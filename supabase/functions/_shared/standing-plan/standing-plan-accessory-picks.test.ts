@@ -615,12 +615,22 @@ Deno.test('an absent block is absent, not an empty one', () => {
   assertEquals(normalizeViadaPrefs(null, EQUIPMENT), null);
   assertEquals(normalizeViadaPrefs(undefined, EQUIPMENT), null);
   assertEquals(normalizeViadaPrefs('picks', EQUIPMENT), null);
-  // ⚠️ AN EMPTY OBJECT IS A REAL BLOCK — an athlete who opened the screen and touched nothing. It
-  // comes back fully pre-filled, which is what makes a zero-touch Continue build a whole week.
+  // ⚠️ AN EMPTY OBJECT IS A REAL BLOCK — an athlete who opened the screen and touched nothing. Every
+  // pick that answers a FRAME SLOT comes back pre-filled, which is what makes a zero-touch Continue
+  // build a whole week.
   const empty = normalizeViadaPrefs({}, EQUIPMENT);
   assert(empty);
   assertEquals(Object.keys(empty!.picks).length, VIADA_PICK_KEYS.length);
-  for (const key of VIADA_PICK_KEYS) assert(empty!.picks[key].length > 0, `${key} came back empty`);
+  for (const key of VIADA_PICK_KEYS) {
+    // ⛔ EXCEPT THE OPT-IN ROW (Michael, 2026-08-29: *"don't default to a core exercise, it's 'add
+    // core'"*). `strength_5k` names no core slot in either column, so nothing is waiting to be
+    // filled there — the athlete is ADDING work, and an untouched screen adds none.
+    if (VIADA_PICKS[key].optIn === true) {
+      assertEquals(empty!.picks[key], '', `${key} is opt-in and came back pre-filled`);
+      continue;
+    }
+    assert(empty!.picks[key].length > 0, `${key} came back empty`);
+  }
 });
 
 Deno.test('the flat pipe carries every named movement exactly once', () => {
@@ -711,10 +721,17 @@ Deno.test('a home athlete never composes leg extension, and the single-leg pick 
 });
 
 Deno.test('the lower-isolation default sits on each side of the machine gate', () => {
-  // Home gym: leg extension is gated out, calf raise leads (the cell's first performable member).
+  /**
+   * ⛔ UPDATED 2026-08-29 — the default moved from `calf raise` to `seated calf raise`, and that is a
+   * fix landing rather than a regression. His p223 focused-quad list names *"seated calf raises"* with
+   * no equipment qualifier — while p220's SECONDARY entry is explicitly *"freestanding BARBELL calf
+   * raises"* — so gating the seated one to a station was ours and too strict. A dumbbell across the
+   * knee on a bench is a seated calf raise, and a home athlete now opens on his movement.
+   * ⚠️ THE ASSERTION THAT MATTERS IS UNCHANGED: a home athlete opens on something they can perform.
+   */
   const home = defaultViadaPicks(EQUIPMENT, []);
-  assertEquals(canonicalize(String(home.quad_iso)), canonicalize('calf raise'),
-    'a home athlete\'s lower-isolation default is not performable-first');
+  assertEquals(canonicalize(String(home.quad_iso)), canonicalize('seated calf raise'),
+    'a home athlete\'s leg-isolation default is not performable-first');
   // Commercial gym: the machine exists, leg extension still leads.
   const gym = defaultViadaPicks(['Commercial gym'], []);
   assertEquals(canonicalize(String(gym.quad_iso)), canonicalize('leg extension'),
@@ -750,19 +767,19 @@ Deno.test('⛔⛔ EVERY LABEL IS HIS PRINTED HEADING — no invented tier names'
    * or reverse lunge — a bilateral squat and a calf raise sit in it.
    */
   for (const key of ['single_leg_a', 'single_leg_b'] as const) {
-    assertEquals(VIADA_PICKS[key].label, 'Secondary press lower');
+    assertEquals(VIADA_PICKS[key].label, 'Leg variation');
     assert(!/single.?leg/i.test(VIADA_PICKS[key].label), `${key} still says single-leg`);
     assert(!/accessory/i.test(VIADA_PICKS[key].label), `${key} still calls a compound an accessory`);
   }
   // ⛔ EVERY LABEL NAMES ITS OWN SLOT. A label that drifts from the category beneath it is the whole
   // defect this test now guards — the screen said "Dumbbell press" over a cell that is the entire
   // secondary push upper category, which is why single-joint work read as belonging there.
-  assertEquals(VIADA_PICKS.quad_iso.label, 'Focused push lower/quads');
-  assertEquals(VIADA_PICKS.db_press.label, 'Secondary push upper');
-  assertEquals(VIADA_PICKS.iso_push.label, 'Focused push/arms');
-  assertEquals(VIADA_PICKS.iso_pull_a.label, 'Focused pull/arms');
-  assertEquals(VIADA_PICKS.iso_pull_b.label, 'Focused pull/arms');
-  assertEquals(VIADA_PICKS.core.label, 'Core exercises');
+  assertEquals(VIADA_PICKS.quad_iso.label, 'Leg isolation');
+  assertEquals(VIADA_PICKS.db_press.label, 'Press variation');
+  assertEquals(VIADA_PICKS.iso_push.label, 'Push isolation');
+  assertEquals(VIADA_PICKS.iso_pull_a.label, 'Pull isolation');
+  assertEquals(VIADA_PICKS.iso_pull_b.label, 'Pull isolation');
+  assertEquals(VIADA_PICKS.core.label, 'Core');
   // ⛔ THE LABEL WAS THE ONLY CHANGE. The 2026-08-25 day split and both lead heads still stand.
   assertEquals(VIADA_PICKS.single_leg_a.slot?.frameDay, 2);
   assertEquals(VIADA_PICKS.single_leg_b.slot?.frameDay, 5);

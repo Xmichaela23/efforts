@@ -52,13 +52,16 @@ Deno.test('⛔⛔ THE HEAVY SET NEVER OPENS AT THE TOP OF THE BAND — the phant
   const bench = benchOf(composeWeek({ ...BASE, week: 4, column: 'standard' } as never));
   assert(bench, 'the fixture stopped producing a bench ME row');
   assertEquals(bench.reps, `${ME_BAND.lo}-${ME_BAND.hi}`, 'the row stopped printing the band');
-  for (const p of bench.set_plan ?? []) {
+  // ⚠️ WORK SETS ONLY. The ramp (pp.139-140) sits in front of them and its rungs carry their
+  // own rep counts — a warm-up at 5 reps is not the heavy set opening at the top of the band.
+  for (const p of (bench.set_plan ?? []).filter((x: any) => x?.warmup !== true)) {
     assert(p.reps == null || p.reps < ME_BAND.hi,
       `the heavy set still opens at ${p.reps} — the top of his band, which nobody has to earn`);
   }
   // ⛔ AND WITH NO HISTORY IT OPENS BLANK, NOT AT THE FLOOR. Michael's ruling, 2026-08-25: prefilling
   // the band floor "read as do 1 rep". The row's own 1-5 carries the target instead.
-  assertEquals((bench.set_plan ?? []).every((p: any) => p.reps == null), true);
+  // ⚠️ WORK SETS ONLY — the ramp (pp.139-140) sits in front and is not a prescription set.
+  assertEquals((bench.set_plan ?? []).filter((p: any) => p?.warmup !== true).every((p: any) => p.reps == null), true);
   // ⚠️ AND THE WEIGHT IS STILL THERE. Only the rep count opens blank — item 5 prefills the weight.
   assert(Number(bench.weight) > 0, 'the heavy set lost its prescribed weight');
 });
@@ -69,7 +72,7 @@ Deno.test('⛔ THE OTHER THREE INTENTS KEEP THEIR SET PLAN — this is an ME rul
     .filter((e: any) => e.slot_intent && e.slot_intent !== 'ME' && Array.isArray(e.set_plan));
   assert(priced.length > 0, 'no non-ME row with a set plan — the assertion below is vacuous');
   for (const e of priced) {
-    for (const p of e.set_plan) {
+    for (const p of e.set_plan.filter((x: any) => x?.warmup !== true)) {
       assert(Number.isFinite(Number(p.reps)) && Number(p.reps) > 0,
         `${e.name} (${e.slot_intent}) lost its per-set rep count`);
     }
@@ -83,7 +86,7 @@ Deno.test('⛔ WITH A LAST TIME, THE SET OPENS ON WHAT THEY GOT — never higher
   const bench = benchOf(wk);
   // ⚠️ THE MOST RECENT, not the best. A window of 5-4-3 is a lift heading down, and opening on the 5
   // would hand the athlete back a number they have not made in two sessions.
-  for (const p of bench.set_plan ?? []) assertEquals(p.reps, 3);
+  for (const p of (bench.set_plan ?? []).filter((x: any) => x?.warmup !== true)) assertEquals(p.reps, 3);
 });
 
 // ── ITEM 6 — THE FROZEN BLOCK ───────────────────────────────────────────────────────────────────
@@ -147,7 +150,8 @@ Deno.test('⛔⛔ THE RESULT REACHES A ROW WHOSE WEIGHT DID NOT MOVE — the thi
   assert(row, 'no bench row was rewritten — the result never reached the calendar');
   const bench = row!.strength_exercises.find((e: any) => e.name === 'Bench Press') as any;
   assertEquals(bench.last_reps, [3]);
-  assertEquals((bench.set_plan ?? [])[0]?.reps, 3, 'the logger prefill did not travel with it');
+  // ⚠️ THE FIRST WORK SET, not the first row in the plan — the ramp (pp.139-140) is in front of it.
+  assertEquals((bench.set_plan ?? []).filter((x: any) => x?.warmup !== true)[0]?.reps, 3, 'the logger prefill did not travel with it');
 
   /**
    * ⛔ AND IT IS NOT A `changes` ENTRY. That list is the PRESCRIPTION diff the athlete is asked to
@@ -201,5 +205,5 @@ Deno.test('⛔ THE READER HANDS THE COMPOSER THE NUMBER IT NEEDS', () => {
     ...BASE, week: 6, column: 'standard', meLastRepsByPattern: reading.lastReps,
   } as never));
   assertEquals(bench.last_reps, [3]);
-  assertEquals((bench.set_plan ?? [])[0]?.reps, 3);
+  assertEquals((bench.set_plan ?? []).filter((x: any) => x?.warmup !== true)[0]?.reps, 3);
 });

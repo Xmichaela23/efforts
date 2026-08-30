@@ -87,7 +87,7 @@ Deno.test('⛔⛔ NO ROW ANYWHERE CARRIES reps.hi AT pct.hi — every slot, ever
         const pct = ex.percent_1rm;
         const band = BY_RANGE.get(String(ex.reps));
         if (pct == null || !band) continue;
-        const plan = Array.isArray(ex.set_plan) ? ex.set_plan : [];
+        const plan = (Array.isArray(ex.set_plan) ? ex.set_plan : []).filter((x: any) => x?.warmup !== true);
         const topReps = Math.max(0, ...plan.map((x) => Number(x.reps) || 0));
         checked += 1;
         assert(!(pct >= band.pct.hi && topReps >= band.reps.hi),
@@ -221,7 +221,8 @@ Deno.test('⛔ THE EARNED COUNT REACHES THE PRESCRIBED ROW', () => {
   const bench = wk.sessions.find((s) => s.name === 'ME: Upper')!.strength_exercises!
     .find((e) => e.name === 'Bench Press')!;
   assertEquals(bench.sets, 2);
-  assertEquals(bench.set_plan!.length, 2);
+// ⚠️ WORK SETS ONLY — the ramp (pp.139-140) sits in front and is not a prescription set.
+  assertEquals(bench.set_plan!.filter((x: any) => x?.warmup !== true).length, 2);
   // ⚠️ AND ONLY THAT PATTERN. A count on the bench must not add a set to the squat.
   const squat = composeWeek({ ...BASE, week: 4, column: 'standard', meSetsByPattern: { push_upper: 2 } } as never)
     .sessions.find((s) => s.name === 'ME: Lower')!.strength_exercises!

@@ -449,7 +449,42 @@ const ALSO_OFFERED_IN: { match: RegExp; categories: ViadaCategory[] }[] = [
   // the complication the ruling refuses — both cells offer all of them and the EQUIPMENT GATE
   // decides what an athlete actually sees: the barbell one needs a barbell, the seated one a station.
   { match: /\bcalf\b|\bsoleus\b/i, categories: ['secondary', 'focused'] },
+  /**
+   * ⚠️ THE RAISE CROSSOVER WAS BUILT AND BACKED OUT, 2026-08-29 — recorded so the next attempt starts
+   * from the finding rather than from the idea.
+   *
+   * ⛔ MICHAEL ASKED FOR IT and the page supports it: p223 prints **hanging leg raises** under CORE
+   * and **weighted knee raises (hip flexors)** under FOCUSED PUSH LOWER/QUADS — the same family,
+   * filed twice on one page. `{ match: /(leg|knee)\s+raise/i, categories: ['core', 'focused'] }`.
+   *
+   * ⛔⛔ WHAT STOPPED IT: a weighted knee raise's PRIME MOVER is `core`. Offering it in the leg cell
+   * makes it the default there for a home athlete, which satisfies the week's core floor — and the
+   * floor is how an explicitly chosen core movement reaches the week, so the athlete's own pick is
+   * then silently dropped. **Two of his own filings collide through the muscle map, not through the
+   * category map.**
+   *
+   * ⛔ SO IT IS THE SAME PIECE OF WORK AS THE OPT-IN CORE ROW: an added row must not depend on the
+   * floor being hungry. Fix that first and this crossover lands with it.
+   */
 ];
+
+/**
+ * ⚠️ CUTTING THE CORE CELL TO HIS FIVE WAS BUILT AND BACKED OUT, 2026-08-29 — recorded so the next
+ * attempt starts from the finding.
+ *
+ * ⛔ THE CASE FOR IT IS REAL: the cell offers 43 movements where p223 names five, and four of the 43
+ * are not movements at all (`core work`, `core circuit`, and `core work (5 min - your choice)` twice
+ * with different punctuation). A picker was offering "core work 5 min your choice" as an exercise.
+ *
+ * ⛔⛔ WHAT STOPPED IT: `fillMuscleFloor` reaches core THROUGH THIS CELL. Closing it to five
+ * movements left the floor unable to find a core movement a given athlete could perform, and a week
+ * came out with no core work at all.
+ *
+ * ⛔ AND RULE 4 (p142) SAYS THE LIST IS NOT CLOSED ANYWAY: *"Note that this doesn't necessarily mean
+ * crunches. It could be referring to dynamic throws, rotational work with med balls or the landmine,
+ * and more."* So p223 is examples. **The defensible cut is the four placeholder non-movements, not a
+ * cut to five.**
+ */
 
 /** Movements in one cell of the grid. Unfiltered by equipment — that is the grid's job. */
 export function movementsIn(category: ViadaCategory, pattern: ViadaPattern | null): GridMovement[] {

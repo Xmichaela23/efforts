@@ -128,6 +128,13 @@ export type ViadaPickSpec = {
    */
   slot: { category: ViadaCategory; pattern: ViadaPattern | null; frameDay?: number } | null;
   /**
+   * ⛔ OPT-IN: the row opens EMPTY and the athlete adds it, rather than opening on a pre-filled
+   * choice (Michael, 2026-08-29: *"don't default to a core exercise, it's 'add core'"*).
+   * ⚠️ Only `core` carries this. Every other pick is a slot the FRAME named, so it must open on
+   * something — a zero-touch Continue has to build a complete week.
+   */
+  optIn?: boolean;
+  /**
    * ⛔ HIS OWN LIST FOR THIS CELL, IN HIS ORDER, AS AN ORDERING HINT — never a filter.
    *
    * The grid ranks by equipment fit, which is right and is blind to what the slot is FOR: a
@@ -230,7 +237,7 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
    */
   db_press: {
     key: 'db_press',
-    label: 'Secondary push upper',
+    label: 'Press variation',
     slot: { category: 'secondary', pattern: 'push_upper' },
     // ⛔ HIS SIX, IN HIS PRINTED ORDER (p220). The head was four movements of which one — incline
     // bench press — was his; the rest named the cell by its implement. Naming a whole category after
@@ -241,7 +248,7 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
   },
   iso_push: {
     key: 'iso_push',
-    label: 'Focused push/arms',
+    label: 'Push isolation',
     slot: { category: 'focused', pattern: 'push_upper' },
     // ⛔ HIS SIX, IN HIS PRINTED ORDER (p222). `chest fly` and `tricep extensions` were our words for
     // two of his — pec deck and behind-the-neck DB triceps extensions — and skull crushers and the
@@ -261,7 +268,7 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
   // curls on both days and hand the balance problem straight back through the dial.
   iso_pull_a: {
     key: 'iso_pull_a',
-    label: 'Focused pull/arms',
+    label: 'Pull isolation',
     slot: { category: 'focused', pattern: 'pull_upper', frameDay: 1 },
     // ⛔ HIS ONE REAR-DELT MOVEMENT FIRST (p222 — "rear delt machine"), then the catalogue's
     // equipment-reachable versions of the same thing. ⚠️ Face pulls and band pull-aparts are NOT his
@@ -272,7 +279,7 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
   },
   iso_pull_b: {
     key: 'iso_pull_b',
-    label: 'Focused pull/arms',
+    label: 'Pull isolation',
     slot: { category: 'focused', pattern: 'pull_upper', frameDay: 4 },
     // ⛔ HIS ARM WORK, IN HIS PRINTED ORDER (p222): preacher curls, spider curls, drag curls,
     // pullover machine. ⚠️ `barbell curl` LED THIS CELL AND IS NOT IN HIS KEY AT ALL — it is what the
@@ -318,7 +325,7 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
   // the two-picks-one-per-day ruling of 2026-08-25 all stand exactly as they were.
   single_leg_a: {
     key: 'single_leg_a',
-    label: 'Secondary press lower',
+    label: 'Leg variation',
     slot: { category: 'secondary', pattern: 'press_lower', frameDay: 2 },
     // ⛔ HIS FOUR FIRST (p220): split squat, Zercher squat, freestanding barbell calf raises,
     // forward or reverse lunge. Step-ups and lateral lunges are not his words; they fit his
@@ -331,7 +338,7 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
   },
   single_leg_b: {
     key: 'single_leg_b',
-    label: 'Secondary press lower',
+    label: 'Leg variation',
     slot: { category: 'secondary', pattern: 'press_lower', frameDay: 5 },
     // ⛔ SAME CELL, DIFFERENT HEAD — the day-5 split of 2026-08-25 stands. His forward/reverse lunge
     // leads here; the walking lunge is the catalogue's name for the forward one.
@@ -349,7 +356,7 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // single-leg pick on a device-verified block. True single-joint quad work does not exist
     // without a machine, and the cell's own p222-223 members include calves — so the label says
     // what the row can honestly offer everyone. Gym athletes still open on leg extension.
-    label: 'Focused push lower/quads',
+    label: 'Leg isolation',
     slot: { category: 'focused', pattern: 'press_lower' },
     /**
      * ⛔⛔ THE CALF VARIANT MATTERS AND IT WAS THE WRONG ONE. p223's focused list names **seated**
@@ -372,7 +379,24 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
   },
   core: {
     key: 'core',
-    label: 'Core exercises',
+    /**
+     * ⚠️ "Add core" AND `optIn` WERE BUILT AND BACKED OUT, 2026-08-29 — recorded so the next attempt
+     * starts from the finding rather than from the idea.
+     *
+     * ⛔ MICHAEL ASKED FOR IT and the reasoning holds: `strength_5k` names no core slot in either
+     * column (p246), so nothing in the frame is waiting to be filled and the athlete is ADDING work.
+     *
+     * ⛔⛔ WHAT STOPPED IT: the core pick reaches the week through `fillMuscleFloor`, which fills a
+     * muscle only when it is BELOW its floor. `weighted knee raises` are p223's focused-quad movement
+     * and their prime mover is `core`, so a week carrying them already satisfies core — the floor
+     * stays quiet and an explicitly chosen V-up is silently dropped. The default was hiding it.
+     * ⚠️ Raising the core `target` to force the placement was tried and DOUBLE-PLACED the row.
+     *
+     * ⛔ THE REAL FIX IS THAT AN ADDED ROW SHOULD NOT GO THROUGH THE FLOOR AT ALL — the floor is a
+     * backstop for a week that is missing something, and a row the athlete asked for is not that.
+     * That is a change to how the pick reaches the week, not a flag on this spec.
+     */
+    label: 'Core',
     slot: null,
     // ⛔ HIS OWN CORE LIST, p223, IN HIS ORDER: hanging leg raises, crunches, V-ups, dynamic plank
     // variants, ab wheel rollouts. The catalogue's spellings for each.
@@ -650,6 +674,9 @@ export function defaultPickFor(
   equipment: string[] | null | undefined,
   dial: DialChip[] = [],
 ): string {
+  // ⛔ AN OPT-IN ROW HAS NO DEFAULT. Empty is the answer, and a caller must treat it as "nothing
+  // added" rather than as a missing value to fill in.
+  if (VIADA_PICKS[key].optIn === true) return '';
   const opts = pickOptions(key, equipment);
   if (opts.length === 0) return '';
   const wanted = musclesForChips(dial.filter((c) => VIADA_PICKS[key].servesChips.includes(c)));

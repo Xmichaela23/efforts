@@ -126,6 +126,7 @@ import {
   type TestedLift,
   type WorkingNumber,
 } from './working-number.ts';
+import { rampFor, RAMP_NOTE, slotTakesRamp } from './warmup.ts';
 
 // ── the app's existing plan-row shape. Nothing new. ─────────────────────────────────────────────
 
@@ -1364,13 +1365,30 @@ function exerciseForSlot(
       // reader that parses it (`isRepBandRow`, `hasRepTotal`, the leading-digit prefill) is anchored
       // on that shape, so the result travels as its own field rather than inside the string.
       ...(lastReps.length > 0 ? { last_reps: lastReps } : {}),
-      set_plan: Array.from({ length: sets }, () => ({
-        weight,
-        // ⚠️ THE KEY IS OMITTED, NOT ZEROED. `plannedSetsFor` reads a non-positive rep count as
-        // absent already, but a stored 0 would render as a logged zero — which is now the FAILED
-        // ATTEMPT signal, and inventing one on an unlogged set would undo a jump the athlete earned.
-        ...(openAt != null ? { reps: openAt } : {}),
-      })),
+      /**
+       * ⛔⛔ THE RAMP GOES IN FRONT OF THE WORK SETS — his Rule 2a, p140: *"your warm-up should begin
+       * with unloaded, rapid concentric back squats, working up in weight"*, and *"the first set of
+       * your skill work should also be the last set of your warm-up."*
+       *
+       * ⚠️ IT IS PREPENDED TO `set_plan`, TAGGED `warmup`, AND COUNTS AS NOTHING. `sets` above is
+       * unchanged and still reports the WORK sets only — every reader that counts (the earned-set
+       * ladder, the rep-band readers, the load ledger, p086's session ceiling) is anchored on that
+       * number and on the tag, so a ramp that inflated either would feed the progression evidence it
+       * is not.
+       *
+       * ⚠️ ONLY WHERE A WEIGHT IS PRESCRIBED AND THE SLOT EARNS ONE. A by-feel row has nothing to
+       * converge on, and `slotTakesRamp` keeps it off the HYP rows — a twelve-rep set is its own ramp.
+       */
+      set_plan: [
+        ...(slotTakesRamp(slot.intent) ? rampFor(weight, args.roundTo ?? 5) : []),
+        ...Array.from({ length: sets }, () => ({
+          weight,
+          // ⚠️ THE KEY IS OMITTED, NOT ZEROED. `plannedSetsFor` reads a non-positive rep count as
+          // absent already, but a stored 0 would render as a logged zero — which is now the FAILED
+          // ATTEMPT signal, and inventing one on an unlogged set would undo a jump the athlete earned.
+          ...(openAt != null ? { reps: openAt } : {}),
+        })),
+      ],
       slot_intent: slot.intent,
       source_row: noteForWeek(slot, args.week),
     },

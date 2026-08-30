@@ -671,7 +671,12 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // collapse two categories into one.
   'split squat': [['dumbbells'], ['barbell']],
   'freestanding barbell calf raise': [['barbell']],
-  'seated calf raise': [['machine']],
+  // ⛔ NOT MACHINE-ONLY (corrected 2026-08-29, Michael: *"seated calf raises is a machine?"*). A
+  // dumbbell across the knee on a bench IS a seated calf raise, and p223 prints it with NO equipment
+  // qualifier — while p220's secondary entry is explicitly *"freestanding BARBELL calf raises"*. He
+  // qualifies the one he means to qualify. Gating this to the station cost a home athlete his only
+  // reachable focused-quad movement and handed the leg slot to knee raises, which train core.
+  'seated calf raise': [['machine'], ['dumbbells', 'bench'], ['barbell', 'bench']],
   'ghd back extension': [['machine']],
   'machine back extension': [['machine']],
   'behind the neck db triceps extension': [['dumbbells']],
