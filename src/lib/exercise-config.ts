@@ -3178,6 +3178,28 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   'drag curl':        { pattern: 'horizontal_pull', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
   'pullover machine': { pattern: 'vertical_pull',   primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
 
+  // ── ⛔ THE NINE THAT A LOOSE COVERAGE CHECK HID (added 2026-08-29, second pass) ─────────────────
+  //
+  // ⚠️ THE FIRST SWEEP REPORTED 69/69 AND WAS WRONG. Its matcher fell back to the last two words of a
+  // name, so "seated calf raise" scored a hit off the plain `calf raise` already here, and
+  // "machine hip thrust" off `hip thrust`. Nine of his movements had no entry of their own and were
+  // passing on a substring.
+  //
+  // ⛔ IT WAS NOT COSMETIC: leading the focused-quad cell with `seated calf raise` — a movement that
+  // did not exist — left a home athlete with no performable default, and the picker test caught it.
+  // ⚠️ THE VARIANT IS THE CATEGORY HERE. p220 files FREESTANDING BARBELL calf raises under secondary
+  // press lower; p223 files SEATED calf raises under focused quads. Same muscle, two tiers, two
+  // pages — so they must be two entries or one of the two pages is contradicted.
+  'split squat':                          { pattern: 'knee_dominant',  primaryRef: 'squat',    ratio: 0.45, displayFormat: 'total', isUnilateral: true },
+  'freestanding barbell calf raise':      { pattern: 'calf',           primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'seated calf raise':                    { pattern: 'calf',           primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'ghd back extension':                   { pattern: 'hip_dominant',   primaryRef: null, ratio: 0.0, displayFormat: 'bodyweight', isUnilateral: false },
+  'machine back extension':               { pattern: 'hip_dominant',   primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'behind the neck db triceps extension': { pattern: 'horizontal_push', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'rear delt machine':                    { pattern: 'horizontal_pull', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'weighted knee raise':                  { pattern: 'core',           primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'machine hip thrust':                   { pattern: 'hip_dominant',   primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+
   // ── FOCUSED LOWER (p223) ────────────────────────────────────────────────────────────────────────
   'hip adduction machine': { pattern: 'knee_dominant', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
   'cable kickback':        { pattern: 'hip_dominant',  primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },

@@ -729,23 +729,40 @@ const GYM = ['Full commercial gym access'];
 const HOME_BARBELL = ['Full barbell + plates', 'Bench (flat/adjustable)'];
 const NOTHING = ['Bodyweight only'];
 
-Deno.test('⛔⛔ THE LABEL IS "LEG ACCESSORY" — the Wendler wording is gone', () => {
+Deno.test('⛔⛔ EVERY LABEL IS HIS PRINTED HEADING — no invented tier names', () => {
   /**
-   * ⛔ MICHAEL, 2026-08-26, off the dropdown's screenshot: *"might be wendler legacy make it right."*
-   * It was, and it was the WORDING rather than the code: `assistance-catalog.ts` carries
-   * `single_leg_core` — one of WENDLER'S three assistance categories — with the display name
-   * "Single-leg / core". This file never imported it; the phrase walked across on its own.
+   * ⛔⛔ MICHAEL, 2026-08-29: *"it should be viada verbatim and the proper exercises in there."*
+   * The labels are now his own printed category headings from pp.218-223, so the word on the screen,
+   * the `slot.category` under it and the page it cites are the same word.
    *
-   * ⛔ AND IT MISDESCRIBED THE CELL. p220's list for `secondary press_lower` is split squat, Zercher
-   * squat, freestanding barbell calf raises, forward or reverse lunge — a bilateral squat and a calf
-   * raise sit in it. "Single-leg" named a subset of HIS OWN LIST.
+   * ⚠️ THIS SUPERSEDES TWO OF HIS OWN EARLIER WORDING RULINGS, and neither was wrong when it was
+   * made — both were the best plain-English name available before the labels were tied to his key:
+   *   · 2026-08-26 "single-leg" → "Leg accessory" (off a screenshot: *"might be wendler legacy make
+   *     it right"*). It WAS Wendler legacy — `assistance-catalog.ts` carries `single_leg_core`, one
+   *     of Wendler's three assistance categories, and the phrase walked across without the wiring.
+   *     ⛔ But "Leg accessory" had its own defect: the cell holds split squats and lunges, which are
+   *     COMPOUNDS. Calling a compound an accessory is backwards, and it is what this fixes.
+   *   · 2026-08-25 "quad isolation" → "Lower isolation", because the cell's p223 members include
+   *     calves and true single-joint quad work needs a machine.
+   *
+   * ⛔ THE p220 POINT THAT KILLED "SINGLE-LEG" STILL STANDS and is why the heading is right: his
+   * `secondary press lower` is split squat, Zercher squat, freestanding barbell calf raises, forward
+   * or reverse lunge — a bilateral squat and a calf raise sit in it.
    */
   for (const key of ['single_leg_a', 'single_leg_b'] as const) {
-    assertEquals(VIADA_PICKS[key].label, 'Leg accessory');
+    assertEquals(VIADA_PICKS[key].label, 'Secondary press lower');
     assert(!/single.?leg/i.test(VIADA_PICKS[key].label), `${key} still says single-leg`);
+    assert(!/accessory/i.test(VIADA_PICKS[key].label), `${key} still calls a compound an accessory`);
   }
-  // ⚠️ AND IT DOES NOT COLLIDE WITH THE SINGLE-JOINT CELL NEXT TO IT.
-  assertEquals(VIADA_PICKS.quad_iso.label, 'Lower isolation');
+  // ⛔ EVERY LABEL NAMES ITS OWN SLOT. A label that drifts from the category beneath it is the whole
+  // defect this test now guards — the screen said "Dumbbell press" over a cell that is the entire
+  // secondary push upper category, which is why single-joint work read as belonging there.
+  assertEquals(VIADA_PICKS.quad_iso.label, 'Focused push lower/quads');
+  assertEquals(VIADA_PICKS.db_press.label, 'Secondary push upper');
+  assertEquals(VIADA_PICKS.iso_push.label, 'Focused push/arms');
+  assertEquals(VIADA_PICKS.iso_pull_a.label, 'Focused pull/arms');
+  assertEquals(VIADA_PICKS.iso_pull_b.label, 'Focused pull/arms');
+  assertEquals(VIADA_PICKS.core.label, 'Core exercises');
   // ⛔ THE LABEL WAS THE ONLY CHANGE. The 2026-08-25 day split and both lead heads still stand.
   assertEquals(VIADA_PICKS.single_leg_a.slot?.frameDay, 2);
   assertEquals(VIADA_PICKS.single_leg_b.slot?.frameDay, 5);

@@ -230,17 +230,23 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
    */
   db_press: {
     key: 'db_press',
-    label: 'Dumbbell press',
+    label: 'Secondary push upper',
     slot: { category: 'secondary', pattern: 'push_upper' },
-    leadWith: ['dumbbell bench press', 'dumbbell incline press', 'incline bench press', 'dumbbell shoulder press'],
+    // ⛔ HIS SIX, IN HIS PRINTED ORDER (p220). The head was four movements of which one — incline
+    // bench press — was his; the rest named the cell by its implement. Naming a whole category after
+    // a dumbbell is why single-joint work read as belonging here.
+    leadWith: ['larsen press', 'incline bench press', 'close grip bench press', 'jm press', 'seated db press', 'arnold press'],
     leadCite: 'Viada p220 — secondary push upper',
     servesChips: ['chest', 'shoulders'],
   },
   iso_push: {
     key: 'iso_push',
-    label: 'Isolation push',
+    label: 'Focused push/arms',
     slot: { category: 'focused', pattern: 'push_upper' },
-    leadWith: ['chest fly', 'lateral raise', 'tricep pushdown', 'tricep extensions'],
+    // ⛔ HIS SIX, IN HIS PRINTED ORDER (p222). `chest fly` and `tricep extensions` were our words for
+    // two of his — pec deck and behind-the-neck DB triceps extensions — and skull crushers and the
+    // Tate press were absent from the head entirely.
+    leadWith: ['triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
     leadCite: 'Viada pp222-223 — focused push / arms',
     servesChips: ['chest', 'shoulders', 'arms'],
   },
@@ -255,17 +261,23 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
   // curls on both days and hand the balance problem straight back through the dial.
   iso_pull_a: {
     key: 'iso_pull_a',
-    label: 'Isolation pull',
+    label: 'Focused pull/arms',
     slot: { category: 'focused', pattern: 'pull_upper', frameDay: 1 },
-    leadWith: ['rear delt fly', 'face pull', 'reverse fly', 'band pull apart'],
+    // ⛔ HIS ONE REAR-DELT MOVEMENT FIRST (p222 — "rear delt machine"), then the catalogue's
+    // equipment-reachable versions of the same thing. ⚠️ Face pulls and band pull-aparts are NOT his
+    // and stay BELOW his own movement rather than above it.
+    leadWith: ['rear delt machine', 'rear delt fly', 'face pull', 'band pull apart'],
     leadCite: 'Viada pp222-223 — focused pull, rear delt / upper back',
     servesChips: ['shoulders'],
   },
   iso_pull_b: {
     key: 'iso_pull_b',
-    label: 'Isolation pull',
+    label: 'Focused pull/arms',
     slot: { category: 'focused', pattern: 'pull_upper', frameDay: 4 },
-    leadWith: ['barbell curl', 'dumbbell curls', 'hammer curls', 'preacher curl'],
+    // ⛔ HIS ARM WORK, IN HIS PRINTED ORDER (p222): preacher curls, spider curls, drag curls,
+    // pullover machine. ⚠️ `barbell curl` LED THIS CELL AND IS NOT IN HIS KEY AT ALL — it is what the
+    // athlete was being offered first on day 4.
+    leadWith: ['preacher curl', 'spider curl', 'drag curl', 'pullover machine', 'dumbbell curls', 'hammer curls'],
     leadCite: 'Viada pp222-223 — focused pull, arms',
     servesChips: ['arms'],
   },
@@ -306,9 +318,12 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
   // the two-picks-one-per-day ruling of 2026-08-25 all stand exactly as they were.
   single_leg_a: {
     key: 'single_leg_a',
-    label: 'Leg accessory',
+    label: 'Secondary press lower',
     slot: { category: 'secondary', pattern: 'press_lower', frameDay: 2 },
-    leadWith: ['bulgarian split squat', 'reverse lunge', 'step up', 'lateral lunge'],
+    // ⛔ HIS FOUR FIRST (p220): split squat, Zercher squat, freestanding barbell calf raises,
+    // forward or reverse lunge. Step-ups and lateral lunges are not his words; they fit his
+    // definition and stay available BELOW his own list.
+    leadWith: ['bulgarian split squat', 'zercher squat', 'reverse lunge', 'step up', 'lateral lunge'],
     leadCite: 'Viada p220 — secondary press lower (ME lower day)',
     servesChips: [],
     requiresLoad: true,
@@ -316,9 +331,11 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
   },
   single_leg_b: {
     key: 'single_leg_b',
-    label: 'Leg accessory',
+    label: 'Secondary press lower',
     slot: { category: 'secondary', pattern: 'press_lower', frameDay: 5 },
-    leadWith: ['walking lunge', 'step up', 'reverse lunge', 'lateral lunge'],
+    // ⛔ SAME CELL, DIFFERENT HEAD — the day-5 split of 2026-08-25 stands. His forward/reverse lunge
+    // leads here; the walking lunge is the catalogue's name for the forward one.
+    leadWith: ['walking lunge', 'reverse lunge', 'zercher squat', 'step up', 'lateral lunge'],
     leadCite: 'Viada p220 — secondary press lower (DE lower day)',
     servesChips: [],
     requiresLoad: true,
@@ -332,15 +349,30 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // single-leg pick on a device-verified block. True single-joint quad work does not exist
     // without a machine, and the cell's own p222-223 members include calves — so the label says
     // what the row can honestly offer everyone. Gym athletes still open on leg extension.
-    label: 'Lower isolation',
+    label: 'Focused push lower/quads',
     slot: { category: 'focused', pattern: 'press_lower' },
-    leadWith: ['leg extension', 'calf raise'],
-    leadCite: 'Viada pp222-223 — focused push lower: quads, calves',
+    /**
+     * ⛔⛔ THE CALF VARIANT MATTERS AND IT WAS THE WRONG ONE. p223's focused list names **seated**
+     * calf raises; p220's SECONDARY press lower names **freestanding barbell** calf raises. Two
+     * variants, two categories, two pages — so a head reading plain `calf raise` put the secondary
+     * movement at the top of the focused cell.
+     * ⚠️ Any rule that files every calf variant in one tier contradicts one of the two pages.
+     */
+    /**
+     * ⛔ HIS FOUR FIRST, THEN THE PERFORMABLE FALLBACK. Every one of his focused-quad movements needs
+     * a station — leg extension, hip adduction, seated calf raise are all `machine`-gated — so a
+     * home athlete's pool contains none of them and the cell would open on whatever the grid happened
+     * to rank first. `calf raise` is kept at the TAIL, not the head: a gym athlete still opens on leg
+     * extension, a home athlete still opens on something they can do. That split is 2026-08-25's
+     * ruling and it survives his ordering.
+     */
+    leadWith: ['leg extension', 'hip adduction machine', 'weighted knee raise', 'seated calf raise', 'calf raise'],
+    leadCite: 'Viada p223 — focused push lower / quads',
     servesChips: [],
   },
   core: {
     key: 'core',
-    label: 'Core movement',
+    label: 'Core exercises',
     slot: null,
     // ⛔ HIS OWN CORE LIST, p223, IN HIS ORDER: hanging leg raises, crunches, V-ups, dynamic plank
     // variants, ab wheel rollouts. The catalogue's spellings for each.

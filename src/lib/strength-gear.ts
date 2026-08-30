@@ -665,6 +665,20 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   'pullover machine': [['machine']],
   'hip adduction machine': [['machine']],
 
+  // ── the nine added on the second pass (2026-08-29) ─────────────────────────────────────────────
+  // ⚠️ THE CALF PAIR IS THE POINT: his FREESTANDING BARBELL calf raise (p220, secondary) needs a
+  // barbell; his SEATED calf raise (p223, focused) needs the station. Gating them the same way would
+  // collapse two categories into one.
+  'split squat': [['dumbbells'], ['barbell']],
+  'freestanding barbell calf raise': [['barbell']],
+  'seated calf raise': [['machine']],
+  'ghd back extension': [['machine']],
+  'machine back extension': [['machine']],
+  'behind the neck db triceps extension': [['dumbbells']],
+  'rear delt machine': [['machine']],
+  'weighted knee raise': [['pull_up_bar'], ['dumbbells']],
+  'machine hip thrust': [['machine']],
+
   // ── cable work ─────────────────────────────────────────────────────────────────────────────────
   'cable upright row': [['cable']],
   'cable kickback': [['cable'], ['machine']],
