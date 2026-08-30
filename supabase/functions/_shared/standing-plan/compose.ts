@@ -115,7 +115,7 @@ import type { EnduranceSession } from '../endurance-library/index.ts';
 import { weekConflicts, type WeekConflict } from './week-conflicts.ts';
 import {
   DEFAULT_SIZE, easyFillHours, EASY_FILL_SPEC, FREE_ENDURANCE_DAYS, ladderOf,
-  REST_DAY_RUNG, rungAt, sizeFor, slotSpans, weekVolumeBounds,
+  REST_DAY_RUNG, rungAt, sayHours, sizeFor, slotSpans, weekVolumeBounds,
   type SizeSolve, type SlotSpec, type WeekVolumeBounds,
 } from './volume-bounds.ts';
 import {
@@ -1785,6 +1785,55 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   }
 
   const sportAssignment = assignSports(days, args.sportMix ?? {});
+
+  /**
+   * ⛔⛔ A STATED DAY COUNT SHRINKS THE WEEK AS WELL AS GROWING IT (2026-08-30, Michael: *"user says
+   * hours and days and we make it work"*).
+   *
+   * `dayShortfall` already grew the week to a stated count — three runs against two run slots buys a
+   * third. The other direction was never built: **two runs against four run slots built four**, and
+   * the athlete's exact answer was honoured upward and ignored downward. `easyFillFor`'s own comment
+   * already states the law this implements — *"A STATED DAY COUNT IS EXACT — IT IS A CAP AS WELL AS
+   * A FLOOR"* — so this is the missing half of a rule the file already declared, not a new one.
+   *
+   * ⛔⛔ ZERO IS AN ANSWER AND ABSENT IS NOT, and they are DIFFERENT STATES — the same distinction
+   * `sport-slots.ts` draws between `'none'` and a missing key, and for the same reason.
+   *   - **absent** — nobody asked. The frame's own sports stand, and the 2026-08-23 default
+   *     ("the program owns the count") is untouched. Every caller predating the day question lands
+   *     here.
+   *   - **`0`** — the athlete said they do not do this sport. Every slot of it goes.
+   * ⚠️ Collapsing the two would make a bike-only athlete's "no running" unsayable, which is exactly
+   * the bug this fixes: `0` was read as "did not answer" and the runs came back.
+   *
+   * ⛔ THE EASIEST GOES FIRST AND THE LONG SESSION GOES LAST. p275's rule for a held sport is that it
+   * keeps its long session and loses its top end; trimming from the bottom is the same ordering read
+   * from the other end. A sport dropped to zero loses all of them, long included.
+   * ⚠️ STANDARD COLUMN ONLY, matching `dayShortfall`. The taper column is a prescription, not an ask.
+   */
+  const droppedSlots: Set<string> = (() => {
+    const drop = new Set<string>();
+    if (args.column !== 'standard') return drop;
+    for (const sport of ['run', 'ride'] as const) {
+      const raw = args.enduranceDaysBySport?.[sport];
+      if (raw == null) continue; // ⛔ ABSENT IS NOT ZERO — see above.
+      const asked = Math.max(0, Math.round(Number(raw) || 0));
+      const mine: { key: string; rank: number }[] = [];
+      for (const dd of days) {
+        dd.endurance.forEach((slot, i) => {
+          const a = assignedSlot(sportAssignment, dd.day, i, slot);
+          if (a.sport !== sport) return;
+          const role = anchorRoleOf(slot.family);
+          mine.push({ key: `${dd.day}:${i}`, rank: role === 'long' ? 2 : role === 'hard' ? 1 : 0 });
+        });
+      }
+      const surplus = mine.length - asked;
+      if (surplus <= 0) continue;
+      // ⚠️ TIES BROKEN BY KEY so the same ask never yields two different weeks.
+      mine.sort((a, b) => a.rank - b.rank || a.key.localeCompare(b.key));
+      for (let i = 0; i < surplus; i++) drop.add(mine[i].key);
+    }
+    return drop;
+  })();
   /**
    * ⛔ ONE RELOCATOR FOR THE WHOLE WEEK — see `enduranceRelocator`. Built here rather than per slot
    * so the sessions it moves can see each other and never stack onto one free day.
@@ -1855,6 +1904,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     const out: SlotSpec[] = [];
     for (const d of days) {
       d.endurance.forEach((slot, i) => {
+        if (droppedSlots.has(`${d.day}:${i}`)) return; // ⛔ the stated day count removed this slot
         const a = assignedSlot(sportAssignment, d.day, i, slot);
         // ⚠️ THE FRAME'S OWN LEVEL, not the dial's answer — `slotSpans` builds the ladder UP from
         // here, so handing it a climbed level would start the ladder half-spent.
@@ -1943,7 +1993,14 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
      * already exists — `sizeFor`'s `over_cap` verdict and `fixedHoursLine` — rather than quietly
      * adding a day. Michael's own framing: they tell us the days, and we chop the hours up.
      */
-    if (Number(args.enduranceDaysBySport?.[sport]) > 0) return byDays;
+    /**
+     * ⛔ A STATED ZERO BUYS NOTHING (2026-08-30). `0` reaching here used to fall past this guard into
+     * the hours branch, which would append easy sessions of a sport the athlete said they do not do.
+     * ⚠️ `!= null` rather than `> 0`, so absent still reaches the hours logic exactly as before.
+     */
+    const stated = args.enduranceDaysBySport?.[sport];
+    if (stated != null && Math.round(Number(stated) || 0) === 0) return 0;
+    if (Number(stated) > 0) return byDays;
     const solve = sport === 'run' ? volume.run : volume.ride;
     const bound = sport === 'run' ? volume.bounds.run : volume.bounds.ride;
     if (solve.verdict !== 'over_cap' || bound.sessions === 0) return byDays;
@@ -2030,6 +2087,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     for (const d of days) {
       d.endurance.forEach((slot, i) => {
         const key = `${d.day}:${i}`;
+        if (droppedSlots.has(key)) return; // ⛔ the stated day count removed this slot
         if (enduranceDays.has(key)) return;
         const hardIndex = hardSlotIndex.get(key) ?? 0;
         // ⛔ THE FRAME'S FAMILY, matching `hardSlotIndex` above — see `anchorRoleOf`.
@@ -2186,6 +2244,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     // slot kept by the running athlete, one easy slot to a kept swim. This loop builds what it was
     // told to and decides nothing.
     day.endurance.forEach((slot, i) => {
+      if (droppedSlots.has(`${day.day}:${i}`)) return; // ⛔ the stated day count removed this slot
       const assigned = assignedSlot(sportAssignment, day.day, i, slot);
       // ⛔ THE LEVEL IS THE DIAL'S ANSWER FOR A BASE SLOT — see `rungForSlot`. Quality is unmoved.
       const rung = rungForSlot(assigned.family, assigned.level, assigned.archetype, assigned.sport);
@@ -2424,6 +2483,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
             + 'add training days to the week.',
         });
       }
+
       /**
        * ⛔⛔ MICHAEL'S OWN SENTENCE, VERBATIM AND WITHOUT A DAY NAME: *"At this many hours, rest day
        * becomes active recovery."* Mine said the day *"stops being a rest day"* — a loss where his
@@ -2441,6 +2501,50 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           cite: 'Viada p139-145',
         });
       }
+    }
+  }
+
+  /**
+   * ⛔⛔ WHEN THE HOURS DO NOT FIT THE STATED DAYS, THE WEEK SAYS SO (2026-08-30). The last hiding
+   * place of the silent trim: fifteen ride hours across two stated ride days built about six and the
+   * block said nothing about the missing nine.
+   *
+   * ⚠️ THE CHANNEL EXISTED AND WAS NEVER CALLED. `easyFillFor`'s comment promised this would surface
+   * *"through the channel that already exists — `sizeFor`'s `over_cap` verdict and `fixedHoursLine`"*
+   * — and `fixedHoursLine` is exported, tested, and invoked from NOWHERE in this file. A promise in a
+   * comment is not a wire. This reads the verdict that comment named rather than adding a second path.
+   *
+   * ⛔⛔ AND IT SITS OUTSIDE THE FILL LOOP DELIBERATELY. It lived inside it for one draft, below that
+   * loop's own `if (want <= 0) continue` — so it could only fire on a week that had ALREADY placed a
+   * fill, which is exactly the case where the hours are NOT short. It never ran once. Do not move it
+   * back in.
+   *
+   * ⛔ ONLY WHEN THE DAY COUNT IS THE ATHLETE'S OWN. Absent a stated count the hours buy extra easy
+   * days above and there is no conflict — the week grew to meet them. A stated count is a hard cap,
+   * so the hours are what has to give, and that is the fact the athlete is owed.
+   * ⚠️ IT NAMES BOTH NUMBERS. "Some hours did not fit" is the same silence in a politer voice.
+   */
+  if (args.column === 'standard') {
+    for (const sport of ['run', 'ride'] as const) {
+      const statedDays = args.enduranceDaysBySport?.[sport];
+      if (statedDays == null) continue;
+      const statedCount = Math.round(Number(statedDays) || 0);
+      if (statedCount <= 0) continue;
+      const solved = sport === 'run' ? volume.run : volume.ride;
+      const askedHours = Number(
+        sport === 'run' ? args.targetRunHours : (args.targetRideHours ?? args.targetWeeklyRideHours),
+      );
+      if (!Number.isFinite(askedHours) || !Number.isFinite(solved.expected)) continue;
+      if (solved.verdict !== 'over_cap') continue;
+      if (askedHours - solved.expected <= 0.25) continue;
+      const noun = sport === 'run' ? 'run' : 'ride';
+      notes.push({
+        kind: 'warning',
+        text: `You asked for ${sayHours(askedHours)} of ${sport === 'run' ? 'running' : 'riding'} `
+          + `across ${statedCount} ${noun}${statedCount === 1 ? '' : 's'}. That many ${noun}s hold `
+          + `${sayHours(solved.expected)}, so the week builds that. `
+          + `Add a ${noun} day to fit the rest.`,
+      });
     }
   }
 

@@ -59,6 +59,17 @@ directions — see the changelog.
 (the folder jumps `p151.jpg` → `p218.jpg`), and p112 points into them for both the **circle of reps**
 and the **threshold adjustment method**. See **Part I9**.
 
+⚠️ **THE GAP IS A CURATION CHOICE, NOT A LOST SECTION — Michael, 2026-08-30.** He owns the physical
+book; pp.152–217 (and the other skipped pages) were deliberately not photographed because he judged
+them not pertinent. Pages from that range are obtainable on request.
+
+⚠️ **BUT: Michael reports (2026-08-30) that even with the full book in hand, the "circle of reps"
+coverage CANNOT BE FOUND.** So p112's pointer may not land anywhere — the likeliest reading is that
+"circle of reps" (p112, p247) is the same mechanism as the p123 **"circle of maxes"** under a loose
+variant name, and no separate Part 2 section exists. That identification is a hypothesis, not a
+finding, and the call is Michael's — but stop treating pp.152–217 as the place the definition is
+hiding.
+
 ## Cross-refs
 
 - `shared/strength-system/loading/wendler-531.ts` — the Wendler loading module (its own citations)

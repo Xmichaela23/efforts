@@ -695,9 +695,16 @@ Deno.serve(async (req: Request) => {
           enduranceDaysBySport: (() => {
             const raw = (body as Record<string, unknown>).endurance_days;
             if (!raw || typeof raw !== 'object') return undefined;
+            /**
+             * ⛔ ZERO IS AN ANSWER (2026-08-30). This read `n > 0`, so an athlete answering "no
+             * running" had their zero turned into `undefined` — which the composer reads as
+             * "nobody asked" and answers with the frame's own runs. A bike-only athlete could not
+             * say they do not run. ⚠️ `>= 0` keeps every other value identical; only the zero,
+             * which was previously unsayable, changes meaning.
+             */
             const pick = (k: string) => {
               const n = Number((raw as Record<string, unknown>)[k]);
-              return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
+              return Number.isFinite(n) && n >= 0 ? Math.round(n) : undefined;
             };
             const run = pick('run');
             const ride = pick('ride');

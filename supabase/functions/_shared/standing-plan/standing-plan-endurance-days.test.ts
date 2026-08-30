@@ -91,9 +91,35 @@ Deno.test('⛔ NO DAY COUNT LEAVES THE WEEK EXACTLY AS IT WAS', () => {
   assert(rideMin <= 4 * 60 + 30, `an unasked week built ${rideMin} minutes of riding against a 4h ask`);
 });
 
-Deno.test('⛔ FEWER DAYS THAN THE FRAME HAS CANNOT DROP A SLOT', () => {
-  // ⛔ p246 owns the four endurance slots and none can be declined (2026-08-26). Asking for one run
-  // day when two slots are runs does not delete one — the day count is a FLOOR, not a cap.
+Deno.test('⛔ FEWER DAYS THAN THE FRAME HAS DROPS A SLOT — the count is exact in both directions', () => {
+  /**
+   * ⛔⛔ REVERSED 2026-08-30 BY MICHAEL'S RULING: *"user says hours and days and we make it work."*
+   * Everything below the line is history.
+   *
+   * ⚠️ THIS TEST AND `compose.ts` CONTRADICTED EACH OTHER FOR FOUR DAYS. This one (2026-08-26) said
+   * *"the day count is a FLOOR, not a cap"*; `easyFillFor`'s own comment (2026-08-27, one day later)
+   * said *"A STATED DAY COUNT IS EXACT — IT IS A CAP AS WELL AS A FLOOR."* Only the growing half was
+   * ever built, so asking for two runs against four run slots built four and said nothing.
+   *
+   * ⚠️⚠️ AND IT IS A SOURCE CONFLICT, NOT ONLY A PRODUCT ONE — flagged, not hidden. The old rule
+   * cited p246 owning the four endurance slots, *"none can be declined"*. Honouring a smaller day
+   * count declines one. That is Michael's call to make and he has made it; the citation is recorded
+   * here so the next session knows the book was overruled deliberately rather than overlooked.
+   *
+   * ─────────────── history ───────────────
+   * ⛔ p246 owns the four endurance slots and none can be declined (2026-08-26). Asking for one run
+   * day when two slots are runs does not delete one — the day count is a FLOOR, not a cap.
+   */
   const asked = week(HIS, 3, 4, { run: 1, ride: 2 });
-  assertEquals(count(asked, 'run'), 2, 'a frame slot was dropped to honour a smaller day count');
+  assertEquals(count(asked, 'run'), 1, 'the smaller day count was ignored and a frame slot survived');
+  // ⛔ AND THE ONE THAT SURVIVES IS THE HARDEST/LONGEST — the easiest is what gets trimmed.
+  assertEquals(count(asked, 'ride'), 2, 'the ride count moved when only the run ask should have');
+});
+
+Deno.test('⛔ ZERO IS AN ANSWER — a sport declined outright disappears', () => {
+  // ⛔ 0 and absent are DIFFERENT STATES (2026-08-30). Absent leaves the frame's own runs alone;
+  // a stated zero removes every one of them, long session included.
+  const none = week(HIS, 3, 4, { run: 0, ride: 3 });
+  assertEquals(count(none, 'run'), 0, 'a stated zero still built runs — zero read as "did not answer"');
+  assertEquals(count(none, 'ride'), 3, 'the ride ask was not honoured exactly');
 });
