@@ -13,6 +13,8 @@ import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.t
 import { composeWeek } from './compose.ts';
 import { voiceViolation } from '../state-trend/week-accent.ts';
 import { viadaCategoryOf } from '../strength-grid/index.ts';
+import { defaultViadaPicks, pickOptions, VIADA_PICK_KEYS } from './accessory-picks.ts';
+import { resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 import {
   DEFAULT_BAR_LB,
   RAMP_BAR_CUE,
@@ -164,5 +166,57 @@ Deno.test('⛔⛔ RULE 4 — core lands AFTER the main work and BEFORE the isola
     }
     // ⛔ AND NOT FIRST EITHER — "but after the main work".
     assert(core > 0, `core opened the session: ${names.join(' → ')}`);
+  }
+});
+
+Deno.test('⛔⛔ THE DISPLAY NAME NEVER REACHES THE DATA — the split that keeps logged sets matching', () => {
+  /**
+   * ⛔ THE DEFECT (Michael, on the screen, 2026-08-29): "already seeing commercial gym exercises."
+   * His p222 entry is "Rear delt machine" and a home athlete reaches it through the implement swap -
+   * seated, chest-supported, on an incline bench - so the row named a machine to somebody who owns
+   * none.
+   *
+   * ⛔⛔ AND THE REASON THIS TEST IS WORTH MORE THAN THE FIX: the compare table matches a LOGGED set
+   * to its PLANNED row by NAME. If the execution name ever reached the stored value, every set an
+   * athlete logged against that row would stop matching and the session would read as unmatched.
+   * The fix is display-only, and this asserts the split rather than trusting it.
+   */
+  const HOME = ['Full barbell + plates', 'Bench (flat/adjustable)', 'Incline bench', 'Squat rack', 'Dumbbells (adjustable or fixed)'];
+  const GYM = ['Full commercial gym access'];
+
+  const home = pickOptions('iso_pull_a', HOME);
+  const shown = home.find((o) => /chest-supported/i.test(o.display));
+  assert(shown, `the home athlete was not offered the swapped movement: ${home.map((o) => o.display).join(', ')}`);
+
+  // ⛔ THE STORED NAME IS HIS, AND IT IS WHAT THE PICKER WRITES. `NonRaceBuilder` renders
+  // `<option value={o.name}>{o.display}</option>`, so `name` is the value that travels.
+  assertEquals(shown!.name, 'rear delt machine');
+  assert(shown!.display !== shown!.name, 'the display name did not change at all');
+
+  // ⛔ EVERY OPTION, NOT JUST THIS ONE: no display name may ever be stored in place of a real one.
+  for (const eq of [HOME, GYM, null]) {
+    for (const key of VIADA_PICK_KEYS) {
+      for (const o of pickOptions(key, eq)) {
+        assertEquals(
+          resolveExerciseConfig(o.name).via === 'none', false,
+          `${key} offers "${o.name}", which the catalogue cannot resolve — a display name reached the data`,
+        );
+      }
+    }
+  }
+
+  // ⛔ AN ATHLETE WITH THE STATION SEES HIS NAME, because that is what they will walk over to.
+  const gym = pickOptions('iso_pull_a', GYM).find((o) => o.name === 'rear delt machine');
+  assert(gym, 'the gym athlete lost the movement');
+  assertEquals(gym!.display, 'Rear Delt Machine');
+
+  // ⛔ AND THE DEFAULT PICK IS A STORED NAME, never a display one — it is what the block is built from.
+  const def = defaultViadaPicks(HOME, []);
+  for (const [key, name] of Object.entries(def)) {
+    if (name === '') continue;
+    assertEquals(
+      resolveExerciseConfig(name).via === 'none', false,
+      `${key} defaulted to "${name}", which the catalogue cannot resolve`,
+    );
   }
 });

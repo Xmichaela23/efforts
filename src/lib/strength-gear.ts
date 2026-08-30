@@ -684,6 +684,11 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // qualifies the one he means to qualify. Gating this to the station cost a home athlete his only
   // reachable focused-quad movement and handed the leg slot to knee raises, which train core.
   'seated calf raise': [['dumbbells', 'bench'], ['barbell', 'bench'], ['machine']],
+  // HAMSTRING CURLS WERE UNTAGGED, so `gearRoutesFor` returned ALWAYS and warned - offered to
+  // everyone. `leg curl` is deliberately ungated on its own written precedent (the machine is
+  // required and not commonly declarable, and its substitute collides with nothing); this is the
+  // spelling p223 uses and it follows that rule rather than inventing a stricter one.
+  'hamstring curl': ALWAYS,
   'ghd back extension': [['machine']],
   'machine back extension': [['machine']],
   'behind the neck db triceps extension': [['dumbbells']],

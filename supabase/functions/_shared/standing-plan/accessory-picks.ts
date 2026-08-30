@@ -30,6 +30,7 @@ import {
 import {
   isBodyweightLoad,
   resolveSlot,
+  executionName,
   type GridMovement,
   type ViadaCategory,
   type ViadaPattern,
@@ -762,7 +763,15 @@ export function pickOptions(
     .sort((a, b) => (a.r === b.r ? a.i - b.i : a.r - b.r))
     .map(({ m }) => ({
       name: m.name,
-      display: movementLabel(m.name),
+      // THE NAME THEY WILL READ, which is his unless the free-weight route is the one their kit
+      // resolved on. `name` above stays canonical - it is what the picker stores and what every
+      // matcher reads.
+      // The execution name is already written for reading; only the canonical name needs the
+      // title-caser. Passing it through `movementLabel` produced "(dumbbell Across Knees)".
+      display: (() => {
+        const exec = executionName(m.name, equipment);
+        return exec === m.name ? movementLabel(m.name) : exec;
+      })(),
       muscle: musclesWorkedBy(m.name)?.primary ?? null,
       // MARKED AT THE SURFACE, not just in the table. An addition the athlete cannot tell from his
       // own movements is an addition the strict cut did not really make.

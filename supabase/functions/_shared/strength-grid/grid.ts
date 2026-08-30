@@ -35,7 +35,7 @@ import {
   type ViadaPattern,
 } from './taxonomy.ts';
 import { foldExerciseName, resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
-import { LAST_RESORT_RANK_FLOOR, ownsLoadingImplement } from '../../../../src/lib/strength-gear.ts';
+import { LAST_RESORT_RANK_FLOOR, ownsLoadingImplement, athleteEquipmentToKeys, gearRoutesFor } from '../../../../src/lib/strength-gear.ts';
 
 export type SlotNote = {
   kind: 'source' | 'inferred' | 'ours' | 'gap';
@@ -432,6 +432,61 @@ export function resolveSlot(req: SlotRequest): ResolvedSlot {
  * ⚠️ IT RENAMES NOTHING ELSE. Undeclared equipment, a loadable route, or a name that already says
  * band, and the movement comes back untouched.
  */
+/**
+ * WHAT THE ATHLETE WILL ACTUALLY DO, when his name for a movement names equipment they do not have.
+ *
+ * THE DEFECT (Michael, on the screen, 2026-08-29): "already seeing commercial gym exercises." His
+ * p222 entry is "Rear delt machine" and the app offers it to a home athlete via the implement swap -
+ * seated and chest-supported on an incline bench, the same position, only the load source differs.
+ * Correct, and unreadable: the row said MACHINE to somebody who owns none.
+ *
+ * DISPLAY ONLY, AND THAT IS THE WHOLE DESIGN. His name stays canonical everywhere that stores, logs,
+ * matches or cites. `pickOptions` already returns `name` and `display` separately and the picker
+ * writes `value={o.name}` while showing `{o.display}`, so a changed display cannot reach the logger -
+ * and if it ever did, logged sets would stop matching planned ones and the session would read as
+ * unmatched.
+ *
+ * IT ONLY FIRES WHEN THE FREE-WEIGHT ROUTE IS THE ONE THAT RESOLVED. A movement whose only route is
+ * the station is never offered to an athlete without one, so there is no wrong name to show; an
+ * athlete WITH the station sees his name, because that is what they will use.
+ */
+export function executionName(name: string, equipment: string[] | null | undefined): string {
+  const declared = Array.isArray(equipment) && equipment.some((c) => String(c || '').trim());
+  if (!declared) return name;
+  const free = EXECUTION_NAME[foldExerciseName(name)];
+  if (!free) return name;
+  /**
+   * OWNING THE STATION IS THE TEST, not which route matched first. An athlete with both a machine
+   * and dumbbells resolves to whichever route the table lists first, which says nothing about what
+   * they will actually walk over to - and a gym member reading "Chest-Supported Rear Delt Raise" for
+   * a movement they have the machine for is the same defect pointed the other way.
+   */
+  const keys = athleteEquipmentToKeys(equipment as string[]);
+  const hasStation = gearRoutesFor(name).some((r) => r.includes('machine') && r.every((k) => keys.has(k)));
+  return hasStation ? name : free;
+}
+
+/**
+ * The free-weight execution of a movement he names for a machine, and WHICH route index is the
+ * station one. Two entries, and both are movements the swap rule already passed - the position and
+ * the joint action are unchanged, only the load source differs.
+ *
+ * A movement belongs here only when it already has a free-weight route in `ASSISTANCE_GEAR`. This
+ * renames; it never widens what an athlete can reach.
+ */
+const EXECUTION_NAME: Record<string, string> = {
+  // Seated, chest against the pad, arms sweeping back - on an incline bench with dumbbells.
+  'rear delt machine': 'Chest-Supported Rear Delt Raise',
+  /**
+   * ONE ENTRY, AND THE OTHER CANDIDATES WERE CHECKED AND LEFT OUT.
+   * `seated calf raise` names no equipment - a home athlete reads it and does it with a dumbbell
+   * across the knees without being told. `machine hip thrust`, `pec deck`, `leg extension` and
+   * `pullover machine` have only a station route, so an athlete without one is never offered them
+   * and there is no wrong name to show. The defect was specifically a MACHINE in the name of a
+   * movement the athlete would do with free weights.
+   */
+};
+
 export function bandRouteName(name: string, equipment: string[] | null | undefined): string {
   const declared = Array.isArray(equipment) && equipment.some((c) => String(c || '').trim());
   if (!declared) return name;
