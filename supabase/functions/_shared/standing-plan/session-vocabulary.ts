@@ -95,6 +95,81 @@ function addOnSeconds(session: EnduranceSession): number {
  * ⚠️ THE WATCH PUTS A NUMBER ON THE RECOVERY (90 seconds) WHERE THE LIBRARY STATES NONE. A watch
  * step cannot be untimed; the session's own card still says full recovery.
  */
+/**
+ * ⛔⛔ A COMPOUND ROUND, AS A TOKEN (2026-08-30). Several intensities inside ONE round is a shape the
+ * grammar could not hold, so it flattened to N equal reps at one pace and the rest of the round
+ * vanished. p231-232's MLSS surge/float and p237's anaerobic sandwich are both this.
+ *
+ * ⛔ ONLY WHEN THE BLOCK ACTUALLY IS ONE. Two or more steps whose (seconds, intensity) pairs are not
+ * all identical. A block of one repeated step is a plain interval and keeps its existing token —
+ * this must not quietly take over sessions that already round-trip correctly.
+ * ⚠️ THE SEQUENCE IS THE BLOCK'S OWN, in order, including its untargeted steps: they are part of the
+ * round's shape, not gaps between reps.
+ */
+function compoundRoundToken(block: {
+  repeat: number;
+  steps: Array<{ role: string; seconds?: number | null; intensity?: { kind: string; hi?: number } | null }>;
+  restBetween?: { seconds?: number | null } | null;
+}): string | null {
+  const steps = block.steps.filter((st) => st.seconds != null && st.seconds > 0);
+  if (steps.length < 2) return null;
+  const shape = steps.map((st) => {
+    const i = st.intensity;
+    // ⚠️ `hi` is the band's top and is what the session prescribes at; `vt1`/`easy` carry no number.
+    const at = i && i.kind === 'pct_threshold' && typeof i.hi === 'number'
+      ? String(Math.round(i.hi * 100))
+      : (i?.kind === 'race_pace' ? 'racepace' : i?.kind === 'vt1' ? 'vt1' : 'easy');
+    /**
+     * ⛔ THE ROLE TRAVELS, and it is not inferable from the number. p237's one-to-one is *"1 min @
+     * 110% / 1 min @ 50%"* — the 50% half is a RECOVERY the source names, and emitting it as work
+     * because it carries a percentage would put a work step at half of threshold on the row.
+     * ⚠️ A FLOAT IS NOT A RECOVERY. p231's 105% float is prescribed work between surges; only
+     * `role: 'recovery'` takes the marker.
+     */
+    const r = st.role === 'recovery' ? 'r' : '';
+    return `${r}${Math.round(st.seconds as number)}s${at}`;
+  });
+  if (new Set(shape).size < 2) return null; // one repeated step is a plain interval, not a round
+  const rest = block.restBetween?.seconds;
+  return `round_${Math.max(1, block.repeat)}x_${shape.join('-')}`
+    + (rest != null && rest > 0 ? `_R${Math.round(rest)}s` : '');
+}
+
+
+/**
+ * ⛔⛔ AN EMBEDDED BLOCK — a faster block inside an otherwise steady session (2026-08-30).
+ *
+ * ⛔ SOURCED: p235 LSD level 2, *"60 min @ VT1 with a single 5-min @ 95% interval in the middle,
+ * 10-min race-pace finish"*; p239 cycling endurance level 2, *"…2 sets of 4 rounds of (2 min @ 80% /
+ * 3 min @ 70%)…"*. Both are steady work carrying something faster; both arrived as the steady part
+ * alone, because the vocabulary only ever translated the session's FIRST block.
+ *
+ * ⚠️ IT REUSES THE ROUND GRAMMAR rather than adding a fourth shape — a block of one step is
+ * `round_1x_600sracepace`, and a block of several is the round token it already builds. The three
+ * shapes turned out to be one shape asked three ways.
+ * ⚠️ THE STEADY BLOCK IS SKIPPED, always: it is the session's own body and already has its token.
+ */
+function embeddedBlockTokens(session: EnduranceSession, steadyIndex = 0): string[] {
+  const out: string[] = [];
+  session.blocks.forEach((block, i) => {
+    if (i === steadyIndex) return;
+    if (block.addOn) return; // strides carry their own token
+    const compound = compoundRoundToken(block as never);
+    if (compound) { out.push(compound); return; }
+    const steps = block.steps.filter((st) => st.seconds != null && (st.seconds as number) > 0);
+    if (steps.length !== 1) return;
+    const st = steps[0];
+    const i2 = st.intensity as { kind: string; hi?: number } | null | undefined;
+    const at = i2 && i2.kind === 'pct_threshold' && typeof i2.hi === 'number'
+      ? String(Math.round(i2.hi * 100))
+      : (i2?.kind === 'race_pace' ? 'racepace' : i2?.kind === 'vt1' ? 'vt1' : null);
+    // ⚠️ SILENT ON AN INTENSITY THE GRAMMAR CANNOT NAME, rather than emitting a wrong one.
+    if (at == null) return;
+    out.push(`round_${Math.max(1, block.repeat)}x_${Math.round(st.seconds as number)}s${at}`);
+  });
+  return out;
+}
+
 function addOnTokens(session: EnduranceSession): string[] {
   const out: string[] = [];
   for (const block of session.blocks) {
@@ -264,20 +339,15 @@ export function translateEnduranceSession(
        * why `addOnSeconds` never saw it and its minutes were never double-counted either.
        * ⚠️ SILENT WHEN THERE IS NO INSERT BLOCK — the hike and the plain VT1 jog are whole sessions.
        */
-      const insertBlock = session.blocks.find((b) => b.repeat > 1 && b.steps.some((st) => st.role === 'work'));
-      const insertWork = insertBlock?.steps.find((st) => st.role === 'work');
-      const pct = insertWork?.intensity?.kind === 'pct_threshold'
-        ? Math.round(insertWork.intensity.hi * 100)
-        : null;
-      const floatSec = insertBlock?.steps.find((st) => st.role !== 'work')?.seconds
-        ?? insertBlock?.restBetween?.seconds ?? 0;
-      work = [`longrun_${Math.max(1, totalMin - minutes(addOnSeconds(session)))}min_easypace`];
-      if (insertBlock && insertWork?.seconds != null && pct != null) {
-        work.push(
-          `interval_${insertBlock.repeat}x${Math.round(insertWork.seconds)}s_${pct}pct`
-          + (floatSec > 0 ? `_R${Math.round(floatSec)}s` : ''),
-        );
-      }
+      /**
+       * ⛔ EVERY BLOCK AFTER THE STEADY ONE NOW TRAVELS (2026-08-30) — see `embeddedBlockTokens`.
+       * The insert-only path this replaces carried p235's sets and silently dropped the race-pace
+       * finish, which is the same session shape asked a different way.
+       */
+      work = [
+        `longrun_${Math.max(1, totalMin - minutes(addOnSeconds(session)))}min_easypace`,
+        ...embeddedBlockTokens(session),
+      ];
       break;
     }
 
@@ -306,6 +376,22 @@ export function translateEnduranceSession(
        * running library and 1600 m the longest — so nothing here invents a distance the source does
        * not use. **The session's note says the intensity is MLSS, not 5K pace.**
        */
+      /**
+       * ⛔⛔ THE ROUND IS CARRIED VERBATIM NOW, AND THE REASONING ABOVE IS SUPERSEDED (2026-08-30).
+       * Everything above the line was true of a grammar that *"can only say n reps of d metres"*.
+       * It can say a compound round since today — see `compoundRoundToken` — so re-expressing p231's
+       * three intensities as six equal reps at one pace is no longer the honest option, it is just
+       * the old one. Measured on a live row before the change: `interval_6x445m_5kpace_R90s`, six
+       * work steps every one at 8:00/mi, against *"6 rounds of: 15s @ 130% / 45s @ 105% / 1 min @
+       * VT1"*. The runner's hardest session of the week.
+       * ⚠️ THE FALLBACK BELOW STANDS UNCHANGED for a session whose block is NOT compound — a single
+       * repeated step is a plain interval and keeps the token it has always had.
+       */
+      {
+        const roundBlock = session.blocks.find((b) => compoundRoundToken(b as never) != null);
+        const roundTok = roundBlock ? compoundRoundToken(roundBlock as never) : null;
+        if (roundTok) { work = [roundTok]; break; }
+      }
       const { restSeconds } = repShape(session);
       const paceSecPerMi = session.anchor.value ?? null;
       const totalWork = workSeconds(session);
@@ -359,6 +445,16 @@ export function translateEnduranceSession(
      * fixed, not here.
      */
     case 'ride_anaerobic': {
+      /**
+       * ⛔⛔ THE SANDWICH IS A COMPOUND ROUND (2026-08-30). p237: *"5 rounds of: 30s @ 120% / 2:30 @
+       * 90% / 30s @ 120% / 4-min easy spin."* `bike_vo2_Nx{min}min` carries ONE intensity, so the 90%
+       * middle was absent from the row and the work seconds came out at roughly double the source's.
+       * ⚠️ `progressive_repeats` IS NOT COMPOUND — one step per round — so it keeps its existing
+       * token, which is the point of the guard inside `compoundRoundToken`.
+       */
+      const roundBlock = session.blocks.find((b) => compoundRoundToken(b as never) != null);
+      const roundTok = roundBlock ? compoundRoundToken(roundBlock as never) : null;
+      if (roundTok) { work = [roundTok]; break; }
       const { reps, workMin, restMin } = repMinutes(session);
       work = [`bike_vo2_${reps}x${workMin}min_R${restMin}min`];
       break;
@@ -366,7 +462,21 @@ export function translateEnduranceSession(
 
     case 'ride_endurance': {
       // ⛔ CONTINUOUS. `bike_endurance_{n}min` is 65-75% of FTP, which is his "below 75%" (p239).
-      work = [`bike_endurance_${Math.max(1, minutes(workSeconds(session) || session.totals.clockedSeconds))}min`];
+      /**
+       * ⛔ AND THE TEMPO BLOCKS TRAVEL WITH IT (2026-08-30). p239 level 2's second option is
+       * *"…2 sets of 4 rounds of (2 min @ 80% / 3 min @ 70%) with 5-min easy spin between sets…"* —
+       * the `mixed` archetype. Only the steady block was ever translated, so every 80% and 70% block
+       * was absent from the row. `steady` has one block and is unaffected.
+       * ⚠️ THE STEADY MINUTES ARE THE FIRST BLOCK'S, not the whole session's, or the embedded work
+       * would be prescribed twice.
+       */
+      const steadySec = session.blocks[0]?.steps
+        .filter((st) => st.seconds != null)
+        .reduce((t, st) => t + (st.seconds as number), 0) ?? 0;
+      work = [
+        `bike_endurance_${Math.max(1, minutes(steadySec || workSeconds(session) || session.totals.clockedSeconds))}min`,
+        ...embeddedBlockTokens(session),
+      ];
       break;
     }
 
@@ -465,6 +575,9 @@ export const EMITTED_TOKEN_SHAPES: { shape: RegExp; example: string }[] = [
   { shape: /^bike_vo2_\d+x\d+min_R\d+min$/, example: 'bike_vo2_6x1min_R5min' },
   // ⛔ p235's long-run inserts (2026-08-30) — seconds at a percentage of threshold speed.
   { shape: /^interval_\d+x\d+s_\d+pct(?:_R\d+s)?$/, example: 'interval_2x90s_115pct_R30s' },
+  // ⛔ p231's surge/float and p237's sandwich — several intensities inside one round.
+  { shape: /^round_\d+x_(?:r?\d+s(?:\d+|vt1|easy|racepace))(?:-r?\d+s(?:\d+|vt1|easy|racepace))*(?:_R\d+s)?$/,
+    example: 'round_3x_15s130-45s105-60svt1_R120s' },
   { shape: /^bike_endurance_\d+min$/, example: 'bike_endurance_90min' },
   { shape: /^swim_warmup_\d+m$/, example: 'swim_warmup_300m' },
   { shape: /^swim_cooldown_\d+m$/, example: 'swim_cooldown_200m' },
@@ -506,6 +619,8 @@ export const MATERIALIZER_RUN_PATTERNS: RegExp[] = [
   // ⛔ THE TIME-BASED PERCENTAGE FORM, added 2026-08-30 with p235's long-run inserts. `/interval_\d+x/`
   // above already matches it, and it is spelled out so the cache names every shape this edge emits.
   /^interval_\d+x\d+s_\d+pct(?:_[rR]\d+s)?$/,
+  // ⛔ THE COMPOUND ROUND (2026-08-30) — both expanders parse it; see their branches.
+  /^round_\d+x_(?:r?\d+s(?:\d+|vt1|easy|racepace))(?:-r?\d+s(?:\d+|vt1|easy|racepace))*(?:_[rR]\d+s)?$/,
   // ⛔ COPIED FROM `expandRunToken`'s strides branch (`materialize-plan/index.ts:1870`) on
   // 2026-08-26. Same cache rule as the rest of this list: if that regex moves, the gate is the
   // tripwire.

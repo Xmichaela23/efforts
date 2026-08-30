@@ -1699,6 +1699,68 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
     }
   }
   /**
+   * ⛔⛔ THE COMPOUND ROUND — `round_3x_28s130-53s115-70svt1_R120s` (2026-08-30).
+   *
+   * ⛔ BOOK-SANCTIONED, p231-232 MLSS, level 2: *"2 sets of 4 rounds of: 15s @ 130% / 45s @ 105% /
+   * 1 min @ VT1; 2-min recovery walk/jog between sets."* Several intensities INSIDE one round is the
+   * shape, and no token could hold it — `interval_Nx{dist}_5kpace` flattened all three to six equal
+   * reps at one pace, which is what a runner's hardest session of the week was arriving as.
+   *
+   * ⚠️ SEGMENTS ARE `{seconds}s{percent}`, or `{seconds}svt1` / `{seconds}seasy` for the untargeted
+   * ones. The list is the round's own sequence, in order; `Nx` is how many rounds; `_R{secs}s` is the
+   * rest BETWEEN rounds and is skipped after the last, matching every other interval branch here.
+   * ⚠️ PERCENT OF THRESHOLD **SPEED**, SO THE PACE DIVIDES — 130% is the threshold pace over 1.30.
+   * The same trap as the p235 inserts, and it would read as an easy jog if multiplied.
+   * ⚠️ ADDITIVE. No existing token changes shape or meaning.
+   */
+  {
+    const mRound = lower.match(/^round_(\d+)x_((?:r?\d+s(?:\d+|vt1|easy|racepace))(?:-r?\d+s(?:\d+|vt1|easy|racepace))*)(?:_r(\d+)s)?$/);
+    if (mRound) {
+      const rounds = parseInt(mRound[1], 10);
+      const segs = mRound[2].split('-');
+      const rest_s = mRound[3] ? parseInt(mRound[3], 10) : 0;
+      const thr = secPerMiFromBaseline(baselines, 'threshold') || undefined;
+      const easy = secPerMiFromBaseline(baselines, 'easy') || undefined;
+      for (let r = 0; r < rounds; r += 1) {
+        for (const seg of segs) {
+          // ⚠️ A LEADING `r` MARKS A RECOVERY the source named — see `compoundRoundToken`. Without
+          // it a 50% segment would arrive as a work step at half of threshold.
+          const m2 = seg.match(/^(r?)(\d+)s(\d+|vt1|easy|racepace)$/);
+          if (!m2) continue;
+          const isRec = m2[1] === 'r';
+          const secs = parseInt(m2[2], 10);
+          const at = m2[3];
+          /**
+           * ⛔ `racepace` IS PRESCRIBED WORK WITH NO PACE, and that is honest rather than lazy. The
+           * library says so itself: *"Race pace — set by the race being trained for, not by this
+           * library."* p235 states the finish and its duration; no page gives it a percentage. Same
+           * treatment the all-out strides already get — the step reaches the watch, the number does
+           * not, because there is no number.
+           */
+          if (at === 'racepace') {
+            out.push({ id: uid(), kind: 'work', duration_s: secs });
+          } else if (at === 'vt1' || at === 'easy' || isRec) {
+            const pct = at === 'vt1' || at === 'easy' ? 0 : parseInt(at, 10) / 100;
+            out.push({
+              id: uid(), kind: 'recovery', duration_s: secs,
+              pace_sec_per_mi: pct > 0 && thr ? Math.round(thr / pct) : easy,
+            });
+          } else {
+            const pct = parseInt(at, 10) / 100;
+            out.push({
+              id: uid(), kind: 'work', duration_s: secs,
+              pace_sec_per_mi: thr && pct > 0 ? Math.round(thr / pct) : undefined,
+            });
+          }
+        }
+        if (rest_s > 0 && r < rounds - 1) {
+          out.push({ id: uid(), kind: 'recovery', duration_s: rest_s, pace_sec_per_mi: easy });
+        }
+      }
+      return out;
+    }
+  }
+  /**
    * ⛔⛔ TIME-BASED RUN INTERVALS AT A PERCENTAGE OF THRESHOLD — `interval_2x90s_115pct_R30s`.
    *
    * ⛔ WHY IT HAD TO EXIST (2026-08-30). Every run interval token here is DISTANCE-based at a NAMED
@@ -2062,6 +2124,42 @@ export function expandBikeToken(tok: string, baselines: Baselines): any[] {
    * ⚠️ `reps - 1`, NOT a trailing pop, so a single-block session emits no recovery at all rather
    * than emitting one and removing it.
    */
+  /**
+   * ⛔⛔ THE COMPOUND ROUND ON THE BIKE — same shape, same grammar as the run branch.
+   * ⛔ p237 anaerobic: *"5 rounds of: 30s @ 120% / 2:30 @ 90% / 30s @ 120% / 4-min easy spin."*
+   * `bike_vo2_Nx{min}min_R{min}min` could only carry ONE intensity, so the 90% middle vanished.
+   * ⚠️ PERCENT OF FTP, and power MULTIPLIES where run pace divides — opposite arithmetic, same word.
+   * ⚠️ AN UNTARGETED SEGMENT CARRIES NO POWER, which is p237's own *"easy spin"* and its stated
+   * preference for a power FLOOR over a target.
+   */
+  {
+    const mRound = lower.match(/^round_(\d+)x_((?:r?\d+s(?:\d+|vt1|easy|racepace))(?:-r?\d+s(?:\d+|vt1|easy|racepace))*)(?:_r(\d+)s)?$/);
+    if (mRound) {
+      const rounds = parseInt(mRound[1], 10);
+      const segs = mRound[2].split('-');
+      const rest_s = mRound[3] ? parseInt(mRound[3], 10) : 0;
+      for (let r = 0; r < rounds; r += 1) {
+        for (const seg of segs) {
+          const m2 = seg.match(/^(r?)(\d+)s(\d+|vt1|easy|racepace)$/);
+          if (!m2) continue;
+          const isRec = m2[1] === 'r';
+          const secs = parseInt(m2[2], 10);
+          const at = m2[3];
+          if (at === 'racepace') out.push({ id: uid(), kind: 'work', duration_s: secs });
+          else if (at === 'vt1' || at === 'easy') out.push({ id: uid(), kind: 'recovery', duration_s: secs });
+          else if (isRec) {
+            const pct = parseInt(at, 10) / 100;
+            out.push({ id: uid(), kind: 'recovery', duration_s: secs, power_range: pctRange(pct, pct) });
+          } else {
+            const pct = parseInt(at, 10) / 100;
+            out.push({ id: uid(), kind: 'work', duration_s: secs, power_range: pctRange(pct, pct) });
+          }
+        }
+        if (rest_s > 0 && r < rounds - 1) out.push({ id: uid(), kind: 'recovery', duration_s: rest_s });
+      }
+      return out;
+    }
+  }
   // SS: bike_ss_3x12min_R4min
   let m = lower.match(/bike_ss_(\d+)x(\d+)min_r(\d+)min/);
   if (m) {
