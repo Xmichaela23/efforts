@@ -92,6 +92,7 @@ import {
   pickKeysInDayOrder,
   defaultViadaPicks,
   pickOptions,
+  pickOptionLabel,
   VIADA_PICKS,
   type DialChip,
   type ViadaAccessoryPrefs,
@@ -5245,7 +5246,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                         aria-label={`${DIAL_OWNERSHIP[chip]} focus movement`}
                       >
                         {opts.map((o) => (
-                          <option key={o.name} value={o.name} className="bg-neutral-900">{o.display}</option>
+                          <option key={o.name} value={o.name} className="bg-neutral-900">{pickOptionLabel(o)}</option>
                         ))}
                       </select>
                     </div>
@@ -5299,7 +5300,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       aria-label={`${spec.label} movement`}
                     >
                       {opts.map((o) => (
-                        <option key={o.name} value={o.name} className="bg-neutral-900">{o.display}</option>
+                        <option key={o.name} value={o.name} className="bg-neutral-900">{pickOptionLabel(o)}</option>
                       ))}
                     </select>
                   </div>
@@ -5683,6 +5684,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 {/* ⛔ VALUE IS THE STORED NAME, LABEL IS WENDLER'S WORD. `Back
                                     Extension` is stored so the token resolves (D-322); the athlete
                                     reads "Back Raise", which is what the book calls it. */}
+                                {/* NOT A PICKER ROW — this dropdown lists dial CATALOGUE entries,
+                                    which carry no `ours` flag. `pickOptionLabel` takes a PickOption
+                                    and was applied here by a blanket edit; tsc caught it. */}
                                 {opts.map((o) => (
                                   <option key={o.name} value={o.name} className="bg-neutral-900">{o.display}</option>
                                 ))}

@@ -13,7 +13,7 @@ import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.t
 import { composeWeek } from './compose.ts';
 import { voiceViolation } from '../state-trend/week-accent.ts';
 import { viadaCategoryOf } from '../strength-grid/index.ts';
-import { defaultViadaPicks, pickOptions, VIADA_PICK_KEYS } from './accessory-picks.ts';
+import { defaultViadaPicks, pickOptionLabel, pickOptions, VIADA_PICK_KEYS } from './accessory-picks.ts';
 import { resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 import {
   DEFAULT_BAR_LB,
@@ -219,4 +219,36 @@ Deno.test('⛔⛔ THE DISPLAY NAME NEVER REACHES THE DATA — the split that kee
       `${key} defaulted to "${name}", which the catalogue cannot resolve`,
     );
   }
+});
+
+Deno.test('⛔ AN ADDITION IS MARKED, AND THE MECHANISM MARKS ANY FUTURE ONE', () => {
+  /**
+   * ⛔ THE `oursList` EXCEPTION WAS ALLOWED ON ONE CONDITION: the movement must not be able to pass
+   * as his. It shipped with `ours: true` in the data and NOTHING RENDERING IT - Michael could not
+   * see a mark, so the condition was unmet.
+   *
+   * ⚠️ THIS ASSERTS THE MECHANISM, NOT THE MOVEMENT. `pickOptionLabel` is the single helper all three
+   * dropdown sites call, so an addition made later is marked without anyone touching the UI.
+   */
+  const HOME = ['Full barbell + plates', 'Bench (flat/adjustable)', 'Squat rack', 'Dumbbells (adjustable or fixed)'];
+  let marked = 0;
+  for (const key of VIADA_PICK_KEYS) {
+    for (const o of pickOptions(key, HOME)) {
+      const label = pickOptionLabel(o);
+      if (o.ours === true) {
+        marked++;
+        assert(label !== o.display, `an addition rendered exactly like his own: ${label}`);
+        assert(/added/.test(label), `the mark does not say what it means: ${label}`);
+      } else {
+        // ⛔ AND HIS OWN MOVEMENTS CARRY NO MARK. A mark on everything marks nothing.
+        assertEquals(label, o.display, `one of his movements was marked as an addition: ${label}`);
+      }
+    }
+  }
+  assert(marked > 0, 'no addition was offered anywhere — this test is vacuous');
+  // ⚠️ NO EMOJI, and nothing that reads as an apology or a disclaimer (Michael's copy rules).
+  const fly = pickOptions('iso_push', HOME).find((o) => o.ours === true)!;
+  const label = pickOptionLabel(fly);
+  assertEquals(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(label), false, 'the mark carries an emoji');
+  assertEquals(/sorry|unfortunate|note that|please/i.test(label), false, 'the mark apologises');
 });

@@ -50,14 +50,37 @@ export type ViadaPickKey =
   | 'iso_pull_b'
   | 'single_leg_a'
   | 'single_leg_b'
+  | 'hinge_lower'
   | 'quad_iso'
   | 'core';
 
 export const VIADA_PICK_KEYS: ViadaPickKey[] = [
-  'db_press', 'iso_push', 'iso_pull_a', 'iso_pull_b', 'single_leg_a', 'single_leg_b', 'quad_iso', 'core',
+  'db_press', 'iso_push', 'iso_pull_a', 'iso_pull_b', 'hinge_lower', 'single_leg_a', 'single_leg_b', 'quad_iso', 'core',
 ];
 
 /**
+ * ⛔⛔ SUPERSEDED 2026-08-29 — MICHAEL RULED THE OTHER WAY AND THE `hinge_lower` PICK NOW EXISTS.
+ * Everything below is history and is kept because two of its three reasons were sound and one was
+ * simply wrong, and the next person to look at this cell should know which.
+ *
+ * ⛔ REASON 1 WAS WRONG. It says "not one of them is `hinge_lower` — not secondary, not focused, in
+ * either column." That is true of the seven HYP cells it was counting, and frame day 2 carries
+ * `DE accessory secondary hinge_lower` all the same (`frames.ts`, day 2, third slot). The pick has a
+ * cell to point at; the count had excluded DE cells without saying so.
+ *
+ * ⚠️ REASON 2 IS STILL TRUE AND NO LONGER DECIDES IT. The slot IS the programme's DE prescription
+ * rather than a free accessory — but `db_press` has always answered a DE cell too (day 1's
+ * `DE accessory secondary push_upper`), so "DE is not the athlete's to own" was already not the rule
+ * this file follows. Michael has now ruled it explicitly.
+ *
+ * ⚠️ REASON 3 STANDS AS AN OBSERVATION, not an objection: the absence of a FOCUSED hamstring slot
+ * here, when p274 gives the All Rounder one, still reads deliberate. This pick does not add a slot -
+ * it hands the athlete the choice inside a slot the frame already prescribes.
+ *
+ * ⛔ AND THE NORDIC-CURL NOTE AT THE BOTTOM SURVIVES INTACT. It is about a movement, not about the
+ * pick, and nothing here reopens it.
+ *
+ * ── history ──────────────────────────────────────────────────────────────────────────────────────
  * ⛔⛔ THERE IS NO EIGHTH PICK FOR THE LOWER POSTERIOR, AND IT WAS CONSIDERED AND REJECTED
  * (Michael, 2026-08-26). This is the note for whoever notices the gap next — because it IS a real
  * gap in the picker, and the obvious fix is wrong for three separate reasons.
@@ -388,6 +411,26 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
   //
   // ⚠️ THE LABEL IS THE ONLY THING THAT CHANGED. The cell, the day split, both `leadWith` heads and
   // the two-picks-one-per-day ruling of 2026-08-25 all stand exactly as they were.
+  /**
+   * DAY 2's HINGE ROW - `1 x DE: Accessory: secondary hinge lower` (p246). Added 2026-08-29 on
+   * Michael's ruling; see the superseded note above for what it reverses.
+   *
+   * IT IS THE SECOND LOWER ROW ON DAY 2, beside `single_leg_a`, and the two answer different cells:
+   * this one is his HINGE, that one is the press-lower reading of his ambiguous "accessory lower"
+   * line. They cannot collide - no movement in p220's hinge list appears in his press-lower list,
+   * and the freestanding barbell calf raise that sits in the press-lower cell is not hinge-shaped.
+   * Asserted rather than assumed, after the pull days collided on a shared head.
+   */
+  hinge_lower: {
+    key: 'hinge_lower',
+    label: 'Hinge variation',
+    slot: { category: 'secondary', pattern: 'hinge_lower', frameDay: 2 },
+    // p220 SECONDARY HINGE LOWER, his six, in his printed order.
+    hisList: ['romanian deadlift', 'stiff-legged deadlift', 'reverse hyper', 'good morning', 'kb swing', 'sandbag throw'],
+    leadWith: ['romanian deadlift', 'stiff-legged deadlift', 'reverse hyper', 'good morning', 'kb swing', 'sandbag throw'],
+    leadCite: 'Viada p220 - secondary hinge lower',
+    servesChips: [],
+  },
   single_leg_a: {
     key: 'single_leg_a',
     label: 'Leg variation',
@@ -549,6 +592,21 @@ export function frameDaysForPick(
       && s.category === spec.slot!.category && s.pattern === spec.slot!.pattern);
     if (hit) out.push(day.day);
   }
+  /**
+   * A DE CELL RESOLVES ITS DAY FROM THE SPEC, and only when the HYP search finds nothing
+   * (2026-08-29). Day 2's hinge row is `DE accessory secondary hinge_lower`, so the search above
+   * returns no day for it and it sorted to the end of the screen instead of beside the other day-2
+   * row.
+   *
+   * WIDENING THE SEARCH ITSELF WAS TRIED AND REVERTED: it also matched day 1's DE secondary push
+   * cell, which moved `db_press` from day 4 to day 1 and changed the day tag on a row nobody had
+   * asked to move. This fallback touches only picks the search cannot place.
+   *
+   * IT IS NOT THE TRAP THE ORDER TEST NAMES. That trap is sorting EVERY pick on `spec.slot.frameDay`,
+   * which leaves the three picks without one unsorted at the front. Here the frame is still the
+   * authority and the spec answers only where the frame's HYP cells are silent.
+   */
+  if (out.length === 0 && spec.slot?.frameDay != null) return [spec.slot.frameDay];
   return out;
 }
 
@@ -646,6 +704,24 @@ const LABEL_ACRONYMS: Record<string, string> = {
   db: 'DB', kb: 'KB', ghd: 'GHD', rdl: 'RDL', trx: 'TRX', ytw: 'YTW', y: 'Y', t: 'T', w: 'W',
   v: 'V', l: 'L', ohp: 'OHP',
 };
+
+/**
+ * WHAT A PICKER ROW READS, INCLUDING THE MARK ON AN ADDITION.
+ *
+ * The `oursList` exception was allowed on one condition: the movement must not be able to pass as
+ * his. `pickOptions` was already returning `ours: true` and NOTHING RENDERED IT - the flag existed
+ * in the data and the athlete could not see it, which is the condition unmet.
+ *
+ * ONE HELPER, THREE RENDER SITES, AND ANY FUTURE ADDITION IS MARKED WITHOUT TOUCHING THE UI. That is
+ * the point of it - the mechanism, not the one movement.
+ *
+ * THE WORDING IS "added" AND IT IS DELIBERATELY FLAT. It states that the movement was put there
+ * rather than found in the source. No emoji, no apology, no explanation of a sourcing policy under a
+ * dropdown - an athlete choosing an exercise does not need the provenance argument, only the fact.
+ */
+export function pickOptionLabel(o: PickOption): string {
+  return o.ours === true ? `${o.display} - added` : o.display;
+}
 
 export function movementLabel(name: string): string {
   return String(name ?? '')

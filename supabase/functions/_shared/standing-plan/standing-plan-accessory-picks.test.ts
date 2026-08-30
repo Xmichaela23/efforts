@@ -71,7 +71,14 @@ Deno.test('every pick names a cell the frame actually carries', () => {
   const cells = new Set(
     FRAMES.strength_5k.columns.standard
       .flatMap((d) => d.strength)
-      .filter((s) => s.intent === 'HYP' && s.role === 'accessory')
+      /**
+       * DE ACCESSORY CELLS COUNT TOO (widened 2026-08-29). Filtering to HYP alone is what made the
+       * 2026-08-26 note conclude the frame carries no `hinge_lower` cell - it does, on day 2, as
+       * `DE accessory secondary hinge_lower`. `db_press` has always answered a DE cell as well
+       * (day 1), so the narrow filter was passing only because that pick also matches a HYP cell on
+       * day 4.
+       */
+      .filter((s) => (s.intent === 'HYP' || s.intent === 'DE') && s.role === 'accessory')
       .map((s) => `${s.category}/${s.pattern}`),
   );
   for (const key of VIADA_PICK_KEYS) {
@@ -85,7 +92,7 @@ Deno.test('every pick names a cell the frame actually carries', () => {
     if (slot.frameDay != null) {
       const day = FRAMES.strength_5k.columns.standard.find((d) => d.day === slot.frameDay);
       assert(
-        (day?.strength ?? []).some((x) => x.intent === 'HYP' && x.role === 'accessory'
+        (day?.strength ?? []).some((x) => (x.intent === 'HYP' || x.intent === 'DE') && x.role === 'accessory'
           && x.category === slot.category && x.pattern === slot.pattern),
         `${key} is scoped to frame day ${slot.frameDay}, which carries no ${slot.category}/${slot.pattern}`,
       );
@@ -949,7 +956,7 @@ Deno.test('⛔⛔ THE ROWS SORT INTO WEEK ORDER, ON THE RESOLVED DAY', () => {
    */
   assertEquals(pickKeysInDayOrder(), [
     'iso_push', 'iso_pull_a',      // day 1
-    'single_leg_a',                // day 2
+    'hinge_lower', 'single_leg_a', // day 2 — the hinge row and the press-lower row
     'db_press', 'iso_pull_b',      // day 4
     'single_leg_b', 'quad_iso',    // day 5
     'core',                        // no day — last
