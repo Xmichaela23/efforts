@@ -12,14 +12,136 @@
  * words or not at all.
  */
 
-import { FRAMES, type ColumnKind } from '../../supabase/functions/_shared/standing-plan/frames.ts';
+import { FRAMES, type ColumnKind, type FrameId } from '../../supabase/functions/_shared/standing-plan/frames.ts';
+import { isHardSlot, isLongSlot } from '../../supabase/functions/_shared/standing-plan/sport-slots.ts';
 
 
-/** Which of the frame's four endurance slots a control is for. */
-export type SlotKey = 'hard1' | 'hard2' | 'easy' | 'long';
+/**
+ * Which of the frame's endurance slots a control is for.
+ *
+ * ⚠️ `hard3` EXISTS BECAUSE A FRAME HAS THREE QUALITY SESSIONS, NOT BECAUSE THE SCREEN GREW A
+ * CONTROL. p274 prescribes MLSS+, Cyc AnA and NT; p246 prescribes two. **The row count is the
+ * frame's, and `frameSlots` is what reads it** — see below.
+ */
+export type SlotKey = 'hard1' | 'hard2' | 'hard3' | 'easy' | 'long';
 export type SlotSport = 'run' | 'ride';
+/** What a slot is FOR, which is what decides its label, its default sport and its row order. */
+export type SlotRole = 'hard' | 'easy' | 'long';
 
-export const SLOT_KEYS: SlotKey[] = ['hard1', 'hard2', 'easy', 'long'];
+/**
+ * ⛔⛔ THE SCREEN'S ROWS, READ OFF THE FRAME (2026-08-30). **This is the fix for the last of the
+ * five hand-kept copies**, and it is on the client rather than the engine.
+ *
+ * ⛔ WHAT STOOD HERE. Four literal keys, a literal label table, a literal family table, a literal
+ * frame-key table, and a `slotFrameDay` that classified slots by whether a family name ENDED IN
+ * `_lsd` or `_vt1`. A comment beside them said four was deliberate — *"a frame with a different
+ * layout needs a different screen, not a longer table"* — and that was true while one frame existed.
+ *
+ * ⛔ IT IS NOT TRUE NOW, AND IT FAILS SILENTLY RATHER THAN LOUDLY. The All Rounder carries FIVE
+ * endurance sessions and prescribes two of them as RIDES. Under the old suffix test its
+ * `ride_endurance` easy session matched neither `_lsd` nor `_vt1`, so the screen would have counted
+ * it as a THIRD hard session and shown no easy row at all — and the fifth session would simply not
+ * have appeared. Nobody would have seen an error.
+ *
+ * ⛔ IT ASKS THE ONE OWNER. `isHardSlot`/`isLongSlot` read the slot's own stated role first and fall
+ * back to the family tables, which is exactly how the engine classifies the same slots — so the
+ * screen and the week cannot disagree about what a session is.
+ *
+ * ⚠️ `strength_5k` COMES BACK IDENTICAL: hard1 on day 1, hard2 on day 3, easy on day 4, long on
+ * day 6, the same labels and the same option order. That is the acceptance test and it is pinned.
+ * ⚠️ THE COLUMN IS AN ARGUMENT because the taper shape is genuinely different — it carries three
+ * endurance slots, not four, and a slot the column does not have is simply absent from the list.
+ */
+export type FrameSlot = {
+  key: SlotKey;
+  role: SlotRole;
+  /** ⛔ DAY NUMBERS, NOT WEEKDAYS — see `slotFrameDay`. */
+  frameDay: number;
+  /** `${frameDay}:${indexWithinDay}` — the key `assignSports` reads. */
+  frameKey: string;
+  family: string;
+  level: number;
+  archetype?: string;
+  label: string;
+  options: { value: SlotSport; label: string }[];
+};
+
+/** ⛔ THE LABEL IS THE ROLE'S, NUMBERED ONLY WHERE THERE IS MORE THAN ONE. Labels are frozen. */
+function labelFor(role: SlotRole, n: number): string {
+  if (role === 'long') return 'Long session';
+  if (role === 'easy') return n > 1 ? `Easy session ${n}` : 'Easy session';
+  return `Hard session ${n}`;
+}
+
+/**
+ * ⛔ RIDE LEADS ON THE HARD SLOTS — strength-leading puts intensity on the bike (p280: no impact, so
+ * it does not tax the lifts). The order states the default before anything is tapped.
+ * ⚠️ KEYED ON THE ROLE, NOT ON THE SLOT'S OWN FAMILY. A frame that prescribes a hard RIDE natively
+ * still offers Ride first, which is the same answer — but it is offered because of what the session
+ * is for, not because of what the page happened to print, so the rule holds for any frame.
+ */
+function optionsFor(role: SlotRole, family: string): { value: SlotSport; label: string }[] {
+  const both = role === 'long'
+    ? [{ value: 'run' as const, label: 'Long run' }, { value: 'ride' as const, label: 'Long ride' }]
+    : role === 'hard'
+      ? [{ value: 'ride' as const, label: 'Ride' }, { value: 'run' as const, label: 'Run' }]
+      : [{ value: 'run' as const, label: 'Run' }, { value: 'ride' as const, label: 'Ride' }];
+  /**
+   * ⛔⛔ A SLOT THE PAGE PRESCRIBES AS A RIDE OFFERS RIDE ONLY, AND THE REASON IS THAT THE ENGINE
+   * IGNORES THE OTHER ANSWER (measured 2026-08-30).
+   *
+   * `assignSports` converts a RUN slot to a ride through `RIDE_EQUIVALENT` and has no conversion in
+   * the other direction. Composing the All Rounder with every slot answered `'run'` returns
+   * `Cyc AnA` and `Cyc endurance` as RIDES regardless — **the athlete taps Run and is handed a ride,
+   * with nothing said.** That is the screen and the week disagreeing, which is the exact defect the
+   * per-slot answer was added to end, so the screen must not offer the tap until the conversion
+   * exists.
+   *
+   * ⚠️ NOT A JUDGEMENT ABOUT WHETHER THE SWAP SHOULD BE OFFERED. p275 permits the modality
+   * substitution in principle; what is missing is a ride-to-run mapping, and inventing one is not
+   * this file's call — `RIDE_EQUIVALENT` is ours already and is deliberately unextended.
+   * ⚠️ `strength_5k` IS UNAFFECTED — every one of its slots is a run family, so all four keep both
+   * options in the same order they have always had.
+   */
+  return family.startsWith('ride_') ? both.filter((o) => o.value === 'ride') : both;
+}
+
+export function frameSlots(
+  frame: FrameId = 'strength_5k',
+  column: ColumnKind = 'standard',
+): FrameSlot[] {
+  const days = FRAMES[frame]?.columns?.[column];
+  if (!Array.isArray(days)) return [];
+  const out: FrameSlot[] = [];
+  const seen: Record<SlotRole, number> = { hard: 0, easy: 0, long: 0 };
+  for (const d of days) {
+    (d.endurance ?? []).forEach((slot, i) => {
+      const role: SlotRole = isLongSlot(slot) ? 'long' : isHardSlot(slot) ? 'hard' : 'easy';
+      seen[role] += 1;
+      const n = seen[role];
+      // ⚠️ THE LONG SESSION IS NEVER NUMBERED — no frame carries two, and `long2` is not a key.
+      const key = (role === 'long' ? 'long' : role === 'easy' && n === 1 ? 'easy' : `${role}${n}`) as SlotKey;
+      out.push({
+        key,
+        role,
+        frameDay: d.day,
+        frameKey: `${d.day}:${i}`,
+        family: String(slot.family),
+        level: Number(slot.level),
+        ...(slot.archetype ? { archetype: slot.archetype } : {}),
+        label: labelFor(role, n),
+        options: optionsFor(role, String(slot.family)),
+      });
+    });
+  }
+  return out;
+}
+
+/** ⛔ THE MODEL ORDER — the frame's own day order. See `REQUIRED_SLOT_DISPLAY_ORDER` for the drawn one. */
+export const slotKeysFor = (frame: FrameId = 'strength_5k', column: ColumnKind = 'standard'): SlotKey[] =>
+  frameSlots(frame, column).map((s) => s.key);
+
+export const SLOT_KEYS: SlotKey[] = slotKeysFor();
 
 /**
  * ⛔ MICHAEL'S HEADER, VERBATIM (2026-08-24). Not paraphrased, not re-voiced, not trimmed.
@@ -162,6 +284,34 @@ export const LONG_SLOT_NOTE = 'one per week, run or ride';
 export const HARD_1_SLOT_NOTE = 'sits the day before heavy legs';
 
 /**
+ * ⛔⛔ WHICH ROW THE NOTE BELONGS ON, ASKED OF THE FRAME (2026-08-30). The screen tested
+ * `key === 'hard1'`, and the comment above explains why that was right: p246 puts hard session 1 on
+ * day 1 and the heavy leg session on day 2.
+ *
+ * ⛔ BUT "SLOT ONE" IS NOT THE FACT — "THE DAY BEFORE A HEAVY LEG DAY" IS, and the two only coincide
+ * in one frame. p274 also opens with a hard session before a heavy leg day, so the note is right
+ * there for the same reason; but its OTHER two quality sessions are followed by an upper day and a
+ * plyometrics day, and a positional test would have put the warning on the wrong row the moment a
+ * frame ordered its week differently.
+ *
+ * ⚠️ IT ASKS `lowerRole`, the same marker the interference law and the p247 reduction read, so the
+ * screen cannot promise a reduction the plan will not apply.
+ * ⚠️ `strength_5k` ANSWERS IDENTICALLY — true for `hard1`, false for `hard2`.
+ */
+export function slotPrecedesHeavyLowerDay(
+  key: SlotKey,
+  frame: FrameId = 'strength_5k',
+  column: ColumnKind = 'standard',
+): boolean {
+  const slot = frameSlots(frame, column).find((s) => s.key === key);
+  if (!slot || slot.role !== 'hard') return false;
+  const days = FRAMES[frame]?.columns?.[column] ?? [];
+  // ⚠️ THE FRAME'S WEEK WRAPS — day 7 is followed by day 1, the same arithmetic `compose.ts` uses.
+  const next = (slot.frameDay % 7) + 1;
+  return days.some((d) => d.day === next && d.lowerRole === 'me');
+}
+
+/**
  * ⛔ WHAT THE SLOT IS, IN THE HEADER'S OWN WORDS — never "Hard 1 / Hard 2" (Michael, 2026-08-24).
  *
  * Those were internal keys leaking onto a screen: an athlete has no first and second hard session,
@@ -200,22 +350,26 @@ export const HARD_1_SLOT_NOTE = 'sits the day before heavy legs';
  * ⚠️ `unansweredLine` BUILDS ITS SENTENCE FROM THIS TABLE, so the blocked-Continue copy follows —
  * *"hard session 2 and easy session have no sport yet."*
  */
-export const SLOT_LABEL: Record<SlotKey, string> = {
-  hard1: 'Hard session 1',
-  hard2: 'Hard session 2',
-  easy: 'Easy session',
-  long: 'Long session',
-};
+/**
+ * ⚠️ DERIVED FROM THE FRAME NOW — see `frameSlots`. Kept as a lookup because the wording above and
+ * `unansweredLine` both read it by key. A key the current frame does not carry falls back to its
+ * role's own words rather than reading `undefined` into a sentence.
+ */
+export const SLOT_LABEL: Record<SlotKey, string> = (() => {
+  const out = {} as Record<SlotKey, string>;
+  for (const s of frameSlots()) out[s.key] = s.label;
+  // ⚠️ EVERY KEY THE TYPE ALLOWS GETS A WORD, so a frame with a third hard row never renders blank.
+  out.hard3 = out.hard3 ?? 'Hard session 3';
+  return out;
+})();
 
 /** The two options a slot offers, in the order they are shown. ⛔ The default sits FIRST. */
-export const SLOT_OPTIONS: Record<SlotKey, { value: SlotSport; label: string }[]> = {
-  // ⛔ RIDE LEADS ON THE HARD SLOTS — strength-leading puts intensity on the bike (p280: no impact,
-  // so it does not tax the lifts). The order states the default before anything is tapped.
-  hard1: [{ value: 'ride', label: 'Ride' }, { value: 'run', label: 'Run' }],
-  hard2: [{ value: 'ride', label: 'Ride' }, { value: 'run', label: 'Run' }],
-  easy: [{ value: 'run', label: 'Run' }, { value: 'ride', label: 'Ride' }],
-  long: [{ value: 'run', label: 'Long run' }, { value: 'ride', label: 'Long ride' }],
-};
+export const SLOT_OPTIONS: Record<SlotKey, { value: SlotSport; label: string }[]> = (() => {
+  const out = {} as Record<SlotKey, { value: SlotSport; label: string }[]>;
+  for (const s of frameSlots()) out[s.key] = s.options;
+  out.hard3 = out.hard3 ?? optionsFor('hard', 'run_mlss');
+  return out;
+})();
 
 /**
  * ⛔ THE SCREEN OPENS FINISHED, AND THIS IS THE LINE THAT SAYS SO (Michael, 2026-08-24).
@@ -246,26 +400,12 @@ export const SLOT_OPTIONS: Record<SlotKey, { value: SlotSport; label: string }[]
  * ⚠️ CLASSIFIED BY FAMILY, in the frame's own day order: the LSD slot is the long one, the VT1 slot
  * is the easy one, and whatever else the column carries is hard, numbered in the order it appears.
  */
-export function slotFrameDay(key: SlotKey, column: ColumnKind = 'standard'): number | null {
-  const days = FRAMES.strength_5k?.columns?.[column];
-  if (!Array.isArray(days)) return null;
-  let hardSeen = 0;
-  for (const d of days) {
-    for (const slot of d.endurance ?? []) {
-      const family = String((slot as { family?: string }).family ?? '');
-      if (family.endsWith('_lsd')) {
-        if (key === 'long') return d.day;
-        continue;
-      }
-      if (family.endsWith('_vt1')) {
-        if (key === 'easy') return d.day;
-        continue;
-      }
-      hardSeen += 1;
-      if (key === (hardSeen === 1 ? 'hard1' : 'hard2')) return d.day;
-    }
-  }
-  return null;
+export function slotFrameDay(
+  key: SlotKey,
+  column: ColumnKind = 'standard',
+  frame: FrameId = 'strength_5k',
+): number | null {
+  return frameSlots(frame, column).find((s) => s.key === key)?.frameDay ?? null;
 }
 
 export function slotSummary(key: SlotKey, sport: SlotSport | null, session?: string | null): string {
@@ -381,10 +521,114 @@ export function runnerMileageLine(unit: 'mi' | 'km'): string {
  * and an athlete who scrolled past it had a mix nobody chose. `hardSlotDefault` still applies the
  * SESSION once a sport is picked; what is gone is guessing the sport.
  */
-export type SlotSelection = Record<SlotKey, SlotSport | null>;
+/**
+ * ⚠️ PARTIAL, BECAUSE THE KEY SET IS THE FRAME'S (2026-08-30). `SlotKey` now spans every key any
+ * frame can carry, and no single frame carries all of them — a four-slot week has no `hard3` and a
+ * required-everything `Record` would make its own selection a type error. Every reader already
+ * treats a missing answer and a `null` answer the same way, which is what makes this safe.
+ */
+export type SlotSelection = Partial<Record<SlotKey, SlotSport | null>>;
 
-export function emptySlotSports(): SlotSelection {
-  return { hard1: null, hard2: null, easy: null, long: null };
+/** ⚠️ THE FRAME'S OWN KEYS — `strength_5k` still returns exactly the four, in the same order. */
+export function emptySlotSports(
+  frame: FrameId = 'strength_5k',
+  column: ColumnKind = 'standard',
+): SlotSelection {
+  const out: SlotSelection = {};
+  for (const k of slotKeysFor(frame, column)) out[k] = null;
+  return out;
+}
+
+/**
+ * ⛔⛔ THE IMPACT FLOOR — HIS RECOMMENDATION, OUR ENFORCEMENT (Michael, 2026-08-30).
+ *
+ * ⛔ WHAT THE PAGE SAYS, p275, both halves:
+ *
+ * > *"Running work may be done on an elliptical or arc trainer, though he **recommends impact with
+ * > the ground on at least one day**."*
+ * > *"The weekend LSR can be a hike, a long ride, a team sport day, or whatever else is of interest."*
+ *
+ * So he sanctions moving running work off the ground, and sanctions the long session becoming a ride
+ * outright. **What he does not sanction is a week with no impact in it.**
+ *
+ * ⛔⛔ THE WORD IS "RECOMMENDS", AND THE ENFORCEMENT IS OURS. He states a recommendation; withholding
+ * the control is a decision to hold an athlete to it, and that decision is not his. It is labelled
+ * here for the same reason `sport-slots.ts` labels its own equivalence table: a future session must
+ * be able to see which half came off the page. **Do not restate this floor as sourced.**
+ *
+ * ⛔ SCOPED BY WHAT THE FRAME PRESCRIBES, NOT BY ITS NAME. A frame that already puts the athlete on
+ * a bike natively is one where the remaining runs are the only impact in the week — which is exactly
+ * the case the recommendation is about. `strength_5k` prescribes no ride at all: substituting rides
+ * for runs is its athletes' normal path, it has its own rules for that, and **it must not inherit
+ * this floor.** Testing the frame's own slots rather than its id is what keeps that true without a
+ * second list to maintain.
+ *
+ * ⚠️ IT ONLY EVER WITHHOLDS `ride`, NEVER `run`. So an athlete with no bike answers every row `run`
+ * and is never blocked, and the screen can always be completed — the floor cannot strand anybody.
+ * ⚠️ AND IT COUNTS ONLY AN EXPLICIT `run`. A row left unanswered might still become one, so nothing
+ * is withheld while any other run-capable row is open; the block appears on the LAST one.
+ */
+export const IMPACT_FLOOR_IS_OURS =
+  'Viada recommends impact with the ground on at least one day (p275) and permits the rest of the '
+  + 'running to move onto a bike or an erg. Holding one run to that recommendation, rather than '
+  + 'letting the week go fully off the ground, is ours.';
+
+/** ⛔ THE SENTENCE THE ATHLETE READS when the last run cannot become a ride. Fact, then the reason. */
+export const IMPACT_FLOOR_NOTE =
+  'This is the last run in the week. At least one day lands on the ground — the rest of the running '
+  + 'can move onto a bike.';
+
+/** ⚠️ A FRAME THAT PRESCRIBES CYCLING NATIVELY. See `IMPACT_FLOOR_IS_OURS` for why that is the test. */
+export function framePrescribesRiding(
+  frame: FrameId = 'strength_5k',
+  column: ColumnKind = 'standard',
+): boolean {
+  return frameSlots(frame, column).some((s) => s.family.startsWith('ride_'));
+}
+
+/**
+ * ⛔ THE ROWS THAT CAN BE EITHER SPORT — the frame's run-family slots. The natively-prescribed rides
+ * are not among them: the engine has no ride-to-run conversion, so those rows state their sport
+ * rather than offering a tap (see `optionsFor`).
+ */
+export function switchableSlots(
+  frame: FrameId = 'strength_5k',
+  column: ColumnKind = 'standard',
+): SlotKey[] {
+  return frameSlots(frame, column).filter((s) => !s.family.startsWith('ride_')).map((s) => s.key);
+}
+
+/**
+ * ⛔ WOULD PUTTING THIS ROW ON THE BIKE LEAVE THE WEEK WITH NO RUN IN IT. Only then is `ride`
+ * withheld, and only on a frame that already prescribes riding.
+ */
+export function impactFloorHoldsSlot(
+  key: SlotKey,
+  slots: SlotSelection,
+  frame: FrameId = 'strength_5k',
+  column: ColumnKind = 'standard',
+): boolean {
+  if (!framePrescribesRiding(frame, column)) return false;
+  const switchable = switchableSlots(frame, column);
+  if (!switchable.includes(key)) return false;
+  // ⚠️ EVERY OTHER RUN-CAPABLE ROW IS ALREADY A RIDE — this one is the week's last run.
+  return switchable.filter((k) => k !== key).every((k) => slots[k] === 'ride');
+}
+
+/**
+ * ⛔ THE OPTIONS A ROW OFFERS RIGHT NOW, which is the static list minus anything the floor holds.
+ * `reason` is present exactly when something was withheld, so the screen can say why rather than
+ * showing a control that does nothing.
+ */
+export function slotOptionsNow(
+  key: SlotKey,
+  slots: SlotSelection,
+  frame: FrameId = 'strength_5k',
+  column: ColumnKind = 'standard',
+): { options: { value: SlotSport; label: string }[]; reason: string | null } {
+  const all = frameSlots(frame, column).find((s) => s.key === key)?.options ?? SLOT_OPTIONS[key] ?? [];
+  if (!impactFloorHoldsSlot(key, slots, frame, column)) return { options: all, reason: null };
+  return { options: all.filter((o) => o.value !== 'ride'), reason: IMPACT_FLOOR_NOTE };
 }
 
 /**
@@ -410,7 +654,8 @@ export function emptySlotSports(): SlotSelection {
  * `hardSessionCount` and `defaultSportForAddedSlot` are deleted below. A partial restoration — a
  * dismiss on one row, a count that still reads "up to two" — is the shape to watch for.
  */
-export const REQUIRED_SLOT_KEYS: SlotKey[] = ['hard1', 'hard2', 'easy', 'long'];
+/** ⚠️ THE FRAME'S OWN SLOTS, in its day order — see `frameSlots`. It was a four-key literal. */
+export const REQUIRED_SLOT_KEYS: SlotKey[] = slotKeysFor();
 
 /**
  * ⛔⛔ THE ORDER THE REQUIRED ROWS ARE **DRAWN** IN — long first (Michael, 2026-08-26).
@@ -433,10 +678,31 @@ export const REQUIRED_SLOT_KEYS: SlotKey[] = ['hard1', 'hard2', 'easy', 'long'];
  * easy session."* The list above the rows and the rows themselves now run in the same sequence.
  * ⚠️ Long still leads, for the reason it was moved there in the first place.
  */
-export const REQUIRED_SLOT_DISPLAY_ORDER: SlotKey[] = ['long', 'easy', 'hard1', 'hard2'];
+/**
+ * ⚠️ DERIVED, AND THE RULING IS THE ROLE ORDER RATHER THAN THE KEY LIST: long, then easy, then the
+ * hard rows in the frame's own day order. That reproduces `['long', 'easy', 'hard1', 'hard2']`
+ * exactly for `strength_5k` and stays true for a frame with three hard rows.
+ */
+export const REQUIRED_SLOT_DISPLAY_ORDER: SlotKey[] = displayOrderFor();
+
+export function displayOrderFor(
+  frame: FrameId = 'strength_5k',
+  column: ColumnKind = 'standard',
+): SlotKey[] {
+  const slots = frameSlots(frame, column);
+  const byRole = (r: SlotRole) => slots.filter((s) => s.role === r).map((s) => s.key);
+  return [...byRole('long'), ...byRole('easy'), ...byRole('hard')];
+}
 
 /** ⛔ THE HARD SLOTS — added, up to two, default zero. */
-export const HARD_SLOT_KEYS: SlotKey[] = ['hard1', 'hard2'];
+export const HARD_SLOT_KEYS: SlotKey[] = hardSlotKeysFor();
+
+export function hardSlotKeysFor(
+  frame: FrameId = 'strength_5k',
+  column: ColumnKind = 'standard',
+): SlotKey[] {
+  return frameSlots(frame, column).filter((s) => s.role === 'hard').map((s) => s.key);
+}
 
 /**
  * ⛔⛔ `MAX_HARD_SESSIONS` AND `hardSessionCount` ARE DELETED (2026-08-26 evening), and this note is

@@ -50,12 +50,15 @@ import {
   upperLowerSplitLine,
   allSlotsChosen,
   REQUIRED_SLOT_DISPLAY_ORDER,
+  HARD_SLOT_KEYS,
+  slotPrecedesHeavyLowerDay,
+  slotOptionsNow,
   type SlotKey,
   type SlotSelection,
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
 import { experienceChips, weekBounds } from '@/lib/standing-plan-week-bounds';
-import type { EnduranceExperience, ExperienceTier } from '../../supabase/functions/_shared/standing-plan/frames.ts';
+import type { EnduranceExperience, ExperienceTier, FrameId } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 /**
  * ⛔ HOW MANY DAYS ONE SPORT CAN RUN OVER. Seven is the week; the engine caps what it can actually
  * place at the two days the frame leaves clear plus the rest day, and says so when the ask exceeds
@@ -78,6 +81,11 @@ export type EnduranceWeekCardProps = {
    * than merely unused.
    */
   onSlotChange: (key: SlotKey, sport: SlotSport) => void;
+  /**
+   * ⛔ WHICH FRAME THIS SCREEN IS DESCRIBING. Absent keeps `strength_5k`, which is every caller that
+   * predates a second frame — the rows, their days and their options all come off it.
+   */
+  frame?: FrameId;
   /** The athlete's baselines row — the caps resolve every session against their own anchors. */
   baselines?: unknown;
   easyPaceSecPerMi?: number | null;
@@ -110,9 +118,12 @@ export type EnduranceWeekCardProps = {
   unit: 'mi' | 'km';
   /** Rendered inside the open hard-slot row — VO2 vs speed, club session. */
   /** ⚠️ WIDENED FOR THE LONG SLOT (slice 2b) — the club toggle is not hard-only. */
-  renderHardFlavor?: (key: 'hard1' | 'hard2' | 'long') => React.ReactNode;
+  // ⚠️ ANY SLOT KEY — the frame owns how many quality rows there are (`HARD_SLOT_KEYS`), so a
+  // three-value union here would silently drop the third row's flavour.
+  renderHardFlavor?: (key: SlotKey) => React.ReactNode;
   /** What the slot currently is, for the collapsed row. Hard slots only; others need no session. */
-  hardSessionTitle?: (key: 'hard1' | 'hard2' | 'long') => string | null;
+  /** ⚠️ ANY SLOT KEY — see `renderHardFlavor`. */
+  hardSessionTitle?: (key: SlotKey) => string | null;
   /**
    * ⛔ THE ATHLETE-TYPE ANSWER PRE-SHAPES THIS SCREEN (Michael, 2026-08-24): "Run only" never
    * renders Ride chips, "Ride only" never renders Run. With one sport allowed, every slot is
@@ -219,7 +230,28 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
            */
           const color = sport ? getDisciplineColor(SPORT_DISCIPLINE[sport]) : null;
           const isOpen = open === key;
-          const isHard = key === 'hard1' || key === 'hard2';
+          /**
+           * ⛔ THE OPTIONS THIS ROW OFFERS RIGHT NOW — the frame's, minus anything the impact floor
+           * holds given the answers on the other rows. `strength_5k` never withholds anything, so
+           * its four rows are exactly what they were.
+           */
+          const floored = slotOptionsNow(key, props.slots, props.frame ?? 'strength_5k');
+          /**
+           * ⛔⛔ THE FLOOR NEVER EMPTIES A ROW. `allowedSports` is the posture step's answer, and a
+           * ride-only athlete on a frame that prescribes riding could have both filters land on the
+           * same row at once — the floor withholding `ride` and the posture withholding `run` — and
+           * the athlete would be left with no chip to tap and no way past the screen.
+           * ⚠️ THE POSTURE WINS THAT TIE, because it is the athlete's own earlier answer about what
+           * they can do at all, and the impact floor is a recommendation we chose to enforce. Held
+           * against a stated impossibility, the recommendation gives.
+           */
+          const allowed = (o: SlotSport) => !props.allowedSports || props.allowedSports.includes(o);
+          const optionsNow = floored.options.some((o) => allowed(o.value))
+            ? floored
+            : { options: SLOT_OPTIONS[key] ?? [], reason: null };
+          // ⚠️ THE FRAME'S OWN HARD ROWS — `HARD_SLOT_KEYS` is derived from it now, so a frame with
+          // three quality sessions gets three hard rows rather than two and a stray.
+          const isHard = HARD_SLOT_KEYS.includes(key);
           /**
            * ⛔ THE LONG SLOT SHOWS ITS SESSION TITLE TOO (slice 2b, 2026-08-25). It was hard-only,
            * so a long slot the athlete had marked as their club ride showed the sport and nothing
@@ -301,11 +333,11 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                     {key === 'long' ? (
                       <span className="block text-white/40 text-xs mt-0.5">{LONG_SLOT_NOTE}</span>
                     ) : null}
-                    {/* ⛔ ONLY SLOT ONE. It is the row the intro's 3-4% is about — day 1 sits before
-                        the heavy leg day. Slot 2 is followed by an upper day and its sport costs the
-                        lifts nothing, so it stays silent rather than carrying a line that would read
-                        as the same warning twice. */}
-                    {key === 'hard1' ? (
+                    {/* ⛔ THE ROW THAT SITS THE DAY BEFORE A HEAVY LEG DAY, asked of the frame —
+                        see `slotPrecedesHeavyLowerDay`. It was `key === 'hard1'`, which is the same
+                        answer for this frame and a positional guess for any other. A quality session
+                        followed by an upper day costs the lifts nothing and stays silent. */}
+                    {slotPrecedesHeavyLowerDay(key) ? (
                       <span className="block text-white/40 text-xs mt-0.5">{HARD_1_SLOT_NOTE}</span>
                     ) : null}
                   </span>
@@ -323,9 +355,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                   {/* The sport, as two chips. Selected carries the sport colour; unselected neutral —
                       colouring both would read as two chosen answers. */}
                   <div className="flex items-center gap-2">
-                    {SLOT_OPTIONS[key].filter((opt) =>
-                      !props.allowedSports || props.allowedSports.includes(opt.value)
-                    ).map((opt) => {
+                    {optionsNow.options.filter((opt) => allowed(opt.value)).map((opt) => {
                       const on = sport === opt.value;
                       const c = getDisciplineColor(SPORT_DISCIPLINE[opt.value]);
                       return (
@@ -347,6 +377,15 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                       );
                     })}
                   </div>
+
+                  {/* ⛔⛔ WHY THE OTHER CHIP IS NOT THERE — the impact floor (p275, enforcement OURS;
+                      see `IMPACT_FLOOR_IS_OURS`). A control that is simply absent reads as a bug or
+                      as the screen having forgotten this row; the athlete reads his reason instead,
+                      and it is his reason rather than ours. It appears only on the row that is
+                      actually the week's last run. */}
+                  {optionsNow.reason ? (
+                    <p className="text-white/45 text-xs leading-snug">{optionsNow.reason}</p>
+                  ) : null}
 
                   {/* ⛔ THE TAX LINE, AT THE MOMENT IT IS ABOUT (2026-08-24). His two sentences left
                       the preamble — where they were read before there was anything to apply them to —

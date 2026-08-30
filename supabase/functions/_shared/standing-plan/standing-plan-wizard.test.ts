@@ -26,8 +26,8 @@ import { SLOT_KEYS, type SlotKey, type SlotSport } from '../../../../src/lib/sta
  * two are the mixes the old `defaultSlotSports(false|true)` produced, written out as fixtures so the
  * agreement checks below still cover a run-only week and a bike-kept one.
  */
-const ALL_RUN: Record<SlotKey, SlotSport> = { hard1: 'run', hard2: 'run', easy: 'run', long: 'run' };
-const BIKE_KEPT: Record<SlotKey, SlotSport> = { hard1: 'ride', hard2: 'ride', easy: 'run', long: 'run' };
+const ALL_RUN: Partial<Record<SlotKey, SlotSport>> = { hard1: 'run', hard2: 'run', easy: 'run', long: 'run' };
+const BIKE_KEPT: Partial<Record<SlotKey, SlotSport>> = { hard1: 'ride', hard2: 'ride', easy: 'run', long: 'run' };
 
 const BASELINES = {
   learned_fitness: {
@@ -45,7 +45,7 @@ const COMPOSE = {
   equipment: ['Commercial gym'],
   roundTo: 5,
 };
-const mixFrom = (slots: Record<SlotKey, SlotSport>) => {
+const mixFrom = (slots: Partial<Record<SlotKey, SlotSport>>) => {
   const runs = SLOT_KEYS.filter((k) => slots[k] === 'run').length;
   // ⛔ THE PER-SLOT ANSWER TRAVELS WITH THE COUNTS. Sending only the counts is what made the screen
   // lie — see `SportMix.slots`.
@@ -67,7 +67,7 @@ Deno.test('the cap the wizard shows brackets the week the composer actually buil
    * composer builds one week inside it. A week outside the band is the bug; a week inside it is the
    * band doing its job.
    */
-  const mixes: Record<SlotKey, SlotSport>[] = [
+  const mixes: Partial<Record<SlotKey, SlotSport>>[] = [
     ALL_RUN,
     BIKE_KEPT,
     { hard1: 'ride', hard2: 'ride', easy: 'ride', long: 'ride' },
@@ -271,7 +271,7 @@ Deno.test('the per-slot answer survives BOTH hops to the engine', async () => {
 
 Deno.test('an explicit per-slot answer overrides the dial; absent, the dial still assigns', () => {
   // ⛔ AN OVERRIDE, NOT A REPLACEMENT. Every caller from before the screen existed is unchanged.
-  const asked: Record<SlotKey, SlotSport> = { hard1: 'run', hard2: 'ride', easy: 'run', long: 'ride' };
+  const asked: Partial<Record<SlotKey, SlotSport>> = { hard1: 'run', hard2: 'ride', easy: 'run', long: 'ride' };
   const withSlots = composeWeek({
     ...COMPOSE, week: 2, column: 'standard', sportMix: mixFrom(asked),
   });

@@ -36,6 +36,15 @@ import {
   unansweredSlots,
   liftingRateTier,
   upperLowerSplitLine,
+  frameSlots,
+  displayOrderFor,
+  framePrescribesRiding,
+  switchableSlots,
+  impactFloorHoldsSlot,
+  slotOptionsNow,
+  IMPACT_FLOOR_IS_OURS,
+  hardSlotKeysFor,
+  slotKeysFor,
   type SlotKey,
   type SlotSport,
 } from './standing-plan-week-copy.ts';
@@ -654,4 +663,136 @@ Deno.test('⛔ RIDE STILL LEADS THE HARD SLOTS, AND RUN LEADS THE OTHER TWO', ()
   }
   assertEquals(SLOT_OPTIONS.easy[0].value, 'run');
   assertEquals(SLOT_OPTIONS.long[0].value, 'run');
+});
+
+Deno.test('⛔⛔ THE ROWS ARE THE FRAME\'S — and the 5K screen is unchanged by that becoming true', () => {
+  /**
+   * ⛔ THE ACCEPTANCE TEST FOR 2026-08-30. Five hand-kept copies of "what is this session for" were
+   * closed that day and this is the last of them: the screen's rows used to be four literals with a
+   * comment saying four was a product decision. They are read off the frame now.
+   *
+   * ⛔ THE FIRST HALF IS THE ONE THAT MATTERS — `strength_5k` MUST COME BACK IDENTICAL. Same keys,
+   * same order, same labels, same day numbers, same frame keys, same families and levels, same
+   * option order with the ride leading on the hard rows. If this half fails, a frozen screen moved.
+   */
+  const five = frameSlots('strength_5k');
+  assertEquals(five.map((s) => s.key), ['hard1', 'hard2', 'easy', 'long']);
+  assertEquals(five.map((s) => s.frameDay), [1, 3, 4, 6]);
+  assertEquals(five.map((s) => s.frameKey), ['1:0', '3:0', '4:0', '6:0']);
+  assertEquals(five.map((s) => s.family), ['run_mlss', 'run_near_threshold', 'run_vt1', 'run_lsd']);
+  assertEquals(five.map((s) => s.level), [2, 3, 1, 2]);
+  assertEquals(five.map((s) => s.label),
+    ['Hard session 1', 'Hard session 2', 'Easy session', 'Long session']);
+  assertEquals(five.map((s) => s.options[0].value), ['ride', 'ride', 'run', 'run']);
+  assertEquals(displayOrderFor('strength_5k'), ['long', 'easy', 'hard1', 'hard2']);
+  assertEquals(hardSlotKeysFor('strength_5k'), ['hard1', 'hard2']);
+
+  /**
+   * ⛔ AND THE ALL ROUNDER IS FIVE ROWS, TWO OF THEM PRESCRIBED AS RIDES (p274). Under the old
+   * suffix test — a family ending `_lsd` is long, `_vt1` is easy, anything else is hard — its
+   * `ride_endurance` easy session matched NEITHER, so it would have been counted as a third hard
+   * session, the screen would have shown no easy row at all, and nothing would have errored.
+   */
+  const all = frameSlots('all_rounder');
+  assertEquals(all.map((s) => s.key), ['hard1', 'hard2', 'hard3', 'easy', 'long']);
+  assertEquals(all.map((s) => s.frameDay), [1, 2, 3, 4, 6]);
+  assertEquals(all.map((s) => s.role), ['hard', 'hard', 'hard', 'easy', 'long']);
+  assertEquals(all.map((s) => s.family),
+    ['run_mlss', 'ride_anaerobic', 'run_near_threshold', 'ride_endurance', 'run_lsd']);
+  assertEquals(all[3].label, 'Easy session', 'the natively-prescribed ride lost its easy row');
+  assertEquals(displayOrderFor('all_rounder'), ['long', 'easy', 'hard1', 'hard2', 'hard3']);
+
+  // ⚠️ THE TAPER IS A DIFFERENT SHAPE AND THE ROWS FOLLOW IT — three slots, not four or five.
+  assertEquals(frameSlots('strength_5k', 'taper').length, 3);
+  assertEquals(frameSlots('all_rounder', 'taper').map((s) => s.role), ['hard', 'easy', 'easy', 'long']);
+
+  // ⛔ EVERY ROW STATES ITS DAY, AND IT IS A DAY NUMBER — never a weekday (Michael, 2026-08-30).
+  for (const frame of ['strength_5k', 'all_rounder'] as const) {
+    for (const s of frameSlots(frame)) {
+      assert(Number.isInteger(s.frameDay) && s.frameDay >= 1 && s.frameDay <= 7,
+        `${frame}/${s.key} has no frame day`);
+      assertEquals(s.frameKey, `${s.frameDay}:${s.frameKey.split(':')[1]}`);
+    }
+  }
+
+  // ⛔ THE DISPLAY ORDER IS A PERMUTATION OF THE MODEL ORDER, for every frame — the existing rule.
+  for (const frame of ['strength_5k', 'all_rounder'] as const) {
+    assertEquals([...displayOrderFor(frame)].sort(), [...slotKeysFor(frame)].sort(),
+      `${frame}: a row is drawn that the model does not have, or the reverse`);
+  }
+});
+
+Deno.test('⛔⛔ THE IMPACT FLOOR — his recommendation, our enforcement, and only where it belongs', () => {
+  /**
+   * ⛔ p275: *"Running work may be done on an elliptical or arc trainer, though he recommends impact
+   * with the ground on at least one day."* Two of the three runs may move to the bike; the last one
+   * is held, and the screen says why.
+   *
+   * ⛔ THE 5K FRAME MUST NOT INHERIT IT. Substituting rides for runs is its athletes' normal path.
+   * This is the assertion that keeps the floor scoped, and it is checked FIRST.
+   */
+  assert(!framePrescribesRiding('strength_5k'), 'the 5K frame now looks like it prescribes riding');
+  const allRides = { hard1: 'ride', hard2: 'ride', easy: 'ride', long: 'ride' } as const;
+  for (const k of slotKeysFor('strength_5k')) {
+    assert(!impactFloorHoldsSlot(k, allRides, 'strength_5k'),
+      `${k}: the 5K screen inherited the impact floor`);
+    assertEquals(slotOptionsNow(k, allRides, 'strength_5k').options.length, 2,
+      `${k}: the 5K screen lost an option`);
+    assertEquals(slotOptionsNow(k, allRides, 'strength_5k').reason, null);
+  }
+
+  // ⛔ THE ALL ROUNDER'S THREE RUNS ARE THE SWITCHABLE ONES — the two prescribed rides are not.
+  assert(framePrescribesRiding('all_rounder'));
+  assertEquals(switchableSlots('all_rounder'), ['hard1', 'hard3', 'long']);
+
+  // ⚠️ NOTHING IS HELD WHILE ANOTHER RUN ROW IS STILL OPEN — an unanswered row might yet be a run.
+  const untouched = emptySlotSports('all_rounder');
+  for (const k of switchableSlots('all_rounder')) {
+    assert(!impactFloorHoldsSlot(k, untouched, 'all_rounder'), `${k} was held on an untouched screen`);
+  }
+
+  // ⛔ TWO OF THE THREE MAY GO. The third is held, and the reason is on the row.
+  const twoGone = { ...untouched, hard1: 'ride', hard3: 'ride' } as const;
+  assert(!impactFloorHoldsSlot('hard1', twoGone, 'all_rounder'), 'a row already on the bike was held');
+  assert(impactFloorHoldsSlot('long', twoGone, 'all_rounder'), 'the last run was switchable');
+  const held = slotOptionsNow('long', twoGone, 'all_rounder');
+  assertEquals(held.options.map((o) => o.value), ['run'], 'the last run still offered a ride');
+  assert((held.reason ?? '').length > 0, 'the control vanished with no reason given');
+  assertEquals(voiceViolation(held.reason ?? ''), null, held.reason ?? '');
+
+  // ⛔ IT WORKS FROM ANY DIRECTION — whichever two go, the remaining one is the held one.
+  for (const kept of switchableSlots('all_rounder')) {
+    const others = switchableSlots('all_rounder').filter((k) => k !== kept);
+    const state = { ...untouched } as Record<string, unknown>;
+    for (const k of others) state[k] = 'ride';
+    assert(impactFloorHoldsSlot(kept, state as never, 'all_rounder'), `${kept} was not held`);
+  }
+
+  /**
+   * ⚠️ NOBODY IS STRANDED. The floor only ever withholds `ride`, so every row always has `run`
+   * available and the screen can be completed from any state — including by an athlete with no bike,
+   * who answers every row `run` and never meets the floor at all.
+   */
+  const allRuns: Record<string, unknown> = {};
+  for (const k of slotKeysFor('all_rounder')) allRuns[k] = 'run';
+  for (const k of slotKeysFor('all_rounder')) {
+    const now = slotOptionsNow(k, allRuns as never, 'all_rounder');
+    assert(now.options.length > 0, `${k} offered nothing at all`);
+    assert(now.options.some((o) => o.value === 'run') || now.options.some((o) => o.value === 'ride'),
+      `${k} offered neither sport`);
+  }
+  for (const k of switchableSlots('all_rounder')) {
+    assert(!impactFloorHoldsSlot(k, allRuns as never, 'all_rounder'),
+      `${k} was held on an all-run week, where there is nothing to protect`);
+  }
+
+  // ⚠️ A DECLINED HARD SESSION IS NOT A RUN. The floor must not read `none` as impact.
+  const declined = { ...untouched, hard1: null, hard3: 'ride' } as const;
+  assert(impactFloorHoldsSlot('long', declined, 'all_rounder') === false,
+    'an unanswered row is not yet a ride, so nothing is held');
+
+  // ⛔ THE ENFORCEMENT IS LABELLED OURS, and the label names the page it enforces.
+  assert(/recommend/i.test(IMPACT_FLOOR_IS_OURS), 'the label lost his word "recommends"');
+  assert(/p275/.test(IMPACT_FLOOR_IS_OURS), 'the label lost its page');
+  assert(/ours/i.test(IMPACT_FLOOR_IS_OURS), 'the enforcement is no longer labelled ours');
 });

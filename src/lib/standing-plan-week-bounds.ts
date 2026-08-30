@@ -54,20 +54,28 @@ import {
   weekVolumeBounds,
   type SlotSpec,
 } from '../../supabase/functions/_shared/standing-plan/volume-bounds.ts';
-import type { SlotKey, SlotSelection, SlotSport } from './standing-plan-week-copy';
+import { frameSlots, type SlotKey, type SlotSelection, type SlotSport } from './standing-plan-week-copy';
 
 /**
- * ⛔ THE FRAME'S OWN SLOTS, in the order the screen shows them. Kept as a literal rather than read
- * from `FRAMES` because the SCREEN's four controls are a product decision — a frame that ever
- * carried five endurance slots would need a new screen, not a longer loop, and a silent extra row is
- * worse than a build error.
+ * ⛔⛔ THE FRAME'S OWN SLOTS, READ OFF THE FRAME (2026-08-30). It was a four-entry literal, and the
+ * comment beside it said the literal was deliberate — *"the SCREEN's four controls are a product
+ * decision; a frame that ever carried five endurance slots would need a new screen, not a longer
+ * loop."*
+ *
+ * ⛔ THAT REASONING IS SUPERSEDED, AND ITS OWN CONDITION IS WHY. **A frame that carries five
+ * endurance slots now exists** (p274), Michael has ruled the fifth row in, and the row it needs is
+ * the same KIND of row as the four already here rather than a new control. What the old note was
+ * really protecting against — a silent extra row — is handled by asking the frame instead of by
+ * refusing to count: the rows are whatever the frame has, so there is nothing to fall out of step.
+ *
+ * ⚠️ `strength_5k` PRODUCES THE IDENTICAL FOUR ENTRIES, same keys, same families, same levels. That
+ * is the acceptance test and it is pinned.
  */
-export const SLOT_FAMILY: Record<SlotKey, { family: FamilyId; level: Level }> = {
-  hard1: { family: 'run_mlss', level: 2 },
-  hard2: { family: 'run_near_threshold', level: 3 },
-  easy: { family: 'run_vt1', level: 1 },
-  long: { family: 'run_lsd', level: 2 },
-};
+export const SLOT_FAMILY: Record<SlotKey, { family: FamilyId; level: Level }> = (() => {
+  const out = {} as Record<SlotKey, { family: FamilyId; level: Level }>;
+  for (const s of frameSlots()) out[s.key] = { family: s.family as FamilyId, level: s.level as Level };
+  return out;
+})();
 
 /**
  * ⛔ THE SCREEN'S SLOT → THE FRAME'S OWN KEY (`${frameDay}:${indexWithinDay}`), which is what
@@ -79,12 +87,11 @@ export const SLOT_FAMILY: Record<SlotKey, { family: FamilyId; level: Level }> = 
  * frame with a different layout needs a different screen, not a longer table — which is the same
  * reason `SLOT_FAMILY` is a literal.
  */
-export const SLOT_FRAME_KEY: Record<SlotKey, string> = {
-  hard1: '1:0',
-  hard2: '3:0',
-  easy: '4:0',
-  long: '6:0',
-};
+export const SLOT_FRAME_KEY: Record<SlotKey, string> = (() => {
+  const out = {} as Record<SlotKey, string>;
+  for (const s of frameSlots()) out[s.key] = s.frameKey;
+  return out;
+})();
 
 /**
  * The athlete's answers, in the shape `SportMix.slots` takes.
@@ -310,12 +317,7 @@ export type ExperienceChoice = { newer: ExperienceChip; experienced: ExperienceC
  */
 const FRAME_ARCHETYPE: Record<SlotKey, string | undefined> = (() => {
   const out = {} as Record<SlotKey, string | undefined>;
-  for (const key of Object.keys(SLOT_FRAME_KEY) as SlotKey[]) {
-    const [day, idx] = SLOT_FRAME_KEY[key].split(':').map((n) => Number(n));
-    const slot = FRAMES.strength_5k.columns.standard
-      .find((d) => d.day === day)?.endurance?.[idx];
-    out[key] = (slot as { archetype?: string } | undefined)?.archetype;
-  }
+  for (const s of frameSlots()) out[s.key] = s.archetype;
   return out;
 })();
 

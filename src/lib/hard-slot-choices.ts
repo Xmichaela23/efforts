@@ -108,13 +108,35 @@ export function hardSlotOptions(sport: 'run' | 'ride') {
  * ⚠️ `slot` IS REQUIRED. A default keyed on sport alone is what produced two identical rows; there is
  * no such thing as "the default hard session" on this frame, only the default for a given slot.
  */
-export type HardSlotKey = 'hard1' | 'hard2';
+/**
+ * ⚠️ THE FRAME OWNS HOW MANY THERE ARE (2026-08-30). p246 prescribes two quality sessions and p274
+ * three, so this spans every hard key any frame can carry — `hardSlotKeysFor` is what says which of
+ * them a given frame actually has.
+ */
+export type HardSlotKey = 'hard1' | 'hard2' | 'hard3';
 
-export function hardSlotDefault(sport: 'run' | 'ride', slot: HardSlotKey = 'hard1'): HardSlotValue {
-  // ⛔ SLOT TWO IS THE SUSTAINED ONE, on either sport — `run_near_threshold` / the sweet-spot blocks.
-  if (slot === 'hard2') return { role: 'threshold', ownership: 'prescribed' };
-  // ⛔ SLOT ONE IS THE TOP-END ONE — `run_mlss` / the 95-105% FTP intervals. On the run that is the
-  // VO2 option (its own table calls it "Recommended"); on the ride it is Helgerud's 4 × 4.
+export function hardSlotDefault(
+  sport: 'run' | 'ride',
+  slot: HardSlotKey = 'hard1',
+  frame: FrameId = 'strength_5k',
+): HardSlotValue {
+  /**
+   * ⛔⛔ THE SESSION IS THE FRAME'S FACT AND IS READ OFF THE SLOT'S FAMILY (2026-08-30). It was
+   * `slot === 'hard2'`, which is a POSITION, and the position only stands in for the family in one
+   * frame: p246 happens to put the sustained session second. p274 puts a top-end ride second and a
+   * near-threshold run third, so a positional test would have handed the third row the top-end
+   * default and the athlete a session the composer does not build there.
+   *
+   * ⚠️ `strength_5k` ANSWERS IDENTICALLY — its `hard2` IS `run_near_threshold`, so it still gets the
+   * sustained default, and `hard1` is still `run_mlss` and still gets the top-end one.
+   */
+  const family = String(frameSlots(frame).find((s) => s.key === slot)?.family ?? '');
+  // ⛔ THE SUSTAINED ONE — near-threshold running, or the sweet-spot blocks on the bike.
+  if (family === 'run_near_threshold' || family === 'ride_sweet_spot') {
+    return { role: 'threshold', ownership: 'prescribed' };
+  }
+  // ⛔ THE TOP-END ONE — `run_mlss` / the 95-105% FTP intervals. On the run that is the VO2 option
+  // (its own table calls it "Recommended"); on the ride it is Helgerud's 4 × 4.
   return sport === 'ride'
     ? { role: 'intensity', ownership: 'prescribed' }
     : { role: 'intensity', goal: 'vo2', ownership: 'prescribed' };
@@ -179,12 +201,25 @@ export const HARD_SLOT_FACT_NOTE =
 // the same table the composer uses, so the card can never offer a workout the week cannot build.
 import { FAMILIES, type FamilyId } from '../../supabase/functions/_shared/endurance-library/index.ts';
 import { RIDE_EQUIVALENT } from '../../supabase/functions/_shared/standing-plan/index.ts';
+import type { FrameId } from '../../supabase/functions/_shared/standing-plan/frames.ts';
+import { frameSlots } from './standing-plan-week-copy';
 
-/** p246: frame day 1's hard slot is MLSS+, day 3's is near-threshold. One place, cite kept. */
-export const HARD_SLOT_RUN_FAMILY: Record<HardSlotKey, FamilyId> = {
-  hard1: 'run_mlss',
-  hard2: 'run_near_threshold',
-};
+/**
+ * ⛔ THE FAMILY EACH HARD SLOT IS PRESCRIBED AS, READ OFF THE FRAME (2026-08-30). It was a literal
+ * pair — p246 puts MLSS+ on frame day 1 and near-threshold on day 3 — and that is still exactly what
+ * comes back for `strength_5k`.
+ *
+ * ⚠️ THE NAME IS NOW HALF WRONG AND IS KEPT ANYWAY. p274 prescribes its second quality session as a
+ * RIDE (`Cyc AnA`), so this is "the family the frame states", not "the run family". Renaming it
+ * would touch every reader for no behaviour; the comment is the correction.
+ */
+export const HARD_SLOT_RUN_FAMILY: Record<HardSlotKey, FamilyId> = (() => {
+  const out = {} as Record<HardSlotKey, FamilyId>;
+  for (const s of frameSlots()) {
+    if (s.role === 'hard') out[s.key as HardSlotKey] = s.family as FamilyId;
+  }
+  return out;
+})();
 
 export type SlotVariantOption = { id: string; label: string };
 
@@ -197,9 +232,20 @@ export type SlotVariantOption = { id: string; label: string };
  * `variantsTakenBy` below exists at all. On the run they are different families and nothing
  * overlaps, so the same code is a no-op there rather than a special case.
  */
-export function slotFamilyFor(key: HardSlotKey, sport: 'run' | 'ride'): FamilyId {
-  const runFam = HARD_SLOT_RUN_FAMILY[key];
-  return sport === 'ride' ? (RIDE_EQUIVALENT[runFam]?.family ?? runFam) : runFam;
+export function slotFamilyFor(
+  key: HardSlotKey,
+  sport: 'run' | 'ride',
+  frame: FrameId = 'strength_5k',
+): FamilyId {
+  const stated = (frameSlots(frame).find((s) => s.key === key)?.family
+    ?? HARD_SLOT_RUN_FAMILY[key]) as FamilyId;
+  /**
+   * ⚠️ A SLOT THE FRAME ALREADY PRESCRIBES AS A RIDE IS ALREADY THE ANSWER — there is no conversion
+   * to do and `RIDE_EQUIVALENT` has no entry for it (it maps run families to ride ones, one way).
+   * The screen does not offer Run on such a slot, for the reason `optionsFor` records.
+   */
+  if (String(stated).startsWith('ride_')) return stated;
+  return sport === 'ride' ? (RIDE_EQUIVALENT[stated]?.family ?? stated) : stated;
 }
 
 export function slotVariantOptions(key: HardSlotKey, sport: 'run' | 'ride'): SlotVariantOption[] {

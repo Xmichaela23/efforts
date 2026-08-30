@@ -20,7 +20,7 @@ import {
   experiencedIsReachable,
   experienceUnansweredLine,
 } from '@/lib/standing-plan-week-copy';
-import { CLUB_SESSION_CONTROL_VISIBLE, hardSlotDefault, slotFamilyFact, slotVariantOptions, variantsTakenBy } from '@/lib/hard-slot-choices';
+import { CLUB_SESSION_CONTROL_VISIBLE, hardSlotDefault, slotFamilyFact, slotVariantOptions, variantsTakenBy, type HardSlotKey } from '@/lib/hard-slot-choices';
 import { SLOT_FAMILY } from '@/lib/standing-plan-week-bounds';
 import { hardPairInFrameOrder, RIDE_EQUIVALENT } from '../../supabase/functions/_shared/standing-plan/index.ts';
 import {
@@ -947,7 +947,9 @@ type NonRaceState = {
      * ⚠️ Absent on drafts made before today. `hardEntry` falls back to the positional read for
      * those, which is correct for them because they always carried both slots.
      */
-    slot?: 'hard1' | 'hard2';
+    // ⚠️ WIDENED 2026-08-30 — the frame owns how many quality rows there are; a frame with three
+    // stores three entries. Optional still, for drafts written before `slot` existed.
+    slot?: HardSlotKey;
     discipline: 'run' | 'bike';
     day: DayName | '';
     ownership: 'prescribed' | 'club';
@@ -3669,7 +3671,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * ⚠️ HARD 1 IS `hardDays[0]`, HARD 2 IS `hardDays[1]` — positional, because the frame's two hard
    * slots are positional and the composer caps at two and dedupes by day.
    */
-  const HARD_SLOT_INDEX: Record<'hard1' | 'hard2', number> = { hard1: 0, hard2: 1 };
+  // ⚠️ THE FRAME'S HARD ROWS IN ITS OWN ORDER — a positional fallback for drafts written before
+  // `slot` existed. Three rows where the frame has three.
+  const HARD_SLOT_INDEX: Record<string, number> = Object.fromEntries(
+    HARD_SLOT_KEYS.map((k, i) => [k, i]),
+  );
 
   /**
    * ⛔ THE ENTRY FOR A SLOT, BY KEY — NOT BY POSITION (2026-08-25). With hard sessions removable, an
@@ -3677,7 +3683,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * positional read hands the wrong session's day and archetype to the row. ⚠️ Falls back to the
    * positional read for drafts written before `slot` existed, which always carried both entries.
    */
-  const hardEntry = (st: NonRaceState, k: 'hard1' | 'hard2') =>
+  const hardEntry = (st: NonRaceState, k: HardSlotKey) =>
     st.hardDays.find((h) => h.slot === k)
     ?? (st.hardDays.some((h) => h.slot) ? undefined : st.hardDays[HARD_SLOT_INDEX[k]]);
 
@@ -3688,7 +3694,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * `p246`'s own two hard days in order. ⚠️ THE WORD "DEFAULT" IS WRONG HERE NOW: there is nothing to
    * default away from, because the card that offered the alternative has been removed.
    */
-  const hardDefaultsFor = (sport: SlotSport, slot: 'hard1' | 'hard2' = 'hard1') => ({
+  const hardDefaultsFor = (sport: SlotSport, slot: HardSlotKey = 'hard1') => ({
     discipline: (sport === 'ride' ? 'bike' : 'run') as 'run' | 'bike',
     // ⛔ ONE OWNER FOR THE DEFAULT — `hardSlotDefault` in `src/lib/hard-slot-choices.ts`, which is
     // also what the card highlights. Two statements of "a ride defaults to threshold" is how the
@@ -3712,7 +3718,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const syncHardDays = (
     st: NonRaceState,
     slots: SlotSelection,
-  ): NonRaceState['hardDays'] => (['hard1', 'hard2'] as const).map((k) => {
+  ): NonRaceState['hardDays'] => (HARD_SLOT_KEYS as HardSlotKey[]).map((k) => {
     const i = HARD_SLOT_INDEX[k];
     const prev = st.hardDays[i];
     const sport = slots[k];
@@ -5827,14 +5833,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               // ⚠️ THE LONG SLOT READS ITS OWN FIELD — see `renderHardFlavor` for why its club
               // answer is not in `hardDays`. Its only session answer is whether it is the club ride.
               if (key === 'long') return state.longClub ? 'Club ride' : null;
-              const h = hardEntry(state, key);
+              // ⚠️ ONLY A HARD ROW HAS AN ENTRY. The easy row reaches here now that the frame owns
+              // the row list, and it has no session answer of its own to show.
+              if (!HARD_SLOT_KEYS.includes(key)) return null;
+              const hk = key as HardSlotKey;
+              const h = hardEntry(state, hk);
               if (h?.ownership === 'club') return 'Club session';
               // ⛔ THE TITLE READS THE LIBRARY (2026-08-24): the chosen variant's label when one is
               // picked, the family's own label otherwise — never the old tables' copy.
               const variant = h?.archetype
-                ? slotVariantOptions(key, sport).find((v) => v.id === h.archetype)?.label
+                ? slotVariantOptions(hk, sport).find((v) => v.id === h.archetype)?.label
                 : null;
-              return variant ?? slotFamilyFact(key, sport)?.title ?? null;
+              return variant ?? slotFamilyFact(hk, sport)?.title ?? null;
             }}
             renderHardFlavor={(key) => {
               const sport = slotSportsNow[key];

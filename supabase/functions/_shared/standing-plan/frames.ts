@@ -172,6 +172,19 @@ export type Frame = {
   id: FrameId;
   /** ⛔ NEVER SHOWN TO AN ATHLETE (pivot §1). Internal only. */
   sourceName: string;
+  /**
+   * ⛔⛔ WHAT THE ATHLETE CALLS THIS, WHICH IS NEVER WHAT THE BOOK CALLS IT (Michael, 2026-08-30).
+   * The naming is Focus-branded, so the All Rounder is **Standard Focus** on every screen. This is
+   * the same id-versus-display split `non-race-goal-seeds.ts` already uses, where the goal id
+   * `get_stronger` displays as "Strong Focus" — and the comment there records what happens when the
+   * two are conflated: the athlete picked one name and was handed a plan called another.
+   *
+   * ⚠️ ABSENT MEANS THE FRAME HAS NO ATHLETE-FACING NAME YET, and `strength_5k` is deliberately left
+   * that way. Michael has ruled it becomes **5K + Strength** inside a Run Focus grouping, and that
+   * grouping does not exist — naming it here before the screen that houses it would put a third name
+   * on a plan that already has two. **That is a separate change; do not fill it in as tidiness.**
+   */
+  displayName?: string;
   cite: string;
   /** ⛔ THE PROGRAM OWNS THIS (pivot §6). Not an athlete dial. */
   liftingDays: number;
@@ -592,6 +605,7 @@ export const FRAMES: Record<FrameId, Frame> = {
   all_rounder: {
     id: 'all_rounder',
     sourceName: 'The All Rounder',
+    displayName: 'Standard Focus',
     cite: 'Viada pp274-275',
     liftingDays: 4,
     columns: { standard: ALL_ROUNDER_STANDARD, taper: ALL_ROUNDER_TAPER },
