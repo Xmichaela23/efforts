@@ -60,7 +60,7 @@ import {
   WEEKDAYS, frameFixedDaysFor, titleCaseDay, weekdayForFrameDay, type Weekday,
 } from './day-map.ts';
 import {
-  assignSports, assignedSlot, isHardSlot, SWIM_SLOT, SWIM_IS_EASY_ONLY, type SportMix,
+  assignSports, assignedSlot, isHardSlot, isLongSlot, SWIM_SLOT, SWIM_IS_EASY_ONLY, type SportMix,
 } from './sport-slots.ts';
 import {
   HAIRCUT_CAUSE_IS_OURS,
@@ -215,9 +215,22 @@ function dayNameFor(args: ComposeArgs, frameDay: number): Weekday {
  * ⛔ Do not "fix" a future sport-assignment need by widening this list to ride families. The frame
  * slot is the anchor; the sport riding on it is a different question.
  */
-function anchorRoleOf(family: string): 'long' | 'hard' | null {
-  if (family === 'run_lsd') return 'long';
-  if (family === 'run_mlss' || family === 'run_near_threshold') return 'hard';
+/**
+ * ⛔⛔ ONE OWNER FOR "WHAT IS THIS SLOT FOR" (2026-08-30). This was a THIRD copy of the run-family
+ * list — beside `HARDNESS`/`isLongSlot` in `sport-slots.ts` and `HARD_FAMILIES` in
+ * `week-conflicts.ts` — and the three had already drifted: `HARD_FAMILIES` was missing
+ * `ride_sweet_spot`'s successor and the hardest session in a rider's week did not count as hard.
+ *
+ * ⛔ IT DELEGATES NOW. `isLongSlot` and `isHardSlot` read the slot's own `role` when the frame states
+ * one and fall back to the family tables when it does not, so a natively-prescribed ride — the All
+ * Rounder's `Cyc AnA` and `Cyc endurance` — is classified rather than invisible.
+ * ⚠️ THE SIGNATURE STILL TAKES A FAMILY STRING for its many callers; a slot-shaped caller can pass
+ * the role through the second argument and it wins.
+ */
+function anchorRoleOf(family: string, role?: 'hard' | 'long' | 'easy' | null): 'long' | 'hard' | null {
+  const slot = { family: family as never, role: role ?? null };
+  if (isLongSlot(slot)) return 'long';
+  if (isHardSlot(slot)) return 'hard';
   return null;
 }
 

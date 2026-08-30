@@ -218,15 +218,52 @@ export const SWIM_IS_EASY_ONLY =
  * is harder. The hard slots are the ones the dial moves to the bike; the long slot is the one a held
  * sport keeps.
  */
+/**
+ * ⛔⛔ EVERY FAMILY, NOT JUST THE RUN ONES (2026-08-30, for the All Rounder).
+ *
+ * ⛔ WHY IT HAD TO WIDEN. This table listed run families alone, and that was correct while every
+ * frame slot WAS a run family — `strength_5k` is transcribed run-only and `RIDE_EQUIVALENT` converts
+ * afterwards, so a ride only ever existed downstream of a run slot that had already been classified.
+ * **The All Rounder prescribes cycling NATIVELY** — p274 puts `Cyc AnA (level 1)` on day 2 and
+ * `Cyc endurance (level 1)` on day 4 — so its ride slots arrive here unconverted and a run-only
+ * table returns `undefined` for them: not hard, not long, not easy. Invisible.
+ *
+ * ⚠️ AND INVISIBLE IS SILENT. A slot with no role gets no pin, no anchor placement, no interference
+ * check against the leg days, and nothing for the experience chips to size. It does not throw; the
+ * week just quietly comes out wrong. **Same class as the `HARD_FAMILIES` defect fixed earlier today,
+ * where the hardest session in a rider's week did not count as hard.**
+ *
+ * ⚠️ THE RIDE NUMBERS MIRROR THE RUN ONES BY INTENSITY, and that ordering is OURS — the corpus
+ * ranks no family against another. `ride_anaerobic` (110-125%, p237) sits where `run_mlss` does
+ * (above threshold, p231); `ride_sweet_spot` (80-95%, p238-239) where `run_near_threshold` does;
+ * `ride_endurance` (below 75%, p239) where `run_vt1` does. It is a ranking for placement, not a
+ * claim about training equivalence.
+ * ⚠️ `ride_sprints` / `ride_vo2` ARE DELIBERATELY ABSENT. No frame prescribes them, and a family
+ * with no role is the honest answer for a session this plan never builds — see `isHardSlot`.
+ */
 const HARDNESS: Partial<Record<FamilyId, number>> = {
   run_mlss: 4,
   run_near_threshold: 3,
   run_vt1: 1,
   run_lsd: 2,
+  ride_anaerobic: 4,
+  ride_sweet_spot: 3,
+  ride_endurance: 1,
 };
 
-/** ⛔ THE LONG SLOT. `run_lsd` is the frame's long session; a held sport keeps it (pivot §2). */
-export function isLongSlot(slot: { family: FamilyId }): boolean {
+/**
+ * ⛔ THE LONG SLOT — the frame's longest session, whatever sport prescribes it.
+ *
+ * ⚠️ IT IS NOT A FAMILY TEST ANY MORE. `family === 'run_lsd'` was right while the long slot was
+ * always an LSD run that a ride might later replace. The All Rounder's day 6 is still LSD, but a
+ * frame whose long session is prescribed as a ride would have had no long slot at all — no long-day
+ * pin, and `sport-slots.ts`'s own "a held sport keeps its long session" rule reduced to a no-op.
+ * ⛔ THE MARKER IS THE SLOT'S, when it carries one — `EnduranceSlot.role` — so a frame states which
+ * session is its long one rather than the reader inferring it from a family name. Absent, the
+ * family test stands exactly as before, which is every caller that predates this.
+ */
+export function isLongSlot(slot: { family: FamilyId; role?: string | null }): boolean {
+  if (slot.role) return slot.role === 'long';
   return slot.family === 'run_lsd';
 }
 
@@ -280,7 +317,10 @@ export const HARD_SESSIONS_ARE_OPT_IN =
   + 'ones become easy running instead, so the miles and hours you set are unchanged.';
 
 /** ⛔ A HARD SLOT — at or above near-threshold. These are the two the dial places. */
-export function isHardSlot(slot: { family: FamilyId }): boolean {
+export function isHardSlot(slot: { family: FamilyId; role?: string | null }): boolean {
+  // ⛔ THE SLOT'S OWN MARKER WINS — see `isLongSlot`. Absent, the intensity table decides, and a
+  // family the table does not rank is NOT hard: the honest answer for a session no frame builds.
+  if (slot.role) return slot.role === 'hard';
   return (HARDNESS[slot.family] ?? 0) >= 3;
 }
 

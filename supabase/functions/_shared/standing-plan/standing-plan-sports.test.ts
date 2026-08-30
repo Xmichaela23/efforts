@@ -948,13 +948,28 @@ Deno.test('⛔ "the hard sessions are on the bike" says what is TRUE of the buil
 });
 
 Deno.test('⚠️ THE BIKE SENTENCE COUNTS FRAME SLOTS, NOT ASSIGNED FAMILIES', () => {
-  // ⛔ THE TRAP UNDER THE FIX, PINNED SO NOBODY "SIMPLIFIES" IT. `isHardSlot` reads `HARDNESS`, which
-  // lists only the RUN families. Ask it about a slot substituted to `ride_sweet_spot` and it says
-  // false — so counting off the ASSIGNMENT returns zero on exactly the week the sentence is about,
-  // and the note goes silent. The frame slot owns hard identity, the same rule `anchorRoleOf` follows.
-  assertEquals(isHardSlot({ family: 'ride_sweet_spot' } as never), false,
-    'a ride family became hard — the note in sport-slots.ts can be simplified, re-read it first');
+  /**
+   * ⛔⛔ THE PROXY IS GONE; THE RULE IT STOOD FOR IS PINNED DIRECTLY (2026-08-30).
+   *
+   * This asserted `isHardSlot({ family: 'ride_sweet_spot' }) === false`. That was never the rule —
+   * it was a PROXY for the real one, "the frame slot owns hard identity", and it worked only while
+   * `HARDNESS` listed run families alone. `HARDNESS` now covers the ride families too, because the
+   * All Rounder prescribes cycling NATIVELY (p274) and a run-only table made those slots invisible
+   * as hard or long. So the proxy is false and the rule is unchanged.
+   *
+   * ⛔ WHAT THE SENTENCE MUST STILL DO, asserted on the sentence itself rather than on a stand-in:
+   * count the FRAME's hard slots, so a week whose hard slots went to the bike says so exactly once
+   * per slot. Counting the assignment would have been wrong before this change and is wrong after.
+   */
   assertEquals(isHardSlot({ family: 'run_mlss' } as never), true);
+  // ⚠️ A ride family IS hard now — deliberately, and this records that it changed.
+  assertEquals(isHardSlot({ family: 'ride_sweet_spot' } as never), true);
+  // ⛔ AND THE SLOT'S OWN MARKER OUTRANKS THE TABLE, which is how a frame states its own shape.
+  assertEquals(isHardSlot({ family: 'run_lsd', role: 'hard' } as never), true);
+  assertEquals(isHardSlot({ family: 'run_mlss', role: 'easy' } as never), false);
+  // ⚠️ THE SENTENCE ITSELF is pinned by the test above, which owns the helper that builds it. Not
+  // repeated here: a second copy of an assertion drifts from the first, which is the defect this
+  // whole file keeps catching.
 });
 
 Deno.test('the bike claim is marked unverified where the copy lives', () => {

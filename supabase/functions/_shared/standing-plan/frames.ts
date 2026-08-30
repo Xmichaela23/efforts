@@ -88,6 +88,17 @@ export type EnduranceSlot = {
   archetype?: string;
   /** Taper only — *"NT (race tempo)"*: race pace with recoveries 25% longer (p247). */
   raceTempo?: boolean;
+  /**
+   * ⛔⛔ WHAT THIS SLOT IS FOR, STATED BY THE FRAME (2026-08-30). `hard` is a quality session, `long`
+   * is the week's long one, `easy` is base work.
+   *
+   * ⚠️ OPTIONAL, AND ABSENT MEANS "INFER IT" — every slot written before this reads exactly as it
+   * did, through the family tables in `sport-slots.ts`. It exists because the All Rounder prescribes
+   * CYCLING NATIVELY (p274: `Cyc AnA` on day 2, `Cyc endurance` on day 4) and a frame should not
+   * have to name its sessions in run-family vocabulary to be understood. Inferring a role from a
+   * family name is what made a natively-prescribed ride invisible as hard or long.
+   */
+  role?: 'hard' | 'long' | 'easy';
   sourceText: string;
 };
 

@@ -70,10 +70,15 @@ export type WeekConflict = {
  * rewritten to the column's easy one, so asking the frame would call a session hard that the week
  * has already converted to easy running.
  */
-// ⛔ `ride_anaerobic` ADDED 2026-08-30 with the bike's second quality slot. Without it the HARDEST
-// session in a rider's week — 110-120% of FTP — was the one session this engine did not count as
-// hard, so a hard ride landing on the heavy leg day raised nothing at all.
-const HARD_FAMILIES = ['run_mlss', 'run_near_threshold', 'ride_sweet_spot', 'ride_anaerobic'];
+/**
+ * ⛔⛔ NO LONGER ITS OWN LIST (2026-08-30). This was a hand-maintained copy of "which families are
+ * hard", and it drifted: `ride_anaerobic` was missing, so the HARDEST session in a rider's week —
+ * 110-120% of FTP — was the one session this engine did not count as hard, and a hard ride landing
+ * on the heavy leg day raised nothing at all.
+ * ⛔ IT ASKS `isHardSlot` NOW, the same owner `anchorRoleOf` and the composer read, so a family
+ * added to the frame cannot be hard in one reader and invisible in another.
+ */
+const isHardFamily = (family: string): boolean => isHardSlot({ family: family as never });
 
 const tagValue = (s: PlanSession, prefix: string): string =>
   (s.tags ?? []).find((t) => t.startsWith(prefix))?.slice(prefix.length) ?? '';
@@ -144,7 +149,7 @@ export function typedSessionsOf(
       s,
       load: role === 'long'
         ? (sport === 'ride' ? 'long_ride' : 'long_run')
-        : (HARD_FAMILIES.includes(family) ? 'hard_cardio' : 'easy'),
+        : (isHardFamily(family) ? 'hard_cardio' : 'easy'),
     });
   }
   return out;
