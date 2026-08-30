@@ -21,7 +21,8 @@ import {
   type EnduranceBaselines,
   type Level,
 } from '../endurance-library/index.ts';
-import { bandRouteName, prescribe, resolveSlot, type ViadaPattern } from '../strength-grid/index.ts';
+import { bandRouteName, prescribe, resolveSlot, viadaCategoryOf, type ViadaPattern
+} from '../strength-grid/index.ts';
 import {
   HOLD_PRESCRIPTION,
   fillMuscleFloor,
@@ -2487,8 +2488,34 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       picks.unplaced.delete(canonicalize(add.movement));
       picks.placed.add(canonicalize(add.movement));
     }
+    /**
+     * ⛔⛔ RULE 4, p142 — "Core Work Before Isolation Work (but After the Main Work)".
+     *
+     * > *"Many athletes are tempted to perform any core/bracing work last in a routine, typically
+     * > hitting isolation/externally braced work (for example, machine work) after their main lift
+     * > and throwing in core work at the end. This tends to do the core a disservice — isolation work
+     * > is rarely degraded by a tired core, and core work tends to have a higher skill component than
+     * > most isolation work."*
+     *
+     * ⛔ EVERY ADDED ROW WAS APPENDED, so a core row landed dead last — behind the calf raise, which
+     * is the exact routine he describes. Seen on a composed week 2026-08-29: `back squat → trap bar
+     * deadlift → bulgarian split squat → weighted single leg calf raise → v up`.
+     *
+     * ⚠️ CORE ONLY. His rule is about core, and the other floor muscles have no stated position — a
+     * general re-order would be inventing an ordering he does not give.
+     *
+     * ⚠️ THE ANCHOR IS THE CATEGORY, ASKED OF THE GRID rather than parsed off the row. `source_row`
+     * carries the frame's slot text and "focused" appears in it, but reading a category out of a
+     * display string is how two vocabularies start disagreeing.
+     */
+    const existing = target.strength_exercises ?? [];
+    const beforeIsolation = add.muscle === 'core'
+      ? existing.findIndex((e) => viadaCategoryOf(String((e as { name?: string })?.name ?? '')) === 'focused')
+      : -1;
+    const at = beforeIsolation >= 0 ? beforeIsolation : existing.length;
+
     target.strength_exercises = [
-      ...(target.strength_exercises ?? []),
+      ...existing.slice(0, at),
       {
         // ⛔ THE FLOOR'S OWN PICKS GET THE SAME BAND LABEL as a slot's — see `bandRouteName`. The
         // athlete's own pick keeps their spelling.
@@ -2540,6 +2567,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
             ? `Your pick for ${add.muscle}.`
             : `Floor: ${add.muscle} had nothing else this week.`,
       },
+      ...existing.slice(at),
     ];
   }
   for (const n of filled.notes) notes.push({ kind: n.kind === 'source' ? 'source' : 'ours', text: n.text, cite: n.cite });

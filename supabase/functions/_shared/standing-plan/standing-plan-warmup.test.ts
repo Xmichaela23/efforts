@@ -12,6 +12,7 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { composeWeek } from './compose.ts';
 import { voiceViolation } from '../state-trend/week-accent.ts';
+import { viadaCategoryOf } from '../strength-grid/index.ts';
 import {
   DEFAULT_BAR_LB,
   RAMP_BAR_CUE,
@@ -131,4 +132,37 @@ Deno.test('⛔ THE COPY PASSES THE VOICE CHECK, and the ours-label says what is 
   // ⛔ HIS SHAPE, OUR NUMBERS — the label has to say both halves or it is not a label.
   assert(/no percentages/i.test(RAMP_RUNGS_ARE_OURS));
   assert(/ours/i.test(RAMP_RUNGS_ARE_OURS));
+});
+
+Deno.test('⛔⛔ RULE 4 — core lands AFTER the main work and BEFORE the isolation work (p142)', () => {
+  /**
+   * ⛔ *"Many athletes are tempted to perform any core/bracing work last in a routine… This tends to
+   * do the core a disservice - isolation work is rarely degraded by a tired core, and core work tends
+   * to have a higher skill component than most isolation work."*
+   *
+   * ⚠️ THE DEFECT THIS PINS, seen on a composed week 2026-08-29: every added row was APPENDED, so a
+   * core row landed behind the calf raise — `back squat → trap bar deadlift → bulgarian split squat →
+   * weighted single leg calf raise → v up`. That is the routine he describes, built by us.
+   */
+  const wk = composeWeek({
+    ...BASE, week: 3, column: 'standard',
+    slotPicks: { core: 'v up' }, accessoryPicks: ['v up'],
+  } as never);
+
+  const withCore = wk.sessions
+    .map((s) => ((s as { strength_exercises?: { name: string }[] }).strength_exercises ?? []).map((e) => e.name))
+    .filter((names) => names.some((n) => /v up/i.test(n)));
+  assert(withCore.length > 0, 'the core pick never reached the week — the fixture is vacuous');
+
+  for (const names of withCore) {
+    const core = names.findIndex((n) => /v up/i.test(n));
+    const firstIso = names.findIndex((n) => viadaCategoryOf(n) === 'focused');
+    // ⛔ NOT LAST. If there is isolation work in the session, core comes before it.
+    if (firstIso >= 0) {
+      assert(core < firstIso,
+        `core sits at ${core} and the first isolation row at ${firstIso}: ${names.join(' → ')}`);
+    }
+    // ⛔ AND NOT FIRST EITHER — "but after the main work".
+    assert(core > 0, `core opened the session: ${names.join(' → ')}`);
+  }
 });
