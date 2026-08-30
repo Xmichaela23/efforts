@@ -8,16 +8,23 @@
 //   > "If performance begins to suffer, particularly if the ME lifts underperform 2 weeks in a row,
 //    consider running a single deload week." — p245
 //
-// ⛔ WHAT THIS FILE IS REALLY GUARDING is not the happy path — it is the two ways a reader can lie
-// about a week nobody logged. Counting a silent week as bad reads absence as failure; RESETTING the
-// run on a silent week reads absence as success and silently forgives the bad week before it. This
-// codebase already refuses the first everywhere (`no_evidence` holds). The second is the one a
-// future session will "fix" without noticing it is the same error pointed the other way.
+// ⛔ WHAT THIS FILE IS REALLY GUARDING is not the happy path — it is what a week nobody logged means.
+//
+//   ⛔ A MISSED WEEK RESETS THE RUN, AND IT IS NOT A BAD WEEK. Those are two different refusals and
+//   both are load-bearing. The field treats a whole missed week as an UNPLANNED RECOVERY WEEK,
+//   resumed from where you left off — so the athlete already had the rest a deload would give them,
+//   and two short weeks either side of a break are not "2 weeks in a row". But counting that week as
+//   a BAD week would read absence as failure, which this codebase refuses everywhere.
+//
+// ⚠️ THIS FILE SHIPPED THE OTHER WAY FOR AN HOUR ON 2026-08-29 — silent weeks were SKIPPED, so weeks
+// 2 and 4 read as consecutive across an untrained week 3. The reasoning was internally sound and
+// rested on a wrong premise: that a missed week is information the app does not have. It is.
 // ============================================================================
 
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   DELOAD_CONSECUTIVE_BAD_WEEKS,
+  DELOAD_MISSED_WEEK_RESETS_IS_OURS,
   deloadProposal,
   type MeLadderReading,
 } from './me-history.ts';
@@ -99,21 +106,52 @@ Deno.test('⛔ A GOOD WEEK BETWEEN TWO BAD ONES BREAKS THE RUN', () => {
   );
 });
 
-Deno.test('⛔⛔ A SILENT WEEK IS SKIPPED — it neither counts as bad nor resets the run', () => {
-  // Week 3 was never logged. Weeks 2 and 4 are the two evidenced weeks, and both were short.
-  const p = deloadProposal({
-    reading: reading([
-      { week: 2, outcome: 'setback' },
-      { week: 4, outcome: 'setback' },
-    ]),
-    ...BLOCK,
-  });
-  assert(p, 'an unlogged week must not forgive the bad week before it');
-  assertEquals(p.because, [2, 4]);
-  assertEquals(p.week, 5);
+Deno.test('⛔⛔ A MISSED WEEK RESETS THE RUN — the athlete already got the rest', () => {
+  /**
+   * ⛔ CORRECTED 2026-08-29, the same day this shipped the other way. The first version SKIPPED a
+   * silent week, so weeks 2 and 4 read as "two in a row" across an untrained week 3.
+   *
+   * The field is consistent: a whole missed week is an UNPLANNED RECOVERY WEEK, resumed from where
+   * you left off — so proposing a deload after one offers a thing that already happened. Two short
+   * weeks either side of a break are not two in a row.
+   */
+  assertEquals(
+    deloadProposal({
+      reading: reading([
+        { week: 2, outcome: 'setback' },
+        { week: 4, outcome: 'setback' },
+      ]),
+      ...BLOCK,
+    }),
+    null,
+  );
 });
 
-Deno.test('⛔ `no_evidence` IS NOT A BAD WEEK, and does not mark the week as evidenced', () => {
+Deno.test('⛔ A MISSED WEEK STILL IS NOT A BAD WEEK — resetting is not the same as counting', () => {
+  // Two clean weeks, then nothing at all. Absence must never manufacture a proposal on its own.
+  assertEquals(
+    deloadProposal({
+      reading: reading([
+        { week: 1, outcome: 'clean' },
+        { week: 2, outcome: 'clean' },
+      ]),
+      throughWeek: 8,
+      totalWeeks: 12,
+    }),
+    null,
+  );
+  // ⛔ AND ONE SHORT WEEK FOLLOWED BY SILENCE PROPOSES NOTHING. The break is the deload.
+  assertEquals(
+    deloadProposal({
+      reading: reading([{ week: 3, outcome: 'setback' }]),
+      throughWeek: 8,
+      totalWeeks: 12,
+    }),
+    null,
+  );
+});
+
+Deno.test('⛔ `no_evidence` IS NOT A BAD WEEK, and does not mark the week as trained', () => {
   // A matched row whose sets were never completed. Silence holds.
   assertEquals(
     deloadProposal({
@@ -125,18 +163,19 @@ Deno.test('⛔ `no_evidence` IS NOT A BAD WEEK, and does not mark the week as ev
     }),
     null,
   );
-  // ⛔ AND IT CANNOT SIT BETWEEN TWO BAD WEEKS AND BREAK THEM — it is not evidence either way, so
-  // the two real weeks either side are still consecutive.
-  const p = deloadProposal({
-    reading: reading([
-      { week: 2, outcome: 'setback' },
-      { week: 3, outcome: 'no_evidence' },
-      { week: 4, outcome: 'setback' },
-    ]),
-    ...BLOCK,
-  });
-  assert(p, 'a no-evidence session must not break a run of two short weeks');
-  assertEquals(p.because, [2, 4]);
+  // ⛔ AND IT READS AS A MISSED WEEK, SO IT BREAKS THE RUN. A row that was prescribed and never
+  // completed is not a week the athlete trained — same as never opening the app.
+  assertEquals(
+    deloadProposal({
+      reading: reading([
+        { week: 2, outcome: 'setback' },
+        { week: 3, outcome: 'no_evidence' },
+        { week: 4, outcome: 'setback' },
+      ]),
+      ...BLOCK,
+    }),
+    null,
+  );
 });
 
 Deno.test('⛔ ANY heavy session coming up short makes the week short (OURS, p245 is ambiguous)', () => {
@@ -219,4 +258,11 @@ Deno.test('⛔ THE LATEST RUN WINS — one live decision, not a history of them'
 
 Deno.test('⛔ AN EMPTY BLOCK PROPOSES NOTHING — silence is the starting state', () => {
   assertEquals(deloadProposal({ reading: reading([]), ...BLOCK }), null);
+});
+
+Deno.test('⛔ THE RULE IN FORCE IS NAMED, so a future reader finds the reasoning not just the loop', () => {
+  assert(DELOAD_MISSED_WEEK_RESETS_IS_OURS.includes('RESETS'));
+  assert(DELOAD_MISSED_WEEK_RESETS_IS_OURS.includes('unplanned recovery week'));
+  // ⛔ AND THE REFUSAL SURVIVES THE CORRECTION: a missed week is still never a bad week.
+  assert(DELOAD_MISSED_WEEK_RESETS_IS_OURS.includes('absence as failure'));
 });

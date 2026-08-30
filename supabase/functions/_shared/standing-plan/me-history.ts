@@ -133,20 +133,41 @@ export const DELOAD_WEEK_IS_BAD_IF_ANY_ME_SETBACK_IS_OURS =
   + 'proposal the athlete can decline — offering one early costs a tap, missing one costs a hole.';
 
 /**
- * ⚠️ A WEEK WITH NO EVIDENCE NEITHER COUNTS NOR BREAKS THE RUN — OURS, and it is the only neutral
- * option available.
+ * ⛔⛔ A MISSED WEEK RESETS THE RUN — CORRECTED 2026-08-29, THE SAME DAY IT SHIPPED SKIPPING.
  *
- * ⛔ SILENCE IS NOT A NUMBER is this codebase's own law (`progressionVerdict` returns `no_evidence`
- * and holds; `TEST_READ_ABSTAINS` says the same). Counting an unlogged week as a bad week reads
- * absence as failure. **But RESETTING the run on an unlogged week reads absence as success**, which
- * is the identical error pointed the other way — a missed week would silently forgive the bad week
- * before it. So a silent week is SKIPPED: weeks 3 and 5 can be "two in a row" if week 4 was never
- * logged.
+ * ⚠️ WHAT THIS SAID FIRST, AND WHY IT WAS WRONG: *"a silent week is SKIPPED — counting it reads
+ * absence as failure, resetting on it reads absence as success, so skipping is the only reading that
+ * adds nothing."* The logic was sound and the premise was not. **It treated a missed week as
+ * information the app does not have. The field treats it as information it does.**
+ *
+ * ⛔ THE PRECEDENT IS CONSISTENT AND IT POINTS ONE WAY: a missed week is **an unplanned recovery
+ * week**, not a symptom.
+ *   · one or two missed sessions — ignore them, carry on;
+ *   · a whole missed week — *"treat it as an unplanned recovery week and start where you left off"*;
+ *   · two weeks — measurable detraining begins (VO2max down 4-7% even in trained athletes);
+ *   · a month — start the block over.
+ *   (TrainRight, Koop, Wahoo — 2026-08-29. ⚠️ **Secondary sources, not a page of Viada.**)
+ *
+ * ⛔ SO THE ATHLETE ALREADY GOT THE REST, AND A DELOAD IS THE REST. Proposing one after a week off
+ * offers a thing that already happened. Two short weeks separated by a week away are not *"2 weeks in
+ * a row"* in any reading of p245 — the row was broken by the break.
+ *
+ * ⚠️ STILL OURS, AND STILL NOT SYMMETRICAL WITH COUNTING IT BAD. Resetting does not read absence as
+ * *success*; it reads absence as **rest**, which is what the absence physically was. Counting it as a
+ * bad week would still be reading absence as failure, and that stays refused.
+ *
+ * ⛔ WHAT THIS DOES **NOT** HANDLE, AND IT IS THE LARGER GAP: **time off should bring the WEIGHT
+ * down, and nothing does that.** `scheduledRise` is a pure function of the week number, so an
+ * athlete returning from a fortnight away is handed a heavier bar than they left — while the
+ * literature says two weeks off is where detraining starts. **Raised, not built.** It changes
+ * prescribed weights and belongs with the p112 "decrease load if you fail to achieve targets" gap,
+ * not smuggled in behind a deload counter.
  */
-export const DELOAD_SILENT_WEEK_IS_SKIPPED_IS_OURS =
-  'A week with no logged heavy session is skipped rather than counted or used to reset. Counting it '
-  + 'reads silence as failure; resetting on it reads silence as success. Skipping is the only '
-  + 'reading that adds nothing.';
+export const DELOAD_MISSED_WEEK_RESETS_IS_OURS =
+  'A week with no logged heavy session RESETS the run rather than being skipped or counted. The '
+  + 'field treats a missed week as an unplanned recovery week - the athlete already got the rest a '
+  + 'deload would have given them, so two short weeks either side of a break are not two in a row. '
+  + 'Counting a missed week as a BAD week stays refused: that would read absence as failure.';
 
 /**
  * ⛔ TWO IN A ROW, and the number is HIS — the one place in this module where a threshold is not
@@ -195,14 +216,24 @@ export function deloadProposal(args: {
     }
   }
 
-  // ⛔ ONLY WEEKS THAT SAID SOMETHING, IN ORDER. A silent week is not in this list at all, which is
-  // what makes it skipped rather than counted or reset — see the constant above.
-  const weeks = [...evidenced].sort((a, b) => a - b);
-
+  /**
+   * ⛔ CONSECUTIVE MEANS CONSECUTIVE ON THE CALENDAR, NOT "the next week that said something".
+   *
+   * The run is walked over week NUMBERS from 1 to `throughWeek`, so a week with no logged heavy
+   * session breaks it — that is `DELOAD_MISSED_WEEK_RESETS_IS_OURS` expressed as a loop rather than
+   * a comment. ⚠️ An earlier version walked only the evidenced weeks, which made weeks 3 and 5
+   * "consecutive" across a missed week 4.
+   */
   let proposal: DeloadProposal | null = null;
-  for (let i = DELOAD_CONSECUTIVE_BAD_WEEKS - 1; i < weeks.length; i++) {
-    const run = weeks.slice(i - (DELOAD_CONSECUTIVE_BAD_WEEKS - 1), i + 1);
-    if (!run.every((w) => short.has(w))) continue;
+  const firstWeek = 1;
+  const lastWeek = Math.max(firstWeek, Math.floor(args.throughWeek));
+  for (let end = firstWeek + (DELOAD_CONSECUTIVE_BAD_WEEKS - 1); end <= lastWeek; end++) {
+    const run: number[] = [];
+    for (let w = end - (DELOAD_CONSECUTIVE_BAD_WEEKS - 1); w <= end; w++) run.push(w);
+    // ⛔ EVERY WEEK IN THE RUN MUST HAVE SAID SOMETHING AND SAID IT WAS SHORT. A week absent from
+    // `evidenced` is a missed week and breaks the run; a week that was trained and was not short
+    // breaks it too.
+    if (!run.every((w) => evidenced.has(w) && short.has(w))) continue;
 
     // The week to deload is the one after the second bad week — the next one the athlete trains.
     const target = run[run.length - 1] + 1;
