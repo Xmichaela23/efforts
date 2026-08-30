@@ -54,3 +54,28 @@ Deno.test('⛔ ABSENT IS NOT ZERO — no answer leaves the frame alone', () => {
   const w = week(undefined);
   assert(w.runs > 0, 'an unasked week lost its runs — absent was collapsed into zero');
 });
+
+// ⛔ THE STATED DAY COUNTS MUST ALSO DECIDE THE SPORT MIX (2026-08-30). The mix chooses WHICH frame
+// slots become rides; the day count then trims. While the mix read `RUN_DAYS_DEFAULT` and the day
+// count said zero, "how much of each sport" had two answers: at a 2-vs-2 ratio only the two hardest
+// slots went to the bike and the LONG slot stayed a run, which the trim then deleted as an unasked
+// run. An athlete asking for two rides and no running lost the long ride — the one session that
+// carries real hours — and got two short hard rides totalling 2h20 against a 6h ask.
+Deno.test('⛔ a stated zero-run / two-ride week keeps its LONG ride', () => {
+  const row = buildStandingPlanRow({
+    compose: {
+      frame: 'strength_5k', competitionLifts: LIFTS, roundTo: 5,
+      // ⚠️ THE MIX THE DOOR NOW BUILDS from the stated days — not one written by hand here.
+      sportMix: { runs: 0, rides: 2 },
+      enduranceDaysBySport: { run: 0, ride: 2 }, targetRideHours: 6,
+    } as never,
+    weeks: 2, goalName: 'Strong Focus',
+  }) as never as { sessions_by_week: Record<string, { type: string; duration?: number }[]> };
+  const wk1 = row.sessions_by_week['1'] ?? [];
+  const rides = wk1.filter((s) => ['ride', 'bike'].includes(String(s.type).toLowerCase()));
+  assertEquals(rides.length, 2, 'the stated ride count was not honoured');
+  assertEquals(wk1.filter((s) => String(s.type).toLowerCase() === 'run').length, 0, 'a stated zero built runs');
+  const hours = rides.reduce((t, s) => t + (s.duration ?? 0), 0) / 60;
+  // ⛔ THE LONG RIDE IS THE TEST. Two short hard rides come to ~2h20; with the long one kept it is ~6h.
+  assert(hours > 5, `two rides against a 6h ask built only ${hours.toFixed(2)}h — the long ride was dropped`);
+});

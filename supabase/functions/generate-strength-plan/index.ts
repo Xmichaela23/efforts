@@ -412,9 +412,46 @@ Deno.serve(async (req: Request) => {
        * Computed here, before the day map, because the frame has ONE long session and an athlete
        * keeping both sports can pin two long days. The unservable one is reported, not dropped.
        */
+      /**
+       * ⛔⛔ HOW MANY DAYS A WEEK THEY DO EACH SPORT — their own answer, parsed ONCE and read twice
+       * (Michael, 2026-08-27: *"I run for three hours a week over the course of three days…"*).
+       *
+       * ⛔ ZERO IS AN ANSWER (2026-08-30). This read `n > 0`, so an athlete answering "no running"
+       * had their zero turned into `undefined` — which the composer reads as "nobody asked" and
+       * answers with the frame's own runs. A bike-only athlete could not say they do not run.
+       * ⚠️ `>= 0` keeps every other value identical; only the zero, previously unsayable, changes.
+       *
+       * ⛔⛔ AND IT WAS PARSED BELOW, INSIDE THE COMPOSE ARGS, WHERE `mixForFrame` COULD NOT SEE IT.
+       * That was the whole bug of 2026-08-30: the mix defaulted to `RUN_DAYS_DEFAULT` while this said
+       * zero, so "how much of each sport" had TWO answers. The mix decides which frame slots become
+       * rides; at 2-vs-2 only the two hardest go to the bike and the LONG slot stays a run, and the
+       * day-count trim then deleted it as an unasked run. An athlete asking for two rides and no
+       * running lost the long ride — the only session that carries real hours — and got two short
+       * hard rides. Hoisted so there is one owner.
+       */
+      const enduranceDaysBySport = (() => {
+        const raw = (body as Record<string, unknown>).endurance_days;
+        if (!raw || typeof raw !== 'object') return undefined;
+        const pick = (k: string) => {
+          const n = Number((raw as Record<string, unknown>)[k]);
+          return Number.isFinite(n) && n >= 0 ? Math.round(n) : undefined;
+        };
+        const run = pick('run');
+        const ride = pick('ride');
+        return run == null && ride == null ? undefined : { run, ride };
+      })();
+
       const mixForFrame = {
-        runs: runDaysAsked ?? RUN_DAYS_DEFAULT,
-        rides: rideDaysAsked ?? (bike && typeof bike === 'object' ? RIDE_DAYS_DEFAULT : 0),
+        /**
+         * ⛔⛔ A STATED DAY COUNT BEATS THE RATIO DEFAULT (2026-08-30). The `?? DEFAULT` chain stays
+         * exactly as it was for every athlete who has NOT answered — the 2026-08-23 rule that the
+         * program owns the count, and `sport-slots.ts`'s default of hard slots to the bike with the
+         * long session kept by the runner, are both untouched on that path. What changed is only
+         * WHICH SOURCE WINS when the athlete has actually stated their days.
+         */
+        runs: runDaysAsked ?? enduranceDaysBySport?.run ?? RUN_DAYS_DEFAULT,
+        rides: rideDaysAsked ?? enduranceDaysBySport?.ride
+          ?? (bike && typeof bike === 'object' ? RIDE_DAYS_DEFAULT : 0),
         swimDays: normalizeSwimDays(swim_days) ?? 0,
         /**
          * ⛔ THE ATHLETE'S OWN PER-SLOT ANSWER, when the wizard collected one. Counts alone do not
@@ -692,24 +729,7 @@ Deno.serve(async (req: Request) => {
            * this frame assigns sports by; this is a count of DAYS. Overloading one on the other is
            * how a ratio starts being read as a schedule.
            */
-          enduranceDaysBySport: (() => {
-            const raw = (body as Record<string, unknown>).endurance_days;
-            if (!raw || typeof raw !== 'object') return undefined;
-            /**
-             * ⛔ ZERO IS AN ANSWER (2026-08-30). This read `n > 0`, so an athlete answering "no
-             * running" had their zero turned into `undefined` — which the composer reads as
-             * "nobody asked" and answers with the frame's own runs. A bike-only athlete could not
-             * say they do not run. ⚠️ `>= 0` keeps every other value identical; only the zero,
-             * which was previously unsayable, changes meaning.
-             */
-            const pick = (k: string) => {
-              const n = Number((raw as Record<string, unknown>)[k]);
-              return Number.isFinite(n) && n >= 0 ? Math.round(n) : undefined;
-            };
-            const run = pick('run');
-            const ride = pick('ride');
-            return run == null && ride == null ? undefined : { run, ride };
-          })(),
+          enduranceDaysBySport,
           // ⛔ THE ATHLETE'S DAYS BEAT THE FRAME ORDER — see `endurancePins` above and the note on
           // the field in `compose.ts`. Absent pins leave the rotation exactly as it was.
           endurancePins,
