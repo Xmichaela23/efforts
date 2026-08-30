@@ -474,3 +474,121 @@ could cover is inside the scroll at all.
 **156 tests green · 9/9 mutations killed · Get Stronger byte-identical (`f7ece1aa…`) · build passes ·
 lint unchanged** (`NonRaceBuilder`'s 2 pre-existing; the four other files clean). The temporary probe
 route was deleted — `git status` is clean of it.
+
+---
+
+# PART 9 — WHAT THIS SCREEN SAYS NOW, AND THE THREE THINGS THAT WERE REVERSED (2026-08-30)
+
+**Read this before changing the endurance screen or the day/hours plumbing.** Three rules were
+reversed in one morning and each looks like a bug from the outside. Two of them were re-derived from
+scratch during that morning because the reasoning lived nowhere.
+
+## 9.1 The screen, as it now reads
+
+Each endurance slot row carries the frame day it lands on — `Day 1 · Hard session 1 · Ride · Sweet
+spot`. **Day NUMBERS, never weekdays**: the frame rotates onto the calendar at generation, *after*
+this screen, and pins can move a session again after that, so a weekday here is a promise the next
+screen breaks. Derived by `slotFrameDay` off `FRAMES`, column-aware — the taper carries three
+endurance slots, not four.
+
+Under the hours and days, one chip pair per sport:
+
+```
+Less experienced · two hard sessions · 45 min max
+More experienced · two hard sessions · 66 min max · needs 4h/wk   [only when greyed]
+The rest of the running stays at conversation pace, bar a few faster inserts in the long run.
+```
+
+⛔ **ONE NUMBER PER CHIP. That is the acceptance test** — Michael counts the numbers on the screen.
+
+## 9.2 REVERSAL 1 — the sum-versus-longest distinction, which caused the whole thing
+
+The screen used to print **three** numbers that measured different things, with nothing saying so:
+
+| what it said | what it actually was |
+|---|---|
+| chip: `66 min` | the LONGEST SINGLE hard session |
+| sentence: `The hard runs come to about 1h40` | the **SUM** of that sport's hard sessions (`fixedHoursLine` → `hardSpans.reduce(minHi)`) |
+| `needs 2h/wk` | the tier's unlock requirement, shown on both chips including the one already met |
+
+All three true, unreconcilable by looking. **The sum sentence is deleted**; the chip gained the
+session COUNT instead, and `needs Nh/wk` now appears only on a chip that is out of reach.
+`fixedHoursLine` still exists and is still the engine's arithmetic — it is the SCREEN that stopped
+printing a second figure. `wizard-focus-theme.test.ts` now has a tripwire asserting it has not come
+back.
+
+## 9.3 REVERSAL 2 — the no-hedge rule HELD, and what the measurement added
+
+The 2026-08-27 rule said no `up to` on the chip: *"the hard session is a fixed dose and the hedge
+overstates it."* **That rule stands.** But it was written about ONE session. Composing a real 12-week
+block showed the chip's number is a maximum across TWO:
+
+```
+RUN · experienced, every week of 12:   near-threshold 66 min (FIXED) · MLSS 41↔49 by week
+RIDE · experienced, every week of 12:  75 min · 65 min
+```
+
+⛔ **The chip's number is a session that happens EVERY WEEK, not a ceiling nobody sees** — the
+question that settled it, and the reason `longestFor`'s across-rotations logic was left alone. A flat
+`66 min` would claim both sessions are 66. So the line reads **`66 min max`**: *max* states the fact,
+*up to* hedges it, and Michael's rule bans the hedge, not the accuracy. Still a maximum, never a
+range — ranges overlap between tiers, maxima ladder cleanly.
+
+## 9.4 REVERSAL 3 — one owner for "how much of each sport"
+
+`mixForFrame` read `runDaysAsked ?? RUN_DAYS_DEFAULT` while `endurance_days` said zero, so the ratio
+and the stated day counts were two answers to one question. The mix decides WHICH frame slots become
+rides; at a 2-vs-2 ratio only the two hardest go to the bike and **the long slot stays a run**, which
+the day-count trim then deleted as an unasked run. An athlete asking for two rides and no running
+lost the long ride — the only session that carries real hours — and got 2h20 against a 6h ask.
+
+Stated counts now win at the door: `runs: runDaysAsked ?? enduranceDaysBySport?.run ?? RUN_DAYS_DEFAULT`.
+⚠️ **The `?? DEFAULT` path is untouched for anyone who has not answered** — the 2026-08-23 "the
+program owns the count" rule and `sport-slots.ts`'s hard-slots-to-the-bike default are both intact.
+Only which source wins when the athlete HAS answered changed.
+
+## 9.5 The days-and-hours rule, in full
+
+Michael, 2026-08-30: *"user says hours and days and we make it work."* A stated day count is exact in
+**both** directions — it grows the week (`dayShortfall`, already built) and now shrinks it
+(`droppedSlots`). **Zero is an answer and absent is not**, the same third state `sport-slots.ts`
+draws between `'none'` and a missing key: absent leaves the frame alone, `0` removes that sport
+entirely. And when the hours cannot fit the stated days the week says so, naming both numbers —
+that channel was promised in a comment and wired to nothing until this morning.
+
+⚠️ **THIS OVERRULES THE BOOK ON ONE POINT, DELIBERATELY.** The old rule cited p246 owning the four
+endurance slots, *"none can be declined"*. Honouring a smaller day count declines one. Michael made
+that call knowingly; it is recorded in `standing-plan-endurance-days.test.ts` so nobody reverts it
+thinking it was an oversight.
+
+## 9.6 Two traps that cost hours, for whoever measures this next
+
+⛔ **A harness must build its inputs the way the edge function does.** Two wrong conclusions came
+from hand-written args: `endurance_frequency` is the RUN count (a ride count in it asks for runs),
+ride days live on `bike.days`, the exact day/hour fields are `endurance_days` + `target_run_hours` /
+`target_ride_hours`, and the overhead-press max is stored as `overheadPress1RM`. An offline result
+against a hand-built `sportMix` the door never constructs is trustworthy only by accident.
+
+⚠️ **The both-tiers-equal guard is measured unreachable today** (all 16 slot combinations swept,
+2026-08-30). Kept, dated, and labelled — not deleted — because two identical chips shipping
+unexplained is the defect it exists to prevent if the tier levels ever move.
+
+
+## 9.7 ⛔ THE "REST OF THE HOURS" LINE DIFFERS BY SPORT, AND THAT IS MEASURED
+
+The line under the chips is NOT the same sentence for both sports, and a shared one would be false:
+
+| sport | the frame's long slot | its work intensity | so the line |
+|---|---|---|---|
+| **ride** | `ride_endurance / steady` | `below_pct 0.75` | *"The rest of the riding stays at conversation pace."* |
+| **run** | `run_lsd / long_with_inserts` | `pct(0.95, 1.15)` — 95-115% of THRESHOLD, ~11% of the session | *"…bar a few faster inserts in the long run."* |
+
+`run_lsd`'s own intent line is *"may combine zones but is **primarily** below VT1"* — and "primarily"
+is the whole point. p109's floor (one speed session, one subthreshold, remainder at VT1 or below)
+describes the WEEK's shape; the long run's inserts are p235's own prescription and sit above that
+ceiling. ⚠️ A single shared sentence here would have the screen describing a session the plan does
+not build.
+
+⚠️ **THE WORDING ITSELF IS NOT RULED YET.** Michael has said his older quotes are stale and should
+not be reused; this phrasing came out of the source rather than from him and he has not chosen it.
+The FACTS in the table are settled; the sentence is a one-line change if he prefers another.

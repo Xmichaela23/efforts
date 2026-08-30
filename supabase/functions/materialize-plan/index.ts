@@ -1698,6 +1698,43 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
       return out;
     }
   }
+  /**
+   * ⛔⛔ TIME-BASED RUN INTERVALS AT A PERCENTAGE OF THRESHOLD — `interval_2x90s_115pct_R30s`.
+   *
+   * ⛔ WHY IT HAD TO EXIST (2026-08-30). Every run interval token here is DISTANCE-based at a NAMED
+   * pace (`5kpace`, `base`, `build`, …). p235's long-run inserts are neither: *"1-hour VT1 run with
+   * 2 sets added at any point; the sets are 2 rounds of 1:30 @ 115% / 30s @ VT1"* — seconds, at a
+   * percentage. There was no token that could carry them, so `run_lsd` emitted only the easy long
+   * run and the inserts vanished between the composer and the row the athlete opens.
+   *
+   * ⚠️ PERCENT OF THRESHOLD **SPEED**, so the pace DIVIDES: 115% of threshold speed is the threshold
+   * pace over 1.15. Multiplying would have made the hard insert slower than the easy running.
+   * ⚠️ THE FLOAT IS AT EASY PACE and is skipped after the last rep, matching the distance branch.
+   * ⚠️ ADDITIVE — no existing token changes shape or meaning.
+   */
+  {
+    const mPct = lower.match(/^interval_(\d+)x(\d+)s_(\d+)pct(?:_[rR](\d+)s)?$/);
+    if (mPct) {
+      const reps = parseInt(mPct[1], 10);
+      const work_s = parseInt(mPct[2], 10);
+      const pct = parseInt(mPct[3], 10) / 100;
+      const float_s = mPct[4] ? parseInt(mPct[4], 10) : 0;
+      const thr = secPerMiFromBaseline(baselines, 'threshold') || undefined;
+      const pace = thr && pct > 0 ? Math.round(thr / pct) : undefined;
+      for (let i = 0; i < reps; i += 1) {
+        out.push({ id: uid(), kind: 'work', duration_s: work_s, pace_sec_per_mi: pace });
+        if (float_s > 0 && i < reps - 1) {
+          out.push({
+            id: uid(),
+            kind: 'recovery',
+            duration_s: float_s,
+            pace_sec_per_mi: secPerMiFromBaseline(baselines, 'easy') || undefined,
+          });
+        }
+      }
+      return out;
+    }
+  }
   // Intervals: interval_5x800m_5kpace_r90s, interval_6x800m_base (phase suffix from session-factory), etc.
   if (/interval_\d+x/.test(lower)) {
     const mLegacy = lower.match(/^interval_(\d+)x(\d+)(m|mi)_5kpace(?:_[rR](\d+)(s|min)?)?$/);

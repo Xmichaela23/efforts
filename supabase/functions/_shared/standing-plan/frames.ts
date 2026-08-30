@@ -368,8 +368,8 @@ export const LOW_VOLUME_TIER_LEVELS: Record<string, Level> = {
   run_lsd: 1,
   /**
    * ⛔ THE RIDE FAMILIES, AND DROPPING **THEIR** LEVEL IS OURS (2026-08-27). `RIDE_EQUIVALENT` maps
-   * the frame's four slots onto `ride_sweet_spot` (the two hard ones) and `ride_endurance` (easy and
-   * long), and p246's taper column — the source for *"the same session, smaller"* on the run side —
+   * the frame's four slots onto `ride_anaerobic` (day 1), `ride_sweet_spot` (day 3) and
+   * `ride_endurance` (easy and long), and p246's taper column — the source for *"the same session, smaller"* on the run side —
    * has no cycling counterpart. **There is no ride taper column, so there is no page under this.**
    * See `LOW_VOLUME_RIDE_LEVELS_ARE_OURS`.
    *
@@ -377,6 +377,20 @@ export const LOW_VOLUME_TIER_LEVELS: Record<string, Level> = {
    * sweet-spot the same way, so level 1 is a dose he states for the session. What is ours is the
    * decision to use it for a lower-volume rider.
    */
+  /**
+   * ⛔⛔ ADDED 2026-08-30, AND ITS ABSENCE WAS A REAL DEFECT. This table listed only the two families
+   * that were reachable when it was written, and the comment above named them; when day 1 became
+   * `ride_anaerobic` the family fell through and the slot stayed at the frame's level for BOTH
+   * experience answers. The two ride chips then printed the SAME duration — a control that changed
+   * nothing — and the cause was this omission, not the control.
+   *
+   * ⚠️ THE THREE LEVELS ARE HIS: p237 prints the anaerobic session at 6-10 x 45s (L1), x 1 min (L2)
+   * and x 1:30 (L3), all at 110-115%+ with 4-6 min recovery. The work interval ladders and the
+   * intensity does not, which is exactly the variation the experience answer is for.
+   * ⚠️ USING LEVEL 1 FOR A LOWER-VOLUME RIDER IS OURS, the same call as the two families below and
+   * carrying the same label — see `LOW_VOLUME_RIDE_LEVELS_ARE_OURS`.
+   */
+  ride_anaerobic: 1,
   ride_sweet_spot: 1,
   ride_endurance: 1,
 };

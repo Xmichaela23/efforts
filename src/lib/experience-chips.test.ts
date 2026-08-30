@@ -155,8 +155,29 @@ Deno.test('⛔ THE TWO CHIPS LADDER — the answer is never a choice between two
     for (const sport of ['run', 'ride'] as const) {
       const pair = chips[sport];
       if (!pair) continue;
+      /**
+       * ⛔⛔ THE TIERS MUST DIFFER; THEY NEED NOT ASCEND (Michael, 2026-08-30: *"no as long as its
+       * honest"*). Everything below the line is history.
+       *
+       * ⚠️ WHAT WAS LEARNED, WITH THE NUMBERS. This asserted `experienced > newer` on the assumption
+       * that the clock and the work move together. p237's anaerobic ride is the case where they do
+       * not — measured off `ladderOf`:
+       *     ride_anaerobic / progressive_repeats   L1 = 65 min   L2 = 63 min   ← DOWN
+       *     ride_sweet_spot / long                 L1 = 57 min   L2 = 61 min   ← up
+       *     ride_sweet_spot / tempo                L1 = 68 min   L2 = 75 min   ← up
+       * His levels are 6-10 x 45s (L1), x 1 min (L2), x 1:30 (L3), ALL with 4-6 minutes of recovery
+       * between sets. The work bands rise with level; the CLOCK falls, because the shorter-rep level
+       * fits more reps inside its band and each one drags a five-minute recovery behind it. More
+       * work, less time on the bike.
+       * ⛔ THE CHIP IS A SCHEDULING NUMBER — time on the bike — so it prints the smaller figure for
+       * the higher tier and that is honest. Do NOT "fix" this inversion, and do NOT add a second
+       * quantity to explain it: one number per chip is the acceptance test.
+       *
+       * ─────────────── history ───────────────
+       * assert(pair.experienced.longestMin > pair.newer.longestMin, '… the control reads as doing nothing')
+       */
       if (pair.experienced.longestMin != null && pair.newer.longestMin != null) {
-        assert(pair.experienced.longestMin > pair.newer.longestMin,
+        assert(pair.experienced.longestMin !== pair.newer.longestMin,
           `${sport} on ${JSON.stringify(slots)}: the two chips print the SAME hard session `
           + `(${pair.experienced.longestMin} vs ${pair.newer.longestMin}) — the control reads as `
           + 'doing nothing');
@@ -223,7 +244,12 @@ Deno.test('⛔ THE GATE IS THE TOP TIER ONLY, AND ONLY ONCE HOURS ARE GIVEN', ()
 });
 
 Deno.test('⛔ THE CHIP LINE CARRIES ALL THREE FACTS, AND NAMES NO PAGE', () => {
-  const line = experienceChipLine('newer', 46, 2);
+  /**
+   * ⛔⛔ SIGNATURE CHANGED 2026-08-30: `(tier, longestMin, hardCount, needsHours | null)`. The count
+   * is new and `needsHours` moved to fourth AND became nullable — it is now shown only on a chip the
+   * athlete cannot reach, because a requirement they have already met is noise.
+   */
+  const line = experienceChipLine('newer', 46, 2, 2);
   /**
    * ⛔ "Newer" IS NOT A WORD THIS SCREEN USES (Michael, 2026-08-27). The customer is a 10-30 mi/wk
    * runner or a weekend rider, not a novice; the contrast is p247's own — *"more proficient"*
@@ -231,13 +257,26 @@ Deno.test('⛔ THE CHIP LINE CARRIES ALL THREE FACTS, AND NAMES NO PAGE', () => 
    */
   assert(/Less experienced/.test(line), `the chip calls the athlete new: ${line}`);
   assert(!/\bNewer\b/.test(line), '⛔ "Newer" came back onto the chip');
-  assert(/More experienced/.test(experienceChipLine('experienced', 71, 3)));
-  // ⛔ NO "up to" — the hard session is a fixed dose and the hedge overstates it.
-  assert(/\b46 min\b/.test(line), `the duration left the chip: ${line}`);
-  assert(!/up to/.test(line), `⛔ the chip hedges a number that cannot vary: ${line}`);
+  assert(/More experienced/.test(experienceChipLine('experienced', 71, 3, 4)));
+  /**
+   * ⛔ THE NO-HEDGE RULE STANDS (Michael, 2026-08-27) — and what changed is the shape of the line,
+   * not the rule.
+   *
+   * ⚠️ WHAT THE 12-WEEK MEASUREMENT ADDED, 2026-08-30: the hard session is NOT a fixed dose once the
+   * chip names a COUNT. At the experienced tier a run athlete has two hard runs — the near-threshold
+   * at 66 min every week, the MLSS swinging 41-49 — so a flat "66 min" would claim both are 66 and a
+   * maximum genuinely has to be stated.
+   * ⛔ SO IT IS "66 min max", NOT "up to 66 min". `max` states the fact; `up to` hedges it, and the
+   * hedge is what his rule bans. Both survive.
+   */
+  assert(/\b46 min max\b/.test(line), `the duration left the chip: ${line}`);
+  assert(!/up to/.test(line), `⛔ the chip hedges instead of stating a maximum: ${line}`);
+  assert(/two hard sessions/.test(line), `the session count left the chip: ${line}`);
   assert(/needs 2h\/wk/.test(line), `the hours left the chip: ${line}`);
+  // ⛔ AND THE REQUIREMENT IS ABSENT WHEN THE CHIP IS REACHABLE — noise once it is met.
+  assert(!/needs/.test(experienceChipLine('newer', 46, 2, null)), 'the requirement showed on a reachable chip');
   // ⚠️ A SPORT WITH NO HARD SLOT CARRIES THE HOURS ALONE, never a zero or a blank.
-  const noHard = experienceChipLine('experienced', null, 4);
+  const noHard = experienceChipLine('experienced', null, 0, 4);
   assert(/needs 4h\/wk/.test(noHard) && !/min/.test(noHard), `${noHard}`);
   /**
    * ⛔ NEVER NAME THE AUTHOR AGAINST A SPECIFIC WORKOUT (§5). The levels, the work bands, the session

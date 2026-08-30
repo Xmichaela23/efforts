@@ -346,12 +346,23 @@ Deno.test('the frame\'s two hard slots are distinct families, and the screen\'s 
   assertEquals(hard[0].endurance[0].family, 'run_mlss');
   assertEquals(hard[1].endurance[0].family, 'run_near_threshold');
   /**
-   * ⛔ AND THEY STAY DISTINCT THROUGH THE RIDE SUBSTITUTION — different archetypes, different tokens.
+   * ⛔ AND THEY STAY DISTINCT THROUGH THE RIDE SUBSTITUTION — different families now, not just
+   * different archetypes.
+   *
+   * ⚠️ DAY 1 LEFT `ride_sweet_spot` ENTIRELY ON 2026-08-30. Both hard slots mapping to that family
+   * built a rider a week of TWO subthreshold sessions with nothing above them — measured on
+   * materialized rows at 198 W and 198 W against an FTP of 220 — which is against p109's floor of
+   * one speed session, one subthreshold, remainder at or below VT1. Day 1 is now `ride_anaerobic /
+   * progressive_repeats`, the session p274's All Rounder actually puts in a rider's week.
+   *
+   * ─────────────── history ───────────────
    * ⚠️ DAY 1 IS `tempo` SINCE 2026-08-27 — his longest printed sweet-spot session (3 x 20 min @ 80%,
    * p238-239), which is what makes the two riding experience answers 68 and 75 rather than 43 and
    * 51. That pair is p278's own `Cyc sweet spot (level 1-2)` span spelled out as two options.
    */
-  assertEquals(RIDE_EQUIVALENT.run_mlss?.archetype, 'tempo');
+  assertEquals(RIDE_EQUIVALENT.run_mlss?.family, 'ride_anaerobic');
+  assertEquals(RIDE_EQUIVALENT.run_mlss?.archetype, 'progressive_repeats');
+  assertEquals(RIDE_EQUIVALENT.run_near_threshold?.family, 'ride_sweet_spot');
   assertEquals(RIDE_EQUIVALENT.run_near_threshold?.archetype, 'long');
 
   const wk = composeWeek({
@@ -364,12 +375,18 @@ Deno.test('the frame\'s two hard slots are distinct families, and the screen\'s 
   /**
    * ⛔ THE CLAIM IS THAT THE TWO HARD SLOTS BUILD DIFFERENT SESSIONS, which is what the screenshot
    * defect was about, and `slot1 !== slot2` is the whole of it.
+   * ⚠️ SLOT ONE'S TOKEN CHANGED AGAIN ON 2026-08-30, and this time the FAMILY moved with it: day 1
+   * is `ride_anaerobic`, emitting the 110-120% band, because two sweet-spot slots left a rider with
+   * no session above subthreshold all block. Slot two is unchanged.
+   * ⛔ THE DISTINCTNESS IS STILL THE POINT — `slot1 !== slot2` is the whole of it; the prefixes below
+   * pin which band each slot carries, which is now a fact worth holding rather than a shape detail.
+   *
+   * ─────────────── history ───────────────
    * ⚠️ SLOT ONE'S TOKEN CHANGED ON 2026-08-27, from a `bike_thr_` shape to a sweet-spot one, because
    * day 1's ride is now his longest printed sweet-spot session (`tempo`). Both hard slots have
-   * always resolved to the `ride_sweet_spot` FAMILY; only day 1's shape within it moved. Pinning one
-   * slot's token prefix was pinning the shape, not the distinctness this test is named for.
+   * always resolved to the `ride_sweet_spot` FAMILY; only day 1's shape within it moved.
    */
-  assert(/bike_ss_/.test(slot1), `slot one is not a sweet-spot session: ${slot1}`);
+  assert(/bike_vo2_/.test(slot1), `slot one is not the anaerobic session: ${slot1}`);
   assert(/bike_ss_/.test(slot2), `slot two is not a sweet-spot session: ${slot2}`);
   assert(slot1 !== slot2, 'the two hard slots built the same session');
 

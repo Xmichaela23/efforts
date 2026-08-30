@@ -123,9 +123,21 @@ Deno.test('⛔⛔ THE HOUR DIALS ARE NOT GATED BEHIND ANSWERING THE OTHER ROWS',
     'the dials no longer read the posture answer — a mixed athlete sees none on arrival');
   assertEquals(/\{allSlotsChosen\(props\.slots\) && \(bounds\.runMilesInput/.test(CARD), false,
     'the dials are gated on every slot being answered again');
-  // ⛔ AND THE CAPS LINE IS STILL GATED — it is genuinely summed from the slots.
-  assert(/allSlotsChosen\(props\.slots\) && line \?/.test(CARD),
-    'the fixed-hours line escaped its gate and will state a figure for a week nobody described');
+  /**
+   * ⛔⛔ THE CAPS LINE IS DELETED, NOT GATED (Michael, 2026-08-30). Everything below is history.
+   *
+   * It printed the SUM of a sport's hard sessions — "The hard runs come to about 1h40" — beside a
+   * chip printing the LONGEST single one, with nothing saying they were different quantities. Two
+   * true numbers that cannot be reconciled by looking is what made the screen read as
+   * self-contradictory, and counting the numbers on it is his acceptance test. The chip now carries
+   * the session COUNT as well as the duration, so the sum has nothing left to add.
+   *
+   * ─────────────── history ───────────────
+   * ⛔ AND THE CAPS LINE IS STILL GATED — it is genuinely summed from the slots.
+   *   assert(/allSlotsChosen\(props\.slots\) && line \?/.test(CARD), …)
+   */
+  assertEquals(/data-testid=\{`\$\{sport\}-fixed-hours`\}/.test(CARD), false,
+    'the fixed-hours sentence came back — the screen is printing a second number again');
 });
 
 Deno.test('⛔ THE RATE FOOTER IS GONE AND THE SPLIT LINE IS IN THE CARD', () => {

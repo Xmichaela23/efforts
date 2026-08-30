@@ -70,7 +70,10 @@ export type WeekConflict = {
  * rewritten to the column's easy one, so asking the frame would call a session hard that the week
  * has already converted to easy running.
  */
-const HARD_FAMILIES = ['run_mlss', 'run_near_threshold', 'ride_sweet_spot'];
+// ⛔ `ride_anaerobic` ADDED 2026-08-30 with the bike's second quality slot. Without it the HARDEST
+// session in a rider's week — 110-120% of FTP — was the one session this engine did not count as
+// hard, so a hard ride landing on the heavy leg day raised nothing at all.
+const HARD_FAMILIES = ['run_mlss', 'run_near_threshold', 'ride_sweet_spot', 'ride_anaerobic'];
 
 const tagValue = (s: PlanSession, prefix: string): string =>
   (s.tags ?? []).find((t) => t.startsWith(prefix))?.slice(prefix.length) ?? '';

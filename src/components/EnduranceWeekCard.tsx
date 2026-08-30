@@ -35,6 +35,8 @@ import {
   EXPERIENCE_HEADING,
   EXPERIENCE_SUBTITLE,
   experienceChipLine,
+  EXPERIENCE_TIERS_EQUAL_LINE,
+  restIsEasyLine,
   experienceGatedLine,
   experiencedIsReachable,
   HARD_1_SLOT_NOTE,
@@ -485,7 +487,6 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
             if (!sportsWithHours.includes(sport)) return null;
             const value = sport === 'run' ? props.runVolume : props.rideHours;
             const onChange = sport === 'run' ? props.onRunVolume : props.onRideHours;
-            const line = sport === 'run' ? props.runFixedLine : props.rideFixedLine;
             return (
               <div key={sport} className="flex-1 min-w-[150px]">
                 <p className="text-white/80 text-[13px] mb-2">
@@ -604,7 +605,14 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                                       backgroundColor: 'rgba(255,255,255,0.03)',
                                       color: 'rgba(255,255,255,0.70)',
                                     }}
-                            >{experienceChipLine(chip.tier, chip.longestMin, chip.needsHours)}</button>
+                            >{experienceChipLine(
+                                chip.tier,
+                                chip.longestMin,
+                                chip.hardCount,
+                                /* ⛔ THE REQUIREMENT ONLY WHERE IT BLOCKS — `dead` is
+                                   `experiencedIsReachable`'s answer, already computed above. */
+                                dead ? chip.needsHours : null,
+                              )}</button>
                           );
                         })}
                       </div>
@@ -614,15 +622,37 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                           {experienceGatedLine(sport, pair.experienced.needsHours)}
                         </p>
                       ) : null}
+                      {/* ⛔ TWO IDENTICAL CHIPS ARE EXPLAINED, NEVER LEFT SITTING THERE. Same duration
+                          AND same count means the answer changes nothing about session length, which
+                          is real information rather than a broken control.
+                          ⚠️ Only when the top chip is REACHABLE — a dead chip already has its own
+                          sentence, and two reasons under one control is the noise this screen is
+                          being cleared of. */}
+                      {canExperienced
+                        && pair.newer.longestMin != null
+                        && pair.newer.longestMin === pair.experienced.longestMin
+                        && pair.newer.hardCount === pair.experienced.hardCount ? (
+                        <p className="text-white/40 text-xs mt-1.5" data-testid={`${sport}-experience-equal`}>
+                          {EXPERIENCE_TIERS_EQUAL_LINE}
+                        </p>
+                      ) : null}
+                      {/* ⛔ WHAT THE REST OF THE HOURS ARE FOR — see `restIsEasyLine`. The third
+                          question a person arrives with, and the only one the chips do not answer.
+                          ⚠️ NO NUMBER, so the screen still reads as one number per chip. */}
+                      <p className="text-white/40 text-xs mt-1.5" data-testid={`${sport}-rest-easy`}>
+                        {restIsEasyLine(sport)}
+                      </p>
                     </div>
                   );
                 })() : null}
-                {/* ⚠️ THIS is the half that genuinely needs every slot answered — it is summed from
-                    them. Before that it would state a figure for a week the athlete has not
-                    described, and it would move under them as they answered. */}
-                {allSlotsChosen(props.slots) && line ? (
-                  <p className="text-white/55 text-xs mt-1.5" data-testid={`${sport}-fixed-hours`}>{line}</p>
-                ) : null}
+                {/* ⛔⛔ THE FIXED-HOURS SENTENCE IS DELETED (Michael, 2026-08-30). It printed the
+                    SUM of this sport's hard sessions — "The hard runs come to about 1h40" — beside a
+                    chip printing the LONGEST single one, with nothing saying they were different
+                    quantities. Two true numbers that cannot be reconciled by looking read as the app
+                    contradicting itself, and counting the numbers on this screen is his acceptance
+                    test. The chip now carries the count as well as the duration, so the sum has
+                    nothing left to add. ⚠️ `fixedHoursLine` still exists and is still the engine's
+                    own arithmetic; it is the SCREEN that stopped printing a second figure. */}
               </div>
             );
           })}

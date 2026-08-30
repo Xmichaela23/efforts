@@ -563,25 +563,117 @@ export const EXPERIENCE_LABEL: Record<'newer' | 'experienced', string> = {
 export function experienceChipLine(
   tier: 'newer' | 'experienced',
   longestMin: number | null,
-  needsHours: number,
+  hardCount: number,
+  /**
+   * ⛔ THE REQUIREMENT IS SHOWN ONLY WHERE IT BLOCKS (Michael, 2026-08-30). `needs Nh/wk` sat on BOTH
+   * chips, so the reachable one carried a demand the athlete had already met — information when it
+   * stops you and noise when it does not. `null` means reachable: say nothing.
+   */
+  needsHours: number | null,
 ): string {
-  const hours = `needs ${needsHours}h/wk`;
+  const hours = needsHours == null ? null : `needs ${needsHours}h/wk`;
   /**
    * ⚠️ NO DURATION WHEN THIS SPORT FILLS NEITHER HARD SLOT. There is no hard session of it in the
-   * week, so the chip states the hours alone rather than a number about a session it is not setting.
-   * ⛔ The answer still matters there — it moves that sport's long session floor, which is what the
-   * hours figure moves with.
+   * week, so the chip states the requirement alone rather than a number about a session it is not
+   * setting. ⛔ The answer still matters there — it moves that sport's long session floor.
+   * ⚠️ AND WITH NOTHING LEFT TO SAY IT IS THE LABEL ALONE, never a dangling separator.
    */
-  if (longestMin == null) return `${EXPERIENCE_LABEL[tier]} · ${hours}`;
+  if (longestMin == null || hardCount <= 0) {
+    return [EXPERIENCE_LABEL[tier], hours].filter(Boolean).join(' · ');
+  }
   /**
-   * ⛔⛔ NO "up to" — THE HARD SESSION IS A FIXED DOSE (Michael, 2026-08-27). `ladderOf` collapses a
-   * non-base family's rung to a POINT: p246 assigns the level and the hours never pull on it, so the
-   * session is this length at every hours ask. *"up to 43 min"* would overstate a number that cannot
-   * vary, and a hedge on a fixed figure reads as the app not knowing its own plan.
-   * ⚠️ PINNED BY A TEST that sweeps the hours and asserts the built hard session does not move.
+   * ⛔⛔ THE COUNT LEADS THE DURATION, because he books EVENINGS and not minutes (2026-08-30).
+   * Measured over a real 12-week block: at the experienced tier a run athlete gets TWO hard runs
+   * every week — 66 min and 41-49 min — and a lone "66 min" is true of each while describing half
+   * the week. The count is derived from the slots, so a mixed week reads "one".
+   *
+   * ⛔⛔ "N min max", NEVER "up to N min", AND THE NO-HEDGE RULE STANDS (Michael, 2026-08-27, held
+   * 2026-08-30). His rule bans hedging a number, and it was written about ONE session, where the
+   * dose really is fixed and "up to" would have overstated it.
+   * ⚠️ WHAT THE 12-WEEK MEASUREMENT ADDED: across TWO hard slots the number is NOT a fixed dose —
+   * 66 every week on the near-threshold slot, 41-49 swinging on the MLSS slot — so a flat "66 min"
+   * would claim both are 66 and a maximum has to be stated. **"max" states it as a fact; "up to"
+   * hedges it.** Both his rule and the arithmetic survive, which is why the word is `max`.
+   * ⚠️ STILL A MAXIMUM AND NEVER A RANGE — ranges overlap between tiers, maxima do not.
+   *
+   * ⛔⛔ AND "MAXIMA LADDER CLEANLY" IS NO LONGER TRUE OF EVERY FAMILY — corrected 2026-08-30, and
+   * DO NOT "FIX" THE INVERSION IT DESCRIBES. That phrase justified printing a maximum instead of a
+   * range, and it assumed the clock and the work move together. p237's anaerobic ride is the case
+   * where they do not. Measured off `ladderOf`:
+   *     ride_anaerobic / progressive_repeats   L1 = 65 min   L2 = 63 min   ← DOWN
+   *     ride_sweet_spot / long                 L1 = 57 min   L2 = 61 min   ← up
+   *     ride_sweet_spot / tempo                L1 = 68 min   L2 = 75 min   ← up
+   * His levels are 6-10 x 45s (L1), x 1 min (L2), x 1:30 (L3), all at 110-115%+ with 4-6 minutes of
+   * recovery between sets. The work bands RISE with level; the CLOCK falls, because the shorter-rep
+   * level fits more reps inside its band and each drags a five-minute recovery behind it. More work,
+   * less time on the bike.
+   * ⛔ THE CHIP IS A SCHEDULING NUMBER — time on the bike — so a family like that prints a SMALLER
+   * figure for the higher tier, and Michael ruled that acceptable (2026-08-30: *"no as long as its
+   * honest"*). ⚠️ AND NO SECOND QUANTITY MAY BE ADDED to explain it — not a work total, not an
+   * interval count. One number per chip is the acceptance test and it survives this.
+   *
+   * ⛔ SINGULAR AND PLURAL BOTH HAVE TO BE RIGHT. "two hard sessions" on a week with one is the app
+   * not knowing what it built, and he reads it that way.
    */
-  return `${EXPERIENCE_LABEL[tier]} · ${longestMin} min · ${hours}`;
+  const sessions = `${hardCount === 1 ? 'one' : hardCount === 2 ? 'two' : String(hardCount)} `
+    + `hard session${hardCount === 1 ? '' : 's'}`;
+  return [EXPERIENCE_LABEL[tier], sessions, `${longestMin} min max`, hours]
+    .filter(Boolean).join(' · ');
 }
+
+/**
+ * ⛔ WHEN THE TWO CHIPS SAY THE SAME THING, THE SCREEN SAYS SO (Michael, 2026-08-30). Two identical
+ * chips side by side read as a choice that does nothing, and the athlete is left looking for the
+ * difference. That the tier does not change the session length here is real information, so it is
+ * stated rather than left to be inferred from two matching numbers.
+ * ⚠️ BOTH HALVES MUST MATCH — same duration AND same count. Two chips reading "66 min" over
+ * different session counts are not the same answer and must not claim to be.
+ */
+/**
+ * ⚠️⚠️ MEASURED UNREACHABLE TODAY (2026-08-30) — swept all 16 slot combinations and no sport lands
+ * both tiers on the same duration AND the same count: run reads 45 vs 66, ride 68 vs 75, in every
+ * arrangement. It is kept as a guard rather than deleted because the alternative is two identical
+ * chips shipping unexplained the first time the tier levels move, and that is the defect it exists
+ * to prevent — the same reason the zero-leader guard in `strength-focus-copy.ts` stayed after it
+ * stopped being reachable. ⛔ If a future session finds it firing, that is the tier table changing,
+ * not a bug here.
+ */
+/**
+ * ⛔⛔ WHAT THE REST OF THE HOURS ARE FOR (2026-08-30).
+ *
+ * ⚠️ IT WAS DELETED BY ACCIDENT AND THIS IS THE REPAIR. The fixed-hours sentence carried TWO things:
+ * the SUM of the hard sessions (the contradictory second number, correctly removed) and this — the
+ * only thing on the screen telling an athlete what fills the hours they typed. Removing the whole
+ * sentence took the answer out with the contradiction. Someone who types 5h and reads *"two hard
+ * sessions · 66 min max"* has been told about roughly 1h50 of their week and nothing about the rest.
+ *
+ * ⛔ NO NUMBER IN IT, DELIBERATELY. *"The other 3h is easy running"* would close the loop harder and
+ * put a second figure back on a screen whose whole repair was removing one. His acceptance test is
+ * counting the numbers; this line has none, so the count stays at one per chip.
+ *
+ * ⛔⛔ AND THE TWO SPORTS GET DIFFERENT SENTENCES, BECAUSE THE FACT IS DIFFERENT. This was measured
+ * before it was written, and a single shared line would have been false for running:
+ *
+ *   - **RIDE** — the frame's long slot maps to `ride_endurance / steady`, whose work is
+ *     `below_pct 0.75`. Genuinely all conversation pace, so the line says so flatly.
+ *   - **RUN** — the frame's long slot is `run_lsd` at archetype `long_with_inserts`, whose work is
+ *     `pct(0.95, 1.15)` — 95-115% of THRESHOLD, about 11% of the session. That is well above VT1.
+ *     `run_lsd`'s own intent line says *"may combine zones but is primarily below VT1"*, and
+ *     "primarily" is the whole point: the long run is easy running with faster sets inside it.
+ *
+ * ⚠️ SO "the rest stays at conversation pace" IS TRUE OF RIDING AND FALSE OF RUNNING. p109's floor
+ * (one speed session, one subthreshold, remainder at VT1 or below) describes the WEEK's shape; the
+ * long run's inserts are p235's own prescription and they sit above that ceiling. Saying otherwise
+ * would be the screen describing a session the plan does not build.
+ */
+export function restIsEasyLine(sport: SlotSport): string {
+  return sport === 'ride'
+    ? 'The rest of the riding stays at conversation pace.'
+    : 'The rest of the running stays at conversation pace, bar a few faster inserts in the long run.';
+}
+
+export const EXPERIENCE_TIERS_EQUAL_LINE =
+  'At these hours the answer makes no difference to how long the sessions are.';
 
 /**
  * ⛔ WHY THE TOP CHIP IS DEAD, ON THE CHIP ITSELF. A greyed control with no reason sends the athlete

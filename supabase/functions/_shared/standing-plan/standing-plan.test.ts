@@ -603,6 +603,17 @@ Deno.test('a quality session never reaches the watch cold', () => {
     const steps = s.steps_preset ?? [];
     const isQuality = steps.some((t) => /^(interval|cruise)_/.test(t));
     if (!isQuality) continue;
+    /**
+     * ⛔⛔ AN INSERT IS NOT A COLD START (2026-08-30). p235's long run carries sets *"added at any
+     * point"* inside an hour of VT1 running — since that day the session emits an `interval_` token
+     * for them, and this heuristic read the whole session as quality and demanded a warm-up in front
+     * of it. The hour of easy running IS the warm-up, and `run_lsd` is a `NO_WRAPPER` family in
+     * `source-rules.ts` precisely because he prints no wrapper for it.
+     * ⚠️ NARROWED, NOT DISABLED: a session that OPENS on a steady bout is warm by construction. One
+     * that opens on the interval itself still has to carry a wrapper, which is the case this test
+     * was written for.
+     */
+    if (/^(longrun|run_easy)_/.test(steps[0] ?? '')) continue;
     assert(/^warmup_/.test(steps[0]), `${s.name} starts on "${steps[0]}", not a warm-up`);
     assert(steps.some((t) => /^cooldown_/.test(t)), `${s.name} has no cooldown`);
   }

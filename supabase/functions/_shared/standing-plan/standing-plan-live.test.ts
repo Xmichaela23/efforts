@@ -535,19 +535,32 @@ Deno.test('every sentence this slice puts in front of an athlete passes the voic
   }
 });
 
-Deno.test('the edge function resolves pins and re-checks the skip server-side', async () => {
+Deno.test('the edge function resolves pins, and the test week can no longer be skipped', async () => {
   const src = await Deno.readTextFile(
     new URL('../../generate-strength-plan/index.ts', import.meta.url).pathname,
   );
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-  const fork = code.slice(code.indexOf('resolveFrame('), code.indexOf('composeStrengthPrimaryPlan('));
+  /**
+   * ⚠️ THE SLICE MARKER MOVED TWICE. It read to `composeStrengthPrimaryPlan(`, which was deleted on
+   * 2026-08-30 with the archived fallback — `indexOf` then returned -1 and this sliced to the last
+   * character, so the "fork" was the whole tail of the file and the assertions below were not
+   * measuring what they name. Anchored to the refusal instead.
+   */
+  const fork = code.slice(code.indexOf('resolveFrame('), code.indexOf('refusing: no Standing Plan frame'));
+  assert(fork.length > 500, 'the fork block could not be isolated — this lint is not reading what it thinks');
   assert(/chooseDayMap\(/.test(fork), 'the pins are not resolved');
-  assert(/evidenceForSkip\(/.test(fork), 'the skip evidence is not read server-side');
-  // ⛔ THE ANSWER IS NOT THE PERMISSION. The caller's `skip_test_week` alone must never skip.
-  assert(/skipAsked\s*&&\s*skipOffer\.available/.test(fork),
-    'a client answer can skip the test week without the server checking the evidence');
-  // ⛔ AND THE TRUST CEILING HAS ONE OWNER.
-  assert(/trustedMaxRepsFor/.test(code), 'the trusted-rep ceiling was re-invented');
+  /**
+   * ⛔⛔ INVERTED 2026-08-30 (Michael: *"the first week is tests"*). Everything below the line is
+   * history. This asserted the skip evidence WAS read server-side and that a client answer alone
+   * could never skip; both were the right guards while a skip existed. There is no skip now, so a
+   * live call to that reader is the defect and this is the tripwire.
+   *
+   * ─────────────── history ───────────────
+   * assert(/evidenceForSkip\(/.test(fork), 'the skip evidence is not read server-side');
+   * assert(/skipAsked\s*&&\s*skipOffer\.available/.test(fork), '…without the server checking');
+   */
+  assert(!/evidenceForSkip\(/.test(code), 'the test-week skip came back');
+  assert(!/skipOffer/.test(code), 'the skip offer came back');
   assert(!/training_max/.test(fork), 'the Standing Plan insert writes a training max');
 });
 

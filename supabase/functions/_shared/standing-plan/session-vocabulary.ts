@@ -220,6 +220,13 @@ export const FAMILY_LABEL: Partial<Record<FamilyId, string>> = {
   // ⛔ SLICE 4 — the ride and swim slots. Plain names in the app's existing register; nothing here
   // says "sweet spot" or "MLSS" at an athlete, and the description carries the intensity.
   ride_sweet_spot: 'Hard Ride',
+  /**
+   * ⛔ p237'S OWN WORD, and it has to differ from the sweet-spot label or the week shows two rows
+   * called "Hard Ride" that are 90% and 110%+ of FTP. ⚠️ "Anaerobic" is the source's term for the
+   * session, not a coined one; the register rule bans OUR jargon ("sweet spot", "MLSS"), not his
+   * name for a session.
+   */
+  ride_anaerobic: 'Anaerobic Ride',
   ride_endurance: 'Ride',
   swim_endurance: 'Easy Swim',
 };
@@ -245,10 +252,34 @@ export function translateEnduranceSession(
       work = [`run_easy_${minutes(workSeconds(session) || session.totals.clockedSeconds)}min`];
       break;
 
-    case 'run_lsd':
+    case 'run_lsd': {
       // ⚠️ THE ADD-ON'S MINUTES COME OFF THE LONG-RUN TOKEN, because they travel as their own token.
+      /**
+       * ⛔⛔ AND THE INSERTS TRAVEL TOO (2026-08-30). This case emitted the easy long run ALONE, so
+       * p235's own sets — *"1-hour VT1 run with 2 sets added at any point; the sets are 2 rounds of
+       * 1:30 @ 115% / 30s @ VT1"* — existed in the composed session and reached the athlete's row
+       * as nothing at all. The composer was right and this edge was dropping his prescription.
+       * ⚠️ THE INSERT BLOCK IS THE REPEATED ONE. `buildContinuousWithInserts` returns exactly two
+       * blocks: a `repeat: 1` steady bout, then the inserts. It carries no `addOn` marker, which is
+       * why `addOnSeconds` never saw it and its minutes were never double-counted either.
+       * ⚠️ SILENT WHEN THERE IS NO INSERT BLOCK — the hike and the plain VT1 jog are whole sessions.
+       */
+      const insertBlock = session.blocks.find((b) => b.repeat > 1 && b.steps.some((st) => st.role === 'work'));
+      const insertWork = insertBlock?.steps.find((st) => st.role === 'work');
+      const pct = insertWork?.intensity?.kind === 'pct_threshold'
+        ? Math.round(insertWork.intensity.hi * 100)
+        : null;
+      const floatSec = insertBlock?.steps.find((st) => st.role !== 'work')?.seconds
+        ?? insertBlock?.restBetween?.seconds ?? 0;
       work = [`longrun_${Math.max(1, totalMin - minutes(addOnSeconds(session)))}min_easypace`];
+      if (insertBlock && insertWork?.seconds != null && pct != null) {
+        work.push(
+          `interval_${insertBlock.repeat}x${Math.round(insertWork.seconds)}s_${pct}pct`
+          + (floatSec > 0 ? `_R${Math.round(floatSec)}s` : ''),
+        );
+      }
       break;
+    }
 
     case 'run_near_threshold': {
       const { reps, repSeconds } = repShape(session);
@@ -309,6 +340,30 @@ export function translateEnduranceSession(
       break;
     }
 
+    /**
+     * ⛔⛔ THE BIKE'S SECOND QUALITY SESSION (2026-08-30) — see `RIDE_EQUIVALENT` for why it exists.
+     * Without this case the family throws, and that throw is the tripwire below doing its job: it
+     * fired 8,000+ times across the fuzz sweep the moment the mapping made this family reachable.
+     *
+     * ⚠️ THE TOKEN IS `bike_vo2_`, AND THAT IS A POWER BAND, NOT A NAME. It is the only token in the
+     * materializer's grammar carrying 110-120% of FTP (`pctRange(1.1, 1.2)`), which is p237's stated
+     * 110-115%+ floor. The athlete never sees the token — the row is labelled from `FAMILY_LABEL`
+     * above, which reads "Anaerobic Ride". ⛔ This does NOT make the session a VO2 session and does
+     * not reopen the `ride_vo2` objection in `sport-slots.ts`; it reuses a band rather than adding a
+     * second grammar for the same numbers.
+     *
+     * ⚠️ MINUTES, BECAUSE THE GRAMMAR HAS NO SECONDS FORM for a powered repeat. `clampRideLevel` caps
+     * every ride family at level 2, and p237's level-2 option is *"6-10 x 1 min @ 110-115%+ with 4-6
+     * min recovery"* — whole minutes, so nothing is rounded away at the level this plan can reach.
+     * ⛔ A level-1 45-second repeat WOULD be rounded, and the grammar is where that would have to be
+     * fixed, not here.
+     */
+    case 'ride_anaerobic': {
+      const { reps, workMin, restMin } = repMinutes(session);
+      work = [`bike_vo2_${reps}x${workMin}min_R${restMin}min`];
+      break;
+    }
+
     case 'ride_endurance': {
       // ⛔ CONTINUOUS. `bike_endurance_{n}min` is 65-75% of FTP, which is his "below 75%" (p239).
       work = [`bike_endurance_${Math.max(1, minutes(workSeconds(session) || session.totals.clockedSeconds))}min`];
@@ -339,9 +394,11 @@ export function translateEnduranceSession(
 
     default:
       // ⛔ ANY FAMILY THIS EDGE HAS NOT BEEN TAUGHT FAILS LOUDLY rather than emitting a token the
-      // materializer will silently drop. ⚠️ That deliberately includes `ride_vo2`, `ride_anaerobic`,
-      // `ride_sprints`, `swim_speed` and `swim_open_water`: none of them is reachable from this
-      // plan's assignment, and a throw here is the tripwire if one ever becomes reachable by accident.
+      // materializer will silently drop. ⚠️ That deliberately includes `ride_vo2`, `ride_sprints`,
+      // `swim_speed` and `swim_open_water`: none of them is reachable from this plan's assignment,
+      // and a throw here is the tripwire if one ever becomes reachable by accident.
+      // ⚠️ `ride_anaerobic` LEFT THAT LIST ON 2026-08-30 — it is now reachable ON PURPOSE and has a
+      // case above. The tripwire worked exactly as written: it fired the moment the mapping changed.
       throw new Error(`no session-vocabulary translation for family: ${session.family}`);
   }
 
@@ -404,6 +461,10 @@ export const EMITTED_TOKEN_SHAPES: { shape: RegExp; example: string }[] = [
   { shape: /^cooldown_bike_\d+min$/, example: 'cooldown_bike_10min' },
   { shape: /^bike_ss_\d+x\d+min_R\d+min$/, example: 'bike_ss_3x12min_R4min' },
   { shape: /^bike_thr_\d+x\d+min_R\d+min$/, example: 'bike_thr_4x8min_R5min' },
+  // ⛔ THE ANAEROBIC RIDE (2026-08-30) — the 110-120% band, `expandBikeToken`'s `bike_vo2_` rule.
+  { shape: /^bike_vo2_\d+x\d+min_R\d+min$/, example: 'bike_vo2_6x1min_R5min' },
+  // ⛔ p235's long-run inserts (2026-08-30) — seconds at a percentage of threshold speed.
+  { shape: /^interval_\d+x\d+s_\d+pct(?:_R\d+s)?$/, example: 'interval_2x90s_115pct_R30s' },
   { shape: /^bike_endurance_\d+min$/, example: 'bike_endurance_90min' },
   { shape: /^swim_warmup_\d+m$/, example: 'swim_warmup_300m' },
   { shape: /^swim_cooldown_\d+m$/, example: 'swim_cooldown_200m' },
@@ -420,6 +481,9 @@ export const MATERIALIZER_RIDE_PATTERNS: RegExp[] = [
   /cooldown_bike_\d+min/,
   /bike_ss_(\d+)x(\d+)min_r(\d+)min/i,
   /bike_thr_(\d+)x(\d+)min_r(\d+)min/i,
+  // ⛔ ADDED 2026-08-30 with the anaerobic ride. It has always existed in `expandBikeToken`
+  // (`pctRange(1.1, 1.2)`); it was missing from this CACHE only because nothing emitted it.
+  /bike_vo2_(\d+)x(\d+)min_r(\d+)min/i,
   /bike_endurance_(\d+)min/,
 ];
 export const MATERIALIZER_SWIM_PATTERNS: RegExp[] = [
@@ -439,6 +503,9 @@ export const MATERIALIZER_RUN_PATTERNS: RegExp[] = [
   /long[_-]?run_\d+min(?:_easypace)?/,
   /cruise_\d+x[\d.]+mi_threshold/,
   /interval_\d+x/,
+  // ⛔ THE TIME-BASED PERCENTAGE FORM, added 2026-08-30 with p235's long-run inserts. `/interval_\d+x/`
+  // above already matches it, and it is spelled out so the cache names every shape this edge emits.
+  /^interval_\d+x\d+s_\d+pct(?:_[rR]\d+s)?$/,
   // ⛔ COPIED FROM `expandRunToken`'s strides branch (`materialize-plan/index.ts:1870`) on
   // 2026-08-26. Same cache rule as the rest of this list: if that regex moves, the gate is the
   // tripwire.

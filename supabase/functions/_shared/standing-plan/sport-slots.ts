@@ -129,7 +129,37 @@ export const RIDE_EQUIVALENT: Partial<Record<FamilyId, { family: FamilyId; arche
    * position in the band, the top of the band instead of its middle. The gap is seven minutes
    * because his span is seven minutes wide.
    */
-  run_mlss: { family: 'ride_sweet_spot', archetype: 'tempo' },
+  /**
+   * ⛔⛔ THE BIKE'S SECOND QUALITY SESSION IS ANAEROBIC, NOT A SECOND SWEET SPOT (2026-08-30).
+   *
+   * ⛔ THE DEFECT IT FIXES, measured on materialized rows at FTP 220: a week with both hard slots on
+   * the bike built 198 W and 198 W — 90% FTP twice — plus two 154 W steady rides. **Two subthreshold
+   * sessions and no quality above them**, for the whole block. p109's floor asks for ONE speed
+   * session, ONE subthreshold session, remainder at or below VT1. Mapping both run quality slots to
+   * `ride_sweet_spot` collapsed them into one family and the speed session was lost in the mapping.
+   *
+   * ⛔ AND IT IS HIS OWN WEEK, NOT AN ESCALATION WE INVENTED. The All Rounder (p274, transcribed and
+   * verified against the page image) puts `Cyc AnA (level 1)` on day 2, beside MLSS+ on day 1 and NT
+   * on day 3. When the source puts a second quality session into a week containing cycling, it is
+   * anaerobic. ⚠️ This does NOT reopen the VO2 question — the objection to `ride_vo2` in this file
+   * stands, and `long_vo2` / `short_vo2` are deliberately not the archetype chosen below.
+   *
+   * ⚠️ WHY `run_mlss` AND NOT `run_near_threshold` — DECIDED ON THE FLOORS, not by eye:
+   *     run_mlss           workFloorPct 1.0   "Above threshold"   → ride_anaerobic  floor 1.0
+   *     run_near_threshold workFloorPct 0.85  "Near-threshold"    → ride_sweet_spot floor 0.80
+   * The floors match across the swap, so each slot keeps the intensity it had on the run side and the
+   * subthreshold slot is untouched.
+   *
+   * ⚠️ `progressive_repeats` IS p237'S OWN FIRST LEVEL-1 OPTION — *"6-10 x 45s @ 110-115%+ with 4-6
+   * min recovery between sets, each set starting at 110% and progressing to 125-130%"* — and the
+   * archetype's stated recovery band (240-360s) is that sentence. p237 also warns the session is
+   * *"best done by feel with a power FLOOR rather than a specific power target — the numbers are
+   * guidelines"*, which is a display question for the row, not a reason to pick a softer family.
+   *
+   * ⚠️ THE LEVEL IS NOT SET HERE. The slot carries the frame's own level and `clampRideLevel` caps
+   * every ride family at 2 (`RIDE_LEVEL_CEILING`), so this cannot climb past what p238-239 print.
+   */
+  run_mlss: { family: 'ride_anaerobic', archetype: 'progressive_repeats' },
   run_near_threshold: { family: 'ride_sweet_spot', archetype: 'long' },
   run_vt1: { family: 'ride_endurance', archetype: 'steady' },
   run_lsd: { family: 'ride_endurance', archetype: 'steady' },

@@ -1814,7 +1814,6 @@ function assemblePayload(
            * server-side and builds the test week anyway when they are not there — a stale client
            * answer cannot skip a test.
            */
-          ...(state.skipTestWeek === true ? { skip_test_week: true } : {}),
           ...(state.posture?.swim === 'maintain' && state.swimDays > 0 ? { swim_days: state.swimDays } : {}),
           // ⚠️ STORED, NOT YET READ. The engine books off `swim_days`; this is the athlete's own
           // number so the swim can stop being a guess without asking them again later.
@@ -3873,18 +3872,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // result, and the athlete cannot tell the difference.
     setPreviewFailed(!Array.isArray(wk1) || wk1.length === 0);
     setPreviewWeek(Array.isArray(wk1) ? wk1 : []);
-    /**
-     * ⛔ THE OFFER, WHEN THERE IS ONE. Only a Standing Plan preview carries it; every other block
-     * leaves it null and the panel renders nothing, which is the honest answer for a plan with no
-     * test week to skip.
-     */
-    const skip = (plan as { _skip_test_week?: { available?: boolean; summary?: string; window_days?: number } } | null)
-      ?._skip_test_week;
-    setPreviewSkip(
-      skip && skip.available === true
-        ? { available: true, summary: String(skip.summary ?? ''), window_days: Number(skip.window_days) || 42 }
-        : null,
-    );
+    // ⛔ THE TEST-WEEK OFFER IS GONE (2026-08-30) — the server stopped sending it and week one is
+    // the test week for every block. Nothing to read, nothing to show.
+    setPreviewSkip(null);
     setPreviewNotes(
       Array.isArray(plan?.placement_compromises)
         // Tolerate the old flat-string shape while any cached plan still carries it.
@@ -7332,26 +7322,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 </div>
               )}
             </div>
-            {/* ⛔ THE TEST-WEEK OFFER (Standing Plan, slice 3). Michael's ruling, 2026-08-23: the test
-                can be skipped ONLY when the number on file is evidence-backed and fresh — read from
-                logged sets inside the window, never a typed-in max — and **the skip is offered, the
-                default stays the test**. So this renders only when the server said the evidence is
-                there, it is off until tapped, and the server re-checks the evidence on the build.
-                ⚠️ Stage 5 rebuilds this wizard; this is the seam, not its final form. */}
-            {previewSkip?.available ? (
-              <label className="flex items-start gap-3 rounded-xl border border-white/12 bg-white/[0.03] p-3">
-                <input
-                  type="checkbox"
-                  checked={state.skipTestWeek === true}
-                  onChange={(e) => setState((p) => ({ ...p, skipTestWeek: e.target.checked }))}
-                  className="mt-0.5 h-4 w-4 accent-white/80"
-                />
-                <span className="text-white/80 text-sm leading-snug">
-                  Start without a test week
-                  <span className="block text-white/50 text-xs mt-1">{previewSkip.summary}</span>
-                </span>
-              </label>
-            ) : null}
+            {/* ⛔⛔ THE TEST-WEEK OFFER IS DELETED (Michael, 2026-08-30: *"one rep max test for the
+                first week and that should not be optional. The first week is tests."*).
+                It rendered a "Start without a test week" checkbox whenever the server found enough
+                logged lifting to derive the working numbers instead. Week one is the test week for
+                every block now, so there is nothing to offer and no checkbox to render.
+                ⚠️ The server no longer sends the offer either — `generate-strength-plan` stopped
+                computing it, so this could not light up even if it were still here. */}
             {/* ⛔ TWO FALSEHOODS ON THIS LINE, both created when the engine changed under it.
                 • "ending in a retest" — Strength Focus has NO retest week. The last set of every
                   third week is the test (the previous program); weeks 9, 10 and 11 are the measurement. The

@@ -283,6 +283,17 @@ export type ExperienceChip = {
    * A displayed minimum the athlete cannot select is a dead end with a reason on it.
    */
   needsHours: number;
+  /**
+   * ⛔⛔ HOW MANY HARD SESSIONS OF THIS SPORT THE WEEK ACTUALLY CONTAINS (Michael, 2026-08-30).
+   *
+   * The duration alone under-describes the week he has to fit around work. Measured across a real
+   * 12-week block at the experienced tier, a run athlete gets TWO hard runs every week — the
+   * near-threshold run at 66 min, and the MLSS run swinging 41-49 by week — and *"up to 66 min"* is
+   * true of each of them while he books two evenings, not one.
+   * ⚠️ DERIVED FROM THE SLOTS, NEVER ASSUMED TO BE TWO. The mixed week, where the other hard slot is
+   * a ride, genuinely has one hard run and must say one.
+   */
+  hardCount: number;
 };
 
 /** The pair for one sport, in screen order. Null when that sport fills no slot. */
@@ -392,6 +403,9 @@ export function experienceChips(
     return {
       tier,
       longestMin: longest > 0 ? Math.round(longest) : null,
+      // ⛔ THE SAME `hard` LIST THE DURATION COMES FROM — one derivation, so the count and the number
+      // can never end up describing different sets of sessions.
+      hardCount: hard.length,
       needsHours: Math.max(1, Math.ceil(floorHours)),
     };
   };

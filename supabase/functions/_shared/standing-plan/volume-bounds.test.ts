@@ -121,9 +121,16 @@ Deno.test('⛔ THE TYPED HOURS SIZE THE WEEK — and his 4h was under the floor 
    * be measuring a different week and calling his export's numbers wrong.
    */
   const midpoint = hours(build(HIS_SLOTS, undefined, undefined, EXPERIENCED));
-  // ⛔ 5h19 IS THE NUMBER OFF HIS EXPORT. The untargeted week still sits at the library's midpoint,
-  // which is the "before" this whole item is measured against.
-  assert(Math.abs(midpoint - 5.32) < 0.1, `the untargeted week left the midpoint: ${midpoint}h`);
+  /**
+   * ⛔ THE MIDPOINT MOVED TO ~5h13 ON 2026-08-30, and the cause is a session swap, not a dial.
+   * Frame day 1's ride left `ride_sweet_spot` for `ride_anaerobic` — two sweet-spot slots gave a
+   * rider no session above subthreshold all block, against p109's floor — and the anaerobic session's
+   * duration band is not the tempo block's. About six minutes a week.
+   * ⚠️ 5h19 WAS THE NUMBER OFF HIS EXPORT and is now historical: that export was built by the old
+   * mapping. The point of the assertion is unchanged — the untargeted week sits at the library's
+   * midpoint, and that is the "before" the sizing item is measured against.
+   */
+  assert(Math.abs(midpoint - 5.22) < 0.1, `the untargeted week left the midpoint: ${midpoint}h`);
 
   /**
    * ⛔⛔ AND HIS FOUR HOURS WERE NEVER REACHABLE — the finding this test exists to keep. These slots'
@@ -141,7 +148,13 @@ Deno.test('⛔ THE TYPED HOURS SIZE THE WEEK — and his 4h was under the floor 
    */
   const asked4 = build(HIS_SLOTS, undefined, 4, EXPERIENCED);
   assertEquals(asked4.volume.ride.verdict, 'under_floor');
-  assert(Math.abs(hours(asked4) - 4.42) < 0.1, `the floor moved: ${hours(asked4).toFixed(2)}h`);
+  /**
+   * ⚠️ 4h25 → ~4h13 ON 2026-08-30. Day 1's ride left `ride_sweet_spot` for `ride_anaerobic` (p109's
+   * floor — two sweet-spot slots gave a rider nothing above subthreshold), and the anaerobic
+   * session's shortest dose is not the tempo block's. The FINDING this test exists for is unchanged:
+   * his four hours were never reachable, and the week says `under_floor` rather than pretending.
+   */
+  assert(Math.abs(hours(asked4) - 4.22) < 0.1, `the floor moved: ${hours(asked4).toFixed(2)}h`);
   assert(hours(asked4) < midpoint, 'asking for less did not get less');
 
   // ⛔ AND A TARGET INSIDE THE BAND IS DELIVERED. ⚠️ Tolerance, because the interior of the dial is a

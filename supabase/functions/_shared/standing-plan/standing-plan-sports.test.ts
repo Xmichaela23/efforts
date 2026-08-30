@@ -860,26 +860,46 @@ Deno.test('⛔ TWO HARD SLOTS NEVER BUILD ONE SHAPE — the unpicked one moves, 
    * rather than 43 and 51. Day 3 is unchanged. ⛔ THE TWO ARE STILL DISTINCT, which is what this
    * test is actually about, and the shapes themselves are not this test's business.
    */
+  /**
+   * ⚠️ DAY 1's SHAPE IS `progressive_repeats` SINCE 2026-08-30 — the slot is no longer a sweet-spot
+   * ride at all. Both hard slots mapping to `ride_sweet_spot` built a week with TWO subthreshold
+   * sessions and none above them, against p109's floor; day 1 is now `ride_anaerobic`, the session
+   * p274's All Rounder puts in a rider's week. ⛔ THE TWO ARE STILL DISTINCT, which is all this test
+   * is about, and the shapes themselves remain not its business.
+   */
   const base = assignSports(STANDARD, { runs: 1, rides: 3, slots: BOTH_RIDE });
-  assertEquals([arche(base, '1:0'), arche(base, '3:0')], ['tempo', 'long'],
+  assertEquals([arche(base, '1:0'), arche(base, '3:0')], ['progressive_repeats', 'long'],
     'the frame defaults stopped being distinct');
 
-  // ⛔ THE PICK STAYS PUT AND THE DEFAULT GETS OUT OF ITS WAY — pins-win (D-452).
-  const one = assignSports(STANDARD, { runs: 1, rides: 3, slots: BOTH_RIDE, archetypes: { '1:0': 'long' } });
-  assertEquals(arche(one, '1:0'), 'long', 'the athlete\'s pick was moved');
-  assert(arche(one, '3:0') !== 'long', `both slots built long: ${arche(one, '3:0')}`);
+  /**
+   * ⛔ THE PICK STAYS PUT AND THE DEFAULT GETS OUT OF ITS WAY — pins-win (D-452).
+   * ⚠️ THE PICK IS NOW SLOT 3's, not slot 1's. `long` is a `ride_sweet_spot` shape and slot 1 stopped
+   * being that family on 2026-08-30; a pick has to be one its own family offers. The rule under test
+   * — a pick is honoured and the OTHER slot moves out of its way — is unchanged, and the screen
+   * derives each slot's menu from `RIDE_EQUIVALENT` too, so it follows this automatically.
+   */
+  const one = assignSports(STANDARD, { runs: 1, rides: 3, slots: BOTH_RIDE, archetypes: { '3:0': 'medium' } });
+  assertEquals(arche(one, '3:0'), 'medium', 'the athlete\'s pick was moved');
+  assert(arche(one, '1:0') !== 'medium', `both slots built medium: ${arche(one, '1:0')}`);
 
   // ⛔ AND IN THE OTHER DIRECTION, so the rule is not an artefact of slot order.
   const two = assignSports(STANDARD, { runs: 1, rides: 3, slots: BOTH_RIDE, archetypes: { '3:0': 'tempo' } });
   assertEquals(arche(two, '3:0'), 'tempo', 'the athlete\'s pick was moved');
   assert(arche(two, '1:0') !== 'tempo', `both slots built tempo: ${arche(two, '1:0')}`);
 
-  // ⚠️ TWO EXPLICIT PICKS OF ONE SHAPE ARE BOTH HONOURED. Both are answers, and overriding one
-  // would be the engine unpicking a choice; the card is what stops this arising at all.
+  /**
+   * ⚠️ TWO EXPLICIT PICKS OF ONE SHAPE CAN NO LONGER ARISE ON THE BIKE (2026-08-30). The two ride
+   * slots are different families since day 1 became `ride_anaerobic`, so a shape is only ever
+   * offered by the one card whose family owns it — `tempo` belongs to sweet spot and slot 1 cannot
+   * build it at all. Each pick is still honoured within its own family, which is the rule.
+   * ⛔ The old case — both slots picking `tempo` and both being honoured — is unreachable, and its
+   * absence is what the family assertion at the top of this test now guards.
+   */
   const both = assignSports(STANDARD, {
-    runs: 1, rides: 3, slots: BOTH_RIDE, archetypes: { '1:0': 'tempo', '3:0': 'tempo' },
+    runs: 1, rides: 3, slots: BOTH_RIDE, archetypes: { '1:0': 'progressive_repeats', '3:0': 'tempo' },
   });
-  assertEquals([arche(both, '1:0'), arche(both, '3:0')], ['tempo', 'tempo']);
+  assertEquals([arche(both, '1:0'), arche(both, '3:0')], ['progressive_repeats', 'tempo'],
+    'a pick was not honoured within its own family');
 });
 
 Deno.test('the RUN slots are untouched by all of it — different families cannot collide', () => {

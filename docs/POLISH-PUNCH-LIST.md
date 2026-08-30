@@ -959,3 +959,56 @@ Moved off the queue. Do not re-open without new evidence.
 - **✅ Bug B — strength logger loses state on iOS sleep.** Fixed (D-109): `AppLayout.tsx:130-176`.
 - **✅ Equipment chips → strength protocol · 1RM → loading · FTP → baked watts · training history → volume floors · group-ride anchor · brick structure.** All verified flowing. *(FTP and 1RM carry the caveats in §1.)*
 - **✅ Taper-mode narrative ban.** Live and guarded (`_shared/arc-narrative-ai-appendix.ts:126`). Standing eval watch, not queue work.
+
+---
+
+# SHELVED 2026-08-30 — open items on Strength + 5K, and which ones follow you into the All Rounder
+
+⛔ **FOUR OF THESE SIX ARE NOT 5K-SPECIFIC.** They live in the materializer, the volume solver and the
+progression, which BOTH frames use. Shelving them as "5K polish" would be wrong — they will surface
+again in the All Rounder. Marked per item.
+
+## Shared — will appear in the All Rounder too
+
+- **The long run's inserts never reach the plan.** Composer intent is `run_lsd / long_with_inserts`,
+  work `pct(0.95, 1.15)`, ~11% of the session. What materializes is ONE step at easy pace, no faster
+  work. Composer and materialized row disagree. ⚠️ **Decide which is right before writing copy about
+  it** — the endurance-focus screen's rest-line wording is blocked on this. The All Rounder carries
+  `LSD (level 2)` on day 6, so it inherits whatever this is.
+- **Running steps carry a watts target.** Easy and long runs render `powerTarget: "11 W"` beside the
+  pace. Cosmetic, but it is on a row the athlete opens. Materializer, so both frames.
+- **The under-floor ask is silently overruled.** Ask for FEWER hours than the week's slots can hold
+  and you get the floor with nothing said — measured at 4h13 for a 3-ride week. `sizeSolve` returns
+  `verdict: 'under_floor'` and **the only reader of that verdict is a comment.** Same silent-trim
+  class as the over-ask that was fixed on 2026-08-30, which now names both numbers. Both frames.
+- **The rider working-max reduction (p280) is unbuilt.** *"Cycling can be surprisingly taxing on the
+  central nervous system… you may want to proactively lower your working max by a few more percentage
+  points than usual."* Today the app does the opposite: `HAIRCUT_CAUSE_IS_OURS` DROPS the p247
+  lower-body reduction when the hard session before leg day is a ride. Spec agreed and not started:
+  the p247 adjacency cut stays per-session and run-triggered; the p280 rider cut sets the STARTING
+  working max ONCE, because this app has a progression loop his book does not and a standing tax
+  would penalise a rider twice for the same fatigue. ⚠️ **Matters MORE in the All Rounder**, which
+  prescribes cycling natively.
+
+## Genuinely 5K-only
+
+- **Slot labels are still frozen pending Michael.** Push isolation · Pull isolation · Hinge variation
+  · Leg variation · Press variation · Leg isolation · Core. His words vs Viada's; he has been given
+  three schemes and chosen none. Nothing may rename them meanwhile.
+- **The endurance-focus rest-line wording.** Currently unresolved between "The rest of the running is
+  easy" (Michael's own earlier phrasing, which he has since ruled stale) and "…stays at conversation
+  pace", sourced to p109's floor — one speed, one subthreshold, remainder at VT1 or below. ⛔ The ride
+  line is settled and TRUE as built (long ride 65-75% FTP, and the library defines the ride's VT1 as
+  <75% FTP). The RUN line is blocked on the inserts item above.
+
+## Also open, found the same day
+
+- **Braced slots silently unbrace at the home baseline** (barbell + dumbbells + bench). `braced press
+  lower` lands on a bulgarian split squat — free-standing, single-leg, no brace — because leg press,
+  hack squat and lever squat are all unperformable on that kit. `braced pull upper` lands on a barbell
+  row for the same reason. ⚠️ The pull one is a TAGGING gap, not a training one: a chest-supported
+  dumbbell row on an incline bench is the real home version and currently has no equipment route. The
+  lower one is a genuine product decision — say what was substituted rather than swap silently.
+- **Four movements carry no gear tag** and so read as home-doable when they are not: `belt squat`,
+  `smith machine squat`, `seated cable row`, `incline dumbbell row`. The module logs a warning naming
+  itself.

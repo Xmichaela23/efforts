@@ -50,9 +50,6 @@ import {
   demonstratedRunVolume,
   demonstratedWeeklyMinutes,
   assignSports,
-  evidenceForSkip,
-  evidenceWorkingNumbers,
-  EVIDENCE_WINDOW_DAYS,
   FRAMES,
   isLongSlot,
   resolveFrame,
@@ -71,7 +68,6 @@ import {
  * ⚠️ IT IS NOT THE PREVIOUS PROGRAM'S NUMBER. It is the app's e1RM trust ceiling, which happens to live in that
  * file; a second copy in the new module would be the doubled disease.
  */
-import { trustedMaxRepsFor } from '../_shared/strength/trusted-reps.ts';
 /**
  * ⛔ THE ONE OWNER OF THE STORED PICK SHAPE (A1, 2026-08-24). `normalizeAssistancePrefs` migrates the
  * v1 flat shape, drops unrecognised keys and never returns a partial week — everything a second
@@ -593,39 +589,29 @@ Deno.serve(async (req: Request) => {
           prescribedFrom[lift] = name;
         }
       }
-      const skipAsked = (body as Record<string, unknown>).skip_test_week === true;
-      let skipOffer: ReturnType<typeof evidenceForSkip> = {
-        available: false, evidence: {}, missing: [], summary: '',
-      };
-      try {
-        const asOf = (typeof start_date === 'string' && start_date.trim())
-          ? String(start_date).slice(0, 10)
-          : new Date().toISOString().slice(0, 10);
-        const from = new Date(Date.parse(`${asOf}T00:00:00Z`) - (EVIDENCE_WINDOW_DAYS + 1) * 86400000)
-          .toISOString().slice(0, 10);
-        const { data: liftRows } = await supabase
-          .from('workouts')
-          .select('workout_date, date, strength_exercises')
-          .eq('user_id', String(user_id))
-          .eq('type', 'strength')
-          .gte('date', from)
-          .lte('date', asOf);
-        skipOffer = evidenceForSkip({
-          rows: liftRows as never,
-          liftForName: prescribedFrom as never,
-          trustedMaxRepsFor,
-          asOfIso: asOf,
-        });
-      } catch (e) {
-        // ⚠️ A READER THAT CANNOT READ DOES NOT SKIP A TEST. The offer stays unavailable and the
-        // block runs the test week, which is the safe direction and the default anyway.
-        console.warn('[standing-plan] skip evidence unreadable; the test week stands:', (e as Error)?.message);
-      }
-      const skipping = skipAsked && skipOffer.available;
-      if (skipAsked && !skipOffer.available) {
+      /**
+       * ⛔⛔ WEEK ONE IS THE TEST WEEK, FOR EVERYONE, EVERY BLOCK (Michael, 2026-08-30: *"one rep max
+       * test for the first week and that should not be optional. The first week is tests."*).
+       *
+       * ⛔ THE SKIP OFFER IS GONE. It read the athlete's logged lifting over a window and, when the
+       * evidence covered every prescribed lift, offered to derive the working numbers from those sets
+       * instead of testing. The evidence reader was careful — it took the number from the logged SET
+       * rather than `performance_numbers`, so a typed-in max could never skip — and none of that is
+       * the point any more. The test week is the prescription, not a formality to be waived when the
+       * data looks good enough.
+       *
+       * ⚠️ NOTHING IS STRANDED. Zero plans in the project carry `test_skipped: true` (checked
+       * 2026-08-30 across every row), so no existing block depends on the skipped shape.
+       * `rematerialize-standing-block` still READS the stored flag and can stay as it is — it will
+       * simply never see a true again.
+       * ⚠️ `evidenceForSkip` / `evidenceWorkingNumbers` in `_shared/standing-plan/test-skip.ts` now
+       * have no live caller. Left in place rather than deleted, with their tests, because removing
+       * them is a separate call — flagged, not smuggled.
+       */
+      if ((body as Record<string, unknown>).skip_test_week === true) {
         console.log(
-          '[standing-plan] a skip was asked for and the evidence is not there — building the test '
-          + `week: ${skipOffer.missing.map((m) => `${m.lift}: ${m.reason}`).join('; ')}`,
+          '[standing-plan] a caller asked to skip the test week; the option no longer exists and '
+          + 'week one is the test week.',
         );
       }
 
@@ -752,8 +738,11 @@ Deno.serve(async (req: Request) => {
            * two-formula-average quantity (p215) the test would have produced, so nothing downstream
            * can tell which route a block took by looking at its numbers.
            */
-          workingNumbers: skipping ? evidenceWorkingNumbers(skipOffer) : undefined,
-          skipTestWeek: skipping,
+          // ⛔ ALWAYS UNDEFINED SINCE 2026-08-30 — the working numbers come from week one's test,
+          // never from logged evidence. See the test-week block above.
+          workingNumbers: undefined,
+          // ⛔ NEVER TRUE SINCE 2026-08-30 — week one is the test week for every block.
+          skipTestWeek: false,
           seed1RMs: {
             bench: maxes.bench,
             squat: maxes.squat,
@@ -813,7 +802,8 @@ Deno.serve(async (req: Request) => {
         goalName: typeof goal_name === 'string' ? goal_name : undefined,
         demonstratedMilesSource: demonstrated.source,
         dayMap,
-        skipEvidence: skipping ? (skipOffer.evidence as Record<string, unknown>) : null,
+        // ⛔ ALWAYS NULL SINCE 2026-08-30 — nothing is skipped, so there is no evidence to record.
+        skipEvidence: null,
         extraNotes: wiringNotes,
       });
 
@@ -825,24 +815,13 @@ Deno.serve(async (req: Request) => {
 
       if (preview === true) {
         /**
-         * ⛔ THE PREVIEW CARRIES THE OFFER, so a surface can put it in front of the athlete before
-         * they commit. `NonRaceBuilder.tsx:2716` already reads `plan.placement_compromises` off this
-         * payload; `skip_test_week` rides beside it rather than inside the plan, because it is a
-         * question about the block, not a property of it.
-         *
-         * ⚠️ IT REPORTS THE OFFER EVEN WHEN THE ANSWER WAS NO. `available` plus `missing` is what
-         * lets a screen say *"we could start from your logged sets"* — or say nothing, honestly,
-         * because the sets are not there.
+         * ⛔ THE PREVIEW NO LONGER CARRIES A SKIP OFFER (2026-08-30). It used to, so a surface could
+         * put *"we could start from your logged sets"* in front of the athlete before they committed.
+         * There is nothing to offer: week one is the test week. A field that always says "no" is a
+         * question the screen would still have to render an answer to.
          */
         return json({
           success: true, plan_id: null, plan: row, phase_structure: row.phaseStructure,
-          skip_test_week: {
-            available: skipOffer.available,
-            taken: skipping,
-            summary: skipOffer.summary,
-            missing: skipOffer.missing,
-            window_days: EVIDENCE_WINDOW_DAYS,
-          },
         }, 200);
       }
 
