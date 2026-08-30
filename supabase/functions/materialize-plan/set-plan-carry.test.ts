@@ -1,7 +1,7 @@
 /**
  * THE PER-SET PRESCRIPTION survives materialization.
  *
- * 5/3/1 prescribes three sets at three weights (docs/SPEC-get-stronger.md §1). The composer authors
+ * the previous program prescribes three sets at three weights (docs/SPEC-get-stronger.md §1). The composer authors
  * them in `set_plan`; if materialize drops the field, the logger falls back to copying the row's one
  * weight onto every set — and the athlete opens each session to the TOP weight sitting on all three,
  * four days a week, for twelve weeks. That failure is silent: the session still looks complete.
@@ -15,7 +15,7 @@ const RAMP = [
   { weight: 160, reps: 5, amrap: true },
 ];
 
-Deno.test('a row with no set_plan is untouched — every non-5/3/1 row keeps its shape', () => {
+Deno.test('a row with no set_plan is untouched — every non-the previous program row keeps its shape', () => {
   assertEquals(carrySetPlan({ name: 'Bench Press', weight: 135 }, 135), undefined);
   assertEquals(carrySetPlan({ set_plan: [] }, 135), undefined);
   assertEquals(carrySetPlan(null, 135), undefined);
@@ -50,7 +50,7 @@ Deno.test('a stripped weight (bodyweight guard) leaves the ramp alone rather tha
 });
 
 Deno.test('the warm-up tag survives the carry and scales with the ramp', () => {
-  // Weeks 1-3 prepend a warm-up ramp (Wendler p.31). The tag must reach the logger so it can section
+  // Weeks 1-3 prepend a warm-up ramp (the previous program). The tag must reach the logger so it can section
   // Warm-up vs Working; without it the athlete opens six unlabelled sets.
   const withWarmup = [
     { weight: 75, reps: 5, warmup: true },

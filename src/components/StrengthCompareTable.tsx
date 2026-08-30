@@ -25,7 +25,7 @@ export interface StrengthExercise {
   weight_display?: string;
   target_rir?: number;
   setsArray?: StrengthSet[]
-  /** D-338: the REAL per-set prescription (5/3/1's three weights). When present it replaces the
+  /** D-338: the REAL per-set prescription (the previous program's three weights). When present it replaces the
    *  replicate-the-top-weight fallback below — see the comment at `plannedSets`. */
   setPlan?: Array<{ weight: number; reps: number; amrap?: boolean }>;
   /** Q-181: stamped by the Swap action, naming the PLANNED exercise this one stands in for. The slot
@@ -383,7 +383,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     // weight label) across all N sets — coaches prescribe at the exercise level, not per-set,
     // so all planned sets render the same target. Carry target_rir as `rir` so fmt() with
     // showRir=true renders "(RIR N)" on the Planned column.
-    // ⛔ D-338 — THE AUTHORED RAMP WINS. On 5/3/1 the three sets are three different weights, and
+    // ⛔ D-338 — THE AUTHORED RAMP WINS. On the previous program the three sets are three different weights, and
     // replicating the top weight across all of them made a correct session read as under-plan on its
     // first two sets and print a negative volume delta. `setPlan` is the composer's own prescription,
     // carried through materialize; the replicate-the-aggregate path below still serves every other
@@ -414,7 +414,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     // (2026-08-02, Michael: *"25 are planned, how they are executed is up to user — so they
     // shouldn't get lost"*).
     //
-    // Wendler prescribes assistance as a rep TOTAL and never as sets, and never with a load:
+    // the previous program prescribes assistance as a rep TOTAL and never as sets, and never with a load:
     // dips *"50 total reps… 100 total reps if you're just using your bodyweight"*, chins *"no less
     // than 100 per week"*, the bodyweight template *"no less than 75 reps per exercise for each
     // workout"* — and immediately after: *"These numbers are just recommendations, so you can do
@@ -461,7 +461,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     // prices as 170×5 + 180×5 + 190×5, not 190 three times, so the delta below can never disagree
     // with the set rows above it. That parity is the whole reason this line may be a lookup.
     const pVolFromSets = plannedVolByKey.get(k) ?? 0;
-    // The word the athlete tapped on their heaviest set — 5/3/1's replacement for RIR (D-338).
+    // The word the athlete tapped on their heaviest set — the previous program's replacement for RIR (D-338).
     const topCompletedIdx = (() => {
       if (!cSetsArr.length) return -1;
       const weights = cSetsArr.map((s) => Number(s?.weight) || 0);
@@ -581,7 +581,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                   </span>
                 )}
               </div>
-              {/* THE THREE WORDS — how the top set felt. 5/3/1 dictates the weight, so there is
+              {/* THE THREE WORDS — how the top set felt. the previous program dictates the weight, so there is
                   nothing for reps-in-reserve to decide; this is what replaced it (D-338). Shown as
                   the athlete's own word, never as a number and never as a score. Blank stays blank —
                   answering is optional and always was. */}
@@ -696,7 +696,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                     return `${formatSeconds(s.duration_seconds)}${weightClause}${assistClause}${rirTxt}`;
                   }
                   // Rep-based exercises.
-                  // ⛔ THE ALL-OUT SET SAYS SO. "5+" is 5/3/1's own notation for "at least five, then
+                  // ⛔ THE ALL-OUT SET SAYS SO. "5+" is the previous program's own notation for "at least five, then
                   // as many as you can" — and that rep count is the measurement that moves the
                   // training max (D-338). Printing it as a flat "5 reps" made the one set that
                   // matters look like every other set, and made a 9-rep effort read as +4 over plan
@@ -818,7 +818,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                 Not sets, not load — the plan named neither. This is the counterpart to the header
                 line: the header says what was asked, this says how much of it got done, and between
                 them the prescription is never lost even on a row with nothing logged (`0 of 25`).
-                ⚠️ It is a COUNT, not a grade — no colour, no percentage, no verdict. Wendler on
+                ⚠️ It is a COUNT, not a grade — no colour, no percentage, no verdict. the previous program on
                 these totals: *"These numbers are just recommendations, so you can do more or less
                 depending on your strength level."* Going over is not an overshoot and going under is
                 not a miss, so nothing here is allowed to render as either. */}
@@ -875,7 +875,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
           </div>
         );
       })}
-      {/* ⛔ "vs plan" IS DELETED (2026-08-02) — IT IS NOT A 5/3/1 MEASUREMENT, AND IT COULD NOT BE
+      {/* ⛔ "vs plan" IS DELETED (2026-08-02) — IT IS NOT A the previous program MEASUREMENT, AND IT COULD NOT BE
           COMPUTED HONESTLY IF IT WERE.
 
           The label was already fixed once: it used to say "Totals" and Michael read "+7,640 lb" as
@@ -892,10 +892,9 @@ export default function StrengthCompareTable({ planned, completed, completedWork
              produces the same fake surplus, and the more assistance the athlete does the "better"
              the number gets.
 
-          2. WENDLER DOES NOT COUNT IT. Tonnage appears nowhere in 5/3/1. His own training log (2nd
-             ed., pp. 123-130) has four columns — one per main lift — carrying Actual Max, Training
+          2. THE PREVIOUS PROGRAM DOES NOT COUNT IT. Tonnage appears nowhere in the previous program. His own training log (the archived source) has four columns — one per main lift — carrying Actual Max, Training
              Max, the three prescribed sets, a blank weight column, and a REP RECORDS table.
-             Assistance has no row on that sheet at all. The measurement 5/3/1 tracks is reps on the
+             Assistance has no row on that sheet at all. The measurement the previous program tracks is reps on the
              last set, and this screen already carries it ("Your best at this weight is 8").
 
           ⚠️ DO NOT REINSTATE IT AS A "session volume" total either. That number already exists,

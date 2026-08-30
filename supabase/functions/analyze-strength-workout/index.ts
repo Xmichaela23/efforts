@@ -1669,7 +1669,7 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
 // ⛔ AND ITS OUTPUT HAD REACHED NOBODY SINCE 2026-07-30. The client stopped rendering the strength
 // narrative that day — Michael, on the paragraph itself: *"we need to lose the narrative... we killed
 // it for strength"* — and the deletion note in `MobileSummary.tsx` records why: on a correctly
-// executed 5/3/1 session it printed three claims and all three were wrong, including "27% under the
+// executed the previous program session it printed three claims and all three were wrong, including "27% under the
 // prescribed weight" for an athlete who lifted exactly what was written (it compared a 55/65/75 ramp
 // against the top-set number). [D-338] removed the block that hosted it. The call kept running for a
 // month, billing on every recompute, writing a paragraph into a field no surface read.

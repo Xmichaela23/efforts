@@ -1113,7 +1113,7 @@ const disciplineOptions = [
   // ⛔ THESE STRINGS ARE MATCHED EXACTLY by `substituteExerciseForEquipment`
   // (materialize-plan/index.ts) and by substring in `_shared/strength-equipment-tier.ts`. Renaming a
   // chip breaks both silently — a chip nobody detects reads as equipment the athlete does not own.
-  // The last three were added 2026-08-13 for the Wendler Forever assistance catalog.
+  // The last three were added 2026-08-13 for the previous program Forever assistance catalog.
   // ⚠️ "Incline bench" is a SEPARATE chip from "Bench (flat/adjustable)" on purpose: that label is an
   // OR, so it cannot be read as incline capability. An athlete with an adjustable bench ticks both.
   /**

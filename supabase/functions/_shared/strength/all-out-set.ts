@@ -8,7 +8,7 @@
  * here. Michael's instruction was explicit: *reuse it, do not rebuild it.* So this is the same
  * code, moved, with `workout-detail` and `coach` both calling in.
  *
- * ⛔ THE REP RECORD LEADS; THE ESTIMATE IS CONTEXT. Wendler p10: *"If your squat goes from 225x6 to
+ * ⛔ THE REP RECORD LEADS; THE ESTIMATE IS CONTEXT. the previous program: *"If your squat goes from 225x6 to
  * 225x9, you've gotten stronger… Don't get stuck just trying to increase your one rep max."* The
  * rep count at a fixed weight is EXACT. The estimated max is an equation's guess about a number
  * nobody measured, and above the trust ceiling it is LABELLED, never capped (D-339).
@@ -22,7 +22,7 @@
  */
 import { canonicalize } from '../canonicalize.ts';
 import { estimate1RMRounded } from '../../../../src/lib/estimate-1rm.ts';
-import { trustedMaxRepsFor } from '../../shared/strength-system/loading/wendler-531.ts';
+import { trustedMaxRepsFor } from './trusted-reps.ts';
 
 /**
  * ⚠️ WIDENED 10 → 40 (2026-07-30) FOR THE REP RECORD. 10 strength sessions is ~2.5 weeks on a
@@ -45,7 +45,7 @@ export type AllOutSetRead = {
   is_rep_record: boolean;
   /** ⛔ How far back "best" looked. NOT all-time; never narrate it as a lifetime PR. */
   rep_record_window_sessions: number;
-  /** Wendler's own formula (D-339), rounded to plate granularity. */
+  /** the standard formula (D-339), rounded to plate granularity. */
   estimated_1rm: number;
   /** False above 8 reps (5 on deadlift) — no equation holds up there. Label it; never cap the reps. */
   estimate_trusted: boolean;
@@ -217,7 +217,7 @@ export type AllOutPoint = AllOutSetReadKeyed & { date: string };
  * ⛔ EVERY all-out set per lift, oldest first — the substrate for the PROGRESS DIRECTION (Slice 2).
  *
  * `lastAllOutByLift` answers "what is the current reading"; this answers "which way is it going",
- * which is the question Wendler actually programs against: *"If you keep setting and breaking rep
+ * which is the question the previous program actually programs against: *"If you keep setting and breaking rep
  * records, you'll get stronger"* (p10), and his own logbook carries a **Rep Records** column per
  * lift per cycle (pp.123-129). One walk, one history — `lastAllOutByLift` is now derived from this
  * so the two reads cannot disagree about whether a given set was a record.

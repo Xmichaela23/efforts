@@ -7,7 +7,7 @@
  * HAS NEVER EXECUTED — the athlete's block reaches its first evaluable cycle boundary weeks after
  * the deploy, so the whole chain (verdict → working number → future-weeks-only diff) has run in
  * tests and never in anger. The unit pieces are each covered (`cycle-verdicts.test.ts`,
- * `wendler-531.test.ts`); what was not covered is them WIRED TOGETHER over a real 12-week block with
+ * the archived loading module's own tests); what was not covered is them WIRED TOGETHER over a real 12-week block with
  * real training maxes. That is the arrangement that runs for the first time on a live plan.
  *
  * ⚠️ THE NUMBERS BELOW ARE A REAL BLOCK'S SHAPE, transcribed read-only: a 12-week strength_primary
@@ -70,7 +70,7 @@ Deno.test('⛔ A CYCLE IS READ ONLY ONCE IT HAS FINISHED — week 5, not week 3'
 // ── THE PROPOSAL ──────────────────────────────────────────────────────────────────────────────
 
 Deno.test('⛔ CRUSHING THE SET PRODUCES NO PROPOSAL — the advance was already in the plan', () => {
-  // ⚠️ THIS IS THE FINDING THAT MOST CHANGES HOW THE FEATURE READS. Wendler's +5/+10 is automatic;
+  // ⚠️ THIS IS THE FINDING THAT MOST CHANGES HOW THE FEATURE READS. the previous program's +5/+10 is automatic;
   // the all-out set does not EARN it, it can only WITHHOLD it (wendler-531.ts:206-208 — "the
   // increment stays +5/+10 and the reps are feedback, not an input"). So a big set produces the same
   // working number the forecast already carried, the diff is empty, and no consent sheet appears.
@@ -130,7 +130,7 @@ Deno.test('⛔ EVERY LIFT CLIMBS ON A PERFECT BLOCK — the 90% ceiling stalled 
     const c3 = wnAtCycle(l, 3, perfect);
     assert(c2 > l.tm, `${l.name}: cycle 2 did not move off the base`);
     assert(c3 > c2, `${l.name}: cycle 3 repeats cycle 2 — the freeze is back`);
-    // Wendler's fixed step, for the light bars too (p90, p107). No percentage shrink.
+    // the previous program's fixed step, for the light bars too (p90, p107). No percentage shrink.
     assertEquals(c3 - c2, l.lower ? 10 : 5, `${l.name}: wrong step size`);
   }
   // ⚠️ AND THE SQUAT'S CYCLE-3 NUMBER (110) NOW EQUALS ITS MAX ON FILE (110). Allowed on purpose:

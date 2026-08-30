@@ -1,5 +1,5 @@
 // ============================================================================
-// THE WORKING NUMBER — Viada's, and a DIFFERENT NUMBER from Wendler's training max.
+// THE WORKING NUMBER — Viada's, and a DIFFERENT NUMBER from the previous program's training max.
 //
 // Source: p215. ⚠️ **IMAGE PENDING IN `book-sources/`** — the page was photographed 2026-08-22 and
 // read in the planning chat; the file has not landed in the folder yet, so this is the one set of
@@ -8,7 +8,7 @@
 //
 // ⛔ THE SAME-WORD COLLISION, AND IT IS THE WHOLE REASON THIS FILE IS SEPARATE.
 //
-//     Wendler   `plans.config.training_max`   85% of a TRUE 1RM        three live readers
+//     the previous program   `plans.config.training_max`   85% of a TRUE 1RM        three live readers
 //     Viada     the working number            96% of a PREDICTED 1RM   this file, and nothing else
 //
 // **They never convert into each other, and no function in this module accepts both.** A helper
@@ -22,7 +22,7 @@ export type TestedLift = 'bench' | 'squat' | 'deadlift' | 'overheadPress';
 export const TESTED_LIFTS: TestedLift[] = ['bench', 'squat', 'deadlift', 'overheadPress'];
 
 /**
- * ⛔ 96% OF THE PREDICTED TRUE 1RM (p215). Not 85%, not of a true max, and not Wendler's.
+ * ⛔ 96% OF THE PREDICTED TRUE 1RM (p215). Not 85%, not of a true max, and not the previous program's.
  */
 export const WORKING_MAX_FRACTION = 0.96;
 
@@ -168,7 +168,7 @@ export type WorkingNumber = {
  * prescribes from.
  *
  * ⚠️ It does not accept a training max, a stored 1RM, or a previous working number. There is no
- * path from Wendler's number into this one.
+ * path from the previous program's number into this one.
  */
 export function workingNumberFromTest(
   lift: TestedLift,
@@ -246,7 +246,7 @@ export const TEST_DAY_LIFTS: Record<number, TestedLift[]> = {
  * written — every week after the first would compose with no working number and prescribe nothing.
  * Something has to come back afterwards and read what the athlete actually did.
  * `rematerialize-strength-block` exists for the identical reason on the Get Stronger side, states
- * the identical rule in its own header, and the two never meet: that one reads a Wendler AMRAP at
+ * the identical rule in its own header, and the two never meet: that one reads a the previous program AMRAP at
  * 95% of a training max, this one reads a p215 pretest. No function accepts both.
  *
  * ⚠️ DB SHAPE, DELIBERATELY LOOSE. This is what a stored `workouts` row looks like to a reader, not

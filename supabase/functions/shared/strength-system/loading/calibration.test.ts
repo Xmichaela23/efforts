@@ -98,7 +98,7 @@ Deno.test('⛔ AN EARNED STEP EMITS A `bump` EVENT — +5 upper, +10 lower, and 
   assertEquals([squatEvents[0].from_training_max, squatEvents[0].to_training_max], [200, 210]);
 });
 
-Deno.test('⛔ A BIG SET DOES NOT BUY A BIGGER STEP — Forever p.20, bold in the book', () => {
+Deno.test('⛔ A BIG SET DOES NOT BUY A BIGGER STEP — the previous program, bold in the book', () => {
   // ⛔ THIS IS THE ONE PLACE SLICE b's BRIEF WAS WRONG AND THE FIXTURE EXISTS TO HOLD THE CORRECTION.
   // The slice specified a Juggernaut-style rep-scaled bump ("more reps over target → larger step").
   // p.20: *"stay the course. Do not increase more than the normal amount each cycle."* p.20-21:

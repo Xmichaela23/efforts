@@ -19,7 +19,7 @@ Deno.test('⛔⛔ THE HEAVY SLOT GETS NO NUDGE — the engine already decided', 
    *   1. `standing-plan/progression.ts` moves the bar off these same logged sessions, so the line was
    *      a SECOND OWNER of one decision — and they disagree: this fires on ONE session at the band
    *      top, the engine waits for two.
-   *   2. The field DOES, it does not ASK. StrongLifts, the 5/3/1 apps and the autoregulated ones all
+   *   2. The field DOES, it does not ASK. StrongLifts, the previous program apps and the autoregulated ones all
    *      put the new weight on the next session and print a short reason. "Add weight" is
    *      asking-shaped, and the engine has already decided.
    */

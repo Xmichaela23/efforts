@@ -85,8 +85,8 @@ Deno.test('protocol: strength_protocol "none" is not a protocol', () => {
 });
 
 Deno.test('protocol: an UNRECOGNISED id reads as unknown — it does NOT resolve to durability', () => {
-  const c = card({ strength_protocol: 'wendler_forever_2027', user_selected_start_date: '2026-07-27', duration_weeks: 8 }, '2026-07-29');
-  assertEquals(c.protocolId, 'wendler_forever_2027'); // carried so it can be logged
+  const c = card({ strength_protocol: 'archived_protocol_2027', user_selected_start_date: '2026-07-27', duration_weeks: 8 }, '2026-07-29');
+  assertEquals(c.protocolId, 'archived_protocol_2027'); // carried so it can be logged
   assertEquals(c.protocolKnown, false);
   // ⛔ Q-192 / D-322, third instance prevented: `resolveProfile()` returns `durability` for ANY
   // unrecognised id, so a missing entry and a deliberate choice were indistinguishable. Here they
@@ -98,7 +98,7 @@ Deno.test('protocol: an UNRECOGNISED id reads as unknown — it does NOT resolve
 // How effort is read — the RIR → AMRAP switch, stated once
 // ---------------------------------------------------------------------------
 
-Deno.test('effort: a 5/3/1 block reads AMRAP, never RIR', () => {
+Deno.test('effort: a the previous program block reads AMRAP, never RIR', () => {
   assertEquals(card(ALL_ANCHOR_12, '2026-07-29').effortRead, 'amrap');
 });
 
@@ -157,7 +157,7 @@ Deno.test('cycle: week 4 is the deload — no open set, nothing to read', () => 
   assertEquals(c.cycle, { kind: 'anchor', weekInCycle: 0, isDeload: true, isTest: false });
   assertEquals(c.hasAllOutSet, false);
   assertEquals(c.isMeasurementWeek, false);
-  // ⚠️ 1.00, NOT 0.60. The 7th-week deload's last set is a single AT the training max (Forever p.21);
+  // ⚠️ 1.00, NOT 0.60. The 7th-week deload's last set is a single AT the training max (the previous program);
   // the old 40/50/60 deload topped out at 60% of it. The set is one rep either way.
   assertEquals(c.topSetPct, 1.00);
   // ⛔ This is the fact audit F2/F4 needed: an e1RM that drops in week 5 dropped because week 4 was
@@ -226,10 +226,10 @@ Deno.test('cycle: a LEADER cycle never measures, at any week', () => {
 // ---------------------------------------------------------------------------
 
 Deno.test('phase word: the internal cycle names never reach a screen', () => {
-  // ⛔ 'Leader' and 'Anchor' are Wendler's words for the two cycle kinds. They are correct, they are
+  // ⛔ 'Leader' and 'Anchor' are the previous program's words for the two cycle kinds. They are correct, they are
   // what the builder stores, and they mean nothing to an athlete looking at a fitness row. The card
   // hands out a plain word so no screen has to keep its own translation table — the moment two do,
-  // they disagree, and a plan that is not 5/3/1 falls through whichever table's default it hits.
+  // they disagree, and a plan that is not the previous program falls through whichever table's default it hits.
   assertEquals(card(ALL_ANCHOR_12, '2026-07-29').phase, 'Anchor');   // stored
   assertEquals(card(ALL_ANCHOR_12, '2026-07-29').phaseWord, 'build'); // printed
   assertEquals(card(ALL_ANCHOR_12, '2026-08-19').phase, 'Deload');
@@ -238,7 +238,7 @@ Deno.test('phase word: the internal cycle names never reach a screen', () => {
 
 Deno.test('phase word: a plan that already speaks plainly is passed through, not re-mapped', () => {
   // The endurance vocabulary IS the display vocabulary — base/build/peak/taper/recovery. A run plan
-  // renders correctly through the same field with nothing 5/3/1-shaped involved.
+  // renders correctly through the same field with nothing the previous program-shaped involved.
   const runPlan = {
     strength_protocol: 'durability',
     user_selected_start_date: '2026-07-27',

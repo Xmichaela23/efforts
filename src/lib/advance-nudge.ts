@@ -14,7 +14,7 @@
  * is a SECOND OWNER of one decision — and the two disagree, because the nudge fires on a single
  * session at the band top where the standing plan's progression waits for two.
  *
- * ⚠️ AND THE FIELD DOES, IT DOES NOT ASK (Michael, 2026-08-26). StrongLifts, the 5/3/1 apps and the
+ * ⚠️ AND THE FIELD DOES, IT DOES NOT ASK (Michael, 2026-08-26). StrongLifts, the previous program apps and the
  * autoregulated ones all put the new weight on the next session and print a short reason beside it.
  * *"Add weight"* is ASKING-shaped. Where the engine has already decided, the row states what happened
  * and instructs nothing — that statement is `last_reps`, which the composer writes onto the row.

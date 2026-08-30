@@ -8,7 +8,7 @@
  * (Gap A-bike is fenced to its own pass — rides must remain steps_preset-free).
  *
  * ⚠️ THE BYTE-IDENTICAL GOLDEN IS GONE, deliberately. It pinned the ATR block's strength sessions
- * (`strength-primary-plan.q126-golden.ts`), and the 5/3/1 rewrite changes every one of them BY
+ * (`strength-primary-plan.q126-golden.ts`), and the previous program rewrite changes every one of them BY
  * DESIGN — a golden that must be regenerated is not a gate. What it actually protected is the
  * type fence below: the run-token pass must never touch a strength row. That is asserted directly
  * now, on the property rather than on a snapshot of the output.

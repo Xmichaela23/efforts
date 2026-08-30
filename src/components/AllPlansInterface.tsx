@@ -1842,7 +1842,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               // splits however they like (the composer's own description says "25 total reps"); the
               // sets field is deliberately absent there, and this exporter is the only place that
               // insisted on printing it.
-              // ⛔ A RAMP IS NOT "SETS × REPS". A 5/3/1 anchor week prescribes 100×5, 110×3, 125×1+
+              // ⛔ A RAMP IS NOT "SETS × REPS". A the previous program anchor week prescribes 100×5, 110×3, 125×1+
               // — three sets at three weights and three rep counts — and this printed
               // "Bench Press: 3×1+ @ 125 lb", which reads as THREE SETS OF ONE at the top weight.
               // The row-level `sets`/`reps`/`weight` deliberately carry the TOP set (so older

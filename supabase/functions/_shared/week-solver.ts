@@ -494,7 +494,7 @@ function scoreKey(
   //
   // ⛔ WITH `pressAdjacencyShortfall` BUILT, THE THING IT WAS A BAD PROXY FOR IS NOW MEASURED
   // DIRECTLY, and what remained was a term that pins an upper lift away from LOWER lifts — the same
-  // mistake `upperLowerShortfall` made (see 4c) and the same one the book contradicts: Wendler's
+  // mistake `upperLowerShortfall` made (see 4c) and the same one the book contradicts: the previous program's
   // week alternates upper and lower on back-to-back days on purpose.
   //
   // ⚠️ IT WAS NOT DEAD, WHICH IS WHY THIS IS A DECISION AND NOT A CLEANUP. Swept over 128 solver
@@ -537,7 +537,7 @@ function scoreKey(
   // It was `upperLowerShortfall`: every upper↔lower pair scored `max(0, 3 - gapDays)`, a preferred
   // 3-day floor mined from `week-optimizer:1638` (`findStrengthPair(3)` then `(2)`).
   //
-  // ⛔ **IT CONTRADICTS THE BOOK IT WAS MEANT TO SERVE.** Wendler's basic week (2nd ed. p.11,
+  // ⛔ **IT CONTRADICTS THE BOOK IT WAS MEANT TO SERVE.** the previous program's basic week (the previous program,
   // verified in the PDF) is Press · Deadlift · Bench · Squat — it ALTERNATES upper and lower on
   // back-to-back days, deliberately. A term that pushes every press 3+ days from every leg day
   // scores the book's own week as worse than a clustered one.
@@ -573,7 +573,7 @@ function scoreKey(
   // press, 24h apart. That term is now deleted (4c), which removes the CAUSE; this term remains as
   // the direct statement of the property, so nothing has to infer it from a side effect again.
   //
-  // ⛔ THE FLOOR IS 3 AND IT IS THE BOOK'S, NOT A PICKED NUMBER. Wendler's basic week (2nd ed. p.11)
+  // ⛔ THE FLOOR IS 3 AND IT IS THE BOOK'S, NOT A PICKED NUMBER. the previous program's basic week (the previous program)
   // is Press · Deadlift · Bench · Squat — it ALTERNATES, and in all three of his suggested day sets
   // (Mon/Tue/Thu/Fri · Sun/Mon/Wed/Fri · Sun/Mon/Wed/Thu) the two pressing days land 3 days apart.
   // Same shape as `upperLowerShortfall`'s floor, which is deliberate: a pure spread term maximises
@@ -1054,7 +1054,7 @@ export function solve(input: SolverInput): SolverResult {
   // opened `Monday: Back Squat`. "Back Squat" simply sorts before "Deadlift", and lower sorted before
   // upper. Nothing chose it; the alphabet did.
   //
-  // ✅ Wendler's basic week (2nd ed. p.11, verified in the PDF) is **Standing Military Press ·
+  // ✅ the previous program's basic week (the previous program, verified in the PDF) is **Standing Military Press ·
   // Deadlift · Bench Press · Squat**, so that is what an unconstrained week should open as. With
   // this order the default week is Mon Press · Tue Deadlift · Thu Bench · Fri Squat — the book
   // verbatim, on the first of his three suggested day sets.
@@ -1063,16 +1063,16 @@ export function solve(input: SolverInput): SolverResult {
   // The book order is a fixed list, exactly as total and as caller-independent as the alphabet was.
   // Lifts outside it — the 3-day shape's paired `"Bench Press + Overhead Press"` slot, and whatever
   // `generate-run-plan` passes — fall through to the previous rule, so nothing that is not one of
-  // Wendler's four changes behaviour at all.
+  // the previous program's four changes behaviour at all.
   //
   // ⛔ AND IT IS ONLY A TIE-BREAK. It is the LAST element of the score vector, so every real term —
   // clearances, rest, stacks, heavy-leg spread, press spacing, the athlete's preferred days — is
   // settled before this is consulted. A pinned endurance day still moves the lifts wherever it needs
   // to. This decides the shape of a week that has nothing else to decide it.
-  const WENDLER_WEEK_ORDER = ['Overhead Press', 'Deadlift', 'Bench Press', 'Back Squat'];
+  const MAIN_LIFT_WEEK_ORDER = ['Overhead Press', 'Deadlift', 'Bench Press', 'Back Squat'];
   const canonicalOrder = lifts
     .map((l, i) => {
-      const w = WENDLER_WEEK_ORDER.indexOf(l.name);
+      const w = MAIN_LIFT_WEEK_ORDER.indexOf(l.name);
       // `0:` sorts the book's four ahead of anything else, in p.11 sequence; `1:` keeps the old
       // lower-first-then-alphabetical rule for everything the book does not name.
       return { i, k: w >= 0 ? `0:${w}` : `1:${l.isLower ? '0' : '1'}:${l.name}` };

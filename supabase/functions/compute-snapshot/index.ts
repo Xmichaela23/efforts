@@ -1062,7 +1062,7 @@ serve(async (req: Request) => {
         // `point.meta.name` — and the points are built `{date, value}` with no meta at all. So the
         // exclusion has been a no-op since the series was written.
         //
-        // On 5/3/1 that is not cosmetic. Week 4 is 40/50/60% of the working number, so its estimate
+        // On the previous program that is not cosmetic. Week 4 is 40/50/60% of the working number, so its estimate
         // lands ~30% below its neighbours; it drags the recent end of the window and the row reads
         // "slipping" on a week the athlete followed exactly.
         //
@@ -1088,7 +1088,7 @@ serve(async (req: Request) => {
          *  working numbers yet (before the test is read), which draws the readings alone. */
         let expectedByCanonical: Record<string, Array<{ date: string; value: number }>> | null = null;
         let measuredDates: string[] = [];
-        // Slice 2: what the block says it READS. 'amrap' (5/3/1) puts waved main lifts on the
+        // Slice 2: what the block says it READS. 'amrap' (the previous program) puts waved main lifts on the
         // all-out-set gauge; anything else keeps the e1RM read, byte for byte.
         let strengthEffortRead: EffortReadMode | null = null;
         /** ⛔ `plans.duration_weeks` — the derived heavy gate's recency window. Null → the assembly
@@ -1521,7 +1521,7 @@ serve(async (req: Request) => {
             .map((f: any) => String(f.date));
         } catch { measuredDates = []; }
 
-        // ── Slice 2: EVERY all-out set per lift — the 5/3/1 progress gauge (Wendler p10) ──────────
+        // ── Slice 2: EVERY all-out set per lift — the previous program progress gauge (the previous program) ──────────
         //
         // ⛔ SAME QUERY SHAPE THE COACH ALREADY RUNS (`coach/index.ts:~2415`), and the SAME builder,
         // so State's spine and the Performance screen cannot disagree about whether a set was a rep

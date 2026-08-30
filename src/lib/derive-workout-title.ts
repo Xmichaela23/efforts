@@ -116,7 +116,7 @@ export function deriveWorkoutTitle(workout: WorkoutLike | null | undefined): str
        * ⚠️ DISPLAY ONLY, AND THE ENGINE STRING IS UNTOUCHED. `workout.name` still reads `ME: Upper`
        * for anything that matches, stores or compares it — this is the last moment before an athlete
        * reads it. `plainIntent` is total and idempotent, so every non-Standing-Plan name (a user's
-       * own "Push Day", a 5/3/1 session, `Test: Upper`) passes through unchanged.
+       * own "Push Day", a the previous program session, `Test: Upper`) passes through unchanged.
        */
       return plainIntent(stripTrailingDateSuffix(candidate)) || 'Strength';
     }

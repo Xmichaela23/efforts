@@ -174,7 +174,7 @@ export const ATHLETES: SyntheticAthlete[] = [
   },
   {
     // ⛔ THE MICHAEL CASE, Q-254. His real screen on 2026-08-03: Deadlift read "Working ~120 vs your
-    // 150 baseline" — a light 5/3/1 week measured against a typed number he had blown past — while
+    // 150 baseline" — a light the previous program week measured against a typed number he had blown past — while
     // the AMRAP said 225 × 6 and beat his record at that weight. The working weight is the
     // PRESCRIPTION; the all-out set is the MEASUREMENT. Both now sit on the row, in that order.
     name: 'A13 · ⛔ THE AMRAP — a light working week over a rep record (Q-254)',

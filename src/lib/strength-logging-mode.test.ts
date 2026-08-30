@@ -57,7 +57,7 @@ function legacyIsDurationBased(name: string): boolean {
 async function knownVocabulary(): Promise<string[]> {
   const src = await Deno.readTextFile(new URL('./exercise-role.ts', import.meta.url));
   const roleKeys = [...src.matchAll(/^ {2}'([^']+)':\s*'(?:primary|secondary|accessory)'/gm)].map((m) => m[1]);
-  const mainBlock = src.split('MAIN_531_LIFTS')[1].split(']')[0];
+  const mainBlock = src.split('MAIN_BARBELL_LIFTS')[1].split(']')[0];
   const mainKeys = [...mainBlock.matchAll(/'([^']+)'/g)].map((m) => m[1]);
   return [...new Set([...roleKeys, ...mainKeys, ...Object.keys(EXERCISE_CONFIG)])];
 }

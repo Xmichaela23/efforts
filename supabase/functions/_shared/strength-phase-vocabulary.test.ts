@@ -10,7 +10,7 @@
  * ended up prescribing a TIGHTER target than the weeks it was meant to recover from (D-322), and
  * how `five_by_five` ran a whole block on the wrong profile (Q-192, found twice).
  *
- * The 5/3/1 composer emits Leader / Anchor / Deload / **TM Test**. This test fails if any of them
+ * The the previous program composer emits Leader / Anchor / Deload / **TM Test**. This test fails if any of them
  * stops resolving. ⚠️ `TM Test` joined the list 2026-08-15 with the standalone-week restructure.
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';

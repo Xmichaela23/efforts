@@ -1,5 +1,5 @@
 /**
- * THE ASSISTANCE CATALOG — Wendler 5/3/1 **Forever**, per-day picker model.
+ * THE ASSISTANCE CATALOG — the previous program **Forever**, per-day picker model.
  *
  * ⛔ THIS SUPERSEDES THE BLOCK-WIDE 3-PICK MODEL AND ITS RE-ROLING (D-385 / D-404 / D-405).
  *
@@ -9,7 +9,7 @@
  * those rules was sourced and defensible, and the whole arrangement existed to answer a question the
  * athlete is better placed to answer themselves.
  *
- * The new model is Forever p.24: **each lift day carries push · pull · single-leg/core, one movement
+ * The new model is the previous program: **each lift day carries push · pull · single-leg/core, one movement
  * per category, chosen by the athlete.** No re-roling, no substitution notes, nothing to apologise
  * for — the frame is locked and the movement inside it is theirs.
  *
@@ -26,7 +26,7 @@
  * ── THE STORED NAME AND THE DISPLAYED NAME ARE ALLOWED TO DIFFER ─────────────────────────────────
  *
  * `name` is what is STORED and what every downstream stage resolves (D-322 — an unresolved name
- * silently borrows another movement's prescription). `display` is **Wendler's own word**, which for
+ * silently borrows another movement's prescription). `display` is **the standard word**, which for
  * three movements is not the config's canonical spelling: Back Extension is his "Back Raise",
  * Dumbbell Curl his "Curls", Ab Wheel Rollout his "Ab Wheel". A display alias, never a second token.
  */
@@ -39,7 +39,7 @@ import { canPerform, equipmentFitRank, hasLoadableFit } from './strength-gear.ts
  */
 import type { ViadaAccessoryPrefs } from '../../supabase/functions/_shared/standing-plan/accessory-picks.ts';
 
-/** Wendler's three categories. One movement each, every lifting day. Forever p.24. */
+/** the previous program's three categories. One movement each, every lifting day. the previous program. */
 export type AssistanceCategory = 'push' | 'pull' | 'single_leg_core';
 
 export const ASSISTANCE_CATEGORIES: AssistanceCategory[] = ['push', 'pull', 'single_leg_core'];
@@ -56,7 +56,7 @@ export const CATEGORY_LABEL: Record<AssistanceCategory, string> = {
  * This was four keys, one per main lift, and that was only ever correct while four lifts meant four
  * days. Every Strong Focus block is three days now: **Squat · Bench · Deadlift + Press**. The press
  * has no day of its own — it stacks onto the deadlift's — so a `press` key was a bucket nothing
- * could read: the merge takes the heavier lift's block (`strength-primary-plan.ts`, §1e — Wendler's
+ * could read: the merge takes the heavier lift's block (`strength-primary-plan.ts`, §1e — the previous program's
  * stacked day is the mains plus ONE round, p.77), and an athlete's press-day picks were discarded in
  * silence. Asking for twelve movements and building nine.
  *
@@ -106,7 +106,7 @@ export function liftDayForMainLift(mainLiftName: string | null | undefined): Lif
  * ⛔ A FOCUS RE-POINTS MOVEMENT CHOICE INSIDE A CATEGORY — IT IS NOT A NEW AXIS. Push serves
  * chest / shoulders / triceps; pull serves back / biceps; single-leg-core serves glutes / abs. There
  * is no Legs or Quads chip: this athlete runs, and the doc's call is that leg volume is not something
- * to encourage. Glutes covers hamstrings (Forever p.29 groups them).
+ * to encourage. Glutes covers hamstrings (the previous program groups them).
  */
 /**
  * ⛔ FOUR CHIPS, NOT SIX — `back` AND `abs` ARE DELETED (Michael, 2026-08-17).
@@ -145,11 +145,11 @@ export const FOCUS_CAP = 3;
 export type CatalogEntry = {
   /** ⛔ STORED, and it resolves `exact` or `folded` in `exercise-config.ts`. Verified by test. */
   name: string;
-  /** What the athlete reads. Wendler's word where it differs from the config's spelling. */
+  /** What the athlete reads. the previous program's word where it differs from the config's spelling. */
   display: string;
   category: AssistanceCategory;
   /**
-   * ⛔ WENDLER'S OWN MUSCLE WORD where he itemizes one. Three movements he names without assigning a
+   * ⛔ THE PREVIOUS PROGRAM'S OWN MUSCLE WORD where he itemizes one. Three movements he names without assigning a
    * muscle take his movement-FAMILY word instead of invented anatomy: Push-Up → chest (it is in his
    * press list), Face Pull → upper back (his row list), Reverse Lunge → legs (his single-leg list).
    */
@@ -158,7 +158,7 @@ export type CatalogEntry = {
   source: string;
   /** Which focus chips this movement serves. Empty = it is never a focus answer, only a default. */
   focus: FocusChip[];
-  /** On the add-abs menu (Forever p.30 / 2nd ed p.43). */
+  /** On the add-abs menu (the previous program / the previous program). */
   isAbs?: boolean;
   /**
    * ⛔ HOW MUCH LOCAL TISSUE DAMAGE THIS MOVEMENT LEAVES BEHIND — the axis this catalog was missing,
@@ -182,17 +182,17 @@ export type CatalogEntry = {
 };
 
 /**
- * ⛔ 28 MOVEMENTS. TWENTY-SEVEN ARE WENDLER'S; ONE IS NOT, AND IT IS MARKED WHERE IT SITS.
+ * ⛔ 28 MOVEMENTS. TWENTY-SEVEN ARE THE PREVIOUS PROGRAM'S; ONE IS NOT, AND IT IS MARKED WHERE IT SITS.
  *
- * No Plank — it is not his. Sit-Up and Side Bend ARE his (2nd ed). The single exception is the HIP
+ * No Plank — it is not his. Sit-Up and Side Bend ARE his (the previous program). The single exception is the HIP
  * THRUST pair, flagged in place below with its justification. **Nothing else may be added here that
  * is not in the book**, and a second exception is a conversation, not a commit.
  */
 export const ASSISTANCE_CATALOG: CatalogEntry[] = [
   // ── PUSH ────────────────────────────────────────────────────────────────────────────────────────
   { name: 'Dips', display: 'Dips', category: 'push', muscle: 'triceps / chest', source: 'p.24', focus: ['arms', 'chest'] },
-  // ⛔ WENDLER'S OWN, AND THE MEATY TRICEPS OPTION — the Simplest Strength Template's big assistance
-  // lift, not a cable accessory. No exception needed: it is in the book, so the "strictly Wendler"
+  // ⛔ THE PREVIOUS PROGRAM'S OWN, AND THE MEATY TRICEPS OPTION — the Simplest Strength Template's big assistance
+  // lift, not a cable accessory. No exception needed: it is in the book, so the "strictly the previous program"
   // guardrail is intact.
   //
   // ⚠️ PLACED WITH THE COMPOUNDS RATHER THAN IN PAGE ORDER, and that is the tie-break doing real
@@ -216,14 +216,14 @@ export const ASSISTANCE_CATALOG: CatalogEntry[] = [
   { name: 'Lat Pulldown', display: 'Lat Pulldown', category: 'pull', muscle: 'lats', source: 'p.27', focus: [] },
   { name: 'Inverted Row', display: 'Inverted Row', category: 'pull', muscle: 'back', source: 'p.26', focus: [] },
   { name: 'Face Pull', display: 'Face Pull', category: 'pull', muscle: 'upper back', source: 'p.28', focus: [] },
-  // Stored canonical, displayed as Wendler writes it.
+  // Stored canonical, displayed as the previous program writes it.
   { name: 'Dumbbell Curl', display: 'Curls', category: 'pull', muscle: 'biceps', source: 'p.27', focus: ['arms'] },
 
   // ── SINGLE-LEG / CORE ───────────────────────────────────────────────────────────────────────────
   { name: 'Reverse Lunge', display: 'Reverse Lunge', category: 'single_leg_core', muscle: 'legs', source: 'p.30', focus: [] , eccentricCost: 'high' },
   { name: 'Bulgarian Split Squat', display: 'Bulgarian Split Squat', category: 'single_leg_core', muscle: 'legs', source: 'p.30', focus: [] , eccentricCost: 'high' },
   { name: 'Front Squat', display: 'Front Squat', category: 'single_leg_core', muscle: 'legs', source: 'p.30', focus: [] , eccentricCost: 'high' },
-  // ⛔ THE ONE DELIBERATE DEPARTURE FROM WENDLER'S LIST, AND IT IS HERE RATHER THAN IN A CHANGELOG SO
+  // ⛔ THE ONE DELIBERATE DEPARTURE FROM THE PREVIOUS PROGRAM'S LIST, AND IT IS HERE RATHER THAN IN A CHANGELOG SO
   // NOBODY "CORRECTS" IT BACK OUT.
   //
   // Forever's assistance chapter has NO TRUE GLUTE MOVEMENT. The Glutes focus was therefore served by
@@ -238,8 +238,8 @@ export const ASSISTANCE_CATALOG: CatalogEntry[] = [
   // ⚠️ BARBELL LEADS ON PURPOSE. The loaded version is the movement; the single-leg version is the
   // answer for someone with no barbell, and it ranks itself there automatically (ALWAYS route) rather
   // than by being listed first.
-  { name: 'Barbell Hip Thrust', display: 'Barbell Hip Thrust', category: 'single_leg_core', muscle: 'glutes', source: 'not Wendler — see note', focus: ['glutes'] , eccentricCost: 'mild' },
-  { name: 'Single-Leg Hip Thrust', display: 'Single-Leg Hip Thrust', category: 'single_leg_core', muscle: 'glutes', source: 'not Wendler — see note', focus: ['glutes'] , eccentricCost: 'mild' },
+  { name: 'Barbell Hip Thrust', display: 'Barbell Hip Thrust', category: 'single_leg_core', muscle: 'glutes', source: 'ours — see note', focus: ['glutes'] , eccentricCost: 'mild' },
+  { name: 'Single-Leg Hip Thrust', display: 'Single-Leg Hip Thrust', category: 'single_leg_core', muscle: 'glutes', source: 'ours — see note', focus: ['glutes'] , eccentricCost: 'mild' },
   { name: 'Glute-Ham Raise', display: 'Glute-Ham Raise', category: 'single_leg_core', muscle: 'glutes', source: 'p.29', focus: ['glutes'] , eccentricCost: 'high' },
   { name: 'Back Extension', display: 'Back Raise', category: 'single_leg_core', muscle: 'lower back / glutes', source: 'p.29', focus: ['glutes'] , eccentricCost: 'mild' },
   { name: 'Reverse Hyper', display: 'Reverse Hyper', category: 'single_leg_core', muscle: 'glutes', source: 'p.29', focus: ['glutes'] , eccentricCost: 'mild' },
@@ -265,7 +265,7 @@ export function catalogFor(category: AssistanceCategory): CatalogEntry[] {
   return ASSISTANCE_CATALOG.filter((e) => e.category === category);
 }
 
-/** The abs add-on menu — four movements, all Wendler's. */
+/** The abs add-on menu — four movements, all the previous program's. */
 export function absCatalog(): CatalogEntry[] {
   return ASSISTANCE_CATALOG.filter((e) => e.isAbs);
 }
@@ -308,7 +308,7 @@ export function absOptions(athleteEquipment?: string[] | null): CatalogEntry[] {
 // ── THE BALANCED DEFAULT ──────────────────────────────────────────────────────────────────────────
 
 /**
- * ⛔ WENDLER'S OWN PAIRINGS, NOT A ROTATION SOMEONE INVENTED.
+ * ⛔ THE PREVIOUS PROGRAM'S OWN PAIRINGS, NOT A ROTATION SOMEONE INVENTED.
  *
  *   Bench    → DB Bench + DB Row          Triumvirate p.48, verbatim
  *   Squat    → low back                   Periodization Bible p.51 ("Squat day → low back, quads, abs")
@@ -316,7 +316,7 @@ export function absOptions(athleteEquipment?: string[] | null): CatalogEntry[] {
  *
  * ⛔ THE DEFAULT IS ALL-COMPOUND, AND ARMS ARE ALREADY IN IT. Confirmed 2026-08-13. There is no
  * Curls and no Triceps Pushdown anywhere in this table, and that is not an omission: **Dips are
- * triceps and a Chin-Up is biceps** (the catalog's own muscle words, which are Wendler's), so the
+ * triceps and a Chin-Up is biceps** (the catalog's own muscle words, which are the previous program's), so the
  * default week trains both arms with compounds. It is also what the book itself defaults to —
  * Triumvirate p.48 pairs the press day with Dips and Chin-Ups and prescribes no isolation.
  *
@@ -494,7 +494,7 @@ export function rankByEquipmentFit(
 ): CatalogEntry[] {
   if (!athleteEquipment) return entries;
   const rank = (e: CatalogEntry) => equipmentFitRank(e.name, athleteEquipment) ?? Number.MAX_SAFE_INTEGER;
-  // Array.prototype.sort is stable, so equal ranks keep the catalog's own order — which is Wendler's
+  // Array.prototype.sort is stable, so equal ranks keep the catalog's own order — which is the previous program's
   // page order, and the tie-break we want.
   return [...entries].sort((a, b) => rank(a) - rank(b));
 }
@@ -532,14 +532,14 @@ export type AssistanceWeekPrefs = {
   /**
    * ⛔ A PERFORMANCE GOAL, AND IT IS A DIFFERENT AXIS FROM `focus` — do not fold the two together.
    * A focus chip biases WHICH movement fills a category. This PINS the pull category to chins across
-   * the week, pushes the volume to Wendler's prescription, and tracks a number that climbs. One is a
+   * the week, pushes the volume to the previous program's prescription, and tracks a number that climbs. One is a
    * preference, the other is a programme. See `src/lib/pullup-progression.ts`.
    *
    * ⚠️ Absent/null is the norm — this is opt-in, and the balanced week is unaffected by it.
    */
   performance_focus?: PerformanceFocus | null;
   /**
-   * ⛔ THE STANDING PLAN'S OWN BLOCK, CARRIED BESIDE WENDLER'S — NOT INSTEAD OF IT (2026-08-24).
+   * ⛔ THE STANDING PLAN'S OWN BLOCK, CARRIED BESIDE THE PREVIOUS PROGRAM'S — NOT INSTEAD OF IT (2026-08-24).
    *
    * The Viada frame's accessory screen asks six questions about ITS OWN slots
    * (`_shared/standing-plan/accessory-picks.ts`), which the nine `by_day` keys cannot express: this
@@ -741,7 +741,7 @@ export type ResolvedAssistanceRow = {
   category: AssistanceCategory;
   /** Stored/canonical name — what goes on the row and what downstream resolves. */
   name: string;
-  /** Wendler's word — what the athlete reads. */
+  /** the previous program's word — what the athlete reads. */
   display: string;
   totalReps: number;
   /** ⚠️ `isAbsAddOn` WENT WITH THE ADD-ABS ROW (2026-08-18). Every row now owns its slot's whole
@@ -753,7 +753,7 @@ export type ResolvedAssistanceRow = {
  * users still choose their preferred exercises like the other"*). ⛔ DO NOT REINTRODUCE IT.
  *
  * It halved the single-leg/core budget between the slot's movement and an optional abs movement —
- * 50 -> 25/25, 30 -> 15/15 — on the reasoning that Forever p.32 allows two movements per category
+ * 50 -> 25/25, 30 -> 15/15 — on the reasoning that the previous program allows two movements per category
  * but a fourth full slot would be pure added fatigue charged against the endurance budget. That
  * reasoning was sound and the FEATURE was still wrong, for a reason upstream of it:
  *
@@ -799,7 +799,7 @@ export function resolveDayAssistance(
    *
    * A performable pick is KEPT — even a band pick, because the athlete chose it (D-423: the
    * athlete's pick is what appears). Only an un-performable name is replaced, and the replacement is
-   * the book's rule, not an invention: same category (Wendler lists each slot as a muscle-category
+   * the book's rule, not an invention: same category (the previous program lists each slot as a muscle-category
    * menu, pp.50-51, and licenses the swap — "you can change exercises however you see fit"), best
    * gear first, bodyweight before bands (`equipmentFitRank` ranks band routes last-resort; the
    * Bodyweight template p.52 is the no-gear floor and bands appear nowhere in the chapter).

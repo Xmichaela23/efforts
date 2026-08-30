@@ -49,7 +49,7 @@ export type FrameResolution =
  *   runner's page would be a different program wearing this one's slot count."*
  *
  * ⛔ WHAT OVERRULES IT IS THE ALTERNATIVE, NOT A COUNTER-ARGUMENT. A refused athlete fell through to
- * the Get Stronger path, and Michael's ruling is *"if wendler has a future at all its not in this
+ * the Get Stronger path, and Michael's ruling is *"if the previous program has a future at all its not in this
  * path."* Refusing a cyclist no longer sends them to a second program; it sends them to one this
  * path is not keeping. **A runner-shaped week filled with rides beats a plan that is being retired.**
  *

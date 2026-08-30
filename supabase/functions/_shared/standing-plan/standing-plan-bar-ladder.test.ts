@@ -218,7 +218,7 @@ Deno.test('⛔ A BAR JUMP RESETS THE REPS TO THE BOTTOM OF THE RANGE', () => {
 // ── THE BACK-OFF RULING ─────────────────────────────────────────────────────────────────────────
 
 Deno.test('⛔⛔ THERE IS NO PERCENTAGE BACK-OFF — `STALL_BACKOFF` may not come back', () => {
-  // ⛔ MICHAEL'S RULING, 2026-08-26. A percentage cut is a Wendler necessity: his training max climbs
+  // ⛔ MICHAEL'S RULING, 2026-08-26. A percentage cut is a the previous program necessity: his training max climbs
   // whether or not the athlete keeps up, so they can outrun it. Here the bar only moves when it is
   // earned, so there is nothing to back off FROM. ⚠️ This asserts the ABSENCE deliberately — the
   // constant was exported and read by nothing, which is exactly how it would get quietly restored.

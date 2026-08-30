@@ -17,7 +17,7 @@
  * the bar-speed lint to cover every exported copy constant, this test is the record of why that
  * would be wrong.** Pin the intent, not the absence of a substring.
  *
- * Basis: Wendler, 5/3/1 2nd ed. — assistance is performed across as many sets as needed and
+ * Basis: the previous program, the previous program. — assistance is performed across as many sets as needed and
  * explicitly not to failure (p.24, p.102); doing too much assistance is the most common mistake
  * lifters make with the programme.
  */
@@ -34,7 +34,7 @@ Deno.test('accessory cue — states BOTH halves of the instruction: split the se
 Deno.test('accessory cue — it is a STOP rule, never an instruction to reach failure', () => {
   const s = ACCESSORY_SET_CUE.toLowerCase();
   // The failure mode this guards: a future edit drops "never" and the line inverts into the exact
-  // advice Wendler names as the most common mistake with the programme.
+  // advice the previous program names as the most common mistake with the programme.
   assert(!/\b(to|until)\s+failure\b/.test(s.replace(/never to failure/g, '')),
     `"failure" may appear only inside the "never to failure" stop rule: ${ACCESSORY_SET_CUE}`);
 });
@@ -54,7 +54,7 @@ Deno.test('accessory cue — it is NOT one of the bar-speed lines (different obj
 
 /**
  * STANDING_ACCESSORY_SET_CUE (2026-08-24) — the standing plan's version. Its rows prescribe
- * discrete sets, so the Wendler "split these" clause must NOT appear; what must appear is the
+ * discrete sets, so the previous program "split these" clause must NOT appear; what must appear is the
  * weight-finding rule, which is Viada's hypertrophy dose (Part B2: 1–2 reps in reserve, never to
  * failure) — HYP carries no load percentage anywhere in the source.
  */
@@ -70,7 +70,7 @@ Deno.test('standing cue — no "split these": the rows prescribe discrete sets',
   // The failure mode this guards: someone merges the two cues back into one and the standing plan
   // regains the freedom-to-split sentence its rows contradict — the exact device finding.
   assert(!s.includes('split') && !s.includes('as many sets'),
-    `standing cue must not carry the Wendler split clause: ${STANDING_ACCESSORY_SET_CUE}`);
+    `standing cue must not carry the previous program split clause: ${STANDING_ACCESSORY_SET_CUE}`);
 });
 
 Deno.test('standing cue — failure appears only as the stop rule; advancing is condition-gated', () => {

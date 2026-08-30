@@ -27,7 +27,7 @@
  * the app lying to them.
  */
 
-/** ⛔ TWELVE WEEKS, NOT A RANGE. Wendler's ratios are 2:1, 3:2, 2:2 and a cycle is four weeks, so 12
+/** ⛔ TWELVE WEEKS, NOT A RANGE. the previous program's ratios are 2:1, 3:2, 2:2 and a cycle is four weeks, so 12
  *  is the only length that runs leader-leader-anchor as designed. The flow used to offer an 8-52
  *  slider; the composer rounds down to whole cycles, so 10 silently became 8 and 14 became 12 — the
  *  athlete picked a number the engine never built. 8 ships later as the short, off-ratio option,
@@ -88,9 +88,9 @@ export function strengthFocusSections(opts: {
         // a FOUR-day count to EVERY athlete, three-day athletes included, and it is the plan's
         // own description — the sentence an athlete reads to find out what they signed up for. The
         // pair is deadlift + press, not bench + press; the wizard said the wrong one too.
-        `Sub-maximal loading (Wendler's 5/3/1) keeps fatigue manageable. Three lifting days — squat, ` +
+        `Sub-maximal loading keeps fatigue manageable. Three lifting days — squat, ` +
         `bench, and deadlift with the overhead press — placed around your endurance. ` +
-        // ⚠️ THE ZERO-LEADER BRANCH IS UNREACHABLE FROM THE ENGINE as of §1b (Forever p.17 has no
+        // ⚠️ THE ZERO-LEADER BRANCH IS UNREACHABLE FROM THE ENGINE as of §1b (the previous program has no
         // all-anchor model) and it stays anyway: a count of zero rendered as a word in prose is the
         // 2026-07-28 defect this whole function was rewritten for, and the guard costs one clause.
         (leaders === 0
@@ -298,8 +298,8 @@ export function strengthFocusDescription(opts: {
 //
 // It read: *"speed is the earliest sign of form breakdown, so slow rep = last rep"* (Michael,
 // 2026-07-25 — "the AMRAP terminator and the whole doctrine in four words"). Neat, and it stops the
-// set too early. Wendler's own instruction for the "+" set is to **grind it out, not to failure**
-// (5/3/1 2nd ed. p.24). A grinding rep is a rep — it is the slow ones at the end of an AMRAP that
+// set too early. the standard instruction for the "+" set is to **grind it out, not to failure**
+// (the previous program). A grinding rep is a rep — it is the slow ones at the end of an AMRAP that
 // make the set worth doing, and the count off that set is what moves the training max. A rule that
 // ends the set at the first slow rep systematically under-reports the number the block runs on.
 //
@@ -317,7 +317,7 @@ export function strengthFocusDescription(opts: {
 // QUALITY CHECK. Speed on an AMRAP is a STOP RULE. They are different sentences.**
 //
 // ⚠️ NOTHING HERE MENTIONS SPEED DECIDING THE WORKING NUMBER. Pairing the two was inventing a signal
-// the engine does not read: the advance/reset rule is Wendler's 95% validity check — five reps at
+// the engine does not read: the advance/reset rule is the previous program's 95% validity check — five reps at
 // 95% or the number comes down 10% (`wendler-531.ts:160-200`, `verdictFrom95Set` / `applyVerdict`).
 // ⛔ **Those two functions are written, correct, and CALLED BY NOTHING.** The composer advances the
 // working number by cycle index, unconditionally (`workingNumberForCycle:112`). Until the verdict is
@@ -332,14 +332,14 @@ export type BarSpeedMoment =
   /**
    * ⛔ THE STANDING PLAN'S PRETEST SET — A DIFFERENT SET WITH THE SAME `amrap` FLAG (2026-08-24).
    *
-   * Both are taken for max reps and both stamp `amrap: true`, so the logger showed Wendler's line on
-   * Viada's test. They are not the same instruction. Wendler's "+" set is TRAINING and grinding reps
-   * are part of the dose — *"grind it out, not to failure"* (2nd ed. p.24). p215's pretest is a
+   * Both are taken for max reps and both stamp `amrap: true`, so the logger showed the previous program's line on
+   * Viada's test. They are not the same instruction. the previous program's "+" set is TRAINING and grinding reps
+   * are part of the dose — *"grind it out, not to failure"* (the previous program). p215's pretest is a
    * MEASUREMENT, and its whole output is a predicted 1RM: a ground rep with a rounded back is not
    * the same rep as a clean one, so counting it prices the block's twelve weeks off a number the
    * athlete cannot repeat.
    *
-   * ⚠️ WENDLER'S LINE IS UNCHANGED and still fires on Get Stronger's own AMRAP.
+   * ⚠️ THE PREVIOUS PROGRAM'S LINE IS UNCHANGED and still fires on Get Stronger's own AMRAP.
    */
   | 'pretest'
   | 'rest'
@@ -349,8 +349,8 @@ export type BarSpeedMoment =
 export const BAR_SPEED_COPY: Record<BarSpeedMoment, string> = {
   warmup: 'Light weight, heavy intent. Move it fast.',
   // ⛔ NO REP-CHASING LINE, AND NO "GRIND" WORD, ANYWHERE NEAR A PRESCRIBED SET.
-  // Wendler's working-set instruction is EXPLOSIVE AND UNDER CONTROL on the concentric — speed in
-  // reserve, no grinding; grinding is reserved for the "+" set (5/3/1 2nd ed. p.24). "Grind" lives
+  // the previous program's working-set instruction is EXPLOSIVE AND UNDER CONTROL on the concentric — speed in
+  // reserve, no grinding; grinding is reserved for the "+" set (the previous program). "Grind" lives
   // ONLY on the amrap line so the two don't contradict on the top set (Michael 2026-08-11).
   work_set: 'Every rep explosive and controlled.',
   // ⚠️ REVERSED 2026-08-01 from "Slow rep = last rep." — see the doctrine note above. Grinding reps
@@ -389,7 +389,7 @@ export const BAR_SPEED_AMRAP_AFTER = 'Not to failure — you train tomorrow.';
  * set — Michael, on his own plan: *"25 chin ups? lol i can do 5."* The prescription never asked for
  * twenty-five in a row, and the row that carries it never mentioned that.
  *
- * **Basis: Wendler, 5/3/1 2nd ed.** Assistance is done across as many sets as it takes and is
+ * **Basis: the previous program, the previous program.** Assistance is done across as many sets as it takes and is
  * explicitly NOT taken to failure (p.24, p.102); doing too much assistance is named as the single
  * most common mistake lifters make with the programme. Both halves of the line are his, in order.
  *
@@ -402,7 +402,7 @@ export const BAR_SPEED_AMRAP_AFTER = 'Not to failure — you train tomorrow.';
 export const ACCESSORY_SET_CUE = 'Split these into as many sets as you need. Leave a rep or two — never to failure.';
 
 /**
- * ⛔ THE STANDING PLAN'S OWN CUE (2026-08-24, Michael on device, day one of his block). The Wendler
+ * ⛔ THE STANDING PLAN'S OWN CUE (2026-08-24, Michael on device, day one of his block). The the previous program
  * line above is FALSE on a standing-plan workout: those accessory rows prescribe DISCRETE sets
  * (3 × 8–10), so "split these into as many sets as you need" describes a freedom the block did not
  * grant. The logger picks between the two by the session's `standing_plan` tag.
@@ -492,10 +492,10 @@ export const STANDING_ME_SET_CUE = (band: string, opts?: { loadPrescribed?: bool
 
 /**
  * ⛔ THE DE ROW'S OWN INSTRUCTION (2026-08-25, Michael on the close-grip card: "move the bar fast
- * and controlled and what the weight cue should be"). The Wendler work-set line was leaking onto
- * this card — `close grip bench press` sits on the MAIN_531_LIFTS list as a bench-slot variant, so
+ * and controlled and what the weight cue should be"). The the previous program work-set line was leaking onto
+ * this card — `close grip bench press` sits on the MAIN_BARBELL_LIFTS list as a bench-slot variant, so
  * `barSpeedCueFor` fired — but on a standing-plan session the row is a SPEED slot with no
- * prescribed load, and the Wendler line names neither the speed intent nor the weight.
+ * prescribed load, and the previous program line names neither the speed intent nor the weight.
  *
  * **Basis: Viada p218/p219** — DE: 2 to 4 reps at 70-80%, *"maximum velocity"*, 3-4 RIR, and the
  * objective: *"Bar speed and quality of movement… Fatigue is discouraged."* The if-it-slows-down
@@ -527,8 +527,8 @@ export const STANDING_ME_SET_CUE = (band: string, opts?: { loadPrescribed?: bool
  * ⚠️ **AND REMOVING ITS RENDER WAS NOT A DELETION AT THE CALL SITE.** `StrengthLogger` renders
  * `standingCue ?? titleCue`, so a DE row returning `null` would have FALLEN THROUGH to
  * `barSpeedCueFor` — and close-grip bench press is a secondary push in this frame and on
- * `MAIN_531_LIFTS`, so it would have started reading *"Every rep explosive and controlled."*
- * Wendler's words on a Viada block, which is the exact defect this cue was written to beat. The
+ * `MAIN_BARBELL_LIFTS`, so it would have started reading *"Every rep explosive and controlled."*
+ * the previous program's words on a Viada block, which is the exact defect this cue was written to beat. The
  * call site suppresses explicitly.
  */
 export const STANDING_DE_SET_CUE = (band: string): string =>
@@ -590,7 +590,7 @@ export function barSpeedLineFor(set: {
 // rendered provenance is what stops it hiding its age. Do not tick the blindness closed on this.
 //
 // WORDS, NOT A NUMBER, and that is field practice rather than preference: RPE 6-10 and RIR 0-4 are
-// standard where the answer DRIVES LOAD (Juggernaut, Hevy, Strong) — it does not here, 5/3/1 already
+// standard where the answer DRIVES LOAD (Juggernaut, Hevy, Strong) — it does not here, the previous program already
 // dictates the weight. The apps optimised for people actually answering use plain language (RP's
 // none/low/moderate/high), because a lifter mid-set does not separate an 8 from an 8.5. Ten points of
 // scale to detect "this is trending wrong" is precision we cannot use and cannot defend. And "RIR" is
@@ -619,7 +619,7 @@ export const SET_DIFFICULTY_PROMPT = 'Select difficulty to mark done';
  * Which set is the TOP set — the only one the difficulty tap appears on.
  *
  * ⛔ HEAVIEST, NOT LAST. Robust to warm-up sets sitting in the same array and to any future
- * reordering. Ties resolve to the LAST occurrence, which is where 5/3/1 puts it: three ascending
+ * reordering. Ties resolve to the LAST occurrence, which is where the previous program puts it: three ascending
  * sets, the third is the top. Returns -1 when nothing is loaded (bodyweight, duration work), which
  * suppresses the tap rather than guessing.
  *

@@ -64,23 +64,23 @@ Deno.test('⛔ NO IMPERATIVE, NO PRAISE, NO CONSOLING CLOSER, NO SECOND PERSON',
 
 // ── What each line has to actually say ──────────────────────────────────────
 
-Deno.test('⛔ THE RESET LINE CARRIES BOTH HALVES OF THE RULE — p.31 and p.33', () => {
-  // p.31 — the drop, the amount, and that the block rebuilds from it.
+Deno.test('⛔ THE RESET LINE CARRIES BOTH HALVES OF THE RULE — the drop, and the hold before it', () => {
+  // The drop, the amount, and that the block rebuilds from it.
   assert(/reset 10 lb to 80/.test(RESET), RESET);
   assert(/rebuild from there/.test(RESET), RESET);
-  // ⛔ p.33 IS THE HALF THAT STOPS IT READING AS A PUNISHMENT. Without it, an athlete who missed one
+  // ⛔ THE HOLD IS THE HALF THAT STOPS IT READING AS A PUNISHMENT. Without it, an athlete who missed one
   // session reads a reset notice and concludes a single bad day cost them 10%.
   assert(/one missed session holds the weight, a second one drops it/.test(RESET), RESET);
-  // And it names the mechanism as the program's own rather than as a verdict on the athlete.
-  assert(/5\/3\/1's own reset/.test(RESET), RESET);
+  // And it names the mechanism as a fixed rule rather than as a verdict on the athlete.
+  assert(/The rule is fixed/.test(RESET), RESET);
 });
 
-Deno.test('⛔ THE BUMP LINE SAYS THE INCREMENT IS FIXED — Forever p.20, bold', () => {
+Deno.test('⛔ THE BUMP LINE SAYS THE INCREMENT IS FIXED', () => {
   assert(/stepped up 5 lb to 95/.test(BUMP), BUMP);
-  // ⛔ THE LOAD-BEARING SENTENCE. p.20: "stay the course. Do not increase more than the normal amount
-  // each cycle." An athlete who reps out and sees +5 reads it as the app under-reacting unless the
-  // line says the increment is fixed on purpose.
-  assert(/adds the same amount whatever the rep count/.test(BUMP), BUMP);
+  // ⛔ THE LOAD-BEARING SENTENCE. The increment does not scale with a big set. An athlete who reps
+  // out and sees +5 reads it as the app under-reacting unless the line says the increment is fixed
+  // on purpose.
+  assert(/the same amount whatever the rep count/.test(BUMP), BUMP);
   // ⚠️ AND NO PRAISE FOR THE REPS. The number going up is the reward.
   assert(!/well done|impressive|strong work/i.test(BUMP), BUMP);
 });

@@ -16,7 +16,7 @@
 //   2. **Only weeks that have not started.** History is not editable, and a session already logged
 //      against a prescription keeps the prescription it was judged against.
 //
-// ⛔ AND THE TWO NEVER MEET. That one walks a Wendler training max through cycle verdicts. This one
+// ⛔ AND THE TWO NEVER MEET. That one walks a the previous program training max through cycle verdicts. This one
 // re-runs THIS composer with the working numbers filled in and takes the difference. No function
 // accepts both numbers.
 // ============================================================================

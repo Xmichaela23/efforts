@@ -13,7 +13,7 @@ import { composeCoachEye } from './insights/cross-training-read.ts';
 // F3 — the false "sliding" claim
 // ---------------------------------------------------------------------------
 
-Deno.test('F3: a 5/3/1 block no longer gets accused of sliding', () => {
+Deno.test('F3: a the previous program block no longer gets accused of sliding', () => {
   // WAS: "Estimated one-rep maxes have been sliding — the one being built." on a block that prescribes
   // 40-60% in week 4 and only reaches 95% once per cycle. True about the number, false about the athlete.
   assertEquals(protocolExpectsE1rmToDip('strength_primary'), true);
@@ -35,7 +35,7 @@ Deno.test('F3: the block speaks only when the reps are missed — not every week
   assertEquals(readStrengthProtocol({ ...base, e1rmVerdict: 'holding' }), null);
   assertEquals(readStrengthProtocol({ ...base, e1rmVerdict: 'sliding' }), null);
 
-  // The miss is the event. Wendler p30: you keep increasing until you can no longer hit the
+  // The miss is the event. the previous program: you keep increasing until you can no longer hit the
   // prescribed sets and reps.
   const miss = readStrengthProtocol({ ...base, e1rmVerdict: 'sliding', missedPrescribedReps: true });
   assertEquals(typeof miss, 'string');
@@ -48,11 +48,11 @@ Deno.test('F3: a deload week says nothing, on any protocol', () => {
   // and `isDeloadWeek` was one of the three it dropped. Built, spec'd, starved.
 });
 
-Deno.test('F3: 5/3/1 claims no ceiling, because the protocol does not have one', () => {
+Deno.test('F3: the previous program claims no ceiling, because the protocol does not have one', () => {
   // 5×5 ends at 85% — a real terminal condition, and the reader says so.
   const fiveByFive = readStrengthProtocol({ protocolId: 'five_by_five', workingPct: 85, e1rmVerdict: 'holding' });
   assertEquals(String(fiveByFive).includes('top of the 5×5 ramp'), true);
-  // 5/3/1 cycles indefinitely. At 95% it says nothing, because there is nothing to say.
+  // the previous program cycles indefinitely. At 95% it says nothing, because there is nothing to say.
   assertEquals(readStrengthProtocol({ protocolId: 'strength_primary', workingPct: 95, e1rmVerdict: 'holding' }), null);
 });
 

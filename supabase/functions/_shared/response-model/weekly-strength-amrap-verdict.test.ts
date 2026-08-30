@@ -5,11 +5,11 @@
  *
  * Two changes, one fixture file, because they are two halves of one bug:
  *
- *   2a  A 5/3/1 lift was judged against a RIR target its own protocol says does not exist
+ *   2a  A the previous program lift was judged against a RIR target its own protocol says does not exist
  *       (`strength_primary` is `usesRir: false`), and the RIR it was compared to was often the
  *       SESSION-WIDE average — which is to say, the accessories'. That produced "add weight" /
  *       "back off weight" with a tappable weight suggestion behind it.
- *   2b  The signal 5/3/1 actually uses — reps on the all-out top set — reaches this function now
+ *   2b  The signal the previous program actually uses — reps on the all-out top set — reaches this function now
  *       (slice 1 put it on `per_lift`) and decides the words instead.
  *
  * ⛔ THE LAST TEST IN THIS FILE IS THE ONE THAT MATTERS. A verdict label is not cosmetic: it feeds
@@ -151,7 +151,7 @@ Deno.test('⛔ NO LABEL SLICE 2 CAN EMIT WRITES A WEIGHT', () => {
 });
 
 Deno.test('⛔ THE WORKING NUMBER IS NOT RECOMPUTED FROM THE AMRAP', () => {
-  // Wendler keeps the +5/+10 increment; reps are feedback, not an input (wendler-531.ts:206-208).
+  // the previous program keeps the +5/+10 increment; reps are feedback, not an input (wendler-531.ts:206-208).
   // A 25-rep set and a 1-rep set produce the SAME row apart from the words — no number moves.
   const big = computeStrength([lift({ target_rir: null, last_all_out: allOut(25) })], 'build').per_lift[0];
   const small = computeStrength([lift({ target_rir: null, last_all_out: allOut(1) })], 'build').per_lift[0];

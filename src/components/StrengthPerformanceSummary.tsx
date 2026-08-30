@@ -58,7 +58,7 @@ const extractExercisesFromComputed = (workout: any) => {
       const looksLikeAssistance = isAssistanceSlot({ sets: s?.sets, reps: rawReps, load_prescribed: s?.load_prescribed });
       const weight = Number(s?.weight || s?.load || 0);
       const target_rir = typeof s?.target_rir === 'number' ? s.target_rir : undefined;
-      // ⛔ THE RAMP, CARRIED (D-338). 5/3/1 is three sets at THREE weights — 170/180/190 — and
+      // ⛔ THE RAMP, CARRIED (D-338). the previous program is three sets at THREE weights — 170/180/190 — and
       // `weight` above deliberately holds only the TOP set so older consumers kept working.
       // `materialize-plan` carries the real per-set prescription through in `set_plan` and the
       // logger already opens each set on its own number; this screen was the one place still
@@ -79,7 +79,7 @@ const extractExercisesFromComputed = (workout: any) => {
       // and carried all the way through materialize (`materialize-plan/index.ts:2156`) — and then
       // died HERE, because this object is a whitelist and the flag was not on it.
       //
-      // Assistance in 5/3/1 is prescribed as a REP TOTAL and nothing else — Wendler, on the exact
+      // Assistance in the previous program is prescribed as a REP TOTAL and nothing else — the previous program, on the exact
       // movements in this athlete's block: *"50 total reps for weighted dips. 100 total reps if
       // you're just using your bodyweight"*, chins *"no less than 100 per week"*, bodyweight
       // template *"no less than 75 reps per exercise for each workout"*. So the composer writes
@@ -268,7 +268,7 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
   // could show a session's numbers as under-plan without ever saying the week was a deload.
   //
   // ⚠️ THE WORD IS THE CARD'S, NOT THIS SCREEN'S. `block.phase` is the plan's own name and on a
-  // 5/3/1 block that is 'Leader' / 'Anchor' — internal vocabulary an athlete should never be shown.
+  // the previous program block that is 'Leader' / 'Anchor' — internal vocabulary an athlete should never be shown.
   // `phase_word` is the plain one, resolved server-side through the app's single phase vocabulary,
   // so this screen and the State fitness rows print the same word for the same week by construction
   // rather than by two tables agreeing for now.
@@ -282,7 +282,7 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
     const where = weeks != null && weeks > 0 ? `week ${week} of ${weeks}` : `week ${week}`;
     /**
      * ⛔ THE PHASE WORD IS STRIPPED HERE TOO (2026-08-29) — same removal as the State row, same
-     * reason: `PHASE_NAME`'s vocabulary is Wendler's block shape (Leader, Anchor, TM Test, Deload),
+     * reason: `PHASE_NAME`'s vocabulary is the previous program's block shape (Leader, Anchor, TM Test, Deload),
      * and none of those words is Viada's. "week 1 of 12" is a position and stays.
      * ⚠️ DISPLAY ONLY — the block still runs on that shape. See the work order.
      */
@@ -521,7 +521,7 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
         <p className="text-xs text-rose-400 mb-2">{recomputeError}</p>
       )}
       {/* ── THE ALL-OUT SET (2026-07-30) ─────────────────────────────────────────────────────────
-          ⛔ THE REP RECORD LEADS. Wendler p10: *"If your squat goes from 225x6 to 225x9, you've
+          ⛔ THE REP RECORD LEADS. the previous program: *"If your squat goes from 225x6 to 225x9, you've
           gotten stronger. Don't get stuck just trying to increase your one rep max."* The rep count
           at a fixed weight is EXACT; the estimated max is an equation's guess about a number nobody
           measured. So the record is the headline and the estimate sits under it, quieter.

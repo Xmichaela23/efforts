@@ -1,7 +1,7 @@
 /**
  * RIR IS OFF FOR ONE PROTOCOL AND ONE ONLY.
  *
- * Strength Focus (Wendler 5/3/1) is deterministic: the working number and the reps are fixed at plan
+ * Strength Focus (the previous program) is deterministic: the working number and the reps are fixed at plan
  * creation, and the only thing that overrides them is a hard rep count on the week-3 check set. The
  * engine never reads a reserve estimate to make a decision there, so no target is stamped, the
  * logger does not ask, and nothing is stored.

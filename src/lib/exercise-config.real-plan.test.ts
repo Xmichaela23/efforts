@@ -15,7 +15,7 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import { EXERCISE_CONFIG, getExerciseConfig, resolveExerciseConfig } from './exercise-config.ts';
 import { getInSlotAlternatives } from './exercise-alternatives.ts';
-import { isMain531Lift, lookupExerciseType } from './exercise-role.ts';
+import { isMainBarbellLift, lookupExerciseType } from './exercise-role.ts';
 import { intensityTierForExercise } from './strength-intensity-tier.ts';
 import { equipmentForExercise } from './strength-logging-mode.ts';
 
@@ -77,9 +77,9 @@ Deno.test('⛔ THE THREE THAT RESOLVED TO NOTHING AT ALL', () => {
 
 Deno.test('⛔ `ohp` IS A MAIN LIFT, BECAUSE THE SERVER ALREADY SAYS SO', () => {
   // `canonicalize('ohp')` returns `overhead_press`, so the strength trend and the learned max have
-  // folded his logged "ohp" sessions into the overhead press all along — while `isMain531Lift` said
+  // folded his logged "ohp" sessions into the overhead press all along — while `isMainBarbellLift` said
   // no. One session, two vocabularies, two answers. Now one.
-  assert(isMain531Lift('ohp'), 'the two readers must agree');
+  assert(isMainBarbellLift('ohp'), 'the two readers must agree');
   assertEquals(lookupExerciseType('ohp'), 'barbell_main');
   assertEquals(EXERCISE_CONFIG['ohp'].primaryRef, 'overhead');
   assertEquals(EXERCISE_CONFIG['ohp'].ratio, EXERCISE_CONFIG['overhead press'].ratio);

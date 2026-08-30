@@ -27,8 +27,8 @@ Deno.test('the rule: the prescribed rep advances, short of it is a miss', () => 
   assertEquals(verdictFrom95Set(null), 'hold');                 // nothing logged is not a miss
 });
 
-Deno.test('a HIT walks the bar up the way Wendler says', () => {
-  // Lower body, +10 a cycle. ⛔ THE 6% PERCENTAGE CAP IS GONE (2026-08-12) — Wendler gives every
+Deno.test('a HIT walks the bar up the way the previous program says', () => {
+  // Lower body, +10 a cycle. ⛔ THE 6% PERCENTAGE CAP IS GONE (2026-08-12) — the previous program gives every
   // lifter the same fixed jump regardless of training age (p90, p107).
   const wn1 = workingNumberForCycles(90, 1, true, ['advance', 'advance'], { unknownMeans: 'hold' }).workingNumber;
   const wn2 = workingNumberForCycles(90, 2, true, ['advance', 'advance'], { unknownMeans: 'hold' }).workingNumber;
@@ -68,7 +68,7 @@ Deno.test('the FORECAST exception belongs to a fresh block, not to this one', ()
 
 Deno.test('⛔ THERE IS NO CEILING — the bar walks past 90% of the max on file, and must', () => {
   // ⛔ INVERTS 'the ceiling binds' (2026-07-28). A working number of 90 against a 106 lb max was
-  // clamped to 95 — one +5 step and then nothing, which is exactly the freeze. Wendler's brake is a
+  // clamped to 95 — one +5 step and then nothing, which is exactly the freeze. the previous program's brake is a
   // missed prescription (p30), not the record, so two clean advances now reach 110.
   assertEquals(
     workingNumberForCycles(90, 3, true, ['advance', 'advance'], { unknownMeans: 'hold' }).workingNumber,

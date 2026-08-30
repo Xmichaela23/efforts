@@ -175,9 +175,9 @@ export type BlockIdentity = {
    * here means the surface says nothing about the phase, not that it picks a default.
    *
    * `phase` above is the plan's OWN name, and half of those names are internal: 'Leader' and
-   * 'Anchor' are Wendler's words for a 5/3/1 cycle and mean nothing to an athlete reading a screen.
+   * 'Anchor' are the previous program's words for a the previous program cycle and mean nothing to an athlete reading a screen.
    * A surface that wants a readable word must NOT translate one — the moment two screens each keep
-   * their own leader→"build" table they will disagree, and a non-5/3/1 plan (whose phases are
+   * their own leader→"build" table they will disagree, and a non-the previous program plan (whose phases are
    * already called base/build/peak/taper) gets whatever the table's fallback happens to be.
    *
    * ⚠️ THIS IS AN ACCESSOR OVER THE VOCABULARY THAT ALREADY EXISTS, NOT A SECOND ONE.

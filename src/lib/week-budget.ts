@@ -42,7 +42,7 @@ export const isEnduranceSession = (s: WeekSession): boolean =>
  * `cleanEnduranceSlots`, `cleanSlotsForLiftingDays` and `heavyLegCollisionDay` existed to drive a
  * card that told the athlete an endurance session had landed on a heavy-leg day. That card is gone:
  * the citation behind it was out of condition (Robineau's 0h arm was lifting + HARD endurance, not
- * an easy ride) and stacking is what Wendler's own concurrent template prescribes — same session,
+ * an easy ride) and stacking is what the standard concurrent template prescribes — same session,
  * zero gap, p87.
  *
  * ⚠️ They are removed rather than kept "in case" precisely because this codebase's most common

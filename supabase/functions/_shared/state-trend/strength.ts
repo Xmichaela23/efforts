@@ -46,7 +46,7 @@ export interface StrengthState {
  * ── [Step 7] THIS IS THE THIRD OF THREE DIFFERENT QUESTIONS, AND THE ONLY ONE STILL UNSETTLED ────
  *   1. "may we coach it?"      → `capabilitiesForExercise().coached`, ~16 names (four lifts + the
  *                                 variants that fill their slots). Wide on purpose.
- *   2. "do we chart a max?"    → `src/lib/tracked-max-lifts.ts`, exactly 4. In 5/3/1 you hold a
+ *   2. "do we chart a max?"    → `src/lib/tracked-max-lifts.ts`, exactly 4. In the previous program you hold a
  *                                 training max on four lifts — one per slot.
  *   3. "does it move the dot?" → THIS SET, currently 5.
  *
@@ -124,7 +124,7 @@ export interface StrengthPerLift {
    *  must NOT interpret it as "not enough data" — `directionBasis` says what it really means. */
   direction: TrendVerdict;
   /** Which measure this lift's readings come from — 'amrap' (the all-out set, for a waved main lift
-   *  on a 5/3/1 block) or 'e1rm' (logged working sets). D-419 infrastructure; it survives D-420 and
+   *  on a the previous program block) or 'e1rm' (logged working sets). D-419 infrastructure; it survives D-420 and
    *  now describes the RECEIPTS rather than a direction. */
   directionGauge?: StrengthGauge;
   /** Since D-420, the retirement note itself — renderable, never re-derived. */
@@ -151,7 +151,7 @@ export interface StrengthPerLift {
   isPr: boolean;
   /**
    * ⛔ THE REP PR (D-420 pillar 2) — the last all-out set for this lift, and whether it beat the most
-   * reps ever done at that weight. Wendler p10: *"If your squat goes from 225x6 to 225x9, you've
+   * reps ever done at that weight. the previous program: *"If your squat goes from 225x6 to 225x9, you've
    * gotten stronger."* This is the home for the high-rep all-out sets the trusted-rep e1RM gate
    * (D-417) correctly refuses — 105×35 can never mint an e1RM, but it is absolutely a rep record.
    *
@@ -248,8 +248,8 @@ export function computeE1rmBand(series: LiftSeries[], baselineByCanonical?: Reco
  *
  * ── TWO MEASUREMENTS, NAMED SEPARATELY, NEVER CONVERTED INTO EACH OTHER ──────────────────────────
  *
- * `cleanMaxReps` is a MAX CLEAN REPS figure: one set, no band, to failure. Wendler's standard
- * (`standardReps` inside `standardMinutes`, Forever p.33) is a SESSION measure — many sets against a
+ * `cleanMaxReps` is a MAX CLEAN REPS figure: one set, no band, to failure. the previous program's standard
+ * (`standardReps` inside `standardMinutes`, the previous program) is a SESSION measure — many sets against a
  * clock. **They are different measurements and neither converts into the other**, so this carries
  * both, labelled, and the surface must render them as two facts rather than a percentage of one
  * toward the other. "12 of 50" would be an invented metric.
@@ -269,12 +269,12 @@ export interface PullupProgress {
   /** Clean reps performed in the window — the volume actually earned at bodyweight. */
   cleanReps: number;
   /**
-   * ⛔ COUNTED, NEVER MERGED. Assisted reps are real work and the on-ramp is Wendler's own (2nd ed
+   * ⛔ COUNTED, NEVER MERGED. Assisted reps are real work and the on-ramp is the standard (the previous program
    * p.36) — but folding them into the clean count makes the number climb while the athlete gets no
    * stronger. Walking the band down shows up as this falling while `cleanReps` rises.
    */
   assistedReps: number;
-  /** Wendler's standard, stated as itself: `standardReps` reps inside `standardMinutes` minutes. */
+  /** the previous program's standard, stated as itself: `standardReps` reps inside `standardMinutes` minutes. */
   standardReps: number;
   standardMinutes: number;
   /** Sessions in the window that carried any chin/pull-up work. Provenance for the two counts. */
@@ -293,7 +293,7 @@ export interface StrengthFitness {
 
 // SIGNAL-VS-NOISE guard for e1RM (2026-07-19). e1RM off working sets scatters ~4-8% session to
 // session — RIR-estimate wobble (the e1RM offset is only as steady as the logged RIR; D-339 moved the
-// formula itself to Wendler's own, `src/lib/estimate-1rm.ts`), best-set
+// formula itself to the standard, `src/lib/estimate-1rm.ts`), best-set
 // selection, and thin per-lift cadence (often n=3-4 in the 6wk window). Without a guard a lift whose
 // e1RM moved LESS than its own scatter still earns "improving"/"sliding" off the dead-band alone. This
 // is the same gate run decoupling already uses (run.ts, noiseGuardStdev 1.0): a directional verdict must
@@ -302,18 +302,18 @@ export interface StrengthFitness {
 const E1RM_NOISE_GUARD_STDEV = 1.0;
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
-// THE PROTOCOL'S OWN GAUGE (Slice 2, 2026-08-12) — 5/3/1 progress is the ALL-OUT SET, not the
+// THE PROTOCOL'S OWN GAUGE (Slice 2, 2026-08-12) — the previous program progress is the ALL-OUT SET, not the
 // waved working-set e1RM.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 //
 // ⛔ THE FRACTURE. The direction above reads the e1RM series, which D-417 correctly gates to trusted
-// low-rep sets. On a 5/3/1 block that leaves ONLY the fixed working sets — whose weight the PROGRAM
+// low-rep sets. On a the previous program block that leaves ONLY the fixed working sets — whose weight the PROGRAM
 // waves by design (65/75/85 → 70/80/90 → 75/85/95, then a new cycle re-bases). So a lighter
 // prescribed week read as "1 lift trending down" on a week the athlete executed perfectly. The one
-// set Wendler actually measures by — the all-out set, which runs long — is excluded from e1RM by
+// set the previous program actually measures by — the all-out set, which runs long — is excluded from e1RM by
 // construction, so the gauge was throwing away the measurement and trending the prescription.
 //
-// ⛔ WHAT THE BOOK SAYS (2nd ed., verified verbatim — do NOT paraphrase these into a new rule):
+// ⛔ WHAT THE BOOK SAYS (the previous program., verified verbatim — do NOT paraphrase these into a new rule):
 //   p9   — "This program allows you to break a wide variety of rep records throughout the entire year."
 //   p10  — "If your squat goes from 225x6 to 225x9, you've gotten stronger. If you keep setting and
 //          breaking rep records, you'll get stronger. Don't get stuck just trying to increase your one
@@ -331,7 +331,7 @@ const E1RM_NOISE_GUARD_STDEV = 1.0;
 //   p24  — "in the 4th week (your deload week), you should NOT be going for max reps."
 //   pp.123-129 — his own logbook carries a **Rep Records** box per lift per cycle.
 //
-// ⛔ SO THE GAUGE IS: the all-out set's Wendler p32 estimate, trended. At a FIXED weight that
+// ⛔ SO THE GAUGE IS: the all-out set's the previous program estimate, trended. At a FIXED weight that
 // estimate is a strictly increasing function of reps — so it IS the rep record (p10), exactly. When
 // the weight steps up between cycles (p28) it is his own comparator doing the bridging (p32). One
 // value, both cases, and no threshold invented here.
@@ -347,7 +347,7 @@ export interface AllOutTrendInput {
   date: string;
   weight: number;
   reps: number;
-  /** Wendler's p32 estimate for this set, computed once at capture. */
+  /** the previous program's p32 estimate for this set, computed once at capture. */
   estimated_1rm: number;
 }
 
@@ -373,7 +373,7 @@ const ALL_OUT_MIN_SESSIONS = 3;
 
 /**
  * ⛔ FRESHNESS SCALES TO THE MEASUREMENT'S OWN CADENCE — 56 days, and the number is the BOOK's, not
- * a preference. A 5/3/1 cycle is four weeks (p26/p28 lay out Week I-IV, then the maxes step up and it
+ * a preference. A the previous program cycle is four weeks (p26/p28 lay out Week I-IV, then the maxes step up and it
  * repeats), and this app prescribes the all-out set on the anchor cycle only, so two consecutive
  * readings can legitimately sit a leader cycle apart. Two cycles = 56 days is therefore the point at
  * which "this is your current direction" stops being true.
@@ -425,7 +425,7 @@ export interface StrengthStateOpts {
 //
 // The WHY is written down and is not re-derived here: `docs/SCIENCE-strength-e1rm-trust.md` §6 and
 // D-420. In one line: **no commercial app computes a weekly per-lift strength direction**, and on a
-// 5/3/1 wave a first-to-last direction reads the WITHIN-CYCLE weight-wave as a trend. It printed
+// the previous program wave a first-to-last direction reads the WITHIN-CYCLE weight-wave as a trend. It printed
 // "1 lift trending down" and an overall "sliding −8.2%" on a deadlift that was simply running the
 // program — 105×35 → 110×25 → 115×20, one cycle's three weeks.
 //
@@ -436,9 +436,9 @@ export interface StrengthStateOpts {
 // gauge infrastructure (`readsEffortAs`, `allOutByLift`) SURVIVES** and still selects which measure the
 // receipts describe.
 //
-// WHAT REPLACES IT — the universal method (Strong / Hevy / Boostcamp) and Wendler's own:
+// WHAT REPLACES IT — the universal method (Strong / Hevy / Boostcamp) and the standard:
 //   1. the e1RM RECORD (best trusted e1RM to date, per lift — monotonic, a max not an average),
-//   2. REP PRs (most reps at a weight, Wendler p10 — honest at any rep count), and
+//   2. REP PRs (most reps at a weight, the previous program — honest at any rep count), and
 //   3. the e1RM CHART over the block; the human reads the slope.
 // All three already existed. This slice removes the fourth thing, which was lying.
 //
@@ -487,7 +487,7 @@ export function computeStrengthState(
       { exclude: isDeloadWeek, noiseGuardStdev: E1RM_NOISE_GUARD_STDEV },
     );
 
-    // D-420: the all-out set is still the RIGHT substrate for a 5/3/1 lift — it is what the record and
+    // D-420: the all-out set is still the RIGHT substrate for a the previous program lift — it is what the record and
     // the rep PRs are read from — but no DIRECTION is claimed off it. D-419's gauge selection survives
     // and now describes which measure the receipts came from; the verdict it fed is retired.
     return {

@@ -59,7 +59,7 @@ export type CalibrationLineInput = {
 };
 
 /**
- * ⛔ THE RESET LINE. Wendler p.31 (the stall, −10%, per lift) gated by p.33 (one bad day is not a
+ * ⛔ THE RESET LINE. the previous program (the stall, −10%, per lift) gated by p.33 (one bad day is not a
  * stall). Both halves are in the sentence, because the second is what stops the first reading as a
  * punishment for a single session.
  *
@@ -75,14 +75,14 @@ export function resetLine(o: CalibrationLineInput): string {
   return (
     `${o.lift} — the top set came up short two cycles running, so the training max reset ` +
     `${drop} lb to ${o.to} and the remaining weeks rebuild from there. ` +
-    `That is 5/3/1's own reset: one missed session holds the weight, a second one drops it.`
+    `The rule is fixed: one missed session holds the weight, a second one drops it.`
   );
 }
 
 /**
  * ⛔ THE BUMP LINE, AND ITS SECOND SENTENCE IS THE LOAD-BEARING HALF.
  *
- * **Forever p.20 is bold that a big set does not buy a bigger jump** — *"stay the course. Do not
+ * **the previous program is bold that a big set does not buy a bigger jump** — *"stay the course. Do not
  * increase more than the normal amount each cycle"* — and the p.20-21 Q&A answers "eight reps at 95%,
  * should I jump more?" with *"The answer every single time is NO."* An athlete who reps out and then
  * sees +5 will read it as the app under-reacting unless the line says the increment is fixed on
@@ -95,7 +95,7 @@ export function bumpLine(o: CalibrationLineInput): string {
   const step = Math.max(0, Math.round(o.to - o.from));
   return (
     `${o.lift} — the top set met its target, so the training max stepped up ${step} lb to ${o.to} ` +
-    `for the remaining weeks. That is the standard cycle increase; 5/3/1 adds the same amount ` +
+    `for the remaining weeks. That is the standard cycle increase — the same amount ` +
     `whatever the rep count.`
   );
 }

@@ -30,10 +30,10 @@ import { BALANCED_WEEK, LIFT_DAYS, normalizeAssistancePrefs, resolveDayAssistanc
 
 // ── The sourced numbers ───────────────────────────────────────────────────────────────────────────
 
-Deno.test('the protocol numbers are Wendler\'s, not ours', () => {
-  assertEquals(WEEKLY_CHIN_VOLUME_TARGET, 100);   // 2nd ed p.35
-  assertEquals(SESSION_STANDARD_REPS, 50);        // Forever p.33
-  assertEquals(SESSION_STANDARD_MINUTES, 10);     // Forever p.33
+Deno.test('the protocol numbers are the previous program\'s, not ours', () => {
+  assertEquals(WEEKLY_CHIN_VOLUME_TARGET, 100);   // the previous program
+  assertEquals(SESSION_STANDARD_REPS, 50);        // the previous program
+  assertEquals(SESSION_STANDARD_MINUTES, 10);     // the previous program
   assertEquals(FULL_DOSE_CAPACITY, 8);            // the pull slot's existing capacity anchor
 });
 
@@ -89,7 +89,7 @@ Deno.test('an athlete who can already pull gets the book\'s full dose', () => {
   assertEquals(dose.weeklyVolume, 100);
   // ⛔ 33 · 33 · 34 — THE WEEKLY ANCHOR IS HIT EXACTLY (§1h, 2026-08-17). It was a flat `25`, from a
   // divisor of FOUR against a block that builds THREE days: the athlete received 75 of the 100
-  // Wendler prescribes and nothing reported the shortfall.
+  // the previous program prescribes and nothing reported the shortfall.
   assertEquals(dose.perDay, [33, 33, 34]);
   assertEquals(dose.perDay.reduce((a, b) => a + b, 0), dose.weeklyVolume);
   assertEquals(dose.basis, 'full_dose');
@@ -97,7 +97,7 @@ Deno.test('an athlete who can already pull gets the book\'s full dose', () => {
 });
 
 Deno.test('⛔ A 2-REP ATHLETE IS NOT HANDED 100 CHINS A WEEK', () => {
-  // Wendler's protocol addressed to someone who cannot perform it is not his protocol. The dose
+  // the previous program's protocol addressed to someone who cannot perform it is not his protocol. The dose
   // scales and the basis SAYS SO, so the copy can name the evidence instead of a bare number.
   const dose = weeklyVolumeFor(2);
   assertEquals(dose.basis, 'scaled_to_capacity');
@@ -106,7 +106,7 @@ Deno.test('⛔ A 2-REP ATHLETE IS NOT HANDED 100 CHINS A WEEK', () => {
   assertEquals(dose.assistedOnRamp, false);
 });
 
-Deno.test('⛔ ZERO REPS IS THE ON-RAMP, NOT AN EXCLUSION (2nd ed p.36)', () => {
+Deno.test('⛔ ZERO REPS IS THE ON-RAMP, NOT AN EXCLUSION (the previous program)', () => {
   // 0 is a valid tested value (Q-102) and it is exactly the athlete the band on-ramp exists for.
   // Prescribing nothing here would be the feature declining to serve its own entry case.
   const dose = weeklyVolumeFor(0);

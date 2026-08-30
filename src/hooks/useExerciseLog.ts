@@ -31,7 +31,7 @@ export interface LiftTrendEntry {
  * `BlockSummaryTab`, which had been unmounted since 2026-03-31 and is now deleted.
  *
  * ⚠️ AND `trend` WAS THE SAME LIE D-347 DELETED FROM THE STATE SCREEN, still breathing on a second
- * surface. A 5/3/1 block prescribes its top set from ~65% up to ~95% of a training max, so an e1RM
+ * surface. A the previous program block prescribes its top set from ~65% up to ~95% of a training max, so an e1RM
  * produced once per cycle moves with the PRESCRIPTION. First-to-last across that ramp reads a
  * correctly-executed light week as a decline. D-347 removed the per-lift direction chip for exactly
  * this reason; this copy survived only because nothing rendered it.

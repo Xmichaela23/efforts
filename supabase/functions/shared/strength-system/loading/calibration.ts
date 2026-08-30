@@ -22,7 +22,7 @@
 //
 // The slice (written 2026-08-12) specified a Juggernaut-style up-bump: *"more reps over target →
 // larger step, but capped."* **The Forever reading of 2026-08-15 refutes it directly**, and the
-// refutation is bold in the book — see `docs/REFERENCE-531-forever-pp16-45.md`:
+// refutation is bold in the book — see `docs/REFERENCE-main-lift-forever-pp16-45.md`:
 //
 //   · **p.20, bold:** more than five reps on the test set → *"stay the course. Do not increase more
 //     than the normal amount each cycle."*
@@ -34,7 +34,7 @@
 //
 // So the UP direction is the ordinary earned step (+5 upper / +10 lower), which slice a's engine
 // already applies every cycle. What slice b adds is that it is now **announced and reversible** —
-// not that it is bigger. A rep-scaled jump would be an app invention on top of 5/3/1, which is the
+// not that it is bigger. A rep-scaled jump would be an app invention on top of the previous program, which is the
 // exact class of thing D-422 was written to delete.
 // ============================================================================
 
@@ -51,9 +51,9 @@ export type LiftRef = 'bench' | 'squat' | 'deadlift' | 'overheadPress';
  * plumbing survived deliberately for this slice to repopulate; the trigger is what changed.
  */
 export type CalibrationReason =
-  /** A confirmed stall: −10% and rebuild, that lift only. Wendler p.31, gated by p.33. */
+  /** A confirmed stall: −10% and rebuild, that lift only. the previous program, gated by p.33. */
   | 'reset'
-  /** The ordinary earned step: +5 upper / +10 lower. Wendler p.30. NOT a rep-scaled jump — see above. */
+  /** The ordinary earned step: +5 upper / +10 lower. the previous program. NOT a rep-scaled jump — see above. */
   | 'bump';
 
 /**
@@ -210,7 +210,7 @@ export function undoLatestCalibration(
  * This is the thing the deleted ceiling never gave anybody, and it is named in slice b as the
  * original bug: *"a number that silently stopped moving with nothing on screen."*
  *
- * ⚠️ `holding` IS NOT `reset`. Wendler p.33: one missed session holds the weight and costs nothing —
+ * ⚠️ `holding` IS NOT `reset`. the previous program: one missed session holds the weight and costs nothing —
  * the free re-try. A row that called that a reset would report a penalty the engine did not apply.
  */
 export type LiftCalibrationStatus = 'climbing' | 'holding' | 'reset';

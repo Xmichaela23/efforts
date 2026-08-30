@@ -195,7 +195,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
             we killed it for strength"*). D-338 gated it on having a plan; the gate was not the
             problem. The paragraph itself was.
 
-            What it printed on a real, correctly-executed 5/3/1 session:
+            What it printed on a real, correctly-executed the previous program session:
               *"No RIR was logged, so effort proximity can't be confirmed… back squat ran about 27%
                under the prescribed weight… Box jumps haven't appeared in recent logged training and
                can make the legs feel heavier than expected."*

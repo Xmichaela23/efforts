@@ -503,7 +503,7 @@ export type ComposeArgs = {
    * week where the athlete had named one.
    *
    * ⛔ FLAT, AND THE DAY IS DELIBERATELY DROPPED — that is OURS and it is stated rather than assumed.
-   * The picker's keys are Wendler's three lifting days (`squat` / `bench` / `deadlift`); this frame's
+   * The picker's keys are the previous program's three lifting days (`squat` / `bench` / `deadlift`); this frame's
    * days are ME:Upper, ME:Lower, DE:Upper and DE:Lower. There is no honest mapping between the two,
    * so a pick is placed by what it TRAINS — its pattern for a HYP slot, its prime mover for a floor —
    * and never by which of another programme's days it was chosen on.
@@ -525,7 +525,7 @@ export type ComposeArgs = {
    * D-450 in `docs/DECISIONS-LOG-3.md`).
    *
    * ⚠️ THIS IS THE HONEST VERSION OF `accessoryPicks`, NOT A SECOND ONE. The flat list exists
-   * because the picker was Wendler's and its day keys mapped onto nothing here, so a pick had to be
+   * because the picker was the previous program's and its day keys mapped onto nothing here, so a pick had to be
    * placed by what it TRAINS. The Standing Plan's own picker asks per FRAME SLOT — `secondary
    * push_upper`, `focused pull_upper` — so the placement is no longer an inference: the athlete
    * named the movement for that cell and it goes in that cell, on every day the frame carries it.

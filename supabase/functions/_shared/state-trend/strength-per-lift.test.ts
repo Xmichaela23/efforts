@@ -61,7 +61,7 @@ Deno.test('per_lift carries allTimeBestE1rm/allTimeCount; PR = latest is a new a
 // ⛔ REWRITTEN FOR [D-420] (2026-08-12). The three tests that stood here pinned D-270's per-lift
 // DIRECTION and the aggregate it rolled up to ("improving bench survives", "aggregate agrees").
 // D-420 retires that verdict entirely — no commercial app computes a weekly strength direction, and on
-// a 5/3/1 wave it reads the program's own light week as a decline (SCIENCE §6). What D-270 got RIGHT
+// a the previous program wave it reads the program's own light week as a decline (SCIENCE §6). What D-270 got RIGHT
 // survives and is what these now pin: the spine owns the per-lift facts, the list keeps its
 // granularity, and every arm reads that one list instead of re-deriving anything.
 //

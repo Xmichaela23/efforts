@@ -7,17 +7,17 @@
  * weekly volume, and the athlete's tested capacity climbs against a target across the block. A chip
  * changes what you do; this changes what you can do, and it can be measured.
  *
- * ── WENDLER'S PROTOCOL, PACKAGED. Nothing here is invented. ───────────────────────────────────────
+ * ── THE PREVIOUS PROGRAM'S PROTOCOL, PACKAGED. Nothing here is invented. ───────────────────────────────────────
  *
- *   VOLUME    100+ chins a week, chins between every pressing set        2nd ed p.35
- *   VARIETY   vary the grip every set or session                         Forever p.26
- *   STRENGTH  some low-rep WEIGHTED work, not only high-rep bodyweight    Forever p.26
- *   STANDARD  50 reps in 10 minutes                                       Forever p.33
- *   ON-RAMP   "if you can't do chins, use a Jump Stretch band"            2nd ed p.36
+ *   VOLUME    100+ chins a week, chins between every pressing set        the previous program
+ *   VARIETY   vary the grip every set or session                         the previous program
+ *   STRENGTH  some low-rep WEIGHTED work, not only high-rep bodyweight    the previous program
+ *   STANDARD  50 reps in 10 minutes                                       the previous program
+ *   ON-RAMP   "if you can't do chins, use a Jump Stretch band"            the previous program
  *
  * ⛔ THE STANDARD AND THE TRACKED NUMBER ARE DIFFERENT UNITS, AND CONFLATING THEM WOULD BE THE
  * INVENTED METRIC THIS FILE EXISTS TO AVOID. `pullupMaxReps` is a MAX CLEAN REPS figure — one set,
- * to failure. Wendler's 50-in-10-minutes is a SESSION standard — many sets, a clock. They are not
+ * to failure. the previous program's 50-in-10-minutes is a SESSION standard — many sets, a clock. They are not
  * the same measurement and one does not convert into the other. So this module carries BOTH,
  * separately labelled, and the copy never implies the max-rep number is "progress toward 50":
  *
@@ -27,7 +27,7 @@
  *
  * ── ⛔ AND A BAND-ASSISTED REP IS NOT A REP ──────────────────────────────────────────────────────
  *
- * The on-ramp is Wendler's own, so a 0-rep athlete has to be able to start. But if an assisted rep
+ * The on-ramp is the standard, so a 0-rep athlete has to be able to start. But if an assisted rep
  * counts toward the tested capacity, the number goes up while the athlete does not get stronger —
  * the progression reports success for walking the assistance DOWN more slowly. Assisted and clean
  * reps are counted separately, everywhere, off the field the logger already writes
@@ -40,10 +40,10 @@
 
 import { isBandAssistedMovement } from './band-assistance.ts';
 
-/** Wendler 2nd ed p.35 — "100 or more chins a week". The floor of the prescription, not a cap. */
+/** the previous program — "100 or more chins a week". The floor of the prescription, not a cap. */
 export const WEEKLY_CHIN_VOLUME_TARGET = 100;
 
-/** Forever p.33 — his standard. ⛔ A SESSION measure (reps inside a clock), NOT a max-rep figure. */
+/** the previous program — his standard. ⛔ A SESSION measure (reps inside a clock), NOT a max-rep figure. */
 export const SESSION_STANDARD_REPS = 50;
 export const SESSION_STANDARD_MINUTES = 10;
 
@@ -60,7 +60,7 @@ export const FULL_DOSE_CAPACITY = 8;
 export type GripVariant = 'chin' | 'pull' | 'neutral' | 'wide';
 
 /**
- * ⛔ THE GRIP ROTATION IS THE PRESCRIPTION, NOT DECORATION (Forever p.26: vary the grip every set or
+ * ⛔ THE GRIP ROTATION IS THE PRESCRIPTION, NOT DECORATION (the previous program: vary the grip every set or
  * session). Four grips, rotated so a block never runs the same grip twice in a row.
  *
  * ⛔ THE ORDER CHANGED WITH §1h (2026-08-17) AND IT IS LOAD-BEARING. It was
@@ -122,7 +122,7 @@ export function movementForGrip(grip: GripVariant): string {
 }
 
 /**
- * ⛔ WENDLER PRESCRIBES *SOME* LOW-REP WEIGHTED WORK, NOT A PERCENTAGE (Forever p.26). ONE lifting
+ * ⛔ THE PREVIOUS PROGRAM PRESCRIBES *SOME* LOW-REP WEIGHTED WORK, NOT A PERCENTAGE (the previous program). ONE lifting
  * day a week carries it, and it is still `weight: 'By feel'` — D-406 is not suspended for this
  * feature. The athlete adds what they can hold for the stated low reps; the app names no load.
  *
@@ -160,7 +160,7 @@ export const WEIGHTED_DAY_REPS = 5;
 export const CHIN_SESSIONS_PER_WEEK = 3;
 
 /**
- * ⛔ THE WEEKLY TOTAL IS THE ANCHOR AND IT IS HIT EXACTLY (2nd ed p.35 — "100 or more chins a week").
+ * ⛔ THE WEEKLY TOTAL IS THE ANCHOR AND IT IS HIT EXACTLY (the previous program — "100 or more chins a week").
  * 100 does not divide by 3, so the days are 33 · 33 · 34 and the remainder goes to the LAST day.
  *
  * ⚠️ THIS DELIBERATELY OVERRIDES THE ROUND-TO-FIVES RULE. `round5` exists so a dose "reads like a
@@ -207,7 +207,7 @@ export type PullupDose = {
  * The weekly chin volume for an athlete with this tested capacity.
  *
  * ⛔ 100 IS THE PRESCRIPTION FOR SOMEONE WHO CAN ALREADY PULL. Handing 100 weekly chins to an
- * athlete whose max is two is not Wendler's protocol, it is the same protocol addressed to someone
+ * athlete whose max is two is not the previous program's protocol, it is the same protocol addressed to someone
  * else — they cannot perform it, and the shortfall reads to them as failure in week one. Below
  * {@link FULL_DOSE_CAPACITY} the dose scales with capacity and the basis SAYS SO.
  *

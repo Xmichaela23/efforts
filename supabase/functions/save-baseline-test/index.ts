@@ -19,7 +19,7 @@
 // derivation — only the athlete knows whether a lower test is a real regression or a bad day. So this
 // function is two-phase: it reports what needs deciding, and writes once the decisions come back.
 //
-// ⚠️ NOT A NEW FORMULA. `estimate1RM` is the app's one 1RM formula (D-339, Wendler's own), the same
+// ⚠️ NOT A NEW FORMULA. `estimate1RM` is the app's one 1RM formula (D-339, the standard), the same
 // module `compute-facts` uses. This function moves WHERE the arithmetic runs, not WHAT it computes.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser } from '../_shared/require-user.ts';

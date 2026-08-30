@@ -12,13 +12,13 @@
  *     /squat|deadlift|bench|overhead|ohp/.test(n) && !/goblet|bulgarian|split|romanian|sumo|stiff|jump/.test(n)
  *
  * — the SEVENTH private exercise classifier in the codebase (audit F5 counted six). It disagreed with
- * `MAIN_531_LIFTS` at the edges, and the disagreements were not cosmetic: **Push Press and Military
+ * `MAIN_BARBELL_LIFTS` at the edges, and the disagreements were not cosmetic: **Push Press and Military
  * Press matched none of those words**, so two of the app's own main lifts rested like accessories —
  * 90 seconds instead of three minutes. It also excluded `sumo` outright, so a Sumo Deadlift, which
  * IS in the main-lift set, took accessory rest.
  *
  * ⚠️ AND IT CUTS THE OTHER WAY TOO. `/bench/` matched DB, incline and decline bench presses, which
- * are assistance in 5/3/1 and now take assistance rest. That is the classifier being right, not a
+ * are assistance in the previous program and now take assistance rest. That is the classifier being right, not a
  * regression — but it is a visible change and it is listed in the fixtures.
  *
  * ⚠️ THE PLYO TEST IS STILL A PRIVATE REGEX and is transcribed here BYTE-FOR-BYTE rather than moved
@@ -27,7 +27,7 @@
  * behaviour change nobody asked for. It is the eighth private list and it is still open — but it now
  * has ONE home instead of two, since the component imports it from here.
  */
-import { isMain531Lift } from './exercise-role.ts';
+import { isMainBarbellLift } from './exercise-role.ts';
 import { REST_BETWEEN_SETS_RULE, REST_BETWEEN_SETS_RULE_HYP } from '@shared/strength-grid/intents.ts';
 
 /**
@@ -51,7 +51,7 @@ export const isPlyometricMovement = (exerciseName: string): boolean => {
  * sets for strength/power, and the phosphagen system — which fuels a set of 3-5 — is only ~85%
  * resynthesised at two minutes and effectively complete around three. 150s sat below the band's
  * midpoint for the heaviest sets in the block, which is the one place under-resting costs reps on the
- * NEXT set, and in 5/3/1 the next set is the one being measured.
+ * NEXT set, and in the previous program the next set is the one being measured.
  *
  * ⚠️ ONLY THE 3-5 REP MAIN CASE MOVES. The 6-8 band stays 120s (a rep range that is not near-maximal),
  * plyometrics stay 150s, and every accessory band is untouched.
@@ -63,7 +63,7 @@ export const HEAVY_MAIN_REST_SEC = 180;
  *
  * ⚠️ THE DEFECT: this function saw a name and a rep count and nothing else, so the standing plan's
  * own vocabulary was invisible to it. **A max-effort pull-up rested 90 seconds** — a pull-up is not
- * on `MAIN_531_LIFTS`, so at 1-5 reps it fell past every accessory band to the catch-all — while a
+ * on `MAIN_BARBELL_LIFTS`, so at 1-5 reps it fell past every accessory band to the catch-all — while a
  * max-effort bench on the same day rested three minutes. **And a speed bench at 2-4 reps took
  * 120-180s**, which is the heavy answer on the one slot whose whole point is that it is not heavy.
  *
@@ -135,7 +135,7 @@ export function restCueForBucket(bucket: RestBucket): string {
  * Rest in SECONDS.
  *
  * ⚠️ `slotIntent` IS THE STANDING PLAN\'S ONLY, AND ITS ABSENCE CHANGES NOTHING — Michael\'s call,
- * 2026-08-27. A 5/3/1 row, a freestyle row and every logged workout with no plan intent fall through
+ * 2026-08-27. A the previous program row, a freestyle row and every logged workout with no plan intent fall through
  * to the ladder below, byte-identical to what they got before. ⛔ **THAT LADDER — 150 / 120 / 90 /
  * 75 / 60 — HAS NO STATED BASIS**: not in this file, not in its fixtures, not in the decisions log.
  * It is OURS and undeclared, it is left running because nobody has reported a problem with it, and
@@ -162,7 +162,7 @@ export function calculateRestTime(
 
   // ⛔ THE SHARED CLASSIFIER. One set, two readers — the same one the State row, the bar-speed cue and
   // the AMRAP verdict all gate on.
-  if (isMain531Lift(exerciseName)) {
+  if (isMainBarbellLift(exerciseName)) {
     // Main lifts:
     // 3-5 reps: 180 sec (3:00) — near-maximal, see HEAVY_MAIN_REST_SEC
     // 6-8 reps: 120 sec (2:00)
@@ -191,7 +191,7 @@ export function calculateRestTime(
  * 150 / 120 / 90 / 75 / 60 ladder has no citation in this file, none in `DECISIONS-LOG`, and its
  * fixtures assert the numbers without ever saying where they came from.
  *
- * ⚠️ IT IS STILL RUNNING, AND ON PURPOSE. Nobody has reported a problem with rest on a 5/3/1 or
+ * ⚠️ IT IS STILL RUNNING, AND ON PURPOSE. Nobody has reported a problem with rest on a the previous program or
  * freestyle session, and changing a number on no evidence is worse than leaving one that works. What
  * changed is that it is no longer anonymous.
  */

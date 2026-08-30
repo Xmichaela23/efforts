@@ -236,7 +236,7 @@ Deno.test('no muscle below its floor, no session at the costly line — every fo
 });
 
 Deno.test('the athlete keeps every movement they picked', () => {
-  // ⚠️ *"It is the work that matters"* (Wendler p.24), and both authors endorse athlete choice. The
+  // ⚠️ *"It is the work that matters"* (the previous program), and both authors endorse athlete choice. The
   // floor is a floor BENEATH the picker, never a replacement for it — so every set the week arrived
   // with must still be there afterwards, unchanged.
   for (const sessionCount of [3, 4] as const) {
@@ -511,7 +511,7 @@ Deno.test('a movement the catalogue cannot attribute is reported, not silently d
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
 Deno.test('core is its own budget, and single-leg work does not spend it', () => {
-  // ⛔ THE THIRD THING THIS STAGE EXISTS FOR. Wendler bundles them into one category
+  // ⛔ THE THIRD THING THIS STAGE EXISTS FOR. the previous program bundles them into one category
   // (`single_leg_core` in `assistance-catalog.ts`), so abs compete with Bulgarian split squats for
   // one budget and lose. Viada gives core its own heading (p223). Here they are separate groups,
   // and a single-leg movement counts to the legs.
@@ -584,9 +584,9 @@ Deno.test('the module does not re-derive what stage 2 and strength-gear already 
   assert(!/EXERCISE_CONFIG\s*[:=]\s*\{/.test(code), 'declares its own exercise config');
   assert(!/ASSISTANCE_GEAR\s*[:=]\s*\{/.test(code), 'declares its own gear table');
   assert(!/BASE_THRESHOLDS\s*[:=]\s*\{/.test(code), 'declares its own threshold table');
-  // ⛔ AND IT DOES NOT TOUCH WENDLER'S REP MODEL. `assistance-menu.ts` serves Strong Focus, which
+  // ⛔ AND IT DOES NOT TOUCH THE PREVIOUS PROGRAM'S REP MODEL. `assistance-menu.ts` serves Strong Focus, which
   // stays live until stage 6; this is a layer beside it, not a rewrite of it.
-  assert(!/assistance-menu/.test(code), 'the dosing module reaches into Wendler\'s rep model');
+  assert(!/assistance-menu/.test(code), 'the dosing module reaches into the previous program\'s rep model');
   assert(!/ASSISTANCE_BAND_BY_HARD_DAYS|assistanceTotalReps|TIER_BAND/.test(code),
     'the dosing module reads or redefines the rep-per-category band');
 });

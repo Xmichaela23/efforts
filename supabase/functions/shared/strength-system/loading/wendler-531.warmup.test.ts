@@ -1,5 +1,5 @@
 /**
- * THE WARM-UP RAMP — Wendler 2nd ed. p.31, pinned.
+ * THE WARM-UP RAMP — the previous program, pinned.
  *
  * The book ramps every WORKING session before the work sets: 1×5 @ 40%, 1×5 @ 50%, 1×3 @ 60% of the
  * working number. ⛔ A STANDALONE WEEK CARRIES NONE — its own sets open at 70% and climb, so they are

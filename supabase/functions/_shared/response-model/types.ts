@@ -385,7 +385,7 @@ export type StrengthLiftSnapshot = {
  * showing the same reading and must show the same numbers.
  *
  * ⛔ THE REP RECORD LEADS AND THE ESTIMATE IS THE HEDGED SECONDARY. That is the shipped Performance
- * model and it is Wendler's own order (p10) — reps at a fixed weight are EXACT, the estimated max is
+ * model and it is the standard order (p10) — reps at a fixed weight are EXACT, the estimated max is
  * an equation's guess about a number nobody measured. Above `estimate_trusted_max_reps` the estimate
  * is LABELLED, never hidden and never capped (D-339).
  */

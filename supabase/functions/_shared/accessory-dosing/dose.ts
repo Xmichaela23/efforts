@@ -12,7 +12,7 @@
 // effective reps per muscle per week; the recovery cost is work sets per session. Neither is
 // expressible in reps-per-category.
 //
-// ⛔ AND THAT FILE IS NOT CHANGED BY THIS STAGE. It is Wendler's, it serves Strong Focus, its band
+// ⛔ AND THAT FILE IS NOT CHANGED BY THIS STAGE. It is the previous program's, it serves Strong Focus, its band
 // and axis were deliberately chosen and are correct, and **rule 0 says Strong Focus stays live until
 // the Standing Plan replaces it.** Changing its unit would change what a live plan builds. This is a
 // new layer beside it — row three of the work order's layer table — and the two meet at stage 6.

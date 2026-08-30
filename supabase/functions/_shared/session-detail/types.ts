@@ -115,7 +115,7 @@ export type SessionDetailV1 = {
     phase: string | null;
     /**
      * ⛔ THE PHASE WORD A SCREEN MAY PRINT — 'base' | 'build' | 'peak' | 'taper' | 'recovery'.
-     * `phase` above is the plan's own name ('Leader' / 'Anchor' / 'Deload' on a 5/3/1 block), which
+     * `phase` above is the plan's own name ('Leader' / 'Anchor' / 'Deload' on a the previous program block), which
      * is internal vocabulary. Null = the plan did not place this week; render the week number alone.
      */
     phase_word: string | null;
@@ -483,7 +483,7 @@ export type SessionDetailV1 = {
    * ⛔ THE ALL-OUT SET, PER LIFT (2026-07-30). Present only on sessions that carried one — a leader
    * cycle and every deload week have none, and that absence is correct, not a gap.
    *
-   * ⛔ THE REP RECORD IS THE FINDING; THE ESTIMATE IS CONTEXT. Wendler p10 — the rep count at a fixed
+   * ⛔ THE REP RECORD IS THE FINDING; THE ESTIMATE IS CONTEXT. the previous program — the rep count at a fixed
    * weight is what "stronger" means here, and it is EXACT. The estimated max is an equation's guess
    * about a number nobody measured, and it is labelled untrusted above the rep ceiling.
    */
@@ -497,7 +497,7 @@ export type SessionDetailV1 = {
     is_rep_record: boolean;
     /** ⛔ How far back "best" looked. NOT all-time; never narrate it as a lifetime PR. */
     rep_record_window_sessions: number;
-    /** Wendler's own formula (D-339), rounded to plate granularity. */
+    /** the standard formula (D-339), rounded to plate granularity. */
     estimated_1rm: number;
     /** False above 8 reps (5 on deadlift) — no equation holds up there. Label it; never cap the reps. */
     estimate_trusted: boolean;

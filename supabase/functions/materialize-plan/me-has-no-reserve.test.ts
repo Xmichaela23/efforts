@@ -28,14 +28,14 @@ Deno.test('the other three intents are UNCHANGED — p218 gives each of them a r
 });
 
 Deno.test('⛔ A ROW WITH NO SLOT INTENT IS UNTOUCHED — every non-standing plan behaves as before', () => {
-  // 5/3/1, freestyle, every legacy row: absent, null, empty and unknown all keep the old answer.
+  // the previous program, freestyle, every legacy row: absent, null, empty and unknown all keep the old answer.
   for (const v of [undefined, null, '', 'nonsense', 0, {}]) {
     assertEquals(stampsTargetRir(true, v), true, `an intent-less row changed behaviour: ${String(v)}`);
   }
 });
 
 Deno.test('the PROTOCOL gate still outranks everything — a protocol that tracks no RIR stamps none', () => {
-  // ⛔ TWO DIFFERENT QUESTIONS, AND THE PROTOCOL ONE IS FIRST. 5/3/1 fixes the weight and the reps at
+  // ⛔ TWO DIFFERENT QUESTIONS, AND THE PROTOCOL ONE IS FIRST. the previous program fixes the weight and the reps at
   // plan creation, so a reserve target there is a second instruction that can contradict the
   // prescription — true regardless of what slot the row is.
   for (const intent of [undefined, 'ME', 'DE', 'SKILL', 'HYP']) {

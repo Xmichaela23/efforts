@@ -54,7 +54,7 @@ const ramp = (plan: any, week: number, lift: string) =>
   setPlan(plan, week, lift).map((p) => `${p.weight}x${p.reps}${p.amrap ? '+' : ''}`).join(' ');
 
 /**
- * The WORK sets only. ⚠️ `set_plan` carries the Wendler p.31 warm-up ramp in front (40/50/60%,
+ * The WORK sets only. ⚠️ `set_plan` carries the previous program warm-up ramp in front (40/50/60%,
  * tagged `warmup`), so index 0 of the raw list is a warm-up, not the opening work set.
  */
 const work = (plan: any, week: number, lift: string) =>
@@ -89,7 +89,7 @@ Deno.test('⛔ NO TWO CYCLES OF A LIGHT BLOCK ARE IDENTICAL — on any of the fo
 
 Deno.test('the ladder underneath: press 85 → 90 → 95, squat 90 → 100 → 110', () => {
   // ⚠️ THE SQUAT'S +10 IS THE OTHER HALF OF THE SLICE. The deleted percentage cap shrank a light
-  // lifter's lower-body step to +5 (6% of a 90 lb training max is 5.4); Wendler gives every lifter
+  // lifter's lower-body step to +5 (6% of a 90 lb training max is 5.4); the previous program gives every lifter
   // the same jump (p90, p107), so it is +10 again.
   assertEquals(workingNumberFrom1RM(LIGHT.overheadPress), 85);
   assertEquals(workingNumberFrom1RM(LIGHT.squat), 90);
@@ -147,7 +147,7 @@ Deno.test('⛔ A LIFTER THE CEILING NEVER BOUND IS BYTE-IDENTICAL TO BEFORE THE 
 Deno.test('⚠️ THE 315 SQUAT IS THE ONE STANDARD BLOCK THE REMOVAL DOES CHANGE — and it is the point', () => {
   // ⛔ "THE CEILING NEVER BOUND FOR A HEAVY LIFTER" IS FALSE, AND THE SLICE DOC SAID IT WOULD BE
   // BYTE-IDENTICAL. Corrected here against the arithmetic: a 315 lb squat is training max 265 → 275
-  // → wants 285, and 90% of 315 rounds to 280 — so cycle 3 was TRUNCATED from 285 onto 280. Wendler's
+  // → wants 285, and 90% of 315 rounds to 280 — so cycle 3 was TRUNCATED from 285 onto 280. the previous program's
   // own book lifter squats in this range, so the ceiling was reshaping a standard block, not just a
   // light one.
   assertEquals(workingNumberFrom1RM(315), 265);

@@ -27,7 +27,7 @@ import { resolveProfile, getTargetRir, protocolUsesRir } from '../_shared/streng
 /**
  * ⛔ DOES THIS ROW GET A DERIVED RESERVE TARGET? Two answers, and they are different questions.
  *
- *   1. **The PROTOCOL** — `protocolUsesRir`. 5/3/1 auto-regulates nothing: the working number and
+ *   1. **The PROTOCOL** — `protocolUsesRir`. the previous program auto-regulates nothing: the working number and
  *      the reps are fixed at plan creation, so a reserve target is a second instruction that can
  *      contradict the prescription.
  *   2. **The SLOT** — p218 gives ME *"no RIR target"* in as many words, while giving DE, SKILL and
@@ -1109,7 +1109,7 @@ export function fallbackUnresolvedPercentDisplay(weight: any, reps: any): string
 /**
  * THE PER-SET PRESCRIPTION, carried through to the phone.
  *
- * 5/3/1 is three sets at three weights (SPEC-get-stronger §1). The authored row states them in
+ * the previous program is three sets at three weights (SPEC-get-stronger §1). The authored row states them in
  * `set_plan`; `weight`/`reps` carry the TOP set so every pre-existing consumer is unchanged. Without
  * this pass-through the logger prefills the top weight onto all three sets — a number the athlete was
  * not asked to lift, twice a session, four days a week, for twelve weeks.
@@ -1119,7 +1119,7 @@ export function fallbackUnresolvedPercentDisplay(weight: any, reps: any): string
  * of the ramp silently pointing at a load the top set no longer uses. Round DOWN, as everywhere else.
  *
  * Returns undefined for any row without an authored `set_plan` — which is every row that is not a
- * 5/3/1 main lift, so nothing else changes shape.
+ * the previous program main lift, so nothing else changes shape.
  */
 export function carrySetPlan(ex: any, finalWeight: number | null | undefined): any[] | undefined {
   const authored = Array.isArray(ex?.set_plan) ? ex.set_plan : null;
@@ -1236,9 +1236,9 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
     }
   }
 
-  // The ab wheel is the one movement on Wendler's abs list (Forever p.30) that needs a piece of kit.
+  // The ab wheel is the one movement on the previous program's abs list (the previous program) that needs a piece of kit.
   // Fall back inside HIS OWN abs list rather than to a generic core movement: hanging leg raise when
-  // there is a bar, sit-up otherwise. Both are on p.30 / 2nd ed p.43.
+  // there is a bar, sit-up otherwise. Both are on p.30 / the previous program.
   if ((name.includes('ab wheel') || name.includes('ab rollout')) && !hasAbWheel) {
     resultName = hasPullUpBar ? 'Hanging Leg Raise' : 'Sit Up';
     notes = 'No ab wheel — same slot, no kit needed';
@@ -2390,7 +2390,7 @@ export function expandTokensForRow(
           
           // Extract target RIR from the exercise (if present from overlay)
           // ⛔ THE RIR STAMP SEAM. A protocol that does not auto-regulate gets NO target — see
-          // `protocolUsesRir`. Today that is Strength Focus (5/3/1) and nothing else: the working
+          // `protocolUsesRir`. Today that is Strength Focus (the previous program) and nothing else: the working
           // number and the reps are fixed at plan creation, so a reserve target is a second
           // instruction that can contradict the prescription. Every other protocol is unchanged.
           const strengthProfile = resolveProfile(strengthProtocolId);
@@ -2756,7 +2756,7 @@ export function expandTokensForRow(
           
           // Extract target RIR from the exercise (if present from overlay)
           // ⛔ THE RIR STAMP SEAM. A protocol that does not auto-regulate gets NO target — see
-          // `protocolUsesRir`. Today that is Strength Focus (5/3/1) and nothing else: the working
+          // `protocolUsesRir`. Today that is Strength Focus (the previous program) and nothing else: the working
           // number and the reps are fixed at plan creation, so a reserve target is a second
           // instruction that can contradict the prescription. Every other protocol is unchanged.
           const strengthProfile = resolveProfile(strengthProtocolId);

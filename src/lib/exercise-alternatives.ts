@@ -40,7 +40,7 @@
  *
  * ⚠️ AND THE MUSCLE AXIS STAYS LOOSE ON PURPOSE. The same audit flagged 253 offers whose target muscle
  * differs (Single Leg RDL → Hip Thrust: hamstrings vs glutes). Those are NOT gated — Michael's ruling
- * and Wendler's: posterior-chain assistance is interchangeable, `pattern` remains the muscle proxy,
+ * and the previous program's: posterior-chain assistance is interchangeable, `pattern` remains the muscle proxy,
  * and a same-muscle gate would empty half these lists.
  *
  * ⚠️ THERE IS A DEAD SECOND TAXONOMY IN THE REPO — `src/services/ExerciseLibrary.ts` (primaryMuscles,
@@ -65,7 +65,7 @@ import { canPerform } from './strength-gear.ts';
 // [Step 4] The ONE answer to "is this one of the four main lifts" — the same classifier the State
 // row and the logger's bar-speed cue gate on. Unioned with this file's curated families, never
 // substituted for them; see `isMainLift` for the measurement behind that.
-import { isMain531Lift } from './exercise-role.ts';
+import { isMainBarbellLift } from './exercise-role.ts';
 // The INTENSITY-TIER gate (2026-08-03). Generalizes the main-lift exclusion below from "never offer a
 // main lift for an accessory" to "never offer across load tiers at all".
 import { intensityTierForExercise } from './strength-intensity-tier.ts';
@@ -123,15 +123,15 @@ const DIRECT_FAMILIES: Array<Set<string>> = [
  *
  * ── [Step 4] THE SHARED CLASSIFIER IS NOW AUTHORITATIVE, AS A UNION — NOT AS A REPLACEMENT ──────
  *
- * ⛔ REPOINTING THIS AT `isMain531Lift` OUTRIGHT WOULD HAVE UNDONE THE FIX ABOVE. Measured across
+ * ⛔ REPOINTING THIS AT `isMainBarbellLift` OUTRIGHT WOULD HAVE UNDONE THE FIX ABOVE. Measured across
  * the 143 config names, the two answers disagree on **27**, and 26 of those run the same way: a
  * Goblet Squat, Leg Press, RDL, Barbell Row, Dumbbell Row, Pull Up, Chin Up and Lat Pulldown are all
- * in a curated family and are all `isMain531Lift === false`. Dropping the family test would let every
+ * in a curated family and are all `isMainBarbellLift === false`. Dropping the family test would let every
  * one of them back into an accessory's swap list — i.e. exactly the Face Pull → "Barbell Row" and
  * Lateral Raise → "Shoulder Press" offers this function was written to stop.
  *
  * ⚠️ THE TWO QUESTIONS ARE GENUINELY DIFFERENT, WHICH IS WHY IT IS A UNION AND NOT A CHOICE.
- * `isMain531Lift` asks "is this one of Wendler's four" — a narrow, protocol question. This asks "is
+ * `isMainBarbellLift` asks "is this one of the previous program's four" — a narrow, protocol question. This asks "is
  * this too heavy a compound to offer in an accessory slot" — a relative one, and a Leg Press is
  * exactly that without being anybody's main lift.
  *
@@ -155,7 +155,7 @@ const DIRECT_FAMILIES: Array<Set<string>> = [
 function isMainLift(name: string): boolean {
   const n = String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
   // Curated family membership OR the shared classifier — either makes it too big for an accessory slot.
-  return directFamilyOf(n) != null || isMain531Lift(name);
+  return directFamilyOf(n) != null || isMainBarbellLift(name);
 }
 
 /** The family a lift belongs to (by normalized name, singular-tolerant), or null if uncurated. */
@@ -278,15 +278,15 @@ export function getInSlotAlternatives(
   // `mainLift` has nothing to say here and is no longer passed. The category IS the answer.
   const planPeers = opts?.assistanceRow ? assistancePeersFor(plannedName, equipment) : null;
   if (planPeers) {
-    // ⛔ TIER ON WENDLER'S OWN ASSISTANCE LINE — supersedes the original "every peer is a DIRECT swap,
+    // ⛔ TIER ON THE PREVIOUS PROGRAM'S OWN ASSISTANCE LINE — supersedes the original "every peer is a DIRECT swap,
     // there is no second tier" (2026-07-30). That held for a single-pattern slot but was FALSE for the
     // leg pool, which carries both of the book's leg camps by design (leg_match answers for both lower
     // days). It labelled a Front Squat a DIRECT swap for a Romanian Deadlift.
     //
-    // The grouping is the BOOK's, not a heuristic: 5/3/1 2nd ed., Periodization Bible (p.50-51) splits
+    // The grouping is the BOOK's, not a heuristic: the previous program., Periodization Bible (p.50-51) splits
     // leg assistance into POSTERIOR (Hamstrings — Leg Curl, GHR; Low Back — Back Raise, Good Morning,
     // Reverse Hyper) vs QUADS (Leg Press, Lunges, Hack Squat, and Front Squat on p.53). `hip_dominant`
-    // IS that posterior camp and `knee_dominant` IS Quads, so the movement pattern reproduces Wendler's
+    // IS that posterior camp and `knee_dominant` IS Quads, so the movement pattern reproduces the previous program's
     // own line exactly. (Hamstrings and Low Back are two book categories, but the book places the same
     // hip-hinge in both — Good Morning is "Low Back" yet is the stock RDL swap — so posterior-together
     // is the finest split the book actually supports.) The slot still governs WHAT is offered (nothing
@@ -327,13 +327,13 @@ export function getInSlotAlternatives(
   // an athlete may not swap down out of a heavy squat — a decision nobody asked for. The audit's
   // finding was about ACCESSORIES offering each other across tiers; main lifts were never in it.
   //
-  // ⛔ AND THE EXEMPTION IS `isMain531Lift`, NOT THIS FILE'S `isMainLift`. They answer different
+  // ⛔ AND THE EXEMPTION IS `isMainBarbellLift`, NOT THIS FILE'S `isMainLift`. They answer different
   // questions and only one fits here. `isMainLift` is a UNION — the shared classifier OR membership
   // of any curated family — built to ask *"is this candidate too big to offer INTO an accessory
   // slot"*, so it calls a Romanian Deadlift, a Barbell Row, a Goblet Squat and a Leg Press main
   // lifts. Using it to exempt SLOTS let `barbell row → ytw raise` and `romanian deadlift → clamshell`
   // straight back through. The swap-down allowance belongs to the four lifts the block is built on.
-  const slotIsMainLift = isMain531Lift(plannedName);
+  const slotIsMainLift = isMainBarbellLift(plannedName);
   // DIRECT = same curated family (Leg Press IS a direct swap for a Back Squat); a same-pattern lift NOT
   // in the family is an ALTERNATIVE (Hip Thrust). If the slot isn't in any family, fall back to a
   // loadable-compound heuristic (a barbell/dumbbell compound is direct; band/bodyweight is lighter).

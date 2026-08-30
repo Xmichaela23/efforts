@@ -25,7 +25,7 @@ import {
   restBucketForIntent,
   restCueForBucket,
 } from './strength-rest-timer.ts';
-import { isMain531Lift } from './exercise-role.ts';
+import { isMainBarbellLift } from './exercise-role.ts';
 import { REST_BETWEEN_SETS_RULE, REST_BETWEEN_SETS_RULE_HYP } from '@shared/strength-grid/intents.ts';
 
 Deno.test('⛔ PUSH PRESS AND MILITARY PRESS REST AS MAIN LIFTS', () => {
@@ -33,7 +33,7 @@ Deno.test('⛔ PUSH PRESS AND MILITARY PRESS REST AS MAIN LIFTS', () => {
   // matches a single one of those words, so two of the app's own main lifts took ACCESSORY rest:
   // 90s on a heavy triple, 60s at 15 reps.
   for (const n of ['Push Press', 'Military Press']) {
-    assertEquals(isMain531Lift(n), true, `${n} is in MAIN_531_LIFTS`);
+    assertEquals(isMainBarbellLift(n), true, `${n} is in MAIN_BARBELL_LIFTS`);
     assertEquals(calculateRestTime(n, 5), 180, `${n} at 5 reps was 90s`);
     assertEquals(calculateRestTime(n, 8), 120, `${n} at 8 reps was 90s`);
   }
@@ -68,11 +68,11 @@ Deno.test('⛔ ACCESSORIES ARE UNTOUCHED', () => {
 });
 
 Deno.test('⚠️ THE OTHER DIRECTION — DB / incline / decline bench now rest as assistance', () => {
-  // The old `/bench/` test called these main lifts. They are assistance in 5/3/1 and are NOT in
-  // MAIN_531_LIFTS, so they now take assistance rest. This is the classifier being right, and it is
+  // The old `/bench/` test called these main lifts. They are assistance in the previous program and are NOT in
+  // MAIN_BARBELL_LIFTS, so they now take assistance rest. This is the classifier being right, and it is
   // a VISIBLE change — pinned here so it is a decision on the record rather than a surprise.
   for (const n of ['Dumbbell Bench Press', 'Incline Bench Press', 'Decline Bench Press']) {
-    assertEquals(isMain531Lift(n), false, `${n} is not a main lift`);
+    assertEquals(isMainBarbellLift(n), false, `${n} is not a main lift`);
     assertEquals(calculateRestTime(n, 5), 90, `${n} at 5 reps (was 150)`);
     assertEquals(calculateRestTime(n, 8), 90, `${n} at 8 reps (was 120)`);
   }
@@ -105,10 +105,10 @@ Deno.test('⛔ THE PRIVATE CLASSIFIER IS GONE FROM THE COMPONENT', async () => {
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
 Deno.test('⛔ THE TWO DEFECTS ON HIS SCREEN — a heavy pull-up and a speed bench', () => {
-  // ⛔ A MAX-EFFORT PULL-UP RESTED 90 SECONDS. It is not on MAIN_531_LIFTS, so at 1-5 reps it fell
+  // ⛔ A MAX-EFFORT PULL-UP RESTED 90 SECONDS. It is not on MAIN_BARBELL_LIFTS, so at 1-5 reps it fell
   // past every accessory band to the catch-all, while a max-effort bench on the same day rested
   // three minutes. Same intent, same day, two answers.
-  assertEquals(isMain531Lift('Pull Up'), false, 'the premise changed — a pull-up is now a main lift');
+  assertEquals(isMainBarbellLift('Pull Up'), false, 'the premise changed — a pull-up is now a main lift');
   assertEquals(calculateRestTime('Pull Up', 3), 90, 'the old answer changed — this fixture is stale');
   assertEquals(calculateRestTime('Pull Up', 3, 'ME'), 180);
   assertEquals(calculateRestTime('Bench Press', 3, 'ME'), 180, 'the two ME rows must agree');
@@ -144,7 +144,7 @@ Deno.test('⛔ THE INTENT OUTRANKS THE MOVEMENT AND THE REP COUNT', () => {
 
 Deno.test('⛔ NO INTENT CHANGES NOTHING — the scope Michael set', () => {
   /**
-   * ⛔ OPTION A, PINNED. 5/3/1 and freestyle rows keep today's numbers exactly. Re-basing them was
+   * ⛔ OPTION A, PINNED. the previous program and freestyle rows keep today's numbers exactly. Re-basing them was
    * the option NOT taken: nobody has reported a problem with rest there, and changing a number on no
    * evidence is worse than leaving one that works.
    */

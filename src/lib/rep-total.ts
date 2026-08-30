@@ -1,8 +1,8 @@
 /**
  * THE ASSISTANCE REP TOTAL — one parser, one countdown. [2026-08-11]
  *
- * Assistance work in 5/3/1 is a rep TOTAL, not a set count: pick a number (25/50/100) and hit it
- * across as many sets as you need, by feel, never to failure (Wendler, 5/3/1 2nd ed. p.24 / p.102).
+ * Assistance work in the previous program is a rep TOTAL, not a set count: pick a number (25/50/100) and hit it
+ * across as many sets as you need, by feel, never to failure (the previous program).
  * The prescription arrives as a STRING on `LoggedExercise.target_reps` — `"50 total"` — because an
  * assistance slot states a movement and a total and never a weight. Some assistance is nonetheless
  * loaded (a Romanian Deadlift has a weight); the TOTAL is always about reps.

@@ -84,12 +84,12 @@ Deno.test('⛔⛔ THE SPEED CUE IS RETIRED — kept as a record, rendered nowher
   /**
    * ⛔⛔ AND `null` WOULD NOT HAVE MEANT "NO CUE". The logger renders `standingCue ?? titleCue`, so a
    * DE row returning null FALLS THROUGH to `barSpeedCueFor` — and close-grip bench press is a
-   * secondary push in this frame AND on `MAIN_531_LIFTS`, so that card would have started printing
-   * *"Every rep explosive and controlled."*: Wendler's words on a Viada block, which is the exact
+   * secondary push in this frame AND on `MAIN_BARBELL_LIFTS`, so that card would have started printing
+   * *"Every rep explosive and controlled."*: the previous program's words on a Viada block, which is the exact
    * defect the DE cue was originally written to beat. The suppression has to be explicit.
    */
   assert(/'suppressed'/.test(logger),
-    'the DE row lost its explicit suppression — it will fall through to the Wendler bar-speed cue');
+    'the DE row lost its explicit suppression — it will fall through to the previous program bar-speed cue');
 });
 
 Deno.test('⛔ AND IT PASSES THE COPY GATE', () => {

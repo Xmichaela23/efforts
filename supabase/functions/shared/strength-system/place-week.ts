@@ -120,7 +120,7 @@ export type EndurancePin = {
  * offering it, because the app would appear to have sanctioned it.
  *
  * (History: an earlier version of this project's docs carried 24h as a hard rule. That was wrong —
- * 24h was Wendler's recommendation before *important* sessions, not Robineau's floor. The tighter
+ * 24h was the previous program's recommendation before *important* sessions, not Robineau's floor. The tighter
  * number distorted the whole scheduling argument. Do not reinstate it.)
  */
 export const MIN_STACK_GAP_H = 6;

@@ -116,7 +116,7 @@ export const STATE_TREND_WINDOWS = {
    * used when there is no block to ask.
    *
    * ⛔ PROVENANCE IS VIADA, NOT A ROUND NUMBER. Part H (p215): the **pretest sets the max at block
-   * start**, and the block is then written from it — Part F records the agreement with Wendler in as
+   * start**, and the block is then written from it — Part F records the agreement with the previous program in as
    * many words: *"progress without retesting on fixed increments."* **So the max is a fact with a
    * lifespan, and that lifespan is the block.** A number from two blocks ago was tested against a
    * body that has since done twelve weeks of work; a number from this block is the one the
@@ -316,7 +316,7 @@ export function intentCanMintAMax(slotIntent: string | null | undefined): boolea
  * ⛔ WHAT IT CLOSES, and why it is the load-bearing correction of this whole work order:
  *  - **The off-plan athlete**, who stamps nothing and therefore had no strength line at all.
  *  - **The Strava importer**, same.
- *  - **The Get Stronger main lift**, which is DELIBERATELY unstamped — a 5/3/1 top set is 65-95%, so
+ *  - **The Get Stronger main lift**, which is DELIBERATELY unstamped — a the previous program top set is 65-95%, so
  *    claiming `ME` would assert a band that programme does not prescribe — and which therefore
  *    **currently mints nothing whatsoever.** Its heavy weeks are heavy by arithmetic; now they count.
  *
@@ -455,7 +455,7 @@ export function buildAllTimeBestByLift(
  *    because a record does not expire. It is what the screen prints as "best".
  *  - This one — *"what max is this block working from?"* **Windowed**, because a max is a fact with a
  *    LIFESPAN: Viada Part H (p215) has the pretest set it at block start, and Part F records the
- *    agreement with Wendler — *"progress without retesting on fixed increments."*
+ *    agreement with the previous program — *"progress without retesting on fixed increments."*
  * ⚠️ Merging them would either expire the record (wrong — item 1 exists because the record must not
  * be gated) or make a two-year-old number a current max (wrong — this window exists to stop that).
  *
@@ -520,7 +520,7 @@ export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[], ctx?: LiftSer
    * ⛔ WHAT THE GATE ACTUALLY DID TO THIS ATHLETE, MEASURED: across 178 logged main-lift rows going
    * back to 2025-09-02, ZERO passed either door. Not one. The stamped door needs `slot_intent`,
    * which only began reaching `exercise_log` on 2026-08-26. The derived door needs a set at 90% of
-   * the known max — and a 5/3/1 top set is 65-95% BY DESIGN, so on this athlete's own numbers
+   * the known max — and a the previous program top set is 65-95% BY DESIGN, so on this athlete's own numbers
    * (bench top set 135, estimated max 165 = 82%) it can never fire. A gate that admits nothing is
    * not a strict gate, it is an empty chart.
    *
@@ -668,7 +668,7 @@ export interface StateTrendInputs {
    *  opening working number at the plan's own rate. Built by the caller; carried, never computed. */
   expectedByCanonical?: Record<string, Array<{ date: string; value: number }>> | null;
   /** Slice 2: EVERY all-out set per canonical lift, oldest first (`allOutSeriesByLift`,
-   *  `_shared/strength/all-out-set.ts`). The substrate for the 5/3/1 progress direction — the rep
+   *  `_shared/strength/all-out-set.ts`). The substrate for the previous program progress direction — the rep
    *  record, not the waved working weight. Absent → every lift keeps the e1RM gauge. */
   allOutByLift?: Record<string, Array<{
     date: string; weight: number; reps: number; estimated_1rm: number;
@@ -1122,7 +1122,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
    * enough" hole this item shipped with.
    *
    * ⛔ PROVENANCE IS VIADA, NOT CONVENIENCE. Part H (p215): the pretest sets the max AT BLOCK START
-   * and the block's percentages are written from it; Part F records the agreement with Wendler —
+   * and the block's percentages are written from it; Part F records the agreement with the previous program —
    * *"progress without retesting on fixed increments."* **A max is therefore a fact with a lifespan,
    * and the lifespan is the block.** A number from two blocks ago was tested against a body that has
    * since done a whole block of work.
@@ -1170,7 +1170,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   if (unjudgeableRows > 0) {
     console.log(`[state-trend] item 4: ${unjudgeableRows}/${inp.exerciseRows.length} logged sets carry no intent AND no known max for their lift — neither door can judge them, so they mint nothing. Expected on a new athlete; it resolves as soon as any max exists for that lift.`);
   }
-  // Slice 2: the protocol's own gauge. For a 5/3/1 block (`readsEffortAs: 'amrap'`) a waved main
+  // Slice 2: the protocol's own gauge. For a the previous program block (`readsEffortAs: 'amrap'`) a waved main
   // lift's direction reads the ALL-OUT SET, not the working-set e1RM the program itself waves.
   // Absent inputs ⇒ 'e1rm' everywhere ⇒ byte-identical pre-slice behaviour.
   const strength = computeStrengthState(liftSeries, asOf, spw.strength, {

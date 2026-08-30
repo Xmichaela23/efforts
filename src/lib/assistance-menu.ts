@@ -1,5 +1,5 @@
 /**
- * THE ASSISTANCE MENU — Strength Focus (Wendler 5/3/1).
+ * THE ASSISTANCE MENU — Strength Focus (the previous program).
  *
  * ⛔ ONE SOURCE. The dropdown in the build flow and the composer that authors the block both read
  * this file. Two lists would be the doubled disease in miniature: a name the picker offers and the
@@ -13,7 +13,7 @@
  *
  * **The engine prescribes NO weight for assistance work. Ever.**
  *
- * Michael, 2026-07-25: in 5/3/1 only the four main lifts are dictated by percentages of the training
+ * Michael, 2026-07-25: in the previous program only the four main lifts are dictated by percentages of the training
  * max. Assistance exists for hypertrophy, joint health and structural balance, and is meant to be
  * auto-regulated — done by feel, that day. Tie a dumbbell row or a single-leg hip thrust to a
  * mathematical percentage and you force progression on a secondary movement; the athlete arrives at
@@ -56,7 +56,7 @@
 // movement belonged on which day. Nothing decides that any more — the athlete does, per day, in
 // `src/lib/assistance-catalog.ts`. What is left is arithmetic on a rep count.
 
-/** The three slots Wendler's assistance prescription defines. These are also the Adjust-tab holes —
+/** The three slots the previous program's assistance prescription defines. These are also the Adjust-tab holes —
  *  a glute focus loads `single_leg_core`, a pull-up focus loads `pull`. An add-on REPLACES the
  *  athlete's pick in a slot; it never adds a fourth.
  *
@@ -69,34 +69,34 @@ export type AssistanceSlot = 'push' | 'pull' | 'single_leg_core';
 
 // ⛔ `AssistanceOption` / `AssistanceSlotMenu` ARE GONE WITH THE MENU (D-407). The shortlist an
 // athlete picks from is now `ASSISTANCE_CATALOG` in `src/lib/assistance-catalog.ts`, which carries
-// the display name, the muscle word, Wendler's page and the focus tags — everything the two-field
+// the display name, the muscle word, the previous program's page and the focus tags — everything the two-field
 // option object held, plus what the per-day picker needs.
 
 /**
  * ⛔⛔ REWRITTEN 2026-08-16 — THE BAND IS SET BY COMPETING STRESS, NOT BY THE CYCLE PHASE.
  *
  * **What stood here and is gone:** three phase-keyed bands (7th week 25-50, leader 50-75, anchor
- * 75-100), scaled UP into the anchor per Forever p.18. Correct for a lifter whose whole recovery
+ * 75-100), scaled UP into the anchor per the previous program. Correct for a lifter whose whole recovery
  * budget goes to the barbell; wrong for this athlete.
  *
  * ⛔ **MICHAEL'S CALL, 2026-08-16.** *"For an athlete carrying an endurance load, pushing 100 reps of
  * accessory volume will fry their central nervous system. Cap it at 50, even in the easier months."*
  *
- * ⚠️ **THIS USED TO SAY "A DELIBERATE STEP BELOW WENDLER" AND THAT WAS TOO APOLOGETIC — corrected
+ * ⚠️ **THIS USED TO SAY "A DELIBERATE STEP BELOW THE PREVIOUS PROGRAM" AND THAT WAS TOO APOLOGETIC — corrected
  * 2026-08-21 against Forever pp.185-191** (images now kept at
- * `~/Efforts_Local_Folder/book-sources/wendler-531-forever/`; addendum in
- * `docs/REFERENCE-531-forever-pp16-45.md`). In Wendler's own RUNNING-INTEGRATED templates,
+ * the archived book-sources folder; addendum in
+ * `docs/REFERENCE-main-lift-forever-pp16-45.md`). In the standard RUNNING-INTEGRATED templates,
  * **25-50 per category is HIS number for the days that carry a run** — Bodybuild the Upper/Athlete
  * the Lower prescribes 25-50 on Mon and Thu (the running days) and 50-100 only on Tue and Fri (sled
  * and prowler, no run), and Strength & Conditioning uses 25-50 throughout its leader, dropping to
  * **0-25** in the seventh week. p.24's 50-100 is general guidance for a lifter with **no endurance
  * load**; pp.185-191 are the case that actually matches this athlete.
  *
- * ⛔ **So 25-50 is defensible AS WENDLER'S for a running week, and our light-week floor of 15 sits
+ * ⛔ **So 25-50 is defensible AS THE PREVIOUS PROGRAM'S for a running week, and our light-week floor of 15 sits
  * inside his 0-25 seventh week. Do not re-raise these numbers toward 50-100 on the strength of p.24
  * alone.**
  *
- * ⚠️ **WHAT IS STILL OURS IS THE AXIS, NOT THE NUMBERS.** Wendler keys the band to the DAY's own
+ * ⚠️ **WHAT IS STILL OURS IS THE AXIS, NOT THE NUMBERS.** the previous program keys the band to the DAY's own
  * content (running day vs sled day). We key it to how many hard endurance days the WEEK carries.
  * That is our design and must be cited as ours.
  *
@@ -119,7 +119,7 @@ export type AssistanceSlot = 'push' | 'pull' | 'single_leg_core';
  * it reads as the fix regressing.
  *
  * ⛔ **AND IT IS A REP TOTAL, NEVER A SET SCHEME.** Michael, 2026-08-16: *"it's never 25 reps in a
- * row — accessory work including pull-ups per Wendler should be broken out at user ease of reps."*
+ * row — accessory work including pull-ups per the previous program should be broken out at user ease of reps."*
  * Confirmed against the source: a total per category per session, one or two movements, split
  * however the athlete likes; chins explicitly tolerate low reps per set, and his own 100-rep dip
  * example is split in two. The card gets a number, never sets x reps.
@@ -236,7 +236,7 @@ export const ASSISTANCE_MERGED_DAY_REPS = 25;
 
 
 /**
- * ⛔ REMOVED 2026-08-15, MICHAEL'S CALL: *"whatever Wendler says."* A 75 clamp stood here — ours, not
+ * ⛔ REMOVED 2026-08-15, MICHAEL'S CALL: *"whatever the previous program says."* A 75 clamp stood here — ours, not
  * his (T3) — and it collapsed the anchor onto a flat 75 while a well-tested leader could reach the
  * same number, which erased the very leader-vs-anchor direction this file had just been fixed to
  * show. The bands are now his, unmodified: leader 50–75, anchor 75–100, seventh week 25–50 (p.24,
@@ -269,7 +269,7 @@ const CAPACITY_ENTRY_REPS = 8;
 const CAPACITY_SLOPE = 3;
 
 /**
- * ⛔ WENDLER'S OWN 10-MINUTE STANDARDS, Forever p.33 — push-ups 100, dips 75, chins 50, hanging leg
+ * ⛔ THE PREVIOUS PROGRAM'S OWN 10-MINUTE STANDARDS, the previous program — push-ups 100, dips 75, chins 50, hanging leg
  * raise 50. They are the REFERENCE POINT each slot's capacity is read against, so the three slots
  * scale on one rule instead of three hand-picked coefficients (§1f).
  *
@@ -452,7 +452,7 @@ export function assistanceBasisNote(basis: 'capacity' | 'posture' | 'floor', cap
  * inferred — and when the inference disagreed with the pick, the app printed a sentence explaining
  * why the athlete was not getting what they chose.
  *
- * Forever p.24 asks for one movement per category per day. Ask for twelve, infer nothing, and the
+ * the previous program asks for one movement per category per day. Ask for twelve, infer nothing, and the
  * substitution note, the role table, the fallback pools and the plane-complement rule all become
  * answers to a question nobody is asking. See `src/lib/assistance-catalog.ts`.
  *

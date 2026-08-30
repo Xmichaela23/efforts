@@ -1515,7 +1515,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // overlaps most, and then renders that neighbour's prescription.
   //
   // ⛔ THE WORST ONE, AND THE REASON THIS SECTION EXISTS: **`press`** — one of the app's own
-  // MAIN_531_LIFTS, 5/3/1's name for the overhead press — matched `leg press` and was priced at
+  // MAIN_BARBELL_LIFTS, the previous program's name for the overhead press — matched `leg press` and was priced at
   // **ratio 1.5 of the SQUAT**. `military press` and `push press` are also main lifts and also had no
   // entry. Two more of the same class: `single leg squat` (a bodyweight pistol) matched `squat` and
   // was priced at 100% of the barbell back squat, and `band overhead press` matched `overhead press`
@@ -1555,7 +1555,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'total',
     isUnilateral: false,
     confidence: 'high',
-    notes: "5/3/1's name for the overhead press. Without this key it fuzzy-matched `leg press` at 1.5x squat.",
+    notes: "the barbell overhead press under its other name. Without this key it fuzzy-matched `leg press` at 1.5x squat.",
   },
   'military press': {
     pattern: 'vertical_push',
@@ -2195,7 +2195,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // ⚠️ THE SERVER ALREADY AGREES: `canonicalize('ohp')` returns `overhead_press`, so the strength
   // trend and the learned max have been folding it into the press all along while this lookup
   // returned null. Two vocabularies disagreeing about one logged session — the same defect class as
-  // the Y-T-W / reverse-fly / squat-jump collisions. See the note on MAIN_531_LIFTS in
+  // the Y-T-W / reverse-fly / squat-jump collisions. See the note on MAIN_BARBELL_LIFTS in
   // `exercise-role.ts`, which is the other half of closing it.
   ohp: {
     pattern: 'vertical_push',
@@ -2902,7 +2902,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false,
   },
 
-  // ── WENDLER FOREVER ASSISTANCE CATALOG (pp.24-32). Added 2026-08-13, slice 1 of the per-day
+  // ── THE PREVIOUS PROGRAM FOREVER ASSISTANCE CATALOG (pp.24-32). Added 2026-08-13, slice 1 of the per-day
   // assistance picker work order. ⛔ EVERY MOVEMENT THE PICKER CAN OFFER MUST RESOLVE `exact` OR
   // `folded` HERE — a fuzzy hit silently borrows a neighbour's prescription (D-322), and these names
   // are persisted on the goal, so the borrow outlives the render that caused it.
@@ -2912,7 +2912,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // counted as a total. Its siblings `db bench press` and `db shoulder press` were already here; the
   // incline one was simply missed.
 
-  // NEW — Forever p.26, the shoulder option. Two hands on one plate, so the load is a TOTAL, not
+  // NEW — the previous program, the shoulder option. Two hands on one plate, so the load is a TOTAL, not
   // per-hand: that is the one thing that differs from `front raise`, which it otherwise mirrors.
   'plate raise': {
     pattern: 'vertical_push',
@@ -2923,7 +2923,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: false,
     notes: 'Front raise holding one plate with both hands.',
   },
-  // NEW — Forever p.29, the hamstring option on a deadlift day. Bodyweight, same shape as the
+  // NEW — the previous program, the hamstring option on a deadlift day. Bodyweight, same shape as the
   // `nordic hamstring curl` entry directly above it in intent and identical in configuration.
   'glute ham raise': {
     pattern: 'hip_dominant',
@@ -2932,7 +2932,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'bodyweight',
     isUnilateral: false,
   },
-  // NEW — 2nd ed pp.43/51, the oblique option. ⛔ `primaryRef: null` IS DELIBERATE AND IS NOT A GAP.
+  // NEW — the previous program, the oblique option. ⛔ `primaryRef: null` IS DELIBERATE AND IS NOT A GAP.
   // It is loaded (a dumbbell in one hand) but there is no research ratio tying an oblique side bend
   // to any of the four main lifts, and inventing one would put a fabricated number in front of an
   // athlete via `suggestedAssistanceWeight`. Same call, same reason, as the carries above: honest
@@ -2983,7 +2983,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'perHand',
     isUnilateral: false,
   },
-  // Wendler's own word for the movement (p.29). Fuzzy-matched to the right entry, which is luck, not
+  // the standard word for the movement (p.29). Fuzzy-matched to the right entry, which is luck, not
   // a rule — `fitsRole` and the swap sheet both read the resolved config, so it has to be exact.
   'reverse hyper': {
     pattern: 'hip_dominant',
@@ -3423,22 +3423,22 @@ export function movementFamilyOfPattern(pattern: MovementPattern | null | undefi
 }
 
 /**
- * THE COMPLEMENT — what Wendler pairs a main lift with, and it CROSSES THE PLANE.
+ * THE COMPLEMENT — what the previous program pairs a main lift with, and it CROSSES THE PLANE.
  *
  * ⛔ NARROWED 2026-07-28 AFTER READING ALL FIVE ASSISTANCE TEMPLATES. My first version cited this
- * as Wendler's assistance principle. **It is not. Four of his five templates do the OPPOSITE**, and
+ * as the previous program's assistance principle. **It is not. Four of his five templates do the OPPOSITE**, and
  * they do it on purpose:
  *
- *   Boring But Big (p47)      Bench 5/3/1 -> Bench 5x10  + DB Row      SAME pattern, then balance
- *   Triumvirate (p48)         Press 5/3/1 -> Dips        + Chin-ups    SAME family, then balance
- *   Triumvirate (p48)         Squat 5/3/1 -> Leg Press   + Leg Curl    SAME pattern, then balance
- *   Periodization Bible (p51) Bench 5/3/1 -> Chest/Shoulders + Lats + Triceps
+ *   Boring But Big (p47)      Bench the previous program -> Bench 5x10  + DB Row      SAME pattern, then balance
+ *   Triumvirate (p48)         Press the previous program -> Dips        + Chin-ups    SAME family, then balance
+ *   Triumvirate (p48)         Squat the previous program -> Leg Press   + Leg Curl    SAME pattern, then balance
+ *   Periodization Bible (p51) Bench the previous program -> Chest/Shoulders + Lats + Triceps
  *
  * The same-pattern movement is the HYPERTROPHY dose. p46's "if you train your chest, train your
  * back" means include both across the session — it does not mean exclude the one you just trained.
  *
  * ✅ **THE ONE TEMPLATE THAT CROSSES IS THE CONCURRENT ONE, AND THAT IS OURS.** p86 — the chapter on
- * combining 5/3/1 with heavy conditioning — gives ONE assistance movement per lift, before the
+ * combining the previous program with heavy conditioning — gives ONE assistance movement per lift, before the
  * conditioning work, and every one of the four is the antagonist:
  *
  *   Bench Press (horizontal push) -> Chin-ups       (vertical pull)
@@ -3456,7 +3456,7 @@ export function movementFamilyOfPattern(pattern: MovementPattern | null | undefi
  *
  * ⚠️ AND THE MAP IS STILL MINE. Four pairings, generalised into a symmetric rule. The reverse
  * directions (`horizontal_pull -> vertical_push`, `vertical_pull -> horizontal_push`) are pure
- * extrapolation — p86 never shows a pull as the MAIN lift, because 5/3/1 has no pulling main lift.
+ * extrapolation — p86 never shows a pull as the MAIN lift, because the previous program has no pulling main lift.
  * They exist so the map is total; nothing in the book supports them.
  */
 const COMPLEMENT: Partial<Record<MovementPattern, MovementPattern>> = {

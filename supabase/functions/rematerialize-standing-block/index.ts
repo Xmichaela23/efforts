@@ -10,7 +10,7 @@
 // and states the weights that follow from it.
 //
 // ⛔ IT IS THE SAME SHAPE AS `rematerialize-strength-block` AND SHARES NONE OF ITS ARITHMETIC. That
-// one walks a WENDLER TRAINING MAX (85% of a true 1RM) through cycle verdicts. This one reads a
+// one walks a THE PREVIOUS PROGRAM TRAINING MAX (85% of a true 1RM) through cycle verdicts. This one reads a
 // VIADA PRETEST (96% of a fresh two-formula prediction, p215) and re-runs the Standing Plan composer.
 // The two numbers are different quantities wearing one English word and no function takes both.
 //
@@ -343,7 +343,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // ⛔ THE WORKING NUMBERS ARE STORED UNDER THE BLOCK'S OWN KEY, never `config.training_max`
-    // (pivot §3). That key is Wendler's 85%-of-a-true-1RM with three live readers, and a number
+    // (pivot §3). That key is the previous program's 85%-of-a-true-1RM with three live readers, and a number
     // written there would be spent as if it were that other quantity.
     const { error: cfgErr } = await supabase
       .from('plans')

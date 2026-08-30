@@ -105,7 +105,7 @@ Deno.test('⛔ THE VERDICT READS THE 95% WEEK, NOT THE LATEST AMRAP', () => {
   const wk3s = { weekInCycle: 3, workout: session('Back Squat', [{ weight: 125, reps: 7, amrap: true }]) };
   assertEquals(verdictForCycle([wk1, wk2, wk3s], 'Back Squat'), 'advance', 'seven at 95% is a pass');
 
-  // ⛔ AND THE CASE THAT MAKES "LATEST" DANGEROUS: the 5/3/1 week is missed. "Latest" would grade the
+  // ⛔ AND THE CASE THAT MAKES "LATEST" DANGEROUS: the previous program week is missed. "Latest" would grade the
   // 90% × 3+ set — three reps, a pass by prescription — against a ≥5 bar and RESET the athlete for
   // completing the session as written.
   assertEquals(verdictForCycle([wk1, wk2], 'Back Squat'), 'hold',

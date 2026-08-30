@@ -320,7 +320,7 @@ const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string; Icon: Card
   ride: { label: 'Ride Focus', blurb: 'FTP and endurance', Icon: Bike, color: getDisciplineColor('ride') },
   strength: {
     label: 'Strength Focus',
-    // 2026-08-24: the card now fronts the Standing Plan (Viada), not Wendler — the Wendler line
+    // 2026-08-24: the card now fronts the Standing Plan (Viada), not the previous program — the previous program line
     // described a block this flow no longer builds. Same rule as before: who it's for, no number.
     // The gate (65, barbell-maxes.ts) still refuses true beginners with its own copy.
     blurb: 'Barbell compounds, heavy and fast, with run, ride or both held around them — based on Alex Viada\'s method.',
@@ -335,7 +335,7 @@ const TRAIN_GOAL: Record<TrainCardId, NonRaceGoalId | null> = {
 };
 
 /**
- * ⛔ THE THREE STRENGTH TIERS (SPEC §A). One Wendler spine, three intents — the tier moves accessory
+ * ⛔ THE THREE STRENGTH TIERS (SPEC §A). One the previous program spine, three intents — the tier moves accessory
  * VOLUME and CHARACTER (plus a focus area for Definition). The main-lift engine (training max,
  * percentages, deload, the "+" set) is identical in all three.
  *
@@ -1253,7 +1253,7 @@ function getSteps(state: NonRaceState): StepKey[] {
   const effective = state.goal;
   const isStrengthFocus = effective === 'get_stronger';
   const isRaceGoal = effective === 'marathon';
-  // ⛔ AND NO LENGTH SLIDER on this path. Twelve weeks is not a preference — Wendler's ratios are
+  // ⛔ AND NO LENGTH SLIDER on this path. Twelve weeks is not a preference — the previous program's ratios are
   // 2:1, 3:2 and 2:2 over four-week cycles, so 12 is the only length that runs leader-leader-anchor
   // as designed. The slider offered 8-52 while the composer rounds DOWN to whole cycles, so 10
   // silently became 8 and 14 became 12: the athlete picked a number the engine never built. 8 ships
@@ -1726,7 +1726,7 @@ function assemblePayload(
           // else: maintain means "hold it", and holding it is durability work.
           //
           // A marathon build is the exception the rule did not anticipate. Michael, 2026-08-05:
-          // *"are we using a 5/3/1 for strength? should give more discretion."* Two sessions of
+          // *"are we using a the previous program for strength? should give more discretion."* Two sessions of
           // heavy low-volume lifting is not a develop block — `strength_frequency` stays 2, there is
           // no progression arc, running is still the goal — but it is not durability work either.
           // Rønnestad's running-economy protocol is what `neural_speed` implements, and it is the
@@ -2116,7 +2116,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       ...s, goal, discipline,
       posture: seed.per_discipline_posture,
       strengthProtocol: seed.strength_protocol,
-      // Strength Focus is FIXED at 12 — the only length that runs Wendler's 2:1 leader/leader/anchor
+      // Strength Focus is FIXED at 12 — the only length that runs the previous program's 2:1 leader/leader/anchor
       // over four-week cycles. There is no slider on that path, so this is the value, not a default.
       targetWeeks: goal === 'get_stronger' ? STRENGTH_FOCUS_WEEKS : Math.max(s.targetWeeks, floor),
     }));
@@ -4085,7 +4085,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           {/* Strength is not a mode you switch into — it is in every plan, and only the dose changes.
               Saying so here is what makes the Train list read as a focus, not as a menu of apps. */}
           <p className="text-white/75 text-sm mt-5 leading-relaxed">
-            Every plan has a strength component built on the same 5/3/1 principle. The load adjusts to
+            Every plan has a strength component built on the same progressive-overload principle. The load adjusts to
             the focus — a race build holds it at maintenance, a strength block develops it.
           </p>
         </StepLayout>
@@ -4599,7 +4599,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               stops being a strength block and goes somewhere else entirely. Offering the option is
               offering to leave.
             • The PROTOCOL picker (5×5 / Upper Aesthetics / Neural Speed) is inert — the engine builds
-              Wendler 5/3/1 regardless, and the confirm screen was reporting the dead choice back as
+              the previous program regardless, and the confirm screen was reporting the dead choice back as
               fact. Omakase: the engine designs the block (D-323).
 
           So the only real question is which endurance you are keeping through the block. Michael,
@@ -4737,7 +4737,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                        * develops it"* — the rule, stated in prose, next to a control that broke it.
                        *
                        * ⛔ AND STRENGTH-DEVELOP HERE WAS SILENTLY WRONG, not merely unwise. It does
-                       * NOT produce a 5/3/1 block: `create-goal…:2432` routes to the strength engine
+                       * NOT produce a the previous program block: `create-goal…:2432` routes to the strength engine
                        * only when strength develops AND no endurance does, so with the run
                        * developing it fell through to the race path carrying
                        * `strength_frequency: 4` (`assemblePayload`) — **four heavy lifting days
@@ -5092,11 +5092,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
 
           ⛔ IT IS A SEPARATE `StepLayout`, NOT A THIRD BRANCH INSIDE THE OLD ONE. The card below had
           five `isStrengthFocus ?` forks in it — intro copy, chips, the pull-up row, the day cards,
-          the dose line — and every one of them was a Wendler control being talked out of applying.
+          the dose line — and every one of them was a the previous program control being talked out of applying.
           Get Stronger's screen is now literally untouched by this path.
 
           ⛔ WHAT THE OLD SHAPE GOT WRONG, so nobody merges them back: it asked for NINE movements
-          across Wendler's three lifting days. This frame has FOUR differently shaped days, seven HYP
+          across the previous program's three lifting days. This frame has FOUR differently shaped days, seven HYP
           accessory slots, no core slot and no open compound-pull slot — so three of the nine picks
           could essentially never place, and the Glutes and Core focus chips could never fire at all
           because no cell in the grid offers a glute- or core-prime movement. */}
@@ -5368,7 +5368,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 are kept — on squat and deadlift days you get the leg work you chose; on bench and
                 press days those slots carry triceps…" Every clause of that was true of the code and
                 every clause of it was the app explaining an inference the athlete never asked it to
-                make. Forever p.24 asks for one movement per category per day; asked directly, there
+                make. the previous program asks for one movement per category per day; asked directly, there
                 is nothing to explain. */}
             {/* ⛔ IT WAS STILL SELLING THE ADD-ABS SLOT (Michael's replacement, 2026-08-19). The
                 paragraph read *"plus an optional abs movement that shares the single-leg reps"* —
@@ -5380,7 +5380,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 to satisfy the lint without asking. */}
             <ul className="space-y-1 list-disc list-outside ml-5 marker:text-white/30">
               {/* ⛔ THE STANDING PLAN'S FORK IS GONE FROM HERE (2026-08-24) — it has its own card
-                  now, above. This copy is Wendler's week and it is true of Wendler's week. */}
+                  now, above. This copy is the previous program's week and it is true of the previous program's week. */}
               <li className="text-white/70 text-sm leading-relaxed pl-1">
                 Three lifting days, each with a push, a pull and a single-leg or core movement.
               </li>
@@ -5465,7 +5465,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             {/* ── THE PULL-UP PROGRESSION ───────────────────────────────────────────────────────
                 ⛔ A DIFFERENT AXIS FROM THE FOCUS CHIPS, AND IT IS SEPARATED ON THE SCREEN FOR THAT
                 REASON. A chip biases which movement fills a category; this is a PROGRAMME — it pins
-                the pull category to chins on all three days, sets the volume off Wendler's own
+                the pull category to chins on all three days, sets the volume off the standard
                 prescription, and tracks a number that climbs. Rendering it as a seventh chip would
                 teach the athlete it is the same kind of choice, and it is not.
                 ⚠️ THE COPY NAMES THE DOSE AND THE STANDARD SEPARATELY. 50 reps in 10 minutes is a
@@ -5536,7 +5536,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               </button>
               {state.assistancePicks.performance_focus === 'pullups' && (
                 <p className="text-white/65 text-xs px-3 pb-3 -mt-0.5 leading-relaxed">
-                  Chins every lifting day, grip varying, tracked to Wendler's {SESSION_STANDARD_REPS}-in-{SESSION_STANDARD_MINUTES} standard.
+                  Chins every lifting day, grip varying, tracked to the {SESSION_STANDARD_REPS}-in-{SESSION_STANDARD_MINUTES} session standard.
                   {/* ⛔ NO HARDCODED DIVISOR (§1h, 2026-08-16). These two calls passed a literal `4`,
                       so the note would keep quoting a four-way split however the library divided —
                       the screen and the engine disagreeing about the dose, which is the defect this
@@ -5575,7 +5575,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   The Viada lat quarantine locks the pull slot to its floor for any athlete who
                   swims — swimming is thousands of unweighted pull-ups, and the lats, teres major
                   and shoulder capsule are under continuous tension through the catch of every
-                  stroke. The progression asks for Wendler's 100 chins a week. Two rules, one
+                  stroke. The progression asks for the previous program's 100 chins a week. Two rules, one
                   bucket, opposite directions.
 
                   ⚠️ D-407/D-423 SETTLES IT: the engine advises, the athlete decides. They toggled
@@ -5599,9 +5599,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 same pattern, so the two screens do not teach two different interactions. */}
             {/* ⛔ THE STANDING PLAN'S FLAT NINE-PICK LIST IS GONE FROM HERE (2026-08-24) AND MUST
                 NOT COME BACK. It was this screen's last attempt at serving both plans: the day cards
-                are Wendler's three lifting days, and on the Viada frame the grouping was a LIE, so
+                are the previous program's three lifting days, and on the Viada frame the grouping was a LIE, so
                 the fix was to drop the grouping and show nine dropdowns in a column.
-                ⛔ THAT WAS STILL THE WRONG NINE. The picks themselves were Wendler's categories —
+                ⛔ THAT WAS STILL THE WRONG NINE. The picks themselves were the previous program's categories —
                 three of them could never place in that frame at all — which is why the whole screen
                 moved rather than the layout. See the Standing Plan card above. */}
             <div className="space-y-2">
@@ -5681,7 +5681,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                 style={{ fontSize: '16px' }}
                                 aria-label={`${LIFT_DAY_LABEL[day]} ${CATEGORY_LABEL[category]} exercise`}
                               >
-                                {/* ⛔ VALUE IS THE STORED NAME, LABEL IS WENDLER'S WORD. `Back
+                                {/* ⛔ VALUE IS THE STORED NAME, LABEL IS THE PREVIOUS PROGRAM'S WORD. `Back
                                     Extension` is stored so the token resolves (D-322); the athlete
                                     reads "Back Raise", which is what the book calls it. */}
                                 {/* NOT A PICKER ROW — this dropdown lists dial CATALOGUE entries,
@@ -5706,7 +5706,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
 
                         {/* ── ADD-ABS ───────────────────────────────────────────────────────────
                             ⛔ A SECOND MOVEMENT IN THE SINGLE-LEG/CORE CATEGORY, SHARING ITS REPS —
-                            Forever p.32 ("one or two exercises per category"). It is NOT a fourth
+                            the previous program ("one or two exercises per category"). It is NOT a fourth
                             category and it must never stack a fresh rep total: that would be pure
                             added fatigue charged against the endurance budget, which is the one
                             thing this whole model is arranged to protect. The split happens in
@@ -5722,8 +5722,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                             different controls, and only one of them charged them half the slot.
 
                             ⛔ AND THE HALVING IS WHAT ACTUALLY DIED HERE. `splitRepsForAbs` paid for
-                            the extra movement out of the same budget (30 -> 15/15), because Forever
-                            p.32 allows two movements per category but this model cannot afford a
+                            the extra movement out of the same budget (30 -> 15/15), because the previous program allows two movements per category but this model cannot afford a
                             fourth 30. An athlete who wanted abs was quietly trading away half their
                             leg work to get them. Choosing an abs movement in the slot itself takes
                             the WHOLE budget, which is the honest version of the same choice. */}
@@ -5734,7 +5733,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 );
               })}
             </div>
-            {/* ⛔ THE REP-TOTAL GUIDANCE IS WENDLER'S MODEL AND THIS IS WENDLER'S SCREEN. The
+            {/* ⛔ THE REP-TOTAL GUIDANCE IS THE PREVIOUS PROGRAM'S MODEL AND THIS IS THE PREVIOUS PROGRAM'S SCREEN. The
                 Standing Plan doses accessories as SETS with reps in reserve (stage 3) and says so
                 on its own card. */}
             <p className="text-white/70 text-sm leading-relaxed">{ASSISTANCE_GUIDANCE}</p>
@@ -6856,7 +6855,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             <div>
               <p className="text-white/85 text-sm mb-2">Long run day</p>
               {/* ⛔ ALL SEVEN DAYS. This was restricted to Sat/Sun with the note "your heavy lower
-                  days (Tue/Fri) need clear space" — a rule from the hardcoded grid the 5/3/1 rebuild
+                  days (Tue/Fri) need clear space" — a rule from the hardcoded grid the previous program rebuild
                   replaced. The long run is now an ABSOLUTE the lifting is solved around
                   (`place-week.ts`), not a session squeezed into what the grid left over. Telling the
                   athlete their long run must be a weekend, because of lifting days the engine no
@@ -7190,8 +7189,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           // that card the week grid cannot show, and dropping it silently would have lost it.
           subtitle={isRaceGoal
             ? `${state.raceDistance} — ${state.raceDate}${planWeeks !== null ? `, about ${planWeeks} weeks` : ''}.`
-            /* ⛔ "of Wendler 5/3/1" DELETED (2026-08-24): his trademark on the final commit
-               screen, and no longer true — the block is the Standing Plan engine, not 5/3/1. */
+            /* ⛔ "of the previous program" DELETED (2026-08-24): his trademark on the final commit
+               screen, and no longer true — the block is the Standing Plan engine, not the previous program. */
             : `${state.goal ? GOAL_LABELS[state.goal] : 'Goal'} — ${state.targetWeeks} weeks. Strength leads; your endurance holds.`}
           onBack={back} onContinue={handleConfirm} canContinue={!saving}
           continueLabel={saving ? 'Building…' : 'Build plan'} saving={saving}
@@ -7355,7 +7354,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             ) : null}
             {/* ⛔ TWO FALSEHOODS ON THIS LINE, both created when the engine changed under it.
                 • "ending in a retest" — Strength Focus has NO retest week. The last set of every
-                  third week is the test (5/3/1); weeks 9, 10 and 11 are the measurement. The
+                  third week is the test (the previous program); weeks 9, 10 and 11 are the measurement. The
                   separate retest week was deleted with the old protocol.
                 • "from your current fitness (≈ N h/wk)" — the hours tier is not asked on this path
                   and nothing reads it. Reporting a number the athlete never gave, that changes

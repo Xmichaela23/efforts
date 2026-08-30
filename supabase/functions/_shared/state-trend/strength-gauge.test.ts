@@ -2,7 +2,7 @@
  * SLICE 2 — STRENGTH PROGRESS READS THE PROTOCOL'S OWN GAUGE. Permanent regression.
  *
  * ⛔ AMENDED BY [D-420] (2026-08-12, slice 3). The gauge SELECTION shipped here is still live and
- * still correct — a 5/3/1 lift's readings come from the all-out set, an assistance lift's from the
+ * still correct — a the previous program lift's readings come from the all-out set, an assistance lift's from the
  * logged working sets. What is gone is the DIRECTION VERDICT that selection used to feed: pointing it
  * at the all-out set was the right substrate and the wrong object, because those sets run 20-35 reps,
  * above the reliable estimate range, so their estimate slides across the wave too. Every assertion
@@ -12,10 +12,10 @@
  * ⛔ FIXTURE A IS THE BUG CASE AND IT NEVER GETS DELETED (Constitution Law 6). Michael's bench,
  * 2026-08-12: the working sets went 120×5 → a new-cycle 105×5 — which is the PROGRAM waving the
  * weight (65/75/85 → a re-based cycle), not a loss — and State read "1 lift trending down". The one
- * set Wendler measures by, the all-out set, was excluded from the e1RM series by the D-417 trusted-rep
+ * set the previous program measures by, the all-out set, was excluded from the e1RM series by the D-417 trusted-rep
  * gate, so the gauge was trending the prescription and throwing away the measurement.
  *
- * ⛔ EVERY RULE HERE IS THE BOOK'S, VERIFIED VERBATIM (5/3/1 2nd ed.) — none is invented:
+ * ⛔ EVERY RULE HERE IS THE BOOK'S, VERIFIED VERBATIM (the previous program.) — none is invented:
  *   p10  "If your squat goes from 225x6 to 225x9, you've gotten stronger… Don't get stuck just
  *         trying to increase your one rep max."
  *   p26  "This program requires that you push yourself on the last set. This often entails
@@ -38,11 +38,11 @@ import { estimate1RMRounded } from '../../../../src/lib/estimate-1rm.ts';
 const ASOF = '2026-08-12';
 const SPW = 3; // strength sessions/week
 
-/** Wendler's own p32 estimate, via the app's one implementation (D-339). */
+/** the standard p32 estimate, via the app's one implementation (D-339). */
 const est = (w: number, r: number) => estimate1RMRounded(w, r);
 
 /**
- * A working-set e1RM series that WAVES the way 5/3/1 waves it, inside the 42-day e1RM window.
+ * A working-set e1RM series that WAVES the way the previous program waves it, inside the 42-day e1RM window.
  * Cycle 1 climbs (120 → 125), then the program RE-BASES and the top working weight drops to 105 and
  * climbs again. The newest end of the window therefore sits on the re-based, lighter weeks — which is
  * exactly the shape that read "trending down" on Michael's screen. Nothing here is a strength loss:
@@ -75,7 +75,7 @@ const ALL_OUT_HOLDING: AllOutTrendInput[] = [
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 // FIXTURE A — THE BUG CASE. Waved working sets DOWN, all-out rep record HOLDING → not declining.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
-Deno.test('FIXTURE A (permanent): 5/3/1 — waved working sets fall, all-out record holds → NOT declining', () => {
+Deno.test('FIXTURE A (permanent): the previous program — waved working sets fall, all-out record holds → NOT declining', () => {
   const r = computeStrengthState(wavedWorkingSets(), ASOF, SPW, {
     allOutByLift: { bench_press: ALL_OUT_HOLDING },
     effortRead: 'amrap',
@@ -167,7 +167,7 @@ Deno.test('FIXTURE C: a genuine decline states no direction either — the recor
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
-// FIXTURE D — A 'rir' PROTOCOL IS BYTE-IDENTICAL. Nothing outside 5/3/1 moves.
+// FIXTURE D — A 'rir' PROTOCOL IS BYTE-IDENTICAL. Nothing outside the previous program moves.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 Deno.test("FIXTURE D: readsEffortAs 'rir' → identical verdict, pctChange and gauge to no-opts (byte-identical)", () => {
   const before = computeStrengthState(wavedWorkingSets(), ASOF, SPW);
@@ -189,7 +189,7 @@ Deno.test("FIXTURE D: readsEffortAs 'rir' → identical verdict, pctChange and g
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 // SCOPE — who is on the new gauge, and what happens when the measurement is missing.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
-Deno.test('SCOPE: an ASSISTANCE lift keeps the e1RM gauge even on a 5/3/1 block (p100 — "just the last set of the day for the big exercise")', () => {
+Deno.test('SCOPE: an ASSISTANCE lift keeps the e1RM gauge even on a the previous program block (p100 — "just the last set of the day for the big exercise")', () => {
   const series: LiftSeries[] = [{
     canonical: 'barbell_row',
     displayName: 'Barbell Row',

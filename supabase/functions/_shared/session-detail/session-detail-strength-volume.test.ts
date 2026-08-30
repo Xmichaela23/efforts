@@ -12,7 +12,7 @@
  * Three things are pinned, and each one is a bug that has already happened once:
  *
  *   1. **Bodyweight work is priced.** The original D-348 hole, now on this surface.
- *   2. **PLANNED prices the AUTHORED RAMP (D-338).** 5/3/1 prescribes three different weights. The
+ *   2. **PLANNED prices the AUTHORED RAMP (D-338).** the previous program prescribes three different weights. The
  *      table renders three rows; if planned volume were priced off `sets × reps × topWeight` the
  *      delta line would disagree with the rows directly above it. That was D-338's bug and moving
  *      this number to the server is exactly how it would come back.

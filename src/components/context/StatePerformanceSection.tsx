@@ -168,10 +168,10 @@ function ciRange(ci: [number, number] | null | undefined): string | null {
 // asked for. This is that wire, and nothing more: every value below is rendered as it arrived.
 //
 // ⚠️ THE WORD COMES FROM THE CARD. `block.phase` is the plan's OWN name and half of those are
-// internal — 'Leader' and 'Anchor' are Wendler's words for a 5/3/1 cycle, not an athlete's. The card
+// internal — 'Leader' and 'Anchor' are the previous program's words for a the previous program cycle, not an athlete's. The card
 // carries `phase_word` (base / build / peak / taper / recovery) resolved through the one vocabulary
 // the effort rules already use, so this screen keeps no translation table of its own: a plan that is
-// not 5/3/1 renders through the identical path, and a plan that does not place the week says only
+// not the previous program renders through the identical path, and a plan that does not place the week says only
 // "week 3 of 12". Null anywhere here means the plan did not say — so the line shortens, never guesses.
 type BlockCard = NonNullable<CoachWeekContextV1['plan']['block']>;
 function blockContextLine(planWeek: number | null | undefined, block: BlockCard | null | undefined): string | null {
@@ -181,9 +181,9 @@ function blockContextLine(planWeek: number | null | undefined, block: BlockCard 
   const weeks = block?.block_weeks ?? null;
   const where = weeks != null && weeks > 0 ? `week ${planWeek} of ${weeks}` : `week ${planWeek}`;
   /**
-   * ⛔ THE PHASE WORD IS STRIPPED (2026-08-29, Michael: *"wendler is a ghost in the machine"* →
+   * ⛔ THE PHASE WORD IS STRIPPED (2026-08-29, Michael: *"the previous program is a ghost in the machine"* →
    * *"remove it"*). `phase_word` resolves from `PHASE_NAME` in `strength-primary-plan.ts`, whose
-   * vocabulary is Wendler's block shape — Leader, Anchor, TM Test, Deload. None of those words is
+   * vocabulary is the previous program's block shape — Leader, Anchor, TM Test, Deload. None of those words is
    * Viada's, and the screen was printing them as though they described the athlete's programme.
    * ⚠️ THE POSITION SURVIVES: "week 1 of 12" is a fact about where the athlete is and belongs to no
    * author. Only the phase name comes off.
@@ -556,7 +556,7 @@ const VOLUME_WORD: Record<TrendVerdict, { word: string; cls: string; arr: string
 // Supersedes the rolled-up "getting stronger" verdict + baseline dot. Commercial strength apps show each MAIN
 // LIFT's estimated 1RM and a PR flag, referenced to YOUR OWN best — not a typed baseline (which the
 // field doesn't use and which pegged the dot dumb once you passed it). The estimate is RIR-adjusted +
-// near-failure-weighted (compute-facts estimated1RM, Wendler's formula per D-339, + D-118), which is the science's own caveat.
+// near-failure-weighted (compute-facts estimated1RM, the previous program's formula per D-339, + D-118), which is the science's own caveat.
 // Receipts kept PER LIFT (sessions · as of). The grinding/RIR fatigue line (D-302) stays below — a distinct
 // fatigue axis, not the number.
 // ⚠️ 2026-08-01: the per-lift TREND CHIP was removed (D2 — see the note inside the component). The
@@ -598,7 +598,7 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
   //
   // This row used to print a direction chip per lift — "↓ −4%", "→ flat", "new" — off the 6-week
   // e1RM trend. The number it judged is produced ONCE PER CYCLE: an e1RM comes off the top set, and
-  // a 5/3/1 cycle deliberately runs that set from 65% to 95% across its weeks. So the series it
+  // a the previous program cycle deliberately runs that set from 65% to 95% across its weeks. So the series it
   // read was mostly the PRESCRIPTION moving, sampled about four times, and it called a week the
   // athlete executed perfectly a decline. Michael, on his own screen: bench reading "flat" with a
   // dropping line, on week 1 of a block that is light on purpose.
@@ -713,7 +713,7 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
                     />
                   );
                 })()}
-                {/* ⛔ THE REP PR (D-420 pillar 2). Wendler p10: 225x6 → 225x9 IS the progress. This is
+                {/* ⛔ THE REP PR (D-420 pillar 2). the previous program: 225x6 → 225x9 IS the progress. This is
                     also the ONLY home for a long all-out set — 105 lb × 35 can never mint an e1RM
                     (D-417's trusted-rep ceiling refuses it, correctly), and it is still a record.
                     ⚠️ Read from the spine, never re-derived: `is_rep_record` was decided in
@@ -779,7 +779,7 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
           `performance_focus === 'pullups'`, so the absence here IS the gate — this screen decides
           nothing (Constitution Law 2: surfaces render, never re-decide).
 
-          ⛔ TWO MEASUREMENTS, SHOWN AS TWO FACTS. The clean max is one set to failure; Wendler's
+          ⛔ TWO MEASUREMENTS, SHOWN AS TWO FACTS. The clean max is one set to failure; the previous program's
           standard is 50 reps inside 10 minutes, which is a SESSION measure. Neither converts into
           the other, so the copy never says "12 of 50" or draws a progress bar between them — that
           would be an invented metric, and this row has been caught minting verdicts before.
@@ -804,12 +804,12 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
               },
               {
                 value: `${fitness.pullups.standardReps} in ${fitness.pullups.standardMinutes} min`,
-                label: "Wendler's standard",
+                label: 'session standard',
               },
             ]}
           />
           {/* ⛔ ASSISTED REPS GET THEIR OWN LINE, ALWAYS SEPARATE. They are real work and the band
-              on-ramp is Wendler's own (2nd ed p.36) — but folded into the clean count the number
+              on-ramp is the standard — but folded into the clean count the number
               climbs while the athlete gets no stronger. Walking the band down shows up here as this
               falling while the clean count rises, which is the actual thing happening. */}
           <span className="basis-full text-white/50 text-[11px] -mt-0.5">

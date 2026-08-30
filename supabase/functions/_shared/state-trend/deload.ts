@@ -17,7 +17,7 @@ export function isDeloadWeek(p: TrendPoint): boolean {
   //
   // The name regex below never fired on the strength series: `liftSeriesFromExerciseLog` built its
   // points as `{date, value}` with no meta of any kind, so a deliberately light week has been
-  // landing on the trend as an ordinary session for as long as the series has existed. On 5/3/1 that
+  // landing on the trend as an ordinary session for as long as the series has existed. On the previous program that
   // week is 40/50/60% of the working number — an estimate ~30% below its neighbours — which is
   // enough on its own to read as "your strength is slipping" on a week the athlete followed exactly.
   //

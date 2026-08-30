@@ -59,8 +59,8 @@ async function vocabularySources(): Promise<Source[]> {
     names: [...roleSrc.matchAll(/^ {2}'([^']+)':\s*'(?:primary|secondary|accessory)'/gm)].map((m) => m[1]),
   });
   out.push({
-    label: 'MAIN_531_LIFTS',
-    names: [...roleSrc.split('MAIN_531_LIFTS')[1].split(']')[0].matchAll(/'([^']+)'/g)].map((m) => m[1]),
+    label: 'MAIN_BARBELL_LIFTS',
+    names: [...roleSrc.split('MAIN_BARBELL_LIFTS')[1].split(']')[0].matchAll(/'([^']+)'/g)].map((m) => m[1]),
   });
 
   // 4. The assistance catalog — the shortlist the athlete picks from at build time. ⛔ Its own header

@@ -144,11 +144,11 @@ Deno.test('the Standing Plan never reaches into the live strength path', async (
   for (const name of names) {
     const src = await Deno.readTextFile(dir + name);
     const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-    // ⛔ Wendler's module, the live composer, and the rep-per-category model are all off limits.
+    // ⛔ the previous program's module, the live composer, and the rep-per-category model are all off limits.
     assert(!/strength-primary-plan/.test(code), `${name} imports the live Get Stronger composer`);
-    assert(!/wendler-531/.test(code), `${name} imports Wendler's loading module`);
-    assert(!/assistance-menu|assistance-catalog/.test(code), `${name} reaches into Wendler's assistance model`);
-    // ⛔ AND THE SAME-WORD COLLISION. `training_max` is Wendler's 85% number with three live readers.
+    assert(!/wendler-531/.test(code), `${name} imports the previous program's loading module`);
+    assert(!/assistance-menu|assistance-catalog/.test(code), `${name} reaches into the previous program's assistance model`);
+    // ⛔ AND THE SAME-WORD COLLISION. `training_max` is the previous program's 85% number with three live readers.
     assert(!/training_max|trainingMax/.test(code), `${name} touches the training max`);
   }
 });
@@ -267,7 +267,7 @@ Deno.test('⛔⛔ p215 WORKED EXAMPLE — the regression that keeps the test set
 });
 
 Deno.test('no function accepts both numbers', async () => {
-  // ⛔ THE COLLISION GUARD. Wendler's training max (85% of a true 1RM, three live readers) and
+  // ⛔ THE COLLISION GUARD. the previous program's training max (85% of a true 1RM, three live readers) and
   // Viada's working number (96% of a fresh prediction) are different quantities wearing one English
   // word. A helper taking both would be the door through which one becomes the other.
   const dir = new URL('.', import.meta.url).pathname;
@@ -277,7 +277,11 @@ Deno.test('no function accepts both numbers', async () => {
   // ⚠️ NOT A BARE `0.85` CHECK — that is also the second step of HIS OWN pretest (85% of predicted),
   // and the first version of this lint flagged it. What must never appear is the two numbers meeting:
   // a function signature, a field or a conversion that carries both.
-  assert(!/wendler/i.test(code), 'the working-number module names Wendler');
+  // ⛔ THE NEEDLE IS BUILT FROM PARTS ON PURPOSE (2026-08-30). This asserts the archived
+  // program's name is absent; spelling it out here would put it back in the codebase, which is
+  // the thing being checked. Do not 'simplify' this to a literal.
+  const ARCHIVED_NAME = new RegExp(['wend', 'ler'].join(''), 'i');
+  assert(!ARCHIVED_NAME.test(code), 'the working-number module names the archived program');
   assert(!/\bTRAINING_MAX|toTrainingMax|fromTrainingMax\b/.test(code),
     'the working-number module converts to or from a training max');
 });

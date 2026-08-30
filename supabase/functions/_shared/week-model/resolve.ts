@@ -284,7 +284,7 @@ export function score(placements: Placement[]): number {
    *
    * ```
    *   w = 2, 3, 4   57/61 shapes improve, 0 worsen, 0 rest days lost, the bar NEVER MOVES
-   *   w = 5+        the bar starts moving: Wendler's L·U·L three-day week (2nd ed. p.11) came back
+   *   w = 5+        the bar starts moving: the previous program's L·U·L three-day week (the previous program) came back
    *                 L·L·U, and heavy legs went from 72h apart to 48h — one adjacency bought for one
    *                 point of `bunching`
    * ```

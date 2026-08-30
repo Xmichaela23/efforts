@@ -56,7 +56,7 @@ Deno.test('an absent pattern is not evidence of a clash (§0h)', () => {
 });
 
 Deno.test('⚠️ THE COST OF THE BARE `press` KEY, RECORDED RATHER THAN HIDDEN (2026-08-03)', () => {
-  // ⛔ ADDING A SHORT KEY WIDENS THE FUZZY NET. `press` was added because without it, 5/3/1's own
+  // ⛔ ADDING A SHORT KEY WIDENS THE FUZZY NET. `press` was added because without it, the previous program's own
   // name for the overhead press resolved to `leg press` at 1.5x SQUAT — a badly wrong prescription
   // on a main lift. The price is that an UNKNOWN "...Press" movement now resolves to `press`
   // (vertical push, overhead x 1.0) instead of to null, wherever no longer key matches.

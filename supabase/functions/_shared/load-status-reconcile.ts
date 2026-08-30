@@ -142,7 +142,7 @@ export function computeSafetyFloor(bodyTrends: BodyTrends, readiness: string, op
 //     an athlete was prescribed is the plan working, not the athlete overreaching. ACWR stays a
 //     descriptive gauge (the number still renders) and never a verdict input here.
 //   • prescribed load — the app cannot hand you a week and then blame you for completing it.
-//   • strength e1RM — a 5/3/1 weight wave dips e1RM BY DESIGN in weeks 2-3 and on the deload.
+//   • strength e1RM — a the previous program weight wave dips e1RM BY DESIGN in weeks 2-3 and on the deload.
 //     That is a protocol artifact, not strain. (The honest strength gauge is Slice 2.)
 //
 // Field-standard backing: the two-key structure (internal RPE + external load) is the standard

@@ -570,7 +570,7 @@ Deno.test('an incoherent request is refused, not guessed', () => {
 Deno.test('every category and pattern the grid names is populated', () => {
   // ✅ **CLOSED 2026-08-29 — THE LIST SHRANK TO NOTHING, WHICH THIS TEST SAID WOULD BE THE FIX
   // LANDING.** What it pinned: `braced / push_upper` was EMPTY because the catalogue grew around
-  // Wendler's barbell-and-dumbbell world and Viada's braced category is the half it never needed.
+  // the previous program's barbell-and-dumbbell world and Viada's braced category is the half it never needed.
   // A coverage sweep of pp.218-223 found 39 of his 69 movements present; the thirty missing ones
   // were added with their gear routes, and machine chest press, Smith machine press and dip machine
   // filled this cell.

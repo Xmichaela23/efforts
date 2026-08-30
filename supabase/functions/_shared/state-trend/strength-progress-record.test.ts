@@ -7,7 +7,7 @@
  *
  * ⛔ THE WHY IS ALREADY WRITTEN AND IS NOT RE-DERIVED HERE — `docs/SCIENCE-strength-e1rm-trust.md` §6
  * and D-420. Short version: no commercial app (Strong, Hevy, Boostcamp) computes a weekly per-lift
- * strength direction, and on a 5/3/1 wave a first-to-last read calls the program's own light week a
+ * strength direction, and on a the previous program wave a first-to-last read calls the program's own light week a
  * decline. Pointing the direction at the all-out set instead (D-419) did not save it — those sets run
  * 20-35 reps, above the reliable estimate range, so the estimate slides across the wave too.
  *
@@ -181,7 +181,7 @@ Deno.test('FIXTURE B: a new best trusted e1RM across cycles → the record ticks
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
-// FIXTURE C — A REP PR FLAGS. Most reps at a weight (Wendler p10).
+// FIXTURE C — A REP PR FLAGS. Most reps at a weight (the previous program).
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 Deno.test('FIXTURE C: more reps at the SAME weight is flagged a rep PR, decided on the spine', () => {
   // Judged by the real capture walk, oldest-first, each set against the sessions before it.
@@ -189,7 +189,7 @@ Deno.test('FIXTURE C: more reps at the SAME weight is flagged a rep PR, decided 
     { date: '2026-07-22', exercises: [{ name: 'Deadlift', sets: [{ weight: 225, reps: 6, amrap: true }] }], plannedExercises: null },
     { date: '2026-08-05', exercises: [{ name: 'Deadlift', sets: [{ weight: 225, reps: 9, amrap: true }] }], plannedExercises: null },
   ]);
-  assertEquals(series.deadlift[1].is_rep_record, true); // 225×9 beats 225×6 — Wendler's own example
+  assertEquals(series.deadlift[1].is_rep_record, true); // 225×9 beats 225×6 — the standard example
 
   const v1 = toStateTrendsV1(
     assembleStateTrends(inputs(DEADLIFT_WORKING, {

@@ -3,7 +3,7 @@
 //
 // Decided by Michael 2026-08-24 (D-450 in `docs/DECISIONS-LOG-3.md` — the handoff spec it was built from is deleted, per the spec lifecycle).
 //
-// ⛔ WHY THIS FILE EXISTS AT ALL. The picker the Standing Plan was borrowing is WENDLER'S taxonomy —
+// ⛔ WHY THIS FILE EXISTS AT ALL. The picker the Standing Plan was borrowing is THE PREVIOUS PROGRAM'S taxonomy —
 // push / pull / single-leg-core across three lifting days — and this frame does not share it. Read
 // off `frames.ts` (p246): the week carries SEVEN HYP accessory slots, no core slot and no open
 // compound-pull slot, so three of the nine picks could essentially never place, every ab pick could
@@ -241,7 +241,7 @@ export type ViadaPickSpec = {
  * `strength_5k` names no core slot in either column — p246 simply does not carry one, and p223 files
  * core as its own heading outside the four patterns. So an ab movement cannot be "placed" the way
  * the other five are. What it CAN do is name the movement the week's core minimum is filled with,
- * which is a real answer the athlete was already giving through a Wendler slot that mapped nowhere.
+ * which is a real answer the athlete was already giving through a the previous program slot that mapped nowhere.
  *
  * ⚠️ THE ATHLETE-FACING SENTENCE FOR THIS LIVES IN `src/lib/dial-copy.ts` (`CORE_PICK_NOTE`), not
  * here. The string that stood in this spot named the source, the missing slot and "the four movement
@@ -396,10 +396,10 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
   // ⚠️ NEITHER SERVES A CHIP, so unlike the pull pair there is no dial split to keep in step.
   //
   // ⛔⛔ "LEG ACCESSORY", NOT "SINGLE-LEG" (Michael, 2026-08-26, off the dropdown's screenshot:
-  // *"might be wendler legacy make it right"*). It was — and it was the WORDING, not the code.
+  // *"might be the previous program legacy make it right"*). It was — and it was the WORDING, not the code.
   //
   // ⚠️ TRACED, NOT ASSERTED: `src/lib/assistance-catalog.ts` carries `single_leg_core` as one of
-  // WENDLER'S three assistance categories, display name *"Single-leg / core"*. This file does not
+  // THE PREVIOUS PROGRAM'S three assistance categories, display name *"Single-leg / core"*. This file does not
   // import it and never has — the `label` strings are hardcoded here — so it was never a live
   // dependency. The phrase walked across; the wiring did not.
   //

@@ -29,7 +29,7 @@
  *
  * ⚠️ THE MUSCLE AXIS IS DELIBERATELY LEFT LOOSE. The audit also flagged 253 offers where the target
  * muscle differs (a Single Leg RDL offered a Hip Thrust — hamstrings vs glutes). Those are NOT gated
- * here, on Michael's ruling and on Wendler's: posterior-chain assistance is interchangeable, and
+ * here, on Michael's ruling and on the previous program's: posterior-chain assistance is interchangeable, and
  * `pattern` stays the muscle proxy. Adding a same-muscle gate would empty half the swap lists.
  */
 import { getExerciseConfig } from './exercise-config';

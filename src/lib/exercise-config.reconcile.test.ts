@@ -9,7 +9,7 @@
  * together, so a movement could be fully classified by the engine and unreachable in the logger —
  * and, worse, a name with no config entry does NOT resolve to null. `getExerciseConfig` ends in a
  * longest-substring fuzzy fallback, so it silently lands on a neighbour and renders that
- * neighbour's prescription. `press` — 5/3/1's own name for the overhead press — matched `leg press`
+ * neighbour's prescription. `press` — the previous program's own name for the overhead press — matched `leg press`
  * and was priced at 1.5x the SQUAT.
  *
  * ⚠️ THE PICKER ARRAY IS PARSED WITH A REAL JS PARSE, NOT A REGEX. The first version of this fixture
@@ -40,14 +40,14 @@ async function pickerList(): Promise<string[]> {
   return arr;
 }
 
-/** The classified vocabulary: TYPE_TABLE keys + MAIN_531_LIFTS, read from source (both private). */
+/** The classified vocabulary: TYPE_TABLE keys + MAIN_BARBELL_LIFTS, read from source (both private). */
 async function classifiedVocabulary(): Promise<Array<{ name: string; type: string }>> {
   const src = await Deno.readTextFile(new URL('./exercise-role.ts', import.meta.url));
   const typeBlock = src.split('const TYPE_TABLE')[1];
   const typed = [...typeBlock.matchAll(
     /^ {2}'([^']+)':\s*'(barbell_main|loaded_accessory|bodyweight|plyo|isometric|mobility|carry|band)'/gm,
   )].map((m) => ({ name: m[1], type: m[2] }));
-  const mainBlock = src.split('MAIN_531_LIFTS')[1].split(']')[0];
+  const mainBlock = src.split('MAIN_BARBELL_LIFTS')[1].split(']')[0];
   const main = [...mainBlock.matchAll(/'([^']+)'/g)].map((m) => ({ name: m[1], type: 'barbell_main' }));
   assert(typed.length > 100, `expected TYPE_TABLE to parse, got ${typed.length}`);
   return [...main, ...typed];
@@ -134,7 +134,7 @@ Deno.test('⛔ THE DEBT LEDGER IS REAL — every listed name still disagrees, so
 });
 
 Deno.test('⛔ THE NAMED REGRESSIONS — each was a live mis-resolution before 2026-08-03', () => {
-  // `press` is one of the app's own MAIN_531_LIFTS and matched `leg press` at 1.5x SQUAT.
+  // `press` is one of the app's own MAIN_BARBELL_LIFTS and matched `leg press` at 1.5x SQUAT.
   const press = getExerciseConfig('press')!;
   assertEquals(press.primaryRef, 'overhead');
   assertEquals(press.ratio, 1.0);

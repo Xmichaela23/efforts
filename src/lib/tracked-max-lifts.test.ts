@@ -13,7 +13,7 @@ import { TRACKED_MAX_LIFTS, isTrackedMaxLift } from './tracked-max-lifts.ts';
 import { capabilitiesForExercise } from './exercise-role.ts';
 import { computeE1rmBand, PRIMARY_LIFTS, type LiftSeries } from '../../supabase/functions/_shared/state-trend/strength.ts';
 
-Deno.test('⛔ EXACTLY FOUR TRACKED MAXES — one per 5/3/1 slot', () => {
+Deno.test('⛔ EXACTLY FOUR TRACKED MAXES — one per the previous program slot', () => {
   assertEquals([...TRACKED_MAX_LIFTS].sort(), ['bench_press', 'deadlift', 'overhead_press', 'squat']);
 });
 
@@ -32,7 +32,7 @@ Deno.test('⛔ ONE LIST, BOTH ENDS — the server emitter and the client rendere
 });
 
 Deno.test('⛔ THE COACHING GATE IS WIDER THAN THE CHART SET, AND THAT IS CORRECT', () => {
-  // In 5/3/1 a variant FILLS a slot — it does not earn a fifth training max. So each of these is
+  // In the previous program a variant FILLS a slot — it does not earn a fifth training max. So each of these is
   // coached (it is that slot this cycle) and charts no max of its own. If a future change makes
   // these equal, it has collapsed two different questions into one.
   for (const variant of ['Front Squat', 'Close Grip Bench Press', 'Sumo Deadlift', 'Push Press', 'Military Press']) {

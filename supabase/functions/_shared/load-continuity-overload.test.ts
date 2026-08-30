@@ -6,7 +6,7 @@
  * build week at ACWR ~1.1: `glance on_track` beside "Signs of overreaching — consider backing off",
  * `load_status elevated` ("a bit high"), the "needs absorbing" accent, and `training_state overstrained`.
  * The whole cascade was fed by two soft, collinear readings — ONE harder-than-usual RPE, and a lift's
- * e1RM dipping across a 5/3/1 weight wave (which the protocol causes on purpose).
+ * e1RM dipping across a the previous program weight wave (which the protocol causes on purpose).
  *
  * THE YARDSTICK (Michael): *a plan you followed can't be "too much" — the plan IS the intended load.
  * Flag on what the body reports, never on the numbers the app handed you.*
@@ -83,7 +83,7 @@ function runWeek(input: {
       strength_rir_avg: null,
       cardiac_efficiency_avg: null,
     } as any,
-    // A 5/3/1 wave: the top-set weight drops across the wave, so the e1RM ESTIMATE trends down while
+    // A the previous program wave: the top-set weight drops across the wave, so the e1RM ESTIMATE trends down while
     // the athlete is doing exactly what the book prescribes. `spine_e1rm_direction` is the spine's
     // owned per-lift direction (D-270) — the same field the live payload carries.
     lifts: input.e1rmDeclining
@@ -170,14 +170,14 @@ function runWeek(input: {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
-// FIXTURE A — THE BUG CASE. On-plan build week, ACWR ~1.1, one harder-than-usual RPE, a 5/3/1-wave
+// FIXTURE A — THE BUG CASE. On-plan build week, ACWR ~1.1, one harder-than-usual RPE, a the previous program-wave
 // e1RM dip. NO overload on ANY lane. ⛔ PERMANENT — this is the regression, it does not get deleted.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 const ON_PLAN_BUILD = {
   rpe: { current: 4.8, baseline: 3.9, n: 4 },   // one harder-than-usual week — the single soft signal
   hrDrift: { current: 4.0, baseline: 4.2, n: 3 }, // body measured fine
   execution: { current: 92, baseline: 91, n: 3 },
-  e1rmDeclining: true,                            // the 5/3/1 weight wave, not a strength loss
+  e1rmDeclining: true,                            // the previous program weight wave, not a strength loss
   acwr: 1.1,                                      // squarely optimal, and it is the plan's own ratio
   actualVsPlannedPct: 2,                          // he did the plan
   unplannedSharePct: 0,                           // nothing added on top
@@ -186,7 +186,7 @@ const ON_PLAN_BUILD = {
   consecutiveDays: 5,
 } as const;
 
-Deno.test('FIXTURE A (permanent): on-plan build week, ACWR 1.1, one RPE bump + 5/3/1 e1RM dip → NO overload on any lane', () => {
+Deno.test('FIXTURE A (permanent): on-plan build week, ACWR 1.1, one RPE bump + the previous program e1RM dip → NO overload on any lane', () => {
   const l = runWeek({ ...ON_PLAN_BUILD });
 
   // The verdict itself
@@ -215,7 +215,7 @@ Deno.test('FIXTURE A: the headline says neither "Load is elevated" nor "rest soo
   assertStringIncludes(l.headlineSubtext, '5 days straight');
 });
 
-Deno.test('FIXTURE A: a 5/3/1-wave e1RM dip is not strain — it never reaches the verdict', () => {
+Deno.test('FIXTURE A: a the previous program-wave e1RM dip is not strain — it never reaches the verdict', () => {
   const l = runWeek({ ...ON_PLAN_BUILD });
   // Guard against a vacuous fixture: the lift really IS reading declining, it just can't count as
   // strain. ⚠️ Read PER-LIFT since [D-420] retired the weekly strength roll-up — the spine's per-lift

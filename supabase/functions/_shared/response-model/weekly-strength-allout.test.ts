@@ -92,7 +92,7 @@ Deno.test('⛔ SLICE 2 — the all-out set MOVES the verdict, and moves nothing 
 
 Deno.test('⛔ SLICE 2 — a rep record now OUTRANKS the RIR verdict', () => {
   // Inverted from slice 1, where this asserted 'add weight'. RIR 4 against a target of 2 used to
-  // read "add weight" and carry a tappable weight; the all-out set is the measurement 5/3/1 is
+  // read "add weight" and carry a tappable weight; the all-out set is the measurement the previous program is
   // built on, so it decides instead — and it carries no weight.
   const row = computeStrength(
     [deadlift({ current_avg_rir: 4, target_rir: 2, last_all_out: ALL_OUT })],

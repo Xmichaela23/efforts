@@ -209,7 +209,7 @@ Deno.test('the ride equivalence never trades a run slot for a HARDER ride', () =
 
 Deno.test('⛔⛔ A BIKE-ONLY ATHLETE TAKES THE FRAME — the refusal is overruled, not forgotten', () => {
   /**
-   * ⛔ MICHAEL, 2026-08-27: *"if wendler has a future at all its not in this path."* `resolveFrame`
+   * ⛔ MICHAEL, 2026-08-27: *"if the previous program has a future at all its not in this path."* `resolveFrame`
    * used to refuse a cyclist — *"strength leading with a cyclist is Cycling: Base (p278/p280) and it
    * is not built"* — and a refused athlete fell through to the Get Stronger path. That is the plan
    * being retired, so the refusal now sends them nowhere better than the frame does.

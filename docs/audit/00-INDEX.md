@@ -18,6 +18,7 @@ Run started: overnight session, 2026-06-16.
 | 8 | Cross-cutting | `08-cross-cutting.md` | done |
 | 9 | DB schema (ground truth) | `09-db-schema.md` | done |
 | — | Consolidated summary | `99-SUMMARY.md` | done |
+| 10 | Reachability sweep (2026-08-30 cleanup audit, section 1 of 4) | `10-reachability-2026-08-30.md` | done — awaiting Michael's approval on the delete list |
 
 Status values: `in progress` → `done` (doc written) / `partial` (note where it stopped here).
 

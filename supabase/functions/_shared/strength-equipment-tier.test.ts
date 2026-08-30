@@ -250,7 +250,7 @@ Deno.test('⛔ THE GATE STILL BITES where the gear is required AND declarable', 
 Deno.test('⛔ SUBSTITUTION, NOT A GATE, FOR GEAR NOBODY CAN DECLARE', () => {
   // A leg-curl machine is required and not declarable, so `canPerform` waves it through and
   // `substituteExerciseForEquipment` swaps it to Nordic / Band Leg Curls. A gate here would DELETE
-  // Wendler's hamstring work; a swap keeps it. Same for the kneel-and-lower family, which now routes
+  // the previous program's hamstring work; a swap keeps it. Same for the kneel-and-lower family, which now routes
   // on the barbell — feet under a loaded bar, which is what most people actually do.
   assertEquals(canPerform('Leg Curl', HOME_GYM), true);
   assertEquals(canPerform('Glute-Ham Raise', HOME_GYM), true);

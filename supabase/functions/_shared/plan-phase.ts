@@ -141,7 +141,7 @@ export function phaseNameToWeekIntent(phaseName: string | null | undefined): Wee
     case 'base':
     case 'baseline': return 'baseline';
     case 'build':    return 'build';    // must be explicit now the default is 'unknown'
-    // 5/3/1 (SPEC-get-stronger): a LEADER cycle accumulates at sub-maximal loads, an ANCHOR
+    // the previous program (SPEC-get-stronger): a LEADER cycle accumulates at sub-maximal loads, an ANCHOR
     // intensifies and measures. Mapped explicitly rather than left to the 'unknown' default so the
     // coach reads a strength block's weeks as what they are.
     case 'leader':   return 'baseline';

@@ -10,8 +10,8 @@ import type {
 import { useExerciseLog } from '@/hooks/useExerciseLog';
 // [D-374 → Step 2] The SAME axis the server gates coaching language on, so the row that renders and
 // the verdict that fills it can never disagree about what a main lift is. `coached` is true on
-// exactly one type row and that row is built from `MAIN_531_LIFTS`, so this is the same answer
-// `isMain531Lift` gave — asked as a capability, from the table that also says what to render
+// exactly one type row and that row is built from `MAIN_BARBELL_LIFTS`, so this is the same answer
+// `isMainBarbellLift` gave — asked as a capability, from the table that also says what to render
 // instead. See SPEC-strength-language, Step 2.
 import { capabilitiesForExercise } from '@/lib/exercise-role';
 import { trustedMaxReps } from '@/lib/estimate-1rm';
@@ -1259,7 +1259,7 @@ export default function StateTab({
   // weight, volume over weeks), never against a tested max. That row is unbuilt. See [Q-253].
   // FILTER FIRST, THEN CAP — off the uncapped list, so a main lift can never be cut by an accessory
   // that happened to sort ahead of it. The cap is kept at the same 5 as a display bound; after the
-  // filter it has nothing to cut in practice (5/3/1 has four slots, and only a variant like a
+  // filter it has nothing to cut in practice (the previous program has four slots, and only a variant like a
   // trap-bar deadlift adds a fifth main-class row).
   const perLiftMain = perLiftSufficient
     .filter((l: { canonical_name?: string | null }) =>
@@ -1398,8 +1398,8 @@ export default function StateTab({
         // do"*). This section is titled "from your logged sets" — so it now shows exactly that: each main
         // lift's recent sessions (weight × reps · date · estimated 1RM), newest first. The old "Working
         // vs baseline" coaching line and the tap-to-adjust are GONE from here. Adjusting weight is a
-        // Training-Max / baseline control (one number, weekly weights recalc from it — how 5/3/1 apps do
-        // it, verified against Strong/Hevy/531 apps), and it lives on the Adjust tab (StateAdjustLens),
+        // Training-Max / baseline control (one number, weekly weights recalc from it — how the previous program apps do
+        // it, verified against Strong/Hevy/main-lift apps), and it lives on the Adjust tab (StateAdjustLens),
         // not as a per-row tweak buried in a read-only history. Data is `useExerciseLog`'s liftTrends —
         // already fetched above, no new query and no server change.
         const trend = liftTrends.find((t) => t.canonical === lt.canonical_name);

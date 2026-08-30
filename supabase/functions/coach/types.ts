@@ -175,7 +175,7 @@ export type CoachWeekContextResponseV1 = {
     /**
      * ⛔ WHAT THIS BLOCK IS (Q-230 / audit F9). Resolved once by `_shared/block-identity.ts` and
      * rendered, never re-derived — the slice above (id, name, week number) was everything State was
-     * ever told, which is why it could not tell a 5/3/1 block from a 5×5 one, or chasing speed from
+     * ever told, which is why it could not tell a the previous program block from a 5×5 one, or chasing speed from
      * chasing distance.
      *
      * ⚠️ Every field is nullable and null MEANS SOMETHING: the plan did not say. Render nothing.

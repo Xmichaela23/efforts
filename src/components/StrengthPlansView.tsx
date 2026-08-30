@@ -105,7 +105,7 @@ const StrengthPlansView: React.FC<StrengthPlansViewProps> = ({
         <h2 className="text-lg font-medium text-gray-900">Current Plan</h2>
         <div className="space-y-1">
           <div className="font-medium text-gray-900">Strength Foundation - Wk 3</div>
-          <div className="text-sm text-muted-foreground">5/3/1 Progressive Overload</div>
+          <div className="text-sm text-muted-foreground">Progressive Overload</div>
         </div>
       </div>
 

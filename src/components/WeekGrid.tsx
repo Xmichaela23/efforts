@@ -7,7 +7,7 @@
  *   - The citation was OUT OF CONDITION. Robineau's 0h arm stacked lifting with HARD endurance;
  *     this is an easy ride. `strength-primary-plan.ts` says so in terms and says not to attach that
  *     citation without a trial that tested lifting + EASY work same-day. There isn't one.
- *   - And stacking is NORMAL. Wendler's own concurrent template is main lift -> assistance ->
+ *   - And stacking is NORMAL. the standard concurrent template is main lift -> assistance ->
  *     conditioning, same session, zero gap (p87), and he explicitly does not care whether it lands
  *     on a lift day (p75).
  *

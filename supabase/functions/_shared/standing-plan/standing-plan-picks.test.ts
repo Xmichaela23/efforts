@@ -128,7 +128,7 @@ Deno.test('an unknown movement name is reported, never silently matched to somet
 });
 
 Deno.test('the athlete is told how their picks were placed, and it is labelled OURS', () => {
-  // ⛔ DROPPING THE DAY IS OURS. The picker's keys are Wendler's three lifting days; this frame has
+  // ⛔ DROPPING THE DAY IS OURS. The picker's keys are the previous program's three lifting days; this frame has
   // four differently shaped ones and there is no honest mapping, so a pick is placed by what it
   // TRAINS. That is a decision and it is stated rather than assumed.
   const wk = week(['Hanging Leg Raise']);

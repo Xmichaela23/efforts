@@ -30,7 +30,7 @@ import { normalizeCompletedStrengthExercise } from '../../../src/lib/normalize-s
 // D-349: unit-aware, human-bounded body-weight resolver — the same one the load score and the
 // backfill use, so a session's lb column and its load score are priced off an identical number.
 import { resolveBodyweightLb } from '../_shared/workload.ts';
-// The all-out set: the rep record, Wendler's own 1RM formula (D-339) and the rep ceiling above which
+// The all-out set: the rep record, the standard 1RM formula (D-339) and the rep ceiling above which
 // it stops holding. Shared with `coach` (Q-254 slice 1) so State and Performance read one function.
 import {
   accumulateBestRepsAtWeight,
@@ -1049,7 +1049,7 @@ async function runSessionDetailPipelineAndPersist(
 
           // ── THE ALL-OUT SET, READ (2026-07-30) ────────────────────────────────────────────────
           //
-          // ⛔ THE REP RECORD LEADS, THE ESTIMATE FOLLOWS. Wendler p10: *"If your squat goes from
+          // ⛔ THE REP RECORD LEADS, THE ESTIMATE FOLLOWS. the previous program: *"If your squat goes from
           // 225x6 to 225x9, you've gotten stronger… Don't get stuck just trying to increase your one
           // rep max."* The rep count at a fixed weight is EXACT; the estimate is an equation's guess
           // about a number nobody measured. So the record is the finding and the estimate is context.
@@ -1057,7 +1057,7 @@ async function runSessionDetailPipelineAndPersist(
           // ⚠️ GROUNDED, NOT REASONED. An earlier version of this showed the estimate only on the 95%
           // week — coherent from the book, and NOT what the field does: Boostcamp tracks max reps at a
           // given weight AND an e1RM curve off top sets continuously, flagging PRs as they happen.
-          // Being the only 5/3/1 app that hides the number three weeks in four is an outlier position
+          // Being the only the previous program app that hides the number three weeks in four is an outlier position
           // taken on instinct. Every anchor week it is.
           //
           // ⛔ THE READ ITSELF MOVED TO `_shared/strength/all-out-set.ts` (Q-254 slice 1). It is the
@@ -1115,7 +1115,7 @@ async function runSessionDetailPipelineAndPersist(
         block_weeks: blockForSession.blockWeeks,
         phase: blockForSession.phase,
         // The plain word for the week — the screen prints this one. `phase` above is the plan's own
-        // name and on a 5/3/1 block that is 'Leader' / 'Anchor', which is Wendler's word, not the
+        // name and on a the previous program block that is 'Leader' / 'Anchor', which is the previous program's word, not the
         // athlete's. Translated once by the card so State and Performance cannot use two tables.
         phase_word: blockForSession.phaseWord,
         cycle_kind: blockForSession.cycle?.kind ?? null,

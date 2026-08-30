@@ -111,7 +111,7 @@ function weekShapeFromStored(config: any, week: number):
     return { kind: 'cycle', cycleIndex: Math.max(1, cycleIndex) };
   }
   // ⚠️ The opening test week runs on cycle 1's number — it validates what the leaders are about to
-  // use (Forever p.21). `Math.max(1, …)` is what makes that true when no cycle has started yet.
+  // use (the previous program). `Math.max(1, …)` is what makes that true when no cycle has started yet.
   if (matched.name === 'tm test' || matched.name === 'tm_test') {
     return { kind: 'tm_test', cycleIndex: Math.max(1, cycleIndex) };
   }
@@ -230,7 +230,7 @@ Deno.serve(async (req) => {
       const walked = cycles.map((c) => workingNumberForCycles(base, c.index, lift.lower, verdicts, {
         // ⛔ NO `oneRM` AS OF 2026-08-12 (slice a) — the 90%-of-1RM ceiling is deleted. The brake on
         // this path is the confirmed stall: one missed 95% set HOLDS the weight, a second consecutive
-        // one drops it 10% (`STALL_CONFIRM_SESSIONS`, Wendler p31/p33).
+        // one drops it 10% (`STALL_CONFIRM_SESSIONS`, the previous program/p33).
         unknownMeans: 'hold',
       }));
       const byCycle = cycles.map((c, i) => ({
@@ -274,7 +274,7 @@ Deno.serve(async (req) => {
         // ⛔ THE SAME FUNCTIONS THE COMPOSER USED. Percentages come from `setsForWeek`, not from a
         // second table — a rewrite that invented its own ramp would be a different programme.
         // ⛔ SAME SHAPE THE COMPOSER WRITES — warm-up ramp in front, then the work sets. A rewrite
-        // that emitted work sets alone would STRIP the ramp the composer authored (Wendler p.31), so
+        // that emitted work sets alone would STRIP the ramp the composer authored (the previous program), so
         // the first progression would silently undo it. ⚠️ A STANDALONE WEEK GETS NO RAMP: its own
         // sets open at 70% and climb, which is the same reason the old deload carve-out existed.
         const isStandalone = shape.kind !== 'cycle';

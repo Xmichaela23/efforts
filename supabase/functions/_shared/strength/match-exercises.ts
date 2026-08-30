@@ -44,9 +44,9 @@
  *
  * WHY ASSISTANCE IS DIFFERENT FROM A MAIN LIFT. A main lift is prescribed BY NAME at a percentage of
  * a training max — a skipped bench is a skipped bench, and Tier 3 below must never touch it. An
- * assistance slot is prescribed as a CATEGORY WITH A MENU: Wendler writes it as *"Lats, Upper Back,
+ * assistance slot is prescribed as a CATEGORY WITH A MENU: the previous program writes it as *"Lats, Upper Back,
  * Triceps — 5 sets of 10-20 reps (DB rows, Bent Over Rows, Chins, T-bar Rows, Lat Pulldowns, Face
- * Pulls, Shrugs)"* (2nd ed. p50-51). Filling that slot with a movement off the menu IS the
+ * Pulls, Shrugs)"* (the previous program-51). Filling that slot with a movement off the menu IS the
  * prescription, not a deviation from it. Michael, 2026-08-02: *"if its not an apples to apples swap
  * we should flag it — credit it."*
  *
@@ -64,7 +64,7 @@
  */
 
 import { sharesMovementFamily } from '../../../../src/lib/exercise-config.ts';
-import { isMain531Lift } from '../../../../src/lib/exercise-role.ts';
+import { isMainBarbellLift } from '../../../../src/lib/exercise-role.ts';
 import { isAssistanceSlot } from '../../../../src/lib/assistance-slot.ts';
 
 export interface MatchableExercise {
@@ -204,10 +204,10 @@ export function matchExercises(
   // "the app credited it but won't say what it was for."
   // ⚠️ A MAIN LIFT MAY NEVER FILL AN ASSISTANCE SLOT. Logging a heavy squat does not discharge the
   // single-leg slot, and crediting it there would hide a skipped accessory behind the day's big
-  // lift. `isMain531Lift` misses to FALSE on an unmapped name, which is the permissive direction —
+  // lift. `isMainBarbellLift` misses to FALSE on an unmapped name, which is the permissive direction —
   // acceptable here because the stake is one assistance row's label, not a load or a verdict.
   const claimable = () =>
-    executed.filter((e) => !consumed.has(e) && !isMain531Lift(String(e?.name ?? '')));
+    executed.filter((e) => !consumed.has(e) && !isMainBarbellLift(String(e?.name ?? '')));
 
   const claim = (entry: { p: any; match: ExerciseMatch }, exec: any) => {
     consumed.add(exec);
@@ -270,7 +270,7 @@ export function matchExercises(
 //   · Either side carries no exercise list → SHARE. A Garmin/Strava strength import has no
 //     exercises on it; we cannot judge what we cannot see, so we must not start declining it.
 //     Today's behaviour stands for every one of those.
-//   · The planned day names an ANCHOR lift → require one of THOSE to have been done. A 5/3/1
+//   · The planned day names an ANCHOR lift → require one of THOSE to have been done. A the previous program
 //     Bench day and a Press day carry the SAME assistance block, so "any exercise in common"
 //     would wave through anything from the same block.
 //   · No anchor planned (an accessory-only day) → require any one exercise in common.

@@ -67,7 +67,7 @@ export interface PerLiftRowText {
  *
  * ⚠️ AN UNRECOGNISED MOVEMENT IS NOT COACHED. `typeForExercise` defaults to `loaded_accessory`,
  * which is `coached: false` — so a movement the table has never heard of shows its number and says
- * nothing, rather than inheriting a 5/3/1 instruction.
+ * nothing, rather than inheriting a the previous program instruction.
  */
 export function composePerLiftRowText(
   lift: PerLiftRowInput,
@@ -127,7 +127,7 @@ export function composePerLiftRowText(
   return { text, coached: true, type, tappable: hasWeightSuggestion, tone };
 }
 
-/** The three lines of the all-out read, in the order Wendler puts them. Null = nothing to say. */
+/** The three lines of the all-out read, in the order the previous program puts them. Null = nothing to say. */
 export interface AllOutRowText {
   /** "All-out set 225 lb x 6 · Jul 28" — the measurement and WHEN it was measured. */
   set_line: string;
@@ -145,7 +145,7 @@ export interface AllOutRowText {
  * still make them disagree is the wording, and that is what this function removes. If you change a
  * sentence here, change `StrengthPerformanceSummary.tsx` in the same breath.
  *
- * ⛔ THE REP RECORD LEADS; THE ESTIMATE IS THE HEDGED SECONDARY. Wendler p10 — the rep count at a
+ * ⛔ THE REP RECORD LEADS; THE ESTIMATE IS THE HEDGED SECONDARY. the previous program — the rep count at a
  * fixed weight is EXACT and is what "stronger" means here. The estimated max is an equation's guess
  * about a number nobody measured, and above the trust ceiling it says so in its own line rather than
  * being hidden or capped (D-339).

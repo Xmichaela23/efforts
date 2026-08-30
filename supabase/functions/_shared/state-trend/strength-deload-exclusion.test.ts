@@ -6,7 +6,7 @@
 // built its points as `{date, value}` with NO META AT ALL. So the exclusion never fired once, on
 // either strength series, for as long as the series has existed.
 //
-// On 5/3/1 that is not cosmetic. The week table (loading/wendler-531.ts) is:
+// On the previous program that is not cosmetic. The week table (loading/wendler-531.ts) is:
 //     wk1 65/75/85   wk2 70/80/90   wk3 75/85/95   wk4 40/50/60  ← deload
 // Brzycki over the top set puts weeks 1-3 at roughly 81-91% of the true 1RM and the DELOAD at ~57%.
 // Every fourth point is ~30% below its neighbours. When the deload lands in the recent end of the
@@ -22,7 +22,7 @@ import { liftSeriesFromExerciseLog } from './assemble.ts';
 import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeState } from './strength.ts';
 import { isDeloadWeek } from './deload.ts';
 
-// A real 5/3/1 cycle for one lift: 1RM 300 → working number 255 (85%). Top set = pct × 255,
+// A real the previous program cycle for one lift: 1RM 300 → working number 255 (85%). Top set = pct × 255,
 // e1RM = Brzycki(w, reps) = w × 36/(37−reps). Weekly, one session per lift.
   // ⛔ `slot_intent: 'ME'` — the e1RM gate fails CLOSED since 2026-08-28: only a set the plan
   // asked to be maximal mints a max. These fixtures are MAIN-LIFT HEAVY sets, so they say so. An

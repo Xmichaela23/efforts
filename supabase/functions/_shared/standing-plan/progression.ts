@@ -3,8 +3,8 @@
 //
 // ⛔ EVERY NUMBER IS LABELLED HIS OR OURS AT THE SITE. Viada leaves the progression mechanism open;
 // `DECISIONS-2026-08-22-standing-plan-pivot.md` §4 fills it with FIELD-STANDARD app mechanics rather
-// than Wendler's signature system, because Michael's constraint is that no plan merges two coaches'
-// techniques. Wendler's wave, training max and AMRAP set are OUT of these plans.
+// than the previous program's signature system, because Michael's constraint is that no plan merges two coaches'
+// techniques. the previous program's wave, training max and AMRAP set are OUT of these plans.
 // ============================================================================
 
 import { RATE_ANCHOR, type FrameId } from './frames.ts';
@@ -194,8 +194,8 @@ export const THRESHOLDS_ARE_OURS =
  * through `back_off`, which needs a logged set BELOW the band floor, and on an ME slot that floor is
  * one rep — unreachable for any set that was logged at all.
  *
- * ⛔ IT WAS NOT FIXED, IT WAS REPLACED, and the reason is that a percentage cut is a WENDLER
- * necessity rather than a Viada one. Wendler's training max climbs every cycle whether or not the
+ * ⛔ IT WAS NOT FIXED, IT WAS REPLACED, and the reason is that a percentage cut is a THE PREVIOUS PROGRAM
+ * necessity rather than a Viada one. the previous program's training max climbs every cycle whether or not the
  * athlete keeps up, so they can get ahead of the bar and have to be pulled back. Here the bar only
  * moves when it is earned, so nobody can outrun it and there is nothing to back off FROM.
  *

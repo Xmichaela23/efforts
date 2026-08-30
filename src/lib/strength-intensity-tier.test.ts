@@ -9,7 +9,7 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import { EXERCISE_CONFIG } from './exercise-config.ts';
 import { getInSlotAlternatives } from './exercise-alternatives.ts';
-import { isMain531Lift } from './exercise-role.ts';
+import { isMainBarbellLift } from './exercise-role.ts';
 import { intensityTierForExercise, sameIntensityTier } from './strength-intensity-tier.ts';
 
 const FULL_GYM = ['Full commercial gym access'];
@@ -119,7 +119,7 @@ Deno.test('⛔ NO OFFER ANYWHERE IN THE LIBRARY CROSSES A TIER', () => {
   // — including curated-family members like a Romanian Deadlift or a Leg Press — IS swept.
   const crossings: string[] = [];
   for (const slot of Object.keys(EXERCISE_CONFIG)) {
-    if (isMain531Lift(slot)) continue;
+    if (isMainBarbellLift(slot)) continue;
     for (const o of offers(slot)) {
       if (!sameIntensityTier(slot, o)) {
         crossings.push(`${slot} → ${o} (${intensityTierForExercise(slot)} → ${intensityTierForExercise(o)})`);
@@ -130,7 +130,7 @@ Deno.test('⛔ NO OFFER ANYWHERE IN THE LIBRARY CROSSES A TIER', () => {
 });
 
 Deno.test('⛔ THE MUSCLE AXIS STAYS LOOSE — this is a ruling, not an oversight', () => {
-  // Michael's call, and Wendler's: posterior-chain assistance is interchangeable. A Single Leg RDL
+  // Michael's call, and the previous program's: posterior-chain assistance is interchangeable. A Single Leg RDL
   // (hamstrings) offering a Hip Thrust (glutes) is ACCEPTED. If a future change adds a same-muscle
   // gate, this fails and forces the decision to be re-made deliberately.
   assert(offers('single leg rdl').includes('hip thrust'),

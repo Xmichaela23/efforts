@@ -177,16 +177,16 @@ export function roleForExercise(name: string): StrengthRole {
 }
 
 /**
- * ⛔ IS THIS ONE OF 5/3/1'S FOUR MAIN LIFTS? A NARROWER QUESTION THAN `roleForExercise`.
+ * ⛔ IS THIS ONE OF the previous program'S FOUR MAIN LIFTS? A NARROWER QUESTION THAN `roleForExercise`.
  *
  * `primary` answers "does skipping this cost full completion weight", and it is deliberately wide —
  * a goblet squat, an RDL, a trap-bar deadlift and a DB bench are all `primary`. That is right for
  * scoring and wrong for the bar-speed cue, which describes **the lift the block prescribes a
- * percentage of a training max for**: squat, bench, deadlift, press. Wendler's four.
+ * percentage of a training max for**: squat, bench, deadlift, press. the previous program's four.
  *
  * ⚠️ WHY THIS IS NOT `roleForExercise(x) === 'primary'`. `roleForExercise` DEFAULTS to `primary` on
  * an unmapped name (loudly, on purpose, so nothing is silently discounted). Gate a cue on it and
- * every exercise the table has never heard of inherits a 5/3/1 instruction — the failure mode is a
+ * every exercise the table has never heard of inherits a the previous program instruction — the failure mode is a
  * default, so it grows on its own as the library does.
  *
  * ⚠️ AND WHY IT IS NOT A CONTAINMENT TEST. "Jump Squat" contains "squat" and is not a squat here,
@@ -197,7 +197,7 @@ export function roleForExercise(name: string): StrengthRole {
  * ⚠️ A MISS RETURNS FALSE, which is the safe direction: an unmapped lift gets no cue rather than the
  * wrong one. The opposite default is what leaked the speed cue onto a box jump.
  */
-const MAIN_531_LIFTS = new Set<string>([
+const MAIN_BARBELL_LIFTS = new Set<string>([
   'back squat', 'barbell back squat', 'squat', 'front squat',
   'bench press', 'barbell bench press', 'close grip bench press',
   'deadlift', 'conventional deadlift', 'trap bar deadlift', 'sumo deadlift',
@@ -213,11 +213,11 @@ const MAIN_531_LIFTS = new Set<string>([
 // ⚠️ CONSEQUENCE, STATED: sessions logged as "ohp" now get main-lift treatment — coaching language
 // and an AMRAP/e1RM read — which is what the trend already gave them.
 // ⚠️ AND THE COMMENT LIVES OUT HERE ON PURPOSE. `exercise-role.type.test.ts` reads this set by
-// splitting the source on `MAIN_531_LIFTS` and regexing quoted strings out of it, so prose with
+// splitting the source on `MAIN_BARBELL_LIFTS` and regexing quoted strings out of it, so prose with
 // apostrophes INSIDE the literal is parsed as though it were exercise names.
 
-export function isMain531Lift(name: string): boolean {
-  return MAIN_531_LIFTS.has(canonical(name));
+export function isMainBarbellLift(name: string): boolean {
+  return MAIN_BARBELL_LIFTS.has(canonical(name));
 }
 
 export function weightForExercise(name: string): number {
@@ -242,7 +242,7 @@ export function weightForExercise(name: string): number {
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 
 export type ExerciseType =
-  | 'barbell_main'      // the four 5/3/1 lifts — percentages of a training max, AMRAP, coached
+  | 'barbell_main'      // the four the previous program lifts — percentages of a training max, AMRAP, coached
   | 'loaded_accessory'  // barbell / DB / cable accessory work — weight x reps, no max, no commands
   | 'bodyweight'        // push-up, pull-up, glute bridge — reps, and D-348 says the body IS load
   | 'plyo'              // box jump, bounding — reps only, no external load, never coached
@@ -322,12 +322,12 @@ export const EXERCISE_TYPE_CAPABILITIES: Record<ExerciseType, TypeCapability> = 
 
 /**
  * Name → type, curated over the SAME vocabulary the rest of this file is built from: every key in
- * `ROLE_TABLE`, every key in `MAIN_531_LIFTS`, and every key in `exercise-config.ts` (140 distinct
+ * `ROLE_TABLE`, every key in `MAIN_BARBELL_LIFTS`, and every key in `exercise-config.ts` (140 distinct
  * canonical names). The fixtures assert that coverage, so a protocol adding a name fails a test
  * rather than falling quietly onto the default.
  *
- * ⛔ THE FOUR MAIN LIFTS ARE NOT IN THIS TABLE. `typeForExercise` reads `MAIN_531_LIFTS` directly,
- * so `barbell_main` and `isMain531Lift` cannot disagree — one set, two readers. Listing them twice
+ * ⛔ THE FOUR MAIN LIFTS ARE NOT IN THIS TABLE. `typeForExercise` reads `MAIN_BARBELL_LIFTS` directly,
+ * so `barbell_main` and `isMainBarbellLift` cannot disagree — one set, two readers. Listing them twice
  * is how a second vocabulary starts, which is the disease this whole spec exists to cure.
  *
  * ⚠️ A NAME IS TYPED `band` BY WHAT THE BAND DOES, NOT BY THE WORD "BAND" IN IT. "Band Assisted
@@ -397,9 +397,9 @@ const TYPE_TABLE: Record<string, ExerciseType> = {
   'dumbbell incline press': 'loaded_accessory',
   'chest fly': 'loaded_accessory',
   'dumbbell fly': 'loaded_accessory',
-  // ⚠️ 'shoulder press' / 'db push press' are NOT the 5/3/1 press slot — a dumbbell press is not
+  // ⚠️ 'shoulder press' / 'db push press' are NOT the previous program press slot — a dumbbell press is not
   // pressed off a training max. `overhead press` and `push press` (bare) are, and they live in
-  // MAIN_531_LIFTS. This is the same narrow-vs-wide split isMain531Lift's own docblock argues.
+  // MAIN_BARBELL_LIFTS. This is the same narrow-vs-wide split isMainBarbellLift's own docblock argues.
   'shoulder press': 'loaded_accessory',
   'db shoulder press': 'loaded_accessory',
   'dumbbell shoulder press': 'loaded_accessory',
@@ -457,7 +457,7 @@ const TYPE_TABLE: Record<string, ExerciseType> = {
   'cable curl': 'loaded_accessory',
   'tricep extension': 'loaded_accessory',
   'tricep pushdown': 'loaded_accessory',
-  // Wendler's own plurals + the DB shorthands the catalog stores (2026-08-13).
+  // the standard plurals + the DB shorthands the catalog stores (2026-08-13).
   'triceps pushdown': 'loaded_accessory',
   'triceps extension': 'loaded_accessory',
   'db incline press': 'loaded_accessory',
@@ -532,10 +532,10 @@ const TYPE_TABLE: Record<string, ExerciseType> = {
   'kettlebell swing': 'loaded_accessory',
   'pallof press': 'loaded_accessory',
   'weighted single leg calf raise': 'loaded_accessory',
-  // ⚠️ 'bench' and 'incline bench' are shorthand the plan emits; `isMain531Lift` does NOT recognise
+  // ⚠️ 'bench' and 'incline bench' are shorthand the plan emits; `isMainBarbellLift` does NOT recognise
   // bare 'bench', so it cannot be `barbell_main` here without breaking the one-set invariant below.
   // That mismatch is real and pre-existing — filed in the Step 1 review note, NOT fixed here,
-  // because widening MAIN_531_LIFTS would change what D-373 coaches on a live screen.
+  // because widening MAIN_BARBELL_LIFTS would change what D-373 coaches on a live screen.
   'bench': 'loaded_accessory',
 
   // ── BODYWEIGHT: the body is the load (D-348), logged as reps ─────────────────────────────────
@@ -571,7 +571,7 @@ const TYPE_TABLE: Record<string, ExerciseType> = {
   'soleus raise': 'bodyweight',
   'tibialis raise': 'bodyweight',
 
-  // ── WENDLER FOREVER ASSISTANCE CATALOG + the equipment-substitution outputs (2026-08-13).
+  // ── THE PREVIOUS PROGRAM FOREVER ASSISTANCE CATALOG + the equipment-substitution outputs (2026-08-13).
   // ⛔ THE DEFAULT WOULD HAVE BEEN 'loaded_accessory' — "counts as load, says nothing" — AND THAT IS
   // WRONG FOR EVERY BODYWEIGHT ENTRY BELOW. A glute-ham raise counting as external load is a silent
   // over-count in the logger and the language layer, and the coverage test is what caught it rather
@@ -719,7 +719,7 @@ const warnedUnmappedTypes = new Set<string>();
 export function lookupExerciseType(name: string): ExerciseType | null {
   const key = canonical(name);
   if (!key) return null;
-  if (MAIN_531_LIFTS.has(key)) return 'barbell_main';
+  if (MAIN_BARBELL_LIFTS.has(key)) return 'barbell_main';
   return TYPE_TABLE[key] ?? null;
 }
 

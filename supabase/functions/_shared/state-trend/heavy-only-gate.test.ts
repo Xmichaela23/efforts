@@ -78,7 +78,7 @@ Deno.test('⛔⛔ REVERSED 2026-08-29: AN UNMARKED SET *DOES* REACH THE LINE', (
    *
    * ⛔ THE EVIDENCE THAT ENDED IT, measured on the athlete's own data: across 178 logged main-lift
    * rows back to 2025-09-02, ZERO passed either door — the stamp did not exist before 2026-08-26,
-   * and the derived door needs 90% of the known max while a 5/3/1 top set is 65-95% by design
+   * and the derived door needs 90% of the known max while a the previous program top set is 65-95% by design
    * (bench 135 against an estimated 165 is 82%). The gate did not admit a strict subset; it admitted
    * nothing, and the chart was empty.
    * ⛔ THE FALSE DIP IS STILL CLOSED — by the week's-heaviest rule in `liftSeriesFromExerciseLog`,

@@ -2309,7 +2309,7 @@ function buildStrengthVolume(
     // ⚠️ SCOPED TO THE PRESCRIPTION DELIBERATELY. The COMPLETED side still prices an unweighted
     // accessory set at body weight, and changing that moves session load and ACWR history, not a
     // screen. Named, not done here.
-    // ⚠️ ASKED OF THE RAMP TOO, NOT ONLY OF `ex.weight`. A 5/3/1 row carries its top-set weight on
+    // ⚠️ ASKED OF THE RAMP TOO, NOT ONLY OF `ex.weight`. A the previous program row carries its top-set weight on
     // the exercise AND a per-set weight on every `set_plan` entry; a row that names a load anywhere
     // is a row that named a load, and must keep pricing exactly as it did.
     const bodyIsTheLoad = typeForExercise(String(ex?.name ?? '')) === 'bodyweight' || bandIsAssistance;
@@ -2319,7 +2319,7 @@ function buildStrengthVolume(
     const plannedNamesNoLoad = (Number(ex?.weight) || 0) <= 0 && !anySetPlanWeight
       && !plannedIsBand && !bandIsLoad && !bodyIsTheLoad;
 
-    // ⛔ THE AUTHORED RAMP WINS (D-338). On 5/3/1 the three sets are three DIFFERENT weights, and
+    // ⛔ THE AUTHORED RAMP WINS (D-338). On the previous program the three sets are three DIFFERENT weights, and
     // the client renders them that way. Pricing `sets × reps × topWeight` here would print a delta
     // that disagrees with the set rows directly above it — the exact bug D-338 fixed.
     // ⛔ THE RAMP IS PRICED ON ONE SIDE ONLY, AND THAT IS THE WHOLE OF THE RED SHORTFALL

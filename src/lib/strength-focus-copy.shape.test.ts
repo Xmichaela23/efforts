@@ -25,7 +25,7 @@ const architecture = (leaders: number, anchors: number, testWeeks: number[] = [1
 
 Deno.test('⛔ NO BLOCK EVER SAYS "0 building cycles"', () => {
   // ⚠️ `leaders = 0` IS NO LONGER REACHABLE FROM THE ENGINE (§1b — zero leaders is not one of
-  // Wendler's shapes, Forever p.17), but the copy must still not print a zero if it is ever handed
+  // the previous program's shapes, the previous program), but the copy must still not print a zero if it is ever handed
   // one. The guard stays; what changed is that it is now belt-and-braces rather than live.
   for (let leaders = 0; leaders <= 3; leaders++) {
     const body = architecture(leaders, 3 - leaders || 1);
@@ -43,7 +43,7 @@ Deno.test('⛔ THE STRUCTURE SENTENCE FOLLOWS THE BLOCK — cycles, light weeks,
     // days" — so while the engine built three, the suite was enforcing the wrong sentence and would
     // have gone red on the fix. A test that holds copy in place has to move when the copy is the
     // thing that was wrong.
-    "Sub-maximal loading (Wendler's 5/3/1) keeps fatigue manageable. Three lifting days — squat, " +
+    'Sub-maximal loading keeps fatigue manageable. Three lifting days — squat, ' +
       'bench, and deadlift with the overhead press — placed around your endurance. ' +
       '2 building cycles, then one measuring cycle from week 9. ' +
       'Each cycle runs three weeks, with a light week between them. ' +

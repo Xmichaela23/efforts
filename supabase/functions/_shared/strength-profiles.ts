@@ -35,7 +35,7 @@ export type StrengthProtocolProfile = {
    * deterministic.
    *
    * RIR belongs to auto-regulated training, where how the athlete feels today decides what goes on
-   * the bar. Wendler's 5/3/1 is the opposite: the working number and the reps are fixed in advance,
+   * the bar. the previous program is the opposite: the working number and the reps are fixed in advance,
    * and the only thing that overrides them is a hard rep count on the week-3 check set. Asking for
    * a subjective reserve estimate there is not just unused — it is a SECOND instruction that can
    * contradict the first, on the exact set where the prescription reads "as many as you can".
@@ -59,11 +59,11 @@ export type StrengthProtocolProfile = {
    *
    * `usesRir: false` says only what NOT to ask for. It does not say what the protocol asks INSTEAD,
    * so every read surface had to infer that — and each one inferred differently, which is how the
-   * State per-lift verdict ended up keyed on a RIR branch that can never fire on a 5/3/1 block
+   * State per-lift verdict ended up keyed on a RIR branch that can never fire on a the previous program block
    * (audit F3). One flag, one answer, read by all of them.
    *
    *   'rir'   — auto-regulated: reps-in-reserve on the working sets is the signal.
-   *   'amrap' — deterministic: an all-out set at a prescribed % is the measurement (Wendler 5/3/1).
+   *   'amrap' — deterministic: an all-out set at a prescribed % is the measurement (the previous program).
    *   'none'  — the protocol reads neither; a surface asking for either is asking for nothing.
    *
    * ⚠️ ABSENT IS NOT 'none'. Absent means "not stated", and it resolves off `usesRir` so every
@@ -138,17 +138,17 @@ export const PROTOCOL_PROFILES: Record<StrengthProtocolId, StrengthProtocolProfi
     deload:      { maxDeviation: -1.0, minSessions: 3 },
   },
 
-  // ⛔ STRENGTH FOCUS (Wendler 5/3/1) — THE ONE PROTOCOL THAT DOES NOT USE RIR.
+  // ⛔ STRENGTH FOCUS (the previous program) — THE ONE PROTOCOL THAT DOES NOT USE RIR.
   //
   // Michael, 2026-07-25: RIR belongs to auto-regulated programmes, where today's feeling sets the
-  // weight. 5/3/1 is deterministic — the working number and the reps are fixed at plan creation and
+  // weight. the previous program is deterministic — the working number and the reps are fixed at plan creation and
   // move only on the hard rep count of the week-3 check set. The engine never reads RIR to decide
   // anything here, so asking for it is a second instruction that can contradict the first, on a
   // block whose athletes are already carrying endurance fatigue.
   //
   // ⚠️ SCOPE: `usesRir: false` is set HERE and NOWHERE ELSE. Every other protocol in this file is
   // untouched and keeps its targets, its grading and its logger prompt. This is a property of the
-  // 5/3/1 block, not a change to how the app handles effort.
+  // the previous program block, not a change to how the app handles effort.
   //
   // The RIR numbers below stay for one reason: `adapt-plan` and the analyzer still resolve a profile
   // for any legacy plan already carrying `source: strength_primary`, and a missing entry resolves to
@@ -156,7 +156,7 @@ export const PROTOCOL_PROFILES: Record<StrengthProtocolId, StrengthProtocolProfi
   //
   // (History: D-322 added this entry because these blocks had none and fell through to `durability`
   // — a flat RIR 2.5 across a block finishing in 94% doubles. That fix was correct for the ATR
-  // protocol it was written against; the 5/3/1 rewrite replaced the protocol, and the honest answer
+  // protocol it was written against; the previous program rewrite replaced the protocol, and the honest answer
   // for the new one is no target at all rather than a better one.)
   strength_primary: {
     usesRir: false,
@@ -200,7 +200,7 @@ export const PROTOCOL_PROFILES: Record<StrengthProtocolId, StrengthProtocolProfi
   // `block-identity.ts` — which silences every effort-aware surface without saying so.
   //
   // ⛔ IT AUTO-REGULATES, and that is the difference from `strength_primary` sitting above it.
-  // 5/3/1 fixes the working number and the reps in advance and measures one all-out set. This block
+  // the previous program fixes the working number and the reps in advance and measures one all-out set. This block
   // prescribes REP RANGES at a stated reserve — p218 gives DE and SKILL 3-4 RIR and HYP 0-2 — and
   // progresses when the athlete holds the top of the range at that reserve (double progression,
   // ours, `standing-plan/progression.ts`). Reps-in-reserve is the signal, so `readsEffortAs: 'rir'`.
@@ -466,7 +466,7 @@ export function normalizePhaseKey(phaseTag: string | null | undefined): PlanPhas
   if (raw in PHASE_RULES) return raw as PlanPhaseId;
   // Intensification blocks: harder than base, not yet the peak.
   if (raw === 'power' || raw === 'strength' || raw === 'intensification' || raw === 'build2') return 'build';
-  // 5/3/1 (SPEC-get-stronger). A LEADER cycle is programmed fives with no all-out set — accumulation,
+  // the previous program (SPEC-get-stronger). A LEADER cycle is programmed fives with no all-out set — accumulation,
   // so `base`. An ANCHOR reinstates the open top set at a higher working number — intensification, so
   // `build`. Registered here at the same time the composer started emitting them: an unrecognised name
   // resolves to the default silently, and that silence is Q-192's whole failure mode.
@@ -475,7 +475,7 @@ export function normalizePhaseKey(phaseTag: string | null | undefined): PlanPhas
   // Planned unloading — must LOOSEN the target, never tighten it.
   if (raw === 'deload' || raw === 'unload' || raw === 'restoration' || raw === 'rest') return 'recovery';
   // Fresh-for-a-number weeks. A retest is a test: arrive rested, do not grind into it.
-  // ⛔ `tm test` / `tm_test` REGISTERED 2026-08-15 — the standalone training-max test week the 5/3/1
+  // ⛔ `tm test` / `tm_test` REGISTERED 2026-08-15 — the standalone training-max test week the previous program
   // composer now emits (Forever pp.20-21). It is exactly this category: low volume, one measured set,
   // and the target must not tighten into it. Registered in the same change that started emitting it,
   // because an unrecognised name resolves to the default silently — Q-192's whole failure mode.

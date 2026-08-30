@@ -342,7 +342,7 @@ export type FloorResult = {
 /**
  * ⛔ THE FLOOR BENEATH THE PICKER — NOT A REPLACEMENT FOR IT.
  *
- * *"It is the work that matters"* (Wendler p.24), and Viada encourages rotation and unfamiliar
+ * *"It is the work that matters"* (the previous program), and Viada encourages rotation and unfamiliar
  * movements. **Every pick the athlete made survives untouched.** What this adds is one slot for each
  * muscle group the week left at zero, so the focus picker can no longer leave quads and shoulders
  * with nothing.

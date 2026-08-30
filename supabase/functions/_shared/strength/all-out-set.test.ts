@@ -20,7 +20,7 @@ import {
 } from './all-out-set.ts';
 
 Deno.test('⛔ THE GAP-1 TRAP: a heavy single after the AMRAP does not become the reading', () => {
-  // A good 5/3/1 session: 225x6 all-out, then a 275 single for fun.
+  // A good the previous program session: 225x6 all-out, then a 275 single for fun.
   // `best_weight` = 275 and `best_reps` = 1 — the aggregate that reads as a MISS.
   const reads = readAllOutSets({
     exercises: [{

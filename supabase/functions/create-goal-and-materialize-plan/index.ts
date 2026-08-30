@@ -2542,7 +2542,7 @@ Deno.serve(async (req: Request) => {
             // under 85 the program writes weights a 45 lb bar cannot be. See
             // `STRENGTH_ENTRY_MIN_1RM_LB` in `barbell-maxes.ts` for the derivation.
             // Under 65, even the 35 lb women's bar cannot carry the program's lightest set —
-            // that athlete needs a beginner program, not a lighter 5/3/1. The 65-84 band is
+            // that athlete needs a beginner program, not a lighter the previous program. The 65-84 band is
             // ADMITTED: those lifts floor at 35 and the plan copy names the women's-bar sets.
             const gsLow = liftsBelowEntryMinimum(gsMaxes).map((l) => `${LIFT_LABEL[l]} (${gsMaxes[l as BarbellLift]} lb)`);
             if (gsLow.length > 0) {
@@ -2610,7 +2610,7 @@ Deno.serve(async (req: Request) => {
             // ⛔ THE BLOCK-TO-BLOCK TRANSITION GATE (§1d) — SPEC §1b's debt, paid 2026-08-15. The
             // CLOSING TM-test week of the finished block decides where the next one starts: five
             // reps at the training max advances it a step, three or four holds it, two or fewer
-            // replaces it with the number computed off that set (Forever p.21). Absent → the
+            // replaces it with the number computed off that set (the previous program). Absent → the
             // composer derives from the 1RM on file, which is the pre-2026-08-15 behaviour exactly.
             let gsPriorTrainingMax: Record<string, number> | undefined;
             if (gsPriorPlanId) {

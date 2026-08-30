@@ -7,7 +7,7 @@
 // missing middle: the gate and the signal both existed and nothing joined them.
 //
 // ⛔ AND IT DOES NOT READ `exercise_log`. That table aggregates to `best_weight` / `best_reps`, which
-// is *the heaviest set, and the most reps at that weight* — NOT the AMRAP. In 5/3/1 those usually
+// is *the heaviest set, and the most reps at that weight* — NOT the AMRAP. In the previous program those usually
 // coincide, because the AMRAP is the top set. They come apart the moment an athlete adds a heavy
 // single afterwards: `best_reps` becomes 1, and 1 < 5 reads as a MISS on a session that went well.
 // The per-set `amrap` flag survives into `workouts.strength_exercises[].sets[]` (StrengthLogger
@@ -140,7 +140,7 @@ export function amrapRepsForLift(
  *   weekInCycle 2 → 90% × 3+     ≥5 is a harsh bar nobody was asked to clear
  *   weekInCycle 3 → 95% × 1+     ⛔ THIS ONE. `VALIDITY_CHECK_PCT` is 0.95.
  *
- * "Latest" coincides with week 3 only while nothing is skipped. Miss the 5/3/1 week and "latest"
+ * "Latest" coincides with week 3 only while nothing is skipped. Miss the previous program week and "latest"
  * becomes the 90% × 3+ set, where three reps is a pass by prescription and a `reset` by this gate —
  * the athlete's working number drops 10% for completing the session as written.
  *
@@ -273,7 +273,7 @@ export function verdictsForBlock(
 // SAME QUESTION. Read this before wiring anything else to either:
 //
 //   `verdictForCycle`      week 3 of a cycle · a set at **95%** of the training max · minimum ONE rep
-//                          (2nd ed. p.23) · answers "did the prescription hold this cycle"
+//                          (the previous program) · answers "did the prescription hold this cycle"
 //   `tmTestResultFor`      a standalone test week · a set at **100%** of it · bar of FIVE
 //                          (Forever pp.20-21) · answers "is the training max still the right number"
 //
@@ -304,7 +304,7 @@ export type TmTestResult = {
   verdict: WorkingNumberVerdict;
   /**
    * ⛔ PRESENT ONLY ON `recalibrate` — the absolute new training max, computed off the set that was
-   * actually performed (Forever p.21). Absent on every other verdict, because every other verdict is
+   * actually performed (the previous program). Absent on every other verdict, because every other verdict is
    * a delta the walker already knows how to apply.
    */
   trainingMax?: number;

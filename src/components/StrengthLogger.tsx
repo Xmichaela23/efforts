@@ -66,7 +66,7 @@ type StandingWorkingNumber = {
 };
 type StandingFillResult = RematerializeResult & { _saved?: unknown };
 // D-208's role table — the app's one answer to "is this a main lift or assistance work".
-import { roleForExercise, isMain531Lift } from '@/lib/exercise-role';
+import { roleForExercise, isMainBarbellLift } from '@/lib/exercise-role';
 // [Step 3] The logger's two private classifiers, moved out of this file and beside the shared type
 // table. `isDurationLogged` reads the table (`loggedAs`); `equipmentForExercise` is the transcribed
 // EQUIPMENT axis the table does not carry — see the module header for why it is not derived.
@@ -96,7 +96,7 @@ import {
   moveSessionStart,
   readResumableStart,
 } from '@/lib/strength-session-clock';
-// The app's ONE 1RM formula — Wendler's own (D-339). `compute-facts` imports the same module.
+// The app's ONE 1RM formula — the standard (D-339). `compute-facts` imports the same module.
 
 /**
  * The hint under the Band (lb) keypad. ⛔ ONE CONSTANT, TWO CALL SITES — the band box is rendered in
@@ -184,7 +184,7 @@ interface LoggedExercise {
   target_rir?: number; // Target RIR from prescription (1-5)
   /** ⛔ false = this protocol does NOT auto-regulate, so no RIR is shown, asked for, or stored.
    *  Stamped by materialize-plan off the protocol profile (`protocolUsesRir`). Today only Strength
-   *  Focus (5/3/1) sets it: the weight and the reps are fixed in advance and nothing reads a reserve
+   *  Focus (the previous program) sets it: the weight and the reps are fixed in advance and nothing reads a reserve
    *  estimate to make a decision. Absent/true → every existing protocol behaves exactly as before. */
   rir_tracked?: boolean;
   target_reps?: string; // Target reps from prescription, e.g. "4-6" or "8" (display only)
@@ -250,7 +250,7 @@ const calculateTotalVolume = (exercises: LoggedExercise[]): number => {
 // Check if exercise is a main compound lift
 // ⛔ `isMainCompound` AND `isPlyometric` LIVED HERE AND ARE GONE (2026-08-03).
 // `isMainCompound` was the SEVENTH private exercise classifier in the app and it disagreed with
-// `MAIN_531_LIFTS`: Push Press and Military Press matched none of its words, so two main lifts
+// `MAIN_BARBELL_LIFTS`: Push Press and Military Press matched none of its words, so two main lifts
 // rested like accessories. Rest length now comes from `src/lib/strength-rest-timer.ts`, which asks
 // the shared classifier — and which can be unit-run, unlike a function inside this file.
 // `isPlyometric` moved to the same module unchanged, so the rest timer and the render gates below
@@ -647,7 +647,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // The 1RM an AMRAP has to beat to be a PR — YOUR BEST MEASURED 1RM, learned from your logged AMRAP
   // history (`learned_fitness.strength_1rms`, ratcheted up-only, D-223). Loaded at mount, so it holds
   // your PRIOR sessions — this AMRAP isn't in it yet. Falls back to the typed number only when you've
-  // never logged this lift. Wendler p10: keep breaking rep records and the 1RM goes up.
+  // never logged this lift. the previous program: keep breaking rep records and the 1RM goes up.
   const bestMeasuredOneRmFor = (name: string): number | undefined => {
     const t = String(name || '').toLowerCase();
     const learned: any = learnedStrength1rms || {};
@@ -981,7 +981,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   /**
    * Bodyweight movements that are normally BAND-ASSISTED rather than loaded — the assistance is the
-   * dial, and walking it down is the progression (Wendler: use band or machine assistance, reduce
+   * dial, and walking it down is the progression (the previous program: use band or machine assistance, reduce
    * tension until you can do clean reps at bodyweight).
    *
    * ⚠️ Deliberately narrower than `isBodyweightMove`. A push-up or a plank has no standard assisted
@@ -1789,7 +1789,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     else s += `${p.reps} reps`;
     // ⛔ NO RIR ON A PROTOCOL THAT KILLED IT. D-324 removed RIR from Strength Focus — not shown, not
     // asked for, not stored — because it was auto-filled and then entered the 1RM maths. The "last:"
-    // anchor kept printing it anyway, from historical sets logged when it WAS tracked, so a 5/3/1
+    // anchor kept printing it anyway, from historical sets logged when it WAS tracked, so a the previous program
     // session showed "last: 120 × 5 @ RIR 3" under a protocol whose whole point is that the weight
     // and the reps are fixed in advance and no reserve estimate decides anything.
     // ⚠️ The number is real history, which is exactly why it survived: it is not FALSE, it is
@@ -1864,17 +1864,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // ⛔ THE FOUR MAIN LIFTS ONLY (2026-08-01). The first cut gated on "not assistance", which let
     // the cue onto everything the block prescribes that is not an accessory — Michael's Box Jump
     // read "Every rep at the same speed as the first", which is advice for a barbell set under a
-    // percentage of a training max, not for a jump. `isMain531Lift` is an explicit curated list and
+    // percentage of a training max, not for a jump. `isMainBarbellLift` is an explicit curated list and
     // MISSES TO FALSE, so an unmapped lift gets no cue rather than the wrong one. Accessories get
     // the section note above the block; plyos get nothing.
-    if (!isMain531Lift(exercise?.name || '')) return null;
+    if (!isMainBarbellLift(exercise?.name || '')) return null;
     if (equipmentForExercise(exercise?.name || '') === 'plyo') return null;
     if (isBaselineTestWorkout(scheduledWorkout || {})) return null;
     return barSpeedLineFor({
       isWarmup: set?.setType === 'warmup',
       isAmrap: set?.amrap === true,
       /**
-       * ⛔ THE STANDING PLAN'S PRETEST IS NOT WENDLER'S AMRAP, AND THEY SHARE A FLAG (2026-08-24).
+       * ⛔ THE STANDING PLAN'S PRETEST IS NOT THE PREVIOUS PROGRAM'S AMRAP, AND THEY SHARE A FLAG (2026-08-24).
        * Both stamp `amrap: true`, so this screen showed *"Grind it out"* on a set whose entire job
        * is a clean measurement. ⚠️ KEYED ON THE SESSION'S OWN TAG rather than on a new field: the
        * composer already tags that session `test_week`, and adding a set-level flag would put a
@@ -2005,7 +2005,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     'Lat Pull Down', 'Weighted Single Leg Calf Raise', 'DB Row', 'DB Floor Press',
     'DB Push Press', 'DB Romanian Deadlift', 'KB Swing',
 
-    // Main lifts the picker was missing. ⛔ "Press" and "Military Press" are 5/3/1's own names for
+    // Main lifts the picker was missing. ⛔ "Press" and "Military Press" are the previous program's own names for
     // the overhead press and neither could be typed in — while "Press" also resolved to a LEG PRESS
     // prescription in the config. Both halves of that are fixed.
     'Press', 'Military Press', 'Push Press', 'Barbell Bench Press',
@@ -2187,7 +2187,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   // ── THE PER-SET PRESCRIPTION ────────────────────────────────────────────────────────────────
-  // 5/3/1 prescribes three sets at three DIFFERENT weights (docs/SPEC-get-stronger.md §1). Every
+  // the previous program prescribes three sets at three DIFFERENT weights (docs/SPEC-get-stronger.md §1). Every
   // prefill path in this file used to take the row's single `weight` and copy it onto every set,
   // which is right for "4×5 @ 135" and wrong for the whole of this protocol: the athlete would open
   // each session to the TOP weight sitting on all three sets and correct two of them by hand, four
@@ -2198,7 +2198,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // the same row shape was being mapped in four places, and that is how this file grows a bug that
   // only shows up on one of them.
   //
-  // Returns null for any row with no `set_plan`, which is every row that is not a 5/3/1 main lift.
+  // Returns null for any row with no `set_plan`, which is every row that is not a the previous program main lift.
   // Those keep the copy-the-one-weight behaviour exactly as before.
   // ⛔ THE ALL-OUT SET HAD NO LABEL ON IT. `amrap: true` changed BEHAVIOUR — the reps box opens
   // blank, Done skips the RIR strip — but nothing on screen said why, so the set looked like every
@@ -2256,14 +2256,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             reps = parseInt(match[1], 10);
           }
         }
-        // "5+" is an all-out set with a floor — Wendler's notation for the anchor's top set. It reads
+        // "5+" is an all-out set with a floor — the previous program's notation for the anchor's top set. It reads
         // as open reps exactly like "AMRAP" does, and without this it fell through as a fixed 5 and
         // took the ordinary 2–3 RIR gate instead of the near-max one.
         const isAmrap = typeof repsRaw === 'string' && (/amrap/i.test(repsRaw) || /^\d+\s*\+$/.test(repsRaw.trim()));
         // ⛔ AN ASSISTANCE REP TOTAL IS NOT A SET OF THAT MANY REPS (2026-08-11). "50 total" was
         // parsed to 50 and written onto every prescribed set, so the row opened reading "one set of
         // 50" — which is not what the block asked for and not how assistance is trained: it is a
-        // total to hit across as many sets as you need (Wendler, 5/3/1 2nd ed. p.24/p.102). The row
+        // total to hit across as many sets as you need (the previous program). The row
         // now opens with ONE blank set and the countdown above it does the accounting.
         // ⚠️ Reps only. A LOADED assistance movement (Romanian Deadlift) keeps its weight prefill —
         // the total is about reps, and blanking the weight would throw away a real prescription.
@@ -2340,7 +2340,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             // materialized before then fall back to the notes regex in the cue detection.
             slot_intent: typeof s?.slot_intent === 'string' ? s.slot_intent : undefined,
             // ⛔ IS THIS ROW ONE OF THE BLOCK'S ASSISTANCE SLOTS? The composer marks them
-            // `load_prescribed: false` — assistance in 5/3/1 is never priced off a percentage
+            // `load_prescribed: false` — assistance in the previous program is never priced off a percentage
             // ("the engine prescribes NO weight for assistance work. Ever."). Carried through so the
             // Swap sheet can offer the PLAN's shortlist for that slot instead of the whole library.
             // ⚠️ Read as an explicit `false`, never as "falsy" — an absent field on a legacy row must
@@ -2357,8 +2357,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // Per-set prescription when the row carries one; otherwise the row's single weight on every
         // set, exactly as before.
         const planned = plannedSetsFor(s);
-        // A 5/3/1 main lift on a working week carries a warm-up ramp in front of the work sets
-        // (Wendler p.31). Only then do we stamp setType, so the logger can section it — a deload lift
+        // A the previous program main lift on a working week carries a warm-up ramp in front of the work sets
+        // (the previous program). Only then do we stamp setType, so the logger can section it — a deload lift
         // or an assistance row (no ramp) stays untyped and renders exactly as before.
         const hasWarmupRamp = Array.isArray(planned) && planned.some((p: any) => p.warmup);
         // A rep total opens as ONE blank set — the athlete taps Add Set per chunk. Any prescribed
@@ -4102,10 +4102,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       return;
     }
 
-    // ⛔ A DETERMINISTIC PROTOCOL RECORDS NO RIR. Strength Focus (5/3/1) fixes the weight and the
+    // ⛔ A DETERMINISTIC PROTOCOL RECORDS NO RIR. Strength Focus (the previous program) fixes the weight and the
     // reps at plan creation; nothing in the engine reads a reserve estimate to decide anything, so
     // asking for one on a heavy set is cognitive load with no consumer. Worse, an auto-filled value
-    // is not inert: the learned 1RM is estimated as estimate1RM(weight, reps + rir) — Wendler's own
+    // is not inert: the learned 1RM is estimated as estimate1RM(weight, reps + rir) — the standard
   // formula since D-339 — so a guessed
     // reserve on a deliberately sub-maximal opener reads back as a heavier lift than happened.
     // Done just completes the set. `rir_tracked === false` is stamped by materialize off the
@@ -4734,7 +4734,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
            *
            * ⚠️ ONLY ON A ROW THAT DECLARED AN INTENT. The timer key is `${exerciseId}-${setIndex}`,
            * so the exercise is recovered by prefix rather than by splitting on a dash — an exercise
-           * id contains them. A 5/3/1 or freestyle row has no intent, gets no sentence, and keeps
+           * id contains them. A the previous program or freestyle row has no intent, gets no sentence, and keeps
            * the countdown it always had.
            */
           const restEx = exercises.find((e) => activeKey.startsWith(`${e.id}-`));
@@ -5072,7 +5072,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         )}
         {exercises.map((exercise, exerciseIndex) => {
           // Card chrome = "is this the prescription?" — see the long note above the card below.
-          const isMainLiftCard = !isMobilityMode && isMain531Lift(exercise?.name || '');
+          const isMainLiftCard = !isMobilityMode && isMainBarbellLift(exercise?.name || '');
           // ⛔ THE LIGHT IS ALWAYS THE SPORT COLOUR — only its BRIGHTNESS says what the card is
           // (2026-08-14, Michael on the assistance block: "can we add more orange space lighting
           // effect in there"). The first cut lit assistance cards in WHITE, which read as a
@@ -5093,12 +5093,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               accessory (three times on Michael's screen) and, placed in the header flex row, it took
               width from the exercise-name search box until the name was invisible. One line, above
               the group, outside every card.
-              Basis: Wendler 5/3/1 2nd ed. p.24 / p.102 — assistance runs across as many sets as it
+              Basis: the archived source — assistance runs across as many sets as it
               takes and is explicitly not taken to failure; too much of it is the most common mistake
               with the programme. See ACCESSORY_SET_CUE for why this line may carry words the
               bar-speed lint bans.
               ⛔ THE LINE IS PICKED BY THE SESSION'S OWN TAG (2026-08-24, Michael on device). On a
-              `standing_plan` session the Wendler line is false — those rows prescribe discrete sets,
+              `standing_plan` session the previous program line is false — those rows prescribe discrete sets,
               not a total to split — so it gets STANDING_ACCESSORY_SET_CUE (Viada Part B2). Same
               tag-not-new-field idiom as the pretest gate above. A `plyo` session gets NO cue: every
               drill row is load_prescribed:false, but "find the load" over a bodyweight A-Skip is the
@@ -5129,14 +5129,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           {/* ⛔ THE ACCENT MEANS "THIS IS THE PRESCRIPTION" (2026-08-14, Michael: "we keep big lift
               orange, accessories white?"). The main lift is the thing the programme drives — a
               percentage of a training max, a rep target, a set that decides the next cycle.
-              Assistance is explicitly by feel (2nd ed. p.24/p.102). Painting both the same colour
+              Assistance is explicitly by feel (the archived source). Painting both the same colour
               spent the accent on the part of the screen that has no prescription to carry.
               So the CARD's colour is main-lift-only.
               ⚠️ STATE stays orange on EVERY card, deliberately — a completed set is a completed set
               whether it is a squat or a chin-up, and the accessory blocks are exactly where you
               scan "how many have I banked". Chrome answers "what kind of work is this"; the check
               and the row tint answer "did I do it". Two questions, two jobs, one hue.
-              The gate is `isMain531Lift` — an explicit curated list that MISSES TO FALSE — and not
+              The gate is `isMainBarbellLift` — an explicit curated list that MISSES TO FALSE — and not
               `!isAssistanceRow`, for the same reason the bar-speed cue uses it: a prescribed Box
               Jump is not assistance and is not a main lift either, and it should not claim the
               accent by default. */}
@@ -5516,7 +5516,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                      information, laid across instead of stacked — the shape Strong and Hevy use,
                      which is the "feels familiar to lifters" bar this surface is held to.
 
-                     ⛔ THE COLUMN SET IS GATED, NOT FIXED, AND THAT IS THE POINT. A 5/3/1 main
+                     ⛔ THE COLUMN SET IS GATED, NOT FIXED, AND THAT IS THE POINT. A the previous program main
                      lift renders NO RIR column (`rir_tracked === false` — D-162/D-324: the weight
                      and the reps are fixed in advance and nothing in the engine reads a reserve
                      estimate, so an auto-filled one would only corrupt the e1RM). A bodyweight or
@@ -5586,7 +5586,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // mid-set with a bar in their hands.
                   const labelCls = 'text-[9px] font-semibold uppercase tracking-[0.08em] text-white/[0.78] leading-none';
                   // ONE bar-speed cue for the whole lift, right under the title (Michael 2026-08-10) —
-                  // Wendler's explosive-rep instruction, main 5/3/1 lifts only. It was repeated on every
+                  // the previous program's explosive-rep instruction, main the previous program lifts only. It was repeated on every
                   // working set's detail line; that space now carries plate math. `barSpeedCueFor` with
                   // an empty set returns the work_set line and misses to null off the main lifts.
                   const titleCue = barSpeedCueFor(exercise, {} as any);
@@ -5597,9 +5597,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // detection reads the composer's own sourceText in `notes` ("1 x ME: …",
                   // "4 x DE: …"), the same tag-not-new-field idiom as the pretest gate.
                   // ⚠️ THE DE CUE DELIBERATELY BEATS THE BAR-SPEED CUE: close grip bench press is
-                  // on the MAIN_531_LIFTS list as a Wendler bench-slot variant, so `titleCue` fires
+                  // on the MAIN_BARBELL_LIFTS list as a the previous program bench-slot variant, so `titleCue` fires
                   // on it — but on a standing session that row is a speed slot with no load, and
-                  // the Wendler line names neither the intent nor the weight. Priced rows
+                  // the previous program line names neither the intent nor the weight. Priced rows
                   // (load_prescribed ≠ false — the tested lifts) keep the bar-speed cue untouched.
                   // Intent comes from `slot_intent` (data, 2026-08-26) with the notes regex as the
                   // legacy fallback — rows materialized before the field existed still carry the
@@ -5613,7 +5613,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                    * only instruction that slot can carry.
                    *
                    * ⚠️ IT NOW BEATS THE BAR-SPEED CUE ON A STANDING SESSION, which is the same call
-                   * already made for DE one paragraph down: `barSpeedCueFor` speaks Wendler, and on a
+                   * already made for DE one paragraph down: `barSpeedCueFor` speaks the previous program, and on a
                    * block composed from Viada that line names the wrong programme's intent. Off a
                    * standing-plan session nothing changes — the tag is the gate.
                    */
@@ -5641,8 +5641,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                    * ⛔⛔ BUT `null` WOULD NOT HAVE MEANT NOTHING. The render below is
                    * `standingCue ?? titleCue`, so a DE row returning null FALLS THROUGH to
                    * `barSpeedCueFor` — and close-grip bench press is a secondary push in this frame
-                   * AND on `MAIN_531_LIFTS`, so that row would have started reading *"Every rep
-                   * explosive and controlled."* Wendler's words on a Viada block. **Deleting the DE
+                   * AND on `MAIN_BARBELL_LIFTS`, so that row would have started reading *"Every rep
+                   * explosive and controlled."* the previous program's words on a Viada block. **Deleting the DE
                    * cue would have restored the exact defect the DE cue was written to beat** — the
                    * comment above says so in as many words. `suppressed` is the difference between
                    * "no standing cue" and "no cue".
@@ -5673,7 +5673,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     movement: exercise.name,
                   });
 
-                  // ⛔ THE ASSISTANCE REP TOTAL, COUNTING DOWN (2026-08-11). Assistance in 5/3/1 is a
+                  // ⛔ THE ASSISTANCE REP TOTAL, COUNTING DOWN (2026-08-11). Assistance in the previous program is a
                   // total to reach across as many sets as you need, so the live number is "how many
                   // do I still owe" — not "which set am I on". It takes the SAME line as the
                   // bar-speed cue above, and the two can never collide: `barSpeedCueFor` misses to
@@ -5836,7 +5836,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         const prior = exIsBaselineTest ? undefined : priorSetsForEx?.[setIndex];
                         // Previous only where it MEANS something (Michael 2026-08-10): the AMRAP top
                         // set (last cycle's rep count shows progress) and accessories (which chase a
-                        // rep total). A fixed 5/3/1 main set is prescribed off the training max — the
+                        // rep total). A fixed the previous program main set is prescribed off the training max — the
                         // target IS the number, so "previous" there is noise. rir_tracked !== false
                         // marks the accessories; set.amrap marks the top set.
                         const showPrevious = set.amrap === true || exercise.rir_tracked !== false;
@@ -6062,7 +6062,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         };
 
                         // ⛔ THE TARGET IS PER SET, NOT PER EXERCISE. `exercise.target_reps` is one
-                        // string for the whole lift; on 5/3/1 that string is "5+", so every set used
+                        // string for the whole lift; on the previous program that string is "5+", so every set used
                         // to print "target 5+" and nothing said which one was the all-out set. Only
                         // the flagged set is open-ended, and it is the one whose count moves the
                         // training max (D-338), so it gets its own words.
@@ -6127,7 +6127,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               </div>
                             )}
 
-                            {/* 5/3/1 warm-up ramp (Wendler p.31): one section marker at the first warm-up
+                            {/* the previous program warm-up ramp (the previous program): one section marker at the first warm-up
                                 and the first work set, so the ramp reads as prep and the work sets as
                                 the prescription. Only when the plan authored a ramp — see parseFromComputed. */}
                             {!exIsBaselineTest && exHasWarmupRamp && ((isWarmup && setIndex === firstWarmupIndex) || (isWorking && setIndex === workingSetIndex)) && (
@@ -6728,7 +6728,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           smaller, not bigger. No confetti, no streak, no praise word — the app keeps score honestly,
           which is the only version that stays trustworthy when the number goes DOWN.
 
-          ⛔ AND A RESET IS NOT A PENALTY. Wendler p30: *"You keep on increasing the max you're working
+          ⛔ AND A RESET IS NOT A PENALTY. the previous program: *"You keep on increasing the max you're working
           from every four weeks until you can no longer hit the prescribed sets and reps."* The miss is
           the SIGNAL and the reset is the mechanism — same tone, same sheet, no softening and no
           apology. Naming it as the program working is accurate, not consolation. */}

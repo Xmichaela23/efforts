@@ -66,7 +66,7 @@ export function missingBarbellLifts(maxes: BarbellMaxes): BarbellLift[] {
  * is the 35 lb women's-class bar (35 / 0.5525 ≈ 64, rounded up to the increment; ⚠️ 35, not the
  * 33 lb women's Olympic spec, because prescriptions round in 5 lb steps and every step off a 35
  * bar is plate-loadable where a 33 bar makes half of them impossible). Under 65 even that bar
- * cannot be prescribed — Wendler's own answer there is a different program, not a lighter 5/3/1,
+ * cannot be prescribed — the standard answer there is a different program, not a lighter the previous program,
  * and that athlete belongs to the (future) beginner tier.
  *
  * A lift in the 65–84 band builds fine: it floors at 35 (`barFloorForWorkingNumber`,

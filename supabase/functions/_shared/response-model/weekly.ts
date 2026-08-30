@@ -42,8 +42,8 @@ import { VERDICT_DEVIATION } from '../strength-profiles.ts';
 import { verdictFrom95Set } from '../../shared/strength-system/loading/wendler-531.ts';
 // [D-373 → Step 2] The gate for coaching language, now asked as a CAPABILITY rather than as a
 // boolean about one protocol's four lifts. `capabilitiesForExercise(x).coached` is true on exactly
-// one type row (`barbell_main`), and that row is built FROM `MAIN_531_LIFTS` — so this is the same
-// answer `isMain531Lift` gave, from the axis that also knows what to render instead.
+// one type row (`barbell_main`), and that row is built FROM `MAIN_BARBELL_LIFTS` — so this is the same
+// answer `isMainBarbellLift` gave, from the axis that also knows what to render instead.
 // Path precedent: `_shared/strength/match-exercises.ts` imports it the same way — Supabase bundles
 // `src/lib/` into each edge function at deploy time.
 import { capabilitiesForExercise } from '../../../../src/lib/exercise-role.ts';
@@ -165,7 +165,7 @@ const ANCHOR_HEADROOM_FRAC = 0.90;
  * than the training max says, and withholding the advance would punish them for it. What is untrusted
  * is the e1RM off that set, which the ALL-OUT card already hedges separately.
  *
- * ⛔ AND NOTHING HERE RECOMPUTES THE WORKING NUMBER. Wendler keeps the +5/+10 increment and treats
+ * ⛔ AND NOTHING HERE RECOMPUTES THE WORKING NUMBER. the previous program keeps the +5/+10 increment and treats
  * reps as feedback (`wendler-531.ts:206-208`: *"Do NOT recompute this from an AMRAP result… the
  * increment stays +5/+10 and the reps are feedback, not an input"*). Letting the AMRAP drive the bar
  * is Q-223 and is out of scope.
@@ -209,7 +209,7 @@ export function computeLiftVerdict(
   // Silence is the safe failure here.
   //
   // ⛔ ONE READER OF "MAY WE COACH THIS" (Step 2). `coached` is true on exactly one type row and
-  // that row reads `MAIN_531_LIFTS` directly, so this returns what `isMain531Lift` returned — but
+  // that row reads `MAIN_BARBELL_LIFTS` directly, so this returns what `isMainBarbellLift` returned — but
   // the CLIENT now asks the same table what to render INSTEAD of a command, rather than inferring
   // it from the empty string this returns. A sentinel that two sides interpret separately is how a
   // second vocabulary starts.
@@ -232,8 +232,8 @@ export function computeLiftVerdict(
     return { label: 'hold weight', tone: 'neutral' };
   }
 
-  // ⛔ THE ALL-OUT SET OUTRANKS RIR, WHICH IS THE WHOLE OF Q-254 GAP 2. In 5/3/1 the progression
-  // signal is reps on the top set at a known percentage — Wendler's own log tracks rep records and
+  // ⛔ THE ALL-OUT SET OUTRANKS RIR, WHICH IS THE WHOLE OF Q-254 GAP 2. In the previous program the progression
+  // signal is reps on the top set at a known percentage — the standard log tracks rep records and
   // nothing else. RIR is a self-reported proxy for how the sets FELT, and on `strength_primary` it
   // is not even collected (`usesRir: false`), so the number that decided growth and the words on the
   // screen were reading different signals.
@@ -355,7 +355,7 @@ export function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: strin
         ? null
         : computeSuggestedWeight(verdict.label, best_weight, l.canonical_name, anchor_1rm),
       anchor_1rm,
-      // ⛔ Q-254 SLICE 1 — CARRIED, NOT CONSULTED. The all-out set is the measurement 5/3/1 is built
+      // ⛔ Q-254 SLICE 1 — CARRIED, NOT CONSULTED. The all-out set is the measurement the previous program is built
       // on, and this function has never seen it: `computeLiftVerdict` above still decides on RIR
       // deviation (how the sets FELT) while the number that actually moves the training max is the
       // rep count on the top set. Slice 1 puts the measurement ON the contract so State can render
@@ -374,7 +374,7 @@ export function computeStrength(lifts: StrengthLiftSnapshot[], weekIntent: strin
   //
   // This printed "N lifts trending down" / "N lifts trending up" / "Strength stable" off a weekly
   // per-lift direction — the construct D-420 retires. WHY, once, not re-derived here: no commercial
-  // app computes a weekly strength direction, and on a 5/3/1 wave a first-to-last read calls the
+  // app computes a weekly strength direction, and on a the previous program wave a first-to-last read calls the
   // program's own light week a decline (docs/SCIENCE-strength-e1rm-trust.md §6). The spine stopped
   // emitting the direction (`state-trend/strength.ts`); this is the second, independent place that
   // could still mint one, so it is closed here too rather than left to inherit the fix.
@@ -474,7 +474,7 @@ function computeAssessment(
   if (endurance.cardiac_efficiency.sufficient) signals.push({ name: 'Cardiac efficiency', trend: endurance.cardiac_efficiency.trend, sufficient: true });
   // ⛔ STRENGTH e1RM IS NOT A STRAIN SIGNAL (Slice 1, 2026-08-12). It still COUNTS as an available
   // signal (the model knows it has strength data, and a gaining lift still reads as responding), but a
-  // DECLINING e1RM can no longer make the athlete look overloaded. A 5/3/1 wave drops the top-set
+  // DECLINING e1RM can no longer make the athlete look overloaded. A the previous program wave drops the top-set
   // weight in weeks 2-3 and again on the deload BY DESIGN, so the e1RM estimate dips on schedule —
   // that is the protocol running correctly, and it was reading as "signs of overreaching". The honest
   // protocol-declared strength gauge is Slice 2; nothing here touches the trend algorithm itself.
@@ -516,7 +516,7 @@ function computeAssessment(
     // trend COUNTS alone, readiness-blind and plan-blind, and that label then set raw readiness
     // 'overreached' (coach/index.ts), which pushed the load verdict to 'a bit high' and fired the
     // over-reach accent. So two soft, sometimes-collinear markers (a single harder-than-usual RPE
-    // reading; a lift's e1RM dipping across a 5/3/1 weight-wave) cascaded into "consider backing off"
+    // reading; a lift's e1RM dipping across a the previous program weight-wave) cascaded into "consider backing off"
     // on an in-range, on-plan week — the exact soft-signal cascade D-416 narrowed for the load verdict
     // but left standing here. Declining markers WITHOUT elevated load are a WATCH, not an alarm: report
     // them honestly ('stagnating') so they still show, but never emit the back-off word or trip the

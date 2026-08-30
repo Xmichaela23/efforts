@@ -6,7 +6,7 @@
 // legal, and a failure in one produces a worse week rather than an unsafe one.
 //
 // ⛔⛔ AND THE REAL REASON: NONE OF THESE THREE TERMS FIRES ANYWHERE ON THE 61-SHAPE SWEEP.
-// The composer's three-day Wendler structure (Squat · Bench · Deadlift+Press) never puts three
+// The composer's three-day the previous program structure (Squat · Bench · Deadlift+Press) never puts three
 // stressors on one day, so `overCap` and `lockedDayExtras` are dormant guards on real athlete
 // input. `SPEC-week-solver.md`'s own law says *"a test that has never failed is not evidence"* —
 // so the cases are constructed here by hand, because production data will not construct them.

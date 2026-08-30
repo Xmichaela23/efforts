@@ -55,7 +55,7 @@ Deno.test('⛔⛔ NO KNOWN MAX → DOOR 2 CANNOT RUN, AND IT FAILS CLOSED — th
 Deno.test('⛔⛔ SUPERSEDED 2026-08-29: THE MAIN LIFT REACHES THE LINE WITH NO GATE AT ALL', () => {
   /**
    * ⚠️ THIS TEST PINNED THE DERIVED DOOR AS THE FIX for the Get Stronger main lift, which is
-   * deliberately unstamped (a 5/3/1 top set is 65-95%, so `ME` would assert a band the programme
+   * deliberately unstamped (a the previous program top set is 65-95%, so `ME` would assert a band the programme
    * does not prescribe). ⛔ MEASURED ON REAL DATA THE DOOR NEVER OPENED: 90% of the known max is
    * above the top of that 65-95% band in practice — this athlete's bench top set is 82% of his own
    * estimate — so across 178 logged rows it admitted zero.
@@ -128,7 +128,7 @@ Deno.test('⛔⛔ THE REFERENCE MAX IS RESOLVED IN THE ASSEMBLY — end to end, 
 // the app's own default block length when no block exists.
 //
 // ⛔ PROVENANCE IS VIADA, NOT A ROUND NUMBER. Part H (p215): the pretest sets the max AT BLOCK START
-// and the block's percentages are written from it. Part F records the agreement with Wendler in as
+// and the block's percentages are written from it. Part F records the agreement with the previous program in as
 // many words — "progress without retesting on fixed increments". So a max is a fact with a LIFESPAN,
 // and the lifespan is the block.
 // ═══════════════════════════════════════════════════════════════════════════════════════════════

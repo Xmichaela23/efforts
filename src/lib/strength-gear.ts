@@ -150,7 +150,7 @@ export function exerciseRequiredGearKeys(name: string): string[] {
   if (/^pull[-\s]?ups?\b|^pull[-\s]?ups\s+\(explosive/.test(n)) return ['pull_up_bar'];
   if (/band[-\s]?assisted\s+pull[-\s]?up/.test(n)) return ['pull_up_bar', 'bands'];
   if (/ring\s+rows?/.test(n)) return ['rings']; // (F-6) explicit rings only; plain "Inverted Rows" falls through to [] ("…or band row" choices handled by the top or-guard)
-  // Ab wheel — the one abs movement on Wendler's list that needs a piece of kit (Forever p.30).
+  // Ab wheel — the one abs movement on the previous program's list that needs a piece of kit (the previous program).
   if (/ab\s+wheel|ab\s+rollout/.test(n)) return ['ab_wheel'];
   // Plyo / power.
   if (/box\s+jumps?/.test(n)) return ['box'];
@@ -263,7 +263,7 @@ export const ALWAYS: GearRoutes = [[]];
 export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // ── PUSH ────────────────────────────────────────────────────────────────────────────────────────
   // ⛔ DIPS ARE THE MOVEMENT SLICE 7 EXISTS FOR. The route was `[['dip_bars'], ['rings']]` — precise,
-  // sourced (Wendler's dips are parallel bars, Forever p.24), and it gated a normal home gym OUT of a
+  // sourced (the previous program), and it gated a normal home gym OUT of a
   // movement it can obviously do. Dips "worked" until Slice 3/4 invented that gate.
   //
   // ⚠️ ANYTHING TO DIP ON COUNTS: rack safety-arms, a dip attachment on the rack, two benches. Both
@@ -359,7 +359,7 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // which is exactly the case Slice 7 says to leave to substitution:
   // `substituteExerciseForEquipment` already turns Leg Curl into Nordic Curls / Band Leg Curls for
   // anyone without gym access. Gating it here would have deleted the movement instead of swapping it,
-  // which is the worse of the two failures — a swap keeps Wendler's hamstring work, a gate loses it.
+  // which is the worse of the two failures — a swap keeps the previous program's hamstring work, a gate loses it.
   'leg curl': ALWAYS,
   'leg curls': ALWAYS,
   'band leg curls': [['bands']],
@@ -769,7 +769,7 @@ export function gearRoutesFor(exerciseName: string): GearRoutes {
  *
  * Every other key names something you can LOAD or PROGRESS: a barbell and dumbbells add weight, a
  * cable stack and a machine add pins, a rack or a bench lets bodyweight work be leaned into, and
- * bodyweight itself progresses by reps (Push-Up, Inverted Row, Reverse Lunge — Wendler's own 50-rep
+ * bodyweight itself progresses by reps (Push-Up, Inverted Row, Reverse Lunge — the standard 50-rep
  * prescription is exactly that progression). A band adds tension that FALLS as the movement
  * shortens, cannot be measured, and cannot be stepped in any repeatable way.
  *

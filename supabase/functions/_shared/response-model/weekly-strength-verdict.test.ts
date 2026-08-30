@@ -84,7 +84,7 @@ Deno.test('D-373: a barbell ACCESSORY (Barbell Row) is still not coached — the
 });
 
 // ⛔ THE DEFAULT DIRECTION MATTERS. `roleForExercise` defaults an UNKNOWN move to 'primary'; the
-// language gate uses `isMain531Lift`, which defaults to false. Silence is the safe failure — gating on
+// language gate uses `isMainBarbellLift`, which defaults to false. Silence is the safe failure — gating on
 // the other classifier would coach every unrecognised movement and rebuild this bug one layer down.
 Deno.test('D-373: an UNKNOWN movement is not coached — the language gate fails to silence', () => {
   const mystery: StrengthLiftSnapshot = {

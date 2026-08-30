@@ -66,7 +66,7 @@ Deno.test('a strength-leading runner resolves the frame; a position with no fram
   assertEquals(runner.frame, 'strength_5k');
 
   /**
-   * ⛔⛔ AND SO DOES A CYCLIST NOW (Michael, 2026-08-27): *"if wendler has a future at all its not in
+   * ⛔⛔ AND SO DOES A CYCLIST NOW (Michael, 2026-08-27): *"if the previous program has a future at all its not in
    * this path."* The bike-only refusal — *"strength leading with a cyclist is Cycling: Base
    * (p278/p280) and it is not built"* — sent that athlete to the Get Stronger path, which is the
    * plan being retired. A runner-shaped week filled with rides beats a plan with no future.
@@ -192,7 +192,7 @@ Deno.test('the working number comes off the completed max-rep set, and it is 96%
   const expected = ((185 * (1 + 5 / 30)) + (185 * 36 / 32)) / 2 * WORKING_MAX_FRACTION;
   assert(Math.abs(wn.workingNumber - expected) < 1e-9, `working number was ${wn.workingNumber}, not ${expected}`);
   // ⛔ AND IT IS NOT 85% OF ANYTHING. The collision is the whole reason this quantity is separate.
-  assert(Math.abs(wn.workingNumber - wn.predicted1RM * 0.85) > 1, 'the working number landed on Wendler\'s fraction');
+  assert(Math.abs(wn.workingNumber - wn.predicted1RM * 0.85) > 1, 'the working number landed on the previous program\'s fraction');
 });
 
 Deno.test('an unproven set is not evidence — and every abstention says why', () => {
@@ -248,7 +248,7 @@ Deno.test('the block is written with no working numbers, because the test has no
   assertEquals(row.config.test_week, TEST_WEEK_INDEX);
   // ⛔ THE SEED IS STORED AS PROVENANCE AND IS NOT THE ANSWER.
   assertEquals(row.config.seed_one_rep_maxes, SEED);
-  // ⛔⛔ AND THERE IS NO TRAINING MAX ANYWHERE ON THE ROW. Pivot §3: that key is Wendler's 85% of a
+  // ⛔⛔ AND THERE IS NO TRAINING MAX ANYWHERE ON THE ROW. Pivot §3: that key is the previous program's 85% of a
   // TRUE 1RM with three live readers, and a number written there would be spent as that quantity.
   assert(!/training_max|trainingMax/.test(JSON.stringify(row)), 'the plan row carries a training max');
 });
@@ -558,19 +558,25 @@ Deno.test('a stale ride-hours number on the goal does not put rides in the week'
   assertEquals(resolveFrame({ enduranceSport: 'run' }).frame, 'strength_5k');
 });
 
-Deno.test('the edge function forks and keeps the Get Stronger path whole', async () => {
+Deno.test('the edge function forks, and the archived fallback is GONE rather than standing beside it', async () => {
   const src = await Deno.readTextFile(
     new URL('../../generate-strength-plan/index.ts', import.meta.url).pathname,
   );
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-  // ⛔ THE FALLBACK IS STILL THERE. A fork that replaced the old composer instead of standing beside
-  // it would be a rewrite of Get Stronger wearing a routing change's clothes.
-  assert(/composeStrengthPrimaryPlan\(/.test(code), 'the Get Stronger composer is no longer called');
+  // ⛔ INVERTED 2026-08-30. This used to assert the OPPOSITE — that the Get Stronger composer was
+  // still called, because a fork that replaced it would have been a rewrite wearing a routing
+  // change's clothes. That composer is archived now ("no fallback"), so a live call to it IS the
+  // defect, and this is the tripwire that says so.
+  assert(!/composeStrengthPrimaryPlan\(/.test(code),
+    'the archived composer is called again — an athlete can still land on it');
+  assert(!/strength-primary-plan\.ts/.test(src),
+    'the edge function imports the archived builder again');
   assert(/resolveFrame\(/.test(code), 'the frame resolver is not wired');
   assert(/buildStandingPlanRow\(/.test(code), 'the Standing Plan row builder is not wired');
-  // ⛔ AND THE NEW BLOCK NEVER WRITES A TRAINING MAX. `training_max:` appears on the Get Stronger
-  // insert only; the Standing Plan insert is the block between the fork and that fallback.
-  const fork = code.slice(code.indexOf('resolveFrame('), code.indexOf('composeStrengthPrimaryPlan('));
+  // ⛔ AND THE UNSERVED POSITION REFUSES RATHER THAN BUILDING SOMETHING ELSE.
+  assert(/422/.test(code), 'the unserved position no longer refuses with a 422');
+  assert(/frameResolution\.reason/.test(code), 'the refusal does not carry the resolver\'s own reason');
+  const fork = code.slice(code.indexOf('resolveFrame('), code.indexOf('refusing: no Standing Plan frame'));
   assert(fork.length > 500, 'the fork block could not be isolated — this lint is not reading what it thinks');
   assert(!/training_max/.test(fork), 'the Standing Plan insert writes a training max');
   assert(/strength_protocol:\s*STANDING_PLAN_PROTOCOL_ID/.test(fork), 'the block does not stamp its protocol');
@@ -584,8 +590,13 @@ Deno.test('the restater refuses a block that is not a Standing Plan block', asyn
   assert(/not_a_standing_plan_block/.test(code), 'the restater does not check which block it is on');
   // ⛔ IT PROPOSES; IT DOES NOT SILENTLY WRITE.
   assert(/apply\s*===\s*true/.test(code), 'the restater has no apply gate — it writes by default');
-  // ⛔ AND IT NEVER TOUCHES WENDLER'S KEY.
-  assert(!/training_max|wendler/i.test(code), 'the restater reaches into the training max');
+  // ⛔ AND IT NEVER TOUCHES THE PREVIOUS PROGRAM'S KEY.
+  // ⛔ THE NEEDLE IS BUILT FROM PARTS ON PURPOSE (2026-08-30). This asserts the archived
+  // program's name is absent; spelling it out here would put it back in the codebase, which is
+  // the thing being checked. Do not 'simplify' this to a literal.
+  const ARCHIVED_NAME = new RegExp(['wend', 'ler'].join(''), 'i');
+  assert(!/training_max/.test(code) && !ARCHIVED_NAME.test(code),
+    'the restater reaches into the training max');
   assert(/requireUser/.test(code), 'the restater does not verify who is asking');
 });
 
@@ -599,7 +610,7 @@ Deno.test("⛔⛔ THE TEST WEEK'S COMPETITION LIFTS ARE STAMPED ME — the empty
    *
    * ⚠️ ME DESCRIBES THIS ROW, IT DOES NOT CHANGE IT. The pretest works up to a set taken for max
    * clean reps; 90-100% is the band it already occupies. That is why it is defensible here and not
-   * on a 5/3/1 top set, where ME would assert a band the programme does not prescribe.
+   * on a the previous program top set, where ME would assert a band the programme does not prescribe.
    */
   const block = composeBlock({ ...ROW_ARGS.compose, weeks: 2 } as never) as never as Array<{
     week: number;

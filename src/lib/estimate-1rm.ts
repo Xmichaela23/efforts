@@ -1,5 +1,5 @@
 /**
- * ESTIMATED 1RM — ONE FORMULA, ONE PLACE (D-339, 2026-07-30, Michael's call: *"use wendler"*).
+ * ESTIMATED 1RM — ONE FORMULA, ONE PLACE (D-339, 2026-07-30, Michael's call: *"use the previous program"*).
  *
  * ⛔ WHY THIS FILE EXISTS: the app had THREE answers to "what is this set worth as a one-rep max."
  *
@@ -8,13 +8,13 @@
  *      strength trend, the per-lift verdict and the learned max.
  *   2. `StrengthLogger.tsx` — a CLUSTER of Epley and Brzycki averaged together, reps capped at 10.
  *      Runs on the baseline test, and writes the number the whole block's working weights derive from.
- *   3. Wendler's own, page 32 of the 2nd edition — `weight × reps × 0.0333 + weight`.
+ *   3. the standard, page 32 of the previous program — `weight × reps × 0.0333 + weight`.
  *
  * So the number that SET the working weights and the number that JUDGED the work against them came
  * from different equations. That is a Constitution Law 1 violation on the most load-bearing number in
  * the strength system, and it is invisible because each site looks reasonable on its own.
  *
- * ⛔ WENDLER'S FORMULA IS EPLEY, EXACTLY. `w × r × 0.0333 + w` is `w × (1 + r/30)` — his 0.0333 is
+ * ⛔ THE PREVIOUS PROGRAM'S FORMULA IS EPLEY, EXACTLY. `w × r × 0.0333 + w` is `w × (1 + r/30)` — his 0.0333 is
  * 1/30 to four figures. This is not an interpretation; the book states the arithmetic and works two
  * examples with it (p32: *"255 x 8 x .0333 + 255 = 322"*).
  *
@@ -24,7 +24,7 @@
  * number that sets an athlete's next working load, erring low is the safe direction."* The reasoning
  * is sound and the premise is only HALF TRUE — it holds below ten reps and inverts above:
  *
- *   | reps | Brzycki | Epley/Wendler |            |
+ *   | reps | Brzycki | Epley/the previous program |            |
  *   |------|---------|---------------|------------|
  *   | 5    | ×1.125  | ×1.167        | Brzycki lower — the note's case holds |
  *   | 10   | ×1.333  | ×1.333        | ⛔ they are IDENTICAL here |
@@ -49,11 +49,11 @@
  */
 
 /**
- * Wendler's coefficient, p32. Identical to Epley's 1/30 (0.03333…) to four significant figures.
+ * the previous program's coefficient, p32. Identical to Epley's 1/30 (0.03333…) to four significant figures.
  * ⛔ Do not "clean this up" to 1/30 — the book prints 0.0333 and the athlete can check our arithmetic
  * against his own copy.
  */
-export const WENDLER_EPLEY_COEFF = 0.0333;
+export const EPLEY_COEFF = 0.0333;
 
 /**
  * ⛔ WHERE BRZYCKI STOPS BEING ARITHMETIC. `36/(37 − reps)` climbs toward a singularity at 37 and is
@@ -68,7 +68,7 @@ export const BRZYCKI_MAX_REPS = 30;
  * ⛔ NO RIR HERE, EVER. Reps-in-reserve is a property of the PROTOCOL, not of this formula. A protocol
  * that stops short of failure converts its reserve to an effective rep count with `effectiveRepsForReserve`
  * and passes THAT in. The estimator never sees a reserve, so it can never silently inflate a set that was
- * taken to failure — which is 5/3/1's whole shape, and it no longer depends on a suppression flag to be
+ * taken to failure — which is the previous program's whole shape, and it no longer depends on a suppression flag to be
  * safe: there is simply no argument through which a reserve could reach the formula. See that helper.
  *
  * @param weight  load on the bar
@@ -83,13 +83,13 @@ export function estimate1RM(weight: number, reps: number): number {
   if (r === 1) return weight;
 
   /**
-   * ⛔⛔ VIADA'S OWN METHOD, p215 (2026-08-29, Michael: *"wendler is a ghost in the machine, use
+   * ⛔⛔ VIADA'S OWN METHOD, p215 (2026-08-29, Michael: *"the previous program is a ghost in the machine, use
    * viada's math"*). The final set's load and reps go through BOTH Epley and Brzycki and the two are
    * AVERAGED — his stated reason is that **the formulas diverge as the rep count changes**, so
    * neither alone is trustworthy across the range his pretest produces.
    *
-   * ⚠️ THIS REPLACES EPLEY-ALONE, which was here as WENDLER's arithmetic (his p32 coefficient) so a
-   * 5/3/1 athlete could check the app against his own copy. That reason stands only while Wendler is
+   * ⚠️ THIS REPLACES EPLEY-ALONE, which was here as THE PREVIOUS PROGRAM's arithmetic (his p32 coefficient) so a
+   * the previous program athlete could check the app against his own copy. That reason stands only while the previous program is
    * the source; this app's programme is composed from Viada.
    * ⚠️ ON THIS ATHLETE'S OWN SETS THE MOVE IS SMALL AND THAT IS EXPECTED: 135×10 is 180 either way
    * (the two equations cross near ten reps); 105×5 goes 122.5 → 120.3. The divergence Viada is
@@ -100,7 +100,7 @@ export function estimate1RM(weight: number, reps: number): number {
    * Epley alone there. ⚠️ This is a guard on arithmetic, NOT a judgement about long sets: that is
    * `trustedMaxReps`'s job and it is unchanged.
    */
-  const epley = weight * r * WENDLER_EPLEY_COEFF + weight;
+  const epley = weight * r * EPLEY_COEFF + weight;
   if (r > BRZYCKI_MAX_REPS) return epley;
   const brzycki = weight * 36 / (37 - r);
   return (epley + brzycki) / 2;
@@ -109,7 +109,7 @@ export function estimate1RM(weight: number, reps: number): number {
 /**
  * ⛔ VIADA'S WORKING MAX — p215: *"roughly 96% of that predicted true 1RM."*
  *
- * ⚠️ IT IS NOT WENDLER'S TRAINING MAX AND THE TWO MUST NEVER CONVERT INTO EACH OTHER. Wendler's is
+ * ⚠️ IT IS NOT THE PREVIOUS PROGRAM'S TRAINING MAX AND THE TWO MUST NEVER CONVERT INTO EACH OTHER. the previous program's is
  * 85% of a true 1RM and has its own live readers (`plans.config.training_max`); Viada's is 96% of a
  * freshly tested predicted max. Same English word, two different numbers, two different programmes.
  * No function may accept both — see Part H of the source record.
@@ -127,7 +127,7 @@ export function viadaWorkingMax(predicted1RM: number): number {
  * estimates like a set of `reps + rir` taken to failure, so its e1RM is
  * `estimate1RM(weight, effectiveRepsForReserve(reps, rir))`.
  *
- * ⛔ THIS IS FOR THE AUTO-REGULATED PROTOCOLS THAT WILL EXIST, NOT FOR 5/3/1. 5/3/1 and any protocol
+ * ⛔ THIS IS FOR THE AUTO-REGULATED PROTOCOLS THAT WILL EXIST, NOT FOR the previous program. the previous program and any protocol
  * whose measuring set is taken to failure pass ACTUAL reps straight to `estimate1RM` and never call this.
  * A protocol opts IN by calling it — gate on `protocolUsesRir` / `protocolEffortRead` first. Because the
  * estimator is pure, forgetting to call this can only ever UNDERSTATE a reserve set, never inflate a
@@ -141,11 +141,11 @@ export function effectiveRepsForReserve(reps: number, rir: number): number {
  * ⛔ THE INVERSE — the weight that yields `reps` from a known 1RM. Lives HERE, beside the forward
  * direction, because it is the same claim read backwards: `estimate1RM` is `w × (1 + r × 0.0333)`,
  * so this is `e1RM ÷ (1 + r × 0.0333)`. Re-deriving that algebra at a call site would be a second
- * copy of Wendler's coefficient, and the next session would have two places to fix it.
+ * copy of the previous program's coefficient, and the next session would have two places to fix it.
  *
  * ⚠️ THIS IS NOT A PRESCRIPTION AND MUST NOT BECOME ONE. It exists so a SUGGESTION can be derived
  * without inventing a percentage — the alternative was picking a number like "65% of the accessory's
- * max", which is exactly the fabricated intensity `materialize-plan` strips on sight. Wendler's own
+ * max", which is exactly the fabricated intensity `materialize-plan` strips on sight. the standard
  * formula is the only anchor in the system that is not made up.
  *
  * @param oneRM   the max to work back from
@@ -158,7 +158,7 @@ export function weightForReps(oneRM: number, reps: number, rir = 0): number {
   if (!Number.isFinite(oneRM) || oneRM <= 0) return 0;
   const effectiveReps = Math.max(1, Math.round((Number(reps) || 0) + (Number(rir) || 0)));
   if (effectiveReps === 1) return oneRM;
-  return oneRM / (1 + effectiveReps * WENDLER_EPLEY_COEFF);
+  return oneRM / (1 + effectiveReps * EPLEY_COEFF);
 }
 
 /** The stored/displayed form: nearest 5 lb, matching how plates actually load. */
@@ -177,7 +177,7 @@ export function estimate1RMRounded(weight: number, reps: number): number {
  *
  * ⚠️ SINGLE-VALUE SOURCE, MIRRORED: `wendler-531.ts`'s `trustedMaxRepsFor` carries the science provenance
  * (LeSuer et al. 1997 — deadlift estimates run systematically low, so its ceiling is tighter). Same
- * numbers (deadlift 5, else 8); keep the two in sync, or unify by having wendler delegate here.
+ * numbers (deadlift 5, else 8); keep the two in sync, or unify by having the previous program delegate here.
  */
 export function trustedMaxReps(_liftName?: string | null): number {
   /**
@@ -212,7 +212,7 @@ export function estimateIsTrusted(liftName: string | null | undefined, reps: num
 }
 
 /**
- * ⛔ THE OTHER HALF OF WENDLER'S POINT, AND THE ONE HE ACTUALLY CARES ABOUT (p10).
+ * ⛔ THE OTHER HALF OF THE PREVIOUS PROGRAM'S POINT, AND THE ONE HE ACTUALLY CARES ABOUT (p10).
  *
  * *"If your squat goes from 225x6 to 225x9, you've gotten stronger. Don't get stuck just trying to
  * increase your one rep max. If you keep breaking your rep records, it'll go up."*

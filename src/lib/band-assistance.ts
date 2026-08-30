@@ -44,7 +44,7 @@
  */
 
 /**
- * The movements where a band is assistance. For the first three, Wendler's own progression is band
+ * The movements where a band is assistance. For the first three, the standard progression is band
  * or machine assistance, walked down until the athlete can do clean reps at body weight.
  *
  * ⛔ `gluteham` ADDED 2026-08-13 (Michael: "glute ham raises needs a band assisted slot — like

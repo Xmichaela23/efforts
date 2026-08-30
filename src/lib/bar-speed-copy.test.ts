@@ -91,7 +91,7 @@ Deno.test('bar speed — no rep-chasing vocabulary on the non-AMRAP lines', () =
 // ─── D-326 — the top-set rule ──────────────────────────────────────────────────────────────────
 
 Deno.test('topSetIndex — the HEAVIEST set, not the last (warm-ups must not steal the tap)', () => {
-  // 5/3/1 leader week: three ascending sets. The third is the top.
+  // the previous program leader week: three ascending sets. The third is the top.
   assertEquals(topSetIndex([{ weight: 120 }, { weight: 140 }, { weight: 160 }]), 2);
   // A back-off set after the top set must NOT take it.
   assertEquals(topSetIndex([{ weight: 120 }, { weight: 190 }, { weight: 135 }]), 1);
@@ -99,7 +99,7 @@ Deno.test('topSetIndex — the HEAVIEST set, not the last (warm-ups must not ste
   assertEquals(topSetIndex([{ weight: 45 }, { weight: 95 }, { weight: 135 }, { weight: 185 }]), 3);
 });
 
-Deno.test('topSetIndex — ties resolve to the LAST, where 5/3/1 puts the top set', () => {
+Deno.test('topSetIndex — ties resolve to the LAST, where the previous program puts the top set', () => {
   assertEquals(topSetIndex([{ weight: 160 }, { weight: 160 }, { weight: 160 }]), 2);
 });
 
@@ -113,7 +113,7 @@ Deno.test('topSetIndex — nothing loaded suppresses the tap rather than guessin
 //
 // The original rule was "slow rep = last rep" — end the "+" set at the first slow rep, on the
 // reasoning that speed is the earliest sign of form breaking down. Stricter than the source it
-// cited: Wendler says to GRIND IT OUT, not to failure (5/3/1 2nd ed. p.24). A grinding rep is a
+// cited: the previous program says to GRIND IT OUT, not to failure (the previous program). A grinding rep is a
 // rep, and the count off that set is what moves the training max — so a speed-stop systematically
 // under-reports the number the block runs on.
 //
@@ -155,10 +155,10 @@ Deno.test('AMRAP is exempt from the rep-chasing lint, and the prescribed lines s
 // THE STANDING PLAN'S PRETEST — a different set with the same `amrap` flag (2026-08-24)
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
-Deno.test('the pretest set gets its own cue, and Wendler\'s AMRAP keeps his', () => {
+Deno.test('the pretest set gets its own cue, and the previous program\'s AMRAP keeps his', () => {
   /**
    * ⛔ THE DEFECT: both sets stamp `amrap: true`, so the logger printed *"Grind it out. Stop before
-   * failure."* on Viada's p215 pretest. They are not the same instruction. Wendler's "+" set is
+   * failure."* on Viada's p215 pretest. They are not the same instruction. the previous program's "+" set is
    * TRAINING and grinding reps are part of the dose; the pretest is a MEASUREMENT whose whole output
    * is a predicted 1RM, so a ground rep prices twelve weeks off a number the athlete cannot repeat.
    */
@@ -166,13 +166,13 @@ Deno.test('the pretest set gets its own cue, and Wendler\'s AMRAP keeps his', ()
   // ⛔ AND IT WINS OVER `isAmrap`, because a pretest set carries that flag too.
   assertEquals(barSpeedLineFor({ isAmrap: true }), BAR_SPEED_COPY.amrap);
   assert(barSpeedLineFor({ isPretest: true, isAmrap: true }) !== BAR_SPEED_COPY.amrap,
-    'the pretest still shows Wendler\'s grind line');
+    'the pretest still shows the previous program\'s grind line');
 
   // ⛔ THE CUE ITSELF: max CLEAN reps, and the stop rule is FORM — not failure, and not grinding.
   assert(/clean reps/i.test(BAR_SPEED_COPY.pretest), BAR_SPEED_COPY.pretest);
   assert(/form/i.test(BAR_SPEED_COPY.pretest), BAR_SPEED_COPY.pretest);
   assert(!/grind/i.test(BAR_SPEED_COPY.pretest), BAR_SPEED_COPY.pretest);
-  // ⚠️ WENDLER'S LINE IS UNCHANGED — Get Stronger's own AMRAP still says what it always said.
+  // ⚠️ THE PREVIOUS PROGRAM'S LINE IS UNCHANGED — Get Stronger's own AMRAP still says what it always said.
   assertEquals(BAR_SPEED_COPY.amrap, 'Grind it out. Stop before failure.');
 });
 

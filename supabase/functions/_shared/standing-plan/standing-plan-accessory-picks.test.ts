@@ -791,9 +791,9 @@ Deno.test('⛔⛔ EVERY LABEL IS HIS PRINTED HEADING — no invented tier names'
    *
    * ⚠️ THIS SUPERSEDES TWO OF HIS OWN EARLIER WORDING RULINGS, and neither was wrong when it was
    * made — both were the best plain-English name available before the labels were tied to his key:
-   *   · 2026-08-26 "single-leg" → "Leg accessory" (off a screenshot: *"might be wendler legacy make
-   *     it right"*). It WAS Wendler legacy — `assistance-catalog.ts` carries `single_leg_core`, one
-   *     of Wendler's three assistance categories, and the phrase walked across without the wiring.
+   *   · 2026-08-26 "single-leg" → "Leg accessory" (off a screenshot: *"might be the previous program legacy make
+   *     it right"*). It WAS the previous program legacy — `assistance-catalog.ts` carries `single_leg_core`, one
+   *     of the previous program's three assistance categories, and the phrase walked across without the wiring.
    *     ⛔ But "Leg accessory" had its own defect: the cell holds split squats and lunges, which are
    *     COMPOUNDS. Calling a compound an accessory is backwards, and it is what this fixes.
    *   · 2026-08-25 "quad isolation" → "Lower isolation", because the cell's p223 members include

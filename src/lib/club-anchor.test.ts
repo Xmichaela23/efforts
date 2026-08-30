@@ -93,7 +93,7 @@ Deno.test('⛔ the screen no longer promises hard running on a day it may not pl
 Deno.test('the strength choice is offered rather than assumed, with three real answers', () => {
   // `non-race-goal-seeds` seeds a marathon with strength: 'maintain', which put two lifting days in
   // the preview with nothing having asked. Michael, 2026-08-05: "we need to add strength as an
-  // option" — then, seeing two options: "are we using a 5/3/1? should give more discretion."
+  // option" — then, seeing two options: "are we using a the previous program? should give more discretion."
   assert(
     /strength: k === 'none' \? 'out' : 'maintain'/.test(SRC),
     'the strength control no longer writes posture.strength — the default is unaskable again',

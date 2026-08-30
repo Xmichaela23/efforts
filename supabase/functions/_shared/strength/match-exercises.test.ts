@@ -24,7 +24,7 @@ const assistance = (name: string, totalReps = 25) =>
 // undeclared work. Two reasons the narrowing is not a relaxation:
 //   · the score it protected is GONE (D-338 deleted the strength execution percentage), so there is
 //     nothing left for a forgiven skip to inflate; and
-//   · an assistance slot is prescribed as a CATEGORY WITH A MENU, not as a movement — Wendler
+//   · an assistance slot is prescribed as a CATEGORY WITH A MENU, not as a movement — the previous program
 //     writes it as "Lats, Upper Back, Triceps — 5 sets of 10-20 (DB rows, Chins, Face Pulls…)" —
 //     so filling it off the menu IS the prescription.
 // A MAIN LIFT is prescribed by name at a percentage of a training max and none of that applies.
@@ -226,7 +226,7 @@ Deno.test('⛔ GATE: a DIFFERENT main lift on the same day does NOT share (the b
 });
 
 Deno.test('⛔ GATE: a SHARED ASSISTANCE BLOCK is not enough when a main lift was planned', () => {
-  // Every 5/3/1 day carries the same assistance work, so "any exercise in common" would wave
+  // Every the previous program day carries the same assistance work, so "any exercise in common" would wave
   // through any session from the same block onto any lifting day.
   const r = strengthSessionsShareTheWork(
     [pex('Overhead Press'), pex('Box Jump'), pex('Push Up')],

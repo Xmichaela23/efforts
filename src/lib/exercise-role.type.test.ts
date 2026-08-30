@@ -19,7 +19,7 @@ import {
   capabilitiesForExercise,
   EXERCISE_TYPE_CAPABILITIES,
   ExerciseType,
-  isMain531Lift,
+  isMainBarbellLift,
   lookupExerciseType,
   typeForExercise,
 } from './exercise-role.ts';
@@ -33,7 +33,7 @@ import { bandMeansAssistance, canonicalize } from '../../supabase/functions/_sha
 /**
  * The known vocabulary, assembled from the three places that hold one.
  *
- * ⚠️ `ROLE_TABLE` and `MAIN_531_LIFTS` are module-private, so their keys are read out of the
+ * ⚠️ `ROLE_TABLE` and `MAIN_BARBELL_LIFTS` are module-private, so their keys are read out of the
  * source text rather than imported. That is deliberate: it keeps Step 1 purely additive (no new
  * exports of internals just to satisfy a test), and it means the fixture tracks the tables
  * automatically — add a role-table row without a type-table row and this test fails, which is
@@ -42,7 +42,7 @@ import { bandMeansAssistance, canonicalize } from '../../supabase/functions/_sha
 async function knownVocabulary(): Promise<string[]> {
   const src = await Deno.readTextFile(new URL('./exercise-role.ts', import.meta.url));
   const roleKeys = [...src.matchAll(/^ {2}'([^']+)':\s*'(?:primary|secondary|accessory)'/gm)].map((m) => m[1]);
-  const mainBlock = src.split('MAIN_531_LIFTS')[1].split(']')[0];
+  const mainBlock = src.split('MAIN_BARBELL_LIFTS')[1].split(']')[0];
   const mainKeys = [...mainBlock.matchAll(/'([^']+)'/g)].map((m) => m[1]);
   const configKeys = Object.keys(EXERCISE_CONFIG);
   assert(roleKeys.length > 50, `expected the role table to parse, got ${roleKeys.length} keys`);
@@ -76,7 +76,7 @@ Deno.test('⛔ COVERAGE, THE SERVER KEYING — every canonicalize() output resol
   );
 });
 
-Deno.test('⛔ ONE SET, TWO READERS — barbell_main and isMain531Lift can never disagree', async () => {
+Deno.test('⛔ ONE SET, TWO READERS — barbell_main and isMainBarbellLift can never disagree', async () => {
   const vocab = await knownVocabulary();
   const names = [
     ...vocab,
@@ -90,8 +90,8 @@ Deno.test('⛔ ONE SET, TWO READERS — barbell_main and isMain531Lift can never
   for (const n of names) {
     assertEquals(
       typeForExercise(n) === 'barbell_main',
-      isMain531Lift(n),
-      `${JSON.stringify(n)}: type says ${typeForExercise(n)}, isMain531Lift says ${isMain531Lift(n)}`,
+      isMainBarbellLift(n),
+      `${JSON.stringify(n)}: type says ${typeForExercise(n)}, isMainBarbellLift says ${isMainBarbellLift(n)}`,
     );
   }
 });
@@ -189,7 +189,7 @@ Deno.test('⛔ containment is not identity, on this axis too', () => {
   assertEquals(typeForExercise('Squat Jump'), 'plyo');
   assertEquals(typeForExercise('Goblet Squat'), 'loaded_accessory');
   assertEquals(typeForExercise('Barbell Hip Thrust'), 'loaded_accessory');
-  // A dumbbell press is not the 5/3/1 press slot, and a DB bench is not the bench slot.
+  // A dumbbell press is not the previous program press slot, and a DB bench is not the bench slot.
   assertEquals(typeForExercise('DB Shoulder Press'), 'loaded_accessory');
   assertEquals(typeForExercise('DB Bench Press'), 'loaded_accessory');
 });
@@ -209,7 +209,7 @@ Deno.test('⛔ AN UNMAPPED NAME COUNTS AS LOAD AND SAYS NOTHING — the safe dir
   assertEquals(cap.coached, false, 'and nothing unrecognised is ever coached');
   assertEquals(cap.hasOneRepMax, false);
   // ⚠️ If this ever starts defaulting to `barbell_main`, every exercise the library gains inherits
-  // a 5/3/1 instruction — the exact failure mode `isMain531Lift`'s docblock warns about.
+  // a the previous program instruction — the exact failure mode `isMainBarbellLift`'s docblock warns about.
   assertEquals(typeForExercise('Zercher Good Morning Complex') === 'barbell_main', false);
 });
 

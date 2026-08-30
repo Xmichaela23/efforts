@@ -7,7 +7,7 @@
 // (`standing_plan`) — and it exists precisely so the working number never has to borrow
 // `config.training_max`.
 //
-// ⛔ THE WORKING NUMBER NEVER TOUCHES `config.training_max` (pivot §3). That key is Wendler's, 85%
+// ⛔ THE WORKING NUMBER NEVER TOUCHES `config.training_max` (pivot §3). That key is the previous program's, 85%
 // of a TRUE 1RM, with three live readers, and this block's number is 96% of a fresh prediction. A
 // row that wrote both would be the conversion this module exists to make impossible.
 // ============================================================================
@@ -245,7 +245,7 @@ const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'satu
 /**
  * ⛔ ONE BLOCK → ONE PLAN ROW.
  *
- * ⚠️ `weeks` IS THE ATHLETE'S ASK, UNROUNDED. Get Stronger rounds down to whole four-week Wendler
+ * ⚠️ `weeks` IS THE ATHLETE'S ASK, UNROUNDED. Get Stronger rounds down to whole four-week the previous program
  * cycles because its wave is four weeks long; this block has no wave, so ten weeks means ten weeks.
  */
 export function buildStandingPlanRow(args: {

@@ -1,4 +1,4 @@
-// THE ASSISTANCE INVARIANTS — per-day picker (D-407, Wendler 5/3/1 Forever p.24).
+// THE ASSISTANCE INVARIANTS — per-day picker (D-407, the previous program).
 //
 // ⛔ THIS FILE HAS BEEN REWRITTEN TWICE AND BOTH REWRITES ARE THE SAME LESSON. Read it before
 // adding a test here.
@@ -18,7 +18,7 @@
 //
 // None of that was wrong. All of it existed because the athlete made THREE picks for TWELVE slots,
 // so nine had to be inferred — and every one of those tests was pinning the quality of an inference
-// nobody had asked for. Forever p.24 asks for one movement per category per day; asked directly, the
+// nobody had asked for. the previous program asks for one movement per category per day; asked directly, the
 // inference and its test suite both disappear. **The old expectations are recorded above rather than
 // deleted, because "we used to assert the opposite" is the single most useful thing a future session
 // can read here.**
@@ -92,7 +92,7 @@ Deno.test('D-322 — the balanced default week only names movements that are in 
 });
 
 Deno.test('the DISPLAY name is an alias, never a second token', () => {
-  // Wendler's word is what the athlete reads; the config's canonical is what is stored. The three
+  // the previous program's word is what the athlete reads; the config's canonical is what is stored. The three
   // that differ are the whole reason the two fields exist.
   assertEquals(catalogEntry('Back Extension')?.display, 'Back Raise');
   assertEquals(catalogEntry('Dumbbell Curl')?.display, 'Curls');
@@ -135,7 +135,7 @@ Deno.test('⛔ THE ATHLETE\'S PICK IS WHAT APPEARS — nothing is re-roled, on a
   }
 });
 
-Deno.test('the balanced default is Wendler\'s own pairings (Triumvirate p.48, Bible p.51)', () => {
+Deno.test('the balanced default is the previous program\'s own pairings (Triumvirate p.48, Bible p.51)', () => {
   // ⛔ THE PRESS ROW IS GONE WITH ITS DAY (slice 5, 2026-08-17). It pinned Triumvirate p.48's press
   // pairing — Dips + Chin-Up — and there is no press day to carry it: the press is trained on the
   // deadlift's day, which keeps its own block (§1e, one round per stacked day).
@@ -313,7 +313,7 @@ Deno.test('⛔ THE ROTATION NEVER SURFACES A BAND-ONLY MOVEMENT WHEN A LOADABLE 
   }
 });
 
-// ── THE GLUTES POOL, AND THE ONE MOVEMENT THAT IS NOT WENDLER'S ─────────────────────────────────
+// ── THE GLUTES POOL, AND THE ONE MOVEMENT THAT IS NOT THE PREVIOUS PROGRAM'S ─────────────────────────────────
 
 Deno.test('⛔ THE GLUTES FOCUS ANSWERS ITS OWN NAME — a hip thrust, not three posterior-chain moves', () => {
   // Forever's assistance chapter has NO true glute movement, so this focus was served by a hamstring
@@ -349,20 +349,20 @@ Deno.test('the bodyweight hip thrust carries the glutes focus when there is no b
   assertEquals(canPerformCat('Barbell Hip Thrust', DB), false);
 });
 
-Deno.test('⛔ EXACTLY ONE MOVEMENT IN THE CATALOG IS NOT WENDLER\'S, and it is labelled', () => {
-  // The guardrail is "stay strictly Wendler for movements". This pins the size of the exception, so
+Deno.test('⛔ EXACTLY ONE MOVEMENT IN THE CATALOG IS OURS RATHER THAN SOURCED, and it is labelled', () => {
+  // The guardrail is "stay strictly the previous program for movements". This pins the size of the exception, so
   // a second one cannot arrive quietly: the count is the test.
-  const nonWendler = ASSISTANCE_CATALOG.filter((e) => e.source.includes('not Wendler'));
-  assertEquals(nonWendler.map((e) => e.name).sort(), ['Barbell Hip Thrust', 'Single-Leg Hip Thrust']);
-  for (const e of nonWendler) assertEquals(e.muscle, 'glutes');
+  const oursOnly = ASSISTANCE_CATALOG.filter((e) => e.source.includes('ours'));
+  assertEquals(oursOnly.map((e) => e.name).sort(), ['Barbell Hip Thrust', 'Single-Leg Hip Thrust']);
+  for (const e of oursOnly) assertEquals(e.muscle, 'glutes');
   // Everything else cites a page or a named template.
   for (const e of ASSISTANCE_CATALOG) {
-    if (e.source.includes('not Wendler')) continue;
+    if (e.source.includes('ours')) continue;
     assertEquals(/p\.\d+|Simplest Strength|2nd ed/.test(e.source), true, `${e.name}: unsourced (${e.source})`);
   }
 });
 
-Deno.test('⛔ CLOSE-GRIP BENCH IS THE MEATY TRICEPS OPTION, and it is Wendler\'s own', () => {
+Deno.test('⛔ CLOSE-GRIP BENCH IS THE MEATY TRICEPS OPTION, and it is the previous program\'s own', () => {
   const HOME = ['Barbell + plates', 'Dumbbells', 'Squat rack / Power cage',
     'Bench (flat/adjustable)', 'Pull-up bar'];
   const arms = focusPool('arms', 'push', HOME).filter((e) => canPerformCat(e.name, HOME)).map((e) => e.name);
@@ -374,7 +374,7 @@ Deno.test('⛔ CLOSE-GRIP BENCH IS THE MEATY TRICEPS OPTION, and it is Wendler\'
   assertEquals(canPerformCat('Close-Grip Bench Press', HOME), true);
   assertEquals(canPerformCat('Close-Grip Bench Press', ['Barbell + plates', 'Bench (flat/adjustable)']), false);
   // No exception needed — it is in the book.
-  assertEquals(catalogEntry('Close-Grip Bench Press')!.source.includes('not Wendler'), false);
+  assertEquals(catalogEntry('Close-Grip Bench Press')!.source.includes('not the previous program'), false);
 });
 
 Deno.test('⛔ A BANDS-ONLY KIT IS NOT STRANDED — the whole pool rotates as before', () => {
@@ -499,8 +499,8 @@ Deno.test('⛔ THE BAND IS SET BY COMPETING STRESS, NOT BY THE CYCLE PHASE (§1g
   assertEquals(assistanceTotalReps('push').totalReps, 30);
 });
 
-Deno.test('⛔ EVERY SLOT SCALES ON ONE RULE, off Wendler\u2019s own standards (§1f)', () => {
-  // Forever p.33: push-ups 100, chins 50, hanging leg raise 50. The pull slot's shipped anchor
+Deno.test('⛔ EVERY SLOT SCALES ON ONE RULE, off the previous program\u2019s own standards (§1f)', () => {
+  // the previous program: push-ups 100, chins 50, hanging leg raise 50. The pull slot's shipped anchor
   // (8 reps → the floor, +3 per rep) is scaled by the ratio between standards, so the three bands
   // line up instead of needing three hand-picked coefficients.
   assertEquals(CAPACITY_STANDARD.push, 100);

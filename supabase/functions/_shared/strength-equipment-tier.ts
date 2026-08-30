@@ -156,7 +156,7 @@ export function hasBench(strengthEquipment: string[]): boolean {
 }
 
 /**
- * Detect an INCLINE-capable bench. Forever p.25 offers DB Incline Press as a push option, and
+ * Detect an INCLINE-capable bench. the previous program offers DB Incline Press as a push option, and
  * without the bench that movement is not harder — it is impossible.
  *
  * ⛔ "Bench (flat/adjustable)" DELIBERATELY DOES NOT COUNT, and this is the one judgement call in
@@ -179,7 +179,7 @@ export function hasInclineBench(strengthEquipment: string[]): boolean {
  */
 
 /**
- * Detect an ab wheel. Forever p.30 lists the rollout on the abs menu.
+ * Detect an ab wheel. the previous program lists the rollout on the abs menu.
  *
  * ⛔ "commercial gym" DOES NOT IMPLY ONE, unlike every other detector in this file. A rack, a bench
  * and a cable stack are what a commercial gym IS; an ab wheel is a ten-dollar accessory that many

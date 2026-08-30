@@ -5,8 +5,8 @@
  *
  * ⛔ THE POINT OF THIS FILE IS THE UNION, AND WHY IT IS A UNION. `isMainLift` in the swap module was
  * never a list of main lifts — it is "does this belong to a curated DIRECT_FAMILIES group", which is
- * a RELATIVE question (is this too heavy a compound for an accessory slot). `isMain531Lift` is a
- * PROTOCOL question (is this one of Wendler's four). Measured over the 143 config names they
+ * a RELATIVE question (is this too heavy a compound for an accessory slot). `isMainBarbellLift` is a
+ * PROTOCOL question (is this one of the previous program's four). Measured over the 143 config names they
  * disagree on 27. Replacing one with the other would have re-opened the 2026-07-30 bug; unioning
  * them closes the one-directional gap without losing a single curated exclusion.
  *
@@ -14,7 +14,7 @@
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { getInSlotAlternatives } from './exercise-alternatives.ts';
-import { isMain531Lift } from './exercise-role.ts';
+import { isMainBarbellLift } from './exercise-role.ts';
 import { EXERCISE_CONFIG } from './exercise-config.ts';
 
 const FULL_GYM = ['Full commercial gym access'];
@@ -63,7 +63,7 @@ Deno.test('⛔ NO MAIN LIFT IS EVER OFFERED IN AN UNCURATED SLOT — the shared 
   const leaks: string[] = [];
   for (const slot of slots) {
     for (const offered of names(getInSlotAlternatives(slot, FULL_GYM))) {
-      if (isMain531Lift(offered)) leaks.push(`${slot} → ${offered}`);
+      if (isMainBarbellLift(offered)) leaks.push(`${slot} → ${offered}`);
     }
   }
   assertEquals(leaks, [], `a main lift was offered in an uncurated slot:\n  ${leaks.join('\n  ')}`);
@@ -77,7 +77,7 @@ Deno.test('⛔ THE UNION IS NOW LOAD-BEARING — `press` became a config key on 
   //
   // It failed, on purpose. The 2026-08-03 config reconciliation ADDED `press`, because as a
   // non-key it was falling through `getExerciseConfig`'s fuzzy fallback onto `leg press` and being
-  // priced at 1.5x the SQUAT — 5/3/1's own name for the overhead press, prescribed as a leg press.
+  // priced at 1.5x the SQUAT — the previous program's own name for the overhead press, prescribed as a leg press.
   //
   // ⚠️ SO THE GUARD IS NOW DOING REAL WORK. `press` IS iterated, it IS a vertical_push, and the
   // main-lift union is the only thing keeping it off every vertical-push accessory's swap list. The
@@ -88,9 +88,9 @@ Deno.test('⛔ THE UNION IS NOW LOAD-BEARING — `press` became a config key on 
     JSON.stringify(cfg['overhead press']),
     'the configs diverged — the dedup no longer hides this name, and the union is now the only thing excluding it',
   );
-  assert(isMain531Lift('standing barbell overhead press'), 'the shared classifier still claims it as a main lift');
+  assert(isMainBarbellLift('standing barbell overhead press'), 'the shared classifier still claims it as a main lift');
   assert(Object.prototype.hasOwnProperty.call(cfg, 'press'), '`press` is a config key as of 2026-08-03');
-  assert(isMain531Lift('press'), 'and the shared classifier calls it a main lift');
+  assert(isMainBarbellLift('press'), 'and the shared classifier calls it a main lift');
 
   // ⛔ NEITHER MAIN LIFT MAY REACH AN ACCESSORY'S LIST. `press` is the new one under test.
   for (const slot of ['Lateral Raise', 'Front Raise', 'Face Pull']) {
@@ -110,7 +110,7 @@ Deno.test('⛔ THE UNION IS NOW LOAD-BEARING — `press` became a config key on 
 
 Deno.test('⛔ NOT ONE CURATED EXCLUSION WAS LOST — the 2026-07-30 bug stays fixed', () => {
   // These are the exact offers Michael reported. Every one of them is a family member that
-  // `isMain531Lift` calls FALSE, so they only stay excluded because the family test survived.
+  // `isMainBarbellLift` calls FALSE, so they only stay excluded because the family test survived.
   const cases: Array<[string, string[]]> = [
     ['Face Pull', ['barbell row', 'bent over row', 'dumbbell row', 'rows']],
     ['Lateral Raise', ['shoulder press', 'overhead press', 'dumbbell shoulder press']],

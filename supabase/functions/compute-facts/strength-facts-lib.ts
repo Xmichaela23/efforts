@@ -34,18 +34,18 @@ function durationMinutes(w: StrengthWorkoutLike): number {
 }
 
 /**
- * ⛔ WAS BRZYCKI, NOW WENDLER'S OWN (D-339, 2026-07-30). The formula moved to `src/lib/estimate-1rm.ts`
+ * ⛔ WAS BRZYCKI, NOW THE PREVIOUS PROGRAM'S OWN (D-339, 2026-07-30). The formula moved to `src/lib/estimate-1rm.ts`
  * so this function, the baseline test in `StrengthLogger.tsx`, and the program the athlete is running
  * all answer the question the same way — they used to give three different answers. The full reasoning,
  * including why the old "DO NOT SWITCH" note's premise inverts above ten reps, is in that file.
  *
  * ⚠️ RIR IS NOT IN THE FORMULA. The estimator is pure (weight, reps). Auto-regulated protocols that
  * stop short of failure fold their reserve into an effective rep count at the CALL SITE via
- * `effectiveRepsForReserve`; 5/3/1 collects no reserve (`avgRir` null) and passes actual reps, so no
+ * `effectiveRepsForReserve`; the previous program collects no reserve (`avgRir` null) and passes actual reps, so no
  * reserve can reach the estimate through any argument — see `protocolUsesRir`.
  *
  * ⚠️ NO REP CAP ANY MORE. The old one existed because Brzycki divides by `37 − reps` and blows up;
- * Wendler's is linear and cannot. Reliability above ~10 reps is handled as PROVENANCE
+ * the previous program's is linear and cannot. Reliability above ~10 reps is handled as PROVENANCE
  * (`trustedMaxRepsFor` / `advance_untrusted`), never by quietly rewriting the rep count.
  */
 export function estimated1RM(weight: number, reps: number): number {
@@ -67,7 +67,7 @@ export interface ExerciseFact {
   planned_reps?: number;
   planned_weight?: string;
   // ── THE THREE WORDS, AND THE MEASURING SET (D-338) ──────────────────────────────────────────
-  // 5/3/1 does not use RIR: the plan dictates the weight, so there is nothing for reps-in-reserve
+  // the previous program does not use RIR: the plan dictates the weight, so there is nothing for reps-in-reserve
   // to decide. The athlete answers "Moved well / Worked for it / Grind" on the TOP set instead, and
   // the all-out set's rep count is what moves the training max. Both were being written to
   // `workouts.strength_exercises` and read by NOTHING — the tap reached the database and stopped.
@@ -189,9 +189,9 @@ export function buildStrengthFacts(
       // protocol positively tracks reserve (`rir_tracked === true`). Default is DON'T fold — the same
       // safe default the estimator now carries. Why this is the fix: reserve has no business in a 1RM
       // estimate for a protocol that doesn't collect it, and the OLD rule ("fold any reserve not flagged
-      // auto-filled") inflated every legacy 5/3/1 session — those were logged before 5/3/1 stamped
+      // auto-filled") inflated every legacy the previous program session — those were logged before the previous program stamped
       // `rir_tracked:false`, so their sets carry a reserve with no flag, and the fold read a deliberately
-      // sub-maximal opener back as a heavier lift. 5/3/1 (`rir_tracked:false`) and legacy (no flag) now
+      // sub-maximal opener back as a heavier lift. the previous program (`rir_tracked:false`) and legacy (no flag) now
       // both ignore any stored reserve; only a protocol that declares it tracks reserve, and only on a
       // set the athlete actually rated (not an auto-filled suggestion), reaches the estimate.
       if (ex.rir_tracked === true && typeof s.rir === "number" && s.rir >= 0 && !s.rir_autofilled) rirValues.push(s.rir);
@@ -202,7 +202,7 @@ export function buildStrengthFacts(
       : null;
 
     // Auto-regulated protocols (reserve collected) fold RIR into effective reps HERE, outside the
-    // estimator; 5/3/1 has avgRir=null and estimates off actual reps. The formula never sees a reserve.
+    // estimator; the previous program has avgRir=null and estimates off actual reps. The formula never sees a reserve.
     const estimateReps = avgRir != null ? effectiveRepsForReserve(bestReps, avgRir) : bestReps;
     const est1rm = bestWeight > 0 && bestReps > 0
       ? estimated1RM(bestWeight, estimateReps)

@@ -5,7 +5,7 @@
 // unloaded, equipment changed after picking, and the BALANCED_WEEK fallbacks all reached the plan
 // unchecked. Michael, 2026-08-13, off a device screenshot: "it's not reading users equipment."
 //
-// The replacement rule is Wendler's, sourced from the 2nd edition before this was written:
+// The replacement rule is the previous program's, sourced from the previous program before this was written:
 //   · same category — each slot is a muscle-category MENU (pp.50-51), and the swap is licensed
 //     ("you can change exercises however you see fit");
 //   · loadable gear first, bands last — the Bodyweight template (p.52) is the no-gear floor and
