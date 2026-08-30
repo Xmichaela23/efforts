@@ -335,6 +335,44 @@ export const EXERCISE_TYPE_CAPABILITIES: Record<ExerciseType, TypeCapability> = 
  * `bandMeansAssistance`, and a fixture asserts every `band` row is one it answers false for.
  */
 const TYPE_TABLE: Record<string, ExerciseType> = {
+  // ── ⛔ VIADA'S MOVEMENT KEY — the thirty added 2026-08-29 (pp.218-223) ────────────────────────
+  // ⚠️ ALL `loaded_accessory`, WHICH IS ALSO THE DEFAULT — so this block changes no behaviour today.
+  // It is here because the default is LOUD by design (the console warning that surfaced `drag curl`
+  // and `hip adduction machine` during the catalogue sweep), and an unmapped name is a name the
+  // language layer cannot speak about. ⛔ NONE of them is a tested max: the four competition lifts
+  // keep that, and a Kroc row is not one.
+  // ⚠️ Keys are FOLDED (lowercase, hyphens to spaces) — the lookup folds before it reads.
+  'paused deadlift': 'loaded_accessory',
+  'box squat': 'loaded_accessory',
+  'larsen press': 'loaded_accessory',
+  'jm press': 'loaded_accessory',
+  'seated db press': 'loaded_accessory',
+  'arnold press': 'loaded_accessory',
+  'kroc row': 'loaded_accessory',
+  't bar row': 'loaded_accessory',
+  'meadows row': 'loaded_accessory',
+  'gorilla row': 'loaded_accessory',
+  'db pullover': 'loaded_accessory',
+  'stiff legged deadlift': 'loaded_accessory',
+  'zercher squat': 'loaded_accessory',
+  'sandbag throw': 'loaded_accessory',
+  'smith machine press': 'loaded_accessory',
+  'machine chest press': 'loaded_accessory',
+  'dip machine': 'loaded_accessory',
+  'cable upright row': 'loaded_accessory',
+  'hack squat': 'loaded_accessory',
+  'lever squat': 'loaded_accessory',
+  'ground based deadlift machine': 'loaded_accessory',
+  'tate press': 'loaded_accessory',
+  'skull crusher': 'loaded_accessory',
+  'pec deck': 'loaded_accessory',
+  'preacher curl': 'loaded_accessory',
+  'spider curl': 'loaded_accessory',
+  'drag curl': 'loaded_accessory',
+  'pullover machine': 'loaded_accessory',
+  'hip adduction machine': 'loaded_accessory',
+  'cable kickback': 'loaded_accessory',
+
   // ── LOADED ACCESSORY: an implement, no tested max, no commands ───────────────────────────────
   'barbell row': 'loaded_accessory',
   'bent over row': 'loaded_accessory',

@@ -3116,6 +3116,72 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     isUnilateral: true,
   },
 
+
+  // ============================================================================
+  // ⛔⛔ VIADA'S MOVEMENT KEY — THE THIRTY THAT WERE MISSING (pp.218-223, added 2026-08-29)
+  //
+  // A coverage check of his five categories against this file found 39 of 69 present. The gaps were
+  // not spread evenly — TWO WHOLE CELLS WERE EMPTY (secondary pull upper 0/5, braced push upper 0/3)
+  // and focused pull/arms held 1 of 5. An empty cell is why a composed block handed the athlete a
+  // barbell curl and a chest fly: the substitution ladder walks down until it finds ANYTHING, so a
+  // starved cell silently becomes a different category's movement.
+  //
+  // ⚠️ RATIOS: isolation work takes `primaryRef: null, ratio: 0.0`, matching `barbell curl` above —
+  // the accessory box opens on the athlete's own last weight rather than a fraction of a parent
+  // lift's max. Only the compound secondaries carry a ref, and those are conservative.
+  // ============================================================================
+
+  // ── PRIMARY (p219) ──────────────────────────────────────────────────────────────────────────────
+  // ⚠️ Both are movements he NAMES as "accessory" examples on p247 — noncompetition lifts sharing the
+  // competition lift's gross pattern. They belong to the primary category and the accessory ROLE.
+  'paused deadlift': { pattern: 'hip_dominant', primaryRef: 'deadlift', ratio: 0.85, displayFormat: 'total', isUnilateral: false },
+  'box squat':       { pattern: 'knee_dominant', primaryRef: 'squat',   ratio: 0.90, displayFormat: 'total', isUnilateral: false },
+
+  // ── SECONDARY PUSH UPPER (p220) ─────────────────────────────────────────────────────────────────
+  'larsen press':    { pattern: 'horizontal_push', primaryRef: 'bench', ratio: 0.90, displayFormat: 'total', isUnilateral: false },
+  'jm press':        { pattern: 'horizontal_push', primaryRef: 'bench', ratio: 0.55, displayFormat: 'total', isUnilateral: false },
+  'seated db press': { pattern: 'vertical_push',   primaryRef: 'bench', ratio: 0.45, displayFormat: 'total', isUnilateral: false },
+  'arnold press':    { pattern: 'vertical_push',   primaryRef: 'bench', ratio: 0.40, displayFormat: 'total', isUnilateral: false },
+
+  // ── SECONDARY PULL UPPER (p220) — ⛔ THIS CELL WAS COMPLETELY EMPTY ──────────────────────────────
+  'kroc row':        { pattern: 'horizontal_pull', primaryRef: 'bench', ratio: 0.55, displayFormat: 'total', isUnilateral: true },
+  't-bar row':       { pattern: 'horizontal_pull', primaryRef: 'bench', ratio: 0.75, displayFormat: 'total', isUnilateral: false },
+  'meadows row':     { pattern: 'horizontal_pull', primaryRef: 'bench', ratio: 0.45, displayFormat: 'total', isUnilateral: true },
+  'gorilla row':     { pattern: 'horizontal_pull', primaryRef: 'bench', ratio: 0.50, displayFormat: 'total', isUnilateral: true },
+  'db pullover':     { pattern: 'vertical_pull',   primaryRef: 'bench', ratio: 0.35, displayFormat: 'total', isUnilateral: false },
+
+  // ── SECONDARY HINGE / PRESS LOWER (p220) ────────────────────────────────────────────────────────
+  'stiff-legged deadlift': { pattern: 'hip_dominant',  primaryRef: 'deadlift', ratio: 0.70, displayFormat: 'total', isUnilateral: false },
+  'zercher squat':         { pattern: 'knee_dominant', primaryRef: 'squat',    ratio: 0.60, displayFormat: 'total', isUnilateral: false },
+  // ⚠️ NO REF — a thrown implement has no percentage of anything. It is his, and it is dosed by feel.
+  'sandbag throw':         { pattern: 'hip_dominant',  primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+
+  // ── BRACED PUSH UPPER (p221) — ⛔ THIS CELL WAS COMPLETELY EMPTY ─────────────────────────────────
+  'smith machine press': { pattern: 'horizontal_push', primaryRef: 'bench', ratio: 0.95, displayFormat: 'total', isUnilateral: false },
+  'machine chest press': { pattern: 'horizontal_push', primaryRef: 'bench', ratio: 0.85, displayFormat: 'total', isUnilateral: false },
+  'dip machine':         { pattern: 'horizontal_push', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+
+  // ── BRACED PULL / LOWER (pp.221-222) ────────────────────────────────────────────────────────────
+  'cable upright row':            { pattern: 'vertical_pull',  primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'hack squat':                   { pattern: 'knee_dominant',  primaryRef: 'squat',    ratio: 0.85, displayFormat: 'total', isUnilateral: false },
+  'lever squat':                  { pattern: 'knee_dominant',  primaryRef: 'squat',    ratio: 0.85, displayFormat: 'total', isUnilateral: false },
+  'ground-based deadlift machine':{ pattern: 'hip_dominant',   primaryRef: 'deadlift', ratio: 0.85, displayFormat: 'total', isUnilateral: false },
+
+  // ── FOCUSED PUSH / ARMS (p222) ──────────────────────────────────────────────────────────────────
+  'tate press':     { pattern: 'horizontal_push', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'skull crusher':  { pattern: 'horizontal_push', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'pec deck':       { pattern: 'horizontal_push', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+
+  // ── FOCUSED PULL / ARMS (p222) — ⛔ ONE OF FIVE WAS PRESENT ─────────────────────────────────────
+  'preacher curl':    { pattern: 'horizontal_pull', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'spider curl':      { pattern: 'horizontal_pull', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'drag curl':        { pattern: 'horizontal_pull', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'pullover machine': { pattern: 'vertical_pull',   primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+
+  // ── FOCUSED LOWER (p223) ────────────────────────────────────────────────────────────────────────
+  'hip adduction machine': { pattern: 'knee_dominant', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  'cable kickback':        { pattern: 'hip_dominant',  primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+
 };
 
 /**

@@ -617,6 +617,65 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   'kettlebell snatches': [['kettlebell']],
   'band overhead press': [['bands']],
   'incline bench': [['barbell', 'incline_bench']],
+
+  // ============================================================================
+  // ⛔⛔ VIADA'S MOVEMENT KEY — ROUTES FOR THE THIRTY ADDED 2026-08-29 (pp.218-223)
+  //
+  // ⛔ ADDING MOVEMENTS WITHOUT ROUTES REPEATS THE DEFECT THE 2026-08-22 GRID AUDIT FOUND: `leg
+  // extension` and `seated calf raise` existed and carried no tag, so for an athlete who HAD declared
+  // equipment they read as *unknown* rather than available and were substituted away. The cell looked
+  // starved when it was only unlabelled.
+  //
+  // ⚠️ FIXED-STATION WORK TAKES `machine`, which the commercial-gym chip grants (2026-08-25). That is
+  // the declaration, so "commonly declarable" is satisfied and the leg-curl "leave it ungated"
+  // precedent does not apply.
+  // ============================================================================
+
+  // ⚠️ KEYS ARE IN FOLDED FORM — `gearRoutesFor` folds the incoming name (lowercase, apostrophes
+  // dropped, hyphens and underscores to spaces) and looks the TABLE up with it, so a hyphenated key
+  // here can never be hit. Three of these were written hyphenated and the untagged-gear warning
+  // caught them: "stiff-legged deadlift", "t-bar row", "ground-based deadlift machine".
+  // ── free-weight secondaries: gate on the implement, never on the bench ──────────────────────────
+  'paused deadlift': [['barbell']],
+  'box squat': [['barbell', 'rack']],
+  'larsen press': [['barbell', 'bench']],
+  'jm press': [['barbell', 'bench']],
+  'seated db press': [['dumbbells', 'bench']],
+  'arnold press': [['dumbbells']],
+  'kroc row': [['dumbbells']],
+  't bar row': [['barbell']],
+  'meadows row': [['barbell']],
+  'gorilla row': [['dumbbells'], ['kettlebell']],
+  'db pullover': [['dumbbells', 'bench']],
+  'stiff legged deadlift': [['barbell'], ['dumbbells']],
+  'zercher squat': [['barbell', 'rack']],
+
+  // ⛔ UNGATED, ON THE `leg curl` PRECEDENT. A sandbag is required and is NOT commonly declarable —
+  // no inventory chip produces one — so a route would delete the movement instead of swapping it.
+  'sandbag throw': ALWAYS,
+
+  // ── fixed stations: the commercial-gym chip is the declaration ──────────────────────────────────
+  'smith machine press': [['machine']],
+  'machine chest press': [['machine']],
+  'dip machine': [['machine']],
+  'hack squat': [['machine']],
+  'lever squat': [['machine']],
+  'ground based deadlift machine': [['machine']],
+  'pec deck': [['machine']],
+  'pullover machine': [['machine']],
+  'hip adduction machine': [['machine']],
+
+  // ── cable work ─────────────────────────────────────────────────────────────────────────────────
+  'cable upright row': [['cable']],
+  'cable kickback': [['cable'], ['machine']],
+
+  // ── focused arms: two ways into most of them ───────────────────────────────────────────────────
+  'tate press': [['dumbbells', 'bench']],
+  'skull crusher': [['barbell', 'bench'], ['dumbbells', 'bench']],
+  'preacher curl': [['barbell', 'bench'], ['dumbbells', 'bench']],
+  'spider curl': [['dumbbells', 'incline_bench']],
+  'drag curl': [['barbell'], ['dumbbells']],
+
 };
 
 /** Names already warned about, so an untagged movement announces itself once, not once per render. */

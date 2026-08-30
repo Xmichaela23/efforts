@@ -568,18 +568,22 @@ Deno.test('an incoherent request is refused, not guessed', () => {
 });
 
 Deno.test('every category and pattern the grid names is populated', () => {
-  // ⛔ THE FINDING THIS TEST PINS: `braced / push_upper` IS EMPTY. Our catalogue has no machine chest
-  // press, Smith press or dip machine — it grew around Wendler's barbell-and-dumbbell world, and
-  // Viada's braced category is the half it never needed. The slot still resolves, via the ladder,
-  // and the athlete is told. **If this list ever grows, something has been deleted; if it shrinks,
-  // the catalogue gained a movement and that is the fix landing.**
+  // ✅ **CLOSED 2026-08-29 — THE LIST SHRANK TO NOTHING, WHICH THIS TEST SAID WOULD BE THE FIX
+  // LANDING.** What it pinned: `braced / push_upper` was EMPTY because the catalogue grew around
+  // Wendler's barbell-and-dumbbell world and Viada's braced category is the half it never needed.
+  // A coverage sweep of pp.218-223 found 39 of his 69 movements present; the thirty missing ones
+  // were added with their gear routes, and machine chest press, Smith machine press and dip machine
+  // filled this cell.
+  // ⛔ THE ASSERTION STILL EARNS ITS KEEP, POINTED THE OTHER WAY: **any cell appearing in this list
+  // is a category the composer can no longer fill from his own key**, and the substitution ladder
+  // will quietly hand the athlete a different category's movement instead.
   const empty: string[] = [];
   for (const category of ['primary', 'secondary', 'braced', 'focused'] as ViadaCategory[]) {
     for (const pattern of VIADA_PATTERNS) {
       if (movementsIn(category, pattern).length === 0) empty.push(`${category}/${pattern}`);
     }
   }
-  assertEquals(empty, ['braced/push_upper'], 'the set of empty grid cells moved');
+  assertEquals(empty, [], 'a grid cell went empty — the composer will silently substitute for it');
   assert(movementsIn('carry', null).length > 0);
   assert(movementsIn('core', null).length > 0);
   // And the cells report themselves for anyone auditing coverage.
