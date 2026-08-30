@@ -14,6 +14,37 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## 📖 THE VOCABULARY IS INVISIBLE — no glossary, and the intent never reaches a screen (filed 2026-08-29)
+
+**Michael:** *"I want people to know what the fuck they're doing."* Traced this session; the data is
+already on every row, so this is a content job, not a plumbing one.
+
+- [ ] **There is no glossary anywhere.** An athlete learns the movements and the cues and never
+      learns the SYSTEM — that there are four session types, what each is for, or why the heavy day
+      carries no reps-in-reserve target while the speed day does.
+      ⚠️ **Worth knowing before writing it:** **ME and DE are NOT Viada's** — they are Westside's, and
+      he says so on p72. **HYP** is generic shorthand. **Only SKILL is his framing** (Westside's third
+      method is "repetition effort"). ⛔ And his Olympic-lifting program uses a completely separate
+      vocabulary — HEAVY / REP / SKILL / GROOVE (Part A3) — so the four are not universal even inside
+      his own book. His own abbreviations page is **p219**.
+- [ ] **The logger teaches by cue, never by label.** `ME: Upper` is rewritten to `Heavy: Upper` at the
+      last moment before the athlete reads it (`StrengthLogger.tsx:80`). The intent drives the rest
+      timer, the rep floor and whether the card carries an effort cue at all — the athlete gets the
+      behaviour and never the name. ⚠️ **That translation is deliberate and bro-friendly; the ask is a
+      way to LEARN the name, not to show the raw token.** A tappable Heavy/Speed label is the cheapest
+      seam.
+- [ ] **The State screen does not surface the intent at all.** `slot_intent` reaches
+      `StateTab.tsx` and is unused; that file's own note records the field being *"dropped at three
+      separate narrow points"*, the same shape as the per-lift chart that went dark for four lifts.
+      ⚠️ **Verify whether it is genuinely dropped or merely unrendered before treating it as a bug.**
+- [ ] The compare/performance table reads `slot_intent` for behaviour, not as a heading.
+
+⚠️ **Scope note:** this is deliberately NOT part of the Viada engine build
+(`PLAN-viada-owns-the-engine-2026-08-29.md`). It is a copy + surface pass and should be taken on its
+own, after the engine work.
+
+---
+
 ## ⏳ AWAITING MICHAEL — THE GEAR GATE (2026-08-26, PUSHED `64509824`, **DEPLOYED**; NOT DEVICE-VERIFIED)
 
 - [x] **Deployed and verified against the API**, 2026-08-26 18:50:23 UTC (commit 18:30:28 UTC):
