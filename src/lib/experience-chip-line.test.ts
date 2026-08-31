@@ -40,10 +40,22 @@ Deno.test('⛔ THE COUNT IS DERIVED FROM THE SLOTS, never assumed to be two', ()
 
 Deno.test('⛔ THE NUMBER ITSELF IS UNCHANGED — the rotation logic was proved correct, not touched', () => {
   const all = experienceChips({ hard1: 'run', hard2: 'run', easy: 'run', long: 'run' } as never, { baselines: {} as never });
-  // Composed across a real 12-week block: the near-threshold run is 66 min EVERY week at this tier,
-  // and the MLSS run swings 41-49 underneath it. The quoted maximum is a session he actually gets.
-  assertEquals(all.run!.experienced.longestMin, 66);
-  assertEquals(all.run!.newer.longestMin, 45);
+  /**
+   * ⚠️ 66 → 59 ON 2026-08-31, AND THE CHIP IS STILL QUOTING A SESSION HE ACTUALLY GETS — which is the
+   * property this test exists for. The near-threshold session shortened because its repeat count is
+   * now the source's own for that level instead of one derived from the week's dose. **The chip
+   * follows the session it measures; that is the whole point of it.**
+   * ⚠️ THIS IS ATHLETE-FACING: the experienced chip now reads about seven minutes shorter. The newer
+   * tier's number is unchanged, which is asserted directly below.
+   */
+  assertEquals(all.run!.experienced.longestMin, 59);
+  /**
+   * ⚠️ 45 → 41 ON 2026-08-31, same cause as the line above: the source's own per-level repeat count
+   * replaced a dose-derived one. ⛔ AND THIS IS THE NUMBER THE ONE-HOUR KNIFE-EDGE TURNS ON — the
+   * newer tier's hard run was 45 minutes against a 60-minute ask, a gap of exactly half an easy run.
+   * See `volume-bounds.test.ts` for what four minutes does to that week.
+   */
+  assertEquals(all.run!.newer.longestMin, 41);
 });
 
 Deno.test('⛔ THE REST OF THE HOURS ARE ACCOUNTED FOR, WITHOUT A SECOND NUMBER', () => {

@@ -402,6 +402,23 @@ export type Archetype = {
    * (swimming, open water) the family band divides cleanly and drives the count directly.
    */
   repsBand?: Range;
+  /**
+   * ⛔⛔ THE COUNT THIS SHAPE USES **AT EACH LEVEL** (2026-08-31). `repsBand` is the family-wide span
+   * across all three levels, and the count is derived from the DOSE and then clamped to it — so a
+   * level-2 session whose dose ran high took the count the source only reaches at level 3. A real
+   * athlete's level-2 session built twelve rounds where his level prints eight.
+   * ⚠️ OPTIONAL, AND ABSENT KEEPS THE OLD CLAMP, so a shape whose source gives no per-level count is
+   * unchanged. Where the source does give one, the level's own range is the clamp.
+   */
+  repsByLevel?: Partial<Record<Level, Range>>;
+  /**
+   * ⛔⛔ THE WORK INTENSITY RISES ACROSS THE REPEATS rather than sitting at one point — p237's
+   * anaerobic repeats are described as starting at the bottom of the band and progressing to the top
+   * by the end. Modelled here as a real per-rep progression: **the band was being emitted on every
+   * rep, and the plan token takes a band's top, so every repeat was prescribed at the ceiling.**
+   * ⚠️ ABSENT MEANS A FLAT EFFORT, which is every other shape.
+   */
+  progressive?: true;
   /** Which levels the source offers this shape at. Absent = all three. */
   levels?: Level[];
   /** Repeats are grouped into sets with their own stated between-set recovery. */
@@ -633,40 +650,112 @@ export const FAMILIES: Record<FamilyId, {
       },
       {
         /**
-         * ⛔ SPLIT FROM THE SHORT REPEATS. His race-specific repeats are two to four efforts of four
-         * to twenty minutes; his short above-threshold repeats are eight to sixteen efforts of about
-         * a minute. One shape holding both would build thirteen five-minute repeats — sixty-five
-         * minutes of above-threshold running, which is not a session anywhere in the book.
+         * ⛔⛔ UNBLENDED (2026-08-31). This ran 4-15 minutes at 92-105% as ONE band — **the source's
+         * race-specific repeats span four race distances, and it pairs each duration with its own
+         * intensity: the shortest repeats at the highest percentage, the longest at the lowest.**
+         * Sampled apart, and with the plan token taking a band's top, the athlete could be
+         * prescribed a fifteen-minute repeat at the shortest race's intensity — a dose on no line
+         * anywhere.
+         * ⚠️ SPLIT BY THE PAIRING, NOT BY RACE NAME. This is the short, sharp end; `race_repeats_long`
+         * is the sustained end. Two coherent shapes rather than four transcribed prescriptions.
+         * ⚠️ THE ID IS UNCHANGED — stored picks and built plans carry it.
          */
         id: 'race_repeats',
         shape: 'intervals',
         label: 'Race-specific repeats',
-        repBand: { lo: 240, hi: 900 },
+        // ⚠️ FIVE TO EIGHT MINUTES. The floor is the shortest repeat this shape reaches, and it sits
+        // ABOVE the embedded-surge block's length deliberately: two shapes of equal length with
+        // different counts trips the library's own pairing property, and they are not equal on the
+        // page either.
+        repBand: { lo: 300, hi: 480 },
         repsBand: { lo: 2, hi: 4 },
-        work: pct(0.92, 1.05),
+        repsByLevel: { 1: { lo: 2, hi: 2 }, 2: { lo: 3, hi: 4 }, 3: { lo: 4, hi: 4 } },
+        work: pct(1.00, 1.05),
         recovery: { kind: 'stated', band: { lo: 180, hi: 300 }, intensity: vt1 },
         cite: 'Viada pp233-234 — 3- to 5-minute recovery walk/jog between sets',
       },
       {
+        /** ⛔ THE SUSTAINED END OF THE SAME METHOD — longer repeats at a lower percentage. Split from
+         *  `race_repeats` so duration and intensity can no longer be sampled apart. */
+        id: 'race_repeats_long',
+        shape: 'intervals',
+        label: 'Sustained race-specific repeats',
+        // ⚠️ 12 TO 15 MINUTES. The band's top is the longest repeat this shape reaches at level 3;
+        // a wider top let level 3 build a twenty-minute repeat, which is a different level's dose.
+        repBand: { lo: 720, hi: 900 },
+        repsBand: { lo: 2, hi: 3 },
+        repsByLevel: { 1: { lo: 2, hi: 2 }, 2: { lo: 2, hi: 3 }, 3: { lo: 3, hi: 3 } },
+        work: pct(0.92, 0.95),
+        recovery: { kind: 'stated', band: { lo: 180, hi: 300 }, intensity: vt1 },
+        cite: 'Viada pp233-234 — 3- to 5-minute recovery walk/jog between sets',
+      },
+      {
+        /**
+         * ⛔⛔ UNBLENDED (2026-08-31). This ran 3:30-8:30 at 85-92% as one band, and **the source
+         * pairs the two: the shorter repeats sit at the higher percentage and the longer ones step
+         * down as they lengthen.** Sampled apart — and with the plan token taking a band's top — the
+         * athlete could get the longest repeat at the hardest end, which is a harder session than
+         * any the page prescribes. This is the shorter, firmer half.
+         * ⚠️ THE ID IS UNCHANGED; `below_threshold_long` is the other half.
+         */
         id: 'below_threshold',
         shape: 'intervals',
         label: 'Sustained sub-threshold repeats',
-        repBand: { lo: 210, hi: 510 },
-        repsBand: { lo: 3, hi: 8 },
-        work: pct(0.85, 0.92),
+        repBand: { lo: 210, hi: 240 },
+        repsBand: { lo: 5, hi: 8 },
+        repsByLevel: { 1: { lo: 5, hi: 5 }, 2: { lo: 6, hi: 6 }, 3: { lo: 8, hi: 8 } },
+        work: pct(0.90),
         recovery: { kind: 'stated', band: { lo: 60, hi: 90 }, intensity: vt1 },
         cite: 'Viada pp233-234 — 1 to 1:30 at VT1 between',
       },
       {
+        /** ⛔ THE LONGER, EASIER HALF of the same method — as the repeat lengthens the percentage
+         *  steps down with it. Split so the two can no longer be combined. */
+        id: 'below_threshold_long',
+        shape: 'intervals',
+        label: 'Long sub-threshold repeats',
+        repBand: { lo: 360, hi: 510 },
+        repsBand: { lo: 3, hi: 6 },
+        repsByLevel: { 1: { lo: 3, hi: 3 }, 2: { lo: 5, hi: 5 }, 3: { lo: 4, hi: 6 } },
+        work: pct(0.85, 0.88),
+        recovery: { kind: 'stated', band: { lo: 60, hi: 90 }, intensity: vt1 },
+        cite: 'Viada pp233-234 — 1 minute at VT1 between',
+      },
+      {
+        /**
+         * ⛔⛔ UNBLENDED (2026-08-31). The surge band ran 115-140%, and **those two surges belong to
+         * two different near-threshold shapes** — a short surge inside a block just under threshold,
+         * and a much sharper one opening a long steady effort. One band let the sharp surge be
+         * prescribed inside the wrong block, and the plan token takes a band's top, so it was.
+         * ⚠️ THE ID IS UNCHANGED; `surge_opener` is the other shape.
+         */
         id: 'surge_embedded',
         shape: 'intervals',
         label: 'Threshold block with an embedded surge',
         repBand: { lo: 240, hi: 300 },
         repsBand: { lo: 4, hi: 12 },
+        repsByLevel: { 1: { lo: 4, hi: 4 }, 2: { lo: 8, hi: 8 }, 3: { lo: 12, hi: 12 } },
         work: pct(0.92, 0.95),
-        float: { band: { lo: 15, hi: 20 }, intensity: pct(1.15, 1.40), label: 'Surge', insideRep: true },
+        float: { band: { lo: 15, hi: 15 }, intensity: pct(1.15), label: 'Surge', insideRep: true },
         recovery: { kind: 'stated', band: { lo: 60, hi: 60 }, intensity: easy },
         cite: 'Viada pp233-234 — a short supra-threshold surge inside a near-threshold block',
+      },
+      {
+        /** ⛔ THE OTHER SHAPE: a brief, much sharper surge opening a long steady effort. Split from
+         *  `surge_embedded` so the sharp surge can no longer land inside the shorter block. */
+        id: 'surge_opener',
+        shape: 'intervals',
+        label: 'Long steady effort opened by a sharp surge',
+        // ⚠️ THE BLOCK IS THE SURGE PLUS THE STEADY EFFORT, and it sits BELOW the short race repeat's
+        // length deliberately: two shapes of equal length with different counts trip the library's
+        // own pairing property, and these two are not equal on the page either.
+        repBand: { lo: 280, hi: 280 },
+        repsBand: { lo: 5, hi: 8 },
+        repsByLevel: { 1: { lo: 5, hi: 5 }, 2: { lo: 6, hi: 6 }, 3: { lo: 8, hi: 8 } },
+        work: pct(0.92),
+        float: { band: { lo: 20, hi: 20 }, intensity: pct(1.40), label: 'Opening surge', insideRep: true },
+        recovery: { kind: 'stated', band: { lo: 60, hi: 60 }, intensity: easy },
+        cite: 'Viada pp233-234 — a sharp opening surge before a long steady effort',
       },
     ],
   },
@@ -809,16 +898,21 @@ export const FAMILIES: Record<FamilyId, {
         cite: 'Viada p236',
       },
       {
+        /**
+         * ⛔⛔ THE ZERO-LENGTH REP WAS AN ARTIFACT (2026-08-31): `repBand { lo: 0, hi: 0 }` gave the
+         * work step no clock, so the session's length was recovery-only and **all three levels built
+         * an identical 92 minutes** — a level that changes nothing is a level that is not being read.
+         * ⛔ THE STEP STILL CARRIES NO INVENTED DURATION. The source states none for a standing start:
+         * it is an acceleration from a near-stop up to speed, and how long that takes is the rider's.
+         * What is fixed is the COUNT, which the source does give per level, so the levels now differ
+         * by what the page differs by rather than by nothing.
+         */
         id: 'standing_start',
         shape: 'intervals',
         label: 'Standing starts',
-        /**
-         * ⛔ THE EFFORT HAS NO STATED DURATION and none is given one here — it runs from a track
-         * stand to speed, which is however long that takes on the day. The rep band is the RECOVERY,
-         * which he does state; the work step carries a null clock.
-         */
         repBand: { lo: 0, hi: 0 },
         repsBand: { lo: 6, hi: 10 },
+        repsByLevel: { 1: { lo: 6, hi: 6 }, 2: { lo: 8, hi: 8 }, 3: { lo: 10, hi: 10 } },
         work: { kind: 'all_out' },
         recovery: { kind: 'stated', band: { lo: 360, hi: 600 }, intensity: easy },
         cite: 'Viada p236 — 6 to 10 minutes of easy spin between reps',
@@ -835,12 +929,23 @@ export const FAMILIES: Record<FamilyId, {
     cite: 'Viada p237',
     archetypes: [
       {
+        /**
+         * ⛔⛔ IT IS A PROGRESSION, NOT A SAMPLING RANGE (2026-08-31). The source describes these
+         * repeats as **starting at the bottom of the band and progressing to the top by the end of
+         * the session** — that is a shape, and it was modelled as one flat band. Every repeat
+         * therefore carried 110-130%, and the plan token takes a band's top, so **every repeat was
+         * prescribed at the ceiling.** `progressive` makes the intensity climb rep by rep, which is
+         * what the page actually asks for and is easier work early and harder work late.
+         * ⚠️ THE REP LENGTH IS PER-LEVEL, which it always was — the level moves the repeat's length
+         * inside the band. What is new is that the COUNT is now per-level too.
+         */
         id: 'progressive_repeats',
         shape: 'intervals',
         label: 'Progressive repeats',
         repBand: { lo: 45, hi: 90 },
         repsBand: { lo: 6, hi: 10 },
-        /** Each set starts at 110% and progresses to 125-130% by the end — his own instruction. */
+        repsByLevel: { 1: { lo: 6, hi: 10 }, 2: { lo: 6, hi: 10 }, 3: { lo: 6, hi: 10 } },
+        progressive: true,
         work: pct(1.10, 1.30),
         recovery: { kind: 'stated', band: { lo: 240, hi: 360 }, intensity: easy },
         cite: 'Viada p237 — 4 to 6 minutes of recovery between sets',

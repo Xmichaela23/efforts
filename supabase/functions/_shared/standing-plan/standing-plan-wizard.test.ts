@@ -399,7 +399,15 @@ Deno.test('the frame\'s two hard slots are distinct families, and the screen\'s 
    * day 1's ride is now his longest printed sweet-spot session (`tempo`). Both hard slots have
    * always resolved to the `ride_sweet_spot` FAMILY; only day 1's shape within it moved.
    */
-  assert(/bike_vo2_/.test(slot1), `slot one is not the anaerobic session: ${slot1}`);
+  /**
+   * ⚠️ THE TOKEN SHAPE CHANGED ON 2026-08-31 and the assertion follows it. p237's anaerobic repeats
+   * **progress across the session** — start at the bottom of the band, finish at the top — and that
+   * was modelled as one flat band, so every repeat was prescribed at the ceiling. A progressive
+   * shape cannot ride on a `repeat` count, because a repeat replays identical steps; it is written
+   * out rep by rep with a rising percentage, which is why this no longer matches `bike_vo2_`.
+   * ⚠️ WHAT IS ASSERTED IS THE SAME FACT: slot one is the anaerobic session, not a sweet-spot one.
+   */
+  assert(/bike_vo2_|(\d+s1[12]\d-.*\d+s130)/.test(slot1), `slot one is not the anaerobic session: ${slot1}`);
   assert(/bike_ss_/.test(slot2), `slot two is not a sweet-spot session: ${slot2}`);
   assert(slot1 !== slot2, 'the two hard slots built the same session');
 

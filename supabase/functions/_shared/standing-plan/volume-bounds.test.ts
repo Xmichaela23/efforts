@@ -424,7 +424,17 @@ Deno.test('⛔ THE OPTIONS ARE WHOLE HOURS, ALWAYS SHOWN — run to 6, ride to 1
    * ⚠️ THE SIZE IS NOT 1 EITHER (2026-08-27). Quality is a fixed dose, and the dial the solve returns
    * describes the BASE families, which this week has none of.
    */
-  assertEquals(wk.volume.run.verdict, 'under_floor');
+  /**
+   * ⚠️ THE VERDICT MOVED ON 2026-08-31, and this test already anticipated that it could: its own note
+   * above says *"the honest answer is still a number and a sentence; which sentence it is changed."*
+   * Un-mashing the blended quality archetypes changed the day-3 session's length by a little, and
+   * this scenario sits exactly on the boundary between the two sentences — a one-hour-a-week runner
+   * carrying a single quality session.
+   * ⛔ `over_cap` IS THE RIGHT SENTENCE HERE and is not a weakening: the frame's own minimum for this
+   * week now EXCEEDS what the athlete asked for, which is what over-cap means. Under-floor would say
+   * the opposite — that the week falls short of them — and it does not.
+   */
+  assertEquals(wk.volume.run.verdict, 'over_cap');
   /**
    * ⛔ NOTHING IS ADDED FOR A GAP SMALLER THAN HALF A SESSION. The fill once used `Math.ceil`, so an
    * eleven-minute gap bought a whole 30-minute easy run and the week built 1h19 against a 1h ask;
@@ -457,12 +467,36 @@ Deno.test('⛔ THE OPTIONS ARE WHOLE HOURS, ALWAYS SHOWN — run to 6, ride to 1
    * buys nothing. **The week is one 45-minute hard run against a one-hour ask, which is his sentence
    * exactly.** ⚠️ Nothing in the fill rule changed; the session it is measuring against did.
    */
+  /**
+   * ⚠️⚠️ THIS FLIPPED AGAIN ON 2026-08-31, AND THE FLIP IS THE FINDING RATHER THAN THE FIX.
+   *
+   * The scenario turns on ONE comparison: the fill buys `Math.round(gap / easyRunLength)` sessions,
+   * so the line sits at exactly half an easy run — fifteen minutes. The hard run measured **45
+   * minutes**, leaving a gap of exactly fifteen. **It sat precisely on the boundary.**
+   *
+   * ⛔ FOUR MINUTES MOVED IT. Binding the quality shapes to their own per-level counts made that
+   * session 41 minutes, the gap became nineteen, and the fill bought one easy run: **two runs, 71
+   * minutes, against a one-hour ask.** Nothing in the fill rule changed; the number it measures
+   * against did.
+   *
+   * ⛔ AND THIS IS THE SECOND TIME. The note above records it flipping the other way on 2026-08-27
+   * and a placement ruling moving it back. **A week whose session COUNT turns on a four-minute
+   * rounding boundary is unstable by construction**, and the margin fix for it is logged and
+   * deliberately not built here — it is a rule about how these weeks behave and it is Michael's.
+   *
+   * ⚠️ THE 41 IS NOT NEGOTIABLE BACK. It is the page's own count for that level; restoring 45 would
+   * mean undoing a source-faithfulness fix to protect a pin.
+   * ⚠️ AND THIS FRAME IS THE RIGHT PLACE FOR THE PIN: it is the one that still ASKS for weekly hours.
+   * The frame that stopped asking can no longer reach the fill at all (`frameAsksWeeklyHours`).
+   */
   const lowTier = build({ '1:0': 'run', '3:0': 'ride', '4:0': 'ride', '6:0': 'ride' }, 1);
   const lowRuns = lowTier.sessions.filter((s) => s.type === 'run');
-  assertEquals(lowRuns.length, 1, lowRuns.map((r) => r.name).join(', '));
-  assertEquals(lowRuns.filter((s) => (s.tags ?? []).includes('volume_fill')).length, 0,
-    'a gap smaller than half a session bought an easy run');
+  assertEquals(lowRuns.length, 2, lowRuns.map((r) => r.name).join(', '));
+  assertEquals(lowRuns.filter((s) => (s.tags ?? []).includes('volume_fill')).length, 1,
+    'the nineteen-minute gap no longer buys the easy run it is measured to buy');
   const lowTotal = lowRuns.reduce((t, s) => t + (Number(s.duration) || 0), 0);
+  // ⚠️ 71 AGAINST 60 — over by eleven where the alternative was under by fifteen. The tolerance is
+  // unchanged and still catches a week that misses the ask by a session.
   assert(Math.abs(lowTotal - 60) <= 20, `a one-hour ask built ${lowTotal} minutes`);
   /**
    * ⚠️ THE STANDARD-COLUMN CASE LANDS NEAR THE ASK RATHER THAN UNDER IT (2026-08-27). It used to be
@@ -825,7 +859,13 @@ Deno.test('⛔⛔ THE FLOOR CANNOT EXCEED WHAT THE ATHLETE RUNS — the low-volu
   const runnerAsk = build(ALL_RUN, 2, undefined, EXPERIENCED);
   const runnerTotal = runnerAsk.sessions.filter((s) => s.type === 'run')
     .reduce((t, s) => t + (Number(s.duration) || 0), 0);
-  assert(runnerTotal >= 195, `the standard column shrank for a runner: ${runnerTotal} minutes`);
+  /**
+   * ⚠️ 195 → 190 ON 2026-08-31, AND IT IS A ROUNDING MOVE, NOT A SHRINK. Un-mashing the blended
+   * quality archetypes changed one session's length by a single minute and this pin sat directly on
+   * the old total. **The bar is kept just under the measured value rather than lowered to it**, so a
+   * real shrink still fails here.
+   */
+  assert(runnerTotal >= 190, `the standard column shrank for a runner: ${runnerTotal} minutes`);
 
   /**
    * ⛔⛔ ALL FOUR SESSIONS ARE STILL THERE. The tier changes how big they are, never how many — the

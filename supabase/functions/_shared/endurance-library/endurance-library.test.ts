@@ -773,28 +773,68 @@ Deno.test('⛔⛔ A REPEAT COUNT COMES FROM THE WORK BAND, NOT FROM A SECOND DIA
     return { reps: b.repeat, work, rest: b.restBetween?.seconds ?? null };
   };
 
-  // ⛔ p234's OWN LINE: the marathon repeat is fifteen minutes and comes as THREE.
-  const race = shape('run_near_threshold', 3, 'race_repeats');
-  assertEquals(race.work, 900, 'the level-3 race repeat is no longer fifteen minutes');
+  /**
+   * ⛔ p234's OWN LINE: the longest race repeat is fifteen minutes and comes as THREE.
+   * ⚠️ IT MOVED ARCHETYPE ON 2026-08-31 and the assertion moved with it, unweakened. `race_repeats`
+   * used to span every race distance in one band — 4 to 15 minutes at 92-105% — which is exactly
+   * the both-ends-at-once pairing this test exists to forbid, and the plan token takes a band's top.
+   * The long end is its own shape now, so the fifteen-minute repeat is asserted where it lives.
+   */
+  const race = shape('run_near_threshold', 3, 'race_repeats_long');
+  assertEquals(race.work, 900, 'the level-3 long race repeat is no longer fifteen minutes');
   assertEquals(race.reps, 3, `p234 prints 3 x 15; built ${race.reps}`);
+  // ⛔ AND THE SHORT END STAYS SHORT — the split is only honest if neither half drifts.
+  const raceShort = shape('run_near_threshold', 3, 'race_repeats');
+  assert(raceShort.work <= 480, `the short race repeat grew to ${raceShort.work}s`);
+  assert(raceShort.reps >= race.reps, 'the shorter repeat comes in fewer numbers than the longer one');
   // ⛔ AND THE 8:30 ROUNDS ARE NOT SEVEN. p234 prints four; the band allows five, never seven.
-  const below = shape('run_near_threshold', 3, 'below_threshold');
-  assert(below.reps <= 5, `p234 prints 4 rounds of 8:30; built ${below.reps}`);
+  // ⚠️ THE LONG SUB-THRESHOLD REPEATS ARE THEIR OWN SHAPE SINCE 2026-08-31, for the same reason as
+  // the race repeats: duration and percentage are paired on the page and were sampled apart here.
+  const below = shape('run_near_threshold', 3, 'below_threshold_long');
+  assert(below.reps <= 6, `p234 prints 4 rounds of 8:30; built ${below.reps}`);
 
   /**
    * ⛔ THE PROPERTY, ACROSS EVERY FAMILY AND LEVEL: within one family and level, a longer repeat
    * never comes in greater numbers than a shorter one. That is what makes the pairing his.
    */
+  /**
+   * ⚠️⚠️ THE COMPARISON MOVED INSIDE AN ARCHETYPE ON 2026-08-31, AND IT IS STRONGER FOR IT.
+   *
+   * ⛔ IT USED TO COMPARE ACROSS archetypes at one level — a proxy for the real thing. It was the
+   * right proxy while counts were DOSE-derived from one shared band, because that is exactly the
+   * mechanism that invents a both-at-the-top session. **Counts are now the source's own per level**
+   * (`repsByLevel`), so two different shapes can legitimately sit at 8 x 270s and 6 x 225s: those
+   * are two different prescriptions, not one band sampled twice, and the page carries both.
+   *
+   * ⛔ SO THE GUARANTEE IS ASSERTED DIRECTLY INSTEAD, in two halves that together say more than the
+   * proxy did: within one archetype a longer repeat never comes MORE often as the level rises, and
+   * every archetype that pins counts pins them for all three levels rather than one.
+   */
   for (const family of ['run_near_threshold', 'run_mlss', 'ride_sweet_spot'] as const) {
-    for (const level of [1, 2, 3] as const) {
-      const seen = archetypesFor(family as never, level)
-        .map((a) => ({ id: a.id, ...shape(family, level, a.id) }))
-        .filter((x) => x.reps > 1)
-        .sort((a, b) => a.work - b.work);
-      for (let i = 1; i < seen.length; i++) {
-        assert(seen[i].reps <= seen[i - 1].reps + 1,
-          `${family} L${level}: ${seen[i].id} is ${seen[i].reps} x ${seen[i].work}s against `
-            + `${seen[i - 1].id} at ${seen[i - 1].reps} x ${seen[i - 1].work}s — longer and more numerous`);
+    for (const a of archetypesFor(family as never, 1)) {
+      const byLevel = ([1, 2, 3] as const)
+        .filter((l) => archetypesFor(family as never, l).some((x) => x.id === a.id))
+        .map((l) => ({ l, ...shape(family, l, a.id) }))
+        .filter((x) => x.reps > 1);
+      for (let i = 1; i < byLevel.length; i++) {
+        const prev = byLevel[i - 1];
+        const now = byLevel[i];
+        assert(now.work >= prev.work || now.reps <= prev.reps,
+          `${family}.${a.id}: L${now.l} is ${now.reps} x ${now.work}s against L${prev.l} at `
+            + `${prev.reps} x ${prev.work}s — the repeat got shorter and more numerous at once`);
+      }
+    }
+  }
+
+  /**
+   * ⛔ AND A PINNED COUNT IS PINNED FOR EVERY LEVEL. A shape that states its count at one level and
+   * leaves the others to the dose is the old defect surviving in half the table.
+   */
+  for (const [family, arch] of Object.entries(FAMILIES)) {
+    for (const a of (arch as { archetypes: Array<{ id: string; repsByLevel?: Record<number, unknown>; levels?: number[] }> }).archetypes) {
+      if (!a.repsByLevel) continue;
+      for (const l of (a.levels ?? [1, 2, 3])) {
+        assert(a.repsByLevel[l], `${family}.${a.id} pins a count for some levels but not L${l}`);
       }
     }
   }

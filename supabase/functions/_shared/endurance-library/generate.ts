@@ -348,6 +348,13 @@ export function applyTempoCrossover(
  */
 function repCount(a: Archetype, ctx: BuildContext, workPerRep: number): number {
   const derived = Math.max(1, Math.round(ctx.target / Math.max(1, workPerRep)));
+  /**
+   * ⛔⛔ THE LEVEL'S OWN COUNT WINS WHERE THE SOURCE GIVES ONE (2026-08-31) — see `repsByLevel`. The
+   * count is DOSE-derived and was clamped only to the family-wide span, so a level-2 session with a
+   * high dose took the level-3 count. This clamps to the level's range first.
+   */
+  const perLevel = a.repsByLevel?.[ctx.level];
+  if (perLevel) return Math.min(perLevel.hi, Math.max(perLevel.lo, derived));
   if (!a.repsBand) return derived;
   return Math.min(a.repsBand.hi, Math.max(a.repsBand.lo, derived));
 }
@@ -383,10 +390,21 @@ function buildIntervals(ctx: BuildContext): Block[] {
   const reps = repCount(a, ctx, workPerRep);
 
   const workLabel = a.float && !floatInside ? 'Surge' : 'Work';
-  const mkRepeat = (): Step[] => {
+  /**
+   * ⛔⛔ A PROGRESSIVE SHAPE RISES ACROSS ITS REPEATS — see `Archetype.progressive`. Rep `i` of `n`
+   * sits at its own point in the band instead of every rep carrying the whole band, which the plan
+   * token then collapsed to the top. ⚠️ The first rep is the band's floor and the last is its top,
+   * which is what "start here and progress to there by the end" means.
+   */
+  const workAt = (i: number, n: number): Intensity => {
+    if (!a.progressive || a.work.kind !== 'pct_threshold' || n < 2) return a.work;
+    const at = a.work.lo + (a.work.hi - a.work.lo) * (i / (n - 1));
+    return { kind: 'pct_threshold', lo: Math.round(at * 100) / 100, hi: Math.round(at * 100) / 100 };
+  };
+  const mkRepeat = (i = 0, n = 1): Step[] => {
     const steps: Step[] = [];
     // A standing start has no stated duration; its step carries a null clock rather than a guess.
-    steps.push(step('work', workLabel, repSeconds > 0 ? repSeconds : null, a.work, sport, anchor));
+    steps.push(step('work', workLabel, repSeconds > 0 ? repSeconds : null, workAt(i, n), sport, anchor));
     if (a.float && !floatInside) {
       steps.push(step(floatCountsAsWork ? 'work' : 'float', a.float.label, floatSeconds, a.float.intensity, sport, anchor));
     }
@@ -399,7 +417,7 @@ function buildIntervals(ctx: BuildContext): Block[] {
     const { sets, perSet } = splitIntoSets(reps, a.set.repeatsPerSet, ctx.level);
     const inner: Step[] = [];
     for (let i = 0; i < perSet; i++) {
-      inner.push(...mkRepeat());
+      inner.push(...mkRepeat(i, perSet));
       if (rest && i < perSet - 1) inner.push({ ...rest });
     }
     return [{
@@ -408,6 +426,21 @@ function buildIntervals(ctx: BuildContext): Block[] {
       steps: inner,
       restBetween: step('recovery', 'Between sets', lerp(a.set.restBand, 0.5), a.set.intensity, sport, anchor),
     }];
+  }
+
+  /**
+   * ⛔ A PROGRESSIVE SHAPE CANNOT RIDE ON `repeat`, because `repeat` replays ONE set of steps — every
+   * repeat would carry the same intensity, which is the thing being fixed. It is written out
+   * instead, rep by rep, with its own recovery between. ⚠️ Only when `progressive` is set; every
+   * other shape keeps the compact `repeat` form the rest of the pipeline expects.
+   */
+  if (a.progressive && reps > 1) {
+    const laid: Step[] = [];
+    for (let i = 0; i < reps; i++) {
+      laid.push(...mkRepeat(i, reps));
+      if (rest && i < reps - 1) laid.push({ ...rest });
+    }
+    return [{ repeat: 1, label: `${reps} x ${a.label.toLowerCase()}`, steps: laid, restBetween: null }];
   }
 
   const inner = mkRepeat();
