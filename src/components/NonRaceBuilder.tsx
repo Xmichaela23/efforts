@@ -39,6 +39,7 @@ import { demonstratedRunVolume, demonstratedWeeklyMinutes } from '../../supabase
 import {
   advancedTierSessions,
   experienceLevels,
+  FRAMES,
   type EnduranceExperience,
   type ExperienceTier,
   type FrameId,
@@ -362,6 +363,9 @@ const TRAIN_GOAL: Record<TrainCardId, NonRaceGoalId | null> = {
   standard: 'get_stronger', run: null, ride: null, strength: 'get_stronger', athletic: null,
 };
 
+/** ⚠️ SMALL COUNTS ARE WORDS, not digits — the register every other sentence on these screens uses. */
+const COUNT_WORD: Record<number, string> = { 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five' };
+
 /** ⛔ WHICH FRAME EACH FOCUS BUILDS. See `resolveFrame` — the engine takes the same two words. */
 const FOCUS_FRAME: Record<'standard' | 'run', FrameId> = {
   standard: 'all_rounder',
@@ -375,6 +379,23 @@ const FOCUS_FRAME: Record<'standard' | 'run', FrameId> = {
  * ⚠️ ABSENT IS `strength_5k`, so the Strength Focus path is untouched.
  */
 const frameOf = (st: { focus?: 'standard' | 'run' }): FrameId => FOCUS_FRAME[st.focus ?? 'run'];
+
+/**
+ * ⛔⛔ WHAT THE ATHLETE CALLS THE PROGRAMME THEY PICKED — ONE SOURCE (2026-08-30).
+ *
+ * ⛔ WHY IT EXISTS. `GOAL_LABELS[goal]` was the one source, and it was right while one card seeded
+ * `get_stronger`. Two cards seed it now, so every screen and the plan's own NAME read "Strong Focus"
+ * for a Standard Focus build — the wizard telling the athlete they picked something else, on the
+ * step right after they picked it.
+ *
+ * ⚠️ THE FRAME OWNS THE NAME WHEN IT HAS ONE (`Frame.displayName`), and `strength_5k` deliberately
+ * has none — so it falls through to the goal label and every existing screen reads exactly as it
+ * does today. That is the same id-versus-display split `non-race-goal-seeds.ts` records, and its
+ * comment records what happens when the two are conflated: the athlete picked one name and was
+ * handed a plan called another.
+ */
+const programmeName = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' }): string =>
+  FRAMES[frameOf(st)]?.displayName ?? (st.goal ? GOAL_LABELS[st.goal] : 'Goal');
 
 /**
  * ⛔⛔ WHAT THE BLOCK ACTUALLY REQUIRES, AT THE DOOR (Michael, 2026-08-30).
@@ -1267,12 +1288,14 @@ function assemblePayload(
   return {
     summary: isRace
       ? `${GOAL_LABELS[goal]} — ${state.raceDate}`
-      : `${state.targetWeeks}-week ${GOAL_LABELS[goal]} block`,
+      // ⛔ THE PROGRAMME'S OWN NAME — see `programmeName`. `GOAL_LABELS[goal]` named the goal, and
+      // two focuses share one goal, so a Standard Focus build was named "Strong Focus block".
+      : `${state.targetWeeks}-week ${programmeName(state)} block`,
     goals: [
       {
         // ⛔ THE RACE'S OWN NAME WHEN THERE IS ONE. Every marathon goal used to be called
         // "Marathon" because this fell through to the card's label.
-        name: isRace && state.raceName.trim() ? state.raceName.trim() : GOAL_LABELS[goal],
+        name: isRace && state.raceName.trim() ? state.raceName.trim() : programmeName(state),
         goal_type: isRace ? 'event' : shape.goal_type,
         target_date: isRace ? state.raceDate : null,
         ...(isRace ? {} : { target_weeks: state.targetWeeks }),
@@ -4523,7 +4546,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           to stop — rename the block and this title silently keeps the old name. One source. */}
       {currentStep === 'posture' && isStrengthFocus && (
         <StepLayout
-          step={stepNo('posture')} totalSteps={steps.length} title={`${GOAL_LABELS.get_stronger} · ${STRENGTH_FOCUS_WEEKS} weeks`}
+          step={stepNo('posture')} totalSteps={steps.length} title={`${programmeName(state)} · ${STRENGTH_FOCUS_WEEKS} weeks`}
           onBack={back} onContinue={next} canContinue={postureCanContinue}
         >
           <div className="space-y-3">
@@ -4614,7 +4637,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 </div>
               )}
             </div>
-            <p className="text-white/50 text-xs">The week has two hard sessions. A sport that doesn't get one keeps its endurance base but not its speed.</p>
+            {/* ⛔ THE COUNT IS THE FRAME'S. p246 prescribes two quality sessions and p274 three, and
+                this sentence stated "two" for both — the screen telling a Standard Focus athlete
+                their week has one fewer hard session than it does, one step before the screen that
+                shows all three. */}
+            <p className="text-white/50 text-xs">{`The week has ${COUNT_WORD[hardSlotKeysFor(wizardFrame).length] ?? String(hardSlotKeysFor(wizardFrame).length)} hard sessions. A sport that doesn't get one keeps its endurance base but not its speed.`}</p>
           </div>
         </StepLayout>
       )}
@@ -7109,7 +7136,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             ? `${state.raceDistance} — ${state.raceDate}${planWeeks !== null ? `, about ${planWeeks} weeks` : ''}.`
             /* ⛔ "of the previous program" DELETED (2026-08-24): his trademark on the final commit
                screen, and no longer true — the block is the Standing Plan engine, not the previous program. */
-            : `${state.goal ? GOAL_LABELS[state.goal] : 'Goal'} — ${state.targetWeeks} weeks. Strength leads; your endurance holds.`}
+            : `${programmeName(state)} — ${state.targetWeeks} weeks. Strength leads; your endurance holds.`}
           onBack={back} onContinue={handleConfirm} canContinue={!saving}
           continueLabel={saving ? 'Building…' : 'Build plan'} saving={saving}
         >

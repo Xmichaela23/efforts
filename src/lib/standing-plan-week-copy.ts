@@ -184,6 +184,40 @@ export const ENDURANCE_WEEK_INTRO_STRUCTURE: string[] = [
 ];
 
 /**
+ * ⛔⛔ HIS FOUR LINES, WITH THE FRAME'S OWN NUMBERS IN THEM (2026-08-30).
+ *
+ * ⛔ WHY THIS IS NOT A REWRITE OF HIS COPY. The block above is Michael's wording, pinned
+ * character-exact, and it is returned BYTE-IDENTICAL for `strength_5k` — the shape of every sentence
+ * is his and untouched. What changes is the two COUNTS, and they changed because the frame did: a
+ * Standard Focus athlete was reading *"Your week has 4 endurance slots… Two hard sessions"* above a
+ * screen that renders five rows and demands three quality answers. **A count is not a style choice;
+ * it is a claim about the week, and it was false.**
+ *
+ * ⚠️ THE ORDER IS HIS TOO — long, easy, hard — and it matches the row order below it.
+ * ⚠️ A ROLE WITH NO SLOT IS OMITTED rather than printed as "Zero", which is the honest answer for a
+ * column that does not carry one (the taper has no long session on some frames).
+ */
+export function introStructureFor(
+  frame: FrameId = 'strength_5k',
+  column: ColumnKind = 'standard',
+): string[] {
+  const slots = frameSlots(frame, column);
+  const n = (role: SlotRole) => slots.filter((x) => x.role === role).length;
+  const word = (c: number) => COUNT_WORDS[c] ?? String(c);
+  const line = (c: number, one: string, many: string) =>
+    c === 0 ? null : `${word(c)} ${c === 1 ? one : many}`;
+  return [
+    `Your week has ${slots.length} endurance slots.`,
+    line(n('long'), 'long session', 'long sessions'),
+    line(n('easy'), 'easy session', 'easy sessions'),
+    line(n('hard'), 'hard session', 'hard sessions'),
+  ].filter((x): x is string => x != null);
+}
+
+/** ⚠️ CAPITALISED, because each is the first word of its own line — his own casing. */
+const COUNT_WORDS: Record<number, string> = { 1: 'One', 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five' };
+
+/**
  * Lines 5-7: WHAT A CHOICE COSTS, and the instruction.
  *
  * ⛔⛔ THESE STAY AT THE TOP OF THE SCREEN AND DO NOT MOVE ONTO THE HARD-SESSION CARD.

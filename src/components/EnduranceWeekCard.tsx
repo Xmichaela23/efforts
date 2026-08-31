@@ -28,10 +28,19 @@
  * improvement percentage appears anywhere** — the work order forbids it and no source gives one.
  */
 import React from 'react';
+/**
+ * ⛔⛔ THIS FILE IMPORTS NO FRAME-BOUND SLOT CONSTANT, AND THAT IS THE FIX (2026-08-30).
+ *
+ * `SLOT_KEYS`, `SLOT_LABEL`, `SLOT_OPTIONS`, `REQUIRED_SLOT_DISPLAY_ORDER` and `HARD_SLOT_KEYS` are
+ * `strength_5k`'s membership. This card read them while its completion gate read the CHOSEN frame,
+ * so Standard Focus drew four rows and demanded five answers: **Continue was disabled and could not
+ * be satisfied.** Everything the card needs now comes from `frame` — see the derivations at the top
+ * of the component. `standing-plan-week-copy.test.ts` asserts this file imports none of them.
+ */
 import { ChevronDown } from 'lucide-react';
 import {
   ENDURANCE_WEEK_INTRO_CONSEQUENCE,
-  ENDURANCE_WEEK_INTRO_STRUCTURE,
+  introStructureFor,
   EXPERIENCE_HEADING,
   EXPERIENCE_SUBTITLE,
   experienceChipLine,
@@ -42,17 +51,15 @@ import {
   HARD_1_SLOT_NOTE,
   LONG_SLOT_NOTE,
   VOLUME_HONESTY_LINES,
-  SLOT_KEYS,
-  SLOT_LABEL,
   slotFrameDay,
-  SLOT_OPTIONS,
   slotSummary,
   upperLowerSplitLine,
   allSlotsChosen,
-  REQUIRED_SLOT_DISPLAY_ORDER,
-  HARD_SLOT_KEYS,
   slotPrecedesHeavyLowerDay,
   slotOptionsNow,
+  displayOrderFor,
+  hardSlotKeysFor,
+  frameSlots,
   type SlotKey,
   type SlotSelection,
   type SlotSport,
@@ -160,8 +167,18 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
    * mounts, scroll it into view once. `chosen` gates the effect so it fires on the transition,
    * not on every re-render while the athlete edits a number.
    */
+  /**
+   * ⛔⛔ THE FRAME, RESOLVED ONCE AND BEFORE EVERY READER (2026-08-30). See the note at `rowKeys`.
+   */
+  const frame: FrameId = props.frame ?? 'strength_5k';
+  const rowKeys = displayOrderFor(frame);
+  const hardKeys = hardSlotKeysFor(frame);
+  // ⛔ HIS FOUR LINES WITH THE FRAME'S OWN COUNTS — see `introStructureFor`. Byte-identical for the
+  // 5K frame; the header said "4 endurance slots … Two hard sessions" above five rows otherwise.
+  const introLines = introStructureFor(frame);
+
   const volumeRef = React.useRef<HTMLDivElement | null>(null);
-  const chosen = allSlotsChosen(props.slots);
+  const chosen = allSlotsChosen(props.slots, frame);
   React.useEffect(() => {
     if (!chosen) return;
     // ⚠️ next frame — the section renders in this commit; scrolling in the same tick measures
@@ -176,6 +193,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
     baselines: props.baselines as never,
     easyPaceSecPerMi: props.easyPaceSecPerMi,
     experience: props.experience,
+    frame,
   });
   /**
    * ⛔⛔ THE TWO CHIPS' NUMBERS, COMPUTED — never typed. `experienceChips` runs the engine's own
@@ -188,6 +206,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
     // ⛔ THE VARIANT THE ATHLETE PICKED INSIDE THE HARD ROW BEATS THE FRAME'S OWN SHAPE, in the
     // composer and therefore here. Without it the chip quotes the session they just replaced.
     archetypes: props.hardArchetypes,
+    frame,
   });
 
   /**
@@ -221,6 +240,14 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
    * own two follow, but a row is a row — extracting this is what keeps the added hard cards and the
    * recovery/long cards from drifting into two slightly different components.
    */
+  /**
+   * ⛔ WHY THE FRAME IS A NAMED CONST AT THE TOP RATHER THAN `props.frame` READ INLINE. The card
+   * shipped reading the frame in three places and MODULE CONSTANTS in five others, so Standard Focus
+   * rendered the 5K frame's four rows while the completion gate demanded five: **Continue was
+   * disabled and could not be satisfied, because the fifth row it named was not on the screen.**
+   * A constant imported at the top of a file is one frame's answer, and nothing at the call site
+   * distinguishes it from a derived one.
+   */
   const slotRow = (key: SlotKey) => {
           const sport = props.slots[key];
           /**
@@ -235,7 +262,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
            * holds given the answers on the other rows. `strength_5k` never withholds anything, so
            * its four rows are exactly what they were.
            */
-          const floored = slotOptionsNow(key, props.slots, props.frame ?? 'strength_5k');
+          const floored = slotOptionsNow(key, props.slots, frame);
           /**
            * ⛔⛔ THE FLOOR NEVER EMPTIES A ROW. `allowedSports` is the posture step's answer, and a
            * ride-only athlete on a frame that prescribes riding could have both filters land on the
@@ -248,10 +275,9 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           const allowed = (o: SlotSport) => !props.allowedSports || props.allowedSports.includes(o);
           const optionsNow = floored.options.some((o) => allowed(o.value))
             ? floored
-            : { options: SLOT_OPTIONS[key] ?? [], reason: null };
-          // ⚠️ THE FRAME'S OWN HARD ROWS — `HARD_SLOT_KEYS` is derived from it now, so a frame with
-          // three quality sessions gets three hard rows rather than two and a stray.
-          const isHard = HARD_SLOT_KEYS.includes(key);
+            : { options: frameSlots(frame).find((x) => x.key === key)?.options ?? [], reason: null };
+          // ⚠️ THIS FRAME'S HARD ROWS — three where the frame prescribes three quality sessions.
+          const isHard = hardKeys.includes(key);
           /**
            * ⛔ THE LONG SLOT SHOWS ITS SESSION TITLE TOO (slice 2b, 2026-08-25). It was hard-only,
            * so a long slot the athlete had marked as their club ride showed the sport and nothing
@@ -262,7 +288,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
             : null;
           // ⛔ THE FRAME OWNS THE DAY — see `slotFrameDay`. `null` on a column with no such slot
           // (the taper carries three, not four), which renders no prefix rather than a wrong one.
-          const dayNumber = slotFrameDay(key);
+          const dayNumber = slotFrameDay(key, 'standard', frame);
           return (
             <div
               key={key}
@@ -337,7 +363,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                         see `slotPrecedesHeavyLowerDay`. It was `key === 'hard1'`, which is the same
                         answer for this frame and a positional guess for any other. A quality session
                         followed by an upper day costs the lifts nothing and stays silent. */}
-                    {slotPrecedesHeavyLowerDay(key) ? (
+                    {slotPrecedesHeavyLowerDay(key, frame) ? (
                       <span className="block text-white/40 text-xs mt-0.5">{HARD_1_SLOT_NOTE}</span>
                     ) : null}
                   </span>
@@ -443,11 +469,11 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           about"; that is the tidy-up this note exists to stop. */}
       <div className="flex flex-col gap-3">
         <div>
-          <p className="text-white/90 text-[15px] leading-snug">{ENDURANCE_WEEK_INTRO_STRUCTURE[0]}</p>
+          <p className="text-white/90 text-[15px] leading-snug">{introLines[0]}</p>
           {/* ⚠️ A LIST BECAUSE HE WROTE ONE — one line per slot, not a paragraph. No bullet glyphs:
               he wrote bare lines and a bullet is punctuation he did not use. */}
           <div className="mt-1.5 space-y-0.5">
-            {ENDURANCE_WEEK_INTRO_STRUCTURE.slice(1).map((line) => (
+            {introLines.slice(1).map((line) => (
               <p key={line} className="text-white/70 text-[14px] leading-snug pl-3">{line}</p>
             ))}
           </div>
@@ -480,7 +506,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           reason it was moved there: it is the row most likely to be the athlete's fixed weekend
           session. */}
       <div className="flex flex-col gap-2">
-        {REQUIRED_SLOT_DISPLAY_ORDER.map(slotRow)}
+        {rowKeys.map(slotRow)}
       </div>
 
       {/* ⛔ VOLUME, BOUNDED BOTH ENDS BY WHAT THE SLOTS HOLD — and the bounds recompute as the sports
@@ -600,7 +626,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                     ⚠️ IT NEEDS EVERY SLOT ANSWERED for the same reason the fixed-hours line does —
                     both numbers are summed from the slots, and before that they would describe a week
                     the athlete has not yet described. */}
-                {allSlotsChosen(props.slots) && chips[sport] ? (() => {
+                {allSlotsChosen(props.slots, frame) && chips[sport] ? (() => {
                   const pair = chips[sport]!;
                   const picked = props.experience[sport] ?? null;
                   const hours = Number(sport === 'run' ? props.runVolume : props.rideHours);

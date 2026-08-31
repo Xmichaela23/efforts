@@ -168,8 +168,13 @@ Deno.test('⛔⛔ THE INTRO RENDERS AS TWO PARTS, AND THE PICKER LEADS WITH LONG
    * were at one visual weight — what the week IS, what a choice COSTS, and the instruction — and
    * the eye could not find the seams. Same words, same place, read as two things.
    */
-  assert(/ENDURANCE_WEEK_INTRO_STRUCTURE\[0\]/.test(CARD), 'the opening line is not rendered on its own');
-  assert(/ENDURANCE_WEEK_INTRO_STRUCTURE\.slice\(1\)\.map/.test(CARD), 'the slots are not rendered as a list');
+  /**
+   * ⚠️ THE NAMES CHANGED 2026-08-30, THE RULING DID NOT. The four lines are read off the CHOSEN
+   * frame now (`introStructureFor` → `introLines`) because the constant was `strength_5k`'s and said
+   * "4 endurance slots … Two hard sessions" above a five-row screen. Same two parts, same order.
+   */
+  assert(/introLines\[0\]/.test(CARD), 'the opening line is not rendered on its own');
+  assert(/introLines\.slice\(1\)\.map/.test(CARD), 'the slots are not rendered as a list');
   assert(/ENDURANCE_WEEK_INTRO_CONSEQUENCE\.map/.test(CARD), 'the consequence lines are not rendered');
   // ⛔ AND THEY ARE SEPARATE ELEMENTS. One `.map` over all seven would be the wall this replaced.
   assertEquals(/ENDURANCE_WEEK_INTRO\.map/.test(CARD), false, 'the block was flattened back into one list');
@@ -181,7 +186,8 @@ Deno.test('⛔⛔ THE INTRO RENDERS AS TWO PARTS, AND THE PICKER LEADS WITH LONG
    * TIDY-UP: a later pass will want them "beside the control they are about".
    */
   const introAt = CARD.indexOf('ENDURANCE_WEEK_INTRO_CONSEQUENCE.map');
-  const requiredAt = CARD.indexOf('REQUIRED_SLOT_DISPLAY_ORDER.map');
+  // ⚠️ `rowKeys` IS THE FRAME'S OWN DRAW ORDER — see `displayOrderFor`.
+  const requiredAt = CARD.indexOf('rowKeys.map');
   assert(introAt > 0 && requiredAt > 0);
   // ⚠️ MEASURED AGAINST THE **ROWS**. The lines have to be read BEFORE the athlete is among the
   // choices at all, not sitting immediately on top of the control they are about.
