@@ -3553,6 +3553,24 @@ function toV3Step(st: any, row?: any): any {
       const miles = out.seconds / paceSecPerMi;
       const distanceMeters = miles * 1609.34;
       out.distanceMeters = Math.max(1, Math.round(distanceMeters));
+      /**
+       * ⛔⛔⛔ THIS DISTANCE IS DERIVED, AND IT SAYS SO — Michael's plan, 2026-08-31.
+       *
+       * The source prescribes this step in TIME. The distance above is `seconds ÷ pace`, kept for
+       * total accounting, and it is only true if the athlete is already running the target pace.
+       * **Two readers were treating it as the prescription**: the planned view printed *"101 yd"*
+       * for a fifteen-second surge and never showed the time, and `send-workout-to-garmin` sent
+       * `durationType: 'DISTANCE'` — so his watch counted down 101 metres for an interval the page
+       * prescribes as fifteen seconds. On a slow day it runs long, on a fast day short: **the
+       * prescription inverts exactly when it matters.**
+       *
+       * ⚠️ THE NUMBER IS NOT REMOVED — the accounting needs it. What is added is the fact that it is
+       * derived, so a reader can tell a prescription from a by-product. Same shape as the plan token
+       * taking a band's top: a derived value read as an instruction.
+       * ⚠️ FIX-FORWARD. Rows materialized before this carry no flag and keep the old reading; a
+       * rebuild or a restate re-materializes them.
+       */
+      out.distanceDerived = true;
       // Log if we're overriding an incorrect distance_m
       if (hasExplicitDistance) {
         console.log(`  ⚠️  Overriding incorrect distance_m=${st.distance_m}m (${(st.distance_m/1609.34).toFixed(1)}mi) with calculated ${distanceMeters.toFixed(0)}m (${miles.toFixed(2)}mi) from duration_s=${st.duration_s}s`);

@@ -816,9 +816,18 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
             continue
           }
           const sIntensity = mapEffortToIntensity(String((seg?.effortLabel ?? interval?.effortLabel) || '').trim())
-          const sMeters = Number(seg?.distanceMeters)
+          /**
+           * ⛔⛔ THE SEGMENT PATH TAKES THE SAME RULE AS THE SINGLE-STEP PATH BELOW (2026-08-31): a
+           * distance that was DERIVED from a time prescription is not a distance step. Fixing only
+           * the simple path would have left every segmented interval — which is most of the quality
+           * work — still counting down metres for a session prescribed in seconds.
+           */
+          const sDerived = (seg as any)?.distanceDerived === true
+          const sMeters = sDerived ? NaN : Number(seg?.distanceMeters)
           // For RUNNING distance steps, suppress duration to avoid confusing time on device
-          const sSeconds = (isRun && Number(seg?.distanceMeters) > 0) ? NaN : Number(seg?.duration)
+          // ⚠️ AND NOT FOR A DERIVED ONE — suppressing the duration there would leave the step with
+          // neither a real distance nor its prescribed time, and the malformed guard would drop it.
+          const sSeconds = (isRun && !sDerived && Number(seg?.distanceMeters) > 0) ? NaN : Number(seg?.duration)
           // ⛔ A LAP-BUTTON STEP HAS NO TIME AND NO DISTANCE BY DESIGN — it is not malformed, and
           // this check would silently drop it. Tested before the malformed guard, never after.
           const sLapButton = (seg as any)?.lapButton === true
@@ -915,7 +924,14 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
 
     // Simple single step
     const intensity = mapEffortToIntensity(String(interval?.effortLabel ?? '').trim())
-    const meters = Number(interval?.distanceMeters)
+    /**
+     * ⛔⛔ A TIME-PRESCRIBED STEP GOES TO THE WATCH AS TIME (2026-08-31). `distanceMeters` on such a
+     * step is `seconds ÷ pace` — see `materialize-plan`, which now marks it — and exporting it as a
+     * DISTANCE step made the watch count down metres for an interval the source prescribes in
+     * seconds. ⚠️ A distance-PRESCRIBED step is unaffected and still exports as distance.
+     */
+    const derivedDistance = (interval as any)?.distanceDerived === true
+    const meters = derivedDistance ? NaN : Number(interval?.distanceMeters)
     const seconds = Number(interval?.duration)
     // ⛔ Same rule as the segment path: a lap-button step is legitimately time-less and distance-less.
     const lapButton = (interval as any)?.lapButton === true

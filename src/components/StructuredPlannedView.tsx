@@ -316,8 +316,16 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         // Non-swim workouts (run, bike): show miles/km, NOT yards
         const pieces: string[] = [];
         if (kind) pieces.push(kind);
-        if (typeof distM==='number' && distM>0) pieces.push(fmtDist(distM));
+        /**
+         * ⛔⛔ THE PRESCRIBED DIMENSION WINS (2026-08-31). `distanceMeters` on a time-prescribed step
+         * is `seconds ÷ pace`, kept for accounting — see `materialize-plan`, which marks it derived.
+         * Printed as the prescription it read *"101 yd"* for a fifteen-second surge and the time
+         * never appeared at all. ⚠️ A distance-prescribed step is unaffected.
+         */
+        const derived = (st as { distanceDerived?: boolean })?.distanceDerived === true;
+        if (!derived && typeof distM==='number' && distM>0) pieces.push(fmtDist(distM));
         else if (typeof secs==='number' && secs>0) pieces.push(fmtDur(secs));
+        else if (typeof distM==='number' && distM>0) pieces.push(fmtDist(distM));
         if (pTxt) pieces.push(`@ ${pTxt}`);
         else if (powRange) pieces.push(`@ ${powRange}`);
         else if (pow) pieces.push(`@ ${pow}`);
