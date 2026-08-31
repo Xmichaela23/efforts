@@ -321,7 +321,11 @@ export function declineHardSlot(
   }
   return {
     family: easySlot.family, level: easySlot.level, archetype: easySlot.archetype, raceTempo: false,
-    sport: 'run', substituted: true, sourceText: slot.sourceText,
+    // ⚠️ THE EASY SLOT'S OWN SPORT (2026-08-30). This said `run` unconditionally, which is the same
+    // "unconverted means run" assumption `asPrescribed` was fixed for — and p274's easy slot IS a
+    // ride, so a declined hard session became a "run" that builds as a ride.
+    sport: String(easySlot.family).startsWith('ride_') ? 'ride' : 'run',
+    substituted: true, sourceText: slot.sourceText,
     // ⛔ THE EASY SLOT'S ROLE — see the ride branch above.
     role: easySlot.role,
   };
@@ -489,6 +493,36 @@ export const HARD_PAIR_ORDER_IS_HIS =
 export const HARD_SLOT_FRAME_KEYS = { hard1: '1:0', hard2: '3:0' } as const;
 
 /**
+ * ⛔⛔ WHETHER THIS FRAME'S FIRST TWO HARD SLOTS ARE INTERCHANGEABLE AT ALL (2026-08-30).
+ *
+ * ⛔ THE SWAP IS p246 + p278's RULE AND IT DOES NOT TRAVEL. Both of `strength_5k`'s quality slots
+ * are RUN families that map onto one ride family, so *"which of the two is the ride"* is genuinely
+ * the athlete's answer to normalise. **p274 prescribes its second quality session as a RIDE
+ * outright** — `Cyc AnA` on day 2 — and it cannot be anything else.
+ *
+ * ⛔ WHAT IT COST, MEASURED. On the All Rounder the second hard answer is always `ride` (the screen
+ * offers nothing else), so an athlete answering `run` on day 1 hit `run + ride` and the rule fired:
+ * **day 1 flipped to a ride, became `ride_anaerobic` through `RIDE_EQUIVALENT`, and the week built
+ * TWO anaerobic rides on consecutive days** — while the athlete's own run answer was moved onto a
+ * slot that ignores it. One rule, and it explains both the duplicated session and the vanished pick.
+ */
+function hardPairIsInterchangeable(days: FrameDay[]): boolean {
+  const hard: EnduranceSlot[] = [];
+  for (const d of days) for (const slot of d.endurance ?? []) if (isHardSlot(slot)) hard.push(slot);
+  return hard.slice(0, 2).length === 2
+    && hard.slice(0, 2).every((s) => !String(s.family).startsWith('ride_'));
+}
+
+/** ⚠️ THE FRAME'S OWN FIRST TWO HARD KEYS, in its day order — never the `strength_5k` literals. */
+function hardKeysOf(days: FrameDay[]): string[] {
+  const keys: string[] = [];
+  for (const d of days) {
+    (d.endurance ?? []).forEach((slot, i) => { if (isHardSlot(slot)) keys.push(`${d.day}:${i}`); });
+  }
+  return keys.slice(0, 2);
+}
+
+/**
  * The two hard answers in his order. ⚠️ TOTAL AND IDEMPOTENT — every other pair, and any pair with
  * an unanswered or declined half, comes back exactly as it went in.
  */
@@ -504,17 +538,22 @@ export function hardPairInFrameOrder<T extends string>(
 /** The athlete's per-slot answers with the one-of-each pair put in his order. */
 export function hardSlotsInFrameOrder(
   slots: Record<string, string> | null | undefined,
+  /**
+   * ⛔ THE FRAME'S OWN DAYS. Absent keeps the `strength_5k` literals, which is every caller that
+   * predates a second frame — see `hardPairIsInterchangeable` for why a frame that prescribes a ride
+   * must not be normalised.
+   */
+  days?: FrameDay[],
 ): Record<string, string> | null | undefined {
   if (!slots) return slots;
-  const a = slots[HARD_SLOT_FRAME_KEYS.hard1];
-  const b = slots[HARD_SLOT_FRAME_KEYS.hard2];
+  if (days && !hardPairIsInterchangeable(days)) return slots;
+  const keys = days ? hardKeysOf(days) : [HARD_SLOT_FRAME_KEYS.hard1, HARD_SLOT_FRAME_KEYS.hard2];
+  if (keys.length < 2) return slots;
+  const a = slots[keys[0]];
+  const b = slots[keys[1]];
   const put = hardPairInFrameOrder(a, b);
   if (put.hard1 === a && put.hard2 === b) return slots;
-  return {
-    ...slots,
-    [HARD_SLOT_FRAME_KEYS.hard1]: put.hard1 as string,
-    [HARD_SLOT_FRAME_KEYS.hard2]: put.hard2 as string,
-  };
+  return { ...slots, [keys[0]]: put.hard1 as string, [keys[1]]: put.hard2 as string };
 }
 
 export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
@@ -529,11 +568,34 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
 
   const byKey: Record<string, AssignedSlot> = {};
   const notes: SlotAssignment['notes'] = [];
-  const asRun = (s: EnduranceSlot): AssignedSlot => ({
+  /**
+   * ⛔⛔ THE SLOT'S OWN SPORT, NOT "RUN UNTIL CONVERTED" (2026-08-30). This stamped `sport: 'run'` on
+   * every slot and a slot only became a ride by being CONVERTED through `RIDE_EQUIVALENT`.
+   *
+   * ⛔ WHAT THAT COST, MEASURED ON p274. Its `Cyc AnA` and `Cyc endurance` are ALREADY rides, so
+   * there is nothing to convert, the conversion is skipped and the run stamp stands. The assignment
+   * reported **`{ run: 4, ride: 1 }` for a week of two runs and three rides.** The family is right,
+   * so the sessions BUILD as rides and look correct on the screen — it is the bookkeeping that lies,
+   * and everything that counts sports reads the bookkeeping:
+   *   · the day-count trim saw FOUR runs against a stated two, and dropped two of the frame's own
+   *     slots — the easy ride on day 4 and the hard run on day 1.
+   *   · the day-count fill then saw ONE ride against a stated three, and added two generic filler
+   *     rides into the week's free days — including the REST day.
+   * One wrong stamp, and the vanished sessions, the shifted day and the rest-day ride are all the
+   * same arithmetic run twice.
+   *
+   * ⚠️ INVISIBLE ON `strength_5k` BY CONSTRUCTION: every slot in p246 is a run family, so the stamp
+   * was true for all four and the conversion set the ride ones correctly. The lie only ever concerned
+   * a slot the PAGE prescribes as a ride, and until p274 no frame had one.
+   * ⚠️ AND IT IS THE SAME DISEASE AS `role`, `lowerRole` and the strides carrier: the frame states
+   * what a session IS, and a reader re-derived it instead — here as "unconverted means run".
+   */
+  const asPrescribed = (s: EnduranceSlot): AssignedSlot => ({
     family: s.family, level: s.level, archetype: s.archetype, raceTempo: s.raceTempo,
-    sport: 'run', substituted: false, sourceText: s.sourceText, role: s.role,
+    sport: String(s.family).startsWith('ride_') ? 'ride' : 'run',
+    substituted: false, sourceText: s.sourceText, role: s.role,
   });
-  for (const { day, i, slot } of slots) byKey[key(day, i)] = asRun(slot);
+  for (const { day, i, slot } of slots) byKey[key(day, i)] = asPrescribed(slot);
 
   const total = slots.length;
   if (total === 0) {
@@ -559,7 +621,8 @@ export function assignSports(days: FrameDay[], mix: SportMix): SlotAssignment {
      * screen alone, because a payload can arrive from a client that never normalised anything and
      * the built week is what the athlete trains.
      */
-    const answered = hardSlotsInFrameOrder(mix.slots) as Record<string, string>;
+    // ⛔ THE FRAME DECIDES WHETHER ITS HARD PAIR MAY BE SWAPPED AT ALL — see `hardSlotsInFrameOrder`.
+    const answered = hardSlotsInFrameOrder(mix.slots, days) as Record<string, string>;
     let substituted = 0;
     let declined = 0;
     // ⚠️ RESOLVED BEFORE THE LOOP so every declined hard slot reads the SAME easy answer, whatever
@@ -723,7 +786,11 @@ export function assignedSlot(
 ): AssignedSlot {
   return assignment?.byKey[key(day, i)] ?? {
     family: fallback.family, level: fallback.level, archetype: fallback.archetype,
-    raceTempo: fallback.raceTempo, sport: 'run', substituted: false, sourceText: fallback.sourceText,
+    raceTempo: fallback.raceTempo,
+    // ⚠️ THE SLOT'S OWN SPORT — the third copy of "unconverted means run" (2026-08-30). A caller with
+    // no assignment at all got `run` for a slot the page prescribes as a ride.
+    sport: String(fallback.family).startsWith('ride_') ? 'ride' : 'run',
+    substituted: false, sourceText: fallback.sourceText,
     role: fallback.role,
   };
 }

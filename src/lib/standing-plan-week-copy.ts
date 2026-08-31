@@ -621,6 +621,25 @@ export function framePrescribesRiding(
 }
 
 /**
+ * ⛔⛔ WHETHER THIS FRAME'S FIRST TWO QUALITY ROWS ARE INTERCHANGEABLE (2026-08-30).
+ *
+ * The wizard normalises the hard PAIR on every tap — p246 + p278's rule — and it holds only where
+ * both quality slots are run families mapping onto one ride family. p274's second quality session is
+ * a RIDE and cannot be anything else, so on that frame the athlete's `run` on row one met a
+ * permanent `ride` on row two, the rule fired, and **row one flipped to a ride: two anaerobic rides
+ * on consecutive days, and the athlete's own run answer moved onto a row that ignores it.**
+ * ⚠️ THE ENGINE MAKES THE SAME TEST (`hardSlotsInFrameOrder`). Two owners of one rule is how a screen
+ * and a week come to disagree; both read the fact off the same frame.
+ */
+export function hardPairIsSwappable(
+  frame: FrameId = 'strength_5k',
+  column: ColumnKind = 'standard',
+): boolean {
+  const hard = frameSlots(frame, column).filter((s) => s.role === 'hard').slice(0, 2);
+  return hard.length === 2 && hard.every((s) => !s.family.startsWith('ride_'));
+}
+
+/**
  * ⛔ THE ROWS THAT CAN BE EITHER SPORT — the frame's run-family slots. The natively-prescribed rides
  * are not among them: the engine has no ride-to-run conversion, so those rows state their sport
  * rather than offering a tap (see `optionsFor`).

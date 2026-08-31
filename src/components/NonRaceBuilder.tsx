@@ -11,6 +11,7 @@ import {
   SLOT_KEYS,
   HARD_SLOT_KEYS,
   allSlotsChosen,
+  hardPairIsSwappable,
   REQUIRED_SLOT_KEYS,
   emptySlotSports,
   slotKeysFor,
@@ -5769,7 +5770,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                * screen that did not would show one week and build another — and the athlete would
                * find their hard run on a different day with nothing said.
                */
-              const order = hardPairInFrameOrder(picked.hard1 ?? undefined, picked.hard2 ?? undefined);
+              /**
+               * ⛔⛔ ONLY WHERE THE PAIR IS INTERCHANGEABLE (2026-08-30) — see `hardPairIsSwappable`.
+               * p274's second quality row is a RIDE and cannot be anything else, so its answer was
+               * permanently `ride`; an athlete answering `run` on row one hit the `run + ride` case
+               * and the rule swapped them. Row one then built an anaerobic RIDE beside the frame's
+               * own one — two on consecutive days — and their run answer landed on a row that
+               * ignores it. One rule, and it explains the duplicate AND the vanished pick.
+               */
+              const order = hardPairIsSwappable(wizardFrame)
+                ? hardPairInFrameOrder(picked.hard1 ?? undefined, picked.hard2 ?? undefined)
+                : { hard1: picked.hard1 ?? undefined, hard2: picked.hard2 ?? undefined };
               const slots = {
                 ...picked,
                 hard1: (order.hard1 ?? null) as SlotSport | null,
