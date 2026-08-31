@@ -1,6 +1,64 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-08-29 — the progress-standard arc: five items live, none verified)
+## 🧭 NEXT SESSION — START HERE (written 2026-08-31 — Standard Focus is BUILT, DEPLOYED, and the week is Michael riding it)
+
+### Your job: NOTHING NEW. Michael is running the programme this week. Wait for what he finds.
+
+**Read `docs/DESIGN-standard-focus-all-rounder-2026-08-30.md` §12 and §13 first** — §12 is what
+actually shipped across the 30-commit arc `ca8d46fa..35a1eafb`, §13 is what is open and every one of
+those is a RULING FOR MICHAEL, not a task to pick up.
+
+⚠️ **The arc is 44 commits (`fcad98a3..35a1eafb`) documented in THREE places** — §12's table at the
+top names them. The first half lives in `docs/HANDOFF-standard-focus-2026-08-30.md`. Reading only
+one of the two will leave you rebuilding something that shipped.
+
+**PUSHED:** `origin/main == 35a1eafb`.
+**DEPLOYED 2026-08-31 21:30**, versions read back from `supabase functions list`, never assumed:
+`coach` **500** · `generate-strength-plan` **199** · `materialize-plan` **333** ·
+`rematerialize-standing-block` **74**.
+⛔ Three of those carry NO edits of their own — they bundle `_shared/standing-plan/accessory-picks.ts`,
+and Supabase freezes a copy of `_shared` per function at deploy time. **Touch that file, deploy
+`coach` + `generate-strength-plan` + `rematerialize-standing-block`.** `create-goal-and-materialize-plan`
+does NOT bundle it (closure checked 2026-08-31, not assumed).
+**CLIENT:** built and synced to iOS (`npm run ios:open`); Michael runs it from Xcode.
+
+### The four traps in this arc, so you do not re-walk them
+
+1. ⛔ **D-457 — one frame's constants indexed by the other frame's rows.** It recurred about EIGHT
+   times. It never errors; the page just offers the wrong cell, or a stored pick evaporates. Go
+   through `PICK_KEYS_BY_FRAME` and take the frame explicitly at every call site.
+2. ⛔ **The display name is not the canonical name.** `bandRouteName` → `executionName` →
+   `movementLabel` are display-only. Renaming `name` breaks logged-vs-planned matching.
+3. ⛔ **Composed fixtures have NO logged history, so progression looks flat and is not.**
+   `me-history.ts` earns ME sets and bar increments from history. A "11 flat weeks" claim was made
+   in this arc, was wrong, and cost a reverted adapt-plan change.
+4. ⛔ **A finding of Michael's was withdrawn as harness error and was REAL** (glute work before the
+   max test). His export is evidence. Re-check on the week HE was reading, not a fresh one.
+
+### ⛔ DO NOT START THE WEEK SWAP
+
+It is Michael's next want and he has explicitly deferred it — *"don't start working on this yet.
+This is a larger conversation."* §13 item 6 records what he described: a swap that COMPENSATES across
+the week (ride Monday's hard session, the engine trades whatever sat on Wednesday), plus athlete-given
+long-run time and week-level swapping. §13 items 4 and 5 are single-day special cases of it and must
+NOT be built in isolation.
+
+### ⛔ HE IS RUNNING THE PROGRAMME THIS WEEK — read §14 before answering a report
+
+`DESIGN-standard-focus-all-rounder-2026-08-30.md` §14 splits what he might see into **§14a fixed but
+never seen by a human**, and **§14b KNOWN GAPS that are already rulings on §13**. Check which side a
+report falls on BEFORE writing code. ⚠️ The likeliest false alarm is *"week 2 looks the same as week
+1"* — progression is earned from logged history and is correctly flat until he logs sets (trap 3).
+The likeliest real report is the hinge day with no hamstring curl (§13 item 1) — his own stored hip
+thrust occupies the row and the backup never fires.
+
+### Suites at close of arc
+
+2465/2465 `_shared`; 894 client with the same 6 pre-existing failures; tsc 315; eslint at baseline.
+
+---
+
+## 🧭 SUPERSEDED — was START HERE (written 2026-08-29 — the progress-standard arc: five items live, none verified)
 
 ### Your job: WATCH IT LAND, THEN ITEM 6. Do not start item 6 before the screen is confirmed.
 
