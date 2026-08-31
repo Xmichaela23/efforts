@@ -355,13 +355,34 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   'barbell hip thrust': [['barbell', 'bench']],
   'romanian deadlift': [['barbell'], ['dumbbells']],
   'good morning': [['barbell']],
-  // ⛔ UNGATED, AND THE BACKSTOP IS WHY. A leg-curl machine is required and NOT commonly declarable,
-  // which is exactly the case Slice 7 says to leave to substitution:
-  // `substituteExerciseForEquipment` already turns Leg Curl into Nordic Curls / Band Leg Curls for
-  // anyone without gym access. Gating it here would have deleted the movement instead of swapping it,
-  // which is the worse of the two failures — a swap keeps the previous program's hamstring work, a gate loses it.
-  'leg curl': ALWAYS,
-  'leg curls': ALWAYS,
+  /**
+   * ⛔⛔ GATED ON THE MACHINE — 2026-08-30, AND IT SUPERSEDES THE RULING BELOW ON THAT RULING'S OWN
+   * REASONING RATHER THAN AGAINST IT.
+   *
+   * ⛔ WHAT IT SAID, AND WHY IT WAS RIGHT AT THE TIME: *"A leg-curl machine is required and NOT
+   * commonly declarable, which is exactly the case Slice 7 says to leave to substitution.
+   * `substituteExerciseForEquipment` already turns Leg Curl into Nordic Curls / Band Leg Curls for
+   * anyone without gym access. Gating it here would have deleted the movement instead of swapping
+   * it, which is the worse of the two failures — a swap keeps the hamstring work, a gate loses it."*
+   *
+   * ⛔⛔ THE FEAR IT RESTS ON NO LONGER HOLDS. A gate no longer loses the work: p274's hamstring row
+   * states its muscle (`StrengthSlot.muscle`), so a blocked cell substitutes a same-muscle movement
+   * from the athlete's own kit — nordic curl and glute ham raise, both barbell, both hamstrings.
+   * **The swap the old ruling wanted now happens by rule instead of by luck.**
+   *
+   * ⛔ AND A PICKER MADE THE GATE NECESSARY, which the old ruling could not have foreseen: the
+   * composer swapping a movement at render is invisible and fine; **a DROPDOWN offering "Leg Curl"
+   * to an athlete with a barbell and a bench is the screen promising a machine they do not own.**
+   * Michael saw it on his own screen — leg curl filled the hamstring row at every kit in the audit.
+   * ⚠️ `machine` IS THE COMMERCIAL-GYM CHIP, so "commonly declarable" is satisfied exactly as it is
+   * for `leg extension`, which took this same call on 2026-08-25 for the same reason.
+   */
+  'leg curl': [['machine']],
+  'leg curls': [['machine']],
+  // ⚠️ p223's OWN SPELLINGS — *"hamstring curls (seated or prone)"*. They were untagged and therefore
+  // offered to everyone; they are the same machine.
+  'seated leg curl': [['machine']],
+  'lying leg curl': [['machine']],
   'band leg curls': [['bands']],
   // ⛔ MACHINE-ONLY, unlike leg curl above — see the `machine` key's note in `GearKey` for why the
   // two machine movements get opposite calls. A home athlete's quad-isolation slot resolves to a
@@ -684,11 +705,9 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // qualifies the one he means to qualify. Gating this to the station cost a home athlete his only
   // reachable focused-quad movement and handed the leg slot to knee raises, which train core.
   'seated calf raise': [['dumbbells', 'bench'], ['barbell', 'bench'], ['machine']],
-  // HAMSTRING CURLS WERE UNTAGGED, so `gearRoutesFor` returned ALWAYS and warned - offered to
-  // everyone. `leg curl` is deliberately ungated on its own written precedent (the machine is
-  // required and not commonly declarable, and its substitute collides with nothing); this is the
-  // spelling p223 uses and it follows that rule rather than inventing a stricter one.
-  'hamstring curl': ALWAYS,
+  // ⚠️ FOLLOWS `leg curl`, WHICH IS NOW GATED (2026-08-30) — see the supersede note there. This is
+  // the spelling p223 uses and it tracks that entry rather than inventing a separate rule.
+  'hamstring curl': [['machine']],
   'ghd back extension': [['machine']],
   'machine back extension': [['machine']],
   'behind the neck db triceps extension': [['dumbbells']],

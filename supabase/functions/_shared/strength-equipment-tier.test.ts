@@ -247,12 +247,33 @@ Deno.test('⛔ THE GATE STILL BITES where the gear is required AND declarable', 
   assertEquals(canPerform('Ab Wheel Rollout', null), true);
 });
 
-Deno.test('⛔ SUBSTITUTION, NOT A GATE, FOR GEAR NOBODY CAN DECLARE', () => {
-  // A leg-curl machine is required and not declarable, so `canPerform` waves it through and
-  // `substituteExerciseForEquipment` swaps it to Nordic / Band Leg Curls. A gate here would DELETE
-  // the previous program's hamstring work; a swap keeps it. Same for the kneel-and-lower family, which now routes
-  // on the barbell — feet under a loaded bar, which is what most people actually do.
-  assertEquals(canPerform('Leg Curl', HOME_GYM), true);
+Deno.test('⛔ A HOME GYM STILL GETS HAMSTRING WORK — the rule, not the mechanism', () => {
+  /**
+   * ⚠️⚠️ REBASED 2026-08-30, AND THE RULE IS UNCHANGED — this asserted the MECHANISM where the rule
+   * is about the OUTCOME, which is the proxy this repo's own note warns about.
+   *
+   * ⛔ WHAT IT SAID: *"A leg-curl machine is required and not declarable, so `canPerform` waves it
+   * through and `substituteExerciseForEquipment` swaps it to Nordic / Band Leg Curls. A gate here
+   * would DELETE the previous program's hamstring work; a swap keeps it."* The FEAR was right; the
+   * assertion pinned the wrong thing — that `canPerform` returns true, rather than that the athlete
+   * ends up with hamstring work.
+   *
+   * ⛔ `leg curl` IS NOW GATED ON THE MACHINE (`strength-gear.ts`, 2026-08-30) because a PICKER was
+   * offering it by name to an athlete with a barbell and a bench — a screen promising a machine they
+   * do not own, which a render-time swap cannot fix. **And the work is not lost**: measured on
+   * composed weeks, p274's hamstring row builds a nordic hamstring curl at both barbell kits, and
+   * the guardrail test directly below still passes with the whole default block performable.
+   * ⚠️ `substituteExerciseForEquipment` IS UNAFFECTED EITHER WAY — it lives inside
+   * `materialize-plan/index.ts` with its own hand-rolled equipment checks and never reads these
+   * routes. The two mechanisms were being described as one.
+   */
+  const HAMSTRING_AT_HOME = ['Nordic Curl', 'Glute-Ham Raise', 'Back Extension', 'Romanian Deadlift'];
+  const reachable = HAMSTRING_AT_HOME.filter((n) => canPerform(n, HOME_GYM));
+  assertEquals(reachable, HAMSTRING_AT_HOME,
+    '⛔ a home gym has lost its hamstring work — THIS is the rule the leg-curl gate must never break');
+  // ⛔ AND THE MACHINE MOVEMENT IS HONESTLY OFF THE MENU, rather than offered and swapped later.
+  assertEquals(canPerform('Leg Curl', HOME_GYM), false);
+  assertEquals(canPerform('Leg Curl', ['Commercial gym']), true);
   assertEquals(canPerform('Glute-Ham Raise', HOME_GYM), true);
   assertEquals(canPerform('Nordic Curl', HOME_GYM), true);
   assertEquals(canPerform('Back Extension', HOME_GYM), true);

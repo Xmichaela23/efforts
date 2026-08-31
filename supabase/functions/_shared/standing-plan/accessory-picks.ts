@@ -1039,6 +1039,14 @@ export type PickOption = {
   /** The muscle a set on it counts to. `null` when the catalogue cannot attribute it. */
   muscle: MuscleGroup | null;
   /**
+   * ⛔ A STAND-IN FOR HIS MOVEMENT, because the athlete's kit reaches none of the ones he printed for
+   * this cell — see the substitution in `pickOptions`. **Not the same fact as `ours` below**, which
+   * is a movement offered as an ADDITION to his list; this one replaces a movement that is his.
+   * ⚠️ THE MUSCLE IS ALWAYS HIS EVEN WHEN THE MOVEMENT IS NOT — that is the rule the substitute is
+   * chosen by, and it is why a substitution is honest rather than a widening.
+   */
+  substituted?: true;
+  /**
    * OURS, NOT HIS - present only on a movement Viada never printed that Michael has deliberately
    * added. Absent on everything else, so a surface can mark it without a second lookup.
    */
@@ -1072,6 +1080,15 @@ const LABEL_ACRONYMS: Record<string, string> = {
  * dropdown - an athlete choosing an exercise does not need the provenance argument, only the fact.
  */
 export function pickOptionLabel(o: PickOption): string {
+  /**
+   * ⛔ THREE STATES, NOT TWO (2026-08-30). "- added" is Michael's own word for a movement offered
+   * ALONGSIDE his (the dumbbell fly ruling, 2026-08-29) and it was being printed on equipment
+   * SUBSTITUTES too — *"Bulgarian Split Squat - added"* on his own screen, which says the opposite
+   * of what happened: nothing was added, his movement was out of reach and this took its place.
+   * ⚠️ THE SUBSTITUTE'S MARK NAMES THE REASON, because the reason is the useful part — the athlete
+   * can see it is about their kit rather than about the programme, and the muscle is unchanged.
+   */
+  if (o.substituted === true) return `${o.display} - for your gear`;
   return o.ours === true ? `${o.display} - added` : o.display;
 }
 
@@ -1278,9 +1295,13 @@ export function pickOptions(
       muscle: musclesWorkedBy(m.name)?.primary ?? null,
       // MARKED AT THE SURFACE, not just in the table. An addition the athlete cannot tell from his
       // own movements is an addition the strict cut did not really make.
-      // ⚠️ AND AN EQUIPMENT SUBSTITUTION IS OURS TOO — it is a movement he did not print for this
-      // cell, offered because the kit reaches none that he did. See the narrowing above.
-      ...(ours.has(canonicalize(m.name)) || narrowed.substituted ? { ours: true as const } : {}),
+      // ⛔⛔ TWO DIFFERENT FACTS, TWO DIFFERENT MARKS (2026-08-30, off Michael's screen). `ours` means
+      // *"a movement he never printed, offered as an ADDITION"* — his own word for the dumbbell fly
+      // ruling. An equipment substitution is not an addition: his movement for this cell is out of
+      // reach and this stands in for it. Labelling it "- added" told the athlete the opposite of
+      // what happened, and **"Bulgarian Split Squat - added" is what he saw.**
+      ...(ours.has(canonicalize(m.name)) ? { ours: true as const } : {}),
+      ...(narrowed.substituted ? { substituted: true as const } : {}),
     }));
 }
 

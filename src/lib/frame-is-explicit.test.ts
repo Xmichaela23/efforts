@@ -35,6 +35,7 @@
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
+  pickOptionLabel,
   ALL_ROUNDER_PICK_KEYS,
   dayLabelForPick,
   frameMuscleForPick,
@@ -429,7 +430,7 @@ Deno.test('⛔ AND EVERY OPTION THE PICKER OFFERS IS THAT MUSCLE, SUBSTITUTES IN
       const his = new Set((VIADA_PICKS[key].hisList ?? []).map((n) => n.toLowerCase()));
       for (const o of options) {
         if (!his.has(o.name.toLowerCase())) {
-          assert(o.ours === true,
+          assert(o.ours === true || o.substituted === true,
             `⛔ ${kitName} ${VIADA_PICKS[key].label} offers "${o.name}", which he did not print here, unmarked`);
         }
       }
@@ -459,4 +460,27 @@ Deno.test('⛔ THE ARMS SUPERSET KEEPS HIS PRINTED LISTS WHOLE — Michael: "fol
   const pull = pickOptions('iso_pull_a', ['Commercial gym'], null).map((o) => o.name.toLowerCase());
   assert(pull.includes('rear delt machine'), 'the rear delt machine was cut from his pull/arms list');
   assert(pull.includes('pullover machine'), 'the pullover machine was cut from his pull/arms list');
+});
+
+Deno.test('⛔ AN EQUIPMENT SUBSTITUTE IS NOT LABELLED "added"', () => {
+  /**
+   * ⛔ OFF MICHAEL'S SCREEN, 2026-08-30: *"Bulgarian Split Squat - added"*. "- added" is his own word
+   * for a movement offered ALONGSIDE his (the dumbbell fly ruling), and it was printing on equipment
+   * SUBSTITUTES — which say the opposite: nothing was added, his movement for that cell was out of
+   * reach and this took its place. Two facts, two marks.
+   */
+  const kit = ['Barbell + plates', 'Dumbbells', 'Flat bench'];
+  const legs = pickOptions('quad_iso', kit, frameMuscleForPick('quad_iso', 'all_rounder'));
+  assert(legs.length > 0, 'the quad row has no substitute at the barbell baseline');
+  for (const o of legs) {
+    assertEquals(o.substituted, true, `"${o.name}" is a substitute and is not marked as one`);
+    assert(o.ours !== true, `"${o.name}" is marked as an addition — it replaced his movement`);
+    assert(!pickOptionLabel(o).includes('- added'), `"${pickOptionLabel(o)}" still reads as an addition`);
+    assert(pickOptionLabel(o).endsWith('- for your gear'), `"${pickOptionLabel(o)}" does not name the reason`);
+  }
+  // ⚠️ AND A GENUINE ADDITION STILL READS AS ONE — the two marks must not collapse into each other.
+  const push = pickOptions('iso_push', ['Commercial gym'], null);
+  const fly = push.find((o) => o.name.toLowerCase() === 'chest fly');
+  assert(fly?.ours === true && pickOptionLabel(fly).endsWith('- added'),
+    'the dumbbell-fly addition lost its own mark');
 });
