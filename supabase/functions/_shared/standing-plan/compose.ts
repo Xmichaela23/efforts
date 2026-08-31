@@ -949,7 +949,41 @@ function exerciseForSlot(
    */
   if (slot.muscle) {
     const want = String(slot.muscle);
-    const onMuscle = resolved.options.filter((o) => musclesWorkedBy(o.name)?.primary === want);
+    /**
+     * ⛔ AND THE MOVEMENTS THE PAGE NAMES ON THIS ROW, whose prime mover disagrees — see
+     * `StrengthSlot.alsoAdmits`. p223 names the hip thrust FIRST in a row headed "hamstrings" and
+     * the catalogue tags it glutes, correctly. Michael's ruling, the same one he gave on the arms
+     * superset: **where the page's own list and a tag pull apart, the list wins.**
+     */
+    const admitted = new Set((slot.alsoAdmits ?? []).map((n) => canonicalize(n)));
+    const keep = (name: string) =>
+      musclesWorkedBy(name)?.primary === want || admitted.has(canonicalize(name));
+    /**
+     * ⛔⛔ AN ADMITTED MOVEMENT IS FETCHED HERE TOO, AND THE PICKER PROVED WHY (2026-08-30). The
+     * catalogue files every hip thrust under BRACED hinge and p274's cell is FOCUSED hinge, so it is
+     * not in this cell's pool at all — a filter can only remove. Without this the dropdown offered
+     * the athlete a movement the composer's own cell could not hold: the pick did not fit, fell
+     * through to the flat pool, and **landed as a SIXTH row on a five-slot day** instead of filling
+     * the row it was chosen for. Measured on the built week, not predicted.
+     * ⚠️ ONLY THE NAMED MOVEMENTS, and only at this cell's own pattern — never a muscle, never a
+     * category. `pickOptions` runs the identical union, which is what keeps the screen and the week
+     * describing the same row.
+     */
+    if (admitted.size > 0) {
+      for (const cat of ['secondary', 'braced', 'focused'] as typeof slot.category[]) {
+        if (cat === slot.category) continue;
+        for (const o of resolveSlot({
+          category: cat, pattern, intent: slot.intent,
+          equipment: args.equipment ?? null, asymmetrical: slot.asymmetrical,
+        }).options) {
+          if (admitted.has(canonicalize(o.name))
+            && !resolved.options.some((x) => canonicalize(x.name) === canonicalize(o.name))) {
+            resolved.options.push(o);
+          }
+        }
+      }
+    }
+    const onMuscle = resolved.options.filter((o) => keep(o.name));
     if (onMuscle.length > 0) {
       resolved.options = onMuscle;
     } else {
@@ -977,7 +1011,7 @@ function exerciseForSlot(
       }
       const seen = new Set<string>();
       resolved.options = pooled.filter((o) => {
-        if (musclesWorkedBy(o.name)?.primary !== want) return false;
+        if (!keep(o.name)) return false;
         const c = canonicalize(o.name);
         if (seen.has(c)) return false;
         seen.add(c);

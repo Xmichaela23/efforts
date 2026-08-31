@@ -141,6 +141,26 @@ export type StrengthSlot = {
    * open.**
    */
   muscle?: string;
+  /**
+   * ⛔⛔⛔ MOVEMENTS THE PAGE NAMES ON THIS ROW WHOSE PRIME MOVER DISAGREES WITH `muscle` — an
+   * explicit, per-cell exception to the muscle law (Michael, 2026-08-30, on his standing
+   * *"follow the book"* precedent).
+   *
+   * ⛔ THE CASE IT EXISTS FOR. p223's row is headed *"Focused hinge lower/hamstrings"* and the FIRST
+   * movement it names is the hip thrust — which the catalogue tags `glutes`, correctly by field
+   * standard. So p274's `1 × HYP: focused hamstring` cell and the movement's own tag disagree, and
+   * the muscle law removed a movement Viada prints first in that very row.
+   * ⛔ THE RULING IS THE SAME ONE HE GAVE ON THE ARMS SUPERSET: **where the page's own list and a tag
+   * pull apart, the list wins.** The muscle law still governs everything the page does not name.
+   *
+   * ⚠️ IT IS A NAMED LIST, NEVER A SECOND MUSCLE. Admitting `glutes` wholesale would let clamshells
+   * and glute bridges into a hamstring row; naming his movements admits exactly what he printed and
+   * nothing else. Every entry has to be traceable to the page.
+   * ⚠️ AND IT ADMITS THE EXECUTIONS OF THOSE MOVEMENTS TOO — p223 prints the machine and Smith
+   * versions, and a barbell hip thrust is the same movement at a kit with no machine, so it is named
+   * here rather than being left to a muscle filter that would reject it.
+   */
+  alsoAdmits?: string[];
   /** What the page prints, kept verbatim so a reader can find the row. */
   sourceText: string;
 };
@@ -484,7 +504,14 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
       S('HYP', 'accessory', 'braced', 'hinge_lower', '2 x HYP: braced hinge / braced lower push superset', { muscle: 'hamstrings' }),
       // ⚠️ p221 braced push lower — hack squat, leg press, lever squat — is quadriceps.
       S('HYP', 'accessory', 'braced', 'press_lower', '2 x HYP: braced hinge / braced lower push superset', { muscle: 'quadriceps' }),
-      S('HYP', 'accessory', 'focused', 'hinge_lower', '1 x HYP: focused hamstring', { muscle: 'hamstrings' }),
+      // ⛔ p223 NAMES THE HIP THRUST FIRST IN THIS ROW — *"machine/Smith machine hip thrust ·
+      // hamstring curls (seated or prone) · cable or machine kickbacks"* — under a heading that says
+      // hamstrings, while the movement's prime mover is glutes. Michael's ruling: the page's list
+      // wins. See `StrengthSlot.alsoAdmits`. The barbell version is the same movement at bar+bench.
+      S('HYP', 'accessory', 'focused', 'hinge_lower', '1 x HYP: focused hamstring', {
+        muscle: 'hamstrings',
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust', 'barbell hip thrust'],
+      }),
       S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: braced push (asymmetrical)', { asymmetrical: true }),
     ],
     endurance: [E('ride_anaerobic', 1, 'Cyc AnA (level 1)', { role: 'hard' })],
@@ -578,7 +605,14 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
     lowerRole: 'de',
     strength: [
       S('DE', 'competition', 'primary', 'hinge_lower', '1 x DE: secondary hinge'),
-      S('HYP', 'accessory', 'focused', 'hinge_lower', '1 x HYP: focused hamstring', { muscle: 'hamstrings' }),
+      // ⛔ p223 NAMES THE HIP THRUST FIRST IN THIS ROW — *"machine/Smith machine hip thrust ·
+      // hamstring curls (seated or prone) · cable or machine kickbacks"* — under a heading that says
+      // hamstrings, while the movement's prime mover is glutes. Michael's ruling: the page's list
+      // wins. See `StrengthSlot.alsoAdmits`. The barbell version is the same movement at bar+bench.
+      S('HYP', 'accessory', 'focused', 'hinge_lower', '1 x HYP: focused hamstring', {
+        muscle: 'hamstrings',
+        alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust', 'barbell hip thrust'],
+      }),
       S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: braced push (asymmetrical)', { asymmetrical: true }),
     ],
     endurance: [],

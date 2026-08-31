@@ -685,17 +685,48 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
    * ⛔ p274 DAY 2 — `1 × HYP: focused hamstring`. p223 FOCUSED HINGE LOWER / HAMSTRINGS:
    * *machine/Smith machine hip thrust · hamstring curls (seated or prone) · cable or machine
    * kickbacks*.
-   * ⚠️ THE HIP THRUST IS NOT IN THIS CELL'S POOL. The catalogue files `machine hip thrust` under
-   * BRACED hinge rather than focused, so it reaches the athlete through `braced_hinge` above and is
-   * not repeated here — offering it twice would let one movement fill two of the day's rows.
+   * ⚠️⚠️ THE NOTE THAT STOOD HERE WAS WRONG, and it is replaced rather than deleted because the
+   * mistake is instructive. It read: *"the hip thrust is not in this cell's pool — the catalogue
+   * files `machine hip thrust` under BRACED hinge, so it reaches the athlete through `braced_hinge`
+   * and is not repeated here."* **It reaches them through neither.** `braced_hinge`'s muscle is
+   * hamstrings too, so the hip thrust was filtered out of that cell as well; the movement reached
+   * them from nowhere. The exclusion was real, my stated reason for it was invented.
+   *
+   * ⛔ AND IT IS IN NOW (Michael, 2026-08-30). p223 names it FIRST in this row — *"machine/Smith
+   * machine hip thrust · hamstring curls (seated or prone) · cable or machine kickbacks"* — under a
+   * heading that says hamstrings, while its prime mover is glutes. His standing precedent applies:
+   * where the page's own list and a tag pull apart, the list wins. The exception is stated on the
+   * FRAME (`StrengthSlot.alsoAdmits`) so the composer honours it too.
+   * ⚠️ HIS TWO SPELLINGS ARE THE MACHINE ONES; the barbell hip thrust is the same movement at a kit
+   * with no machine and reaches the athlete as a marked substitute.
    */
   ham_iso: {
     key: 'ham_iso',
     label: 'Hamstring isolation',
     slot: { category: 'focused', pattern: 'hinge_lower' },
-    hisList: ['leg curl', 'hamstring curl', 'seated leg curl', 'lying leg curl', 'cable kickback'],
-    // ⛔ HIS ORDER, so the zero-touch default is the movement he prints first.
-    leadWith: ['leg curl', 'cable kickback'],
+    hisList: ['machine hip thrust', 'smith machine hip thrust', 'leg curl', 'hamstring curl', 'seated leg curl', 'lying leg curl', 'cable kickback'],
+    /**
+     * ⛔ ONE MOVEMENT, THREE SPELLINGS — merged on evidence, 2026-08-30. `nordic curl`,
+     * `nordic curls` and `nordic hamstring curl` carry **identical `EXERCISE_CONFIG` entries and the
+     * identical gear route**, and in the field they are one exercise under three names; the plural is
+     * a plural. Two of them were surfacing side by side in this row's substitutes, so a dropdown of
+     * two options held one real choice.
+     * ⚠️ THIS IS THE OPPOSITE CALL FROM THE REVERSE HYPERS, and deliberately so. Those looked like
+     * twins and were two executions on different apparatus — checked before splitting. These looked
+     * like twins and are twins — checked before merging. **The check is the same either way; the
+     * answer is not.** `nordic hamstring curl` survives as the most specific name.
+     */
+    excludes: ['nordic curl', 'nordic curls'],
+    /**
+     * ⛔ THE HAMSTRING MOVEMENTS LEAD, and the hip thrust is an option rather than the opening
+     * answer. p223 prints it first in the row, which is why it is admitted at all — but p274's cell
+     * says `1 × HYP: focused hamstring`, and the zero-touch default is what most athletes will
+     * actually train. **His list governs membership; the row's own muscle governs the default.**
+     * ⚠️ ON A KIT WITH NO CURL MACHINE THE DEFAULT IS THE HIP THRUST ANYWAY, because none of the
+     * curls are reachable there. Ordering cannot fix that — it is the consequence of admitting a
+     * glutes movement to a hamstring row, it is flagged to Michael, and it is his call.
+     */
+    leadWith: ['leg curl', 'hamstring curl', 'seated leg curl', 'lying leg curl', 'machine hip thrust', 'cable kickback'],
     leadCite: 'Viada p223 — focused hamstrings',
     servesChips: ['glutes'],
   },
@@ -926,6 +957,24 @@ export function pickReachesFrame(
  * reconcile; a frame that ever printed two different muscles for one cell would need a per-day
  * answer and this is where that would go.
  */
+export function frameAdmitsForPick(
+  key: ViadaPickKey,
+  frame: FrameId,
+  column: ColumnKind = 'standard',
+): string[] {
+  const spec = VIADA_PICKS[key];
+  if (!spec.slot) return [];
+  for (const day of FRAMES[frame]?.columns[column] ?? []) {
+    if (spec.slot.frameDay != null && day.day !== spec.slot.frameDay) continue;
+    for (const sl of day.strength) {
+      if (sl.intent !== 'HYP' || sl.role !== 'accessory') continue;
+      if (sl.category !== spec.slot.category || sl.pattern !== spec.slot.pattern) continue;
+      if (sl.alsoAdmits) return sl.alsoAdmits;
+    }
+  }
+  return [];
+}
+
 export function frameMuscleForPick(
   key: ViadaPickKey,
   frame: FrameId,
@@ -994,7 +1043,8 @@ export function picksForFrame(
    * ⛔ EMPTY IS STILL NOT DRAWN — there is nothing to show and nothing to answer.
    */
   return reachable.filter((k) => VIADA_PICKS[k].slot == null
-    || pickOptions(k, equipment, frameMuscleForPick(k, frame, column)).length >= 1);
+    || pickOptions(k, equipment, frameMuscleForPick(k, frame, column),
+      frameAdmitsForPick(k, frame, column)).length >= 1);
 }
 
 /**
@@ -1184,6 +1234,12 @@ export function pickOptions(
    * muscles — is unchanged on every one of its cells.
    */
   muscle?: string | null,
+  /**
+   * ⛔ THE MOVEMENTS THIS ROW ADMITS DESPITE THE MUSCLE — see `StrengthSlot.alsoAdmits` and
+   * `frameAdmitsForPick`. The composer applies the same list, so the dropdown and the built week
+   * cannot disagree about whether p223's hip thrust belongs in his hamstring row.
+   */
+  alsoAdmits?: string[] | null,
 ): PickOption[] {
   const spec = VIADA_PICKS[key];
   const resolved = resolveSlot({
@@ -1258,9 +1314,37 @@ export function pickOptions(
    * same rule `oursList` already follows.
    */
   const primaryOf = (name: string) => musclesWorkedBy(name)?.primary ?? null;
+  const admitted = new Set((alsoAdmits ?? []).map((n) => canonicalize(n)));
+  /**
+   * ⛔⛔ AN ADMITTED MOVEMENT HAS TO BE FETCHED, NOT JUST PERMITTED — measured, 2026-08-30. The
+   * first cut filtered on `alsoAdmits` and the hip thrust still did not appear, because **it is not
+   * in this cell's pool at all**: the catalogue files every hip thrust under BRACED hinge and p274's
+   * cell is FOCUSED hinge. A filter can only remove.
+   * ⛔ SO THE SAME PATTERN IS ASKED ACROSS HIS OTHER CATEGORIES and only the NAMED movements are
+   * taken — never a muscle, never a category. p223 named these on this row; nothing else comes with
+   * them. ⚠️ The pattern never widens, so an admitted movement is always the frame's own plane.
+   */
+  const admittedPool: GridMovement[] = admitted.size === 0 ? [] : (() => {
+    const found: GridMovement[] = [];
+    for (const cat of ['secondary', 'braced', 'focused'] as ViadaCategory[]) {
+      if (cat === spec.slot?.category) continue;
+      for (const m of resolveSlot({
+        category: cat,
+        pattern: spec.slot?.pattern ?? null,
+        intent: 'HYP',
+        equipment: equipment ?? null,
+      }).options) {
+        if (admitted.has(canonicalize(m.name))) found.push(m);
+      }
+    }
+    return found;
+  })();
+  // ⚠️ THE MUSCLE, OR A MOVEMENT THE PAGE NAMES ON THIS ROW. Never a second muscle — see
+  // `StrengthSlot.alsoAdmits` for why the exception is a named list.
+  const onMuscle = (name: string) => primaryOf(name) === muscle || admitted.has(canonicalize(name));
   const narrowed = muscle
     ? (() => {
-      const his = pool.filter((m) => primaryOf(m.name) === muscle);
+      const his = dedupeByCanonical([...pool, ...admittedPool]).filter((m) => onMuscle(m.name));
       if (his.length > 0) return { list: his, substituted: false };
       /**
        * ⛔⛔ THE SUBSTITUTE POOL WIDENS BY CATEGORY, NEVER BY MUSCLE OR PATTERN (Michael's amendment,
@@ -1314,9 +1398,9 @@ export function pickOptions(
             equipment: equipment ?? null,
           }).options);
         }
-        const subs = dedupeByCanonical(pooled)
+        const subs = dedupeByCanonical([...pooled, ...admittedPool])
           .filter((m) => !excluded.has(canonicalize(m.name)))
-          .filter((m) => primaryOf(m.name) === muscle);
+          .filter((m) => onMuscle(m.name));
         if (subs.length > 0) return { list: subs, substituted: true };
       }
       return { list: [], substituted: true };
@@ -1346,7 +1430,15 @@ export function pickOptions(
       // reach and this stands in for it. Labelling it "- added" told the athlete the opposite of
       // what happened, and **"Bulgarian Split Squat - added" is what he saw.**
       ...(ours.has(canonicalize(m.name)) ? { ours: true as const } : {}),
-      ...(narrowed.substituted ? { substituted: true as const } : {}),
+      /**
+       * ⚠️ AND AN ADMITTED MOVEMENT HE DID NOT PRINT IS A SUBSTITUTE TOO, per movement rather than
+       * per list. p223 prints the MACHINE and Smith hip thrusts; the plain and barbell versions are
+       * the same movement at a kit without one, so at a commercial gym `machine hip thrust` reads as
+       * his and `barbell hip thrust` reads as the stand-in. **Marking the whole list would have
+       * called his own printed movement a substitute.**
+       */
+      ...((narrowed.substituted || (admitted.has(canonicalize(m.name)) && !his.has(canonicalize(m.name))))
+        ? { substituted: true as const } : {}),
     }));
 }
 
@@ -1373,7 +1465,7 @@ export function defaultPickFor(
   // ⛔ AN OPT-IN ROW HAS NO DEFAULT. Empty is the answer, and a caller must treat it as "nothing
   // added" rather than as a missing value to fill in.
   if (VIADA_PICKS[key].optIn === true) return '';
-  const opts = pickOptions(key, equipment, frameMuscleForPick(key, frame));
+  const opts = pickOptions(key, equipment, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame));
   if (opts.length === 0) return '';
   const wanted = musclesForChips(dial.filter((c) => VIADA_PICKS[key].servesChips.includes(c)));
   if (wanted.size > 0) {

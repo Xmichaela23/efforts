@@ -35,6 +35,7 @@
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
+  frameAdmitsForPick,
   pickOptionLabel,
   ALL_ROUNDER_PICK_KEYS,
   dayLabelForPick,
@@ -400,7 +401,14 @@ Deno.test('⛔⛔⛔ THE MUSCLE THE PAGE NAMES IS WHAT THE WEEK BUILDS, AT EVERY
         // ⚠️ A DROPPED SLOT IS LEGAL — the week says "N exercises short" and names the equipment.
         // What is never legal is the wrong muscle standing in for the right one.
         if (built == null) return;
-        assertEquals(musclesWorkedBy(built)?.primary, sl.muscle,
+        /**
+         * ⚠️ OR A MOVEMENT THE PAGE NAMES ON THIS ROW — see `StrengthSlot.alsoAdmits`. p223 prints the
+         * hip thrust first in a row headed "hamstrings" while its prime mover is glutes, and Michael
+         * ruled the page's list wins. The exception is NAMED, so this still fails on any other
+         * crossing.
+         */
+        const admits = new Set((sl.alsoAdmits ?? []).map((n) => n.toLowerCase()));
+        assert(musclesWorkedBy(built)?.primary === sl.muscle || admits.has(built.toLowerCase()),
           `⛔ ${kitName} day ${day.day} "${sl.sourceText}" wants ${sl.muscle} and built "${built}"`);
         checked += 1;
       });
@@ -422,8 +430,10 @@ Deno.test('⛔ AND EVERY OPTION THE PICKER OFFERS IS THAT MUSCLE, SUBSTITUTES IN
     for (const key of ALL_ROUNDER_PICK_KEYS) {
       const muscle = frameMuscleForPick(key, 'all_rounder');
       if (!muscle) continue;
-      const options = pickOptions(key, equipment, muscle);
+      const admits = new Set(frameAdmitsForPick(key, 'all_rounder').map((n) => n.toLowerCase()));
+      const options = pickOptions(key, equipment, muscle, [...admits]);
       for (const o of options) {
+        if (admits.has(o.name.toLowerCase())) continue;
         assertEquals(o.muscle, muscle,
           `⛔ ${kitName} ${VIADA_PICKS[key].label} offers "${o.name}" <${o.muscle}> for a ${muscle} row`);
       }
@@ -483,4 +493,42 @@ Deno.test('⛔ AN EQUIPMENT SUBSTITUTE IS NOT LABELLED "added"', () => {
   const fly = push.find((o) => o.name.toLowerCase() === 'chest fly');
   assert(fly?.ours === true && pickOptionLabel(fly).endsWith('- added'),
     'the dumbbell-fly addition lost its own mark');
+});
+
+Deno.test('⛔⛔ THE PAGE\'S OWN LIST BEATS A PRIME-MOVER TAG, AND ONLY WHERE IT IS NAMED', () => {
+  /**
+   * ⛔ MICHAEL, 2026-08-30, on his standing *"follow the book"* precedent. p223's row is headed
+   * *"Focused hinge lower/hamstrings"* and the FIRST movement it names is the hip thrust — which the
+   * catalogue tags `glutes`, correctly by field standard. The muscle law was removing a movement he
+   * prints first in that very row.
+   * ⛔ THE EXCEPTION IS A NAMED LIST, NEVER A SECOND MUSCLE. Admitting `glutes` wholesale would let
+   * clamshells and glute bridges into a hamstring row; this admits exactly what he printed.
+   */
+  const admits = frameAdmitsForPick('ham_iso', 'all_rounder');
+  assert(admits.some((n) => n.includes('hip thrust')), 'p223\'s hip thrust is not admitted');
+  const names = pickOptions('ham_iso', ['Commercial gym'],
+    frameMuscleForPick('ham_iso', 'all_rounder'), admits).map((o) => o.name.toLowerCase());
+  assert(names.includes('machine hip thrust'), 'his printed hip thrust is not offered');
+  // ⛔ AND THE BARBELL VERSION IS REACHABLE WHERE THE MACHINE IS NOT — Michael's own point.
+  const home = pickOptions('ham_iso', ['Barbell + plates', 'Dumbbells', 'Flat bench'],
+    frameMuscleForPick('ham_iso', 'all_rounder'), admits).map((o) => o.name.toLowerCase());
+  assert(home.includes('barbell hip thrust'), 'the barbell hip thrust is unreachable at bar+bench');
+  // ⛔ AND NOTHING ELSE GLUTE CAME WITH IT. The exception is named, not a widened muscle.
+  for (const n of ['glute bridge', 'clamshell', 'single leg glute bridge']) {
+    assert(!home.includes(n), `"${n}" leaked into a hamstring row — the exception is a named list`);
+  }
+});
+
+Deno.test('⛔ THE NORDIC SPELLINGS ARE ONE MOVEMENT — merged on evidence, unlike the reverse hypers', () => {
+  /**
+   * ⛔ THE CHECK IS THE SAME EITHER WAY; THE ANSWER IS NOT. `nordic curl`, `nordic curls` and
+   * `nordic hamstring curl` carry identical `EXERCISE_CONFIG` entries and the identical gear route,
+   * and in the field they are one exercise under three names. The reverse hypers looked identical
+   * too and were two executions on different apparatus — split. These are twins — merged.
+   */
+  const opts = pickOptions('ham_iso', ['Barbell + plates', 'Dumbbells', 'Flat bench'],
+    frameMuscleForPick('ham_iso', 'all_rounder'), frameAdmitsForPick('ham_iso', 'all_rounder'))
+    .map((o) => o.name.toLowerCase());
+  const nordics = opts.filter((n) => n.includes('nordic'));
+  assert(nordics.length <= 1, `${nordics.length} spellings of one movement in the row: ${nordics.join(', ')}`);
 });
