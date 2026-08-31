@@ -1866,7 +1866,21 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const isRamp = !!plan && plan.length > 1
                 && new Set(plan.map((p: any) => `${p?.weight}x${p?.reps}${p?.amrap ? '+' : ''}`)).size > 1;
               if (isRamp) {
-                const ramp = plan!.map((p: any) => `${p?.weight}×${p?.reps}${p?.amrap ? '+' : ''}`).join(', ');
+                // ⛔ A WORK SET CARRIES NO REP COUNT, AND THAT IS DELIBERATE UPSTREAM — the composer
+                // omits `reps` rather than storing a zero, because a stored 0 is the FAILED ATTEMPT
+                // signal and inventing one would undo an earned jump. This exporter interpolated the
+                // gap straight into the string: Michael's week 2-12 bench rows read
+                // "135×undefined" on the main lift, every week. The prescription for that set is the
+                // row's rep BAND, so print the band; if there is no band either, print the weight
+                // alone rather than a word the athlete has to decode.
+                const repsFor = (p: any) => {
+                  if (p?.reps !== undefined && p?.reps !== null) return `×${p.reps}`;
+                  const band = ex?.reps;
+                  return band !== undefined && band !== null && String(band).trim() !== ''
+                    ? `×${String(band).trim()}`
+                    : '';
+                };
+                const ramp = plan!.map((p: any) => `${p?.weight}${repsFor(p)}${p?.amrap ? '+' : ''}`).join(', ');
                 lines.push(`    - ${name}: ${ramp}${notes}`);
               } else {
                 const setsPrefix = sets ? `${sets}×` : '';
