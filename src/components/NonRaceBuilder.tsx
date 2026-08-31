@@ -1212,7 +1212,7 @@ export type NonRaceState = {
 // file's header for why: the Standard Focus card shipped landing on the wrong screen while every
 // test on the path passed. ⚠️ Re-exported so every `StepKey` reference here is unchanged.
 export type { StepKey } from '@/lib/wizard-steps';
-import { getSteps, type StepKey } from '@/lib/wizard-steps';
+import { getSteps, skipsSportScope, STANDARD_FOCUS_POSTURE, type StepKey } from '@/lib/wizard-steps';
 
 
 // The goal seeded the posture; the user may have edited it. Re-derive goal_type/sport/strength_protocol
@@ -1763,7 +1763,17 @@ function assemblePayload(
             }
             return Object.keys(out).length > 0 ? { endurance_slot_minutes: out } : {};
           })(),
-          ...(isStrengthFocusPath && (state.posture.swim ?? 'out') === 'maintain' && (state.swimEasySessions ?? 0) > 0
+          /**
+           * ⛔ NOT SENT ON A FRAME THAT SKIPS THE SPORT-SCOPE SCREEN (Michael, 2026-08-30). The easy-
+           * swims toggle lived on that card and is PARKED — his framing for this frame is *"a solid
+           * run ride strength program, nothing more"*. ⚠️ It is off by default, so an athlete who
+           * never saw the control loses nothing; and a stale `maintain` carried in from another goal
+           * must not send swims into a week whose screen never offered them.
+           * ⚠️ PARKED, NOT REJECTED — the payload hop, the composer's append and the 1-2 cap are all
+           * untouched, so rehoming the control is a screen change and nothing else.
+           */
+          ...(isStrengthFocusPath && !skipsSportScope(state)
+            && (state.posture.swim ?? 'out') === 'maintain' && (state.swimEasySessions ?? 0) > 0
             ? { swim_easy_sessions: Math.min(2, state.swimEasySessions ?? 1) }
             : {}),
           // Strength Focus: the three assistance picks. The composer validates each name against the
@@ -2132,6 +2142,36 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const isStrengthFocus = state.goal === 'get_stronger';
   // ⛔ THE FRAME EVERY SLOT QUESTION ON THIS SCREEN READS — see `frameOf`.
   const wizardFrame: FrameId = frameOf(state);
+  /**
+   * ⛔⛔⛔ THE POSTURE THE SKIPPED SCREEN WOULD HAVE WRITTEN — and this is a BLOCKER FIX, not tidiness
+   * (Michael, 2026-08-30). See `skipsSportScope` for the ruling and `STANDARD_FOCUS_POSTURE` for the
+   * values.
+   *
+   * ⛔ WHAT BREAKS WITHOUT IT, traced before it was written. `seedFromGoal` INTERSECTS the goal's
+   * posture with the athlete's declared disciplines — *"never prescribe a sport they don't do"* — so
+   * a runner whose `user_baselines.disciplines` lists only running is seeded `bike: 'out'`. The scope
+   * card is where they fix that today. Skip it without this and `allowedSlotSports` is `['run']`,
+   * p274's day 2 and day 4 are ride-ONLY rows that no chip can answer, the single-sport auto-assign
+   * explicitly skips `ride_*` families so it cannot fill them either, `allSlotsChosen` never becomes
+   * true — **Continue is disabled and cannot be satisfied.** The exact defect of 2026-08-30's
+   * morning, and it would have shipped to a runner rather than to a test.
+   *
+   * ⚠️ IT DOES NOT TOUCH SWIM OR STRENGTH. Swim is parked on this frame and off by default; strength
+   * is written by its own step. Only the two the frame prescribes are claimed.
+   * ⚠️ IT RUNS ON THE FRAME, NOT ON A STEP, because the flow no longer HAS the step to hang it off —
+   * and the payload can be assembled from any later screen.
+   */
+  React.useEffect(() => {
+    if (!skipsSportScope(state)) return;
+    const need = (['run', 'bike'] as const)
+      .filter((d) => state.posture[d] !== STANDARD_FOCUS_POSTURE[d]);
+    if (need.length === 0) return;
+    setState((st) => ({
+      ...st,
+      posture: { ...st.posture, run: STANDARD_FOCUS_POSTURE.run, bike: STANDARD_FOCUS_POSTURE.bike },
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.goal, state.focus, state.posture.run, state.posture.bike]);
   // ── THE STANDING PLAN'S ACCESSORY ANSWERS ────────────────────────────────────────────────────
   //
   // ⛔ SEEDED PRE-FILLED, AND THAT IS THE POINT OF THE SCREEN (Michael, 2026-08-24): the picks open

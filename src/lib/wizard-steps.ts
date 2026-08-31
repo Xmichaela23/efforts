@@ -173,6 +173,47 @@ function scheduleSteps(state: StepRouterState, isStrengthFocus: boolean, isRaceG
  * and nothing asserted the route because every test on this path asserted the PAYLOAD instead.
  * See `focus-frame-travel.test.ts`.
  */
+/**
+ * ⛔⛔⛔ STANDARD FOCUS DOES NOT ASK WHICH SPORTS — Michael's ruling from the live flow, 2026-08-30.
+ *
+ * The sport-scope card offers "Run only", "Ride only" and "Run + ride", and **two of its three
+ * answers are unconstructible against p274.** That week prescribes `Cyc AnA` on day 2 and
+ * `Cyc endurance` on day 4 as RIDES that cannot be anything else, and p275's impact floor keeps at
+ * least one run — so run-only and ride-only are both weeks the frame cannot build. A screen whose
+ * options the plan will refuse is a screen asking a question with no answer, which is the same
+ * reason the Strong/Heavy tier card was already skipped for this frame two rulings ago.
+ *
+ * ⛔ AND THE QUESTION HAS A NEW HOME ANYWAY. The endurance screen asks a sport PER ROW now, so the
+ * scope card was asking, one screen earlier and less precisely, what the rows already ask.
+ *
+ * ⛔⛔ THE SKIPPED PATH MUST WRITE THE POSTURE, AND THAT IS NOT OPTIONAL — see
+ * `standardFocusPosture`. `seedFromGoal` INTERSECTS with the athlete's declared disciplines, so a
+ * runner whose baselines list only running is seeded `bike: 'out'`; the scope card is where they fix
+ * that today. Skip it without writing and the two ride-only rows can never be answered, so
+ * **Continue is disabled and cannot be satisfied.** Same defect that cost 2026-08-30 its morning.
+ *
+ * ⚠️ EXPORTED SO THE FLOW AND THE WRITE READ ONE PREDICATE. Two copies of "does this frame ask?" is
+ * how a screen comes to be required and not drawn.
+ * ⚠️ KEYED ON `focus` because that is what this file already has and already branches on — see
+ * `asksTier` directly below. Its frame-side sibling is `weekIsDayOrdered`.
+ * ⚠️ `strength_5k` AND EVERY OTHER GOAL KEEP THE SCREEN, unchanged.
+ */
+export function skipsSportScope(state: StepRouterState): boolean {
+  const effective = state.goal === 'get_stronger';
+  return effective && (state.focus ?? 'run') === 'standard';
+}
+
+/**
+ * ⛔ WHAT THE SKIPPED PATH STORES INSTEAD, and it is the frame's own answer: p274 prescribes running
+ * AND riding, every week, so both are held. Written explicitly rather than left to the seed — the
+ * same discipline as `EXPERIENCE_WHEN_UNASKED`, and for the same reason: a value nobody was asked
+ * for still has to reach the payload, or the screen and the plan disagree in silence.
+ * ⚠️ SWIM IS NOT NAMED. Michael parked the easy-swims toggle on this frame — *"a solid run ride
+ * strength program, nothing more"* — and it is off by default, so an athlete who never saw the
+ * control loses nothing. `swim_easy_sessions` is simply not sent. ⛔ Parked, not rejected.
+ */
+export const STANDARD_FOCUS_POSTURE = { run: 'maintain', bike: 'maintain' } as const;
+
 export function getSteps(state: StepRouterState): StepKey[] {
   // ⛔ STRENGTH FOCUS SKIPS "What can you sustain?". That step converts a Light/Moderate/Committed
   // tier into `weekly_hours_available` — and on this path nothing reads it. The lifting is three days,
@@ -253,7 +294,8 @@ export function getSteps(state: StepRouterState): StepKey[] {
    */
   const asksTier = isStrengthFocus && state.entry === 'train' && (state.focus ?? 'run') !== 'standard';
   const head: StepKey[] = isStrengthFocus
-    ? [...door, ...(asksTier ? ['tier' as StepKey] : []), 'posture']
+    ? [...door, ...(asksTier ? ['tier' as StepKey] : []),
+        ...(skipsSportScope(state) ? [] : ['posture' as StepKey])]
     : [...door, 'posture', 'commitment', 'length'];
   return [...head, ...scheduleSteps(state, isStrengthFocus, isRaceGoal), 'confirm'];
 }

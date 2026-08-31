@@ -11,7 +11,7 @@
  * this file possible — see `wizard-steps.ts`.
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { getSteps, type StepRouterState } from './wizard-steps.ts';
+import { getSteps, skipsSportScope, STANDARD_FOCUS_POSTURE, type StepRouterState } from './wizard-steps.ts';
 
 const strengthPath = (focus?: 'standard' | 'run'): StepRouterState => ({
   goal: 'get_stronger',
@@ -32,10 +32,57 @@ Deno.test('⛔⛔ STANDARD FOCUS DOES NOT LAND ON THE 5K PATH\'S TIER SCREEN', (
    * (p244) — both are 5K programmes, and the book has no Strong/Heavy split of the All Rounder. A
    * Standard Focus athlete sent there is being asked something with no answer for their programme.
    */
-  assertEquals(landsOn(strengthPath('standard')), 'posture',
-    'Standard Focus lands somewhere other than the posture card');
+  /**
+   * ⚠️ IT LANDS ON THE ENDURANCE SCREEN NOW, NOT THE POSTURE CARD — rebased 2026-08-30, and the RULE
+   * is unchanged. This assertion pinned "not the tier screen"; the sport-scope card has since been
+   * ruled off this frame too (see `skipsSportScope`), so the first screen after the card moved one
+   * further along. What it still asserts is that a Standard Focus tap opens a screen that HAS an
+   * answer for this programme.
+   */
+  assertEquals(landsOn(strengthPath('standard')), 'endurance',
+    'Standard Focus lands somewhere other than the endurance week');
   assert(!getSteps(strengthPath('standard')).includes('tier'),
     'the tier screen is back in the Standard Focus flow');
+});
+
+Deno.test('⛔⛔⛔ STANDARD FOCUS NEVER ASKS WHICH SPORTS — two of the three answers cannot be built', () => {
+  /**
+   * ⛔ p274 PRESCRIBES `Cyc AnA` ON DAY 2 AND `Cyc endurance` ON DAY 4 AS RIDES that cannot be
+   * anything else, and p275's impact floor keeps at least one run — so "Run only" and "Ride only"
+   * are both weeks this frame refuses to build. A card offering them asks a question with no answer,
+   * which is the same reason the tier card was already skipped here.
+   * ⛔ AND THE ROWS ASK IT BETTER. The endurance screen takes a sport PER ROW, so the scope card was
+   * asking one screen earlier and less precisely what the rows already ask.
+   */
+  assert(skipsSportScope(strengthPath('standard')));
+  assert(!getSteps(strengthPath('standard')).includes('posture'),
+    'the sport-scope card is back in the Standard Focus flow');
+
+  // ⛔ AND EVERY OTHER FLOW KEEPS IT — the 5K path, a focus-less build, and a non-strength goal.
+  for (const st of [strengthPath('run'), strengthPath(undefined)]) {
+    assert(!skipsSportScope(st));
+    assert(getSteps(st).includes('posture'), 'the 5K path lost its sport-scope card');
+  }
+  const endurance = { ...strengthPath('standard'), goal: 'build_endurance' };
+  assert(!skipsSportScope(endurance), 'a non-strength goal was caught by the Standard Focus skip');
+  assert(getSteps(endurance).includes('posture'));
+});
+
+Deno.test('⛔⛔ AND THE SKIPPED PATH STILL HOLDS BOTH SPORTS — the Continue that cannot be satisfied', () => {
+  /**
+   * ⛔ THE BLOCKER THIS EXISTS FOR. `seedFromGoal` intersects the goal's posture with the athlete's
+   * DECLARED disciplines, so a runner whose baselines list only running is seeded `bike: 'out'`. The
+   * scope card is where they fixed that. Skip it without writing the posture and `allowedSlotSports`
+   * is `['run']`, the two ride-only rows can never be answered, `allSlotsChosen` never becomes true,
+   * and **Continue is disabled with no way to satisfy it** — 2026-08-30's morning, shipped to a
+   * runner instead of to a test.
+   * ⚠️ THE VALUES ARE THE FRAME'S: p274 prescribes running AND riding every week, so both are held.
+   * ⚠️ SWIM IS DELIBERATELY ABSENT — parked on this frame, and off by default.
+   */
+  assertEquals(STANDARD_FOCUS_POSTURE.run, 'maintain');
+  assertEquals(STANDARD_FOCUS_POSTURE.bike, 'maintain');
+  assert(!('swim' in STANDARD_FOCUS_POSTURE),
+    'swim is claimed by the skipped path — it is parked, and off by default');
 });
 
 Deno.test('⛔ AND THE 5K PATH IS UNCHANGED — tier first, exactly as it ships', () => {
@@ -59,9 +106,15 @@ Deno.test('⛔ THE FLOW IS COMPLETE WITHOUT A STANDARD-ONLY SCREEN', () => {
    */
   const standard = getSteps(strengthPath('standard'));
   const run = getSteps(strengthPath('run'));
-  assertEquals(standard, run.filter((k) => k !== 'tier'),
-    'the two flows differ by more than the tier screen');
-  for (const required of ['posture', 'endurance', 'schedule', 'confirm'] as const) {
+  /**
+   * ⚠️ TWO SCREENS APART NOW, NOT ONE — rebased 2026-08-30 with the sport-scope ruling. The rule is
+   * the same and is what matters: **Standard Focus is the 5K flow MINUS screens, never PLUS one.**
+   * Both omissions are questions p274 has no answer for. If a Standard build ever needs a question
+   * the 5K build does not, this assertion is what fails and this is where it goes.
+   */
+  assertEquals(standard, run.filter((k) => k !== 'tier' && k !== 'posture'),
+    'the two flows differ by more than the tier and sport-scope screens');
+  for (const required of ['endurance', 'schedule', 'confirm'] as const) {
     assert(standard.includes(required), `Standard Focus never asks for ${required}`);
   }
 });
