@@ -35,7 +35,6 @@ import {
   experienceAsksFor,
   experienceMovement,
   weekIsDayOrdered,
-  hardWorkoutPickerVisible,
   unansweredLengths,
   unansweredLengthLine,
   EXPERIENCE_WHEN_UNASKED,
@@ -115,6 +114,7 @@ import {
   dayLabelForPick,
   picksForFrame,
   frameMuscleForPick,
+  frameAdmitsForPick,
   defaultViadaPicks,
   pickOptions,
   pickOptionLabel,
@@ -5487,7 +5487,22 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                  * ⚠️ THE COMPOSER NARROWS ON THE SAME FIELD, so the dropdown and the built week
                  * cannot disagree about what the row is for.
                  */
-                const opts = pickOptions(key, strengthEquipment, frameMuscleForPick(key, wizardFrame));
+                /**
+                 * ⛔⛔ THE ADMITTED MOVEMENTS TRAVEL TOO — FOUND 2026-08-31, AND IT WAS ALWAYS BROKEN
+                 * HERE. `frameAdmitsForPick` is p223's named exception: the source files the hip
+                 * thrust under its hamstring heading, so a hamstring cell admits it even though the
+                 * app attributes it to the glutes. The COMPOSER has honoured that since the exception
+                 * was written; **this screen never passed the argument at all**, so the picker
+                 * narrowed the cell by muscle and then dropped every movement the exception exists to
+                 * let back in.
+                 * ⚠️ IT SURFACED WHEN THE REVERSE HYPER WAS RETAGGED TO THE GLUTES: that cell fell to
+                 * a single option, which is the shape of a control that cannot be wrong. The retag is
+                 * correct and it did not cause this — it removed the movement that was hiding it.
+                 */
+                const opts = pickOptions(
+                  key, strengthEquipment,
+                  frameMuscleForPick(key, wizardFrame), frameAdmitsForPick(key, wizardFrame),
+                );
                 const value = viadaPrefs?.picks?.[key] ?? opts[0]?.name ?? '';
                 return (
                   <div key={key}>
@@ -6242,14 +6257,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                * Reported, not smuggled. Gating it to one frame is a one-line test in this condition
                * if he wants that instead.
                */
-              /**
-               * ⛔⛔ AND IT IS STANDARD FOCUS ONLY — Michael's standing freeze on the 5K screen, which
-               * is older and more specific than *"they can choose their hard work"* and therefore
-               * wins where the two meet. See `hardWorkoutPickerVisible` for the ruling and for why
-               * the literal is not written here. ⚠️ The engine still honours a pick from any frame;
-               * this hides the control, it strands nothing.
-               */
-              if (!hardWorkoutPickerVisible(wizardFrame)) return null;
               const hk = key as HardSlotKey;
               // ⛔ EVERY OTHER HARD ROW, NOT "the other one" — see `variantsTakenBy`. p274 has three.
               const others = hardSlotKeysFor(wizardFrame)

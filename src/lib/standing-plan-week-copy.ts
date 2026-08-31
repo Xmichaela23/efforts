@@ -901,24 +901,21 @@ export function weekIsDayOrdered(frame: FrameId = 'strength_5k'): boolean {
 }
 
 /**
- * ⛔⛔ WHICH FRAMES LET THE ATHLETE PICK THE HARD WORKOUT — Michael's standing ruling, relayed
- * 2026-08-31: *"no dont touch 5k"*, *"focus on standard focus only."*
+ * ⛔⛔ `hardWorkoutPickerVisible` IS DELETED (2026-08-31), AND THIS IS ITS TOMBSTONE.
  *
- * ⛔ WHY THIS EXISTS AT ALL. The picker was restored on every hard row (7455d3ba) because *"they can
- * choose their hard work"*, and p246's two quality rows ARE hard rows — so the restore reached the
- * frozen screen as a side effect of being written correctly. **The freeze is the older and more
- * specific instruction**, so the frame answers this question rather than the row's role.
+ * It existed for exactly one day and for exactly one reason: a freeze on the other programme's
+ * screen. It answered *"may this frame's athlete choose their hard workout"* with a frame literal,
+ * and every hard row asked it before drawing its options. **The freeze is lifted, so the question it
+ * asked has no remaining answer that is about frames at all** — a hard row is a hard row, and the
+ * control belongs on all of them.
  *
- * ⛔ THE LITERAL LIVES HERE, BESIDE `weekIsDayOrdered`, AND NOWHERE ELSE. A `frame === 'all_rounder'`
- * test inside the wizard would be a second copy of a ruling in the file whose whole 2026-08-30 fix
- * was removing frame answers from the screen. One owner, one edit when the freeze lifts.
- * ⚠️ NOTHING ELSE IS GATED WITH IT. The engine still honours a pick from any frame — `applyVariantPicks`
- * is untouched — so a 5K plan built from an older draft that carries one still builds it. This hides
- * the CONTROL, exactly as `CLUB_SESSION_CONTROL_VISIBLE` does, and strands no data.
+ * ⚠️ THE NOTE STAYS SO IT IS NOT REBUILT. If a future ruling wants the picker on one programme and
+ * not another, that is a product decision and it needs its own reason written down — not a revival
+ * of a gate whose stated reason has expired.
+ * ⚠️ `weekIsDayOrdered` ABOVE IS **NOT** THE SAME THING and is deliberately untouched: the
+ * day-ordered week, its quiet rows and its theme tags were ruled per-programme on their own merits
+ * as a layout decision, not as protection for a frozen screen.
  */
-export function hardWorkoutPickerVisible(frame: FrameId = 'strength_5k'): boolean {
-  return frame === 'all_rounder';
-}
 
 /** ⛔ THE HARD SLOTS — added, up to two, default zero. */
 export const HARD_SLOT_KEYS: SlotKey[] = hardSlotKeysFor();

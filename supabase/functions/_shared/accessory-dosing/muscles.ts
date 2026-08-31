@@ -132,6 +132,24 @@ const RULES: Rule[] = [
   // ── legs ──────────────────────────────────────────────────────────────────────────────────────
   { re: /\b(calf|calves|soleus|tibialis)\b/, primary: 'calves', secondary: [] },
   { re: /\b(hip thrust|glute bridge|clamshell|abduction|adduction)\b/, primary: 'glutes', secondary: ['hamstrings'] },
+  /**
+   * ⛔⛔ THE REVERSE HYPER IS GLUTE-DOMINANT, AND IT SITS ABOVE THE FAMILY SWEEP FOR THAT REASON
+   * (Michael, ruled from field sources 2026-08-30; unblocked and applied 2026-08-31).
+   *
+   * The rule below claims the whole `hyper` family for the hamstrings, which is right for a good
+   * morning, an RDL and a stiff-leg — a hinge with the feet planted and the hamstrings lengthening
+   * under load. **The reverse hyper is the opposite arrangement:** the torso is fixed and the LEGS
+   * swing, so it is hip extension from a hanging start and the glutes do the work, hamstrings
+   * assisting. Filed under the family sweep it was reported as a hamstring movement, and the muscle
+   * floor filled its glute slot with something else.
+   *
+   * ⚠️ ORDER IS THE WHOLE MECHANISM — this table is FIRST-MATCH. Placed after the sweep, this rule
+   * is unreachable; placed here it takes the reverse hypers and leaves every other hinge alone.
+   * That is the same reason `hip thrust` sits above the hinge rule two lines up.
+   * ⚠️ IT COVERS THE LOADED TWIN TOO. `weighted reverse hyper` and the machine `reverse
+   * hyperextension` are the same movement pattern with a different implement.
+   */
+  { re: /\breverse hyper/, primary: 'glutes', secondary: ['hamstrings'] },
   { re: /\b(back extension|hyperextension|hyper|good morning|romanian|rdl|stiff leg|stiff-leg)\b/, primary: 'hamstrings', secondary: ['glutes'] },
   { re: /\b(deadlift|swing|snatch|clean)\b/, primary: 'hamstrings', secondary: ['glutes', 'quadriceps'] },
   { re: /\b(leg extension|leg extensions|sissy)\b/, primary: 'quadriceps', secondary: [] },

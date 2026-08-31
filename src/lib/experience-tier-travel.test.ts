@@ -131,20 +131,18 @@ Deno.test('⛔⛔ EVERY HARD ROW OFFERS ITS WORKOUT, AND THE LONG ROW STILL DOES
   assert(/slotKey=\{hk\}/.test(code), 'the hard rows lost their workout picker');
 
   /**
-   * ⛔⛔ AND IT IS STANDARD FOCUS ONLY — Michael's standing freeze on the 5K screen, relayed
-   * 2026-08-31: *"no dont touch 5k"*. The restore was written frame-agnostically because a hard row
-   * is a hard row; the freeze is the older and more specific instruction and wins where they meet.
-   * ⚠️ ASSERTED AT THE CALL SITE AND AT THE OWNER, so neither the gate nor its single literal can be
-   * removed without this failing.
+   * ⛔⛔ AND IT IS NO LONGER GATED BY PROGRAMME (2026-08-31). This asserted the opposite for one day:
+   * the picker was hidden on the other frame's screen to honour a freeze, and the freeze is lifted.
+   * **A hard row is a hard row** — the control belongs on all of them, and the function that used to
+   * answer otherwise is deleted rather than left switched on.
+   * ⚠️ THE ASSERTION IS KEPT AND INVERTED rather than removed, so a revival of that gate fails here
+   * instead of quietly taking the control off a screen again.
    */
-  assert(/if \(!hardWorkoutPickerVisible\(wizardFrame\)\) return null;/.test(code),
-    '⛔ the workout picker is no longer gated — it reaches the frozen 5K screen');
   const COPY = await read('./standing-plan-week-copy.ts');
-  assert(/export function hardWorkoutPickerVisible/.test(COPY),
-    'the gate lost its single owner — a frame literal in the wizard is a second copy of the ruling');
-  const { hardWorkoutPickerVisible } = await import('./standing-plan-week-copy.ts');
-  assertEquals(hardWorkoutPickerVisible('strength_5k'), false, '⛔ the 5K screen gained the picker');
-  assertEquals(hardWorkoutPickerVisible('all_rounder'), true);
+  assert(!/export function hardWorkoutPickerVisible/.test(COPY),
+    'the per-frame workout-picker gate is back — its stated reason (a screen freeze) has expired');
+  assert(!/hardWorkoutPickerVisible\(/.test(code),
+    'the wizard gates the workout picker by programme again');
 
   /**
    * ⛔ NO HARD SHAPE IS LEVEL-GATED, which is what makes the picker safe. If a gated archetype is

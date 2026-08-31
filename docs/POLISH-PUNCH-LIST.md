@@ -1059,6 +1059,27 @@ again in the All Rounder. Marked per item.
   the nearest thing when the leg-isolation pool is thin, which would be a quiet substitution of the
   same class as the braced-slot one above.
 
+## [x] CLOSED 2026-08-31 — the reverse hyper's muscle tag (was parked 2026-08-30)
+
+> **Both halves of this entry are fixed.** The screen freeze that was the sole reason either was
+> parked came down on 2026-08-31, and the measurements taken while they were parked are what made
+> lifting them a fix rather than a gamble.
+>
+> · **The tag:** a `\breverse hyper` rule now sits above the hinge sweep in `muscles.ts` — glutes
+>   primary, hamstrings secondary. `back extension`, good mornings, RDLs and stiff-legs are untouched,
+>   which was the control the parking note named.
+> · **The sort:** `compose.ts`'s his-before-ours ranking is no longer gated by programme.
+> · **Measured after:** 40 of 40 composed weeks changed on the previously-frozen programme, 30 of 40
+>   on the All Rounder. On the All Rounder the change is the glute floor filling with the reverse
+>   hyper instead of the hip thrust, and the braced hinge cell falling to `back extension`.
+> · **And it exposed one it was hiding:** with the reverse hyper out of the hamstring cell, that
+>   picker fell to a single option — which is how it was found that **the screen never passed p223's
+>   admitted movements to `pickOptions` at all.** The composer had honoured the exception since it
+>   was written; the picker dropped it. Fixed, and the sweep that should have caught it was calling
+>   `pickOptions` with the same missing argument.
+>
+> Everything below is history.
+
 ## ⛔ PARKED — the reverse hyper's muscle tag is known wrong (2026-08-30)
 
 `muscles.ts` returns **hamstrings** for the whole `hyper` family. Michael ruled from field sources

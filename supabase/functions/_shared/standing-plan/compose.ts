@@ -1101,20 +1101,18 @@ function exerciseForSlot(
    * substitutes, is byte-identical to before.
    */
   /**
-   * ⚠️⚠️ AND IT IS HELD OFF `strength_5k` BY HIS FREEZE, NOT BECAUSE IT IS WRONG THERE — measured,
-   * 2026-08-30, and this is a finding rather than a scoping convenience.
-   *
-   * ⛔ THE SORT CHANGES ALL THIRTY `strength_5k` WEEKS, and every change is an improvement: that
-   * frame stops building `dumbbell bench press`, `drag curl`, `bulgarian split squat` and
-   * `rear delt fly` and starts building `incline bench press`, `preacher curl`, `larsen press`,
-   * `seated calf raise` and `skull crusher` — **p220 and p223's own printed movements, which it has
-   * been passing over in favour of substitutes at every kit.** That is a real defect on the frozen
-   * frame and it is parked, not fixed: Michael's *"strength_5k builds exactly as today"* is absolute
-   * and reopening it is his call, not a side effect of a p274 fix.
-   * ⚠️ SO THE GATE IS THE FREEZE, and when he lifts it this line is the whole change. D-457's rule
-   * holds either way: the frame is explicit rather than assumed.
+   * ⛔⛔ IT APPLIES TO EVERY FRAME NOW (Michael, 2026-08-31). It was held off one frame by a freeze
+   * that has been lifted, and the measurement taken while it was gated is what makes lifting it a
+   * fix rather than a risk: the gated frame stopped building `dumbbell bench press`, `drag curl`,
+   * `bulgarian split squat` and `rear delt fly` and started building `incline bench press`,
+   * `preacher curl`, `larsen press`, `seated calf raise` and `skull crusher` — **the source's own
+   * printed movements for those cells, which it had been passing over in favour of substitutes at
+   * every kit.** Every change the gate was suppressing was an improvement.
+   * ⚠️ D-457 STILL HOLDS: the frame reaches this function explicitly. What is gone is the frame
+   * TEST, not the frame ARGUMENT — a rule about which movements are the page's own has no business
+   * asking which programme is being built.
    */
-  if (slotKey && args.frame !== 'strength_5k') {
+  if (slotKey) {
     const his = new Set((VIADA_PICKS[slotKey].hisList ?? []).map((n) => canonicalize(n)));
     if (his.size > 0) {
       /**

@@ -159,7 +159,21 @@ Deno.test('a back extension is still hamstrings', () => {
   // not be captured by either; it was correct before the fix and has to still be correct after it.
   assertEquals(musclesWorkedBy('back extension')?.primary, 'hamstrings');
   assertEquals(musclesWorkedBy('glute ham raise')?.primary, 'hamstrings');
-  assertEquals(musclesWorkedBy('reverse hyperextension')?.primary, 'hamstrings');
+  /**
+   * ⛔⛔ THE REVERSE HYPERS ARE GLUTES NOW (2026-08-31) — ruled from field sources and applied once
+   * the screen freeze that was blocking it came down. Torso fixed, legs swinging: hip extension from
+   * a hanging start, glutes working and hamstrings assisting. **This line asserted `hamstrings` and
+   * is inverted deliberately, not relaxed.**
+   * ⚠️ AND `back extension` ABOVE IS THE CONTROL THAT MAKES IT A NARROW FIX rather than a family
+   * retag — feet planted, hamstrings lengthening, still hamstrings. The new rule matches on
+   * `reverse hyper` and sits above the hinge sweep; everything else in that family is untouched.
+   */
+  assertEquals(musclesWorkedBy('reverse hyperextension')?.primary, 'glutes');
+  assertEquals(musclesWorkedBy('reverse hyper')?.primary, 'glutes');
+  assertEquals(musclesWorkedBy('weighted reverse hyper')?.primary, 'glutes');
+  // ⚠️ THE REST OF THE HINGE FAMILY DID NOT MOVE WITH THEM.
+  assertEquals(musclesWorkedBy('good morning')?.primary, 'hamstrings');
+  assertEquals(musclesWorkedBy('stiff leg deadlift')?.primary, 'hamstrings');
   // The hinge/glute split either side of it.
   assertEquals(musclesWorkedBy('hip thrust')?.primary, 'glutes');
   assertEquals(musclesWorkedBy('romanian deadlift')?.primary, 'hamstrings');

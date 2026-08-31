@@ -354,13 +354,29 @@ Deno.test('the week-wide pick dedup reads canonically too', () => {
    * slot that used to resolve to the split squat now takes the next option instead. The week is
    * supposed to change here; what it must not do is print the lift twice.
    */
+  /**
+   * ⚠️⚠️ ONE ASSERTION INVERTED (2026-08-31), AND THE TEST'S OWN STALENESS GUARD IS WHAT CAUGHT IT.
+   *
+   * It asserted that the UN-picked week already carries the split squat, and it does not any more:
+   * the his-before-ours sort is no longer fenced off this frame, so that cell now builds the page's
+   * own printed movement and the split squat — a substitute — is not reached. The guard fired
+   * exactly as written: *"the un-picked week no longer carries the split squat — this test is now
+   * stale."*
+   *
+   * ⛔ SO THE CASE IS NOW THE STRONGER ONE, not a weaker one. The pick names a movement the week
+   * would NOT otherwise build, in a PLURAL spelling of a singular catalogue entry — so it still
+   * proves canonical matching, it still proves the pick reaches the week, and it now also proves a
+   * pick can put a movement in that the ranking would never have chosen. **That is what an athlete's
+   * pick is for.** ⚠️ Exactly once remains the point: honouring a pick must not print it twice.
+   */
   const withPick = rows(week({ equipment: HOME_GYM, picks: ['Bulgarian Split Squats'] }))
     .flatMap((s) => s.names).map(canonicalize);
   const without = rows(week({ equipment: HOME_GYM })).flatMap((s) => s.names).map(canonicalize);
   const key = canonicalize('bulgarian split squat');
   assertEquals(withPick.filter((c) => c === key).length, 1);
-  assert(without.filter((c) => c === key).length >= 1,
-    'the un-picked week no longer carries the split squat — this test is now stale');
+  assertEquals(without.filter((c) => c === key).length, 0,
+    'the un-picked week carries the split squat again — the pick no longer proves it was the ATHLETE '
+    + 'that put it there, and this test is back to proving less than it says');
   assert(JSON.stringify(withPick) !== JSON.stringify(without),
     'honouring the pick changed nothing about the week — the pick did not reach it');
 });

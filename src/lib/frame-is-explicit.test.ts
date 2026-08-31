@@ -278,9 +278,33 @@ Deno.test('⛔⛔⛔ EVERY PICK STANDARD FOCUS DRAWS ACTUALLY LANDS IN THE COMPO
 
   let checked = 0;
   for (const key of drawn) {
-      const options = pickOptions(key, ['Commercial gym'], frameMuscleForPick(key, 'all_rounder'))
-      .map((o) => o.name);
+      /**
+       * ⛔⛔ THE ADMITTED MOVEMENTS ARE PASSED HERE TOO (2026-08-31). This swept with three arguments
+       * and the screen did the same, so **the sweep reproduced the screen's own bug instead of
+       * catching it** — p223's hip-thrust exception reached the composer and never reached the
+       * picker, and a sweep written against the same three arguments could not see the difference.
+       */
+      const options = pickOptions(
+        key, ['Commercial gym'],
+        frameMuscleForPick(key, 'all_rounder'), frameAdmitsForPick(key, 'all_rounder'),
+      ).map((o) => o.name);
     assert(options.length >= 1, `${key} is drawn with no movements at all`);
+    /**
+     * ⛔⛔ AND WHICH CELLS HAVE ONLY ONE ANSWER IS PINNED, NOT LEFT SILENT (2026-08-31).
+     *
+     * Michael ruled on the endurance rows that a control with one option is not a choice, and the
+     * same is true of a pick cell. The difference is the REASON: `quad_iso` has one answer because
+     * a commercial gym has exactly one quadriceps isolation machine — that is the world, not a
+     * wiring fault — whereas `ham_iso` had one answer because the screen was dropping p223's
+     * admitted movements, which was a fault and is fixed above.
+     * ⚠️ SO THIS PINS THE LIST RATHER THAN BANNING THE SHAPE. A cell that newly falls to one option
+     * fails here and has to be explained before it ships; whether a one-answer cell should render as
+     * a FACT instead of a picker is a screen ruling nobody has made.
+     */
+    if (options.length < 2) {
+      assertEquals(key, 'quad_iso',
+        `${key} fell to ${options.length} option(s) — only the quad cell is known to have one answer`);
+    }
     const wantDays = (dayLabelForPick(key, 'all_rounder') ?? '')
       .split(' · ').map((d) => Number(d.replace('day ', ''))).filter((n) => Number.isFinite(n));
     assert(wantDays.length > 0, `${key} advertises no day`);
