@@ -75,7 +75,7 @@ Deno.test('⛔ THE LOGGER SPLITS ON THAT MARKER, AND ONLY THE LAUNCHER REPLACES 
    */
   const src = await Deno.readTextFile(
     new URL('../../../../src/components/StrengthLogger.tsx', import.meta.url));
-  assert(/const isTestedLift = \(ex: any\): boolean =>/.test(src),
+  assert(/const isTestedLift = \(ex: Record<string, unknown>\): boolean =>/.test(src),
     'the retest branch stopped splitting tested lifts from accessories — a calf raise gets a ramp again');
   assert(/if \(!name\.includes\('baseline test'\)\) return null;/.test(src),
     '⛔ `getBaselineTestType` matches the plan\'s "Test: Upper" again — that branch REPLACES the '
