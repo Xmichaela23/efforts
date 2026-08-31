@@ -16,6 +16,8 @@
 // ============================================================================
 
 import type { EnduranceSession, FamilyId } from '../endurance-library/index.ts';
+// ⛔ THE SOURCE'S OWN CLASSIFICATION — see `ENDURANCE_CLASS`, and see the tag list below.
+import { ENDURANCE_CLASS, classToken } from '../endurance-library/index.ts';
 
 /** The `type` field on a plan row. Unchanged vocabulary. */
 export type SessionType = 'run' | 'ride' | 'swim' | 'strength';
@@ -319,7 +321,24 @@ export function translateEnduranceSession(
   const sport = sportForFamily(session.family);
   const { pre, post } = wrapperTokens(session, sport);
   const totalMin = minutes(session.totals.clockedSeconds);
-  const tags = ['standing_plan', `family:${session.family}`, `level:${session.level}`, `sport:${sport}`];
+  /**
+   * ⛔⛔ THE SOURCE'S OWN CLASSIFICATION RIDES ON EVERY ENDURANCE SESSION (Michael, 2026-08-31) —
+   * see `ENDURANCE_CLASS`. Two tokens, answering two different questions:
+   *   · `intensity:` — HIS name for this session type, in the short form his programme tables print
+   *     (`mlss+`, `nt`, `cyc_ana`, `lsd`). The family id is the app's key and the family's `label` is
+   *     the field's plain word; neither is his vocabulary, and a reader wanting to reason about a
+   *     week in his terms had nothing to read.
+   *   · `band:` — where it sits relative to threshold, **ours**, derived from the page's own numbers.
+   * ⚠️ ADDITIVE. Nothing is renamed and nothing is removed — `family:`, `level:` and `sport:` are
+   * untouched, so every existing reader is unaffected and a tag list only ever grew.
+   * ⚠️ AND THIS FILE TAKES NO PLACEMENT DECISION. It stores the fact; what may sit beside what is
+   * p130-131's question, and the corpus records that the session-order pages do NOT answer it.
+   */
+  const klass = ENDURANCE_CLASS[session.family];
+  const tags = [
+    'standing_plan', `family:${session.family}`, `level:${session.level}`, `sport:${sport}`,
+    `intensity:${classToken(session.family)}`, `band:${klass.band}`,
+  ];
   let work: string[];
 
   switch (session.family) {

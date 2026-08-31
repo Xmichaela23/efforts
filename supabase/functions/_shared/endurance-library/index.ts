@@ -13,3 +13,4 @@ export * from './types.ts';
 export * from './source-rules.ts';
 export * from './anchors.ts';
 export * from './generate.ts';
+export * from './classification.ts';
