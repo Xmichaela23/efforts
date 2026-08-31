@@ -21,8 +21,9 @@ import {
   type EnduranceBaselines,
   type Level,
 } from '../endurance-library/index.ts';
-import { bandRouteName, prescribe, resolveSlot, viadaCategoryOf, type ViadaPattern
-} from '../strength-grid/index.ts';
+import { bandRouteName, isAsymmetrical, isBodyweightLoad, prescribe, resolveSlot, viadaCategoryOf,
+  type ViadaPattern } from '../strength-grid/index.ts';
+import { ownsLoadingImplement } from '../../../../src/lib/strength-gear.ts';
 import {
   HOLD_PRESCRIPTION,
   fillMuscleFloor,
@@ -40,6 +41,7 @@ import {
   chipForMuscle,
   isDialChip,
   musclesForChips,
+  movementLabel,
   pickKeyForSlot,
   VIADA_PICKS,
   type ViadaPickKey,
@@ -1133,11 +1135,71 @@ function exerciseForSlot(
        * every fresh one, his or ours — which is the same rule the selection below applies, moved
        * early enough to matter.
        */
-      const rank = (name: string) =>
-        (isTaken(name) ? 2 : 0) + (his.has(canonicalize(name)) ? 0 : 1);
+      /**
+       * ⛔⛔ THE DAY'S ASYMMETRICAL ROW OWNS THE SINGLE-LEG PATTERN, and no other row borrows it
+       * (2026-08-31, from Michael's own export).
+       *
+       * ⛔ WHAT HE READ. p274 day 5 printed as: **Back Squat · back extension · bulgarian split
+       * squat · walking lunge · reverse lunge** — three single-leg movements in a five-row day, and
+       * only the last of the three is the row that ASKED for one.
+       *
+       * ⛔ THE CAUSE IS SUBSTITUTION, NOT THE PAGE. p221's braced push lower is *hack squat · leg
+       * press · lever squat* and its focused push lower is *leg extensions · hip adduction machine ·
+       * weighted knee raises · seated calf raises*. Every one of those is a machine. At a barbell
+       * kit BOTH cells fall through to the substitute ladder, and the ladder's quad answers are
+       * lunges — so two independent cells land on the same pattern as each other and as the SKILL
+       * row beside them. Nothing was mis-ranked; the same correct answer was given three times.
+       *
+       * ⛔ HIS OWN RULE IS WHY THE ASYMMETRICAL ROW WINS THE TIE. p275: *"if you want to incorporate
+       * more asymmetrical movements, I encourage you to select those for the secondary movements"* —
+       * asymmetry belongs on the rows designated for it. A day that already designates one does not
+       * need its braced and focused cells to volunteer more.
+       *
+       * ⚠️ **OURS, AND IT IS A SORT, NOT A FILTER** — the same discipline as his-movements-first
+       * above. A day whose only reachable quad movements are single-leg still builds them; they just
+       * go behind any bilateral option. And it is inert on a machine kit, where the cells reach his
+       * printed movements and never consult the ladder at all.
+       * ⚠️ IT READS THE FRAME, NOT `takenToday`. The asymmetrical row is LAST on day 5, so at the
+       * time the braced cell resolves nothing single-legged has been spent yet — a check against
+       * what the day has already taken would see an empty set and do nothing.
+       */
+      const dayReservesAsymmetry = !slot.asymmetrical
+        && frameDay != null
+        && (FRAMES[args.frame].columns[args.column] ?? [])
+          .find((d) => d.day === frameDay)?.strength
+          .some((s) => s.asymmetrical === true) === true;
+
+      /**
+       * ⛔⛔ AND THE BODYWEIGHT DEMOTION IS CARRIED, NOT ASSUMED — measured, 2026-08-31.
+       *
+       * `strength-grid/grid.ts:172` already sorts bodyweight movements behind loaded ones for an
+       * athlete who owns something to load with, so `resolved.options` ARRIVES in that order and
+       * every re-sort here has to preserve it. The first cut of the asymmetry rule above did not: it
+       * ranked only on `[taken, notHis, asymRedundant]`, and a bodyweight squat scored better than a
+       * Bulgarian split squat on the asymmetry key alone. **His day 5 went from three lunges to
+       * `Bodyweight Squat · Air Squat · Bulgarian Split Squat`** — a strictly worse day, and the
+       * whole reason a composed probe was run instead of trusting a green suite.
+       *
+       * ⚠️ IT SITS ABOVE THE ASYMMETRY KEY DELIBERATELY. A loaded single-leg movement beats an
+       * unloaded bilateral one; avoiding a repeated pattern is a preference, and putting load in a
+       * volume cell is closer to a rule (REFERENCE §3).
+       */
+      const demoteBodyweight = ownsLoadingImplement(args.equipment ?? null);
+
+      const rank = (name: string): number[] => [
+        isTaken(name) ? 1 : 0,
+        his.has(canonicalize(name)) ? 0 : 1,
+        demoteBodyweight && isBodyweightLoad(name) ? 1 : 0,
+        dayReservesAsymmetry && isAsymmetrical(name) ? 1 : 0,
+      ];
       resolved.options = resolved.options
         .map((o, i) => ({ o, i, r: rank(o.name) }))
-        .sort((a, b) => (a.r === b.r ? a.i - b.i : a.r - b.r))
+        .sort((a, b) => {
+          for (let k = 0; k < a.r.length; k++) {
+            if (a.r[k] !== b.r[k]) return a.r[k] - b.r[k];
+          }
+          return a.i - b.i;
+        })
         .map(({ o }) => o);
     }
   }
@@ -1400,7 +1462,7 @@ function exerciseForSlot(
   if (!working || pct == null) {
     return {
       exercise: {
-        name: movement,
+        name: rowDisplayName(movement, slot),
         sets,
         reps,
         weight: 'By feel',
@@ -1589,7 +1651,7 @@ function exerciseForSlot(
 
   return {
     exercise: {
-      name: movement,
+      name: rowDisplayName(movement, slot),
       sets,
       reps,
       weight,
@@ -1943,6 +2005,39 @@ export function sessionCueFor(day: FrameDay): string {
  * itself writes. ⚠️ Deliberately narrow: it matches only those two generated names and answers null
  * for anything else, so it can never quietly classify a transcribed day.
  */
+/**
+ * ⛔ THE MOVEMENT IS TITLE-CASED ON THE ROW ITSELF (2026-08-31).
+ *
+ * Michael's own export, the morning he started the block: *"hip thrust"*, *"pull up"*, *"rear delt
+ * machine"*, *"bulgarian split squat"* — every accessory in lower case beside a capitalised *"Bench
+ * Press"*. The picker screen has read `movementLabel` since it was built; the PLAN ROW printed the
+ * raw catalogue key, so the same movement read two ways on two screens.
+ *
+ * ⛔⛔ WHY THIS IS SAFE TO DO TO `name`, WHICH §12b OTHERWISE FORBIDS TOUCHING. That rule is about
+ * RENAMING — changing the words unmatches every set already logged against the old spelling. Case is
+ * not the words. **All three name matchers in this app lowercase before they compare**, verified
+ * rather than assumed: `_shared/canonicalize.ts:147` (`raw.toLowerCase().trim()`),
+ * `src/lib/exercise-config.ts:3795` (`normalizeLiftKey`) and `src/lib/exercise-role.ts:35`
+ * (`canonical`). So `Hip Thrust` and `hip thrust` are the same row to every reader, and no logged
+ * set is orphaned.
+ * ⚠️ THE ONE CASE-SENSITIVE LOOKUP IN THE APP is `ExerciseLibrary.getStrengthExerciseByName`, and it
+ * has no caller on this path. Adding one that takes a plan row's `name` would reintroduce the risk.
+ * ⚠️ AND IT IS DONE HERE, AT THE ONE PLACE THE ROW IS BUILT, rather than in each display surface —
+ * about twenty components read `.name`, and a fix applied per-surface is a fix that goes stale on
+ * the twenty-first.
+ * ⚠️ `movementLabel` is the PICKER's own title-caser, reused rather than reimplemented, so a
+ * movement cannot read one way in the dropdown and another in the plan. It already knows the
+ * acronyms that must not be title-cased.
+ *
+ * ⛔⛔ AND IT IS ACCESSORIES ONLY. A COMPETITION ROW KEEPS THE ATHLETE'S OWN SPELLING, because that
+ * name is theirs — `competitionLifts` is what they called the lift when they set it up, and the
+ * derived-load note already quotes it back to them verbatim. Title-casing it would silently rewrite
+ * an athlete's own word. His export shows the split cleanly: *"Bench Press"*, *"Back Squat"* and
+ * *"Deadlift"* were already right, and every lower-case row in it was an accessory.
+ */
+function rowDisplayName(movement: string, slot: StrengthSlot): string {
+  return slot.role === 'competition' ? movement : movementLabel(movement);
+}
 function testRegionOf(name: string): 'upper' | 'lower' | null {
   if (/^test:\s*upper$/i.test(name.trim())) return 'upper';
   if (/^test:\s*lower$/i.test(name.trim())) return 'lower';
@@ -3046,9 +3141,13 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       {
         // ⛔ THE FLOOR'S OWN PICKS GET THE SAME BAND LABEL as a slot's — see `bandRouteName`. The
         // athlete's own pick keeps their spelling.
-        name: add.fromAthletePick
-          ? (picks.byFold.get(canonicalize(add.movement)) ?? add.movement)
-          : bandRouteName(add.movement, args.equipment ?? null),
+        // ⚠️ TITLE-CASED LIKE EVERY OTHER ROW — the floor's picks were the "hanging leg raise" and
+        // "calf raise" in his export. See the note on `movementLabel` above.
+        name: movementLabel(
+          add.fromAthletePick
+            ? (picks.byFold.get(canonicalize(add.movement)) ?? add.movement)
+            : bandRouteName(add.movement, args.equipment ?? null),
+        ),
         sets: add.sets,
         // ⛔ A HOLD DOES NOT GET REPS (2026-08-24, seen on a device as "Plank — 3 x 8-10"). The row
         // is dosed in sets either way; what changes is the unit of the second number, and
