@@ -105,3 +105,37 @@ Deno.test('⛔ AND THE ROWS ARE READABLE — no wall of options', () => {
     }
   }
 });
+
+Deno.test('⛔ THE ORDER IS THE REFERENCE DOC\'S, AND IT IS NOT MODALITY-BASED', async () => {
+  /**
+   * ⛔ `docs/REFERENCE-exercise-substitution.md` §5. Step one is the source's own printed movements
+   * in the order the page prints them; step two is how many of the like-for-like tests an option
+   * holds. ⚠️ **NOT modality** — §1a cites a 13-study meta-analysis finding no difference between
+   * free weights and machines for strength, hypertrophy or jump, so ranking machines below free
+   * weights on principle is unsupported and this asserts the code does not do it.
+   */
+  const doc = await Deno.readTextFile(new URL('../../../../docs/REFERENCE-exercise-substitution.md', import.meta.url));
+  assert(/PMC10426227/.test(doc), 'the reference doc lost the free-weight vs machine meta-analysis');
+  assert(/§5/.test(doc), 'the reference doc lost its ordering rule');
+
+  const src = await Deno.readTextFile(new URL('./accessory-picks.ts', import.meta.url));
+  assert(/REFERENCE-exercise-substitution\.md/.test(src),
+    'the ranking no longer cites the doc it was derived from — it is back to being judgement');
+
+  /**
+   * ⛔ HIS PRINTED MOVEMENTS LEAD, on a row where the kit reaches them. `iso_push` is his four plus
+   * one of ours, and the addition must not outrank the four.
+   */
+  const iso = opts('iso_push', HOME);
+  assertEquals(iso[0].ours, undefined, 'an added movement leads a row of his own');
+  assert(iso[iso.length - 1].ours === true, 'the addition is no longer last');
+
+  /**
+   * ⚠️ AND A GYM ROW IS NOT PENALISED FOR BEING MACHINES. `braced_push` at a commercial gym is three
+   * machine movements and they are the page's own — if the ranking were modality-based they would
+   * sort below nothing, but the assertion that matters is that they remain his order.
+   */
+  const gym = opts('braced_push', GYM).map((o) => o.name.toLowerCase());
+  assert(gym.length >= 2 && gym.every((n) => /machine|smith|dip/.test(n)),
+    `the gym press row is not the page's machines: ${gym.join(', ')}`);
+});

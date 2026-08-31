@@ -1343,9 +1343,47 @@ export function pickOptions(
     return !(dropBodyweight && isBodyweightLoad(m.name));
   });
   const leadKeys = spec.leadWith.map((n) => canonicalize(n));
+  /**
+   * ⛔⛔⛔ THE ORDER A ROW READS IN — `docs/REFERENCE-exercise-substitution.md` §5, and every step of
+   * it is cited there rather than chosen here.
+   *
+   * ⛔ 1. THE SOURCE'S OWN PRINTED MOVEMENTS FOR THIS CELL, in the order the page prints them. That
+   *    is `leadWith`, and it was already the whole of this function — nothing in the literature
+   *    outranks the programme being followed.
+   * ⛔ 2. THEN HOW MANY OF THE LIKE-FOR-LIKE TESTS THE OPTION HOLDS (§1e): same prime mover, same
+   *    pattern, then stability. A substitute that keeps the stability demand ranks above one that
+   *    changes it — the change is legitimate (§1a) and it is still a bigger change.
+   * ⚠️ 3. AND THE RANKING IS **NOT** MODALITY-BASED, which §1a rules out explicitly: a 13-study
+   *    meta-analysis found no difference between free weights and machines for strength, hypertrophy
+   *    or jump. **At a gym the machine is not a downgrade; at home the free weight is not a
+   *    compromise.** What ranks is the tests held FOR THIS ATHLETE'S KIT.
+   * ⚠️ THE FIELD RANKS NOTHING FOR US — §2b: no source found ranks candidate substitutes for a cell.
+   * The literature justifies HAVING an order and supplies the axes; the order itself is ours and the
+   * doc says so.
+   */
+  const cellPattern = spec.slot?.pattern ?? null;
+  const stabilityOf = (name: string): 'supported' | 'free' => (
+    /\b(machine|smith|cable|pulldown|pec deck|press machine|hack squat|leg press|lever)\b/i.test(name)
+      ? 'supported'
+      : 'free'
+  );
+  /** ⛔ THE CELL'S OWN STABILITY, taken from the movements the page prints for it — not assumed. */
+  const cellStability = (() => {
+    const printed = (spec.hisList ?? []).map((n) => stabilityOf(n));
+    if (printed.length === 0) return null;
+    const supported = printed.filter((x) => x === 'supported').length;
+    return supported * 2 >= printed.length ? 'supported' : 'free';
+  })();
   const rank = (m: GridMovement): number => {
     const i = leadKeys.indexOf(canonicalize(m.name));
-    return i === -1 ? leadKeys.length : i;
+    // ⛔ STEP 1 — his printed movements, in his order, always first.
+    if (i !== -1) return i;
+    // ⛔ STEP 2 — then the like-for-light tests, most held first. The base keeps every one of his
+    // ahead of every substitute, whatever the substitute holds.
+    let penalty = leadKeys.length;
+    if (cellPattern && (m as { pattern?: string }).pattern && (m as { pattern?: string }).pattern !== cellPattern) penalty += 2;
+    if (cellStability && stabilityOf(m.name) !== cellStability) penalty += 1;
+    return penalty;
   };
   /**
    * ⛔⛔⛔ THE MUSCLE NARROWING, AND ITS EQUIPMENT SUBSTITUTION (Michael, 2026-08-30).
