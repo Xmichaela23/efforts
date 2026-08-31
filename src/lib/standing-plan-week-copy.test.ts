@@ -13,8 +13,10 @@ import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.t
 // the whole file down instead of naming what came back.
 import * as api from './standing-plan-week-copy.ts';
 import { voiceViolation } from '../../supabase/functions/_shared/state-trend/week-accent.ts';
-import { SLOT_FAMILY, SLOT_FRAME_KEY, boundsLine, slotsForEngine, weekBounds } from './standing-plan-week-bounds.ts';
+import { SLOT_FAMILY, SLOT_FRAME_KEY, slotsForEngine, weekBounds } from './standing-plan-week-bounds.ts';
 import { sessionDurationBandSeconds } from '../../supabase/functions/_shared/endurance-library/index.ts';
+import { resolveEnduranceAnchors } from '../../supabase/functions/_shared/endurance-library/anchors.ts';
+import { weekVolumeBounds, type SlotSpec } from '../../supabase/functions/_shared/standing-plan/volume-bounds.ts';
 import {
   ENDURANCE_WEEK_HEADER,
   LIFTING_RATE_TIERS_ARE_OURS,
@@ -460,15 +462,33 @@ Deno.test('the bounds round OUTWARD — a cap that rounds in is a cap that lies'
   assert(b.runMiles);
   // ⛔ AGAINST THE RAW ARITHMETIC, not against its own rounding. `min === floor(min)` is true of a
   // ceiled integer too, which is why the first version of this test survived the mutation.
-  let rawShort = 0;
+  /**
+   * ⚠️ THE FLOOR'S BASELINE CHANGED 2026-08-30, THE RULE DID NOT. This compared the returned floor
+   * against the sum of each session's SHORTEST BUILDABLE form. That is no longer what the floor
+   * means: Michael ruled one floor and it is the BUILDER'S — the shortest week the engine will
+   * actually produce (`weekVolumeBounds`), not the shortest the sessions could take. Comparing
+   * against the old quantity was comparing two different weeks and calling the gap a rounding error,
+   * which is the exact mistake this test's own note warns about one paragraph up.
+   * ⛔ THE RULE UNDER TEST IS STILL "FLOOR THE FLOOR, CEIL THE CAP", asserted against the arithmetic
+   * the floor is now made of.
+   */
   let rawLong = 0;
+  const floorSpecs: SlotSpec[] = [];
   for (const key of Object.keys(SLOT_FRAME_KEY) as (keyof typeof SLOT_FRAME_KEY)[]) {
     const band = sessionDurationBandSeconds(SLOT_FAMILY[key].family, SLOT_FAMILY[key].level, {
       baselines: BASELINES as never,
     });
-    rawShort += band.shortest;
     rawLong += band.longest;
+    floorSpecs.push({
+      family: SLOT_FAMILY[key].family,
+      level: SLOT_FAMILY[key].level,
+      // ⚠️ THE FRAME'S OWN SHAPE, because the ladder's floor depends on it — `run_lsd`'s inserts
+      // move the number. Omitting it compares against a session the week does not build.
+      archetype: frameSlots('strength_5k').find((x) => x.key === key)?.archetype,
+      sport: 'run',
+    } as SlotSpec);
   }
+  const rawShort = weekVolumeBounds(floorSpecs, resolveEnduranceAnchors(BASELINES as never)).run.floor * 3600;
   assert(b.runMiles!.min <= rawShort / PACE + 1e-9,
     `the floor rounded IN: ${b.runMiles!.min} > ${(rawShort / PACE).toFixed(2)}`);
   assert(b.runMiles!.max >= rawLong / PACE - 1e-9,
@@ -494,7 +514,6 @@ Deno.test('no easy pace on file means no running cap — never one computed off 
     baselines: BASELINES as never, easyPaceSecPerMi: null,
   });
   assert(rides.rideHours, 'the ride cap vanished with the run pace');
-  assertEquals(boundsLine(null, 'miles a week'), null);
 });
 
 Deno.test('a slot the athlete did not answer keeps the frame\'s own session', () => {

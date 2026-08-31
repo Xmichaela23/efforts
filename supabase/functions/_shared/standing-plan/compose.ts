@@ -2638,6 +2638,42 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     }
   }
 
+  /**
+   * ⛔⛔ AND THE SAME SENTENCE FOR THE OTHER DIRECTION (Michael, 2026-08-30). `sizeSolve` has always
+   * returned `under_floor` and **its only reader was a comment** — so an athlete asking for FEWER
+   * hours than the week's own sessions hold was bumped up to the floor with nothing said. Measured
+   * at four hours of riding on p274's week, which builds 4h15.
+   *
+   * ⛔ IT IS THE OVER-ASK'S TWIN AND READS AS ONE FEATURE: same shape, same voice, both numbers
+   * named. What it does NOT carry is the over-ask's closing advice — there is no day to add, because
+   * the sessions themselves are the floor and the only way under it is a shorter programme.
+   *
+   * ⚠️ AND IT IS NOT GATED ON A STATED DAY COUNT, unlike the over-ask above. The over-ask only
+   * happens when a day count caps the week; the under-ask happens whenever the hours land below what
+   * the frame's own sessions hold, which needs no day count at all.
+   * ⚠️ THE HOURS CONTROL STAYS UNFILTERED (Michael's own ruling, recorded on the dropdown): an ask
+   * under the week's fixed sessions simply builds those sessions. This makes that honest; it does
+   * not prevent the ask.
+   */
+  if (args.column === 'standard') {
+    for (const sport of ['run', 'ride'] as const) {
+      const solved = sport === 'run' ? volume.run : volume.ride;
+      if (solved.verdict !== 'under_floor') continue;
+      const askedHours = Number(
+        sport === 'run' ? args.targetRunHours : (args.targetRideHours ?? args.targetWeeklyRideHours),
+      );
+      if (!Number.isFinite(askedHours) || !Number.isFinite(solved.expected)) continue;
+      // ⚠️ THE SAME QUARTER-HOUR DEAD BAND THE OVER-ASK USES — a rounding-sized gap is not news.
+      if (solved.expected - askedHours <= 0.25) continue;
+      notes.push({
+        kind: 'warning',
+        text: `You asked for ${sayHours(askedHours)} of ${sport === 'run' ? 'running' : 'riding'}. `
+          + `This week's ${sport === 'run' ? 'runs' : 'rides'} hold ${sayHours(solved.expected)}, `
+          + `so the week builds that.`,
+      });
+    }
+  }
+
   // ── accessories: stage 3's floor, over the WHOLE week ─────────────────────────────────────────
   //
   // ⛔ THE LEDGER SEES THE STRENGTH SETS TOO. p147 puts high-intensity work sets from strength work

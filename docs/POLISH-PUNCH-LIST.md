@@ -989,6 +989,13 @@ Moved off the queue. Do not re-open without new evidence.
   missing.
 
 
+- **The endurance screen asks in HOURS and answers in MILES for running.** The volume control is a
+  dropdown of whole hours for both sports; the run band it is measured against is expressed in miles,
+  converted through the athlete's own easy pace (`weekBounds.runMiles`). The two agree numerically —
+  2 hours is about 13 miles at a 9:00 easy pace, inside a 7-14 band — but one screen asking a
+  question in one unit and answering in another is a real friction. Michael, 2026-08-30, on seeing
+  it: not tonight. ⚠️ The RIDE side is hours throughout, so this is a run-only mismatch.
+
 # SHELVED 2026-08-30 — open items on Strength + 5K, and which ones follow you into the All Rounder
 
 ⛔ **FOUR OF THESE SIX ARE NOT 5K-SPECIFIC.** They live in the materializer, the volume solver and the

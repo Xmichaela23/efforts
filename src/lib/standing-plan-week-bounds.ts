@@ -227,13 +227,30 @@ export function weekBounds(
   const levelFor = (family: string, frameLevel: Level): Level =>
     // ⛔ SAME BIKE CEILING THE COMPOSER APPLIES — see `clampRideLevel`.
     clampRideLevel(family, (tierLevels[family] as Level | undefined) ?? frameLevel);
-  let runShort = 0;
   let runLong = 0;
-  let rideShort = 0;
   let rideLong = 0;
   let anyRun = false;
   let anyRide = false;
   let isLowerBound = false;
+  /**
+   * ⛔⛔ ONE FLOOR, AND IT IS THE BUILDER'S (Michael, 2026-08-30). This function summed each
+   * session's SHORTEST BUILDABLE form — the fewest reps his own option set offers at that level —
+   * while `sizeSolve`, which the composer actually sizes against, sums each session's SIZING FLOOR.
+   * The two are different quantities and they disagreed by half an hour on p274's ride week: 3h46
+   * here against 4h15 there.
+   *
+   * ⛔ HIS RULING, AND THE REASON: *"a number the athlete is shown must be a number they can have."*
+   * 3h46 is the shortest form the sessions can take; 4h15 is what the engine produces. Quoting the
+   * first while building the second describes a week nobody receives. So the floor comes from the
+   * SAME function the composer sizes with, and the shortest-buildable sum is gone rather than kept
+   * in agreement — two derivations of one fact is the disease this file has spent the day removing.
+   * ⚠️ THE CEILING IS A DIFFERENT QUANTITY and is untouched: the most the week can hold really is
+   * the sum of the longest forms.
+   */
+  const specs: SlotSpec[] = [];
+  /** ⚠️ THE FRAME'S OWN SHAPE for a run slot — the composer rotates when the frame names none. */
+  const frameShape = (key: SlotKey): string | undefined =>
+    frameSlots(frame).find((x) => x.key === key)?.archetype;
 
   for (const key of Object.keys(families) as SlotKey[]) {
     const base = families[key];
@@ -252,21 +269,29 @@ export function weekBounds(
         baselines: opts.baselines,
         archetype: eq.archetype,
       });
-      rideShort += band.shortest;
       rideLong += band.longest;
       isLowerBound = isLowerBound || band.isLowerBound;
       anyRide = true;
+      specs.push({
+        family: eq.family, level: levelFor(eq.family, base.level), archetype: eq.archetype, sport: 'ride',
+      } as SlotSpec);
     } else {
       const band = sessionDurationBandSeconds(base.family, levelFor(base.family, base.level), {
         baselines: opts.baselines,
       });
-      runShort += band.shortest;
       runLong += band.longest;
       isLowerBound = isLowerBound || band.isLowerBound;
       anyRun = true;
+      specs.push({
+        family: base.family, level: levelFor(base.family, base.level), archetype: frameShape(key), sport: 'run',
+      } as SlotSpec);
     }
   }
 
+  /** ⛔ THE COMPOSER'S OWN FLOOR, in hours — see the note above. */
+  const floors = weekVolumeBounds(specs, anchors);
+  const runShort = floors.run.floor * 3600;
+  const rideShort = floors.ride.floor * 3600;
   const pace = Number(opts.easyPaceSecPerMi);
   const paceOk = Number.isFinite(pace) && pace > 0;
   return {
@@ -495,8 +520,11 @@ export const RUN_MILES_BLOCK_CAP = 20;
  *  the link lights up when the endurance-leading frame ships. */
 export const OVER_CAP_LINE = 'Above 20 miles a week, running leads. That\'s a different block — coming.';
 
-/** The sentence under a bounded input. ⚠️ States the cap as a fact, never as a refusal. */
-export function boundsLine(b: { min: number; max: number } | null, unit: string): string | null {
-  if (!b) return null;
-  return `This week holds ${b.min} to ${b.max} ${unit}.`;
-}
+/**
+ * ⛔⛔ `boundsLine` IS DELETED (2026-08-30). It wrote "This week holds X to Y" and **had no caller
+ * anywhere in the app** — the endurance card never printed the bounds, it only asks whether a sport
+ * has hours worth a question. A sentence nobody renders is a second statement of the week's floor
+ * waiting to disagree with the composer's, which is the fault this pass exists to close.
+ * ⚠️ THE BOUNDS THEMSELVES ARE STILL COMPUTED and still used — for that presence test and for
+ * `isLowerBound`. It is the unrendered SENTENCE that goes.
+ */
