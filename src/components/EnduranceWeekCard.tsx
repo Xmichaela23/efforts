@@ -142,7 +142,13 @@ export type EnduranceWeekCardProps = {
   /** ⚠️ WIDENED FOR THE LONG SLOT (slice 2b) — the club toggle is not hard-only. */
   // ⚠️ ANY SLOT KEY — the frame owns how many quality rows there are (`HARD_SLOT_KEYS`), so a
   // three-value union here would silently drop the third row's flavour.
-  renderHardFlavor?: (key: SlotKey) => React.ReactNode;
+  /**
+   * ⛔ THE SECOND ARGUMENT CLOSES THE ROW (Michael, off the screen 2026-08-31: picking a workout
+   * should collapse it). The open row is this card's own state, so the body cannot close itself —
+   * it is handed the gesture rather than the state. ⚠️ Optional to call: the club toggle and the
+   * sport chips deliberately do NOT close, because both change the very list underneath them.
+   */
+  renderHardFlavor?: (key: SlotKey, ctl: { close: () => void }) => React.ReactNode;
   /** What the slot currently is, for the collapsed row. Hard slots only; others need no session. */
   /** ⚠️ ANY SLOT KEY — see `renderHardFlavor`. */
   hardSessionTitle?: (key: SlotKey) => string | null;
@@ -375,11 +381,17 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
            * ⛔ NO SPORT, NO COLOUR (Michael, 2026-08-24). A row the athlete has not answered carries
            * the neutral edge — the colour is what says "you chose this", so painting it before they
            * chose is the screen answering its own question.
-           * ⛔⛔ AND A FIXED ROW IS NEVER COLOURED, WHICH IS THAT SAME RULE RATHER THAN AN EXCEPTION
-           * TO IT: nobody chose it. Michael's word for how it should read is *"grey it like day
-           * 5/7"*, and the quiet rows are neutral for exactly this reason.
+           *
+           * ⛔⛔ A FIXED ROW **IS** COLOURED — MICHAEL, OFF THE SCREEN, 2026-08-31: *"day 2 should
+           * carry the bike colour on its edge like day 1 carries the run colour — a ride row reads as
+           * a ride at a glance."* This reverses the reading I shipped on 2026-08-31 morning, which
+           * took "grey it like day 5/7" to cover the edge as well as the type.
+           * ⚠️ IT IS NOT A BREAK IN THE 2026-08-24 RULE, it is a correction to what the rule is ABOUT.
+           * The colour answers *"what sport is this day"* — a fact — and greying answers *"is there a
+           * choice here"*. Days 5 and 7 are grey because they carry **no session at all**; day 2
+           * carries a ride, and the athlete reading the week needs to see a ride.
            */
-          const color = (!forced && sport) ? getDisciplineColor(SPORT_DISCIPLINE[sport]) : null;
+          const color = sport ? getDisciplineColor(SPORT_DISCIPLINE[sport]) : null;
           const isOpen = open === key;
           /**
            * ⛔ THE OPTIONS THIS ROW OFFERS RIGHT NOW — the frame's, minus anything the impact floor
@@ -710,7 +722,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                   {lengthPicker(key, lengths, picked, sport)}
 
                   {(isHard || key === 'long') && props.renderHardFlavor
-                    ? props.renderHardFlavor(key)
+                    ? props.renderHardFlavor(key, { close: () => setOpen(null) })
                     : null}
 
                 </div>

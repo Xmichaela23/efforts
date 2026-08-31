@@ -6155,7 +6155,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 : null;
               return variant ?? slotFamilyFact(hk, sport, wizardFrame)?.title ?? null;
             }}
-            renderHardFlavor={(key) => {
+            renderHardFlavor={(key, ctl) => {
               const sport = slotSportsNow[key];
               // ⛔ THE SESSION CHOICES APPEAR WITH THE SPORT — there is nothing to choose between
               // before one is picked, and two empty option lists is the form this screen stopped being.
@@ -6286,6 +6286,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   sport={sport}
                   value={{ archetype: (hardEntry(state, hk) as { archetype?: string } | undefined)?.archetype }}
                   takenByOtherSlot={variantsTakenBy(hk, sport, others, wizardFrame)}
+                  // ⛔ ANSWERING IS THE ONLY REASON THE ROW WAS OPEN — see `renderHardFlavor`.
+                  onPicked={ctl.close}
                   onChange={(patch) => setState((st) => {
                     if (!('archetype' in patch)) return st;
                     /**

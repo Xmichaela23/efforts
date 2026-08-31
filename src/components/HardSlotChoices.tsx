@@ -29,6 +29,14 @@ export type HardSlotChoicesProps = {
   sport: 'run' | 'ride';
   value: HardSlotValue;
   onChange: (patch: HardSlotValue) => void;
+  /**
+   * ⛔ THE ROW CLOSES WHEN A WORKOUT IS PICKED (Michael, off the screen 2026-08-31). Answering is the
+   * only reason the row was open, so leaving it open makes the athlete find the chevron to undo a
+   * gesture they already completed. ⚠️ THE SPORT CHIPS AND THE CLUB TOGGLE DO NOT FIRE IT — a sport
+   * change re-populates the very list underneath it, and closing on that would hide the consequence
+   * of the tap.
+   */
+  onPicked?: () => void;
   /** ⛔ `hard1` / `hard2` — the frame's two hard slots are POSITIONAL and carry different sessions. */
   /**
    * ⛔ WIDENED FOR THE LONG SLOT (slice 2b, 2026-08-25). Club is a property of a session whose day
@@ -101,13 +109,25 @@ export default function HardSlotChoices(props: HardSlotChoicesProps) {
                   disabled={taken}
                   aria-disabled={taken}
                   data-testid={`hard-${props.slotKey}-variant-${v.id || 'engine'}`}
-                  onClick={() => { if (!taken) props.onChange({ archetype: v.id || undefined }); }}
-                  className="w-full text-left px-2.5 py-2 rounded-xl border text-sm"
+                  onClick={() => {
+                    if (taken) return;
+                    props.onChange({ archetype: v.id || undefined });
+                    props.onPicked?.();
+                  }}
+                  /**
+                   * ⛔⛔ IT HAS TO READ AS TAPPABLE (Michael, off the screen 2026-08-31: *"the three
+                   * variant rows don't look tappable — they read as labels"*). They always WERE
+                   * buttons; at a 12%-opacity border on a 2%-opacity fill they looked like text.
+                   * ⚠️ NO NEW VISUAL LANGUAGE — this is the SPORT CHIP's own treatment from the row
+                   * above (`EnduranceWeekCard`): a visible border, a real fill, and full-strength
+                   * text, with the selected state carrying the sport colour exactly as those do.
+                   */
+                  className="w-full text-left px-3 py-2.5 rounded-xl border text-sm transition-colors"
                   style={on
-                    ? { borderColor: color, backgroundColor: `${color}1F`, color: '#fff' }
+                    ? { borderColor: color, backgroundColor: `${color}29`, color: '#fff' }
                     : taken
                       ? { borderColor: 'rgba(255,255,255,0.06)', backgroundColor: 'transparent', color: 'rgba(255,255,255,0.30)', cursor: 'not-allowed' }
-                      : { borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(255,255,255,0.02)', color: 'rgba(255,255,255,0.70)' }}
+                      : { borderColor: 'rgba(255,255,255,0.22)', backgroundColor: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.92)' }}
                 >
                   <span className="block">
                     {v.label}
