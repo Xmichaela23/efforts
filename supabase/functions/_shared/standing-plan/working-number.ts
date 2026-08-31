@@ -205,11 +205,39 @@ export function pretestSession(
   // fractions. Rounding A first is what keeps 1.1A and 1.15A honest additions to the weight the
   // athlete actually put on the bar.
   const warmup = Math.round((predictedFromFile * PRETEST_WARMUP_FRACTION) / step) * step;
-  return PRETEST_STEPS.map((s) => ({
+  const stepped = PRETEST_STEPS.map((s) => ({
     fractionOfPredicted: s.fractionOfPredicted,
     weight: Math.round((warmup * s.multipleOfWarmup) / step) * step,
     reps: s.reps,
   }));
+
+  /**
+   * ⛔⛔ A COLLIDED WARM-UP IS DROPPED, NEVER PRESCRIBED, AND THE MEASURED STEP NEVER MOVES.
+   *
+   * ⚠️ **OURS.** p215's arithmetic is 1.00A / 1.10A / 1.15A, and the top two are 0.05A apart — under
+   * one loadable increment whenever A is below 100 lb at a 5 lb step. They then round to the SAME
+   * weight, and the athlete is prescribed five reps at the test weight immediately before being
+   * asked to take that weight for max clean reps. He rounds by eye on one worked example and never
+   * addresses a light lift, so this is ours and is labelled.
+   *
+   * ⛔ FOUND ON MICHAEL'S OWN EXPORT, 2026-08-31, the morning he started the block: an 85 lb press
+   * test read `75x6, 85x5, 85x1+`. It is not cosmetic — the pre-fatigue lands on the ONE set the
+   * whole block's press numbers are derived from, so it under-reads the max and every prescribed
+   * press weight for twelve weeks comes off the depressed number. Bench, squat and deadlift were
+   * correct in the same export, which is why it survives a spot-check.
+   *
+   * ⛔ THE LAST STEP IS THE MEASUREMENT AND IS KEPT AT ITS OWN WEIGHT. So the drop falls on the
+   * warm-up, and a light lifter gets a two-rung ramp rather than a nudged-apart three. Nudging would
+   * change the tested weight, which is the one number here that may not be invented.
+   * ⚠️ Same rule, same reasoning as `warmup.ts` (*"rungs that collide are dropped, not nudged
+   * apart"*) — the two ramps now agree.
+   */
+  const measured = stepped[stepped.length - 1];
+  const kept = stepped.filter((s, i) => {
+    if (i === stepped.length - 1) return true;
+    return stepped.slice(i + 1).every((later) => later.weight !== s.weight);
+  });
+  return kept.length > 0 ? kept : [measured];
 }
 
 /**
