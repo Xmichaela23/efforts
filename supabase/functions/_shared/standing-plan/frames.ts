@@ -119,6 +119,26 @@ export type StrengthSlot = {
    *
    * ⚠️ ABSENT MEANS THE PAGE NAMED NO MUSCLE, and every slot written before this reads exactly as it
    * did. **p246 is untouched** — its rows name categories, so none of them carry this.
+   *
+   * ⛔⛔ AND THE ARMS SUPERSET CARRIES NONE, BY RULING — MICHAEL, 2026-08-30: ***"follow the book."***
+   *
+   * p274 prints `2 × HYP: focused push/pull (arms) superset` on days 1 and 4, and the parenthetical
+   * says ARMS. **But p223's own lists for those two categories are mixed in his printing**: focused
+   * push/arms holds triceps pushdowns, Tate press and skull crushers AND pec deck AND lateral
+   * raises; focused pull/arms holds preacher, spider and drag curls AND rear delt machine AND
+   * pullover machine. The parenthetical and the category list disagree **on the page**.
+   *
+   * ⛔ THE RULING IS THAT THE LISTS WIN. *"The '(arms)' parenthetical does not override his own
+   * category lists."* So those four cells are left exactly as they are — they build chest flyes and
+   * rear-delt work today and that is correct, not a crossing to fix. **Narrowing them to biceps and
+   * triceps would delete pec deck and lateral raises, movements he prints in that very list**, which
+   * is the app editing the book rather than following it.
+   *
+   * ⚠️ THIS IS THE LINE BETWEEN THE TWO CASES, AND IT IS WORTH HOLDING: a `muscle` is stated where
+   * the page names one AND his list for that cell agrees with it (focused quadriceps → p223's quad
+   * row; braced push upper → p221's three chest presses). It is NOT stated where the page's word and
+   * his own list pull apart. **The field records what the source settles, never what it leaves
+   * open.**
    */
   muscle?: string;
   /** What the page prints, kept verbatim so a reader can find the row. */

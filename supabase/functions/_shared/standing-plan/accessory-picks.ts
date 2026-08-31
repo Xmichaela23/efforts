@@ -888,7 +888,12 @@ export function pickReachesFrame(
 }
 
 /**
- * ⛔ THE MUSCLE THIS FRAME NAMES FOR A PICK'S CELL, or null where the page names only a category.
+ * ⛔ THE MUSCLE THIS FRAME NAMES FOR A PICK'S CELL, or null where the page names only a category —
+ * **or where the page's word and his own list for that cell disagree.** The arms superset is the
+ * second case and it is deliberate: Michael, 2026-08-30, *"follow the book"* — p274 says `(arms)`
+ * and p223's lists for those categories include pec deck, lateral raises, rear delt machine and the
+ * pullover machine, so `iso_push`, `iso_pull_a` and `iso_pull_b` narrow to nothing and keep his
+ * printed lists whole. See `StrengthSlot.muscle` for the ruling in full.
  * One reader for the fact the frame states, so the dropdown and the built week narrow identically —
  * see `StrengthSlot.muscle`.
  * ⚠️ THE FIRST MATCHING CELL'S ANSWER. Every occurrence of a pick's cell within one frame carries

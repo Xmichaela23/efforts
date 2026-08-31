@@ -436,3 +436,27 @@ Deno.test('⛔ AND EVERY OPTION THE PICKER OFFERS IS THAT MUSCLE, SUBSTITUTES IN
     }
   }
 });
+
+Deno.test('⛔ THE ARMS SUPERSET KEEPS HIS PRINTED LISTS WHOLE — Michael: "follow the book"', () => {
+  /**
+   * ⛔ THE RULING, 2026-08-30. p274 prints `2 × HYP: focused push/pull (arms) superset` and the
+   * parenthetical says ARMS — but p223's lists for those two categories are mixed in his own
+   * printing: focused push/arms holds pec deck and lateral raises beside the triceps work, focused
+   * pull/arms holds the rear delt machine and the pullover machine beside the curls. **The word and
+   * the list disagree on the page, and the list wins.**
+   * ⛔ THIS ASSERTION IS WHAT STOPS A LATER SESSION "COMPLETING" THE MUSCLE NARROWING. Narrowing
+   * these four cells to biceps and triceps would delete movements he prints for them — the app
+   * editing the book rather than following it.
+   */
+  for (const k of ['iso_push', 'iso_pull_a', 'iso_pull_b'] as const) {
+    assertEquals(frameMuscleForPick(k, 'all_rounder'), null,
+      `${k} was given a muscle — p274's "(arms)" does not override p223's own list`);
+  }
+  // ⛔ AND HIS LIST IS STILL WHOLE: the non-arm movements he prints are still offered.
+  const push = pickOptions('iso_push', ['Commercial gym'], null).map((o) => o.name.toLowerCase());
+  assert(push.includes('pec deck'), 'pec deck was cut from a list he prints it in');
+  assert(push.includes('lateral raise'), 'lateral raises were cut from a list he prints them in');
+  const pull = pickOptions('iso_pull_a', ['Commercial gym'], null).map((o) => o.name.toLowerCase());
+  assert(pull.includes('rear delt machine'), 'the rear delt machine was cut from his pull/arms list');
+  assert(pull.includes('pullover machine'), 'the pullover machine was cut from his pull/arms list');
+});
