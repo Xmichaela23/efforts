@@ -1376,3 +1376,69 @@ is this codebase's own rule, missed twice in one arc · the `fitness_baselines` 
 **Deployed 2026-08-29:** `compute-snapshot` 145 · `compute-facts` 127 · `coach` 472 · `workout-detail`
 353 · `analyze-running-workout` 832 · `analyze-cycling-workout` 219. Client served at `efforts.work`.
 ⛔ **VERIFIED: NO.** Nothing renders until a snapshot runs on the next ingest.
+
+---
+
+## D-457 — Separate the builders: the chosen frame is explicit at every call site, and no shared surface may default to one (2026-08-30, Michael)
+
+**Michael's words:** *"We need to really separate the builders. The code and anyone touching it needs
+to know the difference. There will be a lot of different builds."*
+
+**THE LAW.** A function that behaves differently per frame takes the frame from its caller. No
+shared surface silently falls back to `strength_5k`, and no screen reads a module constant baked
+from one frame. Enforced by `src/lib/frame-is-explicit.test.ts`.
+
+### Why — it has bitten five times, and every one failed silently
+
+| # | What | What the athlete saw |
+|---|---|---|
+| 1 | The endurance card read `SLOT_KEYS`/`SLOT_LABEL`/`SLOT_OPTIONS`/`REQUIRED_SLOT_DISPLAY_ORDER`/`HARD_SLOT_KEYS` while its gate read the chosen frame | Four rows drawn, five answers demanded — **Continue disabled and unsatisfiable** |
+| 2 | `SLOT_FAMILY`, indexed by a five-row frame's keys | `.family` on `undefined` — **the whole page blank** |
+| 3 | `FRAME_ARCHETYPE` gave p274's ride row p246's RUN archetype | Empty ladder; both riding chips rendered as bare labels with no number |
+| 4 | The equal-tiers guard's own comment swept `strength_5k` and reported it as the app's behaviour | A **provably false** sentence shipped on the other frame |
+| 5 | The Build focus screen called `pickKeysInDayOrder()` and `dayLabelForPick()` with no frame | p246's nine controls over a p274 week; **five dead**, every option swept and none landed |
+
+⛔ **NOT ONE OF THEM THREW.** A defaulted frame argument is indistinguishable, at the call site, from
+a correct one — which is why the guard reads SOURCE. No runtime assertion can see the difference.
+
+### The root cause is a fact about the pages, not about the code
+
+**p246 is built on `secondary` accessory cells; p274 has none** — its accessory work is `braced` and
+`focused`. So a pick table written for one frame does not merely mis-label on the other, it aims at
+cells that do not exist. Expect the same shape from every future frame: two programmes that share a
+composer do not share a membership.
+
+### What shipped with this entry
+
+- `pickReachesFrame` / `picksForFrame` (`accessory-picks.ts`) — reachability is **the composer's own
+  rule read back**, not a second table: `compose.ts` consults a pick only for a cell that is
+  `intent === 'HYP' && role === 'accessory'`, so a pick reaches a frame exactly when that frame
+  carries such a cell of its category and pattern. No hand-kept per-frame list to rot.
+- The Build focus screen passes `wizardFrame` to both call sites. Standard Focus draws four controls
+  (Push isolation `day 1 · day 4`, Pull isolation `day 1`, Pull isolation `day 4`, Leg isolation
+  `day 5`); `strength_5k` draws its nine unchanged.
+- Three dead single-frame imports removed from `NonRaceBuilder` (`SLOT_KEYS`, `REQUIRED_SLOT_KEYS`,
+  `HARD_SLOT_KEYS`) — unused since 2026-08-30 and invisible because `noUnusedLocals` is off.
+- `frame-is-explicit.test.ts`: derives the guarded function list from the modules themselves, so a
+  new frame-taking export is covered the moment it is written.
+
+### ⚠️ What this entry does NOT claim
+
+- **The defaults are not all removed.** ~35 signatures still carry `frame: FrameId = 'strength_5k'`,
+  each documented as "absent keeps the frame every caller that predates a second frame used". Making
+  them required is a mechanical change across every predating caller and was judged too large to ride
+  along with a screen fix. **The guard covers the surface where all five defects landed — the
+  screens — and a future session removing the defaults is the stronger form of this law.**
+- **`strength_5k` is exempt from the pick filter by ruling, not by derivation.** The same rule would
+  drop Hinge variation from that frame too, and would be right: p246's day-2 hinge cell is `DE`, the
+  composer consults picks only on `HYP` cells, and all four of that pick's options were measured not
+  to land on either frame. **That is a real pre-existing defect on the shipped path** — logged
+  separately, not fixed by hiding a control.
+- The source scan catches an **omitted** frame, not a **wrong** one. A screen passing the other
+  frame's id still needs a rendered check, which is why every change in this area gets one.
+
+### Queued, not started
+
+Wiring `all_rounder` its own picks over p274's `braced` and `focused` cells — the athlete currently
+has four controls over 22 slots, and no say at all over the braced supersets p275 prescribes. That
+is a source-reading job before it is a code job (Michael: don't start it).

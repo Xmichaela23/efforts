@@ -1,0 +1,215 @@
+/**
+ * ⛔⛔⛔ D-457 — THE CHOSEN FRAME IS EXPLICIT AT EVERY CALL SITE. THE STANDING LAW, ENFORCED.
+ *
+ * **Michael, 2026-08-30: *"We need to really separate the builders. The code and anyone touching it
+ * needs to know the difference. There will be a lot of different builds."***
+ *
+ * ⛔ THE DISEASE THIS EXISTS TO END, AND IT HAS BITTEN FIVE TIMES ON ONE SCREEN'S PATH:
+ *   1. The endurance card read `SLOT_KEYS` / `SLOT_LABEL` / `SLOT_OPTIONS` /
+ *      `REQUIRED_SLOT_DISPLAY_ORDER` / `HARD_SLOT_KEYS` — five module constants baked from
+ *      `strength_5k` — while its completion gate read the CHOSEN frame. Standard Focus drew four
+ *      rows and demanded five answers: **Continue was disabled and could not be satisfied.**
+ *   2. `SLOT_FAMILY`, the same shape, indexed by a five-row frame's keys: `.family` on `undefined`
+ *      **took the whole page blank.**
+ *   3. `FRAME_ARCHETYPE` handed p274's ride row p246's RUN archetype, so its ladder came back empty
+ *      and both riding chips rendered as bare labels with no number on them.
+ *   4. The equal-tiers line's own comment swept `strength_5k` alone and reported the result as the
+ *      app's, so a **provably false** sentence shipped on the other frame.
+ *   5. The Build focus screen called `pickKeysInDayOrder()` and `dayLabelForPick()` with no frame:
+ *      p246's nine controls rendered over a p274 week and **five of them were dead** — every option
+ *      swept through `composeWeek` and none landed.
+ *
+ * ⛔⛔ EVERY ONE OF THEM FAILED SILENTLY. Not one threw. That is the whole argument for a test that
+ * reads the SOURCE: a defaulted frame argument is indistinguishable, at the call site, from a
+ * correct one, and no runtime assertion can see the difference.
+ *
+ * ⚠️ IT DERIVES ITS OWN SUBJECT. The list of frame-taking functions is read out of the modules at
+ * test time rather than typed here — a hand-kept list of what to guard is the same rot in a
+ * different file. A new frame-taking export is covered the moment it is written.
+ * ⚠️ AND ITS LIMIT IS STATED: this reads source text, so it catches an omitted argument and not a
+ * WRONG one. A screen passing the other frame's id on purpose is a different failure and needs a
+ * rendered check — which is why every frame change in this area also gets one.
+ *
+ * Run from repo root:
+ *   ~/.deno/bin/deno test --allow-read --no-check src/lib/frame-is-explicit.test.ts
+ */
+import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import {
+  dayLabelForPick,
+  pickKeysInDayOrder,
+  picksForFrame,
+  VIADA_PICK_KEYS,
+} from '../../supabase/functions/_shared/standing-plan/accessory-picks.ts';
+
+const read = (rel: string) => Deno.readTextFile(new URL(rel, import.meta.url));
+
+/** ⛔ THE MODULES THAT SPEAK FRAME. A screen reaches the frames through one of these or not at all. */
+const SOURCES = [
+  '../../supabase/functions/_shared/standing-plan/accessory-picks.ts',
+  './standing-plan-week-copy.ts',
+  './standing-plan-week-bounds.ts',
+  './hard-slot-choices.ts',
+];
+/** ⛔ THE SCREENS. Where every one of the five defects above actually landed. */
+const SCREENS = [
+  '../components/NonRaceBuilder.tsx',
+  '../components/EnduranceWeekCard.tsx',
+  '../components/HardSlotChoices.tsx',
+];
+
+/**
+ * Exported functions whose signature takes a `frame`. ⚠️ Parsed from the signature text between the
+ * name and the closing paren of the parameter list, so an options-bag `{ frame?: FrameId }` counts
+ * too — those defaulted just as silently as the positional ones.
+ */
+async function frameTakingExports(rel: string): Promise<Set<string>> {
+  const src = await read(rel);
+  const out = new Set<string>();
+  const re = /export\s+(?:async\s+)?function\s+([A-Za-z0-9_]+)\s*\(/g;
+  for (let m = re.exec(src); m; m = re.exec(src)) {
+    const open = re.lastIndex - 1;
+    let depth = 0;
+    let end = open;
+    for (let i = open; i < src.length; i++) {
+      if (src[i] === '(') depth += 1;
+      else if (src[i] === ')') { depth -= 1; if (depth === 0) { end = i; break; } }
+    }
+    if (/\bframe\b/.test(src.slice(open, end))) out.add(m[1]);
+  }
+  return out;
+}
+
+/** The text of each argument list for `name(...)`, paren-balanced so nested calls do not truncate it. */
+function callArgs(src: string, name: string): string[] {
+  const out: string[] = [];
+  const re = new RegExp(`(^|[^A-Za-z0-9_.])${name}\\s*\\(`, 'g');
+  for (let m = re.exec(src); m; m = re.exec(src)) {
+    const open = re.lastIndex - 1;
+    let depth = 0;
+    for (let i = open; i < src.length; i++) {
+      if (src[i] === '(') depth += 1;
+      else if (src[i] === ')') {
+        depth -= 1;
+        if (depth === 0) { out.push(src.slice(open + 1, i)); break; }
+      }
+    }
+  }
+  return out;
+}
+
+/** ⚠️ WHAT COUNTS AS NAMING A FRAME. A variable called `frame`, a prop, or a frame id spelled out. */
+const NAMES_A_FRAME = (args: string) =>
+  /\bframe\b|\bwizardFrame\b|'all_rounder'|'strength_5k'|"all_rounder"|"strength_5k"/.test(args);
+
+Deno.test('⛔⛔⛔ D-457 — NO SCREEN CALLS A FRAME-TAKING FUNCTION WITHOUT NAMING THE FRAME', async () => {
+  const guarded = new Set<string>();
+  for (const s of SOURCES) for (const n of await frameTakingExports(s)) guarded.add(n);
+  /**
+   * ⚠️ A FLOOR ON THE SUBJECT ITSELF. Without this the test passes loudly the day the parse breaks
+   * or a module is renamed out of `SOURCES` — a guard that guards nothing is worse than none.
+   */
+  assert(guarded.size >= 20,
+    `only ${guarded.size} frame-taking exports found — the parse or the module list has rotted`);
+
+  const offenders: string[] = [];
+  for (const screen of SCREENS) {
+    const src = await read(screen);
+    for (const fn of guarded) {
+      for (const args of callArgs(src, fn)) {
+        if (!NAMES_A_FRAME(args)) {
+          offenders.push(`${screen.replace('../', '')} → ${fn}(${args.trim().slice(0, 60)})`);
+        }
+      }
+    }
+  }
+  assertEquals(offenders, [],
+    '⛔ A SCREEN IS ASKING A FRAME-TAKING FUNCTION WITHOUT SAYING WHICH FRAME, so it silently gets '
+    + '`strength_5k` and renders one programme over another\'s week. Pass the chosen frame:\n  '
+    + offenders.join('\n  '));
+});
+
+Deno.test('⛔⛔ AND NO SCREEN IMPORTS A CONSTANT BAKED FROM ONE FRAME', async () => {
+  /**
+   * ⛔ THESE ARE `strength_5k`'s MEMBERSHIP, evaluated at module load. Every one of them is exported
+   * for a caller that predates the second frame, and every one is a live trap for a screen: **a
+   * constant imported at the top of a file looks identical, at the call site, to a derived value.**
+   * ⚠️ THEY ARE NOT DELETED, because the pre-frame callers are real. What is forbidden is a SCREEN
+   * reading one — a screen always knows its frame and has a function that takes it.
+   */
+  const BAKED = [
+    'SLOT_KEYS', 'SLOT_LABEL', 'SLOT_OPTIONS', 'REQUIRED_SLOT_DISPLAY_ORDER',
+    'REQUIRED_SLOT_KEYS', 'HARD_SLOT_KEYS', 'SLOT_FAMILY', 'FRAME_ARCHETYPE',
+  ];
+  const offenders: string[] = [];
+  for (const screen of SCREENS) {
+    const src = await read(screen);
+    /**
+     * ⚠️ THE IMPORT BLOCKS ONLY, AND WITH THEIR COMMENTS STRIPPED. Two reasons, and the second was
+     * found by this test failing on its own tombstone: these names appear in prose throughout the
+     * files' comment trails, and the note explaining WHY a constant is not imported lives inside the
+     * import braces. **A guard that cannot tell an import from a note about an import is a guard
+     * nobody can satisfy.**
+     */
+    const blocks = (src.match(/import\s*\{[\s\S]*?\}\s*from\s*['"][^'"]+['"];/g) ?? [])
+      .map((b) => b.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, ''));
+    for (const block of blocks) {
+      for (const name of BAKED) {
+        if (new RegExp(`(^|[^A-Za-z0-9_])${name}([^A-Za-z0-9_]|$)`).test(block)) {
+          offenders.push(`${screen.replace('../', '')} imports ${name}`);
+        }
+      }
+    }
+  }
+  assertEquals(offenders, [],
+    '⛔ A SCREEN IMPORTS ONE FRAME\'S MEMBERSHIP AS A CONSTANT. It will index it by the CHOSEN '
+    + 'frame\'s keys, which has blanked the app once and disabled Continue once:\n  '
+    + offenders.join('\n  '));
+});
+
+Deno.test('⛔ THE BUILD FOCUS SCREEN DRAWS ONLY PICKS THE CHOSEN FRAME CAN HONOUR', async () => {
+  /**
+   * ⛔ THE FIFTH BITE, PINNED AT ITS OWN CALL SITE. `picksForFrame` is the composer's own
+   * reachability rule — a pick is drawn when the frame carries an HYP accessory cell it can fill —
+   * and reverting to the unfiltered list is what puts five dead controls back on Standard Focus.
+   */
+  const src = await read('../components/NonRaceBuilder.tsx');
+  assert(/picksForFrame\(wizardFrame\)/.test(src),
+    'the Build focus screen no longer asks the chosen frame which picks it can honour');
+  assert(!/pickKeysInDayOrder\(\s*\)/.test(src),
+    '⛔ the unfiltered, frame-less pick list is back on the screen');
+  assert(/dayLabelForPick\(key,\s*wizardFrame\)/.test(src),
+    'the day tags no longer come from the chosen frame');
+});
+
+Deno.test('⛔⛔ PASSING THE FRAME CHANGED NOTHING FOR `strength_5k` — the identity, asserted', () => {
+  /**
+   * ⛔ THIS IS THE ACCEPTANCE TEST FOR MICHAEL'S *"strength_5k renders exactly as today"*, and it is
+   * stronger than a screenshot because it is permanent. The only change to that frame's Build focus
+   * screen is that two arguments are now named instead of defaulted — and for `strength_5k` the
+   * named value IS the default, so the rendered list and every day tag are identical by
+   * construction rather than by inspection.
+   * ⚠️ IT WOULD FAIL THE DAY THE FILTER STOPPED EXEMPTING THAT FRAME. The same reachability rule
+   * would drop Hinge variation from it — correctly, and it is a separate pre-existing defect — so
+   * this assertion is what makes that a deliberate change rather than a silent one.
+   */
+  assertEquals(picksForFrame('strength_5k'), pickKeysInDayOrder(),
+    'the 5K Build focus screen no longer draws the list it drew before the frame was passed');
+  assertEquals(picksForFrame('strength_5k').length, VIADA_PICK_KEYS.length,
+    'a pick went missing from the 5K screen');
+  for (const k of VIADA_PICK_KEYS) {
+    assertEquals(dayLabelForPick(k, 'strength_5k'), dayLabelForPick(k),
+      `the 5K day tag for ${k} changed when the frame became explicit`);
+  }
+
+  /**
+   * ⛔ AND STANDARD FOCUS DRAWS THE FOUR ITS FRAME CAN HONOUR. The five that go are the five measured
+   * dead against `composeWeek`: Hinge variation, both Leg variations, Press variation and Core.
+   * p274's accessory work is `braced` and `focused`; p246's is `secondary`, and four of the picks
+   * aim at cells this frame does not contain.
+   */
+  assertEquals(picksForFrame('all_rounder'), ['iso_push', 'iso_pull_a', 'iso_pull_b', 'quad_iso']);
+  // ⛔ AND ITS DAY TAGS ARE ITS OWN: p274 carries the focused push cell on day 1 AND day 4, where the
+  // defaulted call printed "day 1" alone.
+  assertEquals(dayLabelForPick('iso_push', 'all_rounder'), 'day 1 · day 4');
+  assertEquals(dayLabelForPick('iso_push'), 'day 1');
+});

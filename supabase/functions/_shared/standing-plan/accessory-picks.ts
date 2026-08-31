@@ -656,6 +656,64 @@ export function pickKeysInDayOrder(
 }
 
 /**
+ * ⛔⛔⛔ WHICH PICKS THIS FRAME CAN ACTUALLY HONOUR — and it is the COMPOSER'S OWN RULE, read here
+ * rather than restated (2026-08-30).
+ *
+ * ⛔ THE ONE LINE THAT DECIDES IT lives in `compose.ts`: a pick is consulted only for a cell that is
+ * `slot.intent === 'HYP' && slot.role === 'accessory'`. So a pick reaches a frame exactly when that
+ * frame carries an HYP accessory cell of its category and pattern — on its own day where the pick is
+ * day-scoped. **Anything else is a control the athlete answers and the plan discards without a word.**
+ *
+ * ⛔⛔ THE DEFECT IT CLOSES, COMPOSED AND MEASURED. The Build focus screen called `pickKeysInDayOrder()`
+ * and `dayLabelForPick()` with no frame, so both defaulted to `strength_5k` and p246's nine controls
+ * rendered over a p274 week. **Five of them were dead** — every option swept, not one:
+ *   Hinge variation · Leg variation (day 2) · Leg variation (day 5) · Press variation · Core.
+ * The cause is one fact about the two pages: **p246 is built on `secondary` accessory cells and p274
+ * has none.** p274's accessory work is `braced` and `focused`, so four picks aimed at cells the frame
+ * does not contain; Core is an ADDED row and p274's 22 slots leave the set cap no room for it.
+ *
+ * ⚠️ NO FALLBACK HERE, DELIBERATELY — this is not `frameDaysForPick`. That one returns
+ * `spec.slot.frameDay` when the search finds nothing, which is honest on p246's DE hinge cell and
+ * MANUFACTURES a day on p274, where no such cell exists at all. Reachability must not inherit a
+ * fallback whose job is to label.
+ *
+ * ⚠️⚠️ AND `strength_5k` IS EXEMPT BY RULING, NOT BY DERIVATION — Michael, 2026-08-30: *"strength_5k
+ * renders exactly as today."* **The derivation would drop Hinge variation from that frame too, and it
+ * would be RIGHT to**: p246's day-2 hinge cell is `DE accessory secondary hinge_lower`, the composer
+ * only consults picks on HYP cells, and all four of that pick's options were measured not to land on
+ * either frame. That is a real, pre-existing defect on the shipped path and it is reported
+ * separately. It is not fixed by hiding the control, and it is not this change's to fix.
+ */
+export function pickReachesFrame(
+  key: ViadaPickKey,
+  frame: FrameId,
+  column: ColumnKind = 'standard',
+): boolean {
+  const spec = VIADA_PICKS[key];
+  if (!spec.slot) return false;
+  const days = FRAMES[frame]?.columns[column] ?? [];
+  return days.some((day) => {
+    if (spec.slot!.frameDay != null && day.day !== spec.slot!.frameDay) return false;
+    return day.strength.some((sl) =>
+      sl.intent === 'HYP' && sl.role === 'accessory'
+      && sl.category === spec.slot!.category && sl.pattern === spec.slot!.pattern);
+  });
+}
+
+/**
+ * ⛔ THE PICK LIST A SCREEN MAY DRAW, for a frame that is named rather than assumed. Day order, then
+ * reachability — so a control that appears is one the built week will honour.
+ * ⚠️ THE FRAME IS REQUIRED. This function exists because its predecessors defaulted to `strength_5k`
+ * and a screen that forgot to pass one rendered the wrong programme in silence. See D-457.
+ */
+export function picksForFrame(frame: FrameId, column: ColumnKind = 'standard'): ViadaPickKey[] {
+  const ordered = pickKeysInDayOrder(frame, column);
+  // ⚠️ SEE `pickReachesFrame` — the exemption is Michael's ruling and its cost is recorded there.
+  if (frame === 'strength_5k') return ordered;
+  return ordered.filter((k) => pickReachesFrame(k, frame, column));
+}
+
+/**
  * ⛔⛔ HIS DAY NUMBER, NOT A WEEKDAY AND NOT A RENUMBER (Michael, 2026-08-26).
  *
  * The wizard asks for the accessories BEFORE it asks for the calendar, so the athlete has not chosen

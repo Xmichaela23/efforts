@@ -8,11 +8,19 @@ import EnduranceWeekCard from './EnduranceWeekCard';
 // ⛔ THE HARD SLOT'S SESSION CHOICES — one component, shared with anything that renders a slot.
 import HardSlotChoices from './HardSlotChoices';
 import {
-  SLOT_KEYS,
-  HARD_SLOT_KEYS,
+  /**
+   * ⛔⛔⛔ `SLOT_KEYS`, `HARD_SLOT_KEYS` AND `REQUIRED_SLOT_KEYS` ARE NOT IMPORTED HERE, AND THAT IS
+   * THE POINT (D-457, 2026-08-30). All three are `strength_5k`'s membership, evaluated at module
+   * load. They were left behind unused by the 2026-08-30 fix that moved this file onto the frame's
+   * own rows — `noUnusedLocals` is off, so nothing said — and an unused import of one frame's answer
+   * is a loaded gun beside a file that renders two. **A constant imported at the top of a file looks
+   * identical, at the call site, to a derived value**; that is how this screen once drew four rows
+   * while demanding five answers, and how `SLOT_FAMILY` blanked the app.
+   * ⚠️ THE FRAME-TAKING SIBLINGS ARE RIGHT HERE: `slotKeysFor(frame)`, `hardSlotKeysFor(frame)`,
+   * `frameSlots(frame)`. `frame-is-explicit.test.ts` fails if any of the three comes back.
+   */
   allSlotsChosen,
   hardPairIsSwappable,
-  REQUIRED_SLOT_KEYS,
   emptySlotSports,
   slotKeysFor,
   hardSlotKeysFor,
@@ -103,7 +111,7 @@ import {
   DIAL_ROW_DAY_IS_THE_COMPOSERS,
   chipHasFrameSlot,
   dayLabelForPick,
-  pickKeysInDayOrder,
+  picksForFrame,
   defaultViadaPicks,
   pickOptions,
   pickOptionLabel,
@@ -5373,7 +5381,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 rows share a label and are told apart by the day tag beside them. This list is driven
                 off the same key table, so a table split shows up here with no change to this file. */}
             <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 space-y-3">
-              {pickKeysInDayOrder().map((key) => {
+              {/* ⛔⛔⛔ THE FRAME IS PASSED, AND BEFORE THIS IT WAS NOT (Michael, 2026-08-30). Both
+                  calls here defaulted to `strength_5k`, so **p246's nine controls rendered over a
+                  p274 week and five of them were dead** — Hinge variation, both Leg variations,
+                  Press variation and Core. Every option on each was swept through `composeWeek` and
+                  none landed. §7 trap one, on a shipped screen: one frame's answer indexed by
+                  another frame's rows.
+                  ⛔ `picksForFrame` IS THE COMPOSER'S OWN REACHABILITY RULE, not a hand-kept list —
+                  a pick is drawn when the frame carries an HYP accessory cell it can fill. See its
+                  note for why p274 has none for four of them and none at all for Core.
+                  ⚠️ D-457: no frame argument may default on a shared surface. */}
+              {picksForFrame(wizardFrame).map((key) => {
                 const spec = VIADA_PICKS[key];
                 const opts = pickOptions(key, strengthEquipment);
                 const value = viadaPrefs?.picks?.[key] ?? opts[0]?.name ?? '';
@@ -5382,7 +5400,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     <div className="flex items-baseline justify-between gap-2 mb-1">
                       <span className="text-white/85 text-sm">{spec.label}</span>
                       <span className="text-white/45 text-xs">
-                        {dayLabelForPick(key) ?? 'fills the week\u2019s core minimum'}
+                        {/* ⛔ THE FRAME'S OWN DAYS. Unpassed, this read p246's: it printed "day 1"
+                            for Push isolation where p274 carries that cell on day 1 AND day 4, and
+                            "day 4" for a pick p274 resolves to no day at all. */}
+                        {dayLabelForPick(key, wizardFrame) ?? 'fills the week\u2019s core minimum'}
                       </span>
                     </div>
                     <select
@@ -5401,8 +5422,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               })}
               {/* ⛔ ONE LINE, UNDER THE FIELD IT IS ABOUT. What stood here named the source, the
                   missing core slot and "the four movement patterns" — sourcing talk and engine
-                  vocabulary, under a dropdown. */}
-              <p className="text-white/45 text-[13px] leading-relaxed">{CORE_PICK_NOTE}</p>
+                  vocabulary, under a dropdown.
+                  ⚠️⚠️ AND IT GOES WHERE THE FIELD GOES (2026-08-30, caught on the rendered page). The
+                  Core picker is not drawn on a frame that cannot honour it, and this line was left
+                  behind explaining a control that is no longer there — *"This pick is the movement
+                  your weekly core work uses"* under four pickers, none of them core. **A note is not
+                  a note when its subject is gone; it is a claim about a control the athlete cannot
+                  find.** It reads the same list the pickers do, so the two cannot come apart. */}
+              {picksForFrame(wizardFrame).includes('core') ? (
+                <p className="text-white/45 text-[13px] leading-relaxed">{CORE_PICK_NOTE}</p>
+              ) : null}
             </div>
 
             {/* ⛔ IT SAID "sets of 6-12" WHILE THE ROWS ON THIS SAME SCREEN SAID "3 x 8-10"
