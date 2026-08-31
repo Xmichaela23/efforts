@@ -21,6 +21,30 @@ import type { FamilyId, Level } from '../endurance-library/index.ts';
  */
 export type FrameId = 'strength_5k' | 'all_rounder';
 
+/**
+ * ⛔⛔⛔ WHETHER THIS FRAME ASKS FOR A WEEKLY HOURS TOTAL AT ALL — Michael, 2026-08-31:
+ * *"you get prescribed the time for your hard sessions."*
+ *
+ * ⛔ THE ALL ROUNDER STOPPED ASKING. Its screen takes a length PER SESSION on the easy and long rows
+ * and prescribes the quality doses; there is no weekly hours box on it any more. The wizard already
+ * declines to send `target_run_hours` for it — but the composer will still act on the field if it
+ * arrives from anywhere else, and it does: a draft saved before the hours box came off, an older
+ * client, or a restate re-composing from a plan row that stored one.
+ *
+ * ⛔⛔ AND WHAT IT DOES THEN IS ADD SESSIONS THE ATHLETE NEVER PICKED. Measured: with a five-hour run
+ * ask, this frame's week gains **two easy runs — one on the legs day and one on the REST day.**
+ * Those are the exact two days p274 leaves clear, and a filler landing on them is a defect this
+ * codebase has already fixed once from a different direction.
+ *
+ * ⚠️ IT IS THE SAME RULING AS `weekIsDayOrdered` ON THE SCREEN, seen from the engine side: a frame
+ * that lays its week out day by day is a frame that asks per session. The literal lives in two
+ * places because the two modules do not share one — **if a third frame arrives, both need editing,
+ * and this note is the pointer between them.**
+ */
+export function frameAsksWeeklyHours(frame: FrameId): boolean {
+  return frame !== 'all_rounder';
+}
+
 export type ColumnKind = 'standard' | 'taper';
 
 /**

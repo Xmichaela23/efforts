@@ -48,6 +48,7 @@ import {
   advancedTierSessions,
   FRAMES,
   EXPERIENCE_IS_THE_ATHLETES_ANSWER,
+  frameAsksWeeklyHours,
   experienceLevels,
   LOW_VOLUME_RIDE_LEVELS_ARE_OURS,
   PLYO_DOSE,
@@ -2239,6 +2240,16 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     const stated = args.enduranceDaysBySport?.[sport];
     if (stated != null && Math.round(Number(stated) || 0) === 0) return 0;
     if (Number(stated) > 0) return byDays;
+    /**
+     * ⛔⛔ A FRAME THAT DOES NOT ASK FOR WEEKLY HOURS NEVER BUYS A SESSION WITH THEM (Michael,
+     * 2026-08-31). See `frameAsksWeeklyHours`. The hours field can still ARRIVE on such a frame —
+     * from a draft written before its hours box came off, an older client, or a restate reading a
+     * plan row that stored one — and acting on it put an easy run on that frame's legs day and its
+     * REST day, neither of which the athlete picked and both of which its page leaves clear.
+     * ⚠️ IT RETURNS `byDays`, NOT ZERO: an explicitly stated day count is a different answer and is
+     * still honoured. What is refused is inventing sessions out of an hours total.
+     */
+    if (!frameAsksWeeklyHours(args.frame)) return byDays;
     const solve = sport === 'run' ? volume.run : volume.ride;
     const bound = sport === 'run' ? volume.bounds.run : volume.bounds.ride;
     if (solve.verdict !== 'over_cap' || bound.sessions === 0) return byDays;
