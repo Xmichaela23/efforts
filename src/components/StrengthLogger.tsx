@@ -2945,8 +2945,34 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             } as LoggedExercise;
           }
           const liftName = String(ex?.name || '').split('—')[0].trim(); // "Bench Press — AMRAP test set" → "Bench Press"
-          const rw = Number(resolved[i]?.sets?.[0]?.weight);
-          const w = Number.isFinite(rw) && rw > 0 ? rw : Number(ex?.weight);
+          /**
+           * ⛔⛔⛔ THE **SCORED** SET SEEDS THE RAMP, NOT THE FIRST ONE (2026-08-31).
+           *
+           * ⛔ THE DEFECT, CAUGHT BY MICHAEL BEFORE HE LIFTED: his plan prescribed the max-rep set at
+           * **130** — the source's pretest is 75%, then +10%, then +5% more — and the logger opened
+           * that session with the top set at **115**. Two different tests for one session, and the
+           * one he would have performed was the lighter.
+           *
+           * ⛔ WHY `sets[0]` WAS EVER RIGHT: the week-12 retest resolves to ONE scored set, so the
+           * first set IS the top set. **A plan's test week resolves to THREE**, and the first of those
+           * is the opening build. This branch was written for the retest and inherited by the test
+           * week when it started being recognised as a test.
+           *
+           * ⚠️ THE `amrap` FLAG IS THE MARKER, with the LAST set as the fallback — the same flag
+           * `readTestWeek` scores on, so the set the logger opens at and the set the block reads are
+           * the same set by construction.
+           */
+          const rsets = Array.isArray(resolved[i]?.sets) ? resolved[i].sets : [];
+          const scored = rsets.find((st) => (st as { amrap?: boolean })?.amrap === true) ?? rsets[rsets.length - 1];
+          const rw = Number(scored?.weight);
+          const planTop = (() => {
+            const plan = Array.isArray(ex?.set_plan) ? ex.set_plan as Array<Record<string, unknown>> : [];
+            const top = plan.find((st) => st?.amrap === true) ?? plan[plan.length - 1];
+            return Number(top?.weight);
+          })();
+          const w = Number.isFinite(rw) && rw > 0
+            ? rw
+            : (Number.isFinite(planTop) && planTop > 0 ? planTop : Number(ex?.weight));
           return createBaselineTestExercise(liftName || String(ex?.name || ''), Number.isFinite(w) && w > 0 ? w : undefined);
         }));
         exercisesLoadedFromWorkout = true;

@@ -81,3 +81,40 @@ Deno.test('⛔ THE LOGGER SPLITS ON THAT MARKER, AND ONLY THE LAUNCHER REPLACES 
     '⛔ `getBaselineTestType` matches the plan\'s "Test: Upper" again — that branch REPLACES the '
     + 'loaded exercises with a hardcoded list, adding a pull-up nobody prescribed and dropping the accessories');
 });
+
+Deno.test('⛔⛔ THE LOGGER SEEDS FROM THE SCORED SET, NOT THE FIRST ONE', async () => {
+  /**
+   * ⛔ THE DEFECT THIS PINS, CAUGHT BEFORE THE ATHLETE LIFTED: the plan prescribed his max-rep bench
+   * at **130** — the source's pretest is 75%, then +10%, then +5% more — and the logger opened the
+   * session with the top set at **115**. Two different tests for one session, and the one he would
+   * have performed was the lighter.
+   *
+   * ⚠️ `sets[0]` WAS RIGHT FOR THE RETEST, which resolves to ONE scored set. A plan's test week
+   * resolves to THREE, and the first of those is the opening build. The branch was written for the
+   * retest and inherited by the test week the moment it started being recognised as a test.
+   */
+  const src = await Deno.readTextFile(
+    new URL('../../../../src/components/StrengthLogger.tsx', import.meta.url));
+  assert(!/const rw = Number\(resolved\[i\]\?\.sets\?\.\[0\]\?\.weight\)/.test(src),
+    '⛔ the logger seeds the test from the FIRST resolved set again — the athlete would test at the '
+    + 'opening build weight instead of the prescribed top set');
+  assert(/const scored = rsets\.find\(\(st\) => \(st as \{ amrap\?: boolean \}\)\?\.amrap === true\) \?\? rsets\[rsets\.length - 1\]/.test(src),
+    'the logger no longer prefers the amrap-flagged set, with the last set as the fallback');
+});
+
+Deno.test('⛔ AND THE COMPOSER STILL MARKS EXACTLY ONE SCORED SET PER TESTED LIFT', () => {
+  /**
+   * ⚠️ THE OTHER HALF OF THE SAME CONTRACT. The logger seeds from the amrap set and `readTestWeek`
+   * SCORES the amrap set; if the composer ever stamped two, or none, the two would silently pick
+   * different sets. This is the marker's own integrity check.
+   */
+  const all = testSessions({ bench: 150, squat: 110, deadlift: 150, overheadPress: 100 } as never)
+    .flatMap((s) => s.strength_exercises ?? []);
+  for (const ex of all.filter(isTested)) {
+    const plan = Array.isArray(ex.set_plan) ? ex.set_plan as Array<Record<string, unknown>> : [];
+    assertEquals(plan.filter((st) => st?.amrap === true).length, 1,
+      `${String(ex.name)} does not carry exactly one scored set`);
+    // ⛔ AND IT IS THE LAST, which is what makes the fallback safe for a row with no flag at all.
+    assertEquals(plan[plan.length - 1]?.amrap, true, `${String(ex.name)}: the scored set is not the last`);
+  }
+});
