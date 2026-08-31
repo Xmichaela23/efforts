@@ -1621,8 +1621,51 @@ export function defaultViadaPicks(
   frame: FrameId = 'strength_5k',
 ): Partial<Record<ViadaPickKey, string>> {
   const out: Partial<Record<ViadaPickKey, string>> = {};
-  for (const key of (PICK_KEYS_BY_FRAME[frame] ?? VIADA_PICK_KEYS)) {
-    out[key] = defaultPickFor(key, equipment, dial, frame);
+  /**
+   * ⛔⛔⛔ TWO ROWS SHARING A DAY DO NOT DEFAULT TO THE SAME MOVEMENT (Michael, off his screen
+   * 2026-08-31): the Leg press row and the Leg isolation row both opened on Bulgarian Split Squat,
+   * and both carry day 5.
+   *
+   * ⛔ THE BUILT WEEK WAS ALREADY RIGHT — traced before changing anything. `takenToday` catches the
+   * repeat, the first row keeps the split squat and the second falls to the next option, so Friday
+   * builds `back extension, bulgarian split squat, walking lunge, reverse lunge, calf raise`: one
+   * split squat, exactly as it should be.
+   *
+   * ⛔ SO THIS IS A SCREEN DEFECT, AND IT IS THE WORSE KIND: the plan is correct and **the screen
+   * shows an answer the plan will not honour.** The athlete reads two rows saying Bulgarian Split
+   * Squat, gets one, and nothing tells them which. Same class as every ask-15-get-20 defect in this
+   * app — the screen promising what the build does not do.
+   *
+   * ⚠️ IT IS THE GUARD'S OWN RULE, MOVED EARLIER. The composer's rule is "not twice in one day"; this
+   * applies the same test at the picker so the default set already satisfies it.
+   * ⚠️ ONLY WHERE THE DAYS OVERLAP. Two rows on different days may legitimately share a movement —
+   * the week is allowed to repeat across days, and only a single day may not.
+   * ⚠️ AND IT MOVES THE **SECOND** ROW, in the frame's own key order, so the first cell keeps the
+   * movement its own list leads with.
+   */
+  const keys = PICK_KEYS_BY_FRAME[frame] ?? VIADA_PICK_KEYS;
+  const takenByDay = new Map<number, Set<string>>();
+  for (const key of keys) {
+    const days = frameDaysForPick(key, frame);
+    const clash = (name: string) =>
+      days.some((d) => takenByDay.get(d)?.has(canonicalize(name)));
+    const first = defaultPickFor(key, equipment, dial, frame);
+    let chosen = first;
+    if (clash(first)) {
+      const alt = pickOptions(key, equipment ?? null, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame))
+        .map((o) => o.name)
+        .find((n) => !clash(n));
+      // ⚠️ NO ALTERNATIVE MEANS KEEP THE DEFAULT. A cell whose every option is already used today has
+      // no honest answer to move to, and an empty pick is worse than a duplicate the composer will
+      // resolve anyway.
+      chosen = alt ?? first;
+    }
+    out[key] = chosen;
+    for (const d of days) {
+      const set = takenByDay.get(d) ?? new Set<string>();
+      set.add(canonicalize(chosen));
+      takenByDay.set(d, set);
+    }
   }
   return out;
 }

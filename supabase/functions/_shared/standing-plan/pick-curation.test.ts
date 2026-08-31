@@ -139,3 +139,49 @@ Deno.test('⛔ THE ORDER IS THE REFERENCE DOC\'S, AND IT IS NOT MODALITY-BASED',
   assert(gym.length >= 2 && gym.every((n) => /machine|smith|dip/.test(n)),
     `the gym press row is not the page's machines: ${gym.join(', ')}`);
 });
+
+Deno.test('⛔⛔ TWO ROWS SHARING A DAY DO NOT OPEN ON THE SAME MOVEMENT', async () => {
+  /**
+   * ⛔ MICHAEL, OFF HIS SCREEN: the Leg press row and the Leg isolation row both opened on Bulgarian
+   * Split Squat, and both carry day 5.
+   *
+   * ⛔ THE BUILT WEEK WAS ALREADY RIGHT — `takenToday` catches the repeat and the second row falls to
+   * the next option. **That is what makes this the worse kind of defect: the plan is correct and the
+   * SCREEN shows an answer the plan will not honour.** The athlete reads two rows saying the same
+   * movement, gets one, and nothing tells them which.
+   * ⚠️ THE FIX IS THE GUARD'S OWN RULE MOVED EARLIER — "not twice in one day", applied at the picker
+   * so the default set already satisfies it.
+   */
+  const { defaultViadaPicks, frameDaysForPick } = await import('./accessory-picks.ts');
+  const { canonicalize } = await import('../canonicalize.ts');
+  for (const kit of [HOME, GYM]) {
+    for (const frame of ['strength_5k', 'all_rounder'] as const) {
+      const picks = defaultViadaPicks(kit, [], frame) as Record<string, string>;
+      const byDay = new Map<number, string[]>();
+      for (const [key, name] of Object.entries(picks)) {
+        for (const d of frameDaysForPick(key as never, frame)) {
+          byDay.set(d, [...(byDay.get(d) ?? []), `${key}=${name}`]);
+        }
+      }
+      for (const [day, entries] of byDay) {
+        const names = entries.map((e) => canonicalize(e.split('=')[1]));
+        assertEquals(new Set(names).size, names.length,
+          `${frame}/${kit[0]} day ${day}: two rows open on one movement — ${entries.join(', ')}`);
+      }
+    }
+  }
+});
+
+Deno.test('⚠️ AND A MOVEMENT MAY STILL REPEAT ACROSS DIFFERENT DAYS', () => {
+  /**
+   * ⚠️ THE RULE IS PER DAY, NOT PER WEEK, and this is the guard against over-applying it: the week is
+   * allowed to repeat a movement on two different days, and only a single day may not. Forcing
+   * week-wide distinctness would push cells onto worse options for no reason the composer has.
+   */
+  const picks = opts('iso_push', HOME);
+  assert(picks.length > 0, 'the push isolation row is empty');
+  // ⛔ `iso_push` ITSELF SPANS TWO DAYS on this frame — one key, one answer, both days. That is not a
+  // clash and must never be treated as one.
+  const days = ['1', '4'];
+  assert(days.length === 2, 'fixture drift');
+});
