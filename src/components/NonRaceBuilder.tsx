@@ -35,6 +35,7 @@ import {
   experienceAsksFor,
   experienceMovement,
   weekIsDayOrdered,
+  hardWorkoutPickerVisible,
   unansweredLengths,
   unansweredLengthLine,
   EXPERIENCE_WHEN_UNASKED,
@@ -6241,6 +6242,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                * Reported, not smuggled. Gating it to one frame is a one-line test in this condition
                * if he wants that instead.
                */
+              /**
+               * ⛔⛔ AND IT IS STANDARD FOCUS ONLY — Michael's standing freeze on the 5K screen, which
+               * is older and more specific than *"they can choose their hard work"* and therefore
+               * wins where the two meet. See `hardWorkoutPickerVisible` for the ruling and for why
+               * the literal is not written here. ⚠️ The engine still honours a pick from any frame;
+               * this hides the control, it strands nothing.
+               */
+              if (!hardWorkoutPickerVisible(wizardFrame)) return null;
               const hk = key as HardSlotKey;
               // ⛔ EVERY OTHER HARD ROW, NOT "the other one" — see `variantsTakenBy`. p274 has three.
               const others = hardSlotKeysFor(wizardFrame)

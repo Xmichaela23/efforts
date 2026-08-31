@@ -131,6 +131,22 @@ Deno.test('⛔⛔ EVERY HARD ROW OFFERS ITS WORKOUT, AND THE LONG ROW STILL DOES
   assert(/slotKey=\{hk\}/.test(code), 'the hard rows lost their workout picker');
 
   /**
+   * ⛔⛔ AND IT IS STANDARD FOCUS ONLY — Michael's standing freeze on the 5K screen, relayed
+   * 2026-08-31: *"no dont touch 5k"*. The restore was written frame-agnostically because a hard row
+   * is a hard row; the freeze is the older and more specific instruction and wins where they meet.
+   * ⚠️ ASSERTED AT THE CALL SITE AND AT THE OWNER, so neither the gate nor its single literal can be
+   * removed without this failing.
+   */
+  assert(/if \(!hardWorkoutPickerVisible\(wizardFrame\)\) return null;/.test(code),
+    '⛔ the workout picker is no longer gated — it reaches the frozen 5K screen');
+  const COPY = await read('./standing-plan-week-copy.ts');
+  assert(/export function hardWorkoutPickerVisible/.test(COPY),
+    'the gate lost its single owner — a frame literal in the wizard is a second copy of the ruling');
+  const { hardWorkoutPickerVisible } = await import('./standing-plan-week-copy.ts');
+  assertEquals(hardWorkoutPickerVisible('strength_5k'), false, '⛔ the 5K screen gained the picker');
+  assertEquals(hardWorkoutPickerVisible('all_rounder'), true);
+
+  /**
    * ⛔ NO HARD SHAPE IS LEVEL-GATED, which is what makes the picker safe. If a gated archetype is
    * ever added to one of these families this fails, and `slotVariantOptions` — which ignores
    * `levels` — has to learn about it before the option can ship.
