@@ -48,7 +48,6 @@ import {
   experienceMovement,
   experienceSubtitle,
   experienceHeadingFor,
-  experienceNoteFor,
   experienceAsksFor,
   experienceChipTextFor,
   restIsEasyLine,
@@ -796,17 +795,21 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                    */
                   const plain = dayOrdered;
                   if (!experienceAsksFor(sport, movement, plain)) return null;
-                  const subtitle = plain
-                    ? experienceNoteFor(sport, movement, plain, pair.newer.hardCount)
-                    : experienceSubtitle(sport, movement);
+                  /**
+                   * ⛔⛔ THE PLAIN QUESTION CARRIES NOTHING UNDER ITS HEADING (Michael, 2026-08-30):
+                   * **"Question, two chips, nothing else."** It briefly carried *"The hard ride is the
+                   * same length either way"*, which he then removed — the heading names the session
+                   * outright, so the sentence was restating the question's own scope. See the
+                   * `experienceNoteFor` tombstone for the arm that went with it.
+                   * ⚠️ `strength_5k` KEEPS ITS SUBTITLE, unchanged.
+                   */
+                  const subtitle = plain ? null : experienceSubtitle(sport, movement);
                   return (
                     <div className="mt-3" data-testid={`${sport}-experience`}>
                       <p className="text-white/80 text-[13px]">
                         {experienceHeadingFor(sport, movement, plain)}
                       </p>
-                      {/* ⛔ THE ONE FACT THE CHIPS NO LONGER CARRY — see `experienceNoteFor`. On the ride
-                          question it is Michael's *"the hard ride is the same length either way"*, which
-                          he ruled must stay on the control. */}
+                      {/* ⚠️ NULL ON THE PLAIN QUESTION — see above. `strength_5k` still renders one. */}
                       {subtitle ? (
                         <p className="text-white/55 text-xs mt-0.5 leading-snug">{subtitle}</p>
                       ) : null}

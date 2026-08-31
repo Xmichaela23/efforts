@@ -25,7 +25,6 @@ import {
   experienceMovement,
   experienceAsksFor,
   experienceHeadingFor,
-  experienceNoteFor,
   experienceChipTextFor,
   experienceSubtitle,
   EXPERIENCE_HEADING,
@@ -191,7 +190,6 @@ Deno.test('⛔ THE 5K FRAME STILL TAKES THE HARD ARM ON EVERY ROW — its copy i
   assertEquals(experienceMovement(run), 'hard');
   assertEquals(experienceSubtitle('run', 'hard'), EXPERIENCE_SUBTITLE.run);
   assertEquals(experienceHeadingFor('run', 'hard', false), EXPERIENCE_HEADING.run);
-  assertEquals(experienceNoteFor('run', 'hard', false, run.newer.hardCount), null);
   assert(experienceChipTextFor('run', 'hard', run.newer, null, false).startsWith('Less experienced'),
     'the 5K chip lost its label');
   assert(/min max/.test(experienceChipTextFor('run', 'hard', run.experienced, null, false)));
@@ -224,9 +222,14 @@ Deno.test('⛔⛔⛔ STANDARD FOCUS ASKS ONE QUESTION, AND ONLY WHERE THE LONG S
 Deno.test('⛔⛔ THE RIDE QUESTION IS A PLAIN LENGTH QUESTION — no experience word on its face', () => {
   const ride = chipsFor(AR_LONG_RIDE, 'all_rounder').ride!;
   assertEquals(experienceHeadingFor('ride', 'long', true), 'How long do you want your long ride to be?');
-  /** ⛔ MICHAEL RULED THIS FACT STAYS ON THE CONTROL — without it a rider assumes the hard ride moved. */
-  assertEquals(experienceNoteFor('ride', 'long', true, ride.newer.hardCount),
-    'The hard ride is the same length either way.');
+  /**
+   * ⛔ NOTHING UNDER THE HEADING — Michael, 2026-08-30: **"Question, two chips, nothing else."** The
+   * subtitle is null on the plain question, and `experienceNoteFor` is deleted with a tombstone. The
+   * `strength_5k` subtitle is asserted separately above and is unchanged.
+   */
+  assertEquals(experienceSubtitle('ride', 'long'),
+    'Sets how long your long ride is. The hard ride is the same length either way.',
+    'the 5K-path subtitle changed — the plain question drops it, the labelled control keeps it');
 
   const lower = experienceChipTextFor('ride', 'long', ride.newer, null, true);
   const upper = experienceChipTextFor('ride', 'long', ride.experienced, null, true);

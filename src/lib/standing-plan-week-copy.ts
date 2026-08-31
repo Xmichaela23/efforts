@@ -1040,37 +1040,26 @@ export function experienceHeadingFor(
 }
 
 /**
- * ⛔ THE ONE FACT THE CHIPS NO LONGER CARRY, SAID ONCE UNDER THE HEADING.
+ * ⛔⛔ `experienceNoteFor` IS DELETED (Michael, 2026-08-30), AND THIS IS WHY IT MAY NOT COME BACK.
  *
- * ⛔ ON THE LONG ARM it is the ride subtitle's second sentence, which Michael ruled must stay on the
- * control: without it a rider reads "long ride" and assumes the hard ride moved with it. It is the
- * answer to the question two identical hard-ride numbers would otherwise leave them hunting for.
+ * It rendered one line under the heading. On the long-ride question that line was *"The hard ride is
+ * the same length either way."* — a fact Michael had asked for one ruling earlier and then removed:
+ * **"not necessary. Question, two chips, nothing else."**
  *
- * ⛔⛔ ON THE HARD ARM it is the SESSION COUNT, and it moved here rather than being dropped. The chip
- * carried *"two hard sessions · 46 min max"* on both options — the count was identical on each, so as
- * an OPTION in a length question it was noise, while as a fact about the week it is the thing Michael
- * added it for on 2026-08-30: *"he books evenings, not minutes."* Stated once, above the two lengths.
- * ⚠️ DERIVED FROM THE SLOTS, never assumed to be two — a mixed week genuinely has one hard run and
- * must say one. Singular and plural both have to be right; a plural over one session reads as the app
- * not knowing what it built.
+ * ⛔ AND THE RULING IS RIGHT ABOUT ITS OWN PREMISE. The sentence existed to stop a rider assuming the
+ * hard ride moved with the answer — a real risk while the control was headed *"Riding experience"*
+ * and could plausibly have meant any riding session. **The heading now names the session outright**
+ * ("How long do you want your long ride to be?"), so the scope of the answer is in the question and
+ * the sentence was restating it.
+ *
+ * ⚠️ THE OTHER ARM IT CARRIED IS GONE WITH IT and is recorded here rather than lost: on a plain
+ * length question about HARD sessions it stated the session COUNT — *"Two hard runs a week, either
+ * way"* — because the count is identical on both chips and is noise as an option but real as a fact
+ * about the week (his 2026-08-30 reason: he books evenings, not minutes). **No such question renders
+ * today** — Standard Focus asks about the long ride only, and `strength_5k` keeps its labelled chips
+ * which carry the count themselves. If a plain hard question is ever added, that is the line it needs
+ * and this note is where it went.
  */
-export function experienceNoteFor(
-  sport: SlotSport,
-  movement: ExperienceMovement,
-  plainLengthQuestion: boolean,
-  hardCount: number,
-): string | null {
-  if (!plainLengthQuestion || movement === 'none') return null;
-  if (movement === 'long') {
-    return sport === 'ride'
-      ? 'The hard ride is the same length either way.'
-      : 'The hard run is the same length either way.';
-  }
-  if (hardCount <= 0) return null;
-  const n = hardCount === 1 ? 'One' : hardCount === 2 ? 'Two' : String(hardCount);
-  const noun = sport === 'ride' ? 'hard ride' : 'hard run';
-  return `${n} ${noun}${hardCount === 1 ? '' : 's'} a week, either way.`;
-}
 
 /**
  * ⛔⛔⛔ ON STANDARD FOCUS THE CONTROL IS **ONE CONDITIONAL QUESTION**, NOT TWO — Michael's final
@@ -1284,7 +1273,7 @@ export function experienceChipTextFor(
   if (plain) {
     /**
      * ⛔ THE COUNT IS NOT ON THE CHIP ON THE PLAIN QUESTION — it is identical on both options and it
-     * is stated once above them by `experienceNoteFor`. What is left is the maximum, which is the
+     * is not an option. What is left is the maximum, which is the
      * one thing the two options differ by. ⚠️ `hardCount` 0 or no duration still prints nothing
      * rather than a dangling separator, same as the labelled arm.
      */
