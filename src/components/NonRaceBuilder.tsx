@@ -2198,7 +2198,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         ...st.assistancePicks,
         viada: {
           version: 1,
-          picks: defaultViadaPicks(strengthEquipment, []),
+          picks: defaultViadaPicks(strengthEquipment, [], wizardFrame),
           dial: [],
           dial_rows: {},
         } as ViadaAccessoryPrefs,
@@ -2246,7 +2246,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const patchViada = (patch: Partial<ViadaAccessoryPrefs>) => setState((st) => {
     const cur = st.assistancePicks.viada ?? {
       version: 1 as const,
-      picks: defaultViadaPicks(strengthEquipment, []),
+      picks: defaultViadaPicks(strengthEquipment, [], wizardFrame),
       dial: [] as DialChip[],
       dial_rows: {},
     };
@@ -2267,12 +2267,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     );
     patchViada({
       dial: next,
-      picks: defaultViadaPicks(strengthEquipment, next),
+      picks: defaultViadaPicks(strengthEquipment, next, wizardFrame),
       dial_rows: rows,
     });
   };
   const setViadaPick = (key: ViadaPickKey, name: string) => patchViada({
-    picks: { ...(viadaPrefs?.picks ?? defaultViadaPicks(strengthEquipment, viadaPrefs?.dial ?? [])), [key]: name },
+    picks: { ...(viadaPrefs?.picks ?? defaultViadaPicks(strengthEquipment, viadaPrefs?.dial ?? [], wizardFrame)), [key]: name },
   });
   const setViadaRow = (key: string, name: string) => patchViada({
     dial_rows: { ...(viadaPrefs?.dial_rows ?? {}), [key]: name },
@@ -5391,14 +5391,36 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   a pick is drawn when the frame carries an HYP accessory cell it can fill. See its
                   note for why p274 has none for four of them and none at all for Core.
                   ⚠️ D-457: no frame argument may default on a shared surface. */}
-              {picksForFrame(wizardFrame).map((key) => {
+              {((drawn: ViadaPickKey[]) => drawn.map((key) => {
                 const spec = VIADA_PICKS[key];
+                /**
+                 * ⛔⛔ THE SUPERSET IS NAMED ONLY WHEN ITS PARTNER IS ON THE SCREEN (caught on the
+                 * rendered page, 2026-08-30). p274 prints the braced pair as one row, but the leg
+                 * press half is machine work (p221) and an athlete without machines does not get a
+                 * control for it — so *"Back extension · superset with the leg press"* rendered over
+                 * a leg press picker that was not there. **The same defect as the orphaned core note,
+                 * one screen later: copy outliving the control it describes.**
+                 * ⚠️ THE SESSION STILL SUPERSETS — the composer fills that cell by substitution. What
+                 * the athlete has no say over, the screen does not talk about.
+                 */
+                const pairDrawn = spec.pairedWith != null && drawn.includes(spec.pairedWith);
                 const opts = pickOptions(key, strengthEquipment);
                 const value = viadaPrefs?.picks?.[key] ?? opts[0]?.name ?? '';
                 return (
                   <div key={key}>
                     <div className="flex items-baseline justify-between gap-2 mb-1">
-                      <span className="text-white/85 text-sm">{spec.label}</span>
+                      <span className="text-white/85 text-sm">
+                        {spec.label}
+                        {/* ⛔⛔ THE SUPERSET THE PAGE PRINTS, NAMED ON BOTH HALVES (p274, 2026-08-30).
+                            The week's lower days carry *"2 × HYP: braced hinge / braced lower push
+                            superset"* — ONE printed row, two movements. Nothing in the app pairs
+                            exercises yet (`frames.ts`, DESIGN §5), so without this the athlete meets
+                            two unrelated dropdowns for a row the book writes as a pair.
+                            ⚠️ It is the SPEC's sentence, not the screen's — `superset` on the pick. */}
+                        {spec.superset && pairDrawn ? (
+                          <span className="text-white/40"> · {spec.superset}</span>
+                        ) : null}
+                      </span>
                       <span className="text-white/45 text-xs">
                         {/* ⛔ THE FRAME'S OWN DAYS. Unpassed, this read p246's: it printed "day 1"
                             for Push isolation where p274 carries that cell on day 1 AND day 4, and
@@ -5419,7 +5441,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     </select>
                   </div>
                 );
-              })}
+              }))(picksForFrame(wizardFrame, strengthEquipment))}
               {/* ⛔ ONE LINE, UNDER THE FIELD IT IS ABOUT. What stood here named the source, the
                   missing core slot and "the four movement patterns" — sourcing talk and engine
                   vocabulary, under a dropdown.
@@ -5429,7 +5451,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   your weekly core work uses"* under four pickers, none of them core. **A note is not
                   a note when its subject is gone; it is a claim about a control the athlete cannot
                   find.** It reads the same list the pickers do, so the two cannot come apart. */}
-              {picksForFrame(wizardFrame).includes('core') ? (
+              {picksForFrame(wizardFrame, strengthEquipment).includes('core') ? (
                 <p className="text-white/45 text-[13px] leading-relaxed">{CORE_PICK_NOTE}</p>
               ) : null}
             </div>

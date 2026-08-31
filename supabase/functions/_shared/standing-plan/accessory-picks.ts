@@ -52,11 +52,94 @@ export type ViadaPickKey =
   | 'single_leg_b'
   | 'hinge_lower'
   | 'quad_iso'
+  /**
+   * ⛔⛔⛔ p274's OWN CELLS — the second frame's pick vocabulary (Michael, 2026-08-30: *"Standard
+   * Focus gets its own accessory pickers over the cells p274 actually has"*).
+   *
+   * ⛔ WHY THEY ARE NEW KEYS AND NOT A WIDENING. **p246 is built on `secondary` accessory cells and
+   * p274 has none** — its accessory work is `braced` and `focused` (p274, transcribed in
+   * `SOURCE-viada-hybrid-athlete.md` Part E1). Four of the 5K table's picks aim at cells this frame
+   * does not contain, which is exactly why they were dead controls on it.
+   * ⚠️ THE FOUR SURVIVORS KEEP THEIR OLD KEYS. `iso_push`, `iso_pull_a`, `iso_pull_b` and `quad_iso`
+   * point at cells BOTH frames carry, so re-keying them would have dropped every pick already stored
+   * on a block for no gain. **The table is per-frame; the key vocabulary is shared where the cell is
+   * the same.** See `PICK_KEYS_BY_FRAME`.
+   */
+  | 'braced_push'
+  | 'braced_pull'
+  | 'braced_hinge'
+  | 'braced_leg'
+  | 'ham_iso'
   | 'core';
 
+/** ⛔ p246's TABLE, FROZEN. `strength_5k`'s membership and nothing else — see `PICK_KEYS_BY_FRAME`. */
 export const VIADA_PICK_KEYS: ViadaPickKey[] = [
   'db_press', 'iso_push', 'iso_pull_a', 'iso_pull_b', 'hinge_lower', 'single_leg_a', 'single_leg_b', 'quad_iso', 'core',
 ];
+
+/**
+ * ⛔⛔⛔ p274's TABLE — the athlete's say over the All Rounder's four lifting days.
+ *
+ * ⛔ EVERY HYP ACCESSORY CELL p274 CARRIES, AND NOTHING ELSE. The week has 22 strength slots; 14 of
+ * them are HYP accessory, which is the only intent the composer consults a pick for. The other eight
+ * are the four day-opening ME slots, two DE and one SKILL — see `MOVEMENT_CHOICE_ON_ME_IS_OURS`.
+ *
+ * | day | cell (p274) | pick |
+ * |---|---|---|
+ * | 1 | 1 × HYP braced push | `braced_push` |
+ * | 1 · 4 | 2 × HYP focused push/pull (arms) superset + 1 × HYP focused push/pull | `iso_push`, `iso_pull_a`, `iso_pull_b` |
+ * | 4 | 1 × HYP braced pull | `braced_pull` |
+ * | 2 · 5 | 2 × HYP braced hinge / braced lower push superset | `braced_hinge`, `braced_leg` |
+ * | 2 | 1 × HYP focused hamstring | `ham_iso` |
+ * | 5 | 1 × HYP focused quadriceps | `quad_iso` |
+ *
+ * ⚠️ THE TWO BRACED PICKS ARE DAY-AGNOSTIC, AND THAT IS A DIFFERENT CALL FROM p246's. That table
+ * splits `focused pull_upper` and `secondary press_lower` per day because the two occurrences do
+ * different jobs. **p274 prints the SAME pairing on both lower days** — *"2 × HYP: braced hinge /
+ * braced lower push superset"*, verbatim on day 2 and day 5 — so one answer for each half is the
+ * faithful reading, and four controls for two printed rows would be the screen inventing a
+ * distinction the page does not make.
+ */
+export const ALL_ROUNDER_PICK_KEYS: ViadaPickKey[] = [
+  'braced_push', 'iso_push', 'iso_pull_a', 'braced_hinge', 'braced_leg', 'ham_iso',
+  'braced_pull', 'iso_pull_b', 'quad_iso',
+];
+
+/**
+ * ⛔⛔⛔ D-457 — THE PICK TABLE IS THE FRAME'S, AND THERE IS NO SHARED DEFAULT. Michael, 2026-08-30:
+ * *"this is a second frame-owned pick table, no shared defaults."* A caller that does not name a
+ * frame cannot get a list out of this module at all.
+ */
+export const PICK_KEYS_BY_FRAME: Record<FrameId, ViadaPickKey[]> = {
+  strength_5k: VIADA_PICK_KEYS,
+  all_rounder: ALL_ROUNDER_PICK_KEYS,
+};
+
+/**
+ * ⚠️⚠️ WHY THE ME, DE AND SKILL SLOTS TAKE NO PICK, AND IT IS **OURS RATHER THAN HIS** — verified
+ * against the source rather than assumed (Michael asked for exactly that check, 2026-08-30).
+ *
+ * ⛔ THE BOOK DOES NOT RESERVE THEM. p275 invites the athlete into the day-opening slot in terms:
+ * *"if you want to incorporate more asymmetrical movements, I encourage you to select those for the
+ * secondary movement that begins each day. You might not consider split squats or similar for ME
+ * lifting, but there is certainly no rule that says you can't."* **That is his permission for an
+ * athlete choice on the ME slot, and we are not offering it.**
+ *
+ * ⛔ WHAT ACTUALLY RESERVES THEM IS OUR MACHINERY. `exerciseForSlot` puts a WEIGHT on a row only
+ * when the movement is the athlete's named competition lift for that pattern, and Michael ruled on
+ * 2026-08-30 that the day-opening lift is a competition primary for that reason — a day with no
+ * tested lift prescribes no weight. And `compose.ts` consults a pick only for a cell that is
+ * `intent === 'HYP' && role === 'accessory'`, so a pick on a DE or SKILL cell would be stored and
+ * silently ignored — the defect class this whole pass exists to close.
+ *
+ * ⚠️ SO IT IS A LIMIT OF THE APP, NOT OF THE PROGRAMME, and it is recorded here so nobody later
+ * writes "the book reserves the ME slot". Opening it needs the weight path to handle a
+ * non-competition movement first.
+ */
+export const MOVEMENT_CHOICE_ON_ME_IS_OURS =
+  'p275 permits the athlete to choose the day-opening secondary movement, including asymmetrical '
+  + 'work; the app reserves it because only a named competition lift resolves to a prescribed '
+  + 'weight. The restriction is ours, not his.';
 
 /**
  * ⛔⛔ SUPERSEDED 2026-08-29 — MICHAEL RULED THE OTHER WAY AND THE `hinge_lower` PICK NOW EXISTS.
@@ -151,6 +234,16 @@ export type ViadaPickSpec = {
    * athlete's pinned days and the frame day does not.
    */
   slot: { category: ViadaCategory; pattern: ViadaPattern | null; frameDay?: number } | null;
+  /**
+   * ⛔ THE OTHER HALF OF A SUPERSET THE PAGE PRINTS AS ONE ROW. p274 pairs `braced hinge` with
+   * `braced lower push` on both lower days: *"2 × HYP: braced hinge / braced lower push superset"*.
+   * ⚠️ IT IS DISPLAY, NOT STRUCTURE — nothing in the app pairs exercises yet (`frames.ts`, DESIGN
+   * §5), so this exists so the two dropdowns read as the one row they came from rather than as two
+   * unrelated controls. **Two answers, one printed row.**
+   */
+  pairedWith?: ViadaPickKey;
+  /** What the screen says beside a paired pick, in lifter words. Absent on an unpaired cell. */
+  superset?: string;
   /**
    * HIS PRINTED LIST FOR THIS CELL, AND THE ONLY THING THE PICKER OFFERS (Michael, 2026-08-29:
    * "I don't want extraneous exercises that aren't in his book").
@@ -497,6 +590,90 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     leadCite: 'Viada p223 — focused push lower / quads',
     servesChips: [],
   },
+  /**
+   * ⛔ p274 DAY 1 — `1 × HYP: braced push`. p221 BRACED PUSH UPPER: *Smith machine press · machine
+   * chest press · dip machine/pressdown*.
+   * ⚠️ MACHINES OR NOTHING, AND THAT IS A REAL LIMIT ON THIS PICK — see `BRACED_NEEDS_MACHINES`.
+   */
+  braced_push: {
+    key: 'braced_push',
+    label: 'Machine press',
+    slot: { category: 'braced', pattern: 'push_upper' },
+    hisList: ['smith machine press', 'machine chest press', 'dip machine'],
+    // ⛔ HIS ORDER, so the zero-touch default is the movement he prints first.
+    leadWith: ['smith machine press', 'machine chest press', 'dip machine'],
+    leadCite: 'Viada p221 — braced push upper',
+    // ⛔ p274 PAIRS NOTHING HERE. The braced push stands alone on day 1; only the arms and the lower
+    // braced rows are printed as supersets.
+    servesChips: ['chest'],
+  },
+  /** ⛔ p274 DAY 4 — `1 × HYP: braced pull`. p221 BRACED PULL UPPER: *chest-supported row (high or
+   *  low) · lat pulldowns (single or double, any grip) · cable upright row*. */
+  braced_pull: {
+    key: 'braced_pull',
+    label: 'Machine pull',
+    slot: { category: 'braced', pattern: 'pull_upper' },
+    hisList: ['chest supported row', 'lat pulldown', 'cable upright row'],
+    // ⛔ HIS ORDER, so the zero-touch default is the movement he prints first.
+    leadWith: ['chest supported row', 'lat pulldown', 'cable upright row'],
+    leadCite: 'Viada p221 — braced pull upper',
+    servesChips: ['shoulders'],
+  },
+  /**
+   * ⛔⛔ p274 DAYS 2 AND 5 — the first half of `2 × HYP: braced hinge / braced lower push superset`.
+   * p221 BRACED HINGE LOWER: *reverse hyperextension (machine) · GHD back extension · ground-based
+   * deadlift machine · machine back extension*.
+   * ⚠️ DAY-AGNOSTIC. The page prints the identical pairing on both lower days, so one answer covers
+   * both — see `ALL_ROUNDER_PICK_KEYS` for why that differs from p246's per-day splits.
+   */
+  braced_hinge: {
+    key: 'braced_hinge',
+    label: 'Back extension',
+    slot: { category: 'braced', pattern: 'hinge_lower' },
+    hisList: ['reverse hyperextension', 'reverse hyper', 'ghd back extension', 'machine back extension', 'back extension', 'ground-based deadlift machine'],
+    leadWith: ['reverse hyperextension', 'ghd back extension', 'machine back extension'],
+    leadCite: 'Viada p221 — braced hinge lower',
+    // ⛔ THE SUPERSET IS HIS, AND THE SCREEN SAYS SO. Nothing in the app pairs exercises yet
+    // (`frames.ts`, DESIGN §5) — this names the pairing the page prints so the two dropdowns read as
+    // the one row they came from.
+    pairedWith: 'braced_leg',
+    superset: 'superset with the leg press',
+    servesChips: ['glutes'],
+  },
+  /**
+   * ⛔⛔ p274 DAYS 2 AND 5 — the second half of that superset. p221 BRACED PUSH LOWER: *hack squat ·
+   * leg press · lever squat*.
+   */
+  braced_leg: {
+    key: 'braced_leg',
+    label: 'Leg press',
+    slot: { category: 'braced', pattern: 'press_lower' },
+    hisList: ['hack squat', 'leg press', 'lever squat'],
+    // ⛔ HIS ORDER, so the zero-touch default is the movement he prints first.
+    leadWith: ['leg press', 'hack squat', 'lever squat'],
+    leadCite: 'Viada p221 — braced push lower',
+    pairedWith: 'braced_hinge',
+    superset: 'superset with the back extension',
+    servesChips: ['glutes'],
+  },
+  /**
+   * ⛔ p274 DAY 2 — `1 × HYP: focused hamstring`. p223 FOCUSED HINGE LOWER / HAMSTRINGS:
+   * *machine/Smith machine hip thrust · hamstring curls (seated or prone) · cable or machine
+   * kickbacks*.
+   * ⚠️ THE HIP THRUST IS NOT IN THIS CELL'S POOL. The catalogue files `machine hip thrust` under
+   * BRACED hinge rather than focused, so it reaches the athlete through `braced_hinge` above and is
+   * not repeated here — offering it twice would let one movement fill two of the day's rows.
+   */
+  ham_iso: {
+    key: 'ham_iso',
+    label: 'Hamstring isolation',
+    slot: { category: 'focused', pattern: 'hinge_lower' },
+    hisList: ['leg curl', 'hamstring curl', 'seated leg curl', 'lying leg curl', 'cable kickback'],
+    // ⛔ HIS ORDER, so the zero-touch default is the movement he prints first.
+    leadWith: ['leg curl', 'cable kickback'],
+    leadCite: 'Viada p223 — focused hamstrings',
+    servesChips: ['glutes'],
+  },
   core: {
     key: 'core',
     /**
@@ -547,9 +724,17 @@ export function pickKeyForSlot(
    * loses its pick. Every caller that HAS a day must pass it.
    */
   frameDay?: number,
+  /**
+   * ⛔⛔⛔ WHICH FRAME'S TABLE (D-457, 2026-08-30). p246 and p274 own different pick vocabularies —
+   * p246 is built on `secondary` accessory cells and p274 has none — so a cell must be matched
+   * against the membership of the frame being built. **Without this a p274 braced cell would be
+   * offered p246's picks and find none, which is the silence this whole pass closed.**
+   * ⚠️ Absent keeps `strength_5k`, which is every caller that predates the second table.
+   */
+  frame: FrameId = 'strength_5k',
 ): ViadaPickKey | null {
   let fallback: ViadaPickKey | null = null;
-  for (const key of VIADA_PICK_KEYS) {
+  for (const key of (PICK_KEYS_BY_FRAME[frame] ?? VIADA_PICK_KEYS)) {
     const slot = VIADA_PICKS[key].slot;
     if (!slot || slot.category !== category || slot.pattern !== pattern) continue;
     if (slot.frameDay == null) {
@@ -647,7 +832,9 @@ export function pickKeysInDayOrder(
     const days = frameDaysForPick(k, frame, column);
     return days.length > 0 ? Math.min(...days) : Number.MAX_SAFE_INTEGER;
   };
-  return [...VIADA_PICK_KEYS]
+  // ⛔ THE FRAME'S OWN TABLE — see `PICK_KEYS_BY_FRAME`. This read `VIADA_PICK_KEYS`, which is
+  // p246's membership, and that is how p246's nine controls came to render over a p274 week.
+  return [...(PICK_KEYS_BY_FRAME[frame] ?? VIADA_PICK_KEYS)]
     .map((k, i) => ({ k, i, d: dayOf(k) }))
     // ⚠️ THE TABLE ORDER IS THE TIEBREAK, so two rows on one day keep the order the table gives them
     // rather than being reordered by an accident of the sort.
@@ -706,12 +893,61 @@ export function pickReachesFrame(
  * ⚠️ THE FRAME IS REQUIRED. This function exists because its predecessors defaulted to `strength_5k`
  * and a screen that forgot to pass one rendered the wrong programme in silence. See D-457.
  */
-export function picksForFrame(frame: FrameId, column: ColumnKind = 'standard'): ViadaPickKey[] {
+export function picksForFrame(
+  frame: FrameId,
+  /**
+   * ⛔⛔ THE ATHLETE'S KIT, AND IT DECIDES WHETHER A CELL IS A CHOICE AT ALL — added with p274's own
+   * table (2026-08-30). **p274's accessory work is BRACED, and braced means machines** (p221: Smith
+   * machine press, hack squat, leg press, reverse hyperextension machine). Standard Focus's own
+   * entry gate asks for a barbell, plates, a rack and a bench — it does not ask for machines — so an
+   * athlete can legitimately arrive with none of his braced movements reachable.
+   *
+   * ⛔ MEASURED, at barbell + dumbbells + bench: `braced push_upper` resolves to dumbbell and
+   * push-up variants, `braced pull_upper` to barbell and dumbbell rows, `braced press_lower` to
+   * split squats and lunges. **Every one of them is a substitute the grid found, and NOT ONE is a
+   * movement he printed for that cell** — the strict cut (Michael, 2026-08-29: *"I don't want
+   * extraneous exercises that aren't in his book"*) removes them all and the cell empties.
+   *
+   * ⛔ SO THE CONTROL IS NOT DRAWN, AND THE COMPOSER STILL FILLS THE CELL. The week is unchanged —
+   * the substitution ladder puts a real movement there — what the athlete does not get is a SAY over
+   * a cell where his list is out of reach. An empty dropdown, or one holding a movement he never
+   * printed, would be worse than no control.
+   * ⚠️ AND A ONE-OPTION PICK IS NOT A CHOICE EITHER. Two is the floor for drawing a control.
+   * ⚠️ ABSENT EQUIPMENT SKIPS THE TEST rather than hiding everything: an athlete nobody asked is the
+   * conservative arm, the same rule `pickOptions` follows for bodyweight gating.
+   */
+  equipment?: string[] | null,
+  column: ColumnKind = 'standard',
+): ViadaPickKey[] {
   const ordered = pickKeysInDayOrder(frame, column);
   // ⚠️ SEE `pickReachesFrame` — the exemption is Michael's ruling and its cost is recorded there.
-  if (frame === 'strength_5k') return ordered;
-  return ordered.filter((k) => pickReachesFrame(k, frame, column));
+  const reachable = frame === 'strength_5k'
+    ? ordered
+    : ordered.filter((k) => pickReachesFrame(k, frame, column));
+  if (equipment == null) return reachable;
+  return reachable.filter((k) => VIADA_PICKS[k].slot == null || pickOptions(k, equipment).length >= 2);
 }
+
+/**
+ * ⛔ WHAT p274 ASKS FOR THAT A BARBELL-ONLY GYM CANNOT GIVE — stated as a finding rather than
+ * improvised around (Michael, 2026-08-30: *"if the book genuinely blocks something, state it as a
+ * finding with the page, don't improvise"*).
+ *
+ * It is not the book that blocks it, it is the kit. p274 spends four of its fourteen accessory cells
+ * on BRACED work and p221 defines braced as machine work — Smith machine press, machine chest press,
+ * dip machine · chest-supported row, lat pulldown, cable upright row · hack squat, leg press, lever
+ * squat · reverse hyperextension, GHD, machine back extension. **An athlete with a barbell, plates,
+ * a rack and a bench — which is all Standard Focus's entry gate asks for — can reach none of them.**
+ * Their week still builds; the grid substitutes. What they lose is the CHOICE over those cells.
+ * ⚠️ p275 offers a rotation out of braced work for the ASYMMETRICAL slots only (*"you can rotate the
+ * braced asymmetrical movements with secondary asymmetrical"*) — those are the DE and SKILL cells,
+ * which take no pick. **He offers no such rotation for the HYP braced superset**, so there is no
+ * sourced substitute to offer and inventing one would be ours.
+ */
+export const BRACED_NEEDS_MACHINES =
+  'p274 spends four accessory cells on braced work and p221 defines braced as machine work. An '
+  + 'athlete without machines reaches none of his movements for those cells, so the picker is not '
+  + 'drawn for them; the composer still fills the cell by substitution.';
 
 /**
  * ⛔⛔ HIS DAY NUMBER, NOT A WEEKDAY AND NOT A RENUMBER (Michael, 2026-08-26).
@@ -942,9 +1178,19 @@ export function defaultPickFor(
 export function defaultViadaPicks(
   equipment: string[] | null | undefined,
   dial: DialChip[] = [],
-): Record<ViadaPickKey, string> {
-  const out = {} as Record<ViadaPickKey, string>;
-  for (const key of VIADA_PICK_KEYS) out[key] = defaultPickFor(key, equipment, dial);
+  /**
+   * ⛔⛔ THE FRAME'S OWN KEYS (D-457, 2026-08-30). Seeded from `VIADA_PICK_KEYS` this wrote p246's
+   * nine answers onto every block — so a Standard Focus plan row carried picks for four cells its
+   * frame does not have and none for the five it does. **Inert in the composer, which only consults
+   * the frame's own table, but it is an answer on the row the athlete never gave for a control they
+   * never saw.** ⚠️ Absent keeps p246's, which is every caller that predates the second table.
+   */
+  frame: FrameId = 'strength_5k',
+): Partial<Record<ViadaPickKey, string>> {
+  const out: Partial<Record<ViadaPickKey, string>> = {};
+  for (const key of (PICK_KEYS_BY_FRAME[frame] ?? VIADA_PICK_KEYS)) {
+    out[key] = defaultPickFor(key, equipment, dial);
+  }
   return out;
 }
 
@@ -1271,7 +1517,12 @@ const DIAL_ROW_LEAD: Partial<Record<DialChip, string[]>> = {
  */
 export type ViadaAccessoryPrefs = {
   version: 1;
-  picks: Record<ViadaPickKey, string>;
+  /**
+   * ⚠️ PARTIAL SINCE 2026-08-30 (D-457). It was a total record because one frame's table was the only
+   * table; with a second, a block carries answers for ITS frame's cells and nothing for the other's.
+   * A total type would have forced every screen to invent answers for cells its week does not have.
+   */
+  picks: Partial<Record<ViadaPickKey, string>>;
   dial: DialChip[];
   /**
    * The named movement for each extra row a chip adds, keyed `<chip>:<n>`. Absent = the engine

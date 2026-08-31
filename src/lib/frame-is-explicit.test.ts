@@ -37,11 +37,27 @@ import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.t
 import {
   dayLabelForPick,
   pickKeysInDayOrder,
+  pickOptions,
   picksForFrame,
+  VIADA_PICKS,
   VIADA_PICK_KEYS,
 } from '../../supabase/functions/_shared/standing-plan/accessory-picks.ts';
+import {
+  composeWeek,
+  defaultCompetitionLifts,
+} from '../../supabase/functions/_shared/standing-plan/index.ts';
 
 const read = (rel: string) => Deno.readTextFile(new URL(rel, import.meta.url));
+
+/** ⚠️ ANCHORS ONLY — the picks are movement names and no number here depends on the athlete. */
+const BASELINES = {
+  learned_fitness: {
+    run_threshold_pace_sec_per_km: { value: 340, confidence: 'high', sample_count: 10 },
+    run_easy_pace_sec_per_km: { value: 340, confidence: 'high', sample_count: 20 },
+  },
+  performance_numbers: { ftp: 250 },
+  ftp: 250,
+};
 
 /** ⛔ THE MODULES THAT SPEAK FRAME. A screen reaches the frames through one of these or not at all. */
 const SOURCES = [
@@ -173,8 +189,8 @@ Deno.test('⛔ THE BUILD FOCUS SCREEN DRAWS ONLY PICKS THE CHOSEN FRAME CAN HONO
    * and reverting to the unfiltered list is what puts five dead controls back on Standard Focus.
    */
   const src = await read('../components/NonRaceBuilder.tsx');
-  assert(/picksForFrame\(wizardFrame\)/.test(src),
-    'the Build focus screen no longer asks the chosen frame which picks it can honour');
+  assert(/picksForFrame\(wizardFrame,\s*strengthEquipment\)/.test(src),
+    'the Build focus screen no longer asks the chosen frame — and its kit — which picks it can draw');
   assert(!/pickKeysInDayOrder\(\s*\)/.test(src),
     '⛔ the unfiltered, frame-less pick list is back on the screen');
   assert(/dayLabelForPick\(key,\s*wizardFrame\)/.test(src),
@@ -196,6 +212,14 @@ Deno.test('⛔⛔ PASSING THE FRAME CHANGED NOTHING FOR `strength_5k` — the id
     'the 5K Build focus screen no longer draws the list it drew before the frame was passed');
   assertEquals(picksForFrame('strength_5k').length, VIADA_PICK_KEYS.length,
     'a pick went missing from the 5K screen');
+  /**
+   * ⛔⛔ AND p274's OWN TABLE MUST NOT LEAK ONTO IT. The five braced/focused picks are p274's cells;
+   * `strength_5k` carries no `braced` category anywhere, so a shared table would have put five
+   * controls on that screen pointing at nothing — the same defect, mirrored.
+   */
+  for (const k of ['braced_push', 'braced_pull', 'braced_hinge', 'braced_leg', 'ham_iso'] as const) {
+    assert(!picksForFrame('strength_5k').includes(k), `p274's ${k} leaked onto the 5K screen`);
+  }
   for (const k of VIADA_PICK_KEYS) {
     assertEquals(dayLabelForPick(k, 'strength_5k'), dayLabelForPick(k),
       `the 5K day tag for ${k} changed when the frame became explicit`);
@@ -207,9 +231,111 @@ Deno.test('⛔⛔ PASSING THE FRAME CHANGED NOTHING FOR `strength_5k` — the id
    * p274's accessory work is `braced` and `focused`; p246's is `secondary`, and four of the picks
    * aim at cells this frame does not contain.
    */
-  assertEquals(picksForFrame('all_rounder'), ['iso_push', 'iso_pull_a', 'iso_pull_b', 'quad_iso']);
+  /**
+   * ⛔⛔ p274's NINE, IN DAY ORDER — its own table, over the cells the page actually carries. Michael
+   * ruled WIRE rather than hide (2026-08-30): the athlete gets a say over all four lifting days.
+   * ⚠️ Equipment omitted here, so this is the frame's full membership before the kit is considered —
+   * `BRACED_NEEDS_MACHINES` covers what a barbell-only athlete loses.
+   */
+  assertEquals(picksForFrame('all_rounder'), [
+    'braced_push', 'iso_push', 'iso_pull_a',
+    'braced_hinge', 'braced_leg', 'ham_iso',
+    'braced_pull', 'iso_pull_b', 'quad_iso',
+  ]);
   // ⛔ AND ITS DAY TAGS ARE ITS OWN: p274 carries the focused push cell on day 1 AND day 4, where the
   // defaulted call printed "day 1" alone.
   assertEquals(dayLabelForPick('iso_push', 'all_rounder'), 'day 1 · day 4');
   assertEquals(dayLabelForPick('iso_push'), 'day 1');
+});
+
+Deno.test('⛔⛔⛔ EVERY PICK STANDARD FOCUS DRAWS ACTUALLY LANDS IN THE COMPOSED WEEK', () => {
+  /**
+   * ⛔⛔ THIS IS THE DEFECT CLASS THAT STARTED THE WHOLE PASS, and it is now a standing check rather
+   * than a one-off sweep. A control the athlete answers and the plan discards is worse than no
+   * control: it is the app agreeing to something it will not do. Five of p246's nine did exactly
+   * that on p274 before this.
+   *
+   * ⛔ IT ASSERTS THE BUILT WEEK, not a module call (handoff §7, trap three). Every option of every
+   * pick is composed and the movement is looked for on the frame day the screen advertises — so a
+   * pick that lands on the WRONG day fails here too, which a presence check alone would miss.
+   */
+  const BASE = {
+    competitionLifts: defaultCompetitionLifts(), roundTo: 5, frame: 'all_rounder' as const, week: 3,
+    column: 'standard' as const, equipment: ['Commercial gym'], baselines: BASELINES,
+    seed1RMs: { bench: 200, squat: 265, deadlift: 340, overheadPress: 125 },
+    sportMix: { slots: { '1:0': 'run', '2:0': 'ride', '3:0': 'run', '4:0': 'ride', '6:0': 'ride' } },
+    enduranceExperience: { run: 'experienced' as const, ride: 'experienced' as const },
+  };
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const drawn = picksForFrame('all_rounder', ['Commercial gym']);
+  assertEquals(drawn.length, 9, 'Standard Focus no longer draws a control for all nine of its cells');
+
+  let checked = 0;
+  for (const key of drawn) {
+    const options = pickOptions(key, ['Commercial gym']).map((o) => o.name);
+    assert(options.length >= 2, `${key} offers fewer than two movements — that is not a choice`);
+    const wantDays = (dayLabelForPick(key, 'all_rounder') ?? '')
+      .split(' · ').map((d) => Number(d.replace('day ', ''))).filter((n) => Number.isFinite(n));
+    assert(wantDays.length > 0, `${key} advertises no day`);
+    for (const movement of options) {
+      const w = composeWeek({ ...BASE, slotPicks: { [key]: movement } } as never) as {
+        sessions: Array<{ day: string; type: string; strength_exercises?: Array<{ name: string }> }>;
+      };
+      const landedOn = new Set(w.sessions
+        .filter((x) => x.type === 'strength'
+          && (x.strength_exercises ?? []).some((e) => e.name.toLowerCase() === movement.toLowerCase()))
+        .map((x) => DAYS.indexOf(x.day) + 1));
+      assert(landedOn.size > 0,
+        `⛔ ${VIADA_PICKS[key].label} → "${movement}" is offered and the built week does not contain it`);
+      for (const d of wantDays) {
+        assert(landedOn.has(d),
+          `⛔ ${VIADA_PICKS[key].label} says day ${d} and "${movement}" landed on ${[...landedOn].join('/')}`);
+      }
+      checked += 1;
+    }
+  }
+  assert(checked >= 30, `only ${checked} pick/movement pairs swept — the sweep stopped covering the table`);
+});
+
+Deno.test('⛔ THE SUPERSET p274 PRINTS AS ONE ROW IS NAMED ON BOTH ITS HALVES', () => {
+  /**
+   * ⛔ p274, BOTH LOWER DAYS, VERBATIM: *"2 × HYP: braced hinge / braced lower push superset"*. One
+   * printed row, two movements. Nothing in the app pairs exercises yet (`frames.ts`, DESIGN §5), so
+   * the screen states the pairing instead — without it the athlete meets two unrelated dropdowns.
+   */
+  assertEquals(VIADA_PICKS.braced_hinge.pairedWith, 'braced_leg');
+  assertEquals(VIADA_PICKS.braced_leg.pairedWith, 'braced_hinge');
+  for (const k of ['braced_hinge', 'braced_leg'] as const) {
+    assert((VIADA_PICKS[k].superset ?? '').length > 0, `${k} lost the sentence naming its pair`);
+  }
+  // ⚠️ AND NOTHING ELSE CLAIMS A PAIR. p274 prints only two supersets and the arms one is already
+  // three separate picks across two days — a `pairedWith` there would assert a 1:1 link it has not.
+  const paired = VIADA_PICK_KEYS.concat(picksForFrame('all_rounder'))
+    .filter((k) => VIADA_PICKS[k].pairedWith != null);
+  assertEquals([...new Set(paired)].sort(), ['braced_hinge', 'braced_leg']);
+});
+
+Deno.test('⛔ THE SUPERSET SENTENCE IS GATED ON ITS PARTNER BEING DRAWN', async () => {
+  /**
+   * ⛔ CAUGHT ON THE RENDERED PAGE, 2026-08-30, and it is the orphaned-core-note defect one screen
+   * later. p274 pairs the braced hinge with the braced lower push, but the leg press half is machine
+   * work (p221) — so an athlete without machines saw *"Back extension · superset with the leg
+   * press"* over a leg press picker that was not on the screen. **Copy outliving the control it
+   * describes.**
+   * ⚠️ THE WEEK STILL SUPERSETS; the composer fills that cell by substitution. What the athlete has
+   * no say over, the screen does not talk about.
+   */
+  const src = await read('../components/NonRaceBuilder.tsx');
+  assert(/spec\.superset && pairDrawn/.test(src),
+    '⛔ the superset sentence is no longer gated on its partner being drawn');
+  assert(/drawn\.includes\(spec\.pairedWith\)/.test(src),
+    'the pair test no longer reads the list the screen actually drew');
+
+  // ⛔ AND THE STATE IT GUARDS IS REACHABLE, not hypothetical: at a barbell/dumbbell/bench kit the
+  // leg press half is dropped and the back extension half survives.
+  const kit = ['Barbell + plates', 'Dumbbells', 'Flat bench'];
+  const drawn = picksForFrame('all_rounder', kit);
+  assert(drawn.includes('braced_hinge'), 'the back extension pick vanished at the barbell baseline');
+  assert(!drawn.includes('braced_leg'),
+    'the leg press pick is drawn at a kit with no machines — p221 makes it machine work');
 });

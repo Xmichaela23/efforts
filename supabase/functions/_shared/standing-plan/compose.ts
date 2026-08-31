@@ -962,7 +962,10 @@ function exerciseForSlot(
    * equipment gate or put a movement in a slot the frame did not ask for.
    */
   const slotKey = slot.intent === 'HYP' && slot.role === 'accessory'
-    ? pickKeyForSlot(slot.category, pattern, frameDay ?? undefined)
+    // ⛔⛔ THE FRAME'S OWN PICK TABLE (D-457, 2026-08-30). p274's accessory cells are BRACED and
+    // FOCUSED; p246's are SECONDARY. Matched against the wrong table a cell finds no pick and the
+    // athlete's answer is discarded in silence — which is what happened to five controls.
+    ? pickKeyForSlot(slot.category, pattern, frameDay ?? undefined, args.frame)
     : null;
   const named = slotKey ? String(args.slotPicks?.[slotKey] ?? '').trim() : '';
   const fromSlotPick = named !== ''
