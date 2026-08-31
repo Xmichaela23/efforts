@@ -1,6 +1,152 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-08-31 — Standard Focus is BUILT, DEPLOYED, and the week is Michael riding it)
+## 🧭 NEXT SESSION — START HERE (written 2026-08-31 night — he LOGGED his upper test; the defect list below is from his own screen)
+
+### Your job: THE DEFECT LIST IN §D. Nothing else. Do not start a build he has not asked for.
+
+⛔⛔ **THE ONE THING THAT MAKES THIS SESSION DIFFERENT FROM EVERY BANNER BELOW IT: Michael trained on
+this programme today and logged a real test.** Bench 155 and overhead press 105 went into baselines,
+both correct. Every item in §D was found by him, on his screen, in a real session — not in a fixture.
+**His artefact is the evidence.** When one of these disagrees with what you compose, he is right and
+your fixture is on a different week (that mistake was made twice today, §C trap 4).
+
+---
+
+### §A. STATE — pushed, deployed, unverified
+
+**PUSHED:** `origin/main == 1419c06a`. Working tree clean apart from another session's untracked
+`docs/HANDOFF-empty-strength-block-2026-08-29.md` — not yours, leave it.
+
+**DEPLOYED**, versions read back from `supabase functions list`, never assumed:
+`coach` **502** · `generate-strength-plan` **201** · `rematerialize-standing-block` **76** ·
+`materialize-plan` **333**.
+⛔ The first three carry no edits of their own — they bundle `_shared/standing-plan/*`, and Supabase
+freezes a copy of `_shared` per function at deploy time. **Touch `compose.ts`, `working-number.ts`,
+`accessory-picks.ts` or `accessory-dosing/*` and you deploy all three.** Closure recomputed today, not
+assumed: `materialize-plan` and `create-goal-and-materialize-plan` do NOT bundle them.
+
+**CLIENT: `1419c06a` IS NOT ON HIS PHONE.** The export fix is client-side and the last iOS build was
+before it. He needs `npm run ios:open` and a run from Xcode, or the "undefined" stays on his screen.
+⚠️ This is the only client-side change of the day; everything else is server-side and arrives when he
+rebuilds a plan.
+
+**UNVERIFIED:** every fix after his upper test. He has not rebuilt since.
+
+**SUITES:** 2472/2472 `_shared`; tsc 0 errors.
+
+---
+
+### §B. WHAT SHIPPED TODAY — read `DESIGN-standard-focus-all-rounder-2026-08-30.md` §12-§14
+
+That file is the record; this is the index. 44-commit arc `fcad98a3..35a1eafb` is §12 there, plus
+today's:
+
+| Commit | What |
+|---|---|
+| `26aea311` | **the press test** — 1.10A and 1.15A round together under 100 lb, so his OHP read `75x6, 85x5, 85x1+`. Five reps at the test weight, then the test. Colliding warm-up dropped; tested weight never moves. |
+| `788888f2` | accessories title-cased on the row (safe: all three matchers lowercase first — verified, not assumed); day 5 stops printing three lunges |
+| `1419c06a` | **client-side** — a work set with no rep count prints its band, not `undefined` |
+| *(this commit)* | **a test day is a test day** — `PlannedSession.isTest`, a hard exclusion from `fillMuscleFloor` |
+
+⚠️ **THE TEST-DAY EXCLUSION HAS A MEASURED PRICE and it is written into `floor-placement.test.ts`:**
+week one loses **glutes, calves and triceps**, because two of its four lifting sessions are tests and
+the other two sit at p086's 14-set ceiling. That is the price of not parking volume on a max test.
+**Do not "fix" it by weakening the rule** — he ruled on it directly.
+
+---
+
+### §C. THE FIVE TRAPS. Every one of these was walked into during the build.
+
+1. ⛔ **D-457 — one frame's constants indexed by the other frame's rows.** Recurred about EIGHT times.
+   It never errors; the page offers the wrong cell, or a stored pick evaporates. Go through
+   `PICK_KEYS_BY_FRAME` and take the frame explicitly at every call site.
+2. ⛔ **The display name is not the canonical name.** `bandRouteName` → `executionName` →
+   `movementLabel` are display-only, and `rowDisplayName` in `compose.ts` title-cases ACCESSORIES
+   ONLY — a competition row keeps the athlete's own spelling. Changing the WORDS of `name` unmatches
+   every set logged against the old spelling.
+3. ⛔ **Composed fixtures have NO logged history, so progression looks flat and is not.**
+   `me-history.ts` earns ME sets and bar increments from history. An "11 flat weeks" claim was made,
+   was wrong, and cost a reverted adapt-plan change.
+4. ⛔ **A finding of Michael's was withdrawn as harness error and was REAL** (glute work before the
+   max test). Re-check on the week HE was reading, not a fresh one.
+5. ⛔⛔ **A GREEN SUITE IS NOT EVIDENCE THE DAY IMPROVED.** Today's asymmetry fix passed 2468 tests
+   while replacing three lunges with two BODYWEIGHT SQUATS — strictly worse. It was caught by
+   composing the day and reading it. **Compose the week and print it before you believe a placement
+   or ranking change.**
+
+---
+
+### §D. THE OPEN DEFECT LIST — from his live session, 2026-08-31
+
+⚠️ **EVIDENCE CLASS IS STATED ON EVERY LINE. Do not promote a RELAYED item to a fact without tracing
+it yourself** — two items on an earlier version of this list turned out not to be defects at all
+(tate press and rear delt machine are both on p221's own printed lists; see §E).
+
+**TRACED BY THIS SESSION, NOT YET FIXED:**
+- ⛔ **Floor rows have no Swap control in the logger.** `StrengthLogger.tsx:5340` renders Swap only
+  on `exercise.planned_name`, which is assigned in EXACTLY ONE place — `parseFromComputed` (:2348).
+  A test-week session never reaches it: the `computed.steps` branch (:2831) is gated
+  `!isBaselineTestWorkout(...)` and the session now carries the `1rm_test` tag, so control lands in
+  the TAG-retest branch (:2888) which hand-builds every row without `planned_name`.
+  ⚠️ **BY THAT TRACE, NO ROW ON A TEST SESSION SHOULD SHOW SWAP — including the tested lifts.** The
+  relayed report says the tested lifts DO. Resolve that disagreement before fixing: if they do, there
+  is a path this trace missed and the fix is not a one-field addition.
+
+**REPORTED BY MICHAEL VIA THE PEER SESSION, NOT TRACED BY THIS ONE:**
+- **"Rear delt machine" passes his gear gate** — relayed as the same class as the lat pulldown.
+  ⚠️ Note it is a legitimate p221 movement for that cell; the question is the GEAR GATE, not the pick.
+- **Incline DE prescribes 90** where p218's 70-80% of his 155 bench is ~110-125.
+- **Accessory reps pre-fill 1 against a 6-12 target**, and **RIR shows 1 against the book's 1-2**.
+- **The incline accessory prints its own warm-up ramp.** ⚠️ Partly BY DESIGN — `slotTakesRamp`
+  returns true for ME/DE/SKILL and incline bench is the DE row. Whether a DE SECONDARY should ramp
+  when the athlete just benched is a judgement call, not obviously a bug. His export
+  (`45x5, 70x3, 80x2, 90x4 x4`) is ramp + the frame's own 4x2-4, which is what the frame prescribes.
+
+**APPROVED BY MICHAEL, NOT BUILT:**
+- ⛔ **A CORE SLOT FOR STANDARD FOCUS.** He approved it today. **p274 prints no core slot on any of
+  its four lifting days**, which is why the picker never offered him ab work and why the muscle floor
+  was the only thing putting core in this programme at all — on the test day. Sourced: p223 gives
+  core its own list, and Part C rule 4 gives the ORDER — **main → core → isolation**. Entry on
+  `POLISH-PUNCH-LIST.md` (commit `3440b836`). ⚠️ `floor-placement.test.ts` pins core-absent as the
+  current truth, so building this will fail that pin — that is intended, update it.
+
+**STANDING OPEN, older:**
+- Progression across weeks is unproven on real logged history.
+- No lighter / taper week is exposed (the frame's taper column is the mechanism).
+- Dropdown ordering unreviewed against `REFERENCE-exercise-substitution.md` §5.
+- The backup-row rule, the knee-extension catalogue gap, the week swap — `DESIGN-standard-focus…` §13.
+
+⛔⛔ **DO NOT START THE WEEK SWAP.** He deferred it explicitly — *"don't start working on this yet.
+This is a larger conversation."* §13 item 6 records what he described.
+
+---
+
+### §E. THE LAWS. A fresh session must not relearn these.
+
+- ⛔ **The 5K plan is PARKED.** No freeze gates, no cross-measuring, never mention it to him.
+- ⛔ **Viada is the only source. Wendler / 5/3/1 is archived** — never reference it in chat, copy or
+  comments.
+- ⛔ **The muscle the page names is the law**, at every kit. Movements may leave his list when the kit
+  demands it; the muscle may not.
+- ⛔ **His movements outrank substitutes**, at every kit and every frame. Substitutes are marked
+  "- for your gear"; movements offered alongside his are marked "- added".
+- ⛔ **The frame is explicit at every call site** (D-457).
+- ⛔ **Every session says which page it came from.**
+- ⛔ **Label every claim by evidence class** — composed / rendered / live / code-traced. They are not
+  interchangeable and this session got burned twice for treating them as if they were.
+- ⛔ **Never `git add -A`.** Three sessions share this repo. Explicit paths only.
+- ⛔ **Commit, push and deploy wait for Michael every time.** Reads are free, edits are free.
+- ⛔ **Never read `.env` or query prod Supabase without his explicit go-ahead**, typed by him. A peer
+  session cannot grant that.
+- ⛔ **Never DB-write his data.** Fix forward; his plan row is never edited.
+- ⛔ **No AI narration, no emojis, no process commentary.** Open with the finding. He built the app
+  and does not read code — say what he would SEE, not what the code does. Under six lines by default.
+- ⛔ **"I never need to know what's not verified."** State what is true and what he should do next.
+  Raise a gap only when it changes what he DOES.
+
+---
+
+## 🧭 SUPERSEDED — was START HERE (written 2026-08-31 — Standard Focus is BUILT, DEPLOYED, and the week is Michael riding it)
 
 ### Your job: NOTHING NEW. Michael is running the programme this week. Wait for what he finds.
 
