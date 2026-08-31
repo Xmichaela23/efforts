@@ -26,7 +26,7 @@ import {
   unansweredLine,
   unansweredSlots,
 } from './standing-plan-week-copy.ts';
-import { builtFamily, familyMapFor, slotsForEngine } from './standing-plan-week-bounds.ts';
+import { builtFamily, experienceChips, familyMapFor, slotsForEngine } from './standing-plan-week-bounds.ts';
 import {
   hardSlotDefault, slotFamilyFact, slotFamilyFor, slotVariantOptions,
 } from './hard-slot-choices.ts';
@@ -217,5 +217,56 @@ Deno.test('⛔ THE WIZARD DOES NOT INDEX A FRAME-BOUND MAP BY A FRAME\'S ROW KEY
   for (const name of ['SLOT_FAMILY', 'SLOT_FRAME_KEY', 'HARD_SLOT_RUN_FAMILY']) {
     assert(!new RegExp(`${name}\\s*\\[`).test(code),
       `NonRaceBuilder indexes ${name}, which holds one frame's rows`);
+  }
+});
+
+Deno.test('⛔⛔ EVERY CHIP THE SCREEN DRAWS SAYS SOMETHING, ON EVERY FRAME', () => {
+  /**
+   * ⛔ WHAT MICHAEL SAW, LIVE. The two riding chips on Standard Focus rendered as bare
+   * "Less experienced" / "More experienced" — no session count, no duration — while the running pair
+   * beside them read correctly, and he could not answer the riding question, so Continue stayed
+   * blocked on "riding experience has no answer yet".
+   *
+   * ⛔ THE CAUSE WAS A MODULE CONSTANT AGAIN. `specFor` took each row's session SHAPE from a table
+   * built out of `strength_5k`, then indexed it by the chosen frame's row keys — so p274's ride row
+   * was handed the 5K frame's day-3 RUN archetype, its ladder came back empty, and the chip lost its
+   * duration. The line prints the count and the duration together, so losing one loses both and the
+   * chip falls back to its label alone.
+   *
+   * ⚠️ A BARE LABEL IS LEGITIMATE IN ONE CASE and this test must not forbid it: a sport that fills no
+   * HARD slot has no duration to state, which is `strength_5k` with both quality rows on the run and
+   * only the long session on the bike. So the assertion is "if this sport has a hard row, the chip
+   * carries its number", not "every chip is long".
+   */
+  for (const focus of ['run', 'standard'] as const) {
+    const frame = FOCUS_FRAME[focus];
+    const answers: Record<string, string> = {};
+    for (const k of slotKeysFor(frame)) {
+      const offered = slotOptionsNow(k, emptySlotSports(frame), frame).options.map((o) => o.value);
+      answers[k] = offered.includes('run') ? 'run' : 'ride';
+    }
+    answers.long = 'ride';
+    const chips = experienceChips(answers as never, {
+      baselines: { performance_numbers: { easyPace: 540, ftp: 220 } } as never,
+      frame,
+    });
+    for (const sport of ['run', 'ride'] as const) {
+      const pair = chips[sport];
+      // ⚠️ NO CHIP AT ALL is right for a sport with no slot — nothing to size.
+      const hasSlot = frameSlots(frame).some((s) => answers[s.key] === sport);
+      if (!hasSlot) { assert(!pair, `${focus}/${sport}: a chip for a sport with no session`); continue; }
+      assert(pair, `${focus}/${sport}: no chip for a sport that fills a slot`);
+      const hardRows = frameSlots(frame)
+        .filter((s) => s.role === 'hard' && answers[s.key] === sport).length;
+      assertEquals(pair.newer.hardCount, hardRows,
+        `${focus}/${sport}: the chip counts ${pair.newer.hardCount} hard sessions, the week has ${hardRows}`);
+      if (hardRows > 0) {
+        // ⛔ THE NUMBER THE ATHLETE PICKS BETWEEN. Null here is the empty chip he could not read.
+        assert(pair.newer.longestMin != null && pair.newer.longestMin > 0,
+          `${focus}/${sport}: the chip has ${hardRows} hard session(s) and no duration`);
+        assert(pair.experienced.longestMin != null && pair.experienced.longestMin > 0,
+          `${focus}/${sport}: the experienced chip has no duration`);
+      }
+    }
   }
 });

@@ -26,7 +26,6 @@ import {
   hardPairInFrameOrder,
   RIDE_EQUIVALENT,
 } from '../../supabase/functions/_shared/standing-plan/index.ts';
-import { HARD_SLOT_KEYS } from './standing-plan-week-copy';
 /**
  * ⛔ THE TIER IS THE ENGINE'S, READ HERE RATHER THAN RESTATED. `experienceLevels` turns the athlete's
  * own per-sport answer into the levels those slots are built at — so this screen quotes hours off
@@ -359,19 +358,12 @@ export type ExperienceChip = {
 export type ExperienceChoice = { newer: ExperienceChip; experienced: ExperienceChip } | null;
 
 /**
- * ⛔ THE FRAME'S OWN SHAPE PER SLOT, READ FROM THE FRAME — not a second table (2026-08-27).
- *
- * `SLOT_FAMILY` above is deliberately a literal because the SCREEN's four controls are a product
- * decision. The SHAPE is not: it is the frame's, it is pinned on two of the four slots, and typing it
- * here is exactly how a chip comes to quote a session the composer does not build.
- * ⚠️ KEYED BY `SLOT_FRAME_KEY`, which is already `${frameDay}:${indexWithinDay}` — the same key
- * `assignSports` reads, so this cannot drift from the slot the screen is describing.
+ * ⛔⛔ `FRAME_ARCHETYPE` IS DELETED (2026-08-30), NOT LEFT UNUSED. It was a module constant holding
+ * `strength_5k`'s shape per row, and `specFor` indexed it by the CHOSEN frame's row keys — so p274's
+ * ride row was handed the 5K frame's run archetype, its ladder came back empty, and the riding chips
+ * rendered as bare labels the athlete could read nothing from. `specFor` asks the frame now
+ * (`archetypeOf`). **A dead frame-bound constant is the next version of this bug**, so it goes.
  */
-const FRAME_ARCHETYPE: Record<SlotKey, string | undefined> = (() => {
-  const out = {} as Record<SlotKey, string | undefined>;
-  for (const s of frameSlots()) out[s.key] = s.archetype;
-  return out;
-})();
 
 /**
  * ⛔⛔ THE TWO CHIPS PER SPORT, COMPUTED (Michael's screen, 2026-08-27).
@@ -400,6 +392,9 @@ export function experienceChips(
   // at day 1's easier dose while the block builds it at day 3's.
   const slots = inFrameOrder(rawSlots, frame);
   const families = familyMapFor(frame);
+  /** ⚠️ THIS FRAME'S OWN SHAPE PER ROW — never the `strength_5k` table. See `specFor`. */
+  const archetypeOf = (key: SlotKey): string | undefined =>
+    frameSlots(frame).find((x) => x.key === key)?.archetype;
   /** One slot as the engine will build it, at one tier. Null when this slot is not that sport. */
   const specFor = (key: SlotKey, sport: SlotSport, tier: ExperienceTier): SlotSpec | null => {
     const sp = slots[key];
@@ -423,7 +418,19 @@ export function experienceChips(
       level: clampRideLevel(family, (tierLevels[family] ?? base.level) as Level),
       // ⛔ THE ATHLETE'S PICK, THEN THE RIDE EQUIVALENT'S, THEN THE FRAME'S. Absent means the
       // composer rotates and `longestFor` takes the max across the shapes it will rotate through.
-      archetype: opts.archetypes?.[key] ?? eq?.archetype ?? FRAME_ARCHETYPE[key],
+      /**
+       * ⛔⛔ THE **CHOSEN** FRAME'S ARCHETYPE (2026-08-30). This read `FRAME_ARCHETYPE`, a module
+       * constant built from `strength_5k` — so on p274 the ride slot on row two was handed the 5K
+       * frame's day-3 shape, `below_threshold`, which is a RUN archetype. `ladderOf` finds no such
+       * shape on `ride_anaerobic`, returns no rungs, and the chip's duration comes back null.
+       *
+       * ⛔ WHAT THE ATHLETE SAW. With no duration the chip line prints the LABEL ALONE — no session
+       * count either, because the count and the duration are shown together — so the two riding chips
+       * rendered as bare "Less experienced" / "More experienced" with nothing on them, while the
+       * running pair beside them read correctly. Same class as `SLOT_FAMILY`: a constant holding one
+       * frame's answer, indexed by another frame's row keys.
+       */
+      archetype: opts.archetypes?.[key] ?? eq?.archetype ?? archetypeOf(key),
       sport: sp,
     } as SlotSpec;
   };
