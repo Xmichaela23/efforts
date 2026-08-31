@@ -1068,6 +1068,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const getBaselineTestType = (workout: any): 'lower' | 'upper' | 'full' | null => {
     if (!isBaselineTestWorkout(workout)) return null;
     const name = String(workout?.name || '').toLowerCase();
+    /**
+     * ⛔⛔ ONLY THE BASELINES LAUNCHER'S OWN SESSIONS (2026-08-31). This branch REPLACES the loaded
+     * exercises with a hardcoded list — Bench/OHP/Pull-ups, or Squat/Deadlift — which is right for the
+     * launcher, whose links carry no exercises of their own. **It is wrong for a PLAN's test week**,
+     * whose session is named `Test: Upper` / `Test: Lower` and carries its own prescribed lifts plus
+     * accessories: matching on the bare words "upper"/"lower" would have added a pull-up nobody
+     * prescribed and dropped every accessory.
+     * ⚠️ THE LAUNCHER'S SESSIONS ARE NAMED "Baseline Test: …", which is the string this now requires.
+     */
+    if (!name.includes('baseline test')) return null;
     if (name.includes('full') || name.includes('both')) return 'full';
     if (name.includes('lower')) return 'lower';
     if (name.includes('upper')) return 'upper';
@@ -2884,7 +2894,56 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // the resolved computed weight; fall back to a numeric strength_exercises weight if present.
         const resolved = ((workoutToLoad as any)?.computed && Array.isArray((workoutToLoad as any).computed?.steps))
           ? parseFromComputed((workoutToLoad as any).computed) : [];
+        /**
+         * ⛔⛔⛔ ONLY THE TESTED LIFTS GET THE RAMP — THE ACCESSORIES COME THROUGH AS THEMSELVES
+         * (2026-08-31).
+         *
+         * ⛔ WHAT THIS BRANCH DID: rebuilt EVERY planned exercise as a warm-up ramp plus an AMRAP set.
+         * Correct for the week-12 retest, whose session is nothing but tested lifts. **Wrong for a
+         * plan's test week**, which carries the two tested lifts AND its accessories — a calf raise
+         * would have arrived as an empty-bar ramp into an all-out single.
+         *
+         * ⛔ THE MARKER IS THE `amrap` FLAG THE COMPOSER ALREADY STAMPS, not the name and not the
+         * position: `testDaySession` puts it on exactly one set of each tested lift, and
+         * `readTestWeek` reads that same flag to decide which set set the block's numbers. One
+         * marker, both ends.
+         *
+         * ⚠️ AND THIS IS WHAT GIVES THE ATHLETE THEIR WARM-UP. p215 says *"warm up to roughly 75% of
+         * the predicted max"* and gives no scheme for getting there; `createBaselineTestExercise`
+         * carries ours — empty bar, ~50%, ~70% — and the plan's test week was falling through to a
+         * plain pre-fill, so it handed over the three scored steps cold.
+         */
+        const isTestedLift = (ex: Record<string, unknown>): boolean => {
+          const plan = Array.isArray(ex?.set_plan) ? ex.set_plan as Array<Record<string, unknown>> : [];
+          if (plan.some((st) => st?.amrap === true)) return true;
+          /**
+           * ⚠️ AND THE `ME` INTENT WHEN THERE IS NO `set_plan` AT ALL. An athlete with no max on file
+           * gets a test row that says "By feel" and carries no resolved sets — so the amrap flag has
+           * nothing to sit on, and that athlete is exactly the one who most needs the ramp. The
+           * composer stamps `slot_intent` on the tested lifts either way; the accessories carry none.
+           */
+          return String(ex?.slot_intent || '').toUpperCase() === 'ME';
+        };
         setExercises(plannedRetest.map((ex, i) => {
+          if (!isTestedLift(ex)) {
+            // ⚠️ AN ACCESSORY, AS PRESCRIBED. Same shape the ordinary pre-fill builds — name, notes and
+            // its own planned sets — so the athlete logs the row the plan actually gave them.
+            const planned = (plannedSetsFor(ex) ?? []) as Array<Record<string, unknown>>;
+            return {
+              id: `ex-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
+              name: String(ex?.name || '').trim(),
+              notes: String(ex?.notes || '').trim() || undefined,
+              expanded: true,
+              sets: (planned.length > 0 ? planned : Array.from({ length: Number(ex?.sets) || 3 }))
+                .map((st: Record<string, unknown> | undefined) => ({
+                  weight: Number(st?.weight) > 0 ? Number(st?.weight) : 0,
+                  reps: Number(st?.reps) > 0 ? Number(st?.reps) : undefined,
+                  setType: 'working' as const,
+                  barType: 'standard' as const,
+                  completed: false,
+                })),
+            } as LoggedExercise;
+          }
           const liftName = String(ex?.name || '').split('—')[0].trim(); // "Bench Press — AMRAP test set" → "Bench Press"
           const rw = Number(resolved[i]?.sets?.[0]?.weight);
           const w = Number.isFinite(rw) && rw > 0 ? rw : Number(ex?.weight);

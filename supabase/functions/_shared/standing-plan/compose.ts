@@ -1703,7 +1703,18 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[]):
     description: 'Work up in three steps. The last set is max clean reps and it is what the block reads.',
     duration: 45,
     strength_exercises: exercises,
-    tags: ['standing_plan', 'test_week'],
+    /**
+     * ⛔⛔ `1rm_test` IS WHAT MAKES THE LOGGER TREAT THIS AS A TEST (2026-08-31), and without it the
+     * athlete got neither half of what a test session is for.
+     *
+     * `isBaselineTestWorkout` matches the name *"baseline test"* OR this tag — the tag exists because
+     * the week-12 retest is named *"Retest — …"*. **This session is named `Test: Upper` and matched
+     * neither**, so it fell through to the ordinary pre-fill: no warm-up ramp before the top set, and
+     * **no offer to write the result into the athlete's baselines**, which is the whole point of a
+     * test. Michael found both on his own plan.
+     * ⚠️ THE NAME IS UNCHANGED. It is athlete-facing and it is right; the tag is what surfaces read.
+     */
+    tags: ['standing_plan', 'test_week', '1rm_test'],
   };
 }
 
