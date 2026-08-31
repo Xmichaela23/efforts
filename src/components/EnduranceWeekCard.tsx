@@ -560,7 +560,21 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                         */}
                       {slotSummary(key, sport)}
                       {session ? (
-                        <span style={isHard && color ? { color } : undefined}>{` · ${session}`}</span>
+                        /**
+                         * ⛔⛔ COLOURED ONLY WHEN IT IS THE ATHLETE'S OWN PICK (2026-08-31). The card's
+                         * rule is that **colour means "you chose this"**, and an unpicked row says
+                         * *"Engine's pick"* — which is precisely NOT their choice. Painting that in
+                         * their sport colour would claim an answer they have not given, which is the
+                         * same defect as colouring an unanswered row's edge.
+                         * ⚠️ SO THE COLOUR APPEARING IS THE FEEDBACK: the row is muted while the
+                         * engine holds it and takes the sport colour the moment they choose.
+                         * ⚠️ READ OFF `hardArchetypes`, the athlete's own pick per row — never off the
+                         * title string, which would make the rule depend on copy.
+                         */
+                        <span
+                          style={isHard && color && props.hardArchetypes?.[key] ? { color } : undefined}
+                          className={isHard && props.hardArchetypes?.[key] ? undefined : 'text-white/45'}
+                        >{` · ${session}`}</span>
                       ) : null}
                       {lengthNow ? <span className="text-white/45">{` · ${lengthNow}`}</span> : null}
                       </span>

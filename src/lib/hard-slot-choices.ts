@@ -304,6 +304,23 @@ export function variantsTakenBy(
 
 
 /**
+ * ⛔⛔ WHAT THE CLOSED ROW SAYS WHEN NO WORKOUT HAS BEEN PICKED (Michael, 2026-08-31).
+ *
+ * ⛔ THE GAP IT CLOSES. The row named the session TYPE — *"Hard session 2 · Ride · Anaerobic"* — and
+ * an athlete reading that has no way to know two things: that they may choose the workout, and that
+ * leaving it alone means the engine rotates the shapes across the block. Michael: *"we have some kind
+ * of cue that they can choose hard session types or rotate?"* There was none.
+ *
+ * ⛔ IT IS THE SAME WORDS THE OPEN ROW ALREADY USES — the default option reads *"Engine's pick —
+ * rotates week to week"*. Naming the closed state with the head of that phrase makes the row and the
+ * control agree, and the state obviously **not the athlete's own**, which is what makes the chevron
+ * read as the way to change it. ⚠️ No new element and no explaining sentence.
+ * ⚠️ SHORT FORM ON THE ROW, because the row already truncates on a phone; the full phrase with its
+ * reason is one tap away and unchanged.
+ */
+export const ENGINE_PICK_ROW_LABEL = "Engine's pick";
+
+/**
  * ⛔ WHAT EACH VARIANT IS, IN PLAIN WORDS — OURS (2026-08-24), one line each, describing the
  * library's own page-cited workouts. Keys are archetype ids; a variant with no line here still
  * renders, label-only, so a new archetype can never be hidden by missing copy.

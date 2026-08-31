@@ -39,7 +39,7 @@ import {
   unansweredLengthLine,
   EXPERIENCE_WHEN_UNASKED,
 } from '@/lib/standing-plan-week-copy';
-import { CLUB_SESSION_CONTROL_VISIBLE, hardSlotDefault, slotFamilyFact, slotVariantOptions, variantsTakenBy, type HardSlotKey } from '@/lib/hard-slot-choices';
+import { CLUB_SESSION_CONTROL_VISIBLE, ENGINE_PICK_ROW_LABEL, hardSlotDefault, slotFamilyFact, slotVariantOptions, variantsTakenBy, type HardSlotKey } from '@/lib/hard-slot-choices';
 // ⛔ `SLOT_FAMILY` IS NOT IMPORTED HERE. It is the 5K frame's four rows, and indexing it by a
 // five-row frame's keys is what blanked the app on 2026-08-30. `familyMapFor` takes the frame.
 import { builtFamily, familyMapFor, prunedSlotMinutes } from '@/lib/standing-plan-week-bounds';
@@ -6153,7 +6153,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               const variant = h?.archetype
                 ? slotVariantOptions(hk, sport, wizardFrame).find((v) => v.id === h.archetype)?.label
                 : null;
-              return variant ?? slotFamilyFact(hk, sport, wizardFrame)?.title ?? null;
+              if (variant) return variant;
+              /**
+               * ⛔⛔ UNPICKED, THE ROW SAYS SO — see `ENGINE_PICK_ROW_LABEL`. It named the session TYPE
+               * (*"Anaerobic"*), which reads as a fact about the day and told the athlete neither that
+               * the workout is theirs to choose nor that leaving it rotates the shapes across the
+               * block. ⚠️ ONLY WHERE THERE IS SOMETHING TO CHOOSE BETWEEN: a row whose family offers
+               * one shape has no rotation and no choice, so it keeps the session's own name.
+               */
+              if (slotVariantOptions(hk, sport, wizardFrame).length > 1) {
+                return ENGINE_PICK_ROW_LABEL;
+              }
+              return slotFamilyFact(hk, sport, wizardFrame)?.title ?? null;
             }}
             renderHardFlavor={(key, ctl) => {
               const sport = slotSportsNow[key];
