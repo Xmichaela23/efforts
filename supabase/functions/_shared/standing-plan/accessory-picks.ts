@@ -630,8 +630,33 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     key: 'braced_hinge',
     label: 'Back extension',
     slot: { category: 'braced', pattern: 'hinge_lower' },
-    hisList: ['reverse hyperextension', 'reverse hyper', 'ghd back extension', 'machine back extension', 'back extension', 'ground-based deadlift machine'],
+    /**
+     * ⛔⛔ p221's FOUR, AND ALL FOUR ARE MACHINES: *reverse hyperextension (MACHINE) · GHD back
+     * extension · ground-based deadlift machine · machine back extension.* The list carried his four
+     * **plus** `back extension` and `reverse hyper`, which are the non-machine executions — so a
+     * barbell athlete met them as though they were his printed movements, unmarked.
+     *
+     * ⚠️ THIS NARROWING WAS BLOCKED FOR ONE COMMIT AND THE REASON IS WORTH KEEPING: while
+     * `reverse hyperextension` was routed on `bench`, cutting the list to his four left a barbell
+     * athlete with **exactly one option** — his list was not empty, so the substitution branch never
+     * fired and the free-weight versions were removed with nothing marked in their place. Measured,
+     * not predicted. **Splitting the machine and bench executions is what unblocked it**; with the
+     * machine gated, his list genuinely empties at a home kit and the substitutes come back carrying
+     * "- for your gear".
+     * ⚠️ THE COMPOSER IS UNAFFECTED — it builds from the grid pool and the frame's muscle, never from
+     * this list. Only the dropdown changes.
+     */
+    hisList: ['reverse hyperextension', 'ghd back extension', 'machine back extension', 'ground-based deadlift machine'],
     leadWith: ['reverse hyperextension', 'ghd back extension', 'machine back extension'],
+    /**
+     * ⚠️⚠️ THE `excludes: ['reverse hyper']` THAT STOOD HERE IS GONE, AND ITS PREMISE WAS WRONG.
+     * It read *"one movement, one option — two `EXERCISE_CONFIG` entries for the same exercise"*, and
+     * they are NOT the same exercise: p221's is the machine and the other is the bench execution
+     * (torso on the bench, hips at the edge, legs swinging, a dumbbell between the feet — a coached
+     * home alternative, resolved from field sources 2026-08-30). **They looked like twins because
+     * both carried the same bench route and neither name said which.** Split routes and a name that
+     * says "Bench" fix the reading; excluding one would have deleted a real movement.
+     */
     leadCite: 'Viada p221 — braced hinge lower',
     // ⛔ THE SUPERSET IS HIS, AND THE SCREEN SAYS SO. Nothing in the app pairs exercises yet
     // (`frames.ts`, DESIGN §5) — this names the pairing the page prints so the two dropdowns read as
@@ -1260,21 +1285,41 @@ export function pickOptions(
        * Back Squat as an accessory beside the day that already opens on it is the engine losing its
        * place, not a substitution. The three noncompetition categories are the whole pool.
        */
-      const wider = ['secondary', 'braced', 'focused'] as ViadaCategory[];
-      const pooled: GridMovement[] = [];
-      for (const cat of wider) {
-        const r = resolveSlot({
-          category: cat,
-          pattern: spec.slot?.pattern ?? null,
-          intent: 'HYP',
-          equipment: equipment ?? null,
-        });
-        pooled.push(...r.options);
+      /**
+       * ⛔⛔ THE CELL'S OWN CATEGORY FIRST, AND ONLY THEN THE OTHERS — measured, 2026-08-30. Widening
+       * all three at once offered **Romanian Deadlift, Sumo Deadlift and Paused Deadlift** as
+       * substitutes for p274's braced hinge row, and the default landed on the RDL. Every one of
+       * them is the right pattern and the right muscle and the wrong ROW: a braced hinge is a
+       * supported, anchored back-extension movement, a free-standing hinge is a different training
+       * effect, **and day 2 already opens on a deadlift.**
+       * ⛔ SO THE WIDENING IS STEPPED. His movements, then the same category, then the other
+       * categories — each step the smallest one that can still answer. `back extension`, `glute ham
+       * raise` and the bench reverse hyper all live in the cell's own category, so the braced hinge
+       * row never reaches past it.
+       * ⚠️ NO `primary`. Those are the competition lifts the ME slots already carry.
+       */
+      const ownCategory = spec.slot?.category;
+      const stepped: ViadaCategory[][] = [
+        ownCategory ? [ownCategory] : [],
+        (['secondary', 'braced', 'focused'] as ViadaCategory[]).filter((c) => c !== ownCategory),
+      ];
+      for (const step of stepped) {
+        if (step.length === 0) continue;
+        const pooled: GridMovement[] = [];
+        for (const cat of step) {
+          pooled.push(...resolveSlot({
+            category: cat,
+            pattern: spec.slot?.pattern ?? null,
+            intent: 'HYP',
+            equipment: equipment ?? null,
+          }).options);
+        }
+        const subs = dedupeByCanonical(pooled)
+          .filter((m) => !excluded.has(canonicalize(m.name)))
+          .filter((m) => primaryOf(m.name) === muscle);
+        if (subs.length > 0) return { list: subs, substituted: true };
       }
-      const subs = dedupeByCanonical(pooled)
-        .filter((m) => !excluded.has(canonicalize(m.name)))
-        .filter((m) => primaryOf(m.name) === muscle);
-      return { list: subs, substituted: true };
+      return { list: [], substituted: true };
     })()
     : { list: pool, substituted: false };
 

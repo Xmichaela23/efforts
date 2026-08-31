@@ -403,10 +403,26 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   'nordic hamstring curl': [['barbell']],
   'glute ham raise': [['barbell']],
   'back extension': [['barbell']],
-  // Hips on the pad, legs swinging — any bench does it. ⚠️ `athleteEquipmentToKeys` adds `bench` for
-  // ANY chip containing the word, so the incline chip satisfies this too.
+  /**
+   * ⛔⛔ TWO EXECUTIONS, TWO ENTRIES, TWO ROUTES (2026-08-30) — and they were one ambiguous pair.
+   *
+   * ⛔ THE MACHINE ONE IS HIS. p221's braced hinge row names *"reverse hyperextension (MACHINE)"*,
+   * so `reverse hyperextension` is gated on the machine and only a gym athlete is offered it as his
+   * printed movement. Routed on `bench` it looked reachable to everyone, which is why the braced
+   * hinge row could not tell his movements from their substitutes at all.
+   *
+   * ⛔ THE BENCH ONE IS REAL AND IS OURS. **Resolved from field sources rather than guessed**: it is
+   * a coached home alternative — torso on the bench, hips at the edge, legs swinging, a dumbbell held
+   * between the feet to load it (BarBend, Garage Gym Reviews both prescribe it). It keeps the bench
+   * route and takes a name that says the execution, so nobody reads it as the machine.
+   * ⚠️ AND ON p274's BRACED HINGE ROW IT CARRIES THE "- for your gear" MARK, because his printed
+   * movement there is the machine and this stands in for it.
+   *
+   * ⚠️ `athleteEquipmentToKeys` ADDS `bench` FOR ANY CHIP CONTAINING THE WORD, so the incline chip
+   * satisfies the bench route too — unchanged.
+   */
   'reverse hyper': [['bench']],
-  'reverse hyperextension': [['bench']],
+  'reverse hyperextension': [['machine']],
   'hanging leg raise': [['pull_up_bar']],
   'hanging knee raise': [['pull_up_bar']],
   'ab wheel rollout': [['ab_wheel']],
@@ -708,6 +724,10 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // ⚠️ FOLLOWS `leg curl`, WHICH IS NOW GATED (2026-08-30) — see the supersede note there. This is
   // the spelling p223 uses and it tracks that entry rather than inventing a separate rule.
   'hamstring curl': [['machine']],
+  // ⛔ p223's OWN SPELLING, and it had no tag — `gearRoutesFor` returned ALWAYS and warned, so a
+  // Smith-rack movement was treated as needing nothing (found 2026-08-30). It follows
+  // `machine hip thrust`: the station is what makes it this movement.
+  'smith machine hip thrust': [['machine']],
   'ghd back extension': [['machine']],
   'machine back extension': [['machine']],
   'behind the neck db triceps extension': [['dumbbells']],

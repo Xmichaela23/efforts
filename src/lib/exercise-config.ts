@@ -1940,6 +1940,7 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'bodyweight',
     isUnilateral: false,
   },
+
   'soleus raise': {
     pattern: 'calf',
     primaryRef: null,
@@ -3202,6 +3203,12 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   // cell, which left a home athlete one option in that slot.
   'weighted knee raise':                  { pattern: 'knee_dominant',  primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
   'machine hip thrust':                   { pattern: 'hip_dominant',   primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  // ⛔ p223's OWN SPELLING — *"machine/Smith machine hip thrust"* — and it had NO entry (found
+  // 2026-08-30). `resolveExerciseConfig` was fuzzy-matching it to the line above and warning into
+  // the void, so it silently borrowed that movement's prescription and display.
+  // ⚠️ THE NUMBERS ARE COPIED FROM ITS TWIN, NOT CHOSEN: same movement, same loading, different
+  // station. What changes is that it says so rather than being guessed at.
+  'smith machine hip thrust':             { pattern: 'hip_dominant',   primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
 
   // ── FOCUSED LOWER (p223) ────────────────────────────────────────────────────────────────────────
   'hip adduction machine': { pattern: 'knee_dominant', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },

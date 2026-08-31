@@ -475,6 +475,30 @@ export function executionName(name: string, equipment: string[] | null | undefin
  * renames; it never widens what an athlete can reach.
  */
 const EXECUTION_NAME: Record<string, string> = {
+  /**
+   * ⛔⛔ "BACK EXTENSION" IS NOT AN INSTRUCTION — Michael, 2026-08-30: *which version, and what does
+   * a home athlete actually do?* There are four in common use — a 45-degree bench, a GHD, a flat
+   * bench, and the floor — and the row said two words. The catalogue holds the GHD and the machine
+   * versions under their own names, so this entry is by elimination the non-machine one, and its
+   * gear route says which: `[['barbell']]`, the same anchor the kneel-and-lower family uses —
+   * *"feet under a loaded bar, which is what most people actually do."* Its config is
+   * `displayFormat: 'bodyweight'` at `ratio: 0.0`, so the bar is the ANCHOR and not the load.
+   * ⚠️ THE ATHLETE WAS NEVER TOLD ANY OF THAT. This is the fact they need to perform the row, in
+   * their own words, and it is display only — the canonical name is unchanged.
+   */
+  // ⚠️ PARENTHESES, NOT A DASH. The substitute mark appends " - for your gear", and two dashes in one
+  // option read as a run-on: *"Back Extension - feet under a loaded bar - for your gear"*.
+  'back extension': 'Back Extension (feet under a loaded bar)',
+  /**
+   * ⛔ THE BENCH EXECUTION, NAMED AS ONE (2026-08-30). `reverse hyper` and `reverse hyperextension`
+   * read as the same movement and were the same route; p221's is the MACHINE, and this is the home
+   * version — torso on the bench, hips at the edge, legs swinging, a dumbbell between the feet.
+   * Naming it "Bench" is what stops an athlete reading it as the machine they do not own.
+   * ⚠️ IT FIRES ALWAYS, not conditionally: this movement has no machine route, so `hasStation` is
+   * never true for it and the bench name is the only one it ever shows. That is deliberate — it is
+   * not an equipment fallback, it IS the movement.
+   */
+  'reverse hyper': 'Bench Reverse Hyper',
   // Seated, chest against the pad, arms sweeping back - on an incline bench with dumbbells.
   'rear delt machine': 'Chest-Supported Rear Delt Raise',
   /**
