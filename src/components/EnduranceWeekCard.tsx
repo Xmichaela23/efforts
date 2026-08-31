@@ -542,7 +542,27 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                         {(dayNumber != null && !dayOrdered) ? (
                           <span className="text-white/45 tabular-nums">{`Day ${dayNumber} · `}</span>
                         ) : null}
-                        {[slotSummary(key, sport, session), lengthNow].filter(Boolean).join(' · ')}
+                        {/**
+                        * ⛔⛔ THE CHOOSABLE PART OF THE ROW IS THE COLOURED PART (Michael, 2026-08-31:
+                        * *"it shouldn't have its own thing, it should just be clear"*).
+                        *
+                        * ⛔ THE PROBLEM, EXACTLY. Closed, day 2 read *"Hard session 2 · Ride ·
+                        * Anaerobic · length varies week to week"* — four segments in one weight, of
+                        * which the sport is fixed, the length is fixed, and **the session name is the
+                        * one thing the athlete can change.** Nothing said which.
+                        *
+                        * ⛔ NO NEW ELEMENT AND NO NEW LANGUAGE: this card already rules that
+                        * **colour means "you chose this"** (2026-08-24, the edge). The session name
+                        * takes the sport colour and the fixed parts stay muted, so the row carries
+                        * exactly one coloured word — the answer — and the chevron opens it.
+                        * ⚠️ HARD ROWS ONLY. The long row's session word is its club answer and the
+                        * easy row has none; neither is a workout choice, so neither is coloured.
+                        */}
+                      {slotSummary(key, sport)}
+                      {session ? (
+                        <span style={isHard && color ? { color } : undefined}>{` · ${session}`}</span>
+                      ) : null}
+                      {lengthNow ? <span className="text-white/45">{` · ${lengthNow}`}</span> : null}
                       </span>
                       {key === 'long' ? (
                         <span className="block text-white/40 text-xs mt-0.5">{LONG_SLOT_NOTE}</span>
