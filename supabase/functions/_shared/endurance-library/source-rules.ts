@@ -549,13 +549,53 @@ export const FAMILIES: Record<FamilyId, {
          * was already recorded in the note above; it is now what the athlete reads.
          */
         label: 'Surge and float',
-        repBand: { lo: 10, hi: 45 },
+        /**
+         * ⛔⛔⛔ THE BANDS ARE BOUND TO ONE SHAPE NOW, AND THIS IS A TRAINING-DOSE FIX FOUND ON A REAL
+         * ATHLETE'S BUILT PLAN (2026-08-31).
+         *
+         * ⛔ WHAT WENT WRONG, AND IT WAS NOT THE SAMPLING. This archetype spanned **two different
+         * surge-and-float prescriptions at once** — a short surge with a moderate float, and a
+         * longer surge with a near-threshold float — as one work band (125-130%) and one float band
+         * (105-115%). The library emitted the float honestly as a RANGE. **The plan token then
+         * collapsed every band to its top** (`session-vocabulary.ts`: *"`hi` is the band's top and
+         * is what the session prescribes at"*), so the athlete was prescribed the hottest surge and
+         * the hottest float together — a pairing that belongs to neither source shape. His float ran
+         * at the top of the band where the short-surge shape asks for the bottom.
+         *
+         * ⛔ SO THE FIX IS TO STOP ONE ARCHETYPE STANDING FOR TWO SHAPES. This one is now the short
+         * surge with the moderate float, and `long_surge_float` below is the other. Each band is
+         * internally coherent, so taking its top is a dose the source actually prescribes.
+         * ⚠️ THE ID IS UNCHANGED — every stored athlete pick and every built plan carries it.
+         * ⚠️ AND THE REP COUNT IS BOUND TO THE LEVEL for the same reason: `repsBand` ran 6-12, and a
+         * level-2 session was taking twelve rounds, which is the count this shape reaches only at
+         * level 3. The band is now the count this shape uses at level 1 through level 3.
+         */
+        repBand: { lo: 15, hi: 15 },
         repsBand: { lo: 6, hi: 12 },
-        work: pct(1.25, 1.30),
-        float: { band: { lo: 45, hi: 60 }, intensity: pct(1.05, 1.15), label: 'Near-threshold float' },
-        recovery: { kind: 'stated', band: { lo: 20, hi: 120 }, intensity: vt1 },
-        set: { repeatsPerSet: { lo: 3, hi: 4 }, restBand: { lo: 120, hi: 120 }, intensity: easy },
+        work: pct(1.30),
+        float: { band: { lo: 45, hi: 45 }, intensity: pct(1.05), label: 'Near-threshold float' },
+        recovery: { kind: 'stated', band: { lo: 60, hi: 60 }, intensity: vt1 },
+        set: { repeatsPerSet: { lo: 4, hi: 4 }, restBand: { lo: 120, hi: 120 }, intensity: easy },
         cite: 'Viada pp231-232 — 2-minute walk/recovery jog between sets',
+      },
+      {
+        /**
+         * ⛔ THE OTHER SURGE-AND-FLOAT SHAPE, SPLIT OUT (2026-08-31) — see `surge_float` above for
+         * why one archetype could not carry both. A longer surge just above threshold with a
+         * near-threshold float under it, and a third step at threshold before the recovery.
+         * ⚠️ NEW ID, so nothing stored resolves to it by accident; it enters the rotation as a fourth
+         * shape the engine may choose, which is `rotatedArchetype`'s own job.
+         */
+        id: 'long_surge_float',
+        shape: 'intervals',
+        label: 'Long surge with a near-threshold float',
+        repBand: { lo: 45, hi: 45 },
+        repsBand: { lo: 6, hi: 12 },
+        work: pct(1.25),
+        float: { band: { lo: 45, hi: 60 }, intensity: pct(1.15), label: 'Near-threshold float' },
+        recovery: { kind: 'stated', band: { lo: 90, hi: 90 }, intensity: vt1 },
+        set: { repeatsPerSet: { lo: 3, hi: 4 }, restBand: { lo: 120, hi: 120 }, intensity: easy },
+        cite: 'Viada pp231-232 — 2-minute recovery walk/jog between sets',
       },
       {
         id: 'descending',
