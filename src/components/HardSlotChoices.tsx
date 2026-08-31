@@ -22,6 +22,7 @@ import React from 'react';
 import { Check } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { CLUB_SESSION_CONTROL_VISIBLE, slotVariantOptions, VARIANT_BODY, type HardSlotKey, type HardSlotValue } from '@/lib/hard-slot-choices';
+import type { FrameId } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 
 export type HardSlotChoicesProps = {
   /** The slot's sport, as the endurance screen has it. */
@@ -35,6 +36,12 @@ export type HardSlotChoicesProps = {
    * athlete's long ride.
    */
   slotKey: HardSlotKey | 'long';
+  /**
+   * ⛔ WHICH FRAME THIS ROW BELONGS TO. The variant list is the SLOT'S OWN FAMILY'S, and the family
+   * is the frame's fact — a third quality row resolved to nothing without it and the menu came back
+   * empty. Absent keeps `strength_5k`, which is every caller before a second frame.
+   */
+  frame?: FrameId;
   /**
    * ⛔ SHAPES THE OTHER HARD CARD IS ALREADY BUILDING (Michael, 2026-08-26): *"a shape picked on one
    * card greys out on the other."* Computed by the caller through `variantsTakenBy`, because only
@@ -70,7 +77,7 @@ export default function HardSlotChoices(props: HardSlotChoicesProps) {
       {/* ⚠️ THE LONG SLOT HAS NO VARIANT MENU. Its family is the LSD session and the frame owns its
           shape; the only question on this card for a long slot is whether it is a club ride. */}
       {!club && props.slotKey !== 'long' && (() => {
-        const variants = slotVariantOptions(props.slotKey, props.sport);
+        const variants = slotVariantOptions(props.slotKey, props.sport, props.frame ?? 'strength_5k');
         if (variants.length < 2) return null;
         return (
           <div className="space-y-1.5" data-testid={`hard-${props.slotKey}-variants`}>

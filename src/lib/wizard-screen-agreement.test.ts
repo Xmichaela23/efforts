@@ -22,10 +22,15 @@ import {
   hardSlotKeysFor,
   introStructureFor,
   slotKeysFor,
+  slotOptionsNow,
   unansweredLine,
   unansweredSlots,
 } from './standing-plan-week-copy.ts';
-import { slotsForEngine } from './standing-plan-week-bounds.ts';
+import { builtFamily, familyMapFor, slotsForEngine } from './standing-plan-week-bounds.ts';
+import {
+  hardSlotDefault, slotFamilyFact, slotFamilyFor, slotVariantOptions,
+} from './hard-slot-choices.ts';
+import { FAMILIES } from '../../supabase/functions/_shared/endurance-library/index.ts';
 import { FRAMES, type FrameId } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 
 /** ⛔ THE ONE MAPPING THE WIZARD USES. A second copy here would defeat the point of the file. */
@@ -139,5 +144,78 @@ Deno.test('⛔⛔ NO SCREEN IMPORTS A FRAME-BOUND SLOT CONSTANT', () => {
   for (const name of FORBIDDEN) {
     assert(!imports.includes(name),
       `EnduranceWeekCard imports ${name} — that is one frame's slot list, not the chosen frame's`);
+  }
+});
+
+Deno.test('⛔⛔ EVERY ROW OF EVERY FRAME RESOLVES THROUGH EVERY LOOKUP THE TAP PATH USES', () => {
+  /**
+   * ⛔⛔ THIS IS THE TEST FOR THE BLANK SCREEN (2026-08-30). Michael answered the FIFTH endurance row
+   * on Standard Focus and the whole app went white:
+   *
+   *     TypeError: undefined is not an object (evaluating 'cr.family')
+   *
+   * The wizard's fixed-hours sentence walked the CHOSEN frame's row keys and looked each one up in
+   * `SLOT_FAMILY` — the 5K frame's FOUR-entry map. `SLOT_FAMILY['hard3']` is undefined, `.family` on
+   * it throws, and it throws inside a render path so the page has nothing to draw. It only runs once
+   * EVERY row is answered, which is why it landed on the fifth tap rather than the first.
+   *
+   * ⛔ SO THE ASSERTION IS NOT ABOUT THAT ONE MAP. Every frame-keyed lookup on the tap path is walked
+   * with every row key of every frame. A four-entry structure indexed by a five-row frame is the
+   * shape, and this catches it wherever it is — including in a lookup written next week.
+   *
+   * ⚠️ IT THROWS RATHER THAN RETURNING FALSE, deliberately: the failure being reproduced IS a throw,
+   * so a lookup that starts returning undefined again fails here exactly as the app failed.
+   */
+  for (const frame of ['strength_5k', 'all_rounder'] as const) {
+    const families = familyMapFor(frame);
+    for (const key of slotKeysFor(frame)) {
+      const slot = frameSlots(frame).find((x) => x.key === key);
+      assert(slot, `${frame}/${key}: the frame's own row is missing from frameSlots`);
+
+      // ⛔ THE CRASHING READ, EXACTLY AS THE WIZARD MAKES IT.
+      const fam = families[key];
+      assert(fam, `${frame}/${key}: no family — this is the read that blanked the app`);
+      assert(fam.family, `${frame}/${key}: the family entry carries no family`);
+
+      for (const sport of ['run', 'ride'] as const) {
+        // ⚠️ A ROW THE FRAME PRESCRIBES AS A RIDE HAS NO RUN ANSWER, and the screen offers none.
+        const offered = slotOptionsNow(key, emptySlotSports(frame), frame)
+          .options.map((o) => o.value);
+        if (!offered.includes(sport)) continue;
+
+        const built = builtFamily(fam, sport);
+        assert(built?.family, `${frame}/${key}/${sport}: resolves to no family`);
+        assert(FAMILIES[built.family], `${frame}/${key}/${sport}: ${built.family} is not a real family`);
+
+        if (slot.role === 'hard') {
+          const hk = key as 'hard1' | 'hard2' | 'hard3';
+          // ⚠️ THESE THREE FAILED QUIETLY RATHER THAN LOUDLY — an empty variant menu and a missing
+          // session title on the third row. Same map, same defect, no crash to find it by.
+          assert(slotFamilyFor(hk, sport, frame), `${frame}/${key}/${sport}: no slot family`);
+          assert(slotVariantOptions(hk, sport, frame).length > 0,
+            `${frame}/${key}/${sport}: the variant menu is empty`);
+          assert(slotFamilyFact(hk, sport, frame), `${frame}/${key}/${sport}: no session fact`);
+          assert(hardSlotDefault(sport, hk, frame).role,
+            `${frame}/${key}/${sport}: no default session`);
+        }
+      }
+    }
+  }
+});
+
+Deno.test('⛔ THE WIZARD DOES NOT INDEX A FRAME-BOUND MAP BY A FRAME\'S ROW KEYS', () => {
+  /**
+   * ⛔ THE IMPORT LINT, EXTENDED TO THE BUILDER. `SLOT_FAMILY` and `SLOT_FRAME_KEY` are the 5K
+   * frame's four rows; the builder imported the first and indexed it by the chosen frame's keys.
+   * ⚠️ `SLOT_KEYS` / `HARD_SLOT_KEYS` / `REQUIRED_SLOT_KEYS` are still imported there — they are
+   * unused by the live paths and their removal is a tidy-up, not a fix — but nothing may INDEX a
+   * frame-bound map, which is what this asserts.
+   */
+  const wizard = Deno.readTextFileSync(new URL('../components/NonRaceBuilder.tsx', import.meta.url));
+  const code = wizard.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    .replace(/\/\/.*$/gm, '');
+  for (const name of ['SLOT_FAMILY', 'SLOT_FRAME_KEY', 'HARD_SLOT_RUN_FAMILY']) {
+    assert(!new RegExp(`${name}\\s*\\[`).test(code),
+      `NonRaceBuilder indexes ${name}, which holds one frame's rows`);
   }
 });

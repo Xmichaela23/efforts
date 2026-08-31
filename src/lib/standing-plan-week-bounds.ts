@@ -155,8 +155,16 @@ function inFrameOrder(slots: SlotSelection, frame: FrameId = 'strength_5k'): Slo
   return { ...slots, hard1: put.hard1 ?? null, hard2: put.hard2 ?? null };
 }
 
-/** ⚠️ THE FRAME'S OWN SLOT FAMILIES — `SLOT_FAMILY` is this for `strength_5k`. */
-function familyMapFor(frame: FrameId): Record<string, { family: FamilyId; level: Level }> {
+/**
+ * ⛔⛔ THE FRAME'S OWN SLOT FAMILIES — EXPORTED, AND `SLOT_FAMILY` IS THIS FOR `strength_5k` ONLY.
+ *
+ * ⛔ THE CONSTANT CRASHED THE APP (2026-08-30). `SLOT_FAMILY` is a FOUR-ENTRY map; the wizard's
+ * fixed-hours sentence indexed it by the frame's own row keys, so on a five-row week
+ * `SLOT_FAMILY['hard3']` was `undefined` and `.family` on it took the whole page blank. It fires
+ * only once EVERY row is answered, which is why it landed on the fifth tap and not the first.
+ * ⚠️ ANY CALLER THAT WALKS A FRAME'S ROWS MUST USE THIS, never the constant.
+ */
+export function familyMapFor(frame: FrameId): Record<string, { family: FamilyId; level: Level }> {
   const out: Record<string, { family: FamilyId; level: Level }> = {};
   for (const x of frameSlots(frame)) out[x.key] = { family: x.family as FamilyId, level: x.level as Level };
   return out;
@@ -166,7 +174,7 @@ function familyMapFor(frame: FrameId): Record<string, { family: FamilyId; level:
  * ⛔ THE FAMILY A SLOT BUILDS ONCE ITS SPORT IS KNOWN. A slot the frame already prescribes as a ride
  * IS the answer — `RIDE_EQUIVALENT` maps run families to ride ones and has no entry for it.
  */
-function builtFamily(
+export function builtFamily(
   base: { family: FamilyId; level: Level },
   sport: SlotSport,
 ): { family: FamilyId; archetype?: string } | null {

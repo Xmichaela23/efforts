@@ -24,7 +24,9 @@ import {
   experienceUnansweredLine,
 } from '@/lib/standing-plan-week-copy';
 import { CLUB_SESSION_CONTROL_VISIBLE, hardSlotDefault, slotFamilyFact, slotVariantOptions, variantsTakenBy, type HardSlotKey } from '@/lib/hard-slot-choices';
-import { SLOT_FAMILY } from '@/lib/standing-plan-week-bounds';
+// ⛔ `SLOT_FAMILY` IS NOT IMPORTED HERE. It is the 5K frame's four rows, and indexing it by a
+// five-row frame's keys is what blanked the app on 2026-08-30. `familyMapFor` takes the frame.
+import { builtFamily, familyMapFor } from '@/lib/standing-plan-week-bounds';
 import { hardPairInFrameOrder, RIDE_EQUIVALENT } from '../../supabase/functions/_shared/standing-plan/index.ts';
 import {
   fixedHoursLine, slotSpans, type SlotSpec,
@@ -3615,7 +3617,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // ⛔ ONE OWNER FOR THE DEFAULT — `hardSlotDefault` in `src/lib/hard-slot-choices.ts`, which is
     // also what the card highlights. Two statements of "a ride defaults to threshold" is how the
     // pre-selected chip and the stored answer start disagreeing.
-    ...hardSlotDefault(sport, slot),
+    // ⛔ THE FRAME DECIDES WHICH SESSION A QUALITY ROW IS — see `hardSlotDefault`.
+    ...hardSlotDefault(sport, slot, wizardFrame),
   });
 
   /**
@@ -3701,18 +3704,30 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
      * compared against the frame's own floor; history is out of the level entirely now.
      */
     const tierLevels = experienceLevels(state.enduranceExperience);
+    /**
+     * ⛔⛔ THE FRAME'S OWN FAMILIES, NOT `SLOT_FAMILY` (fixed 2026-08-30). This walked the CHOSEN
+     * frame's row keys and looked each one up in the 5K frame's four-entry map, so `hard3` came back
+     * undefined and reading `.family` off it took the whole app to a blank screen. It runs only once
+     * every row is answered, which is why it fired on the fifth tap.
+     * ⚠️ AND `builtFamily` REPLACES THE RAW `RIDE_EQUIVALENT` LOOKUP: that table maps RUN families to
+     * ride ones and has no entry for a slot the frame already prescribes as a ride, so the old line
+     * would have resolved p274's two rides to nothing even with the map fixed.
+     */
+    const families = familyMapFor(wizardFrame);
     const specs = slotKeysFor(wizardFrame).map((k) => {
       const s = slotSportsNow[k];
       if (!s) return null;
-      const fam = SLOT_FAMILY[k];
-      const eq = s === 'ride' ? RIDE_EQUIVALENT[fam.family] : null;
-      const family = (eq?.family ?? fam.family);
+      const fam = families[k];
+      if (!fam) return null;
+      const eq = builtFamily(fam, s);
+      if (!eq) return null;
+      const family = eq.family;
       return {
         key: k,
         spec: {
           family,
           level: (tierLevels[family] as typeof fam.level | undefined) ?? fam.level,
-          archetype: eq?.archetype,
+          archetype: eq.archetype,
           sport: s,
         },
       };
@@ -5787,9 +5802,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               // ⛔ THE TITLE READS THE LIBRARY (2026-08-24): the chosen variant's label when one is
               // picked, the family's own label otherwise — never the old tables' copy.
               const variant = h?.archetype
-                ? slotVariantOptions(hk, sport).find((v) => v.id === h.archetype)?.label
+                ? slotVariantOptions(hk, sport, wizardFrame).find((v) => v.id === h.archetype)?.label
                 : null;
-              return variant ?? slotFamilyFact(hk, sport)?.title ?? null;
+              return variant ?? slotFamilyFact(hk, sport, wizardFrame)?.title ?? null;
             }}
             renderHardFlavor={(key) => {
               const sport = slotSportsNow[key];
@@ -5807,6 +5822,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 return (
                   <div className="space-y-2">
                     <HardSlotChoices
+                    frame={wizardFrame}
                     slotKey="long"
                     sport={sport}
                     value={{ ownership: state.longClub ? 'club' : 'prescribed' }}

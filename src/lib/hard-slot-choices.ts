@@ -248,8 +248,12 @@ export function slotFamilyFor(
   return sport === 'ride' ? (RIDE_EQUIVALENT[stated]?.family ?? stated) : stated;
 }
 
-export function slotVariantOptions(key: HardSlotKey, sport: 'run' | 'ride'): SlotVariantOption[] {
-  const rules = FAMILIES[slotFamilyFor(key, sport)];
+export function slotVariantOptions(
+  key: HardSlotKey,
+  sport: 'run' | 'ride',
+  frame: FrameId = 'strength_5k',
+): SlotVariantOption[] {
+  const rules = FAMILIES[slotFamilyFor(key, sport, frame)];
   if (!rules) return [];
   return rules.archetypes.map((a) => ({ id: a.id, label: a.label }));
 }
@@ -329,10 +333,12 @@ const FAMILY_FACT_BODY: Partial<Record<FamilyId, string>> = {
   ride_sweet_spot: 'As close to threshold as possible without going over — lots of time in the zone.',
 };
 
-export function slotFamilyFact(key: HardSlotKey, sport: 'run' | 'ride'):
+export function slotFamilyFact(key: HardSlotKey, sport: 'run' | 'ride', frame: FrameId = 'strength_5k'):
   { title: string; body: string; cite: string } | null {
-  const runFam = HARD_SLOT_RUN_FAMILY[key];
-  const fam = sport === 'ride' ? (RIDE_EQUIVALENT[runFam]?.family ?? runFam) : runFam;
+  // ⛔ THE FRAME'S OWN FAMILY — `HARD_SLOT_RUN_FAMILY` is the 5K frame's two rows, so a third row
+  // resolved to nothing and the card silently showed no session title. Same map, same defect class
+  // as the crash on `SLOT_FAMILY` (2026-08-30); this one failed quietly instead of loudly.
+  const fam = slotFamilyFor(key, sport, frame);
   const rules = FAMILIES[fam];
   if (!rules) return null;
   return { title: rules.label, body: FAMILY_FACT_BODY[fam] ?? rules.intent, cite: rules.cite };
