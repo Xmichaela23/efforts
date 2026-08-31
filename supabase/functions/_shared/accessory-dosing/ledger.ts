@@ -74,6 +74,32 @@ export type PlannedSession = {
   region?: 'upper' | 'lower';
   /** ⛔ A heavy lower-body day — a max test or an ME lower slot. p247 prices what sits before it. */
   heavyLower?: boolean;
+  /**
+   * ⛔⛔ A TEST SESSION, WHICH TAKES NO FLOOR VOLUME AT ALL (Michael, 2026-08-31:
+   * *"it shouldnt arbitrarily drop workouts in so test days should be test days"*).
+   *
+   * ⛔ WHAT HE FOUND, mid-session, on his own Test: Upper — a **hanging leg raise** below the bench
+   * and press, carrying the note *"Floor: core had nothing else this week."* Nothing in p274 puts it
+   * there. The floor put it there because week one's test day holds two lifts and is by a wide
+   * margin the lightest session of the week, and rule 3 is *"then the lightest"*.
+   *
+   * ⛔ AND CORE HITS IT EVERY BLOCK, not occasionally. Rule 2 ranks on region, `rank()` returns the
+   * same middle value for any muscle in neither `UPPER_MUSCLES` nor `LOWER_MUSCLES`, and core is
+   * deliberately in neither — so for core the region preference is inert and placement collapses to
+   * rule 3 alone. The lightest session is the test. It is not a coin flip that landed badly.
+   *
+   * ⛔⛔ WHY IT IS A HARD EXCLUSION AND NOT A PREFERENCE. Every other session in a week costs the
+   * athlete recovery; a test costs the BLOCK its numbers. p215's pretest is a measurement, and work
+   * added around it changes the reading the whole twelve weeks is derived from. A preference would
+   * still put volume there on a week where nothing else fits, which is precisely the week it would
+   * do the most damage.
+   *
+   * ⚠️ THE MUSCLE IS NOT SILENTLY DROPPED. It goes to the next session the rules allow, and if none
+   * qualifies it lands in `unfilled` with a stated reason — the path that already exists.
+   * ⚠️ AND IT IS NARROWER THAN `heavyLower`, which is about what sits BEFORE a heavy day. This is
+   * about what sits INSIDE a test.
+   */
+  isTest?: boolean;
 };
 
 /**
@@ -510,6 +536,9 @@ export function fillMuscleFloor(
     const ordered = lines
       .map((l, i) => ({ l, i, s: sessions[i] }))
       .filter((x) => x.l.countedSets + setsPerSlot < SESSION_SETS_COSTLY)
+      // ⛔ RULE 0 — A TEST SESSION TAKES NOTHING. See `PlannedSession.isTest`. It runs first because
+      // it is the only exclusion that does not depend on which muscle is being placed.
+      .filter((x) => x.s.isTest !== true)
       // ⛔ RULE 1 — the day before a heavy lower day takes no lower-body fill.
       .filter((x) => !(isLower && typeof x.s.day === 'number' && heavyLowerDays.has(x.s.day + 1)))
       .sort((a, b) => {

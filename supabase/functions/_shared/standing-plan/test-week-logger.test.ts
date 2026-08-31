@@ -60,7 +60,14 @@ Deno.test('⛔⛔ ONLY THE TESTED LIFTS ARE MARKED — with a max on file and wi
     const rest = all.filter((e) => !isTested(e)).map((e) => String(e.name));
     assertEquals(marked.sort(), ['Back Squat', 'Bench Press', 'Deadlift', 'Overhead Press'],
       `${label}: the wrong rows are marked as tested lifts`);
-    assert(rest.length > 0, `${label}: the test week carries no accessories at all`);
+    /**
+     * ⛔⛔ THE COMPOSED TEST WEEK NO LONGER CARRIES ACCESSORIES, AND THAT IS THE POINT NOW (Michael,
+     * 2026-08-31: *"test days should be test days"* — `PlannedSession.isTest`). This used to assert
+     * `rest.length > 0`, which only held while the muscle floor was parking work on the test day.
+     * ⚠️ SO THE SPLIT IS EXERCISED AGAINST AN EXPLICIT ACCESSORY BELOW instead of against whatever
+     * the floor happened to drop in. A vacuous pass here is how the logger's accessory branch would
+     * go quietly untested.
+     */
     for (const n of rest) {
       assert(!/bench press|back squat|deadlift|overhead press/i.test(n),
         `${label}: ${n} is a tested lift and would be logged as a plain accessory`);
@@ -117,4 +124,27 @@ Deno.test('⛔ AND THE COMPOSER STILL MARKS EXACTLY ONE SCORED SET PER TESTED LI
     // ⛔ AND IT IS THE LAST, which is what makes the fallback safe for a row with no flag at all.
     assertEquals(plan[plan.length - 1]?.amrap, true, `${String(ex.name)}: the scored set is not the last`);
   }
+});
+
+Deno.test('⛔ the split still classifies an accessory — the test week no longer supplies one', () => {
+  /**
+   * ⛔ WHY THIS FIXTURE IS HAND-BUILT. With test days excluded from the muscle floor, a composed
+   * test week is two tested lifts and nothing else, so the predicate's ACCESSORY branch has no
+   * input. The logger still has to get it right — `StrengthLogger.tsx` uses this exact rule to
+   * decide which rows are rebuilt as a warm-up ramp into an AMRAP and which come through as
+   * prescribed — and a plan whose test day carries an accessory for any other reason (an athlete's
+   * own added row, a future core slot) must not have it turned into a max attempt.
+   */
+  assertEquals(isTested({ name: 'Hanging Leg Raise', sets: 3, reps: '8-10' }), false);
+  assertEquals(isTested({ name: 'Bench Press', slot_intent: 'ME' }), true);
+  assertEquals(
+    isTested({ name: 'Bench Press', set_plan: [{ weight: 115 }, { weight: 130, amrap: true }] }),
+    true,
+  );
+  // ⚠️ A HYP ROW WITH A `set_plan` BUT NO AMRAP IS AN ACCESSORY, which is the case that would
+  // otherwise fall through a naive "has set_plan" test.
+  assertEquals(
+    isTested({ name: 'Calf Raise', slot_intent: 'HYP', set_plan: [{ weight: 45 }, { weight: 45 }] }),
+    false,
+  );
 });

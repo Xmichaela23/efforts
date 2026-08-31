@@ -2576,6 +2576,13 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
              * week that follows.
              */
             day: day.day,
+            /**
+             * ⛔⛔ AND IT TAKES NO FLOOR VOLUME AT ALL (Michael, 2026-08-31, reading his own Test:
+             * Upper mid-session: *"test days should be test days"*). The region and `heavyLower`
+             * facts below stop the WRONG muscle landing here; this stops ANY of them landing here.
+             * See `PlannedSession.isTest` for why it is a hard exclusion and not a preference.
+             */
+            isTest: true,
             ...(testRegionOf(test.name) ? { region: testRegionOf(test.name)! } : {}),
             ...(testRegionOf(test.name) === 'lower' ? { heavyLower: true } : {}),
             sets: (test.strength_exercises ?? []).map((e) => ({

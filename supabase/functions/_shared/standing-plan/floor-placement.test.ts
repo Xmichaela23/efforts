@@ -53,11 +53,20 @@ Deno.test('⛔⛔ NO LOWER-BODY WORK ON THE DAY BEFORE THE LOWER TEST — his we
       + 'deadlift max test (p247: 3-4% off the squat and deadlift)');
   }
 
-  // ⛔ AND IT DID NOT SIMPLY VANISH — the lower work is on the lower day, which is the other half.
-  const lowerFills = names(lower).filter((n) => !/back squat|deadlift/i.test(n))
-    .map((n) => musclesWorkedBy(n)?.primary).filter(Boolean);
-  assert(lowerFills.some((m) => LOWER.includes(String(m))),
-    'the lower test day carries no lower-body fill — the floor stopped filling rather than moving');
+  /**
+   * ⛔⛔ AND NOW NEITHER TEST DAY TAKES A FILL AT ALL — Michael, 2026-08-31, reading his own Test:
+   * Upper mid-session: *"it shouldnt arbitrarily drop workouts in so test days should be test
+   * days"*. See `PlannedSession.isTest`.
+   *
+   * ⚠️ THIS SUPERSEDES THE SECOND HALF OF THIS TEST AS IT WAS FIRST WRITTEN. It used to assert that
+   * the lower work MOVED to the lower test day — correct under the region rule, wrong under his
+   * ruling, which is that a test session is not a place work moves TO.
+   */
+  for (const s of [upper, lower]) {
+    const fills = names(s).filter((n) => !/bench press|overhead press|back squat|deadlift/i.test(n));
+    assert(fills.length === 0,
+      `⛔ "${s!.name}" carries ${fills.join(', ')} — a test session takes no floor volume`);
+  }
 });
 
 Deno.test('⛔ THE WEEKLY VOLUME IS UNCHANGED — this moves work, it does not remove it', () => {
@@ -71,12 +80,37 @@ Deno.test('⛔ THE WEEKLY VOLUME IS UNCHANGED — this moves work, it does not r
     .flatMap((s) => (s.strength_exercises ?? []).map((e) => String(e.name)))
     .map((x) => musclesWorkedBy(x)?.primary).filter(Boolean));
 
-  // ⛔ WEEK ONE IS WHERE THE FLOOR ACTUALLY OPERATES, so it is where the exclusion could starve a
-  // muscle. Every one it reached before the rule, it reaches after.
+  /**
+   * ⛔⛔⛔ WHAT HIS TEST-DAY RULING COSTS, MEASURED RATHER THAN GUESSED (2026-08-31).
+   *
+   * Week one has FOUR lifting sessions and TWO of them are tests. With tests excluded
+   * (`PlannedSession.isTest`) the floor has two candidates left, and both sit close enough to
+   * `SESSION_SETS_COSTLY` (14 — p086) that a fill would cross it. So the floor declines and says so
+   * through `unfilled`, which is the honest path rather than a silent drop.
+   *
+   * ⛔ COMPOSED AT A BARBELL KIT, THE COST IS EXACTLY THIS:
+   *   week 1 reaches biceps · chest · deltoids · hamstrings · lats · quadriceps
+   *   week 2 reaches those plus calves · glutes · triceps
+   * So week one loses **glutes, calves and triceps** for one week, and that is the price of not
+   * parking volume on a max test. ⚠️ It is a PRICE, not a defect — the thing it replaces is a glute
+   * movement the day before the squat and deadlift max, which is the defect this file's first test
+   * exists to catch.
+   *
+   * ⛔⛔ CORE IS ABSENT IN BOTH WEEKS AND THAT IS A DIFFERENT PROBLEM. **p274 prints no core slot on
+   * any of its four lifting days.** The floor was the only thing putting core in this programme at
+   * all, and it was putting it on the test day. The fix is the CORE SLOT Michael approved on
+   * 2026-08-31, not a weaker placement rule. Until it lands, core is honestly absent rather than
+   * dishonestly parked on a max test.
+   *
+   * ⚠️ WEEK 2 IS THE REAL GUARD against silent under-filling, because it is an ordinary week and
+   * nothing about the ruling touches it — asserted in the block below, which already existed and
+   * already pins the core gap.
+   */
   const w1 = musclesIn(1);
-  for (const m of ['quadriceps', 'hamstrings', 'glutes', 'chest', 'triceps', 'core']) {
+  for (const m of ['quadriceps', 'hamstrings', 'chest', 'lats', 'biceps', 'deltoids']) {
     assert(w1.has(m as never), `week 1: nothing in the week trains ${m}`);
   }
+
 
   /**
    * ⛔⛔ AND A PRE-EXISTING GAP IS PINNED RATHER THAN ASSERTED AWAY: **weeks 2+ carry no core work
