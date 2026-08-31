@@ -928,6 +928,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 day: s.day,
                 completed: false,
                 tags: Array.isArray((s as any).tags) ? (s as any).tags : [],
+                // ⛔ THE SESSION'S OWN PAGE — named here rather than spread, because this object is
+                // built field by field and a field not listed is dropped. See `PlanSession.cite`.
+                cite: (s as { cite?: string }).cite || undefined,
                 // View hints parsed from tags (schema-safe)
                 display_overrides: displayOverridesFromTags,
                 expand_spec: expandSpecFromTags,
@@ -1815,6 +1818,16 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               }
             }
           }
+
+          /**
+           * ⛔ THE PAGE THIS SESSION COMES FROM (Michael, 2026-08-31: *"do we have a page per
+           * session?"*). The block carried one citation and every session under it carried none,
+           * while the library has held a page per session type and per workout shape all along —
+           * they simply stopped at the composer. ⚠️ Last line of the session, after its own notes:
+           * provenance, not instruction.
+           */
+          const sessionCite = String((w as { cite?: string })?.cite || '').trim();
+          if (sessionCite) lines.push(`  - _${sessionCite}_`);
 
           // Include materialized strength exercises with calculated weights
           const strengthExercises = w.computed?.steps?.filter((s: any) => s?.kind === 'strength')?.map((s: any) => s.strength) 

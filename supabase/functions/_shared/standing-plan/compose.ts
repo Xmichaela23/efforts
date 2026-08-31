@@ -181,6 +181,13 @@ export type PlanSession = {
   strength_exercises?: StrengthExercise[];
   steps_preset?: string[];
   tags: string[];
+  /**
+   * ⛔ THE PAGE THIS SESSION COMES FROM. Endurance takes the workout's own page where the library
+   * gives one and the session type's otherwise; strength takes the programme's page, because that is
+   * genuinely where a lifting day in this block comes from — one table, one page.
+   * ⚠️ OPTIONAL, so a caller that composes without one is unchanged.
+   */
+  cite?: string;
 };
 
 /**
@@ -1715,6 +1722,9 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[]):
      * ⚠️ THE NAME IS UNCHANGED. It is athlete-facing and it is right; the tag is what surfaces read.
      */
     tags: ['standing_plan', 'test_week', '1rm_test'],
+    // ⛔ THE PRETEST'S OWN PAGE — the three-step protocol and the working number are p215's, not the
+    // programme table's, so this session cites where it actually comes from.
+    cite: 'Viada p215',
   };
 }
 
@@ -1767,6 +1777,8 @@ function plyoSession(day: FrameDay, args: ComposeArgs, rows: StrengthExercise[])
     duration: 20,
     strength_exercises: rows,
     tags: ['standing_plan', 'plyo'],
+    // ⛔ THE PLYO DAY'S DOSE IS p227's — see `PLYO_DOSE`, which the frame's own note points at.
+    cite: 'Viada p227',
   };
 }
 
@@ -2558,6 +2570,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
             'standing_plan', `frame:${frame.id}`, `column:${args.column}`,
             ...(day.lowerRole ? [`lower:${day.lowerRole}`] : []),
           ],
+          // ⛔ A LIFTING DAY IN THIS BLOCK COMES FROM THE PROGRAMME'S OWN TABLE — one page, and it is
+          // the frame's. The per-MOVEMENT pages live on the movements; this is the day's.
+          cite: frame.cite,
         });
         /**
          * ⛔ AND THE SAME FACTS ON EVERY LIFTING DAY — read off the FRAME, never off the label.

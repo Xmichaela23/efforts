@@ -17,7 +17,7 @@
 
 import type { EnduranceSession, FamilyId } from '../endurance-library/index.ts';
 // ⛔ THE SOURCE'S OWN CLASSIFICATION — see `ENDURANCE_CLASS`, and see the tag list below.
-import { ENDURANCE_CLASS, classToken } from '../endurance-library/index.ts';
+import { ENDURANCE_CLASS, classToken, FAMILIES } from '../endurance-library/index.ts';
 
 /** The `type` field on a plan row. Unchanged vocabulary. */
 export type SessionType = 'run' | 'ride' | 'swim' | 'strength';
@@ -29,6 +29,15 @@ export type TranslatedSession = {
   duration: number;
   steps_preset: string[];
   tags: string[];
+  /**
+   * ⛔⛔ THE PAGE THIS SESSION COMES FROM (Michael, 2026-08-31: *"do we have a page per session?"*).
+   *
+   * The block carried ONE citation — the programme's own page — and every session under it carried
+   * none, while the library has held a page reference per family AND per workout shape all along.
+   * They stopped at the composer. **The most specific one wins**: an archetype cites the workout, a
+   * family cites the session type, so a reader is pointed at the narrower of the two.
+   */
+  cite: string;
 };
 
 const minutes = (seconds: number) => Math.max(1, Math.round(seconds / 60));
@@ -533,7 +542,21 @@ export function translateEnduranceSession(
 
   const label = FAMILY_LABEL[session.family] ?? (sport === 'ride' ? 'Ride' : sport === 'swim' ? 'Swim' : 'Run');
   const raceTempo = opts?.raceTempo === true;
+  /**
+   * ⛔ THE ARCHETYPE'S PAGE WHERE THERE IS ONE, THE FAMILY'S OTHERWISE — see `TranslatedSession.cite`.
+   * ⚠️ Read off the same tables the session was BUILT from, never a second list: a citation kept
+   * beside the thing it cites cannot drift from it.
+   */
+  const famRules = FAMILIES[session.family];
+  const archCite = famRules?.archetypes?.find((a) => a.id === session.archetype)?.cite;
   return {
+    /**
+     * ⚠️ THE PAGE, NOT THE WHOLE NOTE. An archetype's `cite` often carries a clause after the page —
+     * *"Viada pp231-232 — 2-minute recovery walk/jog between sets"* — which is provenance for a
+     * reader of the library and noise on a session row. The clause is already in the session's own
+     * notes where it belongs.
+     */
+    cite: (archCite || famRules?.cite || '').split('—')[0].trim(),
     type: sport,
     name: raceTempo ? `${label} (race tempo)` : label,
     description: describeSession(session, raceTempo),
