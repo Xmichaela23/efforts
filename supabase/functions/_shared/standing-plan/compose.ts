@@ -925,6 +925,67 @@ function exerciseForSlot(
     asymmetrical: slot.asymmetrical,
   });
 
+  /**
+   * ⛔⛔⛔ THE MUSCLE THE PAGE NAMES IS THE LAW — `StrengthSlot.muscle` (Michael, 2026-08-30).
+   *
+   * ⛔ AND IT IS ENFORCED HERE AS WELL AS IN THE PICKER, because narrowing only the dropdown would
+   * leave THIS path free to do the very thing that was reported. Measured across three kits before
+   * the fix: p274's `1 × HYP: focused quadriceps` built a **leg extension** at a commercial gym, a
+   * **weighted single-leg calf raise** at barbell+dumbbells+bench and a **freestanding barbell calf
+   * raise** at barbell+rack+bench — calves in a quadriceps row, with no athlete involved. Its
+   * `1 × HYP: braced push` built a **dumbbell shoulder press** on the same kit: deltoids where p221
+   * prints three chest presses.
+   *
+   * ⛔ HIS MOVEMENTS FIRST, THEN A SAME-MUSCLE SUBSTITUTE, NEVER ANOTHER MUSCLE. Michael's amendment
+   * in his own words: *"substitute known barbell/dumbbell versions that hit the SAME muscle… the
+   * movement may leave the printed list when kit demands it."* The pool here is already this cell's
+   * own — same pattern, same category, same equipment gate — so narrowing it can only ever remove a
+   * movement, never reach past the frame.
+   * ⚠️ IF NOTHING IN THE CELL HITS THE MUSCLE the list empties and the slot DROPS through the branch
+   * below, which is the mechanism that already says *"N exercises short"* and names the equipment as
+   * the cause. An honest gap beats a calf raise in a quad row.
+   * ⚠️ `strength_5k` CARRIES NO `muscle` ON ANY SLOT — its rows name categories, not muscles — so
+   * this is a no-op on that frame and its output is byte-identical.
+   */
+  if (slot.muscle) {
+    const want = String(slot.muscle);
+    const onMuscle = resolved.options.filter((o) => musclesWorkedBy(o.name)?.primary === want);
+    if (onMuscle.length > 0) {
+      resolved.options = onMuscle;
+    } else {
+      /**
+       * ⛔⛔ THE SAME WIDENING THE PICKER DOES, AND IT HAS TO BE THE SAME OR THE TWO DISAGREE
+       * (Michael's amendment, 2026-08-30). Measured: `focused press_lower` at a barbell-and-bench
+       * kit holds a seated calf raise and a weighted knee raise and **no quadriceps movement at
+       * all**, so narrowing alone emptied p274's quadriceps row. The split squats and lunges that
+       * serve it are filed one category over.
+       * ⛔ CATEGORY WIDENS, PATTERN AND MUSCLE DO NOT. The plane is the frame's; the category is the
+       * looser of the two and p275 already treats it as rotatable. ⛔ NO `primary` — those are the
+       * competition lifts the ME slots already carry.
+       * ⚠️ STILL EMPTY MEANS THE SLOT DROPS, through the branch below that already says "N exercises
+       * short" and names the equipment as the cause. An honest gap beats a calf raise in a quad row.
+       */
+      const pooled: typeof resolved.options = [];
+      for (const cat of ['secondary', 'braced', 'focused'] as typeof slot.category[]) {
+        pooled.push(...resolveSlot({
+          category: cat,
+          pattern,
+          intent: slot.intent,
+          equipment: args.equipment ?? null,
+          asymmetrical: slot.asymmetrical,
+        }).options);
+      }
+      const seen = new Set<string>();
+      resolved.options = pooled.filter((o) => {
+        if (musclesWorkedBy(o.name)?.primary !== want) return false;
+        const c = canonicalize(o.name);
+        if (seen.has(c)) return false;
+        seen.add(c);
+        return true;
+      });
+    }
+  }
+
   let movement: string;
   /**
    * ⛔ A HYP ACCESSORY SLOT GOES TO THE ATHLETE'S PICK WHEN THE PICK FITS IT (A1, 2026-08-24).

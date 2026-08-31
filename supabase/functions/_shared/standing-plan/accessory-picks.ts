@@ -888,6 +888,33 @@ export function pickReachesFrame(
 }
 
 /**
+ * ⛔ THE MUSCLE THIS FRAME NAMES FOR A PICK'S CELL, or null where the page names only a category.
+ * One reader for the fact the frame states, so the dropdown and the built week narrow identically —
+ * see `StrengthSlot.muscle`.
+ * ⚠️ THE FIRST MATCHING CELL'S ANSWER. Every occurrence of a pick's cell within one frame carries
+ * the same wording on p274 (both `focused quadriceps` rows say quadriceps), so there is nothing to
+ * reconcile; a frame that ever printed two different muscles for one cell would need a per-day
+ * answer and this is where that would go.
+ */
+export function frameMuscleForPick(
+  key: ViadaPickKey,
+  frame: FrameId,
+  column: ColumnKind = 'standard',
+): string | null {
+  const spec = VIADA_PICKS[key];
+  if (!spec.slot) return null;
+  for (const day of FRAMES[frame]?.columns[column] ?? []) {
+    if (spec.slot.frameDay != null && day.day !== spec.slot.frameDay) continue;
+    for (const sl of day.strength) {
+      if (sl.intent !== 'HYP' || sl.role !== 'accessory') continue;
+      if (sl.category !== spec.slot.category || sl.pattern !== spec.slot.pattern) continue;
+      if (sl.muscle) return String(sl.muscle);
+    }
+  }
+  return null;
+}
+
+/**
  * ⛔ THE PICK LIST A SCREEN MAY DRAW, for a frame that is named rather than assumed. Day order, then
  * reachability — so a control that appears is one the built week will honour.
  * ⚠️ THE FRAME IS REQUIRED. This function exists because its predecessors defaulted to `strength_5k`
@@ -925,7 +952,19 @@ export function picksForFrame(
     ? ordered
     : ordered.filter((k) => pickReachesFrame(k, frame, column));
   if (equipment == null) return reachable;
-  return reachable.filter((k) => VIADA_PICKS[k].slot == null || pickOptions(k, equipment).length >= 2);
+  /**
+   * ⚠️⚠️ ONE OPTION STILL DRAWS THE CONTROL — changed 2026-08-30 with Michael's substitution
+   * amendment, and the earlier rule is recorded because it was right for the design it belonged to.
+   * It was `>= 2`, on the reasoning that a single-option dropdown is not a choice. **That held while
+   * an unreachable cell simply emptied.** With same-muscle substitution the empty case is rare and
+   * the single-option case is common and INFORMATIVE — after the muscle narrowing a commercial gym
+   * leaves exactly one honest movement in the quadriceps and hamstring rows, and hiding those
+   * controls would tell the athlete less about their own week, not more. Michael: *"Picker shows the
+   * substitute options too, so the athlete keeps their say."*
+   * ⛔ EMPTY IS STILL NOT DRAWN — there is nothing to show and nothing to answer.
+   */
+  return reachable.filter((k) => VIADA_PICKS[k].slot == null
+    || pickOptions(k, equipment, frameMuscleForPick(k, frame, column)).length >= 1);
 }
 
 /**
@@ -936,18 +975,32 @@ export function picksForFrame(
  * It is not the book that blocks it, it is the kit. p274 spends four of its fourteen accessory cells
  * on BRACED work and p221 defines braced as machine work — Smith machine press, machine chest press,
  * dip machine · chest-supported row, lat pulldown, cable upright row · hack squat, leg press, lever
- * squat · reverse hyperextension, GHD, machine back extension. **An athlete with a barbell, plates,
- * a rack and a bench — which is all Standard Focus's entry gate asks for — can reach none of them.**
- * Their week still builds; the grid substitutes. What they lose is the CHOICE over those cells.
+ * squat · reverse hyperextension, GHD, machine back extension. An athlete with a barbell, plates,
+ * a rack and a bench — which is all Standard Focus's entry gate asks for — reaches few of them.
+ *
+ * ⚠️⚠️ AND THE TEST IS PER CELL, NOT ALL-OR-NOTHING — corrected 2026-08-30, off Michael's own live
+ * screen. This note first read as though braced work were reachable or not as a block, and his
+ * screenshot disproved it in one glance: **Machine pull was drawn while Machine press and Leg press
+ * were not.** That is correct behaviour — p221's braced PULL list (chest-supported row, lat
+ * pulldown, cable upright row) is reachable in a garage gym with a pulldown station, while its
+ * braced PUSH list (Smith machine, machine chest press, dip machine) and braced LOWER list (hack
+ * squat, leg press, lever squat) are not. **Nothing was inconsistent; this sentence was.**
+ *
+ * ⛔ AND THE CELL IS NO LONGER LEFT WITHOUT A CONTROL WHERE A SUBSTITUTE EXISTS (Michael's
+ * amendment, same day): the muscle is the law, and a kit that blocks his printed movement is
+ * offered a free-weight movement for the same muscle, marked `ours`. What survives of the original
+ * finding is narrower and still true: **where neither his list nor a same-muscle substitute is
+ * reachable, the athlete gets no say over that cell.**
  * ⚠️ p275 offers a rotation out of braced work for the ASYMMETRICAL slots only (*"you can rotate the
  * braced asymmetrical movements with secondary asymmetrical"*) — those are the DE and SKILL cells,
  * which take no pick. **He offers no such rotation for the HYP braced superset**, so there is no
  * sourced substitute to offer and inventing one would be ours.
  */
 export const BRACED_NEEDS_MACHINES =
-  'p274 spends four accessory cells on braced work and p221 defines braced as machine work. An '
-  + 'athlete without machines reaches none of his movements for those cells, so the picker is not '
-  + 'drawn for them; the composer still fills the cell by substitution.';
+  'p274 spends four accessory cells on braced work and p221 defines braced as machine work. The '
+  + 'test is PER CELL, not per athlete: a kit reaches his movements for one braced cell and not '
+  + 'another. A picker is drawn where two of his movements for that cell are reachable, or where a '
+  + 'same-muscle substitute is; otherwise the composer fills the cell and the athlete has no say.';
 
 /**
  * ⛔⛔ HIS DAY NUMBER, NOT A WEEKDAY AND NOT A RENUMBER (Michael, 2026-08-26).
@@ -1073,6 +1126,17 @@ function dedupeByCanonical(movements: GridMovement[]): GridMovement[] {
 export function pickOptions(
   key: ViadaPickKey,
   equipment: string[] | null | undefined,
+  /**
+   * ⛔⛔⛔ THE MUSCLE THE PAGE NAMES FOR THIS CELL — see `StrengthSlot.muscle` (2026-08-30).
+   * **The muscle is the law; the movement may leave his printed list when the kit demands it**
+   * (Michael, 2026-08-30). p274 asks for `focused quadriceps`; p223's list for that CATEGORY spans
+   * quads, glutes, calves and hip flexors, so without this the quadriceps row offered — and built —
+   * a seated calf raise on any kit without a leg-extension machine.
+   * ⚠️ ON THE OPTION'S OWN PRIME MOVER, which the catalogue already carries. No second table.
+   * ⚠️ ABSENT LEAVES THE CELL EXACTLY AS IT WAS, so p246 — whose rows name categories rather than
+   * muscles — is unchanged on every one of its cells.
+   */
+  muscle?: string | null,
 ): PickOption[] {
   const spec = VIADA_PICKS[key];
   const resolved = resolveSlot({
@@ -1128,7 +1192,71 @@ export function pickOptions(
     const i = leadKeys.indexOf(canonicalize(m.name));
     return i === -1 ? leadKeys.length : i;
   };
-  return pool
+  /**
+   * ⛔⛔⛔ THE MUSCLE NARROWING, AND ITS EQUIPMENT SUBSTITUTION (Michael, 2026-08-30).
+   *
+   * ⛔ HIS MOVEMENTS FIRST. Where the page names a muscle, the cell offers the movements from HIS
+   * printed list whose prime mover is that muscle — leg extension for `focused quadriceps`, and not
+   * the calves and hip flexors that share p223's category row.
+   *
+   * ⛔⛔ AND WHEN THE KIT REACHES NONE OF THEM, IT SUBSTITUTES RATHER THAN EMPTYING. Michael amended
+   * the strict ruling for exactly this: *"don't leave equipment-blocked cells empty — substitute
+   * known barbell/dumbbell versions that hit the SAME muscle… the movement may leave the printed
+   * list when kit demands it, labeled OURS."* So a quadriceps row on a barbell-and-bench kit offers
+   * split squats and lunges — quadriceps, free weights, **marked `ours`** — never the calf raise
+   * that shares its category.
+   * ⚠️ THE SUBSTITUTES COME FROM THE CELL'S OWN GRID POOL, not from a new list: same pattern, same
+   * category, same equipment gate. Widening the MUSCLE would be the one thing this must never do.
+   * ⚠️ AND THEY ARE MARKED, because the strict cut means nothing if an addition is invisible — the
+   * same rule `oursList` already follows.
+   */
+  const primaryOf = (name: string) => musclesWorkedBy(name)?.primary ?? null;
+  const narrowed = muscle
+    ? (() => {
+      const his = pool.filter((m) => primaryOf(m.name) === muscle);
+      if (his.length > 0) return { list: his, substituted: false };
+      /**
+       * ⛔⛔ THE SUBSTITUTE POOL WIDENS BY CATEGORY, NEVER BY MUSCLE OR PATTERN (Michael's amendment,
+       * 2026-08-30: *"substitute known barbell/dumbbell versions that hit the SAME muscle… split
+       * squat class"*).
+       *
+       * ⛔ THE CELL'S OWN POOL IS NOT ENOUGH, and the measurement is why: `focused press_lower` at a
+       * barbell-and-bench kit holds a seated calf raise and a weighted knee raise and **no quadriceps
+       * movement at all**, so a same-cell substitution left the row empty. The split squats and
+       * lunges that would serve it are filed one category over (p220 secondary press lower, p221
+       * braced push lower).
+       *
+       * ⛔ SO IT ASKS THE SAME PATTERN ACROSS HIS OTHER CATEGORIES and keeps only the same muscle.
+       * The plane of movement is the frame's and does not move; the category does, which is the
+       * looser of the two and the one p275 already treats as rotatable — *"you can rotate the braced
+       * asymmetrical movements with secondary asymmetrical."*
+       * ⚠️ EVERY RESULT IS MARKED `ours`. It is a movement he did not print for this cell, offered
+       * because the kit reaches none that he did.
+       */
+      /**
+       * ⛔ NO `primary`. Those are the competition lifts the frame puts in its ME slots — offering
+       * Back Squat as an accessory beside the day that already opens on it is the engine losing its
+       * place, not a substitution. The three noncompetition categories are the whole pool.
+       */
+      const wider = ['secondary', 'braced', 'focused'] as ViadaCategory[];
+      const pooled: GridMovement[] = [];
+      for (const cat of wider) {
+        const r = resolveSlot({
+          category: cat,
+          pattern: spec.slot?.pattern ?? null,
+          intent: 'HYP',
+          equipment: equipment ?? null,
+        });
+        pooled.push(...r.options);
+      }
+      const subs = dedupeByCanonical(pooled)
+        .filter((m) => !excluded.has(canonicalize(m.name)))
+        .filter((m) => primaryOf(m.name) === muscle);
+      return { list: subs, substituted: true };
+    })()
+    : { list: pool, substituted: false };
+
+  return narrowed.list
     .map((m, i) => ({ m, i, r: rank(m) }))
     .sort((a, b) => (a.r === b.r ? a.i - b.i : a.r - b.r))
     .map(({ m }) => ({
@@ -1145,7 +1273,9 @@ export function pickOptions(
       muscle: musclesWorkedBy(m.name)?.primary ?? null,
       // MARKED AT THE SURFACE, not just in the table. An addition the athlete cannot tell from his
       // own movements is an addition the strict cut did not really make.
-      ...(ours.has(canonicalize(m.name)) ? { ours: true as const } : {}),
+      // ⚠️ AND AN EQUIPMENT SUBSTITUTION IS OURS TOO — it is a movement he did not print for this
+      // cell, offered because the kit reaches none that he did. See the narrowing above.
+      ...(ours.has(canonicalize(m.name)) || narrowed.substituted ? { ours: true as const } : {}),
     }));
 }
 
@@ -1160,11 +1290,19 @@ export function defaultPickFor(
   key: ViadaPickKey,
   equipment: string[] | null | undefined,
   dial: DialChip[] = [],
+  /**
+   * ⛔⛔ THE FRAME, SO THE SEED NARROWS ON THE SAME MUSCLE THE DROPDOWN DOES (2026-08-30). Without
+   * it the pre-filled answer was chosen from the unnarrowed list — **which is exactly what put
+   * `seated calf raise` in the quadriceps row on Michael's screen**, since the seed is what the
+   * screen opens on and what a zero-touch Continue sends.
+   * ⚠️ Absent keeps `strength_5k`, whose cells name no muscle, so its seeds are unchanged.
+   */
+  frame: FrameId = 'strength_5k',
 ): string {
   // ⛔ AN OPT-IN ROW HAS NO DEFAULT. Empty is the answer, and a caller must treat it as "nothing
   // added" rather than as a missing value to fill in.
   if (VIADA_PICKS[key].optIn === true) return '';
-  const opts = pickOptions(key, equipment);
+  const opts = pickOptions(key, equipment, frameMuscleForPick(key, frame));
   if (opts.length === 0) return '';
   const wanted = musclesForChips(dial.filter((c) => VIADA_PICKS[key].servesChips.includes(c)));
   if (wanted.size > 0) {
@@ -1189,7 +1327,7 @@ export function defaultViadaPicks(
 ): Partial<Record<ViadaPickKey, string>> {
   const out: Partial<Record<ViadaPickKey, string>> = {};
   for (const key of (PICK_KEYS_BY_FRAME[frame] ?? VIADA_PICK_KEYS)) {
-    out[key] = defaultPickFor(key, equipment, dial);
+    out[key] = defaultPickFor(key, equipment, dial, frame);
   }
   return out;
 }

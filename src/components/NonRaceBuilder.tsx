@@ -112,6 +112,7 @@ import {
   chipHasFrameSlot,
   dayLabelForPick,
   picksForFrame,
+  frameMuscleForPick,
   defaultViadaPicks,
   pickOptions,
   pickOptionLabel,
@@ -2204,7 +2205,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         } as ViadaAccessoryPrefs,
       },
     }));
-  }, [isStrengthFocus, viadaPrefs, strengthEquipment]);
+    // ⚠️ `wizardFrame` IS A DEPENDENCY NOW (2026-08-30). The seed is drawn from the FRAME's own pick
+    // table and narrowed by the muscles that frame states, so a seed computed under one frame is the
+    // wrong week's answers — the same staleness `strengthEquipment` is here for.
+  }, [isStrengthFocus, viadaPrefs, strengthEquipment, wizardFrame]);
   /**
    * ⛔ THE EXTRA-ROW PICKERS — ONE PER CHIP THAT REACHES NO FRAME SLOT (Glutes, Core).
    *
@@ -5404,7 +5408,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                  * the athlete has no say over, the screen does not talk about.
                  */
                 const pairDrawn = spec.pairedWith != null && drawn.includes(spec.pairedWith);
-                const opts = pickOptions(key, strengthEquipment);
+                /**
+                 * ⛔ THE FRAME'S OWN MUSCLE FOR THIS CELL — see `StrengthSlot.muscle`. p274 names
+                 * `focused quadriceps` where p246 names the category, and p223's list for that
+                 * category spans quads, glutes, calves and hip flexors. Without this the quadriceps
+                 * dropdown offered a seated calf raise and defaulted to it on any kit without a
+                 * leg-extension machine, which is what reached Michael's screen.
+                 * ⚠️ THE COMPOSER NARROWS ON THE SAME FIELD, so the dropdown and the built week
+                 * cannot disagree about what the row is for.
+                 */
+                const opts = pickOptions(key, strengthEquipment, frameMuscleForPick(key, wizardFrame));
                 const value = viadaPrefs?.picks?.[key] ?? opts[0]?.name ?? '';
                 return (
                   <div key={key}>

@@ -35,7 +35,9 @@
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
+  ALL_ROUNDER_PICK_KEYS,
   dayLabelForPick,
+  frameMuscleForPick,
   pickKeysInDayOrder,
   pickOptions,
   picksForFrame,
@@ -46,6 +48,8 @@ import {
   composeWeek,
   defaultCompetitionLifts,
 } from '../../supabase/functions/_shared/standing-plan/index.ts';
+import { FRAMES } from '../../supabase/functions/_shared/standing-plan/frames.ts';
+import { musclesWorkedBy } from '../../supabase/functions/_shared/accessory-dosing/index.ts';
 
 const read = (rel: string) => Deno.readTextFile(new URL(rel, import.meta.url));
 
@@ -272,8 +276,9 @@ Deno.test('⛔⛔⛔ EVERY PICK STANDARD FOCUS DRAWS ACTUALLY LANDS IN THE COMPO
 
   let checked = 0;
   for (const key of drawn) {
-    const options = pickOptions(key, ['Commercial gym']).map((o) => o.name);
-    assert(options.length >= 2, `${key} offers fewer than two movements — that is not a choice`);
+      const options = pickOptions(key, ['Commercial gym'], frameMuscleForPick(key, 'all_rounder'))
+      .map((o) => o.name);
+    assert(options.length >= 1, `${key} is drawn with no movements at all`);
     const wantDays = (dayLabelForPick(key, 'all_rounder') ?? '')
       .split(' · ').map((d) => Number(d.replace('day ', ''))).filter((n) => Number.isFinite(n));
     assert(wantDays.length > 0, `${key} advertises no day`);
@@ -331,11 +336,103 @@ Deno.test('⛔ THE SUPERSET SENTENCE IS GATED ON ITS PARTNER BEING DRAWN', async
   assert(/drawn\.includes\(spec\.pairedWith\)/.test(src),
     'the pair test no longer reads the list the screen actually drew');
 
-  // ⛔ AND THE STATE IT GUARDS IS REACHABLE, not hypothetical: at a barbell/dumbbell/bench kit the
-  // leg press half is dropped and the back extension half survives.
+  /**
+   * ⚠️⚠️ THE STATE IT GUARDS IS NO LONGER REACHABLE, and that is the amendment working rather than
+   * the guard rotting. This test used to assert it live: at a barbell/dumbbell/bench kit the leg
+   * press half was dropped and the back extension half survived, so the survivor named a control
+   * that was not there. **Michael's substitution amendment closed that** — both halves now offer
+   * same-muscle free-weight movements at every kit, so neither is ever dropped alone.
+   * ⛔ THE GUARD STAYS, for the same reason the zero-leader guard in `strength-focus-copy.ts` stayed
+   * after it stopped being reachable: it costs one boolean and it is what stops the next
+   * equipment-gated pick from re-creating the defect. If a future cell has no substitute, this is
+   * what keeps its partner's sentence honest.
+   */
   const kit = ['Barbell + plates', 'Dumbbells', 'Flat bench'];
   const drawn = picksForFrame('all_rounder', kit);
-  assert(drawn.includes('braced_hinge'), 'the back extension pick vanished at the barbell baseline');
-  assert(!drawn.includes('braced_leg'),
-    'the leg press pick is drawn at a kit with no machines — p221 makes it machine work');
+  for (const half of ['braced_hinge', 'braced_leg'] as const) {
+    assert(drawn.includes(half),
+      `${half} is not drawn at the barbell baseline — the same-muscle substitution stopped firing`);
+  }
+});
+
+/** ⛔ THE KITS THE AUDIT RUNS AT. Standard Focus's entry gate asks for a barbell, plates, a rack and
+ *  a bench — so the two barbell rows are real athletes, not edge cases. */
+const KITS: Array<[string, string[]]> = [
+  ['commercial', ['Commercial gym']],
+  ['bb+db+bench', ['Barbell + plates', 'Dumbbells', 'Flat bench']],
+  ['bb+rack+bench', ['Barbell + plates', 'Squat rack', 'Flat bench']],
+];
+
+Deno.test('⛔⛔⛔ THE MUSCLE THE PAGE NAMES IS WHAT THE WEEK BUILDS, AT EVERY KIT', () => {
+  /**
+   * ⛔⛔ THE DEFECT, AS IT REACHED MICHAEL'S SCREEN. p274 asks for `1 × HYP: focused quadriceps`.
+   * p223's list for that CATEGORY is *"leg extensions · hip adduction machine · weighted knee raises
+   * (hip flexors) · seated calf raises"* — only the first is quadriceps, and Viada annotates the
+   * hip-flexor one himself. Measured across three kits before the fix, that row built:
+   *     commercial      leg extension                  <quadriceps>  ✓
+   *     bb+db+bench     weighted single leg calf raise <calves>      ⛔
+   *     bb+rack+bench   freestanding barbell calf raise<calves>      ⛔
+   * and `1 × HYP: braced push` built a **dumbbell shoulder press** <deltoids> at bb+db+bench where
+   * p221 prints three chest presses.
+   *
+   * ⛔ THIS SWEEPS EVERY p274 SLOT THAT NAMES A MUSCLE, AT EVERY KIT, ON THE BUILT WEEK — not on a
+   * module call. The muscle is the law; a substitute may leave his printed list, never his muscle.
+   */
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  let checked = 0;
+  for (const [kitName, equipment] of KITS) {
+    const w = composeWeek({
+      competitionLifts: defaultCompetitionLifts(), roundTo: 5, frame: 'all_rounder', week: 3,
+      column: 'standard', equipment, baselines: BASELINES,
+      seed1RMs: { bench: 200, squat: 265, deadlift: 340, overheadPress: 125 },
+      sportMix: { slots: { '1:0': 'run', '2:0': 'ride', '3:0': 'run', '4:0': 'ride', '6:0': 'ride' } },
+      enduranceExperience: { run: 'experienced' as const, ride: 'experienced' as const },
+    } as never) as { sessions: Array<{ day: string; type: string; strength_exercises?: Array<{ name: string }> }> };
+    const byDay: Record<number, string[]> = {};
+    for (const sess of w.sessions.filter((x) => x.type === 'strength')) {
+      byDay[DAYS.indexOf(sess.day) + 1] = (sess.strength_exercises ?? []).map((e) => e.name);
+    }
+    for (const day of FRAMES.all_rounder.columns.standard) {
+      day.strength.forEach((sl, i) => {
+        if (!sl.muscle) return;
+        const built = byDay[day.day]?.[i];
+        // ⚠️ A DROPPED SLOT IS LEGAL — the week says "N exercises short" and names the equipment.
+        // What is never legal is the wrong muscle standing in for the right one.
+        if (built == null) return;
+        assertEquals(musclesWorkedBy(built)?.primary, sl.muscle,
+          `⛔ ${kitName} day ${day.day} "${sl.sourceText}" wants ${sl.muscle} and built "${built}"`);
+        checked += 1;
+      });
+    }
+  }
+  assert(checked >= 15, `only ${checked} muscle-named slots swept — the sweep stopped covering p274`);
+});
+
+Deno.test('⛔ AND EVERY OPTION THE PICKER OFFERS IS THAT MUSCLE, SUBSTITUTES INCLUDED', () => {
+  /**
+   * ⛔ NARROWING ONLY THE COMPOSER WOULD LEAVE THE DROPDOWN OFFERING A CALF RAISE FOR A QUAD ROW —
+   * the athlete picks it, the composer refuses it, and the screen and the week disagree. Both sides
+   * read `StrengthSlot.muscle`; this is the half that pins the screen.
+   * ⚠️ AND A SUBSTITUTE IS MARKED. Michael's amendment allows the movement to leave his printed list
+   * when the kit demands it — *"labeled OURS"* — and an unmarked addition is exactly what the strict
+   * cut exists to prevent.
+   */
+  for (const [kitName, equipment] of KITS) {
+    for (const key of ALL_ROUNDER_PICK_KEYS) {
+      const muscle = frameMuscleForPick(key, 'all_rounder');
+      if (!muscle) continue;
+      const options = pickOptions(key, equipment, muscle);
+      for (const o of options) {
+        assertEquals(o.muscle, muscle,
+          `⛔ ${kitName} ${VIADA_PICKS[key].label} offers "${o.name}" <${o.muscle}> for a ${muscle} row`);
+      }
+      const his = new Set((VIADA_PICKS[key].hisList ?? []).map((n) => n.toLowerCase()));
+      for (const o of options) {
+        if (!his.has(o.name.toLowerCase())) {
+          assert(o.ours === true,
+            `⛔ ${kitName} ${VIADA_PICKS[key].label} offers "${o.name}", which he did not print here, unmarked`);
+        }
+      }
+    }
+  }
 });

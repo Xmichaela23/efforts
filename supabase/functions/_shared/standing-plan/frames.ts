@@ -93,6 +93,34 @@ export type StrengthSlot = {
    * the athlete's kit cannot reach becomes a split squat rather than losing the asymmetry.
    */
   asymmetrical?: boolean;
+  /**
+   * ⛔⛔⛔ THE MUSCLE THE PAGE NAMES FOR THIS CELL, WHERE IT NAMES ONE (2026-08-30). The catalogue's
+   * own prime-mover word, so the picker and the composer can both narrow to it without either of
+   * them re-deriving what the page said.
+   *
+   * ⛔ THE DEFECT IT CLOSES, AND IT REACHED MICHAEL'S SCREEN. **p274 names a MUSCLE on its two
+   * lower-day focused rows — `1 × HYP: focused quadriceps` and `1 × HYP: focused hamstring` — where
+   * p246 names only the CATEGORY (`focused push lower`).** p223's list for that category is *"leg
+   * extensions · hip adduction machine · weighted knee raises (hip flexors) · seated calf raises"*,
+   * and only the first is quadriceps — Viada annotates the hip-flexor one himself. With a leg
+   * extension machine on file the cell defaults to it and nobody notices; **without one, p274's
+   * quadriceps row fell through to a seated calf raise**, which is what the live screen showed. The
+   * handoff had already recorded the composer's own version of it: *"Day 5's Leg isolation slot
+   * filled with a Weighted Knee Raise, a core movement in a leg slot."*
+   *
+   * ⚠️ THE SAME CELL BIT THE HAMSTRING ROW TOO, one movement further: `cable kickback` is filed in
+   * the catalogue as a TRICEPS movement, so p274's `focused hamstring` cell could be filled by an
+   * arm exercise. p223's *"cable or machine kickbacks"* on that row plainly means the glute/ham one.
+   *
+   * ⛔ IT IS READ BY BOTH SIDES, AND THAT IS THE POINT. Narrowing only the dropdown would leave the
+   * composer free to put a calf raise in a quad row with no athlete involved — which is how it got
+   * there in the first place. `exerciseForSlot` filters on it and drops the slot when nothing
+   * matches, so the week says *"N exercises short"* rather than quietly filling it wrong.
+   *
+   * ⚠️ ABSENT MEANS THE PAGE NAMED NO MUSCLE, and every slot written before this reads exactly as it
+   * did. **p246 is untouched** — its rows name categories, so none of them carry this.
+   */
+  muscle?: string;
   /** What the page prints, kept verbatim so a reader can find the row. */
   sourceText: string;
 };
@@ -406,7 +434,14 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
     strength: [
       S('ME', 'competition', 'primary', 'push_upper', '1 x ME: secondary push'),
       S('DE', 'accessory', 'secondary', 'push_upper', '1 x DE: secondary push'),
-      S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: braced push'),
+      /**
+       * ⚠️ THE MUSCLE IS STATED HERE TOO, and the audit is why (2026-08-30). p221's braced push upper
+       * is *Smith machine press · machine chest press · dip machine/pressdown* — three chest presses.
+       * At a barbell-and-dumbbell kit the substitution ladder reached a **dumbbell shoulder press**,
+       * which is deltoids: right pattern, wrong muscle, and nothing said. Michael's rule — the muscle
+       * is the law, the movement may leave his list when the kit demands it.
+       */
+      S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: braced push', { muscle: 'chest' }),
       // ⚠️ THE ARMS SUPERSET — p274 prints these two as one paired entry. Display-first (DESIGN §5).
       S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: focused push/pull (arms) superset'),
       S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset'),
@@ -425,9 +460,11 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
       S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: secondary hinge'),
       // ⚠️ THE BRACED SUPERSET — same region, opposite patterns, which is p275's own rule 2b for what
       // may be paired: *"similar muscle groups but dramatically different specific patterns and loads."*
-      S('HYP', 'accessory', 'braced', 'hinge_lower', '2 x HYP: braced hinge / braced lower push superset'),
-      S('HYP', 'accessory', 'braced', 'press_lower', '2 x HYP: braced hinge / braced lower push superset'),
-      S('HYP', 'accessory', 'focused', 'hinge_lower', '1 x HYP: focused hamstring'),
+      // ⚠️ p221 braced hinge lower — reverse hyper, GHD, machine back extension — is posterior chain.
+      S('HYP', 'accessory', 'braced', 'hinge_lower', '2 x HYP: braced hinge / braced lower push superset', { muscle: 'hamstrings' }),
+      // ⚠️ p221 braced push lower — hack squat, leg press, lever squat — is quadriceps.
+      S('HYP', 'accessory', 'braced', 'press_lower', '2 x HYP: braced hinge / braced lower push superset', { muscle: 'quadriceps' }),
+      S('HYP', 'accessory', 'focused', 'hinge_lower', '1 x HYP: focused hamstring', { muscle: 'hamstrings' }),
       S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: braced push (asymmetrical)', { asymmetrical: true }),
     ],
     endurance: [E('ride_anaerobic', 1, 'Cyc AnA (level 1)', { role: 'hard' })],
@@ -447,7 +484,9 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
     strength: [
       S('ME', 'competition', 'primary', 'pull_upper', '1 x ME: secondary pull'),
       S('DE', 'accessory', 'secondary', 'pull_upper', '1 x DE: secondary pull'),
-      S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: braced pull'),
+      // ⚠️ p221 braced pull upper is *chest-supported row · lat pulldown · cable upright row* — the
+      // rows and the pulldown are lats and they are what the row is for. See `StrengthSlot.muscle`.
+      S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: braced pull', { muscle: 'lats' }),
       S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: focused push/pull (arms) superset'),
       S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset'),
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: focused pull'),
@@ -461,9 +500,11 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
     lowerRole: 'me',
     strength: [
       S('ME', 'competition', 'primary', 'press_lower', '1 x ME: secondary push'),
-      S('HYP', 'accessory', 'braced', 'hinge_lower', '2 x HYP: braced hinge / braced lower push superset'),
-      S('HYP', 'accessory', 'braced', 'press_lower', '2 x HYP: braced hinge / braced lower push superset'),
-      S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: focused quadriceps'),
+      // ⚠️ p221 braced hinge lower — reverse hyper, GHD, machine back extension — is posterior chain.
+      S('HYP', 'accessory', 'braced', 'hinge_lower', '2 x HYP: braced hinge / braced lower push superset', { muscle: 'hamstrings' }),
+      // ⚠️ p221 braced push lower — hack squat, leg press, lever squat — is quadriceps.
+      S('HYP', 'accessory', 'braced', 'press_lower', '2 x HYP: braced hinge / braced lower push superset', { muscle: 'quadriceps' }),
+      S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: focused quadriceps', { muscle: 'quadriceps' }),
       S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: braced push (asymmetrical)', { asymmetrical: true }),
     ],
     endurance: [],
@@ -496,7 +537,14 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
     themeTag: 'push day (upper)',
     strength: [
       S('SKILL', 'competition', 'primary', 'push_upper', '1 x SKILL: secondary push'),
-      S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: braced push'),
+      /**
+       * ⚠️ THE MUSCLE IS STATED HERE TOO, and the audit is why (2026-08-30). p221's braced push upper
+       * is *Smith machine press · machine chest press · dip machine/pressdown* — three chest presses.
+       * At a barbell-and-dumbbell kit the substitution ladder reached a **dumbbell shoulder press**,
+       * which is deltoids: right pattern, wrong muscle, and nothing said. Michael's rule — the muscle
+       * is the law, the movement may leave his list when the kit demands it.
+       */
+      S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: braced push', { muscle: 'chest' }),
       S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: focused push/pull (arms) superset'),
       S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset'),
       S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: focused push'),
@@ -510,7 +558,7 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
     lowerRole: 'de',
     strength: [
       S('DE', 'competition', 'primary', 'hinge_lower', '1 x DE: secondary hinge'),
-      S('HYP', 'accessory', 'focused', 'hinge_lower', '1 x HYP: focused hamstring'),
+      S('HYP', 'accessory', 'focused', 'hinge_lower', '1 x HYP: focused hamstring', { muscle: 'hamstrings' }),
       S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: braced push (asymmetrical)', { asymmetrical: true }),
     ],
     endurance: [],
@@ -529,7 +577,9 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
     themeTag: 'pull day (upper)',
     strength: [
       S('SKILL', 'competition', 'primary', 'pull_upper', '1 x SKILL: secondary pull'),
-      S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: braced pull'),
+      // ⚠️ p221 braced pull upper is *chest-supported row · lat pulldown · cable upright row* — the
+      // rows and the pulldown are lats and they are what the row is for. See `StrengthSlot.muscle`.
+      S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: braced pull', { muscle: 'lats' }),
       S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: focused push/pull (arms) superset'),
       S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset'),
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: focused pull'),
@@ -543,7 +593,7 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
     lowerRole: 'de',
     strength: [
       S('DE', 'competition', 'primary', 'press_lower', '1 x DE: secondary push'),
-      S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: focused quadriceps'),
+      S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: focused quadriceps', { muscle: 'quadriceps' }),
       S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: braced push (asymmetrical)', { asymmetrical: true }),
     ],
     endurance: [],
