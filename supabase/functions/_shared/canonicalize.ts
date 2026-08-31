@@ -340,6 +340,14 @@ const DISPLAY_NAME: Record<string, string> = {
 
 export function canonicalDisplayName(canonical: string): string {
   if (!canonical) return 'Unknown';
+  /**
+   * ⚠️ SPLIT ON SPACES TOO, NOT ONLY UNDERSCORES (2026-08-31). This was written for snake_case keys
+   * and is also reached with names that already carry spaces — and there the `_` split returns ONE
+   * token, so only the first letter was raised. Michael saw the result in his own plan: a row reading
+   * **"Dumbbell lateral raise"** in a list where every other movement was lower case.
+   * ⚠️ Nothing changes for a genuine snake_case key, and `DISPLAY_NAME` still wins outright.
+   */
   return DISPLAY_NAME[canonical]
-    ?? canonical.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    ?? canonical.split(/[_\s]+/).filter(Boolean)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }

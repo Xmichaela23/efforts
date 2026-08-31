@@ -377,12 +377,28 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
    * ⚠️ `machine` IS THE COMMERCIAL-GYM CHIP, so "commonly declarable" is satisfied exactly as it is
    * for `leg extension`, which took this same call on 2026-08-25 for the same reason.
    */
-  'leg curl': [['machine']],
-  'leg curls': [['machine']],
+  /**
+   * ⛔⛔ AND A HOME ROUTE, ADDED 2026-08-31 ON MICHAEL'S DIRECTION — lying on a bench with a dumbbell
+   * held between the feet. **This is not an invention:** it is the source's own hamstring curl done
+   * with a dumbbell instead of a stack, and it is standard home-gym practice.
+   *
+   * ⛔ THE DEFECT IT CLOSES, SEEN IN HIS OWN BUILT PLAN. The hinge day had **no hamstring-curl
+   * movement anywhere.** Gating the curl family to `machine` was right for the dropdown, but the
+   * same-muscle backup that was meant to cover it — the nordic curl — only appears when a row is
+   * otherwise EMPTY. His hip thrust pick filled the row, so the backup never fired and **a hamstring
+   * row ended up training mostly glutes.**
+   * ⚠️ THE MACHINE ROUTE STAYS AND STAYS SECOND for ranking: a commercial gym still builds the
+   * machine, and `equipmentFitRank` scores on the FIRST route, so the home route leads for the kits
+   * that need it. Same shape as `rear delt machine` above.
+   * ⚠️ `seated leg curl` DELIBERATELY DOES NOT GET THIS. Seated is a machine position; lying is the
+   * one a dumbbell reproduces.
+   */
+  'leg curl': [['dumbbells', 'bench'], ['machine']],
+  'leg curls': [['dumbbells', 'bench'], ['machine']],
   // ⚠️ p223's OWN SPELLINGS — *"hamstring curls (seated or prone)"*. They were untagged and therefore
   // offered to everyone; they are the same machine.
   'seated leg curl': [['machine']],
-  'lying leg curl': [['machine']],
+  'lying leg curl': [['dumbbells', 'bench'], ['machine']],
   'band leg curls': [['bands']],
   // ⛔ MACHINE-ONLY, unlike leg curl above — see the `machine` key's note in `GearKey` for why the
   // two machine movements get opposite calls. A home athlete's quad-isolation slot resolves to a
@@ -726,7 +742,8 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   'seated calf raise': [['dumbbells', 'bench'], ['barbell', 'bench'], ['machine']],
   // ⚠️ FOLLOWS `leg curl`, WHICH IS NOW GATED (2026-08-30) — see the supersede note there. This is
   // the spelling p223 uses and it tracks that entry rather than inventing a separate rule.
-  'hamstring curl': [['machine']],
+  // ⚠️ THE HOME ROUTE TOO — same movement, same reasoning as `leg curl` above.
+  'hamstring curl': [['dumbbells', 'bench'], ['machine']],
   // ⛔ p223's OWN SPELLING, and it had no tag — `gearRoutesFor` returned ALWAYS and warned, so a
   // Smith-rack movement was treated as needing nothing (found 2026-08-30). It follows
   // `machine hip thrust`: the station is what makes it this movement.

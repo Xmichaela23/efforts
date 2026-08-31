@@ -271,9 +271,28 @@ Deno.test('⛔ A HOME GYM STILL GETS HAMSTRING WORK — the rule, not the mechan
   const reachable = HAMSTRING_AT_HOME.filter((n) => canPerform(n, HOME_GYM));
   assertEquals(reachable, HAMSTRING_AT_HOME,
     '⛔ a home gym has lost its hamstring work — THIS is the rule the leg-curl gate must never break');
-  // ⛔ AND THE MACHINE MOVEMENT IS HONESTLY OFF THE MENU, rather than offered and swapped later.
-  assertEquals(canPerform('Leg Curl', HOME_GYM), false);
+  /**
+   * ⛔⛔ THE CURL HAS A HOME ROUTE NOW (Michael, 2026-08-31), AND THAT INVERTS THIS LINE ON PURPOSE.
+   *
+   * ⛔ WHY THE GATE EXISTED: a picker offering "Leg Curl" by name to an athlete with a barbell and a
+   * bench is a screen promising a machine they do not own. ⛔ WHY IT WAS NOT ENOUGH: **his own built
+   * plan had no hamstring-curl movement on the hinge day at all.** The same-muscle backup that was
+   * meant to cover the gate only fires when a row is otherwise EMPTY, and his hip-thrust pick filled
+   * the row — so a hamstring row trained mostly glutes.
+   *
+   * ⛔ THE ANSWER IS A REAL ROUTE, NOT A WIDER GATE. Lying on a bench with a dumbbell held between
+   * the feet is the source's own hamstring curl done with a dumbbell instead of a stack, and it is
+   * standard home practice. The screen is no longer promising a machine, because the movement is
+   * genuinely reachable — which is the only honest way to satisfy both halves.
+   * ⚠️ `seated leg curl` KEEPS THE GATE: seated is a machine position, lying is the one a dumbbell
+   * reproduces. Asserted below so the two do not drift together.
+   */
+  assertEquals(canPerform('Leg Curl', HOME_GYM), true);
   assertEquals(canPerform('Leg Curl', ['Commercial gym']), true);
+  assertEquals(canPerform('Leg Curl', ['Barbell + plates', 'Squat rack / Power cage']), false,
+    'a kit with no bench and no dumbbells reaches the lying curl — it needs both');
+  assertEquals(canPerform('Seated Leg Curl', HOME_GYM), false,
+    'the SEATED curl is a machine position and must not have followed the lying one home');
   assertEquals(canPerform('Glute-Ham Raise', HOME_GYM), true);
   assertEquals(canPerform('Nordic Curl', HOME_GYM), true);
   assertEquals(canPerform('Back Extension', HOME_GYM), true);
