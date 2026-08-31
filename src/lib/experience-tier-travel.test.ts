@@ -24,7 +24,7 @@
  * Run from repo root:
  *   ~/.deno/bin/deno test --allow-read --no-check src/lib/experience-tier-travel.test.ts
  */
-import { assert } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 
 const read = (rel: string) => Deno.readTextFile(new URL(rel, import.meta.url));
 
@@ -109,24 +109,42 @@ Deno.test('⛔ THE SUBTITLE CLAIMS THE HARD SESSIONS AND NOTHING ELSE', async ()
     '⛔ the wider claim came back into the subtitle — it is what sent the number to the long run');
 });
 
-Deno.test('⛔⛔ THE HARD ROW OFFERS THE SPORT AND NOTHING ELSE', async () => {
+Deno.test('⛔⛔ EVERY HARD ROW OFFERS ITS WORKOUT, AND THE LONG ROW STILL DOES NOT', async () => {
   /**
-   * ⛔ MICHAEL, 2026-08-27, off the screenshot: *"we shouldnt offer 3 differnet hard options right we
-   * need to offer the approtriate one for the level we are prescribing."* The LEVEL prescribes the
-   * session; the week-to-week rotation still varies it. What is gone is the athlete overriding it.
+   * ⛔⛔ SUPERSEDES `THE HARD ROW OFFERS THE SPORT AND NOTHING ELSE` (2026-08-27), WHICH PINNED THE
+   * OPPOSITE. Michael, 2026-08-31: *"they can choose their hard work."* That test asserted exactly
+   * one `<HardSlotChoices>` in the wizard — the long slot's club control — and it was right for the
+   * ruling it was written under. **Everything below is the new ruling; the old one is history.**
    *
-   * ⛔ AND THE FIRST REASON WAS A LIVE BUG: a picked shape can cease to exist when the experience
-   * answer changes the level (`ladderOf` — the archetype list varies by level and the library owns
-   * which is offered), and the chip's duration is computed for a RESOLVED shape, so letting the
-   * athlete change it afterwards makes the number on the chip untrue.
+   * ⚠️ ITS FIRST REASON WAS RE-CHECKED RATHER THAN WAVED PAST, and is measured false for these rows:
+   * *"a picked shape can cease to exist when the experience answer changes the level."* Exactly two
+   * archetypes in the whole library carry a `levels` gate and both are p241 open-water SWIMS — every
+   * shape in `run_mlss`, `run_near_threshold`, `ride_anaerobic` and `ride_sweet_spot` is offered at
+   * all three levels. The other reason, the chip measuring a resolved shape, is what `hardArchetypes`
+   * already solves. Both are asserted below rather than trusted.
    */
   const code = WIZARD.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
-  // ⛔ THE LONG SLOT KEEPS ITS CLUB CONTROL — exactly one `HardSlotChoices` is left, and it is that.
+  // ⛔ TWO CALL SITES: the long slot's club control, and the one that serves every hard row.
   const uses = code.match(/<HardSlotChoices/g) ?? [];
-  assert(uses.length === 1, `the hard rows still render a shape picker (${uses.length} found)`);
+  assertEquals(uses.length, 2, `the wizard renders ${uses.length} HardSlotChoices, expected 2`);
   assert(/slotKey="long"/.test(code), 'the long slot lost its club-session control');
-  // ⚠️ THE MACHINERY IS NOT DELETED — the rotation still needs archetypes.
-  assert(/archetype/.test(WIZARD), 'the archetype machinery was deleted, not just the picker');
+  assert(/slotKey=\{hk\}/.test(code), 'the hard rows lost their workout picker');
+
+  /**
+   * ⛔ NO HARD SHAPE IS LEVEL-GATED, which is what makes the picker safe. If a gated archetype is
+   * ever added to one of these families this fails, and `slotVariantOptions` — which ignores
+   * `levels` — has to learn about it before the option can ship.
+   */
+  const { FAMILIES } = await import('../../supabase/functions/_shared/endurance-library/index.ts');
+  for (const fam of ['run_mlss', 'run_near_threshold', 'ride_anaerobic', 'ride_sweet_spot'] as const) {
+    for (const a of (FAMILIES as Record<string, { archetypes: { id: string; levels?: number[] }[] }>)[fam].archetypes) {
+      assert(!a.levels, `${fam}.${a.id} is level-gated and the picker does not filter by level`);
+    }
+  }
+
+  // ⛔ AND THE CHIP MEASURES THE PICKED SHAPE, on every row the FRAME has rather than a fixed pair.
+  assert(/hardArchetypes=\{Object\.fromEntries\(hardSlotKeysFor\(wizardFrame\)/.test(WIZARD),
+    'the chip reads a hardcoded hard-row pair again — the third row\'s pick would not reach it');
 });
 
 Deno.test('⛔⛔ THE SCREEN PUTS THE HARD PAIR IN HIS ORDER, VISIBLY', async () => {

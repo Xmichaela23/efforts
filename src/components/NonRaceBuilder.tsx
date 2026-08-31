@@ -1739,16 +1739,36 @@ function assemblePayload(
            *  slots. 0/absent = none. The composer appends them; they never take a session spot. */
           /** ⛔ THE VARIANT PICKS, keyed the engine's way (same keys as endurance_slots). Only the
            *  hard slots carry one; absent = the engine's rotation. */
+          /**
+           * ⛔⛔⛔ DERIVED FROM THE FRAME (2026-08-31), AND WHAT IT REPLACED WAS SENDING THE WRONG
+           * SLOT. The list was the literal pair `[{i:0,key:'1:0'},{i:1,key:'3:0'}]` — p246's two
+           * hard days, by POSITION. p274 has three hard rows on days 1, 2 and 3, so:
+           *   · the day-2 ride's workout was sent under key `3:0` — **the day-3 run's slot**, and
+           *     the assigner validates the id against THAT slot's family, so it was silently dropped
+           *     or applied to the wrong session;
+           *   · the third row's workout was **never sent at all** — no third entry existed.
+           * Both are invisible: the screen showed the pick, the plan built something else.
+           *
+           * ⚠️ THE KEYS ARE THE FRAME'S OWN `frameKey` (`${day}:${index}`), the same ones
+           * `endurance_slots` and `endurance_slot_minutes` are keyed by, so all three answers about
+           * one session travel under one key.
+           * ⚠️ THE ENTRY IS FOUND BY `slot`, WITH THE POSITIONAL FALLBACK for drafts written before
+           * that field existed — the same rule `hardEntry` uses. It is inlined rather than calling
+           * `hardEntry`, which is declared later in this body; a closure here must not TDZ on it.
+           */
           ...(() => {
             if (!isStrengthFocusPath) return {};
-            // ⚠️ Indices inlined (hard1=0, hard2=3:0's entry=1) — the component-scope
-            // HARD_SLOT_INDEX declares later in this body and a closure here must not TDZ on it.
-            const slots: Array<{ i: number; key: string }> = [{ i: 0, key: '1:0' }, { i: 1, key: '3:0' }];
+            const hardKeys = hardSlotKeysFor(wizardFrame);
+            const byKey = state.hardDays.some((h) => h.slot);
             const out: Record<string, string> = {};
-            slots.forEach(({ i, key }) => {
-              const a = state.hardDays[i]?.archetype;
-              if (a) out[key] = a;
-            });
+            for (const s of frameSlots(wizardFrame)) {
+              if (s.role !== 'hard') continue;
+              const entry = byKey
+                ? state.hardDays.find((h) => h.slot === s.key)
+                : state.hardDays[hardKeys.indexOf(s.key)];
+              const a = (entry as { archetype?: string } | undefined)?.archetype;
+              if (a) out[s.frameKey] = a;
+            }
             return Object.keys(out).length > 0 ? { endurance_slot_archetypes: out } : {};
           })(),
           /**
@@ -3543,7 +3563,22 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * until all four are answered — see `allSlotsChosen`. ⚠️ The pre-fill this replaced put both hard
    * slots on the bike before the athlete had said anything.
    */
-  const slotSportsNow: SlotSelection = state.slotSports ?? emptySlotSports(wizardFrame);
+  /**
+   * ⛔⛔ THE FRAME'S ANSWER WINS ON A ROW THE FRAME ANSWERS — the same correction the card makes for
+   * what it DRAWS, applied here to what the wizard READS: the workout picker's sport, the payload,
+   * and the gate. `forcedSportFor` states that p274's day 2 and day 4 are rides; a draft saved
+   * before that shipped, or the render before the pre-fill effect runs, still carries whatever the
+   * old screen allowed. ⚠️ THE EFFECT IS STILL THERE and still writes state — this is the read side,
+   * so nothing downstream can see a sport the frame does not offer even for one render.
+   */
+  const slotSportsNow: SlotSelection = React.useMemo(() => {
+    const out = { ...(state.slotSports ?? emptySlotSports(wizardFrame)) } as SlotSelection;
+    for (const x of frameSlots(wizardFrame)) {
+      const f = forcedSportFor(x.key, wizardFrame);
+      if (f) out[x.key] = f;
+    }
+    return out;
+  }, [state.slotSports, wizardFrame]);
 
   /**
    * ⛔ THE ATHLETE-TYPE ANSWER PRE-SHAPES THE SLOT SCREEN (Michael, 2026-08-24). "Run only" never
@@ -6007,10 +6042,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             }))}
             /** ⛔ THE VARIANT PICKED IN EACH HARD ROW — same map the payload sends as
              *  `endurance_slot_archetypes`, so the chip measures the session the composer builds. */
-            hardArchetypes={{
-              hard1: (hardEntry(state, 'hard1') as { archetype?: string } | undefined)?.archetype,
-              hard2: (hardEntry(state, 'hard2') as { archetype?: string } | undefined)?.archetype,
-            }}
+            /**
+             * ⚠️ DERIVED FROM THE FRAME (2026-08-31). It was the literal pair `hard1`/`hard2`, which
+             * is p246's row list — so on p274 the THIRD hard row's pick never reached the chip and
+             * its quoted duration was measured on a session the athlete had changed. §7 trap one,
+             * the same shape as every other two-row assumption in this file.
+             */
+            hardArchetypes={Object.fromEntries(hardSlotKeysFor(wizardFrame).map((k) => [
+              k, (hardEntry(state, k as HardSlotKey) as { archetype?: string } | undefined)?.archetype,
+            ]))}
             onExperienceChange={(sport, tier) => setState((st) => ({
               ...st,
               enduranceExperience: { ...(st.enduranceExperience ?? {}), [sport]: tier },
@@ -6176,7 +6216,65 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                * still carries the role and ownership the composer reads, and the LONG slot keeps its
                * club-session control above. Only the hard rows' picker is gone.
                */
-              return null;
+              /**
+               * ⛔⛔⛔ RESTORED, ON EVERY HARD ROW AND ON BOTH SPORTS — MICHAEL, 2026-08-31: *"they
+               * can choose their hard work."* This supersedes the removal recorded directly above,
+               * and the three reasons it gave were re-checked rather than waved past:
+               *
+               * ⛔ 1. *"A picked shape can cease to exist when the experience answer changes the
+               *    level."* **MEASURED FALSE for these rows.** Exactly two archetypes in the whole
+               *    library carry a `levels` gate — the two p241 open-water SWIMS. Every shape in
+               *    `run_mlss`, `run_near_threshold`, `ride_anaerobic` and `ride_sweet_spot` is
+               *    offered at all three levels, so no hard pick can be stranded by a tier change.
+               *    ⚠️ `slotVariantOptions` still ignores `levels`, which is a latent hole for a
+               *    future gated shape and is NOT scaffolded for here — it is recorded, not built.
+               * ⛔ 2. *"The experience chip's duration is computed for a RESOLVED shape."* **Already
+               *    solved** — `hardArchetypes` feeds the athlete's pick into `experienceChips`, so
+               *    the chip measures the session the composer will build. It is now derived from the
+               *    frame's own hard rows rather than a hardcoded pair; see that prop.
+               * ⛔ 3. *"Our labels over a band, not his printed workouts."* **Michael's own new
+               *    constraint answers this** — the two field-standard names are back to the book's
+               *    words, and no option carries a benefit claim. See `VARIANT_BODY`.
+               *
+               * ⚠️⚠️ THIS CHANGES THE 5K SCREEN, WHICH IS OTHERWISE FROZEN, AND IT IS THE ORDER THAT
+               * DOES IT: p246's two hard rows are hard rows, so they gain the picker with the rest.
+               * Reported, not smuggled. Gating it to one frame is a one-line test in this condition
+               * if he wants that instead.
+               */
+              const hk = key as HardSlotKey;
+              // ⛔ EVERY OTHER HARD ROW, NOT "the other one" — see `variantsTakenBy`. p274 has three.
+              const others = hardSlotKeysFor(wizardFrame)
+                .filter((k) => k !== hk)
+                .map((k) => ({
+                  key: k as HardSlotKey,
+                  sport: (slotSportsNow[k] ?? null) as 'run' | 'ride' | null,
+                  archetype: (hardEntry(state, k as HardSlotKey) as { archetype?: string } | undefined)?.archetype,
+                }));
+              return (
+                <HardSlotChoices
+                  frame={wizardFrame}
+                  slotKey={hk}
+                  sport={sport}
+                  value={{ archetype: (hardEntry(state, hk) as { archetype?: string } | undefined)?.archetype }}
+                  takenByOtherSlot={variantsTakenBy(hk, sport, others, wizardFrame)}
+                  onChange={(patch) => setState((st) => {
+                    if (!('archetype' in patch)) return st;
+                    /**
+                     * ⛔ THE PICK IS WRITTEN ONTO THE ROW'S OWN ENTRY, BY KEY. `syncHardDays` keeps
+                     * the entries in step with the sports; this only ever sets `archetype`, so a
+                     * row's day, role and ownership are untouched by choosing a workout.
+                     */
+                    const rows = syncHardDays(st, slotSportsNow);
+                    return {
+                      ...st,
+                      hardDays: rows.map((h, i) => {
+                        const k = h.slot ?? hardSlotKeysFor(wizardFrame)[i];
+                        return k === hk ? { ...h, archetype: patch.archetype } : h;
+                      }),
+                    };
+                  })}
+                />
+              );
             }}
             /**
              * ⛔ THE ENGINE WRITES THE SENTENCE, THIS SCREEN RENDERS IT (§3c, 2026-08-26).

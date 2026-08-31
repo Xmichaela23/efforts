@@ -270,15 +270,36 @@ export function slotVariantOptions(
  * ⛔ IT REPORTS, IT DOES NOT DECIDE. The engine's own de-collision lives in `sport-slots.ts`
  * `assignSports`, because a payload can arrive from an older client that never greyed anything.
  */
+/**
+ * ⚠️ IT TAKES A LIST NOW (2026-08-31), AND THE SINGLE-`other` FORM STILL WORKS. It was written when
+ * a frame had exactly two hard rows, so "the other card" was a well-defined thing. p274 has THREE,
+ * and on a week where two of them are rides a third row could collide with either — asked about one
+ * neighbour, the card would have greyed one shape and offered the other while the engine's own
+ * de-collision moved it anyway. **The same §7 shape as every other two-row assumption in this
+ * area:** correct for the frame it was written against, silently wrong for the frame beside it.
+ */
 export function variantsTakenBy(
   thisKey: HardSlotKey,
   thisSport: 'run' | 'ride',
-  other: { key: HardSlotKey; sport: 'run' | 'ride' | null; archetype?: string } | null,
+  others:
+    | { key: HardSlotKey; sport: 'run' | 'ride' | null; archetype?: string }
+    | { key: HardSlotKey; sport: 'run' | 'ride' | null; archetype?: string }[]
+    | null,
+  frame: FrameId = 'strength_5k',
 ): string[] {
-  if (!other || !other.sport || !other.archetype) return [];
-  if (other.key === thisKey) return [];
-  if (slotFamilyFor(thisKey, thisSport) !== slotFamilyFor(other.key, other.sport)) return [];
-  return [other.archetype];
+  if (!others) return [];
+  const list = Array.isArray(others) ? others : [others];
+  const mine = slotFamilyFor(thisKey, thisSport, frame);
+  const out: string[] = [];
+  for (const other of list) {
+    if (!other || !other.sport || !other.archetype) continue;
+    if (other.key === thisKey) continue;
+    // ⛔ ONLY A ROW BUILDING THE SAME FAMILY CAN TAKE A SHAPE. On the run the hard rows are different
+    // families and this returns nothing; on the bike they collapse onto one and it is the whole case.
+    if (mine !== slotFamilyFor(other.key, other.sport, frame)) continue;
+    if (!out.includes(other.archetype)) out.push(other.archetype);
+  }
+  return out;
 }
 
 
@@ -286,6 +307,20 @@ export function variantsTakenBy(
  * ⛔ WHAT EACH VARIANT IS, IN PLAIN WORDS — OURS (2026-08-24), one line each, describing the
  * library's own page-cited workouts. Keys are archetype ids; a variant with no line here still
  * renders, label-only, so a new archetype can never be hidden by missing copy.
+ *
+ * ⛔⛔ EVERY LINE DESCRIBES THE SHAPE AND NOTHING ELSE — MICHAEL'S CONSTRAINT, CLEARED AGAINST THE
+ * SOURCE, 2026-08-31: *"variants carry no per-variant benefit claims. The book states goals at the
+ * SESSION level only."* p231 gives one objective for the whole MLSS family, p237 one for the whole
+ * anaerobic family; **it never says what one of its four printed workouts is better for.** A line
+ * that did would be ours wearing his authority.
+ *
+ * ⛔ TWO LINES WERE TRIMMED TO MEET IT — `below_threshold` claimed *"steady quality, less sting"*
+ * and `long` called itself *"the classic sweet spot"*. Both are comparative claims about one option
+ * against its siblings, and neither is on the page. What is left is what the workout IS.
+ * ⚠️ THE SESSION-LEVEL GOAL IS NOT LOST: it sits once, on the family, in `FAMILY_FACT_BODY` and
+ * `FAMILIES[...].intent` — which is exactly where he says it belongs.
+ * ⚠️ AND A VARIANT WITH NO LINE STAYS LEGAL — the three p237 ride shapes have none and render
+ * label-only, which is the honest state rather than an invented sentence each.
  */
 export const VARIANT_BODY: Record<string, string> = {
   /**
@@ -312,12 +347,12 @@ export const VARIANT_BODY: Record<string, string> = {
   // run_near_threshold (pp233-234)
   short_above: 'Short repeats just above threshold, controlled recoveries.',
   race_repeats: 'Repeats at your race pace.',
-  below_threshold: 'Longer repeats just under threshold — steady quality, less sting.',
+  below_threshold: 'Longer repeats just under threshold.',
   surge_embedded: 'A threshold block with a surge buried inside it.',
   // ride_sweet_spot (pp238-239)
   minute_surge: 'Sweet-spot blocks with a short surge on every minute.',
   medium: 'Medium repeats just under threshold.',
-  long: 'Long repeats just under threshold — the classic sweet spot.',
+  long: 'Long repeats just under threshold.',
   tempo: 'Steady tempo blocks.',
 };
 

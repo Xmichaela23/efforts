@@ -541,7 +541,14 @@ export const FAMILIES: Record<FamilyId, {
          * ⚠️ THE DESCRIPTION LINE IS UNCHANGED TOO (`hard-slot-choices.ts` `VARIANT_BODY`) — it
          * describes the session, and the session did not change.
          */
-        label: 'Over-unders',
+        /**
+         * ⛔⛔ BACK TO THE BOOK'S OWN WORDS (Michael, 2026-08-31): *"variant option labels are the
+         * book's own workout names/shapes."* This supersedes the field-standard-name ruling directly
+         * above, which is kept because it explains what "over-unders" was doing here and why the id
+         * did not move with it. **"Surge and float" is Viada's phrasing, lifted verbatim** — that
+         * was already recorded in the note above; it is now what the athlete reads.
+         */
+        label: 'Surge and float',
         repBand: { lo: 10, hi: 45 },
         repsBand: { lo: 6, hi: 12 },
         work: pct(1.25, 1.30),
@@ -555,7 +562,9 @@ export const FAMILIES: Record<FamilyId, {
         shape: 'descending',
         // ⛔ FIELD-STANDARD NAME, same call as `surge_float` above — "descending ladder" is the
         // book's words; "cut-downs" is the one a runner would recognise. Id and body unchanged.
-        label: 'Cut-downs',
+        // ⛔ THE BOOK'S WORDS, same ruling as `surge_float` above (2026-08-31). "The descending
+        // ladder" is how p231-232 prints it; "cut-downs" was the field's name for it. Id unchanged.
+        label: 'The descending ladder',
         repBand: { lo: 30, hi: 180 },
         work: pct(1.20),
         recovery: { kind: 'proportional', factor: 0.67, intensity: pct(0.60) },
