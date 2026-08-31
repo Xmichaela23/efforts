@@ -440,7 +440,19 @@ Deno.test('⛔ THE LABEL IS WIRED INTO THE COMPOSER — and today it has no live
    */
   const src = await Deno.readTextFile(new URL('./compose.ts', import.meta.url).pathname);
   const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-  const calls = code.match(/bandRouteName\(/g) ?? [];
+  /**
+   * ⚠️⚠️ IT COUNTS THE CALLS THAT **LABEL**, NOT EVERY MENTION — rebased 2026-08-30, and the rule is
+   * unchanged and now stated more precisely. The bare `bandRouteName\(` count was a proxy: it broke
+   * the moment the duplicate guard started asking the same function *"what will this be called"* so
+   * a day could not print one rendered name twice. Those calls read the label, they do not apply it.
+   * ⛔ THE RULE IS STILL THE ONE THAT MATTERS: the grid slot and the muscle floor each LABEL their
+   * movement, and a refactor that drops either would otherwise break nothing and no test would say
+   * so. Asserted on the two sites that assign a name.
+   */
+  const calls = [
+    ...(code.match(/movement = bandRouteName\(/g) ?? []),
+    ...(code.match(/: bandRouteName\(/g) ?? []),
+  ];
   assertEquals(calls.length, 2,
     'the composer no longer labels both of its engine-named movements — the grid slot and the '
     + 'muscle floor each need one call');

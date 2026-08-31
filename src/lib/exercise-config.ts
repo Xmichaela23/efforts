@@ -2993,6 +2993,34 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'bodyweight',
     isUnilateral: false,
   },
+  /**
+   * ⛔⛔ THE LOADED BENCH REVERSE HYPER, AND IT DID NOT EXIST (2026-08-30). Both reverse-hyper entries
+   * were `bodyweight`, so the app had no way to prescribe the version the field sources teach —
+   * torso on the bench, hips at the edge, **a dumbbell held between the feet** (BarBend, Garage Gym
+   * Reviews). A home athlete's only route into p221's braced hinge row was an unloadable movement in
+   * a HYPERTROPHY slot.
+   *
+   * ⛔ ADDED ALONGSIDE ITS BODYWEIGHT SIBLING, NOT INSTEAD OF IT — the `sit up` / `weighted sit up`
+   * precedent below, for its stated reason: *"the name says weighted and the plate on the chest is
+   * the whole movement."* The unloaded version stays for an athlete not ready to load it.
+   * ⚠️ `total`, NOT `perHand` — one dumbbell between the feet is one number.
+   * ⚠️ `ratio: 0.0` / `primaryRef: null` like the rest of this family: nothing here is a percentage
+   * of a tested lift, and inventing one would price an accessory off a deadlift.
+   *
+   * ⚠️⚠️ ITS MUSCLE TAG IS KNOWN WRONG AND DELIBERATELY UNCHANGED. Michael ruled the reverse hyper
+   * glute-dominant from field sources, and `muscles.ts` still returns `hamstrings` for the whole
+   * `hyper` family. **Retagging changes 12 `strength_5k` weeks through the muscle floor** — the glute
+   * floor slot stops filling with `hip thrust` and starts filling with `reverse hyper` — and his
+   * 5K-builds-exactly-as-today rule is absolute. Parked on the punch list until a frame-aware muscle
+   * answer exists or he reopens 5K. **Do not "fix" the tag without measuring that frame.**
+   */
+  'weighted reverse hyper': {
+    pattern: 'hip_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'total',
+    isUnilateral: false,
+  },
   // ⛔ `total`, NOT `bodyweight` — CORRECTED 2026-08-27, alongside the same row in
   // `exercise-role.ts`'s TYPE_TABLE. Both files had it filed as bodyweight; the name says weighted
   // and the plate on the chest is the whole movement. It went unnoticed because the logger asked its

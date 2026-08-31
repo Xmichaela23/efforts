@@ -1058,3 +1058,24 @@ again in the All Rounder. Marked per item.
   Knee Raise**, a core movement occupying a leg slot — worth checking whether the pool is reaching for
   the nearest thing when the leg-isolation pool is thin, which would be a quiet substitution of the
   same class as the braced-slot one above.
+
+## ⛔ PARKED — the reverse hyper's muscle tag is known wrong (2026-08-30)
+
+`muscles.ts` returns **hamstrings** for the whole `hyper` family. Michael ruled from field sources
+that the reverse hyper is **glute-dominant, hamstring-involved** — hip extension from a hanging
+start, glutes doing the work. The tag is wrong and is deliberately unchanged.
+
+**Why it is parked, measured not guessed:** the fix is one line — a `\breverse hyper` rule placed
+before the family sweep, which keeps good mornings, RDLs and stiff-legs correct. But the tag feeds
+the muscle floor, and **retagging changes 12 `strength_5k` weeks**: the glute floor slot stops
+filling with `hip thrust` and starts filling with `reverse hyper`. His *"strength_5k builds exactly
+as today"* is absolute.
+
+**Unparks when:** he reopens the 5K frame, or a frame-aware muscle answer exists. ⚠️ Do not "fix"
+the tag without re-measuring that frame — it looks like a one-line correction and is not.
+
+**Related, same shape:** `compose.ts`'s his-before-ours sort is gated off `strength_5k` for the same
+reason, and the measurement there is worse: **all 30 5K weeks change, every one an improvement.**
+That frame is passing over p220 and p223's own printed movements — `incline bench press`,
+`preacher curl`, `larsen press`, `seated calf raise`, `skull crusher` — in favour of substitutes, at
+every kit. A real defect on the frozen frame, parked behind the same freeze.

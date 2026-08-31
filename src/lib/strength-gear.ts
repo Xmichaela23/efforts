@@ -422,6 +422,9 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
    * satisfies the bench route too — unchanged.
    */
   'reverse hyper': [['bench']],
+  // ⛔ THE LOADED VERSION THE FIELD SOURCES TEACH — a dumbbell held between the feet, so it needs the
+  // bench AND the dumbbells. See its `EXERCISE_CONFIG` entry for the sources and the precedent.
+  'weighted reverse hyper': [['bench', 'dumbbells']],
   'reverse hyperextension': [['machine']],
   'hanging leg raise': [['pull_up_bar']],
   'hanging knee raise': [['pull_up_bar']],

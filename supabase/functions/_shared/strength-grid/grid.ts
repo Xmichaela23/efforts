@@ -499,6 +499,9 @@ const EXECUTION_NAME: Record<string, string> = {
    * not an equipment fallback, it IS the movement.
    */
   'reverse hyper': 'Bench Reverse Hyper',
+  // ⚠️ THE LOADED ONE SAYS BENCH TOO — without it an athlete reads "Weighted Reverse Hyper" and
+  // pictures the machine with plates on it.
+  'weighted reverse hyper': 'Weighted Bench Reverse Hyper',
   // Seated, chest against the pad, arms sweeping back - on an incline bench with dumbbells.
   'rear delt machine': 'Chest-Supported Rear Delt Raise',
   /**

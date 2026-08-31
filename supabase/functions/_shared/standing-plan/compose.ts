@@ -41,6 +41,7 @@ import {
   isDialChip,
   musclesForChips,
   pickKeyForSlot,
+  VIADA_PICKS,
   type ViadaPickKey,
 } from './accessory-picks.ts';
 import {
@@ -1062,10 +1063,83 @@ function exerciseForSlot(
     // athlete's answer is discarded in silence — which is what happened to five controls.
     ? pickKeyForSlot(slot.category, pattern, frameDay ?? undefined, args.frame)
     : null;
+  /**
+   * ⛔⛔ "ALREADY USED TODAY" HAS TO ASK THE NAME THE ATHLETE WILL READ (2026-08-30). `bandRouteName`
+   * renames a movement on the way out, and **two different canonical movements can route to the same
+   * band execution** — so a day could print one name twice while this Set held two different keys and
+   * saw nothing wrong. Measured: p274's day 1 on a bands-only kit printed *"band lateral raise"*
+   * beside itself, from two different source movements.
+   * ⚠️ IT CHECKS BOTH, not just the rendered one: the stored name is what every other reader matches
+   * on, and dropping that test would let two spellings of one movement back in.
+   * ⚠️ LATENT BEFORE TODAY. The hole was always there; his-movements-first changed which movements
+   * that day lands on and walked straight into it.
+   */
+  const isTaken = (name: string): boolean =>
+    takenToday.has(canonicalize(name))
+    || takenToday.has(canonicalize(bandRouteName(name, args.equipment ?? null)));
+
+  /**
+   * ⛔⛔⛔ HIS MOVEMENTS OUTRANK SUBSTITUTES, AT EVERY KIT (Michael, 2026-08-30). The page's own list
+   * for THIS cell wins; anything else is a stand-in and sorts behind it.
+   *
+   * ⛔ THE DEFECT IT CLOSES, MEASURED. Adding `weighted reverse hyper` — a real, loadable movement
+   * that belongs in p221's braced hinge row — made a commercial-gym week stop building
+   * `ground-based deadlift machine`, one of the four movements p221 actually PRINTS for that cell.
+   * Nothing was wrong with the new entry: **`resolveSlot` ranks on equipment fit, then loaded before
+   * bodyweight, then CATALOGUE ORDER, and has no notion of "his"** — so a new loadable entry
+   * outranked one of his machines by sitting earlier in the file.
+   * ⛔ FILE ORDER WAS THE ALTERNATIVE FIX AND IS THE WRONG ONE. It would have worked, silently, until
+   * the next entry landed in the wrong place. This makes catalogue order stop being load-bearing.
+   *
+   * ⚠️ IT IS A SORT, NOT A FILTER. Every movement the cell could reach is still reachable — a kit
+   * that blocks his whole list still gets the substitutes, in the same order they had. What changes
+   * is only that his own come first when both are available.
+   * ⚠️ THE LIST IS THE ONE THE PICKER SHOWS. `VIADA_PICKS[key].hisList` is the page's printing for
+   * this cell, and the screen already marks anything outside it "- for your gear" — so the composer
+   * and the dropdown now agree about which movements are his.
+   * ⚠️ STABLE: equal ranks keep their existing order, so a cell whose options are all his, or all
+   * substitutes, is byte-identical to before.
+   */
+  /**
+   * ⚠️⚠️ AND IT IS HELD OFF `strength_5k` BY HIS FREEZE, NOT BECAUSE IT IS WRONG THERE — measured,
+   * 2026-08-30, and this is a finding rather than a scoping convenience.
+   *
+   * ⛔ THE SORT CHANGES ALL THIRTY `strength_5k` WEEKS, and every change is an improvement: that
+   * frame stops building `dumbbell bench press`, `drag curl`, `bulgarian split squat` and
+   * `rear delt fly` and starts building `incline bench press`, `preacher curl`, `larsen press`,
+   * `seated calf raise` and `skull crusher` — **p220 and p223's own printed movements, which it has
+   * been passing over in favour of substitutes at every kit.** That is a real defect on the frozen
+   * frame and it is parked, not fixed: Michael's *"strength_5k builds exactly as today"* is absolute
+   * and reopening it is his call, not a side effect of a p274 fix.
+   * ⚠️ SO THE GATE IS THE FREEZE, and when he lifts it this line is the whole change. D-457's rule
+   * holds either way: the frame is explicit rather than assumed.
+   */
+  if (slotKey && args.frame !== 'strength_5k') {
+    const his = new Set((VIADA_PICKS[slotKey].hisList ?? []).map((n) => canonicalize(n)));
+    if (his.size > 0) {
+      /**
+       * ⛔⛔ ALREADY-USED-TODAY SORTS LAST, AHEAD OF EVERYTHING ELSE — and a real regression is why
+       * (2026-08-30). p274's day 1 carries TWO `focused push_upper` cells, so promoting his movements
+       * put `lateral raise` at the front of both and the day printed it twice; on a bands-only kit
+       * the duplicate reached the built week as **"band lateral raise" beside itself**, because the
+       * `takenToday` guard downstream compares canonical names and the band rename happens after it.
+       * ⚠️ SO THE SORT RESPECTS THE DAY, not just the page. A movement already spent today is behind
+       * every fresh one, his or ours — which is the same rule the selection below applies, moved
+       * early enough to matter.
+       */
+      const rank = (name: string) =>
+        (isTaken(name) ? 2 : 0) + (his.has(canonicalize(name)) ? 0 : 1);
+      resolved.options = resolved.options
+        .map((o, i) => ({ o, i, r: rank(o.name) }))
+        .sort((a, b) => (a.r === b.r ? a.i - b.i : a.r - b.r))
+        .map(({ o }) => o);
+    }
+  }
+
   const named = slotKey ? String(args.slotPicks?.[slotKey] ?? '').trim() : '';
   const fromSlotPick = named !== ''
     ? resolved.options.find((o) => canonicalize(o.name) === canonicalize(named)
-      && !takenToday.has(canonicalize(o.name))
+      && !isTaken(o.name)
       && (!competition || canonicalize(o.name) !== canonicalize(competition)))
     : undefined;
 
@@ -1114,10 +1188,10 @@ function exerciseForSlot(
      */
     const focused = dialMuscles.size === 0
       && slot.intent === 'HYP' && slot.role === 'accessory' && focusMuscles.size > 0
-      ? options.find((o) => !takenToday.has(canonicalize(o.name))
+      ? options.find((o) => !isTaken(o.name)
         && focusMuscles.has(musclesWorkedBy(o.name)?.primary ?? ''))
       : undefined;
-    let fresh = focused ?? options.find((o) => !takenToday.has(canonicalize(o.name)));
+    let fresh = focused ?? options.find((o) => !isTaken(o.name));
 
     /**
      * ⛔ IF THE CELL IS EXHAUSTED, WIDEN THE CATEGORY — NOT THE PATTERN.
@@ -1133,7 +1207,7 @@ function exerciseForSlot(
         if (alt === slot.category) continue;
         const wider = resolveSlot({ category: alt, pattern, intent: slot.intent, equipment: args.equipment ?? null });
         fresh = wider.options.find((o) =>
-          !takenToday.has(canonicalize(o.name))
+          !isTaken(o.name)
           && !picks.placed.has(canonicalize(o.name))
           && (!competition || canonicalize(o.name) !== canonicalize(competition)));
         if (fresh) break;
@@ -1156,7 +1230,7 @@ function exerciseForSlot(
      * that frame never exhausts a cell, so this branch cannot fire on the frozen frame.
      */
     const lastResort = fresh ?? options[0] ?? resolved.chosen;
-    if (!lastResort || takenToday.has(canonicalize(lastResort.name))) return null;
+    if (!lastResort || isTaken(lastResort.name)) return null;
     movement = lastResort.name;
     /**
      * ⛔ AND IF THE ONLY ROUTE LEFT IS A BAND, THE ROW SAYS BAND (2026-08-24). `lat pulldown` on a
@@ -1177,6 +1251,17 @@ function exerciseForSlot(
    * same lift twice under two spellings. `canonicalize` is the app's owner of that comparison.
    */
   takenToday.add(canonicalize(movement));
+  /**
+   * ⛔⛔ AND THE NAME THE ATHLETE WILL READ, WHICH IS NOT ALWAYS THE ONE STORED (2026-08-30). Two
+   * different canonical movements can both route to the same band execution — `bandRouteName` renames
+   * on the way out, and this Set was only ever given the pre-rename name. **On a bands-only kit
+   * p274's day 1 printed "band lateral raise" beside itself**: two cells, two different movements,
+   * one rendered name, and the duplicate guard could not see it.
+   * ⚠️ LATENT UNTIL TODAY. It surfaced when his-movements-first changed which two movements that day
+   * lands on; the hole was always there. Additive and idempotent — a movement with no band route adds
+   * the same string twice, which a Set absorbs.
+   */
+  takenToday.add(canonicalize(bandRouteName(movement, args.equipment ?? null)));
 
   if (slot.ambiguousNotation && !notes.some((n) => n.text === slot.ambiguousNotation)) {
     notes.push({ kind: 'gap', text: slot.ambiguousNotation, cite: 'Viada p246' });
