@@ -1913,6 +1913,18 @@ export function sessionCueFor(day: FrameDay): string {
 }
 
 /** ⛔ COMPOSE ONE WEEK. */
+/**
+ * ⛔ WHICH HALF OF THE BODY A TEST SESSION TESTS. The test days are the ONE place the frame states no
+ * `lowerRole` — they are generated rather than transcribed — so this reads the name `testDaySession`
+ * itself writes. ⚠️ Deliberately narrow: it matches only those two generated names and answers null
+ * for anything else, so it can never quietly classify a transcribed day.
+ */
+function testRegionOf(name: string): 'upper' | 'lower' | null {
+  if (/^test:\s*upper$/i.test(name.trim())) return 'upper';
+  if (/^test:\s*lower$/i.test(name.trim())) return 'lower';
+  return null;
+}
+
 export function composeWeek(args: ComposeArgs): ComposedWeek {
   const frame = FRAMES[args.frame];
   if (!frame) throw new Error(`unknown frame: ${args.frame}`);
@@ -2426,6 +2438,17 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           // its purpose, so the ledger sees them.
           dosing.push({
             label: test.name,
+            /**
+             * ⛔⛔ THE PLACEMENT FACTS TRAVEL WITH THE TEST SESSIONS — see `fillMuscleFloor`. A test
+             * day is the LIGHTEST session of its week and the floor used to choose on weight alone,
+             * which is how glute work landed on the upper test day the day before a squat and
+             * deadlift max. ⚠️ `heavyLower` is true for the lower test specifically: it is the most
+             * expensive session in the block to arrive at fatigued, because its numbers price every
+             * week that follows.
+             */
+            day: day.day,
+            ...(testRegionOf(test.name) ? { region: testRegionOf(test.name)! } : {}),
+            ...(testRegionOf(test.name) === 'lower' ? { heavyLower: true } : {}),
             sets: (test.strength_exercises ?? []).map((e) => ({
               movement: e.name,
               intent: 'ME' as const,
@@ -2514,7 +2537,18 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
             ...(day.lowerRole ? [`lower:${day.lowerRole}`] : []),
           ],
         });
-        dosing.push({ label: day.label ?? `day ${day.day}`, sets: dosed });
+        /**
+         * ⛔ AND THE SAME FACTS ON EVERY LIFTING DAY — read off the FRAME, never off the label.
+         * `lowerRole` is the frame's own statement that this is a lower day and whether it is the
+         * heavy one; a label test is what `FrameDay.lowerRole` exists to replace.
+         */
+        dosing.push({
+          label: day.label ?? `day ${day.day}`,
+          day: day.day,
+          ...(day.lowerRole ? { region: 'lower' as const } : { region: 'upper' as const }),
+          ...(day.lowerRole === 'me' ? { heavyLower: true } : {}),
+          sets: dosed,
+        });
       }
     }
 

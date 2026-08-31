@@ -251,10 +251,33 @@ export function slotLengthOptions(
  * ⚠️ NULL ON ANYTHING THAT IS NOT A QUALITY SLOT, and on a slot this sport does not fill. An easy or
  * long session has no fixed length: it has a pick, which is `slotLengthOptions`.
  */
+/**
+ * ⛔⛔⛔ IT ANSWERS `null` WHEN THE SESSION'S SHAPE IS NOT PINNED, AND THAT IS THE FIX — Michael's own
+ * built plan, 2026-08-31.
+ *
+ * ⛔ WHAT IT WAS DOING. The row read *"Anaerobic · 1h05"* and his block built **1h08, 36 min and
+ * 1h05** across three weeks. Neither number was wrong: the composer resolves a DIFFERENT archetype
+ * every week (`rotatedArchetype`, p229's own instruction to cover the shapes), and p237's four
+ * printed workouts genuinely differ in length — `one_to_one` is *"10 rounds of 1 min / 1 min"*,
+ * twenty minutes of work. **The row was computing a single number from an archetype-LESS ladder and
+ * presenting it as the session's dose**, so the screen stated one week's answer as if it were every
+ * week's. Two computations of "how long is this session", which is the ask-15-get-20 defect wearing
+ * a quality row.
+ *
+ * ⛔ SO: a pinned shape gets its OWN true number, and an unpinned one gets no number at all — the
+ * row says the length varies week to week instead. A number the plan will contradict three weeks
+ * out of four is worse than no number.
+ * ⚠️ `archetype` IS THE ATHLETE'S PICK where they made one; the frame's own `row.archetype` still
+ * wins for a slot the page pins (p247 refines the 5K long run this way). Absent means unpinned.
+ */
 export function slotFixedMinutes(
   key: SlotKey,
   rawSlots: SlotSelection,
-  opts: { baselines?: EnduranceBaselines; frame?: FrameId; tier?: ExperienceTier },
+  opts: {
+    baselines?: EnduranceBaselines; frame?: FrameId; tier?: ExperienceTier;
+    /** ⛔ The shape this row is pinned to — the athlete's pick, or the frame's own. */
+    archetype?: string | null;
+  },
 ): number | null {
   const frame = opts.frame ?? 'strength_5k';
   const row = frameSlots(frame).find((x) => x.key === key);
@@ -269,10 +292,36 @@ export function slotFixedMinutes(
   const anchors = resolveEnduranceAnchors((opts.baselines ?? {}) as never);
   const tierLevels = (opts.tier === 'newer' ? lowVolumeLevels([sport]) : {}) as Record<string, Level>;
   const level = clampRideLevel(eq.family, (tierLevels[eq.family] ?? base.level) as Level);
+  /**
+   * ⛔ NO PIN, NO NUMBER. `eq.archetype` is the sport conversion's own pin, `row.archetype` the
+   * frame's, `opts.archetype` the athlete's. With none of the three the session rotates and there is
+   * no single true length to print — see this function's note.
+   */
+  const pinned = opts.archetype || eq.archetype || row.archetype || null;
+  if (!pinned) return null;
   const rungs = ladderOf({
-    family: eq.family, level, archetype: eq.archetype ?? row.archetype, sport,
+    family: eq.family, level, archetype: pinned, sport,
   } as SlotSpec, anchors);
   return rungs.length === 0 ? null : Math.round(rungs[0].hi);
+}
+
+/**
+ * ⛔ WHETHER THIS ROW'S LENGTH IS THE SAME EVERY WEEK. A quality row whose shape is not pinned
+ * rotates through the source's own printed workouts for that session, and those differ in length by
+ * design — so the row states that rather than a number it cannot keep. See `slotFixedMinutes`.
+ */
+export function slotLengthVaries(
+  key: SlotKey,
+  rawSlots: SlotSelection,
+  opts: {
+    baselines?: EnduranceBaselines; frame?: FrameId; tier?: ExperienceTier; archetype?: string | null;
+  },
+): boolean {
+  const frame = opts.frame ?? 'strength_5k';
+  const row = frameSlots(frame).find((x) => x.key === key);
+  if (!row || row.role !== 'hard') return false;
+  if (!rawSlots[key]) return false;
+  return slotFixedMinutes(key, rawSlots, opts) == null;
 }
 
 /**

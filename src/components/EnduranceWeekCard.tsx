@@ -72,6 +72,7 @@ import {
   WEEKLY_VOLUME_IS_THE_SUM_LINE,
   sessionLengthLabel,
   SESSION_LENGTH_LABEL,
+  SESSION_LENGTH_VARIES,
   hardSlotKeysFor,
   frameSlots,
   type SlotKey,
@@ -438,9 +439,19 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           const lengths = dayOrdered
             ? slotLengthOptions(key, slotsNow, { baselines: props.baselines as never, frame })
             : null;
+          /**
+           * ⛔⛔ THE ROW'S OWN PIN TRAVELS INTO THE LENGTH (2026-08-31). Without the athlete's picked
+           * shape this asked an archetype-less ladder and printed one week's answer as the session's
+           * dose — see `slotFixedMinutes`. `null` back means the session rotates and the row says so.
+           */
           const fixed = dayOrdered
-            ? slotFixedMinutes(key, slotsNow, { baselines: props.baselines as never, frame })
+            ? slotFixedMinutes(key, slotsNow, {
+              baselines: props.baselines as never, frame,
+              archetype: props.hardArchetypes?.[key] ?? null,
+            })
             : null;
+          const varies = dayOrdered && hardKeys.includes(key) && lengths == null && fixed == null
+            && slotsNow[key] != null;
           /**
            * ⛔ THE ROW STATES ITS LENGTH, ANSWERED OR NOT. A quality row shows the dose it is fixed
            * at; an easy or long row shows what the athlete set. ⚠️ A row with a pick and no answer
@@ -461,7 +472,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
             : null;
           const lengthNow = fixed != null
             ? sessionLengthLabel(fixed)
-            : (picked != null ? sessionLengthLabel(picked) : null);
+            : (picked != null ? sessionLengthLabel(picked) : (varies ? SESSION_LENGTH_VARIES : null));
           // ⛔ THE FRAME OWNS THE DAY — see `slotFrameDay`. `null` on a column with no such slot
           // (the taper carries three, not four), which renders no prefix rather than a wrong one.
           const dayNumber = slotFrameDay(key, 'standard', frame);

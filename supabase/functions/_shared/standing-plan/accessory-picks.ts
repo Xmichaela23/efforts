@@ -1833,9 +1833,33 @@ export type ViadaAccessoryPrefs = {
 };
 
 /** ⛔ READ ANY STORED SHAPE, RETURN THE CURRENT ONE. Never throws; a bad key falls back per slot. */
+/**
+ * ⛔⛔⛔ IT TAKES THE FRAME NOW, AND WITHOUT IT THIS FUNCTION SILENTLY REPLACED ONE PROGRAMME'S
+ * ANSWERS WITH ANOTHER'S — found on Michael's own live plan row, 2026-08-31.
+ *
+ * ⛔ WHAT IT DID. The loop read `VIADA_PICK_KEYS` — **p246's nine cells, hardcoded** — whatever
+ * programme the athlete was building. On an All Rounder every key the screen wrote (`ham_iso`,
+ * `braced_hinge`, `braced_push`, `braced_leg`, `braced_pull`) was never visited, so `stored` came
+ * back empty for all nine of the OTHER table's keys and each one fell to `defaultPickFor`. **The
+ * function returned a complete, plausible set of answers to questions the athlete was never asked,
+ * and discarded every answer they gave.** His plan row holds `core`, `db_press`, `hinge_lower`,
+ * `single_leg_a`, `single_leg_b` on an `all_rounder` plan, and no `ham_iso` at all — he had changed
+ * that row to Barbell Hip Thrust and the build gave him a nordic curl.
+ *
+ * ⛔⛔ AND THE VALIDATION HAD THE SAME HOLE, INDEPENDENTLY. `pickOptions(key, equipment)` omitted the
+ * cell's MUSCLE and its ADMITTED movements, and measured at his kit that call returns an **empty
+ * list** for `ham_iso` — so even once the key is visited, every stored value fails validation and
+ * falls back. Two faults, either one sufficient to lose the pick, on the same three lines.
+ *
+ * ⚠️ THE FRAME IS OPTIONAL AND DEFAULTS TO `strength_5k`, which is what every caller written before
+ * a second programme existed meant — so nothing that does not pass it changes behaviour.
+ * ⚠️ THIS IS THE §7 SHAPE AGAIN: one programme's key list indexing another's answers. It is the
+ * seventh time, and it is the first time it reached a real athlete's built plan.
+ */
 export function normalizeViadaPrefs(
   raw: unknown,
   equipment?: string[] | null,
+  frame: FrameId = 'strength_5k',
 ): ViadaAccessoryPrefs | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const obj = raw as Record<string, unknown>;
@@ -1846,16 +1870,23 @@ export function normalizeViadaPrefs(
     ? obj.picks as Record<string, unknown>
     : {};
   const picks = {} as Record<ViadaPickKey, string>;
-  for (const key of VIADA_PICK_KEYS) {
+  // ⛔ THE FRAME'S OWN CELLS — see this function's note. It was `VIADA_PICK_KEYS`, unconditionally.
+  for (const key of (PICK_KEYS_BY_FRAME[frame] ?? VIADA_PICK_KEYS)) {
     const stored = String(picksRaw[key] ?? '').trim();
     /**
      * ⚠️ VALIDATED AGAINST THE PICK'S OWN POOL, not merely non-empty. A stale name from an older
      * catalogue would otherwise reach a plan row and resolve to nothing — D-322's disease. The
      * fallback is this pick's default, which is a movement rather than a hole.
+     * ⛔ AND THE POOL IS THE ONE THE SCREEN DREW — narrowed by the cell's muscle, widened by the
+     * movements the source admits into it. Asked with two arguments this returns an empty list for
+     * p274's hamstring cell at a home kit, so every answer to that row failed and was overwritten.
      */
     const ok = stored !== ''
-      && pickOptions(key, equipment ?? null).some((o) => canonicalize(o.name) === canonicalize(stored));
-    picks[key] = ok ? stored : defaultPickFor(key, equipment ?? null, dial);
+      && pickOptions(key, equipment ?? null, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame))
+        .some((o) => canonicalize(o.name) === canonicalize(stored));
+    picks[key] = ok
+      ? stored
+      : defaultPickFor(key, equipment ?? null, dial, frame);
   }
   const rowsRaw = obj.dial_rows && typeof obj.dial_rows === 'object'
     ? obj.dial_rows as Record<string, unknown>

@@ -279,6 +279,17 @@ export function sessionLengthLabel(minutes: number): string {
 }
 
 /**
+ * ⛔⛔ WHAT A ROTATING QUALITY ROW SAYS INSTEAD OF A NUMBER (Michael's own built plan, 2026-08-31).
+ * His row read *"Anaerobic · 1h05"* and the block built 1h08, 36 min and 1h05 across three weeks —
+ * all three faithful to p237's four printed workouts, which differ in length by design. **A number
+ * the plan contradicts three weeks out of four is worse than no number.**
+ * ⚠️ FACT, NO IMPERATIVE, and it does not promise a range: the athlete is told the length moves, and
+ * the session's own page is what decides by how much. ⚠️ It replaces the number in the same slot, so
+ * the row still reads as one sentence.
+ */
+export const SESSION_LENGTH_VARIES = 'length varies week to week';
+
+/**
  * ⛔ THE LABEL OVER THE LENGTH PICKER. Fact-first and no imperative, same voice as every other label
  * on this screen: it names the quantity and stops.
  */

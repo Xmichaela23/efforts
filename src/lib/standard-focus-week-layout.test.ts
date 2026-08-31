@@ -39,6 +39,7 @@ import {
 } from './standing-plan-week-copy.ts';
 import { experienceChips, slotLengthOptions, slotFixedMinutes, slotsForEngine, prunedSlotMinutes } from './standing-plan-week-bounds.ts';
 import { composeWeek, defaultCompetitionLifts } from '../../supabase/functions/_shared/standing-plan/index.ts';
+import { slotVariantOptions } from './hard-slot-choices.ts';
 import { frameSlots } from './standing-plan-week-copy.ts';
 import { FRAMES } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 
@@ -242,7 +243,29 @@ Deno.test('⛔ ONLY THE EASY AND LONG ROWS TAKE A LENGTH — quality is the page
       const fixed = slotFixedMinutes(row.key, slots as never, { baselines: BASELINES as never, frame: 'all_rounder' });
       if (row.role === 'hard') {
         assertEquals(opts, null, `${row.key}: a quality row grew a length picker`);
-        assert(fixed != null && fixed > 0, `${row.key}: a quality row states no fixed length`);
+        /**
+         * ⛔⛔ A QUALITY ROW STATES A NUMBER ONLY WHEN ITS SHAPE IS PINNED (2026-08-31). This
+         * asserted `fixed != null` for every quality row, and that is what put *"Anaerobic · 1h05"*
+         * on Michael's screen over a block that built 1h08, 36 min and 1h05 — three faithful
+         * readings of p237's four printed workouts, which differ in length by design.
+         * **Unpinned, there is no single true number and the row says the length varies instead.**
+         * ⚠️ THE ASSERTION IS NOT DROPPED, IT IS SPLIT: pinned must still give a positive number,
+         * and the pinned number must equal what the composer builds — which the sweep below checks.
+         */
+        const pinnedFor = (a: string) => slotFixedMinutes(row.key, slots as never, {
+          baselines: BASELINES as never, frame: 'all_rounder', archetype: a,
+        });
+        if (fixed != null) {
+          assert(fixed > 0, `${row.key}: a pinned quality row states a non-positive length`);
+        } else {
+          const fam = slotVariantOptions(row.key as never, (slots as never)[row.key], 'all_rounder');
+          assert(fam.length > 1,
+            `${row.key}: no length and no shapes to rotate between — the row can say nothing at all`);
+          for (const v of fam) {
+            const n = pinnedFor(v.id);
+            assert(n != null && n > 0, `${row.key}/${v.id}: a pinned shape still states no length`);
+          }
+        }
       } else {
         assertEquals(fixed, null, `${row.key}: an easy/long row claims a fixed length`);
         assert(opts != null && opts.options.length > 1,

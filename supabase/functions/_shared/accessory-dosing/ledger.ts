@@ -59,7 +59,29 @@ export type PlannedWorkSet = {
   isWarmup?: boolean;
 };
 
-export type PlannedSession = { label: string; sets: PlannedWorkSet[] };
+export type PlannedSession = {
+  label: string;
+  sets: PlannedWorkSet[];
+  /**
+   * ⛔⛔ WHERE THIS SESSION SITS AND WHAT IT TRAINS — SUPPLIED BY THE CALLER, OPTIONAL, AND THE
+   * FLOOR'S PLACEMENT RULE IS BUILT ON IT (2026-08-31). See {@link fillMuscleFloor}.
+   * ⚠️ ABSENT MEANS "no placement facts", and the floor falls back to its old weight-only choice —
+   * so every caller written before this behaves exactly as it did.
+   */
+  /** The frame day this session sits on. Placement needs ORDER, not only weight. */
+  day?: number;
+  /** What this day's lifting trains, stated by the frame rather than read off the label. */
+  region?: 'upper' | 'lower';
+  /** ⛔ A heavy lower-body day — a max test or an ME lower slot. p247 prices what sits before it. */
+  heavyLower?: boolean;
+};
+
+/**
+ * ⛔ WHICH MUSCLES ARE LOWER-BODY, for the floor's placement rule. Core is deliberately in neither
+ * list: it is trained on any day and p223 gives it its own heading rather than a region.
+ */
+const LOWER_MUSCLES: MuscleGroup[] = ['quadriceps', 'hamstrings', 'glutes', 'calves'];
+const UPPER_MUSCLES: MuscleGroup[] = ['chest', 'deltoids', 'lats', 'biceps', 'triceps'];
 
 export type MuscleLine = {
   muscle: MuscleGroup;
@@ -386,7 +408,13 @@ export function fillMuscleFloor(
     target?: Partial<Record<MuscleGroup, number>> | null;
   },
 ): FloorResult {
-  const sessions: PlannedSession[] = week.map((s) => ({ label: s.label, sets: [...s.sets] }));
+  /**
+   * ⚠️ SPREAD, NOT REBUILT FIELD BY FIELD. This read `{ label, sets }` and silently dropped every
+   * other field the caller supplied — which is exactly how the placement facts below arrived and did
+   * nothing on the first attempt. **A local copy that names its fields is a copy that goes stale the
+   * next time the type grows**; the sets array is still cloned so the caller's is not mutated.
+   */
+  const sessions: PlannedSession[] = week.map((s) => ({ ...s, sets: [...s.sets] }));
   const setsPerSlot = muscleFloorSets(opts?.setPosition);
   const added: FloorAddition[] = [];
   const unfilled: { muscle: MuscleGroup; reason: string }[] = [];
@@ -448,12 +476,54 @@ export function fillMuscleFloor(
       continue;
     }
 
-    // ⛔ THE LIGHTEST SESSION THAT STAYS UNDER THE COSTLY LINE. Never the one already at the ceiling.
+    /**
+     * ⛔⛔⛔ WHERE THE FILL GOES — AND WEIGHT IS THE TIE-BREAK NOW, NOT THE RULE (Michael's own built
+     * plan, 2026-08-31).
+     *
+     * ⛔ WHAT IT DID BEFORE: sorted every session by counted sets and took the lightest, blind to
+     * what the day trains and to what follows it. In a TEST week the two test days carry two lifts
+     * each and are by far the lightest sessions of the week, so they soaked up every fill — his week
+     * one put **glute work on the upper-body test day, the day before his squat and deadlift max
+     * test.** That test sets every working number for the whole block.
+     *
+     * ⛔ THE RULE, IN ORDER:
+     *   1. **Never lower-body volume the day before a heavy lower day.** p247 prices a hard session
+     *      the day before heavy legs at 3-4% off the squat and deadlift, and the app already honours
+     *      that adjacency for endurance. A max TEST is the most expensive place to spend it.
+     *   2. **Prefer a session whose region matches the muscle** — glute work on a lower day, triceps
+     *      on an upper one. A fill is weekly volume, but the day it lands on is what the athlete
+     *      reads and what the session has to absorb.
+     *   3. **Then the lightest**, exactly as before.
+     *
+     * ⚠️ RULE 1 IS A HARD EXCLUSION AND RULES 2-3 ARE PREFERENCES, so a week with no matching region
+     * still gets filled rather than leaving a muscle at zero — which the source is clearer about
+     * than it is about placement.
+     * ⚠️ AND IT DEGRADES TO THE OLD BEHAVIOUR when the caller supplies no `day`/`region`, so nothing
+     * that predates these fields moves.
+     */
     const lines = ledgerFor(sessions, { setPosition: opts?.setPosition }).perSession;
+    const heavyLowerDays = new Set(
+      sessions.filter((s) => s.heavyLower && typeof s.day === 'number').map((s) => s.day as number),
+    );
+    const isLower = LOWER_MUSCLES.includes(muscle);
+    const isUpper = UPPER_MUSCLES.includes(muscle);
     const ordered = lines
-      .map((l, i) => ({ l, i }))
+      .map((l, i) => ({ l, i, s: sessions[i] }))
       .filter((x) => x.l.countedSets + setsPerSlot < SESSION_SETS_COSTLY)
-      .sort((a, b) => a.l.countedSets - b.l.countedSets);
+      // ⛔ RULE 1 — the day before a heavy lower day takes no lower-body fill.
+      .filter((x) => !(isLower && typeof x.s.day === 'number' && heavyLowerDays.has(x.s.day + 1)))
+      .sort((a, b) => {
+        // ⛔ RULE 2 — region match first. A session with no stated region ranks between the two.
+        const rank = (x: { s: PlannedSession }) => {
+          if (!x.s.region) return 1;
+          if (isLower) return x.s.region === 'lower' ? 0 : 2;
+          if (isUpper) return x.s.region === 'upper' ? 0 : 2;
+          return 1;
+        };
+        const d = rank(a) - rank(b);
+        // ⛔ RULE 3 — then the lightest, which is the whole of what this used to be.
+        return d !== 0 ? d : a.l.countedSets - b.l.countedSets;
+      });
     if (ordered.length === 0) {
       unfilled.push({
         muscle,

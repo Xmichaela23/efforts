@@ -674,6 +674,9 @@ Deno.serve(async (req: Request) => {
           ? ((body as Record<string, unknown>).assistance_picks as Record<string, unknown>).viada
           : null,
         equipmentStrength,
+        // ⛔ THE FRAME — without it this reads p246's key list whatever programme is being built,
+        // and returns that table's defaults in place of the athlete's answers. See its own note.
+        frameId,
       );
       const accessoryPicks = (() => {
         // ⛔ THE STANDING PLAN'S OWN PICKS, FLATTENED FOR THE FLOOR. The slot picks reach their
