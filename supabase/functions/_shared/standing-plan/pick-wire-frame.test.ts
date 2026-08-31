@@ -32,8 +32,19 @@ Deno.test('⛔⛔ AN ALL ROUNDER ANSWER SURVIVES THE WIRE, AND NO OTHER TABLE\'S
    * was never visited and, when it was, its option pool was asked WITHOUT the muscle and the
    * admitted movements and returned empty at this kit.
    */
-  assertEquals(prefs!.picks.ham_iso, 'Barbell Hip Thrust',
+  /**
+   * ⚠️ IT COMES BACK AS `hip thrust`, AND THAT IS THE ANSWER SURVIVING, NOT BEING LOST (2026-08-31).
+   * The dropdown stopped offering *"Barbell Hip Thrust"* beside *"Hip Thrust"* — one movement wearing
+   * two names — so the wire now MIGRATES a stored answer that differs only by its implement onto the
+   * surviving option's own name. **The alternative was falling back to a default, which is exactly
+   * the discard this test exists to catch.**
+   * ⚠️ THE SUBSTANCE IS ASSERTED, NOT THE SPELLING: what must never happen is the hamstring cell
+   * coming back as a movement the athlete did not choose.
+   */
+  assertEquals(prefs!.picks.ham_iso, 'hip thrust',
     '⛔ the athlete\'s hamstring answer was discarded at the wire');
+  assert(/hip thrust/i.test(String(prefs!.picks.ham_iso)),
+    'the hamstring answer is no longer a hip thrust at all');
   // ⛔ AND THE OTHER PROGRAMME'S CELLS ARE NOT INVENTED. Five of p246's nine are not p274 cells.
   for (const k of ['db_press', 'hinge_lower', 'single_leg_a', 'single_leg_b', 'core'] as const) {
     assert(!(k in prefs!.picks), `p246's ${k} was stored on an all_rounder block`);

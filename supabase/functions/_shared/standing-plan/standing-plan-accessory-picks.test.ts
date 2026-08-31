@@ -901,8 +901,18 @@ Deno.test('⛔ THE RULES ARE DECLARED PER PICK, NEVER GLOBAL', () => {
    * true of every cell. Whether it MATTERS is a per-cell judgement, and widening either rule on one
    * cell's evidence is how a screenshot becomes an app-wide change nobody ruled on.
    */
+  /**
+   * ⚠️ MICHAEL RULED ON 2026-08-31 and the list grew — reviewing the live dropdowns: *"Push Up
+   * variants … a volume slot offering movements that can't be loaded/progressed there. Check each
+   * against the loadable rule."* The rule now covers `db_press` too, whose own note had been holding
+   * the line open for exactly this ruling.
+   * ⛔ IT IS STILL PER PICK AND STILL NOT GLOBAL, which is what this test is for: the cells that
+   * carry it are named, and the assertion below proves a bodyweight cell was not caught by it.
+   */
   const loaded = VIADA_PICK_KEYS.filter((k) => VIADA_PICKS[k].requiresLoad === true);
-  assertEquals(loaded, ['single_leg_a', 'single_leg_b']);
+  // ⚠️ `quad_iso` IS SHARED BY BOTH PROGRAMMES, so the ruling reaches it on either — the same
+  // cell, the same reason: a quadriceps volume slot offering air squats is not volume under load.
+  assertEquals(loaded, ['db_press', 'single_leg_a', 'single_leg_b', 'quad_iso']);
   const excluding = VIADA_PICK_KEYS.filter((k) => (VIADA_PICKS[k].excludes ?? []).length > 0);
   assertEquals(excluding, ['single_leg_a', 'single_leg_b']);
   // ⛔ AND THE OTHER CELLS ARE UNCHANGED — a gym athlete's core pick still holds its bodyweight work,

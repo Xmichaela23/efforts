@@ -505,6 +505,25 @@ const EXECUTION_NAME: Record<string, string> = {
   // Seated, chest against the pad, arms sweeping back - on an incline bench with dumbbells.
   'rear delt machine': 'Chest-Supported Rear Delt Raise',
   /**
+   * ⛔⛔ THE CURL HAS A HOME EXECUTION AND THE NAME HAS TO SAY WHICH (2026-08-31). `leg curl` gained a
+   * bench-and-dumbbell route so p223's hamstring curl is reachable without a stack — and it went on
+   * showing as a bare *"Leg Curl"*, which to an athlete with no machine names a station they do not
+   * own. Same defect and same fix as `back extension`: the row states the execution.
+   * ⚠️ CONDITIONAL, like the rear delt above — an athlete WITH the machine sees the plain name,
+   * because that is what they will walk over to.
+   */
+  /**
+   * ⛔ HIS ROW SAID "Chest Supported Row" AND HE OWNS NO MACHINE (2026-08-31). It routes to dumbbells
+   * on an incline bench for him — the same seated, chest-supported position, only the load source
+   * differs — and the name never said which. ⚠️ Conditional: a gym member with the station sees the
+   * plain name, because that is what they will walk over to.
+   */
+  'chest supported row': 'Chest-Supported Row (incline bench, dumbbells)',
+  'leg curl': 'Leg Curl (lying, dumbbell between the feet)',
+  'leg curls': 'Leg Curl (lying, dumbbell between the feet)',
+  'lying leg curl': 'Leg Curl (lying, dumbbell between the feet)',
+  'hamstring curl': 'Leg Curl (lying, dumbbell between the feet)',
+  /**
    * ONE ENTRY, AND THE OTHER CANDIDATES WERE CHECKED AND LEFT OUT.
    * `seated calf raise` names no equipment - a home athlete reads it and does it with a dumbbell
    * across the knees without being told. `machine hip thrust`, `pec deck`, `leg extension` and

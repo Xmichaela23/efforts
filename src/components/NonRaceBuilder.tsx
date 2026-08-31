@@ -118,6 +118,9 @@ import {
   defaultViadaPicks,
   pickOptions,
   pickOptionLabel,
+  pickOptionLabelInRow,
+  allSubstituted,
+  ROW_IS_ALL_SUBSTITUTES,
   VIADA_PICKS,
   type DialChip,
   type ViadaAccessoryPrefs,
@@ -5504,6 +5507,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   frameMuscleForPick(key, wizardFrame), frameAdmitsForPick(key, wizardFrame),
                 );
                 const value = viadaPrefs?.picks?.[key] ?? opts[0]?.name ?? '';
+                // ⛔ ONE QUESTION ASKED ONCE PER ROW, so half a row cannot end up marked.
+                const rowAllSubs = allSubstituted(opts);
                 return (
                   <div key={key}>
                     <div className="flex items-baseline justify-between gap-2 mb-1">
@@ -5534,9 +5539,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       aria-label={`${spec.label} movement`}
                     >
                       {opts.map((o) => (
-                        <option key={o.name} value={o.name} className="bg-neutral-900">{pickOptionLabel(o)}</option>
+                        <option key={o.name} value={o.name} className="bg-neutral-900">
+                          {pickOptionLabelInRow(o, rowAllSubs)}
+                        </option>
                       ))}
                     </select>
+                    {/* ⛔ THE REASON, ONCE, UNDER THE ROW IT IS ABOUT — see `allSubstituted`. Nine
+                        options each ending "- for your gear" is the same sentence nine times, and a
+                        mark that is on everything marks nothing. */}
+                    {rowAllSubs ? (
+                      <p className="text-white/40 text-xs mt-1 leading-snug">{ROW_IS_ALL_SUBSTITUTES}</p>
+                    ) : null}
                   </div>
                 );
               }))(picksForFrame(wizardFrame, strengthEquipment))}

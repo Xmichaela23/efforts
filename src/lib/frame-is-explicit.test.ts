@@ -536,7 +536,15 @@ Deno.test('⛔⛔ THE PAGE\'S OWN LIST BEATS A PRIME-MOVER TAG, AND ONLY WHERE I
   // ⛔ AND THE BARBELL VERSION IS REACHABLE WHERE THE MACHINE IS NOT — Michael's own point.
   const home = pickOptions('ham_iso', ['Barbell + plates', 'Dumbbells', 'Flat bench'],
     frameMuscleForPick('ham_iso', 'all_rounder'), admits).map((o) => o.name.toLowerCase());
-  assert(home.includes('barbell hip thrust'), 'the barbell hip thrust is unreachable at bar+bench');
+  /**
+   * ⚠️ IT IS OFFERED AS `hip thrust`, NOT `barbell hip thrust` (2026-08-31) — the load-variant
+   * collapse removed the implement-qualified duplicate from the dropdown, because the row was
+   * offering both and they are one movement. **The assertion is the same fact:** the hip thrust is
+   * reachable at a kit with no machine. ⚠️ A stored answer spelled the old way still resolves — the
+   * wire migrates it rather than discarding it.
+   */
+  assert(home.some((n) => n.includes('hip thrust')), 'the hip thrust is unreachable at bar+bench');
+  assert(!home.includes('machine hip thrust'), 'a machine hip thrust reached a kit with no machine');
   // ⛔ AND NOTHING ELSE GLUTE CAME WITH IT. The exception is named, not a widened muscle.
   for (const n of ['glute bridge', 'clamshell', 'single leg glute bridge']) {
     assert(!home.includes(n), `"${n}" leaked into a hamstring row — the exception is a named list`);

@@ -31,6 +31,7 @@ import {
   isBodyweightLoad,
   resolveSlot,
   executionName,
+  bandRouteName,
   type GridMovement,
   type ViadaCategory,
   type ViadaPattern,
@@ -375,11 +376,13 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
    * incline bench, close-grip bench, JM press, seated dumbbell press, Arnold press — six movements,
    * every one of them loaded, and no push-up among them.
    *
-   * ⛔ IT STILL DOES NOT CARRY `requiresLoad`, BECAUSE MICHAEL HAS NOT RULED ON IT. Widening the
-   * rule on the leg cell's evidence is exactly how one screenshot becomes an app-wide behaviour
-   * change nobody asked for. Adding it here is one line the day he says so.
+   * ⚠️⚠️ HE RULED ON 2026-08-31 AND THE LINE IS ADDED. Reviewing the live dropdowns: *"Push Up
+   * variants … a volume slot offering movements that can't be loaded/progressed there. Check each
+   * against the loadable rule."* That is the ruling this note was waiting for, so the rule now
+   * applies to every HYPERTROPHY cell whose job is volume under load.
    */
   db_press: {
+    requiresLoad: true,
     key: 'db_press',
     label: 'Press variation',
     slot: { category: 'secondary', pattern: 'push_upper' },
@@ -559,6 +562,13 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
   },
   quad_iso: {
     key: 'quad_iso',
+    /**
+     * ⛔ A HYPERTROPHY CELL IS VOLUME UNDER LOAD (Michael, 2026-08-31, reviewing the live dropdowns:
+     * *"a volume slot offering movements that can't be loaded/progressed there"*). Bodyweight
+     * movements come out for any athlete who owns something to load with — and only for them, so a
+     * bodyweight athlete's cell is never emptied.
+     */
+    requiresLoad: true,
     // ⛔ "LOWER ISOLATION", NOT "QUAD ISOLATION" (Michael, 2026-08-25). Leg extension is now gated
     // on `machine` (commercial gym only) — it was untagged, the composer placed it for home
     // athletes, and materialize-plan's week-blind swap turned it into a duplicate of their own
@@ -597,6 +607,13 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
    */
   braced_push: {
     key: 'braced_push',
+    /**
+     * ⛔ A HYPERTROPHY CELL IS VOLUME UNDER LOAD (Michael, 2026-08-31, reviewing the live dropdowns:
+     * *"a volume slot offering movements that can't be loaded/progressed there"*). Bodyweight
+     * movements come out for any athlete who owns something to load with — and only for them, so a
+     * bodyweight athlete's cell is never emptied.
+     */
+    requiresLoad: true,
     label: 'Machine press',
     slot: { category: 'braced', pattern: 'push_upper' },
     hisList: ['smith machine press', 'machine chest press', 'dip machine'],
@@ -671,6 +688,13 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
    */
   braced_leg: {
     key: 'braced_leg',
+    /**
+     * ⛔ A HYPERTROPHY CELL IS VOLUME UNDER LOAD (Michael, 2026-08-31, reviewing the live dropdowns:
+     * *"a volume slot offering movements that can't be loaded/progressed there"*). Bodyweight
+     * movements come out for any athlete who owns something to load with — and only for them, so a
+     * bodyweight athlete's cell is never emptied.
+     */
+    requiresLoad: true,
     label: 'Leg press',
     slot: { category: 'braced', pattern: 'press_lower' },
     hisList: ['hack squat', 'leg press', 'lever squat'],
@@ -1137,7 +1161,9 @@ export type PickOption = {
  */
 const LABEL_ACRONYMS: Record<string, string> = {
   db: 'DB', kb: 'KB', ghd: 'GHD', rdl: 'RDL', trx: 'TRX', ytw: 'YTW', y: 'Y', t: 'T', w: 'W',
-  v: 'V', l: 'L', ohp: 'OHP',
+  // ⚠️ `jm` ADDED 2026-08-31 — the row read *"Jm Press"*. It is a person's initials, and a lifter
+  // reading "Jm" does not recognise the movement they know as the JM press.
+  v: 'V', l: 'L', ohp: 'OHP', jm: 'JM',
 };
 
 /**
@@ -1154,6 +1180,22 @@ const LABEL_ACRONYMS: Record<string, string> = {
  * rather than found in the source. No emoji, no apology, no explanation of a sourcing policy under a
  * dropdown - an athlete choosing an exercise does not need the provenance argument, only the fact.
  */
+/**
+ * ⛔⛔ WHEN EVERY OPTION IS A SUBSTITUTE, THE FACT BELONGS ON THE ROW — Michael, reviewing the live
+ * dropdowns 2026-08-31: *"when all options are substitutes, the fact belongs on the row once, not
+ * repeated per option."* His machine-press row listed nine movements and printed
+ * *"- for your gear"* nine times; the suffix stopped being information and became wallpaper.
+ * ⚠️ IT IS A WHOLE-ROW TEST, not a majority. A row where SOME options are his and some are ours still
+ * marks per option, because there the mark is the only thing telling them apart.
+ */
+export function allSubstituted(options: PickOption[]): boolean {
+  return options.length > 0 && options.every((o) => o.substituted === true);
+}
+
+/** ⛔ WHAT THAT ROW SAYS INSTEAD. Fact-first, no imperative — the reason, once. */
+export const ROW_IS_ALL_SUBSTITUTES =
+  'Your kit reaches none of the printed movements for this row — these work the same muscle.';
+
 export function pickOptionLabel(o: PickOption): string {
   /**
    * ⛔ THREE STATES, NOT TWO (2026-08-30). "- added" is Michael's own word for a movement offered
@@ -1165,6 +1207,16 @@ export function pickOptionLabel(o: PickOption): string {
    */
   if (o.substituted === true) return `${o.display} - for your gear`;
   return o.ours === true ? `${o.display} - added` : o.display;
+}
+
+/**
+ * ⛔ THE SAME LABEL, WITH THE SUFFIX DROPPED WHERE THE ROW ALREADY CARRIES IT — see `allSubstituted`.
+ * ⚠️ ONE HELPER RATHER THAN A FLAG THREADED THROUGH THE UI: the screen asks the row once and every
+ * option in it answers the same way, so half a row cannot end up marked.
+ */
+export function pickOptionLabelInRow(o: PickOption, rowIsAllSubstitutes: boolean): string {
+  if (rowIsAllSubstitutes && o.substituted === true) return o.display;
+  return pickOptionLabel(o);
 }
 
 export function movementLabel(name: string): string {
@@ -1313,6 +1365,37 @@ export function pickOptions(
    * ⚠️ AND THEY ARE MARKED, because the strict cut means nothing if an addition is invisible — the
    * same rule `oursList` already follows.
    */
+  /**
+   * ⛔⛔⛔ ONE REFINEMENT, APPLIED TO BOTH BRANCHES (2026-08-31) — and the reason it has to be shared
+   * is that it was NOT: the his-list branch dropped bodyweight movements and the SUBSTITUTE branch
+   * did not, so a leg row on a home kit offered *"Air Squat - for your gear"*, *"Pistol Squats"* and
+   * *"Bodyweight Lunges"* in a HYPERTROPHY slot. Same class as the bodyweight-only reverse hyper:
+   * **a volume cell offering movements that cannot be loaded or progressed in it.**
+   */
+  const refine = (list: GridMovement[]): GridMovement[] => {
+    const noBw = dropBodyweight ? list.filter((m) => !isBodyweightLoad(m.name)) : list;
+    /**
+     * ⛔⛔ AND THE LOAD-VARIANT DUPLICATES GO. The row offered *"Walking Lunge"*, *"Barbell Walking
+     * Lunge"* AND *"Dumbbell Walking Lunge"* together, and *"Hip Thrust"* beside *"Barbell Hip
+     * Thrust"* — **one movement wearing three names**, which is the same real-or-duplicate question
+     * the nordic spellings raised and the opposite answer to the two reverse hypers.
+     *
+     * ⛔ THE TEST IS WHETHER THE PREFIX NAMES A DIFFERENT EXECUTION OR JUST THE IMPLEMENT. A barbell
+     * and a dumbbell walking lunge are the same movement carrying different weights — the athlete
+     * loads it with what they own, and the unqualified name says so. **A MACHINE or SMITH prefix is
+     * NOT collapsed**: those are genuinely different executions with a different bar path, and
+     * merging them would be the mistake this rule exists to avoid pointed the other way.
+     * ⚠️ IT ONLY COLLAPSES WHEN THE BARE NAME IS ALSO PRESENT. A row whose only option is the barbell
+     * version keeps it, named as it is.
+     */
+    const bare = new Set(noBw.map((m) => canonicalize(m.name)));
+    const FREE_WEIGHT_PREFIX = /^(barbell|dumbbell|db)\s+/i;
+    return noBw.filter((m) => {
+      const stripped = String(m.name).replace(FREE_WEIGHT_PREFIX, '').trim();
+      if (stripped === m.name) return true;
+      return !bare.has(canonicalize(stripped));
+    });
+  };
   const primaryOf = (name: string) => musclesWorkedBy(name)?.primary ?? null;
   const admitted = new Set((alsoAdmits ?? []).map((n) => canonicalize(n)));
   /**
@@ -1344,7 +1427,7 @@ export function pickOptions(
   const onMuscle = (name: string) => primaryOf(name) === muscle || admitted.has(canonicalize(name));
   const narrowed = muscle
     ? (() => {
-      const his = dedupeByCanonical([...pool, ...admittedPool]).filter((m) => onMuscle(m.name));
+      const his = refine(dedupeByCanonical([...pool, ...admittedPool]).filter((m) => onMuscle(m.name)));
       if (his.length > 0) return { list: his, substituted: false };
       /**
        * ⛔⛔ THE SUBSTITUTE POOL WIDENS BY CATEGORY, NEVER BY MUSCLE OR PATTERN (Michael's amendment,
@@ -1398,14 +1481,14 @@ export function pickOptions(
             equipment: equipment ?? null,
           }).options);
         }
-        const subs = dedupeByCanonical([...pooled, ...admittedPool])
+        const subs = refine(dedupeByCanonical([...pooled, ...admittedPool])
           .filter((m) => !excluded.has(canonicalize(m.name)))
-          .filter((m) => onMuscle(m.name));
+          .filter((m) => onMuscle(m.name)));
         if (subs.length > 0) return { list: subs, substituted: true };
       }
       return { list: [], substituted: true };
     })()
-    : { list: pool, substituted: false };
+    : { list: refine(pool), substituted: false };
 
   return narrowed.list
     .map((m, i) => ({ m, i, r: rank(m) }))
@@ -1418,8 +1501,19 @@ export function pickOptions(
       // The execution name is already written for reading; only the canonical name needs the
       // title-caser. Passing it through `movementLabel` produced "(dumbbell Across Knees)".
       display: (() => {
-        const exec = executionName(m.name, equipment);
-        return exec === m.name ? movementLabel(m.name) : exec;
+        /**
+         * ⛔⛔ AND A BAND ROUTE SAYS BAND (2026-08-31). *"Lat Pulldown"* stood in his machine-pull row
+         * and he owns no cable stack — it reaches him through the BAND route, and the row named a
+         * station he does not have. The composer has renamed band-routed movements since 2026-08-24
+         * (`bandRouteName`); **the picker never did**, so the dropdown and the built week called the
+         * same movement two different things.
+         * ⚠️ ONE OWNER, ONE RULE — `bandRouteName` renames only when the band execution is the one
+         * that resolved and only when the new name exists in the catalogue, so a cable owner keeps
+         * the plain name.
+         */
+        const banded = bandRouteName(m.name, equipment ?? null);
+        const exec = executionName(banded, equipment);
+        return exec === banded ? movementLabel(banded) : exec;
       })(),
       muscle: musclesWorkedBy(m.name)?.primary ?? null,
       // MARKED AT THE SURFACE, not just in the table. An addition the athlete cannot tell from his
@@ -1881,11 +1975,28 @@ export function normalizeViadaPrefs(
      * movements the source admits into it. Asked with two arguments this returns an empty list for
      * p274's hamstring cell at a home kit, so every answer to that row failed and was overwritten.
      */
-    const ok = stored !== ''
-      && pickOptions(key, equipment ?? null, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame))
-        .some((o) => canonicalize(o.name) === canonicalize(stored));
-    picks[key] = ok
-      ? stored
+    const offered = pickOptions(
+      key, equipment ?? null, frameMuscleForPick(key, frame), frameAdmitsForPick(key, frame),
+    );
+    const exact = stored !== '' && offered.find((o) => canonicalize(o.name) === canonicalize(stored));
+    /**
+     * ⛔⛔ AND A STORED ANSWER THAT ONLY DIFFERS BY ITS IMPLEMENT STILL COUNTS (2026-08-31).
+     *
+     * The dropdown stopped offering *"Barbell Walking Lunge"* beside *"Walking Lunge"* — one movement
+     * wearing two names — and collapsing them would have **discarded an athlete's stored answer**:
+     * his own pick is `Barbell Hip Thrust`, which is no longer an option by that name, so validation
+     * failed and it fell back to a default. **A tidy-up that silently loses a real answer is worse
+     * than the duplicate it removed.**
+     * ⚠️ IT MIGRATES RATHER THAN MERELY ACCEPTING: the surviving option's own name is stored, so the
+     * answer stops depending on a spelling the dropdown no longer shows.
+     */
+    const collapsed = !exact && stored !== ''
+      ? offered.find((o) => canonicalize(o.name)
+        === canonicalize(String(stored).replace(/^(barbell|dumbbell|db)\s+/i, '').trim()))
+      : undefined;
+    const match = exact || collapsed;
+    picks[key] = match
+      ? match.name
       : defaultPickFor(key, equipment ?? null, dial, frame);
   }
   const rowsRaw = obj.dial_rows && typeof obj.dial_rows === 'object'
