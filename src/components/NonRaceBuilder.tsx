@@ -23,6 +23,10 @@ import {
   type SlotSport,
   experiencedIsReachable,
   experienceUnansweredLine,
+  experienceAsksFor,
+  experienceMovement,
+  weekIsDayOrdered,
+  EXPERIENCE_WHEN_UNASKED,
 } from '@/lib/standing-plan-week-copy';
 import { CLUB_SESSION_CONTROL_VISIBLE, hardSlotDefault, slotFamilyFact, slotVariantOptions, variantsTakenBy, type HardSlotKey } from '@/lib/hard-slot-choices';
 // ⛔ `SLOT_FAMILY` IS NOT IMPORTED HERE. It is the 5K frame's four rows, and indexing it by a
@@ -3486,10 +3490,48 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     () => experienceChips(slotSportsNow, { baselines: (baselinesRow ?? {}) as never, frame: wizardFrame }),
     [slotSportsNow, baselinesRow, wizardFrame],
   );
-  /** The sports that actually fill a slot, so have an experience question. ⚠️ A sport the athlete
-   *  keeps but whose four slots carry none of it has nothing for the answer to size. */
-  const experienceSports: SlotSport[] = (['run', 'ride'] as const)
+  /** The sports that actually fill a slot. ⚠️ A sport the athlete keeps but whose slots carry none
+   *  of it has nothing for the answer to size, so it has no chips and no question. */
+  const experienceSportsWithSlots: SlotSport[] = (['run', 'ride'] as const)
     .filter((sp) => experienceOptions[sp] != null);
+  /**
+   * ⛔⛔ WHICH OF THEM THE SCREEN ACTUALLY ASKS ABOUT — Michael's final ruling of 2026-08-30, and it
+   * is one question on Standard Focus rather than two. See `experienceAsksFor` for the measurements:
+   * the run answer moves two sessions by 5-8 minutes and the long run's own 100-minute cap washes the
+   * rest out, and the week's other rides are identical at both tiers. **`strength_5k` is unchanged —
+   * both its sports keep their question.**
+   * ⚠️ ONE OWNER, READ HERE AND IN THE CARD. The screen renders the question this list contains and
+   * Continue gates on the same list, so a question can never be required without being drawn — which
+   * is the exact defect (`Continue disabled and unsatisfiable`) that cost 2026-08-30 its morning.
+   */
+  const experienceAsked: SlotSport[] = experienceSportsWithSlots.filter((sp) => {
+    const pair = experienceOptions[sp];
+    return pair != null
+      && experienceAsksFor(sp, experienceMovement(pair), weekIsDayOrdered(wizardFrame));
+  });
+  /**
+   * ⛔⛔ A SPORT THE SCREEN NEVER ASKS ABOUT STILL SENDS A TIER — `EXPERIENCE_WHEN_UNASKED`, which is
+   * `'experienced'`, which is p274's own printed levels. **Without this the composer receives
+   * `undefined` for that sport and builds the frame's levels anyway — the same answer by accident.**
+   * Storing it explicitly is what makes the plan ROW carry it, so `rematerialize-standing-block`
+   * rewrites the athlete's unstarted weeks at the same levels instead of re-deriving them from a
+   * blank. That is hop 4 of `experience-tier-travel.test.ts`, and it is the silent one.
+   * ⚠️ IT NEVER OVERWRITES AN ANSWER THE ATHLETE GAVE TO A QUESTION THEY WERE ASKED — the guard is
+   * `experienceAsked`, so switching the long session from ride to run leaves the ride answer to be
+   * replaced by the top tier rather than stranded, and switching back re-asks the question.
+   */
+  useEffect(() => {
+    if (currentStep !== 'endurance') return;
+    for (const sport of experienceSportsWithSlots) {
+      if (experienceAsked.includes(sport)) continue;
+      if (state.enduranceExperience?.[sport] === EXPERIENCE_WHEN_UNASKED) continue;
+      setState((st) => ({
+        ...st,
+        enduranceExperience: { ...(st.enduranceExperience ?? {}), [sport]: EXPERIENCE_WHEN_UNASKED },
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, experienceOptions, state.enduranceExperience, wizardFrame]);
   const experienceHoursFor = (sport: SlotSport): number | null => {
     const raw = sport === 'run' ? state.targetRunHours : state.rideHours;
     const n = Number(raw);
@@ -3506,7 +3548,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    */
   useEffect(() => {
     if (currentStep !== 'endurance') return;
-    for (const sport of experienceSports) {
+    // ⚠️ ASKED SPORTS ONLY. An unasked sport is pinned to the top tier above, and falling it back
+    // here would quietly reduce a week the athlete was never offered a say in.
+    for (const sport of experienceAsked) {
       const pair = experienceOptions[sport];
       if (!pair) continue;
       if (state.enduranceExperience?.[sport] !== 'experienced') continue;
@@ -3524,7 +3568,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * the control — the precise defect this control exists to remove — and a preselected "Experienced"
    * has the opposite failure and is worse, because it overreaches by default.
    */
-  const experienceUnanswered: SlotSport[] = experienceSports
+  // ⚠️ ONLY A QUESTION THAT IS ON THE SCREEN MAY BLOCK CONTINUE — see `experienceAsked`. The
+  // unanswered SENTENCE follows the same list, so it can never name a control the athlete cannot find.
+  const experienceUnanswered: SlotSport[] = experienceAsked
     .filter((sp) => state.enduranceExperience?.[sp] !== 'newer'
       && state.enduranceExperience?.[sp] !== 'experienced');
 

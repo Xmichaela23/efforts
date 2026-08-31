@@ -719,6 +719,14 @@ Deno.test('⛔⛔ THE ROWS ARE THE FRAME\'S — and the 5K screen is unchanged b
   assertEquals(all.map((s) => s.family),
     ['run_mlss', 'ride_anaerobic', 'run_near_threshold', 'ride_endurance', 'run_lsd']);
   assertEquals(all[3].label, 'Easy session', 'the natively-prescribed ride lost its easy row');
+  /**
+   * ⚠️⚠️ THIS IS NO LONGER THE ORDER STANDARD FOCUS DRAWS — read it as the role order and nothing
+   * more (2026-08-30). Michael ruled its screen onto the frame's DAY order, so the card asks
+   * `frameWeekDays` for that frame and `displayOrderFor` only for `strength_5k`. The assertion stays
+   * because the function is still the model's role order and still correct; what changed is who reads
+   * it. See `standard-focus-week-layout.test.ts` for the drawn order, and `weekIsDayOrdered` for the
+   * per-frame ruling — his 2026-08-26 long-first order is still in force on the 5K screen.
+   */
   assertEquals(displayOrderFor('all_rounder'), ['long', 'easy', 'hard1', 'hard2', 'hard3']);
 
   // ⚠️ THE TAPER IS A DIFFERENT SHAPE AND THE ROWS FOLLOW IT — three slots, not four or five.

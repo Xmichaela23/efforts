@@ -377,6 +377,28 @@ export type ExperienceChip = {
    * a ride, genuinely has one hard run and must say one.
    */
   hardCount: number;
+  /**
+   * ⛔⛔ THE SHORTEST THE LONG SESSION OF THIS SPORT CAN BE AT THIS TIER, in whole minutes — a FLOOR
+   * and never a length (2026-08-30, Michael's ruling that the ride option may state the long ride).
+   *
+   * ⛔ WHY IT EXISTS. `longestMin` above is the HARD sessions, and on a frame that prescribes its hard
+   * ride natively the tier does not move that session at all: `ride_anaerobic` measures 65 min at both
+   * tiers in every slot arrangement swept, so the two riding chips printed the same number over the
+   * same count and the control read as dead. **The tier does move that rider's week — it moves the
+   * LONG ride** — and this is the number that says so.
+   *
+   * ⛔⛔ A FLOOR IS THE ONLY HONEST FIGURE FOR A BASE FAMILY, and the measurement is why. The long
+   * ride stretches with the hours dial: measured at HEAD, tier `experienced`, 130 min at a 4h ask,
+   * 164 at 6h, 216 at 8h, 271 at 10h, 300 at 12h. Any single length printed here is a promise the
+   * hours control then breaks. What the TIER owns is where that ladder starts — 60 min at `newer`
+   * against 130 at `experienced` — and that number is true at every hours ask.
+   *
+   * ⚠️ NULL WHEN THIS SPORT DOES NOT HOLD THE LONG SLOT. Nothing to floor, so nothing to say.
+   * ⚠️ THE FIRST RUNG'S `lo`, deliberately, where `longestMin` reads the first rung's `hi`: a quality
+   * family's rung is a single point so the two agree there, and a base family's does not — which is
+   * exactly the difference this field exists to carry.
+   */
+  longFloorMin: number | null;
 };
 
 /** The pair for one sport, in screen order. Null when that sport fills no slot. */
@@ -493,9 +515,21 @@ export function experienceChips(
       .filter((sp): sp is SlotSpec => sp != null);
     const longest = hard.reduce((top, spec) => Math.max(top, longestFor(spec)), 0);
     const floorHours = weekVolumeBounds(all, anchors)[sport].floor;
+    /**
+     * ⛔ THE LONG SLOT, WHEN THIS SPORT HOLDS IT — see `ExperienceChip.longFloorMin`. Same derivation
+     * shape as `hard` above: the frame's own rows, filtered to the ones the athlete answered with
+     * this sport, so the number and the row it describes can never come apart.
+     */
+    const longSpec = frameSlots(frame).filter((x) => x.role === 'long').map((x) => x.key)
+      .map((k) => (slots[k] === sport ? specFor(k, sport, tier) : null))
+      .find((sp): sp is SlotSpec => sp != null) ?? null;
+    // ⚠️ THE FIRST RUNG'S FLOOR, not its ceiling — the ceiling is the same at both tiers on a base
+    // family (the hours dial climbs it to level 3 either way, p93) and would print two equal numbers.
+    const longRungs = longSpec ? ladderOf(longSpec, anchors) : [];
     return {
       tier,
       longestMin: longest > 0 ? Math.round(longest) : null,
+      longFloorMin: longRungs.length > 0 ? Math.round(longRungs[0].lo) : null,
       // ⛔ THE SAME `hard` LIST THE DURATION COMES FROM — one derivation, so the count and the number
       // can never end up describing different sets of sessions.
       hardCount: hard.length,

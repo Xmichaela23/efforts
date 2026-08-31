@@ -42,9 +42,15 @@ import {
   ENDURANCE_WEEK_INTRO_CONSEQUENCE,
   introStructureFor,
   EXPERIENCE_HEADING,
-  EXPERIENCE_SUBTITLE,
-  experienceChipLine,
-  EXPERIENCE_TIERS_EQUAL_LINE,
+  // ⚠️ `EXPERIENCE_SUBTITLE` IS NO LONGER READ HERE. The screen asks `experienceSubtitle`, which
+  // picks the sentence off what the answer actually moves — the constant is still that function's
+  // hard arm and is still pinned verbatim by the copy test.
+  experienceMovement,
+  experienceSubtitle,
+  experienceHeadingFor,
+  experienceNoteFor,
+  experienceAsksFor,
+  experienceChipTextFor,
   restIsEasyLine,
   experienceGatedLine,
   experiencedIsReachable,
@@ -58,6 +64,10 @@ import {
   slotPrecedesHeavyLowerDay,
   slotOptionsNow,
   displayOrderFor,
+  frameWeekDays,
+  weekIsDayOrdered,
+  QUIET_DAY_LABEL,
+  RUN_HOURS_LAND_ON_THE_LONG_RUN_LINE,
   hardSlotKeysFor,
   frameSlots,
   type SlotKey,
@@ -173,6 +183,17 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
   const frame: FrameId = props.frame ?? 'strength_5k';
   const rowKeys = displayOrderFor(frame);
   const hardKeys = hardSlotKeysFor(frame);
+  /**
+   * ⛔⛔ THE WEEK AS SEVEN DAYS, ON THE FRAMES RULED ONTO IT (Michael, 2026-08-30). See
+   * `weekIsDayOrdered` for the ruling and `frameWeekDays` for where the days come from.
+   *
+   * ⛔ WHAT IT FIXES: Standard Focus drew five rows for a seven-day week, in role order, and the two
+   * days it left out were left out silently — day 5 lifts with no endurance, day 7 is the rest day.
+   * The frame states both; the screen was not asking. ⚠️ AND `rowKeys` STAYS for `strength_5k`, whose
+   * screen must render exactly as it does today.
+   */
+  const dayOrdered = weekIsDayOrdered(frame);
+  const weekDays = frameWeekDays(frame);
   // ⛔ HIS FOUR LINES WITH THE FRAME'S OWN COUNTS — see `introStructureFor`. Byte-identical for the
   // 5K frame; the header said "4 endurance slots … Two hard sessions" above five rows otherwise.
   const introLines = introStructureFor(frame);
@@ -248,7 +269,17 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
    * A constant imported at the top of a file is one frame's answer, and nothing at the call site
    * distinguishes it from a derived one.
    */
-  const slotRow = (key: SlotKey) => {
+  /**
+   * ⛔⛔ `themeTag` IS THE FRAME'S WORD FOR THE DAY'S LIFTING, PASSED IN RATHER THAN LOOKED UP
+   * (2026-08-30). p274 names each day by its movement pattern — push, hinge, jumps, pull, legs — and
+   * a lifter reads the week faster with them on it. The card does not know them: `frameWeekDays`
+   * reads `FrameDay.themeTag` off the chosen frame, so a frame that states none renders none rather
+   * than the other frame's words. **That is trap one from the handoff, and it is the reason this is
+   * an argument and not a table in this file.**
+   * ⚠️ IT RENAMES NOTHING. The strength SLOT labels are frozen pending Michael; this is new
+   * day-level copy that sits beside them and must not be read as a replacement for any of them.
+   */
+  const slotRow = (key: SlotKey, themeTag?: string | null) => {
           const sport = props.slots[key];
           /**
            * ⛔ NO SPORT, NO COLOUR (Michael, 2026-08-24). A row the athlete has not answered carries
@@ -350,8 +381,42 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                         calendar after this screen, so a weekday here is a promise the next screen
                         breaks. ⚠️ Its own element, not folded into `slotSummary`: the slot labels are
                         frozen and this adds a fact to the row rather than renaming anything. */}
+                    {/* ⛔⛔ THE DAY LINE AND THE ANSWER LINE ARE SEPARATE (2026-08-30, off the
+                        rendered harness). They were one line — `Day 1 · push day (upper) · Hard
+                        session 1 · Ride · Sustained threshold` — and on a 430px phone the answer
+                        truncated to *"Hard sessi…"*, which is the one thing on the row the athlete
+                        came to read. **The day number and the lifting theme are both facts the FRAME
+                        states about the day; the line under them is the athlete's own answer.**
+                        Splitting them by that seam gives the answer the full width and reads as two
+                        kinds of information rather than a five-part string. */}
+                    {/* ⚠️⚠️ THE TWO-LINE SEAM IS PER **LIST**, NOT PER ROW, AND BOTH HALVES OF THAT
+                        WERE FOUND ON THE RENDERED PAGE.
+
+                        ⛔ IT IS GATED ON `dayOrdered` SO `strength_5k` IS BYTE-IDENTICAL. Applied
+                        unconditionally, its rows became `Day 6` over `Long session · Long run` where
+                        they had been one line — a visible change to a screen Michael ruled is not to
+                        be touched.
+                        ⛔ AND IT IS THE WHOLE LIST RATHER THAN "rows that have a tag", because days 6
+                        and 7 carry no lifting and therefore no tag: keyed on the tag, Standard Focus
+                        would have drawn five two-line rows and then a one-line row six, which reads as
+                        a rendering fault rather than as a week. */}
+                    {dayOrdered ? (
+                      <span className="block text-white/45 text-xs leading-snug truncate">
+                        {dayNumber != null ? (
+                          <span className="tabular-nums">{`Day ${dayNumber}`}</span>
+                        ) : null}
+                        {/* ⛔ THE DAY'S LIFTING THEME, IN THE FRAME'S OWN WORDS — see `themeTag`. It
+                            sits with the day number because it describes the DAY, not the session
+                            the row is asking about, and it is greyed for the same reason. */}
+                        {themeTag ? (
+                          <span className="text-white/35">
+                            {`${dayNumber != null ? ' · ' : ''}${themeTag}`}
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : null}
                     <span className="block text-white/90 text-sm leading-snug truncate">
-                      {dayNumber != null ? (
+                      {(dayNumber != null && !dayOrdered) ? (
                         <span className="text-white/45 tabular-nums">{`Day ${dayNumber} · `}</span>
                       ) : null}
                       {slotSummary(key, sport, session)}
@@ -442,6 +507,45 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           );
   };
 
+  /**
+   * ⛔⛔ A DAY WITH NO ENDURANCE CHOICE, DRAWN RATHER THAN OMITTED (Michael, 2026-08-30).
+   *
+   * ⛔ IT IS NOT A CONTROL AND MUST NOT LOOK LIKE ONE. No button, no chevron, no accordion entry, no
+   * sport colour on the edge — it is a label row that states what the frame already decided. The
+   * screen's own rule is that colour means "you chose this", so a row nobody chooses carries none.
+   * ⚠️ `aria-hidden` IS DELIBERATELY NOT SET. The row carries a real fact about the athlete's week —
+   * that day 7 is rest — and hiding it from a screen reader would give a non-sighted athlete the
+   * five-row week this change exists to end.
+   */
+  const quietRow = (day: number, quiet: 'rest' | 'lifting', themeTag: string | null) => (
+    <div
+      key={`quiet-${day}`}
+      data-testid={`quiet-day-${day}`}
+      className="rounded-xl border overflow-hidden"
+      style={{
+        // ⚠️ LONGHANDS ONLY, same as the slot row — see the note there on the shorthand bug.
+        borderTopColor: 'rgba(255,255,255,0.06)',
+        borderRightColor: 'rgba(255,255,255,0.06)',
+        borderBottomColor: 'rgba(255,255,255,0.06)',
+        borderLeftColor: 'rgba(255,255,255,0.06)',
+        borderLeftWidth: 3,
+        backgroundColor: 'rgba(255,255,255,0.012)',
+      }}
+    >
+      {/* ⚠️ THE SAME TWO-LINE SEAM AS A PICKER ROW — frame facts on top, what the day IS underneath —
+          so the quiet days read as part of the same list rather than a different component. */}
+      <div className="pl-4 pr-4 py-3">
+        <span className="block text-white/30 text-xs leading-snug truncate">
+          <span className="tabular-nums">{`Day ${day}`}</span>
+          {themeTag ? <span>{` · ${themeTag}`}</span> : null}
+        </span>
+        <span className="block text-white/40 text-sm leading-snug truncate">
+          {QUIET_DAY_LABEL[quiet]}
+        </span>
+      </div>
+    </div>
+  );
+
   return (
     /**
      * ⚠️ `StepLayout`'s own `pb-24` IS NOT ENOUGH ON A PHONE. Its Continue bar adds
@@ -505,8 +609,26 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           above the rows and the rows themselves read the same way. ⚠️ Long still leads for the
           reason it was moved there: it is the row most likely to be the athlete's fixed weekend
           session. */}
+      {/* ⛔⛔ TWO ORDERS, ONE ROW RENDERER, AND THE FRAME PICKS (Michael, 2026-08-30).
+
+          ⛔ STANDARD FOCUS DRAWS ALL SEVEN DAYS IN DAY ORDER. Its week is p274's week and an athlete
+          reads it against their own calendar; five rows in role order left day 5 and day 7 off the
+          screen with nothing said. The choice-free days are drawn greyed and inert — see `quietRow`.
+
+          ⛔ AND `strength_5k` IS UNTOUCHED — `rowKeys` is `displayOrderFor`, which is still his
+          2026-08-26 long-first ruling, and its screen renders exactly as it did. **That is the
+          acceptance test for this change and it is pinned.** ⚠️ The two orders genuinely conflict:
+          day order puts the gating hard rows first, long-first was chosen to put them first for a
+          different reason. Michael ruled per-frame rather than picking one. */}
       <div className="flex flex-col gap-2">
-        {rowKeys.map(slotRow)}
+        {/* ⚠️ FLAT, NOT NESTED. A day can carry more than one endurance row, and an array returned
+            inside a `map` becomes an unkeyed fragment — `flatMap` keeps every row a direct sibling
+            with its own key, which is what the accordion's one-open-at-a-time state assumes. */}
+        {dayOrdered
+          ? weekDays.flatMap((d) => (d.quiet
+            ? [quietRow(d.day, d.quiet, d.themeTag)]
+            : d.slotKeys.map((k) => slotRow(k, d.themeTag))))
+          : rowKeys.map((k) => slotRow(k))}
       </div>
 
       {/* ⛔ VOLUME, BOUNDED BOTH ENDS BY WHAT THE SLOTS HOLD — and the bounds recompute as the sports
@@ -606,6 +728,20 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                     {Number(sport === 'run' ? props.runDays : props.rideDays) === 1 ? 'day' : 'days'}
                   </span>
                 </div>
+                {/* ⛔⛔ THE HOURS DIAL DOES DIFFERENT THINGS FOR THE TWO SPORTS, AND THE SCREEN NOW
+                    SAYS SO — see `RUN_HOURS_LAND_ON_THE_LONG_RUN_LINE` for the measurements.
+                    Riding hours land; running hours have only the long run to land on and it caps.
+                    The same fact already reached the athlete AFTER the plan was built; this is it
+                    beside the control that is about to disappoint them.
+                    ⛔ RUNNING ONLY — a riding counterpart would warn about a control that works.
+                    ⚠️ GATED ON THE SAME PER-FRAME RULING AS THE LAYOUT (`weekIsDayOrdered`), and NOT
+                    because the fact is false on the other frame — it is true there too. Michael ruled
+                    on 2026-08-30 that the 5K screen is not to be touched, so its copy is unchanged. */}
+                {sport === 'run' && dayOrdered ? (
+                  <p className="text-white/45 text-xs mt-2 leading-snug" data-testid="run-hours-land">
+                    {RUN_HOURS_LAND_ON_THE_LONG_RUN_LINE}
+                  </p>
+                ) : null}
                 {/* ⛔ THE ONE LINE THAT REMAINS — what the book fixes, and where the rest goes.
                     Michael's own shape: *"copy say hard hours cap at 1.38 or whatever for the run
                     and same for bike, rest will be easy."* It replaces every cap, floor and
@@ -639,10 +775,41 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                    * reason on it sends the athlete back up the screen guessing.
                    */
                   const canExperienced = experiencedIsReachable(hours, pair.experienced.needsHours);
+                  /**
+                   * ⛔⛔ WHAT THIS ANSWER ACTUALLY MOVES FOR THIS SPORT — see `experienceMovement`.
+                   * One derivation feeding the subtitle, the two chip lines and the equal-tiers guard,
+                   * so the heading, the numbers and the sentence underneath cannot end up describing
+                   * three different sessions. The riding pair on the All Rounder is why: its hard ride
+                   * is pinned at level 1 by the page and measures 65 min at both tiers, so a subtitle
+                   * claiming the hard rides was false and the control read as dead.
+                   */
+                  const movement = experienceMovement(pair);
+                  /**
+                   * ⛔⛔⛔ ON STANDARD FOCUS THIS IS ONE CONDITIONAL QUESTION AND IT IS THE RIDE'S —
+                   * Michael's final ruling, 2026-08-30. See `experienceAsksFor` for the measurements:
+                   * the run answer moves two sessions by 5-8 min and the long run's own 100-min cap
+                   * washes the rest out, and the week's other rides are identical at both tiers. Where
+                   * nothing is asked, `EXPERIENCE_WHEN_UNASKED` is stored — by the WIZARD, so the
+                   * composer receives a tier on every path.
+                   * ⚠️ `plain` IS THE SAME PER-FRAME RULING AS THE LAYOUT (`weekIsDayOrdered`), so
+                   * `strength_5k` keeps both questions, its headings and its labelled chips.
+                   */
+                  const plain = dayOrdered;
+                  if (!experienceAsksFor(sport, movement, plain)) return null;
+                  const subtitle = plain
+                    ? experienceNoteFor(sport, movement, plain, pair.newer.hardCount)
+                    : experienceSubtitle(sport, movement);
                   return (
                     <div className="mt-3" data-testid={`${sport}-experience`}>
-                      <p className="text-white/80 text-[13px]">{EXPERIENCE_HEADING[sport]}</p>
-                      <p className="text-white/55 text-xs mt-0.5 leading-snug">{EXPERIENCE_SUBTITLE[sport]}</p>
+                      <p className="text-white/80 text-[13px]">
+                        {experienceHeadingFor(sport, movement, plain)}
+                      </p>
+                      {/* ⛔ THE ONE FACT THE CHIPS NO LONGER CARRY — see `experienceNoteFor`. On the ride
+                          question it is Michael's *"the hard ride is the same length either way"*, which
+                          he ruled must stay on the control. */}
+                      {subtitle ? (
+                        <p className="text-white/55 text-xs mt-0.5 leading-snug">{subtitle}</p>
+                      ) : null}
                       <div className="flex items-stretch gap-2 mt-2">
                         {([pair.newer, pair.experienced]).map((chip) => {
                           const dead = chip.tier === 'experienced' && !canExperienced;
@@ -670,13 +837,14 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                                       backgroundColor: 'rgba(255,255,255,0.03)',
                                       color: 'rgba(255,255,255,0.70)',
                                     }}
-                            >{experienceChipLine(
-                                chip.tier,
-                                chip.longestMin,
-                                chip.hardCount,
+                            >{experienceChipTextFor(
+                                sport,
+                                movement,
+                                chip,
                                 /* ⛔ THE REQUIREMENT ONLY WHERE IT BLOCKS — `dead` is
                                    `experiencedIsReachable`'s answer, already computed above. */
                                 dead ? chip.needsHours : null,
+                                plain,
                               )}</button>
                           );
                         })}
@@ -687,29 +855,34 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                           {experienceGatedLine(sport, pair.experienced.needsHours)}
                         </p>
                       ) : null}
-                      {/* ⛔ TWO IDENTICAL CHIPS ARE EXPLAINED, NEVER LEFT SITTING THERE. Same duration
-                          AND same count means the answer changes nothing about session length, which
-                          is real information rather than a broken control.
-                          ⚠️ Only when the top chip is REACHABLE — a dead chip already has its own
-                          sentence, and two reasons under one control is the noise this screen is
-                          being cleared of. */}
-                      {canExperienced
-                        && pair.newer.longestMin != null
-                        && pair.newer.longestMin === pair.experienced.longestMin
-                        && pair.newer.hardCount === pair.experienced.hardCount ? (
-                        <p className="text-white/40 text-xs mt-1.5" data-testid={`${sport}-experience-equal`}>
-                          {EXPERIENCE_TIERS_EQUAL_LINE}
-                        </p>
-                      ) : null}
-                      {/* ⛔ WHAT THE REST OF THE HOURS ARE FOR — see `restIsEasyLine`. The third
-                          question a person arrives with, and the only one the chips do not answer.
-                          ⚠️ NO NUMBER, so the screen still reads as one number per chip. */}
-                      <p className="text-white/40 text-xs mt-1.5" data-testid={`${sport}-rest-easy`}>
-                        {restIsEasyLine(sport)}
-                      </p>
+                      {/* ⛔⛔ THE EQUAL-TIERS LINE IS DELETED FROM HERE (Michael, 2026-08-30), and the
+                          reason is that the state it explained no longer draws a control: the question
+                          renders only where the long session is a ride, and there the two floors always
+                          split. See the tombstone on the constant in `standing-plan-week-copy.ts`. */}
                     </div>
                   );
                 })() : null}
+                {/* ⛔⛔ WHAT THE REST OF THE HOURS ARE FOR, AND IT LEFT THE QUESTION BLOCK (2026-08-30).
+                    It was rendered inside the experience control, so when Michael's ruling made that
+                    control conditional this sentence would have vanished with it — on Standard Focus it
+                    would have disappeared for BOTH sports, taking the only answer to *"what fills the
+                    hours I just typed"* with it. It is about the HOURS, so it lives under the hours.
+                    ⚠️ STILL GATED ON EVERY SLOT BEING ANSWERED: the sentence differs by sport because
+                    the long run carries faster inserts and the long ride does not, and before the slots
+                    are answered there is no week to be right about.
+                    ⚠️ NO NUMBER IN IT, deliberately — see `restIsEasyLine`. */}
+                {allSlotsChosen(props.slots, frame) && chips[sport] ? (
+                  <p
+                    /* ⚠️ THE OLD GAP WHERE THE OLD LAYOUT STILL STANDS. Inside the experience block
+                       this sat `mt-1.5` under the chips; on `strength_5k` it still follows chips and
+                       keeps that spacing, so the screen is unchanged. On the day-ordered frame it can
+                       follow a select instead, which needs the wider gap. */
+                    className={`text-white/40 text-xs ${dayOrdered ? 'mt-3' : 'mt-1.5'}`}
+                    data-testid={`${sport}-rest-easy`}
+                  >
+                    {restIsEasyLine(sport)}
+                  </p>
+                ) : null}
                 {/* ⛔⛔ THE FIXED-HOURS SENTENCE IS DELETED (Michael, 2026-08-30). It printed the
                     SUM of this sport's hard sessions — "The hard runs come to about 1h40" — beside a
                     chip printing the LONGEST single one, with nothing saying they were different

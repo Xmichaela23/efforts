@@ -166,6 +166,26 @@ export type FrameDay = {
    * ME slot; `lowerDaysOf` returns LISTS for that reason.
    */
   lowerRole?: 'me' | 'de';
+  /**
+   * ⛔⛔ WHAT THE ATHLETE CALLS THIS DAY'S LIFTING, STATED BY THE FRAME (2026-08-30) — the same fix
+   * as `EnduranceSlot.role` and `FrameDay.lowerRole`, for the same reason, on the third reader.
+   *
+   * ⛔ IT IS NOT `label`, AND THE TWO MUST NOT BE CONFLATED. `label` is the frame's own transcription
+   * of the page's row — `'Upper body: Push'`, `'ME: Lower'` — and on `strength_5k` it is INTENT
+   * vocabulary (maximal effort / dynamic effort) that means nothing to a lifter reading a wizard.
+   * This is the short lifter-familiar word for the day's THEME, and it exists so the endurance screen
+   * can say what a day is for without string-matching or re-deriving anything.
+   *
+   * ⚠️ OPTIONAL, AND ABSENT MEANS THE FRAME HAS NO ATHLETE-FACING WORD FOR THIS DAY — the screen
+   * renders no tag rather than a guessed one. `strength_5k` is deliberately left without any: Michael
+   * ruled on 2026-08-30 that the day-ordered layout and its tags are **Standard Focus only** and the
+   * 5K screen must render exactly as it does today. p246 speaks in ME/DE intent rather than p274's
+   * movement patterns, so its five words are a separate call he has not made. **Do not fill them in
+   * as tidiness.**
+   *
+   * ⚠️ ONE SHORT TAG AND NEVER A SECOND SENTENCE. It sits greyed beside a day number on a phone.
+   */
+  themeTag?: string;
 };
 
 export type Frame = {
@@ -382,6 +402,7 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
   {
     day: 1,
     label: 'Upper body: Push',
+    themeTag: 'push day (upper)',
     strength: [
       S('ME', 'competition', 'primary', 'push_upper', '1 x ME: secondary push'),
       S('DE', 'accessory', 'secondary', 'push_upper', '1 x DE: secondary push'),
@@ -396,6 +417,7 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
   {
     day: 2,
     label: 'Lower body: Hinge',
+    themeTag: 'hinge',
     // ⛔ BOTH LOWER DAYS OPEN HEAVY IN THIS FRAME — see `FrameDay.lowerRole`. p274 gives it no speed
     // leg day at all, which is why `lowerDaysOf` had to return lists.
     lowerRole: 'me',
@@ -413,6 +435,7 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
   {
     day: 3,
     label: null,
+    themeTag: 'jumps',
     strength: [],
     endurance: [E('run_near_threshold', 2, 'NT (level 2)', { role: 'hard' })],
     plyo: true,
@@ -420,6 +443,7 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
   {
     day: 4,
     label: 'Upper body: Pull',
+    themeTag: 'pull day (upper)',
     strength: [
       S('ME', 'competition', 'primary', 'pull_upper', '1 x ME: secondary pull'),
       S('DE', 'accessory', 'secondary', 'pull_upper', '1 x DE: secondary pull'),
@@ -433,6 +457,7 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
   {
     day: 5,
     label: 'Lower body: Push',
+    themeTag: 'legs',
     lowerRole: 'me',
     strength: [
       S('ME', 'competition', 'primary', 'press_lower', '1 x ME: secondary push'),
@@ -468,6 +493,7 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
   {
     day: 1,
     label: 'Upper body: Push',
+    themeTag: 'push day (upper)',
     strength: [
       S('SKILL', 'competition', 'primary', 'push_upper', '1 x SKILL: secondary push'),
       S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: braced push'),
@@ -480,6 +506,7 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
   {
     day: 2,
     label: 'Lower body: Hinge',
+    themeTag: 'hinge',
     lowerRole: 'de',
     strength: [
       S('DE', 'competition', 'primary', 'hinge_lower', '1 x DE: secondary hinge'),
@@ -491,6 +518,7 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
   {
     day: 3,
     label: null,
+    themeTag: 'jumps',
     strength: [],
     endurance: [E('run_vt1', 1, 'VT1 (level 1)', { role: 'easy' })],
     plyo: true,
@@ -498,6 +526,7 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
   {
     day: 4,
     label: 'Upper body: Pull',
+    themeTag: 'pull day (upper)',
     strength: [
       S('SKILL', 'competition', 'primary', 'pull_upper', '1 x SKILL: secondary pull'),
       S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: braced pull'),
@@ -510,6 +539,7 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
   {
     day: 5,
     label: 'Lower body: Push',
+    themeTag: 'legs',
     lowerRole: 'de',
     strength: [
       S('DE', 'competition', 'primary', 'press_lower', '1 x DE: secondary push'),
