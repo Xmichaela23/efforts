@@ -24,17 +24,22 @@ import {
   QUIET_DAY_LABEL,
   experienceMovement,
   experienceAsksFor,
-  experienceHeadingFor,
   experienceChipTextFor,
   experienceSubtitle,
   EXPERIENCE_HEADING,
   EXPERIENCE_SUBTITLE,
   EXPERIENCE_WHEN_UNASKED,
-  RUN_HOURS_LAND_ON_THE_LONG_RUN_LINE,
+  perSessionIntroFor,
+  WEEKLY_VOLUME_IS_THE_SUM_LINE,
+  sessionLengthLabel,
+  unansweredLengths,
+  unansweredLengthLine,
   type SlotKey,
   type SlotSport,
 } from './standing-plan-week-copy.ts';
-import { experienceChips } from './standing-plan-week-bounds.ts';
+import { experienceChips, slotLengthOptions, slotFixedMinutes, slotsForEngine, prunedSlotMinutes } from './standing-plan-week-bounds.ts';
+import { composeWeek, defaultCompetitionLifts } from '../../supabase/functions/_shared/standing-plan/index.ts';
+import { frameSlots } from './standing-plan-week-copy.ts';
 import { FRAMES } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 
 const BASELINES = {
@@ -189,98 +194,214 @@ Deno.test('⛔ THE 5K FRAME STILL TAKES THE HARD ARM ON EVERY ROW — its copy i
   const run = chipsFor(FIVEK_ALL_RUN, 'strength_5k').run!;
   assertEquals(experienceMovement(run), 'hard');
   assertEquals(experienceSubtitle('run', 'hard'), EXPERIENCE_SUBTITLE.run);
-  assertEquals(experienceHeadingFor('run', 'hard', false), EXPERIENCE_HEADING.run);
-  assert(experienceChipTextFor('run', 'hard', run.newer, null, false).startsWith('Less experienced'),
+  assertEquals(EXPERIENCE_HEADING.run, 'Running experience');
+  assert(experienceChipTextFor('run', 'hard', run.newer, null).startsWith('Less experienced'),
     'the 5K chip lost its label');
-  assert(/min max/.test(experienceChipTextFor('run', 'hard', run.experienced, null, false)));
+  assert(/min max/.test(experienceChipTextFor('run', 'hard', run.experienced, null)));
 });
+
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════
-// C — ONE CONDITIONAL QUESTION ON STANDARD FOCUS, AND IT IS THE RIDE'S
+// C — THE TIER IS DEAD AS AN INPUT ON A PER-SESSION FRAME
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
-Deno.test('⛔⛔⛔ STANDARD FOCUS ASKS ONE QUESTION, AND ONLY WHERE THE LONG SESSION IS A RIDE', () => {
-  const askedWhen = (slots: Partial<Record<SlotKey, SlotSport>>) =>
-    (['run', 'ride'] as const).filter((sp) => {
-      const pair = chipsFor(slots, 'all_rounder')[sp];
-      return pair != null && experienceAsksFor(sp, experienceMovement(pair), true);
-    });
-  assertEquals(askedWhen(AR_LONG_RIDE), ['ride'], 'the long-ride week asks the wrong questions');
+Deno.test('⛔⛔⛔ STANDARD FOCUS ASKS NO EXPERIENCE QUESTION, AND THE 5K SCREEN KEEPS BOTH OF ITS', () => {
   /**
-   * ⛔ NO QUESTION AT ALL WHEN THE LONG SESSION IS A RUN. The run answer moves two sessions by 5-8
-   * minutes and the long run's own 100-minute cap washes the rest out (Michael's ruling); the other
-   * two rides are identical at both tiers. **Nothing honest to ask, so nothing is asked.**
+   * ⛔ MICHAEL'S FINAL RULING, 2026-08-30. The tier had never been a question about experience — it
+   * was a question about session LENGTH wearing the wrong words — so with the length asked directly
+   * on the row there is nothing left for it to decide. See `experienceAsksFor` for the three steps
+   * the ruling walked and the measurements behind each.
    */
-  assertEquals(askedWhen(AR_LONG_RUN), [], 'a question came back that has no honest answer');
-
-  // ⛔ AND THE 5K SCREEN KEEPS BOTH ITS QUESTIONS, unchanged.
-  assertEquals(experienceAsksFor('run', 'hard', false), true);
-  assertEquals(experienceAsksFor('ride', 'hard', false), true);
-  assertEquals(experienceAsksFor('ride', 'none', false), true);
-});
-
-Deno.test('⛔⛔ THE RIDE QUESTION IS A PLAIN LENGTH QUESTION — no experience word on its face', () => {
-  const ride = chipsFor(AR_LONG_RIDE, 'all_rounder').ride!;
-  assertEquals(experienceHeadingFor('ride', 'long', true), 'How long do you want your long ride to be?');
-  /**
-   * ⛔ NOTHING UNDER THE HEADING — Michael, 2026-08-30: **"Question, two chips, nothing else."** The
-   * subtitle is null on the plain question, and `experienceNoteFor` is deleted with a tombstone. The
-   * `strength_5k` subtitle is asserted separately above and is unchanged.
-   */
-  assertEquals(experienceSubtitle('ride', 'long'),
-    'Sets how long your long ride is. The hard ride is the same length either way.',
-    'the 5K-path subtitle changed — the plain question drops it, the labelled control keeps it');
-
-  const lower = experienceChipTextFor('ride', 'long', ride.newer, null, true);
-  const upper = experienceChipTextFor('ride', 'long', ride.experienced, null, true);
-  for (const line of [lower, upper]) {
-    assert(!/experienced/i.test(line), `the experience word is still on the chip: "${line}"`);
-    assert(/^from \d+ min$/.test(line), `the option is not a bare floor: "${line}"`);
-    // ⛔ HIS NO-HEDGE RULE (2026-08-27). "from" states a boundary; "up to" softens a figure.
-    assert(!/up to/i.test(line), `"up to" came back: "${line}"`);
-  }
-  assert(lower !== upper, 'the two options print the same length — the control is dead again');
-
-  // ⛔ THE REQUIREMENT STILL SHOWS WHERE IT BLOCKS, and nowhere else.
-  assert(/needs 5h\/wk/.test(experienceChipTextFor('ride', 'long', ride.experienced, 5, true)));
-  assert(!/needs/.test(upper));
-});
-
-Deno.test('⛔ A SPORT NOBODY IS ASKED ABOUT STILL SENDS THE FRAME\'S OWN LEVELS', () => {
-  /**
-   * ⛔ `'experienced'` IS p274 AS PRINTED. A week nobody was asked about must be the page's week and
-   * not a reduced one — and it must reach the PLAN ROW, or `rematerialize-standing-block` rewrites
-   * the athlete's unstarted weeks from a blank. That is hop 4, and it is the silent one.
-   */
-  assertEquals(EXPERIENCE_WHEN_UNASKED, 'experienced');
-  /**
-   * ⛔⛔ AND IT CAN NEVER BE UNREACHABLE. The gate is `needsHours`; on every path where no question
-   * is asked, both tiers measure the SAME requirement — so pinning the top tier cannot strand an
-   * athlete on a week their hours do not hold. Measured here rather than asserted in a comment.
-   */
-  for (const slots of [AR_LONG_RUN, AR_LONG_RIDE]) {
+  for (const slots of [AR_LONG_RIDE, AR_LONG_RUN]) {
     const chips = chipsFor(slots, 'all_rounder');
     for (const sp of ['run', 'ride'] as const) {
       const pair = chips[sp];
       if (!pair) continue;
-      if (experienceAsksFor(sp, experienceMovement(pair), true)) continue;
-      assertEquals(pair.newer.needsHours, pair.experienced.needsHours,
-        `${sp}: unasked, but the top tier costs more hours than the lower one`);
+      assertEquals(experienceAsksFor(sp, experienceMovement(pair), true), false,
+        `${sp}: a tier question came back on a frame that asks per session`);
+    }
+  }
+  assertEquals(experienceAsksFor('run', 'hard', false), true);
+  assertEquals(experienceAsksFor('ride', 'hard', false), true);
+  /**
+   * ⛔⛔ AND THE STORED ANSWER IS THE PAGE'S OWN LEVELS. `'experienced'` IS p274 as printed — a week
+   * nobody was asked about must be the frame's week, not a reduced one — and it has to reach the
+   * PLAN ROW or `rematerialize-standing-block` rebuilds every unstarted week from a blank.
+   */
+  assertEquals(EXPERIENCE_WHEN_UNASKED, 'experienced');
+});
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// D — THE LENGTH PICK, AND IT AGREES WITH THE COMPOSED WEEK
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+Deno.test('⛔ ONLY THE EASY AND LONG ROWS TAKE A LENGTH — quality is the page\'s dose', () => {
+  for (const slots of [AR_LONG_RIDE, AR_LONG_RUN]) {
+    for (const row of frameSlots('all_rounder')) {
+      const opts = slotLengthOptions(row.key, slots as never, { baselines: BASELINES as never, frame: 'all_rounder' });
+      const fixed = slotFixedMinutes(row.key, slots as never, { baselines: BASELINES as never, frame: 'all_rounder' });
+      if (row.role === 'hard') {
+        assertEquals(opts, null, `${row.key}: a quality row grew a length picker`);
+        assert(fixed != null && fixed > 0, `${row.key}: a quality row states no fixed length`);
+      } else {
+        assertEquals(fixed, null, `${row.key}: an easy/long row claims a fixed length`);
+        assert(opts != null && opts.options.length > 1,
+          `${row.key}: the length picker offers nothing to choose between`);
+      }
     }
   }
 });
 
+Deno.test('⛔⛔ NO OFFERED LENGTH SITS IN A GAP THE LADDER CANNOT BUILD', () => {
+  /**
+   * ⛔ p239's ENDURANCE RIDE RUNS 60-100 MINUTES AND THEN 130-210. **There is no 115-minute ride on
+   * the page.** A grid of round numbers would offer one, the engine would build 100 or 130, and the
+   * screen would have promised a session the plan does not contain — the ask-15-get-20 defect in a
+   * new place. Every value comes off the ladder's own rungs, which is what makes that impossible.
+   */
+  const o = slotLengthOptions('easy', AR_LONG_RIDE as never, { baselines: BASELINES as never, frame: 'all_rounder' })!;
+  assert(o.options.includes(60), 'the ride ladder\'s own floor is not offered');
+  assert(o.options.includes(100) && o.options.includes(130), 'the rung ends are not offered');
+  for (const gap of [105, 110, 115, 120, 125]) {
+    assert(!o.options.includes(gap), `${gap} min is offered and p239 has no such ride`);
+  }
+});
+
+Deno.test('⛔⛔⛔ EVERY OFFERED LENGTH BUILDS EXACTLY THAT LENGTH — swept through composeWeek', () => {
+  /**
+   * ⛔⛔ THIS IS THE AGREEMENT TEST AND IT IS THE WHOLE POINT OF THE FEATURE. The screen offers a
+   * length; the composer resolves it through `rungForMinutes` into a level and a dial position;
+   * `buildEnduranceSession` builds it. **If those three ever disagree, the athlete picks a 2h30 long
+   * ride and gets something else, silently** — the exact defect the endurance work order exists to
+   * close, and the reason the client-side ladder must be the composer's own.
+   * ⚠️ IT ASSERTS THE BUILT SESSION, not a module call (handoff §7, trap three): the number checked
+   * is the duration on the composed week's own row.
+   */
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  let checked = 0;
+  for (const [name, slots] of [['long=ride', AR_LONG_RIDE], ['long=run', AR_LONG_RUN]] as const) {
+    const engineSlots = slotsForEngine(slots as never, 'all_rounder');
+    for (const key of ['easy', 'long'] as const) {
+      const o = slotLengthOptions(key, slots as never, { baselines: BASELINES as never, frame: 'all_rounder' });
+      if (!o) continue;
+      const frameKey = frameSlots('all_rounder').find((x) => x.key === key)!.frameKey;
+      for (const mins of o.options) {
+        const w = composeWeek({
+          competitionLifts: defaultCompetitionLifts(), roundTo: 5, frame: 'all_rounder', week: 3,
+          column: 'standard', equipment: ['Commercial gym'], baselines: BASELINES,
+          seed1RMs: { bench: 200, squat: 265, deadlift: 340, overheadPress: 125 },
+          // ⚠️ NO HOURS SENT — that is the shape this frame's payload now has, and the minutes must
+          // win from a `no_target` verdict rather than being dropped on the floor by it.
+          sportMix: { slots: engineSlots, minutes: { [frameKey]: mins } },
+          enduranceExperience: { run: 'experienced', ride: 'experienced' },
+        } as never) as { sessions: Array<{ day: string; type: string; duration: number }> };
+        const day = DAYS[Number(frameKey.split(':')[0]) - 1];
+        const sess = w.sessions.find((x) => x.day === day && (x.type === 'run' || x.type === 'ride'));
+        assertEquals(sess?.duration, mins,
+          `${name} / ${key}: asked ${mins} min and the week built ${sess?.duration}`);
+        checked += 1;
+      }
+    }
+  }
+  assert(checked >= 40, `only ${checked} lengths swept — the sweep stopped covering the ladder`);
+});
+
+Deno.test('⛔ A QUALITY SLOT IGNORES A MINUTES KEY — the frame owns the page\'s doses', () => {
+  /**
+   * ⛔ THE SCREEN OFFERS NO SUCH CONTROL, so this is about a caller rather than a tap — and it is the
+   * guard that keeps the composer honest if one is ever written. p246 and p274 assign the level and
+   * the dose; a client shortening a hard session would be the athlete's screen overruling the page.
+   */
+  const engineSlots = slotsForEngine(AR_LONG_RIDE as never, 'all_rounder');
+  const hardKey = frameSlots('all_rounder').find((x) => x.role === 'hard')!.frameKey;
+  const build = (minutes?: Record<string, number>) => composeWeek({
+    competitionLifts: defaultCompetitionLifts(), roundTo: 5, frame: 'all_rounder', week: 3,
+    column: 'standard', equipment: ['Commercial gym'], baselines: BASELINES,
+    seed1RMs: { bench: 200, squat: 265, deadlift: 340, overheadPress: 125 },
+    sportMix: { slots: engineSlots, ...(minutes ? { minutes } : {}) },
+    enduranceExperience: { run: 'experienced', ride: 'experienced' },
+  } as never) as { sessions: Array<{ day: string; type: string; duration: number }> };
+  const plain = build();
+  const meddled = build({ [hardKey]: 20 });
+  assertEquals(
+    meddled.sessions.filter((x) => x.type === 'run' || x.type === 'ride').map((x) => x.duration),
+    plain.sessions.filter((x) => x.type === 'run' || x.type === 'ride').map((x) => x.duration),
+    'a minutes key on a quality slot moved the week',
+  );
+});
+
 // ════════════════════════════════════════════════════════════════════════════════════════════════
-// D — THE HOURS DIAL DOES DIFFERENT THINGS FOR THE TWO SPORTS, AND THE SCREEN SAYS SO
+// E — WHAT THE SCREEN SAYS NOW THE HOURS BOXES ARE GONE
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
-Deno.test('⛔ THE RUNNING-HOURS LINE NAMES THE CAP AND THE LEVER, WITHOUT HEDGING', () => {
-  const line = RUN_HOURS_LAND_ON_THE_LONG_RUN_LINE;
-  assert(/long run/.test(line), 'the line no longer says where the hours land');
-  assert(/100 minutes/.test(line), 'p247\'s own cap came off the line');
-  assert(/run day/.test(line), 'the line no longer names the lever that actually works');
-  // ⛔ HIS NO-HEDGE RULE — the cap is stated, never softened.
-  assert(!/up to/i.test(line), '"up to" came back into the running-hours line');
-  // ⛔ NO IMPERATIVE. Fact-first, same voice as `unansweredLine`.
-  assert(!/^(Add|Pick|Set|Choose|Try)\b/.test(line), 'the line became an instruction');
+Deno.test('⛔ THE PER-SESSION HEADER STATES WHAT IS ASKED AND WHAT THE PROGRAMME DECIDES', () => {
+  const lines = perSessionIntroFor('all_rounder');
+  assert(/alongside the lifting/.test(lines[0]));
+  assert(/sport and a length/.test(lines[1]));
+  assert(/conversation pace/.test(lines[2]));
+  // ⛔ THE HARD COUNT IS DERIVED — p274 has three quality sessions, p246 two. A literal is one
+  // frame's answer on a shared line, which is the defect this area keeps producing.
+  assert(/three hard sessions are the programme's/.test(lines[3]), lines[3]);
+  // ⛔ NO IMPERATIVE ANYWHERE — the screen's own standing rule.
+  for (const line of [...lines, WEEKLY_VOLUME_IS_THE_SUM_LINE]) {
+    assert(!/^(Add|Pick|Set|Choose|Try|Hold|Keep)\b/.test(line), `imperative: "${line}"`);
+  }
+  // ⛔ AND THE WEEKLY NUMBER IS ACCOUNTED FOR, with no number in it.
+  assert(/add up to/.test(WEEKLY_VOLUME_IS_THE_SUM_LINE));
+  assert(!/\d/.test(WEEKLY_VOLUME_IS_THE_SUM_LINE), 'a figure came back onto the volume line');
+});
+
+Deno.test('⛔ A LENGTH THE ATHLETE PICKED IS EXACT, NEVER "about"', () => {
+  // ⚠️ `sayHours` is the ENGINE'S formatter and hedges — right for a solved weekly total, wrong for
+  // a number the athlete chose themselves.
+  assertEquals(sessionLengthLabel(45), '45 min');
+  assertEquals(sessionLengthLabel(60), '1h');
+  assertEquals(sessionLengthLabel(135), '2h15');
+  assertEquals(sessionLengthLabel(300), '5h');
+  assert(!/about/.test(sessionLengthLabel(135)));
+});
+
+Deno.test('⛔ CONTINUE WAITS ON A LENGTH FOR EVERY ROW THAT ASKS FOR ONE', () => {
+  const none = unansweredLengths(AR_LONG_RIDE as never, undefined, 'all_rounder');
+  assertEquals([...none].sort(), ['easy', 'long']);
+  assert(/no length yet/.test(unansweredLengthLine(AR_LONG_RIDE as never, undefined, 'all_rounder')!));
+  const half = unansweredLengths(AR_LONG_RIDE as never, { easy: 90 }, 'all_rounder');
+  assertEquals(half, ['long']);
+  assertEquals(unansweredLengths(AR_LONG_RIDE as never, { easy: 90, long: 150 }, 'all_rounder'), []);
+  assertEquals(unansweredLengthLine(AR_LONG_RIDE as never, { easy: 90, long: 150 }, 'all_rounder'), null);
+  /**
+   * ⛔ AND IT IS EMPTY ON `strength_5k` BY CONSTRUCTION, not by a frame test at the call site: that
+   * frame draws no picker, so a gate reading it can never block a screen that shows no control —
+   * the `Continue disabled and unsatisfiable` defect, closed at the source.
+   */
+  assertEquals(unansweredLengths(FIVEK_ALL_RUN as never, undefined, 'strength_5k').length, 2,
+    'the 5K rows are listed — the CALLER gates on the frame, and this asserts it must');
+});
+
+Deno.test('⛔⛔ SWITCHING A ROW\'S SPORT DROPS A LENGTH THE NEW SPORT CANNOT BUILD', () => {
+  /**
+   * ⛔ FOUND ON THE RENDERED PAGE, 2026-08-30, and it is the ask-15-get-20 defect in its newest
+   * disguise. Set the long session to a ride, pick 2h30, tap "Long run": the row went on reading
+   * *"Long session · Long run · 2h30"* over a picker offering 1h08 to 1h40, because `run_lsd` caps
+   * at 100 minutes (p247, HIS). **The stored 150 would have travelled to the composer, resolved to
+   * the nearest real dose, and built a 100-minute run under a screen promising two and a half
+   * hours.** No test would have caught it: every module call involved was individually correct.
+   */
+  const opts = { baselines: BASELINES as never, frame: 'all_rounder' as const };
+  const asRide = prunedSlotMinutes(AR_LONG_RIDE as never, { easy: 90, long: 150 }, opts);
+  assertEquals(asRide, { easy: 90, long: 150 }, 'a valid pick was thrown away');
+
+  const asRun = prunedSlotMinutes(AR_LONG_RUN as never, { easy: 90, long: 150 }, opts);
+  assertEquals(asRun.long, undefined, '⛔ a 2h30 long RUN survived — p247 caps it at 100 minutes');
+  /**
+   * ⚠️ AND THE EASY ROW IS UNTOUCHED, which is the other half of the rule: nothing is dropped for
+   * tidiness. Its sport did not change and its ladder still offers 90.
+   */
+  assertEquals(asRun.easy, 90, 'a row whose sport did not change lost its length');
+
+  // ⛔ DROPPED, NEVER CLAMPED. Clamping would answer for the run a question the athlete was asked
+  // about a ride — and an empty picker with the gate naming the row is the honest state.
+  assert(asRun.long !== 100, 'the stale length was clamped rather than dropped');
+  assert(unansweredLengths(AR_LONG_RUN as never, asRun, 'all_rounder').includes('long'),
+    'the dropped row is not named by the gate, so Continue would pass with no length');
 });

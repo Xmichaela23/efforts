@@ -26,12 +26,14 @@ import {
   experienceAsksFor,
   experienceMovement,
   weekIsDayOrdered,
+  unansweredLengths,
+  unansweredLengthLine,
   EXPERIENCE_WHEN_UNASKED,
 } from '@/lib/standing-plan-week-copy';
 import { CLUB_SESSION_CONTROL_VISIBLE, hardSlotDefault, slotFamilyFact, slotVariantOptions, variantsTakenBy, type HardSlotKey } from '@/lib/hard-slot-choices';
 // ⛔ `SLOT_FAMILY` IS NOT IMPORTED HERE. It is the 5K frame's four rows, and indexing it by a
 // five-row frame's keys is what blanked the app on 2026-08-30. `familyMapFor` takes the frame.
-import { builtFamily, familyMapFor } from '@/lib/standing-plan-week-bounds';
+import { builtFamily, familyMapFor, prunedSlotMinutes } from '@/lib/standing-plan-week-bounds';
 import { hardPairInFrameOrder, RIDE_EQUIVALENT } from '../../supabase/functions/_shared/standing-plan/index.ts';
 import {
   fixedHoursLine, slotSpans, type SlotSpec,
@@ -1141,6 +1143,14 @@ export type NonRaceState = {
    */
   slotSports?: SlotSelection;
   /**
+   * ⛔⛔⛔ HOW LONG EACH EASY AND LONG SESSION IS, in minutes — the athlete's own answer, asked on the
+   * row (Michael, 2026-08-30). It replaces the weekly-hours ask on Standard Focus: the book scales
+   * these sessions by TIME, so the length is the question, and a weekly total was the app asking it
+   * sideways and solving backwards. ⚠️ Keyed by SLOT, translated to the engine's `${frameDay}:${i}`
+   * on the way out — see `endurance_slot_minutes` in the payload.
+   */
+  slotMinutes?: Partial<Record<SlotKey, number>>;
+  /**
    * ⛔⛔ HOW LONG THIS ATHLETE'S HARD SESSIONS AND LONG SESSION ARE, PER SPORT — their own answer,
    * asked once on the Endurance focus step (Michael, 2026-08-27). It is the SOLE input to the level.
    *
@@ -1590,9 +1600,19 @@ function assemblePayload(
            * meanings. ⚠️ Omitted when unanswered: absent means no opinion, and the composer keeps
            * the library's own midpoint.
            */
-          ...(state.targetRunHours !== '' && Number(state.targetRunHours) > 0
+          /**
+           * ⛔⛔⛔ AND THEY ARE NOT SENT AT ALL ON A FRAME THAT ASKS PER SESSION (Michael, 2026-08-30).
+           * The hours boxes are gone from that screen and weekly volume is derived as the sum of the
+           * lengths the athlete set, so a stale number from an earlier goal still sitting in state
+           * would reach `sizeFor` and re-solve every base session behind their backs. **A control the
+           * screen no longer shows must not still be sending a value.**
+           * ⚠️ THE STATE FIELDS ARE NOT CLEARED, deliberately: the athlete may back out to another
+           * goal whose screen does ask, and wiping their answer to travel between screens is a
+           * different bug. The gate is at the wire, where the frame is known.
+           */
+          ...(!weekIsDayOrdered(wizardFrame) && state.targetRunHours !== '' && Number(state.targetRunHours) > 0
             ? { target_run_hours: Number(state.targetRunHours) } : {}),
-          ...(state.rideHours !== '' && Number(state.rideHours) > 0
+          ...(!weekIsDayOrdered(wizardFrame) && state.rideHours !== '' && Number(state.rideHours) > 0
             ? { target_ride_hours: Number(state.rideHours) } : {}),
           /**
            * ⛔⛔ HOW MANY DAYS A WEEK THEY DO EACH SPORT — the count their hours are divided across
@@ -1600,7 +1620,14 @@ function assemblePayload(
            * slot RATIO the frame assigns sports by, this is a count of days.
            * ⚠️ Omitted when unanswered, and per sport — no opinion leaves the frame's own count.
            */
-          ...(isStrengthFocusPath && (state.runDays > 0 || state.rideDays > 0)
+          /**
+           * ⛔ THE DAY COUNTS GO WITH THE HOURS ON A PER-SESSION FRAME (Michael, 2026-08-30: the week
+           * is exactly the frame's rows). Their only job is appending EXTRA easy sessions beyond the
+           * frame's slots, and an extra session has no row on that screen and therefore no length —
+           * a session in the athlete's week they were never able to set. ⚠️ Extra easy days are
+           * PARKED, not rejected; they come back with rows of their own or not at all.
+           */
+          ...(isStrengthFocusPath && !weekIsDayOrdered(wizardFrame) && (state.runDays > 0 || state.rideDays > 0)
             ? {
               endurance_days: {
                 ...(state.runDays > 0 ? { run: state.runDays } : {}),
@@ -1714,6 +1741,28 @@ function assemblePayload(
             });
             return Object.keys(out).length > 0 ? { endurance_slot_archetypes: out } : {};
           })(),
+          /**
+           * ⛔⛔⛔ THE PER-SESSION LENGTHS (Michael, 2026-08-30) — keyed the engine's way, the same
+           * `${frameDay}:${index}` keys `endurance_slots` uses, via `frameSlots`. See
+           * `SportMix.minutes`.
+           * ⛔ AND THE ROUTE IS THE PART THAT KILLS. This key has to survive `create-goal`'s explicit
+           * ALLOWLIST as well as `generate-strength-plan`'s body read, and it must land on the PLAN
+           * ROW inside `sport_mix` or the rematerializer rebuilds every unstarted week at the frame's
+           * own midpoint. `target_run_hours` was missing from that allowlist for two deploys and the
+           * hours dial did nothing the whole time, with nothing erroring.
+           */
+          ...(() => {
+            if (!isStrengthFocusPath) return {};
+            const picked = state.slotMinutes ?? {};
+            const out: Record<string, number> = {};
+            for (const row of frameSlots(wizardFrame)) {
+              const m = Number(picked[row.key]);
+              // ⚠️ QUALITY ROWS CARRY NONE. The composer ignores a minutes key on a hard slot, and
+              // sending one would be the screen claiming a say over a dose the page fixes.
+              if (row.role !== 'hard' && Number.isFinite(m) && m > 0) out[row.frameKey] = Math.round(m);
+            }
+            return Object.keys(out).length > 0 ? { endurance_slot_minutes: out } : {};
+          })(),
           ...(isStrengthFocusPath && (state.posture.swim ?? 'out') === 'maintain' && (state.swimEasySessions ?? 0) > 0
             ? { swim_easy_sessions: Math.min(2, state.swimEasySessions ?? 1) }
             : {}),
@@ -1741,7 +1790,10 @@ function assemblePayload(
             ? { swim_volume: Number(state.swimVolume) } : {}),
           // Bike volume in HOURS (D-323 §6). Stored as typed; the engine turns hours into sessions —
           // it cannot turn miles into anything, having never learned a ride speed.
-          ...(state.posture?.bike === 'maintain' && Number(state.rideHours) > 0
+          // ⛔ SAME GATE, SAME REASON — and `compose.ts` falls back to this key when
+          // `targetRideHours` is absent, so leaving it would re-solve the rides by the back door.
+          // ⚠️ EVERY OTHER FRAME AND POSTURE IS UNTOUCHED (Michael's own answer, 2026-08-30).
+          ...(!weekIsDayOrdered(wizardFrame) && state.posture?.bike === 'maintain' && Number(state.rideHours) > 0
             ? { target_weekly_ride_hours: Number(state.rideHours) } : {}),
           // How many days those hours spread across (1/2/3). Without it the engine guessed.
           // ⛔ SAME SOURCE AS THE RUNS on the strength path — see `run_days` above. A ride count and
@@ -1987,7 +2039,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // to change, and the alternative is a form. Five days with the long run on Sunday is what the
     // plan builds anyway when nothing is pinned — so the screen now SHOWS the default instead of
     // applying it silently, which is the honest half of that rule rather than the letter of it.
-    trainingDays: [], longRunDay: '', longRideDay: '', longClub: false, longClubMinutes: '', qualityDays: {}, hardDays: [], qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetRunHours: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, swimVolume: '', rideHours: '', rideDays: 0, startDate: planWeekStartISO(), skipTestWeek: false, slotSports: undefined, enduranceExperience: undefined,
+    trainingDays: [], longRunDay: '', longRideDay: '', longClub: false, longClubMinutes: '', qualityDays: {}, hardDays: [], qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetRunHours: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, swimVolume: '', rideHours: '', rideDays: 0, startDate: planWeekStartISO(), skipTestWeek: false, slotSports: undefined, slotMinutes: undefined, enduranceExperience: undefined,
     // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
     // silent `intermediate` all over again, one screen further in.
     raceDate: '', raceDistance: RACE_DISTANCES[0], raceName: '', raceElevation: '', fitness: '',
@@ -5767,10 +5819,26 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
            * downstream catches an athlete who never saw the control. ⚠️ The slots are named first —
            * the chips do not exist until all four are answered, so that is the sentence to show.
            */
-          canContinue={allSlotsChosen(slotSportsNow, wizardFrame) && experienceUnanswered.length === 0}
+          /**
+           * ⛔⛔ AND ON A LENGTH FOR EVERY ROW THAT ASKS FOR ONE (Michael, 2026-08-30). The easy and
+           * long rows carry a direct minutes pick on this frame and start empty — no number in an
+           * untouched control — so an ungated Continue would build those sessions at the frame's own
+           * midpoint while the athlete believed they had set them.
+           * ⚠️ THE SPORTS ARE NAMED FIRST: the length picker inside a row does not exist until that
+           * row has a sport, so that is the sentence to show while any row is unanswered.
+           * ⚠️ AND THE LENGTH GATE IS EMPTY ON `strength_5k` BY CONSTRUCTION — `unansweredLengths`
+           * asks the frame, and a frame with no picker offers no row to leave blank.
+           */
+          canContinue={allSlotsChosen(slotSportsNow, wizardFrame)
+            && experienceUnanswered.length === 0
+            && (!weekIsDayOrdered(wizardFrame)
+              || unansweredLengths(slotSportsNow, state.slotMinutes, wizardFrame).length === 0)}
           blockedReason={tintedReason(
             unansweredLine(slotSportsNow, wizardFrame)
             ?? experienceUnansweredLine(experienceUnanswered)
+            ?? (weekIsDayOrdered(wizardFrame)
+              ? unansweredLengthLine(slotSportsNow, state.slotMinutes, wizardFrame)
+              : null)
             ?? undefined,
           )}
           /**
@@ -5793,6 +5861,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             /** ⛔ THE SAME ANSWER THE ENGINE BUILDS THE LEVELS FROM, so the hours this screen quotes
              *  and the hours the block builds come from one input. */
             experience={state.enduranceExperience ?? {}}
+            /** ⛔ THE PER-SESSION LENGTHS — see `NonRaceState.slotMinutes`. */
+            slotMinutes={state.slotMinutes}
+            onSlotMinutes={(key, minutes) => setState((st) => ({
+              ...st,
+              slotMinutes: { ...(st.slotMinutes ?? {}), [key]: minutes },
+            }))}
             /** ⛔ THE VARIANT PICKED IN EACH HARD ROW — same map the payload sends as
              *  `endurance_slot_archetypes`, so the chip measures the session the composer builds. */
             hardArchetypes={{
@@ -5832,9 +5906,20 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 hard1: (order.hard1 ?? null) as SlotSport | null,
                 hard2: (order.hard2 ?? null) as SlotSport | null,
               };
+              /**
+               * ⛔⛔ AND A LENGTH THE NEW SPORT CANNOT BUILD IS DROPPED — see `prunedSlotMinutes`.
+               * Found on the rendered page: a 2h30 long RIDE, switched to a long RUN, left the row
+               * reading 2h30 over a picker offering 1h08 to 1h40, and the stale 150 would have gone
+               * to the composer and built a 100-minute run under a screen promising two and a half
+               * hours. ⚠️ Dropped rather than clamped: they chose a length for a ride, and clamping
+               * would answer for the run a question they have not been asked.
+               */
+              const minutes = prunedSlotMinutes(slots, st.slotMinutes, {
+                baselines: (baselinesRow ?? {}) as never, frame: wizardFrame,
+              });
               // ⛔ THE HARD SLOTS' SESSIONS FOLLOW THEIR SPORT — see `syncHardDays`. Without this the
               // card would offer ride sessions on a slot the engine still had down as a run.
-              return { ...st, slotSports: slots, hardDays: syncHardDays(st, slots) };
+              return { ...st, slotSports: slots, slotMinutes: minutes, hardDays: syncHardDays(st, slots) };
             })}
             /**
              * ⛔ THE SESSION CHOICES, INSIDE THE SLOT THEY BELONG TO (restored 2026-08-24). Same

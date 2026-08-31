@@ -374,6 +374,87 @@ export function rungAt(rungs: Rung[], t: number): { level: Level; size: number; 
   return { level: last.level, size: last.sizeHi, minutes: last.hi };
 }
 
+/**
+ * ⛔⛔⛔ A SESSION'S OWN LENGTH, ASKED DIRECTLY — the inverse of `rungAt`, and the seam Michael's
+ * ruling of 2026-08-30 needs (per-session minutes on the easy and long rows, no weekly hours ask).
+ *
+ * ⛔⛔ AND IT SUPERSEDES `sizeFor`'s STATED POSITION, KNOWINGLY. That function's header says *"ONE
+ * SIZE FOR THE WHOLE SPORT rather than per session… a per-slot solve would let the engine shrink the
+ * long ride to nothing while leaving a hard session at full length, which is a different week rather
+ * than a smaller one."* **That objection was about a per-slot SOLVE driven by a weekly total** — the
+ * engine choosing, unasked, which session to sacrifice to hit a number. This is the ATHLETE naming
+ * one session's length inside that session's own ladder, and the failure it warns about cannot occur:
+ * no session can be shrunk below its own floor, and nothing is being solved for. Michael ruled the
+ * per-session pick with the old position in front of him. **`sizeFor` is untouched and still governs
+ * every frame that asks for weekly hours.**
+ *
+ * ⛔ BISECTED ON `rungAt` ITSELF, NOT INVERTED ARITHMETICALLY. Minutes are monotonic in the dial and
+ * the interior is a STAIRCASE — the builder rounds to whole reps and steps — so a closed-form
+ * inversion lands in the risers. Reading the same function forward is what makes the answer agree
+ * with the composer by construction rather than by a reviewer noticing. Twenty-four halvings.
+ * ⚠️ AND IT TAKES THE NEARER SIDE, TIES LOW, exactly as `sizeFor` does: a minutes value that falls in
+ * a GAP between two rungs — p239's ride ladder jumps 100 → 130 — has no dial position that delivers
+ * it, and the nearer real dose is the honest answer. `slotMinuteOptions` is what stops the screen
+ * offering such a value in the first place.
+ */
+export function rungForMinutes(
+  rungs: Rung[],
+  minutes: number,
+): { level: Level; size: number; minutes: number } {
+  if (rungs.length === 0) return { level: 1 as Level, size: DEFAULT_SIZE, minutes: 0 };
+  const at = (t: number) => rungAt(rungs, t);
+  const want = Number(minutes);
+  if (!Number.isFinite(want)) return at(DEFAULT_SIZE);
+  if (want <= at(0).minutes) return at(0);
+  if (want >= at(1).minutes) return at(1);
+  let low = 0;
+  let high = 1;
+  for (let i = 0; i < 24; i++) {
+    const mid = (low + high) / 2;
+    if (at(mid).minutes < want) low = mid; else high = mid;
+  }
+  const below = at(low);
+  const above = at(high);
+  return (want - below.minutes) <= (above.minutes - want) ? below : above;
+}
+
+/**
+ * ⛔ THE SHORTEST AND LONGEST THIS ONE SESSION CAN HONESTLY BE. The ladder's own ends — the floor is
+ * the first rung's floor and the ceiling is the last rung's top, both already clipped by
+ * `LADDER_CEILING_MIN` where one applies. ⚠️ Per SESSION, never per sport: this is what bounds the
+ * picker, and offering a length outside it would be offering a session the engine will not build.
+ */
+export function slotMinutesBand(rungs: Rung[]): { min: number; max: number } {
+  if (rungs.length === 0) return { min: 0, max: 0 };
+  return { min: Math.round(rungs[0].lo), max: Math.round(rungs[rungs.length - 1].hi) };
+}
+
+/**
+ * ⛔⛔ THE LENGTHS THE PICKER MAY OFFER, AND EVERY ONE OF THEM BUILDS EXACTLY.
+ *
+ * ⛔ THE LADDER HAS GAPS AND THAT IS THE WHOLE REASON THIS EXISTS. p239's endurance ride runs
+ * 60-100 minutes at its first rung and 130-210 at its second — **there is no 115-minute ride on the
+ * page.** A plain grid of round numbers would offer one, the engine would build 100 or 130, and the
+ * screen would have promised a session the plan does not contain. That is the ask-15-get-20 defect
+ * the whole endurance work order exists to close, in a new place.
+ *
+ * ⚠️ QUARTER-HOURS INSIDE EACH RUNG, PLUS THE RUNG'S OWN ENDS. The ends matter because they are the
+ * real floor and the real ceiling — a list that started at 75 would hide the 60-minute ride p239
+ * prints. ⚠️ Deduplicated and sorted, so overlapping rungs (60-100, 130-210, 180-300) read as one
+ * list of lengths rather than three.
+ */
+export function slotMinuteOptions(rungs: Rung[], step = 15): number[] {
+  const out = new Set<number>();
+  for (const r of rungs) {
+    const lo = Math.round(r.lo);
+    const hi = Math.round(r.hi);
+    out.add(lo);
+    out.add(hi);
+    for (let m = Math.ceil(lo / step) * step; m < hi; m += step) if (m > lo) out.add(m);
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
 export type VolumeBound = {
   /** The shortest and longest this sport's slots can deliver, in the sport's own unit. */
   floor: number;

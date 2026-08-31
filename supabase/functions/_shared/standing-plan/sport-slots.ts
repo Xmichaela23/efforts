@@ -64,6 +64,34 @@ export type SportMix = {
    * workouts, never past them. Absent = the engine's rotation.
    */
   archetypes?: Record<string, string> | null;
+  /**
+   * ⛔⛔⛔ HOW LONG THE ATHLETE WANTS THIS SESSION TO BE, IN MINUTES — Michael's ruling, 2026-08-30,
+   * replacing the weekly-hours ask on Standard Focus.
+   *
+   * *"Easy and long sessions take a direct minutes pick per session, within the engine's honest
+   * floor and ceiling for that session. These scale by time in the book — conversation pace,
+   * duration is the dose."* The three quality sessions take no such pick: their dose is the page's,
+   * at the level already ruled, and nothing is asked about them.
+   *
+   * ⛔⛔ IT SUPERSEDES THE WEEKLY-HOURS SOLVE FOR THE SLOTS IT NAMES, AND KNOWINGLY. `sizeFor`'s own
+   * header argues for one dial per SPORT — *"a per-slot solve would let the engine shrink the long
+   * ride to nothing while leaving a hard session at full length."* That was about the ENGINE choosing
+   * which session to sacrifice to reach a weekly number, unasked. **This is the athlete naming one
+   * session, inside that session's own ladder**, so nothing can fall below its own floor and nothing
+   * is being solved for. Michael ruled it with the old position in front of him; `sizeFor` is
+   * untouched and still governs every frame that asks for weekly hours. See `rungForMinutes`.
+   *
+   * ⚠️ KEYED `${frameDay}:${indexWithinDay}`, the same keys as `slots` and `archetypes` — so a caller
+   * cannot name a slot the column does not have, and the whole answer travels on the plan row inside
+   * `sport_mix` rather than needing a hop of its own.
+   * ⚠️ ABSENT IS NO OPINION and every caller that predates this is unchanged: the slot takes the
+   * dial's answer exactly as it did. A key naming a QUALITY slot is ignored — the frame owns those
+   * doses, and honouring one here would let a screen shorten a session the page fixes.
+   * ⚠️ A VALUE OUTSIDE THE SLOT'S OWN LADDER RESOLVES TO THE NEAREST REAL DOSE rather than being
+   * refused. p239's ride ladder jumps 100 → 130 with nothing between; `slotMinuteOptions` is what
+   * keeps the screen from offering a length in that gap.
+   */
+  minutes?: Record<string, number> | null;
 };
 
 export type AssignedSlot = {

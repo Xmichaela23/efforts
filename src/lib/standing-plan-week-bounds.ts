@@ -50,6 +50,8 @@ import {
 import { FAMILIES } from '../../supabase/functions/_shared/endurance-library/index.ts';
 import {
   ladderOf,
+  slotMinuteOptions,
+  slotMinutesBand,
   weekVolumeBounds,
   type SlotSpec,
 } from '../../supabase/functions/_shared/standing-plan/volume-bounds.ts';
@@ -181,6 +183,133 @@ export function builtFamily(
   if (sport !== 'ride') return { family: base.family };
   const eq = RIDE_EQUIVALENT[base.family];
   return eq ? { family: eq.family, archetype: eq.archetype } : null;
+}
+
+/**
+ * ⛔⛔⛔ THE LENGTHS ONE SESSION MAY BE OFFERED — Michael's ruling of 2026-08-30: the easy and long
+ * rows take a direct minutes pick, within the engine's honest floor and ceiling for that session.
+ *
+ * ⛔ EVERY VALUE IT RETURNS BUILDS EXACTLY, and that is the whole point. p239's endurance ride runs
+ * 60-100 minutes at its first rung and 130-210 at its second — **there is no 115-minute ride on the
+ * page.** A grid of round numbers would offer one and the engine would build 100 or 130, which is
+ * the ask-15-get-20 defect wearing a new hat. `slotMinuteOptions` walks the rungs the engine itself
+ * measured, so the gap is simply not in the list.
+ *
+ * ⛔⛔ THE SAME LADDER THE COMPOSER RESOLVES AGAINST. `ladderOf` here and `ladderOf` inside
+ * `rungForSlot` are one function over one spec — the family after `RIDE_EQUIVALENT`, the level after
+ * the tier, the archetype the build will actually use. That is what makes the number on the screen
+ * and the number in the plan the same number by construction. The agreement test pins it end to end.
+ *
+ * ⚠️ NULL ON A SLOT THAT TAKES NO PICK — a quality slot, or one this sport does not fill. The frame
+ * owns quality doses (p246, p274) and a screen may not shorten them.
+ * ⚠️ THE TIER IS `'experienced'` BY DEFAULT because Michael retired the tier as an input on the
+ * frame that asks this question; it stays a parameter so the function does not bake in that ruling.
+ */
+export function slotLengthOptions(
+  key: SlotKey,
+  rawSlots: SlotSelection,
+  opts: {
+    baselines?: EnduranceBaselines;
+    frame?: FrameId;
+    tier?: ExperienceTier;
+  },
+): { options: number[]; min: number; max: number } | null {
+  const frame = opts.frame ?? 'strength_5k';
+  const row = frameSlots(frame).find((x) => x.key === key);
+  // ⛔ QUALITY TAKES NO PICK — the frame's dose, and the role is the frame's own answer.
+  if (!row || row.role === 'hard') return null;
+  const slots = inFrameOrder(rawSlots, frame);
+  const sport = slots[key];
+  if (!sport) return null;
+  const base = familyMapFor(frame)[key];
+  if (!base) return null;
+  const eq = builtFamily(base, sport);
+  if (!eq) return null;
+  const anchors = resolveEnduranceAnchors((opts.baselines ?? {}) as never);
+  const tierLevels = (opts.tier === 'newer'
+    ? lowVolumeLevels([sport])
+    : {}) as Record<string, Level>;
+  const level = clampRideLevel(eq.family, (tierLevels[eq.family] ?? base.level) as Level);
+  const rungs = ladderOf({
+    family: eq.family,
+    level,
+    archetype: eq.archetype ?? row.archetype,
+    sport,
+  } as SlotSpec, anchors);
+  if (rungs.length === 0) return null;
+  const band = slotMinutesBand(rungs);
+  return { options: slotMinuteOptions(rungs), min: band.min, max: band.max };
+}
+
+/**
+ * ⛔ THE LENGTH A QUALITY SESSION IS FIXED AT — Michael, 2026-08-30: *"their fixed length may be
+ * displayed on the row, but nothing is asked."* The three hard sessions take no control; this is the
+ * number the row states.
+ *
+ * ⛔ THE RUNG'S OWN TOP, and on a quality family the rung is a single point — p246 assigns the level
+ * and the hours never pull on it, so `lo` and `hi` are the same number and the dose really is fixed.
+ * ⚠️ NULL ON ANYTHING THAT IS NOT A QUALITY SLOT, and on a slot this sport does not fill. An easy or
+ * long session has no fixed length: it has a pick, which is `slotLengthOptions`.
+ */
+export function slotFixedMinutes(
+  key: SlotKey,
+  rawSlots: SlotSelection,
+  opts: { baselines?: EnduranceBaselines; frame?: FrameId; tier?: ExperienceTier },
+): number | null {
+  const frame = opts.frame ?? 'strength_5k';
+  const row = frameSlots(frame).find((x) => x.key === key);
+  if (!row || row.role !== 'hard') return null;
+  const slots = inFrameOrder(rawSlots, frame);
+  const sport = slots[key];
+  if (!sport) return null;
+  const base = familyMapFor(frame)[key];
+  if (!base) return null;
+  const eq = builtFamily(base, sport);
+  if (!eq) return null;
+  const anchors = resolveEnduranceAnchors((opts.baselines ?? {}) as never);
+  const tierLevels = (opts.tier === 'newer' ? lowVolumeLevels([sport]) : {}) as Record<string, Level>;
+  const level = clampRideLevel(eq.family, (tierLevels[eq.family] ?? base.level) as Level);
+  const rungs = ladderOf({
+    family: eq.family, level, archetype: eq.archetype ?? row.archetype, sport,
+  } as SlotSpec, anchors);
+  return rungs.length === 0 ? null : Math.round(rungs[0].hi);
+}
+
+/**
+ * ⛔⛔⛔ A LENGTH THE NEW SPORT CANNOT BUILD IS DROPPED WHEN THE SPORT CHANGES — found on the
+ * rendered page, 2026-08-30, and it is the ask-15-get-20 defect in its newest disguise.
+ *
+ * ⛔ WHAT IT LOOKED LIKE. Set the long session to a ride and pick 2h30. Tap "Long run". The row went
+ * on reading **"Long session · Long run · 2h30"** while the picker underneath it offered 1h08 to
+ * 1h40 and showed no selection — because `run_lsd` caps at 100 minutes (p247, HIS) and there is no
+ * two-and-a-half-hour long run in this programme. **The stored 150 would have travelled to the
+ * composer, resolved to the nearest real dose, and built a 100-minute run under a screen promising
+ * 2h30.** Silent, like every other defect in this family.
+ *
+ * ⛔ SO THE PRUNE IS A RULE, NOT A HANDLER. It is stated here and read on every slot change, because
+ * a fix living in one screen's tap callback is a fix the next caller does not get.
+ * ⚠️ IT DROPS RATHER THAN CLAMPS. Clamping 2h30 to 1h40 would silently answer a question the athlete
+ * has not been asked yet — they chose a length for a ride, not for a run. An empty picker with the
+ * gate naming the row is the honest state, and it is the same rule the screen already follows for an
+ * untouched control: no number means no opinion.
+ * ⚠️ AND IT KEEPS ANYTHING THE NEW LADDER STILL OFFERS. Switching the easy row between two sports
+ * that both hold a 90-minute session leaves the 90 alone; nothing is thrown away for tidiness.
+ */
+export function prunedSlotMinutes(
+  slots: SlotSelection,
+  minutes: Partial<Record<SlotKey, number>> | undefined,
+  opts: { baselines?: EnduranceBaselines; frame?: FrameId; tier?: ExperienceTier },
+): Partial<Record<SlotKey, number>> {
+  const out: Partial<Record<SlotKey, number>> = {};
+  for (const [k, v] of Object.entries(minutes ?? {})) {
+    const key = k as SlotKey;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n <= 0) continue;
+    const offered = slotLengthOptions(key, slots, opts);
+    // ⚠️ A ROW WITH NO PICKER KEEPS NOTHING — its sport was cleared, or it became a quality row.
+    if (offered?.options.includes(n)) out[key] = n;
+  }
+  return out;
 }
 
 export type WeekBounds = {

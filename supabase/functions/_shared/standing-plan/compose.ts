@@ -115,7 +115,7 @@ import type { EnduranceSession } from '../endurance-library/index.ts';
 import { weekConflicts, type WeekConflict } from './week-conflicts.ts';
 import {
   DEFAULT_SIZE, easyFillHours, EASY_FILL_SPEC, FREE_ENDURANCE_DAYS, ladderOf,
-  REST_DAY_RUNG, rungAt, sayHours, sizeFor, slotSpans, weekVolumeBounds,
+  REST_DAY_RUNG, rungAt, rungForMinutes, sayHours, sizeFor, slotSpans, weekVolumeBounds,
   type SizeSolve, type SlotSpec, type WeekVolumeBounds,
 } from './volume-bounds.ts';
 import {
@@ -2086,6 +2086,15 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    */
   const rungForSlot = (
     family: string, frameLevel: Level, archetype: string | undefined, sport: 'run' | 'ride' | 'swim',
+    /**
+     * ⛔⛔⛔ THE ATHLETE'S OWN LENGTH FOR THIS ONE SESSION, WHEN A SCREEN HAS ASKED FOR ONE — see
+     * `SportMix.minutes` (Michael, 2026-08-30). It BEATS the per-sport dial, because it is a direct
+     * answer about this session rather than a number divided across the sport's sessions.
+     * ⚠️ IT IS RESOLVED INSIDE THIS SLOT'S OWN LADDER (`rungForMinutes`), so it cannot put a session
+     * below its floor or above its ceiling however the caller was answered.
+     * ⚠️ ABSENT ON EVERY CALL THAT PREDATES IT, and those take the dial exactly as they did.
+     */
+    minutesAsked?: number | null,
   ): { level: Level; size: number } => {
     const override = args.levelOverrides?.[family] as Level | undefined;
     if (override != null) return { level: override, size: dialForSport(sport) };
@@ -2103,8 +2112,18 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
      * ⚠️ CAUGHT BY THE SWEEP THAT PINS THE UNTARGETED WEEK: it read 7h55 where the frame builds 5h19.
      */
     const verdict = sport === 'run' ? volume.run.verdict : sport === 'ride' ? volume.ride.verdict : 'no_target';
-    if (verdict === 'no_target') return { level, size: DEFAULT_SIZE };
     const rungs = ladderOf({ family: family as never, level, archetype, sport }, anchors);
+    /**
+     * ⛔⛔ THE ATHLETE'S OWN ANSWER FIRST, AND BEFORE THE `no_target` BRANCH. A screen that asks per
+     * session sends no weekly hours at all, so the verdict there is always `no_target` — reading it
+     * first would drop every minutes pick on the floor and build the frame's midpoint instead, with
+     * nothing said. **The silent shape of every defect in this area.**
+     */
+    if (minutesAsked != null && Number.isFinite(Number(minutesAsked)) && rungs.length > 0) {
+      const at = rungForMinutes(rungs, Number(minutesAsked));
+      return { level: at.level, size: at.size };
+    }
+    if (verdict === 'no_target') return { level, size: DEFAULT_SIZE };
     if (rungs.length === 0) return { level, size: dialForSport(sport) };
     const at = rungAt(rungs, dialForSport(sport));
     return { level: at.level, size: at.size };
@@ -2331,8 +2350,33 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     day.endurance.forEach((slot, i) => {
       if (droppedSlots.has(`${day.day}:${i}`)) return; // ⛔ the stated day count removed this slot
       const assigned = assignedSlot(sportAssignment, day.day, i, slot);
+      /**
+       * ⛔⛔ ONE ARCHETYPE, RESOLVED ONCE, READ BY BOTH THE LADDER AND THE BUILD (2026-08-30).
+       *
+       * `rungForSlot` was handed `assigned.archetype` — often `undefined`, because the frame names no
+       * shape on most slots — while `buildEnduranceSession` below fell back to `rotatedArchetype`.
+       * **Two different sessions measured and built.** It was invisible while the ladder only had to
+       * be roughly right for a dial position; a minutes pick is resolved INSIDE that ladder, so the
+       * length the athlete chose would have been mapped through one session's rungs and delivered as
+       * another's. ⚠️ It changes nothing for a slot whose shape is pinned — `RIDE_EQUIVALENT` pins
+       * every ride slot, and p246's near-threshold slot names its own — and for the rest it makes the
+       * measured session the built one, which is what the ladder always claimed to be.
+       */
+      const slotArchetype = assigned.archetype
+        ?? rotatedArchetype(assigned.family, levelForFamily(assigned.family, assigned.level), args.week);
+      /**
+       * ⛔ THE ATHLETE'S OWN LENGTH FOR THIS SESSION, WHERE A SCREEN ASKED — see `SportMix.minutes`.
+       * ⚠️ THE FRAME'S ROLE DECIDES WHETHER IT IS HONOURED, never a family name: quality doses are the
+       * page's and a screen may not shorten them (`isHardSlot` reads the frame's own `role` first).
+       */
+      const askedMinutes = isHardSlot(slot)
+        ? null
+        : Number(args.sportMix?.minutes?.[`${day.day}:${i}`] ?? NaN);
       // ⛔ THE LEVEL IS THE DIAL'S ANSWER FOR A BASE SLOT — see `rungForSlot`. Quality is unmoved.
-      const rung = rungForSlot(assigned.family, assigned.level, assigned.archetype, assigned.sport);
+      const rung = rungForSlot(
+        assigned.family, assigned.level, slotArchetype, assigned.sport,
+        Number.isFinite(askedMinutes) ? askedMinutes : null,
+      );
       const level = rung.level;
       /**
        * ⛔ "ENGINE'S PICK — ROTATES WEEK TO WEEK" MUST BE TRUE (Michael, 2026-08-24). With no
@@ -2368,7 +2412,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       const built = buildEnduranceSession({
         family: assigned.family,
         level,
-        archetype: assigned.archetype ?? rotatedArchetype(assigned.family, level, args.week),
+        // ⚠️ THE SAME SHAPE THE LADDER ABOVE WAS MEASURED ON — see `slotArchetype`.
+        archetype: slotArchetype,
         anchors,
         // ⛔ §3c — the dial the athlete's typed number set. See `volume-bounds.ts`.
         size: rung.size,

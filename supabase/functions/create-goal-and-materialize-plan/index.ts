@@ -3056,6 +3056,26 @@ Deno.serve(async (req: Request) => {
                 }
                 return Object.keys(out).length > 0 ? { endurance_slot_archetypes: out } : {};
               })(),
+              /**
+               * ⛔⛔ THE PER-SESSION LENGTHS (Michael, 2026-08-30) — `endurance_slot_minutes`, see
+               * `SportMix.minutes`. **THIS BODY IS AN EXPLICIT ALLOWLIST AND A KEY NOT NAMED HERE
+               * NEVER REACHES THE GENERATOR.** `target_run_hours` was missing from this list for two
+               * deploys and the hours dial did nothing the whole time, with nothing erroring. The
+               * minutes picker fails exactly the same way if this block is removed: every session
+               * builds the frame's own midpoint and the athlete's answer dies here in silence.
+               * ⚠️ Numbers, validated; a malformed map is dropped whole rather than in part.
+               */
+              ...(() => {
+                const raw = (gsTp as Record<string, unknown>).endurance_slot_minutes;
+                if (!raw || typeof raw !== 'object') return {};
+                const out: Record<string, number> = {};
+                for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+                  const n = Math.round(Number(v));
+                  if (!Number.isFinite(n) || n <= 0) return {};
+                  out[k] = n;
+                }
+                return Object.keys(out).length > 0 ? { endurance_slot_minutes: out } : {};
+              })(),
               /** ⛔ The easy-swim ADD-ON (Michael, 2026-08-24): 1-2, outside the slots. Validated. */
               ...(() => {
                 const n = Math.round(Number((gsTp as Record<string, unknown>).swim_easy_sessions));

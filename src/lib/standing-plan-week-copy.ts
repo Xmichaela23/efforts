@@ -218,6 +218,73 @@ export function introStructureFor(
 const COUNT_WORDS: Record<number, string> = { 1: 'One', 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five' };
 
 /**
+ * ⛔⛔⛔ THE HEADER FOR A SCREEN THAT ASKS PER SESSION — Michael's draft, 2026-08-30, fitted to the
+ * copy voice and approved as fitted.
+ *
+ * ⛔ IT REPLACES `introStructureFor` ON STANDARD FOCUS AND NOWHERE ELSE. That header counts the
+ * week's slots, which was the right opening while the athlete's next act was reading a list of
+ * sessions and answering a weekly-hours box. **The screen now asks a length per session**, so the
+ * opening has to say what is being asked and what the app decides — the slot count is visible in the
+ * seven rows underneath it and does not need stating twice.
+ *
+ * ⛔ THE HARD COUNT IS DERIVED, never typed. p274 prescribes three quality sessions and p246 two;
+ * a literal "three" here is one frame's answer on a shared line, which is the defect this whole area
+ * keeps producing.
+ *
+ * ⚠️ ONE CHANGE FROM HIS DRAFT AND HE APPROVED IT: *"hold what you feel comfortable"* is stated as a
+ * fact about the length rather than as an instruction, because this screen carries no imperatives.
+ * ⚠️ THE CONSEQUENCE LINES ARE UNTOUCHED — `ENDURANCE_WEEK_INTRO_CONSEQUENCE` still renders under
+ * this, with the same words and the same reason.
+ */
+export function perSessionIntroFor(
+  frame: FrameId = 'all_rounder',
+  column: ColumnKind = 'standard',
+): string[] {
+  const hard = frameSlots(frame, column).filter((x) => x.role === 'hard').length;
+  const word = COUNT_WORDS[hard] ?? String(hard);
+  return [
+    'Standard Focus runs endurance alongside the lifting, every week.',
+    'Each session takes a sport and a length.',
+    'The easy and long sessions are at conversation pace, so their length is whatever you hold comfortably.',
+    `The ${word.toLowerCase()} hard session${hard === 1 ? '' : 's'} ${hard === 1 ? 'is' : 'are'} the programme's, at a set length.`,
+  ];
+}
+
+/**
+ * ⛔ WHERE THE WEEKLY NUMBER WENT. The hours boxes are gone from this frame (Michael, 2026-08-30) and
+ * weekly volume is no longer an ask — it is whatever the sessions come to. Said once, in the
+ * consequence block's own voice, so an athlete who arrives looking for the hours field finds the
+ * answer rather than a missing control.
+ * ⚠️ NO NUMBER IN IT. His acceptance test is counting the numbers on this screen, and the lengths on
+ * the rows are already the count.
+ */
+export const WEEKLY_VOLUME_IS_THE_SUM_LINE =
+  'Your weekly volume is what these sessions add up to.';
+
+/**
+ * ⛔ A SESSION'S LENGTH AS THE ATHLETE READS IT. `sayHours` is the ENGINE'S formatter and says
+ * *"about 2h15"* — it rounds to five minutes and hedges, both correct for a solved weekly total and
+ * both wrong for a length the athlete picked themselves. **A number they chose is exact and is not
+ * "about" anything.**
+ * ⚠️ MINUTES UNDER THE HOUR, hours above it: "45 min" reads as a session and "0h45" reads as a
+ * readout.
+ */
+export function sessionLengthLabel(minutes: number): string {
+  const m = Math.round(Number(minutes));
+  if (!Number.isFinite(m) || m <= 0) return '';
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  const rest = m % 60;
+  return rest === 0 ? `${h}h` : `${h}h${String(rest).padStart(2, '0')}`;
+}
+
+/**
+ * ⛔ THE LABEL OVER THE LENGTH PICKER. Fact-first and no imperative, same voice as every other label
+ * on this screen: it names the quantity and stops.
+ */
+export const SESSION_LENGTH_LABEL = 'Length';
+
+/**
  * Lines 5-7: WHAT A CHOICE COSTS, and the instruction.
  *
  * ⛔⛔ THESE STAY AT THE TOP OF THE SCREEN AND DO NOT MOVE ONTO THE HARD-SESSION CARD.
@@ -990,56 +1057,6 @@ export function experienceSubtitle(sport: SlotSport, movement: ExperienceMovemen
 }
 
 /**
- * ⛔⛔⛔ THE CONTROL IS A PLAIN LENGTH QUESTION, AND THE WORD "EXPERIENCE" IS OFF ITS FACE —
- * MICHAEL, 2026-08-30, ON STANDARD FOCUS ONLY.
- *
- * *"Both sports become a plain question."* The heading asks how long the athlete wants the session
- * to be and the two chips are the two lengths. **`Less experienced` / `More experienced` no longer
- * appear anywhere on the control.**
- *
- * ⛔ THE STORED ANSWER IS UNCHANGED AND THIS IS A COPY CHANGE ONLY. `'newer'` and `'experienced'` are
- * still what the wizard, the payload, the plan row and the composer pass around, and there are blocks
- * on them already — the same reasoning `EXPERIENCE_LABEL`'s own migration warning records. **Renaming
- * the keys would be a migration for a wording ruling.**
- *
- * ⛔ WHY IT IS RIGHT AND NOT JUST SHORTER. The control never measured experience; it picked a level,
- * and the level is a session length. Asking about training age and answering with minutes made the
- * athlete translate between two vocabularies to check the app had understood them. The question and
- * the answer are now the same quantity.
- *
- * ⛔⛔ AND THE TWO SIDES KEEP DIFFERENT VOCABULARY, DELIBERATELY — his ruling names both:
- *   - **runs quote a MAXIMUM** (`46 min max`). The hard runs are a fixed dose the hours dial cannot
- *     move, so a maximum is exact.
- *   - **the long ride quotes a FLOOR** (`from 130 min`). The hours dial raises it — measured 130 at a
- *     4h ask through 300 at 12h — so a maximum there would be a number the next control changes.
- * ⛔ NEVER *"up to"* on either. His no-hedge rule (2026-08-27) stands: **`max` and `from` are the
- * words**, and both state a boundary rather than softening a figure.
- *
- * ⚠️ STANDARD FOCUS ONLY, gated by the caller on `weekIsDayOrdered` — the same per-frame ruling as
- * the layout. `strength_5k` keeps `EXPERIENCE_HEADING` and the labelled chips, because Michael ruled
- * its screen is not to be touched.
- * ⚠️ AND `'none'` FALLS BACK TO THE OLD CONTROL ON PURPOSE. Where the answer moves nothing — the All
- * Rounder rider who keeps the long session as a RUN — there is no length to ask about, and a
- * question whose two answers print the same number is the dead control this whole change is fixing.
- * `EXPERIENCE_TIERS_EQUAL_LINE` is what speaks there.
- */
-export function experienceHeadingFor(
-  sport: SlotSport,
-  movement: ExperienceMovement,
-  plainLengthQuestion: boolean,
-): string {
-  if (!plainLengthQuestion || movement === 'none') return EXPERIENCE_HEADING[sport];
-  if (movement === 'long') {
-    return sport === 'ride'
-      ? 'How long do you want your long ride to be?'
-      : 'How long do you want your long run to be?';
-  }
-  return sport === 'ride'
-    ? 'How long do you want your hard rides to be?'
-    : 'How long do you want your hard runs to be?';
-}
-
-/**
  * ⛔⛔ `experienceNoteFor` IS DELETED (Michael, 2026-08-30), AND THIS IS WHY IT MAY NOT COME BACK.
  *
  * It rendered one line under the heading. On the long-ride question that line was *"The hard ride is
@@ -1062,54 +1079,99 @@ export function experienceHeadingFor(
  */
 
 /**
- * ⛔⛔⛔ ON STANDARD FOCUS THE CONTROL IS **ONE CONDITIONAL QUESTION**, NOT TWO — Michael's final
- * ruling, 2026-08-30. It renders for RIDING, and only when the athlete has set the long session to a
- * ride. Everywhere else on that frame there is no question at all and the tier is stored as
- * `'experienced'`.
+ * ⛔⛔⛔ THE EXPERIENCE TIER IS DEAD AS AN INPUT ON A FRAME THAT ASKS PER SESSION — Michael's final
+ * ruling, 2026-08-30. No question of either sport, and `'experienced'` is stored for both.
  *
- * ⛔ WHY THE RUN QUESTION IS GONE, AND IT IS HIS REASONING. *"Hard runs always build at max"* — the
- * `experienced` tier IS p274's own printed levels, so the frame's week is what the athlete gets.
- * Measured at HEAD, the answer moved the two hard runs by 5-8 minutes (44→49 and 45→53), and the long
- * run's 100-minute cap (HIS, p247) washes out the rest: at a 4h ask or higher **both tiers build the
- * same 100-minute long run**, and at 3h they INVERT — 90 min at the lower tier against 78 at the
- * higher, because the longer hard runs eat the budget first. A control whose two answers are five
- * minutes apart and sometimes backwards is not a choice worth a question.
+ * ⛔ THE RULING WALKED THREE STEPS IN ONE DAY AND ALL THREE ARE RECORDED, because the reasoning is
+ * what survives and the intermediate designs are what a later session would otherwise rebuild:
+ *   1. Two labelled tier chips per sport (shipped, and the riding pair printed the same number at
+ *      both tiers while silently moving the long ride).
+ *   2. One plain length question — *"How long do you want your long ride to be?"* — rendered only
+ *      where the long session was a ride, with the two ladder FLOORS as its options. Michael: the
+ *      floors *"confused even him"*, and a floor is not what a person books an afternoon around.
+ *   3. **This.** The easy and long sessions take a direct minutes pick on their own rows; the three
+ *      quality sessions take nothing and build at the page's own levels. The tier had never been a
+ *      question about experience — it was a question about session length wearing the wrong words —
+ *      so with the length asked directly there is nothing left for it to decide.
  *
- * ⛔ AND WHY THERE IS NO RIDE QUESTION WHEN THE LONG SESSION IS A RUN. The week's other two rides are
- * IDENTICAL at both tiers — measured 65 min hard and 80 min easy, because `ride_anaerobic` and
- * `ride_endurance` are both level 1 on p274 and `lowVolumeLevels` puts them at level 1 too. There is
- * nothing honest to ask, so nothing is asked.
+ * ⛔ WHY THE RUN SIDE WENT FIRST, and it is the measurement that killed the whole control: the tier
+ * moved the two hard runs by 5-8 minutes (44→49 and 45→53) and the long run's 100-minute cap (HIS,
+ * p247) washed the rest out — at a 4h ask or higher both tiers build the SAME 100-minute long run,
+ * and at 3h they INVERT, 90 at the lower tier against 78 at the higher.
  *
- * ⚠️ ONE CORNER IS DECIDED BY THE RULING RATHER THAN BY THE DERIVATION, and it is recorded rather
- * than hidden: an athlete who puts both switchable quality slots on the bike and keeps the long
- * session as a run has a week whose only run is the long one, and there the run answer genuinely does
- * move its floor (35 min against 68). **Michael ruled no run question, so that athlete gets the
- * `experienced` floor and the hours dial from there.** If it is ever revisited, `experienceMovement`
- * already returns `'long'` for that case and the derivation would produce the question for free.
- *
- * ⚠️ `strength_5k` IS UNTOUCHED — `plainLengthQuestion` is false there and both sports keep their
- * question, their heading and their labelled chips.
+ * ⚠️ THE STORED VALUES ARE UNTOUCHED. `'newer'` / `'experienced'` still travel through the wizard,
+ * the payload, the plan row and the composer, and there are blocks on them already — see
+ * `EXPERIENCE_LABEL`'s migration note. This is a screen ruling, not a data change.
+ * ⚠️ `strength_5k` KEEPS ITS CONTROL, unchanged: both questions, both headings, labelled chips. It
+ * asks for weekly hours and has no per-session pick, so the tier is still the only lever it has.
  */
 export function experienceAsksFor(
   sport: SlotSport,
   movement: ExperienceMovement,
-  plainLengthQuestion: boolean,
+  perSessionFrame: boolean,
 ): boolean {
-  if (!plainLengthQuestion) return true;
-  if (sport === 'run') return false;
-  return movement === 'long';
+  // ⚠️ THE ARGUMENTS ARE KEPT so the call sites read as a question about THIS sport on THIS week
+  // rather than a bare frame test, and so the 5K path's own conditions have somewhere to live if it
+  // is ever ruled onto the same design.
+  if (perSessionFrame) return false;
+  return sport === 'run' || movement !== 'none' || true;
 }
 
 /**
- * ⛔ WHAT IS STORED FOR A SPORT THE SCREEN NEVER ASKS ABOUT. `'experienced'` is the frame's own
- * printed levels — p274 as written — so a week nobody was asked about is the week the page prescribes
- * rather than a reduced one.
- * ⚠️ AND IT IS NEVER UNREACHABLE. The gate is `needsHours`, and on every unasked path the two tiers
- * measure the SAME requirement (run 3/3 with the long session as a run, 2/2 with it as a ride; ride
- * 3/3 with the long session as a run), so storing the top tier can never leave an athlete on a week
- * their hours do not hold. Measured at HEAD, not assumed.
+ * ⛔⛔ `experienceHeadingFor`, `experienceNoteFor` AND `experienceChipFloorLine` ARE DELETED
+ * (2026-08-30) — the plain length question they wrote is superseded by the per-session minutes pick,
+ * step 3 above. They read:
+ *   heading  "How long do you want your long ride to be?"
+ *   chips    "from 60 min" / "from 130 min"
+ * ⛔ AND THE REASON THE FLOORS FAILED IS WORTH KEEPING: a base session's length is set by the ladder
+ * AND by how much time the week has, so the tier could only honestly promise where the ladder
+ * STARTS. *"from 130 min"* is true and is not a length anyone can plan around — which is exactly
+ * Michael's objection. The row's own minutes pick states the length itself, and
+ * `slotMinuteOptions` makes every offered value one the engine actually builds.
+ * ⚠️ `experienceSubtitle`'s `'long'` arm SURVIVES as the 5K path's guard — that frame still has a
+ * tier control, and if a future frame lands a sport there whose hard sessions do not move, the
+ * sentence it needs is already written.
  */
+
 export const EXPERIENCE_WHEN_UNASKED = 'experienced' as const;
+
+/**
+ * ⛔ THE ROWS THAT TAKE A LENGTH AND HAVE NOT BEEN GIVEN ONE — the frame's easy and long rows, in
+ * screen order. Continue waits on these the way it waits on the sports: a week with a session of
+ * unstated length is not a week.
+ * ⚠️ THE FRAME'S OWN `role` DECIDES which rows are in this list, so a quality row can never end up
+ * in it and a frame with two easy rows has both.
+ */
+export function unansweredLengths(
+  slots: SlotSelection,
+  minutes: Partial<Record<SlotKey, number>> | undefined,
+  frame: FrameId = 'strength_5k',
+): SlotKey[] {
+  return frameSlots(frame)
+    .filter((x) => x.role !== 'hard' && slots[x.key])
+    .map((x) => x.key)
+    .filter((k) => !(Number(minutes?.[k]) > 0));
+}
+
+/**
+ * ⛔ WHAT THE SCREEN SAYS WHILE A LENGTH IS STILL BLANK. Fact-first and no imperative, the same
+ * voice and the same shape as `unansweredLine` — it names the rows and stops.
+ * ⚠️ NAMED BY THEIR OWN LABELS, lower-cased mid-sentence, so the sentence points at rows the athlete
+ * can see rather than at keys.
+ */
+export function unansweredLengthLine(
+  slots: SlotSelection,
+  minutes: Partial<Record<SlotKey, number>> | undefined,
+  frame: FrameId = 'strength_5k',
+): string | null {
+  const keys = unansweredLengths(slots, minutes, frame);
+  if (keys.length === 0) return null;
+  const names = keys.map((k) => (SLOT_LABEL[k] ?? String(k)).toLowerCase());
+  const named = names.length === 1
+    ? names[0]
+    : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return `The ${named} ${names.length === 1 ? 'has' : 'have'} no length yet.`;
+}
 
 /**
  * ⛔ THE TWO ANSWERS, AND THERE IS NO THIRD (Michael: *"if its not associated with 5k plus stregnth
@@ -1205,47 +1267,6 @@ export function experienceChipLine(
 }
 
 /**
- * ⛔⛔ THE CHIP WHEN THE ANSWER MOVES THE LONG SESSION AND NOTHING ELSE — see `experienceMovement`.
- *
- * ⛔⛔ "from N min", AND IT IS A FLOOR RATHER THAN A LENGTH BECAUSE A LENGTH WOULD BE A LIE. Measured
- * at HEAD off composed weeks: at the `experienced` tier the long ride builds 130 min at a 4h ask,
- * 164 at 6h, 216 at 8h, 271 at 10h and 300 at 12h. **The hours dial owns the length; the tier owns
- * where the ladder starts.** A printed length here is a promise the very next control breaks — which
- * is the ask-15-get-20 defect the whole endurance-week work order exists to kill.
- *
- * ⛔ AND "from" IS NOT A HEDGE, WHICH IS THE RULE IT HAS TO SURVIVE (Michael, 2026-08-27: no *"up
- * to"* on a number). *"up to"* softens a figure the app actually knows. *"from"* states a boundary
- * the app knows exactly and the athlete can hold it to: the session is never shorter than this.
- * ⚠️ ONE NUMBER PER CHIP, still — his acceptance test is counting the numbers on this screen, and
- * this arm prints one where the hard arm prints one.
- */
-export function experienceChipFloorLine(
-  tier: 'newer' | 'experienced',
-  sport: SlotSport,
-  longFloorMin: number | null,
-  needsHours: number | null,
-  /**
-   * ⛔ THE LABEL COMES OFF THE CHIP ON THE PLAIN QUESTION (Michael, 2026-08-30) — see
-   * `experienceHeadingFor`. The heading asks how long, so the option is a length and nothing else.
-   * ⚠️ FALSE KEEPS THE LABELLED CHIP, which is every caller on `strength_5k`.
-   */
-  plainLengthQuestion = false,
-): string {
-  const hours = needsHours == null ? null : `needs ${needsHours}h/wk`;
-  const label = plainLengthQuestion ? null : EXPERIENCE_LABEL[tier];
-  if (longFloorMin == null) return [label, hours].filter(Boolean).join(' · ');
-  /**
-   * ⚠️ THE SPORT WORD DROPS WITH THE LABEL. Under *"How long do you want your long ride to be?"* a
-   * chip reading `long ride from 130 min` says "long ride" twice in two lines; the heading owns the
-   * noun and the option owns the number.
-   */
-  const length = plainLengthQuestion
-    ? `from ${longFloorMin} min`
-    : `${sport === 'ride' ? 'long ride' : 'long run'} from ${longFloorMin} min`;
-  return [label, length, hours].filter(Boolean).join(' · ');
-}
-
-/**
  * ⛔ THE ONE ENTRY POINT THE SCREEN CALLS. It picks the arm off `experienceMovement`, so the chip's
  * number and the subtitle above it are answering the same question by construction rather than by a
  * reviewer noticing. ⚠️ `'none'` TAKES THE HARD ARM DELIBERATELY: both chips then print the same true
@@ -1261,28 +1282,16 @@ export function experienceChipTextFor(
     hardCount: number;
   },
   needsHours: number | null,
-  plainLengthQuestion = false,
 ): string {
-  // ⚠️ `'none'` TAKES THE LABELLED HARD ARM WHATEVER THE FRAME — there is no length question to
-  // answer where the answer moves nothing, so the plain framing does not apply. See
-  // `experienceHeadingFor`.
-  const plain = plainLengthQuestion && movement !== 'none';
-  if (movement === 'long') {
-    return experienceChipFloorLine(chip.tier, sport, chip.longFloorMin, needsHours, plain);
-  }
-  if (plain) {
-    /**
-     * ⛔ THE COUNT IS NOT ON THE CHIP ON THE PLAIN QUESTION — it is identical on both options and it
-     * is not an option. What is left is the maximum, which is the
-     * one thing the two options differ by. ⚠️ `hardCount` 0 or no duration still prints nothing
-     * rather than a dangling separator, same as the labelled arm.
-     */
-    const hours = needsHours == null ? null : `needs ${needsHours}h/wk`;
-    const max = (chip.longestMin != null && chip.hardCount > 0) ? `${chip.longestMin} min max` : null;
-    return [max, hours].filter(Boolean).join(' · ');
-  }
+  // ⚠️ ONE ARM NOW. The plain-length arm went with the control it wrote — see the tombstone above.
+  // `sport` and `movement` stay in the signature because the 5K path's subtitle already branches on
+  // them and a chip that stopped agreeing with its own heading is the defect this pair exists to
+  // prevent.
+  void sport;
+  void movement;
   return experienceChipLine(chip.tier, chip.longestMin, chip.hardCount, needsHours);
 }
+
 
 /**
  * ⛔ WHEN THE TWO CHIPS SAY THE SAME THING, THE SCREEN SAYS SO (Michael, 2026-08-30). Two identical

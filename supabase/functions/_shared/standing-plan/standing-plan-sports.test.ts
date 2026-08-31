@@ -564,8 +564,28 @@ Deno.test('the block stores the mix it was built on, so a restate reaches the sa
   });
   // ⛔ Widened 2026-08-24: the per-slot answers and variant picks ride along in the stored mix —
   // a restate without them would rebuild the dial's own week over the athlete's calendar.
-  assertEquals(row.config.sport_mix, { runs: 2, rides: 2, swimDays: 0, slots: null, archetypes: null });
+  // ⛔ Widened again 2026-08-30 for `minutes` — the per-session lengths, which are the athlete's own
+  // answer to how long every easy and long session is. A row without them rebuilds those sessions at
+  // the frame's own midpoint the first time the test week is read back.
+  assertEquals(row.config.sport_mix,
+    { runs: 2, rides: 2, swimDays: 0, slots: null, archetypes: null, minutes: null });
   assertEquals(row.config.sport_counts, { run: 2, ride: 2, swim: 0 });
+
+  /**
+   * ⛔⛔ AND THE RULE ITSELF, NOT JUST TODAY'S FIELD LIST. `buildStandingPlanRow` rebuilds this object
+   * FIELD BY FIELD, so a field added to `SportMix` and not added there is dropped in silence — which
+   * is exactly how this assertion came to need widening twice. **This asserts that every key the
+   * composer was handed came back out**, so the next field fails here rather than in a rebuilt week.
+   */
+  const sent = { runs: 2, rides: 2, swimDays: 1, slots: { '1:0': 'run' }, archetypes: { '1:0': 'x' }, minutes: { '6:0': 90 } };
+  const wide = buildStandingPlanRow({
+    compose: { ...BASE, sportMix: sent as never }, weeks: 12, taperWeeks: [],
+  });
+  for (const k of Object.keys(sent)) {
+    assert(k in (wide.config.sport_mix ?? {}),
+      `⛔ sport_mix drops \`${k}\` — the restate will rebuild a week the athlete did not choose`);
+  }
+  assertEquals((wide.config.sport_mix as Record<string, unknown>).minutes, { '6:0': 90 });
 });
 
 Deno.test('the restater re-composes on the block\'s OWN mix', async () => {

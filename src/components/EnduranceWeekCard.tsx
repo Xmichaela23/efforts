@@ -47,7 +47,6 @@ import {
   // hard arm and is still pinned verbatim by the copy test.
   experienceMovement,
   experienceSubtitle,
-  experienceHeadingFor,
   experienceAsksFor,
   experienceChipTextFor,
   restIsEasyLine,
@@ -67,13 +66,17 @@ import {
   weekIsDayOrdered,
   QUIET_DAY_LABEL,
   RUN_HOURS_LAND_ON_THE_LONG_RUN_LINE,
+  perSessionIntroFor,
+  WEEKLY_VOLUME_IS_THE_SUM_LINE,
+  sessionLengthLabel,
+  SESSION_LENGTH_LABEL,
   hardSlotKeysFor,
   frameSlots,
   type SlotKey,
   type SlotSelection,
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
-import { experienceChips, weekBounds } from '@/lib/standing-plan-week-bounds';
+import { experienceChips, weekBounds, slotLengthOptions, slotFixedMinutes } from '@/lib/standing-plan-week-bounds';
 import type { EnduranceExperience, ExperienceTier, FrameId } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 /**
  * ⛔ HOW MANY DAYS ONE SPORT CAN RUN OVER. Seven is the week; the engine caps what it can actually
@@ -146,6 +149,16 @@ export type EnduranceWeekCardProps = {
    * auto-assigned to it — the four-choices screen only exists for the mixed athlete.
    */
   allowedSports?: SlotSport[];
+  /**
+   * ⛔⛔⛔ HOW LONG THE ATHLETE WANTS EACH EASY AND LONG SESSION TO BE, in minutes (Michael,
+   * 2026-08-30). It replaces the weekly-hours ask on the frames that draw the week by day: the book
+   * scales these sessions by time — conversation pace, duration is the dose — so the length IS the
+   * question, and a weekly total was the app asking it sideways and then solving backwards.
+   * ⚠️ THE THREE QUALITY ROWS CARRY NO ENTRY. Their dose is the page's; the row states it and asks
+   * nothing. `slotLengthOptions` returns null for them, which is the frame's own `role` answering.
+   */
+  slotMinutes?: Partial<Record<SlotKey, number>>;
+  onSlotMinutes?: (key: SlotKey, minutes: number) => void;
 };
 
 /**
@@ -195,7 +208,12 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
   const weekDays = frameWeekDays(frame);
   // ⛔ HIS FOUR LINES WITH THE FRAME'S OWN COUNTS — see `introStructureFor`. Byte-identical for the
   // 5K frame; the header said "4 endurance slots … Two hard sessions" above five rows otherwise.
-  const introLines = introStructureFor(frame);
+  /**
+   * ⛔⛔ TWO HEADERS, AND THE FRAME PICKS — see `perSessionIntroFor` (Michael, 2026-08-30). The
+   * slot-count opening was right while the next act was a weekly-hours box; a screen that asks a
+   * length per session opens by saying so. ⚠️ `strength_5k` keeps `introStructureFor` verbatim.
+   */
+  const introLines = weekIsDayOrdered(frame) ? perSessionIntroFor(frame) : introStructureFor(frame);
 
   const volumeRef = React.useRef<HTMLDivElement | null>(null);
   const chosen = allSlotsChosen(props.slots, frame);
@@ -316,6 +334,41 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           const session = (isHard || key === 'long')
             ? props.hardSessionTitle?.(key) ?? null
             : null;
+          /**
+           * ⛔⛔ THE LENGTHS THIS ROW MAY BE SET TO, OR THE ONE IT IS FIXED AT (Michael, 2026-08-30).
+           * Both come off the SAME ladder the composer resolves the answer against, so the number on
+           * the row and the number in the plan are one number by construction — an agreement test
+           * sweeps every offered length through `composeWeek` and asserts the built session matches.
+           * ⚠️ `lengths` IS NULL ON A QUALITY ROW and `fixed` is null on every other, because the
+           * frame's own `role` decides which question a row is: p246 and p274 own the quality doses.
+           */
+          const lengths = dayOrdered
+            ? slotLengthOptions(key, props.slots, { baselines: props.baselines as never, frame })
+            : null;
+          const fixed = dayOrdered
+            ? slotFixedMinutes(key, props.slots, { baselines: props.baselines as never, frame })
+            : null;
+          /**
+           * ⛔ THE ROW STATES ITS LENGTH, ANSWERED OR NOT. A quality row shows the dose it is fixed
+           * at; an easy or long row shows what the athlete set. ⚠️ A row with a pick and no answer
+           * yet shows nothing rather than a default — a number in an untouched control reads as a
+           * suggestion, which is this screen's own standing rule for the hours box.
+           */
+          /**
+           * ⚠️⚠️ AND IT MUST BE A LENGTH THIS ROW ACTUALLY OFFERS. Found on the rendered page: with the
+           * long session switched from a ride to a run, the row still read *"Long run · 2h30"* over a
+           * picker offering 1h08 to 1h40 — `run_lsd` caps at 100 minutes (p247). `prunedSlotMinutes`
+           * is what stops the stale value being SENT; this is what stops it being SHOWN, and both are
+           * needed because the screen must not print a session the picker underneath it disagrees
+           * with even for the render between the tap and the state update.
+           */
+          const picked = lengths && props.slotMinutes?.[key] != null
+            && lengths.options.includes(props.slotMinutes[key]!)
+            ? props.slotMinutes[key]!
+            : null;
+          const lengthNow = fixed != null
+            ? sessionLengthLabel(fixed)
+            : (picked != null ? sessionLengthLabel(picked) : null);
           // ⛔ THE FRAME OWNS THE DAY — see `slotFrameDay`. `null` on a column with no such slot
           // (the taper carries three, not four), which renders no prefix rather than a wrong one.
           const dayNumber = slotFrameDay(key, 'standard', frame);
@@ -418,7 +471,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                       {(dayNumber != null && !dayOrdered) ? (
                         <span className="text-white/45 tabular-nums">{`Day ${dayNumber} · `}</span>
                       ) : null}
-                      {slotSummary(key, sport, session)}
+                      {[slotSummary(key, sport, session), lengthNow].filter(Boolean).join(' · ')}
                     </span>
                     {key === 'long' ? (
                       <span className="block text-white/40 text-xs mt-0.5">{LONG_SLOT_NOTE}</span>
@@ -496,6 +549,37 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                       long ride — Michael, after field research: a 2.5-3h weekend club ride is
                       routinely an athlete's long day. So the club toggle is not a property of hard
                       sessions, it is a property of a session whose day the world fixes. */}
+                  {/* ⛔⛔ THE LENGTH, PICKED ON THE ROW IT IS ABOUT (Michael, 2026-08-30). Every value
+                      offered is a length the engine actually builds — `slotMinuteOptions` walks the
+                      ladder's own rungs, so p239's gap between a 100-minute ride and a 130-minute one
+                      is simply not in the list. A round-number grid would offer 115, the plan would
+                      build 100 or 130, and the screen would have promised a session that does not
+                      exist: the ask-15-get-20 defect in a new place.
+                      ⚠️ THE EMPTY OPTION STAYS FIRST, the same rule the hours box had: no number in an
+                      untouched control, because a preselected value reads as a recommendation. */}
+                  {lengths ? (
+                    <div>
+                      <p className="text-white/80 text-[13px] mb-2">{SESSION_LENGTH_LABEL}</p>
+                      <div className="flex items-baseline gap-2">
+                        <select
+                          data-testid={`slot-${key}-minutes`}
+                          value={picked != null ? String(picked) : ''}
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            if (Number.isFinite(n) && n > 0) props.onSlotMinutes?.(key, n);
+                          }}
+                          className="w-28 px-3 py-2 rounded-xl bg-white/[0.05] border border-white/12 text-white text-base tabular-nums focus:outline-none focus:border-[var(--fc)]"
+                          style={{ ['--fc' as string]: `rgb(${getDisciplineColorRgb(SPORT_DISCIPLINE[sport ?? 'run'])})` }}
+                        >
+                          <option value="">—</option>
+                          {lengths.options.map((m) => (
+                            <option key={m} value={String(m)}>{sessionLengthLabel(m)}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  ) : null}
+
                   {(isHard || key === 'long') && props.renderHardFlavor
                     ? props.renderHardFlavor(key)
                     : null}
@@ -587,6 +671,14 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           {ENDURANCE_WEEK_INTRO_CONSEQUENCE.map((line) => (
             <p key={line} className="text-white/60 text-[13px] leading-relaxed">{line}</p>
           ))}
+          {/* ⛔ WHERE THE WEEKLY NUMBER WENT. The hours boxes are gone from this frame and volume is
+              no longer an ask — an athlete who arrives looking for that field finds the answer here
+              rather than a control that has vanished. ⚠️ No number in it, deliberately. */}
+          {dayOrdered ? (
+            <p className="text-white/60 text-[13px] leading-relaxed" data-testid="weekly-volume-is-sum">
+              {WEEKLY_VOLUME_IS_THE_SUM_LINE}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -645,7 +737,26 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           `fixedHoursLine` — the only thing here summed from them — stays behind `allSlotsChosen`
           below. The bounds still decide WHICH dials exist, because a sport nobody is doing has no
           hours to set. */}
-      {(sportsWithHours.length > 0) ? (
+      {/* ⛔⛔⛔ THE WEEKLY HOURS AND DAYS BOXES ARE GONE FROM THIS FRAME (Michael, 2026-08-30), AND SO
+          IS EVERYTHING THAT HUNG OFF THEM.
+
+          ⛔ WHY, IN HIS OWN TERMS: the easy and long sessions scale by TIME in the book, so the length
+          is the question. A weekly total asked it sideways — the athlete typed hours, the engine
+          solved backwards for a dial position, and the two warnings that had to exist (*"you asked
+          for 6h, the week holds 4h15"* in both directions) were the cost of that indirection. **A
+          per-session pick bounded by that session's own ladder cannot be over or under anything, so
+          the class of error those sentences report ceases to exist.**
+
+          ⛔ WHAT GOES WITH THEM ON THIS FRAME, all correctly and none of it deleted from the module:
+          the two hour dials, the two day dials, the running-hours line added earlier today, the whole
+          experience control, and `restIsEasyLine`. The over-ask and under-ask notes in `compose.ts`
+          are untouched and simply stop firing here — they are gated on a finite hours ask, and they
+          still serve `strength_5k` and every other caller.
+          ⚠️ THE CONTINUE GATE MOVED WITH THEM. `NonRaceBuilder`'s `volumeMissing` blocked Continue
+          until hours were typed; leaving that in place with the boxes gone is a Continue that cannot
+          be satisfied, which is the exact defect that cost 2026-08-30 its morning. It is re-scoped in
+          the same change, not after. */}
+      {(!dayOrdered && sportsWithHours.length > 0) ? (
         <div ref={volumeRef}>
           {/* ⛔ THE HONESTY NOTE, BESIDE THE NUMBER IT IS ABOUT (moved off the tier screen,
               Michael, 2026-08-24 evening). His words, verbatim — the first line reworded from
@@ -796,20 +907,19 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                   const plain = dayOrdered;
                   if (!experienceAsksFor(sport, movement, plain)) return null;
                   /**
-                   * ⛔⛔ THE PLAIN QUESTION CARRIES NOTHING UNDER ITS HEADING (Michael, 2026-08-30):
-                   * **"Question, two chips, nothing else."** It briefly carried *"The hard ride is the
-                   * same length either way"*, which he then removed — the heading names the session
-                   * outright, so the sentence was restating the question's own scope. See the
-                   * `experienceNoteFor` tombstone for the arm that went with it.
-                   * ⚠️ `strength_5k` KEEPS ITS SUBTITLE, unchanged.
+                   * ⛔⛔⛔ NOTHING IS ASKED ON A PER-SESSION FRAME (Michael, 2026-08-30). The tier is
+                   * dead as an input there — the easy and long rows carry a direct minutes pick and
+                   * the quality rows carry the page's own dose — so `experienceAsksFor` returns false
+                   * and this whole control does not render. `'experienced'` is what the wizard stores.
+                   * ⚠️ THE CONTINUE GATE READS THE SAME PREDICATE. A question that is required but not
+                   * drawn is a Continue that cannot be satisfied — the defect that cost 2026-08-30 its
+                   * morning, and the reason one owner answers "is this asked" for both.
                    */
-                  const subtitle = plain ? null : experienceSubtitle(sport, movement);
+                  if (!experienceAsksFor(sport, movement, dayOrdered)) return null;
+                  const subtitle = experienceSubtitle(sport, movement);
                   return (
                     <div className="mt-3" data-testid={`${sport}-experience`}>
-                      <p className="text-white/80 text-[13px]">
-                        {experienceHeadingFor(sport, movement, plain)}
-                      </p>
-                      {/* ⚠️ NULL ON THE PLAIN QUESTION — see above. `strength_5k` still renders one. */}
+                      <p className="text-white/80 text-[13px]">{EXPERIENCE_HEADING[sport]}</p>
                       {subtitle ? (
                         <p className="text-white/55 text-xs mt-0.5 leading-snug">{subtitle}</p>
                       ) : null}
@@ -847,7 +957,6 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                                 /* ⛔ THE REQUIREMENT ONLY WHERE IT BLOCKS — `dead` is
                                    `experiencedIsReachable`'s answer, already computed above. */
                                 dead ? chip.needsHours : null,
-                                plain,
                               )}</button>
                           );
                         })}

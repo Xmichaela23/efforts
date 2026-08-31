@@ -141,6 +141,16 @@ export type StandingPlanConfig = {
      *  calendar than the one that exists. */
     slots?: Record<string, string> | null;
     archetypes?: Record<string, string> | null;
+    /**
+     * ⛔⛔ THE PER-SESSION LENGTHS RIDE ALONG TOO (Michael, 2026-08-30) — see `SportMix.minutes`.
+     * **THIS OBJECT IS REBUILT FIELD BY FIELD BELOW, so a field not named here is DROPPED**, and
+     * dropping this one is the silent failure: `rematerialize-standing-block` re-composes every
+     * unstarted week from this row, so a block whose long ride the athlete set to 2h30 would rebuild
+     * it at the frame's own midpoint the first time the test week is read back — the session
+     * shortening mid-block, on a calendar they are already training against. Same law as
+     * `endurance_experience`, and the same silence.
+     */
+    minutes?: Record<string, number> | null;
   } | null;
   /** The easy-swim ADD-ON count the block was built on (Michael, 2026-08-24) — stored so a restate
    *  re-composes the identical week. 0/absent = none. */
@@ -346,6 +356,8 @@ export function buildStandingPlanRow(args: {
             swimDays: Math.max(0, Math.round(Number(args.compose.sportMix.swimDays) || 0)),
             slots: args.compose.sportMix.slots ?? null,
             archetypes: args.compose.sportMix.archetypes ?? null,
+            // ⛔ SEE THE FIELD'S NOTE ABOVE — omitted here, the restate rebuilds a different week.
+            minutes: args.compose.sportMix.minutes ?? null,
           }
         : null,
       swim_easy_sessions: Math.min(2, Math.max(0, Math.round(Number(args.compose.swimEasySessions) || 0))) || null,

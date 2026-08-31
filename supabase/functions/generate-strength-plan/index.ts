@@ -485,6 +485,26 @@ Deno.serve(async (req: Request) => {
           }
           return Object.keys(out).length > 0 ? out : null;
         })(),
+        /**
+         * ⛔⛔ THE PER-SESSION LENGTHS (Michael, 2026-08-30) — see `SportMix.minutes`. The easy and
+         * long rows take a direct minutes pick on Standard Focus, and this is the hop that carries it.
+         * ⚠️ SHAPE VALIDATED HERE, MEANING VALIDATED IN THE COMPOSER: a value outside the slot's own
+         * ladder resolves to the nearest real dose (`rungForMinutes`) rather than being refused, and
+         * a key naming a quality slot is ignored there. What this rejects is a malformed map — and it
+         * drops the WHOLE map rather than half of it, the same discipline the two fields above use,
+         * because a half-applied answer builds a week nobody chose.
+         */
+        minutes: (() => {
+          const raw = (body as Record<string, unknown>).endurance_slot_minutes;
+          if (!raw || typeof raw !== 'object') return null;
+          const out: Record<string, number> = {};
+          for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+            const n = Math.round(Number(v));
+            if (!Number.isFinite(n) || n <= 0) return null;
+            out[k] = n;
+          }
+          return Object.keys(out).length > 0 ? out : null;
+        })(),
       };
       const longSlotSport = (() => {
         const a = assignSports(FRAMES[frameId].columns.standard, mixForFrame);
