@@ -1039,3 +1039,15 @@ again in the All Rounder. Marked per item.
 - **Four movements carry no gear tag** and so read as home-doable when they are not: `belt squat`,
   `smith machine squat`, `seated cable row`, `incline dumbbell row`. The module logs a warning naming
   itself.
+
+- **Standard Focus has no core slot, and p274 does not print one.** The 5K frame carries a Core slot;
+  the All Rounder's four lifting days are pattern slots only. He DOES have a core category (p223 —
+  hanging leg raises, crunches, V-ups, dynamic plank variants, ab wheel rollouts) and a placement rule
+  (Part C rule 4: **main → core → isolation**, because isolation work is rarely degraded by a tired
+  core while core work carries the higher skill component). So adding one would be sourced to his
+  ORDERING rule rather than to the page's table, and would be OURS. Michael's call, deferred
+  2026-08-30: "eh leave it for now".
+  ⚠️ Related oddity seen on the live picker: day 5's **Leg isolation** slot filled with **Weighted
+  Knee Raise**, a core movement occupying a leg slot — worth checking whether the pool is reaching for
+  the nearest thing when the leg-isolation pool is thin, which would be a quiet substitution of the
+  same class as the braced-slot one above.
