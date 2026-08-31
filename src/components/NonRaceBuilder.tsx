@@ -26,6 +26,7 @@ import {
   hardSlotKeysFor,
   frameSlots,
   unansweredLine,
+  forcedSportFor,
   type SlotKey,
   type SlotSelection,
   type SlotSport,
@@ -3712,6 +3713,39 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * single-sport athlete has one legal answer per row, so the screen is not deciding anything for
    * them; a mixed athlete is still asked four times.
    */
+  /**
+   * ⛔⛔ THE ROWS THE FRAME ITSELF ANSWERS — WRITTEN INTO STATE SO THE PAYLOAD CARRIES THEM
+   * (Michael, off the live screen, 2026-08-31). p274's day 2 and day 4 are cycling sessions with no
+   * run version offered, so the screen states them as facts rather than drawing a lone Ride button —
+   * see `forcedSportFor`. The answer still has to REACH the plan, and `slotSports` is what carries
+   * it.
+   *
+   * ⛔ IT IS NOT WHAT MAKES CONTINUE WORK, AND THAT SEPARATION IS DELIBERATE. `allSlotsChosen` reads
+   * `forcedSportFor` directly, so the gate is satisfied on the first render — before this effect has
+   * run at all. **A gate that waits on an effect is the unsatisfiable-Continue defect of 2026-08-30
+   * in a new place.** This effect exists for the payload, not for the button.
+   *
+   * ⚠️ IT DOES NOT WAIT FOR THE ENDURANCE STEP, unlike the single-sport fill below it: this is the
+   * frame's own answer rather than a response to something the athlete typed, and the payload can be
+   * assembled from any later screen.
+   */
+  useEffect(() => {
+    const fixed = frameSlots(wizardFrame)
+      .map((x) => [x.key, forcedSportFor(x.key, wizardFrame)] as const)
+      .filter((e): e is readonly [SlotKey, SlotSport] => e[1] != null);
+    if (fixed.length === 0) return;
+    const cur = state.slotSports ?? emptySlotSports(wizardFrame);
+    if (fixed.every(([k, sp]) => cur[k] === sp)) return;
+    setState((st) => {
+      const slots = { ...(st.slotSports ?? emptySlotSports(wizardFrame)) } as SlotSelection;
+      for (const [k, sp] of fixed) slots[k] = sp;
+      return { ...st, slotSports: slots, hardDays: syncHardDays(st, slots) };
+    });
+    // ⚠️ `syncHardDays` IS RE-CREATED EACH RENDER; listing it re-runs this on every render. Same
+    // disable, same reason, as the single-sport fill directly below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wizardFrame, state.slotSports]);
+
   useEffect(() => {
     if (currentStep !== 'endurance' || allowedSlotSports.length !== 1) return;
     const only = allowedSlotSports[0];

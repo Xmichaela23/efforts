@@ -65,6 +65,8 @@ import {
   frameWeekDays,
   weekIsDayOrdered,
   QUIET_DAY_LABEL,
+  forcedSportFor,
+  FIXED_SPORT_LINE,
   RUN_HOURS_LAND_ON_THE_LONG_RUN_LINE,
   perSessionIntroFor,
   WEEKLY_VOLUME_IS_THE_SUM_LINE,
@@ -176,6 +178,36 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
    * ⚠️ NOTHING IS OPEN ON ARRIVAL: the screen's whole claim is that it is already answered.
    */
   const [open, setOpen] = React.useState<SlotKey | null>(null);
+  // ⚠️ DECLARED BEFORE `slotsNow`, WHICH READS IT INSIDE A `useMemo` FACTORY THAT RUNS DURING
+  // THIS RENDER — below it, that is a temporal-dead-zone throw rather than a stale value.
+  const frame: FrameId = props.frame ?? 'strength_5k';
+  /**
+   * ⛔⛔⛔ THE FRAME'S ANSWER WINS ON A ROW THE FRAME ANSWERS — FOUND ON THE RENDERED PAGE,
+   * 2026-08-31, and it is the screen-vs-plan disagreement this whole area exists to prevent.
+   *
+   * `forcedSportFor` states that p274's day 2 and day 4 are rides. `slotSports` is written by an
+   * effect in the wizard, so on the render BEFORE that effect — and on any draft saved before this
+   * shipped — those rows still carry whatever the old screen let the athlete tap. Rendered from
+   * `props.slots` they read *"Hard session 2 · Run · 1h05"* and drew the RUN length ladder, while
+   * `assignSports` builds a ride regardless. **The screen would have promised a run and the plan
+   * would have delivered a ride, with nothing said** — see `optionsFor`.
+   *
+   * ⛔ SO IT IS OVERRIDDEN ONCE, HERE, AND EVERY READER BELOW USES THE CORRECTED MAP: the summary
+   * line, the length ladder, the bounds, the experience chips. Correcting it at one call site and
+   * not the others is how the row's words and the row's picker came to disagree in the first place.
+   * ⚠️ IT WRITES NOTHING BACK. State is the wizard's to fix (it does, in its own effect); this is
+   * the card refusing to RENDER a sport the frame does not offer.
+   * ⚠️ `strength_5k` HAS NO FIXED ROW, so this is the identity map there — measured in
+   * `wizard-screen-agreement`, not assumed.
+   */
+  const slotsNow = React.useMemo(() => {
+    const out = { ...props.slots } as SlotSelection;
+    for (const s of frameSlots(frame)) {
+      const forcedHere = forcedSportFor(s.key, frame);
+      if (forcedHere) out[s.key] = forcedHere;
+    }
+    return out;
+  }, [props.slots, frame]);
   /**
    * ⛔⛔ THE ADD/UNDO STATE IS DELETED (2026-08-26 evening). It remembered which row was open when
    * "+ Add a hard session" was tapped, so dismissing the added card put the screen back exactly as
@@ -192,7 +224,6 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
   /**
    * ⛔⛔ THE FRAME, RESOLVED ONCE AND BEFORE EVERY READER (2026-08-30). See the note at `rowKeys`.
    */
-  const frame: FrameId = props.frame ?? 'strength_5k';
   const rowKeys = displayOrderFor(frame);
   const hardKeys = hardSlotKeysFor(frame);
   /**
@@ -216,7 +247,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
   const introLines = weekIsDayOrdered(frame) ? perSessionIntroFor(frame) : introStructureFor(frame);
 
   const volumeRef = React.useRef<HTMLDivElement | null>(null);
-  const chosen = allSlotsChosen(props.slots, frame);
+  const chosen = allSlotsChosen(slotsNow, frame);
   React.useEffect(() => {
     if (!chosen) return;
     // ⚠️ next frame — the section renders in this commit; scrolling in the same tick measures
@@ -227,7 +258,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
     return () => window.clearTimeout(t);
   }, [chosen]);
 
-  const bounds = weekBounds(props.slots, {
+  const bounds = weekBounds(slotsNow, {
     baselines: props.baselines as never,
     easyPaceSecPerMi: props.easyPaceSecPerMi,
     experience: props.experience,
@@ -239,7 +270,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
    * baselines, so a run on the first hard slot and a run on the second give different numbers.
    * ⚠️ NULL FOR A SPORT THAT FILLS NO SLOT — there is nothing for the answer to size, so no chip.
    */
-  const chips = experienceChips(props.slots, {
+  const chips = experienceChips(slotsNow, {
     baselines: props.baselines as never,
     // ⛔ THE VARIANT THE ATHLETE PICKED INSIDE THE HARD ROW BEATS THE FRAME'S OWN SHAPE, in the
     // composer and therefore here. Without it the chip quotes the session they just replaced.
@@ -271,7 +302,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
    * what he killed). It is a real p247 fact and the only thing on the screen naming WHICH lifts the
    * running costs. It renders in the volume note; see there for why that is its honest home.
    */
-  const split = upperLowerSplitLine(props.slots);
+  const split = upperLowerSplitLine(slotsNow);
 
   /**
    * ⛔ ONE ROW RENDERER, TWO BLOCKS (2026-08-25). The hard sessions lead the screen and the frame's
@@ -296,21 +327,65 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
    * ⚠️ IT RENAMES NOTHING. The strength SLOT labels are frozen pending Michael; this is new
    * day-level copy that sits beside them and must not be read as a replacement for any of them.
    */
+  /**
+   * ⛔⛔ THE LENGTH CONTROL, EXTRACTED (2026-08-31) BECAUSE IT NOW HAS TWO HOMES. It sits inside the
+   * accordion on a row the athlete opens, and directly on the face of a FIXED row — day 4's easy
+   * ride has no other question, so it does not open, and its minutes control would have had nowhere
+   * to live. **Michael's ruling is that only the SPORT is fixed there; the length is still theirs.**
+   * ⚠️ ONE COPY, so the two placements cannot drift into two slightly different controls — the same
+   * reason `slotRow` itself is one renderer for two blocks.
+   */
+  const lengthPicker = (
+    key: SlotKey,
+    lengths: { options: number[] } | null,
+    picked: number | null,
+    sport: SlotSport | null | undefined,
+  ) => (lengths ? (
+    <div>
+      <p className="text-white/80 text-[13px] mb-2">{SESSION_LENGTH_LABEL}</p>
+      <div className="flex items-baseline gap-2">
+        <select
+          data-testid={`slot-${key}-minutes`}
+          value={picked != null ? String(picked) : ''}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            if (Number.isFinite(n) && n > 0) props.onSlotMinutes?.(key, n);
+          }}
+          className="w-28 px-3 py-2 rounded-xl bg-white/[0.05] border border-white/12 text-white text-base tabular-nums focus:outline-none focus:border-[var(--fc)]"
+          style={{ ['--fc' as string]: `rgb(${getDisciplineColorRgb(SPORT_DISCIPLINE[sport ?? 'run'])})` }}
+        >
+          <option value="">—</option>
+          {lengths.options.map((m) => (
+            <option key={m} value={String(m)}>{sessionLengthLabel(m)}</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  ) : null);
+
   const slotRow = (key: SlotKey, themeTag?: string | null) => {
-          const sport = props.slots[key];
+          /**
+           * ⛔⛔ THE SPORT THIS ROW IS FIXED AT, OR NULL — see `forcedSportFor` for the ruling and for
+           * why it reads the FRAME's options rather than this row's options right now.
+           */
+          const forced = forcedSportFor(key, frame);
+          const sport = slotsNow[key];
           /**
            * ⛔ NO SPORT, NO COLOUR (Michael, 2026-08-24). A row the athlete has not answered carries
            * the neutral edge — the colour is what says "you chose this", so painting it before they
            * chose is the screen answering its own question.
+           * ⛔⛔ AND A FIXED ROW IS NEVER COLOURED, WHICH IS THAT SAME RULE RATHER THAN AN EXCEPTION
+           * TO IT: nobody chose it. Michael's word for how it should read is *"grey it like day
+           * 5/7"*, and the quiet rows are neutral for exactly this reason.
            */
-          const color = sport ? getDisciplineColor(SPORT_DISCIPLINE[sport]) : null;
+          const color = (!forced && sport) ? getDisciplineColor(SPORT_DISCIPLINE[sport]) : null;
           const isOpen = open === key;
           /**
            * ⛔ THE OPTIONS THIS ROW OFFERS RIGHT NOW — the frame's, minus anything the impact floor
            * holds given the answers on the other rows. `strength_5k` never withholds anything, so
            * its four rows are exactly what they were.
            */
-          const floored = slotOptionsNow(key, props.slots, frame);
+          const floored = slotOptionsNow(key, slotsNow, frame);
           /**
            * ⛔⛔ THE FLOOR NEVER EMPTIES A ROW. `allowedSports` is the posture step's answer, and a
            * ride-only athlete on a frame that prescribes riding could have both filters land on the
@@ -326,6 +401,24 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
             : { options: frameSlots(frame).find((x) => x.key === key)?.options ?? [], reason: null };
           // ⚠️ THIS FRAME'S HARD ROWS — three where the frame prescribes three quality sessions.
           const isHard = hardKeys.includes(key);
+          /**
+           * ⛔⛔ A FIXED ROW STILL OPENS **IF IT HAS SOMETHING ELSE TO CHOOSE**, AND THIS IS A
+           * DELIBERATE NARROWING OF THE RULING — flagged, not silent (2026-08-31).
+           *
+           * Michael's words were *"no chevron"* on both fixed rows. Measured, that is right for the
+           * day 4 easy ride, whose only question is its length. It is **wrong for the day 2 hard
+           * ride**, which carries three named session choices off p237 — Progressive repeats,
+           * One-to-one repeats, Surge-sustain-surge — reachable from nowhere else in the flow. An
+           * inert grey row there would have deleted three real answers to fix a lone button, so the
+           * ruling is applied to the part it was about: **the sport is a fact on both rows; the
+           * chevron goes only where the sport was the whole question.**
+           *
+           * ⚠️ THE TEST IS THE SAME ONE `renderHardFlavor` IS ALREADY CALLED UNDER, so a row that
+           * opens always has a body and a row that does not open never had one.
+           */
+          const expandable = !forced || isHard || key === 'long';
+          // ⚠️ ONE NAME FOR "this row is a label, not a question" — the header reads it three times.
+          const dim = !expandable;
           /**
            * ⛔ THE LONG SLOT SHOWS ITS SESSION TITLE TOO (slice 2b, 2026-08-25). It was hard-only,
            * so a long slot the athlete had marked as their club ride showed the sport and nothing
@@ -343,10 +436,10 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
            * frame's own `role` decides which question a row is: p246 and p274 own the quality doses.
            */
           const lengths = dayOrdered
-            ? slotLengthOptions(key, props.slots, { baselines: props.baselines as never, frame })
+            ? slotLengthOptions(key, slotsNow, { baselines: props.baselines as never, frame })
             : null;
           const fixed = dayOrdered
-            ? slotFixedMinutes(key, props.slots, { baselines: props.baselines as never, frame })
+            ? slotFixedMinutes(key, slotsNow, { baselines: props.baselines as never, frame })
             : null;
           /**
            * ⛔ THE ROW STATES ITS LENGTH, ANSWERED OR NOT. A quality row shows the dose it is fixed
@@ -372,6 +465,75 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           // ⛔ THE FRAME OWNS THE DAY — see `slotFrameDay`. `null` on a column with no such slot
           // (the taper carries three, not four), which renders no prefix rather than a wrong one.
           const dayNumber = slotFrameDay(key, 'standard', frame);
+          /**
+           * ⛔ THE LABEL IS BUILT ONCE AND PLACED TWICE — inside the button on a row that opens, and
+           * inside a plain div on a fixed row that does not. Two JSX copies of a nine-part label is
+           * how the two would drift, and it also hid a real thing from the compiler: with the copies
+           * inline, TypeScript could prove `key === 'long'` was dead in the fixed branch, because a
+           * long row is always expandable. One definition, one narrowing, one truth.
+           */
+          const labelSpan = (
+                    <span className="min-w-0">
+                      {/* ⛔ THE ROW STATES ITS WHOLE ANSWER — never "Hard 1". See `slotSummary`. */}
+                      {/* ⛔ AND WHICH DAY OF THE WEEK'S SEVEN IT IS (Michael, 2026-08-30: *"lets number
+                          the days in this section"*). Read off the frame by `slotFrameDay`, never
+                          hardcoded, and a NUMBER rather than a weekday — the frame rotates onto the
+                          calendar after this screen, so a weekday here is a promise the next screen
+                          breaks. ⚠️ Its own element, not folded into `slotSummary`: the slot labels are
+                          frozen and this adds a fact to the row rather than renaming anything. */}
+                      {/* ⛔⛔ THE DAY LINE AND THE ANSWER LINE ARE SEPARATE (2026-08-30, off the
+                          rendered harness). They were one line — `Day 1 · push day (upper) · Hard
+                          session 1 · Ride · Sustained threshold` — and on a 430px phone the answer
+                          truncated to *"Hard sessi…"*, which is the one thing on the row the athlete
+                          came to read. **The day number and the lifting theme are both facts the FRAME
+                          states about the day; the line under them is the athlete's own answer.**
+                          Splitting them by that seam gives the answer the full width and reads as two
+                          kinds of information rather than a five-part string. */}
+                      {/* ⚠️⚠️ THE TWO-LINE SEAM IS PER **LIST**, NOT PER ROW, AND BOTH HALVES OF THAT
+                          WERE FOUND ON THE RENDERED PAGE.
+
+                          ⛔ IT IS GATED ON `dayOrdered` SO `strength_5k` IS BYTE-IDENTICAL. Applied
+                          unconditionally, its rows became `Day 6` over `Long session · Long run` where
+                          they had been one line — a visible change to a screen Michael ruled is not to
+                          be touched.
+                          ⛔ AND IT IS THE WHOLE LIST RATHER THAN "rows that have a tag", because days 6
+                          and 7 carry no lifting and therefore no tag: keyed on the tag, Standard Focus
+                          would have drawn five two-line rows and then a one-line row six, which reads as
+                          a rendering fault rather than as a week. */}
+                      {dayOrdered ? (
+                        <span className={`block ${dim ? 'text-white/30' : 'text-white/45'} text-xs leading-snug truncate`}>
+                          {dayNumber != null ? (
+                            <span className="tabular-nums">{`Day ${dayNumber}`}</span>
+                          ) : null}
+                          {/* ⛔ THE DAY'S LIFTING THEME, IN THE FRAME'S OWN WORDS — see `themeTag`. It
+                              sits with the day number because it describes the DAY, not the session
+                              the row is asking about, and it is greyed for the same reason. */}
+                          {themeTag ? (
+                            <span className={dim ? 'text-white/25' : 'text-white/35'}>
+                              {`${dayNumber != null ? ' · ' : ''}${themeTag}`}
+                            </span>
+                          ) : null}
+                        </span>
+                      ) : null}
+                      <span className={`block ${dim ? 'text-white/40' : 'text-white/90'} text-sm leading-snug truncate`}>
+                        {(dayNumber != null && !dayOrdered) ? (
+                          <span className="text-white/45 tabular-nums">{`Day ${dayNumber} · `}</span>
+                        ) : null}
+                        {[slotSummary(key, sport, session), lengthNow].filter(Boolean).join(' · ')}
+                      </span>
+                      {key === 'long' ? (
+                        <span className="block text-white/40 text-xs mt-0.5">{LONG_SLOT_NOTE}</span>
+                      ) : null}
+                      {/* ⛔ THE ROW THAT SITS THE DAY BEFORE A HEAVY LEG DAY, asked of the frame —
+                          see `slotPrecedesHeavyLowerDay`. It was `key === 'hard1'`, which is the same
+                          answer for this frame and a positional guess for any other. A quality session
+                          followed by an upper day costs the lifts nothing and stays silent. */}
+                      {slotPrecedesHeavyLowerDay(key, frame) ? (
+                        <span className="block text-white/40 text-xs mt-0.5">{HARD_1_SLOT_NOTE}</span>
+                      ) : null}
+                    </span>
+          );
+
           return (
             <div
               key={key}
@@ -417,86 +579,62 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                   second tap on the chosen sport must NOT clear the slot. It conflates "I want the
                   other sport" with "I do not want this session", and it loses the answer to a
                   mis-tap with no undo. The chips do exactly one thing. */}
-              <div className="flex items-stretch">
-                <button
-                  type="button"
-                  data-testid={`slot-row-${key}`}
-                  aria-expanded={isOpen}
-                  onClick={() => setOpen(isOpen ? null : key)}
-                  className="flex-1 min-w-0 text-left pl-4 pr-2 py-3.5 flex items-center justify-between gap-3"
-                >
-                  <span className="min-w-0">
-                    {/* ⛔ THE ROW STATES ITS WHOLE ANSWER — never "Hard 1". See `slotSummary`. */}
-                    {/* ⛔ AND WHICH DAY OF THE WEEK'S SEVEN IT IS (Michael, 2026-08-30: *"lets number
-                        the days in this section"*). Read off the frame by `slotFrameDay`, never
-                        hardcoded, and a NUMBER rather than a weekday — the frame rotates onto the
-                        calendar after this screen, so a weekday here is a promise the next screen
-                        breaks. ⚠️ Its own element, not folded into `slotSummary`: the slot labels are
-                        frozen and this adds a fact to the row rather than renaming anything. */}
-                    {/* ⛔⛔ THE DAY LINE AND THE ANSWER LINE ARE SEPARATE (2026-08-30, off the
-                        rendered harness). They were one line — `Day 1 · push day (upper) · Hard
-                        session 1 · Ride · Sustained threshold` — and on a 430px phone the answer
-                        truncated to *"Hard sessi…"*, which is the one thing on the row the athlete
-                        came to read. **The day number and the lifting theme are both facts the FRAME
-                        states about the day; the line under them is the athlete's own answer.**
-                        Splitting them by that seam gives the answer the full width and reads as two
-                        kinds of information rather than a five-part string. */}
-                    {/* ⚠️⚠️ THE TWO-LINE SEAM IS PER **LIST**, NOT PER ROW, AND BOTH HALVES OF THAT
-                        WERE FOUND ON THE RENDERED PAGE.
 
-                        ⛔ IT IS GATED ON `dayOrdered` SO `strength_5k` IS BYTE-IDENTICAL. Applied
-                        unconditionally, its rows became `Day 6` over `Long session · Long run` where
-                        they had been one line — a visible change to a screen Michael ruled is not to
-                        be touched.
-                        ⛔ AND IT IS THE WHOLE LIST RATHER THAN "rows that have a tag", because days 6
-                        and 7 carry no lifting and therefore no tag: keyed on the tag, Standard Focus
-                        would have drawn five two-line rows and then a one-line row six, which reads as
-                        a rendering fault rather than as a week. */}
-                    {dayOrdered ? (
-                      <span className="block text-white/45 text-xs leading-snug truncate">
-                        {dayNumber != null ? (
-                          <span className="tabular-nums">{`Day ${dayNumber}`}</span>
-                        ) : null}
-                        {/* ⛔ THE DAY'S LIFTING THEME, IN THE FRAME'S OWN WORDS — see `themeTag`. It
-                            sits with the day number because it describes the DAY, not the session
-                            the row is asking about, and it is greyed for the same reason. */}
-                        {themeTag ? (
-                          <span className="text-white/35">
-                            {`${dayNumber != null ? ' · ' : ''}${themeTag}`}
-                          </span>
-                        ) : null}
-                      </span>
-                    ) : null}
-                    <span className="block text-white/90 text-sm leading-snug truncate">
-                      {(dayNumber != null && !dayOrdered) ? (
-                        <span className="text-white/45 tabular-nums">{`Day ${dayNumber} · `}</span>
-                      ) : null}
-                      {[slotSummary(key, sport, session), lengthNow].filter(Boolean).join(' · ')}
-                    </span>
-                    {key === 'long' ? (
-                      <span className="block text-white/40 text-xs mt-0.5">{LONG_SLOT_NOTE}</span>
-                    ) : null}
-                    {/* ⛔ THE ROW THAT SITS THE DAY BEFORE A HEAVY LEG DAY, asked of the frame —
-                        see `slotPrecedesHeavyLowerDay`. It was `key === 'hard1'`, which is the same
-                        answer for this frame and a positional guess for any other. A quality session
-                        followed by an upper day costs the lifts nothing and stays silent. */}
-                    {slotPrecedesHeavyLowerDay(key, frame) ? (
-                      <span className="block text-white/40 text-xs mt-0.5">{HARD_1_SLOT_NOTE}</span>
-                    ) : null}
-                  </span>
+              {/* ⛔⛔ THE HEADER IS A BUTTON ONLY WHERE THERE IS SOMETHING BEHIND IT (2026-08-31).
+                  A fixed row with no other question is a LABEL — no button element, no chevron, no
+                  hit target, nothing that invites a tap that would do nothing. It is the same shape
+                  as `quietRow` and for the same reason: it states what the frame decided. */}
+              <div className="flex items-stretch">
+                {expandable ? (
+                  <button
+                    type="button"
+                    data-testid={`slot-row-${key}`}
+                    aria-expanded={isOpen}
+                    onClick={() => setOpen(isOpen ? null : key)}
+                    className="flex-1 min-w-0 text-left pl-4 pr-2 py-3.5 flex items-center justify-between gap-3"
+                  >
+                  {labelSpan}
                   <ChevronDown
                     aria-hidden
                     className="h-4 w-4 shrink-0 text-white/35 transition-transform"
                     style={isOpen ? { transform: 'rotate(180deg)' } : undefined}
                   />
-                </button>
+                  </button>
+                ) : (
+                  /* ⚠️ `aria-hidden` IS DELIBERATELY NOT SET, same as `quietRow`: the row carries a
+                     real fact about the athlete's week and a non-sighted athlete must get it too. */
+                  <div
+                    data-testid={`slot-row-${key}`}
+                    className="flex-1 min-w-0 pl-4 pr-4 py-3.5"
+                  >
+                  {labelSpan}
+                  {/* ⛔ THE LENGTH IS STILL THE ATHLETE'S ON A FIXED ROW, so it renders on the face of
+                      it rather than behind a chevron this row does not have. ⚠️ It is `lengths`, not
+                      `dim`, that decides — a fixed QUALITY row is dosed by the page and offers
+                      nothing here, and this stays silent rather than drawing an empty control. */}
+                  {lengths ? (
+                    <div className="mt-3">{lengthPicker(key, lengths, picked, sport)}</div>
+                  ) : null}
+                  </div>
+                )}
               </div>
 
-              {isOpen ? (
+              {/* ⚠️ `expandable` IS RE-TESTED HERE AND NOT ONLY ON THE HEADER. `open` is a single key
+                  of component state, so a row that stops being expandable while it is the open one —
+                  a sport change on another row narrowing this one — would otherwise render an
+                  accordion body under a header with no chevron to close it. */}
+              {isOpen && expandable ? (
                 <div className="px-4 pb-4 space-y-3">
                   <div className="instrument-divider !my-0" />
                   {/* The sport, as two chips. Selected carries the sport colour; unselected neutral —
                       colouring both would read as two chosen answers. */}
+                  {/* ⛔⛔ NO CHIPS AT ALL ON A FIXED ROW — see `forcedSportFor`. Not "one chip, already
+                      selected": a lone button that cannot change anything is the exact thing Michael
+                      called out on the live screen. The sport is stated in the header and the reason
+                      is stated below, where the chips were. */}
+                  {forced ? (
+                    <p className="text-white/45 text-xs leading-snug">{FIXED_SPORT_LINE[forced]}</p>
+                  ) : (
                   <div className="flex items-center gap-2">
                     {optionsNow.options.filter((opt) => allowed(opt.value)).map((opt) => {
                       const on = sport === opt.value;
@@ -520,6 +658,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                       );
                     })}
                   </div>
+                  )}
 
                   {/* ⛔⛔ WHY THE OTHER CHIP IS NOT THERE — the impact floor (p275, enforcement OURS;
                       see `IMPACT_FLOOR_IS_OURS`). A control that is simply absent reads as a bug or
@@ -557,28 +696,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                       exist: the ask-15-get-20 defect in a new place.
                       ⚠️ THE EMPTY OPTION STAYS FIRST, the same rule the hours box had: no number in an
                       untouched control, because a preselected value reads as a recommendation. */}
-                  {lengths ? (
-                    <div>
-                      <p className="text-white/80 text-[13px] mb-2">{SESSION_LENGTH_LABEL}</p>
-                      <div className="flex items-baseline gap-2">
-                        <select
-                          data-testid={`slot-${key}-minutes`}
-                          value={picked != null ? String(picked) : ''}
-                          onChange={(e) => {
-                            const n = Number(e.target.value);
-                            if (Number.isFinite(n) && n > 0) props.onSlotMinutes?.(key, n);
-                          }}
-                          className="w-28 px-3 py-2 rounded-xl bg-white/[0.05] border border-white/12 text-white text-base tabular-nums focus:outline-none focus:border-[var(--fc)]"
-                          style={{ ['--fc' as string]: `rgb(${getDisciplineColorRgb(SPORT_DISCIPLINE[sport ?? 'run'])})` }}
-                        >
-                          <option value="">—</option>
-                          {lengths.options.map((m) => (
-                            <option key={m} value={String(m)}>{sessionLengthLabel(m)}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  ) : null}
+                  {lengthPicker(key, lengths, picked, sport)}
 
                   {(isHard || key === 'long') && props.renderHardFlavor
                     ? props.renderHardFlavor(key)
@@ -872,7 +990,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                     ⚠️ IT NEEDS EVERY SLOT ANSWERED for the same reason the fixed-hours line does —
                     both numbers are summed from the slots, and before that they would describe a week
                     the athlete has not yet described. */}
-                {allSlotsChosen(props.slots, frame) && chips[sport] ? (() => {
+                {allSlotsChosen(slotsNow, frame) && chips[sport] ? (() => {
                   const pair = chips[sport]!;
                   const picked = props.experience[sport] ?? null;
                   const hours = Number(sport === 'run' ? props.runVolume : props.rideHours);
@@ -983,7 +1101,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                     the long run carries faster inserts and the long ride does not, and before the slots
                     are answered there is no week to be right about.
                     ⚠️ NO NUMBER IN IT, deliberately — see `restIsEasyLine`. */}
-                {allSlotsChosen(props.slots, frame) && chips[sport] ? (
+                {allSlotsChosen(slotsNow, frame) && chips[sport] ? (
                   <p
                     /* ⚠️ THE OLD GAP WHERE THE OLD LAYOUT STILL STANDS. Inside the experience block
                        this sat `mt-1.5` under the chips; on `strength_5k` it still follows chips and

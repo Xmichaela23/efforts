@@ -926,17 +926,78 @@ export function hardSlotKeysFor(
  */
 
 /**
+ * ⛔⛔ A ROW THE FRAME ALREADY ANSWERED — ONE OPTION IS NOT A CHOICE (Michael, off the live screen,
+ * 2026-08-31).
+ *
+ * p274's day 2 is a cycling anaerobic session and its day 4 is a cycling endurance session, so
+ * `optionsFor` narrows both to Ride alone — see its own note for why the run tap must not be
+ * offered. **The screen still drew them as questions:** a chevron, an accordion, and a single Ride
+ * button sitting there asking to be tapped. A control with one option is a control that cannot be
+ * wrong, and drawing it says the athlete has a decision here when the page made it for them.
+ *
+ * ⛔⛔ IT READS THE **FRAME'S** OPTIONS, NEVER THE ROW'S OPTIONS RIGHT NOW. `slotOptionsNow` can
+ * narrow a row to one at runtime — the impact floor withholding `ride`, the posture withholding
+ * `run` — and greying a row on THAT would freeze an answer the athlete can still legitimately
+ * change by editing another row. Fixed means the page prescribes one sport for this session, full
+ * stop; transient narrowing keeps its chips and states its reason, which is what `optionsNow.reason`
+ * is for.
+ *
+ * ⚠️ `strength_5k` CANNOT REACH THIS AND THAT IS MEASURED, NOT ASSUMED: every slot in both of its
+ * columns is a run family, so every row carries both options and `forcedSportFor` returns null for
+ * all four. No frame test is needed here and none is written — a `frame === 'all_rounder'` literal
+ * would be a second copy of a ruling that the frame already states in its own data.
+ */
+export function forcedSportFor(
+  key: SlotKey,
+  frame: FrameId = 'strength_5k',
+  column: ColumnKind = 'standard',
+): SlotSport | null {
+  const opts = frameSlots(frame, column).find((s) => s.key === key)?.options ?? [];
+  return opts.length === 1 ? opts[0].value : null;
+}
+
+/**
+ * ⛔ WHY THERE ARE NO CHIPS ON A ROW THAT STILL OPENS. A control that is simply absent reads as a
+ * bug or as the screen having forgotten the row — the same reason the impact floor states its
+ * reason rather than silently dropping a chip. Fact-first, no imperative, no apology.
+ * ⚠️ IT IS ONLY DRAWN ON A ROW THAT HAS SOMETHING ELSE TO CHOOSE. A row whose sport is its only
+ * question does not open at all, and its header already says `Easy session · Ride`.
+ */
+export const FIXED_SPORT_LINE: Record<SlotSport, string> = {
+  ride: 'This session is a ride in this plan.',
+  run: 'This session is a run in this plan.',
+};
+
+/**
  * ⛔⛔ CONTINUE WAITS ON ALL FOUR AGAIN (Michael, 2026-08-26 evening), which is what it did before
  * the hard slots became opt-in on 2026-08-25. A week with an unanswered slot is not a week.
+ *
+ * ⛔⛔ AND A FIXED ROW IS ANSWERED BY THE FRAME, NOT BY THE ATHLETE — `forcedSportFor`. This is
+ * deliberately NOT left to the pre-fill effect that writes those rows into state: **the gate must be
+ * true on the render before any effect has run.** A gate that waits on an effect is the
+ * unsatisfiable-Continue defect of 2026-08-30 in a new place — Continue disabled, the sentence
+ * naming a row, and no control on the screen able to satisfy it. The gate and the sentence read the
+ * same function the renderer does, so the three cannot disagree.
  */
 export function allSlotsChosen(slots: SlotSelection, frame: FrameId = 'strength_5k'): boolean {
   // ⚠️ THE FRAME'S OWN ROWS — a five-slot week is not finished when its first four are answered.
-  return slotKeysFor(frame).every((k) => slots[k] === 'run' || slots[k] === 'ride');
+  return slotKeysFor(frame).every((k) => slotIsAnswered(slots, k, frame));
+}
+
+/** ⚠️ ONE DEFINITION OF "answered", SHARED BY THE GATE AND THE SENTENCE. They were two expressions. */
+export function slotIsAnswered(
+  slots: SlotSelection,
+  key: SlotKey,
+  frame: FrameId = 'strength_5k',
+  column: ColumnKind = 'standard',
+): boolean {
+  return forcedSportFor(key, frame, column) != null
+    || slots[key] === 'run' || slots[key] === 'ride';
 }
 
 /** The rows still waiting, in screen order — for the line above a disabled Continue. */
 export function unansweredSlots(slots: SlotSelection, frame: FrameId = 'strength_5k'): SlotKey[] {
-  return slotKeysFor(frame).filter((k) => slots[k] !== 'run' && slots[k] !== 'ride');
+  return slotKeysFor(frame).filter((k) => !slotIsAnswered(slots, k, frame));
 }
 
 /**

@@ -25,6 +25,7 @@ import {
   slotOptionsNow,
   unansweredLine,
   unansweredSlots,
+  forcedSportFor,
 } from './standing-plan-week-copy.ts';
 import { builtFamily, experienceChips, familyMapFor, slotsForEngine } from './standing-plan-week-bounds.ts';
 import {
@@ -71,8 +72,24 @@ Deno.test('⛔⛔ THE ROWS, THE HEADER AND THE BLOCKED SENTENCE ALL COUNT THE SA
      * blocked sentence named five — so Continue was disabled and could not be satisfied, because the
      * fifth row it demanded was not on the screen.
      */
-    assertEquals(s.rows.length, s.blockedNames.length,
-      `${focus}: ${s.rows.length} rows drawn but ${s.blockedNames.length} named as unanswered`);
+    /**
+     * ⛔⛔ REBASED 2026-08-31, AND THE DIRECTION THAT MATTERS IS KEPT. This read
+     * `rows.length === blockedNames.length` — every drawn row must be nameable as unanswered — and
+     * that stopped being true when a row the FRAME answers stopped drawing as a question:
+     * Standard Focus draws five rows and only three of them ask anything (see `forcedSportFor`).
+     * ⚠️ THE DEFECT IT WAS WRITTEN FOR IS A NAME WITH NO ROW, and that is asserted below, unweakened.
+     * What is compared here now is the rows that actually ASK — so a fixed row silently becoming a
+     * question again, or a real question silently going fixed, still fails.
+     */
+    const asks = s.rows.filter((k) => forcedSportFor(k, s.frame) == null);
+    assertEquals(asks.length, s.blockedNames.length,
+      `${focus}: ${asks.length} rows ask for a sport but ${s.blockedNames.length} named as unanswered`);
+    // ⛔ AND A ROW THE FRAME ANSWERS IS NEVER NAMED — the athlete cannot satisfy a row with no control.
+    for (const k of s.rows) {
+      if (forcedSportFor(k, s.frame) != null) {
+        assert(!s.blockedNames.includes(k), `${focus}: ${k} is fixed by the frame and still named`);
+      }
+    }
     assertEquals(s.rows.length, s.payloadKeys.length,
       `${focus}: the screen draws ${s.rows.length} rows and sends ${s.payloadKeys.length} answers`);
     assert(s.intro[0].includes(String(s.rows.length)),
@@ -268,5 +285,39 @@ Deno.test('⛔⛔ EVERY CHIP THE SCREEN DRAWS SAYS SOMETHING, ON EVERY FRAME', (
           `${focus}/${sport}: the experienced chip has no duration`);
       }
     }
+  }
+});
+
+Deno.test("⛔⛔ A ROW THE FRAME ANSWERS NEVER GATES CONTINUE, AND THE 5K FRAME HAS NONE", () => {
+  /**
+   * ⛔ MEASURED, NOT ASSUMED (Michael, off the live screen, 2026-08-31). Every `strength_5k` slot is
+   * a run family, so it has no fixed row and this whole behaviour is unreachable there — which is
+   * WHY `forcedSportFor` carries no frame test. If a future column ever gives 5K a single-option row
+   * this fails, and the freeze gets looked at before the screen changes under it.
+   */
+  for (const column of ['standard', 'taper'] as const) {
+    for (const k of slotKeysFor('strength_5k', column)) {
+      assertEquals(forcedSportFor(k, 'strength_5k', column), null, `5K ${column} ${k} is fixed`);
+    }
+  }
+
+  // ⛔ p274's day 2 and day 4 are cycling sessions — see `optionsFor` for why no run tap is offered.
+  assertEquals(forcedSportFor('hard2', 'all_rounder'), 'ride');
+  assertEquals(forcedSportFor('easy', 'all_rounder'), 'ride');
+
+  /**
+   * ⛔⛔ THE WHOLE POINT: ANSWERING ONLY THE ROWS THAT ASK SATISFIES CONTINUE. Before this, the
+   * screen drew a lone Ride button on two rows and the gate waited on a tap that changed nothing —
+   * and if the pre-fill effect had ever not run, Continue was unsatisfiable. The gate reads the
+   * frame, so it is true on the first render with those rows untouched.
+   */
+  for (const frame of ['strength_5k', 'all_rounder'] as const) {
+    const asked = Object.fromEntries(
+      slotKeysFor(frame)
+        .filter((k) => forcedSportFor(k, frame) == null)
+        .map((k) => [k, 'run']),
+    ) as never;
+    assert(allSlotsChosen(asked, frame), `${frame}: every asking row answered and Continue is blocked`);
+    assertEquals(unansweredLine(asked, frame), null);
   }
 });
