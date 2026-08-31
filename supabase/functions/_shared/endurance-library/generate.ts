@@ -617,9 +617,29 @@ function buildDescending(ctx: BuildContext): Block[] {
    * the dose target buys at the band's own mean rep — so a bigger dose gets a longer ladder rather
    * than a different one.
    */
+  /**
+   * ⛔⛔ THE SOURCE'S OWN RUNGS WHERE IT GIVES THEM — see `Archetype.ladderByLevel`. The fallback
+   * below is the old even interpolation, kept for any descending shape that states no sequence.
+   */
+  const rounds = a.ladderByLevel?.[ctx.level];
+  const steps: Step[] = [];
+  if (rounds && rounds.length > 0) {
+    rounds.forEach((round, r) => {
+      round.forEach((work, i) => {
+        steps.push(step('work', `Rung ${i + 1}`, work, a.work, sport, anchor));
+        const rest = recoveryStep(a, work, sport, anchor);
+        // ⚠️ THE LAST RUNG OF THE LAST ROUND ENDS THE BLOCK — no trailing recovery into the cooldown.
+        if (rest && !(r === rounds.length - 1 && i === round.length - 1)) steps.push(rest);
+      });
+      if (r < rounds.length - 1 && a.ladderRoundRest) {
+        steps.push(step('recovery', 'Between rounds', a.ladderRoundRest, { kind: 'easy' }, sport, anchor));
+      }
+    });
+    const rungCount = rounds.reduce((t, x) => t + x.length, 0);
+    return [{ repeat: 1, label: `Cut-downs, ${rungCount} rungs`, steps, restBetween: null }];
+  }
   const meanRep = (a.repBand.lo + a.repBand.hi) / 2;
   const rungs = clamp(Math.round(ctx.target / meanRep), 2, 12);
-  const steps: Step[] = [];
   for (let i = 0; i < rungs; i++) {
     const t = rungs === 1 ? 0 : i / (rungs - 1);
     const work = Math.round(a.repBand.hi - (a.repBand.hi - a.repBand.lo) * t);

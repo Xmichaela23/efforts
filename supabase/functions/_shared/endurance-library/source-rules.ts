@@ -419,6 +419,24 @@ export type Archetype = {
    * ⚠️ ABSENT MEANS A FLAT EFFORT, which is every other shape.
    */
   progressive?: true;
+  /**
+   * ⛔⛔⛔ A LADDER'S OWN RUNGS, PER LEVEL — `descending` only (2026-08-31, on Michael's ruling).
+   *
+   * `buildDescending` interpolated evenly between the ends of `repBand` and took however many rungs
+   * the DOSE bought, so it produced a smooth decay — 180/159/137/116/94/73/51/30 — where the source
+   * prescribes a specific stepped sequence that halves and then narrows. **Neither the step sizes nor
+   * the rung count were the page's.**
+   *
+   * ⚠️ EACH ENTRY IS A LIST OF ROUNDS, and each round a list of WORK reps in seconds. The recovery
+   * between rungs is still `recovery` — the ladder's recoveries fall with the work at a constant
+   * ratio, which the existing proportional rule already expresses exactly. Only the work sequence
+   * was missing.
+   * ⚠️ THE LEVELS DIFFER BY ROUNDS, NOT BY RUNGS: the source runs the same ladder more times as the
+   * level rises, and its middle level starts its second round partway down rather than at the top.
+   */
+  ladderByLevel?: Partial<Record<Level, number[][]>>;
+  /** Seconds of easy recovery between ladder rounds, where the source states one. */
+  ladderRoundRest?: number;
   /** Which levels the source offers this shape at. Absent = all three. */
   levels?: Level[];
   /** Repeats are grouped into sets with their own stated between-set recovery. */
@@ -622,9 +640,21 @@ export const FAMILIES: Record<FamilyId, {
         // ⛔ THE BOOK'S WORDS, same ruling as `surge_float` above (2026-08-31). "The descending
         // ladder" is how p231-232 prints it; "cut-downs" was the field's name for it. Id unchanged.
         label: 'The descending ladder',
+        /**
+         * ⛔ THE RUNGS ARE THE SOURCE'S, PER LEVEL — see `ladderByLevel`. Level one runs the ladder
+         * once; level two runs it again from partway down; level three runs it three times.
+         */
+        ladderByLevel: {
+          1: [[180, 120, 60, 45, 30]],
+          2: [[180, 120, 60, 45, 30], [120, 60, 45, 30]],
+          3: [[180, 120, 60, 45, 30], [180, 120, 60, 45, 30], [180, 120, 60, 45, 30]],
+        },
+        ladderRoundRest: 120,
         repBand: { lo: 30, hi: 180 },
         work: pct(1.20),
-        recovery: { kind: 'proportional', factor: 0.67, intensity: pct(0.60) },
+        // ⚠️ TWO THIRDS EXACTLY, not the rounded 0.67 — the ladder's recovery is two-thirds of the
+        // work rep, and the rounded constant put 121 seconds where the source's step is two minutes.
+        recovery: { kind: 'proportional', factor: 2 / 3, intensity: pct(0.60) },
         cite: 'Viada pp231-232 — reps step down, recovery steps down with them',
       },
     ],
