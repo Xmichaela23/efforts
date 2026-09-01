@@ -82,8 +82,68 @@ function closureOf(fn: string): Set<string> {
   return seen;
 }
 
-function importersOf(marker: string, fns: string[]): string[] {
-  return fns.filter((fn) => [...closureOf(fn)].some((f) => f.includes(marker)));
+/**
+ * ⛔⛔ EVERY SHARED FILE, READ OFF THE CLOSURES — NOT A HAND-NAMED LIST OF FOLDERS.
+ *
+ * The first shape of this table enumerated `_shared/standing-plan/` per file and then hand-named two
+ * more markers (`strength-grid/`, `strength-gear`). `_shared/state-trend/` was in neither. So a
+ * session that edited it, correctly consulted THIS generated table, found no row, and reasonably
+ * concluded there was nothing to deploy — the exact shape of the failure this repo records as having
+ * stranded 17 functions for a month. **A hole in a generated list is worse than a hole in a
+ * hand-written one, because the generated one is the list people are told to trust.**
+ *
+ * So the table is now driven from two directions and the union is printed:
+ *   1. every file any function's bundle REACHES outside that function's own folder — `_shared/**`,
+ *      `shared/**`, `src/lib/**`, and anything else a relative import can get to; a new shared
+ *      folder cannot be missed because nothing here names folders;
+ *   2. every non-test `.ts` on disk under `_shared/` and `shared/`, so a file nothing bundles still
+ *      prints — as "— nothing bundles it", which is itself a fact worth seeing.
+ * Matching is by exact resolved path, not substring: a `run/` marker would match
+ * `endurance-library/run/…` and any other folder called `run`.
+ */
+function closures(fns: string[]): Map<string, Set<string>> {
+  return new Map(fns.map((fn) => [fn, closureOf(fn)]));
+}
+
+function importersOf(path: string, cl: Map<string, Set<string>>): string[] {
+  return [...cl.entries()].filter(([, set]) => set.has(path)).map(([fn]) => fn).sort();
+}
+
+function exists(path: string): boolean {
+  try { return Deno.statSync(path).isFile; } catch { return false; }
+}
+
+/** Every non-test `.ts` under `dir`, recursively, as absolute paths. */
+function sourceFilesUnder(dir: string): string[] {
+  const out: string[] = [];
+  let entries: Iterable<Deno.DirEntry>;
+  try { entries = Deno.readDirSync(dir); } catch { return out; }
+  for (const e of entries) {
+    const p = `${dir}/${e.name}`;
+    if (e.isDirectory) out.push(...sourceFilesUnder(p));
+    else if (e.isFile && e.name.endsWith('.ts') && !e.name.includes('.test.')) out.push(p);
+  }
+  return out;
+}
+
+/** The shared files, grouped by folder (repo-relative), each with the functions that bundle it. */
+function sharedFilesByFolder(fns: string[], cl: Map<string, Set<string>>): Map<string, Array<[string, string[]]>> {
+  const all = new Set<string>();
+  for (const [fn, set] of cl) {
+    const own = `${ROOT}supabase/functions/${fn}/`;
+    for (const f of set) if (!f.startsWith(own) && exists(f)) all.add(f);
+  }
+  for (const d of ['_shared', 'shared']) for (const f of sourceFilesUnder(`${ROOT}supabase/functions/${d}`)) all.add(f);
+
+  const byFolder = new Map<string, Array<[string, string[]]>>();
+  for (const abs of [...all].sort()) {
+    const rel = abs.slice(ROOT.length);
+    const folder = rel.slice(0, rel.lastIndexOf('/'));
+    const file = rel.slice(rel.lastIndexOf('/') + 1);
+    if (!byFolder.has(folder)) byFolder.set(folder, []);
+    byFolder.get(folder)!.push([file, importersOf(abs, cl)]);
+  }
+  return byFolder;
 }
 
 // ── render ──────────────────────────────────────────────────────────────────────────────────────
@@ -104,22 +164,29 @@ function slotLine(frame: FrameId, column: ColumnKind): string[] {
 
 export function render(): string {
   const fns = edgeFunctions();
-  const standingPlan = importersOf('standing-plan/', fns);
-  const strengthGrid = importersOf('strength-grid/', fns);
-  const gear = importersOf('strength-gear', fns);
+  const cl = closures(fns);
 
   /**
-   * ⛔ THE STANDING-PLAN FILES ONE BY ONE. These are the files this project edits most, and a
-   * folder-level answer sends people to deploy functions whose bundle does not contain the change.
+   * ⛔ EVERY SHARED FILE ONE BY ONE, ONE TABLE PER FOLDER. A folder-level answer sends people to
+   * deploy functions whose bundle does not contain the change; a folder that is not enumerated at
+   * all sends them to deploy nothing (see `sharedFilesByFolder`). The folder heading carries the
+   * UNION of its files' importers, so the old folder-level lines still exist — as a ceiling, above a
+   * per-file floor.
    */
-  const spDir = `${ROOT}supabase/functions/_shared/standing-plan`;
-  const spFiles = [...Deno.readDirSync(spDir)]
-    .filter((e) => e.isFile && e.name.endsWith('.ts') && !e.name.includes('.test.'))
-    .map((e) => e.name).sort();
-  const perFile = spFiles.map((f) => {
-    const who = importersOf(`standing-plan/${f}`, fns);
-    return `| \`${f}\` | ${who.map((x) => `\`${x}\``).join(' · ') || '— nothing bundles it' } |`;
-  });
+  const perFolder: string[] = [];
+  for (const [folder, files] of sharedFilesByFolder(fns, cl)) {
+    const union = [...new Set(files.flatMap(([, who]) => who))].sort();
+    perFolder.push(
+      `### \`${folder}/\` — ${files.length} file${files.length === 1 ? '' : 's'} · anything in it → ${union.length} function${union.length === 1 ? '' : 's'}`,
+      '',
+      union.length ? union.map((f) => `\`${f}\``).join(' · ') : '(nothing bundles this folder)',
+      '',
+      '| touch this file | redeploy these |',
+      '|---|---|',
+      ...files.map(([f, who]) => `| \`${f}\` | ${who.map((x) => `\`${x}\``).join(' · ') || '— nothing bundles it'} |`),
+      '',
+    );
+  }
 
   const L: string[] = [
     '# INVENTORY — generated from the code',
@@ -149,14 +216,15 @@ export function render(): string {
     'function that imports only `frames.ts` does not carry `compose.ts` in its bundle, and deploying',
     'it on a `compose.ts` change is noise that trains people to ignore the list.',
     '',
-    '| touch this file | redeploy these |',
-    '|---|---|',
-    ...perFile,
+    '⛔ **EVERY FOLDER A BUNDLE REACHES, NOT A HAND-NAMED FEW.** An earlier shape of this table listed',
+    '`standing-plan/` per file and named two other markers by hand; `state-trend/` was in neither, so',
+    'an edit there met a blank row and read as "nothing to deploy". Folders are now read off the',
+    'bundles themselves — `_shared/`, `shared/`, `src/lib/`, and whatever else a relative import',
+    'reaches — plus everything on disk under `_shared/` and `shared/`, so an unbundled file still',
+    'prints as such. **If the file you touched has no row here, that is a generator bug, not a',
+    'no-deploy.**',
     '',
-    `**Anything in \`_shared/strength-grid/\`** → ${strengthGrid.length} functions: ${strengthGrid.map((f) => `\`${f}\``).join(' · ') || '(none)'}`,
-    '',
-    `**\`src/lib/strength-gear.ts\`** → ${gear.length} functions: ${gear.map((f) => `\`${f}\``).join(' · ') || '(none)'}`,
-    '',
+    ...perFolder,
     '---',
     '',
     '## 2. THE FRAMES — the programmes, as transcribed',
