@@ -820,6 +820,39 @@ export interface ViadaWeekPerformed {
    * bumped (176 → 177) so cached rows re-source; without it the field lands nowhere.
    */
   weekChange?: ViadaWeekChange | null;
+  /**
+   * ⛔ WHAT THE ATHLETE DID THAT THE PLAN DID NOT ASK FOR (2026-09-01, approved by Michael). The
+   * All Rounder is built to the book's doses, so the only lifting volume the programme has not
+   * already accounted for — and therefore the only volume worth measuring against the book's
+   * ranges — is what was added outside the plan. This is that volume, per muscle, on the same
+   * ledger the rest of the card uses.
+   *
+   * ⛔ THE MARKER IS THE LOGGER'S `planned_name` (Q-181): stamped on every row prefilled from the
+   * plan, undefined on a hand-added exercise. A row that carries it was prescribed (a typed-over
+   * name is a SWAP of a prescribed slot, still prescribed volume); a row without it, in a session
+   * where other rows carry it, was added.
+   *
+   * ⛔⛔ ABSENT MARKER MEANS UNKNOWN, NEVER "ADDED". Rows logged before the field existed carry it
+   * on nothing, and so does a session with no plan behind it. A session where NO row carries the
+   * marker cannot be classified — every row in it is unknown — and a window with no classifiable
+   * session sets `known: false`. A wrong "you added this" accuses the athlete of something they did
+   * not do; silence is the correct output for a week the app cannot read.
+   *
+   * ⚠️ ABSENT ON A PAYLOAD WRITTEN BEFORE THIS — the card renders nothing. `COACH_PAYLOAD_VERSION`
+   * bumped (177 → 178).
+   */
+  offPlan?: ViadaWeekOffPlan | null;
+}
+
+export interface ViadaWeekOffPlan {
+  /** FALSE when no session in the window carries the plan marker on any row — unknown, not "nothing added". */
+  known: boolean;
+  /** Sessions in the window that could be classified (at least one row carries the marker). */
+  classifiedSessions: number;
+  /** The added-only dose per muscle — `ledgerFor`'s own lines, over added rows only. Empty = nothing added. */
+  perMuscle: Array<{ muscle: string; sets: number; effectiveReps: number; verdict: string }>;
+  /** Added work sets across the window's classified sessions. */
+  workSets: number;
 }
 
 export interface ViadaWeekChange {
@@ -1551,11 +1584,32 @@ function buildViadaWeekPerformed(
     }
   }
 
+  /**
+   * ⛔ OFF-PLAN WORK — classified per SESSION, never per row. A session where at least one row
+   * carries the plan marker was logged after the marker existed and against a plan, so its unmarked
+   * rows were added by hand. A session where no row carries it is UNKNOWN (pre-marker, or no plan
+   * behind it) and contributes nothing — not to the count, not to the dose. See `ViadaWeekOffPlan`.
+   */
+  const classified = week.filter((sess) => sess.exercises.some((ex) => ex.plannedName != null));
+  const addedOnly: PerformedSession[] = classified
+    .map((sess) => ({ ...sess, exercises: sess.exercises.filter((ex) => ex.plannedName == null) }))
+    .filter((sess) => sess.exercises.length > 0);
+  const addedLedger = addedOnly.length > 0 ? performedLedgerFor(addedOnly) : null;
+  const offPlan: ViadaWeekOffPlan = {
+    known: classified.length > 0,
+    classifiedSessions: classified.length,
+    perMuscle: (addedLedger?.perMuscle ?? [])
+      .filter((m) => m.sets > 0)
+      .map((m) => ({ muscle: m.muscle, sets: m.sets, effectiveReps: m.effectiveReps, verdict: m.verdict })),
+    workSets: (addedLedger?.perSession ?? []).reduce((a, s) => a + s.countedSets, 0),
+  };
+
   return {
     since,
     perMuscle: ledger.perMuscle
       .filter((m) => m.sets > 0)
       .map((m) => ({ muscle: m.muscle, sets: m.sets, effectiveReps: m.effectiveReps, verdict: m.verdict })),
+    offPlan,
     belowFloor: ledger.belowFloor,
     perSession: ledger.perSession.map((sess) => ({
       label: sess.label,
@@ -1581,12 +1635,16 @@ function shiftYmd(ymd: string, days: number): string {
   return new Date(new Date(ymd + 'T12:00:00Z').getTime() + days * 86_400_000).toISOString().slice(0, 10);
 }
 
+/** A performed exercise plus the plan marker it was logged with — see `ViadaWeekOffPlan`. */
+type WindowExercise = PerformedSession['exercises'][number] & { plannedName: string | null };
+type WindowSession = Omit<PerformedSession, 'exercises'> & { exercises: WindowExercise[] };
+
 /** The logged sessions inside `[since, until]`, shaped for the ledgers. One reader for both windows. */
 function performedWindow(
   rows: NonNullable<StateTrendInputs['loggedSessions']>,
   since: string,
   until: string,
-): PerformedSession[] {
+): WindowSession[] {
   return rows
     .filter((r) => {
       const d = String(r?.date ?? '').slice(0, 10);
@@ -1598,6 +1656,10 @@ function performedWindow(
       exercises: (Array.isArray(r?.exercises) ? r.exercises : []).map((ex: any) => ({
         name: String(ex?.name ?? ''),
         intent: typeof ex?.slot_intent === 'string' ? ex.slot_intent : null,
+        // ⛔ THE PLAN MARKER, CARRIED — Q-181's `planned_name`, stamped only on rows prefilled from
+        // the plan. Null on a hand-added row AND on any row logged before the field existed; the
+        // off-plan read tells those apart at the session level, never at the row level.
+        plannedName: typeof ex?.planned_name === 'string' && ex.planned_name.length > 0 ? ex.planned_name : null,
         sets: (Array.isArray(ex?.sets) ? ex.sets : []).map((st: any) => ({
           weightLb: Number(st?.weight) || null,
           reps: Number(st?.reps) || null,

@@ -601,10 +601,36 @@ before reordering ships.** No block may read whether another block is rendered.
       The ruling is that it should speak only about off-plan work — the same server split. Not
       narrowed by approximation, not deleted; a comment on the render says so.
       Build green, eslint clean, no type errors in the file.
-- [ ] 3-lift-offplan. **SERVER: split prescribed vs added in `buildViadaWeekPerformed`** off
-      `planned_name` (and/or `plannedExercises`), emit the added-only dose per muscle with its verdict,
-      and scope `weekChange` to it. Then the card draws item 3 and the change line narrows. 27
-      functions, payload 177 → 178. Not started.
+- [x] 3-lift-offplan. **DONE 2026-09-01 (evening). SERVER + CLIENT. 27-function deploy, payload
+      177 → 178. Approved by Michael ("deploy").**
+      `display.viadaWeek` gains `offPlan`: the added-only lifting dose per muscle, on the same ledger
+      the rest of the card uses, resolved in `buildViadaWeekPerformed`.
+      **MARKER (a), as ruled:** the logger's `planned_name` (Q-181), carried through `performedWindow`
+      — it rides inside the raw exercises the builder already receives; `plannedExercises` (b) was not
+      needed and is still dropped by the snapshot. The trace did not contradict the preference.
+      ⛔ **CLASSIFIED PER SESSION, NEVER PER ROW — ABSENT MEANS UNKNOWN.** A session with at least one
+      marked row can be read: its unmarked rows were added. A session with NO marked row (pre-marker,
+      or no plan behind it) is unknown and contributes nothing — not to the count, not to the dose.
+      `known: false` when no session in the window can be read. A swap (typed-over name, marker
+      present) is prescribed volume. **Pinned: the no-marker window yields `known: false`, empty, zero
+      — it never reads as "added".**
+      **THE CARD:** a block "outside the plan this week" — muscle · added sets · effective reps — only
+      when `known` and something was added. The verdict word prints ONLY when the added volume alone
+      is over the solid band ("over the solid range on its own" / "borders overreaching on its own" /
+      "past the maximum on its own"); light/solid on an extra print nothing, since that would read as
+      a nudge to add more. Caption: "anything you add outside the plan is the volume the programme has
+      not already counted". ⛔ No movement is ever named.
+      ⚠️ **THE >10% CHANGE LINE IS STILL UNSCOPED** — a second decision, per the PM; it still speaks
+      about all lifting buckets.
+      **FIXTURES (6, green):** marked session with an added row → known, added dose only (3 sets, not
+      the 4 prescribed); marked with nothing added → known, empty; **no marker anywhere → unknown,
+      empty, zero**; a swap is not added; a mixed window reads the marked session and ignores the
+      unknown one; the rest of the card byte-identical either way. Suites: 340 passed. Build green,
+      eslint clean, no new type errors. INVENTORY unchanged (closure identical).
+      **CITATION CORRECTION, recorded here and in the card header:** the p275 "resist the urge to add
+      difficulty or length" line (`SOURCE:1199`) is about the ENDURANCE work and was wrongly cited for
+      the lifting cut on the day. The cut stands on the programme being built to the doses and on the
+      mid-week judgement being wrong both ways. Do not attach that quote to a lifting ruling.
 - [x] 3-lift-4. **DONE 2026-09-01. SERVER + CLIENT. NEEDS A DEPLOY (27 functions) — closure below.**
       ITEM 4 — §B5's change rule. `display.viadaWeek` gains `weekChange`: this rolling seven-day
       window's lifting buckets against the seven days immediately before it, listing ONLY the buckets

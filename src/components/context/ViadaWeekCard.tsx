@@ -90,6 +90,15 @@ export type ViadaWeekPerformed = {
   /** ⛔ Server-resolved: §B5's change rule — the buckets that moved more than 10% against the seven
    *  days before this window. Undefined on a payload written before the field existed → no line. */
   weekChange?: ViadaWeekChange | null;
+  /** ⛔ Server-resolved: what was done that the plan did not ask for, per muscle. `known: false` =
+   *  the window's sessions carry no plan marker (logged before it existed, or no plan behind them) —
+   *  unknown, render nothing. Undefined on a payload written before the field existed → nothing. */
+  offPlan?: {
+    known: boolean;
+    classifiedSessions: number;
+    perMuscle: Array<{ muscle: string; sets: number; effectiveReps: number; verdict: string }>;
+    workSets: number;
+  } | null;
 };
 
 /** ⚠️ The catalogue's pattern keys are snake_case; the screen speaks English. */
@@ -128,6 +137,18 @@ const SESSION_VERDICT_WORD: Record<SessionVerdict, string> = {
 };
 
 const isSessionVerdict = (v: string): v is SessionVerdict => v in SESSION_VERDICT_WORD;
+
+/**
+ * ⛔ DISPLAY WORDS OVER THE SERVER'S MUSCLE VERDICT, FOR ADDED WORK ONLY — a map, not a comparison,
+ * and deliberately silent below the solid band. `below_floor` / `light` / `solid` on an EXTRA print
+ * nothing: the extra is measured against the book's ranges only to catch too much, never to ask for
+ * more. An enum value this map does not know prints nothing.
+ */
+const OVER_BAND_WORD: Record<string, string> = {
+  above_solid: 'over the solid range on its own',
+  overreaching: 'borders overreaching on its own',
+  over_max: 'past the maximum on its own',
+};
 
 /**
  * The lead line: how many of the window's sessions sit in each of his brackets. Counts of the
@@ -205,7 +226,35 @@ export default function ViadaWeekCard({ week }: { week: ViadaWeekPerformed | nul
         </div>
       )}
 
-      {/* ── (the per-muscle dose list used to sit here — see the header for why it is not drawn) ── */}
+      {/* ── 3. OUTSIDE THE PLAN — the only lifting volume the programme has not accounted for ──── */}
+      {/**
+        * ⛔ RENDERS THE SERVER'S ADDED-ONLY LEDGER. Which rows were added is decided on the spine off
+        * the logger's plan marker, per session; this prints the per-muscle result. Silent when the
+        * window is UNKNOWN (`known: false` — nothing carries the marker) and silent when nothing was
+        * added — a wrong "you added this" is worse than nothing. The verdict word is shown only when
+        * the added volume alone is over the book's solid band; "light" on an extra would read as a
+        * nudge to add more, which is the opposite of the point.
+        * ⛔ COPY NEVER NAMES A MOVEMENT — "anything you add outside the plan". Muscles only.
+        */}
+      {week.offPlan && week.offPlan.known && week.offPlan.perMuscle.length > 0 && (
+        <div className="mt-3">
+          <div className="text-[11px] uppercase tracking-[0.08em] text-white/55">outside the plan this week</div>
+          <div className="mt-1 space-y-1">
+            {week.offPlan.perMuscle.map((m) => (
+              <div key={m.muscle} className="flex items-baseline justify-between gap-3">
+                <span className="text-[13px] text-white/80">{word(MUSCLE_WORD, m.muscle)}</span>
+                <span className="text-[12px] text-white/60 tabular-nums">
+                  <span className="text-white/80">{m.sets}</span> sets · {m.effectiveReps} effective reps
+                  {OVER_BAND_WORD[m.verdict] && <> · {OVER_BAND_WORD[m.verdict]}</>}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="text-[11px] text-white/55 mt-1">
+            anything you add outside the plan is the volume the programme has not already counted
+          </div>
+        </div>
+      )}
 
       {/* ── 3. THE CHANGE RULE (§B5: no bucket moves more than 10% week to week) ─────────────── */}
       {/**
