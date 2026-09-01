@@ -48,7 +48,7 @@ it on a `compose.ts` change is noise that trains people to ignore the list.
 | `warmup.ts` | `coach` · `generate-strength-plan` · `rematerialize-standing-block` |
 | `week-conflicts.ts` | `coach` · `generate-strength-plan` · `rematerialize-standing-block` |
 | `week-ledger.ts` | `coach` · `generate-strength-plan` · `rematerialize-standing-block` |
-| `working-number.ts` | `coach` · `generate-strength-plan` · `rematerialize-standing-block` |
+| `working-number.ts` | `coach` · `compute-snapshot` · `generate-strength-plan` · `rematerialize-standing-block` |
 
 **Anything in `_shared/strength-grid/`** → 27 functions: `adapt-plan` · `analyze-cycling-workout` · `analyze-running-workout` · `arc-setup-chat` · `coach` · `complete-race` · `compute-adaptation-metrics` · `compute-snapshot` · `compute-workout-analysis` · `course-detail` · `course-strategy` · `create-goal-and-materialize-plan` · `delete-plan` · `end-plan` · `generate-combined-plan` · `generate-run-plan` · `generate-strength-plan` · `generate-triathlon-plan` · `get-arc-context` · `import-strava-history` · `learn-fitness-profile` · `materialize-plan` · `planning-context` · `refresh-goal-race-projections` · `rematerialize-standing-block` · `strava-webhook` · `workout-detail`
 
