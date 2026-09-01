@@ -30,7 +30,14 @@ wins and both get corrected.**
 
 ---
 
-## 0b. ⛔ BEFORE YOU INVESTIGATE A "HOLE", READ THE GOLDEN BLOCKS
+## 0b. ⛔ BEFORE YOU INVESTIGATE A "HOLE", READ THE GOLDEN BLOCKS — AND THE PROTOCOL TESTS
+
+⚠️ **Two more checks exist since 2026-09-01 and they answer different questions.**
+`protocol.test.ts` asserts **the book's own rules**, ten of them, each test named after the page it
+enforces — because a rule labelled as somebody's decision can be argued with and one labelled `p218`
+cannot. `frame-rules.test.ts` asserts the four laws **every frame** must satisfy, so a programme
+transcribed next month is held to them the moment it is added.
+
 
 `supabase/functions/_shared/standing-plan/golden/` holds the **complete composed output** — every row
 of every week of a twelve-week block — for three archetype athletes, committed to the repo and
@@ -263,23 +270,34 @@ logged several heavy sessions at the same weight.
 
 ## 5. WHAT IS ACTUALLY OPEN — hard-separated from what only looks open
 
-### Genuinely open, code-verified
+### Genuinely open, code-verified — **as of 2026-09-01, everything below is UNFIXED**
+
+⚠️ Six items that stood here on 2026-08-31 are **closed** and were removed rather than left ticked —
+a list of things that are done is a list nobody reads. The audit carries what each one was.
 
 1. **No lighter / taper week is reachable.** The taper column is fully transcribed; both build sites
-   pass `taperWeeks: []` as a literal (code-traced, `generate-strength-plan:833`,
-   `rematerialize-standing-block:171`).
-2. **A core slot for Standard Focus** — approved, not built.
-3. **A test session's rows carry no prescription.** ⚠️ **FIXED in the tree 2026-08-31, not deployed** —
-   see `AUDIT-upper-test-session-2026-08-31.md` §9.1. The test branch built rows with no
-   `planned_name`, so the logger offered "Add to plan" on prescribed lifts instead of Swap.
-4. **The derived-weight note is false as written** — "About 85% of your bench press" beside a weight
-   that is 58% of it (code-traced + composed).
-5. **A movement reached on its dumbbell route is printed under its machine name** (`rear delt
-   machine`) — composed at HEAD with an incline bench declared.
-6. **The band tier still wins a cell** — `braced_pull` at a barbell home gym offers a
-   chest-supported row and a band pull down, and nothing loadable beyond them.
-7. **The test's press number is never spent** by either frame (§3).
-8. **Progression on real logged history is unproven** — see §4, and it is unproven, not broken.
+   pass `taperWeeks: []` as a literal (`generate-strength-plan:833`,
+   `rematerialize-standing-block:171`). ⛔ **His ruling, 2026-09-01: an OFFER on the State screen,
+   taken when the athlete needs it — never a scheduled deload.** p120 rejects overreach-to-deload for
+   a hybrid athlete outright, so nobody may add an every-Nth-week version. What is missing is the
+   switch; the week it switches to is already built.
+2. **`braced_pull` offers one real option** at a barbell home gym — a chest-supported row and a band
+   pull down, nothing else loadable. His list for that cell is machines and cables.
+3. **Progression on real logged history is unproven.** One logged test exists, and a test day carries
+   no rep-band heavy set, so nothing has earned an increment and nothing should have. An absence of
+   evidence, not a defect.
+4. **The athlete's own added exercise has no dose control.** *"Add to plan"* writes a standing rule
+   at whatever the row looked like when it was tapped — one set of ten, every matching lifting day,
+   no end date. There is no way to change or remove it from the app.
+5. **Four of the book's rules are not pinned**, listed in `protocol.test.ts`'s header: p140's *"skill
+   work first"* (the frame prints SKILL last on its leg day — that needs a ruling, not a test),
+   p148's change rule, p89's plyometric ladder, p78's rest periods.
+6. ⚠️ **The All Rounder is written for a GYM, and that is the product's real problem to solve.** Six
+   of the week's slots are braced — Smith press, machine chest press, dip machine, chest-supported
+   row, lat pulldown, hack squat, leg press, reverse hyper, GHD — and most of the focused work is
+   machines too. **Not one primary lift appears in the programme as written**, so the rack this app
+   asks for is OURS, not his: every day opens on the athlete's competition lift because that is the
+   only way a row gets a weight. p275 permits primaries in; it does not require them.
 
 ### Looks open, and is not
 

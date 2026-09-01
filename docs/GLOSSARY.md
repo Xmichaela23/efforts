@@ -59,6 +59,15 @@ prescription — you pick the weight that leaves you one or two.
 **FRAME — a programme, transcribed from its page as data.** Standard Focus is the All Rounder
 (pp.274–275). Each frame has two **columns**: `standard` and `taper` (the lighter variant).
 
+⛔ **AND THE ALL ROUNDER AS PRINTED IS A GYM PROGRAMME.** Six of its slots are *braced* — his own
+list for those is Smith press, machine chest press, dip machine, chest-supported row, lat pulldown,
+hack squat, leg press, reverse hyper, GHD — and most of the focused work is machines as well.
+⚠️ **Not one primary lift appears in it.** Every slot is secondary, braced or focused, which is why
+p275 has to add that primaries *may* be substituted in. **So the barbell and rack this app asks for
+are OURS**, not his: a day opens on the athlete's competition lift because that is the only way a row
+gets a weight. Running his programme for an athlete with no gym is the substitution ladder's whole
+job, and it is the part of this app that is worth the most.
+
 **SLOT — one printed row of the frame.** The frame owns which slots exist, their order, and the
 spacing between lifting days. Nothing may add or reorder a slot.
 
@@ -159,6 +168,9 @@ work, so **nothing has earned an increment yet, and nothing should have.**
 | *Is this thing built?* | `WHAT-IS-BUILT.md` |
 | *What is the state of the work right now?* | `ENGINE-STATE.md` — top banner |
 | *Is this row a hole?* | `_shared/standing-plan/golden/` — and `npm run block:check` |
+| *Does this still obey the book?* | `protocol.test.ts` — ten rules, each named after its page |
+| *Would a NEW programme obey it?* | `frame-rules.test.ts` — four laws over every frame and kit |
+| *What do I have to redeploy?* | `docs/INVENTORY.md` §1 — per file, generated |
 | *What does the book actually say?* | `SOURCE-viada-hybrid-athlete.md` — page images open when written |
 | *Why is it like this?* | the decisions logs, `D-NNN` |
 
