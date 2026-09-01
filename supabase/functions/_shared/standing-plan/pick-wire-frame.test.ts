@@ -45,8 +45,16 @@ Deno.test('⛔⛔ AN ALL ROUNDER ANSWER SURVIVES THE WIRE, AND NO OTHER TABLE\'S
     '⛔ the athlete\'s hamstring answer was discarded at the wire');
   assert(/hip thrust/i.test(String(prefs!.picks.ham_iso)),
     'the hamstring answer is no longer a hip thrust at all');
-  // ⛔ AND THE OTHER PROGRAMME'S CELLS ARE NOT INVENTED. Five of p246's nine are not p274 cells.
-  for (const k of ['db_press', 'hinge_lower', 'single_leg_a', 'single_leg_b', 'core'] as const) {
+  /**
+   * ⛔ AND THE OTHER PROGRAMME'S CELLS ARE NOT INVENTED. Four of p246's nine are not p274 cells.
+   *
+   * ⚠️ `core` LEFT THIS LIST ON 2026-08-31 (Michael: *"make abs an option in the picker"*). It is
+   * the one key on the All Rounder's table that is NOT a p274 cell — the page prints no core row —
+   * and it is offered anyway, opt-in, so an athlete who leaves it alone gets the page unchanged.
+   * The other four stay out: they ARE p246 cells with no p274 counterpart, which is what this
+   * assertion is for.
+   */
+  for (const k of ['db_press', 'hinge_lower', 'single_leg_a', 'single_leg_b'] as const) {
     assert(!(k in prefs!.picks), `p246's ${k} was stored on an all_rounder block`);
   }
   assertEquals(Object.keys(prefs!.picks).sort(), [...ALL_ROUNDER_PICK_KEYS].sort());

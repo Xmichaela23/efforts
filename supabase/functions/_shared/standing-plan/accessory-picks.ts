@@ -104,6 +104,24 @@ export const VIADA_PICK_KEYS: ViadaPickKey[] = [
 export const ALL_ROUNDER_PICK_KEYS: ViadaPickKey[] = [
   'braced_push', 'iso_push', 'iso_pull_a', 'braced_hinge', 'braced_leg', 'ham_iso',
   'braced_pull', 'iso_pull_b', 'quad_iso',
+  /**
+   * ⛔⛔ CORE IS OFFERED HERE AND NOWHERE ELSE IN THIS FRAME (Michael, 2026-08-31: *"make abs an
+   * option in the picker"*).
+   *
+   * ⛔ IT IS THE ONE KEY ON THIS LIST THAT IS NOT A p274 CELL. Every other entry above fills a slot
+   * the page prints; **p274 prints no core row on any of its four lifting days**, which is why the
+   * picker never offered him ab work and why the muscle floor was the only thing putting core in
+   * this programme at all — on the test day, which is where he found it.
+   *
+   * ⛔ SO IT IS OPT-IN AND IT ADDS NOTHING UNLESS ASKED. No pick, no core row: the frame is
+   * unchanged for an athlete who leaves it alone, which is the only way to add a row the page does
+   * not print without overwriting the page.
+   *
+   * ⚠️ AND IT NO LONGER TRAVELS THROUGH THE FLOOR. `compose.ts` places a chosen core movement
+   * directly — see `CORE_PICK_FREQUENCY_IS_OURS` and the 2026-08-29 backout recorded on the `core`
+   * spec below, which is the reason the first attempt at this failed.
+   */
+  'core',
 ];
 
 /**
@@ -1050,10 +1068,21 @@ export function picksForFrame(
   column: ColumnKind = 'standard',
 ): ViadaPickKey[] {
   const ordered = pickKeysInDayOrder(frame, column);
-  // ⚠️ SEE `pickReachesFrame` — the exemption is Michael's ruling and its cost is recorded there.
+  /**
+   * ⛔⛔ `core` IS EXEMPT FROM THE REACHABILITY TEST, AND IT HAS TO BE (2026-08-31).
+   *
+   * `pickReachesFrame` answers *"does the frame print a cell this pick can fill"* and returns false
+   * for any spec with `slot: null` — which core is, in both frames, because **neither page prints a
+   * core row**. That is exactly why the control is wanted: without it the only route core has into a
+   * week is the muscle floor, which put a hanging leg raise on Michael's max-test day.
+   *
+   * ⚠️ IT IS NOT A HOLE IN THE RULE. Every other key on the list must name a printed cell or it is
+   * the screen inventing a slot; core names an ADDITION, opt-in, placed by the composer after the
+   * frame is built and absent entirely when the athlete leaves it alone.
+   */
   const reachable = frame === 'strength_5k'
     ? ordered
-    : ordered.filter((k) => pickReachesFrame(k, frame, column));
+    : ordered.filter((k) => k === 'core' || pickReachesFrame(k, frame, column));
   if (equipment == null) return reachable;
   /**
    * ⚠️⚠️ ONE OPTION STILL DRAWS THE CONTROL — changed 2026-08-30 with Michael's substitution
