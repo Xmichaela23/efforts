@@ -1,6 +1,123 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-01 — the night he trained on it, then ruled on what he found)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-01 — the night the engine was held to the book)
+
+### ⛔ READ IN THIS ORDER, AND THE FIRST TWO ARE NEW: `docs/GLOSSARY.md`, then `docs/WHAT-IS-BUILT.md`, then this banner.
+
+The glossary carries the vocabulary and **the five states a plan moves through** — most reported
+"holes" are stage 2 read as stage 4. `WHAT-IS-BUILT` says what exists. This says what the state of
+the work is. `CAPABILITY-MAP.md` is dead-marked and points at them.
+
+---
+
+### §0. THE TOOLS THAT DID NOT EXIST YESTERDAY. USE THEM BEFORE YOU INVESTIGATE ANYTHING.
+
+| command | what it answers |
+|---|---|
+| `npm run block:check` | **is this row a hole?** Three archetype athletes, twelve weeks each, every row committed under `_shared/standing-plan/golden/`. `untested-minimal.txt` is what a correct UNPRICED block looks like. A change arrives as a DIFF a human reads |
+| `npm run inventory:write` | **what do I have to redeploy?** Per FILE, not per folder. Also every frame's slots and every picker cell — generated, pinned, cannot rot |
+| `protocol.test.ts` | **does this still obey the book?** Ten rules, each named after its page |
+| `frame-rules.test.ts` | **does a NEW programme obey it?** Four laws over every frame, column and kit |
+
+⛔ **A GREEN SUITE IS STILL NOT EVIDENCE A DAY IMPROVED.** Compose the week and read it. Every defect
+found tonight was found that way; none of them by a test.
+
+---
+
+### §A. STATE
+
+**PUSHED:** `origin/main == 001e0739`.
+
+**DEPLOYED 2026-09-01 14:38 UTC**, read back from `supabase functions list`, never assumed:
+`coach` **508** · `generate-strength-plan` **207** · `rematerialize-standing-block` **82** ·
+`materialize-plan` **339**.
+⚠️ The closure is now generated — `docs/INVENTORY.md` §1, per file. Touch `compose.ts` and you deploy
+coach + generate-strength-plan + rematerialize-standing-block, and NOT compute-snapshot, which
+reaches `frames.ts` and nothing else.
+
+⛔ **CLIENT: NOT ON HIS PHONE.** Three changes are app-side and need `npm run ios:open` and a run
+from Xcode: the logger's brightness and text size, the test-row controls, and the execution name in
+the logger's own name box.
+
+⛔⛔ **AND HIS BLOCK HAS NONE OF IT.** Every engine change below reaches a block when it is REBUILT.
+His current block was written 2026-08-31 22:15 UTC and still carries the ab work on its Test: Lower.
+
+**SUITES:** 2570 `_shared` + `materialize-plan`; tsc 0 errors; client build clean.
+
+---
+
+### §B. WHAT SHIPPED — the record is `docs/AUDIT-upper-test-session-2026-08-31.md`
+
+| what | why |
+|---|---|
+| **A test day is only the test** | no floor volume, no athlete adds, no second all-out set, and the tested lifts offer NEITHER Swap nor Add. The second all-out set was a DATA path: any completed working set overwrote the tested number on its way to baselines |
+| **The day gets its overhead press** | measured: nine movement patterns, the week covered eight, and vertical pressing appeared only as a lateral raise. His own p220 list holds two overhead entries and ranking on equipment fit never reached them |
+| **Abs are a pick, three of them, rotated** | two slots a week, two different movements, positioned by p142 rule 4, never on a test day |
+| **A by-feel row says WHICH kind** | auto-regulated · no tested lift · per side · awaiting test. Only the last promises a number later |
+| **One name end to end** | `execution_name` — a movement reached on a dumbbell route stops printing a machine's name |
+| **The logger is legible** | every opacity under 70% and every size under 12px came up one step |
+
+---
+
+### §C. THE THREE THINGS I GOT WRONG, so nobody re-derives them
+
+1. ⛔⛔ **"Fourteen work sets" is a COST, NOT A CAP.** p86 describes what a **highly taxing** 14+ set
+   session costs against a 6-to-8 set one. **He states no limit**, and he wrote it alongside a
+   programme whose own rows come to 16-17 sets a day. The code was enforcing it as a rule, so the
+   floor refused every session on this frame and left muscles at ZERO. Fixed — the floor fills a gap
+   wherever it must, the DIAL still respects the cost.
+2. ⛔ **p275 permits primaries in the secondary slots** — *"primary lifts CAN be substituted in,
+   you're encouraged to keep your options open."* I acted on p220's category definition alone and
+   removed the barbell press. His secondaries lead; his primaries sit behind them.
+3. ⛔ **Two dated-artefact theories for one defect, both wrong.** His screen outranked the trace both
+   times. The Swap defect was a live path at HEAD.
+
+⚠️ **THE PATTERN IN ALL THREE: a number or a definition read without the sentence around it.** Read
+the page, not the line.
+
+---
+
+### §D. OPEN
+
+- **His ab wheel is still an active `plan_adjustment`** — 1 set of 10 on every matching lifting day,
+  indefinitely, from a tap on 2026-08-31. His data; nobody has touched it.
+- **No lighter / taper week is reachable.** Both columns are transcribed; both build sites pass an
+  empty week list. ⛔ **His ruling: an OFFER on the State screen, taken when needed — never a
+  scheduled deload.** p120 rejects overreach-to-deload for a hybrid athlete outright.
+- **`braced_pull` offers one real option** at a barbell home gym — a band pull down.
+- **Progression on real logged history is unproven.** One logged test exists and a test day carries
+  no rep-band heavy set, so nothing has earned an increment and nothing should have.
+- **Not pinned yet, and listed in `protocol.test.ts`'s header:** p140's "skill work first" (the frame
+  prints SKILL last on its leg day — a ruling, not a test), p148's change rule, p89's plyo ladder,
+  p78's rest periods.
+
+---
+
+### §E. THE LAWS
+
+- ⛔ **The rules are the BOOK'S, not the athlete's and not ours.** Michael, 2026-09-01: *"it's never
+  my decision, it's the book's protocol."* A check labelled as somebody's decision can be argued
+  with; one labelled `p218` cannot. Where we depart, it is labelled OURS **and says why**.
+- ⛔ **Viada is the only source. Wendler / 5-3-1 is archived.** Never in chat, copy or comments.
+- ⛔ **The 5K plan is PARKED.** Never mention it.
+- ⛔ **The muscle the page names is the law**, at every kit. Movements may leave his printed list when
+  the kit demands it; the muscle may not.
+- ⛔ **His movements outrank substitutes**, and a movement the frame NAMES outranks one that merely
+  matches the muscle.
+- ⛔ **One number, one bar.** A movement held in two hands carries no prescribed weight.
+- ⛔ **A pick is never prescribed twice in one week.**
+- ⛔ **Label every claim by evidence class** — composed / rendered / live / code-traced.
+- ⛔ **Never `git add -A`.** Three sessions share this repo.
+- ⛔ **Commit, push and deploy wait for Michael every time.** Reads and edits are free.
+- ⛔ **Never read `.env` or query production without his explicit go-ahead, typed by him.**
+- ⛔ **Never write his data.** Fix forward.
+- ⛔ **He built the app and does not read code.** Plain words, complete answers, no jargon, no
+  emojis, no idiom. ⚠️ **Short is not the same as incomplete** — he has said both, and both are real:
+  cut words, never facts.
+
+---
+
+## 🧭 SUPERSEDED — was START HERE (written 2026-09-01 — the night he trained on it, then ruled on what he found)
 
 ### ⛔ FIRST: read `docs/WHAT-IS-BUILT.md`. It is new, and it exists because sessions keep proposing to build things that already exist.
 
