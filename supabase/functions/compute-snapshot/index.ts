@@ -36,6 +36,12 @@ function addDaysIso(iso: string, days: number): string {
 // The block's own rate — 1% every three weeks (Viada p247). The curve states the plan's shape and it
 // must be the rate the plan was BUILT on, never a second opinion.
 import { RATE_ANCHOR } from "../_shared/standing-plan/frames.ts";
+// ⛔ THE ONE DEFINITION OF A TEST WEEK — the composer's own function, the same constant it tags the
+// test session with. Imported HERE rather than in `state-trend/assemble.ts` on purpose: assemble is
+// bundled into 27 edge functions, so importing `working-number.ts` there would widen ITS closure
+// from 3 to 27 and tax every future edit to the pretest arithmetic. This file already holds
+// `weekByDate` and already imports `standing-plan/`, so resolving here costs one function.
+import { isTestWeek } from "../_shared/standing-plan/working-number.ts";
 import { resolveAcwrAsOf } from "./acwr-as-of.ts";
 import { fetchAthleteTimezone, resolveAthleteTimezone } from "../_shared/athlete-timezone.ts";
 import {
@@ -1084,6 +1090,7 @@ serve(async (req: Request) => {
          * omitted, and a point with no week is drawn without one.
          */
         let weekByDate: Record<string, number> | null = null;
+        let testWeekDates: string[] | null = null;
         /** ⛔ The block's expected curve per lift — see the build below. Null when the block has no
          *  working numbers yet (before the test is read), which draws the readings alone. */
         let expectedByCanonical: Record<string, Array<{ date: string; value: number }>> | null = null;
@@ -1141,6 +1148,18 @@ serve(async (req: Request) => {
             }
             if (Object.keys(map).length) phaseByDate = map;
             if (Object.keys(weeks).length) weekByDate = weeks;
+            /**
+             * ⛔ WHICH DATES THE PLAN CALLS A TEST — resolved once, here, and handed to the spine.
+             * The heavy band opens at 90% and the p215 pretest tops out at 86.25%, so a test week's
+             * heavy count is structurally zero and the band must not print for it. The spine is TOLD;
+             * it does not work it out. See `ViadaWeekPerformed.patternBandApplies`.
+             * ⚠️ `isTestWeek` is the only definition — no week number is compared to a literal here
+             * or anywhere downstream.
+             */
+            const testDates = Object.entries(weeks)
+              .filter(([, w]) => Number.isFinite(Number(w)) && isTestWeek(Number(w)))
+              .map(([d]) => d);
+            if (testDates.length) testWeekDates = testDates;
 
             /**
              * ⛔⛔ THE EXPECTED CURVE — the faint line behind the lift's own readings.
@@ -1760,7 +1779,7 @@ serve(async (req: Request) => {
           console.log("[compute-snapshot] fitness baseline derive/persist failed (non-fatal):", e?.message || e);
         }
 
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, expectedByCanonical, namedSessions, enduranceSpine, blockDurationWeeks, measuredDates, allOutByLift, strengthEffortRead, pullupProgress, loggedSessions });
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, testWeekDates, expectedByCanonical, namedSessions, enduranceSpine, blockDurationWeeks, measuredDates, allOutByLift, strengthEffortRead, pullupProgress, loggedSessions });
         // VDOT race projections (goal-free) — computed HERE, not in the shared assembler, because they need
         // learned_fitness + the VDOT engine and we keep that OFF the client-math fallback path (dumb client).
         // Threshold pace: learned first, then performance_numbers. Long-run distance is estimated inside

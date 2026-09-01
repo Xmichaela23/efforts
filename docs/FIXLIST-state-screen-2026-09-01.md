@@ -147,6 +147,12 @@ that MOVES anything should be attempted before the blocks it moves are named com
       ⚠️ **THE "ONE SUBJECT SPLIT IN HALF" COMPLAINT IS REAL BUT IS A LAYOUT ITEM, NOT A DELETE** —
       the rides card sits on the trends plate and the bike row in Fitness. That is **3.5a**
       (one block per sport inside TRENDS), not Round 1.
+- [ ] 1c-round3. ⛔ **RE-FILED 2026-09-01 — THE QUESTION AS WRITTEN WAS THE WRONG ONE.** The item asked
+      whether the two bike surfaces show the same METRIC. They do not, and that trace stands. **But
+      Michael's actual complaint is that his BIKE APPEARS IN TWO PLACES on one screen** — a
+      CONSOLIDATION question, not a duplication one. Round 3 item: **one block per sport, and that
+      block owns everything about that sport** — efficiency, load, chart, and one line of meaning.
+      Not built; it belongs to the Round 3 design pass Michael approves before anything is written.
 - [ ] 1c-latent. **The bike row's `aerobicLead` branch will duplicate the rides efficiency card**
       once the athlete's power read establishes and efficiency leads. Not built — building for a
       state no athlete is currently in, and the Round 1 instruction is delete-not-redesign. Filed so
@@ -191,7 +197,24 @@ that MOVES anything should be attempted before the blocks it moves are named com
 
 ## ROUND 2 — WRONG OR CONTRADICTORY ON SCREEN.
 
-- [ ] 2a. ⛔ **The same movement printed twice in one sentence, in two cases:**
+- [x] 2a. **DONE 2026-09-01. Client-only, one file. Same class of fault as 1d, fixed with the same
+      existing mechanism — no new map.**
+      **CAUSE, TRACED:** `unpriced` is built from the RAW logged exercise name —
+      `_shared/accessory-dosing/performed-ledger.ts:169`, `unpriced.add(ex.name)` into a `Set`. A Set
+      is case-sensitive on strings, so "Ab Wheel Rollout" and "ab wheel rollout" are two members and
+      the sentence named one movement twice. Not a display-name-vs-raw-name collision as the item
+      guessed — two raw spellings.
+      **FIX:** `ViadaWeekCard` canonicalises, de-duplicates on the canonical key, and renders
+      `canonicalDisplayName`. Verified by running the real functions: "Ab Wheel Rollout",
+      "ab wheel rollout", "Ab Wheel Rollouts" and "AB WHEEL ROLLOUT" all → `ab_rollout` → "Ab Rollout".
+      ⚠️ **THE WORD ON SCREEN CHANGES:** it will read **"Ab Rollout"**, not "Ab Wheel Rollout" — that is
+      the canonical label the rest of the screen uses, and using it is the point of the fix.
+      ⚠️ The render gate now tests the DEDUPED list, so a list that collapses to nothing cannot draw an
+      empty sentence.
+      ⚠️ **FIXED AT THE EDGE, NOT THE SOURCE, DELIBERATELY.** `performed-ledger.ts` is server code
+      inside the 27-function closure and this round is client-only. The server still emits both
+      spellings — filed under the server-side leftovers as S5.
+- [ ] 2a-original. ⛔ **The same movement printed twice in one sentence, in two cases:**
       *"no known max yet for Ab Wheel Rollout, ab wheel rollout — those sets are in the muscle counts
       above, not in the percentages."* Almost certainly the display name and the raw name reaching
       the same list.
@@ -282,13 +305,126 @@ that MOVES anything should be attempted before the blocks it moves are named com
       directly under Deadlift (180). A variant aggregating into its slot has been ruled before.
       ⚠️ **Michael's ruling wanted** — is a trap bar its own lift on this screen or part of the
       deadlift?
-- [ ] 2c. **Every movement pattern reads `0 heavy`** — hinge, row, push, squat, overhead press — in a
+- [x] 2c-SERVER. ⛔⛔ **BUILT 2026-09-01. SERVER + CLIENT. NEEDS A DEPLOY (27) — see the closure below.**
+      Michael: *"cant we just flag tests? feels like we are over complicating this."* Yes — the flag
+      existed on the plan row and simply never reached the screen. It does now.
+      **THE FLAG:** `ViadaWeekPerformed.patternBandApplies` — false when a day inside the card's own
+      seven-day window is a test day. The card is TOLD the band does not apply; it works nothing out.
+      Asked of the WINDOW, not of "the current week", so the flag and the numbers beside it always
+      describe the same seven days — and it survives a plan whose test is not week 1, or one with more
+      than one test week, because it is a date-set intersection.
+      **ONE DEFINITION:** resolved in `compute-snapshot` from `isTestWeek()`
+      (`standing-plan/working-number.ts`) — the composer's own function, the same constant it tags the
+      test session with. ⛔ No week number is compared to a literal anywhere, client or server.
+      ⛔ **RESOLVED IN THE CALLER, NOT IMPORTED INTO THE SPINE, AND THAT WAS THE CALL.** Importing
+      `working-number.ts` into `state-trend/assemble.ts` would have widened ITS closure from 3
+      functions to 27 — taxing every future edit to the pretest arithmetic forever to save one
+      parameter today. `compute-snapshot` already holds `weekByDate` and already imports
+      `standing-plan/`, so resolving there widens that closure by ONE (3 → 4: coach ·
+      **compute-snapshot** · generate-strength-plan · rematerialize-standing-block).
+      ⛔ **A FLAG, NOT `perPattern: []`** (Michael's ruling, over the simpler option I put to him).
+      Emptiness cannot distinguish "no band applies" from "no data", and a card inferring meaning from
+      an absent field taking the wrong branch with no error is this screen's recurring failure. The
+      flag states what is true; the numbers are byte-identical either way (pinned by fixture).
+      **THE WHOLE ROW GOES, NOT THE ZERO HALF** — `ViadaWeekCard` gates on
+      `perPattern.length > 0 && patternBandApplies !== false`. Undefined means the band applies, so an
+      old payload keeps today's behaviour rather than silently hiding the row.
+      **PAYLOAD VERSION BUMPED 175 → 176**, with a note in the file's own convention recording that a
+      cached row would otherwise serve a `display` object with no flag and pass the
+      `cachedVer >= COACH_PAYLOAD_VERSION` gate — the same trap v175 hit on `perLift` in this same
+      object. ⛔ Without the bump the fix lands nowhere.
+      **FIXTURES, BOTH DIRECTIONS (5, all green):** no test dates → band applies; a test date inside
+      the window → band does not apply; a test date OUTSIDE the window → still applies; an empty list
+      is not a suppression; and `perPattern` / `perMuscle` byte-identical either way.
+- [x] 2c-BLOCKED-SERVER-original. ⛔⛔ **RULED BY MICHAEL 2026-09-01 — the trace that established there
+      was no honest client-side route.**
+      The ruling is right and the reason is settled: the zero does NOT resolve once the sessions are
+      logged — the pretest tops out at 0.8625 and the heavy band opens at 0.90, so the row reads
+      `0 heavy` for the whole test week no matter what the athlete does. A number that can never be
+      non-zero in a phase should not print in that phase. **Suppress the WHOLE heavy/speed band row for
+      that week**, not the zero half — "16 speed" alone with the heavy count silently missing is worse.
+      ⛔ **WHY IT CANNOT BE DONE ON THE CLIENT — every route checked:**
+      · `ViadaWeekPerformed` (`assemble.ts:750-766`) carries `since`, `perMuscle`, `belowFloor`,
+        `perSession`, `perPattern`, `unpriced`. **No phase, no week index, no test flag.**
+      · `config.test_week = TEST_WEEK_INDEX` IS persisted on the plan row (`plan-row.ts:329`) but is
+        **not forwarded to the client** in any payload.
+      · The composer TAGS the test session `test_week`, and that tag does reach the client — but only
+        on a scheduled workout (`StrengthLogger.tsx:1903`). State does not fetch planned workouts.
+      · `block.is_measurement_week` / `block.top_set_pct` are only populated `if (cycle)`
+        (`block-identity.ts:398-412`) — the leader/anchor cycle machinery — and describe a 95% amrap,
+        not the 86.25% pretest. Null for a standing block.
+      · `week.intent` has no value meaning "test" for a standing block (`plan-phase.ts:134-153`).
+      **The only client-side route left is `week.index === 1`, i.e. the client hardcoding
+      `TEST_WEEK_INDEX`. That is a second source of truth about the block's shape and is refused** —
+      it duplicates a server constant and would be wrong for any plan whose test is not week 1.
+      **THE SERVER FIX IS SMALL AND WANTS A RULING ON SHAPE:** either forward the already-persisted
+      `test_week` on the block payload, or (better, because it is the card's own contract) add a
+      resolved flag to `ViadaWeekPerformed` — e.g. the phase suppresses the band. ⛔ Not chosen, not
+      built. Inside the 27-function deploy closure.
+- [x] 2c. **TRACED 2026-09-01 — THE ZERO IS ARITHMETICALLY CORRECT. NOTHING BUILT; THE DISPLAY CALL
+      IS MICHAEL'S.** ⛔ Do not re-file this as a counting bug.
+      **THE NUMBERS, ALL TRACED:** the heavy band is `pct >= 0.90` and the velocity band is
+      `0.70 <= pct <= 0.85` (`performed-ledger.ts:112-113`). The p215 pretest ramps in three steps at
+      **0.75 / 0.825 / 0.8625** of the predicted max (`working-number.ts:118-120`), the last taken for
+      max clean reps. So in a test week:
+      · steps 1 and 2 (0.75, 0.825) land INSIDE the velocity band — which is why every pattern appears
+        on the card at all;
+      · the measured top set (0.8625) lands in the **deliberately unnamed 85–90% gap**. The ledger's own
+        comment: *"A SET BETWEEN 85% AND 90% COUNTS TO NEITHER, AND THAT IS HIS PAGE, NOT AN OVERSIGHT.
+        p084 names two bands and leaves the gap between them unnamed; filling it would be ours."*
+      **So the test sets are not "failing to count as heavy" — they legitimately fall outside both
+      bands, by the source's own definition.** Every pattern reading `0 heavy` in week 1 is the
+      arithmetic working.
+      ⚠️ **IT IS STILL MISLEADING, AND THAT IS THE REAL ITEM.** The card prints `0 heavy` in the one
+      week whose entire purpose was the athlete's most maximal sets of the block. Suppressing the heavy
+      count for a test week is a DISPLAY decision (and needs the phase reaching this card, which it does
+      not today). Not built — Michael's call.
+- [ ] 2c-original. **Every movement pattern reads `0 heavy`** — hinge, row, push, squat, overhead press — in a
       week that is the two tests. Verify whether zero is correct for a test week and simply should
       not print, or whether the test sets are failing to count as heavy.
-- [ ] 2d. **NEXT lists today.** Today is Tue 9/1; the first row is *"Tue, 9/1 Test: Lower"*.
-- [ ] 2e. **"Holding" on the run row** is the known unexplained verdict (Q-289) — it is stated for
+- [x] 2d. **RULED AND BUILT 2026-09-01. Client-only.** Michael: *"I dont think we need today
+      reflected on state screen or next — its a broader picture."* Today's session belongs to the day
+      screen; State is the arc around it. NEXT now excludes today outright.
+      ⛔ **THE SERVER'S FIELD WAS NOT CHANGED, AND THAT WAS THE CALL.** `key_sessions_remaining` is
+      correct as documented — today is listed BECAUSE it is not done — and the coach reads the SAME
+      field for more than this row: `hasUpcomingLong` (`coach/index.ts:739`) uses it to write race-week
+      guidance. Moving the exclusion into that filter would have silently changed race-week copy to
+      satisfy a State-screen ruling. `StateTab` is the only client reader of the field (checked), so
+      the narrowing lives on the one surface it was ruled for. This is a display scope, not a second
+      definition of "remaining".
+      ⚠️ **LOCAL DATE, NOT UTC.** `toISOString().slice(0,10)` is tomorrow's date for anyone west of UTC
+      in the evening and would have dropped tomorrow's session too. Uses `formatLocalDate`, the repo's
+      own helper.
+      ⚠️ **THE ROW KEEPS ITS NAME.** "NEXT" was only inaccurate because today was in it. This closes
+      the Round 4 rename item rather than copy closing it.
+      ⚠️ The earlier trace below stands as the reason the SERVER was left alone — it was overruled on
+      the display question, not on the mechanism.
+- [x] 2d-trace. **TRACED 2026-09-01 — the server behaviour is INTENTIONAL AND DOCUMENTED.**
+      `coach/index.ts:1200` filters `date > asOfDate || (date === asOfDate && !isPlannedCompleted(r))`,
+      and `coach/types.ts:221` states the contract in words: *"from as_of_date (inclusive), excluding
+      completed planned rows."* Today's session is listed BECAUSE it is not done yet; it drops off the
+      moment it is logged.
+      ⛔ **DO NOT "FIX" THIS BY EXCLUDING TODAY** — that would hide an unfinished session from the one
+      row that says what is left, which is a real regression in exchange for a cosmetic one.
+      ⚠️ What is actually wrong is the WORD: "NEXT" reads as "after today". That is a copy call
+      (Round 4), not a data change.
+- [ ] 2d-original. **NEXT lists today.** Today is Tue 9/1; the first row is *"Tue, 9/1 Test: Lower"*.
+- [x] 2e. **CLOSED BY 1b, 2026-09-01.** The row that carried the unexplained "Holding" verdict is
+      deleted — the run card no longer exists in the Fitness section. Nothing to build.
+- [ ] 2e-original. **"Holding" on the run row** is the known unexplained verdict (Q-289) — it is stated for
       both a genuinely flat number and a suppressed one. If 1b removes the row this dies with it.
-- [ ] 2f. **The easy-run card's own line disagrees with its headline.** The number is 1.330 and the
+- [x] 2f. **TRACED 2026-09-01 — SAME SERIES, NO DISAGREEMENT POSSIBLE. NOTHING BUILT.**
+      In `SpineCard` (`StrengthReadCards.tsx:112-155`) the headline is `latest.efficiency` where
+      `latest = pts[pts.length - 1]`, and the line is
+      `pts.map(p => ({ date: p.date, value: p.efficiency }))` fed to `DatedChart`. **Both read
+      `p.efficiency` off the same `pts` array — the headline IS the line's last point.**
+      ⚠️ And they cannot diverge even at the edge: the headline block is gated on
+      `latest.efficiency != null`, so when the newest point has no efficiency the number is not drawn
+      at all rather than falling back to an older one.
+      The card reads as a contradiction because a line ending low sits beside a headline number, but it
+      is the same value stated twice — which is what the card's own "watch the line over a few weeks"
+      copy is there to frame.
+- [ ] 2f-original. **The easy-run card's own line disagrees with its headline.** The number is 1.330 and the
       line's last point drops hard, while the copy says to watch the line over weeks. Check the
       headline number is the same series the line draws.
 
@@ -344,6 +480,10 @@ touched. None of them is done; none was quietly tolerated.
 - [ ] S3. **`src/lib/strength-read.ts` and the `me_history_v1` payload field are unrendered** since
       1a deleted their only consumer. Bannered, not retired. Retiring `me_history_v1` is a payload
       contract change.
+- [ ] S5. **`performed-ledger.ts` still emits duplicate raw spellings in `unpriced`** — it adds
+      `ex.name` verbatim to a case-sensitive `Set` (`:169`). The client now canonicalises and
+      de-duplicates at the edge (2a), so nothing renders twice, but the payload still carries both.
+      Canonicalising at the source is a server change inside the 27-function closure.
 - [ ] S4. **`RunFitnessRow` (~330 lines) is unreachable** since 1b. Bannered, not deleted. It holds
       the measured heat cost (D-346), the conditions caption, the ⓘ definition and the Q-179 posture
       sentence — content that exists nowhere else. Retiring it is a product call.

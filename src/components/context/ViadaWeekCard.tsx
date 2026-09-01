@@ -21,6 +21,16 @@
  */
 
 import React from 'react';
+// ⛔ THE ONE NAME MAP AGAIN (FIXLIST 2a, same class of fault as 1d). `unpriced` is built from the RAW
+// logged exercise name — `performed-ledger.ts:169` does `unpriced.add(ex.name)` into a Set, and a Set
+// is case-sensitive, so "Ab Wheel Rollout" and "ab wheel rollout" are two members and the sentence
+// named the same movement twice. Canonicalising collapses every spelling of a movement to one key
+// ("Ab Wheel Rollout", "ab wheel rollout", "Ab Wheel Rollouts", "AB WHEEL ROLLOUT" all → `ab_rollout`),
+// and `canonicalDisplayName` gives it the same clean label the rest of the screen uses.
+// ⚠️ FIXED AT THE EDGE, NOT AT THE SOURCE, DELIBERATELY: `performed-ledger.ts` is server code inside a
+// 27-function deploy closure, and this round is client-only. The server still emits both spellings —
+// see the FIXLIST's server-side leftovers.
+import { canonicalize, canonicalDisplayName } from '@shared/canonicalize';
 
 export type ViadaWeekPerformed = {
   since: string;
@@ -32,6 +42,9 @@ export type ViadaWeekPerformed = {
     heavy: 'below' | 'in_band' | 'above'; velocity: 'below' | 'in_band' | 'above';
   }>;
   unpriced: string[];
+  /** ⛔ Server-resolved: does p084's heavy/velocity band apply to this window at all? False in a
+   *  test week. Undefined on a payload written before the field existed → the band applies. */
+  patternBandApplies?: boolean;
 };
 
 /** ⚠️ The catalogue's pattern keys are snake_case; the screen speaks English. */
@@ -55,6 +68,20 @@ const MUSCLE_WORD: Record<string, string> = {
 const word = (map: Record<string, string>, key: string) => map[key] ?? key.replace(/_/g, ' ');
 
 export default function ViadaWeekCard({ week }: { week: ViadaWeekPerformed | null | undefined }) {
+  // One entry per MOVEMENT, not per spelling. Order of first appearance is kept so the sentence reads
+  // in the order the athlete's own week produced.
+  const unpricedNames = React.useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const raw of week?.unpriced ?? []) {
+      const key = canonicalize(raw);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(canonicalDisplayName(key));
+    }
+    return out;
+  }, [week?.unpriced]);
+
   if (!week || week.perMuscle.length === 0) return null;
 
   return (
@@ -80,7 +107,18 @@ export default function ViadaWeekCard({ week }: { week: ViadaWeekPerformed | nul
       )}
 
       {/* ── REPS BY PATTERN (p084: 4-6 above 90%, 15-20 at 70-85%) ───────────────────────────── */}
-      {week.perPattern.length > 0 && (
+      {/**
+        * ⛔ THE BAND ROW DOES NOT DRAW IN A TEST WEEK (2026-09-01, ruled by Michael). The server says
+        * whether p084's heavy/velocity band applies — `patternBandApplies` — and this renders that
+        * answer. It does NOT work out which week it is: the heavy count is structurally zero in a
+        * test week (band opens at 90%, the pretest tops out at 86.25%), so a zero that can never
+        * resolve would read as a failure.
+        * ⛔ BOTH HALVES GO TOGETHER. "16 speed" alone, with the heavy count silently missing, looks
+        * like the heavy number was lost rather than that the band does not apply.
+        * ⚠️ UNDEFINED MEANS THE BAND APPLIES — a payload written before this field existed keeps
+        * today's behaviour rather than silently hiding the row.
+        */}
+      {week.perPattern.length > 0 && week.patternBandApplies !== false && (
         <>
           <div className="mt-3 space-y-1">
             {week.perPattern.map((p) => (
@@ -100,9 +138,9 @@ export default function ViadaWeekCard({ week }: { week: ViadaWeekPerformed | nul
       )}
 
       {/* ⛔ NAMED, NOT COUNTED AS ZERO — a percentage of an unknown max is no number at all. */}
-      {week.unpriced.length > 0 && (
+      {unpricedNames.length > 0 && (
         <div className="text-[12px] text-white/50 mt-2">
-          no known max yet for {week.unpriced.join(', ')} — those sets are in the muscle counts above,
+          no known max yet for {unpricedNames.join(', ')} — those sets are in the muscle counts above,
           not in the percentages
         </div>
       )}

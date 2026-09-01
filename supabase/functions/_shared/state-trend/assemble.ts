@@ -658,6 +658,20 @@ export interface StateTrendInputs {
   /** ⛔ The athlete-scoped endurance spine — carried, never computed here. See `EnduranceSpineSeries`. */
   enduranceSpine?: EnduranceSpineSeries[] | null;
   /**
+   * ⛔ DATES THE PLAN CONSIDERS A TEST WEEK — RESOLVED BY THE CALLER, NEVER DERIVED HERE.
+   *
+   * `compute-snapshot` already holds `weekByDate` and asks `isTestWeek()`
+   * (`standing-plan/working-number.ts`) — the composer's OWN function, the same constant it tags the
+   * test session with. ⛔ There is exactly one definition of a test week and it is that function.
+   * Nothing in this file compares a week number to a literal.
+   *
+   * ⚠️ PASSED IN RATHER THAN IMPORTED, AND THAT IS THE POINT. Importing `working-number.ts` here
+   * would widen ITS deploy closure from 3 functions to 27, taxing every future edit to the pretest
+   * arithmetic forever to save one parameter today. The caller already carries both facts.
+   * ⚠️ Absent → the band applies, which is today's behaviour.
+   */
+  testWeekDates?: string[] | null;
+  /**
    * ⛔ THE ACTIVE BLOCK'S LENGTH IN WEEKS (`plans.duration_weeks`) — the recency window for the
    * derived heavy gate's reference max (ruled 2026-08-28). Absent → `defaultBlockWeeks`.
    * ⚠️ It is the BLOCK's number, never a constant chosen at the read site: an athlete on an 8- or
@@ -763,6 +777,30 @@ export interface ViadaWeekPerformed {
   }>;
   /** Lifts with no known max in the window — named, never counted as zero. */
   unpriced: string[];
+  /**
+   * ⛔⛔ DOES p084'S HEAVY / VELOCITY BAND APPLY TO THIS WEEK AT ALL? (2026-09-01, ruled by Michael.)
+   *
+   * FALSE in a TEST WEEK, and the arithmetic is why. The heavy band opens at 90% of the max
+   * (`HEAVY_PCT`, `accessory-dosing/performed-ledger.ts`), and the p215 pretest ramps to 0.8625 of
+   * the predicted max (`PRETEST_STEPS`, `standing-plan/working-number.ts`). So the heavy count is
+   * STRUCTURALLY ZERO for the whole test week — it does not resolve once the sessions are logged,
+   * because no prescribed set in that week can reach the band. Printing `0 heavy` in the one week
+   * whose purpose was the athlete's most maximal sets reads as a failure and is not one.
+   *
+   * ⛔ THE WHOLE ROW GOES, NOT THE ZERO HALF. "16 speed" alone, with the heavy count silently
+   * absent, is worse than both numbers — it looks like the heavy count was lost rather than that the
+   * band does not apply.
+   *
+   * ⛔ IT IS A STATED FLAG, NOT AN EMPTY ARRAY, DELIBERATELY (Michael's ruling, over the simpler
+   * `perPattern: []`). Emptiness cannot tell a reader "no band applies this week" from "no data",
+   * and a card inferring meaning from an absent field taking the wrong branch with no error is the
+   * failure mode this screen has produced repeatedly. This says what is true.
+   *
+   * ⚠️ ABSENT ON A PAYLOAD WRITTEN BEFORE THIS — treat undefined as TRUE (the band applies), which
+   * is exactly today's behaviour, so an old cached row degrades to the current screen rather than to
+   * a wrong one. `COACH_PAYLOAD_VERSION` was bumped so cached rows re-source and it actually lands.
+   */
+  patternBandApplies?: boolean;
 }
 
 /** The assembly. Mirrors useStateTrends' body — one code path for client + server. */
@@ -1387,7 +1425,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     // because the percentages need `refMaxByCanonical`, which is resolved a few lines up — the same
     // windowed max the derived heavy gate uses. A second resolution of "what is this lift's max"
     // is how two screens come to disagree about whether a set was heavy.
-    viadaWeek: buildViadaWeekPerformed(inp.loggedSessions, asOf, refMaxByCanonical),
+    viadaWeek: buildViadaWeekPerformed(inp.loggedSessions, asOf, refMaxByCanonical, inp.testWeekDates),
   };
 }
 
@@ -1402,6 +1440,7 @@ function buildViadaWeekPerformed(
   loggedSessions: StateTrendInputs['loggedSessions'],
   asOf: string,
   refMaxByCanonical: Record<string, number>,
+  testWeekDates?: string[] | null,
 ): ViadaWeekPerformed | null {
   const rows = Array.isArray(loggedSessions) ? loggedSessions : [];
   if (rows.length === 0) return null;
@@ -1451,6 +1490,14 @@ function buildViadaWeekPerformed(
     })),
     perPattern: dose.perPattern,
     unpriced: dose.unpriced,
+    /**
+     * The band applies unless a day INSIDE THIS CARD'S OWN WINDOW is a test day. Asked of the window
+     * the card describes — not of "the current week" — so the flag and the numbers beside it always
+     * describe the same seven days. Survives a plan whose test is not week 1, and a plan with more
+     * than one test week, because it is a date-set intersection rather than a week comparison.
+     */
+    patternBandApplies: !(Array.isArray(testWeekDates) && testWeekDates.length > 0
+      && week.some((sess) => testWeekDates.includes(sess.date))),
   };
 }
 

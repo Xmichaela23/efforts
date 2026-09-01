@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import type { CoachWeekContextV1 } from '@/hooks/useCoachWeekContext';
 import { useExerciseLog } from '@/hooks/useExerciseLog';
+import { formatLocalDate } from '@/lib/dateUtils';
 // [D-374 → Step 2] The SAME axis the server gates coaching language on, so the row that renders and
 // the verdict that fills it can never disagree about what a main lift is. `coached` is true on
 // exactly one type row and that row is built from `MAIN_BARBELL_LIFTS`, so this is the same answer
@@ -595,8 +596,33 @@ export default function StateTab({
   //    `wsv.week_execution_v1` (server-owned), further down in the JSX. ──
 
   // ── NEXT row ─────────────────────────────────────────────────────────────
+  /**
+   * ⛔⛔ TODAY IS NOT ON THIS SCREEN (Michael, 2026-09-01, FIXLIST 2d):
+   * *"I dont think we need today reflected on state screen or next — its a broader picture."*
+   * Today's session belongs to the day screen; State is the arc around it.
+   *
+   * ⛔ THE SERVER'S FIELD IS CORRECT AND IS NOT CHANGED. `key_sessions_remaining` is documented as
+   * *"from as_of_date (inclusive), excluding completed planned rows"* (`coach/types.ts:221`) and
+   * built that way at `coach/index.ts:1200` — today is listed BECAUSE it is not done yet. That is the
+   * right answer to the question the coach is asking, and the coach asks it for more than this row:
+   * `hasUpcomingLong` (`coach/index.ts:739`) reads the same field to write race-week guidance. Moving
+   * the exclusion into that filter would silently change race-week copy for a State-screen ruling.
+   * ⚠️ SO THE NARROWING LIVES HERE, ON THE ONE SURFACE IT WAS RULED FOR, and `StateTab` is the only
+   * client reader of the field (checked). This is a display scope, not a second definition of
+   * "remaining" — nothing here re-decides what is left, it chooses what this screen shows.
+   *
+   * ⚠️ LOCAL DATE, NOT UTC. `toISOString().slice(0,10)` is tomorrow's date for anyone west of UTC in
+   * the evening, which would drop tomorrow's session as well as today's. `formatLocalDate` is the
+   * repo's own helper for exactly this.
+   *
+   * ⚠️ AND THE ROW KEEPS ITS NAME. "NEXT" was only inaccurate because today was in it; with today
+   * gone the word is correct, so this closes the rename rather than needing copy.
+   */
   const sessionsRemaining = data.week?.key_sessions_remaining ?? [];
-  const nextSessions = sessionsRemaining.slice(0, 3);
+  const todayYmd = formatLocalDate(new Date());
+  const nextSessions = sessionsRemaining
+    .filter((s) => String(s?.date || '').slice(0, 10) > todayYmd)
+    .slice(0, 3);
 
   // ── intent summary + readiness — server-computed ─────────────────────────
   const intentSummary = wsv.week.intent_summary ?? null;
