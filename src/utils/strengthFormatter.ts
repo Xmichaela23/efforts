@@ -13,7 +13,18 @@ export function formatStrengthExercise(
   exercise: any,
   _units: 'imperial' | 'metric' = 'imperial'
 ): string {
-  const name = String(exercise?.name || '').replace(/_/g, ' ').trim();
+  /**
+   * ⛔⛔ THE EXECUTION THE ATHLETE'S KIT ACTUALLY REACHES, WHERE THE CANONICAL NAME SAYS MACHINE
+   * (2026-08-31, Michael's own screen). `rear delt machine` routes to dumbbells on an incline bench
+   * for him and the row named a station he does not own. The composer stamps `execution_name` when
+   * — and only when — the free-weight route is the one that resolved; absent means the canonical
+   * name is already the right one, and an athlete WITH the machine still reads the machine's name.
+   *
+   * ⚠️ DISPLAY ONLY, AND THAT IS THE WHOLE CONSTRAINT. `name` is untouched everywhere that stores,
+   * logs, matches or cites: it is the key logged-vs-planned matching runs on, and moving the WORDS
+   * would unmatch every set already logged against the old spelling.
+   */
+  const name = String(exercise?.execution_name || exercise?.name || '').replace(/_/g, ' ').trim();
   const sets = Number(exercise?.sets) || 0;
   const reps = exercise?.reps;
   
