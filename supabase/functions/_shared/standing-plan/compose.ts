@@ -3337,7 +3337,34 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * ⚠️ IT CANNOT DOUBLE-PLACE. The direct placement below asks the BUILT WEEK whether the movement
    * is already there, so whichever path lands it, the other stands down.
    */
-  const corePickRaw = String(args.slotPicks?.core ?? '').trim();
+  /**
+   * ⛔⛔ THREE CORE ANSWERS, ONE A WEEK, ROTATED (Michael, 2026-09-01: *"ab drop down pick 3 and we
+   * rotate"*).
+   *
+   * ⛔ THE REASON IS COVERAGE, NOT VARIETY FOR ITS OWN SAKE. Core does four separable jobs — resist
+   * extension, resist rotation, resist side-bend, flex — and one movement trains one of them. A
+   * single answer placed every week is one job trained twelve times and three never trained. p223
+   * says it in his own words: core *"is not necessarily crunches — dynamic throws, rotational
+   * med-ball, landmine work all count"*.
+   *
+   * ⚠️ THE DOSE DOES NOT CHANGE. Still ONE core slot a week — see `CORE_PICK_FREQUENCY_IS_OURS`.
+   * What rotates is WHICH movement fills it, so three answers cost the week nothing.
+   * ⚠️ DUPLICATES COLLAPSE. Picking the same movement twice is an answer, not an instruction to do
+   * it two weeks running, and the wizard defaults every cell to the list's first option — so without
+   * this an athlete who opened the screen and changed nothing would rotate between three identical
+   * rows.
+   * ⚠️ ONE ANSWER BEHAVES EXACTLY AS BEFORE, which is what keeps every block built before today
+   * unchanged.
+   */
+  const corePicksAll = ['core', 'core_2', 'core_3']
+    .map((k) => String((args.slotPicks as Record<string, string> | undefined)?.[k] ?? '').trim())
+    .filter((n) => n !== '');
+  const corePicksUnique = [...new Set(corePicksAll.map((n) => canonicalize(n)))]
+    .map((c) => corePicksAll.find((n) => canonicalize(n) === c)!);
+  const corePickRaw = corePicksUnique.length > 0
+    // ⚠️ THE WEEK IS THE INDEX, so the cycle is the same for everyone and repeats every N weeks.
+    ? corePicksUnique[(Math.max(1, args.week) - 1) % corePicksUnique.length]
+    : '';
   const filled = fillMuscleFloor(dosing, {
     equipment: args.equipment ?? null,
     prefer: [

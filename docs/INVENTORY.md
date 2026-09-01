@@ -149,7 +149,7 @@ the deliberate exception**: neither page prints a core row, and it is offered an
 - `quad_iso` — Leg isolation
 - `core` — Core  ⚠️ names no printed cell (opt-in addition)
 
-**`all_rounder`** — 10 cells
+**`all_rounder`** — 12 cells
 
 - `braced_push` — Machine press
 - `iso_push` — Push isolation
@@ -161,6 +161,8 @@ the deliberate exception**: neither page prints a core row, and it is offered an
 - `iso_pull_b` — Pull isolation
 - `quad_iso` — Leg isolation
 - `core` — Core  ⚠️ names no printed cell (opt-in addition)
+- `core_2` — Core 2  ⚠️ names no printed cell (opt-in addition)
+- `core_3` — Core 3  ⚠️ names no printed cell (opt-in addition)
 
 ---
 

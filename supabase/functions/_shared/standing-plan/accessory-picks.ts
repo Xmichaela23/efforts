@@ -71,7 +71,24 @@ export type ViadaPickKey =
   | 'braced_hinge'
   | 'braced_leg'
   | 'ham_iso'
-  | 'core';
+  | 'core'
+  /**
+   * ⛔⛔ THREE CORE CELLS, AND THE ENGINE ROTATES THEM (Michael, 2026-09-01: *"ab drop down pick 3
+   * and we rotate"*).
+   *
+   * ⛔ THE REASON IS THE MOVEMENT, NOT THE DOSE. Core does four separable jobs — resisting
+   * extension, resisting rotation, resisting side-bend, and flexion — and ONE movement trains one of
+   * them. His own note on p223 says as much: core *"is not necessarily crunches — dynamic throws,
+   * rotational med-ball, landmine work all count"*. A single chosen movement placed every week is
+   * one job trained twelve times and three never trained.
+   *
+   * ⚠️ TWO EXTRA KEYS RATHER THAN AN ARRAY, and that is deliberate. `slot_picks` already travels the
+   * whole chain — wire, plan row, rematerializer, composer — as a flat map of key to movement, and
+   * `iso_pull_a` / `iso_pull_b` are already two cells of one label. A parallel array would be a
+   * second carrier for the same fact on four more files.
+   */
+  | 'core_2'
+  | 'core_3';
 
 /** ⛔ p246's TABLE, FROZEN. `strength_5k`'s membership and nothing else — see `PICK_KEYS_BY_FRAME`. */
 export const VIADA_PICK_KEYS: ViadaPickKey[] = [
@@ -121,7 +138,7 @@ export const ALL_ROUNDER_PICK_KEYS: ViadaPickKey[] = [
    * directly — see `CORE_PICK_FREQUENCY_IS_OURS` and the 2026-08-29 backout recorded on the `core`
    * spec below, which is the reason the first attempt at this failed.
    */
-  'core',
+  'core', 'core_2', 'core_3',
 ];
 
 /**
@@ -381,6 +398,15 @@ export const EXPLOSIVE_STEP_UP_IS_THE_WRONG_INTENT = ['explosive step up'];
  * asserted by the gate, because a pick pointing at a cell the frame does not carry is a control
  * that silently does nothing, which is the whole defect this file replaces.
  */
+/**
+ * ⛔ p223 CORE, HIS FIVE, in his order — shared by all three core cells so they cannot drift.
+ * "Dynamic plank variants" is his own catch-all, so the MOVING planks are inside it and the static
+ * holds are not: a plank hold is not a dynamic variant.
+ */
+const CORE_LIST = ['hanging leg raise', 'crunch', 'v up', 'plank with shoulder tap',
+  'side plank with hip dip', 'stir the pot', 'trx fallout', 'ab wheel rollout', 'ab rollout'];
+const CORE_LEAD = ['hanging leg raise', 'crunch', 'v up', 'plank with shoulder tap', 'ab rollout'];
+
 export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
   /**
    * ⚠️ THE SAME DEFECT LIVES HERE AND IS DELIBERATELY UNFIXED — recorded 2026-08-26 so it is not
@@ -800,12 +826,39 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // not, because a plank hold is not a dynamic variant. Side bends, sit-ups, dead bugs, bird dogs,
     // flutter kicks, scissor kicks and toe touches are cut, along with the four `core work`
     // placeholder entries that were never movements.
-    hisList: ['hanging leg raise', 'crunch', 'v up', 'plank with shoulder tap', 'side plank with hip dip', 'stir the pot', 'trx fallout', 'ab wheel rollout', 'ab rollout'],
-    leadWith: ['hanging leg raise', 'crunch', 'v up', 'plank with shoulder tap', 'ab rollout'],
+    hisList: CORE_LIST,
+    leadWith: CORE_LEAD,
     leadCite: 'Viada p223 — core',
     servesChips: ['core'],
   },
+  /**
+   * ⛔ THE SECOND AND THIRD CORE CELLS — the same list, the same page, a different week.
+   * ⚠️ ALL THREE ARE OPTIONAL. One answer is one movement every week; three are rotated one per
+   * week. An athlete who fills only the first gets exactly what they got before this existed.
+   * ⚠️ THE LABEL IS NUMBERED because unlike `iso_pull_a` / `iso_pull_b` these do not sit on
+   * different days — they sit in different WEEKS, and a shared label with no day tag beside it would
+   * read as the screen asking the same question three times.
+   */
+  /**
+   * ⛔ THE THREE CELLS DEFAULT TO THREE DIFFERENT JOBS, and that is the whole reason for having
+   * three. Core does four separable things and one movement trains one of them, so three cells that
+   * all opened on `hanging leg raise` would rotate between three identical rows and buy nothing.
+   * ⚠️ ALL FROM HIS OWN p223 LIST, in his spellings: a leg raise is FLEXION, an ab wheel rollout
+   * resists EXTENSION, a side plank with hip dip resists SIDE-BEND. The athlete can change any of
+   * them; what they get for changing nothing is coverage rather than repetition.
+   */
+  core_2: { key: 'core_2', label: 'Core 2', slot: null,
+    hisList: CORE_LIST,
+    leadWith: ['ab wheel rollout', 'ab rollout', 'stir the pot', 'crunch', 'v up'],
+    leadCite: 'Viada p223 — core', servesChips: ['core'] },
+  core_3: { key: 'core_3', label: 'Core 3', slot: null,
+    hisList: CORE_LIST,
+    leadWith: ['side plank with hip dip', 'plank with shoulder tap', 'trx fallout', 'v up', 'crunch'],
+    leadCite: 'Viada p223 — core', servesChips: ['core'] },
 };
+
+/** ⛔ ONE LIST FOR THREE CELLS — p223, his order. A second copy is how two of them drift apart. */
+export const CORE_PICK_KEYS = ['core', 'core_2', 'core_3'] as const;
 
 /**
  * ⛔ WHICH PICK OWNS A GIVEN FRAME SLOT — the composer's half of the table, so a slot and a pick can
@@ -1082,7 +1135,7 @@ export function picksForFrame(
    */
   const reachable = frame === 'strength_5k'
     ? ordered
-    : ordered.filter((k) => k === 'core' || pickReachesFrame(k, frame, column));
+    : ordered.filter((k) => (CORE_PICK_KEYS as readonly string[]).includes(k) || pickReachesFrame(k, frame, column));
   if (equipment == null) return reachable;
   /**
    * ⚠️⚠️ ONE OPTION STILL DRAWS THE CONTROL — changed 2026-08-30 with Michael's substitution
