@@ -29,6 +29,14 @@ const WORKING = {
   bench: workingNumberFromTest('bench', { weight: 135, reps: 8 })!,
   squat: workingNumberFromTest('squat', { weight: 100, reps: 10 })!,
   deadlift: workingNumberFromTest('deadlift', { weight: 135, reps: 10 })!,
+  /**
+   * ⚠️ ADDED 2026-09-01, AND THE FIXTURE WAS THE THING THAT WAS WRONG. Week one tests all four
+   * lifts, so a block always has this number — the fixture just never carried it, and once the push
+   * pattern could price from EITHER of its tested lifts, the overhead press row correctly stayed by
+   * feel for want of a test that every real athlete has done. Supplying it restores what this test
+   * is actually asserting: on a real block, a top set that CAN be derived is.
+   */
+  overheadPress: workingNumberFromTest('overheadPress', { weight: 95, reps: 8 })!,
 };
 const BASE = {
   frame: 'strength_5k' as const,

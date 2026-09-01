@@ -337,7 +337,19 @@ const STRENGTH_5K_STANDARD: FrameDay[] = [
     strength: [
       S('ME', 'competition', 'primary', 'push_upper', '1 x ME: Primary push'),
       S('ME', 'accessory', 'primary', 'pull_upper', '1 x ME: Accessory: primary pull'),
-      S('DE', 'accessory', 'secondary', 'push_upper', '1 x DE: Accessory: secondary push'),
+      /**
+       * ⛔ THE SAME RULE AS THE OTHER FRAME'S DAY-1 SPEED CELL, applied here so the rule is the
+       * TEMPLATE'S and not one programme's (2026-09-01). `frame-rules.test.ts` asserts every frame's
+       * standard week presses overhead and trains every lift it tests; this frame failed both for
+       * the identical reason — ranking on equipment fit alone lands on a bench variant, and half of
+       * p220's own secondary push list was never reached.
+       * ⚠️ Same mechanism, same labelling: the muscle is ours, the pairing and the movement list are
+       * his, and `alsoAdmits` names the barbell press for the athlete whose kit reaches nothing else.
+       */
+      S('DE', 'accessory', 'secondary', 'push_upper', '1 x DE: Accessory: secondary push', {
+        muscle: 'deltoids',
+        alsoAdmits: ['overhead press', 'military press', 'standing barbell overhead press', 'push press'],
+      }),
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),
       S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: Accessory: focused pull, focused push'),
     ],
