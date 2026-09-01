@@ -2929,9 +2929,33 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             // ⚠️ AN ACCESSORY, AS PRESCRIBED. Same shape the ordinary pre-fill builds — name, notes and
             // its own planned sets — so the athlete logs the row the plan actually gave them.
             const planned = (plannedSetsFor(ex) ?? []) as Array<Record<string, unknown>>;
+            /**
+             * ⛔⛔ THE PRESCRIBED NAME IS STAMPED HERE, AND ITS ABSENCE WAS THE DEFECT (2026-08-31,
+             * Michael's own two screens, side by side, same build). `planned_name` is what the
+             * logger keys BOTH row controls off — `:5335` renders **Swap** when it is set, `:5347`
+             * renders **Add this exercise to the plan** when it is not — and this branch built every
+             * row without it. So a test session's rows were indistinguishable from exercises the
+             * athlete had typed in themselves: the prescribed lift lost the action that belongs to
+             * it and gained the one that does not, and a floor row could not be swapped at all.
+             * ⚠️ IT IS THE ROW'S OWN NAME, not a display string. `substituted_for` is derived at save
+             * by comparing this to `name`, so seeding anything else would read as a swap the athlete
+             * never made.
+             */
+            const plannedReps = ex?.target_reps ?? ex?.reps;
             return {
               id: `ex-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
               name: String(ex?.name || '').trim(),
+              planned_name: String(ex?.name || '').trim(),
+              /**
+               * ⚠️ AND THE PRESCRIPTION TRAVELS WITH IT. Without `target_reps` the band label never
+               * renders and `exOpenRepBand` (:5782) is false, so an auto-regulated row on a test day
+               * showed no target at all; without `target_rir` the accessory lost the reserve its plan
+               * row carries (his ab wheel arrived at 1.5 and saved with none).
+               */
+              target_reps: (typeof plannedReps === 'string' && /\d/.test(plannedReps))
+                ? plannedReps.trim()
+                : (typeof plannedReps === 'number' && plannedReps > 0 ? String(plannedReps) : undefined),
+              target_rir: typeof ex?.target_rir === 'number' ? ex.target_rir : undefined,
               notes: String(ex?.notes || '').trim() || undefined,
               expanded: true,
               sets: (planned.length > 0 ? planned : Array.from({ length: Number(ex?.sets) || 3 }))
@@ -2973,6 +2997,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           const w = Number.isFinite(rw) && rw > 0
             ? rw
             : (Number.isFinite(planTop) && planTop > 0 ? planTop : Number(ex?.weight));
+          /**
+           * ⛔⛔ A TESTED LIFT GETS NEITHER CONTROL — NOT "Add to plan", AND NOT SWAP EITHER
+           * (Michael, 2026-08-31: *"no swap"*).
+           *
+           * ⛔ THE FIRST FIX STAMPED `planned_name` HERE and that turned the wrong button into a
+           * different wrong button. Swap substitutes one movement for another — and the movement on
+           * this row is the one the block's every working number is derived from. Substituting it
+           * does not change a session, it changes what the next eleven weeks are priced off.
+           * ⚠️ **A test day is a test day.** The row is the measurement; there is nothing here to
+           * exchange, so no control is offered and the Add button is suppressed alongside it (see
+           * the `Add` gate at the render site, which reads the same scored-set marker).
+           * ⚠️ THE ACCESSORY BRANCH ABOVE IS UNCHANGED and still carries its prescription — those
+           * rows are ordinary work and swapping one costs the test nothing.
+           */
           return createBaselineTestExercise(liftName || String(ex?.name || ''), Number.isFinite(w) && w > 0 ? w : undefined);
         }));
         exercisesLoadedFromWorkout = true;
@@ -3931,7 +3969,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // AMRAP 1RM test (tag-retest OR any amrap-flagged working set): NO RIR gate — the AMRAP protocol is
         // the near-max signal; compute the e1RM straight from weight×reps on completion. A legacy NON-amrap
         // working set in a baseline-tagged workout keeps the sub-max RIR 2–3 !autofilled gate. (Q-097)
-        const isAmrapBaseline = isTagRetest || (updatedSet as any).amrap === true;
+        /**
+         * ⛔⛔ ON A TEST ROW, ONLY THE SCORED SET MAY WRITE THE BASELINE (2026-08-31).
+         *
+         * `isTagRetest` is true for the whole session, so this accepted ANY completed working set —
+         * and `setBaselineTestResults` is keyed by exercise, last write wins. Log one more set after
+         * the AMRAP and the number on its way to `user_baselines` became that set's, not the test's.
+         * ⚠️ THE GUARD IS "DOES THIS ROW HAVE A SCORED SET AT ALL". Where one exists the flag is the
+         * marker and nothing else qualifies; where none does — a named baseline's sub-max path, a
+         * lift the athlete added themselves — every branch below is exactly as it was.
+         */
+        const rowHasScoredSet = exercise.sets.some((st) => (st as { amrap?: boolean }).amrap === true);
+        const thisSetIsScored = (updatedSet as { amrap?: boolean }).amrap === true;
+        const isAmrapBaseline = (isTagRetest || thisSetIsScored) && (!rowHasScoredSet || thisSetIsScored);
         const amrapReady = isAmrapBaseline && updatedSet.setType === 'working' && updatedSet.completed
           && updatedSet.weight && updatedSet.weight > 0 && updatedSet.reps && updatedSet.reps > 0;
         const submaxReady = !isAmrapBaseline && updatedSet.setType === 'working' && updatedSet.completed
@@ -5344,7 +5394,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 )}
                 {/* Adapt-a-plan #2 — a hand-added lift (never prescribed) can be added to the plan for
                     real: the confirm below writes it and lets materialize place it on matching days. */}
-                {!exercise.planned_name && String(exercise.name ?? '').trim().length > 1 && (
+                {/**
+                  * ⛔⛔ AND NOT ON A TESTED LIFT (2026-08-31). `planned_name` is absent on a test
+                  * row BY DESIGN — see the test builder — so without this gate the row falls into
+                  * the hand-added branch and offers to add the athlete's own bench press to their
+                  * plan. That is the button Michael found on his Test: Lower squat.
+                  * ⚠️ THE MARKER IS THE SCORED SET, the same one `Add Set` and the baseline write
+                  * read, so all three agree about what a test row is by construction.
+                  */}
+                {!exercise.planned_name
+                  && !exercise.sets.some((s) => s.amrap === true || s.repMaxTest === true)
+                  && String(exercise.name ?? '').trim().length > 1 && (
                   <button
                     onClick={() => setAddToPlanFor(addToPlanFor === exercise.id ? null : exercise.id)}
                     className={`flex items-center gap-1 pl-1.5 pr-1 py-2 text-[11px] font-medium transition-colors ${addToPlanFor === exercise.id ? 'text-teal-300' : 'text-white/55 hover:text-white/90'}`}
@@ -6563,6 +6623,22 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   </div>
                 )}
                 
+                {/**
+                  * ⛔⛔ A SCORED TEST ROW TAKES NO SECOND SET (2026-08-31, Michael's screen: the
+                  * working set read *"AMRAP · 5 minimum"* at 100 lb with **Add Set** under it).
+                  *
+                  * ⛔ ONE ALL-OUT SET IS THE TEST. p215's protocol works up in three steps and takes
+                  * the LAST one for max clean reps; a second all-out set at the same weight is a
+                  * fatigued repeat, and it is not what the block's numbers may be read from.
+                  * ⛔ AND IT WAS A DATA PATH, NOT ONLY A TRAINING ONE. On a `1rm_test` session
+                  * `isTagRetest` is true, so `amrapReady` (:3935) accepts **any** completed working
+                  * set — and `setBaselineTestResults` is keyed by exercise, last write wins. An extra
+                  * set logged after the test therefore REPLACED the tested result on its way to
+                  * `user_baselines`. The gate below removes the offer; `:3935` refuses the write.
+                  * ⚠️ ONLY WHERE A SCORED SET EXISTS. Every other row on the session — the
+                  * accessories, and any lift the athlete added themselves — keeps Add Set.
+                  */}
+                {!exercise.sets.some((s) => s.amrap === true || s.repMaxTest === true) && (
                 <GalaxyButton
                   variant="secondary"
                   size="sm"
@@ -6579,6 +6655,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   <Plus className="h-3.5 w-3.5" />
                   Add Set
                 </GalaxyButton>
+                )}
                 
                 {/* Notes section - collapsible, shown when exercise is expanded */}
                 {(() => {

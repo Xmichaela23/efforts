@@ -21,13 +21,15 @@ import {
   type EnduranceBaselines,
   type Level,
 } from '../endurance-library/index.ts';
-import { bandRouteName, isAsymmetrical, isBodyweightLoad, prescribe, resolveSlot, viadaCategoryOf,
+import { bandRouteName, executionName, isAsymmetrical, isBodyweightLoad, prescribe, resolveSlot,
   type ViadaPattern } from '../strength-grid/index.ts';
 import { ownsLoadingImplement } from '../../../../src/lib/strength-gear.ts';
 import {
   HOLD_PRESCRIPTION,
   fillMuscleFloor,
+  isRepPrescribable,
   ledgerFor,
+  muscleFloorSets,
   type DoseLedger,
   type MuscleGroup,
   type PlannedSession as DosingSession,
@@ -171,6 +173,26 @@ export type StrengthExercise = {
    * `notes` line carries the same fact in words so the athlete sees it either way.
    */
   load_basis?: 'derived_ratio';
+  /**
+   * ⛔⛔ THE NAME OF THE EXECUTION THIS ATHLETE'S KIT ACTUALLY REACHES — DISPLAY ONLY (2026-08-31).
+   *
+   * ⛔ THE DEFECT. `rear delt machine` is tagged `[['dumbbells','incline_bench'], ['machine']]`, so
+   * an athlete with dumbbells and an incline bench reaches it on the FREE-WEIGHT route — and the row
+   * printed the name of a station they do not own. Michael, on his own screen. `executionName`
+   * already held the answer (`Chest-Supported Rear Delt Raise`) and **only the PICKER called it**,
+   * so the dropdown and the built week called one movement two different things.
+   *
+   * ⛔⛔ IT IS A SECOND FIELD AND NOT A REWRITE OF `name`, AND THAT IS THE WHOLE CONSTRAINT
+   * (DESIGN §12b / §13 item 3). `name` is what logged-vs-planned matching keys on: changing the
+   * WORDS unmatches every set already logged against the old spelling. ⚠️ This is NOT the same as
+   * `bandRouteName`, which DOES move `name` — it may, because the string it moves to
+   * (`band pull down`) is itself a catalogue movement that resolves exactly. An execution label is
+   * not a catalogue entry, so it cannot travel in `name` and must travel beside it.
+   *
+   * ⚠️ ABSENT MEANS THE CANONICAL NAME IS ALREADY THE RIGHT ONE — an athlete who owns the station
+   * sees the station's name, because that is what they will walk over to.
+   */
+  execution_name?: string;
   set_plan?: PlannedSet[];
 };
 
@@ -732,6 +754,20 @@ function targetRirForIntent(intent: 'ME' | 'DE' | 'SKILL' | 'HYP'): number | nul
  * two doses, and the rows that carry each are decided in different places.
  */
 const ACCESSORY_TARGET_RIR = 1.5;
+
+/**
+ * ⛔ HOW OFTEN A CHOSEN CORE MOVEMENT IS PLACED — OURS, AND SAID SO ON THE PLAN.
+ *
+ * p223 gives core its own movement list and p142's rule 4 gives its position inside a session. **He
+ * states no frequency and no weekday for it**, and this frame prints no core slot at all, so any
+ * answer here is ours. One slot a week is the floor's own structural convention — see
+ * `MUSCLE_FLOOR_IS_ONE_SLOT` — applied to a row the athlete asked for rather than to a gap.
+ */
+const CORE_PICK_FREQUENCY_IS_OURS =
+  'Your core choice is placed once a week, on your lightest lifting day and never on a test day. '
+  + 'The source gives core its own movements and says where they sit in a session — after the main '
+  + 'work, before the isolation work — but names no frequency, so once a week is ours: the same '
+  + 'one-slot dose every other accessory here takes.';
 
 /**
  * ⛔ HIS ME SET BAND — 1 to 3, p218 — READ OFF STAGE 2 RATHER THAN RESTATED HERE.
@@ -1463,6 +1499,9 @@ function exerciseForSlot(
     return {
       exercise: {
         name: rowDisplayName(movement, slot),
+        ...(rowExecutionName(movement, slot, args.equipment)
+          ? { execution_name: rowExecutionName(movement, slot, args.equipment)! }
+          : {}),
         sets,
         reps,
         weight: 'By feel',
@@ -1642,16 +1681,37 @@ function exerciseForSlot(
    * entirely. What marks it is `load_basis` for any surface that wants to branch, and the note for
    * the one that does not.
    */
+  /**
+   * ⛔⛔ AND IT HAS TO STATE WHAT THE NUMBER ON THE ROW ACTUALLY IS (2026-08-31, Michael's own
+   * screen). This read *"About 85% of your bench press"* beside a DE incline row prescribing 90 lb
+   * — and 90 is **58%** of his 155 bench, not 85%. The 85 is the movement RATIO, the estimate of
+   * this lift's max against the tested one; the sentence stated it as a fraction of the weight. Two
+   * numbers on one card, neither of which described the number in front of him, on a row whose
+   * weight is correct — the arithmetic was never wrong, the sentence was.
+   *
+   * ⛔ SO IT NAMES BOTH STEPS, IN THE ORDER THEY HAPPEN: the intent's percentage is OF THIS LIFT'S
+   * OWN estimated max, and that estimate is the ratio of the tested lift. `weight = pct × ratio ×
+   * working number`, and the line now reads as that chain rather than collapsing it into one
+   * misleading fraction.
+   */
   const derivedNote = derived
     // ⚠️ THE ATHLETE'S OWN NAME FOR THE LIFT, not the canonical one — `refLift` is this pattern's
     // tested lift, so `competitionLifts[pattern]` is that same lift as they named it.
-    ? `About ${Math.round(derived.ratio * 100)}% of your `
-      + `${testedLiftName(derived.refLift, args.competitionLifts[pattern]).toLowerCase()} — derived, not tested.`
+    // ⚠️ THE CLOSING CLAUSE STAYS LOWERCASE AND STAYS LAST. `standing-plan-derived-load.test.ts:86`
+    // pins the literal *"derived, not tested"* as this row's contract; a sentence-initial "Derived"
+    // is the same words and a different string, and the pin is right to care.
+    ? `${Math.round((pct ?? 0) * 100)}% of what this lift's own max works out to — about `
+      + `${Math.round(derived.ratio * 100)}% of your `
+      + `${testedLiftName(derived.refLift, args.competitionLifts[pattern]).toLowerCase()} `
+      + '— derived, not tested.'
     : null;
 
   return {
     exercise: {
       name: rowDisplayName(movement, slot),
+      ...(rowExecutionName(movement, slot, args.equipment)
+        ? { execution_name: rowExecutionName(movement, slot, args.equipment)! }
+        : {}),
       sets,
       reps,
       weight,
@@ -2037,6 +2097,55 @@ export function sessionCueFor(day: FrameDay): string {
  */
 function rowDisplayName(movement: string, slot: StrengthSlot): string {
   return slot.role === 'competition' ? movement : movementLabel(movement);
+}
+
+/**
+ * ⛔⛔ WHERE A CORE ROW GOES IN A SESSION — p142 rule 4, and the anchor is the ACCESSORY BLOCK.
+ *
+ * > *"Many athletes are tempted to perform any core/bracing work last in a routine, typically
+ * > hitting isolation/externally braced work (for example, machine work) after their main lift and
+ * > throwing in core work at the end. This tends to do the core a disservice — isolation work is
+ * > rarely degraded by a tired core, and core work tends to have a higher skill component than most
+ * > isolation work."*
+ *
+ * ⛔ HIS PHRASE IS *"isolation/externally braced work"* AND IT IS BOTH CATEGORIES, NOT ONE.
+ * ⚠️ Corrected 2026-08-31 on Michael's ruling — *"they need to be placed correctly, read the book"*.
+ * The anchor was the first row whose GRID category is `focused`, which on the All Rounder's leg day
+ * is the CALF RAISE: core landed after the back extension, the zercher squat and the goblet squat
+ * and ahead of one row. That is *"throwing in core work at the end"* — the exact routine the rule
+ * describes — because the grid calls a goblet squat `secondary` while p274 uses it as that day's
+ * `focused quadriceps`. **Braced work is externally braced work; his sentence names it first.**
+ *
+ * ⛔ THE ANCHOR IS `slot_intent`, WHICH IS DATA THE COMPOSER STAMPED, not a category re-derived from
+ * a display name. HYP is the accessory block in both frames; ME, DE and SKILL are the main and skill
+ * work rule 4 says core comes AFTER.
+ * ⚠️ NO FRAME ROW IS REORDERED. p274's own order stands — a SKILL row it prints last stays last.
+ * This decides one insertion point and nothing else.
+ * ⚠️ A SESSION WITH NO HYP ROW AT ALL appends, which is the only position left.
+ */
+function coreInsertIndex(existing: StrengthExercise[]): number {
+  const at = existing.findIndex((e) => e.slot_intent === 'HYP');
+  return at >= 0 ? at : existing.length;
+}
+
+/**
+ * ⛔ THE EXECUTION LABEL FOR THIS ROW, or `null` when the canonical name is already right.
+ *
+ * ⚠️ THE SAME TWO CALLS THE PICKER MAKES, IN THE SAME ORDER (`accessory-picks.ts:1551`) — the band
+ * rename first, then the execution rename — so the dropdown and the built week cannot disagree about
+ * what a movement is called. The composer has already applied `bandRouteName` to `movement` by the
+ * time this runs, which is why only the second call is made here.
+ * ⚠️ A COMPETITION LIFT IS NAMED BY THE ATHLETE and is never relabelled — the same carve-out
+ * `rowDisplayName` above makes, for the same reason.
+ */
+function rowExecutionName(
+  movement: string,
+  slot: StrengthSlot,
+  equipment: string[] | null | undefined,
+): string | null {
+  if (slot.role === 'competition') return null;
+  const exec = executionName(movement, equipment ?? null);
+  return exec === movement ? null : exec;
 }
 function testRegionOf(name: string): 'upper' | 'lower' | null {
   if (/^test:\s*upper$/i.test(name.trim())) return 'upper';
@@ -3138,10 +3247,10 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
      * display string is how two vocabularies start disagreeing.
      */
     const existing = target.strength_exercises ?? [];
-    const beforeIsolation = add.muscle === 'core'
-      ? existing.findIndex((e) => viadaCategoryOf(String((e as { name?: string })?.name ?? '')) === 'focused')
-      : -1;
-    const at = beforeIsolation >= 0 ? beforeIsolation : existing.length;
+    // ⛔ ONE OWNER FOR RULE 4'S POSITION — see `coreInsertIndex`. ⚠️ CORE ONLY: his rule is about
+    // core, and the other floor muscles have no stated position, so a general re-order would be
+    // inventing an ordering he does not give.
+    const at = add.muscle === 'core' ? coreInsertIndex(existing) : existing.length;
 
     target.strength_exercises = [
       ...existing.slice(0, at),
@@ -3203,6 +3312,104 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       ...existing.slice(at),
     ];
   }
+  /**
+   * ⛔⛔ A CORE MOVEMENT THE ATHLETE CHOSE IS PLACED, NOT LEFT TO THE FLOOR (Michael, 2026-08-31:
+   * *"make abs an option in the picker"*).
+   *
+   * ⛔⛔ THIS IS THE SECOND ATTEMPT AND THE FIRST ONE'S FINDING IS WHY IT LOOKS LIKE THIS. An
+   * *"Add core"* control was built and BACKED OUT on 2026-08-29, recorded in `accessory-picks.ts`'s
+   * `core` spec: the pick reached the week through `fillMuscleFloor`, **which fills a muscle only
+   * when it is BELOW its floor** — and `weighted knee raise` is p223's focused-quad movement whose
+   * prime mover is core, so a week already carrying one satisfies core, the floor stays quiet, and
+   * an explicitly chosen V-up is silently dropped. Raising core's `target` to force it was tried and
+   * **double-placed the row**. That file's own conclusion names this fix: *"an added row should not
+   * go through the floor at all — the floor is a backstop for a week that is missing something, and
+   * a row the athlete asked for is not that."*
+   *
+   * ⛔ SO IT RUNS AFTER THE FLOOR AND ONLY ON WHAT THE FLOOR LEFT UNPLACED. A core pick the floor
+   * DID place is already in `picks.placed` and never reaches here, which is what stops the double.
+   *
+   * ⛔ THE DOSE IS NOT A NEW NUMBER. One accessory slot — `add.sets` is the same
+   * `accessorySetsPerSlot` every floor row takes, and p86's `8-10 at 1-2 RIR` gives the reps and the
+   * reserve, exactly as the floor rows above take them.
+   *
+   * ⛔ THE POSITION IS HIS: Part C rule 4, p142 — **main → core → isolation**. Same anchor the floor
+   * uses ten lines above, asked of the grid rather than parsed off the row.
+   *
+   * ⚠️ **THE DAY IS OURS AND IT IS LABELLED.** p223 gives core its own list and rule 4 gives its
+   * position within a day; neither states a frequency or a weekday. One slot a week, on the lightest
+   * non-test lifting day, is this file's own floor convention applied to a chosen row — not a new
+   * claim about how often core should be trained.
+   * ⛔ AND NEVER ON A TEST DAY. Same hard exclusion as the floor (`PlannedSession.isTest`), for the
+   * same reason: a test costs the block its numbers.
+   */
+  /**
+   * ⚠️ THE PICKER'S OWN CORE CELL, AND NOT "any core movement in the flat list". The picker asks the
+   * core question once and stores one answer; reading the flat list instead would place a SECOND
+   * core row for an athlete whose Dial rows happen to include one, and would silence
+   * `standing-plan-picks.test.ts`'s *"a pick that could not be honoured is named"* — which is a
+   * different contract and still has to hold. The flat-list path is untouched.
+   * ⛔⛔ AND THE "ALREADY THERE" TEST READS THE BUILT WEEK, NOT `picks.placed`. That set is SEEDED
+   * with every slot answer before the day loop runs (`:2214`) — deliberately, to steer the engine
+   * off a movement the athlete already owns — so it says *"this is spoken for"*, never *"this is on
+   * the plan"*. Reading it here found the core pick pre-placed and dropped the row silently, which
+   * is the same disappearance the 2026-08-29 attempt died of, arriving through a different door.
+   * ⚠️ Asking the SESSIONS is the only question with one answer: is this movement on the week or not.
+   */
+  const corePickRaw = String(args.slotPicks?.core ?? '').trim();
+  const coreAlreadyOnWeek = corePickRaw !== '' && sessions.some((x) =>
+    (x.strength_exercises ?? []).some((e) =>
+      canonicalize(String((e as { name?: string })?.name ?? '')) === canonicalize(corePickRaw)));
+  const corePick = corePickRaw
+    && !coreAlreadyOnWeek
+    && musclesWorkedBy(corePickRaw)?.primary === 'core'
+      ? corePickRaw
+      : null;
+  if (corePick) {
+    const home = filled.sessions
+      .filter((d) => !d.isTest && sessions.some((x) => x.type === 'strength' && (x.name === d.label || x.day === d.label)))
+      .sort((a, b) => {
+        const setsOf = (d: DosingSession) => d.sets.reduce((n, w) => n + (Number(w.sets) || 0), 0);
+        const diff = setsOf(a) - setsOf(b);
+        return diff !== 0 ? diff : (a.day ?? 99) - (b.day ?? 99);
+      })[0];
+    const target = home
+      ? sessions.find((x) => x.type === 'strength' && (x.name === home.label || x.day === home.label))
+      : undefined;
+    if (target) {
+      picks.unplaced.delete(canonicalize(corePick));
+      picks.placed.add(canonicalize(corePick));
+      const existing = target.strength_exercises ?? [];
+      const at = coreInsertIndex(existing);
+      const takesReps = isRepPrescribable(corePick);
+      target.strength_exercises = [
+        ...existing.slice(0, at),
+        {
+          // ⚠️ THE ATHLETE'S OWN SPELLING, title-cased like every other row — this is their pick and
+          // it is not ours to relabel.
+          name: movementLabel(corePick),
+          sets: muscleFloorSets(),
+          reps: takesReps ? '8-10' : HOLD_PRESCRIPTION,
+          weight: 'By feel',
+          load_prescribed: false,
+          ...(takesReps ? { target_rir: ACCESSORY_TARGET_RIR } : {}),
+          notes: 'Your core pick.',
+        },
+        ...existing.slice(at),
+      ];
+      notes.push({
+        kind: 'source',
+        text: 'Core sits after the main work and before the isolation work — isolation is rarely '
+          + 'degraded by a tired core, and core work carries the higher skill component.',
+        cite: 'Viada p142 (rule 4), p223',
+      });
+      notes.push({
+        kind: 'ours',
+        text: CORE_PICK_FREQUENCY_IS_OURS,
+      });
+    }
+  }
+
   for (const n of filled.notes) notes.push({ kind: n.kind === 'source' ? 'source' : 'ours', text: n.text, cite: n.cite });
   for (const u of filled.unfilled) {
     notes.push({ kind: 'warning', text: `${u.muscle}: ${u.reason}` });

@@ -198,6 +198,27 @@ function planAddInjections(
     const candidates: any[] = [];
     for (const row of rows) {
       if (String(row?.type ?? '').toLowerCase() !== 'strength') continue;
+      /**
+       * ⛔⛔ A MAX TEST TAKES NO ADDED WORK (2026-08-31, Michael on his own Test: Upper: *"the added
+       * abs are weird"*). His ab wheel rollout was HIS OWN add — `plan_adjustments`, 22:35 UTC — and
+       * this function put it on **every** matching strength day, the two test days included.
+       *
+       * ⛔ THE COMPOSER'S OWN EXCLUSION DOES NOT REACH HERE, AND THAT IS THE POINT. `fillMuscleFloor`
+       * refuses a test day (`PlannedSession.isTest`), but an add is injected at MATERIALIZE time from
+       * a different table and never passed through that rule — so the floor fix alone would have left
+       * this landing anyway. Two doors onto a test day; this is the second one.
+       *
+       * ⛔ AND IT IS THE FIELD'S OWN CONVENTION, NOT A PREFERENCE. Volume comes DOWN into a max test
+       * — peaking guidance is a 40-50% cut, run in a light week — and no source prescribes accessory
+       * work AFTER a max. A test day carrying add-on volume is not standard anywhere.
+       * ⚠️ IT WEAKENS NOTHING. The floor rule and its measured cost (week one losing glutes, calves
+       * and triceps — Michael ruled on it directly) are untouched; this only stops a SECOND source of
+       * volume reaching the same day.
+       */
+      const rowTags: string[] = Array.isArray((row as any)?.tags)
+        ? (row as any).tags.map((t: any) => String(t).toLowerCase())
+        : [];
+      if (rowTags.includes('1rm_test')) continue;
       const date = String(row?.date ?? '');
       if (adj.applies_from > date) continue;
       if (adj.applies_until && adj.applies_until < date) continue;
@@ -2612,6 +2633,23 @@ export function expandTokensForRow(
             }
           }
           const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight, set_plan: carrySetPlan(ex, finalWeight), rir_tracked: tracksRir,
+            /**
+             * ⛔ THE EXECUTION LABEL, CARRIED — DISPLAY ONLY (2026-08-31). The composer sets
+             * `execution_name` when the athlete's kit reaches a movement on its FREE-WEIGHT route and
+             * the canonical name says machine (`rear delt machine` at a home gym). This object is a
+             * WHITELIST, so without this line the fact dies here and every surface prints the station
+             * again. ⚠️ `name` is untouched and stays canonical — it is what logged-vs-planned
+             * matching keys on, and moving it would unmatch every set logged against the old spelling.
+             */
+            /**
+             * ⚠️ AND ONLY WHILE THE ROW IS STILL THE MOVEMENT THE COMPOSER LABELLED. An equipment
+             * substitution or an athlete swap rewrites `name` a few lines above; the label describes
+             * the ORIGINAL movement's execution and would be a lie on the replacement. Dropped rather
+             * than re-derived — this seam does not own the naming rule.
+             */
+            execution_name: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
+              ? ((ex as any)?.execution_name ?? undefined)
+              : undefined),
             // ⛔ CARRY THE ASSISTANCE MARKER (2026-07-30). This object is a WHITELIST, and
             // `load_prescribed: false` — set on every assistance row the composer authors — was not on
             // it. The flag reached materialize (it is read twenty lines above, to stop a weight being
@@ -2975,6 +3013,23 @@ export function expandTokensForRow(
             }
           }
           const strength = { name, sets, reps, weight: finalWeight, weight_display: finalWeightDisplay, percent_1rm, resolved_from, notes: equipmentNotes, baseline_missing: baselineMissing, required_baseline: baselineLabel, target_rir, adjusted: wasAdjusted, original_weight: originalWeight, set_plan: carrySetPlan(ex, finalWeight), rir_tracked: tracksRir,
+            /**
+             * ⛔ THE EXECUTION LABEL, CARRIED — DISPLAY ONLY (2026-08-31). The composer sets
+             * `execution_name` when the athlete's kit reaches a movement on its FREE-WEIGHT route and
+             * the canonical name says machine (`rear delt machine` at a home gym). This object is a
+             * WHITELIST, so without this line the fact dies here and every surface prints the station
+             * again. ⚠️ `name` is untouched and stays canonical — it is what logged-vs-planned
+             * matching keys on, and moving it would unmatch every set logged against the old spelling.
+             */
+            /**
+             * ⚠️ AND ONLY WHILE THE ROW IS STILL THE MOVEMENT THE COMPOSER LABELLED. An equipment
+             * substitution or an athlete swap rewrites `name` a few lines above; the label describes
+             * the ORIGINAL movement's execution and would be a lie on the replacement. Dropped rather
+             * than re-derived — this seam does not own the naming rule.
+             */
+            execution_name: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
+              ? ((ex as any)?.execution_name ?? undefined)
+              : undefined),
             // ⛔ CARRY THE ASSISTANCE MARKER (2026-07-30). This object is a WHITELIST, and
             // `load_prescribed: false` — set on every assistance row the composer authors — was not on
             // it. The flag reached materialize (it is read twenty lines above, to stop a weight being
