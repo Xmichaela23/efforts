@@ -5460,23 +5460,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 {/* Adapt-a-plan #2 — a hand-added lift (never prescribed) can be added to the plan for
                     real: the confirm below writes it and lets materialize place it on matching days. */}
                 {/**
-                  * ⛔ AN ADDED EXERCISE CAN BE TAKEN BACK OFF (2026-09-01). It arrives through
-                  * `computed.steps` looking exactly like a prescribed row — same shape, same
-                  * `planned_name` — so it carries `athlete_added`, and this is the only control that
-                  * reads it. Without it, one tap on "Add to plan" was permanent: one set of ten, on
-                  * every matching lifting day, for as long as the block ran.
-                  */}
-                {exercise.athlete_added === true && (
-                  <button
-                    onClick={() => setRemoveFromPlanFor(removeFromPlanFor === exercise.id ? null : exercise.id)}
-                    className={`flex items-center gap-1 pl-1.5 pr-1 py-2 text-[12px] font-medium transition-colors ${removeFromPlanFor === exercise.id ? 'text-teal-300' : 'text-white/72 hover:text-white/90'}`}
-                    aria-label="Remove this exercise from the plan"
-                  >
-                    <X className="h-4 w-4" />
-                    <span>Remove</span>
-                  </button>
-                )}
-                {/**
                   * ⛔⛔ AND NOT ON A TESTED LIFT (2026-08-31). `planned_name` is absent on a test
                   * row BY DESIGN — see the test builder — so without this gate the row falls into
                   * the hand-added branch and offers to add the athlete's own bench press to their
@@ -5716,17 +5699,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               {removeFromPlanFor === exercise.id && (
                 <div className="mt-2 mb-3 rounded-xl border-2 border-white/15 bg-white/[0.06] backdrop-blur-md p-3">
                   <p className="text-[13px] text-white/72 leading-snug mb-2.5">
-                    Take {exercise.execution_name || exercise.name} off the rest of your plan? It stays in
-                    today's session — this only stops it appearing on your future training days.
+                    You added {exercise.execution_name || exercise.name} to your plan. Remove it just for
+                    today, or off the rest of your plan?
                   </p>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
-                      onClick={() => { void persistPlanRemove(exercise.name); setRemoveFromPlanFor(null); }}
+                      onClick={() => { setRemoveFromPlanFor(null); deleteExercise(exercise.id); }}
+                      className="px-3 py-1.5 rounded-xl text-[13px] border border-white/15 bg-white/[0.04] text-white/72 hover:text-white/85 transition-colors"
+                    >Just today</button>
+                    <button
+                      onClick={() => { void persistPlanRemove(exercise.name); setRemoveFromPlanFor(null); deleteExercise(exercise.id); }}
                       className="px-3 py-1.5 rounded-xl text-[13px] border border-teal-300/60 bg-teal-400/15 text-teal-100 hover:bg-teal-400/25 transition-colors"
-                    >Remove from plan</button>
+                    >Off the plan</button>
                     <button
                       onClick={() => setRemoveFromPlanFor(null)}
-                      className="px-3 py-1.5 rounded-xl text-[13px] border border-white/15 bg-white/[0.04] text-white/72 hover:text-white/85 transition-colors"
+                      className="px-3 py-1.5 rounded-xl text-[13px] border border-white/15 bg-white/[0.04] text-white/55 hover:text-white/85 transition-colors"
                     >Cancel</button>
                   </div>
                 </div>
@@ -6805,7 +6792,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   <div className="flex justify-end mt-3">
                     <button
                       type="button"
-                      onClick={() => deleteExercise(exercise.id)}
+                      /**
+                       * ⛔ ON A ROW THE ATHLETE ADDED, REMOVING IT ASKS WHICH REMOVAL (2026-09-01).
+                       * *"Add to plan"* writes a standing rule — every matching lifting day, no end
+                       * date — and until now there was no way back out of it from anywhere in the
+                       * app. ⚠️ IT IS THE SAME TWO-CHOICE SHAPE AS ADDING, on the control that was
+                       * already here, rather than a third button beside Swap: today, or the plan.
+                       * ⚠️ Every other row is untouched — one tap, `deleteExercise`, as before.
+                       */
+                      onClick={() => {
+                        if (exercise.athlete_added === true) { setRemoveFromPlanFor(exercise.id); return; }
+                        deleteExercise(exercise.id);
+                      }}
                       className="px-2.5 py-1 rounded-xl text-[12px] border border-white/15 bg-white/[0.04] text-white/72 hover:text-red-400 hover:border-red-400/50 transition-colors flex items-center gap-1"
                       style={{ fontFamily: 'Inter, sans-serif' }}
                     >

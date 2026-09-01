@@ -288,9 +288,9 @@ a list of things that are done is a list nobody reads. The audit carries what ea
    evidence, not a defect.
 4. **An added exercise can be removed but not RE-DOSED.** *"Add to plan"* still writes the rule at
    whatever the row looked like when it was tapped — one set of ten if that is what was on screen.
-   The logger now offers **Remove** on any row the athlete added (2026-09-01), which reverts the rule
-   and rebuilds the remaining weeks. ⚠️ Changing the SETS without removing and re-adding is still not
-   possible.
+   *"Remove exercise"* on a row the athlete added now asks **just today, or off the plan** — the same
+   two-choice shape as adding, on the control that was already there (2026-09-01). ⚠️ Changing the
+   SETS without removing and re-adding is still not possible.
 5. **Four of the book's rules are not pinned**, listed in `protocol.test.ts`'s header: p140's *"skill
    work first"* (the frame prints SKILL last on its leg day — that needs a ruling, not a test),
    p148's change rule, p89's plyometric ladder, p78's rest periods.
