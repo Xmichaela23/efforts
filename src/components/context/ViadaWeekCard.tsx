@@ -13,24 +13,30 @@
  * ⛔ THE ORDER, AND WHY (2026-09-01). The card used to lead with the muscle list and end with what
  * each session cost — the hybrid athlete's real question ("is today's lifting going to cost
  * tomorrow's run") was the last line. Now:
- *   1. COST LEADS — which of the week's sessions sit in which of his brackets (p086: 6-8 work sets
- *      recovers in 24-48h; 14+ can cost up to 72h). The bracket is the server's `verdict`, which the
- *      card previously received and discarded.
- *   2. COVERAGE — what got nothing. The one line that states a conclusion.
- *   3. DOSE PER MUSCLE, AGAINST THE TARGET — the two numbers were printed with neither band beside
- *      them, and the server's verdict word was discarded here too.
- *   4. The pattern rows and the unpriced note stay underneath, as detail.
+ *   1. COST LEADS — which of the week's sessions sit in which of the book's brackets (p086: 6-8
+ *      work sets recovers in 24-48h; 14+ can cost up to 72h). The bracket is the server's `verdict`,
+ *      which the card previously received and discarded. The one read the programme does not
+ *      guarantee.
+ *   2. COVERAGE — what got nothing. The completion read: if the athlete skips, the programme's
+ *      guarantee breaks. Promoted, and kept prominent.
+ *   3. The pattern rows and the unpriced note stay underneath, as detail.
  *
- * ⛔⛔ ONE VERDICT COVERS BOTH NUMBERS ON A MUSCLE LINE — DO NOT ADD A SECOND COMPARISON FOR
- * EFFECTIVE REPS. Effective reps are sets × 4 by his own formula (`effectiveRepsFor`, p147), and his
- * 32-48 effective-rep band is his 8-12 set band multiplied by four (`dose.ts`: "the second is the
- * first multiplied by four — his arithmetic, not ours"). A set count inside 8-12 IS an effective-rep
- * count inside 32-48; they cannot disagree. So `verdict` is printed once, beside both figures, and
- * both targets are printed beside it. A session that builds an effective-rep verdict here builds a
- * second copy of the same band and a way for the two to drift.
+ * ⛔⛔ THE PER-MUSCLE DOSE LIST IS DELIBERATELY NOT DRAWN (2026-09-01, same day it was promoted —
+ * reversed on a source finding, approved by Michael). The All Rounder is a fixed programme built to
+ * the book's own doses, so "is chest getting 8-12 sets" is answered by the PROGRAMME, not by the
+ * athlete — printing it back mid-week is the app grading its own homework. Worse, it graded a
+ * seven-day target on day three: nearly every muscle read "light" (a nudge to add work the
+ * programme does not ask for), and a muscle on pace to finish OVER read "in range". Wrong in both
+ * directions. ⚠️ THE DECISION STANDS ON THAT LEG ONLY. The source's "resist the urge to add
+ * difficulty or length" line (p275, `SOURCE-viada-hybrid-athlete.md:1199`) is about the ENDURANCE
+ * work and was wrongly cited for this ruling on the day; do not attach it to lifting.
+ * ⚠️ THE SERVER VERDICTS ARE UNTOUCHED — `perMuscle[].verdict` is still
+ * on the payload and still correct for a completed week; other surfaces may read it. This is a
+ * rendering decision. The one volume worth measuring against the book's ranges is what the athlete
+ * did that the plan did not ask for — and the performed payload cannot yet separate prescribed rows
+ * from added ones (see the FIXLIST); until it can, nothing here approximates it.
  *
- * ⛔ THE NUMBERS ON SCREEN ARE READ FROM `dose.ts`, NOT RETYPED. `WEEKLY_SETS_SOLID`,
- * `WEEKLY_SETS_OVERREACHING`, `WEEKLY_EFFECTIVE_REPS_RECOMMENDED`, `SESSION_SETS_RECOVERS` and
+ * ⛔ THE NUMBERS ON SCREEN ARE READ FROM `dose.ts`, NOT RETYPED. `SESSION_SETS_RECOVERS` and
  * `SESSION_SETS_COSTLY` are the same constants the server's verdicts are cut on, through the same
  * `@shared` alias the wizard already bundles (`NonRaceBuilder` reaches `accessory-dosing/index.ts`),
  * so this adds no bundle weight and no second source for a figure.
@@ -62,13 +68,8 @@ import React from 'react';
 // see the FIXLIST's server-side leftovers.
 import { canonicalize, canonicalDisplayName } from '@shared/canonicalize';
 import {
-  EFFECTIVE_REPS_PER_SET,
   SESSION_SETS_COSTLY,
   SESSION_SETS_RECOVERS,
-  WEEKLY_EFFECTIVE_REPS_RECOMMENDED,
-  WEEKLY_SETS_OVERREACHING,
-  WEEKLY_SETS_SOLID,
-  type MuscleVerdict,
   type SessionVerdict,
 } from '@shared/accessory-dosing/dose.ts';
 import { weekChangeParts, type ViadaWeekChange } from '@/lib/week-change-line';
@@ -112,26 +113,13 @@ const MUSCLE_WORD: Record<string, string> = {
 const word = (map: Record<string, string>, key: string) => map[key] ?? key.replace(/_/g, ' ');
 
 /**
- * ⛔ DISPLAY WORDS OVER THE SERVER'S MUSCLE VERDICT — a map, not a comparison. `light` is its own
- * verdict and is not a fault (`dose.ts`: under 8 sets is where a hybrid athlete lives); it is printed
- * as the plain word. An enum value this map does not know prints nothing rather than a guess.
- */
-// ⛔ NO POSSESSIVE (Michael, 2026-09-01, off the live screen: "should say 'his' numbers its a very
-// confusing data dump"). "His" is the book's author, who appears nowhere on the screen. The ranges
-// are stated bare; the older "his range is…" lines elsewhere on this card are Round 4's.
-const MUSCLE_VERDICT_WORD: Record<MuscleVerdict, string> = {
-  below_floor: 'under the floor',
-  light: 'light',
-  solid: 'in range',
-  above_solid: 'over range',
-  overreaching: 'borders overreaching',
-  over_max: 'past the maximum',
-};
-
-/**
- * ⛔ DISPLAY WORDS OVER THE SERVER'S SESSION VERDICT. `above_recovers` is the gap between his two
- * figures (over 8, under 14) — he gives no recovery time for it, so the word states the position and
- * claims nothing about the next day.
+ * ⛔ DISPLAY WORDS OVER THE SERVER'S SESSION VERDICT — a map, not a comparison. `above_recovers` is
+ * the gap between the book's two figures (over 8, under 14) — it gives no recovery time for it, so
+ * the word states the position and claims nothing about the next day. An enum value this map does
+ * not know prints nothing rather than a guess.
+ * ⛔ NO POSSESSIVE (Michael, 2026-09-01, off the live screen: "should say 'his' numbers its a very
+ * confusing data dump"). "His" is the book's author, who appears nowhere on the screen. The older
+ * "his range is…" pattern caption on this card is Round 4's.
  */
 const SESSION_VERDICT_WORD: Record<SessionVerdict, string> = {
   recovers: 'next day about normal',
@@ -139,7 +127,6 @@ const SESSION_VERDICT_WORD: Record<SessionVerdict, string> = {
   costly: 'costs up to three days',
 };
 
-const isMuscleVerdict = (v: string): v is MuscleVerdict => v in MUSCLE_VERDICT_WORD;
 const isSessionVerdict = (v: string): v is SessionVerdict => v in SESSION_VERDICT_WORD;
 
 /**
@@ -218,25 +205,15 @@ export default function ViadaWeekCard({ week }: { week: ViadaWeekPerformed | nul
         </div>
       )}
 
-      {/* ── 3. DOSE PER MUSCLE, AGAINST THE TARGET (p086) — one verdict, both numbers ─────────── */}
-      <div className="mt-3 space-y-1">
-        {week.perMuscle.map((m) => (
-          <div key={m.muscle} className="flex items-baseline justify-between gap-3">
-            <span className="text-[13px] text-white/80">{word(MUSCLE_WORD, m.muscle)}</span>
-            <span className="text-[12px] text-white/60 tabular-nums">
-              <span className="text-white/80">{m.sets}</span> sets · {m.effectiveReps} effective reps
-              {isMuscleVerdict(m.verdict) && <> · {MUSCLE_VERDICT_WORD[m.verdict]}</>}
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="text-[11px] text-white/55 mt-1">
-        {WEEKLY_SETS_SOLID.lo}–{WEEKLY_SETS_SOLID.hi} sets a muscle a week
-        — {WEEKLY_EFFECTIVE_REPS_RECOMMENDED.lo}–{WEEKLY_EFFECTIVE_REPS_RECOMMENDED.hi} effective reps,
-        about {EFFECTIVE_REPS_PER_SET} a set. {WEEKLY_SETS_OVERREACHING.lo}–{WEEKLY_SETS_OVERREACHING.hi} borders overreaching.
-      </div>
+      {/* ── (the per-muscle dose list used to sit here — see the header for why it is not drawn) ── */}
 
-      {/* ── 4. THE CHANGE RULE (§B5: no bucket moves more than 10% week to week) ─────────────── */}
+      {/* ── 3. THE CHANGE RULE (§B5: no bucket moves more than 10% week to week) ─────────────── */}
+      {/**
+        * ⚠️ AS DEPLOYED 2026-09-01, SPEAKING ABOUT ALL LIFTING BUCKETS. The ruling is that it should
+        * speak only about work the plan did not ask for — which needs the prescribed/added split on
+        * the performed payload, the same server change the dose list waits on. Left as built rather
+        * than narrowed by approximation; see the FIXLIST.
+        */}
       {/**
         * ⛔ RENDERS THE SERVER'S LIST. Which buckets crossed the line is decided in
         * `state-trend/assemble.ts` against `WEEK_CHANGE_FLAG_PCT`; this prints them. Nothing prints

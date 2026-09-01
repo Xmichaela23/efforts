@@ -573,6 +573,38 @@ before reordering ships.** No block may read whether another block is rendered.
       `display.viadaWeek`, counted off logged sets. Nothing in this addendum reads `week_ledger_v1`.
       Build green, eslint clean on the file, no type errors in the file (project baseline unchanged).
       NOT committed, NOT pushed, NOT seen on a device.
+- [x] 3-lift-cut. **DONE 2026-09-01 (evening). Client-only, one file. PARTLY REVERSES 3-lift-1235 on a
+      source finding, approved by Michael. NOT committed, NOT pushed.**
+      **THE FINDING:** the All Rounder is a fixed programme built to the book's own doses, so "is chest
+      getting 8–12 sets" is answered by the programme, not the athlete — printing it mid-week is the app
+      grading its own homework, and it graded a seven-day target on day three (nearly everything
+      "light"; a muscle on pace to finish over reading "in range"). The book's conditioning notes
+      (`SOURCE-viada-hybrid-athlete.md:1199`, p275) say to resist adding difficulty or length and
+      adjust intensity instead. ⚠️ That quote is about the ENDURANCE work specifically; the lifting
+      argument stands on the programme being built to the doses.
+      **WHAT WENT:** the per-muscle sets / effective reps / verdict-word list and its targets caption.
+      Rendering only — `perMuscle[].verdict` and `dose.ts` are untouched and still on the payload.
+      **WHAT STAYS:** the session cost lines (leading), "nothing this week for …" (prominent), the
+      pattern rows and the no-known-max note (not touched this pass).
+      ⛔ **ITEM 3 ("what was done that the plan did not ask for") — TRACED, NOT BUILT, IT IS A SERVER
+      CHANGE.** The performed payload (`display.viadaWeek`) cannot separate prescribed rows from added
+      ones: the builder maps each logged exercise to name / slot_intent / sets and drops everything
+      else. The SERVER already has the marker, twice over: (a) `planned_name` on the logged row —
+      stamped only when prefilled from the plan, undefined on hand-added exercises
+      (`StrengthLogger.tsx:201-208`, Q-181), and it is inside the raw `exercises` `compute-snapshot`
+      already hands to the assembler; (b) `compute-snapshot` also fetches each session's
+      `plannedExercises` for the all-out walk and drops them before `loggedSessions`. Either gives the
+      split inside `buildViadaWeekPerformed` with no new query — 27-function closure, payload bump.
+      ⚠️ Rows logged before `planned_name` existed would all read as "added"; the card's window is
+      seven days, so that is history only. **Not approximated on the client.**
+      ⚠️ **THE >10% CHANGE LINE (3-lift-4) IS LEFT AS DEPLOYED**, speaking about all lifting buckets.
+      The ruling is that it should speak only about off-plan work — the same server split. Not
+      narrowed by approximation, not deleted; a comment on the render says so.
+      Build green, eslint clean, no type errors in the file.
+- [ ] 3-lift-offplan. **SERVER: split prescribed vs added in `buildViadaWeekPerformed`** off
+      `planned_name` (and/or `plannedExercises`), emit the added-only dose per muscle with its verdict,
+      and scope `weekChange` to it. Then the card draws item 3 and the change line narrows. 27
+      functions, payload 177 → 178. Not started.
 - [x] 3-lift-4. **DONE 2026-09-01. SERVER + CLIENT. NEEDS A DEPLOY (27 functions) — closure below.**
       ITEM 4 — §B5's change rule. `display.viadaWeek` gains `weekChange`: this rolling seven-day
       window's lifting buckets against the seven days immediately before it, listing ONLY the buckets
