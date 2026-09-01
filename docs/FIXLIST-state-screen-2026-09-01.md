@@ -244,6 +244,41 @@ that MOVES anything should be attempted before the blocks it moves are named com
       window (`assemble.ts:1253` → `StatePerformanceSection.tsx:709`), not the series length. The trap
       bar had a real multi-week history.
       ⛔⛔ **AND THE SERVER STILL DOUBLE-COUNTS THIS SLOT. NOT FIXED, NOT MINE TO FIX — SEE 2b-server.**
+- [x] 2b-fold-bug. **FOUND LIVE AND FIXED 2026-09-01 (evening). Client-only, one file
+      (`src/lib/fold-lift-slots.ts`). NOT committed, NOT pushed.**
+      **ON SCREEN:** one Deadlift card, E1RM **135**, BEST **180**, **no chart, no all-out line**; the
+      other three cards had both. Aug 25 (180) and Aug 28 (135) are the SAME ISO week, and the
+      server's rule is one point per ISO week, the heaviest — so the slot's reading was 180.
+      **CAUSE, CODE-TRACED:** the fold picked a REPRESENTATIVE row by most-recent reading and spread
+      its fields whole. The trap-bar row is not a tracked-max lift, so on the payload it carries NO
+      `series` and NO `lastAllOut` (`assemble.ts`: chart series only for `isTrackedMaxLift`); copying
+      it whole gave the wrong headline, an empty chart and no all-out line — one mistake, three
+      symptoms. `latestE1rm` was never redefined; it was fed half a week.
+      **FIX:** merge the SERIES, not the cards. The slot's readings are unioned and the same
+      Monday-based ISO-week-heaviest rule is applied to the union (week key copied from `assemble.ts`
+      so the boundary cannot differ). Headline, chart, count, as-of and PR flag all read off the merged
+      series; the all-out line is whichever version's is more recent.
+      ⚠️ **WHAT THE CLIENT CAN AND CANNOT MERGE, STATED:** a variant row carries ONE reading
+      (`latestE1rm` at `newestAgeDays`), dated off the slot's own as-of (last series date +
+      `newestAgeDays`). Its older weeks are not on the payload and cannot be drawn. Drawing them is a
+      server merge per slot inside `assemble.ts` (27-function closure) — filed as **2b-fold-server**,
+      not done. With no series on either row (trap-bar-only athlete, or fewer than two deadlift weeks)
+      the fold falls back to the previous most-recent-row behaviour.
+      **THE SHORTCUT'S OTHER COSTS, CHECKED:** session count was the two rows' counts SUMMED, so a
+      same-week pair counted as two sessions where the server counts one weekly point — now the
+      merged weekly points in the window (3 on his screen, not 4). As-of was the representative's age
+      — now the slot's freshest reading (unchanged in effect: 4 days). The range caption does not exist
+      on this card (`range` is never rendered for strength, D-420). PR flag was the representative's —
+      now the flag of the row whose reading became the slot's latest, withdrawn only if the record
+      beats it (his 180 stays a PR).
+      **FIXTURES:** 13 green, incl. the exact live case (same week, lighter logged later → 180, chart
+      draws with 3 points, all-out line kept, count 3, as-of 4d, PR kept), order-of-arrival
+      independence, the cross-week drop still correct (135 owns a later week, chart gains the point,
+      "best" explains it), a heavier same-week variant winning its week, and the no-series fallback.
+      Build green, eslint clean, no new type errors.
+- [ ] 2b-fold-server. **Merge variant readings per slot on the SERVER** (`assemble.ts`, before
+      `liftLatest` / `strengthChartByCanonical` / `lastAllOut`), so the chart carries the variant's
+      full history rather than its latest reading only. 27-function deploy. Not started.
 - [x] 2b-server. **DONE 2026-09-01. SERVER CHANGE — NEEDS A DEPLOY (27 functions). See below.**
       ⛔ **FIRST, THE THING THAT CHANGES WHAT YOU TELL MICHAEL: THE FAULT IS COMPUTED AND UNRENDERED.**
       `computeE1rmBand`'s output reaches exactly one field (`strengthFitness.e1rm.range`,
