@@ -161,6 +161,22 @@ work, so **nothing has earned an increment yet, and nothing should have.**
 
 ---
 
+## 6b. WHAT THE ATHLETE CAN CHANGE, AND WHERE
+
+| they want to | control | where |
+|---|---|---|
+| do a different movement **today** | Swap → *Just today* | the row, in the logger |
+| do a different movement **from now on** | Swap → *Rest of plan* | same control — this is also how an exercise they added earlier comes back off |
+| add a movement the plan does not have | type it in, then *Add to plan* | ⚠️ it is dosed at whatever the row looked like when they tapped, on every matching lifting day, with no end date |
+| choose the accessory movements up front | the picker, per printed cell | the wizard |
+| drop a row from today only | *Remove exercise* | the foot of the card |
+
+⛔ **THE TWO-CHOICE SHAPE — today, or the rest of the plan — IS THE PATTERN.** It exists on Swap. A
+session on 2026-09-01 built a second removal path rather than reading it, and the work was reverted.
+Anything new that changes a plan from the logger belongs in that shape, on that control.
+
+---
+
 ## 7. WHERE TO GO NEXT
 
 | question | file |

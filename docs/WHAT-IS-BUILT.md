@@ -286,9 +286,14 @@ a list of things that are done is a list nobody reads. The audit carries what ea
 3. **Progression on real logged history is unproven.** One logged test exists, and a test day carries
    no rep-band heavy set, so nothing has earned an increment and nothing should have. An absence of
    evidence, not a defect.
-4. **The athlete's own added exercise has no dose control.** *"Add to plan"* writes a standing rule
-   at whatever the row looked like when it was tapped — one set of ten, every matching lifting day,
-   no end date. There is no way to change or remove it from the app.
+4. **An added exercise is re-dosed by swapping it, not by editing it.** *"Add to plan"* writes a
+   standing rule at whatever the row looked like when it was tapped — one set of ten if that is what
+   was on screen. ⚠️ **The way out is the control that already exists**: Swap → *Rest of plan*
+   (`StrengthLogger.tsx:5566`). ⛔ A session on 2026-09-01 built a parallel removal path — a marker,
+   a confirm, a change to `materialize-plan` — without reading that the swap had carried both choices
+   since it was written. **It was reverted in full.** Read the file before building the thing beside
+   it.
+
 5. **Four of the book's rules are not pinned**, listed in `protocol.test.ts`'s header: p140's *"skill
    work first"* (the frame prints SKILL last on its leg day — that needs a ruling, not a test),
    p148's change rule, p89's plyometric ladder, p78's rest periods.

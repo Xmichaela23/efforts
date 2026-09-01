@@ -80,7 +80,10 @@ the page, not the line.
 ### §D. OPEN
 
 - **His ab wheel is still an active `plan_adjustment`** — 1 set of 10 on every matching lifting day,
-  indefinitely, from a tap on 2026-08-31. His data; nobody has touched it.
+  indefinitely, from a tap on 2026-08-31. His data; nobody has touched it. ⚠️ **The way off it is
+  Swap → *Rest of plan***, which the logger has carried since the swap was built
+  (`StrengthLogger.tsx:5566`). ⛔ A parallel removal path was built on 2026-09-01 without reading
+  that, and reverted in full. **Read the control that exists before building one beside it.**
 - **No lighter / taper week is reachable.** Both columns are transcribed; both build sites pass an
   empty week list. ⛔ **His ruling: an OFFER on the State screen, taken when needed — never a
   scheduled deload.** p120 rejects overreach-to-deload for a hybrid athlete outright.
