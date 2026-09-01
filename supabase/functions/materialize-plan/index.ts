@@ -2650,6 +2650,18 @@ export function expandTokensForRow(
             execution_name: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
               ? ((ex as any)?.execution_name ?? undefined)
               : undefined),
+            /**
+             * ⛔ HOW THE WEIGHT WAS ARRIVED AT, OR WHY THERE ISN'T ONE — carried (2026-09-01). This
+             * object is a WHITELIST and `load_basis` was never on it, so the composer's marker died
+             * here and every surface downstream saw a bare "By feel" with no way to tell an
+             * auto-regulated row from one still waiting on a test. That ambiguity is the most-reported
+             * false alarm in this project.
+             * ⚠️ Dropped alongside `execution_name` when a substitution or swap rewrote the row: the
+             * basis describes how the ORIGINAL movement was priced.
+             */
+            load_basis: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
+              ? ((ex as any)?.load_basis ?? undefined)
+              : undefined),
             // ⛔ CARRY THE ASSISTANCE MARKER (2026-07-30). This object is a WHITELIST, and
             // `load_prescribed: false` — set on every assistance row the composer authors — was not on
             // it. The flag reached materialize (it is read twenty lines above, to stop a weight being
@@ -3029,6 +3041,18 @@ export function expandTokensForRow(
              */
             execution_name: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
               ? ((ex as any)?.execution_name ?? undefined)
+              : undefined),
+            /**
+             * ⛔ HOW THE WEIGHT WAS ARRIVED AT, OR WHY THERE ISN'T ONE — carried (2026-09-01). This
+             * object is a WHITELIST and `load_basis` was never on it, so the composer's marker died
+             * here and every surface downstream saw a bare "By feel" with no way to tell an
+             * auto-regulated row from one still waiting on a test. That ambiguity is the most-reported
+             * false alarm in this project.
+             * ⚠️ Dropped alongside `execution_name` when a substitution or swap rewrote the row: the
+             * basis describes how the ORIGINAL movement was priced.
+             */
+            load_basis: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
+              ? ((ex as any)?.load_basis ?? undefined)
               : undefined),
             // ⛔ CARRY THE ASSISTANCE MARKER (2026-07-30). This object is a WHITELIST, and
             // `load_prescribed: false` — set on every assistance row the composer authors — was not on

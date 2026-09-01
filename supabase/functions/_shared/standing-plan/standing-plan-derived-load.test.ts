@@ -99,7 +99,13 @@ Deno.test('⛔⛔ PULL-UPS STAY BY FEEL — the pattern has no tested lift, and 
   for (const week of [2, 3, 5]) {
     for (const r of rowsFor(week).filter((x) => /pull ?up|chin ?up/i.test(x.name))) {
       assertEquals(String(r.weight), 'By feel', `${r.name} was handed a weight in week ${week}`);
-      assertEquals(r.load_basis, undefined);
+      /**
+       * ⚠️ AMENDED 2026-09-01: this asserted `undefined`, which was right while `load_basis` only
+       * ever meant *"a weight was derived"*. It now also states WHY a row has no weight, and the
+       * stronger claim is the one worth pinning — a pull is unpriced because the PATTERN has no
+       * tested lift, which no amount of testing will change. What must never appear is a derivation.
+       */
+      assertEquals(r.load_basis, 'no_tested_lift', `${r.name} no longer says why it is by feel`);
     }
   }
 });
@@ -117,11 +123,13 @@ Deno.test('⛔ THE GROWTH WORK AND THE PER-HAND WORK STAY BY FEEL', () => {
   for (const week of [2, 5]) {
     for (const r of rowsFor(week)) {
       if (r.slot_intent === 'HYP' || r.slot_intent === 'SKILL') {
-        assertEquals(r.load_basis, undefined, `${r.name} (${r.slot_intent}) was handed a derived weight`);
+        // ⚠️ AMENDED 2026-09-01 — see the pull-up test above. The claim is that no DERIVATION landed
+        // here, not that the row is silent; a HYP row now says its weight is the athlete's call.
+        assert(r.load_basis !== 'derived_ratio', `${r.name} (${r.slot_intent}) was handed a derived weight`);
       }
       const cfg = resolveExerciseConfig(r.name).config;
       if (cfg?.displayFormat === 'perHand' || cfg?.isUnilateral === true) {
-        assertEquals(r.load_basis, undefined, `${r.name} is per-hand and was handed a total`);
+        assert(r.load_basis !== 'derived_ratio', `${r.name} is per-hand and was handed a total`);
         // ⚠️ NOT ASSERTED AS THE STRING "By feel" — a plyometric drill reads "Bodyweight" and is
         // per-hand in the catalogue. What matters is that no NUMBER was prescribed.
         assertEquals(typeof r.weight === 'number', false, `${r.name} is per-hand and carries a number`);

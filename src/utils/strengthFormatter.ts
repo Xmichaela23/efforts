@@ -43,6 +43,31 @@ export function formatStrengthExercise(
     parts.push(`@ [Setup Required]`);
   }
   
+  /**
+   * ⛔⛔ A BY-FEEL ROW SAYS WHICH KIND OF BY-FEEL IT IS (2026-09-01).
+   *
+   * ⛔ THE PROBLEM IS A READING ONE AND IT HAS COST REAL DAYS. Three of the four ways a weight is
+   * decided are deliberately "By feel" — an auto-regulated accessory, a pattern with no tested lift,
+   * a per-side movement — and on the screen all three look identical to a weight that failed to
+   * land. *"Week 2 has no weight"* gets reported, investigated, and turns out to be the design.
+   *
+   * ⚠️ THE SENTENCES ARE FOR THE ATHLETE, NOT FOR A DEBUGGER. Each one says what to DO or what to
+   * expect, in their words: pick a load, there is nothing to price this against, it arrives when you
+   * test. ⚠️ `awaiting_test` is the ONLY one that promises a number later; saying that on a curl
+   * would leave an athlete waiting for something that is never coming.
+   * ⚠️ AND NOTHING IS SAID WHERE A WEIGHT EXISTS. A priced row already answers the question.
+   */
+  if (!weightDisplay && !exercise?.baseline_missing) {
+    const why: Record<string, string> = {
+      auto_regulated: 'your call — pick a weight that leaves 1-2 reps in reserve',
+      no_tested_lift: 'no tested lift for this pattern, so it stays your call',
+      per_side: 'per side — your call, so one number cannot mislead you',
+      awaiting_test: 'weights arrive once you log the test',
+    };
+    const line = why[String(exercise?.load_basis ?? '')];
+    if (line) parts.push(`— ${line}`);
+  }
+
   if (exercise?.notes) parts.push(`(${exercise.notes})`);
 
   /**

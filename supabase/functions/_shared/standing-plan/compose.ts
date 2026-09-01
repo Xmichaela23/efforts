@@ -172,7 +172,25 @@ export type StrengthExercise = {
    * ⚠️ A DISPLAY SURFACE SHOULD NOT RENDER THE TWO IDENTICALLY. Nothing branches on it yet — the
    * `notes` line carries the same fact in words so the athlete sees it either way.
    */
-  load_basis?: 'derived_ratio';
+  /**
+   * ⛔⛔ HOW THIS ROW'S WEIGHT WAS ARRIVED AT — **INCLUDING WHEN THERE ISN'T ONE** (widened 2026-09-01).
+   *
+   * ⛔ THE DEFECT IT CLOSES IS A READING DEFECT, AND IT IS THE MOST-REPORTED ONE IN THIS PROJECT.
+   * A correctly working block has MORE by-feel rows than numbered ones — three of the four ways a
+   * weight is decided are deliberately "By feel" — and on the screen they are indistinguishable
+   * from each other and from a weight that failed to land. So *"week 2 has no weight"* gets reported,
+   * investigated, and turns out to be the design. **The row now says WHICH kind of by-feel it is,
+   * in the box the athlete already reads.**
+   *
+   * `derived_ratio`   a number, from the tested lift's prescribed weight × this movement's ratio
+   * `auto_regulated`  no number BY DESIGN — p218 gives HYP reps and a reserve and no load
+   * `no_tested_lift`  no number POSSIBLE — this pattern has no tested lift (a pull, chiefly)
+   * `per_side`        no number HONEST — per-hand or single-leg; one figure would read as doubled
+   * `awaiting_test`   no number YET — the test has not been logged, so nothing is priced
+   *
+   * ⚠️ ABSENT still means the weight is the tested lift's own. That is unchanged.
+   */
+  load_basis?: 'derived_ratio' | 'auto_regulated' | 'no_tested_lift' | 'per_side' | 'awaiting_test';
   /**
    * ⛔⛔ THE NAME OF THE EXECUTION THIS ATHLETE'S KIT ACTUALLY REACHES — DISPLAY ONLY (2026-08-31).
    *
@@ -1496,9 +1514,30 @@ function exerciseForSlot(
   const targetRir = targetRirForIntent(slot.intent);
 
   if (!working || pct == null) {
+    /**
+     * ⛔ WHICH KIND OF BY-FEEL, ASKED IN THE ORDER THE REASONS ACTUALLY APPLY — see `load_basis`.
+     *
+     * ⚠️ HYP IS FIRST BECAUSE IT IS NOT AN ABSENCE AT ALL. p218 gives that intent reps and a reserve
+     * and NO load, so the weight is an OUTPUT of the rule rather than a number the engine withheld —
+     * an athlete told "the test will price this" on a curl would be waiting for something that is
+     * never coming.
+     * ⚠️ THEN THE TWO STRUCTURAL ONES, which no amount of testing changes: a pattern with no tested
+     * lift, and a movement that cannot honestly carry one figure.
+     * ⚠️ AND ONLY WHAT IS LEFT IS "not yet" — the athlete has a test ahead of them and this row is
+     * waiting on it.
+     */
+    const byFeel: NonNullable<StrengthExercise['load_basis']> = pct == null
+      ? 'auto_regulated'
+      : (testedLift == null || args.competitionLifts[pattern] == null)
+        ? 'no_tested_lift'
+        : ((() => {
+            const cfg = resolveExerciseConfig(movement).config;
+            return cfg?.displayFormat === 'perHand' || cfg?.isUnilateral === true || cfg?.ratioIsTotal === true;
+          })() ? 'per_side' : 'awaiting_test');
     return {
       exercise: {
         name: rowDisplayName(movement, slot),
+        load_basis: byFeel,
         ...(rowExecutionName(movement, slot, args.equipment)
           ? { execution_name: rowExecutionName(movement, slot, args.equipment)! }
           : {}),
@@ -3271,6 +3310,10 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         reps: add.repPrescribable ? '8-10' : HOLD_PRESCRIPTION,
         weight: 'By feel',
         load_prescribed: false,
+        // ⚠️ A FLOOR, DIAL OR CORE ROW IS ACCESSORY WORK — p86 doses it in reps and a reserve and
+        // gives it no load, so its by-feel is the SAME kind as a HYP slot's: an output of the rule,
+        // not a number waiting on a test. See `load_basis`.
+        load_basis: 'auto_regulated' as const,
         /**
          * ⛔ THE RESERVE IS STAMPED HERE TOO, AND ITS ABSENCE WAS VISIBLE ON A DEVICE
          * (Michael's screenshots, 2026-08-27). One session showed dumbbell bench at
@@ -3392,6 +3435,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           reps: takesReps ? '8-10' : HOLD_PRESCRIPTION,
           weight: 'By feel',
           load_prescribed: false,
+          load_basis: 'auto_regulated' as const,
           ...(takesReps ? { target_rir: ACCESSORY_TARGET_RIR } : {}),
           notes: 'Your core pick.',
         },

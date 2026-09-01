@@ -101,6 +101,16 @@ is what week one tests.
 ⚠️ **So a correctly working block has more "By feel" rows than numbered ones.** That is the design,
 not a gap.
 
+⛔ **AND THE ROW NOW SAYS WHICH KIND IT IS** (2026-09-01), because on a screen all three looked
+identical to a weight that failed to land:
+
+| the row prints | it means |
+|---|---|
+| *your call — pick a weight that leaves 1-2 reps in reserve* | auto-regulated. **No number is coming, ever** — the reserve IS the prescription |
+| *no tested lift for this pattern, so it stays your call* | structural. Testing more will not change it |
+| *per side — your call, so one number cannot mislead you* | one figure would read as doubled |
+| *weights arrive once you log the test* | **the only one that promises a number later** |
+
 ---
 
 ## 5. HOW A WEIGHT MOVES — and for Standard Focus there is no calendar drift at all
