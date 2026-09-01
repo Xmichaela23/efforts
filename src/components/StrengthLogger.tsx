@@ -207,6 +207,15 @@ interface LoggedExercise {
   // Undefined on hand-added exercises — those were never prescribed, so they can never be a swap.
   planned_name?: string;
   /** `false` = one of the block's assistance slots (never priced). Absent on every other row. */
+  /**
+   * ⛔ THE NAME THE ATHLETE READS, where it differs from the canonical one (2026-09-01, Michael:
+   * *"we need to rename it from the picker on out, no other name"*). One movement, one name, on
+   * every surface — the dropdown, the plan row, the session card and this field.
+   * ⚠️ `name` STAYS CANONICAL underneath: it is what logged-vs-planned matching keys on, and what a
+   * typed rename is compared against to record a swap. This field is cleared the moment the athlete
+   * edits the box, so their own words become the name and the swap logic is untouched.
+   */
+  execution_name?: string;
   load_prescribed?: boolean;
   /** ⛔ A STARTING POINT FOR THE WEIGHT BOX — NOT A PRESCRIPTION (D-406). Rides only on assistance
    *  rows, always beside `load_prescribed: false`. The plan still says "by feel"; this is a number
@@ -2356,6 +2365,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             // ⚠️ Read as an explicit `false`, never as "falsy" — an absent field on a legacy row must
             // not silently turn a main lift into an assistance row.
             load_prescribed: s?.load_prescribed === false ? false : undefined,
+            // ⛔ THE DISPLAY NAME TRAVELS WITH THE ROW — see `execution_name` on the type.
+            execution_name: typeof s?.execution_name === 'string' && s.execution_name.trim()
+              ? s.execution_name.trim()
+              : undefined,
             // ⛔ CARRIED, NOT APPLIED (D-406). This only makes the number available to the weight
             // box as a greyed starting point; it does not become the row's `weight`, and nothing
             // here treats it as a prescription. Guarded on a finite positive so an absent
@@ -5332,7 +5345,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     </div>
                     <Input
                       placeholder="Add exercise..."
-                      value={exercise.name}
+                      /**
+                       * ⛔ THE ATHLETE READS THE EXECUTION NAME AND THE APP KEEPS THE CANONICAL ONE.
+                       * `rear delt machine` is reached with dumbbells on an incline bench, and this
+                       * box said MACHINE to somebody who owns none. ⚠️ The moment they type, the
+                       * display name is dropped and `name` is what they wrote — so `maybePersistTypedSwap`
+                       * below still compares their words against the prescription, exactly as before.
+                       */
+                      value={exercise.execution_name || exercise.name}
                       // D-133: exercise name is a search-to-pick field, NOT a contact/credential.
                       // Suppress iOS autofill/save bubble (was offering to "save" the lift name).
                       type="search"
@@ -5343,6 +5363,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       spellCheck={false}
                       name="exercise-search"
                       onChange={(e) => {
+                        // ⛔ THEIR WORDS WIN. Dropping the display name here is what keeps the swap
+                        // contract honest: from this keystroke on, `name` is the only name.
+                        setExercises((prev) => prev.map((ex) => ex.id === exercise.id ? { ...ex, execution_name: undefined } : ex));
                         updateExerciseName(exercise.id, e.target.value);
                         setActiveDropdown(e.target.value.length > 0 ? exercise.id : null);
                       }}

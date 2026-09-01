@@ -14,6 +14,8 @@
     "block:print": "~/.deno/bin/deno run --allow-read --no-check scripts/print-block.ts",
     "block:write": "~/.deno/bin/deno run --allow-read --allow-write --no-check scripts/print-block.ts --write",
     "block:check": "~/.deno/bin/deno test --allow-read --allow-env --no-check supabase/functions/_shared/standing-plan/golden-block.test.ts",
+    "inventory:print": "~/.deno/bin/deno run --allow-read --no-check scripts/print-inventory.ts",
+    "inventory:write": "~/.deno/bin/deno run --allow-read --allow-write --no-check scripts/print-inventory.ts --write",
     "seed:exercises": "npx tsx scripts/seed-exercises.ts",
     "seed:insert": "npx tsx scripts/insert-seed-exercises.ts",
     "backfill:exercise-ids": "npx tsx scripts/backfill-exercise-ids.ts",

@@ -17,6 +17,7 @@ production data was read. Where I do not know, it says so.
 |---|---|---|
 | **`ENGINE-STATE.md`** | **TODAY.** What is pushed vs deployed vs unverified, what shipped this week, the open defect list, the traps this month, the standing laws. It is a dated banner stack — the top banner is the current one. | ⛔ **the doc to trust.** Read its top banner every session |
 | **THIS FILE** | **ALWAYS.** What exists at all, how the chain fits together, who owns which fact. It changes when a subsystem is added or rewired, not when a defect is found. | current as of 2026-08-31 |
+| **`INVENTORY.md`** | **GENERATED.** The deploy closure per file, the frames' slots, the picker cells, the edge functions. Never hand-edited — `npm run inventory:write`, pinned by a test | cannot rot |
 | **`GLOSSARY.md`** | **the words, the numbers, and the FIVE STATES a plan moves through.** Read it first if the vocabulary is unfamiliar, or before reporting anything as missing — most "holes" are stage 2 read as stage 4 | current |
 | `SOURCE-viada-hybrid-athlete.md` | the book, transcribed with page images open. **The only training source.** | high on pp.218–227 and pp.244–284 |
 | `TRUTH-MAP.md` | per-fact authority + fractures, code-derived 2026-07-09/10 | ⚠️ **predates the Standing Plan entirely** — see §6 |
@@ -275,8 +276,8 @@ logged several heavy sessions at the same weight.
    that is 58% of it (code-traced + composed).
 5. **A movement reached on its dumbbell route is printed under its machine name** (`rear delt
    machine`) — composed at HEAD with an incline bench declared.
-6. **The band tier still wins cells** — `braced_pull` offers only `lat pulldown` (rank 101) to a
-   barbell home gym (composed).
+6. **The band tier still wins a cell** — `braced_pull` at a barbell home gym offers a
+   chest-supported row and a band pull down, and nothing loadable beyond them.
 7. **The test's press number is never spent** by either frame (§3).
 8. **Progression on real logged history is unproven** — see §4, and it is unproven, not broken.
 

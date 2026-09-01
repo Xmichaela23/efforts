@@ -244,9 +244,13 @@ which Michael already named.
 2. ⛔ **The band tier is still winning cells.** `lat pulldown`, `tricep pushdown` and `face pull` sit
    at rank 101 and are the ONLY option in `braced_pull` for this kit (composed) — the 2026-08-24
    device finding's exact shape, narrowed but not closed.
-3. ⚠️ **`braced_push`, `braced_hinge` and `braced_leg` return an EMPTY pick list** for a home gym
-   (composed). Correct — nothing is offered that cannot be done — but the athlete gets a control with
-   no options and no sentence saying why.
+3. ⛔ ~~`braced_push`, `braced_hinge` and `braced_leg` return an EMPTY pick list~~ — **WITHDRAWN
+   2026-09-01. I was wrong, and the mistake was mine, not the app's.** I called `pickOptions` without
+   the frame's muscle and admitted-movement list, which **the real screen always passes**
+   (`NonRaceBuilder.tsx:5505`). Asked the way the client asks it, **every cell has options**: braced
+   push 9, braced leg 10, braced hinge 2, braced pull 2, hamstring 2 — each substitute marked
+   *"for your gear"*. There is no empty picker anywhere at this kit. ⚠️ A harness that does not call
+   the function the way the caller calls it produces a finding about the harness.
 
 ---
 
@@ -344,7 +348,7 @@ shows it.**
 | 4 | **A test session's rows are indistinguishable from hand-added ones.** The test branch sets no `planned_name`, so the prescribed lifts lose Swap and gain **Add to plan**. Live at HEAD on a block built today | defect · logger | live + code-traced |
 | 4b | **`usePlannedWorkouts` never selects `tags`**, so a logger that finds its own session cannot see `1rm_test` — no ramp, no baseline save, and every row stamped as prescribed | defect · data fetch | code-traced |
 | 5 | **The band tier still wins cells** — `braced_pull` offers only `lat pulldown` (rank 101) to this kit | defect · gate | composed |
-| 6 | An empty pick list is shown with no explanation for `braced_push` / `braced_hinge` / `braced_leg` | gap · copy | composed |
+| 6 | ~~empty pick lists~~ — **WITHDRAWN, my harness error. Every cell has options** (§4) | not-a-defect | composed |
 | 7 | The DE row ramps after the ME row already ramped the same joints — ours, labelled, and a ruling for Michael | ruling | code-traced |
 | 8 | RIR 1 on HYP rows is p218's own midpoint. **Not a defect.** The band is not shown | not-a-defect | source + composed |
 | 9 | The DE incline at 90 is p218's floor applied to the estimated incline max. **Not a defect.** | not-a-defect | source + composed |
