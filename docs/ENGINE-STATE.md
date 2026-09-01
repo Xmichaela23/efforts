@@ -18,6 +18,11 @@ weight"*. Read the equivalent row in the closest archetype before opening an inv
 the check after any composer change — the diff is the blast radius, in rows rather than test names.
 `docs/WHAT-IS-BUILT.md` §0b has the usage and the rule that a failure is not automatically a bug.
 
+⚠️ **And `docs/GLOSSARY.md` is new too** — the vocabulary, the numbers, and the **five states a plan
+moves through**. Most reported holes are stage 2 (materialized, correctly unpriced) read as stage 4
+(repriced). It also records the one that keeps being got wrong: **Standard Focus has NO scheduled
+rise. Zero, by ruling. Progression is earned or it does not happen.**
+
 ---
 
 ### §A. STATE — pushed, deployed, unverified

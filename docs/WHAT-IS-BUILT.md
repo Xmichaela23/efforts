@@ -17,6 +17,7 @@ production data was read. Where I do not know, it says so.
 |---|---|---|
 | **`ENGINE-STATE.md`** | **TODAY.** What is pushed vs deployed vs unverified, what shipped this week, the open defect list, the traps this month, the standing laws. It is a dated banner stack — the top banner is the current one. | ⛔ **the doc to trust.** Read its top banner every session |
 | **THIS FILE** | **ALWAYS.** What exists at all, how the chain fits together, who owns which fact. It changes when a subsystem is added or rewired, not when a defect is found. | current as of 2026-08-31 |
+| **`GLOSSARY.md`** | **the words, the numbers, and the FIVE STATES a plan moves through.** Read it first if the vocabulary is unfamiliar, or before reporting anything as missing — most "holes" are stage 2 read as stage 4 | current |
 | `SOURCE-viada-hybrid-athlete.md` | the book, transcribed with page images open. **The only training source.** | high on pp.218–227 and pp.244–284 |
 | `TRUTH-MAP.md` | per-fact authority + fractures, code-derived 2026-07-09/10 | ⚠️ **predates the Standing Plan entirely** — see §6 |
 | `CAPABILITY-MAP.md` | was the "does X exist" lookup | 🔴 **stale and actively misleading** — see §6 |
@@ -211,12 +212,17 @@ progression looks flat and is not — an "11 flat weeks" claim was made in this 
 cost a reverted change. (2) A green suite is not evidence. **And do not swing the other way:** the
 existence of `me-history.ts` is not proof the ladder is working on real data.
 
-**There are three levers, and they stack:**
+⛔⛔ **ON STANDARD FOCUS THE SCHEDULED RISE IS ZERO, AND THAT IS A RULING** (Michael, 2026-08-30,
+`RATE_ANCHOR.all_rounder`). The book prints *"1% every 3 weeks"* for a **different programme**; p275
+states no rate for this one. **Progression is earned or it does not happen** — a calendar drift is a
+guess stacked on evidence the app already holds, and it can only ever fire for an athlete who is not
+earning it. ⚠️ The other frame keeps its own rate; do not copy one to the other.
 
-| lever | rate | source | earned from |
+**So there are two levers, both earned:**
+
+| lever | step | source | earned from |
 |---|---|---|---|
-| **the scheduled rise** | 1% every three weeks | p247, `RATE_ANCHOR` | the calendar. Nothing is read |
-| **the earned bar increment** | +5 lb upper / +10 lb lower, raised to the athlete's smallest loadable pair | ours (pivot §4), `advanceStep` | **finishing the rep band twice running** on the heavy set |
+| **the bar increment** | +5 lb upper / +10 lb lower, raised to the athlete's smallest loadable pair | ours (pivot §4), `advanceStep` | **finishing the rep band twice running** on the heavy set |
 | **the ME set ladder** | 1 → 2 → 3 sets, clamped to p218's 1–3 band | p218's *"start at the lower end, increase only if progressing well"* | demonstrated sessions |
 
 **How an increment is earned** (code-traced, `progression.ts:211` + `:601`):
@@ -234,10 +240,11 @@ existence of `me-history.ts` is not proof the ladder is working on real data.
 `barOffsetsByPattern`, `meSetsByPattern` and `meLastRepsByPattern` back into a fresh compose
 (code-traced). **The ladder is wired.**
 
-**⛔ What happens when the earned increment is smaller than the plates he owns — and this is the
-whole design.** p247's 1% every three weeks on a 148.8 bench is about 1.5 lb. At a 5 lb step that
-rounds straight back to where it started: **the scheduled rise alone cannot move a bar under roughly
-250 lb.** So the reps carry the progression, and the earned increment is where a real jump arrives —
+**⛔ What happens when a rate is smaller than the plates he owns — and this is why the drift is
+zero.** One per cent on a 148.8 bench is about 1.5 lb. At a 5 lb step it rounds straight back to
+where it started: **a scheduled rise cannot move a bar under roughly 250 lb**, and on the one week
+per block where it happened to cross a rounding line it moved the weight for someone who might have
+logged nothing. So the reps carry the progression, and the earned increment is where a jump arrives —
 added to the *rounded* weight, never inside the percentage arithmetic, so it stays exactly loadable
 and cannot compound with the rise. A derived lift (front squat, incline bench) takes its ratio of the
 **primary's already-rounded prescribed weight**, so it moves exactly when the primary moves — the fix
