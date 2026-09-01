@@ -23,7 +23,7 @@ import {
 } from '../endurance-library/index.ts';
 import { bandRouteName, executionName, isAsymmetrical, isBodyweightLoad, prescribe, resolveSlot,
   type ViadaPattern } from '../strength-grid/index.ts';
-import { ownsLoadingImplement } from '../../../../src/lib/strength-gear.ts';
+import { gearRoutesFor, ownsLoadingImplement } from '../../../../src/lib/strength-gear.ts';
 import {
   HOLD_PRESCRIPTION,
   fillMuscleFloor,
@@ -1564,6 +1564,25 @@ function exerciseForSlot(
      * on the row is the weight on the bar.
      */
     if (cfg.displayFormat === 'perHand' || cfg.isUnilateral === true || cfg.ratioIsTotal === true) return null;
+    /**
+     * ⛔⛔ AND A DUMBBELL MOVEMENT STAYS BY FEEL WHATEVER ITS TAGS SAY (2026-09-01). **One number,
+     * one bar** is the rule this block already states; the three tags above were the only way it was
+     * being enforced, and they miss.
+     *
+     * ⛔ MEASURED, THE HOUR IT BECAME REACHABLE. p220's `seated db press` is catalogued
+     * `displayFormat: 'total'` with `isUnilateral: false`, so it passed all three tags and the day-1
+     * speed row printed **"Seated DB Press @ 45"**. To a lifter that reads as 45s in each hand —
+     * ninety pounds — on a row meant to be forty-five across both. That is the doubled prescription
+     * this block exists to prevent, arriving through a tag rather than through the maths.
+     *
+     * ⚠️ THE TEST IS THE GEAR ROUTE, NOT THE NAME. If every way to reach the movement needs
+     * dumbbells or kettlebells, it is held in two hands and one figure cannot describe it.
+     * ⚠️ THE CATALOGUE TAG IS LEFT ALONE. Re-tagging one entry fixes one row; this fixes the class.
+     */
+    const routes = gearRoutesFor(movement);
+    const twoHanded = routes.length > 0
+      && routes.every((r) => r.includes('dumbbells') || r.includes('kettlebell'));
+    if (twoHanded) return null;
     const ratio = Number(cfg.ratio);
     if (!Number.isFinite(ratio) || ratio <= 0) return null;
     // ⚠️ THE NUMBER COMES FROM THE LIFT THE MOVEMENT REFERENCES, which is the whole point of the
@@ -1598,7 +1617,15 @@ function exerciseForSlot(
         ? 'no_tested_lift'
         : ((() => {
             const cfg = resolveExerciseConfig(movement).config;
-            return cfg?.displayFormat === 'perHand' || cfg?.isUnilateral === true || cfg?.ratioIsTotal === true;
+            if (cfg?.displayFormat === 'perHand' || cfg?.isUnilateral === true || cfg?.ratioIsTotal === true) return true;
+            /**
+             * ⚠️ THE SAME TWO-HANDED TEST THE PRICING USES — see the `derived` block. Without it a
+             * seated DB press read *"weights arrive once you log the test"*, and no test will ever
+             * price it: it is held in two hands and one figure cannot describe it.
+             */
+            const routes = gearRoutesFor(movement);
+            return routes.length > 0
+              && routes.every((r) => r.includes('dumbbells') || r.includes('kettlebell'));
           })() ? 'per_side' : 'awaiting_test');
     return {
       exercise: {

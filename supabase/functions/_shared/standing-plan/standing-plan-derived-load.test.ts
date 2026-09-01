@@ -15,6 +15,7 @@
 
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { composeWeek, defaultCompetitionLifts, workingNumberFromTest } from './index.ts';
+import { gearRoutesFor } from '../../../../src/lib/strength-gear.ts';
 import { resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 
 const BASELINES = {
@@ -68,8 +69,19 @@ Deno.test('⛔⛔ NO TOP SET SAYS "By feel" BESIDE ONE THAT CARRIES A NUMBER', (
     for (const r of rowsFor(week).filter(isTopSet)) {
       if (String(r.weight) !== 'By feel') continue;
       const cfg = resolveExerciseConfig(r.name).config;
+      /**
+       * ⚠️ AND A TWO-HANDED MOVEMENT IS EXCUSABLE TOO (2026-09-01). The three tags below were the
+       * whole test and they MISS: p220's `seated db press` is tagged `displayFormat: 'total'` with
+       * `isUnilateral: false`, so it passed all three and printed **"Seated DB Press @ 45"** — which
+       * a lifter reads as 45s in each hand. One number, one bar; if every route to a movement needs
+       * dumbbells or kettlebells, no single figure describes it.
+       */
+      const routes = gearRoutesFor(r.name);
+      const twoHanded = routes.length > 0
+        && routes.every((rt) => rt.includes('dumbbells') || rt.includes('kettlebell'));
       const excusable = !cfg
         || cfg.primaryRef == null
+        || twoHanded
         || cfg.displayFormat === 'perHand'
         || cfg.isUnilateral === true
         || (cfg as { ratioIsTotal?: boolean }).ratioIsTotal === true;

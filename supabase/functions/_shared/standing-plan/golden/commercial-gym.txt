@@ -69,7 +69,7 @@ WEEK 02  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
-      DE     Overhead Press                 4x2-4        @ 100           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 55wx5 75wx3 90wx2 100x4 100x4 100x4 100x4 · note: 70% of your tested overhead press — derived, not tested.
+      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -123,7 +123,7 @@ WEEK 03  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
-      DE     Overhead Press                 4x2-4        @ 100           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 55wx5 75wx3 90wx2 100x4 100x4 100x4 100x4 · note: 70% of your tested overhead press — derived, not tested.
+      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -177,7 +177,7 @@ WEEK 04  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
-      DE     Overhead Press                 4x2-4        @ 100           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 55wx5 75wx3 90wx2 100x4 100x4 100x4 100x4 · note: 70% of your tested overhead press — derived, not tested.
+      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -231,7 +231,7 @@ WEEK 05  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
-      DE     Overhead Press                 4x2-4        @ 100           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 55wx5 75wx3 90wx2 100x4 100x4 100x4 100x4 · note: 70% of your tested overhead press — derived, not tested.
+      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -285,7 +285,7 @@ WEEK 06  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
-      DE     Overhead Press                 4x2-4        @ 100           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 55wx5 75wx3 90wx2 100x4 100x4 100x4 100x4 · note: 70% of your tested overhead press — derived, not tested.
+      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -339,7 +339,7 @@ WEEK 07  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
-      DE     Overhead Press                 4x2-4        @ 100           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 55wx5 75wx3 90wx2 100x4 100x4 100x4 100x4 · note: 70% of your tested overhead press — derived, not tested.
+      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -392,7 +392,7 @@ WEEK 08  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
-      DE     Overhead Press                 4x2-4        @ 100           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 55wx5 75wx3 90wx2 100x4 100x4 100x4 100x4 · note: 70% of your tested overhead press — derived, not tested.
+      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -445,7 +445,7 @@ WEEK 09  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
-      DE     Overhead Press                 4x2-4        @ 100           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 55wx5 75wx3 90wx2 100x4 100x4 100x4 100x4 · note: 70% of your tested overhead press — derived, not tested.
+      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -498,7 +498,7 @@ WEEK 10  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
-      DE     Overhead Press                 4x2-4        @ 100           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 55wx5 75wx3 90wx2 100x4 100x4 100x4 100x4 · note: 70% of your tested overhead press — derived, not tested.
+      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -551,7 +551,7 @@ WEEK 11  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
-      DE     Overhead Press                 4x2-4        @ 100           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 55wx5 75wx3 90wx2 100x4 100x4 100x4 100x4 · note: 70% of your tested overhead press — derived, not tested.
+      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -604,7 +604,7 @@ WEEK 12  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
-      DE     Overhead Press                 4x2-4        @ 100           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 55wx5 75wx3 90wx2 100x4 100x4 100x4 100x4 · note: 70% of your tested overhead press — derived, not tested.
+      DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated

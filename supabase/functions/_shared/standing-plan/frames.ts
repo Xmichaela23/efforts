@@ -348,7 +348,8 @@ const STRENGTH_5K_STANDARD: FrameDay[] = [
        */
       S('DE', 'accessory', 'secondary', 'push_upper', '1 x DE: Accessory: secondary push', {
         muscle: 'deltoids',
-        alsoAdmits: ['overhead press', 'military press', 'standing barbell overhead press', 'push press'],
+        // ⚠️ HIS TWO, BY NAME — see the other frame's day-1 cell for the reasoning.
+        alsoAdmits: ['seated db press', 'arnold press'],
       }),
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),
       S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: Accessory: focused pull, focused push'),
@@ -533,18 +534,34 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
        * a fast overhead press is exactly that, and the day still covers chest twice over (the ME
        * bench and the braced push cell, which states `chest`).
        *
-       * ⚠️ `alsoAdmits` IS FOR THE BARBELL-ONLY ATHLETE, and it is the same mechanism p223's hip
-       * thrust uses on the hamstring row. Measured: at a barbell-and-bench kit the deltoid pool is
-       * `pike push up` and `handstand push ups` — bodyweight, and neither is on his list — because
-       * the barbell overhead press is catalogued as a PRIMARY movement and a secondary cell cannot
-       * reach it. Naming it here admits the one movement that athlete would actually perform.
-       * ⚠️ IT DOES NOT PUT A NUMBER ON THE ROW. A dumbbell press is per-hand and stays by feel, and
-       * the barbell press is not this pattern's tested lift. The movement appears; the weight is
-       * still the athlete's call. Pricing it is a separate change and is not made here.
+       * ⛔⛔ AND THE BARBELL PRESS IS **NOT** ADMITTED HERE — corrected 2026-09-01, Michael: *"he
+       * doesn't really have compounds in the all rounder, so what is the version he would have had
+       * for press?"* He is right and the first version of this was wrong.
+       *
+       * ⛔ SECONDARY IS DEFINED ON p220 AS *"compound noncontested movements, **dumbbell variants**
+       * — variable form and plane of movement"*, and his list for this cell is Larsen press ·
+       * incline bench · close-grip bench · JM press · **seated DB press · Arnold press**. The
+       * barbell overhead press, military press and push press are his **PRIMARY** push-upper list —
+       * the day-opening competition slot, not this one. `alsoAdmits` had been used to pull one of
+       * them in, which put a primary compound in a cell his page reserves for dumbbell variants.
+       *
+       * ⚠️ THE COST IS STATED RATHER THAN ENGINEERED AROUND. His overhead work for this cell needs
+       * DUMBBELLS. A barbell-and-bench athlete has no secondary overhead press on his list, and the
+       * honest answer is that they do not get one here — not that we substitute a movement from a
+       * category he put somewhere else.
+       * ⚠️ AND IT STAYS BY FEEL. A seated DB press is per-hand, so the tested press does not price
+       * it. An athlete who wants a NUMBER on an overhead press names it as their competition lift,
+       * which is exactly where his primary list puts it.
        */
       S('DE', 'accessory', 'secondary', 'push_upper', '1 x DE: secondary push', {
         muscle: 'deltoids',
-        alsoAdmits: ['overhead press', 'military press', 'standing barbell overhead press', 'push press'],
+        /**
+         * ⚠️ HIS TWO, BY NAME, so the cell lands on the movements p220 actually prints for it rather
+         * than on the catalogue's generic `dumbbell shoulder press` — which is the same movement
+         * under a name he never used. Named movements rank ahead of incidental matches, so an
+         * athlete with dumbbells gets his.
+         */
+        alsoAdmits: ['seated db press', 'arnold press'],
       }),
       /**
        * ⚠️ THE MUSCLE IS STATED HERE TOO, and the audit is why (2026-08-30). p221's braced push upper

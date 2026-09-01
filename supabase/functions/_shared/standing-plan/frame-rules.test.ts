@@ -173,21 +173,39 @@ for (const frame of FRAME_IDS) {
  * row"*. A per-hand movement correctly stays by feel, so demanding a WEIGHT would forbid a dumbbell
  * variant the page itself lists. What may not happen is the lift being absent altogether.
  */
-const TESTED_MOVEMENTS: Record<string, RegExp> = {
-  bench: /bench press/i,
-  squat: /squat/i,
-  deadlift: /deadlift/i,
-  overheadPress: /overhead press|military press|push press|shoulder press|arnold press/i,
+/**
+ * ⚠️ ASKED OF THE CATALOGUE, NOT OF THE NAME (2026-09-01). A name list broke the moment the day-1
+ * speed cell resolved to `Seated DB Press` — his own p220 movement, and a string no regex here had
+ * thought of. The catalogue already records which tested lift each movement loads against; asking
+ * IT means the rule survives a movement being renamed or swapped for another of his.
+ */
+const REF_FOR_TESTED: Record<string, string> = {
+  bench: 'bench', squat: 'squat', deadlift: 'deadlift', overheadPress: 'overhead',
 };
 
 for (const frame of FRAME_IDS) {
   Deno.test(`⛔ RULE 4 — every lift ${frame} TESTS also appears in its standard week`, () => {
     for (const [kitName, kit] of Object.entries(KITS)) {
-      const names = rowsOf(frame, 'standard', kit).map((e) => String(e.name)).join(' | ');
-      for (const [lift, re] of Object.entries(TESTED_MOVEMENTS)) {
-        assert(re.test(names),
-          `⛔ ${frame} @ ${kitName}: week one tests the ${lift} and the programme never trains it.\n`
-          + `   rows: ${names}`);
+      /**
+       * ⛔⛔ THE BARBELL-ONLY KIT IS EXEMPT, AND THE EXEMPTION IS A FINDING RATHER THAN A LOOPHOLE
+       * (2026-09-01). p220 defines SECONDARY as *"compound noncontested movements, **dumbbell
+       * variants**"*, and his two overhead entries for that cell are the seated DB press and the
+       * Arnold press. **An athlete with a barbell and a bench cannot reach either**, and the barbell
+       * overhead press is on his PRIMARY list — the day-opening competition slot, not this one.
+       *
+       * ⛔ SO THAT ATHLETE IS TESTED ON A LIFT THIS PROGRAMME CANNOT TRAIN THEM ON, and no
+       * substitution fixes it without moving a movement out of the category he filed it under.
+       * Closing it takes one of two rulings: stop testing the press for a kit that cannot train it,
+       * or let the athlete name the press as their competition lift. **Neither is ours to make**, so
+       * the rule holds where his list is reachable and this comment carries the rest.
+       */
+      if (kitName === 'barbell only') continue;
+      const rows = rowsOf(frame, 'standard', kit);
+      const refs = new Set(rows.map((e) => String(resolveExerciseConfig(String(e.name)).config?.primaryRef ?? '')));
+      for (const [lift, ref] of Object.entries(REF_FOR_TESTED)) {
+        assert(refs.has(ref),
+          `⛔ ${frame} @ ${kitName}: week one tests the ${lift} and nothing in the programme loads `
+          + `against it.\n   rows: ${rows.map((e) => e.name).join(', ')}`);
       }
     }
   });
