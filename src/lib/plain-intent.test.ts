@@ -9,7 +9,7 @@
  * has one owner, because the failure was never the two lines being wrong; it was them being private.
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { INTENT_WORD, plainIntent } from './plain-intent.ts';
+import { INTENT_WORD, plainIntent, spelledIntentLabel } from './plain-intent.ts';
 
 Deno.test('the pair, and both halves of it', () => {
   assertEquals(plainIntent('ME: Upper'), 'Heavy: Upper');
@@ -128,3 +128,28 @@ const SURFACES = [
  *     (`session_detail_v1.next_session.name`) and therefore cannot be fixed on the client at all
  *   · `AssociatePlannedDialog.tsx:238, :261` — the planned-session picker
  */
+
+// ── THE SPELLED-OUT FORM (State's weekly lifting card, Michael 2026-09-01: "spell it out") ──────
+Deno.test('spelled: ME/DE/Test with Upper/Lower become the full phrase, from the same two words', () => {
+  assertEquals(spelledIntentLabel('DE: Upper'), 'Speed day, upper body');
+  assertEquals(spelledIntentLabel('DE: Lower'), 'Speed day, lower body');
+  assertEquals(spelledIntentLabel('ME: Upper'), 'Heavy day, upper body');
+  assertEquals(spelledIntentLabel('ME: Lower'), 'Heavy day, lower body');
+  assertEquals(spelledIntentLabel('Test: Upper'), 'Test day, upper body');
+  assertEquals(spelledIntentLabel('Test: Lower'), 'Test day, lower body');
+});
+
+Deno.test('spelled: the Strength prefix is dropped, em dash or hyphen', () => {
+  assertEquals(spelledIntentLabel('Strength — DE: Upper'), 'Speed day, upper body');
+  assertEquals(spelledIntentLabel('Strength - ME: Lower'), 'Heavy day, lower body');
+});
+
+Deno.test('spelled: anything the frames do not mint falls through to plainIntent, untouched', () => {
+  assertEquals(spelledIntentLabel('Upper body: Push'), 'Upper body: Push');
+  assertEquals(spelledIntentLabel('Lower body: Hinge'), 'Lower body: Hinge');
+  assertEquals(spelledIntentLabel('Easy run'), 'Easy run');
+  assertEquals(spelledIntentLabel(''), '');
+  assertEquals(spelledIntentLabel(null), '');
+  // A compact form that already went through plainIntent is not double-mapped and not spelled.
+  assertEquals(spelledIntentLabel('Heavy: Upper'), 'Heavy: Upper');
+});

@@ -61,3 +61,28 @@ export function plainIntent(name: string | null | undefined): string {
     (_m, prefix: string, key: string) => `${prefix}${INTENT_WORD[key]}:`,
   );
 }
+
+/**
+ * THE SAME LABEL, SPELLED OUT — `"DE: Upper"` → `"Speed day, upper body"` (Michael, 2026-09-01, off
+ * the State screen's weekly lifting card: *"spell it out"*).
+ *
+ * ⛔ ONE FORMATTER OVER ONE VOCABULARY, NOT A SECOND VOCABULARY. The intent word comes from
+ * `INTENT_WORD` above — the same two strings the compact form uses — so "Heavy" here and "Heavy:" in
+ * the logger cannot drift. `Test:` keeps its own word, as everywhere. The `Strength — ` prefix is
+ * dropped: a card that lists lifting sessions does not need each row to say it is strength.
+ *
+ * ⚠️ ONLY THE FORMS THE FRAMES MINT ARE SPELLED: `ME` / `DE` / `Test` with `Upper` / `Lower`. Any
+ * other label — `Upper body: Push`, an endurance name, a hand-typed session — comes back through
+ * `plainIntent` untouched rather than half-rewritten. SKILL and HYP are slot intents, never day
+ * labels; there is no day to spell.
+ */
+const SPELLED_LABEL_RE = /^\s*(?:Strength\s*[—–-]\s*)?(ME|DE|Test):\s*(Upper|Lower)\s*$/i;
+const BODY_WORD: Record<string, string> = { upper: 'upper body', lower: 'lower body' };
+
+export function spelledIntentLabel(name: string | null | undefined): string {
+  const m = SPELLED_LABEL_RE.exec(String(name ?? ''));
+  if (!m) return plainIntent(name);
+  const key = m[1].toUpperCase();
+  const word = key === 'TEST' ? 'Test' : INTENT_WORD[key];
+  return `${word} day, ${BODY_WORD[m[2].toLowerCase()]}`;
+}

@@ -601,6 +601,23 @@ before reordering ships.** No block may read whether another block is rendered.
       The ruling is that it should speak only about off-plan work — the same server split. Not
       narrowed by approximation, not deleted; a comment on the render says so.
       Build green, eslint clean, no type errors in the file.
+- [x] 3-lift-labels. **DONE 2026-09-01 (night). Client-only, two files. NOT committed, NOT pushed.**
+      Michael, off the live card: *"LLM jiberish what is DE?"*, then *"spell it out"*. The session
+      rows printed the raw engine label — "DE: Upper", "ME: Lower". They now read **"Speed day, upper
+      body"**, **"Heavy day, lower body"**, **"Test day, upper body"**.
+      ⛔ **NO SECOND VOCABULARY.** The Heavy/Speed words have one owner — `INTENT_WORD` in
+      `src/lib/plain-intent.ts`, read by the logger, the calendar, the week grid and the plan download
+      since 2026-08-28. This adds ONE formatter beside it, `spelledIntentLabel`, that reads those same
+      two words and writes the full phrase ("upper body" / "lower body" in plain words); anything the
+      frames do not mint falls through to `plainIntent` untouched. The payload string is unchanged.
+      8 fixtures green in `plain-intent.test.ts` (the six spelled forms, the prefix, the fall-through
+      and non-double-mapping).
+      **COVERAGE, traced:** the only day labels the frames mint are `ME:` / `DE:` (Upper/Lower),
+      `Test:`, and the already-plain `Upper body: Push` / `Lower body: Hinge` family. `Test:` is left
+      alone by design. SKILL and HYP are slot intents, never day labels — no frame titles a day with
+      either, so there is no string to translate and none was invented (the module's own header says
+      so). The helper also handles a `Strength — ` prefix, em dash or hyphen, and is idempotent.
+      Build green, eslint clean.
 - [x] 3-lift-patterns-cut. **DONE 2026-09-01 (evening). Client-only, one file. NOT committed, NOT
       pushed.** Same ruling as 3-lift-cut, applied consistently — Michael: *"I just want this to be
       useful and have value."*

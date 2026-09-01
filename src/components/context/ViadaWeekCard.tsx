@@ -77,6 +77,12 @@ import {
   type SessionVerdict,
 } from '@shared/accessory-dosing/dose.ts';
 import { weekChangeParts, type ViadaWeekChange } from '@/lib/week-change-line';
+// ⛔ `DE: Upper` → `Speed day, upper body`, at the last moment before the athlete reads it (Michael,
+// off the live card: "LLM jiberish what is DE?" … "spell it out"). One formatter over the ONE owner
+// of the Heavy/Speed vocabulary — the logger, the calendar, the week grid and the plan download all
+// read the same two words; this card spells the phrase out in full. The engine string on the payload
+// is untouched. `Test:` keeps its word; SKILL/HYP are slot intents, never day labels.
+import { spelledIntentLabel } from '@/lib/plain-intent';
 
 export type ViadaWeekPerformed = {
   since: string;
@@ -198,7 +204,7 @@ export default function ViadaWeekCard({ week }: { week: ViadaWeekPerformed | nul
           <div className="mt-1 space-y-1">
             {week.perSession.map((s, i) => (
               <div key={`${s.label}-${i}`} className="flex items-baseline justify-between gap-3">
-                <span className="text-[13px] text-white/80">{s.label}</span>
+                <span className="text-[13px] text-white/80">{spelledIntentLabel(s.label)}</span>
                 <span className="text-[12px] text-white/60 tabular-nums">
                   <span className="text-white/80">{s.countedSets}</span> work sets
                   {isSessionVerdict(s.verdict) && <> · {SESSION_VERDICT_WORD[s.verdict]}</>}
