@@ -87,7 +87,28 @@ replaced the tested number on its way to `user_baselines`.
   and a test day carries no rep-band heavy set for the ladder to read. Not a defect; an absence.
 - **No lighter / taper week is reachable** — both frames' taper columns are transcribed and both
   build sites pass an empty week list (`generate-strength-plan:833`, `rematerialize-standing-block:171`).
-- **The overhead press is tested every block and prices nothing** — neither frame carries a press slot.
+  ⛔⛔ **AND MICHAEL HAS RULED ON WHAT IT SHOULD BE (2026-09-01): an OFFER on the State screen, taken
+  when the athlete needs it — "use it as he does". NOT a scheduled deload, and NOT built now.**
+  ⚠️ **The ruling matches the source and that is why it is recorded here rather than re-argued.**
+  p120 rejects overreach-to-deload outright for a hybrid athlete — the rebound only pays if they
+  actually rest, and one who keeps running through the light week *"may be unable to pull themselves
+  out of their overreached state"*. His standard week is built to run indefinitely; the taper column
+  is *"a tool you deploy"* — a race, or a break needed — never a calendar event. ⛔ **So nobody may
+  add an every-Nth-week deload here.** What is missing is the athlete-triggered switch, and the week
+  it would switch to is already built.
+- **The overhead press is tested every block and prices nothing** — neither frame carries a press
+  slot. ⚠️ **Michael, 2026-09-01: could the press max price SECONDARY lifts?** Traced: **29 catalogue
+  movements carry `primaryRef: 'overhead'`**, including military press, push press, standing barbell
+  overhead press, seated DB press and kettlebell press. Two things block them today, and only one is
+  a limitation:
+  1. `LIFT_FOR_PATTERN` maps `push_upper` to **`bench` alone**, and the derived path requires the
+     movement's own `primaryRef` to equal THAT lift — so a press-referenced movement is rejected
+     whatever its ratio.
+  2. Most press variants are **per-hand**, which stays by feel by design and correctly so.
+  ⛔ **So the change that would make the press number earn its keep is narrow: let a pattern carry
+  MORE THAN ONE tested lift and match on the movement's own reference.** It would price the whole-bar
+  press variants and nothing else. **Not built, not scoped — his question is answered, the build is
+  not authorised.**
 - **The band tier still wins cells** — `braced_pull` offers only `lat pulldown` at his kit.
 
 ### §E. THE TRAP THAT COST THE MOST TONIGHT
