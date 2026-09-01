@@ -132,21 +132,33 @@ const MUSCLE_WORD: Record<string, string> = {
 const word = (map: Record<string, string>, key: string) => map[key] ?? key.replace(/_/g, ' ');
 
 /**
- * ⛔ DISPLAY WORDS OVER THE SERVER'S SESSION VERDICT — a map, not a comparison. `above_recovers` is
- * the gap between the book's two figures (over 8, under 14) — it gives no recovery time for it, so
- * the word states the position and claims nothing about the next day. An enum value this map does
- * not know prints nothing rather than a guess.
+ * ⛔ DISPLAY WORDS OVER THE SERVER'S SESSION VERDICT — a map, not a comparison. An enum value this
+ * map does not know prints nothing rather than a guess.
  * ⛔ NO POSSESSIVE (Michael, 2026-09-01, off the live screen: "should say 'his' numbers its a very
- * confusing data dump"). "His" is the book's author, who appears nowhere on the screen. The older
- * "his range is…" pattern caption on this card is Round 4's.
+ * confusing data dump"). "His" is the book's author, who appears nowhere on the screen.
+ *
+ * ⛔ THE GAUGE IS RECOVERY TIME, AND THE CARD SAYS SO ONCE (Michael, 2026-09-01: "what does about
+ * normal mean? … what are we communicating? what are we using as a gauge?"). The book gives exactly
+ * two anchors (p086): 6–8 work sets recovers in ~24–48h; 14+ can cost up to 72h. So:
+ *   · `recovers`       → "a day or two"
+ *   · `costly`         → "up to three days"
+ *   · `above_recovers` → NOTHING. The 9–13 gap has no figure in the source. The row prints its set
+ *                        count alone; no phrase is invented for it, and no summary sentence may
+ *                        extend the 6–8 figure across it.
+ * The phrases are the book's recovery figures in plain words; the set thresholds beside them come
+ * from `dose.ts`, not retyped.
  */
 const SESSION_VERDICT_WORD: Record<SessionVerdict, string> = {
-  recovers: 'next day about normal',
-  above_recovers: `over ${SESSION_SETS_RECOVERS.hi}`,
-  costly: 'costs up to three days',
+  recovers: 'a day or two',
+  above_recovers: '',
+  costly: 'up to three days',
 };
 
 const isSessionVerdict = (v: string): v is SessionVerdict => v in SESSION_VERDICT_WORD;
+
+/** The gauge, stated once at the block, with its two anchors and nothing for the gap between them. */
+const RECOVERY_GAUGE_LINE =
+  `how long each day takes to recover from, by its work sets — ${SESSION_SETS_RECOVERS.lo}–${SESSION_SETS_RECOVERS.hi} is a day or two, ${SESSION_SETS_COSTLY} or more is up to three days`;
 
 /**
  * ⛔ DISPLAY WORDS OVER THE SERVER'S MUSCLE VERDICT, FOR ADDED WORK ONLY — a map, not a comparison,
@@ -161,28 +173,16 @@ const OVER_BAND_WORD: Record<string, string> = {
 };
 
 /**
- * The lead line: how many of the window's sessions sit in each of his brackets. Counts of the
- * server's verdicts — the card does not look at a set count to place a session.
+ * ⛔ NO SUMMARY SENTENCE OVER THE ROWS (2026-09-01). There was one ("3 sessions: 1 at 6–8 work sets
+ * or under — next day about normal · 2 over 8"). Any honest one-liner has to say something about
+ * every session, and the 9–13 bracket has no recovery figure to say — a sentence like "nothing this
+ * week costs more than a day or two" would extend the 6–8 figure across the gap the book leaves
+ * empty. The gauge line names the scale once; each row carries its phrase where the book has one.
  */
-function costLead(perSession: ViadaWeekPerformed['perSession']): string {
-  const n = { recovers: 0, above_recovers: 0, costly: 0 } as Record<SessionVerdict, number>;
-  for (const s of perSession) if (isSessionVerdict(s.verdict)) n[s.verdict] += 1;
-  const total = n.recovers + n.above_recovers + n.costly;
-  if (total === 0) return '';
-  const session = (k: number) => `${k} session${k === 1 ? '' : 's'}`;
-  const recoversText = `at ${SESSION_SETS_RECOVERS.lo}–${SESSION_SETS_RECOVERS.hi} work sets or under — next day about normal`;
-  if (n.recovers === total) return `all ${session(total)} ${recoversText}`;
-  const parts: string[] = [];
-  if (n.recovers > 0) parts.push(`${n.recovers} ${recoversText}`);
-  if (n.above_recovers > 0) parts.push(`${n.above_recovers} over ${SESSION_SETS_RECOVERS.hi}`);
-  if (n.costly > 0) parts.push(`${n.costly} at ${SESSION_SETS_COSTLY} or more — costs up to three days`);
-  return `${session(total)}: ${parts.join(' · ')}`;
-}
 
 export default function ViadaWeekCard({ week }: { week: ViadaWeekPerformed | null | undefined }) {
   if (!week || week.perMuscle.length === 0) return null;
 
-  const lead = costLead(week.perSession);
   // Null when there is nothing to say — no prior work, or nothing over the line. Both are silence.
   const changeParts = weekChangeParts(week.weekChange, (kind, key) => {
     switch (kind) {
@@ -200,14 +200,14 @@ export default function ViadaWeekCard({ week }: { week: ViadaWeekPerformed | nul
       {/* ── 1. WHAT EACH SESSION COST — LEADS (p086: 6-8 recovers in 24-48h, 14+ up to 72h) ──── */}
       {week.perSession.length > 0 && (
         <div className="mt-2">
-          {lead && <div className="text-[13px] text-white/85">{lead}</div>}
+          <div className="text-[11px] text-white/55">{RECOVERY_GAUGE_LINE}</div>
           <div className="mt-1 space-y-1">
             {week.perSession.map((s, i) => (
               <div key={`${s.label}-${i}`} className="flex items-baseline justify-between gap-3">
                 <span className="text-[13px] text-white/80">{spelledIntentLabel(s.label)}</span>
                 <span className="text-[12px] text-white/60 tabular-nums">
                   <span className="text-white/80">{s.countedSets}</span> work sets
-                  {isSessionVerdict(s.verdict) && <> · {SESSION_VERDICT_WORD[s.verdict]}</>}
+                  {isSessionVerdict(s.verdict) && SESSION_VERDICT_WORD[s.verdict] && <> · {SESSION_VERDICT_WORD[s.verdict]}</>}
                 </span>
               </div>
             ))}

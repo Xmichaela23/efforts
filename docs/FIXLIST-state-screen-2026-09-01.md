@@ -601,6 +601,23 @@ before reordering ships.** No block may read whether another block is rendered.
       The ruling is that it should speak only about off-plan work — the same server split. Not
       narrowed by approximation, not deleted; a comment on the render says so.
       Build green, eslint clean, no type errors in the file.
+- [x] 3-lift-recovery-copy. **DONE 2026-09-01 (night). Client-only, copy only, one file. NOT
+      committed, NOT pushed.** Michael: *"what does about normal mean? … what are we communicating?
+      what are we using as a gauge?"*
+      **THE GAUGE IS RECOVERY TIME, and the block now says so once:** "how long each day takes to
+      recover from, by its work sets — 6–8 is a day or two, 14 or more is up to three days" (set
+      thresholds from `dose.ts`; the day figures are p086's two anchors in plain words).
+      **ROWS:** ≤8 work sets → "· a day or two"; ≥14 → "· up to three days"; **9–13 → the set count
+      alone, no phrase** — the book gives no figure for the gap and none is invented. "over 8" and
+      "next day about normal" are gone.
+      ⛔ **THE SUMMARY SENTENCE IS GONE, NOT REWORDED.** Any one-liner over the rows has to say
+      something about every session, and the 9–13 bracket has nothing sayable — "nothing this week
+      costs more than a day or two" would extend the 6–8 figure across the gap the book leaves empty
+      (the PM caught and withdrew that phrasing before the build). The gauge line names the scale
+      once; each row carries its phrase where the book has one.
+      ⚠️ **HOW IT READS ON HIS CURRENT WEEK:** two of three days are 9–13 and carry no phrase; only
+      the 6-set day says "a day or two". Reported as-is rather than filled. Server verdicts untouched.
+      Build green, eslint clean.
 - [x] 3-lift-labels. **DONE 2026-09-01 (night). Client-only, two files. NOT committed, NOT pushed.**
       Michael, off the live card: *"LLM jiberish what is DE?"*, then *"spell it out"*. The session
       rows printed the raw engine label — "DE: Upper", "ME: Lower". They now read **"Speed day, upper
