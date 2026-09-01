@@ -30,7 +30,6 @@ import {
   isRepPrescribable,
   ledgerFor,
   muscleFloorSets,
-  SESSION_SETS_COSTLY,
   type DoseLedger,
   type MuscleGroup,
   type PlannedSession as DosingSession,
@@ -787,8 +786,7 @@ const CORE_PICK_FREQUENCY_IS_OURS =
   + 'day, rotating through the movements you chose. The source gives core its own movements and says '
   + 'where they sit in a session — after the main work, before the isolation work — but names no '
   + 'frequency, so twice is ours: one slot a week is this app\'s floor for any muscle rather than a '
-  + 'dose, and two sessions of three sets is where direct work starts to be worth doing without '
-  + 'crowding the session limit your running and riding depend on.';
+  + 'dose, and two sessions of three sets is where direct work starts to be worth doing.';
 
 /**
  * ⛔ HIS ME SET BAND — 1 to 3, p218 — READ OFF STAGE 2 RATHER THAN RESTATED HERE.
@@ -3375,20 +3373,35 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * ⚠️ THE SOURCE STATES NO FREQUENCY, so this is ours and is labelled — see
    * `CORE_PICK_FREQUENCY_IS_OURS`. His own 8-to-12 solid range is unreachable here and
    * `MUSCLE_FLOOR_IS_ONE_SLOT` already records the arithmetic.
-   * ⛔ AND TWO IS THE CEILING'S ANSWER AS WELL AS THE EVIDENCE'S: a slot is three sets and p086 puts
-   * a session's cost at fourteen. Two fit inside the week; four would start buying the ceiling.
+   * ⚠️ AND TWO RATHER THAN FOUR IS STILL A COST JUDGEMENT, just not a limit one. p86 says a highly
+   * taxing session costs the next day's running; two slots is where direct core work starts to be
+   * worth doing without adding a fourth accessory to every lifting day.
    *
    * ⚠️ TWO DIFFERENT MOVEMENTS WHERE THE ATHLETE GAVE ENOUGH ANSWERS, consecutive in the rotation,
    * so a week covers two of core's four jobs rather than doing one of them twice.
    */
+  /**
+   * ⚠️ AND THE FLAT LIST COUNTS AS ASKING, TOO. A core movement can reach the week through the
+   * picker's own cell OR through the flat pick list the Dial and the older screens write. Skipping
+   * core on the strength of the slot cells alone would silently drop an ab movement an athlete had
+   * named on the other path — which is the A1 defect, arriving through a new door.
+   */
+  const flatListHasCore = [...picks.unplaced]
+    .map((f) => picks.byFold.get(f) ?? f)
+    .some((n) => musclesWorkedBy(n)?.primary === 'core');
+
   const CORE_SLOTS_PER_WEEK = 2;
   /**
-   * ⚠️ TWO SLOTS EVEN FROM ONE ANSWER. The dose is the ruling; the rotation only decides WHICH
-   * movement fills each slot. An athlete who names one movement gets it twice a week, which is the
-   * same six sets and one of core's four jobs — their choice, and better than three sets.
+   * ⛔ ONE ANSWER IS ONE SLOT, AND THAT IS AN EXISTING LAW RATHER THAN A DOSE OPINION. *"A pick is
+   * never prescribed twice in one week"* is pinned by `standing-plan-picks.test.ts` and exists
+   * because dropping it once put the same movement in every matching slot — a preference becoming
+   * the whole week. Placing one chosen movement on two days breaks it.
+   * ⚠️ THE WIZARD DEFAULTS THE THREE CELLS TO THREE DIFFERENT MOVEMENTS, so an athlete who leaves
+   * the screen alone has two slots by construction. Filling only one box is a choice, and its cost
+   * is three sets rather than six.
    */
   const coreWanted = corePicksUnique.length === 0 ? [] : Array.from(
-    { length: CORE_SLOTS_PER_WEEK },
+    { length: Math.min(CORE_SLOTS_PER_WEEK, corePicksUnique.length) },
     // ⚠️ THE WEEK IS THE INDEX, so the cycle is the same for everyone and repeats every N weeks.
     // ⛔ `(_, i)` — `Array.from`'s map function takes the VALUE first and the INDEX second. Written
     // as `(i) =>` this silently produced `NaN` subscripts and placed nothing at all, with no error.
@@ -3402,6 +3415,12 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       ...[...picks.unplaced].map((f) => picks.byFold.get(f) ?? f),
       ...coreWanted,
     ],
+    /**
+     * ⛔ CORE IS OPT-IN AND THE FLOOR MUST NOT OVERRIDE THAT (Michael's ruling, 2026-08-31). p274
+     * prints no core row; an athlete who chooses none gets none. ⚠️ Where they HAVE chosen, the
+     * floor may place it and is preferred to do so — that is the line above.
+     */
+    ...((coreWanted.length === 0 && !flatListHasCore) ? { skipMuscles: ['core' as const] } : {}),
     ...(Object.keys(dialTarget).length > 0 ? { target: dialTarget } : {}),
   });
   if (dialChips.length > 0) {
@@ -3560,8 +3579,18 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   const onWeekAlready = (name: string) => sessions.some((x) =>
     (x.strength_exercises ?? []).some((e) =>
       canonicalize(String((e as { name?: string })?.name ?? '')) === canonicalize(name)));
-  const coreToPlace = coreWanted.filter((n) =>
-    !onWeekAlready(n) && musclesWorkedBy(n)?.primary === 'core');
+  /**
+   * ⛔ THE COUNT IS WHAT THE FLOOR ALREADY SATISFIED, NOT WHICH MOVEMENT (2026-09-01). Filtering by
+   * NAME dropped the second slot for an athlete who named one movement — the floor placed it, the
+   * name matched, and the week ended with three sets instead of six. The dose is two slots; what the
+   * floor already put there counts toward it, whatever it chose.
+   */
+  const coreRowsAlready = sessions.reduce((n, x) => n + (x.strength_exercises ?? [])
+    .filter((e) => musclesWorkedBy(String((e as { name?: string })?.name ?? ''))?.primary === 'core').length, 0);
+  const coreToPlace = coreWanted
+    .filter((n) => musclesWorkedBy(n)?.primary === 'core')
+    .filter((n) => !onWeekAlready(n) || coreRowsAlready < coreWanted.length)
+    .slice(0, Math.max(0, coreWanted.length - coreRowsAlready));
   if (coreToPlace.length > 0) {
     /**
      * ⛔ THE TWO LIGHTEST NON-TEST LIFTING DAYS, in that order — the same rule the single slot used,
@@ -3574,8 +3603,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       .sort((a, b) => (a.sets === b.sets ? (a.d.day ?? 99) - (b.d.day ?? 99) : a.sets - b.sets));
 
     let wantIdx = 0;
-    let overCeiling = 0;
-    for (const { d, sets } of homes) {
+    for (const { d } of homes) {
       if (wantIdx >= coreToPlace.length) break;
       /**
        * ⛔⛔ THE CEILING IS REPORTED HERE, NOT ENFORCED — and the measurement is why (2026-09-01).
@@ -3593,7 +3621,6 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
        * below. Deciding whether p274's row count or p086's session cost wins is a ruling, and
        * quietly picking one by dropping rows would be making it without saying so.
        */
-      if (sets + muscleFloorSets() > SESSION_SETS_COSTLY) overCeiling += 1;
       const target = sessions.find((x) => x.type === 'strength' && (x.name === d.label || x.day === d.label));
       if (!target) continue;
       const movement = coreToPlace[wantIdx];
@@ -3628,16 +3655,16 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         cite: 'Viada p142 (rule 4), p223',
       });
       notes.push({ kind: 'ours', text: CORE_PICK_FREQUENCY_IS_OURS });
-      if (overCeiling > 0) {
-        notes.push({
-          kind: 'warning',
-          text: 'Your core work lands on a day that is already at the session limit the source warns '
-            + 'about — fourteen work sets, past which it says the cost shows up in your running and '
-            + 'riding for up to three days. The choice is yours and it is placed; this is the price '
-            + 'of it.',
-          cite: 'Viada p86',
-        });
-      }
+      /**
+       * ⛔ NO WARNING IS PUSHED HERE ANY MORE, and removing it is the correction (2026-09-01).
+       *
+       * It read *"your core work lands on a day already at the session limit the source warns
+       * about"*. **There is no such limit.** p86 describes what a HIGHLY TAXING 14+ set session
+       * costs against what a 6-to-8 set one costs; it is a cost curve with a qualifier, and he wrote
+       * it alongside a programme whose own rows come to sixteen and seventeen a day. Warning the
+       * athlete that his week breaches his own advice was the app misreading a description as a rule
+       * — and it is the same misreading that had the floor refusing to fill a muscle sitting at zero.
+       */
     }
   }
 

@@ -39,6 +39,8 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      -      Reverse Flyes (bodyweight)     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: chest had nothing else this week.
+      -      YTW Raises                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: deltoids had nothing else this week.
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -47,7 +49,8 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
-      -      Reverse Flyes (bodyweight)     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: chest had nothing else this week.
+      -      Reverse Hyper                  3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: glutes had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
   [Saturday] run      Long Run — 42 min
   NOTES
       [source  ] The first week is the test. Two guided sessions set the numbers the rest of the block is built on, and the weights fill in as soon as those two are logged. Testing before a programme is the source's own advice.  (Viada p215, p247)
@@ -58,12 +61,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
       [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
-      [ours    ] Added one slot each for chest, which the week left at zero. Every movement the athlete chose is untouched.
-      [ours    ] Could not reach deltoids, glutes, calves, core.
-      [warning ] deltoids: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
-      [warning ] glutes: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
-      [warning ] calves: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
-      [warning ] core: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
+      [ours    ] Added one slot each for chest, deltoids, glutes, calves, which the week left at zero. Every movement the athlete chose is untouched.
       [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
       [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
 
@@ -105,7 +103,6 @@ WEEK 02  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
-      -      Dead Bug                       3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: core had nothing else this week.
       HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension (feet under a loaded bar)"
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -118,7 +115,7 @@ WEEK 02  column=standard
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
       [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
-      [ours    ] Added one slot each for calves, core, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Added one slot each for calves, which the week left at zero. Every movement the athlete chose is untouched.
       [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
       [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
 
@@ -160,7 +157,6 @@ WEEK 03  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
-      -      Dead Bug                       3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: core had nothing else this week.
       HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension (feet under a loaded bar)"
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -173,7 +169,7 @@ WEEK 03  column=standard
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
       [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
-      [ours    ] Added one slot each for calves, core, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Added one slot each for calves, which the week left at zero. Every movement the athlete chose is untouched.
       [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
       [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
 
@@ -215,7 +211,6 @@ WEEK 04  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
-      -      Dead Bug                       3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: core had nothing else this week.
       HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension (feet under a loaded bar)"
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -228,7 +223,7 @@ WEEK 04  column=standard
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
       [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
-      [ours    ] Added one slot each for calves, core, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Added one slot each for calves, which the week left at zero. Every movement the athlete chose is untouched.
       [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
       [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
 
@@ -270,7 +265,6 @@ WEEK 05  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
-      -      Dead Bug                       3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: core had nothing else this week.
       HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension (feet under a loaded bar)"
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -283,7 +277,7 @@ WEEK 05  column=standard
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
       [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
-      [ours    ] Added one slot each for calves, core, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Added one slot each for calves, which the week left at zero. Every movement the athlete chose is untouched.
       [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
       [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
 
@@ -325,7 +319,6 @@ WEEK 06  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
-      -      Dead Bug                       3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: core had nothing else this week.
       HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension (feet under a loaded bar)"
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -338,7 +331,7 @@ WEEK 06  column=standard
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
       [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
-      [ours    ] Added one slot each for calves, core, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Added one slot each for calves, which the week left at zero. Every movement the athlete chose is untouched.
       [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
       [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
 
@@ -380,7 +373,6 @@ WEEK 07  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
-      -      Dead Bug                       3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: core had nothing else this week.
       HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension (feet under a loaded bar)"
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -393,7 +385,7 @@ WEEK 07  column=standard
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
       [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
-      [ours    ] Added one slot each for calves, core, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Added one slot each for calves, which the week left at zero. Every movement the athlete chose is untouched.
       [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
       [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
 
@@ -435,7 +427,6 @@ WEEK 08  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
-      -      Dead Bug                       3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: core had nothing else this week.
       HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension (feet under a loaded bar)"
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -448,7 +439,7 @@ WEEK 08  column=standard
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
       [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
-      [ours    ] Added one slot each for calves, core, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Added one slot each for calves, which the week left at zero. Every movement the athlete chose is untouched.
       [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
       [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
 
@@ -490,7 +481,6 @@ WEEK 09  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
-      -      Dead Bug                       3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: core had nothing else this week.
       HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension (feet under a loaded bar)"
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -503,7 +493,7 @@ WEEK 09  column=standard
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
       [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
-      [ours    ] Added one slot each for calves, core, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Added one slot each for calves, which the week left at zero. Every movement the athlete chose is untouched.
       [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
       [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
 
@@ -545,7 +535,6 @@ WEEK 10  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
-      -      Dead Bug                       3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: core had nothing else this week.
       HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension (feet under a loaded bar)"
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -558,7 +547,7 @@ WEEK 10  column=standard
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
       [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
-      [ours    ] Added one slot each for calves, core, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Added one slot each for calves, which the week left at zero. Every movement the athlete chose is untouched.
       [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
       [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
 
@@ -600,7 +589,6 @@ WEEK 11  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
-      -      Dead Bug                       3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: core had nothing else this week.
       HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension (feet under a loaded bar)"
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -613,7 +601,7 @@ WEEK 11  column=standard
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
       [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
-      [ours    ] Added one slot each for calves, core, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Added one slot each for calves, which the week left at zero. Every movement the athlete chose is untouched.
       [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
       [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
 
@@ -655,7 +643,6 @@ WEEK 12  column=standard
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ By feel       | awaiting_test
-      -      Dead Bug                       3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: core had nothing else this week.
       HYP    Back Extension                 3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Back Extension (feet under a loaded bar)"
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -668,6 +655,6 @@ WEEK 12  column=standard
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
       [source  ] The two quality runs and the long run are prescribed at the smaller of the source's own sizes, which is the answer given for running experience. The taper column prescribes these sessions at level 1, and the 90-to-100-minute long run is stated as the more proficient runner's figure.  (Viada pp246-247)
       [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
-      [ours    ] Added one slot each for calves, core, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Added one slot each for calves, which the week left at zero. Every movement the athlete chose is untouched.
       [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
       [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)

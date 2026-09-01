@@ -709,7 +709,14 @@ Deno.test('the ledger sees the strength sets, and no week breaks the ceiling or 
           .filter((n) => n.kind === 'warning')
           .flatMap((n) => wk.ledger.belowFloor.filter((m) => n.text.startsWith(`${m}:`))),
       );
-      const silent = wk.ledger.belowFloor.filter((m) => !spoken.has(m));
+      /**
+       * ⚠️ CORE IS EXEMPT AND THE EXEMPTION IS A RULING (2026-09-01). It is OPT-IN on this app — the
+       * page prints no core row — so a week built with no core answer leaves it under its floor ON
+       * PURPOSE, and it is deliberately NOT reported: `unfilled` becomes `placement_compromises`,
+       * the channel that tells an athlete something they asked for could not be done. Nobody asked,
+       * and nothing failed. Every other muscle still has to be filled or named.
+       */
+      const silent = wk.ledger.belowFloor.filter((m) => m !== 'core' && !spoken.has(m));
       assertEquals(silent, [], `${where}: muscles left below the floor with no warning naming them`);
     }
   }
@@ -757,7 +764,14 @@ Deno.test('a block runs test week first and holds its shape throughout', () => {
   for (const wk of block) {
     assertEquals(wk.sessions.filter((s) => s.type === 'strength' && !s.tags.includes('plyo')).length, 4,
       `wk${wk.week} lost a lifting day`);
-    assertEquals(wk.ledger.belowFloor, [], `wk${wk.week} left a muscle below the floor`);
+    /**
+     * ⚠️ CORE IS THE ONE ALLOWED EXCEPTION (2026-09-01). It is OPT-IN on this app — the page prints
+     * no core row — so a block built with no core answer correctly leaves it under its floor, and
+     * the filler reports it in `unfilled` rather than adding work nobody asked for. Every other
+     * muscle must still be reached.
+     */
+    assertEquals(wk.ledger.belowFloor.filter((m) => m !== 'core'), [],
+      `wk${wk.week} left a muscle below the floor`);
   }
 });
 

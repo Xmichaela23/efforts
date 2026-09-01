@@ -13,11 +13,11 @@
 // ============================================================================
 
 import {
+  SESSION_SETS_COSTLY,
   accessorySetsPerSlot,
   COUNTED_INTENTS,
   effectiveRepsFor,
   SESSION_CEILING_NOTE,
-  SESSION_SETS_COSTLY,
   WEEKLY_SETS_SOLID,
   UNCLASSIFIED_INTENTS,
   UNCLASSIFIED_INTENTS_NOTE,
@@ -460,6 +460,7 @@ export function fillMuscleFloor(
     (opts?.prefer ?? []).map((n) => canonicalize(String(n ?? '').trim())).filter((k) => k && k !== 'unknown'),
   );
 
+  const skip = new Set(opts?.skipMuscles ?? []);
   const gaps = ledgerFor(sessions, { setPosition: opts?.setPosition }).belowFloor;
   /**
    * ⚠️ What the week already prescribes — a floor slot should widen the week, not repeat it.
@@ -474,6 +475,17 @@ export function fillMuscleFloor(
   );
 
   for (const muscle of gaps) {
+    /**
+     * ⛔ A MUSCLE THE CALLER RULED OUT IS SKIPPED IN SILENCE, AND SILENCE IS CORRECT HERE — see
+     * `skipMuscles`.
+     * ⚠️ IT WAS PUSHED TO `unfilled` FIRST AND THAT WAS WRONG. `unfilled` becomes
+     * `placement_compromises`, the channel that tells an athlete *"we could not do what you asked"*.
+     * Core being offered as a CHOICE is not a compromise — nobody asked and nothing failed — and
+     * reporting it there put a cost on the screen for a design decision. The block-level invariant
+     * that every below-floor muscle is accounted for carries the exemption instead, where the reason
+     * belongs.
+     */
+    if (skip.has(muscle)) continue;
     // Which movement — through stage 2's grid, so the equipment ladder and the ranking are not
     // re-implemented here. The first option whose PRIME MOVER is this muscle wins.
     const forMuscle = movementsForMuscle(muscle, opts?.equipment ?? null);
@@ -535,7 +547,26 @@ export function fillMuscleFloor(
     const isUpper = UPPER_MUSCLES.includes(muscle);
     const ordered = lines
       .map((l, i) => ({ l, i, s: sessions[i] }))
-      .filter((x) => x.l.countedSets + setsPerSlot < SESSION_SETS_COSTLY)
+      /**
+       * ⛔⛔ FOURTEEN IS A COST, NOT A CAP — corrected 2026-09-01 after re-reading p86 with Michael.
+       *
+       * ⛔ HIS SENTENCE, IN FULL: *"A **highly taxing**, 14+ work set session may diminish
+       * performance in other modalities significantly for twenty-four hours and still notably for up
+       * to seventy-two hours. A less taxing 6 to 8 work set session may result in only marginal
+       * performance deficits."* That is a cost curve with a qualifier on it. **He states no limit
+       * anywhere**, and he wrote both that sentence and a programme whose own printed rows come to
+       * sixteen and seventeen work sets a day — he does not consider his week to breach his advice.
+       *
+       * ⛔ WHAT THE HARD FILTER DID, MEASURED. It compared the count against fourteen and REFUSED,
+       * so on this frame every session failed and a muscle sitting at ZERO stayed at zero — the
+       * floor declining to do the one job it exists for, in the name of a limit its author never
+       * set. Michael, reading the result: *"are we over programming?"* We were not; the code was
+       * enforcing a number as a rule.
+       *
+       * ⚠️ THE PREFERENCE SURVIVES AND IS THE HONEST HALF. Rule 3 below still sorts the lightest
+       * session first, so added work lands where it costs least — which is what the cost curve
+       * actually supports.
+       */
       // ⛔ RULE 0 — A TEST SESSION TAKES NOTHING. See `PlannedSession.isTest`. It runs first because
       // it is the only exclusion that does not depend on which muscle is being placed.
       .filter((x) => x.s.isTest !== true)
@@ -556,8 +587,11 @@ export function fillMuscleFloor(
     if (ordered.length === 0) {
       unfilled.push({
         muscle,
-        reason: 'Every session is already close enough to fourteen work sets that adding a slot would '
-          + 'cross it, and the source says that costs up to three days of other-discipline performance.',
+        // ⚠️ REWORDED 2026-09-01. This said every session was "close enough to fourteen work sets",
+        // which was the cap this path no longer enforces — fourteen is a cost, not a limit (p86).
+        // What is left here is a genuine dead end: no session could take the slot at all.
+        reason: 'No session on this week could take an added slot for it — every lifting day is '
+          + 'either a test or already carries this movement pattern.',
       });
       continue;
     }
@@ -664,7 +698,15 @@ export function fillMuscleFloor(
          * which is the number p086 names as costing up to three days of other-discipline
          * performance. A ceiling you are allowed to land on is not a ceiling.
          */
-        .filter((x) => x.l.countedSets + setsPerSlot < SESSION_SETS_COSTLY)
+        /**
+       * ⛔ THE DIAL KEEPS THE COST TEST, AND THE FLOOR DOES NOT — the distinction is the point
+       * (2026-09-01). The FLOOR fills a muscle sitting at ZERO: that is the one job it exists for,
+       * and refusing it in the name of a number p86 never states as a limit left muscles unworked.
+       * The DIAL is EXTRA volume on top of a week that is already complete, asked for by the athlete
+       * — optional work, and optional work is exactly what a cost curve should steer. So a gap is
+       * always filled and an addition lands only where there is room.
+       */
+      .filter((x) => x.l.countedSets + setsPerSlot < SESSION_SETS_COSTLY)
         // ⚠️ AND NOT ONTO A SESSION THAT ALREADY HOLDS THIS MOVEMENT. Two rows of one lift in one
         // session reads as the engine losing its place — the same defect `takenToday` guards in the
         // slot path. A repeat goes on a DIFFERENT day or it does not go.

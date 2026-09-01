@@ -51,11 +51,15 @@ const BASE = {
   roundTo: 5,
 };
 
+/**
+ * ⚠️ TWO ANSWERS, because two is the dose and one answer is one slot — *"a pick is never prescribed
+ * twice in one week"* is a law this file must not break to make a point about volume.
+ */
 const week = (wk: number, corePick: string | null) =>
   composeWeek({
     ...BASE,
     week: wk,
-    ...(corePick ? { slotPicks: { core: corePick } } : {}),
+    ...(corePick ? { slotPicks: { core: corePick, core_2: 'ab wheel rollout' } } : {}),
   } as never);
 
 const strengthSessions = (w: ReturnType<typeof week>): PlanSession[] =>
@@ -118,12 +122,24 @@ Deno.test('⛔ TWO core rows a week, and they carry the accessory dose', () => {
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
 Deno.test('⛔ NO PICK, NO CORE ROW — the frame is unchanged for an athlete who leaves it alone', () => {
-  const withPick = strengthSessions(week(2, 'v up')).flatMap(rowsOf).map((e) => e.name);
-  const without = strengthSessions(week(2, null)).flatMap(rowsOf).map((e) => e.name);
-  assertEquals(without.filter((n) => /v up/i.test(n)).length, 0, 'a core row appeared with no pick');
-  // ⚠️ AND NOTHING ELSE MOVED. The core row is the ONLY difference between the two weeks.
-  assertEquals(withPick.filter((n) => !/v up/i.test(n)), without,
-    'choosing a core movement changed a row that is not the core row');
+  const without = strengthSessions(week(2, null)).flatMap(rowsOf).map((e) => String(e.name));
+  /**
+   * ⛔ THE ASSERTION IS NOW "NO CORE AT ALL", not "no v-up" (2026-09-01). The floor's session-set cap
+   * was removed the same day — it misread p86's cost curve as a limit — and with it gone the floor
+   * can reach core like any other muscle. That would have made core arrive whether or not the
+   * athlete chose it, overriding the opt-in ruling as a side effect, so the composer now tells the
+   * floor to skip core when nobody asked. This is the pin for that.
+   */
+  const CORE = /v up|hanging leg raise|crunch|plank|ab wheel|sit ?up/i;
+  assertEquals(without.filter((n) => CORE.test(n)).length, 0,
+    `core work appeared with no pick: ${without.filter((n) => CORE.test(n)).join(', ')}`);
+  /**
+   * ⚠️ AND THE REST OF THE WEEK IS NOT ASSERTED IDENTICAL ANY MORE, deliberately. Satisfying core
+   * changes which muscle the floor finds at zero, so the floor's OWN row legitimately differs
+   * between the two weeks. Demanding byte-equality there would pin an accident.
+   */
+  const withPick = strengthSessions(week(2, 'v up')).flatMap(rowsOf).map((e) => String(e.name));
+  assert(withPick.filter((n) => CORE.test(n)).length > 0, 'the chosen core movement was not placed');
 });
 
 Deno.test('⛔⛔ A TEST DAY TAKES NO CORE ROW, chosen or not', () => {
