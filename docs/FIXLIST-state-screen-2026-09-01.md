@@ -289,6 +289,10 @@ that MOVES anything should be attempted before the blocks it moves are named com
       `strava-webhook` · `workout-detail`
       ⚠️ Regenerate `INVENTORY.md` (`npm run inventory:write`) when this ships — it will not gain a
       state-trend row on its own, since the generator only enumerates `standing-plan/` per file.
+      ⛔ **SUPERSEDED — FIXED 2026-09-01.** The generator no longer hand-names folders: §1 is driven
+      off the bundles themselves, `_shared/state-trend/` now prints with its 27, and 38 folders are
+      listed where there was 1. §1 also now states the rule outright — a touched file with no row is
+      a GENERATOR BUG, not a no-deploy.
 - [ ] 2b-server-original. ⛔⛔ **THE STRENGTH DOT IS INFLATED FOR ANY ATHLETE WHO LOGS BOTH DEADLIFT VERSIONS.**
       `PRIMARY_LIFTS` (`_shared/state-trend/strength.ts:71`) contains `trap_bar_deadlift`, and
       `buildStrengthBaselines` gives it the SAME baseline as `deadlift`. `computeE1rmBand` averages
@@ -509,6 +513,79 @@ before reordering ships.** No block may read whether another block is rendered.
 - [ ] 3.5d. ⛔ **This REPLACES the old "decide the permanent order" item.** What survives of it is
       choosing a good DEFAULT order — now / trends / next, one block per sport inside trends — which
       is a cheaper argument because it is no longer permanent.
+- [x] 3-lift-1235. **DONE 2026-09-01. Client-only, one file (`ViadaWeekCard.tsx`). No server change,
+      no deploy.** Items 1, 2, 3 and 5 of the SPEC addendum (approved by Michael). The block's order was
+      inverted; it now reads: session cost (leads) → coverage → dose per muscle against the target →
+      pattern rows and the unpriced note as detail.
+      ⛔ **THE FAULT WAS COMPUTED AND UNRENDERED, TWICE OVER.** The server already sent a verdict per
+      session (`recovers` / `above_recovers` / `costly`, `accessory-dosing/dose.ts:136`) and per muscle
+      (`below_floor` / `light` / `solid` / `above_solid` / `overreaching` / `over_max`, `dose.ts:101`),
+      and the card read neither — it printed bare numbers. Both are now rendered as display words
+      mapped at the edge; **no threshold on the client**, and a verdict value the map does not know
+      prints nothing rather than a guess.
+      ⛔ **ONE VERDICT COVERS SETS AND EFFECTIVE REPS — pinned in the file header.** Effective reps are
+      sets × 4 by his formula (`effectiveRepsFor`), so 32–48 is 8–12 restated; a second comparison
+      would be a second copy of the same band. Both targets print beside the one word.
+      **The figures on screen** (8–12, 18–20, 32–48, 6–8, 14) are read from `dose.ts` constants through
+      the `@shared` alias — the same file the server's verdicts are cut on, already in the client bundle
+      via `NonRaceBuilder` → `accessory-dosing/index.ts`. Nothing retyped.
+      ⚠️ **COPY NOTE:** the lead line says "next day about normal" / "costs up to three days" for the
+      two brackets he prices, and only "over 8" for the 9–13 gap, because the book gives no recovery
+      figure for it. "his range is…" phrasing is unchanged pending Round 4.
+      ⛔ **`week_ledger_v1` IS THE PLANNED OBJECT — SETTLED, do not re-open.** Its header: "it computes
+      nothing — every number is lifted verbatim off a week the composer already built"; stored per week
+      index on the plan's config, twelve identical weeks. The performed object is
+      `display.viadaWeek`, counted off logged sets. Nothing in this addendum reads `week_ledger_v1`.
+      Build green, eslint clean on the file, no type errors in the file (project baseline unchanged).
+      NOT committed, NOT pushed, NOT seen on a device.
+- [x] 3-lift-4. **DONE 2026-09-01. SERVER + CLIENT. NEEDS A DEPLOY (27 functions) — closure below.**
+      ITEM 4 — §B5's change rule. `display.viadaWeek` gains `weekChange`: this rolling seven-day
+      window's lifting buckets against the seven days immediately before it, listing ONLY the buckets
+      that moved by MORE than 10% (`WEEK_CHANGE_FLAG_PCT`, new in `accessory-dosing/dose.ts`, the
+      book's number with its citation). Resolved in `buildViadaWeekPerformed`
+      (`state-trend/assemble.ts`) off the same 40 logged sessions the builder already receives — **no
+      new query, no new column.** The card prints one line: *"against the seven days before that:
+      chest sets +18%, hinge speed reps −12%"* (wording approved). Nothing prints when nothing moved.
+      ⛔ **ONE TIER.** "Ideally ≤5%" is not a second flag — stated in the constant's comment. Strictly
+      over the line: 10 → 11 sets (+10%) is not listed; 10 → 12 is. Pinned.
+      ⛔ **A STATED FLAG AGAIN.** `comparable: false` when the prior seven days hold no logged work
+      (first week, week off) — distinct from `moved: []` (a base existed, nothing crossed the line).
+      Both render silence; the server keeps them apart.
+      **THE BUCKETS:** total work sets (§B5 bucket 4) · sets per muscle (bucket 5 — effective reps are
+      sets × 4, same percentage, ONE bucket) · p084's heavy and speed reps per pattern. A bucket with
+      no prior work is never listed (no base, no percentage); one dropped to nothing lists at −100.
+      ⛔ Pattern buckets are OMITTED when EITHER window contains a test day — the heavy count is
+      structurally zero there and would flag every pattern (same reasoning as `patternBandApplies`).
+      ⛔ **"THE SEVEN DAYS BEFORE THAT", NEVER "LAST WEEK"** — both windows are rolling; the prior
+      window's bounds ride on the payload so any surface can say exactly what it compared.
+      ⚠️ Forty sessions cover fourteen days for any athlete this app is for; more than twenty lifting
+      sessions a week would produce a falsely empty prior window. Stated in the code, not guarded.
+      **PAYLOAD VERSION 176 → 177**, note in the file's convention naming the cached-row trap.
+      **FIXTURES, BOTH DIRECTIONS (12, all green):** server — over the line lists with its percentage
+      (2 → 4 sets = +100 on work sets, on every muscle, and on hinge speed reps 10 → 20); nothing
+      moved → comparable + empty; no prior work → not comparable; +10% not listed, +20% listed;
+      dropped-to-nothing = −100; a test day in either window drops the pattern buckets only; and the
+      CURRENT window's numbers are byte-identical with and without a prior window. Client — the line's
+      wording is a pure function (`src/lib/week-change-line.ts`, no React) so the silence is pinned:
+      nothing moved → null, not comparable → null, old payload → null. State-trend + accessory-dosing
+      suites: 315 passed.
+      **CLIENT HALF:** `ViadaWeekCard.tsx` renders the line between the dose caption and the pattern
+      rows. **The possessive is gone from every line written today** ("in range" / "over range" /
+      "past the maximum"; the caption reads "8–12 sets a muscle a week — 32–48 effective reps, about 4
+      a set. 18–20 borders overreaching."). The pre-existing "his range is 4–6 reps…" pattern caption
+      is untouched — Round 4.
+      ⛔ **DEPLOY CLOSURE — 27 FUNCTIONS, read from the generated `INVENTORY.md`** (rows for
+      `assemble.ts`, `dose.ts`, `performed-ledger.ts` all → the same 27; `coach` is among them and is
+      also the payload-version file): `adapt-plan` · `analyze-cycling-workout` ·
+      `analyze-running-workout` · `arc-setup-chat` · `coach` · `complete-race` ·
+      `compute-adaptation-metrics` · `compute-snapshot` · `compute-workout-analysis` · `course-detail` ·
+      `course-strategy` · `create-goal-and-materialize-plan` · `delete-plan` · `end-plan` ·
+      `generate-combined-plan` · `generate-run-plan` · `generate-strength-plan` ·
+      `generate-triathlon-plan` · `get-arc-context` · `import-strava-history` · `learn-fitness-profile` ·
+      `materialize-plan` · `planning-context` · `refresh-goal-race-projections` ·
+      `rematerialize-standing-block` · `strava-webhook` · `workout-detail`
+      Build green, eslint clean, no type errors in the changed files. NOT committed, NOT pushed, NOT
+      deployed, NOT seen on a device.
 
 ---
 

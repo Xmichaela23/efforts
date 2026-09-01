@@ -35,6 +35,8 @@ import {
   performedStrengthDose,
   type PerformedSession,
 } from '../accessory-dosing/performed-ledger.ts';
+// ⛔ §B5's change-rule line — the book's number, read from the dose module, not typed here.
+import { WEEK_CHANGE_FLAG_PCT } from '../accessory-dosing/dose.ts';
 import { getExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 // ⛔ The workout screen's engine. D-346: State reads THIS, it does not mint its own run verdict.
 import { routeTrend, type RouteTrend } from '../heat-adjust.ts';
@@ -801,6 +803,54 @@ export interface ViadaWeekPerformed {
    * a wrong one. `COACH_PAYLOAD_VERSION` was bumped so cached rows re-source and it actually lands.
    */
   patternBandApplies?: boolean;
+  /**
+   * ⛔ §B5's CHANGE RULE, RESOLVED HERE (2026-09-01, Round 3 addendum item 4, approved by Michael).
+   * *"Change any bucket by less than 10% per week — ideally ≤5%."* This window's lifting buckets
+   * against the seven days immediately before it; only the buckets that moved by MORE than
+   * `WEEK_CHANGE_FLAG_PCT` are listed. The card prints the list and decides nothing — the >10% test
+   * is a verdict and lives on the spine (Law 4). ⛔ ONE TIER. The book's "ideally ≤5%" is not a
+   * second flag; adding one is a ruling that has not been made.
+   *
+   * ⚠️ "THE SEVEN DAYS BEFORE THAT", NEVER "LAST WEEK". Both windows are ROLLING (as-of minus six
+   * days), not calendar weeks, and a label that misdescribes its own window is the class of defect
+   * this screen has been carrying. The prior window's bounds ride along so any surface can say
+   * exactly what it compared.
+   *
+   * ⚠️ ABSENT ON A PAYLOAD WRITTEN BEFORE THIS — the card renders nothing. `COACH_PAYLOAD_VERSION`
+   * bumped (176 → 177) so cached rows re-source; without it the field lands nowhere.
+   */
+  weekChange?: ViadaWeekChange | null;
+}
+
+export interface ViadaWeekChange {
+  /** The comparison window — the seven days ending the day before this card's `since`. */
+  priorSince: string;
+  priorUntil: string;
+  /**
+   * ⛔ A STATED FLAG, NOT AN EMPTY LIST (the `patternBandApplies` ruling again). FALSE when the prior
+   * seven days hold no logged work — a first lifting week, or a week off. There is then no base to
+   * measure a change against, and "nothing moved" would be the wrong sentence. `moved` is empty
+   * either way; only this tells the two apart.
+   */
+  comparable: boolean;
+  /**
+   * The buckets over the line, and only those. `pctChange` is the signed percentage, rounded, of
+   * `to` against `from`. A bucket with no work in the prior window has no base and is never listed —
+   * a percentage of zero is not a number. A bucket that dropped to nothing is listed at −100.
+   *   · `work_sets`     — the window's counted work sets, all sessions (§B5 bucket 4). `key` is ''.
+   *   · `muscle_sets`   — sets per muscle (§B5 bucket 5; effective reps are sets × 4, so the same
+   *                       percentage — one bucket, not two).
+   *   · `pattern_heavy` / `pattern_speed` — p084's reps per movement pattern. ⛔ OMITTED WHEN EITHER
+   *                       window contains a test day: the heavy count is structurally zero there
+   *                       (see `patternBandApplies`), so the comparison would flag every pattern.
+   */
+  moved: Array<{
+    kind: 'work_sets' | 'muscle_sets' | 'pattern_heavy' | 'pattern_speed';
+    key: string;
+    from: number;
+    to: number;
+    pctChange: number;
+  }>;
 }
 
 /** The assembly. Mirrors useStateTrends' body — one code path for client + server. */
@@ -1444,37 +1494,62 @@ function buildViadaWeekPerformed(
 ): ViadaWeekPerformed | null {
   const rows = Array.isArray(loggedSessions) ? loggedSessions : [];
   if (rows.length === 0) return null;
-  const since = new Date(new Date(asOf + 'T12:00:00Z').getTime() - 6 * 86_400_000).toISOString().slice(0, 10);
-  const week: PerformedSession[] = rows
-    .filter((r) => {
-      const d = String(r?.date ?? '').slice(0, 10);
-      return d.length === 10 && d >= since && d <= asOf;
-    })
-    .map((r) => ({
-      label: String(r?.label ?? r?.date ?? ''),
-      date: String(r?.date ?? '').slice(0, 10),
-      exercises: (Array.isArray(r?.exercises) ? r.exercises : []).map((ex: any) => ({
-        name: String(ex?.name ?? ''),
-        intent: typeof ex?.slot_intent === 'string' ? ex.slot_intent : null,
-        sets: (Array.isArray(ex?.sets) ? ex.sets : []).map((st: any) => ({
-          weightLb: Number(st?.weight) || null,
-          reps: Number(st?.reps) || null,
-          // ⚠️ THE LOGGER'S OWN FLAGS. A prefill the athlete never touched is not a receipt (D-204),
-          // and a warm-up is not a work set at any percentage (p147).
-          isWarmup: st?.warmup === true || (st?.completed !== true && st?.prefilled === true),
-        })),
-      })).filter((ex) => ex.name.length > 0),
-    }));
+  const since = shiftYmd(asOf, -6);
+  const week = performedWindow(rows, since, asOf);
   if (week.length === 0) return null;
 
+  const maxFor = (name: string) => refMaxByCanonical[canonicalize(name)] ?? refMaxByCanonical[name] ?? null;
+  const patternFor = (name: string) => getExerciseConfig(name)?.pattern ?? null;
   const ledger = performedLedgerFor(week);
-  const dose = performedStrengthDose(
-    week,
-    (name) => refMaxByCanonical[canonicalize(name)] ?? refMaxByCanonical[name] ?? null,
-    (name) => getExerciseConfig(name)?.pattern ?? null,
-  );
+  const dose = performedStrengthDose(week, maxFor, patternFor);
   const hasWork = ledger.perMuscle.some((m) => m.sets > 0);
   if (!hasWork) return null;
+
+  const bandAppliesTo = (sessions: PerformedSession[]) => !(Array.isArray(testWeekDates) && testWeekDates.length > 0
+    && sessions.some((sess) => testWeekDates.includes(sess.date)));
+  const patternBandApplies = bandAppliesTo(week);
+
+  /**
+   * ⛔ THE SEVEN DAYS BEFORE THIS CARD'S SEVEN — §B5's change rule needs a base. Read off the same
+   * rows: the caller hands over the last `REP_RECORD_WINDOW_SESSIONS` (40) logged sessions and this
+   * function was already trimming them to seven days, so the prior window costs no query. ⚠️ Forty
+   * sessions cover fourteen days for any athlete this app is for; an athlete logging more than
+   * twenty lifting sessions a week would see a falsely empty prior window, and that is stated
+   * rather than guarded.
+   */
+  const priorUntil = shiftYmd(since, -1);
+  const priorSince = shiftYmd(since, -7);
+  const prior = performedWindow(rows, priorSince, priorUntil);
+  const priorLedger = prior.length > 0 ? performedLedgerFor(prior) : null;
+  const priorHasWork = priorLedger != null && priorLedger.perMuscle.some((m) => m.sets > 0);
+  const weekChange: ViadaWeekChange = { priorSince, priorUntil, comparable: priorHasWork, moved: [] };
+  if (priorLedger && priorHasWork) {
+    const flag = (kind: ViadaWeekChange['moved'][number]['kind'], key: string, from: number, to: number) => {
+      // ⛔ NO BASE, NO PERCENTAGE. A bucket that held nothing in the prior window is not "up ∞%".
+      if (!(from > 0)) return;
+      const pct = ((to - from) / from) * 100;
+      // ⛔ STRICTLY OVER THE LINE. His rule is "less than 10%"; the flag is the book's number from
+      // `dose.ts`, not a figure typed here, and there is ONE tier.
+      if (Math.abs(pct) > WEEK_CHANGE_FLAG_PCT) weekChange.moved.push({ kind, key, from, to, pctChange: Math.round(pct) });
+    };
+    flag('work_sets', '',
+      priorLedger.perSession.reduce((a, s) => a + s.countedSets, 0),
+      ledger.perSession.reduce((a, s) => a + s.countedSets, 0));
+    const nowSets = new Map(ledger.perMuscle.map((m) => [m.muscle, m.sets]));
+    for (const m of priorLedger.perMuscle) flag('muscle_sets', m.muscle, m.sets, nowSets.get(m.muscle) ?? 0);
+    // ⛔ PATTERN REPS ONLY WHEN THE BAND APPLIES TO BOTH WINDOWS — a test week's heavy count is
+    // structurally zero and would flag every pattern at −100 or +∞. Same reasoning as
+    // `patternBandApplies`, applied to the comparison.
+    if (patternBandApplies && bandAppliesTo(prior)) {
+      const priorDose = performedStrengthDose(prior, maxFor, patternFor);
+      const nowPat = new Map(dose.perPattern.map((p) => [p.pattern, p]));
+      for (const p of priorDose.perPattern) {
+        const now = nowPat.get(p.pattern);
+        flag('pattern_heavy', p.pattern, p.heavyReps, now?.heavyReps ?? 0);
+        flag('pattern_speed', p.pattern, p.velocityReps, now?.velocityReps ?? 0);
+      }
+    }
+  }
 
   return {
     since,
@@ -1496,9 +1571,42 @@ function buildViadaWeekPerformed(
      * describe the same seven days. Survives a plan whose test is not week 1, and a plan with more
      * than one test week, because it is a date-set intersection rather than a week comparison.
      */
-    patternBandApplies: !(Array.isArray(testWeekDates) && testWeekDates.length > 0
-      && week.some((sess) => testWeekDates.includes(sess.date))),
+    patternBandApplies,
+    weekChange,
   };
+}
+
+/** `ymd` plus `days`, at noon UTC so a DST edge cannot move the date. */
+function shiftYmd(ymd: string, days: number): string {
+  return new Date(new Date(ymd + 'T12:00:00Z').getTime() + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** The logged sessions inside `[since, until]`, shaped for the ledgers. One reader for both windows. */
+function performedWindow(
+  rows: NonNullable<StateTrendInputs['loggedSessions']>,
+  since: string,
+  until: string,
+): PerformedSession[] {
+  return rows
+    .filter((r) => {
+      const d = String(r?.date ?? '').slice(0, 10);
+      return d.length === 10 && d >= since && d <= until;
+    })
+    .map((r) => ({
+      label: String(r?.label ?? r?.date ?? ''),
+      date: String(r?.date ?? '').slice(0, 10),
+      exercises: (Array.isArray(r?.exercises) ? r.exercises : []).map((ex: any) => ({
+        name: String(ex?.name ?? ''),
+        intent: typeof ex?.slot_intent === 'string' ? ex.slot_intent : null,
+        sets: (Array.isArray(ex?.sets) ? ex.sets : []).map((st: any) => ({
+          weightLb: Number(st?.weight) || null,
+          reps: Number(st?.reps) || null,
+          // ⚠️ THE LOGGER'S OWN FLAGS. A prefill the athlete never touched is not a receipt (D-204),
+          // and a warm-up is not a work set at any percentage (p147).
+          isWarmup: st?.warmup === true || (st?.completed !== true && st?.prefilled === true),
+        })),
+      })).filter((ex) => ex.name.length > 0),
+    }));
 }
 
 // ---- cache shape: athlete_snapshot.state_trends_v1 ----

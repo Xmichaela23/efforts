@@ -133,6 +133,24 @@ export const SESSION_CEILING_NOTE =
 
 export type SessionVerdict = 'recovers' | 'above_recovers' | 'costly';
 
+// ── THE CHANGE RULE ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ⛔ §B5: *"Change any bucket by less than 10% per week — ideally ≤5%. When overreaching, back off
+ * ALL buckets equally."* The line a bucket's week-over-week change is measured against.
+ *
+ * ⛔ ONE TIER, DELIBERATELY. The "ideally ≤5%" is his preference inside the rule, not a second
+ * threshold, and no surface flags at 5% — that is a ruling nobody has made. A bucket is flagged
+ * when its change is STRICTLY MORE than this: "less than 10%" is compliant, so 10% exactly is not
+ * over the line.
+ *
+ * ⚠️ The five buckets are §B5's: sub-VT1 minutes, near-threshold minutes, over-threshold minutes,
+ * high-intensity work sets, effective reps per muscle. Today only the two lifting buckets are
+ * compared (`state-trend/assemble.ts`, `ViadaWeekChange`); the endurance three are a separate
+ * decision and this constant is theirs too when it comes.
+ */
+export const WEEK_CHANGE_FLAG_PCT = 10;
+
 export function verdictForSessionSets(sets: number): SessionVerdict {
   if (sets <= SESSION_SETS_RECOVERS.hi) return 'recovers';
   if (sets < SESSION_SETS_COSTLY) return 'above_recovers';
