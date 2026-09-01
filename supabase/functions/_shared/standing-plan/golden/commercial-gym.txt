@@ -1,0 +1,712 @@
+====================================================================================================
+GOLDEN BLOCK — COMMERCIAL GYM — tested, every machine reachable, core chosen
+====================================================================================================
+
+The other end of the gear gate: the braced cells resolve to the movements the page actually
+prints, so this file is the closest thing to the programme as written. It also carries a CORE
+pick, which is the only row on the week that no page prints.
+
+⛔ GENERATED. Do not hand-edit. Regenerate with:
+     ~/.deno/bin/deno run --allow-read --allow-write scripts/print-block.ts --write
+⛔ A DIFF HERE IS THE POINT. If a change to the composer moves a row you did not intend to move,
+   it shows up in this file before it shows up on an athlete's phone.
+
+INPUTS: {"frame":"all_rounder","competitionLifts":{"push_upper":"Bench Press","press_lower":"Back Squat","hinge_lower":"Deadlift"},"seed1RMs":{"bench":225,"squat":300,"deadlift":365,"overheadPress":145},"workingNumbers":{"bench":{"lift":"bench","predicted1RM":235,"workingNumber":225.6,"measured":{"weight":200,"reps":6},"cite":"archetype fixture"},"squat":{"lift":"squat","predicted1RM":315,"workingNumber":302.4,"measured":{"weight":265,"reps":6},"cite":"archetype fixture"},"deadlift":{"lift":"deadlift","predicted1RM":375,"workingNumber":360,"measured":{"weight":315,"reps":6},"cite":"archetype fixture"},"overheadPress":{"lift":"overheadPress","predicted1RM":150,"workingNumber":144,"measured":{"weight":125,"reps":6},"cite":"archetype fixture"}},"equipment":["Commercial gym"],"roundTo":5,"slotPicks":{"core":"hanging leg raise"},"enduranceExperience":{"run":"experienced","ride":"experienced"},"sportMix":{"run":2,"ride":2},"targetRunHours":3,"targetRideHours":4}
+
+WEEK 01  column=standard  ⟵ TEST WEEK
+----------------------------------------------------------------------------------------------------
+  [Monday] STRENGTH Test: Upper   (Viada p215)
+      tags: standing_plan, test_week, 1rm_test
+      ME     Bench Press                    3x6, 5, max  @ 195           | plan 170x6 185x5 195+x1 · note: Test set — the last set is taken for max clean reps, and it sets the block's numbers.
+      ME     Overhead Press                 3x6, 5, max  @ 125           | plan 110x6 120x5 125+x1 · note: Test set — the last set is taken for max clean reps, and it sets the block's numbers.
+  [Monday] run      Hard Run — 43 min
+  [Tuesday] STRENGTH Test: Lower   (Viada p215)
+      tags: standing_plan, test_week, 1rm_test
+      ME     Back Squat                     3x6, 5, max  @ 260           | plan 225x6 250x5 260+x1 · note: Test set — the last set is taken for max clean reps, and it sets the block's numbers.
+      ME     Deadlift                       3x6, 5, max  @ 315           | plan 275x6 305x5 315+x1 · note: Test set — the last set is taken for max clean reps, and it sets the block's numbers.
+  [Tuesday] ride     Anaerobic Ride — 65 min
+  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+      tags: standing_plan, plyo
+      -      Stiff-Legged Run               1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Pogo Hops                      1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Ladder Drills                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+  [Wednesday] run      Near-threshold Run — 46 min
+  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     pull up                        1x1-5        @ By feel
+      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5
+      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1
+  [Thursday] ride     Ride — 175 min
+  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Back Squat                     1x1-5        @ 265           | 90% · plan 45wx5 145wx5 200wx3 240wx2 265x
+      -      Hanging Leg Raise              3x8-10       @ By feel       | RIR 1.5 · note: Your core pick.
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1
+      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5
+      -      Tricep Extensions              3x8-10       @ By feel       | RIR 1.5 · note: Floor: triceps had nothing else this week.
+  [Saturday] run      Long Run — 92 min
+  NOTES
+      [source  ] The first week is the test. Two guided sessions set the numbers the rest of the block is built on, and the weights fill in as soon as those two are logged. Testing before a programme is the source's own advice.  (Viada p215, p247)
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
+      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
+      [source  ] The other lifting days run by feel this week — the numbers arrive once the test is done.  (Viada p215)
+      [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
+      [source  ] Core sits after the main work and before the isolation work — isolation is rarely degraded by a tired core, and core work carries the higher skill component.  (Viada p142 (rule 4), p223)
+      [ours    ] Your core choice is placed once a week, on your lightest lifting day and never on a test day. The source gives core its own movements and says where they sit in a session — after the main work, before the isolation work — but names no frequency, so once a week is ours: the same one-slot dose every other accessory here takes.
+      [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
+      [ours    ] Added one slot each for triceps, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Could not reach glutes, calves, core.
+      [warning ] glutes: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
+      [warning ] calves: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
+      [warning ] core: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
+      [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
+      [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
+
+WEEK 02  column=standard
+----------------------------------------------------------------------------------------------------
+  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
+      DE     Dumbbell Bench Press           4x2-4        @ By feel       | RIR 3.5
+      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1
+  [Monday] run      Hard Run — 42 min
+  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Deadlift                       1x1-5        @ 315           | 90% · plan 45wx5 175wx5 235wx3 285wx2 315x
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5
+      -      Hip Adduction Machine          3x8-10       @ By feel       | RIR 1.5 · note: Floor: glutes had nothing else this week.
+  [Tuesday] ride     Anaerobic Ride — 36 min
+  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+      tags: standing_plan, plyo
+      -      A-Skip                         1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Rebound Jumps                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+  [Wednesday] run      Near-threshold Run — 56 min
+  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     pull up                        1x1-5        @ By feel
+      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5
+      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1
+  [Thursday] ride     Ride — 205 min
+  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Back Squat                     1x1-5        @ 265           | 90% · plan 45wx5 145wx5 200wx3 240wx2 265x
+      -      Hanging Leg Raise              3x8-10       @ By feel       | RIR 1.5 · note: Your core pick.
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1
+      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · note: Floor: calves had nothing else this week.
+  [Saturday] run      Long Run — 82 min
+  NOTES
+      [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
+      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
+      [source  ] Core sits after the main work and before the isolation work — isolation is rarely degraded by a tired core, and core work carries the higher skill component.  (Viada p142 (rule 4), p223)
+      [ours    ] Your core choice is placed once a week, on your lightest lifting day and never on a test day. The source gives core its own movements and says where they sit in a session — after the main work, before the isolation work — but names no frequency, so once a week is ours: the same one-slot dose every other accessory here takes.
+      [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
+      [ours    ] Added one slot each for glutes, calves, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Could not reach core.
+      [warning ] core: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
+      [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
+      [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
+
+WEEK 03  column=standard
+----------------------------------------------------------------------------------------------------
+  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
+      DE     Dumbbell Bench Press           4x2-4        @ By feel       | RIR 3.5
+      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1
+  [Monday] run      Hard Run — 39 min
+  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Deadlift                       1x1-5        @ 315           | 90% · plan 45wx5 175wx5 235wx3 285wx2 315x
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5
+      -      Hip Adduction Machine          3x8-10       @ By feel       | RIR 1.5 · note: Floor: glutes had nothing else this week.
+  [Tuesday] ride     Anaerobic Ride — 65 min
+  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+      tags: standing_plan, plyo
+      -      B-Skip                         1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Lunge Hops                     1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Hopscotch                      1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+  [Wednesday] run      Near-threshold Run — 49 min
+  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     pull up                        1x1-5        @ By feel
+      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5
+      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1
+  [Thursday] ride     Ride — 176 min
+  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Back Squat                     1x1-5        @ 265           | 90% · plan 45wx5 145wx5 200wx3 240wx2 265x
+      -      Hanging Leg Raise              3x8-10       @ By feel       | RIR 1.5 · note: Your core pick.
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1
+      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · note: Floor: calves had nothing else this week.
+  [Saturday] run      Long Run — 92 min
+  NOTES
+      [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
+      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
+      [source  ] Core sits after the main work and before the isolation work — isolation is rarely degraded by a tired core, and core work carries the higher skill component.  (Viada p142 (rule 4), p223)
+      [ours    ] Your core choice is placed once a week, on your lightest lifting day and never on a test day. The source gives core its own movements and says where they sit in a session — after the main work, before the isolation work — but names no frequency, so once a week is ours: the same one-slot dose every other accessory here takes.
+      [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
+      [ours    ] Added one slot each for glutes, calves, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Could not reach core.
+      [warning ] core: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
+      [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
+      [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
+
+WEEK 04  column=standard
+----------------------------------------------------------------------------------------------------
+  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
+      DE     Dumbbell Bench Press           4x2-4        @ By feel       | RIR 3.5
+      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1
+  [Monday] run      Hard Run — 43 min
+  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Deadlift                       1x1-5        @ 320           | 90% · plan 45wx5 175wx5 240wx3 290wx2 320x
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5
+      -      Hip Adduction Machine          3x8-10       @ By feel       | RIR 1.5 · note: Floor: glutes had nothing else this week.
+  [Tuesday] ride     Anaerobic Ride — 65 min
+  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+      tags: standing_plan, plyo
+      -      Bounding                       1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Single-Leg Hops                1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Ladder Drills                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+  [Wednesday] run      Near-threshold Run — 47 min
+  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     pull up                        1x1-5        @ By feel
+      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5
+      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1
+  [Thursday] ride     Ride — 175 min
+  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Back Squat                     1x1-5        @ 270           | 90% · plan 45wx5 150wx5 205wx3 245wx2 270x
+      -      Hanging Leg Raise              3x8-10       @ By feel       | RIR 1.5 · note: Your core pick.
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1
+      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · note: Floor: calves had nothing else this week.
+  [Saturday] run      Long Run — 90 min
+  NOTES
+      [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
+      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
+      [source  ] Core sits after the main work and before the isolation work — isolation is rarely degraded by a tired core, and core work carries the higher skill component.  (Viada p142 (rule 4), p223)
+      [ours    ] Your core choice is placed once a week, on your lightest lifting day and never on a test day. The source gives core its own movements and says where they sit in a session — after the main work, before the isolation work — but names no frequency, so once a week is ours: the same one-slot dose every other accessory here takes.
+      [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
+      [ours    ] Added one slot each for glutes, calves, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Could not reach core.
+      [warning ] core: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
+      [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
+      [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
+
+WEEK 05  column=standard
+----------------------------------------------------------------------------------------------------
+  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
+      DE     Dumbbell Bench Press           4x2-4        @ By feel       | RIR 3.5
+      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1
+  [Monday] run      Hard Run — 42 min
+  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Deadlift                       1x1-5        @ 320           | 90% · plan 45wx5 175wx5 240wx3 290wx2 320x
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5
+      -      Hip Adduction Machine          3x8-10       @ By feel       | RIR 1.5 · note: Floor: glutes had nothing else this week.
+  [Tuesday] ride     Anaerobic Ride — 36 min
+  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+      tags: standing_plan, plyo
+      -      Stiff-Legged Run               1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Skater Hops                    1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+  [Wednesday] run      Near-threshold Run — 59 min
+  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     pull up                        1x1-5        @ By feel
+      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5
+      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1
+  [Thursday] ride     Ride — 205 min
+  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Back Squat                     1x1-5        @ 270           | 90% · plan 45wx5 150wx5 205wx3 245wx2 270x
+      -      Hanging Leg Raise              3x8-10       @ By feel       | RIR 1.5 · note: Your core pick.
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1
+      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · note: Floor: calves had nothing else this week.
+  [Saturday] run      Long Run — 79 min
+  NOTES
+      [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
+      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
+      [source  ] Core sits after the main work and before the isolation work — isolation is rarely degraded by a tired core, and core work carries the higher skill component.  (Viada p142 (rule 4), p223)
+      [ours    ] Your core choice is placed once a week, on your lightest lifting day and never on a test day. The source gives core its own movements and says where they sit in a session — after the main work, before the isolation work — but names no frequency, so once a week is ours: the same one-slot dose every other accessory here takes.
+      [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
+      [ours    ] Added one slot each for glutes, calves, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Could not reach core.
+      [warning ] core: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
+      [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
+      [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
+
+WEEK 06  column=standard
+----------------------------------------------------------------------------------------------------
+  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
+      DE     Dumbbell Bench Press           4x2-4        @ By feel       | RIR 3.5
+      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1
+  [Monday] run      Hard Run — 39 min
+  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Deadlift                       1x1-5        @ 320           | 90% · plan 45wx5 175wx5 240wx3 290wx2 320x
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5
+      -      Hip Adduction Machine          3x8-10       @ By feel       | RIR 1.5 · note: Floor: glutes had nothing else this week.
+  [Tuesday] ride     Anaerobic Ride — 65 min
+  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+      tags: standing_plan, plyo
+      -      A-Skip                         1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Pogo Hops                      1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Hopscotch                      1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+  [Wednesday] run      Near-threshold Run — 61 min
+  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     pull up                        1x1-5        @ By feel
+      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5
+      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1
+  [Thursday] ride     Ride — 176 min
+  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Back Squat                     1x1-5        @ 270           | 90% · plan 45wx5 150wx5 205wx3 245wx2 270x
+      -      Hanging Leg Raise              3x8-10       @ By feel       | RIR 1.5 · note: Your core pick.
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1
+      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · note: Floor: calves had nothing else this week.
+  [Saturday] run      Long Run — 80 min
+  NOTES
+      [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
+      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
+      [source  ] Core sits after the main work and before the isolation work — isolation is rarely degraded by a tired core, and core work carries the higher skill component.  (Viada p142 (rule 4), p223)
+      [ours    ] Your core choice is placed once a week, on your lightest lifting day and never on a test day. The source gives core its own movements and says where they sit in a session — after the main work, before the isolation work — but names no frequency, so once a week is ours: the same one-slot dose every other accessory here takes.
+      [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
+      [ours    ] Added one slot each for glutes, calves, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Could not reach core.
+      [warning ] core: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
+      [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
+      [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
+
+WEEK 07  column=standard
+----------------------------------------------------------------------------------------------------
+  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
+      DE     Dumbbell Bench Press           4x2-4        @ By feel       | RIR 3.5
+      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1
+  [Monday] run      Hard Run — 43 min
+  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Deadlift                       1x1-5        @ 325           | 90% · plan 45wx5 180wx5 245wx3 295wx2 325x
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5
+      -      Hip Adduction Machine          3x8-10       @ By feel       | RIR 1.5 · note: Floor: glutes had nothing else this week.
+  [Tuesday] ride     Anaerobic Ride — 65 min
+  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+      tags: standing_plan, plyo
+      -      B-Skip                         1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Rebound Jumps                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Ladder Drills                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+  [Wednesday] run      Near-threshold Run — 51 min
+  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     pull up                        1x1-5        @ By feel
+      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5
+      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1
+  [Thursday] ride     Ride — 175 min
+  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Back Squat                     1x1-5        @ 270           | 90% · plan 45wx5 150wx5 205wx3 245wx2 270x
+      -      Hanging Leg Raise              3x8-10       @ By feel       | RIR 1.5 · note: Your core pick.
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1
+      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · note: Floor: calves had nothing else this week.
+  [Saturday] run      Long Run — 86 min
+  NOTES
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
+      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
+      [source  ] Core sits after the main work and before the isolation work — isolation is rarely degraded by a tired core, and core work carries the higher skill component.  (Viada p142 (rule 4), p223)
+      [ours    ] Your core choice is placed once a week, on your lightest lifting day and never on a test day. The source gives core its own movements and says where they sit in a session — after the main work, before the isolation work — but names no frequency, so once a week is ours: the same one-slot dose every other accessory here takes.
+      [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
+      [ours    ] Added one slot each for glutes, calves, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Could not reach core.
+      [warning ] core: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
+      [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
+      [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
+
+WEEK 08  column=standard
+----------------------------------------------------------------------------------------------------
+  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
+      DE     Dumbbell Bench Press           4x2-4        @ By feel       | RIR 3.5
+      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1
+  [Monday] run      Hard Run — 42 min
+  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Deadlift                       1x1-5        @ 325           | 90% · plan 45wx5 180wx5 245wx3 295wx2 325x
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5
+      -      Hip Adduction Machine          3x8-10       @ By feel       | RIR 1.5 · note: Floor: glutes had nothing else this week.
+  [Tuesday] ride     Anaerobic Ride — 36 min
+  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+      tags: standing_plan, plyo
+      -      Bounding                       1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Lunge Hops                     1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+  [Wednesday] run      Near-threshold Run — 46 min
+  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     pull up                        1x1-5        @ By feel
+      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5
+      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1
+  [Thursday] ride     Ride — 205 min
+  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Back Squat                     1x1-5        @ 270           | 90% · plan 45wx5 150wx5 205wx3 245wx2 270x
+      -      Hanging Leg Raise              3x8-10       @ By feel       | RIR 1.5 · note: Your core pick.
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1
+      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · note: Floor: calves had nothing else this week.
+  [Saturday] run      Long Run — 92 min
+  NOTES
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
+      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
+      [source  ] Core sits after the main work and before the isolation work — isolation is rarely degraded by a tired core, and core work carries the higher skill component.  (Viada p142 (rule 4), p223)
+      [ours    ] Your core choice is placed once a week, on your lightest lifting day and never on a test day. The source gives core its own movements and says where they sit in a session — after the main work, before the isolation work — but names no frequency, so once a week is ours: the same one-slot dose every other accessory here takes.
+      [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
+      [ours    ] Added one slot each for glutes, calves, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Could not reach core.
+      [warning ] core: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
+      [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
+      [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
+
+WEEK 09  column=standard
+----------------------------------------------------------------------------------------------------
+  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
+      DE     Dumbbell Bench Press           4x2-4        @ By feel       | RIR 3.5
+      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1
+  [Monday] run      Hard Run — 39 min
+  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Deadlift                       1x1-5        @ 325           | 90% · plan 45wx5 180wx5 245wx3 295wx2 325x
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5
+      -      Hip Adduction Machine          3x8-10       @ By feel       | RIR 1.5 · note: Floor: glutes had nothing else this week.
+  [Tuesday] ride     Anaerobic Ride — 65 min
+  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+      tags: standing_plan, plyo
+      -      Stiff-Legged Run               1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Single-Leg Hops                1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Hopscotch                      1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+  [Wednesday] run      Near-threshold Run — 56 min
+  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     pull up                        1x1-5        @ By feel
+      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5
+      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1
+  [Thursday] ride     Ride — 176 min
+  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Back Squat                     1x1-5        @ 270           | 90% · plan 45wx5 150wx5 205wx3 245wx2 270x
+      -      Hanging Leg Raise              3x8-10       @ By feel       | RIR 1.5 · note: Your core pick.
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1
+      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · note: Floor: calves had nothing else this week.
+  [Saturday] run      Long Run — 85 min
+  NOTES
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
+      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
+      [source  ] Core sits after the main work and before the isolation work — isolation is rarely degraded by a tired core, and core work carries the higher skill component.  (Viada p142 (rule 4), p223)
+      [ours    ] Your core choice is placed once a week, on your lightest lifting day and never on a test day. The source gives core its own movements and says where they sit in a session — after the main work, before the isolation work — but names no frequency, so once a week is ours: the same one-slot dose every other accessory here takes.
+      [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
+      [ours    ] Added one slot each for glutes, calves, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Could not reach core.
+      [warning ] core: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
+      [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
+      [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
+
+WEEK 10  column=standard
+----------------------------------------------------------------------------------------------------
+  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
+      DE     Dumbbell Bench Press           4x2-4        @ By feel       | RIR 3.5
+      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1
+  [Monday] run      Hard Run — 43 min
+  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Deadlift                       1x1-5        @ 325           | 90% · plan 45wx5 180wx5 245wx3 295wx2 325x
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5
+      -      Hip Adduction Machine          3x8-10       @ By feel       | RIR 1.5 · note: Floor: glutes had nothing else this week.
+  [Tuesday] ride     Anaerobic Ride — 65 min
+  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+      tags: standing_plan, plyo
+      -      A-Skip                         1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Skater Hops                    1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Ladder Drills                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+  [Wednesday] run      Near-threshold Run — 49 min
+  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     pull up                        1x1-5        @ By feel
+      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5
+      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1
+  [Thursday] ride     Ride — 175 min
+  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Back Squat                     1x1-5        @ 270           | 90% · plan 45wx5 150wx5 205wx3 245wx2 270x
+      -      Hanging Leg Raise              3x8-10       @ By feel       | RIR 1.5 · note: Your core pick.
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1
+      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · note: Floor: calves had nothing else this week.
+  [Saturday] run      Long Run — 88 min
+  NOTES
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
+      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
+      [source  ] Core sits after the main work and before the isolation work — isolation is rarely degraded by a tired core, and core work carries the higher skill component.  (Viada p142 (rule 4), p223)
+      [ours    ] Your core choice is placed once a week, on your lightest lifting day and never on a test day. The source gives core its own movements and says where they sit in a session — after the main work, before the isolation work — but names no frequency, so once a week is ours: the same one-slot dose every other accessory here takes.
+      [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
+      [ours    ] Added one slot each for glutes, calves, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Could not reach core.
+      [warning ] core: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
+      [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
+      [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
+
+WEEK 11  column=standard
+----------------------------------------------------------------------------------------------------
+  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
+      DE     Dumbbell Bench Press           4x2-4        @ By feel       | RIR 3.5
+      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1
+  [Monday] run      Hard Run — 42 min
+  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Deadlift                       1x1-5        @ 325           | 90% · plan 45wx5 180wx5 245wx3 295wx2 325x
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5
+      -      Hip Adduction Machine          3x8-10       @ By feel       | RIR 1.5 · note: Floor: glutes had nothing else this week.
+  [Tuesday] ride     Anaerobic Ride — 36 min
+  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+      tags: standing_plan, plyo
+      -      B-Skip                         1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Pogo Hops                      1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+  [Wednesday] run      Near-threshold Run — 47 min
+  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     pull up                        1x1-5        @ By feel
+      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5
+      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1
+  [Thursday] ride     Ride — 205 min
+  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Back Squat                     1x1-5        @ 270           | 90% · plan 45wx5 150wx5 205wx3 245wx2 270x
+      -      Hanging Leg Raise              3x8-10       @ By feel       | RIR 1.5 · note: Your core pick.
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1
+      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · note: Floor: calves had nothing else this week.
+  [Saturday] run      Long Run — 91 min
+  NOTES
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
+      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
+      [source  ] Core sits after the main work and before the isolation work — isolation is rarely degraded by a tired core, and core work carries the higher skill component.  (Viada p142 (rule 4), p223)
+      [ours    ] Your core choice is placed once a week, on your lightest lifting day and never on a test day. The source gives core its own movements and says where they sit in a session — after the main work, before the isolation work — but names no frequency, so once a week is ours: the same one-slot dose every other accessory here takes.
+      [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
+      [ours    ] Added one slot each for glutes, calves, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Could not reach core.
+      [warning ] core: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
+      [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
+      [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)
+
+WEEK 12  column=standard
+----------------------------------------------------------------------------------------------------
+  [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     Bench Press                    1x1-5        @ 205           | 90% · plan 45wx5 115wx5 155wx3 185wx2 205x
+      DE     Dumbbell Bench Press           4x2-4        @ By feel       | RIR 3.5
+      HYP    Smith Machine Press            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1
+  [Monday] run      Hard Run — 39 min
+  [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Deadlift                       1x1-5        @ 325           | 90% · plan 45wx5 180wx5 245wx3 295wx2 325x
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1
+      DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5
+      -      Hip Adduction Machine          3x8-10       @ By feel       | RIR 1.5 · note: Floor: glutes had nothing else this week.
+  [Tuesday] ride     Anaerobic Ride — 65 min
+  [Wednesday] STRENGTH Plyometrics   (Viada p227)
+      tags: standing_plan, plyo
+      -      Bounding                       1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Rebound Jumps                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Hopscotch                      1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+  [Wednesday] run      Near-threshold Run — 59 min
+  [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard
+      ME     pull up                        1x1-5        @ By feel
+      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5
+      HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1
+      HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1
+  [Thursday] ride     Ride — 176 min
+  [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
+      tags: standing_plan, frame:all_rounder, column:standard, lower:me
+      ME     Back Squat                     1x1-5        @ 270           | 90% · plan 45wx5 150wx5 205wx3 245wx2 270x
+      -      Hanging Leg Raise              3x8-10       @ By feel       | RIR 1.5 · note: Your core pick.
+      HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1
+      HYP    Leg Press                      3x6-12       @ By feel       | RIR 1
+      HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1
+      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · note: Floor: calves had nothing else this week.
+  [Saturday] run      Long Run — 82 min
+  NOTES
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
+      [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
+      [source  ] Core sits after the main work and before the isolation work — isolation is rarely degraded by a tired core, and core work carries the higher skill component.  (Viada p142 (rule 4), p223)
+      [ours    ] Your core choice is placed once a week, on your lightest lifting day and never on a test day. The source gives core its own movements and says where they sit in a session — after the main work, before the isolation work — but names no frequency, so once a week is ours: the same one-slot dose every other accessory here takes.
+      [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
+      [ours    ] Added one slot each for glutes, calves, which the week left at zero. Every movement the athlete chose is untouched.
+      [ours    ] Could not reach core.
+      [warning ] core: Every session is already close enough to fourteen work sets that adding a slot would cross it, and the source says that costs up to three days of other-discipline performance.
+      [warning ] Tuesday has the hard ride and the heavy leg session on it. Riding hard costs the legs less than running hard does, so the barbell work gives up less here — it still opens on legs that have already worked.  (Viada p130, p131)
+      [warning ] the long run on Saturday comes within a day of the heavy leg session on Friday. A long run on legs that have not had a day clear of hard work is where this plan carries injury risk rather than a hard day.  (Viada p130, p131)

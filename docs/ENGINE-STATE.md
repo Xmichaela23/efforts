@@ -9,6 +9,17 @@ now.** They do not compete; `CAPABILITY-MAP.md` is dead-marked and points at it.
 
 ---
 
+### §0. ⛔ NEW TOOL, USE IT BEFORE YOU INVESTIGATE ANYTHING
+
+`npm run block:check` — three archetype athletes, twelve weeks each, every row committed under
+`_shared/standing-plan/golden/`. **`untested-minimal.txt` is what a correct UNPRICED block looks
+like**, which is the answer to the most-reported false alarm in this project: *"week 2 has no
+weight"*. Read the equivalent row in the closest archetype before opening an investigation, and run
+the check after any composer change — the diff is the blast radius, in rows rather than test names.
+`docs/WHAT-IS-BUILT.md` §0b has the usage and the rule that a failure is not automatically a bug.
+
+---
+
 ### §A. STATE — pushed, deployed, unverified
 
 **PUSHED:** `origin/main == 2217e11f` (four commits: `1994d473` test-week · `35041913` core in the

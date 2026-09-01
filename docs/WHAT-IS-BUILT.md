@@ -28,6 +28,40 @@ wins and both get corrected.**
 
 ---
 
+## 0b. ⛔ BEFORE YOU INVESTIGATE A "HOLE", READ THE GOLDEN BLOCKS
+
+`supabase/functions/_shared/standing-plan/golden/` holds the **complete composed output** — every row
+of every week of a twelve-week block — for three archetype athletes, committed to the repo and
+checked by `golden-block.test.ts` on every run.
+
+| file | what it is for |
+|---|---|
+| `untested-minimal.txt` | **an athlete with no tested max.** Every top set says `By feel`. This is what a correct, unpriced block looks like — and *"week 2 has no weight"* is the single most-reported false alarm in this project |
+| `home-barbell.txt` | tested numbers, no machines and no incline bench — the kit where the gear gate bites and the substitution ladder does the work |
+| `commercial-gym.txt` | tested numbers, every machine reachable, and a core pick — the closest thing to the programme as the page prints it |
+
+**How to use them:**
+
+- ⛔ **Before opening an investigation**, find the equivalent row in the archetype closest to the
+  athlete. If it looks the same there, you are looking at a correct state, not a defect.
+- ⛔ **After any change to the composer**, run `npm run block:check`. A diff is the review artefact:
+  it shows the blast radius of your change in rows, not in test names.
+- ⚠️ **A failure is not automatically a bug.** Read the diff. If the change is what you meant,
+  `npm run block:write` and **commit the diff**. Never regenerate to turn a test green without
+  reading what moved.
+
+```
+npm run block:check    # does the composer still produce the committed output?
+npm run block:print    # line counts;  npm run block:print -- home-barbell  prints one
+npm run block:write    # regenerate after an intended change
+```
+
+⚠️ **Why this exists at all.** Every other test in that folder pins a rule somebody thought to pin.
+The ab row that landed in the wrong place passed 2541 of them. **A green suite says the rules you
+pinned still hold; it says nothing about the rows you never pinned.**
+
+---
+
 ## 1. WHAT EXISTS — the reachable inventory
 
 ### 1a. The plan builders — four exist, one is the current work
