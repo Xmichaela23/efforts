@@ -601,6 +601,30 @@ before reordering ships.** No block may read whether another block is rendered.
       The ruling is that it should speak only about off-plan work — the same server split. Not
       narrowed by approximation, not deleted; a comment on the render says so.
       Build green, eslint clean, no type errors in the file.
+- [x] 3-lift-patterns-cut. **DONE 2026-09-01 (evening). Client-only, one file. NOT committed, NOT
+      pushed.** Same ruling as 3-lift-cut, applied consistently — Michael: *"I just want this to be
+      useful and have value."*
+      **WHAT WENT:** the five heavy/speed pattern rows and their caption ("his range is 4–6 reps above
+      90% and 15–20 at 70–85%, per pattern") — which also closes the last "his" on this block. p084's
+      bands are the PROGRAMME'S prescription; the All Rounder is built to them, so reading them back
+      is the plan's own guarantee, not information about the athlete, and in a test week they are
+      structurally zero, which is what made them look broken. One argument, both blocks.
+      ⛔ **RENDERING ONLY.** `perPattern`, its bands, `dose.ts` and the test-week flag
+      `patternBandApplies` are untouched and still on the payload; the flag's suppression logic is
+      not why the rows went.
+      **THE "NO KNOWN MAX YET FOR …" NOTE WENT WITH THEM — traced, not assumed.** It explained where
+      unpriced sets landed relative to the PERCENTAGES ("those sets are in the muscle counts above,
+      not in the percentages"). After this cut nothing on the block prices a set against a max: the
+      session cost counts work sets (`performedLedgerFor`, no max), the coverage line is the same
+      ledger, and the off-plan read is the same ledger over added rows. Both things the note pointed
+      at ("the muscle counts above", "the percentages") are off the screen. It referred to nothing, so
+      it goes. `unpriced` stays on the payload (S5 still stands server-side).
+      **THE FINISHED SHAPE:** 1. what each session cost (lead + rows) · 2. what got missed · 3. anything
+      done outside the plan. Completion and cost only; whether strength is improving lives below in
+      the lift cards. The >10% change line is still drawn between 2 and 3, unscoped (the PM's second
+      decision).
+      Build green, eslint clean, no type errors in the file; no "his" left in rendered copy on the
+      card.
 - [x] 3-lift-offplan. **DONE 2026-09-01 (evening). SERVER + CLIENT. 27-function deploy, payload
       177 → 178. Approved by Michael ("deploy").**
       `display.viadaWeek` gains `offPlan`: the added-only lifting dose per muscle, on the same ledger
