@@ -503,7 +503,12 @@ const EXECUTION_NAME: Record<string, string> = {
   // pictures the machine with plates on it.
   'weighted reverse hyper': 'Weighted Bench Reverse Hyper',
   // Seated, chest against the pad, arms sweeping back - on an incline bench with dumbbells.
-  'rear delt machine': 'Chest-Supported Rear Delt Raise',
+  /**
+   * ⚠️ "FLY", NOT "RAISE" (2026-09-01). Both name the movement; **fly is the word lifters search
+   * for**, and an athlete who does not know it looks it up. A name that finds the wrong video, or
+   * none, has failed at the only job a display name has.
+   */
+  'rear delt machine': 'Chest-Supported Rear Delt Fly',
   /**
    * ⛔⛔ THE CURL HAS A HOME EXECUTION AND THE NAME HAS TO SAY WHICH (2026-08-31). `leg curl` gained a
    * bench-and-dumbbell route so p223's hamstring curl is reachable without a stack — and it went on
