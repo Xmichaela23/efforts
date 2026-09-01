@@ -57,10 +57,20 @@ Deno.test('⚠️ THE UNSETTLED ONE — PRIMARY_LIFTS still holds a fifth member
   assertEquals(extra, ['trap_bar_deadlift'], 'PRIMARY_LIFTS differs from the tracked four by exactly this');
 });
 
-Deno.test('⚠️ AND HERE IS WHAT IT COSTS — a logged variant moves the dot on unchanged strength', () => {
-  // The measurement behind the product call. `computeE1rmBand` averages one ratio per canonical, and
-  // `buildStrengthBaselines` gives trap_bar_deadlift the SAME baseline as deadlift — so the deadlift
-  // slot is counted twice for an athlete who rotates variants.
+/**
+ * ⛔⛔ THIS TEST PINNED THE FAULT AND NOW PINS THE FIX (2026-09-01, FIXLIST 2b-server).
+ *
+ * ⚠️ EVERYTHING IN THE PREVIOUS VERSION WAS CORRECT WHEN IT WAS WRITTEN. It asserted
+ * `dot(plusTrapBar) === 0.833` and `dot(plusTrapBar) > dot(squatAndDeadlift)`, with the message
+ * "logging a variant should not, by itself, raise the dot" — it was DOCUMENTING the cost of an
+ * unmade product call, not endorsing it. Michael made that call: the four slots aggregate their
+ * variants. `computeE1rmBand` now takes one ratio per SLOT, so the assertions invert.
+ *
+ * ⛔ The 0.833 figure is kept in the message below on purpose — it is the number the fix is measured
+ * against, and a future session that reintroduces per-canonical averaging will fail here with the
+ * history in front of it.
+ */
+Deno.test('⛔ A LOGGED VARIANT NO LONGER MOVES THE DOT — the hinge slot counts once', () => {
   const pts = (v: number) => [{ date: '2026-08-01', value: v }];
   const baselines = { squat: 300, bench_press: 200, deadlift: 400, trap_bar_deadlift: 400, overhead_press: 120 };
   const squatAndDeadlift = [
@@ -70,7 +80,11 @@ Deno.test('⚠️ AND HERE IS WHAT IT COSTS — a logged variant moves the dot o
   const plusTrapBar = [...squatAndDeadlift, { canonical: 'trap_bar_deadlift', displayName: 'Trap Bar Deadlift', points: pts(400) }];
 
   const dot = (s: LiftSeries[]) => computeE1rmBand(s, baselines)!.positionPct;
-  assertEquals(Number(dot(squatAndDeadlift).toFixed(3)), 0.75);
-  assertEquals(Number(dot(plusTrapBar).toFixed(3)), 0.833);
-  assert(dot(plusTrapBar) > dot(squatAndDeadlift), 'logging a variant should not, by itself, raise the dot');
+  assertEquals(Number(dot(squatAndDeadlift).toFixed(3)), 0.75, 'the two-lift athlete is unchanged by the fix');
+  assertEquals(
+    Number(dot(plusTrapBar).toFixed(3)),
+    0.75,
+    'was 0.833 before 2026-09-01 — the deadlift slot was averaged twice',
+  );
+  assertEquals(dot(plusTrapBar), dot(squatAndDeadlift), 'logging a variant must not, by itself, move the dot');
 });

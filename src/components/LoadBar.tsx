@@ -193,11 +193,15 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact }: LoadB
                   }}
                   title={`${disciplineName(c.type)} ${c.displayPct}%`}
                 >
-                  {c.pct >= 26 && (
-                    <span className="text-[11px] font-semibold" style={{ color: 'rgba(0,0,0,0.62)' }}>
-                      {isDom ? `${disciplineName(c.type)} ${c.displayPct}%` : `${c.displayPct}%`}
-                    </span>
-                  )}
+                  {/* ⛔ NO TEXT INSIDE THE BAR (FIXLIST 1e, 2026-09-01). Every percentage was printed
+                      TWICE — once here and again in the legend two lines below, which already carries
+                      the swatch, the sport name and the share for EVERY segment in that sport's colour.
+                      ⚠️ AND THE IN-BAR LABEL WAS INCONSISTENT BY CONSTRUCTION: it was gated on
+                      `c.pct >= 26`, so on a typical split only the dominant segment cleared it. The bar
+                      read as one labelled block beside two anonymous ones, sitting over a legend that
+                      labelled all three. The segment's own colour plus the legend swatch is the tie,
+                      and the dominant segment keeps its inset ring above — a mark, not a second
+                      caption. The `title` tooltip keeps the per-segment read on hover. */}
                 </div>
               );
             })}

@@ -12,6 +12,10 @@ import { isDeloadWeek } from './deload.ts';
 import { positionInRange, type RangePosition } from './position-in-range.ts';
 import type { EffortReadMode } from '../strength-profiles.ts';
 import { capabilitiesForExercise } from '../../../../src/lib/exercise-role.ts';
+// ⛔ THE SLOT MAP — ONE FILE, READ BY THIS FUNCTION AND BY THE CLIENT'S DISPLAY FOLD. Same path
+// precedent as the line above and as `assemble.ts`'s `tracked-max-lifts` import: a constant the two
+// sides must agree on exists exactly once. See `src/lib/lift-slots.ts` for why front squat is absent.
+import { slotForCanonical } from '../../../../src/lib/lift-slots.ts';
 
 /** Per-lift dated e1RM series. value = estimated_1rm; meta.name carries the workout name (deload detect). */
 export interface LiftSeries {
@@ -61,12 +65,15 @@ export interface StrengthState {
  * squat + deadlift → dot **0.750**; squat + deadlift + trap bar → dot **0.833**. The dot moved eight
  * points because a variant was logged, not because anything got stronger.
  *
- * ⚠️ NOT FIXED HERE, DELIBERATELY. The fix is a design choice, not a cleanup: either the four SLOTS
- * aggregate their variants (one ratio per slot, whichever movement filled it) or a variant carries
- * its own max. That is the same question as "should a Front Squat carry its own tracked max", and it
- * changes a number on screen for any athlete who rotates variants. Surfaced for Michael; see the
- * Step 7 review block in `SPEC-strength-language.md`. Do NOT widen or narrow this set to make the
- * three lists match — that would ship the product call by accident.
+ * ⛔⛔ FIXED 2026-09-01 — EVERYTHING ABOVE THIS LINE IS HISTORY. Michael ruled (FIXLIST 2b): the four
+ * SLOTS aggregate their variants, one ratio per slot, whichever movement filled it. The fix is
+ * applied inside `computeE1rmBand` below, NOT by editing this set — read the block there before
+ * changing either. The double-count is gone; the measured 0.833 now reads 0.750.
+ *
+ * ⛔ THIS SET STILL CONTAINS `trap_bar_deadlift` ON PURPOSE. `isPrimary` is also what puts a lift in
+ * the client's card list, so removing it here would delete the trap bar's row before the display fold
+ * merges it and lose the athlete's record and session count. Membership is the right answer; the
+ * AGGREGATION was the bug. Do NOT widen or narrow this set to make the three lists match.
  */
 export const PRIMARY_LIFTS = new Set([
   'squat',
@@ -217,14 +224,52 @@ export function buildStrengthBaselines(perfRaw: any, learnedRaw: any): Record<st
 }
 
 export function computeE1rmBand(series: LiftSeries[], baselineByCanonical?: Record<string, number> | null): RangePosition | null {
+  /**
+   * ⛔⛔ ONE RATIO PER SLOT, NOT PER CANONICAL (2026-09-01, FIXLIST 2b-server). THIS IS THE FIX FOR
+   * THE MEASURED FAULT DESCRIBED ABOVE `PRIMARY_LIFTS`, and it is applied HERE rather than by
+   * narrowing that set — read this before "simplifying" it back.
+   *
+   * ⛔ THE FAULT. This function averages ONE RATIO PER SERIES, and a series is keyed by canonical.
+   * `PRIMARY_LIFTS` contains BOTH `deadlift` and `trap_bar_deadlift`, and `buildStrengthBaselines`
+   * gives them the SAME baseline (both from `perf.deadlift`). So an athlete who logs a conventional
+   * and a trap-bar deadlift had the HINGE SLOT COUNTED TWICE. Measured, on a synthetic athlete of
+   * identical strength: squat + deadlift → 0.750; squat + deadlift + trap bar → 0.833. Eight points,
+   * because a variant was logged rather than because anything got stronger.
+   *
+   * ⛔ WHY NOT JUST DROP `trap_bar_deadlift` FROM `PRIMARY_LIFTS` — IT WOULD LOSE DATA.
+   * `isPrimary` is also what puts a lift in the client's card list
+   * (`fitness.perLift.filter(l => l.isPrimary …)`). Removing it there would delete the trap bar's row
+   * BEFORE the display fold merges it, so the athlete would lose the record and the session count
+   * that fold exists to keep. Membership stays; the AGGREGATION changes. That is Michael's ruling
+   * read literally: *the four slots aggregate their variants — one ratio per slot, whichever
+   * movement filled it.*
+   *
+   * ⚠️ FRONT SQUAT NEEDS NOTHING AND THAT IS NOT AN OVERSIGHT. `front_squat` is not in
+   * `PRIMARY_LIFTS`, so it never reaches this function and cannot inflate the squat slot. See the
+   * note in `src/lib/lift-slots.ts`.
+   *
+   * ⚠️ The slot map is the SAME FILE the client's display fold reads, for the reason
+   * `tracked-max-lifts.ts` records: a constant two sides must agree on exists exactly once.
+   */
   const primaries = (Array.isArray(series) ? series : []).filter((s) => PRIMARY_LIFTS.has(s.canonical));
   if (primaries.length === 0) return null;
+  const bySlot = new Map<string, LiftSeries>();
+  for (const s of primaries) {
+    const slot = slotForCanonical(s.canonical);
+    const held = bySlot.get(slot);
+    if (!held) { bySlot.set(slot, s); continue; }
+    // The slot's reading is its most recent one — the same representative rule the display fold uses,
+    // so the card and the band cannot disagree about which pull is current.
+    const lastOf = (x: LiftSeries) => (x.points.length ? x.points[x.points.length - 1].date : '');
+    if (lastOf(s) > lastOf(held)) bySlot.set(slot, s);
+  }
+  const slots = [...bySlot.values()];
   // PREFERRED: e1RM vs BASELINE — the baseline 1RM is the right edge, and the dot is current e1RM ÷
   // baseline. This is the honest frame for strength: you have a KNOWN max, so "where am I versus it"
   // beats "where am I in my 12wk range" — which pegs the dot right in ANY build block (e1RM is
   // highest-in-12wk by construction). Working at ~82% of baseline lands the dot at 0.82, not maxed.
   if (baselineByCanonical) {
-    const ratios = primaries.map((s) => {
+    const ratios = slots.map((s) => {
       const cur = s.points.length ? s.points[s.points.length - 1].value : null;
       const base = baselineByCanonical[s.canonical];
       return cur != null && base != null && base > 0 ? cur / base : null;
@@ -236,7 +281,7 @@ export function computeE1rmBand(series: LiftSeries[], baselineByCanonical?: Reco
   }
   // FALLBACK (no baseline yet): 12wk range, but NEVER fully confident — it pegs right while building,
   // so hedge it grey rather than assert "at your max".
-  const positions = primaries.map((s) => positionInRange(s.points, { higherIsBetter: true })).filter((r): r is RangePosition => r != null);
+  const positions = slots.map((s) => positionInRange(s.points, { higherIsBetter: true })).filter((r): r is RangePosition => r != null);
   if (positions.length === 0) return null;
   const avgPct = positions.reduce((a, p) => a + p.positionPct, 0) / positions.length;
   return { low: 0, high: 1, current: avgPct, positionPct: avgPct, confident: false };

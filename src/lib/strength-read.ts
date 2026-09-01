@@ -1,4 +1,16 @@
 /**
+ * ⛔⛔ UNRENDERED SINCE 2026-09-01 — NOTHING ON ANY SCREEN CALLS `strengthReadCards()`.
+ *
+ * Its only consumer was <StrengthReadCards> ("is the bar going up" on the State trends plate),
+ * DELETED by FIXLIST item 1a (docs/FIXLIST-state-screen-2026-09-01.md) because it drew the same four
+ * lifts, off the same server series, as the STRENGTH block in <StatePerformanceSection>.
+ *
+ * ⚠️ THE EIGHT FIXTURES BELOW STILL PASS AND STILL PROVE NOTHING ABOUT THE LIVE SCREEN. They are
+ * kept, not deleted, because the ladder output they pin is still produced server-side — but do not
+ * read a green run here as evidence that anything renders. Retiring this module (and the
+ * `me_history_v1` payload field that feeds it) is a separate call and has not been made.
+ */
+/**
  * THE STRENGTH READ — turning the block's own per-session history into one card per main lift.
  * [2026-08-28, work order item 1]
  *

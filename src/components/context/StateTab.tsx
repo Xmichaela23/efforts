@@ -1,12 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, RefreshCw, ChevronDown } from 'lucide-react';
-import type {
-  CoachWeekContextV1,
-  RaceReadinessV1,
-  RaceFinishProjectionV1,
-  FitnessVerdictDivergence,
-} from '@/hooks/useCoachWeekContext';
+import { Loader2 } from 'lucide-react';
+import type { CoachWeekContextV1 } from '@/hooks/useCoachWeekContext';
 import { useExerciseLog } from '@/hooks/useExerciseLog';
 // [D-374 → Step 2] The SAME axis the server gates coaching language on, so the row that renders and
 // the verdict that fills it can never disagree about what a main lift is. `coached` is true on
@@ -14,16 +9,11 @@ import { useExerciseLog } from '@/hooks/useExerciseLog';
 // `isMainBarbellLift` gave — asked as a capability, from the table that also says what to render
 // instead. See SPEC-strength-language, Step 2.
 import { capabilitiesForExercise } from '@/lib/exercise-role';
-import { trustedMaxReps } from '@/lib/estimate-1rm';
-import { getDisciplineColor, hexToRgb } from '@/lib/context-utils';
 import LoadBar from '@/components/LoadBar';
 import { supabase, getStoredUserId, invokeFunctionFormData, invokeFunction } from '@/lib/supabase';
 import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 import CourseStrategyModal from '@/components/CourseStrategyModal';
 import { pickRaceFinishProjectionV1FromCoachData, pickRaceReadinessFromCoachData } from '@/lib/coach-payload';
-import type { BlockVerdictResult } from '@/lib/analysis/goal-predictor';
-import { planWizardRaceDistanceDisplay } from '@/lib/plan-wizard-distance-label';
-import { resolveRaceHeader } from '@/lib/race-header';
 import { actualFinishSecondsPreferElapsed, type WorkoutTimeRow } from '@/lib/race-finish-seconds';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import type { ArcReadiness } from '@/lib/arc-types';
@@ -35,699 +25,31 @@ import { buildLoadHeadline, statusVolumeLabel } from '@/lib/load-headline';
 import { readoutPlateStyle } from '@/lib/readout-plate';
 import { useSwimBaselineNudge } from '@/hooks/useSwimBaselineNudge';
 import { useAppContext } from '@/contexts/AppContext';
-import { StrengthReadCards, EnduranceReadCards } from './StrengthReadCards';
-import { strengthReadCards } from '@/lib/strength-read';
 import ViadaWeekCard from './ViadaWeekCard';
+import StrengthLoggedSets from './StrengthLoggedSets';
+import StateNextBlock from './StateNextBlock';
+import StateSignalBlock from './StateSignalBlock';
+import StateSwimNudge from './StateSwimNudge';
+import StateRaceBlock from './StateRaceBlock';
+import StateTrendsBlock from './StateTrendsBlock';
+import StateWeekExecution from './StateWeekExecution';
+import StateReadinessRow from './StateReadinessRow';
+import StateBodyBlock from './StateBodyBlock';
+import StateRaceDayBar from './StateRaceDayBar';
+import StateLastRaceCard from './StateLastRaceCard';
+import StateHeaderBlock from './StateHeaderBlock';
 
-const NUDGE_DISMISS_KEY = 'efforts.nudge.dismissed.';
+import {
+  isNudgeSnoozed,
+  snoozeNudge,
+  type CoachDataProp,
+  type VisibleSignal,
+  type PrimaryRaceReadinessRow,
+  isRaceWeekClosed,
+  isRunPrimary,
+  goalMetaFromGoalLite,
+} from './state-primitives';
 
-function isNudgeSnoozed(kind: string): boolean {
-  try {
-    const raw = window.localStorage.getItem(`${NUDGE_DISMISS_KEY}${kind}`);
-    if (!raw) return false;
-    const ymd = raw.trim().slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
-    return (Date.now() - new Date(`${ymd}T12:00:00`).getTime()) / 86400000 < 7;
-  } catch {
-    return false;
-  }
-}
-
-function snoozeNudge(kind: string): void {
-  try {
-    window.localStorage.setItem(`${NUDGE_DISMISS_KEY}${kind}`, new Date().toISOString().slice(0, 10));
-  } catch { void 0; }
-}
-
-type CoachDataProp = {
-  data: CoachWeekContextV1 | null;
-  loading: boolean;
-  error: string | null;
-  refresh: () => void;
-  revalidating?: boolean;
-};
-
-type PrimaryRaceReadinessRow = NonNullable<CoachWeekContextV1['primary_race_readiness']>;
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-function trendColor(dir: string, tone?: string): string {
-  if (tone === 'positive') return 'text-emerald-400/90';
-  if (tone === 'danger') return 'text-red-400/90';
-  if (tone === 'warning') return 'text-amber-400/90';
-  if (dir === 'improving') return 'text-emerald-400/85';
-  if (dir === 'declining') return 'text-amber-400/85';
-  return 'text-white/55';
-}
-
-
-function fmtDate(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
-}
-
-/** Days from `ymd` to today (UTC-naive). Negative = future, positive = past. Null when invalid. */
-function daysSinceYmd(ymd: string | null | undefined): number | null {
-  if (!ymd) return null;
-  const target = new Date(`${String(ymd).slice(0, 10)}T00:00:00`);
-  if (Number.isNaN(target.getTime())) return null;
-  const today = new Date();
-  const a = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
-  const b = Date.UTC(target.getFullYear(), target.getMonth(), target.getDate());
-  return Math.round((a - b) / 86_400_000);
-}
-
-/** Race references stay in State for the race week, then disappear once 7 days have passed. */
-function isRaceWeekClosed(ymd: string | null | undefined): boolean {
-  const d = daysSinceYmd(ymd);
-  return d != null && d > 7;
-}
-
-/** Goal target finish clock from coach `goal_context.primary_event.target_time` (seconds). */
-function fmtGoalClock(totalSec: number): string {
-  const h = Math.floor(totalSec / 3600);
-  const mi = Math.floor((totalSec % 3600) / 60);
-  const s = Math.round(totalSec % 60);
-  if (h > 0) return `${h}:${String(mi).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-  return `${mi}:${String(s).padStart(2, '0')}`;
-}
-
-/** +MM:SS or +H:MM:SS vs a reference time (actual − goal; negative delta = faster than goal). */
-function fmtSignedDeltaVsGoal(actualSec: number, goalSec: number): string {
-  const d = actualSec - goalSec;
-  if (d === 0) return 'on goal';
-  const sign = d < 0 ? '−' : '+';
-  const ad = Math.abs(Math.round(d));
-  const h = Math.floor(ad / 3600);
-  const mi = Math.floor((ad % 3600) / 60);
-  const s = ad % 60;
-  const body = h > 0 ? `${h}:${String(mi).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${mi}:${String(s).padStart(2, '0')}`;
-  return `${sign}${body} vs goal`;
-}
-
-function fmtSignedDeltaVsModel(actualSec: number, modelSec: number): string {
-  const d = actualSec - modelSec;
-  if (d === 0) return 'same as model projection';
-  const sign = d < 0 ? '−' : '+';
-  const ad = Math.abs(Math.round(d));
-  const h = Math.floor(ad / 3600);
-  const mi = Math.floor((ad % 3600) / 60);
-  const s = ad % 60;
-  const body = h > 0 ? `${h}:${String(mi).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${mi}:${String(s).padStart(2, '0')}`;
-  return `${sign}${body} vs model`;
-}
-
-/** +MM:SS / −H:MM:SS vs the course-model projection (actual − projected). */
-function fmtSignedDeltaVsProjection(actualSec: number, projSec: number): string {
-  const d = actualSec - projSec;
-  if (d === 0) return 'on projection';
-  const sign = d < 0 ? '−' : '+';
-  const ad = Math.abs(Math.round(d));
-  const h = Math.floor(ad / 3600);
-  const mi = Math.floor((ad % 3600) / 60);
-  const s = ad % 60;
-  const body = h > 0 ? `${h}:${String(mi).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${mi}:${String(s).padStart(2, '0')}`;
-  return `${sign}${body} vs projection`;
-}
-
-// STATE "how your sessions went" ACCENT — the one composed sentence for the week (server-owned, this
-// only renders it — Law 4). docs/STATE-WEEK-EXECUTION.md. Deliberately neutral (grey, no icon-as-alarm):
-// it is a heads-up, never a scold. Tap reveals the source measurement it was drawn from (traceability §5c).
-function WeekAccentLine({ sentence, detail }: { sentence: string; detail: string | null }) {
-  const [open, setOpen] = React.useState(false);
-  return (
-    <div className="px-4 pb-1.5 pt-0.5">
-      <button
-        type="button"
-        onClick={() => { if (detail) setOpen((o) => !o); }}
-        className="text-left text-[13px] leading-snug text-white/55 max-w-[min(100%,360px)]"
-      >
-        {sentence}
-        {detail && <span className="text-white/50 text-[11px]"> {open ? '▾' : 'ⓘ'}</span>}
-      </button>
-      {open && detail && (
-        <p className="mt-1 text-[12px] text-white/55 leading-snug max-w-[min(100%,340px)]">Based on: {detail}</p>
-      )}
-    </div>
-  );
-}
-
-// THE WEEK · MIX — planned vs actual by discipline, so a swap is SEEN, not just counted (a run traded
-// for a swim shows the run share shrink and the swim share grow). Bars share one scale, so an over- or
-// under-done week reads as a longer/shorter actual bar. Colors are the app's SPORT_COLORS.
-function WeekMixBar({ counts, hasPlan, partialWeek }: { counts: Array<{ discipline: string; planned: number; done: number }>; hasPlan: boolean; partialWeek: boolean }) {
-  const ORDER = ['strength', 'run', 'ride', 'swim'];
-  const NAME: Record<string, string> = { run: 'run', ride: 'bike', strength: 'strength', swim: 'swim' };
-  const ordered = ORDER.map((d) => counts.find((c) => c.discipline === d)).filter(Boolean) as typeof counts;
-  const totalPlanned = ordered.reduce((s, c) => s + c.planned, 0);
-  const totalDone = ordered.reduce((s, c) => s + c.done, 0);
-  const scale = Math.max(totalPlanned, totalDone, 1);
-  // F26 (2026-07-20): a no-plan athlete has NOTHING planned, so there is no "planned" row to draw.
-  // The old code drew an empty "planned" bar above a full "actual" bar — a shortfall a freeballer
-  // never signed up for. When nothing was planned, show only what they did, labelled as such.
-  const showPlanned = hasPlan && totalPlanned > 0;
-  // F21 (2026-07-20): `done` is week-TO-DATE while `planned` is the WHOLE week (server: coach counts
-  // planned over the full week, done bounded to [weekStart, today]). Drawn on one scale, a Monday
-  // shows a full plan over an empty result with no explanation. The SENTENCE already guards partial
-  // weeks (the Q-177 trap); the PICTURE never did. Label the result "so far" so the two bars aren't
-  // read on the same footing.
-  const doneLabel = !showPlanned ? 'this week' : partialWeek ? 'so far' : 'actual';
-  const Bar = ({ label, pick }: { label: string; pick: (c: { planned: number; done: number }) => number }) => (
-    <div className="flex items-center gap-2">
-      <span className="text-[12px] text-white/60 w-12 shrink-0 lowercase">{label}</span>
-      <div className="flex-1 flex h-2 rounded-full overflow-hidden bg-white/[0.05]">
-        {ordered.map((c) => {
-          const v = pick(c);
-          if (v <= 0) return null;
-          return <div key={c.discipline} style={{ width: `${(v / scale) * 100}%`, backgroundColor: getDisciplineColor(c.discipline) }} />;
-        })}
-      </div>
-    </div>
-  );
-  return (
-    <div className="px-4 py-3 space-y-1.5">
-      {showPlanned && <Bar label="planned" pick={(c) => c.planned} />}
-      <Bar label={doneLabel} pick={(c) => c.done} />
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pl-14 pt-1">
-        {ordered.filter((c) => c.planned > 0 || c.done > 0).map((c) => (
-          <span key={c.discipline} className="inline-flex items-center gap-1 text-[12px] text-white/65">
-            <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: getDisciplineColor(c.discipline) }} />
-            {NAME[c.discipline] ?? c.discipline}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// "as of {Mon D}" for a BODY row's newest session date — so a rolling 7d/week read isn't mistaken for
-// today's data (BODY-4.8 freshness-legibility). Null-safe: no date → no stamp.
-function fmtBodyAsOf(dateStr: string | null | undefined): string | null {
-  if (!dateStr) return null;
-  const d = new Date(`${dateStr}T12:00:00`);
-  if (isNaN(d.getTime())) return null;
-  return `as of ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-}
-
-function isRunPrimary(pe: { sport?: string | null } | null | undefined): boolean {
-  if (!pe) return false;
-  const s = String(pe.sport || '').toLowerCase();
-  return s === 'run' || s === 'running' || !pe.sport;
-}
-
-function goalMetaFromGoalLite(
-  g: { name: string; sport?: string | null; distance?: string | null; target_time?: number | null } | null | undefined,
-  upcoming: Array<{ name: string; weeks_out: number }> | undefined,
-): { name: string; weeks_out: number; distance: string; target_time_seconds: number | null } | null {
-  if (!g || !isRunPrimary(g)) return null;
-  const weeksOutMeta = upcoming?.find(r => r.name === g.name)?.weeks_out ?? 0;
-  const tt = (g as { target_time?: number | null }).target_time;
-  return {
-    name: g.name,
-    weeks_out: weeksOutMeta,
-    distance: g.distance || 'marathon',
-    target_time_seconds:
-      tt != null && Number.isFinite(Number(tt)) && Number(tt) > 0 ? Math.round(Number(tt)) : null,
-  };
-}
-
-// ── sub-components ────────────────────────────────────────────────────────────
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-baseline gap-3 py-2.5 border-b border-white/[0.055] last:border-0">
-      {/* readout-label (index.css): the Details tab's instrument label, tinted by the plate's
-          accent — neutral white on these multi-sport plates. */}
-      <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase w-[72px] shrink-0 pt-0.5">
-        {label}
-      </span>
-      <div className="flex-1 text-[13px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none">
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function Chip({ label, value, valueClass }: { label?: string; value: React.ReactNode; valueClass?: string }) {
-  return (
-    <span className="inline-flex items-baseline gap-1">
-      {label != null && <span className="text-white/60 text-[13px]">{label}</span>}
-      {/* Values glow in the plate accent unless the caller pinned a colour (e.g. "week complete"). */}
-      <span className={valueClass ?? 'readout-num'}>{value}</span>
-    </span>
-  );
-}
-
-function Dot() {
-  return <span className="text-white/50 select-none">·</span>;
-}
-
-function assessmentColor(a: RaceReadinessV1['assessment']): string {
-  if (a === 'ahead') return 'text-emerald-400/90';
-  if (a === 'on_track') return 'text-emerald-400/85';
-  if (a === 'behind') return 'text-amber-400/90';
-  return 'text-red-400/90';
-}
-
-function assessmentLabel(a: RaceReadinessV1['assessment']): string {
-  if (a === 'ahead') return 'ahead';
-  if (a === 'on_track') return 'on track';
-  if (a === 'behind') return 'stretch';
-  return 'adjust target';
-}
-
-function signalToneColor(tone: string): string {
-  if (tone === 'positive') return 'text-emerald-400/85';
-  if (tone === 'warning') return 'text-amber-400/85';
-  return 'text-white/65';
-}
-
-function hasRaceProjectionDetail(rr: RaceReadinessV1 | null | undefined): boolean {
-  const secs = rr?.projection_display?.sections;
-  if (secs && secs.length > 0) return true;
-  return Boolean(rr?.projection_facts && rr.projection_facts.length > 0);
-}
-
-function RaceSection({
-  projection,
-  rr,
-  goalMeta,
-  planWizardDistance,
-  planWizardTargetSeconds,
-  primaryRaceReadiness,
-  onOpenKeyRun,
-  resolvedGoalId,
-  courseRow,
-  courseBusy,
-  onAddCourse,
-  onViewStrategy,
-  /** When set, RACE shows official chip time and hides the training “Projected” model. */
-  officialResult,
-  /**
-   * After race day: logged run on the race (elapsed not moving), with model projection for comparison.
-   * Replaces the big “Projected” block until the user records an official result and ends the plan.
-   */
-  postRaceUnofficial,
-  blockVerdict,
-  divergence,
-}: {
-  projection: RaceFinishProjectionV1 | null;
-  rr: RaceReadinessV1 | null;
-  goalMeta: { name: string; weeks_out: number; distance: string; target_time_seconds: number | null } | null;
-  /** From coach `plan.active_plans[].distance` (same as Plan Wizard / plan config). */
-  planWizardDistance: string | null;
-  /** `plans.config.target_time` from coach (Plan Wizard / generate-run-plan). Shown when coach RFP row is absent. */
-  planWizardTargetSeconds: number | null;
-  primaryRaceReadiness?: PrimaryRaceReadinessRow | null;
-  onOpenKeyRun?: (workoutId: string) => void;
-  resolvedGoalId: string | null;
-  courseRow: { id: string; name: string } | null;
-  courseBusy: boolean;
-  onAddCourse: () => void;
-  onViewStrategy: () => void;
-  officialResult: {
-    actual_seconds: number;
-    goal_target_seconds: number | null;
-    modelProjected?: { seconds: number; display: string } | null;
-  } | null;
-  postRaceUnofficial: { loggedSeconds: number; workoutId: string; daysAfterRace: number } | null;
-  /** D-212 Piece 4 — block-adaptation third axis (the N-way room), rendered compact + drivers-gated. */
-  blockVerdict: BlockVerdictResult | null;
-  /** D-212 Cut 2 — spine↔projection divergence for the displayed goal; null/empty = aligned, render nothing. */
-  divergence: FitnessVerdictDivergence | null;
-}) {
-  const distLabel = planWizardRaceDistanceDisplay(
-    planWizardDistance ?? rr?.goal.distance ?? goalMeta?.distance ?? null,
-  );
-  // H4 (Q-107): the weeks-out + real-race gate are resolved below (they need hasAnyFinishTime) via
-  // resolveRaceHeader — never fabricate a "0w out" countdown from the `?? 0` default.
-
-  const statedSec = goalMeta?.target_time_seconds ?? null;
-  const wizardSec =
-    planWizardTargetSeconds != null && Number.isFinite(planWizardTargetSeconds) && planWizardTargetSeconds > 0
-      ? Math.round(planWizardTargetSeconds)
-      : null;
-  /**
-   * Stated goal: plan config / wizard first (intent), then goal meta, then coach plan_goal mirror.
-   * No client-side pace math.
-   */
-  const statedGoalDisplay =
-    wizardSec != null
-      ? fmtGoalClock(wizardSec)
-      : statedSec != null
-        ? fmtGoalClock(statedSec)
-        : projection?.plan_goal_display ?? null;
-
-  const modelProjected = rr
-    && Number.isFinite(rr.predicted_finish_time_seconds) &&
-    rr.predicted_finish_time_seconds > 0
-    ? { seconds: rr.predicted_finish_time_seconds, display: rr.predicted_finish_display }
-    : null;
-
-  if (officialResult) {
-    return (
-      <div className="px-3 py-3 space-y-2.5">
-        <div className="flex items-center justify-between gap-3">
-          <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase shrink-0">RACE</span>
-          <span className="text-[13px] text-white/55 text-right leading-snug">{distLabel} · result on file</span>
-        </div>
-        {statedGoalDisplay != null && (
-          <div className="flex flex-col gap-0.5">
-            <p className="text-[12px] text-white/65 leading-snug">Your goal</p>
-            <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">
-              {statedGoalDisplay}
-            </span>
-          </div>
-        )}
-        <div className="flex flex-col gap-0.5">
-          <p className="text-[12px] text-white/65 leading-snug">Completed</p>
-          <span className="text-[22px] font-semibold tabular-nums text-emerald-300/90 tracking-tight">
-            {fmtGoalClock(officialResult.actual_seconds)}
-          </span>
-          <p className="text-[12px] text-white/60 leading-snug max-w-[min(100%,320px)]">
-            Official finish: elapsed (chip) time, not moving time. Training “projected” is replaced after you save this result.
-          </p>
-        </div>
-        {officialResult.goal_target_seconds != null && (
-          <p className="text-[13px] text-white/50">
-            {fmtSignedDeltaVsGoal(officialResult.actual_seconds, officialResult.goal_target_seconds)}
-          </p>
-        )}
-        {officialResult.modelProjected && (
-          <p className="text-[13px] text-white/50 leading-snug">
-            Model had projected {officialResult.modelProjected.display} · {fmtSignedDeltaVsModel(officialResult.actual_seconds, officialResult.modelProjected.seconds)}
-          </p>
-        )}
-      </div>
-    );
-  }
-
-  if (postRaceUnofficial) {
-    const wk = postRaceUnofficial.daysAfterRace;
-    const postLabel = wk === 1 ? '1 day after race' : wk < 7 ? `${wk} days after race` : 'after your race';
-    return (
-      <div className="px-3 py-3 space-y-2.5">
-        <div className="flex items-center justify-between gap-3">
-          <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase shrink-0">RACE</span>
-          <span className="text-[13px] text-white/55 text-right leading-snug">{distLabel} · {postLabel}</span>
-        </div>
-        {statedGoalDisplay != null && (
-          <div className="flex flex-col gap-0.5">
-            <p className="text-[12px] text-white/65 leading-snug">Your goal</p>
-            <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">
-              {statedGoalDisplay}
-            </span>
-          </div>
-        )}
-        <div className="flex flex-col gap-0.5">
-          <p className="text-[12px] text-white/65 leading-snug">Your finish (from log)</p>
-          <span className="text-[22px] font-semibold tabular-nums text-emerald-300/90 tracking-tight">
-            {fmtGoalClock(postRaceUnofficial.loggedSeconds)}
-          </span>
-          <p className="text-[12px] text-white/60 leading-snug max-w-[min(100%,320px)]">
-            Elapsed (chip) time if your device reported it; otherwise we fall back to other durations. The large “Projected” block is hidden after race day so this stays primary.
-          </p>
-        </div>
-        {modelProjected && (
-          <div className="space-y-1">
-            <p className="text-[12px] text-white/65 leading-snug">Model had projected (pre-race)</p>
-            <p className="text-[20px] font-semibold tabular-nums text-white/75">
-              {modelProjected.display}
-            </p>
-            <p className="text-[13px] text-white/50">
-              {fmtSignedDeltaVsModel(postRaceUnofficial.loggedSeconds, modelProjected.seconds)}
-            </p>
-          </div>
-        )}
-        <p className="text-[12px] text-white/60 leading-snug">
-          Race result auto-saves to My Record once your run is logged. The plan then moves to past on its own.
-        </p>
-      </div>
-    );
-  }
-  /** Server fitness clock — prefer full race_readiness so headline matches delta + sections (same model path). */
-  const projectedFromTraining =
-    rr?.predicted_finish_display ??
-    projection?.fitness_projection_display ??
-    (projection &&
-    projection.source_kind &&
-    projection.source_kind !== 'plan_target' &&
-    projection.anchor_display
-      ? projection.anchor_display
-      : null);
-  const hasProjection = projectedFromTraining != null;
-  const showProjectionPlaceholder = statedGoalDisplay != null && !hasProjection;
-  const hasAnyFinishTime = statedGoalDisplay != null || hasProjection;
-  // H4 (Q-107): gate the RACE header on a REAL race — no fabricated "0w out" from the `?? 0` default.
-  const { hasRealRace, weeksOut: raceWeeksOut } = resolveRaceHeader({
-    readinessWeeksOut: rr?.goal?.weeks_out ?? null,
-    goalMetaWeeksOut: goalMeta?.weeks_out ?? null,
-    hasAnyFinishTime,
-  });
-
-  return (
-    <div className="px-3 py-3 space-y-2.5">
-      {/* Header: goal + weeks out */}
-      <div className="flex items-center justify-between gap-3">
-        <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase shrink-0">RACE</span>
-        {hasRealRace && (
-          <span className="text-[13px] text-white/55 text-right leading-snug">{distLabel}{raceWeeksOut != null ? ` — ${raceWeeksOut}w out` : ''}</span>
-        )}
-      </div>
-
-      {/* Goal (intent) vs projected finish (server fitness); terrain refines projected server-side when applicable. */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex flex-col gap-3 min-w-0 flex-1">
-          {statedGoalDisplay != null && (
-            <div className="flex flex-col gap-0.5">
-              <p className="text-[12px] text-white/65 leading-snug">Your goal</p>
-              <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">
-                {statedGoalDisplay}
-              </span>
-            </div>
-          )}
-          {hasProjection && (
-            <div className="flex flex-col gap-0.5">
-              <p className="text-[12px] text-white/65 leading-snug">Projected</p>
-              <span className="text-[22px] font-semibold tabular-nums text-white/90 tracking-tight">
-                {projectedFromTraining}
-              </span>
-              {rr && (
-                <p className="text-[12px] text-white/32 leading-snug max-w-[280px]">
-                  Matches the gap and details below — one model, from your threshold, fade over distance, and data confidence.
-                </p>
-              )}
-            </div>
-          )}
-          {showProjectionPlaceholder && (
-            <p className="text-[13px] text-white/55 leading-snug pr-1">
-              Can’t project a finish time yet (race date on the goal/plan, or baselines).
-            </p>
-          )}
-        </div>
-        <div className="flex flex-col items-end gap-1 shrink-0 pt-0.5">
-          {rr?.delta_display && (
-            <span className={`text-[14px] font-medium tabular-nums ${assessmentColor(rr.assessment)}`}>
-              {rr.delta_display}
-            </span>
-          )}
-          {rr && (
-            <span className={`text-[12px] font-semibold uppercase tracking-wider ${assessmentColor(rr.assessment)}`}>
-              {assessmentLabel(rr.assessment)}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Factual projection: framing + grouped sections (server); legacy flat list still supported */}
-      {rr?.projection_display?.sections && rr.projection_display.sections.length > 0 && (
-        <div className="space-y-3 pt-0.5">
-          <p className="text-[12px] text-white/60 uppercase tracking-wide">From your data</p>
-          {rr.projection_display.framing ? (
-            <p className="text-[13px] text-white/60 leading-relaxed">{rr.projection_display.framing}</p>
-          ) : null}
-          {rr.projection_display.sections.map((sec) => (
-            <div key={sec.label} className="space-y-1.5">
-              <p className="text-[12px] font-semibold tracking-[0.1em] text-white/65 uppercase">{sec.label}</p>
-              <ul className="list-disc pl-4 space-y-1 text-[13px] text-white/65 leading-relaxed">
-                {sec.lines.map((line, i) => (
-                  <li key={`${sec.label}-${i}`}>{line}</li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      )}
-      {rr?.projection_facts && rr.projection_facts.length > 0 && !(rr.projection_display?.sections?.length) && (
-        <div className="space-y-1.5 pt-0.5">
-          <p className="text-[12px] text-white/60 uppercase tracking-wide">From your data</p>
-          <ul className="list-disc pl-4 space-y-1.5 text-[13px] text-white/60 leading-relaxed">
-            {rr.projection_facts.map((line, i) => (
-              <li key={i}>{line}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {projection?.mismatch_blurb && !hasRaceProjectionDetail(rr) && (
-        <p className="text-[13px] text-white/50 leading-relaxed">{projection.mismatch_blurb}</p>
-      )}
-      {!hasAnyFinishTime && (
-        <p className="text-[13px] text-white/60 leading-snug">
-          Add a race target in your plan to see your goal and projection.
-        </p>
-      )}
-
-      {/* Target comparison — full race_readiness only */}
-      {rr?.target_finish_display && (
-        <div className="flex items-baseline gap-2 text-[13px] text-white/55">
-          <span>Target {rr.target_finish_display}</span>
-          <Dot />
-          <span>Race pace {rr.predicted_race_pace_display}</span>
-        </div>
-      )}
-
-      {/* VDOT trend */}
-      {rr && (
-        <div className="flex items-baseline gap-2 text-[13px]">
-          <span className="text-white/55">VDOT {rr.current_vdot.toFixed(1)}</span>
-          {rr.plan_vdot != null && rr.vdot_delta != null && rr.vdot_direction !== 'stable' && (
-            <>
-              <Dot />
-              <span className={rr.vdot_direction === 'improved' ? 'text-emerald-400/85' : 'text-amber-400/85'}>
-                {rr.vdot_delta > 0 ? '+' : ''}{rr.vdot_delta.toFixed(1)} since plan start
-              </span>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Legacy narrative — hidden when projection display supplies factual copy */}
-      {rr && !hasRaceProjectionDetail(rr) && (
-        <p className="text-[13px] text-white/65 leading-relaxed">{rr.assessment_message}</p>
-      )}
-
-      {resolvedGoalId && (
-        <div className="pt-0.5">
-          {courseBusy ? (
-            <p className="text-[13px] text-white/60">Working on course…</p>
-          ) : courseRow ? (
-            <button
-              type="button"
-              onClick={onViewStrategy}
-              className="w-full text-left text-[13px] text-sky-400/85 hover:text-sky-300/90 py-1"
-            >
-              View terrain strategy → <span className="text-white/60">{courseRow.name}</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onAddCourse}
-              className="w-full text-left text-[13px] text-sky-400/85 hover:text-sky-300/90 py-1"
-            >
-              Add course for terrain strategy based on your data →
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* KEY RUN — primary long-run race readiness (single signal; full block on Performance) */}
-      {primaryRaceReadiness && onOpenKeyRun && (
-        <button
-          type="button"
-          onClick={() => onOpenKeyRun(primaryRaceReadiness.workout_id)}
-          className="w-full text-left rounded-lg border border-white/[0.1] bg-white/[0.04] px-3 py-3 space-y-2.5 mt-1 active:opacity-90"
-        >
-          <span className="text-[12px] font-medium text-white/65 uppercase tracking-wide">Key run</span>
-          <p className="text-[13px] text-white/50 tabular-nums">
-            {fmtDate(primaryRaceReadiness.workout_date)} · {primaryRaceReadiness.distance_miles}mi
-          </p>
-          <p className="text-[14px] font-semibold text-white/90 leading-snug">{primaryRaceReadiness.headline}</p>
-          {!!String(primaryRaceReadiness.tactical_instruction || '').trim() && (
-            <div className="rounded-md border border-white/15 bg-white/[0.08] px-2.5 py-2">
-              <span className="text-[12px] font-medium text-white/65 uppercase tracking-wide">Race day</span>
-              <p className="text-[13px] text-white/85 mt-0.5 leading-snug">{primaryRaceReadiness.tactical_instruction}</p>
-            </div>
-          )}
-          {!!String(primaryRaceReadiness.projection || '').trim() && (
-            <p className="text-[13px] text-white/65 leading-relaxed">{primaryRaceReadiness.projection}</p>
-          )}
-          <span className="text-[13px] font-normal text-white/60">View full analysis →</span>
-        </button>
-      )}
-
-      {/* Training signals */}
-      {rr && rr.training_signals.length > 0 && (
-        <div className="flex flex-wrap gap-x-3 gap-y-1 pt-0.5">
-          {rr.training_signals.map((s, i) => (
-            <span key={i} className="text-[13px]">
-              <span className="text-white/50">{s.label}</span>{' '}
-              <span className={signalToneColor(s.tone)}>{s.value}</span>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Pace zones */}
-      {rr && (
-        <div className="flex items-center gap-3 pt-0.5 text-[12px] text-white/65">
-          <span>Easy {rr.pace_zones.easy}</span>
-          <span>Threshold {rr.pace_zones.threshold}</span>
-          <span>Race {rr.pace_zones.race}</span>
-        </div>
-      )}
-
-      {/* Modifiers */}
-      {rr && (
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[12px] text-white/55">
-          {rr.data_source === 'plan_targets' && (
-            <span className="italic">Based on plan targets</span>
-          )}
-          {rr.durability_factor < 0.97 && (
-            <span>Durability adj {((1 - rr.durability_factor) * 100).toFixed(1)}%</span>
-          )}
-          {rr.durability_factor >= 1.0 && (
-            <span className="text-emerald-400/40">Durability +{((rr.durability_factor - 1) * 100).toFixed(1)}%</span>
-          )}
-          {rr.confidence_adjustment_pct > 0 && (
-            <span>Confidence adj +{rr.confidence_adjustment_pct.toFixed(1)}%</span>
-          )}
-        </div>
-      )}
-
-      {/* Fitness verdicts (D-212 N-way room) — the block-adaptation third axis, beside the projection.
-          Drivers-gated honesty: a seeded block_verdict (empty drivers, e.g. goal_probability 50) is the
-          DORMANT "needs data" state, NOT a real probability — show a muted line, never a fake %. block_verdict
-          null → hide. The colored-% branch is dark until block-adaptation data exists (Q-080). */}
-      {blockVerdict && (
-        blockVerdict.drivers.length === 0 ? (
-          <p className="text-[13px] text-white/60 pt-0.5">Goal trajectory · needs more comparable sessions</p>
-        ) : (
-          <div className="flex items-baseline gap-2 pt-0.5 text-[13px]">
-            <span className="text-white/50">Goal trajectory</span>
-            <span className={
-              blockVerdict.goal_probability_pct >= 70 ? 'text-emerald-400/85'
-              : blockVerdict.goal_probability_pct >= 40 ? 'text-amber-400/85'
-              : 'text-rose-400/85'
-            }>{blockVerdict.goal_probability_pct}% on track</span>
-          </div>
-        )
-      )}
-
-      {/* D-212 Cut 2 — spine↔projection divergence: shown ONLY when verdicts genuinely disagree
-          ("on-track finish, but swim sliding"). No divergence → render nothing (never "all agree"). */}
-      {divergence && divergence.observations.length > 0 && (
-        <div className="pt-0.5 space-y-0.5">
-          {divergence.observations.map((o, i) => (
-            <p key={i} className="text-[13px] text-amber-400/70 leading-snug">{o.note}</p>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── main ──────────────────────────────────────────────────────────────────────
 
 export default function StateTab({
   coachData,
@@ -747,7 +69,6 @@ export default function StateTab({
   const [stateLens, setStateLens] = useState<StateLens>('status'); // State-as-hub: Status / Adjust / Schedule (D-316)
   // Strength per-lift detail is COLLAPSED by default (Michael 2026-07-16) — the e1RM dot is the read;
   // the per-lift "from your logged sets" list is drill-down, folded until tapped.
-  const [strengthDetailOpen, setStrengthDetailOpen] = useState<boolean>(false);
   const [resolvedGoalId, setResolvedGoalId] = useState<string | null>(null);
   const [stateCourseRow, setStateCourseRow] = useState<{ id: string; name: string } | null>(null);
   const [courseBusy, setCourseBusy] = useState(false);
@@ -1039,7 +360,7 @@ export default function StateTab({
   const week = wsv.week;
   const load = wsv.load;
   const rm = ((data as any)?.response_model ?? (wsv as any)?.response_model) as {
-    visible_signals: Array<{ label: string; category?: string; trend: string; trend_icon?: string; trend_tone: string; detail: string; samples: number; provenance?: string | null; soreness_flag?: string | null }>;
+    visible_signals: Array<VisibleSignal>;
     overall_training_read?: { summary: string; tone: 'positive' | 'warning' | 'neutral' | 'info' } | null;
     strength: { per_lift: Array<{ canonical_name: string; display_name: string; e1rm_trend: string; rir_current: number | null; sufficient: boolean; last_session_date?: string | null }> };
     endurance: unknown;
@@ -1223,7 +544,7 @@ export default function StateTab({
   const weekLabel = week.index != null ? `WK ${week.index}` : 'WEEK';
 
   // ── BODY row — endurance signals only (strength signals go in STRENGTH row) ─
-  const visibleSignals = (rm?.visible_signals ?? []).filter((s: any) => s.category === 'endurance');
+  const visibleSignals = (rm?.visible_signals ?? []).filter((s) => s.category === 'endurance');
 
   // ── STRENGTH row — server-computed per_lift from response_model ──────────
   // ⛔ THE CAP MUST NOT RUN BEFORE THE MAIN-LIFT FILTER — that is what hid the Overhead Press.
@@ -1376,88 +697,11 @@ export default function StateTab({
     .slice(0, 8);
 
   const strengthPerLiftDetail: React.ReactNode = (perLiftMain.length > 0 || otherLifts.length > 0) ? (
-    // Layout 2026-08-11 (Michael): reclaim the horizontal space — the list used to indent 84px to align
-    // under the parent label column, leaving each lift cramped in ~68% width. It now runs near-full-width
-    // (a light border-l keeps the nesting cue) so the sets read clean, like Strong's exercise detail.
-    <div className="mt-2 ml-1 pl-3 border-l border-white/[0.07] space-y-3.5">
-      {/* Collapsed by default — the e1RM dot above is the read; this list is drill-down. */}
-      <button
-        type="button"
-        onClick={() => setStrengthDetailOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-[12px] uppercase tracking-wider text-white/55 hover:text-white/55 transition-colors"
-        aria-expanded={strengthDetailOpen}
-      >
-        <span className={`inline-block transition-transform duration-200 ${strengthDetailOpen ? 'rotate-90' : ''}`}>›</span>
-        from your logged sets
-        {/* ⚠️ THE COUNT NOW INCLUDES THE OTHER LIFTS (item 5) — it named only the main ones while
-            accessories had no home, and would understate the section the moment they got one. */}
-        <span className="text-white/45 normal-case tracking-normal">· {perLiftMain.length + otherLifts.length} {perLiftMain.length + otherLifts.length === 1 ? 'lift' : 'lifts'}</span>
-      </button>
-      {strengthDetailOpen && perLiftMain.map((lt: any) => {
-        // A SET HISTORY, LIKE STRONG/HEVY (2026-08-11, Michael: *"it should offer what the other apps
-        // do"*). This section is titled "from your logged sets" — so it now shows exactly that: each main
-        // lift's recent sessions (weight × reps · date · estimated 1RM), newest first. The old "Working
-        // vs baseline" coaching line and the tap-to-adjust are GONE from here. Adjusting weight is a
-        // Training-Max / baseline control (one number, weekly weights recalc from it — how the previous program apps do
-        // it, verified against Strong/Hevy/main-lift apps), and it lives on the Adjust tab (StateAdjustLens),
-        // not as a per-row tweak buried in a read-only history. Data is `useExerciseLog`'s liftTrends —
-        // already fetched above, no new query and no server change.
-        const trend = liftTrends.find((t) => t.canonical === lt.canonical_name);
-        const entries = trend?.entries ?? [];
-        if (entries.length === 0) return null;
-        const recent = [...entries].reverse().slice(0, 5); // newest first, most-recent handful
-        // D-417: "best" is the strongest TRUSTED reading in the window — a high-rep set inflates its
-        // estimate, so it can't be your best (that would rank by reps, not weight). Untrusted sets still
-        // show in the list, they just can't win the tag. No trusted set → no "best" (bestIdx stays -1).
-        const isTrusted = (e: { best_reps?: number | null }) =>
-          Number(e.best_reps) > 0 && Number(e.best_reps) <= trustedMaxReps(lt.canonical_name);
-        const bestIdx = recent.reduce(
-          (bi, e, i) => (isTrusted(e) && (bi < 0 || (Number(e.estimated_1rm) || 0) > (Number(recent[bi].estimated_1rm) || 0))) ? i : bi,
-          -1,
-        );
-        return (
-          <div key={lt.canonical_name} className="space-y-1.5">
-            <div className="text-[13px] text-white/80">{lt.display_name}</div>
-            <div className="space-y-1">
-              {recent.map((e, i) => {
-                const dateLabel = e.date
-                  ? new Date(e.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                  : '';
-                const est = Number(e.estimated_1rm) || 0;
-                const isBest = i === bestIdx; // bestIdx is -1 when no trusted set exists (D-417)
-                return (
-                  <div key={i} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px]">
-                    <span className="text-white/75 tabular-nums">{e.best_weight} lb × {e.best_reps}</span>
-                    {dateLabel && <span className="text-white/40">{dateLabel}</span>}
-                    {est > 0 && isTrusted(e) && <span className="text-white/45 tabular-nums">e1RM {est} lb</span>}
-                    {/* Sport colour, not green — green means bike (Michael 2026-08-15, with the PR tags). */}
-                    {isBest && <span className="text-strength font-medium">best</span>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
-      {/* ── SECONDARIES AND ACCESSORIES: RECORDS, NOT A LINE (item 5). ── */}
-      {strengthDetailOpen && otherLifts.length > 0 && (
-        <div className="space-y-1.5 pt-1">
-          {/* ⚠️ ITS OWN QUIET HEADING, because these answer a DIFFERENT question from the rows above.
-              A main lift shows a history trending toward a max; these show the best you have done.
-              Running them together would imply the accessory has a max line, which it does not. */}
-          <div className="text-[11px] uppercase tracking-wider text-white/40">your best sets</div>
-          {otherLifts.map((l) => (
-            <div key={l.canonical} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px]">
-              <span className="text-white/75">{l.displayName}</span>
-              <span className="text-white/75 tabular-nums">{l.best!.best_weight} lb × {l.best!.best_reps}</span>
-              {/* ⛔ NO e1RM AND NO DIRECTION WORD. Nobody trends a one-rep max on a curl, and this app
-                  does not assert a direction it cannot support. The count is the receipt. */}
-              <span className="text-white/40 tabular-nums">{l.sessions} {l.sessions === 1 ? 'session' : 'sessions'}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    // ⛔ THE GATE STAYS HERE, NOT INSIDE THE COMPONENT (Round 0b, 2026-09-01).
+    //    `StatePerformanceSection` tests this value for TRUTHINESS to decide whether to draw a
+    //    standalone detail block. An element that renders null is still truthy, so the emptiness
+    //    test cannot move inside <StrengthLoggedSets>.
+    <StrengthLoggedSets perLiftMain={perLiftMain} otherLifts={otherLifts} liftTrends={liftTrends} />
   ) : null;
 
   return (
@@ -1474,84 +718,22 @@ export default function StateTab({
 
       {stateLens === 'status' && (<>
       {/* ── Header ── */}
-      <div className="flex items-start justify-between mb-4 px-0.5">
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-baseline gap-2 flex-wrap">
-            <span className="text-[13px] font-semibold tracking-widest text-white/65 uppercase">{weekLabel}</span>
-            {/* Chip Option A / research (Whoop): readiness is STRAIN-class — never headline/crown material.
-                It moved to BODY as the row's driver. "WEEK" stays as the plain section header. */}
-          </div>
-          {isAimless ? (
-            <>
-              <span className="text-[15px] font-medium text-white/85 leading-snug">{aimlessHeadline}</span>
-              <span className="text-[13px] text-white/50 leading-snug">{aimlessSubtext}</span>
-              {aimlessCtaAction !== 'none' && (
-                <button
-                  type="button"
-                  onClick={() => navigate(aimlessCtaTarget)}
-                  className="mt-1 self-start rounded-lg border border-teal-400/30 bg-teal-500/10 px-3 py-1.5 text-[13px] font-medium text-teal-100/95 hover:bg-teal-500/15 active:opacity-90"
-                >
-                  {aimlessCtaLabel}
-                </button>
-              )}
-            </>
-          ) : (
-            <>
-              {intentSummary && (
-                <span className="text-[15px] font-medium text-white/85 leading-snug">{intentSummary}</span>
-              )}
-              {loadHeadline && (
-                <span className="text-[14px] font-medium text-white/80 leading-snug">{loadHeadline}</span>
-              )}
-              {(readinessWhy || readinessSuggestion) && (
-                <div className="flex flex-col">
-                  <button
-                    type="button"
-                    onClick={() => setNarrativeOpen((o) => !o)}
-                    className="self-start flex items-center gap-1 text-[13px] text-white/65 hover:text-white/70 transition-colors mt-0.5 touch-manipulation"
-                    aria-expanded={narrativeOpen}
-                  >
-                    {narrativeOpen ? 'Show less' : 'Show more'}
-                    <ChevronDown className={`w-3 h-3 transition-transform ${narrativeOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  {narrativeOpen && (
-                    <>
-                      {/* D-232: the FATIGUED headline expands to its real factors, then the loaded-legs suggestion, then prose. */}
-                      {readinessWhy && <span className="text-[13px] text-amber-300/70 leading-snug mt-1">{readinessWhy}</span>}
-                      {readinessSuggestion && <span className="text-[13px] text-white/60 leading-snug mt-1">{readinessSuggestion}</span>}
-                    </>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-          {!isAimless && raceWeekGuidance && raceWeekGuidance.bullets.length > 0 && (
-            <div
-              className="mt-2 rounded-lg border border-sky-400/20 bg-sky-500/[0.07] px-3 py-2.5"
-              role="region"
-              aria-label="Race-week guidance"
-            >
-              <p className="text-[12px] font-semibold tracking-[0.12em] text-sky-300/85 uppercase mb-1.5">
-                {raceWeekGuidance.title}
-              </p>
-              <ul className="text-[13px] text-white/72 leading-relaxed space-y-1.5 list-disc pl-3.5 marker:text-sky-400/50">
-                {raceWeekGuidance.bullets.map((line, i) => (
-                  <li key={i}>{line}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={() => refresh()}
-          disabled={coachBusy}
-          className="min-h-[44px] min-w-[44px] -mr-1 flex items-center justify-center rounded-lg text-white/60 hover:text-white/65 hover:bg-white/[0.06] disabled:opacity-40 disabled:pointer-events-none transition-colors shrink-0 touch-manipulation relative z-10"
-          aria-label={coachBusy ? 'Updating training data' : 'Refresh'}
-        >
-          <RefreshCw className={`w-4 h-4 ${coachBusy ? 'animate-spin' : ''}`} />
-        </button>
-      </div>
+      <StateHeaderBlock
+        weekLabel={weekLabel}
+        isAimless={isAimless}
+        aimlessHeadline={aimlessHeadline}
+        aimlessSubtext={aimlessSubtext}
+        aimlessCtaAction={aimlessCtaAction}
+        aimlessCtaLabel={aimlessCtaLabel}
+        onAimlessCta={() => navigate(aimlessCtaTarget)}
+        intentSummary={intentSummary}
+        loadHeadline={loadHeadline}
+        readinessWhy={readinessWhy}
+        readinessSuggestion={readinessSuggestion}
+        raceWeekGuidance={raceWeekGuidance}
+        coachBusy={coachBusy}
+        onRefresh={() => refresh()}
+      />
 
       {/* ── THE STRENGTH READ (2026-08-28) — one card per main lift, HEAVY DAYS ONLY. Its own plate,
           above load and body, because it is a different clock and a different question: load and body
@@ -1588,193 +770,29 @@ export default function StateTab({
         {/* LOAD — full-width gauge + sparkline */}
         <LoadBar load={load} loadStatus={loadStatus} weekIntent={week.intent} />
 
-        {showTopLastRaceCard && lastCompletedRace && (
-          <div className="px-3 py-2.5 border-b border-white/[0.055] space-y-1">
-            <p className="text-[12px] font-semibold tracking-[0.12em] text-white/50 uppercase">Last race</p>
-            <p className="text-[13px] text-white/80">
-              <span className="text-white/60">{lastCompletedRace.name}</span>
-              <span className="text-white/60"> · {fmtDate(lastCompletedRace.target_date)}</span>
-            </p>
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-              <span className="text-[20px] font-semibold tabular-nums text-white/90">
-                {fmtGoalClock(lastCompletedRace.actual_seconds)}
-              </span>
-              <span className="text-[13px] text-white/65">actual (elapsed / chip)</span>
-            </div>
-            {lastCompletedRace.goal_target_seconds != null && (
-              <p className="text-[13px] text-white/50">
-                Goal {fmtGoalClock(lastCompletedRace.goal_target_seconds)}
-                <Dot />
-                <span
-                  className={
-                    lastCompletedRace.actual_seconds <= lastCompletedRace.goal_target_seconds
-                      ? 'text-emerald-400/90'
-                      : 'text-amber-400/85'
-                  }
-                >
-                  {fmtSignedDeltaVsGoal(
-                    lastCompletedRace.actual_seconds,
-                    lastCompletedRace.goal_target_seconds,
-                  )}
-                </span>
-              </p>
-            )}
-            {lastCompletedRace.projected_seconds != null && (
-              <p className="text-[13px] text-white/50">
-                Projected {fmtGoalClock(lastCompletedRace.projected_seconds)}
-                <Dot />
-                <span
-                  className={
-                    lastCompletedRace.actual_seconds <= lastCompletedRace.projected_seconds
-                      ? 'text-emerald-400/90'
-                      : 'text-amber-400/85'
-                  }
-                >
-                  {fmtSignedDeltaVsProjection(
-                    lastCompletedRace.actual_seconds,
-                    lastCompletedRace.projected_seconds,
-                  )}
-                </span>
-              </p>
-            )}
-          </div>
-        )}
+        {showTopLastRaceCard && lastCompletedRace && <StateLastRaceCard lastCompletedRace={lastCompletedRace} />}
 
-        {showAmberRecordBar && (
-          <div className="px-3 py-2.5 border-b border-white/[0.055] space-y-1">
-            <p className="text-[12px] font-semibold tracking-[0.12em] text-amber-300/80 uppercase">Race day</p>
-            <p className="text-[13px] text-white/55 leading-snug">
-              Logging your race as a completed run auto-saves the elapsed (chip) result to My Record and ends this plan.
-            </p>
-          </div>
-        )}
+        {showAmberRecordBar && <StateRaceDayBar />}
 
         {/* BODY */}
-        <div className="px-3 py-3">
-          <div className="flex items-start gap-3">
-            <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase pt-0.5 w-[72px] shrink-0">BODY</span>
-            <div className="flex-1 space-y-1.5 tabular-nums">
-              {/* overall_training_read "This week" fallback DELETED 2026-07-24 — the ~25-branch summary
-                  duplicated the load bar above (F8 / docs/COPY-VOICE.md). When BODY has no per-metric
-                  signals it now simply reads "not enough data". */}
-              {visibleSignals.length === 0 && (
-                <Chip value="not enough data" valueClass="text-white/55" />
-              )}
-              {visibleSignals.map((s) => (
-                <div key={s.label}>
-                  {/* D-232 progressive disclosure: tap the row to reveal one line of provenance
-                      (source = your own ratings · cross-discipline · 7d vs 28d). Only when provenance exists. */}
-                  <button
-                    type="button"
-                    disabled={!s.provenance}
-                    onClick={() => s.provenance && setExpandedSignal(expandedSignal === s.label ? null : s.label)}
-                    className="w-full flex items-start gap-3 text-left"
-                  >
-                    <span className="text-[13px] text-white/70 shrink-0 w-[104px]">{s.label}</span>
-                    <div className="flex-1 flex items-start gap-2 min-w-0">
-                      <span className={`flex-1 text-[13px] text-left leading-snug ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
-                      {s.provenance && <span className="text-white/50 text-[11px] shrink-0 mt-0.5">{expandedSignal === s.label ? '▾' : '▸'}</span>}
-                    </div>
-                  </button>
-                  {/* ⛔ THE PERSISTENCE LINE POINTS AT A DOOR, IT DOES NOT OPEN ONE ITSELF (D-354).
-                      Soreness above this athlete's OWN normal for 4 of the last 6 sessions. It states
-                      the fact and offers the Adjust tab; nothing changes unless the athlete goes and
-                      changes it. ⚠️ Adjust is still a scaffold for endurance — strength steers work
-                      (in the logger), ease/push does not exist yet. Sending someone there is honest
-                      because that tab says so itself; it is not honest to pretend the line acts. */}
-                  {s.soreness_flag && (
-                    <button
-                      type="button"
-                      onClick={() => setStateLens('adjust')}
-                      className="w-full flex items-baseline gap-2 text-left pl-[116px] -mt-0.5 mb-1"
-                    >
-                      <span className="text-[12px] text-white/60 leading-snug">{s.soreness_flag}</span>
-                      <span className="text-[12px] text-white/40 shrink-0">Adjust ›</span>
-                    </button>
-                  )}
-                  {/* Whoop pairing (verdict + its driver, together): the RPE driver — which session
-                      moved the week — sits WITH the "how hard it feels" verdict, dim + always-visible.
-                      RPE-clause only (server guarantees no non-RPE factor reaches this row). */}
-                  {s.label === 'How hard it feels' && readinessRpeDriver && (
-                    <p className="text-[13px] text-white/65 leading-snug mt-0.5">{readinessRpeDriver}</p>
-                  )}
-                  {fmtBodyAsOf(s.as_of_date) && (
-                    <p className="text-[12px] text-white/45 leading-snug mt-0.5">{fmtBodyAsOf(s.as_of_date)}</p>
-                  )}
-                  {expandedSignal === s.label && s.provenance && (
-                    <p className="text-[12px] text-white/60 leading-snug mt-1 max-w-[min(100%,320px)]">{s.provenance}</p>
-                  )}
-                </div>
-              ))}
-              {/* The BODY 'Cross-training' row is DELETED (D-354). BODY is only what the athlete
-                  REPORTS — effort and soreness. This row compared declared targets against GPS
-                  mileage, which the athlete already knows. The server no longer sends the field. */}
-            </div>
-          </div>
-        </div>
+        <StateBodyBlock
+          visibleSignals={visibleSignals}
+          readinessRpeDriver={readinessRpeDriver}
+          onOpenAdjust={() => setStateLens('adjust')}
+        />
 
         {/* READINESS — athlete-reported energy/soreness/sleep (Q-049 Phase 1, D-144).
             Raw + distinct sliders; shown ONLY when a recent check-in exists (no-data
             on absent, per Q3). Neutral tone — Phase 1 is visible-only, no good/bad
             judgement encoded. Trend arrow per signal (newest vs oldest in window)
             when ≥3 check-ins. */}
-        {checkinReadiness?.latest && (() => {
-          const L = checkinReadiness.latest!;
-          const today = new Date().toISOString().slice(0, 10);
-          const dayDiff = Math.round(
-            (Date.parse(today + 'T00:00:00Z') - Date.parse(L.date + 'T00:00:00Z')) / 86400000,
-          );
-          const whenLabel = dayDiff <= 0 ? 'today' : dayDiff === 1 ? 'yesterday' : `${dayDiff}d ago`;
-          const arrow = (k: 'energy' | 'soreness' | 'sleep') => {
-            if (checkinReadiness.recent.length < 3) return '';
-            const newest = checkinReadiness.recent[0][k];
-            const oldest = checkinReadiness.recent[checkinReadiness.recent.length - 1][k];
-            return newest > oldest ? ' ↑' : newest < oldest ? ' ↓' : ' →';
-          };
-          return (
-            <div className="px-3 py-3">
-              <Row label="READINESS">
-                <Chip label="energy" value={`${L.energy}${arrow('energy')}`} />
-                <Dot />
-                <Chip label="soreness" value={`${L.soreness}${arrow('soreness')}`} />
-                <Dot />
-                <Chip label="sleep" value={`${L.sleep}${arrow('sleep')}`} />
-                <Dot />
-                <Chip value={whenLabel} valueClass="text-white/65" />
-              </Row>
-            </div>
-          );
-        })()}
+        {checkinReadiness?.latest && <StateReadinessRow checkinReadiness={checkinReadiness} />}
 
         {/* "How your sessions went · last 7 days" — REBUILT (docs/STATE-WEEK-EXECUTION.md). Neutral
             per-discipline planned-vs-done COUNTS + at most ONE composed accent. No fitness verdicts here
             (that is PERFORMANCE, below); interval/execution % lives in session detail. Server owns the
             accent; this renders it (Law 4). Three states: counts+accent / counts-only / nothing. */}
-        {(() => {
-          const we = (wsv as any).week_execution_v1 as {
-            counts?: Array<{ discipline: string; planned: number; done: number }>;
-            accent?: { sentence: string; trace?: { detail?: string } } | null;
-          } | null | undefined;
-          const counts = Array.isArray(we?.counts) ? we!.counts! : [];
-          const accent = we?.accent ?? null;
-          if (counts.length === 0 && !accent) return null; // nothing to say → render nothing
-          const hasPlan = !!wsv.plan?.has_active_plan;
-          const totalPlanned = counts.reduce((s, c) => s + (c.planned || 0), 0);
-          // F21/F26: partial week = the calendar week has not closed yet (end_date is still in the
-          // future). daysSinceYmd = today − end_date, so < 0 means the week is still running.
-          const endDays = daysSinceYmd((week as any)?.end_date ?? null);
-          const partialWeek = endDays != null && endDays < 0;
-          // Header: only claim "planned vs actual" when there IS a plan to compare against (F26).
-          const showsPlanned = hasPlan && totalPlanned > 0;
-          const sectionLabel = showsPlanned ? 'this week · planned vs actual' : 'this week';
-          return (
-            <>
-              <div className="px-4 pt-3 text-[12px] text-white/50 lowercase tracking-[0.12em]">{sectionLabel}</div>
-              {counts.length > 0 && <WeekMixBar counts={counts} hasPlan={hasPlan} partialWeek={partialWeek} />}
-              {accent?.sentence && <WeekAccentLine sentence={accent.sentence} detail={accent.trace?.detail ?? null} />}
-            </>
-          );
-        })()}
+        <StateWeekExecution wsv={wsv} week={week} />
 
         {/* ⛔ WHAT THE WEEK BOUGHT EACH MUSCLE — the same seven days the rows above measure, in
             Viada's own units. Moved here from the trends plate (2026-08-29): sets and effective reps
@@ -1791,118 +809,7 @@ export default function StateTab({
           opens on fitness / fatigue / form, Intervals.icu the same, Whoop on today's recovery.
           This screen opened on a 13-week efficiency chart — a trend — on a screen called State.
           The load plate above is the NOW; everything below it is the arc behind it. */}
-      {(() => {
-        const meHistory = (wsv as { me_history_v1?: React.ComponentProps<typeof StrengthReadCards>['meHistory'] }).me_history_v1;
-        const namedSessions = (wsv.trends?.display as { namedSessions?: React.ComponentProps<typeof EnduranceReadCards>['sessions'] } | undefined)?.namedSessions ?? null;
-        // ⛔ THE ATHLETE-SCOPED SPINE (2026-08-28, item 3 / Q-294). Every run and ride, grouped by
-        // session type, NO PLAN REQUIRED — the primary endurance read. `namedSessions` above is the
-        // overlay that appears when a block exists, and it is drawn after this.
-        const enduranceSpine = (wsv.trends?.display as { enduranceSpine?: React.ComponentProps<typeof EnduranceReadCards>['spine'] } | undefined)?.enduranceSpine ?? null;
-        // ⛔ VIADA'S TWO LIFTING DOSES OVER THE LOGGED WEEK (2026-08-29). Resolved server-side and
-        // rendered verbatim; absent when nothing was lifted in the window.
-        const viadaWeek = (wsv.trends?.display as { viadaWeek?: React.ComponentProps<typeof ViadaWeekCard>['week'] } | undefined)?.viadaWeek ?? null;
-        // ⛔ EITHER HALF IS ENOUGH, AND THE RUN HALF ARRIVES FIRST. Week 1 of a block is the two
-        // strength tests, so there is no heavy session and no lift card — but the Wednesday run is
-        // prescribed in week 1 like every other week, so the run card can stand alone. Gating the
-        // section on the lift half would hide it for the block's whole first week.
-        // ⛔ ANY OF THE THREE IS ENOUGH. The spine was added to this test on 2026-08-28: an athlete
-        // with no block at all still has runs, and gating the section on a plan-linked series is the
-        // exact precondition item 3 removed.
-        // ⚠️ AND THE WEEK'S DOSE IS A FOURTH WAY IN. An athlete who lifted this week has something to
-        // read even with no heavy session, no named session and no run in the window.
-        if (!meHistory && !(namedSessions && namedSessions.length > 0) && !(enduranceSpine && enduranceSpine.length > 0) && !viadaWeek) return null;
-        const seriesByCanonical: Record<string, Array<{ date: string; value: number; recent: boolean; week?: number }>> = {};
-        const expectedByCanonical: Record<string, Array<{ date: string; value: number }>> = {};
-        /**
-         * ⛔⛔ THE FIELD IS `canonical`, NOT `canonical_name` (2026-08-29) — and reading the wrong one
-         * cost nothing visible, which is why it survived. `per_lift` entries carry `canonical`;
-         * `exercise_log` rows carry `canonical_name`, and this loop was written against the second
-         * while reading the first. Every entry failed the guard, the map came out EMPTY, and the
-         * charts simply did not render — no error, no warning, no blank card. Four of this athlete's
-         * lifts had a series sitting in the payload the whole time.
-         * ⚠️ THE PATTERN THIS CODEBASE KEEPS REPEATING: a field resolved upstream and rebuilt by name
-         * downstream. `slot_intent` was dropped at three separate narrow points the same way.
-         * ⚠️ BOTH NAMES ARE ACCEPTED so a payload written before this cannot go dark again.
-         */
-        /**
-         * ⛔⛔ TWO DIFFERENT `per_lift` OBJECTS, AND THIS READ THE ONE WITHOUT THE CHART.
-         *
-         * `response_model.strength.per_lift` (the coach's) carries the VERDICT row — rir_trend,
-         * suggested_weight, e1rm_delta_pct, keyed `canonical_name`. It has no `series` and never has.
-         * `state_trends_v1.strength.per_lift` (the snapshot's) carries the CHART — `series`,
-         * `expected`, `bestE1rm` — keyed `canonical`. Same name, same subject, different payloads.
-         * The chart source is checked first; the coach's row stays as the fallback so nothing that
-         * used to render can stop.
-         * ⚠️ THIRD TIME THIS SHAPE HAS BITTEN: a field resolved upstream and looked up by the wrong
-         * name downstream fails SILENTLY — empty map, no chart, no error.
-         */
-        /**
-         * ⛔⛔ THE CLIENT ONLY EVER RECEIVES `trends.display` — VERIFIED AGAINST THE LIVE PAYLOAD.
-         * `state_trends_v1.strength.per_lift` exists in the SNAPSHOT ROW and is not forwarded; asking
-         * for it here returned nothing, which is why two previous fixes changed nothing on screen.
-         * The same lifts, with the same series, ride inside `display.strengthFitness.perLift`.
-         * ⚠️ Fallbacks kept in source order — display first, then the un-forwarded branch, then the
-         * coach's verdict rows (which carry no series at all) — so no payload shape can go dark.
-         */
-        const displayPerLift = ((wsv.trends?.display as any)?.strengthFitness?.perLift ?? []) as Array<any>;
-        const trendPerLift = ((wsv.trends as any)?.strength?.per_lift ?? []) as Array<any>;
-        const modelPerLift = (rm?.strength?.per_lift ?? []) as Array<any>;
-        const perLiftRows = displayPerLift.length > 0 ? displayPerLift
-          : trendPerLift.length > 0 ? trendPerLift : modelPerLift;
-        for (const l of perLiftRows as Array<{ canonical?: string; canonical_name?: string; series?: Array<{ date: string; value: number; recent: boolean; week?: number }>; expected?: Array<{ date: string; value: number }> }>) {
-          const key = l?.canonical ?? l?.canonical_name;
-          if (!key) continue;
-          if (Array.isArray(l.series)) seriesByCanonical[key] = l.series;
-          if (Array.isArray(l.expected)) expectedByCanonical[key] = l.expected;
-        }
-        // The cards' own predicate, so the header above them cannot disagree with them.
-        // ⚠️ The header follows the CARDS, and a card can now come from the series alone (2026-08-29),
-        // so the count has to include those or the header disappears exactly when the charts arrive.
-        const liftCardCount = strengthReadCards({
-          history: meHistory?.history,
-          lastReps: meHistory?.last_reps,
-          atWeight: meHistory?.at_weight,
-        }).length + Object.values(seriesByCanonical).filter((pts) => (pts?.length ?? 0) >= 2).length;
-        const cards = (
-          <StrengthReadCards
-            meHistory={meHistory ?? null}
-            seriesByCanonical={seriesByCanonical}
-            expectedByCanonical={expectedByCanonical}
-          />
-        );
-        return (
-          <>
-            {/* ⛔ THE HEADER BELONGS TO THE LIFT CARDS AND NOTHING ELSE (2026-08-29, Michael: it sat
-                above easy runs, quality runs, rides and the week's lifting, none of which are about
-                a bar). It moves inside, directly over the cards it describes, and renders only when
-                there are cards to describe. */}
-            <div
-              className="mb-3 galaxy-card readout-texture readout-texture--spectral rounded-2xl"
-              style={readoutPlateStyle(undefined, { galaxy: true })}
-            >
-              {/* ⚠️ GATED ON THE CARDS EXISTING, NOT ON THE HISTORY EXISTING (2026-08-29, second cut).
-                  `me_history_v1` is present as soon as any heavy session is on file, but the cards
-                  render off `strengthReadCards`, which returns nothing until a lift has a heavy day
-                  IN THIS BLOCK — week 1 is the two tests. So the header still drew, alone, above the
-                  runs. Same predicate the cards use, asked once here. */}
-              {liftCardCount > 0 && (
-                <div className="px-3 pt-3 text-[12px] text-white/50 lowercase">is the bar going up</div>
-              )}
-              {cards}
-              {/* ⛔ THE ENDURANCE CARDS SIT ON THE SAME PLATE, LAST — one per sport. They answer the
-                  same question in the other disciplines (is the same work getting cheaper) and the
-                  block is one thing, not three screens. ⚠️ They render independently of the lift
-                  cards: week 1 of every block is the two strength tests, so a week where the runs
-                  and rides are logged and no heavy session is yet shows these alone, which is the
-                  honest state. */}
-              <EnduranceReadCards sessions={namedSessions} spine={enduranceSpine} />
-              {/* ⚠️ THE WEEK'S DOSE MOVED TO THE LOAD PLATE (2026-08-29) — it is a week's fact and
-                  belongs with the other week facts. `viadaWeek` is still read here because the
-                  section's render gate counts it as substance. */}
-            </div>
-          </>
-        );
-      })()}
+      <StateTrendsBlock wsv={wsv} />
 
       {/* PERFORMANCE — STATE v2 per-discipline trend (perf where data exists, adherence fallback). Under review; not yet shipped. */}
       {/* ⛔ `block` is the block-identity card the coach payload has carried since v150 — protocol,
@@ -1918,137 +825,65 @@ export default function StateTab({
         {/* SWIM re-test nudge (D-200) — fires after ≥4 weeks + ≥4 honored swims; auto-clears when the
             threshold is updated/tested (lastUpdatedAt moves). Dismiss = 7-day snooze (shared pattern). */}
         {swimNudge?.show && nudgeDismissNonce >= 0 && !isNudgeSnoozed('swim_retest') && (
-          <div className="mt-3 rounded-lg border border-sky-400/20 bg-sky-500/[0.07] px-3 py-2.5">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-[12px] font-semibold tracking-[0.12em] text-sky-300/85 uppercase mb-1">Swim check-in</p>
-                <p className="text-[13px] text-white/75 leading-snug">
-                  About {Math.round(swimNudge.weeksSince)} weeks of steady swimming since your last update — a quick CSS test would refresh your threshold.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => { snoozeNudge('swim_retest'); setNudgeDismissNonce((n) => n + 1); }}
-                className="text-[13px] text-white/60 hover:text-white/70 shrink-0 touch-manipulation"
-                aria-label="Dismiss swim check-in"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
+          <StateSwimNudge
+            weeksSince={swimNudge.weeksSince}
+            onDismiss={() => setNudgeDismissNonce((n) => n + 1)}
+          />
         )}
 
         {/* SIGNAL — longitudinal nudge, only when there's an actionable signal */}
         {showNudge && (
-          <div className="px-3 py-3">
-            <div className="flex items-start gap-3">
-              <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase pt-0.5 w-[72px] shrink-0">SIGNAL</span>
-              <div className="flex-1">
-                <div className="flex items-start justify-between gap-2">
-                  <span className={`text-[13px] leading-snug flex-1 ${
-                    nudgeDecision.severity === 'concern' ? 'text-amber-400/85' : 'text-white/75'
-                  }`}>
-                    {nudgeDecision.headline}
-                  </span>
-                  <button
-                    type="button"
-                    className="shrink-0 p-0.5 text-white/50 hover:text-white/65 bg-transparent border-none cursor-pointer"
-                    aria-label="Dismiss signal"
-                    onClick={() => {
-                      snoozeNudge(nudgeDecision.nudge_kind!);
-                      setNudgeDismissNonce((n) => n + 1);
-                    }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                      <path d="M1 1l10 10M11 1L1 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  className="mt-1.5 text-[13px] text-teal-400/70 hover:text-teal-300/90 bg-transparent border-none cursor-pointer p-0"
-                  onClick={() => navigate('/arc-setup', { state: { arcNudgeSeed: nudgeDecision.headline } })}
-                >
-                  Review with Arc →
-                </button>
-              </div>
-            </div>
-          </div>
+          <StateSignalBlock
+            severity={nudgeDecision.severity}
+            headline={nudgeDecision.headline}
+            nudgeKind={nudgeDecision.nudge_kind!}
+            onDismiss={() => setNudgeDismissNonce((n) => n + 1)}
+            onReviewWithArc={() => navigate('/arc-setup', { state: { arcNudgeSeed: nudgeDecision.headline } })}
+          />
         )}
 
         {/* STRENGTH per-lift detail moved (Q-107 H3) — now nested under the STRENGTH trend row inside
             <StatePerformanceSection> above (passed as strengthDetail). No second "STRENGTH" header. */}
 
         {/* RACE — visible during the build and through race week; disappears 7 days after the race. */}
-        {(() => {
-          // item 5 (Arc source-gate — relevance earned by live data, else null): RACE requires an
-          // actual race signal, NOT a bare active plan. A non-race plan (e.g. Get Stronger) has
-          // has_active_plan=true but no goal/projection → this used to render an empty RACE header.
-          // (This is the QUICK half of the Q-120 overlap — a render narrowing, no logic added, so it
-          // does not complicate the full Q-120 readiness-gating redesign.)
-          // RACE only when there is a REAL race. Hard race artifacts (a computed projection / official
-          // result) always qualify. A soft goal or readiness qualifies ONLY with an actual race DATE —
-          // because goalMetaFromGoalLite defaults distance to 'marathon', so `goalMeta` is truthy for ANY
-          // linked goal (incl. a non-race "Get Stronger" plan), which was leaking an empty RACE prompt.
-          const hasRaceContent =
-            raceFinishProjection ||
-            officialForRace ||
-            postRaceUnofficial ||
-            (!!raceYmdForActivePlan && (raceReadiness || goalMeta));
-          if (!hasRaceContent) return null;
-          const upcomingDays = daysSinceYmd(raceYmdForActivePlan);
-          const stillRaceWeek = upcomingDays == null || upcomingDays <= 7;
-          if (!stillRaceWeek) return null;
-          return (
-          <RaceSection
-            projection={raceFinishProjection}
-            rr={raceReadiness}
-            blockVerdict={data?.goal_prediction?.block_verdict ?? null}
-            divergence={
-              (data?.fitness_verdict_divergence ?? []).find(
-                (d) => d.goal_id === raceReadiness?.goal?.id || d.goal_name === raceReadiness?.goal?.name,
-              ) ?? null
+        <StateRaceBlock
+          raceFinishProjection={raceFinishProjection}
+          officialForRace={officialForRace}
+          postRaceUnofficial={postRaceUnofficial}
+          raceYmdForActivePlan={raceYmdForActivePlan}
+          raceReadiness={raceReadiness}
+          goalMeta={goalMeta}
+          blockVerdict={data?.goal_prediction?.block_verdict ?? null}
+          divergence={
+            (data?.fitness_verdict_divergence ?? []).find(
+              (d) => d.goal_id === raceReadiness?.goal?.id || d.goal_name === raceReadiness?.goal?.name,
+            ) ?? null
+          }
+          planWizardDistance={planWizardDistance}
+          planWizardTargetSeconds={planWizardTargetSeconds ?? null}
+          primaryRaceReadiness={primaryRaceReadiness}
+          resolvedGoalId={resolvedGoalId}
+          courseRow={stateCourseRow}
+          courseBusy={courseBusy}
+          onAddCourse={() => stateCourseFileRef.current?.click()}
+          onViewStrategy={() => {
+            if (stateCourseRow?.id) {
+              setStrategyCourseId(stateCourseRow.id);
+              setStrategyModalOpen(true);
             }
-            goalMeta={goalMeta}
-            planWizardDistance={planWizardDistance}
-            planWizardTargetSeconds={planWizardTargetSeconds ?? null}
-            primaryRaceReadiness={primaryRaceReadiness}
-            resolvedGoalId={resolvedGoalId}
-            courseRow={stateCourseRow}
-            courseBusy={courseBusy}
-            onAddCourse={() => stateCourseFileRef.current?.click()}
-            onViewStrategy={() => {
-              if (stateCourseRow?.id) {
-                setStrategyCourseId(stateCourseRow.id);
-                setStrategyModalOpen(true);
-              }
-            }}
-            onOpenKeyRun={
-              onSelectWorkout
-                ? (workoutId) => {
-                    onClose?.();
-                    onSelectWorkout({ id: workoutId, workout_status: 'completed', type: 'run' });
-                  }
-                : undefined
-            }
-            officialResult={officialForRace}
-            postRaceUnofficial={officialForRace ? null : postRaceUnofficial}
-          />
-          );
-        })()}
+          }}
+          onOpenKeyRun={
+            onSelectWorkout
+              ? (workoutId) => {
+                  onClose?.();
+                  onSelectWorkout({ id: workoutId, workout_status: 'completed', type: 'run' });
+                }
+              : undefined
+          }
+        />
 
         {/* NEXT */}
-        <div className="px-3 py-3">
-          <Row label="NEXT">
-            {nextSessions.length === 0 && <Chip value="week complete" valueClass="text-white/55" />}
-            {nextSessions.map((s, i) => (
-              <React.Fragment key={i}>
-                {i > 0 && <Dot />}
-                <Chip label={fmtDate(s.date)} value={s.name ?? s.type} />
-              </React.Fragment>
-            ))}
-          </Row>
-        </div>
+        <StateNextBlock nextSessions={nextSessions} />
       </div>
 
       {wsv.plan.plan_name && (

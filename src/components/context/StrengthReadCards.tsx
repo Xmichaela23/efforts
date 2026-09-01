@@ -1,235 +1,28 @@
 /**
- * THE STRENGTH READ — one card per main lift, heavy days only. [2026-08-28, work order item 1]
+ * THE ENDURANCE READ — one card per sport, on the trends plate.
  *
- * ⛔ IT RENDERS AND DOES NOT DECIDE. The word is the ladder's own `meSessionOutcome`, mapped at this
- * edge; the weight and reps are one stored reading; the line is the heavy-only e1RM series with its
- * week index already resolved server-side. Nothing here computes a verdict, a week, or a trend.
+ * ⛔⛔ THIS FILE USED TO OWN BOTH HALVES. The strength half — "is the bar going up", one card per
+ * main lift with its weekly-heaviest-set line — WAS DELETED 2026-09-01 (FIXLIST item 1a, ruled by
+ * Michael). It drew the same four lifts, off the same series, as the STRENGTH block inside
+ * <StatePerformanceSection>, which survives because it also carries the all-history record, the
+ * session count and as-of date, the last all-out set with its rep-PR flag, and the training-max
+ * climbing / holding / reset line.
  *
- * ⛔ HEAVY SETS ONLY, EVERYWHERE. The line is gated in `state-trend/assemble.ts` and the word comes
- * from ME sessions only. On a Viada block the same lift is prescribed twenty percent apart in one
- * week — bench 135 heavy, 105 speed — and a speed set may move none of this.
+ * ⛔ DO NOT RESTORE IT. What went with it: <StrengthReadCards>, its default export, `ReadChart`,
+ * `Card`, `LineOnlyCard`, `canonicalKey` and `BLOCK_WEEKS`. Nothing in the endurance half used any
+ * of them (checked: `ReadChart` had exactly two call sites, both in the deleted half).
  *
- * ⛔ NO EMPTY STATE, RULED. A lift with no heavy session logged in the block does not render; if
- * none do, the section does not appear. Week 1 is the two tests, so an empty first week is the
- * block's shape rather than a defect.
- *
- * ⚠️ THIS CHART IS ITS OWN, AND THAT IS DELIBERATE RATHER THAN A SECOND COPY. `TrendSparkline` is
- * shared by the run, bike and strength rows and is built around DATES, one series, and a tap-to-
- * expand affordance. This axis is BLOCK WEEKS, it carries a second faint series, it marks where the
- * athlete is, and it does not expand — four props no other caller would ever pass, replacing most of
- * that component's chrome. The DATA series is not duplicated: it is the same server-gated series,
- * read once. ⚠️ If a third surface ever wants this shape, extract it then, not now.
+ * ⚠️ THE SERVER IS UNCHANGED AND STILL SENDS THE INPUTS. `liftSeriesFromExerciseLog`,
+ * `state_trends_v1.strength.per_lift`, `display.strengthFitness.perLift` and `me_history_v1` all
+ * still exist and still feed the surviving STRENGTH block. `src/lib/strength-read.ts` and its eight
+ * fixtures are now UNRENDERED — see its own banner. Retiring them is a separate call, not this one.
  */
 
 import React from 'react';
-import { strengthReadCards, type StrengthReadCard } from '@/lib/strength-read';
 import { getDisciplineColor } from '@/lib/context-utils';
 
 type SeriesPoint = { date: string; value: number; recent: boolean; week?: number };
 
-/** ⚠️ Matched on the lift's canonical name, which is how the series is keyed. */
-type LiftSeriesByCanonical = Record<string, SeriesPoint[] | undefined>;
-
-const BLOCK_WEEKS = 12;
-
-/**
- * ⛔⛔ THE LINE IS THE ATHLETE'S, NOT THE BLOCK'S (ruled 2026-08-28). It plots every heavy reading in
- * the chart window regardless of which block produced it, because a lifted weight does not stop
- * being the athlete's because the app rebuilt their plan. Michael's own framing for the customer
- * this is for: *"I ride a lot, I want to get stronger, I want the scaffolding of a program."* That
- * person thinks in bench numbers, not in blocks, and a strength line that resets on a rebuild is the
- * thing that makes them close the app.
- *
- * ⛔ THE FAINT CURVE IS THE BLOCK'S AND STARTS WHERE THE BLOCK STARTS. Two clocks on one chart, and
- * that is the correct answer rather than a compromise: "am I stronger" and "am I doing this
- * programme" are different questions, and only the second is about the programme.
- *
- * ⚠️ SO THE AXIS IS DATES, NOT BLOCK WEEKS. The week index still rides on each point — it is the
- * only honest way to write "week 6", since a client cannot derive it without re-deriving block
- * starts — but it labels, it no longer positions.
- */
-function ReadChart({ points, expected }: {
-  points: SeriesPoint[];
-  expected?: Array<{ date: string; value: number }>;
-}) {
-  if (points.length < 2) return null;
-  const W = 300, H = 46, PAD_Y = 6, PAD_X = 2;
-
-  const t = (iso: string) => Date.parse(`${iso}T12:00:00Z`);
-  // ⚠️ The domain is the READINGS' own span. The curve is clipped to it rather than stretching the
-  // axis — a block that ends next month must not squash the athlete's history into the left half.
-  const t0 = t(points[0].date), t1 = t(points[points.length - 1].date);
-  const span = Math.max(1, t1 - t0);
-  const ghost = (expected ?? []).filter((p) => t(p.date) >= t0 && t(p.date) <= t1);
-
-  const vals = [...points.map((p) => p.value), ...ghost.map((p) => p.value)];
-  const minV = Math.min(...vals), maxV = Math.max(...vals);
-  const center = (minV + maxV) / 2 || 1;
-  // The same noise floor the shared chart uses: an e1RM wobbles a few percent session to session,
-  // and a domain stretched to the data turns that into a cliff.
-  const dRange = Math.max((maxV - minV) * 1.3, center * 0.25, 1e-6);
-  const dMin = center - dRange / 2;
-  const x = (iso: string) => PAD_X + ((t(iso) - t0) / span) * (W - 2 * PAD_X);
-  const y = (v: number) => PAD_Y + (1 - (v - dMin) / dRange) * (H - 2 * PAD_Y);
-
-  const last = points[points.length - 1];
-  const color = getDisciplineColor('strength');
-  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const fmtD = (iso: string) => { const [, m, d] = iso.split('-'); return `${MON[+m - 1]} ${+d}`; };
-
-  return (
-    <div className="mt-2">
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="block">
-        {/* ⚠️ The programme's shape, and it decides nothing — the word comes from completed reps. */}
-        {ghost.length > 1 && (
-          <polyline points={ghost.map((p) => `${x(p.date)},${y(p.value)}`).join(' ')}
-            fill="none" stroke="rgba(255,255,255,0.16)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
-        )}
-        <polyline points={points.map((p) => `${x(p.date)},${y(p.value)}`).join(' ')}
-          fill="none" stroke={color} strokeOpacity={0.9} strokeWidth={1.75} vectorEffect="non-scaling-stroke" />
-        {points.map((p, i) => <circle key={i} cx={x(p.date)} cy={y(p.value)} r={1.6} fill={color} fillOpacity={0.55} />)}
-        <circle cx={x(last.date)} cy={y(last.value)} r={2.5} fill={color} />
-      </svg>
-      <div className="flex items-baseline justify-between text-[10px] text-white/55 tabular-nums mt-0.5">
-        <span>{fmtD(points[0].date)}</span>
-        {/* ⚠️ The week LABELS the latest reading; it does not place it. Absent when that reading came
-            from before the current block — a session from a deleted block is not week 1 of this one. */}
-        <span className="text-white/60">
-          {Number.isFinite(last.week as number) ? `you are here · week ${last.week}` : 'latest'}
-        </span>
-        <span>{fmtD(last.date)}</span>
-      </div>
-    </div>
-  );
-}
-
-function Card({ card, points, expected }: { card: StrengthReadCard; points?: SeriesPoint[]; expected?: Array<{ date: string; value: number }> }) {
-  const reps = card.recentReps;
-  const lastReps = reps.length > 0 ? reps[reps.length - 1] : null;
-  const firstReps = reps.length > 1 ? reps[0] : null;
-  return (
-    <div className="px-3 py-3 border-t border-white/[0.055] first:border-t-0">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[13px] text-white/80">{card.movement}</span>
-        {/* ⚠️ ONE WORD, NO COLOUR CODING. "Stalled" is a fact about a session, not an alarm — and a
-            red chip on a screen a lifter reads mid-block is a judgement this app does not make. */}
-        <span className="text-[11px] uppercase tracking-[0.08em] text-white/55">{card.word}</span>
-      </div>
-      <div className="flex items-baseline gap-1.5 mt-1">
-        <span className="readout-num text-[26px] leading-none">{card.atWeight}</span>
-        <span className="text-[12px] text-white/60">lb</span>
-      </div>
-      {lastReps != null && (
-        <div className="text-[12px] text-white/50 mt-1">
-          last time <span className="tabular-nums text-white/75">{lastReps} reps</span>
-          {/* ⚠️ Only when there IS an earlier reading at this weight. More reps under the same bar is
-              the progress this plan produces between increments — but two numbers where the second
-              is the first would state a comparison that has not happened yet. */}
-          {firstReps != null && (
-            <span className="text-white/55"> · first at this weight <span className="tabular-nums">{firstReps}</span></span>
-          )}
-        </div>
-      )}
-      <ReadChart points={points ?? []} expected={expected} />
-    </div>
-  );
-}
-
-export function StrengthReadCards({
-  meHistory,
-  seriesByCanonical,
-  expectedByCanonical,
-}: {
-  meHistory?: {
-    history: Partial<Record<string, Array<{ week: number; day: string; movement: string; outcome: string }>>>;
-    last_reps: Partial<Record<string, number[]>> | null;
-    at_weight: Partial<Record<string, number>> | null;
-  } | null;
-  seriesByCanonical?: LiftSeriesByCanonical;
-  /** ⛔ The block's expected curve per lift — block-scoped while the readings are not. */
-  expectedByCanonical?: Record<string, Array<{ date: string; value: number }> | undefined>;
-}) {
-  const cards = strengthReadCards({
-    history: meHistory?.history,
-    lastReps: meHistory?.last_reps,
-    atWeight: meHistory?.at_weight,
-  });
-
-  /**
-   * ⛔⛔ THE LINE DOES NOT WAIT FOR THE BLOCK (2026-08-29, Michael: *"we don't get strength graphs
-   * anymore? it should just be how fitbod and strong and hevy show"*).
-   *
-   * These cards were gated entirely on `meHistory` — the block's own heavy-session ladder — so a
-   * lifter with a year of logged sets and no heavy day IN THE CURRENT BLOCK saw nothing at all.
-   * Week 1 of every block is the tests, so that is every athlete, every twelve weeks.
-   *
-   * ⛔ THE FIELD SHOWS THE CHART REGARDLESS. Strong charts a lift's estimated max and volume from
-   * your logged sets; Hevy graphs projected 1RM, heaviest weight, best set and volume with a metric
-   * picker. Neither requires a programme to be running.
-   * ⚠️ WHAT THE BLOCK STILL OWNS IS THE WORD. "Stalled" / "on track" / "moving up" judges against a
-   * prescription, so a lift with a line and no block history renders its chart and NO word — never a
-   * verdict inferred from a line.
-   */
-  const seriesOnly = Object.entries(seriesByCanonical ?? {})
-    .filter(([canonical, pts]) => (pts?.length ?? 0) >= 2 && !cards.some((c) => canonicalKey(c.movement) === canonical))
-    .map(([canonical, pts]) => ({ canonical, points: pts! }));
-
-  if (cards.length === 0 && seriesOnly.length === 0) return null;
-
-  return (
-    <>
-      {cards.map((c) => (
-        <Card
-          key={c.pattern}
-          card={c}
-          // ⚠️ Matched on the movement's canonical key. A lift the series does not carry renders the
-          // card WITHOUT a line rather than not at all — the weight, the reps and the word are the
-          // reading; the line is the long view behind it.
-          points={seriesByCanonical?.[canonicalKey(c.movement)]}
-          expected={expectedByCanonical?.[canonicalKey(c.movement)]}
-        />
-      ))}
-      {seriesOnly.map((s) => (
-        <LineOnlyCard key={s.canonical} canonical={s.canonical} points={s.points} />
-      ))}
-    </>
-  );
-}
-
-/**
- * ⛔ A LIFT WITH A LINE AND NO BLOCK VERDICT. The chart, the latest estimate, and nothing else —
- * the reading is the line's own direction, which the athlete can see.
- * ⚠️ NO WORD, DELIBERATELY: see the note above. A verdict here would be inferred from a chart
- * rather than judged against a prescription.
- */
-function LineOnlyCard({ canonical, points }: { canonical: string; points: SeriesPoint[] }) {
-  const latest = points[points.length - 1];
-  const name = canonical.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
-  return (
-    <div className="px-3 py-3 border-t border-white/[0.055] first:border-t-0">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[13px] text-white/80">{name}</span>
-        <span className="text-[11px] text-white/55 tabular-nums">{points.length} weeks</span>
-      </div>
-      <div className="flex items-baseline gap-1.5 mt-1">
-        <span className="readout-num text-[26px] leading-none">{Math.round(latest.value)}</span>
-        <span className="text-[12px] text-white/60">lb estimated max</span>
-      </div>
-      <div className="text-[11px] text-white/55 mt-0.5">your heaviest set each week</div>
-      <ReadChart points={points} />
-    </div>
-  );
-}
-
-/**
- * ⚠️ THE SERIES IS KEYED BY CANONICAL NAME AND THE HISTORY BY THE MOVEMENT AS THE BLOCK NAMED IT.
- * This is the app's own canonical form — lowercase, underscores — and it is the same shape
- * `canonicalize` produces for the common cases. ⛔ It is a KEY LOOKUP ONLY: a miss costs the card
- * its line and nothing else, so this can never put a wrong number on screen.
- */
-function canonicalKey(movement: string): string {
-  return movement.trim().toLowerCase().replace(/\s+/g, '_');
-}
 
 /**
  * THE ENDURANCE CARDS — one per sport, the same shape as a lift card. [work order item 2, extended
@@ -537,4 +330,4 @@ function DatedChart({ points, color }: { points: Array<{ date: string; value: nu
   );
 }
 
-export default StrengthReadCards;
+export default EnduranceReadCards;

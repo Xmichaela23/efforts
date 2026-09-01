@@ -13,6 +13,7 @@ import { useStateTrends } from '@/hooks/useStateTrends';
 import { useAppContext } from '@/contexts/AppContext';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/lib/trend-receipt';
+import { foldVariantSlots } from '@/lib/fold-lift-slots';
 import { formatPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
 import { readoutPlateStyle } from '@/lib/readout-plate';
@@ -588,7 +589,17 @@ const CALIBRATION_REF_BY_CANONICAL: Record<string, string> = {
 
 function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: { fitness: StrengthFitness; fatigue?: boolean; planWeek?: number | null; block?: BlockCard | null; calibration?: StrengthCalibrationRead }) {
   // Main lifts with a real e1RM number; primaries lead (squat/bench/deadlift/press — the field's "main lifts").
-  const lifts = fitness.perLift.filter((l) => l.isPrimary && l.latestE1rm != null);
+  /**
+   * ⛔ ONE SLOT, ONE CARD (FIXLIST 2b, ruled by Michael 2026-09-01). The trap bar deadlift is not a
+   * fifth lift on this screen — it fills the deadlift slot, per the book's PRIMARY HINGE pattern, and
+   * the app already prescribed its working weight off the deadlift training max
+   * (`CALIBRATION_REF_BY_CANONICAL` directly above maps it). The fold is DISPLAY-side: no stored
+   * history, canonical name or athlete data changes, and no server field moves.
+   * ⚠️ See `src/lib/fold-lift-slots.ts` for why there is no "which version" line on the card, and why
+   * a merged number reading lower than the unmerged deadlift did is the correct outcome rather than a
+   * regression — `showBest` below renders the record precisely when that happens.
+   */
+  const lifts = foldVariantSlots(fitness.perLift.filter((l) => l.isPrimary && l.latestE1rm != null));
   const blockLine = blockContextLine(planWeek, block);
   // ⛔ SLICE b — the ambient per-lift state, by `training_max` key. Absent for any lift the current
   // block does not prescribe (an accessory, or a lift on a plan that is not a strength block), and
@@ -1079,6 +1090,21 @@ function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: nu
   );
 }
 
+/**
+ * ⛔⛔ UNREACHABLE SINCE 2026-09-01 — NOTHING RENDERS THIS. FIXLIST item 1b removed the run card from
+ * the Fitness section entirely, so there is no longer a call site.
+ *
+ * ⚠️ IT WAS ALREADY DARK FOR ALMOST EVERY ATHLETE BEFORE THAT. `runSpineCovers` had suppressed it
+ * since 2026-08-29 for anyone whose payload carried an endurance spine — which is anyone with a
+ * single logged run (`compute-snapshot/index.ts` emits a spine group at one point; `SpineCard`
+ * renders at one point). Only a coach payload cached before v174 ever reached this component.
+ *
+ * ⛔ NOT DELETED, DELIBERATELY, AND NOT MY CALL TO DELETE. It carries content that exists nowhere
+ * else on the screen: the measured heat cost in seconds per mile per 10°F off the athlete's own
+ * runs (D-346), the temperature-spread caption, the ⓘ definition tap-down, and the Q-179 posture
+ * sentence. Retiring ~330 lines of that is a product decision, not a cleanup. Left standing with
+ * this banner so the next session cannot mistake it for live code.
+ */
 function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; postureSentence?: string | null; showAxis?: boolean; mode?: FitnessMode; anchor?: FitnessAnchor }) {
   const { useImperial } = useAppContext();
   const eff = fitness.efficiency;
@@ -1515,24 +1541,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   // The bike row shows the dual Power · Efficiency read when either has substance; otherwise it
   // falls through to the standard card (adherence).
   const bikeHasSubstance = !!bikeFitness && (bikeFitness.power.verdict !== 'needs_data' || bikeFitness.efficiency.verdict !== 'needs_data');
-  // The run row shows the dual Decoupling · Efficiency read when there's decoupling substance
-  // (a verdict, OR a stale-but-real value to carry forward) or an efficiency verdict; else it
-  // falls through to the standard card (adherence). Mirrors bike.
-  const runHasSubstance = !!runFitness && (runFitness.decoupling.verdict !== 'needs_data' || runFitness.decoupling.stale || runFitness.efficiency.verdict !== 'needs_data');
-  /**
-   * ⛔ THE RUN ROW STANDS DOWN WHERE THE SPINE CARDS COVER IT (2026-08-29, Michael: *"I never trusted
-   * those old rows"* / *"why two ride lines?"*).
-   *
-   * The efficiency cards at the top of State draw this read per session type — easy runs, quality
-   * runs, rides — each with its own line, date range and the field's own name for the number. This
-   * row then said the same thing again in a different shape, and once its duplicate chart was removed
-   * it was a single sentence sitting under a sport header.
-   * ⚠️ IT IS A STAND-DOWN, NOT A DELETION. With no spine (a new athlete, or a payload written before
-   * the cards existed) the row renders exactly as it did — nothing that used to appear can vanish.
-   * ⚠️ THE BIKE ROW IS UNTOUCHED: its charts are POWER and LOAD, and no card carries those.
-   */
-  const runSpineCovers = Array.isArray((stateDisplay as any)?.enduranceSpine)
-    && ((stateDisplay as any).enduranceSpine as Array<any>).some((g) => String(g?.sport ?? g?.discipline ?? '') === 'run');
+
   // Strength shows the Volume · e1RM · sessions composite when volume trends or e1RM has a verdict;
   // else the adherence card. Volume gives the row a real verdict so it stops falling to the shrug.
   // ⚠️ THE PULL-UP PROGRESSION IS SUBSTANCE ON ITS OWN (Slice 6). An athlete who opted into it and
@@ -1580,7 +1589,36 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   // integers rather than ±Infinity sentinels — `Infinity - Infinity` is NaN, and a NaN comparator
   // makes Array.sort's result implementation-defined.
   const bandOf = (d: string) => (primaryDisc && d === primaryDisc ? 0 : d === 'swim' ? 2 : 1);
-  const sortedCards = [...cards].sort((a, b) => {
+  /**
+   * ⛔⛔ THE RUN CARD LEAVES THIS SECTION (FIXLIST 1b, 2026-09-01). Run's efficiency read belongs to
+   * the endurance cards on the trends plate, and to nothing else.
+   *
+   * WHAT WAS ACTUALLY ON SCREEN, TRACED BEFORE CUTTING: the row Michael photographed
+   * ("Efficiency Holding · over 6wk · 10 runs · 4d ago · as of Aug 28") was NOT <RunFitnessRow>.
+   * `runSpineCovers` was already suppressing that, correctly. It was <DisciplineRow>, which labels
+   * run's metric "Efficiency" (see its own comment, Q-110), prints the verdict word, and appends
+   * `trendEvidence` + `asOf`. So the stand-down worked and a THINNER duplicate was drawing beneath it.
+   *
+   * ⛔ AND THE STAND-DOWN ITSELF HAD TO GO, not be rewired. `runSpineCovers` read
+   * `stateDisplay.enduranceSpine` — one block deciding what to draw from another block's data. Round 3
+   * (athlete-reorderable blocks) forbids exactly that: if the athlete can hide the trends plate, a run
+   * row that stands down for it leaves them with NEITHER read. Removing the run card removes the gate
+   * by removing its subject.
+   *
+   * ⚠️ NOTHING CURRENTLY ON SCREEN IS LOST, CHECKED ONE BY ONE IN THE STOOD-DOWN STATE:
+   *  · the posture sentence renders inside <RunFitnessRow>'s efficiency ⓘ tap-down only (see the
+   *    Q-179 note above that component) — <DisciplineRow> never reads `card.postureSentence`.
+   *  · the fitness anchor is passed only to <RunFitnessRow>; <DisciplineRow> takes no anchor.
+   *  · the dot/range branch in <DisciplineRow> cannot fire for run: `card.performance` comes from
+   *    `perfByDisc.run` = `perfFromTrend(...)` (`_shared/state-trend/discipline.ts:86`), which carries
+   *    verdict / pctChange / sampleCount / newestAgeDays / windowDays / stale / minSessions and NO
+   *    `range` field at all.
+   * So this is a pure duplicate removal, not content leaving the screen.
+   *
+   * ⚠️ THE COUNTS NEVER DISAGREED. "10 runs over 6wk" is the fitness verdict's pooled window;
+   * "19 easy / 5 quality" is the spine's per-session-type population. Two questions, one word.
+   */
+  const sortedCards = [...cards].filter((c) => c.discipline !== 'run').sort((a, b) => {
     const band = bandOf(a.discipline) - bandOf(b.discipline);
     if (band !== 0) return band;
     const byCadence = (cadenceCounts?.[b.discipline] ?? 0) - (cadenceCounts?.[a.discipline] ?? 0);
@@ -1607,7 +1645,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         const renderCard = (card: DisciplineCard, showAxis: boolean) => {
           const inner = (() => {
             if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow fitness={bikeFitness!} showAxis={showAxis} mode={fitnessMode.bike ?? 'trend_only'} anchor={fitnessAnchors.bike} />;
-            if (card.discipline === 'run' && runHasSubstance && !runSpineCovers) return <RunFitnessRow fitness={runFitness!} postureSentence={card.postureSentence} showAxis={showAxis} mode={fitnessMode.run ?? 'trend_only'} anchor={fitnessAnchors.run} />;
+            // ⛔ THE RUN BRANCH IS GONE (FIXLIST 1b) — run no longer has a card in this section at all.
             // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
             if (card.discipline === 'swim' && swimVolume) return <SwimVolumeRow vol={swimVolume} />;
             if (card.discipline === 'strength' && strengthHasSubstance) return (
