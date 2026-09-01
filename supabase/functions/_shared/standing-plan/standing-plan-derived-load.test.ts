@@ -84,7 +84,19 @@ Deno.test('⛔ THE NAMED COMPOUNDS CARRY THE CATALOGUE\'S OWN RATIO', () => {
     // ⛔ AND IT SAYS SO ON THE ROW. Two steps from anything measured, and p125 warns those estimates
     // carry wider error bars for a hybrid athlete than for a specialist.
     assert(/derived, not tested/.test(String(row!.notes)), String(row!.notes));
-    assert(new RegExp(`${Math.round(cfg.ratio * 100)}%`).test(String(row!.notes)), String(row!.notes));
+    /**
+     * ⚠️ AMENDED 2026-09-01. This asserted the RATIO appears in the note, which was right while every
+     * derivation was a fraction. A ratio of exactly 1.0 — the trap bar deadlift — printed *"about
+     * 100% of your deadlift"*, which describes a lift as a fraction of itself and reads as a mistake.
+     * That case now names the lift the number came from, so the assertion follows: a real fraction
+     * must still state its percentage, and a 1.0 must still say WHOSE number it is.
+     */
+    if (Math.round(cfg.ratio * 100) === 100) {
+      assert(/tested (bench press|back squat|deadlift|overhead press)/i.test(String(row!.notes)),
+        `a 1.0-ratio row does not name the lift it was priced from: ${row!.notes}`);
+    } else {
+      assert(new RegExp(`${Math.round(cfg.ratio * 100)}%`).test(String(row!.notes)), String(row!.notes));
+    }
   }
 });
 

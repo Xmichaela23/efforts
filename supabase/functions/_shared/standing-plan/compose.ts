@@ -815,6 +815,37 @@ function pctForIntent(intent: 'ME' | 'DE' | 'SKILL' | 'HYP'): number | null {
   return p.pctOf1RM.lo;
 }
 
+/**
+ * ⛔⛔ EVERY TESTED LIFT A PATTERN CAN PRICE FROM — plural, because `push_upper` tests two of them
+ * (2026-09-01, Michael: *"we may not have an overhead press, but will the estimated one rep max help
+ * secondary lifts"*).
+ *
+ * ⛔ THE DEFECT IT CLOSES. Week one tests the overhead press on day 1, and `LIFT_FOR_PATTERN` maps
+ * the whole push pattern to `bench` ALONE — so the derived path rejected every press-referenced
+ * movement whatever its ratio, and the athlete's tested press priced NOTHING for twelve weeks. With
+ * the day-1 speed cell now asking for an overhead press, that row would have carried *"weights
+ * arrive once you log the test"* against a test that could never reach it.
+ *
+ * ⚠️ MATCHED ON THE MOVEMENT'S OWN REFERENCE, not on the pattern's. A barbell row's reference is
+ * `bench` because a row LOADS at roughly a bench's fraction — that map answers *"whose number do I
+ * derive from"*, and this one answers *"is that number one this pattern actually tested"*. Both
+ * questions have to agree before a weight is put on a row.
+ * ⚠️ `pull_upper` IS EMPTY AND STAYS EMPTY. A pull has no tested lift of its own; the pull-up's own
+ * field is a REP capacity. It is excluded here as well as by the competition-lift guard.
+ */
+const TESTED_LIFTS_FOR_PATTERN: Record<ViadaPattern, TestedLift[]> = {
+  push_upper: ['bench', 'overheadPress'],
+  pull_upper: [],
+  hinge_lower: ['deadlift'],
+  press_lower: ['squat'],
+};
+
+/** The catalogue's `primaryRef` spelling → the tested lift it names. ⚠️ `overhead` is the catalogue's
+ *  word and `overheadPress` is the reader's; one line here beats two vocabularies drifting. */
+const TESTED_LIFT_FOR_REF: Record<string, TestedLift> = {
+  bench: 'bench', squat: 'squat', deadlift: 'deadlift', overhead: 'overheadPress',
+};
+
 const LIFT_FOR_PATTERN: Record<ViadaPattern, TestedLift> = {
   push_upper: 'bench',
   pull_upper: 'bench',
@@ -1035,7 +1066,18 @@ function exerciseForSlot(
      * describing the same row.
      */
     if (admitted.size > 0) {
-      for (const cat of ['secondary', 'braced', 'focused'] as typeof slot.category[]) {
+      /**
+       * ⛔ `primary` IS IN THIS LIST AND ONLY FOR AN EXPLICITLY NAMED MOVEMENT (2026-09-01). The
+       * OTHER widening below excludes primary on the grounds that *"those are the competition lifts
+       * the ME slots already carry"* — right as a blanket rule, wrong for a movement the frame wrote
+       * down by name.
+       * ⛔ MEASURED: the barbell overhead press is filed `primary`, so a barbell-and-bench athlete
+       * whose day-1 speed cell asks for deltoids reached `pike push up` — bodyweight, not on his
+       * list, for someone standing next to a loaded barbell.
+       * ⚠️ NOTHING IS ADMITTED BY CATEGORY HERE. Only the movements this slot names, and only at its
+       * own pattern — the fallback below is untouched and still refuses primary.
+       */
+      for (const cat of ['primary', 'secondary', 'braced', 'focused'] as typeof slot.category[]) {
         if (cat === slot.category) continue;
         for (const o of resolveSlot({
           category: cat, pattern, intent: slot.intent,
@@ -1050,7 +1092,21 @@ function exerciseForSlot(
     }
     const onMuscle = resolved.options.filter((o) => keep(o.name));
     if (onMuscle.length > 0) {
-      resolved.options = onMuscle;
+      /**
+       * ⛔⛔ A MOVEMENT THE FRAME NAMED OUTRANKS ONE THAT MERELY MATCHES THE MUSCLE (2026-09-01).
+       *
+       * ⛔ MEASURED. Day 1's speed cell asks for deltoids and NAMES the barbell overhead press. At a
+       * barbell-and-bench kit the pool already held `pike push up` — deltoids, incidental, and filed
+       * in this cell's own category — so it sat ahead of the fetched press and won on position
+       * alone. The athlete stood next to a loaded barbell and was prescribed a bodyweight movement.
+       *
+       * ⚠️ IT IS THE LAW THIS FILE ALREADY STATES, applied one level down: **his movements outrank
+       * substitutes.** p223 names the hip thrust FIRST in its hamstring row for the same reason, and
+       * the same ordering now serves it. ⚠️ Stable within each group, so nothing else reorders.
+       */
+      const named = onMuscle.filter((o) => admitted.has(canonicalize(o.name)));
+      const rest = onMuscle.filter((o) => !admitted.has(canonicalize(o.name)));
+      resolved.options = [...named, ...rest];
     } else {
       /**
        * ⛔⛔ THE SAME WIDENING THE PICKER DOES, AND IT HAS TO BE THE SAME OR THE TWO DISAGREE
@@ -1486,7 +1542,14 @@ function exerciseForSlot(
     if (slot.intent !== 'ME' && slot.intent !== 'DE') return null;
     if (args.competitionLifts[pattern] == null) return null;
     const cfg = resolveExerciseConfig(movement).config;
-    if (!cfg || cfg.primaryRef !== testedLift) return null;
+    /**
+     * ⛔ THE MOVEMENT'S OWN REFERENCE, CHECKED AGAINST WHAT THIS PATTERN ACTUALLY TESTED — see
+     * `TESTED_LIFTS_FOR_PATTERN`. This was `cfg.primaryRef !== testedLift`, which asked whether the
+     * movement derives from the pattern's ONE nominated lift and so could never price an overhead
+     * press on a push day, however the day was filled.
+     */
+    const ownLift = cfg ? TESTED_LIFT_FOR_REF[String(cfg.primaryRef)] : undefined;
+    if (!cfg || !ownLift || !TESTED_LIFTS_FOR_PATTERN[pattern].includes(ownLift)) return null;
     /**
      * ⛔⛔ ONE NUMBER, ONE BAR — A PER-HAND OR UNILATERAL MOVEMENT STAYS BY FEEL. The catalogue marks
      * a dumbbell bench `displayFormat: 'perHand'` with `ratioIsTotal: true`, so its 0.8 is the TOTAL
@@ -1502,8 +1565,10 @@ function exerciseForSlot(
     if (cfg.displayFormat === 'perHand' || cfg.isUnilateral === true || cfg.ratioIsTotal === true) return null;
     const ratio = Number(cfg.ratio);
     if (!Number.isFinite(ratio) || ratio <= 0) return null;
-    const w = args.workingNumbers?.[testedLift];
-    return w ? { working: w, ratio, refLift: testedLift } : null;
+    // ⚠️ THE NUMBER COMES FROM THE LIFT THE MOVEMENT REFERENCES, which is the whole point of the
+    // change above — an overhead press prices off the tested press, not off the bench.
+    const w = args.workingNumbers?.[ownLift];
+    return w ? { working: w, ratio, refLift: ownLift } : null;
   })();
 
   const working = movementIsTested ? args.workingNumbers?.[testedLift] : derived?.working;
@@ -1733,17 +1798,32 @@ function exerciseForSlot(
    * working number`, and the line now reads as that chain rather than collapsing it into one
    * misleading fraction.
    */
-  const derivedNote = derived
-    // ⚠️ THE ATHLETE'S OWN NAME FOR THE LIFT, not the canonical one — `refLift` is this pattern's
-    // tested lift, so `competitionLifts[pattern]` is that same lift as they named it.
-    // ⚠️ THE CLOSING CLAUSE STAYS LOWERCASE AND STAYS LAST. `standing-plan-derived-load.test.ts:86`
-    // pins the literal *"derived, not tested"* as this row's contract; a sentence-initial "Derived"
-    // is the same words and a different string, and the pin is right to care.
-    ? `${Math.round((pct ?? 0) * 100)}% of what this lift's own max works out to — about `
-      + `${Math.round(derived.ratio * 100)}% of your `
-      + `${testedLiftName(derived.refLift, args.competitionLifts[pattern]).toLowerCase()} `
-      + '— derived, not tested.'
-    : null;
+  const derivedNote = (() => {
+    if (!derived) return null;
+    /**
+     * ⚠️ THE ATHLETE'S OWN NAME ONLY WHERE IT IS THE SAME LIFT (fixed 2026-09-01). `refLift` used to
+     * be the pattern's single tested lift, so the athlete's competition name was always the right
+     * word for it. A pattern can now price from EITHER of its tested lifts, and passing the push
+     * day's competition name for an overhead-press derivation printed *"100% of your bench press"*
+     * on a row derived from the tested PRESS.
+     * ⚠️ THE CLOSING CLAUSE STAYS LOWERCASE AND LAST — `standing-plan-derived-load.test.ts` pins the
+     * literal *"derived, not tested"* as this row's contract.
+     */
+    const sameLift = derived.refLift === LIFT_FOR_PATTERN[pattern];
+    const refName = testedLiftName(
+      derived.refLift,
+      sameLift ? args.competitionLifts[pattern] : null,
+    ).toLowerCase();
+    /**
+     * ⚠️ A RATIO OF ONE IS NOT AN ESTIMATE AND MUST NOT READ AS ONE. *"about 100% of your overhead
+     * press"* describes a lift as a fraction of itself. The row is priced straight off that test.
+     */
+    if (Math.round(derived.ratio * 100) === 100) {
+      return `${Math.round((pct ?? 0) * 100)}% of your tested ${refName} — derived, not tested.`;
+    }
+    return `${Math.round((pct ?? 0) * 100)}% of what this lift's own max works out to — about `
+      + `${Math.round(derived.ratio * 100)}% of your ${refName} — derived, not tested.`;
+  })();
 
   return {
     exercise: {
@@ -3247,9 +3327,23 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   if (dose.targetSets != null) {
     for (const m of dialMuscles) dialTarget[m] = dose.targetSets;
   }
+  /**
+   * ⛔ THE CORE PICK IS OFFERED TO THE FLOOR AS A PREFERENCE, not left for the direct placement
+   * below to find (2026-09-01). Measured on a composed week: when the week left core under its
+   * floor, the floor filled it FIRST with a movement of its own choosing — the same hanging leg
+   * raise the athlete had picked — and stamped it *"Floor: core had nothing else this week"*. The
+   * row was right and the sentence told the athlete the engine had never seen their choice, which
+   * is the exact A1 defect the pick note exists to prevent.
+   * ⚠️ IT CANNOT DOUBLE-PLACE. The direct placement below asks the BUILT WEEK whether the movement
+   * is already there, so whichever path lands it, the other stands down.
+   */
+  const corePickRaw = String(args.slotPicks?.core ?? '').trim();
   const filled = fillMuscleFloor(dosing, {
     equipment: args.equipment ?? null,
-    prefer: [...picks.unplaced].map((f) => picks.byFold.get(f) ?? f),
+    prefer: [
+      ...[...picks.unplaced].map((f) => picks.byFold.get(f) ?? f),
+      ...(corePickRaw ? [corePickRaw] : []),
+    ],
     ...(Object.keys(dialTarget).length > 0 ? { target: dialTarget } : {}),
   });
   if (dialChips.length > 0) {
@@ -3399,7 +3493,6 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * is the same disappearance the 2026-08-29 attempt died of, arriving through a different door.
    * ⚠️ Asking the SESSIONS is the only question with one answer: is this movement on the week or not.
    */
-  const corePickRaw = String(args.slotPicks?.core ?? '').trim();
   const coreAlreadyOnWeek = corePickRaw !== '' && sessions.some((x) =>
     (x.strength_exercises ?? []).some((e) =>
       canonicalize(String((e as { name?: string })?.name ?? '')) === canonicalize(corePickRaw)));

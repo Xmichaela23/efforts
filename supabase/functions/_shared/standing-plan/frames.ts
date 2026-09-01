@@ -497,7 +497,43 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
     themeTag: 'push day (upper)',
     strength: [
       S('ME', 'competition', 'primary', 'push_upper', '1 x ME: secondary push'),
-      S('DE', 'accessory', 'secondary', 'push_upper', '1 x DE: secondary push'),
+      /**
+       * ⛔⛔ THIS CELL IS THE DAY'S OVERHEAD PRESS, AND THE MUSCLE IS WHAT MAKES IT ONE (Michael,
+       * 2026-09-01: *"there's really no overhead press work in that plan"*).
+       *
+       * ⛔ MEASURED, ON A COMPOSED WEEK. Nine movement patterns, and the built week covered eight:
+       * horizontal push, both pulls, hinge, knee, calf, plyo — and **vertical pressing appeared only
+       * as a lateral raise**, which is a raise and not a press. The athlete tests an overhead press
+       * in week one and then never presses overhead again for twelve weeks.
+       *
+       * ⛔ THE MUSCLE FLOOR CANNOT CATCH IT AND THAT IS STRUCTURAL, not a bug in the floor. It counts
+       * MUSCLES, and deltoids are already covered twice by the bench and the lateral raises — every
+       * floor passes. A pattern is not a muscle.
+       *
+       * ⛔ AND HIS OWN LIST FOR THIS CELL CONTAINS THE ANSWER. p220's secondary push upper is
+       * *Larsen press · incline bench press · close-grip bench press · JM press · **seated DB press**
+       * · **Arnold press*** — two of the six are overhead presses. Nothing is being added to his
+       * page; the cell is being pointed at the half of his own list that was never reached, because
+       * ranking on equipment fit alone lands on a bench variant every time.
+       *
+       * ⚠️ **THE CHOICE OF DELTOIDS IS OURS AND THE PAIRING IS HIS.** p275 rule 2b pairs *"similar
+       * muscle groups but dramatically different specific patterns and loads"* — a heavy bench then
+       * a fast overhead press is exactly that, and the day still covers chest twice over (the ME
+       * bench and the braced push cell, which states `chest`).
+       *
+       * ⚠️ `alsoAdmits` IS FOR THE BARBELL-ONLY ATHLETE, and it is the same mechanism p223's hip
+       * thrust uses on the hamstring row. Measured: at a barbell-and-bench kit the deltoid pool is
+       * `pike push up` and `handstand push ups` — bodyweight, and neither is on his list — because
+       * the barbell overhead press is catalogued as a PRIMARY movement and a secondary cell cannot
+       * reach it. Naming it here admits the one movement that athlete would actually perform.
+       * ⚠️ IT DOES NOT PUT A NUMBER ON THE ROW. A dumbbell press is per-hand and stays by feel, and
+       * the barbell press is not this pattern's tested lift. The movement appears; the weight is
+       * still the athlete's call. Pricing it is a separate change and is not made here.
+       */
+      S('DE', 'accessory', 'secondary', 'push_upper', '1 x DE: secondary push', {
+        muscle: 'deltoids',
+        alsoAdmits: ['overhead press', 'military press', 'standing barbell overhead press', 'push press'],
+      }),
       /**
        * ⚠️ THE MUSCLE IS STATED HERE TOO, and the audit is why (2026-08-30). p221's braced push upper
        * is *Smith machine press · machine chest press · dip machine/pressdown* — three chest presses.
