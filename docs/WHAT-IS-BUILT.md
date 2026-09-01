@@ -286,11 +286,9 @@ a list of things that are done is a list nobody reads. The audit carries what ea
 3. **Progression on real logged history is unproven.** One logged test exists, and a test day carries
    no rep-band heavy set, so nothing has earned an increment and nothing should have. An absence of
    evidence, not a defect.
-4. **An added exercise can be removed but not RE-DOSED.** *"Add to plan"* still writes the rule at
-   whatever the row looked like when it was tapped — one set of ten if that is what was on screen.
-   *"Remove exercise"* on a row the athlete added now asks **just today, or off the plan** — the same
-   two-choice shape as adding, on the control that was already there (2026-09-01). ⚠️ Changing the
-   SETS without removing and re-adding is still not possible.
+4. **The athlete's own added exercise has no dose control.** *"Add to plan"* writes a standing rule
+   at whatever the row looked like when it was tapped — one set of ten, every matching lifting day,
+   no end date. There is no way to change or remove it from the app.
 5. **Four of the book's rules are not pinned**, listed in `protocol.test.ts`'s header: p140's *"skill
    work first"* (the frame prints SKILL last on its leg day — that needs a ruling, not a test),
    p148's change rule, p89's plyometric ladder, p78's rest periods.
