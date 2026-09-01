@@ -1,3 +1,22 @@
+> # ⛔⛔ DEAD — DO NOT READ THIS AS CURRENT. Read `docs/WHAT-IS-BUILT.md` instead.
+>
+> **Marked 2026-08-31 on Michael's ruling.** This file was the "does X exist" lookup and new sessions
+> are still pointed at it first. It is stale in ways that cause real re-invention:
+>
+> - Its Standing Plan row says progression is *"BUILT AND ORPHANED — the plan climbs on a CALENDAR
+>   only"*. **That is false at HEAD** — `earnedMeSets` is called by `rematerialize-standing-block:261`
+>   and its outputs feed the next compose (code-traced 2026-08-31).
+> - It is built around **Wendler / 5-3-1, which is ARCHIVED.** Viada is the only source, and Wendler
+>   must not be referenced in chat, copy or comments.
+> - Last substantive edit 2026-08-26 — before the Standard Focus arc, the gear gate work, the
+>   test-week tag and the progression wiring.
+>
+> ⛔ **NOT DELETED AND NOT REWRITTEN, DELIBERATELY.** Everything below is the only surviving record of
+> the 2026-07-13 audit, including its "built, tested, and never executed" list, which is still the
+> best inventory of that class of problem. Read it as HISTORY. For what exists today, and for which
+> doc is for what, read `docs/WHAT-IS-BUILT.md`; for the state of the work right now, read
+> `docs/ENGINE-STATE.md`.
+
 # CAPABILITY MAP — "does X exist, and where?"
 
 **Rebuilt from code 2026-07-13** (4 parallel readers, every row verified by code-read — not by trusting comments or the previous map). The previous version asserted a deleted code path was live, cited a decision number that was never written, was 16 coach versions stale, and omitted ~13 shipped subsystems. Treat this rebuild as the baseline; append to it, and **when you ship something that changes a row, change the row.**
