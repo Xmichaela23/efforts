@@ -216,6 +216,13 @@ interface LoggedExercise {
    * edits the box, so their own words become the name and the swap logic is untouched.
    */
   execution_name?: string;
+  /**
+   * ⛔ THIS ROW IS ON THE PLAN BECAUSE THE ATHLETE ADDED IT — `plan_adjustments`, written by
+   * *"Add to plan"*. ⚠️ Until 2026-09-01 nothing carried this, so an added exercise could be created
+   * from the logger and never changed or removed from anywhere in the app: one set of ten, on every
+   * matching lifting day, indefinitely, from a single tap.
+   */
+  athlete_added?: boolean;
   load_prescribed?: boolean;
   /** ⛔ A STARTING POINT FOR THE WEIGHT BOX — NOT A PRESCRIPTION (D-406). Rides only on assistance
    *  rows, always beside `load_prescribed: false`. The plan still says "by feel"; this is a number
@@ -590,6 +597,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // (add_meta); materialize does the smart placement — it lands only on matching-focus future days at a
   // frequency the plan's own shape dictates, and seeds the weight from the athlete's baseline.
   const [addToPlanFor, setAddToPlanFor] = useState<string | null>(null);
+  /** ⛔ The mirror of `addToPlanFor` — see `persistPlanRemove`. */
+  const [removeFromPlanFor, setRemoveFromPlanFor] = useState<string | null>(null);
   const persistPlanAdd = async (ex: LoggedExercise) => {
     try {
       const userId = getStoredUserId();
@@ -621,6 +630,38 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       }
     } catch (e) {
       console.error('[add] persistPlanAdd failed', e);
+    }
+  };
+
+  /**
+   * ⛔⛔ TAKE AN ADDED EXERCISE BACK OFF THE PLAN (2026-09-01). `persistPlanAdd` above wrote a
+   * standing rule and **nothing could undo it** — the athlete tapped once and got one set of ten on
+   * every matching lifting day, indefinitely, with no control anywhere in the app.
+   *
+   * ⚠️ IT REVERTS, IT DOES NOT DELETE. `plan_adjustments` rows are the record of what was asked for
+   * and when; `status: 'reverted'` is the shape `persistPlanAdd` already uses when it replaces one,
+   * so there is one vocabulary for "no longer active" rather than two.
+   * ⚠️ AND IT REMATERIALIZES, or the rule is gone and the rows it injected are still on the calendar
+   * until something else happens to rebuild them.
+   */
+  const persistPlanRemove = async (name: string) => {
+    try {
+      const userId = getStoredUserId();
+      const planId = (scheduledWorkout as any)?.training_plan_id || null;
+      const clean = String(name ?? '').trim();
+      if (!userId || !clean) return;
+      await supabase
+        .from('plan_adjustments')
+        .update({ status: 'reverted', updated_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .eq('exercise_name', clean)
+        .eq('status', 'active')
+        .not('add_meta', 'is', null);
+      if (planId) {
+        await (supabase.functions.invoke as any)('materialize-plan', { body: { training_plan_id: planId } });
+      }
+    } catch (e) {
+      console.error('[add] persistPlanRemove failed', e);
     }
   };
 
@@ -2369,6 +2410,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             execution_name: typeof s?.execution_name === 'string' && s.execution_name.trim()
               ? s.execution_name.trim()
               : undefined,
+            athlete_added: s?.athlete_added === true ? true : undefined,
             // ⛔ CARRIED, NOT APPLIED (D-406). This only makes the number available to the weight
             // box as a greyed starting point; it does not become the row's `weight`, and nothing
             // here treats it as a prescription. Guarded on a finite positive so an absent
@@ -5418,6 +5460,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 {/* Adapt-a-plan #2 — a hand-added lift (never prescribed) can be added to the plan for
                     real: the confirm below writes it and lets materialize place it on matching days. */}
                 {/**
+                  * ⛔ AN ADDED EXERCISE CAN BE TAKEN BACK OFF (2026-09-01). It arrives through
+                  * `computed.steps` looking exactly like a prescribed row — same shape, same
+                  * `planned_name` — so it carries `athlete_added`, and this is the only control that
+                  * reads it. Without it, one tap on "Add to plan" was permanent: one set of ten, on
+                  * every matching lifting day, for as long as the block ran.
+                  */}
+                {exercise.athlete_added === true && (
+                  <button
+                    onClick={() => setRemoveFromPlanFor(removeFromPlanFor === exercise.id ? null : exercise.id)}
+                    className={`flex items-center gap-1 pl-1.5 pr-1 py-2 text-[12px] font-medium transition-colors ${removeFromPlanFor === exercise.id ? 'text-teal-300' : 'text-white/72 hover:text-white/90'}`}
+                    aria-label="Remove this exercise from the plan"
+                  >
+                    <X className="h-4 w-4" />
+                    <span>Remove</span>
+                  </button>
+                )}
+                {/**
                   * ⛔⛔ AND NOT ON A TESTED LIFT (2026-08-31). `planned_name` is absent on a test
                   * row BY DESIGN — see the test builder — so without this gate the row falls into
                   * the hand-added branch and offers to add the athlete's own bench press to their
@@ -5654,6 +5713,24 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               })()}
 
               {/* Adapt-a-plan #2 — add-to-plan confirm for a hand-added lift. */}
+              {removeFromPlanFor === exercise.id && (
+                <div className="mt-2 mb-3 rounded-xl border-2 border-white/15 bg-white/[0.06] backdrop-blur-md p-3">
+                  <p className="text-[13px] text-white/72 leading-snug mb-2.5">
+                    Take {exercise.execution_name || exercise.name} off the rest of your plan? It stays in
+                    today's session — this only stops it appearing on your future training days.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { void persistPlanRemove(exercise.name); setRemoveFromPlanFor(null); }}
+                      className="px-3 py-1.5 rounded-xl text-[13px] border border-teal-300/60 bg-teal-400/15 text-teal-100 hover:bg-teal-400/25 transition-colors"
+                    >Remove from plan</button>
+                    <button
+                      onClick={() => setRemoveFromPlanFor(null)}
+                      className="px-3 py-1.5 rounded-xl text-[13px] border border-white/15 bg-white/[0.04] text-white/72 hover:text-white/85 transition-colors"
+                    >Cancel</button>
+                  </div>
+                </div>
+              )}
               {addToPlanFor === exercise.id && (
                 <div className="mt-2 mb-3 rounded-xl border-2 border-white/15 bg-white/[0.06] backdrop-blur-md p-3">
                   <p className="text-[12px] text-white/70 leading-snug mb-2.5">

@@ -2351,7 +2351,16 @@ export function expandTokensForRow(
         // focus + weekly-frequency cap decided across the whole plan). Idempotent — adds live in
         // plan_adjustments, never persisted into strength_exercises, so re-materialize re-injects fresh.
         // They flow through the loop below, so weight seeds from their own reference.
-        for (const _add of addsToInject) exs.push(_add);
+        /**
+         * ⛔⛔ AN INJECTED ROW IS MARKED AS THE ATHLETE'S OWN (2026-09-01, Michael: *"what kind of
+         * stupidity is keeping this going?"* — fair). *"Add to plan"* writes a standing rule at
+         * whatever the row looked like when it was tapped: one set of ten, every matching lifting
+         * day, no end date. **Nothing in the app could then change or remove it**, because nothing
+         * downstream could tell an injected row from a prescribed one — it arrives through
+         * `computed.steps` looking exactly like a slot the composer wrote.
+         * ⚠️ One flag, carried on the row, is what lets the logger offer to take it back off.
+         */
+        for (const _add of addsToInject) exs.push({ ..._add, athlete_added: true });
         
         for (const ex of exs) {
           const originalName = String(ex?.name||'exercise');
@@ -2662,6 +2671,9 @@ export function expandTokensForRow(
             load_basis: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
               ? ((ex as any)?.load_basis ?? undefined)
               : undefined),
+            // ⛔ THE ATHLETE'S OWN ADDED ROW, CARRIED — this object is a WHITELIST, so without this
+            // line the mark dies here and the logger cannot offer to remove what it cannot identify.
+            athlete_added: (ex as any)?.athlete_added === true ? true : undefined,
             // ⛔ CARRY THE ASSISTANCE MARKER (2026-07-30). This object is a WHITELIST, and
             // `load_prescribed: false` — set on every assistance row the composer authors — was not on
             // it. The flag reached materialize (it is read twenty lines above, to stop a weight being
@@ -2759,7 +2771,8 @@ export function expandTokensForRow(
         // focus + weekly-frequency cap decided across the whole plan). Idempotent — adds live in
         // plan_adjustments, never persisted into strength_exercises, so re-materialize re-injects fresh.
         // They flow through the loop below, so weight seeds from their own reference.
-        for (const _add of addsToInject) exs.push(_add);
+        // ⛔ SAME MARK ON THE SECOND SEAM — see the first for why.
+        for (const _add of addsToInject) exs.push({ ..._add, athlete_added: true });
         
         for (const ex of exs) {
           const originalName = String(ex?.name||'exercise');
@@ -3054,6 +3067,9 @@ export function expandTokensForRow(
             load_basis: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
               ? ((ex as any)?.load_basis ?? undefined)
               : undefined),
+            // ⛔ THE ATHLETE'S OWN ADDED ROW, CARRIED — this object is a WHITELIST, so without this
+            // line the mark dies here and the logger cannot offer to remove what it cannot identify.
+            athlete_added: (ex as any)?.athlete_added === true ? true : undefined,
             // ⛔ CARRY THE ASSISTANCE MARKER (2026-07-30). This object is a WHITELIST, and
             // `load_prescribed: false` — set on every assistance row the composer authors — was not on
             // it. The flag reached materialize (it is read twenty lines above, to stop a weight being
