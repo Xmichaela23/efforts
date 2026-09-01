@@ -1,6 +1,90 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-08-31 night — he LOGGED his upper test; the defect list below is from his own screen)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-01 — the night he trained on it, then ruled on what he found)
+
+### ⛔ FIRST: read `docs/WHAT-IS-BUILT.md`. It is new, and it exists because sessions keep proposing to build things that already exist.
+
+That doc says what EXISTS and how the chain runs. **This one says what the state of the work is right
+now.** They do not compete; `CAPABILITY-MAP.md` is dead-marked and points at it.
+
+---
+
+### §A. STATE — pushed, deployed, unverified
+
+**PUSHED:** `origin/main == 2217e11f` (four commits: `1994d473` test-week · `35041913` core in the
+picker · `b0a700ac` row copy + execution names · `2217e11f` docs).
+
+**DEPLOYED 2026-09-01 03:16 UTC**, versions read back from `supabase functions list`, never assumed:
+`materialize-plan` **334** · `rematerialize-standing-block` **77** · `generate-strength-plan` **202** ·
+`coach` **503**.
+⛔ The last three carry no edits of their own — they bundle `_shared/standing-plan/*`. Touch
+`compose.ts` or `accessory-picks.ts` and you deploy all three. `create-goal-and-materialize-plan`
+does NOT bundle them (closure re-checked 2026-09-01).
+
+⛔⛔ **CLIENT: `2217e11f` IS NOT ON HIS PHONE.** Two of tonight's fixes are client-side —
+`StrengthLogger.tsx` (the test-row controls, the second all-out set) and `strengthFormatter.ts` (the
+execution name). **He needs `npm run ios:open` and a run from Xcode**, or none of that reaches him.
+
+⛔ **AND THE SERVER FIXES ONLY REACH A BLOCK THAT IS REBUILT.** The composer authors twelve weeks up
+front; `rematerialize-standing-block` rewrites the weeks that have not happened and deliberately
+skips ones that are done or past. **His current block still carries the ab work on its Test: Lower**
+— that session is tomorrow.
+
+**SUITES:** 2545/2545 `_shared` + `materialize-plan`; tsc 0 errors.
+
+**UNVERIFIED:** every fix tonight. Nothing has been seen on a device.
+
+---
+
+### §B. WHAT SHIPPED TONIGHT — the record is `docs/AUDIT-upper-test-session-2026-08-31.md`
+
+| what | where it is written up |
+|---|---|
+| **A test day is only the test** — no floor volume, no athlete adds, no second all-out set, and the tested lifts offer NEITHER Swap nor Add | audit §9, §9.1a |
+| **Abs are a pick** on Standard Focus, opt-in, once a week, never on a test day, positioned by p142 rule 4 | audit §10, §10a |
+| **The derived-weight line says what the number is**; a movement reached on its dumbbell route prints that execution | audit §8 |
+
+⚠️ **THE SECOND ALL-OUT SET WAS A DATA PATH, NOT A TRAINING ONE.** On a `1rm_test` session every
+completed working set qualified as the test result, last write wins — a set logged after the AMRAP
+replaced the tested number on its way to `user_baselines`.
+
+---
+
+### §C. WHAT HE RULED, AND IT IS NOT UP FOR RE-LITIGATION
+
+- ⛔ **"No swap"** on a tested lift. It is the measurement every working number derives from; there is
+  nothing there to exchange. The first fix stamped it swappable and that was wrong.
+- ⛔ **Abs are an OPTION**, not something the engine drops in.
+- ⛔ **Do not weaken the test-day floor exclusion.** Its cost — week one losing glutes, calves and
+  triceps — he ruled on directly.
+
+### §D. STILL OPEN, AND TWO ARE HIS TO RULE
+
+- **His ruling wanted:** should the logger's editable exercise field show the execution name?
+  ⚠️ Typing in that field IS how a swap is recorded, so it is not a free change.
+- **His ruling wanted:** the display-only rear delt rename is live on the plan/session screens; he
+  has not said whether he wants it.
+- **His own data, untouched:** his `Ab Wheel Rollout` add is still active in `plan_adjustments` as
+  **1 set of 10 on every matching lifting day, indefinitely**. It was captured from the row as it
+  looked when he tapped. Nobody has edited his data.
+- **Progression on real logged history is unproven** — one logged test is all the evidence there is,
+  and a test day carries no rep-band heavy set for the ladder to read. Not a defect; an absence.
+- **No lighter / taper week is reachable** — both frames' taper columns are transcribed and both
+  build sites pass an empty week list (`generate-strength-plan:833`, `rematerialize-standing-block:171`).
+- **The overhead press is tested every block and prices nothing** — neither frame carries a press slot.
+- **The band tier still wins cells** — `braced_pull` offers only `lat pulldown` at his kit.
+
+### §E. THE TRAP THAT COST THE MOST TONIGHT
+
+⛔⛔ **A RULE WITH NO PIN IS A RULE THAT WILL SHIP WRONG.** p142 rule 4 was implemented, explained in
+a comment, and asserted by nothing — **2541 tests were green while the core row sat second from
+last**, and Michael found it by reading the composed week. `core-placement.test.ts` now pins it and
+is mutation-tested against the old anchor. ⚠️ Two dated-artefact theories for the Swap defect were
+also offered and both were wrong; his screen outranked the trace every time.
+
+---
+
+## 🧭 SUPERSEDED — was START HERE (written 2026-08-31 night — he LOGGED his upper test; the defect list below is from his own screen)
 
 ### Your job: THE DEFECT LIST IN §D. Nothing else. Do not start a build he has not asked for.
 
