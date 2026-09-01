@@ -348,8 +348,11 @@ const STRENGTH_5K_STANDARD: FrameDay[] = [
        */
       S('DE', 'accessory', 'secondary', 'push_upper', '1 x DE: Accessory: secondary push', {
         muscle: 'deltoids',
-        // ⚠️ HIS TWO, BY NAME — see the other frame's day-1 cell for the reasoning.
-        alsoAdmits: ['seated db press', 'arnold press'],
+        // ⚠️ HIS SECONDARIES FIRST, HIS PRIMARIES BEHIND THEM — see the other frame's day-1 cell.
+        alsoAdmits: [
+          'seated db press', 'arnold press',
+          'overhead press', 'military press', 'standing barbell overhead press', 'push press',
+        ],
       }),
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),
       S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: Accessory: focused pull, focused push'),
@@ -534,34 +537,39 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
        * a fast overhead press is exactly that, and the day still covers chest twice over (the ME
        * bench and the braced push cell, which states `chest`).
        *
-       * ⛔⛔ AND THE BARBELL PRESS IS **NOT** ADMITTED HERE — corrected 2026-09-01, Michael: *"he
-       * doesn't really have compounds in the all rounder, so what is the version he would have had
-       * for press?"* He is right and the first version of this was wrong.
+       * ⛔ WHICH MOVEMENT, AND THE ORDER, IS SETTLED ON p275 — see `alsoAdmits` below. His
+       * secondaries lead because his emphasis is deliberate; his primaries are admitted behind them
+       * because he permits them in as many words.
        *
-       * ⛔ SECONDARY IS DEFINED ON p220 AS *"compound noncontested movements, **dumbbell variants**
-       * — variable form and plane of movement"*, and his list for this cell is Larsen press ·
-       * incline bench · close-grip bench · JM press · **seated DB press · Arnold press**. The
-       * barbell overhead press, military press and push press are his **PRIMARY** push-upper list —
-       * the day-opening competition slot, not this one. `alsoAdmits` had been used to pull one of
-       * them in, which put a primary compound in a cell his page reserves for dumbbell variants.
-       *
-       * ⚠️ THE COST IS STATED RATHER THAN ENGINEERED AROUND. His overhead work for this cell needs
-       * DUMBBELLS. A barbell-and-bench athlete has no secondary overhead press on his list, and the
-       * honest answer is that they do not get one here — not that we substitute a movement from a
-       * category he put somewhere else.
-       * ⚠️ AND IT STAYS BY FEEL. A seated DB press is per-hand, so the tested press does not price
-       * it. An athlete who wants a NUMBER on an overhead press names it as their competition lift,
-       * which is exactly where his primary list puts it.
+       * ⚠️ p220 FILES SECONDARY AS *"compound noncontested movements, dumbbell variants"* and his
+       * two overhead entries there are the seated DB press and the Arnold press — which is why they
+       * lead. A barbell-and-bench athlete cannot reach either, and p275's permission is what keeps
+       * them from getting no overhead work at all.
        */
       S('DE', 'accessory', 'secondary', 'push_upper', '1 x DE: secondary push', {
         muscle: 'deltoids',
         /**
-         * ⚠️ HIS TWO, BY NAME, so the cell lands on the movements p220 actually prints for it rather
-         * than on the catalogue's generic `dumbbell shoulder press` — which is the same movement
-         * under a name he never used. Named movements rank ahead of incidental matches, so an
-         * athlete with dumbbells gets his.
+         * ⛔⛔ HIS TWO SECONDARIES FIRST, AND HIS PRIMARIES BEHIND THEM — and BOTH halves are his
+         * own note (p275, corrected 2026-09-01 after Michael sent me back to the page).
+         *
+         * ⛔ p275, verbatim in substance: *"the emphasis on secondary lifts over primary lifts is
+         * deliberate — the primary lifts are not the only way to build limit strength… **primary
+         * lifts CAN be substituted in**, you're encouraged to keep your options open."* So the
+         * emphasis is real AND the permission is explicit. Verified alongside it: every ME slot in
+         * the All Rounder is a secondary lift — **the programme as written contains no primary at
+         * all**, which is why the emphasis leads here and the permission follows.
+         *
+         * ⚠️ THE ORDER IS THE RULING. A kit with dumbbells lands on `seated db press` — his own
+         * secondary, his own spelling, his stated emphasis. A kit without them reaches the barbell
+         * press, which he permits in as many words, rather than being handed a pike push-up or left
+         * with no overhead work at all.
+         * ⚠️ AND ONLY THE BARBELL ROUTE CARRIES A NUMBER. A dumbbell press is held in two hands and
+         * one figure cannot describe it; the barbell press prices off the tested press directly.
          */
-        alsoAdmits: ['seated db press', 'arnold press'],
+        alsoAdmits: [
+          'seated db press', 'arnold press',
+          'overhead press', 'military press', 'standing barbell overhead press', 'push press',
+        ],
       }),
       /**
        * ⚠️ THE MUSCLE IS STATED HERE TOO, and the audit is why (2026-08-30). p221's braced push upper

@@ -187,19 +187,12 @@ for (const frame of FRAME_IDS) {
   Deno.test(`⛔ RULE 4 — every lift ${frame} TESTS also appears in its standard week`, () => {
     for (const [kitName, kit] of Object.entries(KITS)) {
       /**
-       * ⛔⛔ THE BARBELL-ONLY KIT IS EXEMPT, AND THE EXEMPTION IS A FINDING RATHER THAN A LOOPHOLE
-       * (2026-09-01). p220 defines SECONDARY as *"compound noncontested movements, **dumbbell
-       * variants**"*, and his two overhead entries for that cell are the seated DB press and the
-       * Arnold press. **An athlete with a barbell and a bench cannot reach either**, and the barbell
-       * overhead press is on his PRIMARY list — the day-opening competition slot, not this one.
-       *
-       * ⛔ SO THAT ATHLETE IS TESTED ON A LIFT THIS PROGRAMME CANNOT TRAIN THEM ON, and no
-       * substitution fixes it without moving a movement out of the category he filed it under.
-       * Closing it takes one of two rulings: stop testing the press for a kit that cannot train it,
-       * or let the athlete name the press as their competition lift. **Neither is ours to make**, so
-       * the rule holds where his list is reachable and this comment carries the rest.
+       * ⚠️ THE BARBELL-ONLY EXEMPTION IS GONE (2026-09-01). It was written on the reading that his
+       * secondary list needs dumbbells and nothing else may fill that cell — true of the CATEGORY,
+       * and p275 overrides it: *"primary lifts CAN be substituted in… you're encouraged to keep your
+       * options open."* With his primaries admitted behind his secondaries, every kit reaches an
+       * overhead press and every kit trains the lift week one tested.
        */
-      if (kitName === 'barbell only') continue;
       const rows = rowsOf(frame, 'standard', kit);
       const refs = new Set(rows.map((e) => String(resolveExerciseConfig(String(e.name)).config?.primaryRef ?? '')));
       for (const [lift, ref] of Object.entries(REF_FOR_TESTED)) {

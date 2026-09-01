@@ -70,7 +70,7 @@ WEEK 02  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Pike Push Up                   4x2-4        @ By feel       | RIR 3.5 · awaiting_test
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · awaiting_test
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -124,7 +124,7 @@ WEEK 03  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Pike Push Up                   4x2-4        @ By feel       | RIR 3.5 · awaiting_test
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · awaiting_test
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -178,7 +178,7 @@ WEEK 04  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Pike Push Up                   4x2-4        @ By feel       | RIR 3.5 · awaiting_test
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · awaiting_test
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -232,7 +232,7 @@ WEEK 05  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Pike Push Up                   4x2-4        @ By feel       | RIR 3.5 · awaiting_test
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · awaiting_test
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -286,7 +286,7 @@ WEEK 06  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Pike Push Up                   4x2-4        @ By feel       | RIR 3.5 · awaiting_test
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · awaiting_test
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -340,7 +340,7 @@ WEEK 07  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Pike Push Up                   4x2-4        @ By feel       | RIR 3.5 · awaiting_test
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · awaiting_test
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -394,7 +394,7 @@ WEEK 08  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Pike Push Up                   4x2-4        @ By feel       | RIR 3.5 · awaiting_test
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · awaiting_test
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -448,7 +448,7 @@ WEEK 09  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Pike Push Up                   4x2-4        @ By feel       | RIR 3.5 · awaiting_test
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · awaiting_test
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -502,7 +502,7 @@ WEEK 10  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Pike Push Up                   4x2-4        @ By feel       | RIR 3.5 · awaiting_test
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · awaiting_test
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -556,7 +556,7 @@ WEEK 11  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Pike Push Up                   4x2-4        @ By feel       | RIR 3.5 · awaiting_test
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · awaiting_test
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -610,7 +610,7 @@ WEEK 12  column=standard
   [Monday] STRENGTH Upper body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Bench Press                    1x1-5        @ By feel       | awaiting_test
-      DE     Pike Push Up                   4x2-4        @ By feel       | RIR 3.5 · awaiting_test
+      DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5 · awaiting_test
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
