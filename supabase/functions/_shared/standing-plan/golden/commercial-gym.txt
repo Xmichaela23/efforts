@@ -35,6 +35,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       tags: standing_plan, frame:all_rounder, column:standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      -      Hanging Leg Raise              3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Your core pick.
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -58,7 +59,8 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       [source  ] The other lifting days run by feel this week — the numbers arrive once the test is done.  (Viada p215)
       [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
       [source  ] Core sits after the main work and before the isolation work — isolation is rarely degraded by a tired core, and core work carries the higher skill component.  (Viada p142 (rule 4), p223)
-      [ours    ] Your core choice is placed once a week, on your lightest lifting day and never on a test day. The source gives core its own movements and says where they sit in a session — after the main work, before the isolation work — but names no frequency, so once a week is ours: the same one-slot dose every other accessory here takes.
+      [ours    ] Your core choices are placed twice a week, on your two lightest lifting days and never on a test day, rotating through the movements you chose. The source gives core its own movements and says where they sit in a session — after the main work, before the isolation work — but names no frequency, so twice is ours: one slot a week is this app's floor for any muscle rather than a dose, and two sessions of three sets is where direct work starts to be worth doing without crowding the session limit your running and riding depend on.
+      [warning ] Your core work lands on a day that is already at the session limit the source warns about — fourteen work sets, past which it says the cost shows up in your running and riding for up to three days. The choice is yours and it is placed; this is the price of it.  (Viada p86)
       [source  ] Externally braced and fixed-path movements are the source's own choice for hypertrophy work, with compounds reserved for strength — partly because a single-joint movement is far easier to count toward one muscle.  (Viada p86)
       [ours    ] Added one slot each for triceps, which the week left at zero. Every movement the athlete chose is untouched.
       [ours    ] Could not reach glutes, calves, core.

@@ -97,10 +97,16 @@ Deno.test('⛔⛔ RULE 4 — the core row sits AFTER the main work and BEFORE ev
 // B — THE DOSE AND THE COUNT
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
-Deno.test('⛔ ONE core row a week, and it carries the accessory dose', () => {
+Deno.test('⛔ TWO core rows a week, and they carry the accessory dose', () => {
+  /**
+   * ⚠️ AMENDED 2026-09-01 — Michael asked *"is one exercise a week enough?"* and it was not: one slot
+   * is three sets, which is this app's FLOOR for any muscle rather than a dose. Two sessions of three
+   * sets is where direct work starts to be worth doing. ⚠️ A single answer is still placed twice,
+   * because the dose is the point and the rotation only decides WHICH movement fills each slot.
+   */
   const w = week(2, 'v up');
   const all = strengthSessions(w).flatMap(rowsOf).filter(isCoreRow);
-  assertEquals(all.length, 1, `${all.length} core rows in one week`);
+  assertEquals(all.length, 2, `${all.length} core rows in one week`);
   assertEquals(all[0].sets, 3, 'the core row is not one accessory slot');
   assertEquals(all[0].reps, '8-10', 'the core row lost p86\'s reps');
   assertEquals(all[0].target_rir, 1.5, 'the core row lost p86\'s 1-2 in reserve');

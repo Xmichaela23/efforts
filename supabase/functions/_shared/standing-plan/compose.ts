@@ -30,6 +30,7 @@ import {
   isRepPrescribable,
   ledgerFor,
   muscleFloorSets,
+  SESSION_SETS_COSTLY,
   type DoseLedger,
   type MuscleGroup,
   type PlannedSession as DosingSession,
@@ -782,10 +783,12 @@ const ACCESSORY_TARGET_RIR = 1.5;
  * `MUSCLE_FLOOR_IS_ONE_SLOT` — applied to a row the athlete asked for rather than to a gap.
  */
 const CORE_PICK_FREQUENCY_IS_OURS =
-  'Your core choice is placed once a week, on your lightest lifting day and never on a test day. '
-  + 'The source gives core its own movements and says where they sit in a session — after the main '
-  + 'work, before the isolation work — but names no frequency, so once a week is ours: the same '
-  + 'one-slot dose every other accessory here takes.';
+  'Your core choices are placed twice a week, on your two lightest lifting days and never on a test '
+  + 'day, rotating through the movements you chose. The source gives core its own movements and says '
+  + 'where they sit in a session — after the main work, before the isolation work — but names no '
+  + 'frequency, so twice is ours: one slot a week is this app\'s floor for any muscle rather than a '
+  + 'dose, and two sessions of three sets is where direct work starts to be worth doing without '
+  + 'crowding the session limit your running and riding depend on.';
 
 /**
  * ⛔ HIS ME SET BAND — 1 to 3, p218 — READ OFF STAGE 2 RATHER THAN RESTATED HERE.
@@ -3361,15 +3364,43 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     .filter((n) => n !== '');
   const corePicksUnique = [...new Set(corePicksAll.map((n) => canonicalize(n)))]
     .map((c) => corePicksAll.find((n) => canonicalize(n) === c)!);
-  const corePickRaw = corePicksUnique.length > 0
+  /**
+   * ⛔⛔ TWO CORE SLOTS A WEEK, NOT ONE (Michael, 2026-09-01, asking the right question: *"is one
+   * exercise a week enough?"*). **It was not — it was a FLOOR being used as a dose.**
+   *
+   * ⛔ ONE SLOT IS THREE SETS A WEEK, which is this app's structural minimum for any muscle so that
+   * nothing lands at zero. It is not a target. The field's lower bound for a muscle to actually
+   * change is roughly four to six sets a week, two sessions generally beat one at matched volume,
+   * and three sets once a week sits under both.
+   * ⚠️ THE SOURCE STATES NO FREQUENCY, so this is ours and is labelled — see
+   * `CORE_PICK_FREQUENCY_IS_OURS`. His own 8-to-12 solid range is unreachable here and
+   * `MUSCLE_FLOOR_IS_ONE_SLOT` already records the arithmetic.
+   * ⛔ AND TWO IS THE CEILING'S ANSWER AS WELL AS THE EVIDENCE'S: a slot is three sets and p086 puts
+   * a session's cost at fourteen. Two fit inside the week; four would start buying the ceiling.
+   *
+   * ⚠️ TWO DIFFERENT MOVEMENTS WHERE THE ATHLETE GAVE ENOUGH ANSWERS, consecutive in the rotation,
+   * so a week covers two of core's four jobs rather than doing one of them twice.
+   */
+  const CORE_SLOTS_PER_WEEK = 2;
+  /**
+   * ⚠️ TWO SLOTS EVEN FROM ONE ANSWER. The dose is the ruling; the rotation only decides WHICH
+   * movement fills each slot. An athlete who names one movement gets it twice a week, which is the
+   * same six sets and one of core's four jobs — their choice, and better than three sets.
+   */
+  const coreWanted = corePicksUnique.length === 0 ? [] : Array.from(
+    { length: CORE_SLOTS_PER_WEEK },
     // ⚠️ THE WEEK IS THE INDEX, so the cycle is the same for everyone and repeats every N weeks.
-    ? corePicksUnique[(Math.max(1, args.week) - 1) % corePicksUnique.length]
-    : '';
+    // ⛔ `(_, i)` — `Array.from`'s map function takes the VALUE first and the INDEX second. Written
+    // as `(i) =>` this silently produced `NaN` subscripts and placed nothing at all, with no error.
+    (_, i) => corePicksUnique[((Math.max(1, args.week) - 1) + i) % corePicksUnique.length],
+  );
+  /** ⚠️ The first of the week's two, kept for the floor preference below. */
+  const corePickRaw = coreWanted[0] ?? '';
   const filled = fillMuscleFloor(dosing, {
     equipment: args.equipment ?? null,
     prefer: [
       ...[...picks.unplaced].map((f) => picks.byFold.get(f) ?? f),
-      ...(corePickRaw ? [corePickRaw] : []),
+      ...coreWanted,
     ],
     ...(Object.keys(dialTarget).length > 0 ? { target: dialTarget } : {}),
   });
@@ -3520,37 +3551,64 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * is the same disappearance the 2026-08-29 attempt died of, arriving through a different door.
    * ⚠️ Asking the SESSIONS is the only question with one answer: is this movement on the week or not.
    */
-  const coreAlreadyOnWeek = corePickRaw !== '' && sessions.some((x) =>
+  /**
+   * ⚠️ WHICHEVER THE FLOOR ALREADY LANDED IS DROPPED FROM THE LIST, not from the count — if the
+   * floor placed one of the two, the other is still placed here. The test asks the BUILT WEEK
+   * rather than `picks.placed`, which is seeded with every slot answer before the day loop runs and
+   * so says "spoken for" rather than "on the plan".
+   */
+  const onWeekAlready = (name: string) => sessions.some((x) =>
     (x.strength_exercises ?? []).some((e) =>
-      canonicalize(String((e as { name?: string })?.name ?? '')) === canonicalize(corePickRaw)));
-  const corePick = corePickRaw
-    && !coreAlreadyOnWeek
-    && musclesWorkedBy(corePickRaw)?.primary === 'core'
-      ? corePickRaw
-      : null;
-  if (corePick) {
-    const home = filled.sessions
+      canonicalize(String((e as { name?: string })?.name ?? '')) === canonicalize(name)));
+  const coreToPlace = coreWanted.filter((n) =>
+    !onWeekAlready(n) && musclesWorkedBy(n)?.primary === 'core');
+  if (coreToPlace.length > 0) {
+    /**
+     * ⛔ THE TWO LIGHTEST NON-TEST LIFTING DAYS, in that order — the same rule the single slot used,
+     * applied twice. Sorting by work sets keeps core off the day that is already heaviest, and the
+     * day number breaks ties so the answer is the same for everyone.
+     */
+    const homes = filled.sessions
       .filter((d) => !d.isTest && sessions.some((x) => x.type === 'strength' && (x.name === d.label || x.day === d.label)))
-      .sort((a, b) => {
-        const setsOf = (d: DosingSession) => d.sets.reduce((n, w) => n + (Number(w.sets) || 0), 0);
-        const diff = setsOf(a) - setsOf(b);
-        return diff !== 0 ? diff : (a.day ?? 99) - (b.day ?? 99);
-      })[0];
-    const target = home
-      ? sessions.find((x) => x.type === 'strength' && (x.name === home.label || x.day === home.label))
-      : undefined;
-    if (target) {
-      picks.unplaced.delete(canonicalize(corePick));
-      picks.placed.add(canonicalize(corePick));
+      .map((d) => ({ d, sets: d.sets.reduce((n, w) => n + (Number(w.sets) || 0), 0) }))
+      .sort((a, b) => (a.sets === b.sets ? (a.d.day ?? 99) - (b.d.day ?? 99) : a.sets - b.sets));
+
+    let wantIdx = 0;
+    let overCeiling = 0;
+    for (const { d, sets } of homes) {
+      if (wantIdx >= coreToPlace.length) break;
+      /**
+       * ⛔⛔ THE CEILING IS REPORTED HERE, NOT ENFORCED — and the measurement is why (2026-09-01).
+       *
+       * ⛔ THIS WAS WRITTEN AS A HARD SKIP and it placed NOTHING. Measured on a composed week: this
+       * frame's own printed rows come to **16 and 17 work sets a day** before any core is added —
+       * one ME set, four DE, and three on each of four HYP cells, every one of them already at the
+       * LOW end of p218's bands. **p086's fourteen is exceeded by the page's own layout**, so a
+       * ceiling test here does not moderate the dose, it silently deletes the athlete's choice.
+       *
+       * ⛔ AND A SILENT DELETION IS THE ONE THING THIS PATH MAY NOT DO. A1's ruling is that a pick
+       * that cannot be honoured is NAMED. The athlete asked for this movement; it is placed, and the
+       * cost is stated on the plan where they can see it.
+       * ⚠️ THE TENSION IS THE SOURCE'S, NOT OURS, and it is not resolved here — see the note pushed
+       * below. Deciding whether p274's row count or p086's session cost wins is a ruling, and
+       * quietly picking one by dropping rows would be making it without saying so.
+       */
+      if (sets + muscleFloorSets() > SESSION_SETS_COSTLY) overCeiling += 1;
+      const target = sessions.find((x) => x.type === 'strength' && (x.name === d.label || x.day === d.label));
+      if (!target) continue;
+      const movement = coreToPlace[wantIdx];
+      wantIdx += 1;
+      picks.unplaced.delete(canonicalize(movement));
+      picks.placed.add(canonicalize(movement));
       const existing = target.strength_exercises ?? [];
       const at = coreInsertIndex(existing);
-      const takesReps = isRepPrescribable(corePick);
+      const takesReps = isRepPrescribable(movement);
       target.strength_exercises = [
         ...existing.slice(0, at),
         {
           // ⚠️ THE ATHLETE'S OWN SPELLING, title-cased like every other row — this is their pick and
           // it is not ours to relabel.
-          name: movementLabel(corePick),
+          name: movementLabel(movement),
           sets: muscleFloorSets(),
           reps: takesReps ? '8-10' : HOLD_PRESCRIPTION,
           weight: 'By feel',
@@ -3561,16 +3619,25 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         },
         ...existing.slice(at),
       ];
+    }
+    if (wantIdx > 0) {
       notes.push({
         kind: 'source',
         text: 'Core sits after the main work and before the isolation work — isolation is rarely '
           + 'degraded by a tired core, and core work carries the higher skill component.',
         cite: 'Viada p142 (rule 4), p223',
       });
-      notes.push({
-        kind: 'ours',
-        text: CORE_PICK_FREQUENCY_IS_OURS,
-      });
+      notes.push({ kind: 'ours', text: CORE_PICK_FREQUENCY_IS_OURS });
+      if (overCeiling > 0) {
+        notes.push({
+          kind: 'warning',
+          text: 'Your core work lands on a day that is already at the session limit the source warns '
+            + 'about — fourteen work sets, past which it says the cost shows up in your running and '
+            + 'riding for up to three days. The choice is yours and it is placed; this is the price '
+            + 'of it.',
+          cite: 'Viada p86',
+        });
+      }
     }
   }
 
