@@ -1523,4 +1523,9 @@ heart-rate-derived `steady_state | intervals | hill_repeats` fallback. Untagged 
 only: `run_facts.workout_type` is rewritten when a run is recomputed. ⚠️ Not touched: the decoupling
 substrate's `workout_intent` (`compute-facts:~858`) still reads the analyser's word first — a
 different path, same shape of inference, flagged for the follow-up.
+Follow-up the same evening: the standing plan tags its sessions `family:run_<family>` and names the
+hard one "Hard Run"; neither reached the classifier, so the one attached hard run still read easy.
+`classifyRunIntent` now reads the family tag first, then plan words (`quality` / `hard` added). Live
+finding on the account: 20 of 23 runs point at planned rows that no longer exist (plans rebuilt) — the
+plan cannot tag what it no longer has; those runs are easy by ruling until re-attached.
 

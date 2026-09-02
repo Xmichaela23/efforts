@@ -21,7 +21,12 @@ all three plan-weight spots route through it; coach payload 180→181; run card 
    emits no `discipline_trend` for run any more (that was the "run trend ↓ sliding −22%" on the workout
    page). Run summary line: pace/count only. **Bucket = plan tag or easy, no inference** (Michael:
    "just let the plan tag it") — `classifyRunIntent` reads the plan's words only; the analyser's HR
-   guess is out of every grouping site in `compute-snapshot`. **Item 1 below shipped as code but is now UNREAD — D-458
+   guess is out of every grouping site in `compute-snapshot`. `classifyRunIntent` reads the standing
+   plan's `family:run_*` tag first (mlss / near_threshold / sprint_power → hard, lsd → long, vt1 → easy),
+   then the plan's words (`quality` / `hard` added). **DEPLOYED + RECOMPUTED 2026-09-02:** 45d122e7 has 23
+   runs in 90d; 20 carry a `planned_id` whose planned row no longer exists (plans rebuilt) and 2 were never
+   attached — all 22 group as easy by ruling; the one attached Hard Run (08-31) groups as quality. Re-
+   attaching runs to live planned sessions is the only way an old run changes bucket. **Item 1 below shipped as code but is now UNREAD — D-458
    is superseded; keep the gate, read nothing.** Bike row: same shape of problem, left alone by ruling.
 
 1. **The false run "declining −22%" — fixed at the source, `heat-adjust.ts routeTrend` (now unread, see 0).** The previous
