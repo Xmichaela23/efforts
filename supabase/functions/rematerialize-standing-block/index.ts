@@ -117,6 +117,33 @@ Deno.serve(async (req: Request) => {
     }));
 
     const reading = readTestWeek(joined, sp.test_lift_names);
+    /**
+     * ⛔ A LOCKED 1RM OVERRIDES THE TEST (Michael 2026-09-02: "user should be able to override — I don't
+     * know why they would, but they should"). `user_baselines.locked_baselines[lift]` is the athlete's
+     * asserted number with auto off (D-459). When one is set it IS the working number for that lift,
+     * ahead of the week-1 test read; the test still stands for every unlocked lift, and a locked lift
+     * with no test stops being "missing". Provenance is on the record: `cite` names the lock.
+     */
+    try {
+      const { data: ubLock } = await supabase.from('user_baselines').select('locked_baselines').eq('user_id', userId).maybeSingle();
+      const locked = (ubLock?.locked_baselines ?? null) as Record<string, unknown> | null;
+      const LOCK_KEY: Record<string, string> = { bench: 'bench', squat: 'squat', deadlift: 'deadlift', overheadPress: 'overheadPress1RM' };
+      if (locked && typeof locked === 'object') {
+        for (const [lift, key] of Object.entries(LOCK_KEY)) {
+          const v = Number(locked[key]);
+          if (!Number.isFinite(v) || v <= 0) continue;
+          const prior = (reading.working as Record<string, any>)[lift];
+          (reading.working as Record<string, any>)[lift] = {
+            lift,
+            predicted1RM: v,
+            workingNumber: v,
+            measured: prior?.measured ?? { weight: v, reps: 1 },
+            cite: 'user_baselines.locked_baselines — the athlete\'s locked number overrides the week-1 test (D-459, 2026-09-02)',
+          };
+          reading.missing = reading.missing.filter((m) => m.lift !== lift);
+        }
+      }
+    } catch (e) { console.warn('[restate] locked_baselines not read:', (e as Error)?.message ?? String(e)); }
     const found = Object.keys(reading.working);
     // ⛔ THE RESPONSE CARRIES THE NAME THE ATHLETE SEES (2026-08-24, Michael on device: the sheet
     // printed `overheadPress`). `working` is keyed by lift for the composer; the sheet needs the

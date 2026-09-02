@@ -63,6 +63,30 @@ Deno.serve(async (req: Request) => {
     const answered: number[] = Array.isArray(sp.endurance_checkpoints)
       ? sp.endurance_checkpoints.map((c: any) => Number(c?.week)).filter((w: number) => Number.isFinite(w))
       : [];
+    // ⛔ RE-PRICE ON DEMAND (Michael 2026-09-02: "changing baselines changes the plan now?"). Same loop
+    // the checkpoint's accept runs — every unstarted run/ride row through the per-row materializer —
+    // with no checkpoint gate and nothing recorded. The Baselines screen calls this after a save that
+    // changed a pace, FTP or threshold HR. Strength rows are untouched: a block's weights come from
+    // its week-1 test, not from Baselines.
+    if (p?.reprice === true) {
+      const { data: rows } = await supabase
+        .from('planned_workouts')
+        .select('id, week_number, date, type, tags, computed, workout_status, completed_workout_id')
+        .eq('training_plan_id', plan.id)
+        .eq('user_id', userId)
+        .order('date');
+      const pending = (rows ?? []).filter((r: any) => isRepriceable(r, today));
+      let repriced = 0;
+      for (const r of pending) {
+        try {
+          const { error } = await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(r.id) } });
+          if (!error) repriced += 1;
+        } catch (e) { console.warn(`[reprice] row ${r.id} not re-priced:`, (e as Error)?.message ?? String(e)); }
+      }
+      console.log(`[reprice] plan=${plan.id} repriced=${repriced}/${pending.length}`);
+      return json({ success: true, repriced: true, rows_repriced: repriced, rows_pending: pending.length });
+    }
+
     const due = checkpointDue(currentWeek, weeks, answered);
     if (!due.due) return json({ success: true, due: false, current_week: currentWeek, reason: due.reason });
 

@@ -902,7 +902,36 @@ const handleSave = async () => {
 
     setOriginalData(JSON.stringify(dataToSave)); // match the SAVED copy (incl. swimPace100_updated_at) so the button greys out post-save
     setInitialManualHR(JSON.stringify({ manualRunMaxHR, manualRunLTHR, manualRideMaxHR, manualRideLTHR }));
-    setSaveMessage('Saved!');
+    // ⛔ A SAVED NUMBER RE-PRICES THE PLAN (Michael 2026-09-02). If a pace anchor, FTP, the 5K or a manual
+    // threshold HR changed, every unstarted run/ride row is re-priced through the checkpoint function's
+    // re-price mode — the same per-row rebuild the six-week checkpoint uses. Strength rows are untouched:
+    // a block's weights come from its week-1 test. No plan → the call returns no_plan and nothing happens.
+    let repriceNote = '';
+    try {
+      const prevPn = (JSON.parse(originalData || '{}')?.performanceNumbers ?? {}) as Record<string, unknown>;
+      const nextPn = ((dataToSave as any)?.performanceNumbers ?? {}) as Record<string, unknown>;
+      const WATCH = ['threshold_pace_min_per_mi', 'threshold_pace_source', 'ftp', 'ftp_source', 'fiveK', 'fiveK_source', 'threshold_heart_rate'];
+      const changed = WATCH.some((k) => String(prevPn[k] ?? '') !== String(nextPn[k] ?? '')) || !!(manualRunLTHR || manualRideLTHR);
+      if (changed) {
+        const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } });
+        if (rp?.success && rp?.repriced) {
+          const n = Number(rp.rows_repriced) || 0;
+          repriceNote = n > 0 ? ` · ${n} upcoming ${n === 1 ? 'session' : 'sessions'} updated` : '';
+        }
+      }
+    } catch (e) { console.warn('[TrainingBaselines] re-price after save failed:', e); }
+    // ⛔ A LOCKED 1RM RESTATES THE BLOCK'S WEIGHTS (Michael 2026-09-02: "user should be able to override").
+    // The restate the logger fires on every strength save now honours `locked_baselines` above the
+    // week-1 test; changing a lock here runs it once so the unstarted weeks move now.
+    try {
+      const prevLocked = JSON.stringify(JSON.parse(originalData || '{}')?.locked_baselines ?? null);
+      const nextLocked = JSON.stringify((dataToSave as any)?.locked_baselines ?? null);
+      if (prevLocked !== nextLocked) {
+        const { data: rs } = await supabase.functions.invoke('rematerialize-standing-block', { body: { apply: true } });
+        if (rs?.success) repriceNote += ' · weights updated';
+      }
+    } catch (e) { console.warn('[TrainingBaselines] restate after lock change failed:', e); }
+    setSaveMessage(`Saved!${repriceNote}`);
     setLastUpdated(new Date().toISOString());
     setTimeout(() => setSaveMessage(''), 2000);
   } catch (error) {

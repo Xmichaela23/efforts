@@ -192,7 +192,7 @@ export function workingNumberFromTest(
     workingNumber: predicted * WORKING_MAX_FRACTION,
     measured: { weight: measured.weight, reps: measured.reps },
     // ⚠️ IMAGE PENDING — see the file header and Part G item 7.
-    cite: 'Viada p215 (image pending in book-sources/)',
+    cite: 'Viada p215 (book-sources/p215.png)',
   };
 }
 
