@@ -14,6 +14,36 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## 🅿️ PARKED 2026-09-02 — THE MARATHON BUILDER STILL RUNS ON THE OLD PACE TABLE (step 4 of the threshold-anchor cut)
+
+**Michael, 2026-09-02:** *"not worried about marathon unless we have to pick now to avoid confusion."*
+Nobody is on a marathon plan; it waits. Trace in `docs/AUDIT-plan-materialization-2026-09-02.md` §5.
+
+- [ ] **A marathon plan built before this lands shows two paces for one session.** The week text
+      (`generate-run-plan` → `PerformanceBuildGenerator`, `performance-build.ts:1672–1688`) prints
+      paces from the vDOT table (`effort_paces`); the step targets (`materialize-plan`) come off the
+      threshold anchor and the goal time (D-462). Text and steps can disagree on the same card.
+- [ ] **The ruling needed before touching it:** a performance-build marathon with NO goal time.
+      **A (recommended):** require an entered goal time + a threshold (learned or entered); refuse
+      plainly otherwise; "complete" plans unchanged, effort only. **B:** build it with race-pace
+      sessions carrying effort targets and no pace (the generator throws without a race pace at
+      `performance-build.ts:1686`).
+- [ ] **The 7 builder readers** to move onto threshold + goal time: `generate-run-plan/index.ts`
+      100–140 (gate), 240–275 (zone anchor), 325–345 (refuses without `effort_paces.race`), 525–545
+      (`target_time` from `effort_paces.race`); `performance-build.ts` 1672–1688; `create-goal…:3909`,
+      `:4198–4216`; client gates `GoalsScreen.tsx:604/623`, `run-pace-calibration.ts:51–52`.
+- [ ] **The 3 race-projection readers** (`resolve-server-predicted-finish.ts:247–253`,
+      `recompute-goal-race-projections.ts:91–151`, race-readiness) — race pace input becomes goal
+      time + threshold. ⚠️ The vDOT time table these project from is internally inconsistent
+      (measured 2026-09-02: its 5K times and its paces disagree; marathon pace comes out FASTER than
+      threshold from vdot 44 up).
+- [ ] **The 14 dead-weight readers** (selects and pass-throughs into resolvers that ignore the field)
+      — strip with no behaviour change. List in the audit doc §5.
+- [ ] **Verification is a real rebuild:** a marathon plan on a throwaway account before and after,
+      paces compared session by session. Trusted plan; no fixture-only sign-off.
+
+---
+
 ## 📖 THE VOCABULARY IS INVISIBLE — no glossary, and the intent never reaches a screen (filed 2026-08-29)
 
 **Michael:** *"I want people to know what the fuck they're doing."* Traced this session; the data is

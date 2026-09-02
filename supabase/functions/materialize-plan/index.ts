@@ -60,6 +60,8 @@ import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace, describeThresholdBasis } from '../../../src/lib/resolve-current-run-pace.ts';
 import { pacesFromThresholdSecPerMi } from '../../../src/lib/run-paces-from-threshold.ts';
 import { resolveCurrent5kPace } from '../../../src/lib/resolve-current-5k-pace.ts';
+import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
+import { frielZones } from '../_shared/endurance/hr-zones.ts';
 
 // Type for plan adjustments
 type PlanAdjustment = {
@@ -631,6 +633,40 @@ type Baselines = {
   equipment?: any;
 };
 
+
+/**
+ * ⛔ THE PRESCRIPTION ON A RUN STEP (Michael, 2026-09-02, rulings 1 and 2).
+ *   · EASY steps carry a HEART-RATE range (`hr_range`, bpm) and `prescription: 'heart_rate'`. The pace
+ *     on them is a reference band, not the target.
+ *   · HARD steps carry an EFFORT target (`target_rpe`, session RPE): threshold work 5–6, intervals
+ *     8–10 — his numbers. The pace on them is the target; the effort is the gauge he trusts more.
+ * ⚠️ OURS: which token shapes count as easy / threshold / interval. Labelled below. Strides carry
+ * neither — they are neuromuscular, not an effort band.
+ * ⚠️ On a long-run token only the steps priced at the easy band (or unpriced) get the heart-rate
+ * range; a race-pace finish keeps its pace.
+ */
+export function stampRunPrescription(tok: string, steps: any[], baselines: Baselines): any[] {
+  const t = String(tok ?? '').toLowerCase();
+  const hr = (baselines as any)?._easyHrRange as { lower: number; upper: number } | undefined;
+  const easyBand = (baselines as any)?._resolvedEasySecPerMi as number | undefined;
+  const isEasyToken = /^(warmup_run_|cooldown_run_|run_easy_|longrun_)/.test(t);
+  const isThresholdToken = /^(cruise_|tempo_\d+(?:min|mi)_threshold)/.test(t);
+  const isIntervalToken = /^(interval_|run_vo2_|round_|tempo_\d+(?:min|mi)_5kpace)/.test(t);
+  for (const s of steps) {
+    if (!s || typeof s !== 'object') continue;
+    const kind = String(s.kind ?? '');
+    const atEasyPace = s.pace_sec_per_mi == null || (easyBand != null && s.pace_sec_per_mi === easyBand);
+    const easyStep = kind === 'warmup' || kind === 'cooldown' || kind === 'recovery' || (isEasyToken && kind === 'work' && atEasyPace);
+    if (easyStep) {
+      s.prescription = 'heart_rate';
+      if (hr) s.hr_range = { lower: hr.lower, upper: hr.upper };
+      continue;
+    }
+    if (kind === 'work' && isThresholdToken) s.target_rpe = { lo: 5, hi: 6 };
+    else if (kind === 'work' && isIntervalToken) s.target_rpe = { lo: 8, hi: 10 };
+  }
+  return steps;
+}
 
 /**
  * The goal's ENTERED finish time ÷ its race distance, in sec/mi. Only the four road distances have a
@@ -3102,7 +3138,7 @@ export function expandTokensForRow(
   console.log(`🔍 Parsing ${tokens.length} tokens for ${discipline}:`, tokens);
   for (const tok of tokens) {
     let added: any[] = [];
-    if (discipline==='run' || discipline==='walk') added = expandRunToken(tok, baselines);
+    if (discipline==='run' || discipline==='walk') added = stampRunPrescription(tok, expandRunToken(tok, baselines), baselines);
     else if (discipline==='ride' || discipline==='bike' || discipline==='cycling') added = expandBikeToken(tok, baselines);
     else if (discipline==='swim') {
       // Detailed swim expansion — one line per rep
@@ -3733,7 +3769,7 @@ Deno.serve(async (req) => {
     try {
       // `weight` rides along for D1 — planned bodyweight sets are priced at the athlete's own body
       // weight, exactly as the completed side prices them, or the two stop reconciling.
-      const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness, locked_baselines, equipment, effort_source_distance, effort_source_time, units, weight').eq('user_id', userId).maybeSingle();
+      const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness, locked_baselines, equipment, effort_source_distance, effort_source_time, configured_hr_zones, units, weight').eq('user_id', userId).maybeSingle();
       plannedBodyweightLb = resolveBodyweightLb(ub as any);
       // ⛔ AND WHAT THE ATHLETE LIFTS ON EACH MOVEMENT (2026-08-29). Viada leaves hypertrophy work
       // auto-regulated, so an accessory is authored "By feel" with no weight and stays that way —
@@ -3846,6 +3882,33 @@ Deno.serve(async (req) => {
         console.log(`[Paces] Resolved 5K: ${fiveKResolved.sec_per_mi}s/mi (source=${fiveKResolved.source})`);
       }
       if (goalRacePaceSecPerMi != null) (baselines as any)._racePaceSecPerMi = goalRacePaceSecPerMi;
+      // ⛔ PROVENANCE, written onto every row's `computed.anchors` (2026-09-02): the numbers this
+      // materialization priced off. The six-week checkpoint diffs these against the live resolvers to
+      // say what would change on the rows not yet started. Facts only; nothing reads them to prescribe.
+      (baselines as any)._anchors = {
+        as_of: new Date().toISOString().slice(0, 10),
+        threshold_sec_per_mi: (baselines as any)._resolvedThresholdSecPerMi ?? null,
+        threshold_basis: (baselines as any)._thresholdBasis ?? null,
+        easy_sec_per_mi: (baselines as any)._resolvedEasySecPerMi ?? null,
+        fiveK_sec_per_mi: (baselines as any)._fiveKSecPerMi ?? null,
+        race_pace_sec_per_mi: goalRacePaceSecPerMi,
+        ftp_w: typeof (baselines as any).ftp === 'number' ? (baselines as any).ftp : null,
+      };
+
+      // ⛔ EASY DAYS ARE PRESCRIBED AS A HEART-RATE ZONE (Michael, 2026-09-02, ruling 1). Off the
+      // athlete's threshold heart rate through the one LTHR resolver; the band is Friel zone 2
+      // (85–90% of LTHR), the zone Garmin and TrainingPeaks call aerobic / easy, which is where
+      // Viada's VT1 (talk test, p235) sits. ⚠️ OURS: choosing Z2 as "easy" — the book gives a talk
+      // test, not a percentage. No LTHR on file → no range (Law 2); the pace band still shows.
+      const lthrResolved = resolveCurrentLthr(ub as any, { sport: 'run' });
+      if (lthrResolved.bpm != null) {
+        const z2 = frielZones(lthrResolved.bpm)[1];
+        (baselines as any)._easyHrRange = { lower: z2.min, upper: z2.max };
+        if ((baselines as any)._anchors) { (baselines as any)._anchors.lthr_bpm = lthrResolved.bpm; (baselines as any)._anchors.easy_hr_range = { lower: z2.min, upper: z2.max }; }
+        console.log(`[HR] Easy zone: ${z2.min}–${z2.max} bpm (LTHR ${lthrResolved.bpm}, source=${lthrResolved.source})`);
+      } else {
+        console.log('[HR] No threshold heart rate on file — easy steps ship without a heart-rate range');
+      }
 
       // FTP via shared precedence helper. Quality-gated for plan baking — accepts learned
       // (≥medium) > manual but REJECTS 'learned-low' (low-confidence values shouldn't get
@@ -4043,7 +4106,7 @@ Deno.serve(async (req) => {
             const finalTotalSeconds = actualTotal > 0 ? actualTotal : (originalDuration * 60);
             const finalDuration = actualTotal > 0 ? Math.round(actualTotal / 60) : (originalDuration > 0 ? originalDuration : 1);
             const update: any = {
-              computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: finalTotalSeconds },
+              computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: finalTotalSeconds, anchors: (baselines as any)._anchors ?? null },
               total_duration_seconds: finalTotalSeconds,
               duration: Math.max(1, finalDuration),
             };
@@ -4089,6 +4152,7 @@ Deno.serve(async (req) => {
               normalization_version: 'v3',
               steps: v3,
               total_duration_seconds: finalTotalSeconds,
+              anchors: (baselines as any)._anchors ?? null,
               ...(Array.isArray(swim_equipment_suggested) && swim_equipment_suggested.length > 0
                 ? { swim_equipment_suggested }
                 : {}),

@@ -67,6 +67,21 @@ the Baselines save and the wizards' `saveCalibration` are the only writers, both
 5K, FTP all share one `auto | my number` row (`AutoMinePill`); "locked" renamed. Deploy for D-461:
 `generate-run-plan`, `materialize-plan`.
 
+**D-462 PUSHED 4f5f9bbe + DEPLOYED 2026-09-02 (all 31 functions in the arc-context closure, one deploy).**
+Threshold is the only pace anchor (learned or entered); easy = HR zone with a threshold × 1.19 reference
+band; marathon pace = goal time ÷ distance; 5K work = typed 5K by division. Not verified on a device.
+⚠️ An athlete with only easy runs on file now gets NO run paces anywhere until a threshold is measured or
+entered — accepted by Michael. Michael's own threshold: learned 12:12/mi is built on easy running (two
+sub-max hard runs on file); he was told to enter ~10:50 as "my number" and let the checkpoint correct it.
+
+**STEP 4 (the 24 remaining effort_paces readers, incl. the marathon builder) is PARKED by Michael
+2026-09-02** ("not worried about marathon unless we have to pick now") — see the PARKED block at the top
+of `POLISH-PUNCH-LIST.md` and `AUDIT-plan-materialization-2026-09-02.md` §8. **UNCOMMITTED IN THE TREE,
+awaiting Michael's commit word:** the HR-zone / effort-target / Garmin HEART_RATE slice (materialize-plan
+`stampRunPrescription`, session-vocabulary row sentence, send-workout-to-garmin) + the sheet display
+(`PlannedWorkoutSummary`). Redeploy for it: materialize-plan, send-workout-to-garmin, coach,
+generate-strength-plan, rematerialize-standing-block, create-goal-and-materialize-plan.
+
 **THE AUDIT SESSION (michaelambp-4f) OWNS THE PACE CUT + SIX-WEEK CHECKPOINT** — see
 `docs/AUDIT-plan-materialization-2026-09-02.md` §5–§6. Steps 1–3 (threshold is the anchor; effort_paces
 unread by the resolvers and the materializer) are BUILT IN THE WORKING TREE, uncommitted, awaiting

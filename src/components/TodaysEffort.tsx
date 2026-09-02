@@ -2087,6 +2087,25 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                      */
                     hideHeader
                   />
+                  {/* ⛔ RULING 7 (Michael 2026-09-02): a hot day changes nothing in the zone — heart rate simply
+                      reads high while the run is still conversational. ONE line, today only (the weather here
+                      is today's, ephemeral), only on a run whose steps are prescribed by heart rate. ≥ 75°F is
+                      OURS (field heat guidance); the analysis side's own heat floor is 60°F (heat-adjust.ts). */}
+                  {(() => {
+                    try {
+                      const w: any = selectedPlannedWorkout;
+                      const isRun = /run/i.test(String(w?.type ?? w?.workout_type ?? ''));
+                      const steps: any[] = Array.isArray(w?.computed?.steps) ? w.computed.steps : [];
+                      const byHeartRate = isRun && steps.some((st) => st?.prescription === 'heart_rate');
+                      const hot = isTodayDate && typeof weather?.temperature === 'number' && weather.temperature >= 75;
+                      if (!byHeartRate || !hot) return null;
+                      return (
+                        <p className="mt-2 text-[12px] leading-snug" style={{ color: 'rgba(255,255,255,0.62)' }}>
+                          Hot today. Go by conversation; heart rate reads high in the heat.
+                        </p>
+                      );
+                    } catch { return null; }
+                  })()}
                 </>
               );
             })()}

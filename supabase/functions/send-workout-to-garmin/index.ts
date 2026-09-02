@@ -375,6 +375,19 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       // Only apply when step has no explicit target
       const hasTarget = step.targetType || step.targetValue != null || step.targetValueLow != null
       if (hasTarget) return
+      // ⛔ HEART-RATE PRESCRIBED STEPS GO TO THE WATCH AS A HEART-RATE RANGE (Michael, 2026-09-02,
+      // ruling 6). Easy run steps carry `hr_range` (bpm) from the materializer; the pace on them is a
+      // reference band and is deliberately NOT sent — a SPEED target would make the watch nag about
+      // the reference. Applies to any sport that carries the field.
+      const hrr: any = (cs as any)?.hr_range
+      const hrLo = Number(hrr?.lower), hrHi = Number(hrr?.upper)
+      if (Number.isFinite(hrLo) && Number.isFinite(hrHi) && hrLo > 0 && hrHi > hrLo) {
+        step.targetType = 'HEART_RATE'
+        step.targetValueLow = Math.round(hrLo)
+        step.targetValueHigh = Math.round(hrHi)
+        delete (step as any).targetValue
+        return
+      }
       // RUNNING pace from computed pace_range / pace_sec_per_mi / paceTarget
       if (sport === 'RUNNING' && (typeof cs?.pace_sec_per_mi === 'number' || cs?.pace_range || typeof cs?.paceTarget === 'string')) {
         // Normalize various shapes into seconds-per-mile range or center
@@ -890,7 +903,7 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
               if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
                 lastSpeedLow = Number((step as any).targetValueLow)
                 lastSpeedHigh = Number((step as any).targetValueHigh)
-              } else if (lastSpeedLow != null && lastSpeedHigh != null) {
+              } else if (step.targetType !== 'HEART_RATE' && lastSpeedLow != null && lastSpeedHigh != null) {
                 step.targetType = 'SPEED'
                 step.targetValueLow = lastSpeedLow
                 step.targetValueHigh = lastSpeedHigh
@@ -899,11 +912,11 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
               if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
                 lastRestLow = Number((step as any).targetValueLow)
                 lastRestHigh = Number((step as any).targetValueHigh)
-              } else if (lastRestLow != null && lastRestHigh != null) {
+              } else if (step.targetType !== 'HEART_RATE' && lastRestLow != null && lastRestHigh != null) {
                 step.targetType = 'SPEED'
                 step.targetValueLow = lastRestLow
                 step.targetValueHigh = lastRestHigh
-              } else if (lastWarmLow != null && lastWarmHigh != null) {
+              } else if (step.targetType !== 'HEART_RATE' && lastWarmLow != null && lastWarmHigh != null) {
                 step.targetType = 'SPEED'
                 step.targetValueLow = lastWarmLow
                 step.targetValueHigh = lastWarmHigh
@@ -991,7 +1004,7 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
           lastSpeedLow = Number((step as any).targetValueLow)
           lastSpeedHigh = Number((step as any).targetValueHigh)
-        } else if (lastSpeedLow != null && lastSpeedHigh != null) {
+        } else if (step.targetType !== 'HEART_RATE' && lastSpeedLow != null && lastSpeedHigh != null) {
           step.targetType = 'SPEED'
           step.targetValueLow = lastSpeedLow
           step.targetValueHigh = lastSpeedHigh
@@ -1000,11 +1013,11 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
           lastRestLow = Number((step as any).targetValueLow)
           lastRestHigh = Number((step as any).targetValueHigh)
-        } else if (lastRestLow != null && lastRestHigh != null) {
+        } else if (step.targetType !== 'HEART_RATE' && lastRestLow != null && lastRestHigh != null) {
           step.targetType = 'SPEED'
           step.targetValueLow = lastRestLow
           step.targetValueHigh = lastRestHigh
-        } else if (lastWarmLow != null && lastWarmHigh != null) {
+        } else if (step.targetType !== 'HEART_RATE' && lastWarmLow != null && lastWarmHigh != null) {
           step.targetType = 'SPEED'
           step.targetValueLow = lastWarmLow
           step.targetValueHigh = lastWarmHigh

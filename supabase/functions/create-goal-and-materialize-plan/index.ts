@@ -29,7 +29,7 @@ import {
   type TrainingTransition,
 } from '../_shared/planning-context.ts';
 import { normalizeGoalDistanceKey, projectRaceSplits } from '../_shared/race-projections.ts';
-import { LIFT_LABEL, liftsBelowEntryMinimum, missingBarbellLifts, readBarbellMaxes, STRENGTH_ENTRY_MIN_1RM_LB, type BarbellLift } from '../shared/strength-system/barbell-maxes.ts';
+import { LIFT_LABEL, liftsBelowEntryMinimum, missingBarbellLifts, readBarbellMaxesResolved, STRENGTH_ENTRY_MIN_1RM_LB, type BarbellLift } from '../shared/strength-system/barbell-maxes.ts';
 import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 // ⛔ THE INTAKE'S OWN SEED TABLE, read here to tell an ANSWER from a PREFILL. See the precedence
 // note on `current_weekly_miles` below. Same file the run generator's tables live in, so the two
@@ -2497,7 +2497,7 @@ Deno.serve(async (req: Request) => {
         const gsEnduranceDevelops = ['run', 'bike', 'swim'].some((d) => gsPosture?.[d] === 'develop');
         if (gsPosture?.strength === 'develop' && !gsEnduranceDevelops) {
           const { data: gsBaseline } = await supabase
-            .from('user_baselines').select('equipment, performance_numbers, learned_fitness').eq('user_id', user_id).maybeSingle();
+            .from('user_baselines').select('equipment, performance_numbers, learned_fitness, locked_baselines').eq('user_id', user_id).maybeSingle();
           // ── D-323 / SPEC-get-stronger §0 — THE ENTRY GATE ────────────────────────────────────
           // ⛔ THERE IS NO EQUIPMENT GATE, DELIBERATELY. Michael, 2026-07-25: all cards are
           // pickable, the CARD states what it needs ("barbell, rack, bench"), and the athlete
@@ -2530,7 +2530,13 @@ Deno.serve(async (req: Request) => {
             // written out here inline, which meant this gate and the composer each carried their own
             // list: a key one accepted and the other didn't would let an athlete past the gate into a
             // plan with no weight on a lifting day.
-            const gsMaxes = readBarbellMaxes((gsBaseline?.performance_numbers ?? {}) as Record<string, unknown>);
+            // ⛔ THE RESOLVED FOUR (2026-09-02): locked > trusted learned > typed. Same reader as the builder.
+            const gsMaxes = readBarbellMaxesResolved(
+              (gsBaseline?.performance_numbers ?? {}) as Record<string, unknown>,
+              (gsBaseline?.learned_fitness ?? null) as Record<string, unknown> | null,
+              ((gsBaseline as Record<string, unknown> | null)?.locked_baselines ?? null) as Record<string, unknown> | null,
+              new Date().toISOString().slice(0, 10),
+            );
             const gsMissing = missingBarbellLifts(gsMaxes).map((l) => LIFT_LABEL[l]);
             if (gsMissing.length > 0) {
               const list = gsMissing.length === 1

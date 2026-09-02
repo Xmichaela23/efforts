@@ -590,6 +590,19 @@ function describeSession(session: EnduranceSession, raceTempo: boolean): string 
     // thing and the card should not imply they are.
     parts.push('Held at the hardest pace you could hold for about an hour of racing, not 5K pace.');
   }
+  /**
+   * ⛔ THE PRESCRIPTION LINE (Michael, 2026-09-02, rulings 1 and 2). Easy sessions are a heart-rate
+   * zone with the pace shown for reference; hard sessions carry an effort target beside the pace —
+   * threshold work 5–6 of 10, intervals 8–10, his numbers. The step-level fields are stamped by the
+   * materializer (`stampRunPrescription`); this is the sentence on the row.
+   */
+  if (session.family === 'run_vt1' || session.family === 'run_lsd') {
+    parts.push('Heart-rate zone; the pace shown is a reference.');
+  } else if (session.family === 'run_near_threshold') {
+    parts.push('Effort 5–6 of 10.');
+  } else if (session.family === 'run_mlss') {
+    parts.push('Effort 8–10 of 10.');
+  }
   return parts.join(' ');
 }
 

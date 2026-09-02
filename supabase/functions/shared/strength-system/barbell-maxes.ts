@@ -10,6 +10,8 @@
 // footgun's sibling), which is exactly why the alias list has to live in one place.
 // ============================================================================
 
+import { resolveStrengthNumbers } from '../../_shared/athlete-snapshot.ts';
+
 export type BarbellLift = 'squat' | 'bench' | 'deadlift' | 'overheadPress';
 
 /** Every key each lift has ever been stored under, most-current first. */
@@ -52,6 +54,32 @@ export function readBarbellMaxes(performanceNumbers: Record<string, unknown> | n
 }
 
 /** The lifts with no number on file, in prescription order. Empty = the gate opens. */
+/**
+ * ⛔ THE RESOLVED FOUR (2026-09-02) — the number the rest of the app uses, not only the typed one.
+ *
+ * The gate read `performance_numbers` alone, so an athlete whose bench came from logged sets, or who
+ * LOCKED a number on the Baselines screen and never typed one, was refused "missing Bench Press" while
+ * the coach, State and Baselines all showed a bench number. One reader for the four, same precedence
+ * everywhere: LOCKED > trusted LEARNED > typed (`resolveStrengthNumbers`, D-459). A lift with none of
+ * the three is 0, exactly as before, so `missingBarbellLifts` / `liftsBelowEntryMinimum` are unchanged.
+ */
+export function readBarbellMaxesResolved(
+  performanceNumbers: Record<string, unknown> | null | undefined,
+  learnedFitness: Record<string, unknown> | null | undefined,
+  locked: Record<string, unknown> | null | undefined,
+  asOf: string,
+): BarbellMaxes {
+  const r = resolveStrengthNumbers(performanceNumbers, learnedFitness, locked, asOf);
+  const pick = (resolved: number | null, lift: BarbellLift) =>
+    resolved != null && Number.isFinite(resolved) && resolved > 0 ? Math.round(resolved) : readMax(performanceNumbers, lift);
+  return {
+    squat: pick(r.squat, 'squat'),
+    bench: pick(r.bench, 'bench'),
+    deadlift: pick(r.deadlift, 'deadlift'),
+    overheadPress: pick(r.overheadPress1RM, 'overheadPress'),
+  };
+}
+
 export function missingBarbellLifts(maxes: BarbellMaxes): BarbellLift[] {
   return BARBELL_LIFTS.filter((l) => !(maxes[l] > 0));
 }

@@ -146,3 +146,28 @@ rulings 1/2/6/7 from the package.
 - **Threshold pace = learned or entered. Nothing else.** Ruling B is void: no 5K seeding at all. An
   athlete with neither gets no pace on hard runs, effort target only, until a test / race / entry.
 - **5K time's only pace job:** 5K race pace by division. Marathon race pace = threshold × 1.093 (A stands).
+
+## 8. Step 4 trace (audit session) — 24 remaining `effort_paces` readers, three groups
+1. **Dead weight (14)** — selects + pass-throughs into resolvers that ignore the field: create-goal
+   344–429 seed merge, arc-context 242/621/1097/1196/1487/1497, coach 1946/3249/4899/4924/4934,
+   analyze-running-workout 291–343, compute-snapshot 1679/1822, generate-strength-plan 205,
+   end-plan-core 71, anchors.ts 34, athlete-snapshot 285, coach/types 280; client: TrainingBaselines
+   81/1460, AppContext 124/506, useCoachWeekContext 208, NonRaceBuilder 2359. Strip; no behaviour change.
+2. **Race projections (3)** — resolve-server-predicted-finish 247–253, recompute-goal-race-projections
+   91–151, race-readiness (already off the resolver): race pace input becomes goal time + threshold.
+3. **The marathon builder (7)** — generate-run-plan index.ts 100–140 (performance_build gate),
+   240–275 (zone anchor → threshold rung only), 325–345 (refuses without effort_paces.race), 525–545
+   (target_time from effort_paces.race); performance-build.ts 1672–1688 (throws without race);
+   create-goal 3909 (hasThresholdPace = effort_paces.race), 4198–4216; GoalsScreen 604/623;
+   run-pace-calibration 51–52.
+
+### OPEN RULING FOR MICHAEL — a performance-build marathon with NO goal time
+- **A (recommended):** require an entered goal time + a threshold (learned/entered); refuse plainly
+  otherwise. "Complete" plans unchanged, effort only.
+- **B:** build it with M-pace sessions carrying effort targets and no pace (bigger change inside
+  PerformanceBuildGenerator, which throws at 1686).
+Verification either way: rebuild a marathon plan on a throwaway account before/after (trusted plan).
+
+Note: the easy reference pace is one number (×1.19) inside Friel's zone-2 pace band (114–129% of
+threshold). Showing the band instead of a point = display change (State-numbers session) + a
+two-number field (audit session).

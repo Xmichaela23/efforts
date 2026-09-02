@@ -79,7 +79,7 @@ import {
  * happens at the WIRE, and the composer takes plain movement names.
  */
 import { normalizeAssistancePrefs } from '../../../src/lib/assistance-catalog.ts';
-import { LIFT_LABEL, liftsBelowEntryMinimum, missingBarbellLifts, readBarbellMaxes, STRENGTH_ENTRY_MIN_1RM_LB } from '../shared/strength-system/barbell-maxes.ts';
+import { LIFT_LABEL, liftsBelowEntryMinimum, missingBarbellLifts, readBarbellMaxesResolved, STRENGTH_ENTRY_MIN_1RM_LB } from '../shared/strength-system/barbell-maxes.ts';
 import { describeThresholdBasis, resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolveCurrent5kPace } from '../../../src/lib/resolve-current-5k-pace.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
@@ -202,7 +202,7 @@ Deno.serve(async (req: Request) => {
       // door never fetched it — the SELECT-projection footgun this repo has hit repeatedly. It feeds
       // the swim anchor only, so the run frame is unaffected either way; a resolver is fed what it
       // asks for rather than what today's caller happens to need.
-      .select('learned_fitness, performance_numbers, effort_paces, equipment, units')
+      .select('learned_fitness, performance_numbers, locked_baselines, equipment, units')
       .eq('user_id', String(user_id))
       .maybeSingle();
 
@@ -219,7 +219,14 @@ Deno.serve(async (req: Request) => {
     // function is also invoked directly, and every session's weight comes off these four numbers — a
     // missing one is a lifting day with no weight on it. Same reader the entry gate in
     // `create-goal-and-materialize-plan` uses (`barbell-maxes.ts`), so the two cannot drift apart.
-    const maxes = readBarbellMaxes((ub?.performance_numbers ?? {}) as Record<string, unknown>);
+    // ⛔ THE RESOLVED FOUR (2026-09-02): locked > trusted learned > typed — the number the rest of the
+    // app uses. A learned or locked max alone used to be refused as "missing".
+    const maxes = readBarbellMaxesResolved(
+      (ub?.performance_numbers ?? {}) as Record<string, unknown>,
+      (ub?.learned_fitness ?? null) as Record<string, unknown> | null,
+      ((ub as Record<string, unknown> | null)?.locked_baselines ?? null) as Record<string, unknown> | null,
+      new Date().toISOString().slice(0, 10),
+    );
     const missing = missingBarbellLifts(maxes);
     if (missing.length > 0) {
       const list = missing.map((l) => LIFT_LABEL[l]);

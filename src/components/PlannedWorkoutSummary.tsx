@@ -463,6 +463,26 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
         } catch { return undefined; }
       };
       const powerStr = (st:any) => (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : undefined;
+      /**
+       * ⛔ WHAT THE STEP IS PRESCRIBED BY (Michael 2026-09-02, D-462 + the materializer's stampRunPrescription).
+       * Easy steps carry `prescription: 'heart_rate'` + `hr_range` (bpm) — the heart rate is the target and the
+       * pace is a reference. Hard work steps carry `target_rpe` — the pace is the target, the effort is the
+       * gauge. Rows written before the stamp carry neither and print exactly as before.
+       */
+      const hrStr = (st:any) => (st?.prescription === 'heart_rate' && st?.hr_range && typeof st.hr_range.lower === 'number' && typeof st.hr_range.upper === 'number')
+        ? `HR ${Math.round(st.hr_range.lower)}–${Math.round(st.hr_range.upper)}` : undefined;
+      const rpeStr = (st:any) => (st?.target_rpe && typeof st.target_rpe.lo === 'number' && typeof st.target_rpe.hi === 'number')
+        ? `effort ${st.target_rpe.lo}–${st.target_rpe.hi}` : undefined;
+      const workAnnoOf = (st:any, pace?: string, power?: string): string => anno(st, pace, power);
+      const anno = (st:any, pace?: string, power?: string): string => {
+        const hr = hrStr(st);
+        if (hr) return ` (${hr}${pace ? ` · ref ${pace}` : ''})`;
+        const rpe = rpeStr(st);
+        if (pace) return ` (${pace}${rpe ? ` · ${rpe}` : ''})`;
+        if (power) return ` (${power})`;
+        if (rpe) return ` (${rpe})`;
+        return '';
+      };
       const out: string[] = [];
       let i = 0;
       const isWork = (x:any)=> String((x?.kind||'')).toLowerCase()==='work' || String((x?.kind||''))==='interval_work' || String((x?.kind||'')).toLowerCase()==='steady';
@@ -472,12 +492,12 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
         const kind = String(st?.kind||'').toLowerCase();
         if (kind==='warmup' && typeof st?.seconds==='number') {
           const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'warmup', st?.pace_range);
-          out.push(`WU ${fmtTime(st.seconds)}${pace?` (${pace})`:''}`);
+          out.push(`WU ${fmtTime(st.seconds)}${anno(st, pace)}`);
           i += 1; continue;
         }
         if (kind==='cooldown' && typeof st?.seconds==='number') {
           const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'cooldown', st?.pace_range);
-          out.push(`CD ${fmtTime(st.seconds)}${pace?` (${pace})`:''}`);
+          out.push(`CD ${fmtTime(st.seconds)}${anno(st, pace)}`);
           i += 1; continue;
         }
         if (isWork(st)) {
@@ -544,13 +564,13 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
             const bLabel = (b && isRec(b)) ? ((typeof b?.seconds==='number' && b.seconds>0) ? fmtTime(b.seconds) : (typeof b?.distanceMeters==='number' && b.distanceMeters>0 ? fmtDist(b.distanceMeters) : (typeof b?.distance_m==='number' && b.distance_m>0 ? fmtDist(b.distance_m) : 'rest'))) : undefined;
             const bPace = (b && isRec(b)) ? paceStrWithRange(typeof b?.paceTarget==='string'?b.paceTarget:undefined, 'recovery', b?.pace_range) : undefined;
             const bPow = (b && isRec(b)) ? powerStr(b) : undefined;
-            const sameWork = (aLabel===workLabel) && (aPace===workPace) && (aPow===workPower);
-            const sameRest = (!hasRec && !b) || (!!hasRec && !!b && isRec(b) && bLabel===restLabel && bPace===restPace && bPow===restPower);
+            const sameWork = (aLabel===workLabel) && anno(a, aPace, aPow)===workAnnoOf(st, workPace, workPower);
+            const sameRest = (!hasRec && !b) || (!!hasRec && !!b && isRec(b) && bLabel===restLabel && anno(b, bPace, bPow)===anno(next, restPace, restPower));
             if (!sameWork || !sameRest) break;
             count += 1; j += hasRec ? 2 : 1;
           }
-          const workAnno = workPace ? ` (${workPace})` : (workPower?` (${workPower})`:'' );
-          const restAnno = hasRec ? (restPace ? ` ${restLabel} (${restPace})` : (restPower?` ${restLabel} (${restPower})` : ` ${restLabel}`)) : '';
+          const workAnno = anno(st, workPace, workPower);
+          const restAnno = hasRec ? ` ${restLabel}${anno(next, restPace, restPower)}` : '';
           const countDisplay = Math.max(1, Number(count)||0);
           out.push(`${countDisplay} × ${workLabel}${workAnno}${restAnno}`);
           if (j <= i) { i += 1; continue; }
