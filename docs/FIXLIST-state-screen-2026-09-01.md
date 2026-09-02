@@ -567,6 +567,19 @@ touched. None of them is done; none was quietly tolerated.
       `ex.name` verbatim to a case-sensitive `Set` (`:169`). The client now canonicalises and
       de-duplicates at the edge (2a), so nothing renders twice, but the payload still carries both.
       Canonicalising at the source is a server change inside the 27-function closure.
+- [ ] S6. **`buildLoadHeadline` is plan-BLIND, by decision — the client gates it, the server printer
+      does not.** (2026-09-01, Round 3 copy pass.) The glance headline function still says "Load a bit
+      high" / "Load high" on any over-target week, with no idea whether the plan prescribed it. On the
+      STATE SCREEN this is now correct: the client gates the headline at its one call site
+      (`StateTab`) off the shared `loadRead` decision (kind === 'condition' only), so it agrees with
+      the LoadBar read and goes quiet on a prescribed-hard or on-plan week. **But the FUNCTION itself
+      is unchanged**, and it has THREE consumers:
+      · `StateTab` (client, now gated) · `_shared/state-trend/state-screen-print.ts:90` (SERVER,
+        inside the 27-function closure) · `load-headline.test.ts`.
+      Aligning the function requires new inputs (planned / done / has_active_plan) on its signature →
+      all three call sites AND feeding those inputs to the server printer, which does not have them.
+      **Server change, 27-function deploy.** Filed as known-and-deliberate: wherever the server printer
+      renders the headline it will keep the plan-blind wording until this ships.
 - [ ] S4. **`RunFitnessRow` (~330 lines) is unreachable** since 1b. Bannered, not deleted. It holds
       the measured heat cost (D-346), the conditions caption, the ⓘ definition and the Q-179 posture
       sentence — content that exists nowhere else. Retiring it is a product call.

@@ -77,6 +77,8 @@ import {
   type SessionVerdict,
 } from '@shared/accessory-dosing/dose.ts';
 import { weekChangeLead, weekChangeParts, type ViadaWeekChange } from '@/lib/week-change-line';
+// ⛔ The coverage-line gate lives in a pure module so a fixture pins it — see state-coverage.ts.
+import { coverageVisible } from '@/lib/state-coverage';
 // ⛔ `DE: Upper` → `Speed day, upper body`, at the last moment before the athlete reads it (Michael,
 // off the live card: "LLM jiberish what is DE?" … "spell it out"). One formatter over the ONE owner
 // of the Heavy/Speed vocabulary — the logger, the calendar, the week grid and the plan download all
@@ -180,7 +182,7 @@ const OVER_BAND_WORD: Record<string, string> = {
  * empty. The gauge line names the scale once; each row carries its phrase where the book has one.
  */
 
-export default function ViadaWeekCard({ week }: { week: ViadaWeekPerformed | null | undefined }) {
+export default function ViadaWeekCard({ week, hasPlan = true }: { week: ViadaWeekPerformed | null | undefined; hasPlan?: boolean }) {
   if (!week || week.perMuscle.length === 0) return null;
 
   // Null when there is nothing to say — no prior work, or nothing over the line. Both are silence.
@@ -216,7 +218,11 @@ export default function ViadaWeekCard({ week }: { week: ViadaWeekPerformed | nul
       )}
 
       {/* ── 2. COVERAGE — what got nothing ────────────────────────────────────────────────────── */}
-      {week.belowFloor.length > 0 && (
+      {/* ⛔ PLAN-DEPENDENT (2026-09-01): a coverage GAP only means something against a prescription.
+          With no active plan, "nothing this week for triceps" is the app inventing a gap — so this
+          line renders ONLY with a plan. `hasPlan` is `has_active_plan`, this card's own input; it
+          does not read whether another block rendered. */}
+      {coverageVisible(hasPlan, week.belowFloor) && (
         <div className="text-[13px] text-white/80 mt-3">
           nothing this week for {week.belowFloor.map((m) => word(MUSCLE_WORD, m)).join(', ')}
         </div>

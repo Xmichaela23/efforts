@@ -1,6 +1,6 @@
 import React from 'react';
 import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
-import { statusVolumeLabel } from '@/lib/load-headline';
+import { loadRead } from '@/lib/load-read';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,29 +29,22 @@ interface LoadBarProps {
   weekIntent?: string | null;
   /** compact variant (calendar) — verdict + ACWR only, no composition strip. */
   compact?: boolean;
+  /** ⛔ PROGRAMME-AWARE LOAD READ (2026-09-01). Whether a plan is active, and this week's planned vs
+   *  done session totals (from `wsv.week_execution_v1.counts`, the SAME source the planned-vs-actual
+   *  bar reads — no second notion of "missed"). Absent → treated as no plan. */
+  hasActivePlan?: boolean;
+  plannedThisWeek?: number;
+  doneThisWeek?: number;
 }
+
+// ⛔ loadRead moved to src/lib/load-read.ts (2026-09-01) so the LOAD word and the glance HEADLINE
+// share ONE programme-aware decision and cannot drift. Imported below.
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-// Color for the reconciled VERDICT word (D-260/D-266 — statusVolumeLabel's outputs only).
-// ⛔ THE VERDICT IS WHITE WHEN FINE AND ESCALATES ON THE RED AXIS (2026-08-15, Michael:
-// "balanced shouldn't be green — its run's color... maybe it's white and skews up to red").
-// The field norm is a traffic light (Garmin training status, Whoop, TrainingPeaks form zones:
-// green good → amber caution → red danger) — but this app's traffic-light colours are TAKEN:
-// green is bike, gold/amber is run, orange is strength. Emerald "balanced" sat two rows above a
-// green bike legend meaning something completely different. So the escalation LOGIC stays
-// (quiet → caution → alarm) and the palette moves to the one axis no discipline owns: white when
-// nothing needs attention, the app's non-discipline red (#FF5A5F, the FOCUS_RACE_COLOR family)
-// when it does. Same rule the logger palette set: a discipline colour only ever means its
-// discipline, and a verdict is not a discipline.
-function loadVolumeColor(label: string): string {
-  if (label === 'balanced') return 'text-white/85';
-  if (label === 'productive') return 'text-white/85';        // positive = calm, not coloured
-  if (label === 'build more') return 'text-white/60';        // a nudge, not an alarm
-  if (label === 'a bit high') return 'text-[#FF5A5F]/75';    // caution — soft non-discipline red
-  if (label === 'pull back') return 'text-[#FF5A5F]';        // alarm — full red
-  return 'text-white/45';
-}
+// ⛔ loadVolumeColor + statusVolumeLabel removed here (2026-09-01) — the load word is now the
+// programme-aware `loadRead` above, which carries its own colour.
+
 
 // One discipline vocabulary app-wide (Michael 2026-07-22): "bike" not "Ride" (swim-bike-run is the tri
 // canon), lowercase to match the calm secondary-label style everywhere else on the screen.
@@ -76,12 +69,15 @@ function Dot() {
 // leads, the weekly composition (which discipline carried the load — our differentiator) is the primary
 // visual, ACWR is demoted to a reference number, and per-day detail lives in the calendar drill-down.
 
-export default function LoadBar({ load, loadStatus, weekIntent, compact }: LoadBarProps) {
+export default function LoadBar({ load, loadStatus, weekIntent, compact, hasActivePlan, plannedThisWeek, doneThisWeek }: LoadBarProps) {
   const isTaperOrPeak = weekIntent === 'taper' || weekIntent === 'peak';
 
-  // Verdict = the reconciled two-key read (D-260 sole authority). ACWR shows only as a reference.
-  const verdict = statusVolumeLabel(loadStatus?.status);
-  const showVerdict = verdict !== '—' && !(isTaperOrPeak && verdict === 'build more');
+  // ⛔ THE READ IS PROGRAMME-AWARE (2026-09-01) — see `loadRead`. It reads the reconciled two-key
+  // status (D-260 sole authority) plus this week's planned-vs-done, and states a FACT or nothing —
+  // never an imperative. `week` (test week) counts as prescribed-light/hard like taper/peak.
+  const prescribedShaped = isTaperOrPeak || weekIntent === 'test';
+  const read = loadRead(loadStatus?.status, prescribedShaped, hasActivePlan === true, plannedThisWeek ?? 0, doneThisWeek ?? 0);
+  const showVerdict = read != null;
 
   // Weekly COMPOSITION — aggregate the 7-day load by discipline (from by_type; fall back to the
   // day's dominant_type). This is the primary load visual; the per-day rhythm lives in the calendar.
@@ -123,8 +119,8 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact }: LoadB
             neutral white here, since LOAD sits on the multi-sport plate. */}
         <span className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase">LOAD</span>
         <div className="flex items-center gap-2">
-          {showVerdict && (
-            <span className={`text-[15px] font-semibold tracking-tight ${loadVolumeColor(verdict)}`}>{verdict}</span>
+          {read && (
+            <span className={`text-[15px] font-semibold tracking-tight ${read.cls}`}>{read.text}</span>
           )}
           {load.acwr != null && (
             <>
@@ -153,7 +149,7 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact }: LoadB
       {showAcwrInfo && (
         <div className="mt-2 space-y-1.5 text-[11px] leading-snug text-white/45">
           <p>
-            <span className="text-white/70">Points</span> — training stress: how long × how hard, scaled so
+            <span className="text-white/70">Training load</span> — how long × how hard, scaled so
             ~1 hour at your threshold ≈ 100. The bar splits your rolling-7-day total by sport.
           </p>
           <p>
@@ -162,9 +158,9 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact }: LoadB
             number, not a verdict.
           </p>
           <p>
-            <span className="text-white/70">The word</span> (e.g. "balanced") combines all of it — your points
-            <span className="italic"> and</span> ACWR together with how your body's handling it (heart rate,
-            effort, readiness) — so it can differ from the bare ratio on purpose.
+            <span className="text-white/70">The load read</span> (e.g. "balanced") combines all of it — your
+            training load<span className="italic"> and</span> ACWR together with how your body's handling it
+            (heart rate, effort, readiness) — so it can differ from the bare ratio on purpose.
           </p>
         </div>
       )}

@@ -118,8 +118,10 @@ export function EnduranceReadCards(
       {list.map((s) => <EnduranceCard key={`${s.sport}:${s.family}`} session={s} />)}
       {hasLine && (
         <div className="px-3 pb-3 text-[11px] text-white/55">
+          {/* ⛔ "watch the line over a few weeks" cut (2026-09-01) — a coaching instruction. The fact
+              before it is real and stays: conditions move this more than fitness does. */}
           one session doesn't tell you much — a hot day or a hilly route moves this more than your
-          fitness does. watch the line over a few weeks.
+          fitness does.
         </div>
       )}
     </>

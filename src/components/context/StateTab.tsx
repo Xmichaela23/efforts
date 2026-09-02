@@ -23,6 +23,7 @@ import StatePerformanceSection from '@/components/context/StatePerformanceSectio
 import StateHubTabs, { type StateLens } from '@/components/context/StateHubTabs';
 import StateAdjustLens from '@/components/context/StateAdjustLens';
 import { buildLoadHeadline, statusVolumeLabel } from '@/lib/load-headline';
+import { loadRead } from '@/lib/load-read';
 import { readoutPlateStyle } from '@/lib/readout-plate';
 import { useSwimBaselineNudge } from '@/hooks/useSwimBaselineNudge';
 import { useAppContext } from '@/contexts/AppContext';
@@ -357,6 +358,15 @@ export default function StateTab({
   if (!wsv) return <div className="py-8 text-center text-[13px] text-white/50">Loading state…</div>;
 
   const week = wsv.week;
+  // ⛔ THE SAME planned-vs-done SOURCE THE BAR READS (2026-09-01) — `wsv.week_execution_v1.counts`,
+  // summed across disciplines, handed to the programme-aware load read. No second notion of "missed".
+  const weekExecTotals = (() => {
+    const counts = ((wsv as any).week_execution_v1?.counts ?? []) as Array<{ planned?: number; done?: number }>;
+    return {
+      planned: counts.reduce((s, c) => s + (Number(c?.planned) || 0), 0),
+      done: counts.reduce((s, c) => s + (Number(c?.done) || 0), 0),
+    };
+  })();
   const load = wsv.load;
   const rm = ((data as any)?.response_model ?? (wsv as any)?.response_model) as {
     visible_signals: Array<VisibleSignal>;
@@ -648,14 +658,31 @@ export default function StateTab({
   // D-260/D-266: the LOAD verdict reads the RECONCILED load_status (the two-key engine, sole verdict
   // authority) — not raw ACWR. ACWR stays the gauge number only. If the server verdict is absent, the
   // headline omits the load slot (no ACWR-word fallback — ACWR never mints a verdict).
-  const loadHeadline = buildLoadHeadline({
-    loadLabel: statusVolumeLabel(loadStatus?.status),
-    readinessState: readiness,
-    readinessLabel, // D-232: refined chip label wins so the headline can't contradict the chip
-    fitnessDirection: (trends as any).fitness_direction,
-    isTaperOrPeak: week.intent === 'taper' || week.intent === 'peak',
-    acwr: load.acwr, // D-268 Phase 5: "headroom" only when load is genuinely light (server-computed acwr)
-  });
+  // ⛔ THE HEADLINE READS THE SAME LOAD DECISION AS THE BAR (2026-09-01, Round 3) — one call to the
+  // shared `loadRead`, the SAME inputs the LoadBar read uses (weekExecTotals · has_active_plan ·
+  // week.intent). The glance headline speaks ONLY on a plain over-CONDITION (kind === 'condition',
+  // i.e. high with no plan to compare against); it goes quiet whenever the bar read is quiet — a
+  // prescribed-hard week, or high on-plan without added work — so the two surfaces cannot disagree.
+  // ⚠️ buildLoadHeadline itself stays plan-blind (it is shared with the server printer, 27-function
+  // closure); the gate lives HERE, at the one call site, keyed off the shared decision, not a second
+  // copy of the rule. The server-side alignment of the function is filed as a leftover.
+  const loadReadForHeadline = loadRead(
+    loadStatus?.status,
+    week.intent === 'taper' || week.intent === 'peak' || week.intent === 'test',
+    wsv.plan.has_active_plan === true,
+    weekExecTotals.planned,
+    weekExecTotals.done,
+  );
+  const loadHeadline = loadReadForHeadline?.kind === 'condition'
+    ? buildLoadHeadline({
+        loadLabel: statusVolumeLabel(loadStatus?.status),
+        readinessState: readiness,
+        readinessLabel, // D-232: refined chip label wins so the headline can't contradict the chip
+        fitnessDirection: (trends as any).fitness_direction,
+        isTaperOrPeak: week.intent === 'taper' || week.intent === 'peak',
+        acwr: load.acwr, // D-268 Phase 5: "headroom" only when load is genuinely light (server-computed acwr)
+      })
+    : null;
 
 
   // ── Cross-training signal (server-computed) ──────────────────────────────
@@ -792,7 +819,14 @@ export default function StateTab({
       <div className="galaxy-card readout-texture readout-texture--spectral rounded-2xl divide-y divide-white/[0.055]" style={readoutPlateStyle(undefined, { galaxy: true })}>
 
         {/* LOAD — full-width gauge + sparkline */}
-        <LoadBar load={load} loadStatus={loadStatus} weekIntent={week.intent} />
+        <LoadBar
+          load={load}
+          loadStatus={loadStatus}
+          weekIntent={week.intent}
+          hasActivePlan={wsv.plan.has_active_plan === true}
+          plannedThisWeek={weekExecTotals.planned}
+          doneThisWeek={weekExecTotals.done}
+        />
 
         {showTopLastRaceCard && lastCompletedRace && <StateLastRaceCard lastCompletedRace={lastCompletedRace} />}
 
@@ -847,7 +881,7 @@ export default function StateTab({
           (null before a plan starts and after it ends), so the two always agree.
           Sits OUTSIDE the neutral plates: its rows are per-discipline, and each wears its own
           sport-keyed plate inside the section. */}
-      <StatePerformanceSection strengthDetail={strengthPerLiftDetail} stateDisplay={wsv.trends?.display} primaryDiscipline={(wsv.plan as any)?.primary_discipline ?? null} planWeek={week.index ?? null} block={planRoot?.block ?? null} strengthFatigue={strengthFatigue} />
+      <StatePerformanceSection strengthDetail={strengthPerLiftDetail} stateDisplay={wsv.trends?.display} primaryDiscipline={(wsv.plan as any)?.primary_discipline ?? null} planWeek={week.index ?? null} block={planRoot?.block ?? null} strengthFatigue={strengthFatigue} hasActivePlan={wsv.plan.has_active_plan === true} />
 
       <div className="mt-2 galaxy-card readout-texture readout-texture--spectral rounded-2xl divide-y divide-white/[0.055]" style={readoutPlateStyle(undefined, { galaxy: true })}>
 
@@ -911,8 +945,10 @@ export default function StateTab({
           }
         />
 
-        {/* NEXT */}
-        <StateNextBlock nextSessions={nextSessions} />
+        {/* NEXT — ⛔ PLAN-DEPENDENT (2026-09-01). "What's next" is a prescription; with no active plan
+            there is nothing to render, and the block's "week complete" empty-chip would read wrong.
+            Gate on `has_active_plan` so it disappears cleanly (absent, not an empty header). */}
+        {wsv.plan.has_active_plan === true && <StateNextBlock nextSessions={nextSessions} />}
       </div>
 
       {wsv.plan.plan_name && (

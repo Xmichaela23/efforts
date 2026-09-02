@@ -36,9 +36,9 @@ import { liftStatusLine } from '@/lib/strength-calibration-copy';
 import { Activity, Bike, Waves, Dumbbell, type LucideIcon } from 'lucide-react';
 
 const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
-  improving: { word: 'improving', cls: 'text-emerald-400', arr: '↑' },
-  holding: { word: 'holding', cls: 'text-white/70', arr: '→' }, // NEUTRAL (Michael) — steady is neither good nor bad; gray, not amber (amber was a false caution AND collided with run-gold)
-  sliding: { word: 'easing off', cls: 'text-amber-300', arr: '↓' }, // mild decline stays amber — so "steady" and "slipping" no longer read identical
+  improving: { word: 'up', cls: 'text-emerald-400', arr: '' },
+  holding: { word: '', cls: 'text-white/70', arr: '' }, // ⛔ NO WORD, NO ARROW (2026-09-01): "holding" meant both genuinely-flat AND too-noisy-to-call (Q-289). When the verdict can't call a direction, the row shows the number + count and stops.
+  sliding: { word: 'down', cls: 'text-amber-300', arr: '' }, // ⛔ "easing off" told the athlete they CHOSE to ease off when the number simply dropped — interpretive and flattering (2026-09-01). State the measurement: down.
   needs_data: { word: 'needs data', cls: 'text-white/60', arr: '' },
   withheld: { word: 'too few to read', cls: 'text-white/60', arr: '' },
 };
@@ -67,9 +67,9 @@ const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> 
 // If that pairing looks wrong on the screen, the fix is to give `settled lower` its own glyph, not
 // to bring the words back.
 const NUMERIC: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
-  improving: { word: '', cls: 'text-emerald-400', arr: '↑' },
-  holding: { word: '', cls: 'text-white/70', arr: '→' },
-  sliding: { word: '', cls: 'text-white/70', arr: '↓' },
+  improving: { word: '', cls: 'text-emerald-400', arr: '' },
+  holding: { word: '', cls: 'text-white/70', arr: '' },
+  sliding: { word: '', cls: 'text-white/70', arr: '' },
   // Not verdicts — these two say "there is no reading", which no arrow can express. Words stay.
   needs_data: { word: 'needs data', cls: 'text-white/60', arr: '' },
   withheld: { word: 'too few to read', cls: 'text-white/60', arr: '' },
@@ -95,10 +95,10 @@ const NUMERIC: Record<TrendVerdict, { word: string; cls: string; arr: string }> 
 // same effort" says what the number means to a runner. The arrow and the signed percent still ride
 // alongside — the word replaces nothing, it explains.
 const RUN_EFF_WORDS: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
-  improving: { word: 'Faster at the same effort', cls: 'text-emerald-400', arr: '↑' },
-  holding: { word: 'Holding steady', cls: 'text-white/70', arr: '→' },
+  improving: { word: 'Faster at the same effort', cls: 'text-emerald-400', arr: '' },
+  holding: { word: '', cls: 'text-white/70', arr: '' }, // ⛔ no word (2026-09-01) — see VERDICT.holding
   // Neutral, not amber — a decline here is a direction, and heat or a base block routinely cause it.
-  sliding: { word: 'Slower at the same effort', cls: 'text-white/70', arr: '↓' },
+  sliding: { word: 'Slower at the same effort', cls: 'text-white/70', arr: '' },
   needs_data: { word: 'Need a few more runs', cls: 'text-white/60', arr: '' },
   withheld: { word: 'Too soon to tell', cls: 'text-white/60', arr: '' },
 };
@@ -107,13 +107,8 @@ const RUN_EFF_WORDS: Record<TrendVerdict, { word: string; cls: string; arr: stri
 // ride you just finished is in there yet. Distinct from `asOf()`, which prints a calendar date.
 // Q-255: verdict words for the bike load floor. Bands are Friel/intervals.icu's (see the server
 // module `state-trend/load-floor.ts` for sources); these are just their on-screen words.
-const LOAD_FRESHNESS_WORDS: Record<string, string> = {
-  very_fresh: 'very fresh',
-  fresh: 'fresh',
-  neutral: 'steady',
-  working: 'carrying training fatigue',
-  heavily_fatigued: 'heavily fatigued',
-};
+// ⛔ LOAD_FRESHNESS_WORDS removed (2026-09-01) — its only consumer was the bike CTL/TSB line, now gone.
+
 
 function recencyOf(ageDays: number | null | undefined): string | null {
   if (ageDays == null || ageDays < 0) return null;
@@ -129,10 +124,10 @@ function verdictLabel(
   wordMap: Record<TrendVerdict, { word: string; cls: string; arr: string }> = VERDICT,
 ): { word: string; cls: string; arr: string } {
   if (verdict === 'sliding' && recentlyFlat) {
-    if (wordMap === NUMERIC) return { word: '', cls: 'text-white/70', arr: '→' };  // bike: the number carries the drop
+    if (wordMap === NUMERIC) return { word: '', cls: 'text-white/70', arr: '' };  // bike: the number carries the drop
     // "Dropped, then levelled" is the split nobody else draws — on the run row it gets said out loud.
-    if (wordMap === RUN_EFF_WORDS) return { word: 'Slower, now holding', cls: 'text-white/70', arr: '→' };
-    return { word: 'settled lower', cls: 'text-white/55', arr: '→' };
+    if (wordMap === RUN_EFF_WORDS) return { word: 'Slower, then level', cls: 'text-white/70', arr: '' };
+    return { word: 'dropped, then level', cls: 'text-white/55', arr: '' };
   }
   return wordMap[verdict];
 }
@@ -210,10 +205,10 @@ function blockContextLine(planWeek: number | null | undefined, block: BlockCard 
 // are earned by the noise gate (Q-241), which is the same bar run durability and strength clear;
 // a confidence interval was never the requirement, beating your own scatter was.
 const BIKE_AEROBIC_WORDS: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
-  improving: { word: 'Easier at the same power', cls: 'text-emerald-400', arr: '↑' },
-  holding: { word: 'Holding steady', cls: 'text-white/70', arr: '→' },
+  improving: { word: 'Easier at the same power', cls: 'text-emerald-400', arr: '' },
+  holding: { word: '', cls: 'text-white/70', arr: '' }, // ⛔ no word (2026-09-01) — see VERDICT.holding
   // Neutral, never amber: heat, a hard block or a poor night all do this, and none of them is a fault.
-  sliding: { word: 'Harder at the same power', cls: 'text-white/70', arr: '↓' },
+  sliding: { word: 'Harder at the same power', cls: 'text-white/70', arr: '' },
   needs_data: { word: 'Need a few more rides', cls: 'text-white/60', arr: '' },
   withheld: { word: 'Too few rides to read', cls: 'text-white/60', arr: '' },
 };
@@ -370,22 +365,19 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
       {building ? (
         // BUILDING — say what is there and what it becomes. Never a bare "needs data": the athlete
         // cannot tell whether that means "ride more" or "the app is broken".
-        // Q-255: when the load floor is present the row LEADS with it — training load is a real read
-        // built from every ride (CTL/TSB, the same model Strava/TrainingPeaks render), so the row no
-        // longer reports its own hunger on an athlete who is riding. The measurement promise stays as
-        // the tail. Floor absent (no computed ride load) → the original copy, unchanged.
+        // ⛔ THE CTL/TSB READ IS REMOVED (2026-09-01, ruled). "fitness N · form −M" and the
+        // "carrying training fatigue" freshness word are the Banister/Coggan model — coach-facing
+        // jargon, an inference we can't state plainly, and a duplicate of the ACWR/load plate at the
+        // top of the screen. The MODEL stays server-side (fitness.loadFloor is still computed and
+        // still gates `building`); it is simply no longer rendered here. What remains is the
+        // measurement promise. Floor absent → the original copy, unchanged.
         fitness.loadFloor ? (
           <span className="inline-flex items-baseline gap-1.5 flex-wrap text-white/60">
-            <span className="text-white/85">
-              {`Bike load${fitness.loadFloor.fitness_trend ? ` ${fitness.loadFloor.fitness_trend}` : ''} · ${LOAD_FRESHNESS_WORDS[fitness.loadFloor.freshness]}`}
-            </span>
-            {/* The floor counts EVERY ride, so its recency stamp is the newest ride overall — the
-                measurement signals' qualifying-only stamp said "6d ago" the day after a ride. */}
             {(recencyOf(fitness.loadFloor.newest_ride_age_days) ?? buildingRecency) && (
               <span className="text-white/45">{recencyOf(fitness.loadFloor.newest_ride_age_days) ?? buildingRecency}</span>
             )}
             <span className="basis-full">
-              {`fitness ${fitness.loadFloor.ctl} · form ${fitness.loadFloor.tsb >= 0 ? `+${fitness.loadFloor.tsb}` : fitness.loadFloor.tsb} · from every ride — a few more hard rides add the power read`}
+              {'from your rides — a few more hard rides add the power read'}
             </span>
           </span>
         ) : (
@@ -554,9 +546,9 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
 // claim), session count is the receipt, "unplanned" a dim receipt. Volume DOWN is neutral-colored,
 // not red (a deload/taper isn't a fitness loss). Industry-standard (Strong/Hevy/JEFIT).
 const VOLUME_WORD: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
-  improving: { word: 'up', cls: 'text-emerald-400', arr: '↑' },
-  holding: { word: 'steady', cls: 'text-white/70', arr: '→' }, // NEUTRAL — steady volume is not a caution
-  sliding: { word: 'down', cls: 'text-white/50', arr: '↓' },
+  improving: { word: 'up', cls: 'text-emerald-400', arr: '' },
+  holding: { word: 'steady', cls: 'text-white/70', arr: '' }, // NEUTRAL — steady volume is not a caution
+  sliding: { word: 'down', cls: 'text-white/50', arr: '' },
   needs_data: { word: 'needs data', cls: 'text-white/60', arr: '' },
   withheld: { word: 'too few to read', cls: 'text-white/60', arr: '' },
 };
@@ -1447,7 +1439,7 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
 // always-visible week-execution trade sentence. (The old always-visible `PostureLine` — orphaned since
 // it was written, F10 — is removed 2026-07-24 now that the ⓘ carries this.)
 
-export default function StatePerformanceSection({ strengthDetail, stateDisplay, primaryDiscipline, planWeek, block, strengthFatigue }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; primaryDiscipline?: string | null; planWeek?: number | null; block?: BlockCard | null; strengthFatigue?: boolean }) {
+export default function StatePerformanceSection({ strengthDetail, stateDisplay, primaryDiscipline, planWeek, block, strengthFatigue, hasActivePlan }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; primaryDiscipline?: string | null; planWeek?: number | null; block?: BlockCard | null; strengthFatigue?: boolean; hasActivePlan?: boolean }) {
   // S2: `stateDisplay` is the server-assembled display contract from the coach payload. When present the
   // hook renders it (no in-browser queries/assembly); absent → legacy live path (safe rollout fallback).
   const { cards, bikeFitness, runFitness, strengthFitness, swimRest, swimVolume, fitnessMode, fitnessAnchors, cadenceCounts, posture: declaredPosture, activeDisciplines, loading } = useStateTrends(stateDisplay);
@@ -1605,9 +1597,9 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                 {strengthDetail}
                 {/* ⛔ ONE OWNER PER SPORT (Round 3 pass 1). The weekly lifting card (moved from the LOAD
                     section) lives under strength now — same subject, one place. Its own null gate means
-                    no lifting → nothing drawn, so the plate is unchanged for an athlete who has not
-                    lifted this week. */}
-                <ViadaWeekCard week={viadaWeek} />
+                    no lifting → nothing drawn. `hasPlan` gates the coverage line inside it (a gap only
+                    means something against a prescription). */}
+                <ViadaWeekCard week={viadaWeek} hasPlan={hasActivePlan === true} />
               </>
             );
             // ⛔ THE RIDE CARDS AND THE LIFTING CARD ALSO RIDE ALONG WHEN THE FITNESS ROW HAS NO
@@ -1616,7 +1608,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
             // week. Each is gated by its own content, so nothing new appears.
             const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} showAxis={showAxis} />;
             if (card.discipline === 'bike') return <>{row}<EnduranceReadCards sessions={enduranceSessions} spine={enduranceSpine} sport="ride" /></>;
-            if (card.discipline === 'strength') return <>{row}{strengthDetail}<ViadaWeekCard week={viadaWeek} /></>;
+            if (card.discipline === 'strength') return <>{row}{strengthDetail}<ViadaWeekCard week={viadaWeek} hasPlan={hasActivePlan === true} /></>;
             return row;
           })();
           // Each discipline's card wears its own READOUT PLATE keyed to its sport (2026-08-15,
