@@ -20,6 +20,11 @@
 
 import React from 'react';
 import { getDisciplineColor } from '@/lib/context-utils';
+// ⛔ THE ONE CHART LANGUAGE (Round 3 pass 2, 2026-09-01). The endurance cards used to draw their own
+// dates-only, non-expanding chart (DatedChart); they now draw the same sparkline as strength and
+// bike, so the screen has ONE caption format and ONE expand rule. DatedChart is kept as a thin
+// adapter over it (same call sites) — see below.
+import TrendSparkline from './TrendSparkline';
 
 type SeriesPoint = { date: string; value: number; recent: boolean; week?: number };
 
@@ -77,9 +82,15 @@ const GROUP_LABEL: Record<string, string> = {
 const GROUP_ORDER = ['easy', 'long', 'quality', 'all'];
 
 export function EnduranceReadCards(
-  { sessions, spine }: { sessions?: NamedSession[] | null; spine?: SpineSeries[] | null },
+  { sessions, spine, sport }: { sessions?: NamedSession[] | null; spine?: SpineSeries[] | null; sport?: 'run' | 'ride' },
 ) {
-  const list = (sessions ?? []).filter((s) => (s?.points?.length ?? 0) > 0);
+  // ⛔ ONE OWNER PER SPORT (Round 3 pass 1, 2026-09-01). `sport` filters this to a single discipline
+  // so the ride cards can render under the bike plate and the run cards under the run block, each
+  // owned by one place. ⚠️ BEHAVIOUR-PRESERVING: no `sport` → every card, exactly as before. The
+  // cards already carry their own `sport` ('run' / 'ride'), so this is a filter, not a re-grouping —
+  // no card's own render gate changes, only which subset a caller asks for.
+  const bySport = <T extends { sport: string }>(xs: T[]) => (sport ? xs.filter((x) => x.sport === sport) : xs);
+  const list = bySport((sessions ?? []).filter((s) => (s?.points?.length ?? 0) > 0));
   /**
    * ⛔⛔ THE SPINE RENDERS WITHOUT A PLAN, AND IT RENDERS FIRST (2026-08-28, work order item 3).
    *
@@ -93,14 +104,24 @@ export function EnduranceReadCards(
    * overlay that appears when a block exists** — the build shipped it inverted, with the overlay as
    * the headline and the spine filtered down to nothing.
    */
-  const spineList = (spine ?? [])
-    .filter((s) => (s?.points?.length ?? 0) > 0)
+  const spineList = bySport((spine ?? [])
+    .filter((s) => (s?.points?.length ?? 0) > 0))
     .sort((a, b) => (GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group)) || a.sport.localeCompare(b.sport));
   if (list.length === 0 && spineList.length === 0) return null;
+  // ⛔ THE CAUTION, ONCE FOR THE SPORT (Round 3 pass 2) — see SpineCard for why it moved here. Shown
+  // when any card carries a line to read (≥2 points); a lone reading has no trend to caution about.
+  const hasLine = spineList.some((s) => (s.points ?? []).filter((p) => p.efficiency != null).length >= 2)
+    || list.some((s) => (s.points ?? []).length >= 2);
   return (
     <>
       {spineList.map((s) => <SpineCard key={`spine:${s.sport}:${s.group}`} series={s} />)}
       {list.map((s) => <EnduranceCard key={`${s.sport}:${s.family}`} session={s} />)}
+      {hasLine && (
+        <div className="px-3 pb-3 text-[11px] text-white/55">
+          one session doesn't tell you much — a hot day or a hilly route moves this more than your
+          fitness does. watch the line over a few weeks.
+        </div>
+      )}
     </>
   );
 }
@@ -153,22 +174,13 @@ function SpineCard({ series }: { series: SpineSeries }) {
             */}
         </>
       )}
-      {eff.length >= 2 && <DatedChart points={eff} color={color} />}
+      {eff.length >= 2 && <DatedChart points={eff} color={color} dotNoun={isRide ? 'ride' : 'run'} />}
 
-      {/**
-        * ⛔ HOW TO READ IT, ON THE CARD (2026-08-29, Michael). The number alone invited exactly the
-        * comparison TrainingPeaks warns against — this session against the one before — so the card
-        * now says what to watch instead. Their own instruction: compare similar sessions across
-        * several weeks; a rising line means the aerobic base is improving.
-        * ⚠️ ONLY WHERE THERE IS A LINE TO WATCH. On a single reading this sentence would be telling
-        * the athlete to read a trend that does not exist yet.
-        */}
-      {eff.length >= 2 && (
-        <div className="text-[11px] text-white/55 mt-1">
-          one session doesn't tell you much — a hot day or a hilly route moves this more than your
-          fitness does. watch the line over a few weeks.
-        </div>
-      )}
+      {/* ⛔ THE "one session doesn't tell you much" CAUTION MOVED TO ONCE PER SPORT (Round 3 pass 2).
+          It was printed under EVERY spine card (easy / long / quality / rides), which is the "said
+          four times" the card-language pass is removing; it now renders once at the foot of the
+          endurance group in <EnduranceReadCards>. Same words, same TrainingPeaks reasoning (compare
+          similar sessions over weeks, not one against the last), said once. */}
 
       {/* ── FADE, AND THE CASE WHERE THERE DELIBERATELY IS NONE. ── */}
       {latest.driftPct != null ? (
@@ -298,36 +310,26 @@ function SessionChart({ points, color, valueOf }: {
   return <DatedChart points={usable} color={color} />;
 }
 
-function DatedChart({ points, color }: { points: Array<{ date: string; value: number }>; color: string }) {
-  const W = 300, H = 40, PAD_Y = 5, PAD_X = 2;
-  const t = (iso: string) => Date.parse(`${iso}T12:00:00Z`);
-  const t0 = t(points[0].date), t1 = t(points[points.length - 1].date);
-  const span = Math.max(1, t1 - t0);
-  const vals = points.map((p) => p.value);
-  const minV = Math.min(...vals), maxV = Math.max(...vals);
-  const center = (minV + maxV) / 2 || 1;
-  // The same noise floor the other charts use: a few percent of session-to-session wobble must not
-  // fill the height and read as a cliff.
-  const dRange = Math.max((maxV - minV) * 1.3, center * 0.08, 1e-6);
-  const dMin = center - dRange / 2;
-  const x = (iso: string) => PAD_X + ((t(iso) - t0) / span) * (W - 2 * PAD_X);
-  const y = (v: number) => PAD_Y + (1 - (v - dMin) / dRange) * (H - 2 * PAD_Y);
-  const last = points[points.length - 1];
-  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const fmtD = (iso: string) => { const [, m, d] = iso.split('-'); return `${MON[+m - 1]} ${+d}`; };
-  return (
-    <div className="mt-1.5">
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="block">
-        <polyline points={points.map((p) => `${x(p.date)},${y(p.value)}`).join(' ')}
-          fill="none" stroke={color} strokeOpacity={0.9} strokeWidth={1.75} vectorEffect="non-scaling-stroke" />
-        {points.map((p, i) => <circle key={i} cx={x(p.date)} cy={y(p.value)} r={1.6} fill={color} fillOpacity={0.55} />)}
-        <circle cx={x(last.date)} cy={y(last.value)} r={2.5} fill={color} />
-      </svg>
-      <div className="flex items-baseline justify-between text-[10px] text-white/30 tabular-nums mt-0.5">
-        <span>{fmtD(points[0].date)}</span><span>{fmtD(last.date)}</span>
-      </div>
-    </div>
-  );
+/**
+ * ⛔ NOW A THIN ADAPTER OVER THE SHARED `TrendSparkline` (Round 3 pass 2, 2026-09-01) — one chart
+ * language across the whole screen. It kept its own SVG (dates-only caption, no expand) until now;
+ * the endurance cards read better matching the strength model, and the four caption phrasings the
+ * screen carried collapse to the one `TrendSparkline` prints.
+ * ⚠️ `recent` IS COMPUTED HERE — the endurance points carry no recent flag (unlike the e1RM series),
+ * so the last-six-weeks tail is coloured by date, the same "recent 6 weeks in color" the other charts
+ * use. `dotNoun` names the reading for the expanded caption; the callers pass their sport's word.
+ * ⚠️ NO UNIT PASSED — efficiency is an index, so the range is suppressed (the shape is the message),
+ * exactly as before.
+ */
+const RECENT_WINDOW_MS = 42 * 86_400_000;
+function DatedChart({ points, color, dotNoun = 'session' }: { points: Array<{ date: string; value: number }>; color: string; dotNoun?: string }) {
+  const lastT = Date.parse(`${points[points.length - 1].date}T12:00:00Z`);
+  const series = points.map((p) => ({
+    date: p.date,
+    value: p.value,
+    recent: lastT - Date.parse(`${p.date}T12:00:00Z`) <= RECENT_WINDOW_MS,
+  }));
+  return <TrendSparkline series={series} color={color} dotNoun={dotNoun} />;
 }
 
 export default EnduranceReadCards;

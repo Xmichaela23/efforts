@@ -24,6 +24,14 @@ import { isTrackedMaxLift } from '@/lib/tracked-max-lifts';
 // Performance both render `StrengthCalibrationNotice` off it and both route to the same undo.
 import { useStrengthCalibration, type StrengthCalibrationRead } from '@/hooks/useStrengthCalibration';
 import StrengthCalibrationNotice from '@/components/StrengthCalibrationNotice';
+// ⛔ ONE OWNER PER SPORT (Round 3 pass 1, 2026-09-01). The bike efficiency cards and the weekly
+// lifting card render HERE now, on the sport's own plate — the ride cards under bike, the lifting
+// lines under strength — so nothing about a sport appears in two places on the screen. Both were
+// moved from other blocks (the trends plate and the LOAD section); no card was restyled and no
+// server field changed. Run keeps its own plate for one more pass (see StateTrendsBlock).
+import { EnduranceReadCards } from '@/components/context/StrengthReadCards';
+import ViadaWeekCard from '@/components/context/ViadaWeekCard';
+import TrendSparkline from '@/components/context/TrendSparkline';
 import { liftStatusLine } from '@/lib/strength-calibration-copy';
 import { Activity, Bike, Waves, Dumbbell, type LucideIcon } from 'lucide-react';
 
@@ -998,97 +1006,8 @@ const RUN_TREND_MIN_RUNS = 8;
 // no line (can't imply a trend through one dot). Tap to expand. TP charts LOAD; this charts OUTPUT.
 // Generalized 2026-07-23 so the same visual serves run efficiency AND per-lift strength e1RM (Michael's
 // big-4 chart). Props default to the run row's exact look/copy; strength passes color + nouns + a lb formatter.
-function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, recentLabel = 'recent 6 in color', caption, buildingLabel = (w: number) => `building · ${w} of 12 weeks` }: {
-  series?: Array<{ date: string; value: number; recent: boolean; tempF?: number | null }>;
-  color?: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string; minSpanFraction?: number; recentLabel?: string;
-  /**
-   * ⛔ THE COVERAGE LABEL, OVERRIDABLE AT THE CALL SITE (2026-08-01). "building · 3 of 12 weeks" is
-   * honest for run — it counts data coverage of a 12-week canvas. On a strength lift it lands two
-   * lines under "week 3 of 12" and reads as the same claim about the block, which it is not: it is a
-   * per-LIFT data span, so it differs lift to lift and says "3 of 12" on a lift first logged three
-   * weeks into a nine-month training history.
-   * ⚠️ Changed HERE and only here — this component is shared by run, bike and strength, and the
-   * default keeps the other two rendering exactly as they did.
-   */
-  buildingLabel?: (spanWeeks: number) => string;
-  /** ⛔ CONDITIONS ARE SHOWN, NOT CORRECTED (D-346). Intervals.icu overlays weather so a reader can
-   *  interpret a poor data point; nobody in the field adjusts an efficiency chart for heat, so neither
-   *  do we. One line of context under the chart, and the athlete does the discounting. */
-  caption?: string | null;
-}) {
-  const [expanded, setExpanded] = React.useState(false);
-  const pts = Array.isArray(series) ? series : [];
-  if (pts.length < 2) {
-    return pts.length === 1
-      ? <span className="basis-full text-[11px] text-white/45">building — 1 {dotNoun} so far; a few more draws the 12-week trend</span>
-      : null;
-  }
-  const runColor = color ?? getDisciplineColor('run');
-  const W = 300, H = expanded ? 72 : 42, PAD_Y = expanded ? 10 : 6, PAD_X = 2;
-  const vals = pts.map((p) => p.value);
-  const minV = Math.min(...vals), maxV = Math.max(...vals);
-  const rawRange = maxV - minV;
-  const center = (minV + maxV) / 2 || 1;
-  // Domain HEADROOM (Michael 2026-07-22) — pad the value scale 15% each side so the line never touches the
-  // top/bottom edge. Without it, stretching the range to fill the height turns normal wobble into cliffs.
-  // NOISE FLOOR (2026-07-23) — the domain spans at LEAST minSpanFraction of the center value, so a small move
-  // on a slow lift stays visually small. Strength e1RM wobbles ~5-8% session to session; without a floor a
-  // 10lb bounce on a 100lb lift fills the whole height and reads as a crash. minSpanFraction=0 (run default)
-  // leaves the run chart unchanged; strength passes a fraction so its full height = a real % change, not noise.
-  const dRange = Math.max(rawRange * 1.3, center * minSpanFraction, 1e-6);
-  const dMin = center - dRange / 2, dMax = center + dRange / 2;
-  const x = (i: number) => PAD_X + (i / (pts.length - 1)) * (W - 2 * PAD_X);
-  const y = (v: number) => PAD_Y + (1 - (v - dMin) / dRange) * (H - 2 * PAD_Y); // higher efficiency = higher on chart
-  const firstRecent = pts.findIndex((p) => p.recent);
-  const recentStart = firstRecent <= 0 ? 0 : firstRecent - 1; // include the join point so the segments connect
-  const dimPoly = pts.map((p, i) => `${x(i)},${y(p.value)}`).join(' ');
-  const recentPoly = firstRecent >= 0 ? pts.slice(recentStart).map((p, i) => `${x(recentStart + i)},${y(p.value)}`).join(' ') : '';
-  const last = pts[pts.length - 1];
-  // ⚠️ THE CAP IS FOR THE "BUILDING" GATE ONLY, NOT FOR THE LABEL (2026-07-31).
-  //
-  // `spanWeeks` was clamped to 12 because the chart was designed as a fixed 12-week canvas that fills
-  // as the athlete trains. The run pool is now ~13 weeks, so the clamp printed "last 12 weeks" two
-  // lines under a row reading "over 13wk" — the same data, two spans, which is the exact class of
-  // stale label this row has now been caught on three times.
-  //
-  // The clamped value still drives `building` (a coverage question about the 12-week canvas); the
-  // LABEL states what was actually drawn.
-  const spanWeeksRaw = Math.max(1, Math.ceil((Date.parse(last.date + 'T12:00:00Z') - Date.parse(pts[0].date + 'T12:00:00Z')) / (7 * 86_400_000)));
-  const spanWeeks = Math.min(12, spanWeeksRaw);
-  const building = spanWeeks < 11;
-  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const fmtD = (iso: string) => { const [, m, d] = iso.split('-'); return `${MON[+m - 1]} ${+d}`; };
-  const gridYs = expanded ? [maxV, (maxV + minV) / 2, minV] : []; // subtle reference lines only when expanded
-  return (
-    <span className="basis-full flex flex-col gap-1 mt-1.5">
-      <button type="button" onClick={() => setExpanded((e) => !e)} className="text-left w-full" aria-label="toggle efficiency chart size">
-        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="block">
-          {gridYs.map((gv, i) => <line key={`g${i}`} x1={0} x2={W} y1={y(gv)} y2={y(gv)} stroke="rgba(255,255,255,0.055)" strokeWidth={1} vectorEffect="non-scaling-stroke" />)}
-          <polyline points={dimPoly} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth={1.25} vectorEffect="non-scaling-stroke" />
-          {recentPoly && <polyline points={recentPoly} fill="none" stroke={runColor} strokeOpacity={0.9} strokeWidth={1.75} vectorEffect="non-scaling-stroke" />}
-          {/* expanded → a dot per actual run, so the jags read as "each dot is a reading", not chart noise */}
-          {expanded && pts.map((p, i) => <circle key={`d${i}`} cx={x(i)} cy={y(p.value)} r={1.6} fill={p.recent ? runColor : 'rgba(255,255,255,0.32)'} />)}
-          <circle cx={x(pts.length - 1)} cy={y(last.value)} r={2.5} fill={runColor} />
-        </svg>
-      </button>
-      {expanded && (
-        <span className="text-[10px] text-white/30 flex items-center justify-between tabular-nums -mt-0.5">
-          <span>{fmtD(pts[0].date)}</span><span>{fmtD(last.date)}</span>
-        </span>
-      )}
-      <span className="text-[10px] text-white/45 flex items-center justify-between">
-        <span>{building ? buildingLabel(spanWeeks) : (expanded ? `each dot = one ${dotNoun} · ${recentLabel}` : `last ${spanWeeksRaw} weeks · ${recentLabel} · tap to expand`)}</span>
-        {/* Range only — the session COUNT lives on the lift's name line (the verdict window); repeating a
-            different chart-window count here read as a contradiction (UX pass 2026-07-23). */}
-        {/* ⚠️ Suppressed when there is no unit. The run chart plots the efficiency INDEX, so this
-            rendered a bare "1.24–1.90" that means nothing to a reader — the shape is the message.
-            Strength passes a lb unit and keeps its range, where the numbers are self-explanatory. */}
-        {unit ? <span className="tabular-nums text-white/30">{fmtVal(minV)}–{fmtVal(maxV)}{unit}</span> : <span />}
-      </span>
-      {caption && <span className="text-[10px] text-white/40">{caption}</span>}
-    </span>
-  );
-}
+// ⛔ TrendSparkline MOVED to ./TrendSparkline.tsx (Round 3 pass 2) — the one chart language,
+// shared by run, ride, bike and strength. Imported at the top of this file.
 
 /**
  * ⛔⛔ UNREACHABLE SINCE 2026-09-01 — NOTHING RENDERS THIS. FIXLIST item 1b removed the run card from
@@ -1618,7 +1537,23 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
    * ⚠️ THE COUNTS NEVER DISAGREED. "10 runs over 6wk" is the fitness verdict's pooled window;
    * "19 easy / 5 quality" is the spine's per-session-type population. Two questions, one word.
    */
-  const sortedCards = [...cards].filter((c) => c.discipline !== 'run').sort((a, b) => {
+  // ⛔ ONE OWNER PER SPORT (Round 3 pass 1). The moved content, read off the same display contract the
+  // trends block and the LOAD section read — no new payload field. Each renders on its sport's plate
+  // below, guarded by its OWN gate (EnduranceReadCards returns null with no rides; ViadaWeekCard with
+  // no lifting), so the exact same cards appear as before, only relocated.
+  const enduranceSessions = (stateDisplay as { namedSessions?: React.ComponentProps<typeof EnduranceReadCards>['sessions'] } | null | undefined)?.namedSessions ?? null;
+  const enduranceSpine = (stateDisplay as { enduranceSpine?: React.ComponentProps<typeof EnduranceReadCards>['spine'] } | null | undefined)?.enduranceSpine ?? null;
+  const viadaWeek = (stateDisplay as { viadaWeek?: React.ComponentProps<typeof ViadaWeekCard>['week'] } | null | undefined)?.viadaWeek ?? null;
+
+  // ⛔ RUN RE-ENTERS THE COMPOSITION (Round 3 pass 2, 2026-09-01) — one owner per sport, run included.
+  // It is kept OUT only when there is no run content, so a run-less athlete gets no empty run plate.
+  // ⚠️ The run BRANCH below renders the run efficiency cards, NOT a DisciplineRow — the run
+  // DisciplineRow ("Efficiency Holding · over 6wk…") was deleted as a duplicate in 1b and must not
+  // come back; re-including run in `cards` is only so it earns a plate.
+  const hasRunContent =
+    (Array.isArray(enduranceSessions) && enduranceSessions.some((s: { sport?: string }) => s?.sport === 'run'))
+    || (Array.isArray(enduranceSpine) && enduranceSpine.some((s: { sport?: string }) => s?.sport === 'run'));
+  const sortedCards = [...cards].filter((c) => c.discipline !== 'run' || hasRunContent).sort((a, b) => {
     const band = bandOf(a.discipline) - bandOf(b.discipline);
     if (band !== 0) return band;
     const byCadence = (cadenceCounts?.[b.discipline] ?? 0) - (cadenceCounts?.[a.discipline] ?? 0);
@@ -1644,8 +1579,20 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         // ("vs your baseline" for strength, "vs your 12-week range" for endurance).
         const renderCard = (card: DisciplineCard, showAxis: boolean) => {
           const inner = (() => {
-            if (card.discipline === 'bike' && bikeHasSubstance) return <BikeFitnessRow fitness={bikeFitness!} showAxis={showAxis} mode={fitnessMode.bike ?? 'trend_only'} anchor={fitnessAnchors.bike} />;
-            // ⛔ THE RUN BRANCH IS GONE (FIXLIST 1b) — run no longer has a card in this section at all.
+            // ⛔ ONE OWNER PER SPORT (Round 3 pass 1). The BIKE plate now also holds the ride
+            // efficiency cards (moved from the trends plate), so the bike lives in one place. The
+            // cards carry their own render gate — no rides → EnduranceReadCards returns null — so the
+            // bike plate looks exactly as before for an athlete with no rides.
+            if (card.discipline === 'bike' && bikeHasSubstance) return (
+              <>
+                <BikeFitnessRow fitness={bikeFitness!} showAxis={showAxis} mode={fitnessMode.bike ?? 'trend_only'} anchor={fitnessAnchors.bike} />
+                <EnduranceReadCards sessions={enduranceSessions} spine={enduranceSpine} sport="ride" />
+              </>
+            );
+            // ⛔ RUN OWNS ITS PLATE (Round 3 pass 2) — the run efficiency cards, and ONLY those. No
+            // DisciplineRow: the "Efficiency Holding" run row was a duplicate deleted in 1b. The cards'
+            // own gate means a run-less plate never reaches here (hasRunContent filters it out above).
+            if (card.discipline === 'run') return <EnduranceReadCards sessions={enduranceSessions} spine={enduranceSpine} sport="run" />;
             // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
             if (card.discipline === 'swim' && swimVolume) return <SwimVolumeRow vol={swimVolume} />;
             if (card.discipline === 'strength' && strengthHasSubstance) return (
@@ -1656,10 +1603,21 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                     same component and routes to the same undo — one signal, two placements. */}
                 <StrengthCalibrationNotice lifts={calibration.byLift} undo={calibration.undo} />
                 {strengthDetail}
+                {/* ⛔ ONE OWNER PER SPORT (Round 3 pass 1). The weekly lifting card (moved from the LOAD
+                    section) lives under strength now — same subject, one place. Its own null gate means
+                    no lifting → nothing drawn, so the plate is unchanged for an athlete who has not
+                    lifted this week. */}
+                <ViadaWeekCard week={viadaWeek} />
               </>
             );
+            // ⛔ THE RIDE CARDS AND THE LIFTING CARD ALSO RIDE ALONG WHEN THE FITNESS ROW HAS NO
+            // SUBSTANCE — the fallback branch. A bike with rides but no established power/efficiency
+            // verdict still owns its rides; strength with lifting but no e1RM trend still owns its
+            // week. Each is gated by its own content, so nothing new appears.
             const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} showAxis={showAxis} />;
-            return (card.discipline === 'strength' && strengthDetail) ? <>{row}{strengthDetail}</> : row;
+            if (card.discipline === 'bike') return <>{row}<EnduranceReadCards sessions={enduranceSessions} spine={enduranceSpine} sport="ride" /></>;
+            if (card.discipline === 'strength') return <>{row}{strengthDetail}<ViadaWeekCard week={viadaWeek} /></>;
+            return row;
           })();
           // Each discipline's card wears its own READOUT PLATE keyed to its sport (2026-08-15,
           // shared recipe in src/lib/readout-plate.ts) — this is the one place on State where a
@@ -1681,9 +1639,19 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         const inPlanOrActive = (c: DisciplineCard) => postureOf(c) === 'develop' || postureOf(c) === 'maintain' || isActive(c);
         const active = sortedCards.filter(inPlanOrActive);
         const resting = sortedCards.filter((c) => !inPlanOrActive(c)); // dropped + inactive → dimmed
+        // ⛔ THE AXIS GRAMMAR GOES ON THE FIRST CARD THAT CONSUMES IT (Round 3 pass 2). Only the dot
+        // rows — bike (FitnessDotBlock) and swim (DisciplineRow) — render the "weaker / range /
+        // stronger" axis; strength and run ignore `showAxis`. The old rule was positional
+        // (idx 0, or idx 1 after strength), which broke when run re-entered at position 1 and pushed
+        // bike to index 2 — bike would silently lose its axis label. Targeting the first axis-CONSUMER
+        // instead keeps bike's axis wherever run sorts, and reproduces the old result exactly for the
+        // pre-run cases (bike was that first consumer; swim only when there is no bike).
+        // ⚠️ FROM `active` ONLY, and resting cards keep `false` exactly as before — a dimmed card
+        // never carried the axis, and that does not change here.
+        const firstAxisDisc = active.find((c) => c.discipline === 'bike' || c.discipline === 'swim')?.discipline;
         return (
           <>
-            {active.map((card, idx) => renderCard(card, idx === 0 || (idx === 1 && active[0]?.discipline === 'strength')))}
+            {active.map((card) => renderCard(card, card.discipline === firstAxisDisc))}
             {resting.length > 0 && (
               <div className="opacity-45 mt-1">
                 {resting.map((card) => renderCard(card, false))}

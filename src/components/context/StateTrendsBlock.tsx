@@ -3,8 +3,17 @@ import { readoutPlateStyle } from '@/lib/readout-plate';
 import { EnduranceReadCards } from './StrengthReadCards';
 
 /**
- * TRENDS — the endurance cards, one per sport, on one plate.
- * Extracted from StateTab 2026-09-01 (Round 0a), then narrowed by Round 1a the same day.
+ * TRENDS — the RUN endurance cards, on one plate.
+ * Extracted from StateTab 2026-09-01 (Round 0a), narrowed by Round 1a the same day, and narrowed
+ * again to RUN ONLY by Round 3 pass 1 (2026-09-01).
+ *
+ * ⛔⛔ ROUND 3 PASS 1 (A2), 2026-09-01: THE RIDE CARDS MOVED OUT — one owner per sport. Bike's
+ * efficiency cards now render under the bike plate in <StatePerformanceSection>, beside the bike
+ * fitness/form row, so nothing about the bike appears in two places (Michael: "still seeing rides and
+ * bike"). This block is the RUN cards now. ⚠️ RUN KEEPS ITS OWN PLATE FOR ONE MORE PASS, BY DECISION:
+ * run has no plate in <StatePerformanceSection> today (its row was deleted in 1b), so giving it one is
+ * an appearance change, and that belongs in pass 2 where the card language changes anyway — NOT an
+ * oversight. Until then run stays here, faithfully, on this plate.
  *
  * ⛔⛔ ROUND 1a, RULED BY MICHAEL 2026-09-01: "IS THE BAR GOING UP" IS DELETED FROM THIS BLOCK.
  * The four main lifts were drawn twice in one scroll — here as name / estimated max / weekly-heaviest
@@ -49,18 +58,21 @@ export default function StateTrendsBlock({ wsv }: { wsv: any }) {
    * the week-1 case this screen keeps producing. The gate is now the endurance cards' own predicate,
    * so the plate and its contents cannot disagree.
    */
-  if (!(namedSessions && namedSessions.length > 0) && !(enduranceSpine && enduranceSpine.length > 0)) return null;
+  // ⛔ RUN PRESENCE GATES THIS PLATE NOW (Round 3 pass 1). A ride-only athlete would otherwise get an
+  // empty run heading now that the rides have moved to the bike plate. Gate on the same `sport: 'run'`
+  // subset the block renders, so the plate and its contents cannot disagree.
+  const hasRun = (xs?: Array<{ sport: string }> | null) => Array.isArray(xs) && xs.some((x) => x.sport === 'run');
+  if (!hasRun(namedSessions) && !hasRun(enduranceSpine)) return null;
   return (
     <div
       className="mb-3 galaxy-card readout-texture readout-texture--spectral rounded-2xl"
       style={readoutPlateStyle(undefined, { galaxy: true })}
     >
-      {/* ⛔ ONE PER SPORT. They answer "is the same work getting cheaper" in the endurance
-          disciplines, and the block is one thing, not three screens. They render independently of
-          anything strength: week 1 of every block is the two strength tests, so a week where the
-          runs and rides are logged and no heavy session is yet shows these alone, which is the
-          honest state. */}
-      <EnduranceReadCards sessions={namedSessions} spine={enduranceSpine} />
+      {/* ⛔ RUN ONLY (Round 3 pass 1). Rides moved to the bike plate. The run cards answer "is the same
+          work getting cheaper" and render independently of anything strength: week 1 of every block is
+          the two strength tests, so a week where the runs are logged and no heavy session is yet shows
+          these alone, which is the honest state. */}
+      <EnduranceReadCards sessions={namedSessions} spine={enduranceSpine} sport="run" />
     </div>
   );
 }

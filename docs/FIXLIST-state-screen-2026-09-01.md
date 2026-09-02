@@ -573,7 +573,67 @@ touched. None of them is done; none was quietly tolerated.
 
 ---
 
-## ROUND 3 — THE ATHLETE OWNS THE ORDER. Ruled by Michael 2026-09-01.
+## ROUND 3 — ONE BLOCK PER SPORT, THEN MOVABLE. Ruled by Michael 2026-09-01 ("finish it out").
+
+- [x] 3-consolidate-pass1. **BUILT 2026-09-01 (night). Client-only, no deploy. NOT committed.**
+      Architecture (A) — one OWNER per sport — chosen by the PM; done in PASS 1 (faithful move) for
+      BIKE, STRENGTH, SWIM. ⛔ **RUN IS DEFERRED TO PASS 2 BY DECISION, NOT OVERSIGHT:** run has no
+      plate in `StatePerformanceSection` today (its row was deleted in 1b, and `sortedCards` filters
+      `discipline !== 'run'`), so giving it one is an APPEARANCE change — that belongs in pass 2 where
+      the card language changes anyway, so pass 1 stays a true faithful move. Run still renders in
+      `StateTrendsBlock`, now filtered to run only.
+      **WHAT MOVED (same cards, new position — a reorder, not a restyle):**
+      · Ride efficiency cards → onto the BIKE plate, under the bike fitness/form row (were on the
+        neutral trends plate). ⚠️ They now sit on the bike-coloured readout plate — a background change
+        that comes with one-owner, the sport's own colour.
+      · The weekly lifting card → onto the STRENGTH plate, under the lift cards (was in the LOAD
+        section). Same note: strength-coloured plate now.
+      **HOW, faithfully:** `EnduranceReadCards` gained an optional `sport` filter (no prop = every card,
+      unchanged); each moved card keeps its OWN render gate (no rides → null; no lifting → null), so the
+      exact same cards appear. The server emits a card per discipline (`ORDER = [strength,bike,run,swim]`),
+      so each plate always exists — nothing synthesises a plate.
+      **THE COMPOSITION IIFE IS UNTOUCHED** — the active/resting dim, the focus sort and the
+      showAxis-on-first-row logic are byte-for-byte as before; the only change is content appended
+      inside the bike and strength branch bodies. (Run re-entering that IIFE is the pass-2 risk.)
+      Comments carried. Build green; tsc net unchanged (314, the StateTab errors are pre-existing,
+      shifted one line by the removed `ViadaWeekCard` import); eslint = the files' pre-existing debt only.
+- [x] 3-cardlang-pass2. **BUILT 2026-09-01 (night). Client-only, no deploy. NOT committed. Ships with
+      pass 1.**
+      **RUN GETS ITS PLATE.** Run re-enters the per-discipline composition in `StatePerformanceSection`
+      (kept out only when it has no run content, so no empty plate); its branch renders the run
+      efficiency cards ONLY — never the deleted run DisciplineRow. `StateTrendsBlock` is retired from
+      the screen (its call site + import removed from `StateTab`); the endurance cards now all live on
+      their sport's plate.
+      ⛔ **THE IIFE DIFF (the risk you flagged), before → after:**
+      · SORT: `TIEBREAK` unchanged (`strength 0, run 1, bike 2, swim 9`); run now appears at position 1
+        instead of being filtered out. Order was strength · bike · swim → now strength · run · bike ·
+        swim.
+      · DIM (active/resting): unchanged rule; each card's active/resting is independent of the others'
+        presence, so adding run dims nothing differently. Run is active when run posture is
+        develop/maintain or a run is logged in ~4wk.
+      · AXIS: the old rule was positional (`idx 0`, or `idx 1` after strength) — run at position 1
+        would have pushed bike to index 2 and bike would have SILENTLY LOST its axis label. Replaced
+        with "first axis-CONSUMER in `active`" (only bike/swim consume `showAxis`; strength and run
+        ignore it). This reproduces the old result for every pre-run case (bike was that first
+        consumer; swim only with no bike) and keeps bike's axis wherever run sorts. Resting cards keep
+        `false`, exactly as before.
+      **ONE CARD LANGUAGE.** `TrendSparkline` extracted to its own module and shared by run, ride,
+      bike-power/load and strength e1RM — one caption format, one expand rule. The endurance cards'
+      own chart (`DatedChart`: dates-only, no expand) is now a thin adapter over `TrendSparkline`
+      (computing the recent-6-weeks tail by date, which the endurance points don't carry), so the four
+      caption phrasings collapse to one and every chart expands. `recentLabel` default standardised to
+      "recent 6 weeks in color". The "one session doesn't tell you much" caution moved from under
+      every spine card to ONCE per sport group.
+      ⚠️ **DELIBERATELY LEFT for Michael's eye / Round 4:** the NUMBER TREATMENT still differs (strength
+      = ReadoutTiles; endurance = big number + definition line) — both are value + label + definition,
+      and ReadoutTiles for a single efficiency factor would read oddly, so it was not forced.
+      ⚠️ **APPEARANCE CHANGES (not pure move):** the endurance charts now draw the dim-history +
+      colored-recent-tail look (matching strength) instead of an all-solid line, and gain tap-to-expand.
+      Intended by the spec (strength is the model), stated so it is not read as accidental.
+      Cross-block gate: none introduced — each plate reads only its own discipline's data. Comments
+      carried. Build green; tsc net unchanged (314); eslint clean on the new/changed files.
+
+## ROUND 3 (original) — THE ATHLETE OWNS THE ORDER. Ruled by Michael 2026-09-01.
 
 ⛔ **AFTER rounds 1 and 2, never instead of them.** A moveable block lets one athlete hide a
 duplicate; it does not stop the screen drawing the same lift twice for everyone who never opens the

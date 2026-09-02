@@ -26,13 +26,11 @@ import { buildLoadHeadline, statusVolumeLabel } from '@/lib/load-headline';
 import { readoutPlateStyle } from '@/lib/readout-plate';
 import { useSwimBaselineNudge } from '@/hooks/useSwimBaselineNudge';
 import { useAppContext } from '@/contexts/AppContext';
-import ViadaWeekCard from './ViadaWeekCard';
 import StrengthLoggedSets from './StrengthLoggedSets';
 import StateNextBlock from './StateNextBlock';
 import StateSignalBlock from './StateSignalBlock';
 import StateSwimNudge from './StateSwimNudge';
 import StateRaceBlock from './StateRaceBlock';
-import StateTrendsBlock from './StateTrendsBlock';
 import StateWeekExecution from './StateWeekExecution';
 import StateReadinessRow from './StateReadinessRow';
 import StateBodyBlock from './StateBodyBlock';
@@ -820,11 +818,12 @@ export default function StateTab({
             accent; this renders it (Law 4). Three states: counts+accent / counts-only / nothing. */}
         <StateWeekExecution wsv={wsv} week={week} />
 
-        {/* ⛔ WHAT THE WEEK BOUGHT EACH MUSCLE — the same seven days the rows above measure, in
-            Viada's own units. Moved here from the trends plate (2026-08-29): sets and effective reps
-            per muscle are a WEEK's fact, not a trend, and it read as an orphan under thirteen weeks
-            of charts. */}
-        <ViadaWeekCard week={(wsv.trends?.display as { viadaWeek?: React.ComponentProps<typeof ViadaWeekCard>['week'] } | undefined)?.viadaWeek ?? null} />
+        {/* ⛔ THE WEEKLY LIFTING CARD MOVED TO THE STRENGTH PLATE (Round 3 pass 1, 2026-09-01) — one
+            owner per sport. It was here in the LOAD section (moved from the trends plate 2026-08-29);
+            it now renders under the strength cards in <StatePerformanceSection>, its natural owner.
+            ⚠️ History, so the move is traceable: this block held "what the week bought each muscle" in
+            Viada's own units — a WEEK's fact, not a trend — and read as an orphan under the charts,
+            which is why it was pulled out of trends; consolidating strength gives it a home. */}
 
       </div>
 
@@ -835,7 +834,11 @@ export default function StateTab({
           opens on fitness / fatigue / form, Intervals.icu the same, Whoop on today's recovery.
           This screen opened on a 13-week efficiency chart — a trend — on a screen called State.
           The load plate above is the NOW; everything below it is the arc behind it. */}
-      <StateTrendsBlock wsv={wsv} />
+      {/* ⛔ THE RUN CARDS MOVED TO THE RUN PLATE (Round 3 pass 2, 2026-09-01) — one owner per sport.
+          <StateTrendsBlock> held the run efficiency cards and nothing else after pass 1 moved the
+          rides to bike; run now renders on its own plate inside <StatePerformanceSection> below, so
+          this block is retired from the screen. The "trends · the arc behind this week" heading above
+          still introduces the Fitness section that follows. */}
 
       {/* PERFORMANCE — STATE v2 per-discipline trend (perf where data exists, adherence fallback). Under review; not yet shipped. */}
       {/* ⛔ `block` is the block-identity card the coach payload has carried since v150 — protocol,
