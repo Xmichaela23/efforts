@@ -489,6 +489,18 @@ serve(async (req: Request) => {
     // 6. Compute trends vs 4-week avg
     // -----------------------------------------------------------------------
     const priorAggs = priorWeeks.map((wk) => aggregateWeek(wk));
+    // The typical week per sport — mean of the prior weeks that had any of it (2026-09-02). Read by the
+    // payload's `workload_by_discipline_typical` and by the State display contract's `loadByDiscipline`.
+    const workloadByDiscTypical: Record<string, number> = (() => {
+      const out: Record<string, number> = {};
+      const keys = new Set<string>();
+      for (const a of priorAggs) for (const k of Object.keys(a.workloadByDisc ?? {})) keys.add(k);
+      for (const k of keys) {
+        const vals = priorAggs.map((a) => Number(a.workloadByDisc?.[k] ?? 0)).filter((v) => v > 0);
+        if (vals.length > 0) out[k] = Math.round(vals.reduce((x, y) => x + y, 0) / vals.length);
+      }
+      return out;
+    })();
 
     // RPE trend
     const priorRPEs = priorAggs.map((a) => a.avgRPE).filter((v): v is number => v != null);
@@ -1871,6 +1883,16 @@ serve(async (req: Request) => {
           }
         } catch (e: any) { console.log("⚠️ race projections (non-fatal):", e?.message || e); }
         stateTrendsV1 = toStateTrendsV1(result, asOf);
+        // This week's points per sport vs the athlete's typical week — onto the display contract, the
+        // only object that reaches the State screen (the coach carries state_trends_v1.display verbatim).
+        if (stateTrendsV1?.display) {
+          const lbd: Record<string, { week: number | null; typical: number | null }> = {};
+          for (const k of new Set([...Object.keys(current.workloadByDisc ?? {}), ...Object.keys(workloadByDiscTypical)])) {
+            const wk = Number(current.workloadByDisc?.[k]);
+            lbd[k] = { week: Number.isFinite(wk) && wk > 0 ? Math.round(wk) : null, typical: workloadByDiscTypical[k] ?? null };
+          }
+          stateTrendsV1.display.loadByDiscipline = lbd;
+        }
         // Carry the descent cause on the payload (JSONB, no schema change) so the coach's composer receives
         // it as a candidate rather than inferring it (contract §3a/§4).
         if (runAnchorDescent && stateTrendsV1) (stateTrendsV1 as any).run_anchor_descent = runAnchorDescent;
@@ -1888,6 +1910,10 @@ serve(async (req: Request) => {
 
       workload_total: Math.round(current.workloadTotal),
       workload_by_discipline: current.workloadByDisc,
+      // The typical week per sport — mean of the prior weeks that had any of it — so a surface can put
+      // this week's run points against the athlete's own usual, the way Strava shows Relative Effort
+      // against its weekly range (2026-09-02). Facts; no verdict.
+      workload_by_discipline_typical: workloadByDiscTypical,
       acwr,
       session_count: current.sessionCount,
       session_count_planned: sessionCountPlanned,

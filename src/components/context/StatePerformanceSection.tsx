@@ -1128,6 +1128,14 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         return `${label} · ${grp.runs} run${grp.runs === 1 ? '' : 's'}`;
       };
       const lines = [lineFor('easy', 'easy'), lineFor('quality', 'hard')].filter((x): x is string => !!x);
+      // ⛔ THE WEEK'S RUN POINTS AGAINST THE ATHLETE'S TYPICAL (Michael 2026-09-02: run load scored Strava's
+      // way). Read off the display contract — `loadByDiscipline.run = { week, typical }` from compute-snapshot
+      // (`workload_by_discipline` / `workload_by_discipline_typical`). Absent on rows from before it shipped.
+      const runLoad = (stateDisplay as any)?.loadByDiscipline?.run as { week?: number | null; typical?: number | null } | undefined;
+      if (runLoad && runLoad.week != null && Number.isFinite(Number(runLoad.week))) {
+        const typ = runLoad.typical != null && Number.isFinite(Number(runLoad.typical)) ? ` · typical ${Math.round(Number(runLoad.typical))}` : '';
+        lines.push(`run ${Math.round(Number(runLoad.week))} pts${typ}`);
+      }
       if (lines.length) return lines;
       // No grouped data yet — fall back to the top-level read.
       const ef = runFitness?.efficiency;

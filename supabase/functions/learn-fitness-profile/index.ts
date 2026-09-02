@@ -761,9 +761,14 @@ export function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
       const duration = r.moving_time || r.duration || 0;
       const hr = r.avg_heart_rate || 0;
       const pace = r.avg_pace || 0;
+      // ⛔ THE TALK TEST IS THE DEFINITION OF EASY (Viada p235); the heart-rate band is its proxy. A run
+      // the athlete rated 3 or under ("conversational — full sentences", the popup's own anchor) is easy
+      // even when heat pushed the heart rate above the band (Michael, 2026-09-02: "but they are chatting").
+      const rpe = Number((r as any).rpe ?? (r as any).workout_metadata?.session_rpe);
+      const talkTestEasy = Number.isFinite(rpe) && rpe > 0 && rpe <= 3;
       return duration >= 20 &&
              pace > 150 && pace < 900 &&
-             isEasyHr(hr, runEasyBand) === true;
+             (talkTestEasy || isEasyHr(hr, runEasyBand) === true);
     });
 
     if (easyPaceRuns.length >= 3) {

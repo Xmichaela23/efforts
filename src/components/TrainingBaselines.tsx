@@ -112,6 +112,8 @@ export default function TrainingBaselines({ onClose, onOpenBaselineTest }: Train
 const { saveUserBaselines, loadUserBaselines } = useAppContext();
 // A lift switched to "locked" before a number exists — the input is in lock mode, nothing saved yet.
 const [lockDrafts, setLockDrafts] = useState<Record<string, boolean>>({});
+const [thresholdInfoOpen, setThresholdInfoOpen] = useState(false);
+const [ftpInfoOpen, setFtpInfoOpen] = useState(false);
 const { addPlannedWorkout } = usePlannedWorkouts() as any;
 
 // FTP Test workout template - let user pick date
@@ -1516,7 +1518,13 @@ return (
                               })()}
                             </div>
                             <div className="flex flex-col gap-1.5">
-                              <label className="text-sm text-white/75 font-medium">Threshold pace</label>
+                              <label className="text-sm text-white/75 font-medium">
+                                Threshold pace{' '}
+                                <button type="button" onClick={() => setThresholdInfoOpen((o) => !o)} aria-label="What is threshold pace?" className="text-white/45 text-[11px] bg-transparent border-none p-0 cursor-pointer">{thresholdInfoOpen ? '▾' : 'ⓘ'}</button>
+                              </label>
+                              {thresholdInfoOpen && (
+                                <p className="text-[12px] text-white/55 leading-snug max-w-[min(100%,340px)]">The fastest pace you could hold for about an hour. Hard sessions are set from it.</p>
+                              )}
                               {/**
                                 * ⛔ SAME ROW AS EASY PACE AND STRENGTH (Michael 2026-09-02: "add my number to
                                 * threshold"). The resolver already honoured a typed `threshold_pace_min_per_mi`
@@ -1699,6 +1707,13 @@ return (
                             <h3 className="text-sm font-medium text-white/90">Cycling</h3>
                           </div>
                           <div className="space-y-3">
+                            <label className="text-sm text-white/75 font-medium">
+                              FTP{' '}
+                              <button type="button" onClick={() => setFtpInfoOpen((o) => !o)} aria-label="What is FTP?" className="text-white/45 text-[11px] bg-transparent border-none p-0 cursor-pointer">{ftpInfoOpen ? '▾' : 'ⓘ'}</button>
+                            </label>
+                            {ftpInfoOpen && (
+                              <p className="text-[12px] text-white/55 leading-snug max-w-[min(100%,340px)]">The most power you could hold for about an hour. Hard rides and your power zones are set from it.</p>
+                            )}
                             {/**
                               * ⛔ THE SAME ROW AS RUN AND STRENGTH (Michael 2026-09-02, "go"). FTP had this switch
                               * first (Q-240: typing is choosing; `ftp_source: 'manual'` = my number, absent/'learned'

@@ -65,6 +65,8 @@ interface WorkoutData {
   threshold_heart_rate?: number; // bpm (LTHR, for HR-vs-threshold intensity + zones)
   max_heart_rate?: number; // bpm (sensor max; zones)
   workout_metadata?: any; // Unified metadata: { session_rpe?, notes?, readiness? }
+  /** The post-workout rating for run/ride/swim. ⚠️ The popup writes THIS column for cardio, not workout_metadata.session_rpe. */
+  rpe?: number | null;
 }
 
 /**
@@ -121,6 +123,23 @@ function getSessionIntensity(workout: WorkoutData, sessionRPE?: number): number 
   if (workout.type === 'mobility' && workout.mobility_exercises) {
     return getMobilityIntensity(workout.mobility_exercises);
   }
+  /**
+   * ⛔ A RATED RUN IS SCORED FROM THE RATING (Michael, 2026-09-02, Strava's rule for Relative Effort:
+   * when the athlete enters a perceived exertion it replaces heart rate for that activity's effort).
+   * The number a runner sees should rise when they worked, whatever the pace did — a hot day at 143
+   * bpm that they called a 3 scores as a 3. Heart rate and pace are untouched in the row; only the
+   * load points change. ⛔ EXTENDED TO EVERY CARDIO SPORT (Michael, later the same day: "should we
+   * have the same for rides? ok that's our approach") — one rule: the rating wins when given; without
+   * it, the watch data (power, then heart rate, then pace).
+   *
+   * ⚠️ AND THIS PATH WAS STARVED. The popup writes a cardio rating to `workouts.rpe`; this function
+   * read only `workout_metadata.session_rpe` and did not select `rpe`, so the sRPE fallback below had
+   * never once seen a run's rating. Same shape as every starved input in this codebase.
+   */
+  if (workout.type === 'run' || workout.type === 'ride' || workout.type === 'bike' || workout.type === 'swim') {
+    const rated = Number(workout.rpe ?? (workout.workout_metadata || {}).session_rpe);
+    if (Number.isFinite(rated) && rated >= 1 && rated <= 10) return mapRPEToIntensity(rated);
+  }
   if (workout.steps_preset && workout.steps_preset.length > 0) {
     return getStepsIntensity(workout.steps_preset, workout.type);
   }
@@ -138,7 +157,7 @@ function getSessionIntensity(workout: WorkoutData, sessionRPE?: number): number 
     // is a field-standard load proxy, r≈0.68–0.74) instead of the flat default. Kept on the
     // same intensity² scale via mapRPEToIntensity so ACWR stays comparable. The flat default
     // is reserved for the double-missing (no HR AND no RPE) case.
-    const rpe = sessionRPE ?? (workout.workout_metadata || {}).session_rpe;
+    const rpe = sessionRPE ?? (workout.workout_metadata || {}).session_rpe ?? workout.rpe;
     if (typeof rpe === 'number' && rpe >= 1 && rpe <= 10) return mapRPEToIntensity(rpe);
   }
   return getDefaultIntensityForType(workout.type);
@@ -323,7 +342,7 @@ serve(async (req) => {
     if (!finalWorkoutData) {
       const { data: workout, error: workoutError } = await supabaseClient
         .from('workouts')
-        .select('type, duration, strength_exercises, mobility_exercises, workout_status, moving_time, avg_pace, avg_power, avg_heart_rate, max_heart_rate, functional_threshold_power, threshold_heart_rate')
+        .select('type, duration, strength_exercises, mobility_exercises, workout_status, moving_time, avg_pace, avg_power, avg_heart_rate, max_heart_rate, functional_threshold_power, threshold_heart_rate, rpe, workout_metadata')
         .eq('id', workout_id)
         .single()
       

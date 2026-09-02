@@ -132,7 +132,13 @@ export function EnduranceReadCards(
  * ⛔ ONE GROUP OF SESSIONS, COMPARED TO ITSELF. Dates, never block weeks — a rebuilt block cannot
  * empty this card, which is the whole reason the spine exists beside the overlay.
  */
+// ⓘ copy, Michael 2026-09-02 (voice-checked): what the two run numbers mean, in plain words.
+const EF_EXPLAIN = 'How much speed each heartbeat buys you on easy runs. Higher means the same heart rate is moving you faster. It creeps up with fitness over weeks and drops on hot days.';
+const DECOUPLING_EXPLAIN = 'How much your heart rate climbed in the second half of the run compared with the first, at the same pace. Under 5% is holding together. Higher means heat, fatigue, or a run that was too long for the day.';
+
 function SpineCard({ series }: { series: SpineSeries }) {
+  const [efOpen, setEfOpen] = React.useState(false);
+  const [decOpen, setDecOpen] = React.useState(false);
   const pts = series.points;
   const latest = pts[pts.length - 1];
   const prior = pts.length > 1 ? pts[pts.length - 2] : null;
@@ -160,11 +166,18 @@ function SpineCard({ series }: { series: SpineSeries }) {
             */}
           <div className="flex items-baseline gap-1.5 mt-1">
             <span className="readout-num text-[26px] leading-none">{fmtEff(latest.efficiency, isRide)}</span>
-            <span className="text-[12px] text-white/60">efficiency factor</span>
+            <button type="button" onClick={() => setEfOpen((o) => !o)} aria-label="What is efficiency factor?" className="text-[12px] text-white/60 bg-transparent border-none p-0 cursor-pointer">
+              efficiency factor <span className="text-white/45 text-[11px]">{efOpen ? '▾' : 'ⓘ'}</span>
+            </button>
           </div>
           <div className="text-[11px] text-white/55 mt-0.5">
             {isRide ? 'watts per heartbeat' : 'pace per heartbeat'} · higher is better
           </div>
+          {efOpen && (
+            <p className="mt-1 text-[12px] text-white/55 leading-snug max-w-[min(100%,340px)]">
+              {isRide ? EF_EXPLAIN.replace('speed', 'power').replace('easy runs', 'rides').replace('moving you faster', 'making more power') : EF_EXPLAIN}
+            </p>
+          )}
           {/**
             * ⛔⛔ "last time 1.720" IS DELETED, AND THE SOURCE SAYS WHY. TrainingPeaks' instruction is
             * to compare SIMILAR sessions over several weeks — a rising line means the aerobic base is
@@ -195,7 +208,10 @@ function SpineCard({ series }: { series: SpineSeries }) {
           show nothing — a number for a non-steady effort is not the same number. */}
       {!isRide && latest.driftPct != null && !latest.fadeWithheld && (
         <div className="text-[11px] text-white/55 mt-1">
-          decoupling <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span> on the latest run · lower is better
+          <button type="button" onClick={() => setDecOpen((o) => !o)} aria-label="What is decoupling?" className="bg-transparent border-none p-0 cursor-pointer text-white/55 text-[11px]">
+            decoupling <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span> on the latest run · lower is better <span className="text-white/45">{decOpen ? '▾' : 'ⓘ'}</span>
+          </button>
+          {decOpen && <p className="mt-1 text-[12px] text-white/55 leading-snug max-w-[min(100%,340px)]">{DECOUPLING_EXPLAIN}</p>}
         </div>
       )}
       {latest.durationMin != null && latest.durationMin > 0 && (

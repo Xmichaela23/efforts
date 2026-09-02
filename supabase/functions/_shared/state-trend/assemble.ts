@@ -1913,6 +1913,13 @@ export interface StateDisplayV1 {
    * 16-week block gets their own window, which is the whole point of the ruling.
    */
   blockDurationWeeks?: number | null;
+  /**
+   * ⛔ THIS WEEK'S LOAD POINTS PER SPORT AGAINST THE ATHLETE'S TYPICAL WEEK (2026-09-02, Michael:
+   * "a load number for running based on Strava so people don't get bummed out by their pace").
+   * `week` = the snapshot week's points for that sport; `typical` = the mean of prior weeks that had
+   * any. Carried from compute-snapshot's `workload_by_discipline(_typical)`; facts, no verdict.
+   */
+  loadByDiscipline?: Record<string, { week: number | null; typical: number | null }> | null;
 }
 
 export interface StateTrendsV1 {

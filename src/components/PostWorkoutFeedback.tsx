@@ -402,6 +402,16 @@ export default function PostWorkoutFeedback({
           title: 'Feedback saved',
           variant: 'success',
         });
+
+        // ⛔ A RATED RUN IS RE-SCORED NOW (Michael 2026-09-02: run load is scored Strava's way — the rating
+        // decides the points). `calculate-workload` reads `workouts.rpe` first for a run; without this call
+        // the number the athlete just influenced would not move until the next ingest. Fire-and-forget
+        // through the one ordered orchestrator (workload → facts → snapshot).
+        if ((updateData as any).rpe != null) { // every cardio sport: the rating decides the points (2026-09-02)
+          void supabase.functions.invoke('recompute-workout', { body: { workout_id: workoutId } })
+            .then(({ error: rcErr }) => { if (rcErr) console.warn('[PostWorkoutFeedback] recompute after rating failed:', rcErr.message); })
+            .catch((e) => console.warn('[PostWorkoutFeedback] recompute after rating failed:', e));
+        }
       }
 
       onSave?.(updateData);
