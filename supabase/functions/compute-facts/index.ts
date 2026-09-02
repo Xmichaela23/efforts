@@ -46,7 +46,7 @@ import { topSetIndex, type SetDifficulty } from "../../../src/lib/strength-focus
 // ⛔ THE STRENGTH FACT BUILDER LIVES BESIDE THIS FILE, NOT IN IT (2026-08-28) — `serve()` below runs
 // at import, so nothing here could ever be driven by a test. Moved verbatim so it can be; see
 // `strength-facts-lib.ts`. Same pattern as `recompute-workout/orchestrator-lib.ts`.
-import { buildStrengthFacts, type ExerciseFact } from "./strength-facts-lib.ts";
+import { buildStrengthFacts, aggregateLearnedStrengthMaxes, type ExerciseFact, type LearnedStrengthRow } from "./strength-facts-lib.ts";
 import {
   buildRegistryLookup,
   resolveExerciseId,
@@ -919,52 +919,30 @@ async function updateLearnedStrengthFromExerciseLog(
 
     const { data: rows } = await supabase
       .from("exercise_log")
-      .select("canonical_name, estimated_1rm, date, avg_rir")
+      .select("canonical_name, estimated_1rm, best_reps, date, avg_rir")
       .eq("user_id", userId)
       .gte("date", fromDate)
       .in("canonical_name", STRENGTH_ANCHORS);
 
     if (!rows?.length) return;
 
-    // D-118 (Q-039 / Q-040): RIR preference-with-fallback. Within the window, aggregate a
-    // lift's e1RM from sessions with avg_rir ≤4 (or no RIR data) when any exist — RIR ≥5
-    // sessions are "far from failure" and would inflate the estimate (the deadlift 175→155
-    // case). If a lift has ONLY RIR ≥5 sessions, fall back to using them (don't go dark) and
-    // flag the estimate low-confidence. NOT blanket exclusion. Granularity = session avg_rir.
-    const byLift: Record<string, { preferred: any[]; fallback: any[] }> = {};
-    for (const r of rows) {
-      const c = r.canonical_name as StrengthAnchor;
-      if (!(STRENGTH_ANCHORS as readonly string[]).includes(c)) continue;
-      const val = Number(r.estimated_1rm);
-      if (!Number.isFinite(val) || val <= 0) continue;
-      const rir = r.avg_rir == null ? null : Number(r.avg_rir);
-      const bucket = rir != null && rir >= 5 ? "fallback" : "preferred"; // null or ≤4 → preferred
-      (byLift[c] ??= { preferred: [], fallback: [] })[bucket].push(r);
-    }
-
-    const agg: Record<string, { max1rm: number; count: number; last_logged: string; usedFallback: boolean }> = {};
-    for (const [c, b] of Object.entries(byLift)) {
-      const use = b.preferred.length > 0 ? b.preferred : b.fallback;
-      if (use.length === 0) continue;
-      let max1rm = 0;
-      let last = "";
-      for (const r of use) {
-        max1rm = Math.max(max1rm, Number(r.estimated_1rm));
-        if (r.date > last) last = r.date;
-      }
-      agg[c] = { max1rm, count: use.length, last_logged: last, usedFallback: b.preferred.length === 0 };
-    }
+    // ⛔ TRUSTED REPS ONLY + D-118 RIR preference — the pure `aggregateLearnedStrengthMaxes`
+    // (strength-facts-lib.ts) owns this so a test pins it to real sets. The trusted-reps gate is why
+    // his learned deadlift is 185 (the 105×35 conditioning set can no longer store a fake 225); the
+    // RIR preference-with-fallback (prefer avg_rir ≤4 / no RIR, fall back to ≥5 flagged low-conf) is
+    // unchanged. See the function for the full reasoning.
+    const agg = aggregateLearnedStrengthMaxes(rows as LearnedStrengthRow[], STRENGTH_ANCHORS);
 
     const strength_1rms: Record<string, LearnedMetric & { last_logged: string }> = {};
     for (const lift of STRENGTH_ANCHORS) {
       const a = agg[lift];
       if (!a) continue;
       strength_1rms[lift] = {
-        value: Math.round(a.max1rm),
+        value: a.value,
         // Only-RIR≥5 fallback estimates are flagged low-confidence (D-118).
-        confidence: a.usedFallback ? "low" : confidenceFromSamples(a.count),
+        confidence: a.usedFallback ? "low" : confidenceFromSamples(a.sample_count),
         source: "exercise_log",
-        sample_count: a.count,
+        sample_count: a.sample_count,
         last_logged: a.last_logged,
       };
     }

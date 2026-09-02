@@ -12,7 +12,7 @@
  *        supabase/functions/compute-facts/strength-facts-lib.test.ts
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { buildStrengthFacts } from './strength-facts-lib.ts';
+import { buildStrengthFacts, aggregateLearnedStrengthMaxes } from './strength-facts-lib.ts';
 
 /** A completed heavy set. `completed: true` so D-204's untouched-prefill rule keeps it. */
 const set = (weight: number, reps: number) => ({ weight, reps, completed: true });
@@ -126,4 +126,37 @@ Deno.test('⚠️ A SESSION WITH NOTHING TO SAY SERIALIZES AS IT DID — the fie
   const out = buildStrengthFacts(workout({}) as never, null, null);
   const factEx = (out.strength_facts.exercises as Array<Record<string, unknown>>)[0];
   assert(!('slot_intent' in factEx), 'an absent intent added a key to the fact JSON');
+});
+
+// ── LEARNED MAX: TRUSTED REPS ONLY (2026-09-02, Michael: the deadlift 150/185/225 split) ─────────
+// Real logged deadlift sets from the account. `estimated_1rm` is the value the app stored per set.
+Deno.test('⛔ learned max ignores high-rep sets — 105×35 no longer stores a 225 deadlift', () => {
+  const rows = [
+    { canonical_name: 'deadlift', estimated_1rm: 185, best_reps: 3,  avg_rir: null, date: '2026-09-01' }, // 170×3  — trusted, the real max
+    { canonical_name: 'deadlift', estimated_1rm: 180, best_reps: 10, avg_rir: null, date: '2026-08-25' }, // 135×10 — trusted
+    { canonical_name: 'deadlift', estimated_1rm: 190, best_reps: 20, avg_rir: null, date: '2026-08-11' }, // 115×20 — UNTRUSTED
+    { canonical_name: 'deadlift', estimated_1rm: 200, best_reps: 25, avg_rir: null, date: '2026-08-07' }, // 110×25 — UNTRUSTED
+    { canonical_name: 'deadlift', estimated_1rm: 225, best_reps: 35, avg_rir: null, date: '2026-08-01' }, // 105×35 — the fake 225
+  ];
+  const out = aggregateLearnedStrengthMaxes(rows, ['deadlift']);
+  assertEquals(out.deadlift.value, 185);       // the trusted max, NOT 225
+  assertEquals(out.deadlift.sample_count, 2);  // only the two ≤10-rep sets counted
+});
+
+Deno.test('a lift with ONLY high-rep sets learns nothing rather than a fabricated max', () => {
+  const rows = [
+    { canonical_name: 'deadlift', estimated_1rm: 225, best_reps: 35, avg_rir: null, date: '2026-08-01' },
+    { canonical_name: 'deadlift', estimated_1rm: 200, best_reps: 25, avg_rir: null, date: '2026-08-07' },
+  ];
+  assertEquals(aggregateLearnedStrengthMaxes(rows, ['deadlift']).deadlift, undefined);
+});
+
+Deno.test('D-118 RIR preference survives the gate: an RIR≥5 set is fallback-only', () => {
+  const rows = [
+    { canonical_name: 'squat', estimated_1rm: 150, best_reps: 5, avg_rir: 6, date: '2026-08-10' }, // far from failure
+    { canonical_name: 'squat', estimated_1rm: 125, best_reps: 5, avg_rir: 2, date: '2026-08-12' }, // real effort
+  ];
+  const out = aggregateLearnedStrengthMaxes(rows, ['squat']);
+  assertEquals(out.squat.value, 125);          // the RIR-6 150 is ignored while a real set exists
+  assertEquals(out.squat.usedFallback, false);
 });

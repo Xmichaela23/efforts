@@ -67,12 +67,15 @@ export function efficiencySummary(args: {
 }): string {
   const dir = dirWord(args.verdict);
   const n = Number(args.sampleCount) || 0;
-  const change = dir && args.pctChange != null && Number.isFinite(args.pctChange)
-    ? `${dir} ${Math.abs(Math.round(args.pctChange))}%${args.sinceMonth ? ` since ${args.sinceMonth}` : ''}`
+  const directional = !!dir && args.pctChange != null && Number.isFinite(args.pctChange);
+  const change = directional
+    ? `${dir} ${Math.abs(Math.round(args.pctChange as number))}%${args.sinceMonth ? ` since ${args.sinceMonth}` : ''}`
     : `${n} ${args.noun}${n === 1 ? '' : 's'}`;
   const value = (args.value ?? '').trim();
+  // With a real value the change is a second clause (value · change). Without one, a DIRECTION reads
+  // as a phrase continuing the label ("pace per heartbeat up 4%"), a COUNT as its own clause ("· 9 runs").
   if (value) return `${value} · ${change}`;
-  return `${args.label} · ${change}`;
+  return directional ? `${args.label} ${change}` : `${args.label} · ${change}`;
 }
 
 /**

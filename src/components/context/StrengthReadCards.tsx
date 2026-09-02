@@ -76,7 +76,7 @@ type SpineSeries = { sport: string; group: string; points: SpinePoint[] };
 
 /** ⛔ THE SPINE'S GROUPS IN THE ATHLETE'S OWN WORDS. No invented vocabulary on a screen. */
 const GROUP_LABEL: Record<string, string> = {
-  easy: 'easy runs', long: 'long runs', quality: 'quality runs', all: 'rides',
+  easy: 'easy runs', long: 'long runs', quality: 'hard runs', all: 'rides',
 };
 /** ⛔ THE SPINE LEADS, THE OVERLAY FOLLOWS — easy first, then long, then quality, then rides. */
 const GROUP_ORDER = ['easy', 'long', 'quality', 'all'];
@@ -138,7 +138,6 @@ function SpineCard({ series }: { series: SpineSeries }) {
   const prior = pts.length > 1 ? pts[pts.length - 2] : null;
   const isRide = series.sport === 'ride';
   const color = getDisciplineColor(isRide ? 'ride' : 'run');
-  const driftLimit = latest.keySessionWithin24h ? DRIFT_KEY_SESSION_PCT : DRIFT_STANDARD_PCT;
   const label = GROUP_LABEL[series.group] ?? `${series.sport} sessions`;
   const eff = pts.map((p) => ({ date: p.date, value: p.efficiency })).filter((p) => p.value != null) as Array<{ date: string; value: number }>;
 
@@ -184,30 +183,10 @@ function SpineCard({ series }: { series: SpineSeries }) {
           endurance group in <EnduranceReadCards>. Same words, same TrainingPeaks reasoning (compare
           similar sessions over weeks, not one against the last), said once. */}
 
-      {/* ── FADE, AND THE CASE WHERE THERE DELIBERATELY IS NONE. ── */}
-      {latest.driftPct != null ? (
-        <div className="text-[12px] text-white/50 mt-2">
-          last one:{' '}
-          <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span> harder in the
-          second half
-          <span className="text-white/55">
-            {' '}· {driftLimit}% is the line{latest.keySessionWithin24h ? ', and a hard day is inside 24 hours' : ''}
-          </span>
-        </div>
-      ) : latest.fadeWithheld ? (
-        /**
-         * ⛔⛔ SAY IT OUT LOUD RATHER THAN LEAVING A GAP. A fade read needs a steady effort, and a
-         * long run with surges, pauses or a race-pace finish is not one — its pace changes BY
-         * PRESCRIPTION, so the ratio falls apart by design. Printing a fade number there would fail
-         * the athlete every week for doing exactly what the book asked.
-         * ⚠️ RENDERED AS A BLANK IT READS AS BROKEN DATA, and the athlete concludes the app is
-         * missing their run. It is not missing — it is a different kind of session.
-         * ⚠️ AND THE SESSION STILL COUNTS ABOVE: only the fade figure is withheld, never the run.
-         */
-        <div className="text-[12px] text-white/55 mt-2">
-          last one: no second-half number — its pace changed on purpose
-        </div>
-      ) : null}
+      {/* ⛔ FADE / SECOND-HALF-DRIFT LINE REMOVED (2026-09-01, Michael: "gobbely gook nonsense"). The
+          decoupling read ("N% harder in the second half · M% is the line, and a hard day is inside 24
+          hours" / "no second-half number — its pace changed on purpose") was unreadable on a glance.
+          The signal still exists server-side; it is just not surfaced here as prose. */}
 
       {latest.durationMin != null && latest.durationMin > 0 && (
         <div className="text-[11px] text-white/55 mt-1">{latest.durationMin} min long</div>
@@ -232,7 +211,6 @@ function EnduranceCard({ session }: { session: NamedSession }) {
   const ref = session.reference ?? null;
   const refLatest = ref && ref.points.length > 0 ? ref.points[ref.points.length - 1] : null;
 
-  const driftLimit = latest.keySessionWithin24h ? DRIFT_KEY_SESSION_PCT : DRIFT_STANDARD_PCT;
 
   return (
     <div className="px-3 py-3 border-t border-white/[0.055] first:border-t-0">
@@ -272,20 +250,8 @@ function EnduranceCard({ session }: { session: NamedSession }) {
       )}
       <SessionChart points={pts} color={color} valueOf={(p) => (p.efficiency ?? null)} />
 
-      {/* ── ROW 3: fade inside the session, against p107. ── */}
-      {latest.driftPct != null && (
-        <div className="text-[12px] text-white/50 mt-2">
-          fade <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span>
-          {/* ⛔ THE LINE IS STATED BESIDE THE NUMBER AND NOTHING IS GRADED. p107 gives 10%, and 5%
-              when a key session falls within 24 hours — the app knows what tomorrow is, so it says
-              which line applies. ⚠️ No verdict word: that was not ruled, and "fine"/"too much" off a
-              single session's HR is a claim this app does not make unasked. */}
-          <span className="text-white/55">
-            {' '}· {session.label.toLowerCase().includes('ride') ? 'his' : 'the source’s'} line is {driftLimit}%
-            {latest.keySessionWithin24h ? ' — a key session is inside 24 hours' : ''}
-          </span>
-        </div>
-      )}
+      {/* ⛔ ROW 3 (fade / second-half drift) REMOVED (2026-09-01, Michael: "gobbely gook nonsense") —
+          same reason as the spine card above. The decoupling signal stays server-side, off the card. */}
 
       {durLabel && <div className="text-[11px] text-white/55 mt-1">same {durLabel} session</div>}
     </div>

@@ -11,7 +11,7 @@
 // ============================================================================
 
 import { strengthSetVolume, barLbForExercise } from "../_shared/workload.ts";
-import { estimate1RMRounded, effectiveRepsForReserve } from "../../../src/lib/estimate-1rm.ts";
+import { estimate1RMRounded, effectiveRepsForReserve, estimateIsTrusted } from "../../../src/lib/estimate-1rm.ts";
 import { canonicalize, muscleGroup } from "../_shared/canonicalize.ts";
 import { isBandAssistedMovement } from "../../../src/lib/band-assistance.ts";
 import { typeForExercise } from "../../../src/lib/exercise-role.ts";
@@ -290,4 +290,59 @@ export function buildStrengthFacts(
     },
     exercises,
   };
+}
+
+// ── LEARNED PER-LIFT MAX (pure, testable) ───────────────────────────────────────────────────────
+export interface LearnedStrengthRow {
+  canonical_name: string;
+  estimated_1rm: number | string | null;
+  best_reps: number | string | null;
+  avg_rir: number | string | null;
+  date: string;
+}
+export interface LearnedStrengthAgg { value: number; sample_count: number; last_logged: string; usedFallback: boolean }
+
+/**
+ * ⛔ THE LEARNED PER-LIFT MAX — TRUSTED REPS ONLY (2026-09-02, Michael: the deadlift 150/185/225 split).
+ *
+ * A 1RM formula is invalid past ~10 reps, so a high-rep conditioning set is a rep count in disguise:
+ * a 105 × 35 set stored a 225 "max" for a lift whose real e1RM is 185. This gate (`estimateIsTrusted`,
+ * reps ≤ 10) is the SAME one the State strength display already applies; the learned max was the one
+ * consumer skipping it, which is why the learned baseline (225) and the shown number (185) disagreed.
+ * There is NO fallback to untrusted sets for the max — that is exactly the number being removed.
+ *
+ * D-118 RIR preference kept: prefer sets at RIR ≤ 4 (or no RIR data); fall back to RIR ≥ 5 sets only
+ * when a lift has nothing else, flagged `usedFallback` so the caller can mark it low-confidence.
+ *
+ * Pure: no DB, no clock — the whole point is that a test can pin it to real logged sets.
+ */
+export function aggregateLearnedStrengthMaxes(
+  rows: ReadonlyArray<LearnedStrengthRow>,
+  anchors: ReadonlyArray<string>,
+): Record<string, LearnedStrengthAgg> {
+  const anchorSet = new Set(anchors);
+  const byLift: Record<string, { preferred: LearnedStrengthRow[]; fallback: LearnedStrengthRow[] }> = {};
+  for (const r of rows ?? []) {
+    const c = r.canonical_name;
+    if (!anchorSet.has(c)) continue;
+    const val = Number(r.estimated_1rm);
+    if (!Number.isFinite(val) || val <= 0) continue;
+    if (!estimateIsTrusted(c, Number(r.best_reps))) continue; // ⛔ the gate that kills the 225
+    const rir = r.avg_rir == null ? null : Number(r.avg_rir);
+    const bucket = rir != null && rir >= 5 ? "fallback" : "preferred"; // null or ≤4 → preferred
+    (byLift[c] ??= { preferred: [], fallback: [] })[bucket].push(r);
+  }
+  const out: Record<string, LearnedStrengthAgg> = {};
+  for (const [c, b] of Object.entries(byLift)) {
+    const use = b.preferred.length > 0 ? b.preferred : b.fallback;
+    if (use.length === 0) continue;
+    let max = 0;
+    let last = "";
+    for (const r of use) {
+      max = Math.max(max, Number(r.estimated_1rm));
+      if (r.date > last) last = r.date;
+    }
+    out[c] = { value: Math.round(max), sample_count: use.length, last_logged: last, usedFallback: b.preferred.length === 0 };
+  }
+  return out;
 }
