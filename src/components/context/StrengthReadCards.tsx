@@ -121,8 +121,9 @@ export function EnduranceReadCards(
         <div className="px-3 pb-3 text-[11px] text-white/55">
           {/* ⛔ "watch the line over a few weeks" cut (2026-09-01) — a coaching instruction. The fact
               before it is real and stays: conditions move this more than fitness does. */}
-          one session doesn't tell you much — a hot day or a hilly route moves this more than your
-          fitness does.
+          {/* Michael 2026-09-02. By the book: p235 (effort at easy varies with fatigue, hydration and
+              environment; check by talk test), p123 (reported effort is one of the three signals). */}
+          hills and heat push these numbers around. your rating is what counts, as long as it's honest.
         </div>
       )}
     </>
