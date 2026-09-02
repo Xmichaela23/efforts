@@ -164,7 +164,7 @@ Deno.test('the working number is 96% of a two-formula average', () => {
   assertEquals(Math.round(epley1RM(185, 5) * 100) / 100, 215.83);
   assertEquals(Math.round(brzycki1RM(185, 5) * 100) / 100, 208.13);
   const predicted = predictedTrue1RM(185, 5)!;
-  assertEquals(Math.round(predicted * 100) / 100, 211.98);
+  assertEquals(Math.round(predicted * 100) / 100, 211.96); // D1 (2026-09-01): predictedTrue1RM now = estimate1RM (book coeff 0.0333); was 211.98 off exact 1/30
   // ⛔ THE AVERAGE, NOT EITHER ONE. He averages because they diverge as reps change, and the last
   // pretest step is taken for MAX reps — the case where picking one picks an unknown error.
   assert(predicted > brzycki1RM(185, 5) && predicted < epley1RM(185, 5));
@@ -252,16 +252,15 @@ Deno.test('⛔⛔ p215 WORKED EXAMPLE — the regression that keeps the test set
   /**
    * ⛔ AND HIS ARITHMETIC, off the page's own weight and rep count.
    *
-   * ⚠️ EPLEY DIFFERS FROM HIS PRINTED FIGURE BY 0.1 lb, AND THE CODE IS THE PRECISE ONE. p215 prints
-   * the formula as `E x (1 + 0.0333 x F)` — a rounded 1/30 — giving 190 x 1.1998 = 227.9. We use
-   * exact `reps/30`, giving 190 x 1.2 = 228. Brzycki matches him exactly (220.6).
-   * ⛔ THE DIFFERENCE DIES IN THE ROUNDING THAT MATTERS: his average is 224.25 and ours 224.32, and
-   * both give **215** for the training max — the number the block is actually built from.
+   * ⚠️ THE NAMED PRIMITIVES `epley1RM`/`brzycki1RM` USE EXACT 1/30 (228) — kept for this divergence
+   * check and the athlete's book-check. But the RECIPE `predictedTrue1RM` now delegates to
+   * `estimate1RM` at the book's printed 0.0333 (D1, 2026-09-01), so predicted(190,6) = 224.30, his
+   * printed 224.25. ⛔ THE TRAINING MAX IS 215 EITHER WAY — the number the block is built from.
    */
   assertEquals(Math.round(epley1RM(190, 6) * 10) / 10, 228);
   assertEquals(Math.round(brzycki1RM(190, 6) * 10) / 10, 220.6);
   const wn = workingNumberFromTest('bench', { weight: 190, reps: 6 })!;
-  assertEquals(Math.round(wn.predicted1RM * 100) / 100, 224.32);
+  assertEquals(Math.round(wn.predicted1RM * 100) / 100, 224.30); // D1 (2026-09-01): predictedTrue1RM now = estimate1RM (book coeff 0.0333); was 224.32 off exact 1/30. Training max still 215.
   // ⛔ HIS NUMBER, REACHED FROM HIS PAGE: "225 is your true max, and 215 training max."
   assertEquals(Math.round(wn.workingNumber), 215);
 });

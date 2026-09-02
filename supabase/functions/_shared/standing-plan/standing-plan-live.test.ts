@@ -25,6 +25,7 @@ import {
   weekdayForFrameDay,
   WEEKDAYS,
   WORKING_MAX_FRACTION,
+  predictedTrue1RM,
   type PlanSession,
   type TestedLift,
 } from './index.ts';
@@ -267,7 +268,9 @@ Deno.test('the skip produces the SAME quantity the test would — p215, not some
     rows: FULL(), liftForName: PRESCRIBED, trustedMaxRepsFor: TRUSTED, asOfIso: '2026-09-25',
   });
   const wn = evidenceWorkingNumbers(offer);
-  const expected = ((185 * (1 + 5 / 30)) + (185 * 36 / 32)) / 2 * WORKING_MAX_FRACTION;
+  // D1 (2026-09-01): the skip and the pretest share ONE recipe (predictedTrue1RM → estimate1RM), so
+  // assert against it, not a re-inlined formula — that is exactly the single-source this checks.
+  const expected = predictedTrue1RM(185, 5)! * WORKING_MAX_FRACTION;
   assert(Math.abs(wn.bench!.workingNumber - expected) < 1e-9,
     `the skip used a different formula: ${wn.bench!.workingNumber} vs ${expected}`);
   assertEquals(wn.bench!.measured, { weight: 185, reps: 5 });

@@ -16,6 +16,14 @@
 // `wendler-531.ts` is untouched and Get Stronger ships on it unchanged.
 // ============================================================================
 
+// ⛔ ONE e1RM RECIPE (D-339, audit D1 2026-09-01). `predictedTrue1RM` below delegates to `estimate1RM`
+// — the single Epley/Brzycki-average implementation, at the book's coefficient (0.0333, p32). This
+// file used to average inline, a second copy of the recipe. The ×0.96 working-max (p215 H2) stays and
+// is a DIFFERENT quantity, applied by the caller. `epley1RM`/`brzycki1RM` below stay as the book's two
+// named primitives (the divergence test + the athlete's book-check use them); only the inline average
+// is gone.
+import { estimate1RM } from '../../../../src/lib/estimate-1rm.ts';
+
 /** The lifts the pretest covers. Same keys as `OneRepMaxes` so nothing has to be re-spelled. */
 export type TestedLift = 'bench' | 'squat' | 'deadlift' | 'overheadPress';
 
@@ -138,18 +146,20 @@ export function brzycki1RM(weight: number, reps: number): number {
 }
 
 /**
- * ⛔ BOTH FORMULAS, AVERAGED, AND HE GIVES THE REASON: **they diverge as the rep count changes.**
- * The last pretest step is taken for MAX reps, so its rep count is not known in advance — which is
- * exactly the case where picking one formula picks an error whose size nobody can predict.
+ * ⛔ THE ONE e1RM RECIPE — `estimate1RM` (D-339, audit D1 2026-09-01). Both formulas averaged, at the
+ * book's coefficient; the reason is his: **they diverge as the rep count changes**, and the last
+ * pretest step is taken for MAX reps, so picking one formula picks an unpredictable error. This used
+ * to average inline (a second copy); it now delegates so the block/test path and the Performance path
+ * cannot drift.
  *
- * ⚠️ Reps at or above 37 break Brzycki (the denominator hits zero and then inverts). A max-rep set
- * that long is not a strength test; it returns `null` rather than a number, and the caller must say
- * so instead of prescribing off it.
+ * ⚠️ The null contract is preserved so the caller still abstains. Reps ≥ 37 break Brzycki (denominator
+ * → 0, then inverts); that guard stays here. (`estimate1RM` itself falls back to Epley-only above 30
+ * reps, which a strength test never reaches.)
  */
 export function predictedTrue1RM(weight: number, reps: number): number | null {
   if (!Number.isFinite(weight) || weight <= 0) return null;
   if (!Number.isInteger(reps) || reps < 1 || reps >= 37) return null;
-  return (epley1RM(weight, reps) + brzycki1RM(weight, reps)) / 2;
+  return estimate1RM(weight, reps);
 }
 
 export type WorkingNumber = {

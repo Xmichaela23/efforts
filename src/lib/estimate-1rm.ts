@@ -51,7 +51,12 @@
 /**
  * the previous program's coefficient, p32. Identical to Epley's 1/30 (0.03333…) to four significant figures.
  * ⛔ Do not "clean this up" to 1/30 — the book prints 0.0333 and the athlete can check our arithmetic
- * against his own copy.
+ * against his own copy. (A "0.0333 is just a truncation" instinct got as far as a ruling on 2026-09-01
+ * and was reverted when this comment was read — see D-339 and AUDIT-state-numbers. Read this before
+ * touching the constant.)
+ * ⛔ TWO CONSUMERS NOW: `estimate1RM` here AND `predictedTrue1RM` in
+ * `_shared/standing-plan/working-number.ts`, which imports `estimate1RM` (audit D1). The block/test
+ * path and the Performance path share this one coefficient — do not fork it.
  */
 export const EPLEY_COEFF = 0.0333;
 

@@ -82,6 +82,18 @@ is a one-line fix; each is a small design call. Reporting before any change.
   formula" is already false. ⚠️ [code-traced] **FIX (report-first): `working-number.ts` should import
   `estimate1RM`, not re-derive Epley/Brzycki.** Server change (working-number is in the 4-fn closure).
   The ×0.96 working-max stays; only the underlying e1RM formula unifies.
+- ✅ **BUILT 2026-09-01 as Take A** (unify, KEEP 0.0333): `predictedTrue1RM` now delegates to
+  `estimate1RM`; the inline copy is gone. Constant stays 0.0333 (the book's printed value — see below).
+  Deploy = the 4-fn working-number closure (coach · compute-snapshot · generate-strength-plan ·
+  rematerialize-standing-block). ⚠️ **PRESCRIPTION IMPACT, NAMED:** the block's working number shifts
+  by the coefficient (185×5: working 204→203); the TRAINING MAX is unchanged (215); a boundary sweep
+  (round-half-up, realistic reps) found **~16 of 3456 weight/rep/% combos tip one 5-lb step** — only
+  values sitting exactly on a rounding boundary, underlying shift ≤ 0.051 lb. Held for the go.
+- ⛔ **THE LESSON, for the record (PM, 2026-09-01):** three "the maths is wrong" instincts this day
+  were wrong — the O'Conner guess, the ×0.96 "hidden shave", and "0.0333 is a truncation". Each was
+  contradicted by a comment sitting next to the code. **Read the comment before correcting a constant.**
+  The 0.0333 stays because the book prints it and the athlete verifies against their own copy; there is
+  an explicit ⛔ on the constant saying so.
 
 **D2 — FTP: one client resolver, but verify it matches the FTP the server's power bands rest on.**
 - Displayed FTP (`ftpNow`) = `resolveCurrentFtp(learned_fitness, performance_numbers)`
@@ -108,6 +120,24 @@ while the load VERDICT is the server reconciler (D-260 sole authority). The spli
 - STRENGTH: e1RM per lift, all-time best, sessions, all-out — vs the block's working numbers.
 - SWIM: counts (single source; recency field missing — S7).
 - HEADER/NEXT/planned-vs-actual: week index, counts.
+
+## HOW MANY CALCULATIONS PER NUMBER — the duplication count [code-traced 2026-09-01, whole-repo sweep]
+
+Michael: *"how many different calculations are being run right now?"* Answer, by quantity:
+
+| number | how many places compute it | verdict |
+|---|---|---|
+| **Estimated 1-rep max** | **THREE.** (1) `src/lib/estimate-1rm.ts` — the standard, writes stored `estimated_1rm` (compute-facts) + baselines + now the block. (2) `working-number.ts predictedTrue1RM` — its own inline average; **D1 merges this into (1)**. (3) `compute-adaptation-metrics/index.ts:102` — its OWN Epley × an RIR fatigue factor, for adaptation analytics. | ⛔ 3 → after D1, 2. (3) is a different purpose (RIR-adjusted) but still a separate e1RM — consolidate next. |
+| **FTP** | **ONE** — `resolveCurrentFtp` (many callers, one resolver). Separately, the bike verdict gates per-ride on `band_hi/0.75` (D2) — a different job, not a duplicate of the number. | ✅ one number; D2 is a display-vs-gate question, not a dup. |
+| **ACWR / load** | **ONE** — `_shared/acwr.ts` (reconciler D-260 sole authority, many readers). | ✅ clean. |
+| **Working weight (96%)** | **ONE** — `working-number.ts` (× the shared e1RM). | ✅ clean. |
+| **Run/bike efficiency** | **ONE SOURCE** — `compute-facts` writes `efficiency_index` per workout — but **several downstream re-derivations** off it in different shapes: `state-trend/run.ts` (pace-at-HR), `fact-packet/queries.ts` + `utils.ts`, `core-effort.ts` (speed-per-bpm), `block-adaptation` (week1-vs-week4 %). | ⚠️ one stored number, 4-ish re-derivations — tighten, but not "many maxes". |
+| **Run threshold / easy pace** | **ONE** — `learn-fitness-profile`. ⛔ but overwritten in place, no history (Q-290) — the silent-move problem, a different fault than duplication. | one calc, no audit trail. |
+
+⛔ **THE HEADLINE:** the only number computed multiple genuinely-conflicting ways is the **1-rep max
+(3 places)** — which is exactly the "185 vs 176" he saw. Everything else is one calculation with many
+readers, or one stored value re-shaped downstream. D1 takes the max from 3 → 2; the third
+(adaptation-metrics, RIR-adjusted) is the next consolidation.
 
 ## WHAT IS EXCLUDED, PER METRIC — [code-traced 2026-09-01, verified not assumed]
 

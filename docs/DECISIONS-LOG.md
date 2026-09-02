@@ -2398,6 +2398,20 @@ Audit: `docs/AUDIT-performance-state-2026-07-29.md`. Supersedes the RIR half of 
 
 ## D-339 — ONE 1RM FORMULA, AND IT IS WENDLER'S OWN (2026-07-30, SHIPPED + DEPLOYED)
 
+> ⛔ **2026-09-01 (audit D1): "ONE FORMULA" NOW MEANS IT, and the ONE is `estimate1RM` at the book's
+> printed coefficient (`EPLEY_COEFF = 0.0333`).** The audit found a SECOND implementation —
+> `predictedTrue1RM` in `_shared/standing-plan/working-number.ts` averaged Epley/Brzycki INLINE, and
+> it used exact `1/30`, not 0.0333 — so the block/test path and the Performance path were never
+> byte-identical. `predictedTrue1RM` now delegates to `estimate1RM`; the inline copy is gone. The
+> ×0.96 working-max is a different quantity and is untouched.
+> ⛔ **THE CONSTANT STAYS 0.0333, DELIBERATELY** — the book prints it and the athlete checks the app's
+> arithmetic against their own copy (see the ⛔ comment on `EPLEY_COEFF`). A "0.0333 is a truncation,
+> clean it to 1/30" instinct reached a ruling this day and was reverted on reading that comment; do
+> not repeat it. ⚠️ Unifying moved the block's working number by the coefficient (e.g. 185×5:
+> 211.98→211.96, working 204→203); the training max is unchanged (215), and a boundary sweep found a
+> hairline set of prescriptions (~0.5% of weight/rep/% combos, underlying shift ≤0.051 lb) tip one
+> 5-lb step. Full detail in `docs/AUDIT-state-numbers-2026-09-01.md`.
+
 **Michael:** *"use wendler."*
 
 ### The finding: THREE answers to one question
