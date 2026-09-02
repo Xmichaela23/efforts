@@ -1791,10 +1791,14 @@ export interface NamedSessionPoint {
 
 /** ⛔ p107, read off the page. Ours to STATE, never to re-derive — and two lines, not one. */
 export const DRIFT_LIMITS = {
-  /** Terminate the session at this drift. */
+  /** Terminate the session at this drift — the general-population number. */
   standardPct: 10,
   /** ⛔ The tighter line when a key session falls within 24 hours. */
   keySessionWithin24hPct: 5,
+  /** ⛔ THE LINE FOR OUR ATHLETES (p107, second clause, re-read 2026-09-02): *"For hybrid athletes engaged
+   *  in numerous weekly sessions, OR if a session will be followed by a key session within 24 hours, the
+   *  number is 5 percent."* Every Efforts athlete is the first clause, so the surfaces state 5, always. */
+  hybridPct: 5,
   cite: 'Viada p107',
 } as const;
 
@@ -1862,6 +1866,10 @@ export interface SpineSessionPoint {
   /** ⛔ True when the plan puts a key session inside 24 hours, so p107's tighter 5% line applies
    *  rather than the standard 10%. An athlete with no plan gets `false` everywhere — correct, not missing. */
   keySessionWithin24h: boolean;
+  /** The day's temperature (°F) and the climb (m) — facts beside the drift, never a correction
+   *  (Michael 2026-09-02: hills and heat matter; whether they were pushing is the athlete's call). */
+  tempF?: number | null;
+  elevationGainM?: number | null;
 }
 
 /**
@@ -1919,7 +1927,7 @@ export interface StateDisplayV1 {
    * `week` = the snapshot week's points for that sport; `typical` = the mean of prior weeks that had
    * any. Carried from compute-snapshot's `workload_by_discipline(_typical)`; facts, no verdict.
    */
-  loadByDiscipline?: Record<string, { week: number | null; typical: number | null }> | null;
+  loadByDiscipline?: Record<string, { week: number | null; typical: number | null; /** last five weeks of points, oldest → this week */ weeks?: number[] }> | null;
 }
 
 export interface StateTrendsV1 {

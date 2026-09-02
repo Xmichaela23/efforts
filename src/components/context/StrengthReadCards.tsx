@@ -20,6 +20,7 @@
 
 import React from 'react';
 import { getDisciplineColor } from '@/lib/context-utils';
+import { DRIFT_LIMITS } from '@shared/state-trend';
 // ⛔ THE ONE CHART LANGUAGE (Round 3 pass 2, 2026-09-01). The endurance cards used to draw their own
 // dates-only, non-expanding chart (DatedChart); they now draw the same sparkline as strength and
 // bike, so the screen has ONE caption format and ONE expand rule. DatedChart is kept as a thin
@@ -71,7 +72,7 @@ type NamedSession = {
 type SpinePoint = {
   date: string; hrAvg: number | null; durationMin: number | null;
   efficiency: number | null; driftPct: number | null; fadeWithheld: boolean; keySessionWithin24h: boolean;
-};
+ tempF?: number | null; elevationGainM?: number | null; };
 type SpineSeries = { sport: string; group: string; points: SpinePoint[] };
 
 /** ⛔ THE SPINE'S GROUPS IN THE ATHLETE'S OWN WORDS. No invented vocabulary on a screen. */
@@ -134,7 +135,14 @@ export function EnduranceReadCards(
  */
 // ⓘ copy, Michael 2026-09-02 (voice-checked): what the two run numbers mean, in plain words.
 const EF_EXPLAIN = 'How much speed each heartbeat buys you on easy runs. Higher means the same heart rate is moving you faster. It creeps up with fitness over weeks and drops on hot days.';
-const DECOUPLING_EXPLAIN = 'How much your heart rate climbed in the second half of the run compared with the first, at the same pace. Under 5% is holding together. Higher means heat, fatigue, or a run that was too long for the day.';
+const DECOUPLING_EXPLAIN = `Did your heart rate creep up as the run went on? This is how much higher it was in the second half than in the first, at the same pace. The book's rule for athletes training many sessions a week: stop an easy session when it reaches ${DRIFT_LIMITS.hybridPct}%. Under the line is room; over it is the sign to dial back next time. Heat, tiredness, or a run that was too long push it up. TrainingPeaks calls this decoupling.`;
+
+/** "1.9 of room" / "0.4 over" against p107's line. */
+function driftVsLine(pct: number): string {
+  const line = DRIFT_LIMITS.hybridPct;
+  const d = Math.round((pct - line) * 10) / 10;
+  return d > 0 ? `${d.toFixed(1)} over` : `${Math.abs(d).toFixed(1)} of room`;
+}
 
 function SpineCard({ series }: { series: SpineSeries }) {
   const [efOpen, setEfOpen] = React.useState(false);
@@ -146,6 +154,11 @@ function SpineCard({ series }: { series: SpineSeries }) {
   const color = getDisciplineColor(isRide ? 'ride' : 'run');
   const label = GROUP_LABEL[series.group] ?? `${series.sport} sessions`;
   const eff = pts.map((p) => ({ date: p.date, value: p.efficiency })).filter((p) => p.value != null) as Array<{ date: string; value: number }>;
+  // the day's conditions as facts — heat and climb move drift, and whether the athlete was pushing is theirs to read
+  const conditions = [
+    latest.tempF != null ? `${latest.tempF}°F` : null,
+    latest.elevationGainM != null && latest.elevationGainM > 0 ? `${Math.round(latest.elevationGainM * 3.281)} ft of climb` : null,
+  ].filter(Boolean).join(' · ');
 
   return (
     <div className="px-3 py-3 border-t border-white/[0.055] first:border-t-0">
@@ -209,7 +222,7 @@ function SpineCard({ series }: { series: SpineSeries }) {
       {!isRide && latest.driftPct != null && !latest.fadeWithheld && (
         <div className="text-[11px] text-white/55 mt-1">
           <button type="button" onClick={() => setDecOpen((o) => !o)} aria-label="What is decoupling?" className="bg-transparent border-none p-0 cursor-pointer text-white/55 text-[11px]">
-            decoupling <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span> on the latest run · lower is better <span className="text-white/45">{decOpen ? '▾' : 'ⓘ'}</span>
+            heart rate drift <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span> on the latest run · the line is {DRIFT_LIMITS.hybridPct}% · <span className="text-white/75">{driftVsLine(latest.driftPct)}</span>{conditions ? <span className="text-white/45"> · {conditions}</span> : null} <span className="text-white/45">{decOpen ? '▾' : 'ⓘ'}</span>
           </button>
           {decOpen && <p className="mt-1 text-[12px] text-white/55 leading-snug max-w-[min(100%,340px)]">{DECOUPLING_EXPLAIN}</p>}
         </div>

@@ -32,6 +32,7 @@ import StrengthCalibrationNotice from '@/components/StrengthCalibrationNotice';
 import { EnduranceReadCards } from '@/components/context/StrengthReadCards';
 import ViadaWeekCard from '@/components/context/ViadaWeekCard';
 import EnduranceCheckpointSheet from '@/components/context/EnduranceCheckpointSheet';
+import LoadWeeksCard from '@/components/context/LoadWeeksCard';
 // ⛔ COLLAPSE TO ONE LINE PER SPORT (Round 3, 2026-09-01) — each sport shows a change-leading summary
 // and expands on tap. The summary wording is a set of pure functions so the confidence rule is pinned.
 import { changeMonth, efficiencySummary, strengthGlance } from '@/lib/sport-summary';
@@ -1133,8 +1134,8 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       // (`workload_by_discipline` / `workload_by_discipline_typical`). Absent on rows from before it shipped.
       const runLoad = (stateDisplay as any)?.loadByDiscipline?.run as { week?: number | null; typical?: number | null } | undefined;
       if (runLoad && runLoad.week != null && Number.isFinite(Number(runLoad.week))) {
-        const typ = runLoad.typical != null && Number.isFinite(Number(runLoad.typical)) ? ` · typical ${Math.round(Number(runLoad.typical))}` : '';
-        lines.push(`run ${Math.round(Number(runLoad.week))} pts${typ}`);
+        const typ = runLoad.typical != null && Number.isFinite(Number(runLoad.typical)) ? ` · usual ${Math.round(Number(runLoad.typical))}` : '';
+        lines.push(`${Math.round(Number(runLoad.week))} run points this week${typ}`);
       }
       if (lines.length) return lines;
       // No grouped data yet — fall back to the top-level read.
@@ -1306,7 +1307,12 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
             // ⛔ RUN OWNS ITS PLATE (Round 3 pass 2) — the run efficiency cards, and ONLY those. No
             // DisciplineRow: the "Efficiency Holding" run row was a duplicate deleted in 1b. The cards'
             // own gate means a run-less plate never reaches here (hasRunContent filters it out above).
-            if (card.discipline === 'run') return <EnduranceReadCards sessions={enduranceSessions} spine={enduranceSpine} sport="run" />;
+            if (card.discipline === 'run') return (
+              <>
+                <LoadWeeksCard sport="run" load={(stateDisplay as any)?.loadByDiscipline?.run ?? null} />
+                <EnduranceReadCards sessions={enduranceSessions} spine={enduranceSpine} sport="run" />
+              </>
+            );
             // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
             if (card.discipline === 'swim' && swimVolume) return <SwimVolumeRow vol={swimVolume} />;
             if (card.discipline === 'strength' && strengthHasSubstance) return (

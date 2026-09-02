@@ -1280,7 +1280,7 @@ serve(async (req: Request) => {
          * ruling, Q-294). The plan-linked overlay reads the same two maps, so there is one query and
          * one definition rather than a second copy that could drift.
          */
-        const endFactByDate = new Map<string, { efficiency: number | null; drift: number | null; hr: number | null }>();
+        const endFactByDate = new Map<string, { efficiency: number | null; drift: number | null; hr: number | null; elevM: number | null }>();
         const keyDates = new Set<string>();
         try {
           const { data: factRows } = await supabase
@@ -1306,6 +1306,8 @@ serve(async (req: Request) => {
               // finiteness alone. A `> 0` test here would silently drop the best sessions.
               drift: Number.isFinite(drift) ? drift : null,
               hr: Number.isFinite(hr) && hr > 0 ? hr : null,
+              // the climb, as a fact beside the drift (Michael 2026-09-02: hills and heat matter; the athlete deciphers)
+              elevM: (() => { const e = Number(rf?.elevation_gain_m ?? bf?.elevation_gain_m); return Number.isFinite(e) && e > 0 ? Math.round(e) : null; })(),
             });
           }
           /**
@@ -1366,7 +1368,7 @@ serve(async (req: Request) => {
         let enduranceSpine: EnduranceSpineSeries[] = [];
         try {
           const { data: spineRows } = await supabase
-            .from("workouts").select("date,type,workout_analysis")
+            .from("workouts").select("date,type,workout_analysis,weather_data")
             .eq("user_id", userId).in("type", ["run", "running", "ride", "bike", "cycling"])
             .eq("workout_status", "completed")
             .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", asOf);
@@ -1422,6 +1424,9 @@ serve(async (req: Request) => {
               driftPct: steady ? f.drift : null,
               fadeWithheld: !steady,
               keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
+              // conditions, shown never corrected: the day's temperature and the climb
+              tempF: (() => { const t = Number(r?.weather_data?.temperature); return Number.isFinite(t) ? Math.round(t) : null; })(),
+              elevationGainM: f.elevM ?? null,
             });
           }
           for (const [sport, groups] of bySport) {
@@ -1886,10 +1891,15 @@ serve(async (req: Request) => {
         // This week's points per sport vs the athlete's typical week — onto the display contract, the
         // only object that reaches the State screen (the coach carries state_trends_v1.display verbatim).
         if (stateTrendsV1?.display) {
-          const lbd: Record<string, { week: number | null; typical: number | null }> = {};
-          for (const k of new Set([...Object.keys(current.workloadByDisc ?? {}), ...Object.keys(workloadByDiscTypical)])) {
+          const lbd: Record<string, { week: number | null; typical: number | null; weeks: number[] }> = {};
+          const allKeys = new Set([...Object.keys(current.workloadByDisc ?? {}), ...Object.keys(workloadByDiscTypical)]);
+          for (const a of priorAggs) for (const k of Object.keys(a.workloadByDisc ?? {})) allKeys.add(k);
+          for (const k of allKeys) {
             const wk = Number(current.workloadByDisc?.[k]);
-            lbd[k] = { week: Number.isFinite(wk) && wk > 0 ? Math.round(wk) : null, typical: workloadByDiscTypical[k] ?? null };
+            // the last five weeks, oldest → this week, for the bars (priorAggs[i] = i+1 weeks back)
+            const weeks = [...priorAggs].reverse().map((a) => Math.round(Number(a.workloadByDisc?.[k] ?? 0)) || 0);
+            weeks.push(Number.isFinite(wk) && wk > 0 ? Math.round(wk) : 0);
+            lbd[k] = { week: Number.isFinite(wk) && wk > 0 ? Math.round(wk) : null, typical: workloadByDiscTypical[k] ?? null, weeks };
           }
           stateTrendsV1.display.loadByDiscipline = lbd;
         }

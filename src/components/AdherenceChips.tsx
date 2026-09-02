@@ -1,4 +1,5 @@
 import React from 'react';
+import { DRIFT_LIMITS } from '@shared/state-trend';
 import {
   type SessionInterpretationV1,
 } from '@/utils/performance-format';
@@ -320,6 +321,22 @@ export default function AdherenceChips({
       : (isGapAdjusted ? 'Grade-adjusted pace' : 'Pace adherence');
 
     const showPaceChip = !sd.classification?.is_easy_like;
+    // ⛔ HEART-RATE DRIFT AGAINST THE BOOK'S LINE (Michael 2026-09-02: "the performance screen should reflect
+    // that difference so the user can see if they need to dial back or have room"). p107: terminate an easy
+    // session at 10%; 5% for hybrid athletes training many sessions a week — our whole audience. The chip
+    // states the measurement and the room; it does not judge. Terrain-confounded ('raw') reads say so.
+    const decoupling = (sd.classification as any)?.decoupling as { pct: number | null; basis: 'gap' | 'raw' | null } | null | undefined;
+    const driftPct = decoupling?.pct ?? null;
+    const driftValue = driftPct != null ? `${driftPct.toFixed(1)}%` : null;
+    const driftSubtitle = (() => {
+      if (driftPct == null) return 'Heart-rate drift';
+      const line = DRIFT_LIMITS.hybridPct;
+      const d = Math.round((driftPct - line) * 10) / 10;
+      const room = d > 0 ? `${d.toFixed(1)} over the ${line}% line` : `${Math.abs(d).toFixed(1)} of room to ${line}%`;
+      const t = (sd as any)?.weather?.temperature_f;
+      const heat = typeof t === 'number' && Number.isFinite(t) ? ` · ${Math.round(t)}°F` : '';
+      return `${room}${decoupling?.basis === 'raw' ? ' · hills mixed in' : ''}${heat}`;
+    })();
 
     return (
       <div className="w-full pt-1 pb-2">
@@ -328,6 +345,7 @@ export default function AdherenceChips({
           <div className="flex items-start gap-3">
             {chipText('Workload', loadValue, loadSubtitle)}
             {chipText('Duration', durationValue, 'Moving time vs plan')}
+            {driftValue != null && chipText('Drift', driftValue, driftSubtitle)}
             {/* An easy run had the Pace chip hidden and NOTHING put in its place — the athlete was
                 told the session was not judged on pace, and then shown no read at all on whether they
                 held it easy. The ride solved this on 2026-08-01; this is the same chip, the run's own
