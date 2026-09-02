@@ -123,7 +123,7 @@ export function EnduranceReadCards(
               before it is real and stays: conditions move this more than fitness does. */}
           {/* Michael 2026-09-02. By the book: p235 (effort at easy varies with fatigue, hydration and
               environment; check by talk test), p123 (reported effort is one of the three signals). */}
-          hills and heat push these numbers around. your rating is what counts, as long as it's honest.
+          Hills and heat can have an impact. Trust your RPE, but be honest.
         </div>
       )}
     </>
