@@ -94,6 +94,20 @@ const STRENGTH_LIFT_FIELDS = [
   { key: 'pullupMaxReps', label: 'Pull-ups', placeholder: '8', learnedKey: null, reps: true },
 ] as const;
 
+/** ⛔ ONE SWITCH FOR EVERY NUMBER (2026-09-02, Michael: "run should match how strength locks now").
+ *  `auto` = the app's measured value, kept updating. `my number` = yours holds until you switch back.
+ *  "locked" was the first label and read as confusing; the app already said "Use my number". */
+function AutoMinePill({ mine, onAuto, onMine, color, label }: { mine: boolean; onAuto: () => void; onMine: () => void; color: string; label: string }) {
+  const seg = 'px-2.5 h-7 text-[11px] leading-7 transition-colors whitespace-nowrap';
+  const on = 'text-white', off = 'text-white/45 hover:text-white/70';
+  return (
+    <div className="flex rounded-full border border-white/20 overflow-hidden shrink-0" role="group" aria-label={`${label}: auto or my number`}>
+      <button type="button" onClick={onAuto} aria-pressed={!mine} className={`${seg} ${!mine ? on : off}`} style={{ backgroundColor: !mine ? `${color}40` : 'transparent' }}>auto</button>
+      <button type="button" onClick={onMine} aria-pressed={mine} className={`${seg} ${mine ? on : off}`} style={{ backgroundColor: mine ? `${color}40` : 'transparent' }}>my number</button>
+    </div>
+  );
+}
+
 export default function TrainingBaselines({ onClose, onOpenBaselineTest }: TrainingBaselinesProps) {
 const { saveUserBaselines, loadUserBaselines } = useAppContext();
 // A lift switched to "locked" before a number exists — the input is in lock mode, nothing saved yet.
@@ -1476,83 +1490,68 @@ return (
                               */}
                             <div className="flex flex-col gap-1.5">
                               <label className="text-sm text-white/75 font-medium">Easy pace</label>
+                              {/**
+                                * ⛔ THE SAME ROW AS STRENGTH (2026-09-02, Michael: "run should match how strength
+                                * locks now"). Number in use, where it came from, one input, auto / my number.
+                                * Storage unchanged: `easyPace` is your typed number, `easy_pace_source` is the
+                                * choice (`learned` = auto, `manual` = my number) — the resolver already reads both
+                                * (Q-174). The old two-pill picker under a separate input is gone.
+                                */}
                               {(() => {
                                 const resolvedEasy = resolveCurrentRunEasyPace({
                                   learned_fitness: learnedFitness,
                                   performance_numbers: data.performanceNumbers,
                                 } as never);
-                                const onManual = resolvedEasy.source === 'manual-chosen' || resolvedEasy.source === 'manual';
+                                const mine = (data.performanceNumbers as any)?.easy_pace_source === 'manual';
+                                const typed = data.performanceNumbers?.easyPace || '';
+                                const asOf = !mine && hasEasyLearned ? learnedAsOfLine(easyLearned) : null;
+                                const status = mine
+                                  ? 'your number. Your runs don\'t change it.'
+                                  : hasEasyLearned
+                                    ? `auto. ${learnedBasisLine(easyLearned, 'run') || 'measured from your runs'}${asOf ? ` ${asOf}` : ''}`
+                                    : typed
+                                      ? 'auto. Your typed number, until your runs measure one.'
+                                      : 'auto. Nothing on file yet.';
+                                const setMine = () => setData(prev => {
+                                  const pn: any = { ...prev.performanceNumbers, easy_pace_source: 'manual' };
+                                  // seed with the number in use so "my number" never starts empty
+                                  if (!pn.easyPace && resolvedEasy.sec_per_mi) pn.easyPace = formatPaceSecPerMi(resolvedEasy.sec_per_mi);
+                                  return { ...prev, performanceNumbers: pn };
+                                });
+                                const setAuto = () => setData(prev => ({
+                                  ...prev,
+                                  performanceNumbers: { ...prev.performanceNumbers, easy_pace_source: 'learned' },
+                                }));
                                 return (
-                                  <div className="px-3 py-2.5 rounded-xl bg-white/[0.09] border border-white/25 text-left">
-                                    <div className="flex items-baseline justify-between gap-2">
-                                      <span className="text-2xl font-semibold text-white tabular-nums">
-                                        {formatPaceSecPerMi(resolvedEasy.sec_per_mi)}
-                                      </span>
-                                      {!onManual && hasEasyLearned && (
-                                        <span className="text-[10px] text-white/35" title="Model confidence">
-                                          {getConfidenceDots(easyLearned.confidence)}
+                                  <div
+                                    className="rounded-xl border px-3 py-2 flex items-center gap-3"
+                                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: mine ? `${SPORT_COLORS.run}55` : 'rgba(255,255,255,0.15)' }}
+                                  >
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-baseline gap-1.5">
+                                        <span className="text-lg font-semibold tabular-nums text-white">
+                                          {resolvedEasy.sec_per_mi ? formatPaceSecPerMi(resolvedEasy.sec_per_mi) : '—'}
                                         </span>
-                                      )}
+                                      </div>
+                                      <div className="text-[11px] text-white/55 leading-snug">{status}</div>
                                     </div>
-                                    <p className="text-[12px] text-white/60 mt-1 leading-snug">
-                                      {onManual
-                                        ? 'you entered this'
-                                        : (learnedBasisLine(easyLearned, 'run') || 'measured from your runs')}
-                                    </p>
-                                    {!onManual && learnedAsOfLine(easyLearned) && (
-                                      <p className="text-[12px] text-white/50 mt-0.5 leading-snug">{learnedAsOfLine(easyLearned)}</p>
-                                    )}
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      aria-label="Easy pace, my number, minutes per mile"
+                                      value={typed}
+                                      onChange={(e) => setData(prev => ({
+                                        ...prev,
+                                        performanceNumbers: { ...prev.performanceNumbers, easyPace: e.target.value },
+                                      }))}
+                                      placeholder={hasEasyLearned ? formatPace(easyLearned.value) : '11:30'}
+                                      className="w-[4.5rem] h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40 text-center shrink-0"
+                                      style={{ fontFamily: 'Inter, sans-serif' }}
+                                    />
+                                    <AutoMinePill mine={mine} onAuto={setAuto} onMine={setMine} color={SPORT_COLORS.run} label="Easy pace" />
                                   </div>
                                 );
                               })()}
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <input
-                                  type="text"
-                                  value={data.performanceNumbers?.easyPace || ''}
-                                  onChange={(e) => setData(prev => ({
-                                    ...prev,
-                                    performanceNumbers: { ...prev.performanceNumbers, easyPace: e.target.value },
-                                  }))}
-                                  placeholder="11:30"
-                                  className="w-24 h-10 px-3 text-sm font-medium bg-white/[0.09] border border-white/30 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-white/40 text-center"
-                                />
-                                <span className="text-[12px] text-white/60">your own number, /mi</span>
-                              </div>
-                              {/* The picker only appears when there are two real answers to choose between. */}
-                              {hasEasyLearned && data.performanceNumbers?.easyPace && (
-                                <div className="flex items-stretch gap-1.5 mt-0.5">
-                                  {([
-                                    { key: 'learned', label: 'Use my runs', val: formatPace(easyLearned.value) },
-                                    { key: 'manual', label: 'Use my number', val: data.performanceNumbers?.easyPace || '—' },
-                                  ] as const).map(({ key, label, val }) => {
-                                    const chosen = (data.performanceNumbers as any)?.easy_pace_source ?? 'learned';
-                                    const active = chosen === key;
-                                    return (
-                                      <button
-                                        key={key}
-                                        type="button"
-                                        onClick={() => setData(prev => ({
-                                          ...prev,
-                                          performanceNumbers: { ...prev.performanceNumbers, easy_pace_source: key },
-                                        }))}
-                                        className={`flex-1 min-h-[2.5rem] px-2.5 py-1.5 rounded-lg text-[11px] leading-tight border transition-colors text-left ${
-                                          active ? 'text-white' : 'bg-white/[0.04] border-white/10 text-white/45 hover:text-white/70'
-                                        }`}
-                                        style={active ? {
-                                          backgroundColor: `${SPORT_COLORS.run}26`,
-                                          borderColor: `${SPORT_COLORS.run}80`,
-                                        } : undefined}
-                                        title={key === 'manual'
-                                          ? 'Your entered pace is used, even when your runs measure a different one.'
-                                          : 'Tracks what your easy runs measure, and keeps updating.'}
-                                      >
-                                        <div className="font-medium">{label}</div>
-                                        <div className="opacity-70 tabular-nums">{val}</div>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                              )}
                             </div>
                             {/* ⛔ ALWAYS RENDERED. "Not enough data" is a STATE the athlete is told, not
                                 an absence they have to notice. Fixed width + min-height for the same
@@ -2207,7 +2206,7 @@ return (
                               const learnedSets = Number(learnedEntry?.sample_count);
                               const unit = lift.reps ? 'reps' : (data.units === 'metric' ? 'kg' : 'lb');
                               const status = isLocked
-                                ? 'locked. Your lifts don\'t change it.'
+                                ? 'your number. Your lifts don\'t change it.'
                                 : resolved.source === 'learned'
                                   ? `auto. From your lifts${Number.isFinite(learnedSets) && learnedSets > 0 ? ` (${learnedSets} sets)` : ''}.`
                                   : resolved.source === 'typed'
@@ -2256,9 +2255,6 @@ return (
                                   }));
                                 }
                               };
-                              const segBase = 'px-2.5 h-7 text-[11px] leading-7 transition-colors';
-                              const segOn = 'text-white';
-                              const segOff = 'text-white/45 hover:text-white/70';
                               return (
                                 <div
                                   key={lift.key}
@@ -2277,29 +2273,14 @@ return (
                                     type="number"
                                     min={0}
                                     inputMode="numeric"
-                                    aria-label={`${lift.label} ${isLocked ? 'locked value' : 'typed number'}`}
+                                    aria-label={`${lift.label} ${isLocked ? 'my number' : 'typed number'}`}
                                     value={inputValue}
                                     onChange={(e) => onInput(e.target.value)}
                                     placeholder={placeholder}
                                     className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40 shrink-0"
                                     style={{ fontFamily: 'Inter, sans-serif' }}
                                   />
-                                  <div className="flex rounded-full border border-white/20 overflow-hidden shrink-0" role="group" aria-label={`${lift.label} auto or locked`}>
-                                    <button
-                                      type="button"
-                                      onClick={setAuto}
-                                      aria-pressed={!isLocked}
-                                      className={`${segBase} ${!isLocked ? segOn : segOff}`}
-                                      style={{ backgroundColor: !isLocked ? `${SPORT_COLORS.strength}40` : 'transparent' }}
-                                    >auto</button>
-                                    <button
-                                      type="button"
-                                      onClick={setLocked}
-                                      aria-pressed={isLocked}
-                                      className={`${segBase} ${isLocked ? segOn : segOff}`}
-                                      style={{ backgroundColor: isLocked ? `${SPORT_COLORS.strength}40` : 'transparent' }}
-                                    >locked</button>
-                                  </div>
+                                  <AutoMinePill mine={isLocked} onAuto={setAuto} onMine={setLocked} color={SPORT_COLORS.strength} label={lift.label} />
                                 </div>
                               );
                             })}
