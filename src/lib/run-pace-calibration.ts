@@ -104,7 +104,10 @@ export function effortFieldsFromFiveKTimeSec(fiveKTimeSec: number): {
   effort_source_time: number;
   effort_paces: TrainingPaces;
   effort_paces_source: 'calculated';
-  effort_score_status: 'self_reported';
+  /** ⛔ The DB check constraint allows only 'estimated' | 'verified' (probed 2026-09-02). 'self_reported'
+   *  was what the wizards wrote for months — and every one of those upserts was rejected. A typed 5K is
+   *  an estimate until a race verifies it. */
+  effort_score_status: 'estimated';
   effort_updated_at: string;
 } {
   const score = calculateEffortScore(5000, fiveKTimeSec);
@@ -114,7 +117,7 @@ export function effortFieldsFromFiveKTimeSec(fiveKTimeSec: number): {
     effort_source_time: Math.round(fiveKTimeSec),
     effort_paces: getPacesFromScore(score),
     effort_paces_source: 'calculated',
-    effort_score_status: 'self_reported',
+    effort_score_status: 'estimated',
     effort_updated_at: new Date().toISOString(),
   };
 }
