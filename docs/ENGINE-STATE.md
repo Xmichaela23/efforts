@@ -1,5 +1,38 @@
 # Engine State
 
+## 🧭 NEXT SESSION — START HERE (2026-09-02 — the STATE-SCREEN NUMBERS thread)
+
+> ⚠️ There are TWO live threads. THIS block is the State-screen / baseline-numbers cleanup. The
+> 2026-09-01 banner below it is the separate standing-plan/book engine thread — still valid for that work.
+
+**Full plan for this thread: `docs/PLAN-strength-numbers-2026-09-02.md`.** Read it before touching strength/pace numbers.
+
+**SHIPPED + VERIFIED today (deployed to prod, confirmed on the real account 45d122e7):**
+- **Deadlift 225 → 185.** The learned-max writer skipped the ≤10-rep trust gate, so a 105×35 set stored
+  a fake 225. Fixed in `compute-facts` (pure `aggregateLearnedStrengthMaxes`). Tested.
+- **Single source of truth for strength numbers (auto/locked switch — REVERSES D-231 typed-wins).**
+  `capacity-resolver.ts` precedence is now LOCKED > trusted-LEARNED (auto) > typed seed. All three plan-weight
+  spots route through it (`athlete-snapshot.ts` resolveLive + extractPerformanceNumbers, materialize legacy).
+  Coach anchor_1rm reads the resolved value; COACH_PAYLOAD_VERSION 180→181. 74 tests incl. a DELOAD-GUARD.
+  ⛔ Only affects NEW plans (existing plans keep frozen pins). Back-annotate D-231 next session.
+- **Run card:** "quality"→"hard", fade/decoupling gibberish removed, real recorded pace surfaced.
+
+**OPEN — the two next jobs:**
+1. **The false "run efficiency declining −22%".** NOT heat, NOT the noise guard (both ruled out — I chased
+   3–4 wrong causes first). CODE-VERIFIED source: `assemble.ts:1095` — `efficiency.verdict` = `runRoute`
+   (the familiar-routes regression, `heat-adjust.ts routeTrend`), which fits heat + time JOINTLY. On this
+   athlete heat and time are COLLINEAR (hot runs = recent runs), so β_time is unidentifiable and the regression
+   blames time. Fix: make routeTrend WITHHOLD when temp↔day correlation is high (can't separate heat from
+   fitness), rather than assert a decline. ⚠️ Verify by recomputing 45d122e7 and seeing the verdict leave
+   'sliding'. (A run-efficiency noise guard was added at `run.ts computeRunEfficiencyState` — real + safe, but
+   it is BYPASSED whenever `runRoute` exists, so it did not fix this. Keep it.)
+2. **Baselines LOCK-SWITCH UI.** The `locked_baselines` map is already threaded through the resolver +
+   `LiveBaselinesFallback`; there is NO writer/UI yet. Build the auto/locked toggle on `TrainingBaselines.tsx`
+   (Garmin model: default auto, tap to lock, locked wins + holds). Separate: a Performance-screen edit of a
+   mis-logged set (fixes junk like the 609-lb barbell row on 2026-02-16 at source).
+
+---
+
 ## 🧭 NEXT SESSION — START HERE (written 2026-09-01 — the night the engine was held to the book)
 
 ### ⛔ READ IN THIS ORDER, AND THE FIRST TWO ARE NEW: `docs/GLOSSARY.md`, then `docs/WHAT-IS-BUILT.md`, then this banner.
