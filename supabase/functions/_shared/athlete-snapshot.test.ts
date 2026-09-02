@@ -177,21 +177,35 @@ Deno.test('readAthleteSnapshotOrLive: legacy plan with no snapshot falls back to
   assertEquals(resolved.performance_numbers.squat, 250);
 });
 
-Deno.test('readAthleteSnapshotOrLive: legacy fallback merges manual > learned > null', () => {
+Deno.test('readAthleteSnapshotOrLive: live path uses the AUTO/LOCKED resolver (trusted-learned > typed seed)', () => {
+  const ASOF = '2026-09-02';
+  const FRESH = '2026-08-30'; // within the freshness window
+  const trusted = (value: number) => ({ value, confidence: 'high', sample_count: 6, last_logged: FRESH });
   const live = {
-    performance_numbers: { deadlift: 200 }, // manual deadlift
+    performance_numbers: { deadlift: 150, bench: 155 }, // stale signup seeds
     learned_fitness: {
       strength_1rms: {
-        deadlift: { value: 999 }, // would be ignored — manual wins
-        squat: { value: 175 }, // no manual → learned wins
-        bench: { value: 0 }, // not positive → falls to null
+        deadlift: trusted(185),         // trusted logged → WINS over the typed 150 (the flip)
+        squat: trusted(125),            // no typed → trusted learned fills
+        bench: { value: 999, confidence: 'low', sample_count: 1, last_logged: FRESH }, // UNtrusted → typed 155 holds
       },
     },
   };
-  const resolved = readAthleteSnapshotOrLive(null, live, { logLegacyFallback: false });
-  assertEquals(resolved.performance_numbers.deadlift, 200, 'manual wins over learned');
-  assertEquals(resolved.performance_numbers.squat, 175, 'learned used when manual missing');
-  assertEquals(resolved.performance_numbers.bench, null, 'zero learned → null');
+  const resolved = readAthleteSnapshotOrLive(null, live, { logLegacyFallback: false, asOf: ASOF });
+  assertEquals(resolved.performance_numbers.deadlift, 185, 'trusted logged wins over the typed seed');
+  assertEquals(resolved.performance_numbers.squat, 125, 'trusted learned fills when no typed');
+  assertEquals(resolved.performance_numbers.bench, 155, 'an untrusted thin learned set does NOT drop to noise — typed seed holds');
+});
+
+Deno.test('readAthleteSnapshotOrLive: a LOCKED value wins over both typed and trusted learned', () => {
+  const ASOF = '2026-09-02';
+  const live = {
+    performance_numbers: { deadlift: 150 },
+    learned_fitness: { strength_1rms: { deadlift: { value: 185, confidence: 'high', sample_count: 6, last_logged: '2026-08-30' } } },
+    locked_baselines: { deadlift: 205 },
+  };
+  const resolved = readAthleteSnapshotOrLive(null, live, { logLegacyFallback: false, asOf: ASOF });
+  assertEquals(resolved.performance_numbers.deadlift, 205, 'the locked value the athlete set wins');
 });
 
 Deno.test('readAthleteSnapshotOrLive: schema_version mismatch falls back to live', () => {

@@ -282,7 +282,7 @@ type StrengthIntentMat = 'support' | 'performance' | null;
 
 type SwimIntentMat = 'focus' | 'race' | null;
 
-import { readAthleteSnapshotOrLive } from '../_shared/athlete-snapshot.ts';
+import { readAthleteSnapshotOrLive, resolveStrengthNumbers } from '../_shared/athlete-snapshot.ts';
 
 /**
  * Clamp %1RM from goal strength_intent: performance ≥60%; support ≤60% (bench/squat lower).
@@ -3938,31 +3938,21 @@ Deno.serve(async (req) => {
         (baselines as any).pullupMaxReps = Math.round(perfPullups);
       }
 
-      (baselines as any).squat = mergeAnchor1RmLb(
-        Number.isFinite(perfSquat) && perfSquat > 0 ? perfSquat : undefined,
-        strength.squat,
-        135,
-      );
-      (baselines as any).bench = mergeAnchor1RmLb(
-        Number.isFinite(perfBench) && perfBench > 0 ? perfBench : undefined,
-        strength.bench_press,
-        135,
-      );
-      let dlMerged = mergeAnchor1RmLb(
-        Number.isFinite(perfDl) && perfDl > 0 ? perfDl : undefined,
-        strength.deadlift,
-        0,
-      );
+      // ⛔ SINGLE SOURCE (2026-09-02): the legacy pre-snapshot defaults route through the SAME resolver
+      // as the pin and live paths (locked > trusted-learned > typed seed). This block is overridden by
+      // the athlete-snapshot read right below whenever a plan id exists; routing it too closes the
+      // no-snapshot edge so the three plan-weight spots can never disagree again.
+      const _legacyAsOf = new Date().toISOString().slice(0, 10);
+      const _legacy = resolveStrengthNumbers(perfRaw, ub?.learned_fitness, (ub as any)?.locked_baselines, _legacyAsOf);
+      (baselines as any).squat = _legacy.squat ?? 135;
+      (baselines as any).bench = _legacy.bench ?? 135;
+      let dlMerged = _legacy.deadlift ?? 0;
       if (dlMerged <= 0) {
-        dlMerged = mergeAnchor1RmLb(undefined, strength.trap_bar_deadlift, 0);
+        dlMerged = mergeAnchor1RmLb(undefined, strength.trap_bar_deadlift, 0); // trap-bar: accessory, no resolver key
       }
       if (dlMerged <= 0) dlMerged = 135;
       (baselines as any).deadlift = dlMerged;
-      (baselines as any).overheadPress1RM = mergeAnchor1RmLb(
-        Number.isFinite(perfOhp) && perfOhp > 0 ? perfOhp : undefined,
-        strength.overhead_press,
-        95,
-      );
+      (baselines as any).overheadPress1RM = _legacy.overheadPress1RM ?? 95;
       const perfHip = Number(perfRaw.hipThrust ?? perfRaw.hip_thrust);
       const dlNum = (baselines as any).deadlift as number;
       (baselines as any).hipThrust = mergeAnchor1RmLb(
@@ -3989,7 +3979,7 @@ Deno.serve(async (req) => {
             : null) as Record<string, unknown> | null;
           const resolved = readAthleteSnapshotOrLive(
             planConfigForSnap,
-            { performance_numbers: ub?.performance_numbers ?? null, learned_fitness: ub?.learned_fitness ?? null },
+            { performance_numbers: ub?.performance_numbers ?? null, learned_fitness: ub?.learned_fitness ?? null, locked_baselines: (ub as any)?.locked_baselines ?? null },
           );
           // Snapshot wins per field; preserve existing baselines.* (default fallbacks) when
           // snapshot has no value for that lift.

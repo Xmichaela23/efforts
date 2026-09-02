@@ -1,5 +1,40 @@
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveStrengthCapacity } from './state-trend/capacity-resolver.ts';
+
+/**
+ * ⛔ ONE strength-1RM resolution for BOTH the plan-pin path and the live path — the exact pattern
+ * `extractBike` / `resolveLiveBike` already use for FTP. Routes the four primaries through
+ * `resolveStrengthCapacity` (LOCKED > trusted-LEARNED auto > typed seed, 2026-09-02) so a plan can
+ * never prescribe off a number that disagrees with the screen or the coach. Hip thrust has no
+ * canonical resolver key (accessory) → simple typed-then-learned, unchanged.
+ */
+export function resolveStrengthNumbers(
+  perf: Record<string, unknown> | null | undefined,
+  learnedFitness: Record<string, unknown> | null | undefined,
+  locked: Record<string, unknown> | null | undefined,
+  asOf: string,
+): { deadlift: number | null; squat: number | null; bench: number | null; overheadPress1RM: number | null; hipThrust: number | null } {
+  const pn = (perf && typeof perf === 'object' && !Array.isArray(perf) ? perf : {}) as Record<string, unknown>;
+  const lf = (learnedFitness && typeof learnedFitness === 'object' && !Array.isArray(learnedFitness) ? learnedFitness : {}) as Record<string, unknown>;
+  const s1rms = (typeof lf.strength_1rms === 'object' && lf.strength_1rms != null ? lf.strength_1rms : {}) as Record<string, unknown>;
+  const lockedMap = (locked && typeof locked === 'object' && !Array.isArray(locked) ? locked : null) as Record<string, unknown> | null;
+  // canonical typed map from the alias soup the wizard / Arc / migration data carries.
+  const typed: Record<string, number> = {
+    squat: Number(pn.squat ?? pn.squat1RM ?? pn.squat_1rm),
+    bench: Number(pn.bench ?? pn.bench_press ?? pn.benchPress),
+    deadlift: Number(pn.deadlift ?? pn.dead_lift),
+    overheadPress1RM: Number(pn.overheadPress1RM ?? pn.ohp ?? pn.overhead_press ?? pn.overhead),
+  };
+  const cap = (key: string): number | null =>
+    resolveStrengthCapacity({ key, typed, learnedStrength1rms: s1rms, locked: lockedMap, asOf }).value;
+  // hip thrust — accessory, no resolver key: typed then learned, matching the old merge.
+  const hipTyped = Number(pn.hipThrust ?? pn.hip_thrust);
+  const hipLearned = Number((s1rms as Record<string, { value?: unknown }>)?.hip_thrust?.value);
+  const hipThrust = Number.isFinite(hipTyped) && hipTyped > 0 ? Math.round(hipTyped)
+    : (Number.isFinite(hipLearned) && hipLearned > 0 ? Math.round(hipLearned) : null);
+  return { deadlift: cap('deadlift'), squat: cap('squat'), bench: cap('bench'), overheadPress1RM: cap('overheadPress1RM'), hipThrust };
+}
 
 /**
  * AthleteSnapshot — single source of truth for the athlete-input values used to build a plan.
@@ -159,17 +194,20 @@ export function buildAthleteSnapshot(input: {
   athleteState?: Record<string, unknown> | null;
   goals?: Array<Record<string, unknown>> | null;
   source?: 'request' | 'arc';
+  /** the day the freshness gate is judged against; defaults to now (plan creation IS now). */
+  asOf?: string;
 }): AthleteSnapshotV1 {
   const state = (input.athleteState && typeof input.athleteState === 'object' && !Array.isArray(input.athleteState))
     ? (input.athleteState as Record<string, unknown>)
     : {};
+  const asOf = input.asOf ?? new Date().toISOString().slice(0, 10);
 
   return {
     schema_version: 1,
     generated_at: new Date().toISOString(),
     source: input.source ?? 'request',
 
-    performance_numbers: extractPerformanceNumbers(state),
+    performance_numbers: extractPerformanceNumbers(state, asOf),
     bike: extractBike(state),
     run: extractRun(state),
 
@@ -188,40 +226,22 @@ export function buildAthleteSnapshot(input: {
  * key set the materializer's `mergeAnchor1RmLb` already tolerates so wizard / Arc / migration
  * data shapes all snapshot consistently.
  */
-function extractPerformanceNumbers(state: Record<string, unknown>): AthleteSnapshotV1['performance_numbers'] {
+function extractPerformanceNumbers(state: Record<string, unknown>, asOf: string): AthleteSnapshotV1['performance_numbers'] {
   const pn = state.performance_numbers as Record<string, unknown> | undefined | null;
-  if (!pn || typeof pn !== 'object' || Array.isArray(pn)) return null;
+  const hasPn = pn && typeof pn === 'object' && !Array.isArray(pn);
+  const hasLearned = state.learned_fitness && typeof state.learned_fitness === 'object';
+  if (!hasPn && !hasLearned) return null;
 
-  const num = (v: unknown): number | undefined => {
-    const n = Number(v);
-    return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
-  };
-
+  // ⛔ PIN THE RESOLVED NUMBER, NOT JUST TYPED (2026-09-02). A new plan freezes whatever the ONE
+  // resolver would return now (locked > trusted-learned > typed), so the plan's weights match the
+  // screen and the coach from day one — the same reason `extractBike` freezes `resolveCurrentFtp`.
+  const r = resolveStrengthNumbers(pn as Record<string, unknown>, state.learned_fitness as Record<string, unknown>, state.locked_baselines as Record<string, unknown>, asOf);
   const out: NonNullable<AthleteSnapshotV1['performance_numbers']> = {};
-  const dl = num((pn as Record<string, unknown>).deadlift ?? (pn as Record<string, unknown>).dead_lift);
-  if (dl != null) out.deadlift = dl;
-  const sq = num(
-    (pn as Record<string, unknown>).squat ??
-      (pn as Record<string, unknown>).squat1RM ??
-      (pn as Record<string, unknown>).squat_1rm,
-  );
-  if (sq != null) out.squat = sq;
-  const bp = num(
-    (pn as Record<string, unknown>).bench ??
-      (pn as Record<string, unknown>).bench_press ??
-      (pn as Record<string, unknown>).benchPress,
-  );
-  if (bp != null) out.bench = bp;
-  const op = num(
-    (pn as Record<string, unknown>).overheadPress1RM ??
-      (pn as Record<string, unknown>).ohp ??
-      (pn as Record<string, unknown>).overhead_press ??
-      (pn as Record<string, unknown>).overhead,
-  );
-  if (op != null) out.overheadPress1RM = op;
-  const hip = num((pn as Record<string, unknown>).hipThrust ?? (pn as Record<string, unknown>).hip_thrust);
-  if (hip != null) out.hipThrust = hip;
-
+  if (r.deadlift != null) out.deadlift = r.deadlift;
+  if (r.squat != null) out.squat = r.squat;
+  if (r.bench != null) out.bench = r.bench;
+  if (r.overheadPress1RM != null) out.overheadPress1RM = r.overheadPress1RM;
+  if (r.hipThrust != null) out.hipThrust = r.hipThrust;
   return Object.keys(out).length > 0 ? out : null;
 }
 
@@ -274,6 +294,8 @@ function extractRun(state: Record<string, unknown>): AthleteSnapshotV1['run'] {
 export type LiveBaselinesFallback = {
   performance_numbers?: Record<string, unknown> | null;
   learned_fitness?: Record<string, unknown> | null;
+  /** per-lift values the athlete LOCKED (auto off). Absent = auto. Threads into the strength resolver. */
+  locked_baselines?: Record<string, unknown> | null;
 };
 
 /**
@@ -287,11 +309,12 @@ export type LiveBaselinesFallback = {
 export function readAthleteSnapshotOrLive(
   planConfig: Record<string, unknown> | null | undefined,
   liveFallback: LiveBaselinesFallback | null | undefined,
-  options?: { logLegacyFallback?: boolean },
+  options?: { logLegacyFallback?: boolean; asOf?: string },
 ): AthleteResolved {
   const snapRaw = planConfig?.athlete_snapshot;
   const snap = isAthleteSnapshotV1(snapRaw) ? snapRaw : null;
   const live = liveFallback ?? {};
+  const asOf = options?.asOf ?? new Date().toISOString().slice(0, 10);
 
   // Per-category resolution: snapshot wins per category. A snapshot can populate one
   // category (e.g., performance_numbers) while leaving another (bike) null — that null
@@ -305,7 +328,7 @@ export function readAthleteSnapshotOrLive(
         overheadPress1RM: snap.performance_numbers.overheadPress1RM ?? null,
         hipThrust: snap.performance_numbers.hipThrust ?? null,
       }
-    : resolveLivePerformanceNumbers(live);
+    : resolveLivePerformanceNumbers(live, asOf);
 
   const bike = snap?.bike
     ? { ftp_w: snap.bike.ftp_w ?? null }
@@ -343,34 +366,16 @@ function isAthleteSnapshotV1(value: unknown): value is AthleteSnapshotV1 {
  */
 function resolveLivePerformanceNumbers(
   live: LiveBaselinesFallback,
+  asOf: string,
 ): AthleteResolved['performance_numbers'] {
-  const pn = (live.performance_numbers && typeof live.performance_numbers === 'object' && !Array.isArray(live.performance_numbers)
-    ? live.performance_numbers
-    : {}) as Record<string, unknown>;
-  const lf = (live.learned_fitness && typeof live.learned_fitness === 'object' && !Array.isArray(live.learned_fitness)
-    ? live.learned_fitness
-    : {}) as Record<string, unknown>;
-  const learned = (typeof lf.strength_1rms === 'object' && lf.strength_1rms != null
-    ? lf.strength_1rms
-    : {}) as Record<string, { value?: unknown } | undefined>;
-
-  const merge = (perfVal: unknown, learnedVal: { value?: unknown } | undefined): number | null => {
-    const p = Number(perfVal);
-    if (Number.isFinite(p) && p > 0) return Math.round(p);
-    const l = Number(learnedVal?.value);
-    if (Number.isFinite(l) && l > 0) return Math.round(l);
-    return null;
-  };
-
+  // ⛔ ONE resolver, same as the pin path — locked > trusted-learned (auto) > typed seed (2026-09-02).
+  const r = resolveStrengthNumbers(live.performance_numbers, live.learned_fitness, live.locked_baselines, asOf);
   return {
-    deadlift: merge(pn.deadlift ?? pn.dead_lift, learned.deadlift),
-    squat: merge(pn.squat ?? pn.squat1RM ?? pn.squat_1rm, learned.squat),
-    bench: merge(pn.bench ?? pn.bench_press ?? pn.benchPress, learned.bench_press),
-    overheadPress1RM: merge(
-      pn.overheadPress1RM ?? pn.ohp ?? pn.overhead_press ?? pn.overhead,
-      learned.overhead_press,
-    ),
-    hipThrust: merge(pn.hipThrust ?? pn.hip_thrust, learned.hip_thrust),
+    deadlift: r.deadlift,
+    squat: r.squat,
+    bench: r.bench,
+    overheadPress1RM: r.overheadPress1RM,
+    hipThrust: r.hipThrust,
   };
 }
 
