@@ -155,6 +155,14 @@ export function recentGroupPaceHr(
   return { recentPaceSecPerKm: pace > 0 ? Math.round(pace) : null, recentHrAvg: hr > 0 ? Math.round(hr) : null };
 }
 
+// ⛔ THE NOISE GUARD RUN EFFICIENCY WAS MISSING (2026-09-02, Michael: "our running numbers don't seem
+// right"). Bike power/efficiency (BIKE_NOISE_GUARD_STDEV), strength e1RM (E1RM_NOISE_GUARD_STDEV) and run
+// DECOUPLING (:324) all refuse to assert a direction when the early→recent shift is smaller than the
+// series' own scatter — but run EFFICIENCY did not, so a GAP-pace-driven index bouncing 1.24–1.76 with no
+// real trend was reported "sliding −22%" (verified on the real account: 18 easy runs, scatter ≈ the claimed
+// change). Same 1.0 the other three use; a scattered series now reads `withheld`, not a false decline.
+const RUN_EFF_NOISE_GUARD_STDEV = 1.0;
+
 export function computeRunEfficiencyState(series: TrendPoint[], asOf: string, sessionsPerWeek: number): RunState {
   return {
     // efficiency_index is HIGHER-is-better → lowerIsBetter: false (a RISING index = improving fitness).
@@ -162,7 +170,7 @@ export function computeRunEfficiencyState(series: TrendPoint[], asOf: string, se
       series,
       { ...resolveThresholds('run', sessionsPerWeek), improvePct: 3, slidePct: -3, lowerIsBetter: false },
       asOf,
-      { exclude: isDeloadWeek },
+      { exclude: isDeloadWeek, noiseGuardStdev: RUN_EFF_NOISE_GUARD_STDEV },
     ),
     metricLabel: 'efficiency (pace per HR)',
   };
