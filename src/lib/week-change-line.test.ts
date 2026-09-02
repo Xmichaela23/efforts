@@ -7,7 +7,7 @@
  * line that appears with no buckets in it, or appears over a window with no base, is the defect.
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { weekChangeParts, type ViadaWeekChange } from './week-change-line.ts';
+import { weekChangeLead, weekChangeParts, type ViadaWeekChange } from './week-change-line.ts';
 
 const label = (kind: string, key: string) => (key ? `${key} ${kind}` : kind);
 const base = { priorSince: '2026-08-19', priorUntil: '2026-08-25' };
@@ -42,4 +42,15 @@ Deno.test('a −100 (bucket dropped to nothing) prints as −100%', () => {
     moved: [{ kind: 'muscle_sets', key: 'triceps', from: 6, to: 0, pctChange: -100 }],
   };
   assertEquals(weekChangeParts(change, label), ['triceps muscle_sets −100%']);
+});
+
+// ── THE LEAD PHRASE FOLLOWS THE SERVER'S BASIS (closed plan weeks only, 2026-09-01) ─────────────
+Deno.test('⛔ the lead never says "this week" over an open week — it follows the basis the server chose', () => {
+  assertEquals(weekChangeLead({ ...base, basis: 'this_week', comparable: true, moved: [] }), 'against last week');
+  assertEquals(weekChangeLead({ ...base, basis: 'last_week', comparable: true, moved: [] }), 'last week against the week before');
+});
+
+Deno.test('a pre-plan-week payload (no basis) keeps the rolling wording it was built with', () => {
+  assertEquals(weekChangeLead({ ...base, comparable: true, moved: [] }), 'against the seven days before that');
+  assertEquals(weekChangeLead(undefined), 'against the seven days before that');
 });

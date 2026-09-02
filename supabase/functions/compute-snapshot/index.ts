@@ -80,7 +80,7 @@ import { allOutSeriesByLift, REP_RECORD_WINDOW_SESSIONS } from "../_shared/stren
 import { resolvePlanPhase } from "../_shared/plan-phase.ts";
 // D-338: the date → plan-week resolver, so a phase can be resolved for any dated point in the
 // series. Same module the coach uses; honours the plan's own week_start rather than assuming Monday.
-import { resolvePlanWeekIndex } from "../_shared/plan-week.ts";
+import { resolvePlanWeekIndex, resolveWeekStartDowFromPlanConfig } from "../_shared/plan-week.ts";
 import { computeEfficiencyIndex } from "../_shared/efficiency-index.ts"; // ONE efficiency formula (grade-adjusted feed)
 import { projectStandardRaces } from "../_shared/race-readiness/index.ts"; // goal-free VDOT 5k/10k/half/marathon
 import { deriveSnapshotWatermark } from "./watermark.ts";
@@ -1091,6 +1091,10 @@ serve(async (req: Request) => {
          */
         let weekByDate: Record<string, number> | null = null;
         let testWeekDates: string[] | null = null;
+        // ⛔ THE PLAN'S WEEK START-DAY — the same resolver the coach cuts the planned-vs-actual bar
+        // on. Handed to the assembler so the weekly lifting card is cut on the SAME week as that bar
+        // (2026-09-01, Michael: "is this a rolling week?"). The resolver's own default when no plan.
+        let weekStartDow: ReturnType<typeof resolveWeekStartDowFromPlanConfig> = resolveWeekStartDowFromPlanConfig(null);
         /** ⛔ The block's expected curve per lift — see the build below. Null when the block has no
          *  working numbers yet (before the test is read), which draws the readings alone. */
         let expectedByCanonical: Record<string, Array<{ date: string; value: number }>> | null = null;
@@ -1108,6 +1112,7 @@ serve(async (req: Request) => {
             .order("created_at", { ascending: false }).limit(1).maybeSingle();
           const cfg = (activePlanRow as any)?.config ?? null;
           if (cfg) {
+            weekStartDow = resolveWeekStartDowFromPlanConfig(cfg);
             const protocolId = resolveProtocolId(cfg);
             strengthEffortRead = protocolId ? protocolEffortRead(resolveProfile(protocolId)) : null;
             const dur = Number((activePlanRow as any)?.duration_weeks) || null;
@@ -1779,7 +1784,7 @@ serve(async (req: Request) => {
           console.log("[compute-snapshot] fitness baseline derive/persist failed (non-fatal):", e?.message || e);
         }
 
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, testWeekDates, expectedByCanonical, namedSessions, enduranceSpine, blockDurationWeeks, measuredDates, allOutByLift, strengthEffortRead, pullupProgress, loggedSessions });
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, testWeekDates, expectedByCanonical, namedSessions, enduranceSpine, blockDurationWeeks, measuredDates, allOutByLift, strengthEffortRead, pullupProgress, loggedSessions, weekStartDow });
         // VDOT race projections (goal-free) — computed HERE, not in the shared assembler, because they need
         // learned_fitness + the VDOT engine and we keep that OFF the client-math fallback path (dumb client).
         // Threshold pace: learned first, then performance_numbers. Long-run distance is estimated inside

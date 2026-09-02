@@ -601,6 +601,49 @@ before reordering ships.** No block may read whether another block is rendered.
       The ruling is that it should speak only about off-plan work — the same server split. Not
       narrowed by approximation, not deleted; a comment on the render says so.
       Build green, eslint clean, no type errors in the file.
+- [x] 3-lift-plan-week. **BUILT 2026-09-01 (night). SERVER + CLIENT. 27-function deploy, payload
+      178 → 179. Approved by Michael (the move); the closed-week basis ruled by the PM. NOT
+      committed, NOT pushed, NOT deployed — awaiting his word.**
+      Michael: *"is this a rolling week?"* It was — as-of minus six days under the label "THIS WEEK'S
+      LIFTING" / "nothing this week for …", stacked under a planned-vs-actual bar that IS the plan's
+      week. Field practice: rolling windows for load/fatigue (ACWR — the load plate at the top stays
+      rolling, untouched), calendar/plan weeks for volume against a plan, and the label matches the
+      window (Hevy labels its rolling view "Last 7 days"; Strava's week is calendar).
+      **THE WINDOW IS NOW THE PLAN'S WEEK, ON THE BAR'S OWN BOUNDARY:** `weekStartOf(asOf,
+      start-day)` from `_shared/plan-week.ts`, start-day from the plan config via
+      `resolveWeekStartDowFromPlanConfig` — the identical pair the coach cuts the bar on.
+      `compute-snapshot` resolves the start-day (it already imports that file and holds the config)
+      and hands it to the assembler as one new input; the builder cuts `since` = the plan week's first
+      day → as-of. ⛔ No second definition of "this week" anywhere. Coverage, session rows and the
+      off-plan read all move with it; the test-week intersection is unchanged (asked of the window).
+      ⚠️ **MID-WEEK THE WINDOW IS PARTIAL BY DESIGN** — "nothing this week for …" means nothing SO
+      FAR this week, which is what the words say. ⚠️ **NOTHING LIFTED YET THIS PLAN WEEK → NO CARD**
+      (the existing null rule, now per plan week): on the first day of a week before the first
+      session the block is absent. Stated; not redesigned.
+      ⛔ **THE >10% LINE SPEAKS ONLY ABOUT CLOSED PLAN WEEKS** (PM's ruling, option (a)): while the
+      current week is OPEN it compares LAST week against the week BEFORE (`basis: 'last_week'`,
+      "last week against the week before: …"); on the week's final day it compares THIS week against
+      last (`basis: 'this_week'`, "against last week: …"). An open week is never compared to a closed
+      one — a −40% on Wednesday because the week is not finished is the "score that lies". **When
+      there are not two closed weeks of lifting behind the card the line is ABSENT, and that is
+      CORRECT, not missing** — written on the builder, the type, and the card so nobody "fixes" it.
+      Payload carries `basis` / `from` / `to`; the old `priorSince/priorUntil` names still ride as the
+      `from` window. A pre-179 cached row keeps the rolling wording on the client (no `basis`) rather
+      than saying "last week" over a rolling window.
+      **PAYLOAD 178 → 179**, note in the convention.
+      **FIXTURES (new + rewritten, all green; suites 358 passed):** Monday-start plan — the week's
+      first day IN, the day before OUT; a Sunday-start plan opens on 08-30 (follows the config, not
+      an assumption); a session six days ago in last plan week is not "this week"; nothing yet this
+      plan week → no card; test-week intersection unchanged; an open week is never the change line's
+      subject and the final day is. Change rule rewritten on plan weeks: closed → this vs last with
+      exact windows; open → last vs the week before, this week's partial sets play no part; **the
+      mid-week pin: open week with only last week behind it → not comparable, empty**; nothing moved;
+      no base; +10 not / +20 yes; −100; test day in either week drops pattern buckets; current week's
+      numbers byte-identical with and without earlier weeks. Client lead-phrase fixtures for both
+      bases and the no-basis fallback. Off-plan fixtures moved onto the plan week's first day.
+      Build green, eslint clean, tsc baseline unchanged (314, none in touched files); `deno check` on
+      the builder shows only the two PRE-EXISTING errors (`ledger.ts:463 skipMuscles`,
+      `assemble.ts` bike `lead`), neither in this change. INVENTORY unchanged (assemble.ts → 27).
 - [x] 3-lift-recovery-copy. **DONE 2026-09-01 (night). Client-only, copy only, one file. NOT
       committed, NOT pushed.** Michael: *"what does about normal mean? … what are we communicating?
       what are we using as a gauge?"*

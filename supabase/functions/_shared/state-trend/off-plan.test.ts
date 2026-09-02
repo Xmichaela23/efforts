@@ -13,7 +13,7 @@ import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.t
 import { assembleStateTrends } from './assemble.ts';
 
 const AS_OF = '2026-09-01';
-const IN_WINDOW = '2026-08-30';
+const IN_WINDOW = '2026-08-31'; // Monday — the plan week's first day (window is the plan's week since 2026-09-01)
 
 const set = () => ({ weight: 100, reps: 8, completed: true });
 const prescribed = (name: string, sets = 3) => ({ name, planned_name: name, slot_intent: 'HYP', sets: Array.from({ length: sets }, set) });

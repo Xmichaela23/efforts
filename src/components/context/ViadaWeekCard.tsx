@@ -76,7 +76,7 @@ import {
   SESSION_SETS_RECOVERS,
   type SessionVerdict,
 } from '@shared/accessory-dosing/dose.ts';
-import { weekChangeParts, type ViadaWeekChange } from '@/lib/week-change-line';
+import { weekChangeLead, weekChangeParts, type ViadaWeekChange } from '@/lib/week-change-line';
 // ⛔ `DE: Upper` → `Speed day, upper body`, at the last moment before the athlete reads it (Michael,
 // off the live card: "LLM jiberish what is DE?" … "spell it out"). One formatter over the ONE owner
 // of the Heavy/Speed vocabulary — the logger, the calendar, the week grid and the plan download all
@@ -264,11 +264,13 @@ export default function ViadaWeekCard({ week }: { week: ViadaWeekPerformed | nul
         * `state-trend/assemble.ts` against `WEEK_CHANGE_FLAG_PCT`; this prints them. Nothing prints
         * when nothing moved, and nothing prints when there was no prior work to measure against —
         * the server's `comparable` flag tells those apart, and neither is a sentence.
-        * ⛔ "THE SEVEN DAYS BEFORE THAT", NEVER "LAST WEEK" — both windows are rolling.
+        * ⛔ CLOSED PLAN WEEKS ONLY (2026-09-01): the server compares last week against the week
+        * before while this week is open, and this week against last only on its final day; the lead
+        * phrase follows the server's `basis`. Absent mid-week for want of two closed weeks = CORRECT.
         */}
       {changeParts && (
         <div className="text-[12px] text-white/70 mt-2">
-          against the seven days before that: {changeParts.join(', ')}
+          {weekChangeLead(week.weekChange)}: {changeParts.join(', ')}
         </div>
       )}
 

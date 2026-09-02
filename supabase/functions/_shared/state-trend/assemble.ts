@@ -37,6 +37,11 @@ import {
 } from '../accessory-dosing/performed-ledger.ts';
 // ⛔ §B5's change-rule line — the book's number, read from the dose module, not typed here.
 import { WEEK_CHANGE_FLAG_PCT } from '../accessory-dosing/dose.ts';
+// ⛔ THE PLAN'S WEEK, THE ONE DEFINITION — the same `weekStartOf` + plan-config start-day the coach
+// cuts the planned-vs-actual bar on. The lifting card reads the plan's week (2026-09-01, Michael:
+// "is this a rolling week?"), and it must be the SAME week as the bar directly above it.
+import { weekStartOf } from '../plan-week.ts';
+type WeekStartDow = Parameters<typeof weekStartOf>[1];
 import { getExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 // ⛔ The workout screen's engine. D-346: State reads THIS, it does not mint its own run verdict.
 import { routeTrend, type RouteTrend } from '../heat-adjust.ts';
@@ -707,6 +712,12 @@ export interface StateTrendInputs {
    * velocity reps at 70-85%, sets per muscle), and the aggregate threw the other sets away.
    * ⚠️ THE CALLER ALREADY FETCHES THESE for the rep-record window — no new query, no new column.
    */
+  /**
+   * ⛔ THE PLAN'S WEEK START-DAY, from the plan config via `resolveWeekStartDowFromPlanConfig` —
+   * the same value the coach cuts the planned-vs-actual bar on. The weekly lifting card is cut on
+   * it so the two blocks describe ONE week. Absent → Monday, which is that resolver's own default.
+   */
+  weekStartDow?: WeekStartDow | null;
   loggedSessions?: Array<{
     date: string;
     label?: string | null;
@@ -764,7 +775,13 @@ export interface StateTrendResult {
  * week of zeroes is not the same statement as a week with no data.
  */
 export interface ViadaWeekPerformed {
-  /** The seven days ending `asOf`, inclusive — his buckets are weekly (p084, p086). */
+  /**
+   * The first day of the PLAN'S current week — the window runs from here to `asOf`, inclusive, so it
+   * is partial mid-week by design. Cut on `weekStartOf` + the plan's start-day, the same boundary
+   * the planned-vs-actual bar uses (2026-09-01). Was a rolling as-of-minus-six before that; the copy
+   * said "this week" the whole time, and the label now matches the window. His buckets are weekly
+   * (p084, p086).
+   */
   since: string;
   /** Sets and effective reps per muscle, with his verdict bands. `ledgerFor`'s own output. */
   perMuscle: Array<{ muscle: string; sets: number; effectiveReps: number; verdict: string }>;
@@ -856,7 +873,17 @@ export interface ViadaWeekOffPlan {
 }
 
 export interface ViadaWeekChange {
-  /** The comparison window — the seven days ending the day before this card's `since`. */
+  /**
+   * ⛔ WHICH TWO CLOSED PLAN WEEKS ARE COMPARED. `'last_week'` while the current plan week is open
+   * (last week against the week before it); `'this_week'` only on the week's last day (this week
+   * against last). Never an open week against a closed one — see the builder.
+   */
+  basis: 'this_week' | 'last_week';
+  /** The earlier of the two weeks (the base the percentage is taken against). */
+  from: { since: string; until: string };
+  /** The later of the two weeks (the one being described). */
+  to: { since: string; until: string };
+  /** Same as `from` — the names the first payload used. */
   priorSince: string;
   priorUntil: string;
   /**
@@ -1508,7 +1535,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     // because the percentages need `refMaxByCanonical`, which is resolved a few lines up — the same
     // windowed max the derived heavy gate uses. A second resolution of "what is this lift's max"
     // is how two screens come to disagree about whether a set was heavy.
-    viadaWeek: buildViadaWeekPerformed(inp.loggedSessions, asOf, refMaxByCanonical, inp.testWeekDates),
+    viadaWeek: buildViadaWeekPerformed(inp.loggedSessions, asOf, refMaxByCanonical, inp.testWeekDates, inp.weekStartDow ?? 'mon'),
   };
 }
 
@@ -1524,10 +1551,24 @@ function buildViadaWeekPerformed(
   asOf: string,
   refMaxByCanonical: Record<string, number>,
   testWeekDates?: string[] | null,
+  weekStartDow: WeekStartDow = 'mon',
 ): ViadaWeekPerformed | null {
   const rows = Array.isArray(loggedSessions) ? loggedSessions : [];
   if (rows.length === 0) return null;
-  const since = shiftYmd(asOf, -6);
+  /**
+   * ⛔ THE PLAN'S WEEK, NOT A ROLLING SEVEN DAYS (2026-09-01, approved by Michael — he spotted it:
+   * "is this a rolling week?"). The card's copy says "this week"; a rolling window under that label
+   * was a calendar-week label on a rolling number, and it disagreed with the planned-vs-actual bar
+   * directly above it, which IS the plan's week. Field practice is strict about this: rolling
+   * windows for load and fatigue (the ACWR plate at the top stays rolling), calendar/plan weeks for
+   * volume against a plan, and the label always matches the window.
+   * ⛔ ONE DEFINITION: `weekStartOf` on the plan's own start-day — the coach's boundary for the bar.
+   * ⚠️ The window runs from the week's first day to as-of, so mid-week it is PARTIAL by design;
+   * "nothing this week for …" then means nothing SO FAR this week, which is what the words say.
+   */
+  const since = weekStartOf(asOf, weekStartDow);
+  const weekEnd = shiftYmd(since, 6);
+  const weekClosed = asOf >= weekEnd;
   const week = performedWindow(rows, since, asOf);
   if (week.length === 0) return null;
 
@@ -1543,22 +1584,47 @@ function buildViadaWeekPerformed(
   const patternBandApplies = bandAppliesTo(week);
 
   /**
-   * ⛔ THE SEVEN DAYS BEFORE THIS CARD'S SEVEN — §B5's change rule needs a base. Read off the same
-   * rows: the caller hands over the last `REP_RECORD_WINDOW_SESSIONS` (40) logged sessions and this
-   * function was already trimming them to seven days, so the prior window costs no query. ⚠️ Forty
-   * sessions cover fourteen days for any athlete this app is for; an athlete logging more than
-   * twenty lifting sessions a week would see a falsely empty prior window, and that is stated
-   * rather than guarded.
+   * ⛔⛔ §B5's CHANGE RULE SPEAKS ONLY ABOUT CLOSED PLAN WEEKS (2026-09-01, ruled by the PM under
+   * Michael's move to the plan's week). A partial week against a complete one reads −40% on a
+   * Wednesday because the week is not finished — arithmetically true, communicatively false, the
+   * "score that lies". So:
+   *   · while the current plan week is OPEN, the comparison is LAST week against the week BEFORE it
+   *     (`basis: 'last_week'`) — two closed weeks, an honest sentence any day of the week;
+   *   · on the week's last day (`weekClosed`), it is THIS week against last (`basis: 'this_week'`).
+   * ⚠️ WHEN THERE ARE NOT TWO CLOSED WEEKS OF LIFTING BEHIND THE CARD, THE LINE IS ABSENT, AND THAT
+   * IS CORRECT, NOT MISSING. Do not "fix" it by comparing the open week.
+   * Read off the same rows: the caller hands over the last `REP_RECORD_WINDOW_SESSIONS` (40) logged
+   * sessions, so three plan weeks cost no query. ⚠️ Forty sessions cover three weeks for any
+   * athlete this app is for; more than thirteen lifting sessions a week would see a falsely empty
+   * earliest window, and that is stated rather than guarded.
    */
-  const priorUntil = shiftYmd(since, -1);
-  const priorSince = shiftYmd(since, -7);
-  const prior = performedWindow(rows, priorSince, priorUntil);
-  const priorLedger = prior.length > 0 ? performedLedgerFor(prior) : null;
-  const priorHasWork = priorLedger != null && priorLedger.perMuscle.some((m) => m.sets > 0);
-  const weekChange: ViadaWeekChange = { priorSince, priorUntil, comparable: priorHasWork, moved: [] };
-  if (priorLedger && priorHasWork) {
+  const lastSince = shiftYmd(since, -7);
+  const lastUntil = shiftYmd(since, -1);
+  const beforeSince = shiftYmd(since, -14);
+  const beforeUntil = shiftYmd(since, -8);
+  const lastWeek = performedWindow(rows, lastSince, lastUntil);
+  const weekBefore = performedWindow(rows, beforeSince, beforeUntil);
+  const basis: ViadaWeekChange['basis'] = weekClosed ? 'this_week' : 'last_week';
+  const [toSessions, fromSessions, windowFrom, windowTo] = weekClosed
+    ? [week, lastWeek, { since: lastSince, until: lastUntil }, { since, until: weekEnd }]
+    : [lastWeek, weekBefore, { since: beforeSince, until: beforeUntil }, { since: lastSince, until: lastUntil }];
+  const toLedger = toSessions === week ? ledger : (toSessions.length > 0 ? performedLedgerFor(toSessions) : null);
+  const fromLedger = fromSessions.length > 0 ? performedLedgerFor(fromSessions) : null;
+  const fromHasWork = fromLedger != null && fromLedger.perMuscle.some((m) => m.sets > 0);
+  const toHasWork = toLedger != null && toLedger.perMuscle.some((m) => m.sets > 0);
+  const weekChange: ViadaWeekChange = {
+    basis,
+    from: windowFrom,
+    to: windowTo,
+    // Back-compat names for the "from" window — earlier payloads called it the prior window.
+    priorSince: windowFrom.since,
+    priorUntil: windowFrom.until,
+    comparable: fromHasWork && toHasWork,
+    moved: [],
+  };
+  if (fromLedger && toLedger && fromHasWork && toHasWork) {
     const flag = (kind: ViadaWeekChange['moved'][number]['kind'], key: string, from: number, to: number) => {
-      // ⛔ NO BASE, NO PERCENTAGE. A bucket that held nothing in the prior window is not "up ∞%".
+      // ⛔ NO BASE, NO PERCENTAGE. A bucket that held nothing in the earlier week is not "up ∞%".
       if (!(from > 0)) return;
       const pct = ((to - from) / from) * 100;
       // ⛔ STRICTLY OVER THE LINE. His rule is "less than 10%"; the flag is the book's number from
@@ -1566,18 +1632,19 @@ function buildViadaWeekPerformed(
       if (Math.abs(pct) > WEEK_CHANGE_FLAG_PCT) weekChange.moved.push({ kind, key, from, to, pctChange: Math.round(pct) });
     };
     flag('work_sets', '',
-      priorLedger.perSession.reduce((a, s) => a + s.countedSets, 0),
-      ledger.perSession.reduce((a, s) => a + s.countedSets, 0));
-    const nowSets = new Map(ledger.perMuscle.map((m) => [m.muscle, m.sets]));
-    for (const m of priorLedger.perMuscle) flag('muscle_sets', m.muscle, m.sets, nowSets.get(m.muscle) ?? 0);
-    // ⛔ PATTERN REPS ONLY WHEN THE BAND APPLIES TO BOTH WINDOWS — a test week's heavy count is
+      fromLedger.perSession.reduce((a, s) => a + s.countedSets, 0),
+      toLedger.perSession.reduce((a, s) => a + s.countedSets, 0));
+    const toSets = new Map(toLedger.perMuscle.map((m) => [m.muscle, m.sets]));
+    for (const m of fromLedger.perMuscle) flag('muscle_sets', m.muscle, m.sets, toSets.get(m.muscle) ?? 0);
+    // ⛔ PATTERN REPS ONLY WHEN THE BAND APPLIES TO BOTH WEEKS — a test week's heavy count is
     // structurally zero and would flag every pattern at −100 or +∞. Same reasoning as
     // `patternBandApplies`, applied to the comparison.
-    if (patternBandApplies && bandAppliesTo(prior)) {
-      const priorDose = performedStrengthDose(prior, maxFor, patternFor);
-      const nowPat = new Map(dose.perPattern.map((p) => [p.pattern, p]));
-      for (const p of priorDose.perPattern) {
-        const now = nowPat.get(p.pattern);
+    if (bandAppliesTo(toSessions) && bandAppliesTo(fromSessions)) {
+      const fromDose = performedStrengthDose(fromSessions, maxFor, patternFor);
+      const toDose = toSessions === week ? dose : performedStrengthDose(toSessions, maxFor, patternFor);
+      const toPat = new Map(toDose.perPattern.map((p) => [p.pattern, p]));
+      for (const p of fromDose.perPattern) {
+        const now = toPat.get(p.pattern);
         flag('pattern_heavy', p.pattern, p.heavyReps, now?.heavyReps ?? 0);
         flag('pattern_speed', p.pattern, p.velocityReps, now?.velocityReps ?? 0);
       }
