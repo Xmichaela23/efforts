@@ -739,7 +739,7 @@ Deno.test('the plyo drills are his, and the dose labels survive', () => {
     for (const ex of s.strength_exercises ?? []) {
       // ⛔ ONE ROW, ONE DRILL, no load. A `sets: 3` row would be the placeholder back again.
       assertEquals(ex.sets, 1);
-      assertEquals(ex.reps, PLYO_DOSE.effortsPerDrill);
+      assertEquals(ex.reps, PLYO_DOSE.effortsPerDrill.hi); // a 3–4 range since 2026-09-02; the row carries the top
       assertEquals(ex.load_prescribed, false);
     }
   }

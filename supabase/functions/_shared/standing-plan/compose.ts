@@ -2015,14 +2015,15 @@ function plyoRows(args: ComposeArgs, notes: ComposeNote[]): StrengthExercise[] {
     notes.push({ kind: 'ours', text: PLYO_FAMILY_MIX_IS_OURS });
   }
   return PLYO_FAMILIES_PER_DAY.map((family) => ({
-    name: drillForWeek(family, args.week),
+    name: drillForWeek(family, args.week, args.equipment),
     // ⛔ ONE ROW, ONE DRILL, and the efforts sit in `reps` because a plyometric row shows reps and
     // nothing else (D-3452) — there is no load to record and no plate calculator to draw.
     sets: 1,
-    reps: PLYO_DOSE.effortsPerDrill,
+    // the range's top is the row's recorded-efforts capacity; the logger records, never targets
+    reps: PLYO_DOSE.effortsPerDrill.hi,
     weight: 'Bodyweight',
     load_prescribed: false,
-    notes: `About ${PLYO_DOSE.effortsPerDrill} efforts, full rest between. `
+    notes: `${PLYO_DOSE.effortsPerDrill.lo}–${PLYO_DOSE.effortsPerDrill.hi} efforts, full rest between. `
       + `${PLYO_FAMILIES[family].benefit}. Stop when the movement stops being crisp.`,
   }));
 }

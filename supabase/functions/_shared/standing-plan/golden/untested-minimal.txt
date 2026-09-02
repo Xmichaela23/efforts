@@ -27,9 +27,9 @@ WEEK 01  column=standard  ⟵ TEST WEEK
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Stiff-Legged Run               1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
-      -      Pogo Hops                      1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
-      -      Ladder Drills                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+      -      Stiff-Legged Run               1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Pogo Hops                      1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
   [Wednesday] run      Near-threshold Run — 42 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -54,7 +54,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
   [Saturday] run      Long Run — 42 min
   NOTES
       [source  ] The first week is the test. Two guided sessions set the numbers the rest of the block is built on, and the weights fill in as soon as those two are logged. Testing before a programme is the source's own advice.  (Viada p215, p247)
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [source  ] The other lifting days run by feel this week — the numbers arrive once the test is done.  (Viada p215)
@@ -87,9 +87,9 @@ WEEK 02  column=standard
   [Tuesday] ride     Anaerobic Ride — 36 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      A-Skip                         1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
-      -      Rebound Jumps                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
-      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+      -      A-Skip                         1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Rebound Jumps                  1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Hopscotch                      1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
   [Wednesday] run      Near-threshold Run — 32 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -109,7 +109,7 @@ WEEK 02  column=standard
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 53 min
   NOTES
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
@@ -141,9 +141,9 @@ WEEK 03  column=standard
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      B-Skip                         1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
-      -      Lunge Hops                     1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
-      -      Hopscotch                      1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+      -      B-Skip                         1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Lunge Hops                     1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
   [Wednesday] run      Near-threshold Run — 46 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -163,7 +163,7 @@ WEEK 03  column=standard
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 44 min
   NOTES
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
@@ -195,9 +195,9 @@ WEEK 04  column=standard
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Bounding                       1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
-      -      Single-Leg Hops                1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
-      -      Ladder Drills                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+      -      Bounding                       1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Single-Leg Hops                1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Hopscotch                      1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
   [Wednesday] run      Near-threshold Run — 41 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -217,7 +217,7 @@ WEEK 04  column=standard
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 43 min
   NOTES
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
@@ -249,9 +249,9 @@ WEEK 05  column=standard
   [Tuesday] ride     Anaerobic Ride — 36 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Stiff-Legged Run               1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
-      -      Skater Hops                    1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
-      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+      -      Stiff-Legged Run               1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Skater Hops                    1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
   [Wednesday] run      Near-threshold Run — 39 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -271,7 +271,7 @@ WEEK 05  column=standard
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 47 min
   NOTES
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
@@ -303,9 +303,9 @@ WEEK 06  column=standard
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      A-Skip                         1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
-      -      Pogo Hops                      1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
-      -      Hopscotch                      1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+      -      A-Skip                         1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Pogo Hops                      1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Hopscotch                      1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
   [Wednesday] run      Near-threshold Run — 37 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -325,7 +325,7 @@ WEEK 06  column=standard
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 53 min
   NOTES
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
@@ -357,9 +357,9 @@ WEEK 07  column=standard
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      B-Skip                         1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
-      -      Rebound Jumps                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
-      -      Ladder Drills                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+      -      B-Skip                         1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Rebound Jumps                  1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
   [Wednesday] run      Near-threshold Run — 45 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -379,7 +379,7 @@ WEEK 07  column=standard
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 38 min
   NOTES
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
@@ -411,9 +411,9 @@ WEEK 08  column=standard
   [Tuesday] ride     Anaerobic Ride — 36 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Bounding                       1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
-      -      Lunge Hops                     1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
-      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+      -      Bounding                       1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Lunge Hops                     1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Hopscotch                      1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
   [Wednesday] run      Near-threshold Run — 42 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -433,7 +433,7 @@ WEEK 08  column=standard
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 44 min
   NOTES
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
@@ -465,9 +465,9 @@ WEEK 09  column=standard
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Stiff-Legged Run               1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
-      -      Single-Leg Hops                1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
-      -      Hopscotch                      1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+      -      Stiff-Legged Run               1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Single-Leg Hops                1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
   [Wednesday] run      Near-threshold Run — 32 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -487,7 +487,7 @@ WEEK 09  column=standard
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 58 min
   NOTES
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
@@ -519,9 +519,9 @@ WEEK 10  column=standard
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      A-Skip                         1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
-      -      Skater Hops                    1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
-      -      Ladder Drills                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+      -      A-Skip                         1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Skater Hops                    1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Hopscotch                      1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
   [Wednesday] run      Near-threshold Run — 46 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -541,7 +541,7 @@ WEEK 10  column=standard
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 37 min
   NOTES
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
@@ -573,9 +573,9 @@ WEEK 11  column=standard
   [Tuesday] ride     Anaerobic Ride — 36 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      B-Skip                         1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
-      -      Pogo Hops                      1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
-      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+      -      B-Skip                         1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Pogo Hops                      1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Ickey Shuffle                  1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
   [Wednesday] run      Near-threshold Run — 41 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -595,7 +595,7 @@ WEEK 11  column=standard
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 45 min
   NOTES
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.
@@ -627,9 +627,9 @@ WEEK 12  column=standard
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
-      -      Bounding                       1x4          @ Bodyweight    | note: About 4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
-      -      Rebound Jumps                  1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
-      -      Hopscotch                      1x4          @ Bodyweight    | note: About 4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
+      -      Bounding                       1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. running gait and speed. Stop when the movement stops being crisp.
+      -      Rebound Jumps                  1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general speed and explosiveness. Stop when the movement stops being crisp.
+      -      Hopscotch                      1x4          @ Bodyweight    | note: 3–4 efforts, full rest between. general foot and leg control. Stop when the movement stops being crisp.
   [Wednesday] run      Near-threshold Run — 39 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
@@ -649,7 +649,7 @@ WEEK 12  column=standard
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 52 min
   NOTES
-      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Four efforts is ours, from field practice for low-amplitude plyometrics.
+      [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [ours    ] The two sizes are his — p246's taper column prescribes the quality sessions at level 1, and p247 states the 90-to-100-minute long run as the more proficient runner's figure. WHICH of the two an athlete gets is now their own answer, asked once in the wizard. It was inferred from the last four weeks of logged training until 2026-08-27; the source names "experience level" and never recent mileage.

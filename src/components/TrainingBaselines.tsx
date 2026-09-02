@@ -1197,6 +1197,9 @@ const disciplineOptions = [
     "Kettlebells",
     "Cable machine",
     "Resistance bands",
+    // ⛔ ADDED 2026-09-02 (WORKORDER-plyo-screen §3): gates the ladder drills in the plyo family; matched
+    // by exact string in the logger's plyo Swap options.
+    "Agility ladder",
     "Ab wheel",
     // ⛔ ADDED 2026-08-26 — see the ruling above. ⚠️ Both strings are matched by SUBSTRING in
     // `athleteEquipmentToKeys` ("trx"/"suspension", "stability ball"); renaming either silently

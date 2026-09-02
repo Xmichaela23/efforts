@@ -77,6 +77,34 @@ import { canWritePullupCapacity } from '@/lib/pullup-progression';
 // Rest-timer lengths + the plyo test, extracted so both are testable and the main-lift question is
 // asked of the shared classifier rather than a private regex.
 import { calculateRestTime, isPlyometricMovement as isPlyometric, restBucketForIntent, restCueForBucket, REST_MINUTES_ARE_OURS } from '@/lib/strength-rest-timer';
+import { PLYO_FAMILIES, PLYO_FAMILY_IDS, type PlyoFamily } from '@shared/standing-plan/plyo';
+
+// ⛔ THE PLYO ROW IS A DRILL, NOT A SET (WORKORDER-plyo-screen-2026-09-02, p227). No weight, no rep
+// target, no reserve — "performed multiple times with ample rest", done "until the movement is
+// optimized for the day and the athlete develops confidence in it". The effort count is RECORDED after,
+// never targeted. Swap offers the other drills in the SAME family (the three buckets are the session's
+// structure), gated on equipment: ladder drills need an agility ladder.
+const PLYO_SESSION_NOTE = 'Drills are done separately, with full rest between efforts. The objective is quality: fatigue, poor form and imprecise movement defeat it. Each drill is repeated until the movement is crisp and you are confident in it, then you move on.';
+const PLYO_STOP_RULE = 'Stop when the movement stops being crisp.';
+const PLYO_LADDER_DRILLS = new Set(['ladder drills']);
+function plyoFamilyFor(name: string): PlyoFamily | null {
+  const n = String(name || '').trim().toLowerCase();
+  for (const id of PLYO_FAMILY_IDS) {
+    const fam = PLYO_FAMILIES[id];
+    if (fam.drills.some((d) => d.toLowerCase() === n)) return fam;
+  }
+  return null;
+}
+function plyoAlternatives(name: string, equipment: string[]): AlternativeOption[] {
+  const fam = plyoFamilyFor(name);
+  if (!fam) return [];
+  const hasLadder = (equipment || []).some((e) => /agility ladder/i.test(String(e)));
+  const n = String(name || '').trim().toLowerCase();
+  return fam.drills
+    .filter((d) => d.toLowerCase() !== n)
+    .filter((d) => hasLadder || !PLYO_LADDER_DRILLS.has(d.toLowerCase()))
+    .map((d) => ({ name: d, same_pattern: true, equipment: 'bodyweight' } as AlternativeOption));
+}
 // ⛔ `ME: Upper` → `Heavy: Upper`, at the last moment before an athlete reads it. The engine string
 // is untouched. See `plain-intent.ts` — the mapping has one owner, not one copy per surface.
 import { plainIntent } from '@/lib/plain-intent';
@@ -5511,7 +5539,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     so there is nothing to substitute FOR, and an undeclared miss must stay a skip.
                     The field makes Swap a FIRST-CLASS ACTION precisely because delete-and-re-add
                     destroys the planned↔executed link. Renaming already worked — nobody could find it. */}
-                {exercise.planned_name && (
+                {(exercise.planned_name || plyoFamilyFor(exercise.name)) && (
                   <button
                     onClick={() => setSwapFor(swapFor === exercise.id ? null : exercise.id)}
                     className={`flex items-center gap-1 pl-1.5 pr-1 py-2 text-[12px] font-medium transition-colors ${swapFor === exercise.id ? 'text-teal-300' : 'text-white/70 hover:text-white/90'}`}
@@ -5578,7 +5606,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   "its job is not to stop you moving; it is to make sure you know you moved."
               ─────────────────────────────────────────────────────────────────────────────────────── */}
               {swapFor === exercise.id && (() => {
-                const alts: AlternativeOption[] = getInSlotAlternatives(
+                const alts: AlternativeOption[] = plyoFamilyFor(exercise.name)
+                  ? plyoAlternatives(exercise.name, strengthEquipment)
+                  : getInSlotAlternatives(
                   exercise.planned_name || exercise.name,
                   strengthEquipment,
                   // ⛔ WORK WITHIN THE PLAN'S FRAMEWORK (Michael, 2026-07-30). On an assistance row the
@@ -5604,12 +5634,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         && typeof e.planned_percent_1rm === 'number' && e.planned_percent_1rm > 0)?.name
                       ?? null,
                   },
-                );
+                  );
                 return (
                   <div className="mt-2 mb-3 rounded-xl border-2 border-white/15 bg-white/[0.06] backdrop-blur-md p-3">
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <span className="text-[12px] uppercase tracking-wide text-white/72">
-                        Swap {exercise.planned_name}
+                        Swap {exercise.planned_name || exercise.name}
                       </span>
                       <button
                         onClick={() => { setSwapRestOfPlan(false); setSwapFor(null); }}
@@ -6044,11 +6074,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           </span>
                         </div>
                       )}
+                      {exIsPlyo && (() => {
+                        const fam = plyoFamilyFor(exercise.name);
+                        const firstPlyoIdx = exercises.findIndex((e) => isPlyometric(e.name) || equipmentForExercise(e.name) === 'plyo');
+                        return (
+                          <div className="px-1.5 pb-1.5">
+                            {firstPlyoIdx === exerciseIndex && (
+                              <p className="text-[12px] text-white/72 leading-snug mb-1.5">{PLYO_SESSION_NOTE}</p>
+                            )}
+                            <p className="text-[12px] text-white/60 leading-snug">
+                              {fam ? `For ${fam.benefit}. ` : ''}{PLYO_STOP_RULE} Efforts are a record, not a target.
+                            </p>
+                          </div>
+                        );
+                      })()}
                       <div style={gridStyle} className="px-1.5 pt-1 pb-1.5 border-b border-white/10">
-                        <span className={labelCls}>Set</span>
+                        <span className={labelCls}>{exIsPlyo ? 'Drill' : 'Set'}</span>
                         <span className={labelCls}>Previous</span>
                         {exShowWeight && <span className={`${labelCls} text-center`}>{exWeightLabel}</span>}
-                        <span className={`${labelCls} text-center`}>Reps</span>
+                        <span className={`${labelCls} text-center`}>{exIsPlyo ? 'Efforts' : 'Reps'}</span>
                         {exShowRir && <span className={`${labelCls} text-center`}>RIR</span>}
                         <span aria-hidden="true" />
                         <span aria-hidden="true" />
@@ -6373,7 +6417,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           : (exHasRepTotal
                             ? null
                             : (exercise.target_reps ? `target ${String(exercise.target_reps).replace(/\+$/, '')}` : null));
-                        const targetHint = [repHint, set.amrap ? null : rirHint].filter(Boolean).join(' · ') || null;
+                        const targetHint = exIsPlyo ? null : ([repHint, set.amrap ? null : rirHint].filter(Boolean).join(' · ') || null);
                         const cue = barSpeedCueFor(exercise, set);
                         const platesOpen = !isDurationBased && !exIsBodyweight && exEquip === 'barbell'
                           && expandedPlates[`${exercise.id}-${setIndex}`];

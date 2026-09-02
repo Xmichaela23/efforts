@@ -46,7 +46,7 @@ Deno.test('⛔ NO GENERIC ROW SURVIVES — every plyo row names a drill from his
         assert(!/^plyometric drills$/i.test(r.name), 'the placeholder row is back');
         // ⛔ ONE ROW, ONE DRILL. `sets: 3` on a row called "drills" is the placeholder in disguise.
         assertEquals(r.sets, 1, `${r.name}: a plyo row prescribes one drill`);
-        assertEquals(r.reps, PLYO_DOSE.effortsPerDrill);
+        assertEquals(r.reps, PLYO_DOSE.effortsPerDrill.hi); // a range now (2026-09-02); the row carries the top as capacity
         assertEquals(r.load_prescribed, false);
       }
     }
@@ -220,3 +220,17 @@ Deno.test('the drills never enter the dosing ledger', () => {
     for (const from of m.secondaryFrom) assert(!drills.has(from), `${from} was counted against ${m.muscle}`);
   }
 });
+
+Deno.test('⛔ NO DRILL AN ATHLETE CANNOT DO — ladder drills need an agility ladder (WORKORDER-plyo-screen §3)', () => {
+  const weeksOfNames = (equipment: string[] | null) =>
+    [1, 2, 3, 4, 5, 6].flatMap((week) => {
+      const wk = composeWeek({ ...BASE, week, column: 'standard', equipment } as never);
+      return wk.sessions.filter((s) => s.tags.includes('plyo')).flatMap((s) => (s.strength_exercises ?? []).map((e) => e.name));
+    });
+  const noLadder = weeksOfNames(['Barbell + plates', 'Dumbbells', 'Pull-up bar', 'Resistance bands']);
+  assert(!noLadder.includes('Ladder Drills'), 'ladder drills prescribed to an athlete with no ladder');
+  assert(noLadder.some((n) => n === 'Hopscotch' || n === 'Ickey Shuffle'), 'the footspeed family still fills from the same bucket');
+  const withLadder = weeksOfNames(['Barbell + plates', 'Agility ladder']);
+  assert(withLadder.includes('Ladder Drills'), 'an athlete with a ladder never sees the ladder drill');
+});
+

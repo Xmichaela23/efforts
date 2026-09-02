@@ -1092,11 +1092,15 @@ export function experienceLevels(
  */
 export const PLYO_DOSE = {
   drillsPerDay: 3,
-  effortsPerDrill: 4,
+  /** ⛔ REVISED 2026-09-02 (Michael, WORKORDER-plyo-screen §2) — a RANGE, not the fixed 4 this was
+   *  written as. He is revising a deliberate OURS decision knowing it is one: the page gives no figure,
+   *  three to five is the field standard, and a range states the honest shape of the guidance rather
+   *  than implying a target. `hi` is what a row carries as its recorded-efforts capacity. */
+  effortsPerDrill: { lo: 3, hi: 4 },
   drillCountIsHis: 'Viada p227 — more than three or four is likely a waste of time',
   effortCountIsOurs:
     'The source says each drill is performed "multiple times with ample rest" and gives no number. '
-    + 'Four efforts is ours, from field practice for low-amplitude plyometrics.',
+    + 'Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.',
   stopRule:
     'Stop each drill when the movement is optimised for the day and it feels confident — not on a '
     + 'rep count. Fatigue, poor form and imprecise movements are the signal to move on.',

@@ -153,8 +153,18 @@ export const PLYO_ROTATION_ORDER_IS_HIS =
  * was being read as a ramp; see `PLYO_ROTATION_ORDER_IS_HIS`. ⚠️ The two lists hold the same names,
  * so nothing downstream sees a new movement — a drill simply arrives in a different week.
  */
-export function drillForWeek(family: PlyoFamilyId, week: number): string {
-  const order = PLYO_FAMILIES[family].rotation;
+/** ⛔ NO DRILL AN ATHLETE CANNOT DO (WORKORDER-plyo-screen §3, 2026-09-02). Ladder drills need an agility
+ *  ladder; the Ickey Shuffle is usually taught in one but does not require it; hopscotch is equipment-free.
+ *  Matched by substring against the athlete's equipment strings, the way lifting kit already is. */
+const DRILL_REQUIRES: Record<string, RegExp> = { 'ladder drills': /agility ladder/i };
+export function drillAllowed(drill: string, equipment?: string[] | null): boolean {
+  const req = DRILL_REQUIRES[drill.toLowerCase()];
+  if (!req) return true;
+  return (equipment ?? []).some((e) => req.test(String(e)));
+}
+
+export function drillForWeek(family: PlyoFamilyId, week: number, equipment?: string[] | null): string {
+  const order = PLYO_FAMILIES[family].rotation.filter((d) => drillAllowed(d, equipment));
   const w = Math.max(1, Math.round(week));
   return order[(w - 1) % order.length];
 }
