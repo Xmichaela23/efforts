@@ -68,7 +68,10 @@ const LABELS: Record<CanonicalLiftKey, string> = {
   pullupMaxReps: 'Pull ups',
 };
 
-export type CapacitySource = 'typed' | 'learned_gapfill' | 'none';
+// AUTO / LOCKED model (2026-09-02, Michael — the Garmin switch). 'locked' = the athlete set it and turned
+// auto off (wins, learning never touches it). 'learned' = auto default, the trusted logged value.
+// 'typed' = the signup seed, used only until logged evidence is trustworthy. Reverses D-231's typed-wins.
+export type CapacitySource = 'locked' | 'learned' | 'typed' | 'none';
 
 export interface CapacityResolution {
   /** the canonical lift this answer is for */
@@ -126,6 +129,8 @@ export function resolveStrengthCapacity(args: {
   key: string;
   typed: Record<string, any> | null | undefined;
   learnedStrength1rms: Record<string, any> | null | undefined;
+  /** AUTO/LOCKED switch — canonical typed key → the value the athlete LOCKED (auto off). Absent = auto. */
+  locked?: Record<string, any> | null;
   asOf: string;
   typedAsOf?: string | null;
   label?: string;
@@ -145,35 +150,29 @@ export function resolveStrengthCapacity(args: {
 
   const learnedKey = TYPED_TO_LEARNED[canon];
   const learnedAgg = learnedKey ? toLearnedAggregate(args.learnedStrength1rms?.[learnedKey]) : null;
+  const learnedTrusted = !!(learnedAgg && isTrustedAggregate(learnedAgg, args.asOf));
 
-  if (hasTyped) {
-    // Typed is the anchor — it IS the value. Learned only surfaces drift as a suggestion.
-    const suggestion = suggestBaselineUpdate({
-      key: canon,
-      label,
-      baseline: typedNum,
-      learned: learnedAgg,
-      asOf: args.asOf,
-    });
-    // typedStale: trusted+fresh logged evidence exists AND the typed row predates it.
-    let typedStale = false;
-    if (suggestion && learnedAgg?.last_logged && args.typedAsOf) {
-      const lag = daysBetween(String(learnedAgg.last_logged), String(args.typedAsOf));
-      typedStale = lag != null && lag > 0;
-    }
-    return { key: canon, value: typedNum, source: 'typed', provisional: false, typedStale, suggestion };
+  // 1. LOCKED WINS — the athlete set this and turned auto off (Garmin switch). Learning never touches it.
+  //    A drift ABOVE the locked value surfaces as a suggestion ("your lifts passed what you set") — never applied.
+  const rawLocked = args.locked?.[canon];
+  const lockedNum = Number(rawLocked);
+  const hasLocked = Number.isFinite(lockedNum) && (canon === 'pullupMaxReps' ? lockedNum >= 0 : lockedNum > 0);
+  if (hasLocked) {
+    const suggestion = suggestBaselineUpdate({ key: canon, label, baseline: lockedNum, learned: learnedAgg, asOf: args.asOf });
+    return { key: canon, value: lockedNum, source: 'locked', provisional: false, typedStale: false, suggestion };
   }
 
-  // No typed anchor — gap-fill from a TRUSTED learned aggregate only. Untrusted → no answer (never trust raw-ish noise).
-  if (learnedAgg && isTrustedAggregate(learnedAgg, args.asOf)) {
-    return {
-      key: canon,
-      value: Math.round(learnedAgg.value),
-      source: 'learned_gapfill',
-      provisional: true,
-      typedStale: false,
-      suggestion: null,
-    };
+  // 2. AUTO (default) — the TRUSTED logged value wins (reverses D-231's typed-wins). The trust gate
+  //    (≥3 samples, ≥medium confidence, fresh) plus upstream slot_intent filtering (speed/deload sets
+  //    never reach the e1RM series) are what keep a light day from dropping the number and lying "back off".
+  if (learnedTrusted) {
+    return { key: canon, value: Math.round(learnedAgg!.value), source: 'learned', provisional: false, typedStale: false, suggestion: null };
+  }
+
+  // 3. TYPED SEED — until logged evidence is trustworthy. Drift (thin/low learned above typed) still surfaces.
+  if (hasTyped) {
+    const suggestion = suggestBaselineUpdate({ key: canon, label, baseline: typedNum, learned: learnedAgg, asOf: args.asOf });
+    return { key: canon, value: typedNum, source: 'typed', provisional: false, typedStale: !!suggestion, suggestion };
   }
 
   return { key: canon, value: null, source: 'none', provisional: false, typedStale: false, suggestion: null };

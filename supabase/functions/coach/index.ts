@@ -2494,7 +2494,9 @@ Deno.serve(async (req) => {
             // no typed anchor → anchor_1rm null → legacy behavior. Full plan/history-aware tone = Q-111.
             const canon = canonicalizeLiftKey(key);
             const cap = canon ? resolveStrengthCapacity({ key, typed: perf, learnedStrength1rms: s1rms, asOf: asOfDate }) : null;
-            const anchor1rm = cap && cap.source === 'typed' ? cap.value : null;
+            // The de-alarm anchor is the RESOLVED capacity (locked / learned / typed), not only typed —
+            // under the AUTO/LOCKED flip (2026-09-02) the athlete's real number is usually the learned one.
+            const anchor1rm = cap && cap.value != null && cap.source !== 'none' ? cap.value : null;
             return {
             canonical_name: key,
             display_name: LIFT_DISPLAY[key] || key.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
