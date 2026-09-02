@@ -1107,7 +1107,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   // Baselines launcher (Q-097/Q-102): ~88% top-set seed off a stored 1RM (canonical keys, mirrors materialize's
   // read side); undefined → no stored 1RM → createBaselineTestExercise bar-starts into the discovery loop.
-  const baselineSeedFor = (name: string, perf: any): number | undefined => {
+  /** The typed max on file for a lift, as stored — the number a test row names as "on file". */
+  const storedMaxFor = (name: string, perf: any): number | undefined => {
     const k = getBaselineKeyForExercise(name);
     const p = perf || {};
     const stored =
@@ -1116,7 +1117,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       : k === 'squat' ? Number(p.squat ?? p.squat1RM ?? p.squat_1rm)
       : k === 'deadlift' ? Number(p.deadlift ?? p.dead_lift)
       : NaN; // pull-ups / unknown → bodyweight, no seed
-    return Number.isFinite(stored) && stored > 0 ? Math.max(5, Math.round((stored * 0.88) / 5) * 5) : undefined;
+    return Number.isFinite(stored) && stored > 0 ? stored : undefined;
+  };
+  const baselineSeedFor = (name: string, perf: any): number | undefined => {
+    const stored = storedMaxFor(name, perf);
+    return stored != null ? Math.max(5, Math.round((stored * 0.88) / 5) * 5) : undefined;
   };
 
   // Helper: create baseline/retest exercise structure — warm-up ramp + ONE AMRAP working set.
@@ -1217,6 +1222,95 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           completed: false
         }
       ]
+    };
+  };
+
+  /**
+   * ⛔⛔ A PLAN'S TEST DAY, AS THE PLAN WROTE IT (SPEC-test-day-2026-09-01, parts A + B).
+   *
+   * ⛔ THE DEFECT THIS REPLACES: the `1rm_test` arm below handed every tested lift of a STANDING
+   * PLAN to `createBaselineTestExercise`, which threw the composer's p215 ramp away and built the
+   * generic baseline test instead — empty bar, ~57%, ~80%, then ONE all-out set at the plan's top
+   * weight with *"aim ~3–6. Stop at ~RPE 9"*. On the one session whose purpose is finding a limit,
+   * the copy told the athlete to stop; and when the plan had no seed for the lift ("By feel"), the
+   * same builder started him at the empty bar. Michael, 2026-09-01, squatting 80 × 9 against a real
+   * ~125: *"it capped me"* · *"It's like this thing doesn't know it's a test."*
+   *
+   * WHAT THIS BUILDS INSTEAD — the row the composer actually wrote:
+   *   · one empty-bar warm-up (p215: warm up to ~75%; the plan's first step IS the 75% set);
+   *   · the plan's steps as prescribed (`set_plan`: 6 reps at 75%, 5 at 82.5%, then the 86.25% set
+   *     flagged `amrap`), each with its weight — the last one says plainly that it sets the block's
+   *     numbers. ⛔ NO REP TARGET AND NO RPE STOP ON THE LAST SET.
+   *   · with NO seed (the composer's "By feel" row, no `set_plan`): three open steps — work up,
+   *     heavier, then the last one for max clean reps. Still no cap; the athlete is told the ramp is
+   *     open because nothing is on file, not started at the bar and told to aim for 3–6.
+   *   · the row's note names the number on file and where it came from, so the athlete knows what
+   *     the ramp is a share of and what they are trying to beat.
+   *
+   * ⛔ `planned_name` IS DELIBERATELY NOT STAMPED — Michael's 2026-08-31 ruling ("no swap"): that
+   * field is what renders the Swap control, and the tested lift is the movement every working number
+   * is priced off. ⚠️ CONSEQUENCE, stated: State's off-plan read keys on that same marker, so a plan
+   * test session reads as UNKNOWN there (`offPlan.known: false`) — silence, not a wrong word. The
+   * honest marker for a tested lift is its `amrap` set; teaching the server that is a FIXLIST item.
+   *
+   * ⚠️ REACHED ONLY FOR A `standing_plan` SESSION. The week-12 "Retest — …" sessions carry
+   * `1rm_test` without `standing_plan` and keep the builder they had. The "Baseline Test: …"
+   * launcher is a different branch and is untouched.
+   *
+   * ⚠️ NOT HERE (spec C–F, report-first): which number the ramp is a share of, the open-ended
+   * ladder, the ask on tap-out, and the guard on the block's re-pricing. This makes the row honest
+   * about what the plan prescribed; it does not change what the plan prescribes.
+   */
+  const TEST_LAST_SET_HINT =
+    'Last set — as many CLEAN reps as you can at this weight. This set sets the block\'s numbers. Stop when form breaks.';
+  const createStandingTestExercise = (ex: any, onFile: number | undefined): LoggedExercise => {
+    const name = String(ex?.name || '').trim();
+    const nlow = name.toLowerCase();
+    const emptyBarWeight = nlow.includes('overhead') || nlow.includes('ohp') ? 0 : 45;
+    const planned = (plannedSetsFor(ex) ?? []) as Array<{ weight?: number; reps?: number; amrap: boolean }>;
+    const hasSteps = planned.length > 0;
+    const fileNote = onFile && onFile > 0
+      ? `${name} on file: ${Math.round(onFile)} lb (typed in your baselines). The steps below are a share of that number; the last one is what you are trying to beat.`
+      : hasSteps
+        ? 'The steps below are a share of the number that was on file when this block was built; the last one is what you are trying to beat.'
+        : `No ${name.toLowerCase()} max on file — the ramp is open. Work up until the last set is genuinely hard.`;
+    const composerNote = String(ex?.notes || '').trim();
+    const stepSets: LoggedSet[] = hasSteps
+      ? planned.map((p, i) => ({
+          weight: Number(p.weight) > 0 ? Number(p.weight) : 0,
+          reps: p.amrap ? undefined : (Number(p.reps) > 0 ? Number(p.reps) : undefined),
+          setType: 'working' as const,
+          barType: 'standard' as const,
+          completed: false,
+          prefilled: true, // D-204: the plan's weight; cleared on first athlete edit
+          ...(p.amrap
+            ? { amrap: true, setHint: TEST_LAST_SET_HINT }
+            : { setHint: i === 0 ? 'Step 1 — the first ramp set, as prescribed.' : `Step ${i + 1} — heavier, as prescribed.` }),
+        }))
+      : [
+          { weight: 0, reps: undefined, setType: 'working' as const, barType: 'standard' as const, completed: false,
+            setHint: 'Work up — a moderate set. Add weight if it moved well.' },
+          { weight: 0, reps: undefined, setType: 'working' as const, barType: 'standard' as const, completed: false,
+            setHint: 'Heavier. Clean reps only.' },
+          { weight: 0, reps: undefined, setType: 'working' as const, barType: 'standard' as const, completed: false,
+            amrap: true, setHint: TEST_LAST_SET_HINT },
+        ];
+    return {
+      id: `ex-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name,
+      notes: [fileNote, composerNote].filter(Boolean).join(' '),
+      expanded: true,
+      sets: [
+        {
+          weight: emptyBarWeight,
+          reps: undefined,
+          setType: 'warmup',
+          setHint: 'Empty bar — a few easy reps to groove the movement.',
+          barType: 'standard',
+          completed: false,
+        },
+        ...stepSets,
+      ],
     };
   };
 
@@ -3024,6 +3118,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
            * ⚠️ THE ACCESSORY BRANCH ABOVE IS UNCHANGED and still carries its prescription — those
            * rows are ordinary work and swapping one costs the test nothing.
            */
+          /**
+           * ⛔⛔ A STANDING PLAN'S TEST ROW IS BUILT AS THE PLAN WROTE IT (SPEC-test-day-2026-09-01
+           * A + B). Only the week-12 "Retest — …" sessions (`1rm_test` without `standing_plan`)
+           * still go through `createBaselineTestExercise` — that builder collapses the plan's three
+           * steps into one all-out set with "aim ~3–6 · stop at RPE 9", the cap that cost Michael a
+           * test on 2026-09-01. See `createStandingTestExercise`.
+           */
+          const isStandingPlan = (Array.isArray((workoutToLoad as any)?.tags) ? (workoutToLoad as any).tags : [])
+            .map((t: unknown) => String(t).toLowerCase()).includes('standing_plan');
+          if (isStandingPlan) {
+            return createStandingTestExercise(ex, storedMaxFor(liftName || String(ex?.name || ''), performanceNumbers));
+          }
           return createBaselineTestExercise(liftName || String(ex?.name || ''), Number.isFinite(w) && w > 0 ? w : undefined);
         }));
         exercisesLoadedFromWorkout = true;
