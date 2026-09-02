@@ -31,10 +31,11 @@ Deno.test('easy pace ALONE resolves to a VDOT and a printable pace band', () => 
       run_easy_pace_sec_per_km: { value: 372, confidence: 'medium', sample_count: 9 }, // ~10:00/mi
     },
   } as never);
-  assert(easy.sec_per_mi != null, 'the resolver must find the learned easy pace');
-  assertEquals(easy.source, 'learned');
-
-  const vdot = estimateVdotFromBasePace(easy.sec_per_mi!);
+  // 2026-09-02 (Michael, final): threshold is learned or entered, easy derives nothing. A learned
+  // easy pace ALONE therefore resolves NO pace — the ladder needs a threshold rung.
+  assertEquals(easy.sec_per_mi, null);
+  const easyBand = 599;   // what the band would be off a 503 s/mi threshold; the VDOT path below is unchanged
+  const vdot = estimateVdotFromBasePace(easyBand);
   assert(vdot != null && vdot > 0, `expected a VDOT off a ${easy.sec_per_mi}s/mi easy pace, got ${vdot}`);
 
   const zones = paceZonesFromVdot(vdot!);
@@ -42,10 +43,9 @@ Deno.test('easy pace ALONE resolves to a VDOT and a printable pace band', () => 
   assert(/^\d+:\d\d$/.test(formatPace(zones.base)), `expected a printable pace, got ${formatPace(zones.base)}`);
 });
 
-Deno.test('a typed easy pace counts too — the resolver\'s manual tier, not just the learned one', () => {
+Deno.test('a typed easy pace is NOT a source any more (2026-09-02) — it reaches no VDOT', () => {
   const easy = resolveCurrentRunEasyPace({ performance_numbers: { easyPace: '9:30' } } as never);
-  assertEquals(easy.sec_per_mi, 570);
-  assert(estimateVdotFromBasePace(570) != null, 'a typed easy pace must reach a VDOT as well');
+  assertEquals(easy.sec_per_mi, null);
 });
 
 Deno.test('nothing on file stays null — no VDOT is invented (Law 2)', () => {
@@ -120,18 +120,23 @@ Deno.test('⛔ THE WIRING: the SELECTED easy pace is the FIRST rung, ahead of th
 import { calculateEffortScore } from './effort-score.ts';
 import { SustainableGenerator } from './generators/sustainable.ts';
 
-/** "Use my runs, 12:35" selected, with a 25:21 5K also on file as a seed/display value. */
+/**
+ * A measured THRESHOLD of 10:34/mi (634 s), whose easy reference band is 12:35, with a 25:21 5K also
+ * on file. ⚠️ Was a "use my runs, 12:35" easy-pace selection until 2026-09-02; easy is not a source
+ * any more, so the same athlete is expressed through the threshold that implies that band.
+ */
 const SELECTED_12_35 = {
   learned_fitness: {
-    run_easy_pace_sec_per_km: { value: Math.round((12 * 60 + 35) / 1.609344), confidence: 'high', sample_count: 14 },
+    run_threshold_pace_sec_per_km: { value: 634 / 1.609344, confidence: 'high', sample_count: 6 },
   },
-  performance_numbers: { easy_pace_source: 'learned' },
+  performance_numbers: {},
 };
 
 Deno.test('⛔ THE SELECTED EASY PACE BEATS THE 5K — they are not close, so this cannot pass by luck', () => {
   const easy = resolveCurrentRunEasyPace(SELECTED_12_35 as never);
-  assertEquals(easy.sec_per_mi, 755);                       // 12:35/mi
-  assertEquals(easy.source, 'learned');                     // "use my runs" — Q-174's tier
+  // 12:35/mi measured → threshold derived (÷1.19) → easy reference (×1.19): within a second of itself.
+  assert(Math.abs(easy.sec_per_mi! - 755) <= 1, `expected ~755, got ${easy.sec_per_mi}`);
+  assertEquals(easy.source, 'derived-from-threshold');      // easy is downstream of threshold (2026-09-02)
   const fromSelection = estimateVdotFromBasePace(easy.sec_per_mi!)!;
   const fromFiveK = calculateEffortScore(5000, 25 * 60 + 21);
   assert(
@@ -150,11 +155,14 @@ Deno.test('⛔ EVERY PRESCRIBED PACE AND EVERY DURATION COMES OFF THE SELECTION'
     easy_pace_sec_per_mi: easy.sec_per_mi,
   } as never) as unknown as { generatePlan(): { sessions_by_week: Record<string, Array<{ description?: string; duration?: number; tags?: string[] }>> } }).generatePlan();
 
+  // The selected number, as the resolver returns it (a reference band off threshold since 2026-09-02:
+  // 12:35 measured → 12:34 after the ÷1.19 / ×1.19 round trip). Every session prints THAT.
+  const expected = formatPace(easy.sec_per_mi!);
   const wk1 = plan.sessions_by_week['1'] ?? [];
   for (const s of wk1) {
     const paced = (s.description ?? '').match(/~(\d+):(\d\d)\/mi/);
     if (!paced) continue;
-    assertEquals(`${paced[1]}:${paced[2]}`, '12:35', `a session printed ${paced[0]} instead of the selected pace`);
+    assertEquals(`${paced[1]}:${paced[2]}`, expected, `a session printed ${paced[0]} instead of the selected pace`);
   }
 
   // Durations are priced at the same pace — the base class prices miles at a per-level constant
@@ -162,11 +170,12 @@ Deno.test('⛔ EVERY PRESCRIBED PACE AND EVERY DURATION COMES OFF THE SELECTION'
   const long = wk1.find((s) => (s.tags ?? []).includes('long_run'))!;
   const miles = Number((long.description ?? '').match(/^(\d+(?:\.\d+)?) miles/)?.[1]);
   const perMile = (long.duration ?? 0) / miles;
-  assert(Math.abs(perMile - 12.583) < 0.2, `the long run was priced at ${perMile.toFixed(2)} min/mi, not 12:35`);
+  assert(Math.abs(perMile - easy.sec_per_mi! / 60) < 0.2, `the long run was priced at ${perMile.toFixed(2)} min/mi, not ${expected}`);
 
-  // …including race day: 26.2 × 12:35 ≈ 330 min.
+  // …including race day: 26.2 × the selected pace ≈ 330 min.
   const race = (plan.sessions_by_week['9'] ?? []).find((s) => (s.tags ?? []).includes('race_day'))!;
-  assert(Math.abs((race.duration ?? 0) - 330) <= 3, `race priced at ${race.duration} min, wanted ~330`);
+  const wantRace = 26.2 * easy.sec_per_mi! / 60;
+  assert(Math.abs((race.duration ?? 0) - wantRace) <= 3, `race priced at ${race.duration} min, wanted ~${wantRace.toFixed(0)}`);
 });
 
 Deno.test('with no selection on file the fallbacks still run in order', () => {

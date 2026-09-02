@@ -1558,3 +1558,37 @@ prefilling from Baselines. Each is its own cut.
 **Legacy rows.** A row with `effort_*` but no `fiveK` keeps its columns until a 5K is entered — the
 Baselines save leaves them alone rather than nulling them.
 
+## D-462 — Threshold pace is the only pace anchor; easy is a heart-rate zone (2026-09-02)
+
+**Rulings (Michael, in order, same evening).** *"Easy: no pace. Prescribe a heart rate zone. Threshold
+and harder: prescribe a pace, from threshold pace."* Then: *"we don't have to do any easy or threshold
+math from 5K, it's either learned or entered."* Industry check: TrainingPeaks / Garmin / Coros / Daniels
+all anchor on threshold (test, race, or detected); none asks for an easy pace.
+
+**What it is.** Threshold pace resolver: my number (chosen) > learned (med/high) > typed > derived from
+learned easy runs (÷1.19, med/high only) > learned-low > null. No 5K seed, no `effort_paces`. Easy
+pace resolver: threshold × 1.19 or null — a reference band, `is_estimate` true, never a prescription
+source; `easyPace` / `easy_pace_source` are read by nothing. Materializer: threshold and easy from the
+resolvers; marathon = threshold × 1.093; 5K-pace work = the typed 5K by division (`resolveCurrent5kPace`);
+cruise/tempo tokens read threshold directly. `effort_paces` / `effort_score` no longer selected by
+materialize-plan. An athlete with no learned and no typed threshold gets NO pace on hard runs — effort
+target only — until a test, race or entry (accepted).
+
+**Built by** the 2026-09-02 plan materialization audit session (`src/lib/run-paces-from-threshold.ts`,
+resolvers, materialize-plan, arc-context, race-readiness; 148 tests). Baselines run tab: easy row is a
+read-only "run by heart rate, reference pace from your threshold" line; `saveCalibration` no longer
+writes `easyPace`. Back-annotated: Q-174, D-287 (easy half).
+
+**Ripple, recorded not resolved.** Nine server readers of the easy resolver (analyze-running-workout,
+compute-workout-analysis, compute-adaptation-metrics, end-plan-core, planning-context,
+athlete-weekly-intent, block-adaptation, endurance-library/anchors, course-detail) now grade or plan
+against the threshold-derived band instead of a measured easy pace. Analyzer verdicts on easy runs are
+the surface most likely to move. `generate-run-plan` performance_build still requires
+`effort_paces.race` (step 4, audit session).
+
+**Amended the same evening (Michael: "why are we still doing math?").** Two of the three remaining
+ratios go. (1) `derived-from-easy` is DROPPED: threshold is learned or entered, full stop. (2) Marathon
+pace is NOT threshold × 1.093: it is the plan's entered goal time ÷ 26.2 — entered, not derived; no
+goal time → effort target only. (3) Easy = threshold × 1.19 STAYS, as the industry's zone math, and
+only as a reference band under a heart-rate prescription. The audit session applies (1) and (2).
+

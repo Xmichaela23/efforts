@@ -618,6 +618,12 @@ D-033's reconciler, the easy band (`easy-hr.ts`), the VDOT tables, and **no numb
 
 ## D-287 — The run-pace resolver is now UNIVERSAL on the server. One truth, every surface. (2026-07-13, completes D-285)
 
+> ⛔ **THE EASY HALF IS SUPERSEDED 2026-09-02 (D-462).** `resolveCurrentRunEasyPace` no longer resolves
+> a measured/typed/chosen easy pace; it returns threshold × 1.19 as a REFERENCE band (source
+> `derived-from-threshold`, is_estimate true). The "one resolver on every surface" principle stands and
+> is what made the swap a one-file change; what the resolver answers changed. Threshold's resolver is
+> unchanged in role and now has no 5K or effort_paces tier. Everything below about easy is history.
+
 - **Date:** 2026-07-13. **Completes D-285**, which created `resolveCurrentRunEasyPace` and wired only **3** consumers. **D-285 stopped the app LYING (killed 7 fabricated paces). It did not stop the app DISAGREEING WITH ITSELF.** This closes that.
 - **The disease, measured.** Three *different* precedences were live simultaneously:
 

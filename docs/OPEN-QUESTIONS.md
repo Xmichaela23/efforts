@@ -576,6 +576,12 @@ Low-severity, noticed-and-deferred: **(1)** tri athlete missing bodyweight → n
 
 ## Q-174 — Should the athlete's TYPED pace beat the app's LEARNED one? (PRODUCT, 2026-07-13)
 
+> ⛔ **SUPERSEDED 2026-09-02 (D-462, Michael).** For EASY pace the question is moot: easy is not a pace
+> source any more — easy days are a heart-rate zone and the shown easy pace is a reference band derived
+> from threshold pace. `easy_pace_source` and a typed `easyPace` are read by nothing. For THRESHOLD pace
+> the answer is the auto / my number switch (D-459 shape): learned wins, "my number" wins when chosen.
+> Everything below is history.
+
 - **Status: DECIDED + SHIPPED 2026-07-13 (Michael): THE ATHLETE CHOOSES, and their choice wins.** Implemented for the RUN. **⚠ BIKE IS NOT DONE — see the blast-radius note at the bottom; do not "finish the job" without reading it.**
 - **The ruling.** `performance_numbers.easy_pace_source: 'manual' | 'learned'`, set by a two-option control in Baselines. `'manual'` is honored **even over a high-confidence learned pace** — an assertion outranks an inference (Law 2 draws exactly that line, and Garmin/TrainingPeaks both respect a value you set). `'learned'` tracks the learner live and **deliberately SKIPS the manual tier entirely**, so a stale typed number the athlete explicitly declined cannot resurface just because the learner momentarily thins out.
 - **Purely additive.** An **absent** choice behaves byte-identically to the old learned-first precedence. No migration, no regression, no backfill. Pinned by fixture.

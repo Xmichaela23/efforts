@@ -67,6 +67,13 @@ the Baselines save and the wizards' `saveCalibration` are the only writers, both
 5K, FTP all share one `auto | my number` row (`AutoMinePill`); "locked" renamed. Deploy for D-461:
 `generate-run-plan`, `materialize-plan`.
 
+**THE AUDIT SESSION (michaelambp-4f) OWNS THE PACE CUT + SIX-WEEK CHECKPOINT** — see
+`docs/AUDIT-plan-materialization-2026-09-02.md` §5–§6. Steps 1–3 (threshold is the anchor; effort_paces
+unread by the resolvers and the materializer) are BUILT IN THE WORKING TREE, uncommitted, awaiting
+Michael's re-ruling on two measured findings (the pace table is not a ratio; marathon M pace was
+faster than T for sub-22 5K runners). D-461 is pushed 297befeb + deployed (materialize-plan 349,
+generate-run-plan 220).
+
 **DEPLOY LIST (when Michael says go), in this order:** `supabase db push` → `compute-snapshot`, `coach`,
 `materialize-plan`, `generate-run-plan`, `generate-triathlon-plan`, `create-goal-and-materialize-plan`,
 `generate-combined-plan`, `get-arc-context`, `workout-detail`, `compute-facts`. Those ten change behaviour. The full transitive closure of

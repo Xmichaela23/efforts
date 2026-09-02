@@ -133,7 +133,7 @@ export interface RunPaceForCoachEntry {
    * using. Now both come from the resolver, which means a value can legitimately be a typed one or
    * one worked out from the athlete's easy runs — and the model must never call those measured.
    */
-  basis?: 'measured' | 'derived-from-easy' | 'stated' | 'derived-from-5k';
+  basis?: 'measured' | 'derived-from-easy' | 'stated' | 'derived-from-5k' | 'derived-from-threshold';
 }
 
 /**
@@ -652,7 +652,7 @@ function buildRunPaceForCoach(
   const eBasis: RunPaceForCoachEntry['basis'] | undefined =
     e.source === 'learned' || e.source === 'learned-low' ? 'measured'
     : e.source === 'manual' || e.source === 'manual-chosen' ? 'stated'
-    : e.source === 'effort_paces' ? 'derived-from-5k'
+    : e.source === 'derived-from-threshold' ? 'derived-from-threshold'
     : undefined;
   const easy = eBasis == null ? null : entry(e.sec_per_mi, e.confidence, e.sample_count, e.as_of, eBasis);
 
@@ -726,7 +726,6 @@ export function buildFiveKNudge(
    */
   const evidence: ArcFiveKLearnedDivergence['evidence'] | null =
     resolved.source === 'learned' ? 'measured'
-    : resolved.source === 'derived-from-easy' ? 'derived-from-easy'
     : (resolved.source === 'manual' || resolved.source === 'manual-chosen') ? 'stated'
     : null;
   if (evidence == null) return null;

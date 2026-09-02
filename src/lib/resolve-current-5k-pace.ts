@@ -106,6 +106,13 @@ type EffortPacesLike = {
 export type FiveKBaselinesLike = {
   performance_numbers?: PerformanceNumbersLike;
   effort_paces?: EffortPacesLike;
+  /**
+   * The wizard-era 5K (D-461): `effort_source_time` is the 5K race clock in seconds when
+   * `effort_source_distance` is 5000. A row written by the wizards BEFORE D-461 carries the 5K
+   * here and nowhere else, so the race-time reader falls back to it (2026-09-02).
+   */
+  effort_source_distance?: number | null;
+  effort_source_time?: number | null;
 } | null | undefined;
 
 const NULL_RESULT: ResolvedFiveKPace = {
@@ -176,9 +183,15 @@ function firstUsablePace(...candidates: unknown[]): number | null {
  */
 export function resolveFiveKRaceTimeSec(baselines: FiveKBaselinesLike): number | null {
   const pn = baselines?.performance_numbers;
-  const sec = parseRaceClockToSec(pn?.fiveK ?? pn?.fiveKTime);
-  if (sec == null) return null;
-  return sec >= RACE_TIME_SANE_SEC.min && sec <= RACE_TIME_SANE_SEC.max ? Math.round(sec) : null;
+  const sane = (sec: number | null) =>
+    sec != null && sec >= RACE_TIME_SANE_SEC.min && sec <= RACE_TIME_SANE_SEC.max ? Math.round(sec) : null;
+  const typed = sane(parseRaceClockToSec(pn?.fiveK ?? pn?.fiveKTime));
+  if (typed != null) return typed;
+  // The wizard-era 5K (pre-D-461 rows). Same clock, older key. Only when it IS a 5K.
+  if (Number(baselines?.effort_source_distance) === 5000) {
+    return sane(asPositiveFinite(baselines?.effort_source_time));
+  }
+  return null;
 }
 
 /**

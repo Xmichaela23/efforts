@@ -163,33 +163,21 @@ Deno.test('BAND: no candidate stays no candidate', () => {
 // THE INVARIANT ACROSS EVERY ATHLETE — not tuned to one
 // ═══════════════════════════════════════════════════════════════════════════
 
-Deno.test('SWEEP: across the whole pace table, a resolved threshold is never slower than easy', () => {
-  // PACE_TABLE's `base` column, vdot 30 (a 31-minute 5K) to vdot 80 (elite). For each, every
-  // threshold candidate from absurdly fast to absurdly slow. The invariant must hold at all of them
-  // — if it only holds at one athlete's pace it is the wrong fix.
+Deno.test('SWEEP: across the whole pace table, a measured easy pace plus a typed 5K resolve NO threshold (2026-09-02: learned or entered only)', () => {
+  // PACE_TABLE's `base` column, vdot 30 (a 31-minute 5K) to vdot 80 (elite), against every 5K pace
+  // from absurdly fast to absurdly slow. Neither is a threshold tier any more. The derivation helper
+  // itself is still exercised by the pure tests above; the RESOLVER never calls it.
   const easyPaces = [744, 708, 672, 642, 612, 585, 560, 536, 514, 494, 474, 456, 439, 423, 408, 394, 362, 334, 309, 287];
-  let replacedAtLeastOnce = false;
-  let passedAtLeastOnce = false;
   for (const easy of easyPaces) {
-    for (const candidate of [180, 240, 300, 360, 420, 480, 540, 600, 660, 720, 800, 900]) {
+    for (const fiveK of [160, 220, 280, 340, 400, 460, 520, 580, 640, 700, 780, 880]) {
       const r = resolveCurrentRunThresholdPace({
         learned_fitness: easyLearned(easy),
-        effort_paces: { steady: candidate },
+        performance_numbers: { fiveK_pace: fiveK },
       });
-      assert(r.sec_per_mi != null, `easy ${easy} candidate ${candidate}: resolved to nothing`);
-      // THE INVARIANT, stated as the athlete experiences it: the threshold pace on screen is
-      // faster than the easy pace on screen. Pace-seconds — smaller is faster.
-      assert(
-        r.sec_per_mi! < easy,
-        `easy ${easy}/mi, candidate ${candidate}/mi -> threshold ${r.sec_per_mi}/mi is NOT faster than easy`,
-      );
-      if (r.source === 'derived-from-easy') replacedAtLeastOnce = true;
-      if (r.source === 'effort_paces') passedAtLeastOnce = true;
+      assertEquals(r.sec_per_mi, null, `easy ${easy} 5K ${fiveK}: something derived a threshold`);
+      assertEquals(r.source, null);
     }
   }
-  // Both branches must be exercised, or the sweep is only testing one of them.
-  assert(replacedAtLeastOnce, 'sweep never exercised the replacement');
-  assert(passedAtLeastOnce, 'sweep never exercised the pass-through');
 });
 
 Deno.test('SWEEP: the ratio holds the derived value inside the band the app calls noise', () => {
@@ -213,59 +201,48 @@ Deno.test('SWEEP: the ratio holds the derived value inside the band the app call
 // THE RESOLVER TIERS
 // ═══════════════════════════════════════════════════════════════════════════
 
-Deno.test('the wizard tier reads effort_paces.STEADY — the key the app actually writes', () => {
-  // ⛔ THE STARVATION FIX. `getPacesFromScore` emits {base, race, steady, power, speed}; the tier
-  // used to read only `threshold`/`z4`, which nothing writes, so it had never once run.
-  const r = resolveCurrentRunThresholdPace({ effort_paces: { steady: 495 } });
-  assertEquals(r.sec_per_mi, 495);
-  assertEquals(r.source, 'effort_paces');
-  assertEquals(r.is_estimate, true);
+Deno.test('a typed 5K alone gives NO threshold — there is no 5K tier (2026-09-02)', () => {
+  const r = resolveCurrentRunThresholdPace({ performance_numbers: { fiveK_pace: 475 } });
+  assertEquals(r.sec_per_mi, null);
+  assertEquals(r.source, null);
 });
 
-Deno.test('a stale 5K cannot prescribe something too fast — THE JOB', () => {
-  // Measured easy 12:35/mi across 10 runs; a 5K typed long ago that implies a 8:58/mi threshold.
-  // Regression fixture for the 2026-08-19 report — asserted as a SHAPE, not a tuned number.
-  const easy = 755;                       // 12:35/mi, measured
-  const staleFiveKThreshold = 538;        // 8:58/mi, from the typed 5K
+Deno.test('a stale 5K cannot prescribe anything — THE JOB, now by construction', () => {
+  // Measured easy 12:35/mi across 10 runs; a 5K typed long ago that USED TO imply a 8:58/mi
+  // threshold (the 2026-08-19 report). Since 2026-09-02 the 5K has no tier and the easy pace derives
+  // nothing: the athlete has no threshold, and the session says so rather than prescribing 8:58.
   const r = resolveCurrentRunThresholdPace({
-    learned_fitness: easyLearned(easy),
-    effort_paces: { steady: staleFiveKThreshold },
+    learned_fitness: easyLearned(755),
+    performance_numbers: { fiveK_pace: 518 },
   });
-  assert(r.sec_per_mi! > staleFiveKThreshold, 'the stale 5K pace was prescribed unchanged');
-  assert(r.sec_per_mi! < easy, 'threshold came out slower than easy');
-  assertEquals(r.sec_per_mi, thresholdFloorSecPerMi(easy));
-  // ⛔ AND THE NAME CHANGES WITH THE NUMBER. A value the 5K did not produce must not keep the 5K's
-  // label, or the screen says one thing while the engine used another.
-  assertEquals(r.source, 'derived-from-easy');
-  assertEquals(r.is_estimate, true);
+  assertEquals(r.sec_per_mi, null);
+  assertEquals(describeThresholdBasis(r).state, 'unknown');
 });
 
-Deno.test('with NO candidate at all, the measured easy pace derives one', () => {
+Deno.test('the measured easy pace alone derives NOTHING — it is checkpoint evidence, not a threshold (2026-09-02)', () => {
   const r = resolveCurrentRunThresholdPace({ learned_fitness: easyLearned(600) });
-  assertEquals(r.sec_per_mi, 504);
-  assertEquals(r.source, 'derived-from-easy');
-  assertEquals(r.is_estimate, true);
-  // Both units travel, like every other tier.
-  assertEquals(r.sec_per_km, Math.round(504 / SEC_PER_KM_TO_SEC_PER_MI));
+  assertEquals(r.sec_per_mi, null);
+  assertEquals(r.source, null);
+  // The helper still answers for the checkpoint; the resolver does not call it.
+  assertEquals(deriveThresholdFromEasySecPerMi(600), 504);
 });
 
-Deno.test('CIRCULARITY: an easy pace that came from the 5K may NOT bound the 5K', () => {
-  // `effort_paces.base` is the SAME VDOT lookup off the SAME typed 5K as `.steady`. If the bound
-  // read it, the 5K would bound itself: a floor that can never be crossed and a guard that always
-  // passes. So with no LEARNED easy pace there is no bound, and the wizard value stands as-is.
-  const r = resolveCurrentRunThresholdPace({ effort_paces: { base: 755, steady: 400 } });
-  assertEquals(r.sec_per_mi, 400);
-  assertEquals(r.source, 'effort_paces');
+Deno.test('the bound helper still holds a candidate to the easy band — even though the resolver has no candidate tier left', () => {
+  // `boundInferredThresholdSecPerMi` is kept for the checkpoint (a proposed threshold is a
+  // candidate). With a measured easy of 755, a 400 candidate is held to the floor.
+  const b = boundInferredThresholdSecPerMi(400, 755);
+  assertEquals(b.replaced, true);
+  assertEquals(b.sec_per_mi, thresholdFloorSecPerMi(755));
 });
 
 Deno.test('a LOW-confidence easy pace does not found the bound', () => {
   // The learner saying "not confident yet" is not a base to bound a prescription with.
   const r = resolveCurrentRunThresholdPace({
     learned_fitness: easyLearned(755, 'low', 2),
-    effort_paces: { steady: 538 },
+    performance_numbers: { fiveK_pace: 518 },
   });
-  assertEquals(r.sec_per_mi, 538);
-  assertEquals(r.source, 'effort_paces');
+  // A thin easy pace founds nothing, and the 5K has no tier: nothing, honestly.
+  assertEquals(r.sec_per_mi, null);
 });
 
 Deno.test('a MEASURED threshold outranks the derivation and is never bounded', () => {
@@ -301,17 +278,18 @@ Deno.test('the athlete\'s explicit choice still outranks everything (Q-174 unbro
   assertEquals(r.source, 'manual-chosen');
 });
 
-Deno.test('the derivation outranks a LOW-confidence measured threshold', () => {
-  // `low` is the learner's own statement that it cannot steer a plan — and it is the tier the
-  // contaminated too-slow read now lands in. Ten clean easy runs beat two marginal candidates.
+Deno.test('a LOW-confidence measured threshold is what the athlete gets when it is all there is — labelled thin (2026-09-02)', () => {
+  // The easy-pace derivation used to outrank this. It is gone: learned or entered, full stop. A
+  // thin learned threshold is still MEASURED, and `describeThresholdBasis` says it is thin.
   const r = resolveCurrentRunThresholdPace({
     learned_fitness: {
       ...easyLearned(755),
       run_threshold_pace_sec_per_km: { value: miToKm(884), confidence: 'low', sample_count: 2 },
     },
   });
-  assertEquals(r.source, 'derived-from-easy');
-  assert(r.sec_per_mi! < 755, 'the contaminated slower-than-easy read won');
+  assertEquals(r.source, 'learned-low');
+  assertEquals(r.sec_per_mi, 884);
+  assert(describeThresholdBasis(r).note != null, 'a thin read was presented with no caveat');
 });
 
 Deno.test('learned-low still answers when there is nothing to derive from', () => {
@@ -350,17 +328,13 @@ Deno.test('STATE 1 — measured but thin says so', () => {
   assert(b.note != null, 'a two-run read was presented with no caveat');
 });
 
-Deno.test('STATE 2 — worked out from your easy pace, and it CARRIES ITS WEAKNESS', () => {
+Deno.test('STATE 2 is GONE — a measured easy pace plus a 5K is state 3, no number (2026-09-02)', () => {
   const b = describeThresholdBasis(resolveCurrentRunThresholdPace({
     learned_fitness: easyLearned(755),
-    effort_paces: { steady: 538 },
+    performance_numbers: { fiveK_pace: 518 },
   }));
-  assertEquals(b.state, 'derived-from-easy');
-  assertEquals(b.showNumber, true);
-  // The ratio's one weakness must reach the athlete: easy pace is partly a choice.
-  assert(b.note != null && /choice/i.test(b.note), 'the derived state hid its weakness');
-  // ⛔ And it must NOT claim to be measured.
-  assert(!/measured/i.test(b.label), `derived state labelled itself measured: "${b.label}"`);
+  assertEquals(b.state, 'unknown');
+  assertEquals(b.showNumber, false);
 });
 
 Deno.test('STATE 3 — not enough data, and NO NUMBER IS SHOWN', () => {
@@ -379,12 +353,11 @@ Deno.test('the typed and 5K states are distinct sentences, and neither says meas
     performance_numbers: { threshold_pace_sec_per_mi: 480 },
   }));
   assertEquals(stated.state, 'stated');
-  const fromFiveK = describeThresholdBasis(resolveCurrentRunThresholdPace({ effort_paces: { steady: 495 } }));
-  assertEquals(fromFiveK.state, 'derived-from-5k');
-  assert(stated.label !== fromFiveK.label, 'two different provenances got the same sentence');
-  for (const b of [stated, fromFiveK]) {
-    assert(!/measured/i.test(b.label), `"${b.label}" claims to be measured`);
-  }
+  // There is no 5K state any more; a 5K alone is state 3, no number.
+  const fromFiveK = describeThresholdBasis(resolveCurrentRunThresholdPace({ performance_numbers: { fiveK_pace: 475 } }));
+  assertEquals(fromFiveK.state, 'unknown');
+  assertEquals(fromFiveK.showNumber, false);
+  assert(!/measured/i.test(stated.label), `"${stated.label}" claims to be measured`);
 });
 
 /**
@@ -429,31 +402,11 @@ Deno.test('the typed and 5K states are distinct sentences, and neither says meas
  * differently.
  */
 
-Deno.test('the derivation honours the athlete\'s easy-pace CHOICE (Q-174)', () => {
-  // ⛔ SEEN ON SCREEN. He selected "use my number 11:30" and the threshold beside it still read 10:39
-  // — derived from the learned 12:41 he had just declined. Two boxes in one card contradicting.
+Deno.test('no easy pace of any kind — measured, typed, or chosen — resolves a threshold (Q-174 superseded, 2026-09-02)', () => {
   const both = {
     learned_fitness: { run_easy_pace_sec_per_km: { value: 761 / SEC_PER_KM_TO_SEC_PER_MI, confidence: 'high', sample_count: 18 } },
     performance_numbers: { easyPace: '11:30', easy_pace_source: 'manual' },
   };
-  const chosen = resolveCurrentRunThresholdPace(both as never);
-  assertEquals(chosen.sec_per_mi, Math.round(690 / 1.19));   // 11:30 -> 9:40
-  assertEquals(chosen.source, 'derived-from-easy');
-
-  // Tracking the runs instead derives from the learned value.
-  const tracking = resolveCurrentRunThresholdPace({
-    ...both, performance_numbers: { easyPace: '11:30', easy_pace_source: 'learned' },
-  } as never);
-  assertEquals(tracking.sec_per_mi, Math.round(761 / 1.19));
-});
-
-Deno.test('a TYPED easy pace can found the bound; the 5K-derived one still cannot', () => {
-  // An assertion about their own running is independent of the race time. `effort_paces.base` is not.
-  const typed = resolveCurrentRunThresholdPace({ performance_numbers: { easyPace: '10:00' } } as never);
-  assertEquals(typed.sec_per_mi, Math.round(600 / 1.19));
-  assertEquals(typed.source, 'derived-from-easy');
-  // Unchanged: base + steady both from the 5K → no bound, the wizard value stands.
-  const circular = resolveCurrentRunThresholdPace({ effort_paces: { base: 755, steady: 400 } } as never);
-  assertEquals(circular.sec_per_mi, 400);
-  assertEquals(circular.source, 'effort_paces');
+  assertEquals(resolveCurrentRunThresholdPace(both as never).sec_per_mi, null);
+  assertEquals(resolveCurrentRunThresholdPace({ performance_numbers: { easyPace: '10:00' } } as never).sec_per_mi, null);
 });

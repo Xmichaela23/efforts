@@ -160,12 +160,11 @@ export async function saveCalibration(
   userId: string,
   result: CalibrationResult,
 ): Promise<{ error: string | null }> {
-  // ⛔ WRITES THE 5K WHERE BASELINES KEEPS IT, then the ONE derivation (D-461). The typed easy pace
-  // lands as the typed seed too — it used to be validated and thrown away.
+  // ⛔ WRITES THE 5K WHERE BASELINES KEEPS IT, then the ONE derivation (D-461).
   const { data: row } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', userId).maybeSingle();
   const pn = { ...((row?.performance_numbers as Record<string, unknown> | null) ?? {}) } as Record<string, unknown>;
   pn.fiveK = formatRaceClock(result.fiveKTimeSec);
-  pn.easyPace = `${formatPaceInput(result.easyPaceSecPerMi)}/mi`;
+  // `easyPace` is NOT written (D-462): easy is a heart-rate zone; no reader takes a typed easy pace.
   const { error } = await supabase.from('user_baselines').upsert({
     user_id: userId,
     performance_numbers: pn,

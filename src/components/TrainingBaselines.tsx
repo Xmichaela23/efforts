@@ -1489,73 +1489,32 @@ return (
                               * between. Both values stay visible and the one IN USE is named (Law 3) —
                               * which is what the two-block version was protecting and is preserved here.
                               */}
+                            {/**
+                              * ⛔ EASY IS NOT A NUMBER YOU SET (Michael 2026-09-02, D-462). Easy days are a heart-rate
+                              * zone off threshold HR (the Heart Rate Zones card below); the pace shown here is a
+                              * REFERENCE band derived from threshold pace (resolveCurrentRunEasyPace is now threshold
+                              * × 1.19, nothing else). The typed easy pace field and the auto / my number switch that
+                              * sat here are gone — `easyPace` / `easy_pace_source` are no longer read by anything.
+                              */}
                             <div className="flex flex-col gap-1.5">
-                              <label className="text-sm text-white/75 font-medium">Easy pace</label>
-                              {/**
-                                * ⛔ THE SAME ROW AS STRENGTH (2026-09-02, Michael: "run should match how strength
-                                * locks now"). Number in use, where it came from, one input, auto / my number.
-                                * Storage unchanged: `easyPace` is your typed number, `easy_pace_source` is the
-                                * choice (`learned` = auto, `manual` = my number) — the resolver already reads both
-                                * (Q-174). The old two-pill picker under a separate input is gone.
-                                */}
+                              <label className="text-sm text-white/75 font-medium">Easy days</label>
                               {(() => {
                                 const resolvedEasy = resolveCurrentRunEasyPace({
                                   learned_fitness: learnedFitness,
                                   performance_numbers: data.performanceNumbers,
                                 } as never);
-                                const mine = (data.performanceNumbers as any)?.easy_pace_source === 'manual';
-                                const typed = data.performanceNumbers?.easyPace || '';
-                                const asOf = !mine && hasEasyLearned ? learnedAsOfLine(easyLearned) : null;
-                                const status = mine
-                                  ? 'your number. Your runs don\'t change it.'
-                                  : hasEasyLearned
-                                    ? `auto. ${learnedBasisLine(easyLearned, 'run') || 'measured from your runs'}${asOf ? ` ${asOf}` : ''}`
-                                    : typed
-                                      ? 'auto. Your typed number, until your runs measure one.'
-                                      : 'auto. Nothing on file yet.';
-                                const setMine = () => setData(prev => {
-                                  const pn: any = { ...prev.performanceNumbers, easy_pace_source: 'manual' };
-                                  // seed with the number in use so "my number" never starts empty
-                                  if (!pn.easyPace && resolvedEasy.sec_per_mi) pn.easyPace = formatPaceSecPerMi(resolvedEasy.sec_per_mi);
-                                  return { ...prev, performanceNumbers: pn };
-                                });
-                                const setAuto = () => setData(prev => ({
-                                  ...prev,
-                                  performanceNumbers: { ...prev.performanceNumbers, easy_pace_source: 'learned' },
-                                }));
                                 return (
-                                  <div
-                                    className="rounded-xl border px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1"
-                                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: mine ? `${SPORT_COLORS.run}55` : 'rgba(255,255,255,0.15)' }}
-                                  >
-                                    <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
-                                      <span className="text-lg font-semibold tabular-nums text-white">
-                                        {resolvedEasy.sec_per_mi ? formatPaceSecPerMi(resolvedEasy.sec_per_mi) : '—'}
-                                      </span>
+                                  <div className="rounded-xl border px-3 py-2" style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.15)' }}>
+                                    <div className="text-[13px] text-white/85">Run by heart rate — zone 2, conversational.</div>
+                                    <div className="text-[11px] text-white/55 leading-snug mt-0.5">
+                                      {resolvedEasy.sec_per_mi != null
+                                        ? `Reference pace about ${formatPaceSecPerMi(resolvedEasy.sec_per_mi)}, from your threshold pace. Hot days read high — go by conversation.`
+                                        : 'A reference pace appears once a threshold pace is on file.'}
                                     </div>
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      aria-label="Easy pace, my number, minutes per mile"
-                                      value={typed}
-                                      onChange={(e) => setData(prev => ({
-                                        ...prev,
-                                        performanceNumbers: { ...prev.performanceNumbers, easyPace: e.target.value },
-                                      }))}
-                                      placeholder={hasEasyLearned ? formatPace(easyLearned.value) : '11:30'}
-                                      className="w-[4.5rem] h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40 text-center shrink-0"
-                                      style={{ fontFamily: 'Inter, sans-serif' }}
-                                    />
-                                    <AutoMinePill mine={mine} onAuto={setAuto} onMine={setMine} color={SPORT_COLORS.run} label="Easy pace" />
-                                    <div className="basis-full text-[11px] text-white/55 leading-snug">{status}</div>
                                   </div>
                                 );
                               })()}
                             </div>
-                            {/* ⛔ ALWAYS RENDERED. "Not enough data" is a STATE the athlete is told, not
-                                an absence they have to notice. Fixed width + min-height for the same
-                                reason the easy card has them: the states carry different amounts of
-                                provenance and the page jumped when they swapped. */}
                             <div className="flex flex-col gap-1.5">
                               <label className="text-sm text-white/75 font-medium">Threshold pace</label>
                               {/**

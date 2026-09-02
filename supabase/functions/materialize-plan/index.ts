@@ -57,8 +57,8 @@ import {
   swimGearNormalized,
 } from '../../../src/lib/plan-tokens/swim-drill-tokens.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
-import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace, describeThresholdBasis, resolveMeasuredEasyPaceSecPerMi } from '../../../src/lib/resolve-current-run-pace.ts';
-import { boundInferredThresholdSecPerMi } from '../../../src/lib/run-threshold-from-easy.ts';
+import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace, describeThresholdBasis } from '../../../src/lib/resolve-current-run-pace.ts';
+import { pacesFromThresholdSecPerMi } from '../../../src/lib/run-paces-from-threshold.ts';
 import { resolveCurrent5kPace } from '../../../src/lib/resolve-current-5k-pace.ts';
 
 // Type for plan adjustments
@@ -629,36 +629,25 @@ type Baselines = {
   easyPace?: any; easy_pace?: any; 
   marathonPace?: any; marathon_pace?: any;
   equipment?: any;
-  // New effort_paces from PlanWizard (seconds per mile)
-  effort_paces?: {
-    base: number;    // Easy pace
-    race: number;    // Marathon pace
-    steady: number;  // Threshold pace
-    power: number;   // Interval/5K pace
-    speed: number;   // Repetition pace
-  };
 };
 
-function parsePaceToSecPerMi(v: any): number | null {
-  try {
-    if (v == null) return null;
-    if (typeof v === 'number' && v > 0) return v; // already sec/mi
-    const txt = String(v).trim();
-    if (!txt) return null;
-    // formats: mm:ss/mi or mm:ss /km
-    const m = txt.match(/(\d{1,2}):(\d{2})\s*\/(mi|km)/i);
-    if (m) {
-      const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
-      const unit = m[3].toLowerCase();
-      if (unit === 'mi') return sec;
-      if (unit === 'km') return Math.round(sec * 1.60934);
-      return sec;
-    }
-    // plain mm:ss
-    const m2 = txt.match(/(\d{1,2}):(\d{2})/);
-    if (m2) return parseInt(m2[1],10)*60 + parseInt(m2[2],10);
-  } catch {}
-  return null;
+
+/**
+ * The goal's ENTERED finish time ÷ its race distance, in sec/mi. Only the four road distances have a
+ * distance to divide by; anything else (a tri, a custom event) returns null rather than a guess.
+ */
+export function goalRacePaceFromTargetTime(targetTimeSec: unknown, distance: unknown): number | null {
+  const t = Number(targetTimeSec);
+  if (!Number.isFinite(t) || t <= 0) return null;
+  const d = String(distance ?? '').toLowerCase().replace(/[\s_-]+/g, ' ').trim();
+  let miles: number | null = null;
+  if (/\bhalf\b/.test(d) && /marathon|half$/.test(d) && !/iron/.test(d)) miles = 13.1094;
+  else if (/marathon/.test(d) && !/iron/.test(d)) miles = 26.2188;
+  else if (/\b10 ?k\b/.test(d)) miles = 6.2137;
+  else if (/\b5 ?k\b/.test(d)) miles = 3.1069;
+  if (miles == null) return null;
+  const pace = Math.round(t / miles);
+  return pace >= 180 && pace <= 1200 ? pace : null;   // 3:00–20:00/mi, the same sanity band the 5K resolver uses
 }
 
 function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'|'threshold'): number | null {
@@ -707,74 +696,53 @@ function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'|'th
     }
   }
 
-  // §1c — 5K PACE via the ONE resolver (`src/lib/resolve-current-5k-pace.ts`), the third of the family
-  // after FTP and easy/threshold (D-287). It owns every key spelling, the sec/mi unit, and the
-  // distinction this file used to get wrong: `performance_numbers.fiveK` is a race CLOCK ("22:30"), and
-  // the chain below read it straight into `parsePaceToSecPerMi` as a 22:30/mi pace — which the threshold
-  // branch then prescribed at +20s/mi. It sits BELOW the snapshot pin (§1 — a plan freezes its paces for
-  // its lifetime, unchanged) and REPLACES both the `effort_paces.power` tier and the legacy chain.
+  // §1c — THE RULING (2026-09-02, final): threshold is learned or entered, nothing else; 'easy' is
+  // threshold × 1.19, a reference band under a heart-rate prescription; 'fivek' is the typed 5K by
+  // division; 'marathon' is the goal's entered time ÷ distance. Nothing is derived from the 5K, from
+  // the easy runs, or from the vDOT table.
   //
-  // ⚠ ORDER CHANGE, deliberate: `effort_paces.power` used to be read BEFORE the athlete's typed 5K. The
-  // resolver puts a typed value above a wizard/VDOT inference, the same inversion audit 2026-07-17 #6
-  // fixed in the coach's threshold read. An athlete carrying both now gets their own number.
+  // ⛔ THE TABLE IS GONE FROM HERE. `effort_paces.base` / `.race`, the raw `easyPace` / `marathonPace`
+  // parses, the `easy − 30` marathon guess and the `5K + 20` threshold branch all lived below this
+  // line as second authorities on facts the resolvers own. Every one prescribed a different number
+  // from the surface next to it. No number is invented here: no threshold → null (D-285).
+  // ⛔ 5K PACE IS THE TYPED 5K BY DIVISION, NOT THRESHOLD MATH (Michael, 2026-09-02, final). Resolved
+  // once at the baselines-load block (`_fiveKSecPerMi`, from `resolveCurrent5kPace`: a typed pace, or
+  // the race clock ÷ 3.107). No 5K on file → no target on 5K-pace work (D-285).
   if (which === 'fivek') {
-    const r = resolveCurrent5kPace({ performance_numbers: b as any, effort_paces: b.effort_paces as any });
-    if (r.sec_per_mi != null) console.log(`[Paces] Using RESOLVED 5K: ${r.sec_per_mi}s/mi (source=${r.source})`);
-    else console.log('[Paces] No 5K pace on file — segments ship without a pace target (D-285)');
-    return r.sec_per_mi;
-  }
-
-  // §2 PREFER effort_paces from PlanWizard (already in seconds per mile)
-  if (b.effort_paces) {
-    if (which === 'easy' && b.effort_paces.base) {
-      const paceSec = b.effort_paces.base;
-      const min = Math.floor(paceSec / 60);
-      const sec = paceSec % 60;
-      console.log(`[Paces] Using effort_paces.base for easy: ${paceSec}s/mi (${min}:${String(sec).padStart(2,'0')}/mi)`);
-      return b.effort_paces.base;
+    const fk = (b as any)._fiveKSecPerMi;
+    if (typeof fk === 'number' && Number.isFinite(fk) && fk > 0) {
+      console.log(`[Paces] Using 5K pace: ${fk}s/mi (typed / race clock)`);
+      return fk;
     }
-    if (which === 'marathon' && b.effort_paces.race) {
-      const paceSec = b.effort_paces.race;
-      const min = Math.floor(paceSec / 60);
-      const sec = paceSec % 60;
-      console.log(`[Paces] Using effort_paces.race for marathon: ${paceSec}s/mi (${min}:${String(sec).padStart(2,'0')}/mi)`);
-      return b.effort_paces.race;
-    }
-    // ⛔ THE `effort_paces.steady` BRANCH IS DELETED (2026-08-19), NOT DISABLED. §1b-threshold above
-    // resolves the same key through `resolveCurrentRunThresholdPace`, which reads `steady` as its
-    // wizard tier and returns before this line — so this could only ever have fired when the
-    // resolver had already declined the identical value, which cannot happen. An unreachable second
-    // authority on one fact is how this file grew two of everything; it goes rather than sits.
-  }
-  
-  // FALLBACK to legacy performance_numbers ('fivek' returned at §1c above — it has an owner now)
-  let raw: any;
-  if (which === 'marathon') {
-    raw = b.marathonPace ?? b.marathon_pace;
-    // If no marathon pace, estimate from easy pace (+30sec slower)
-    if (raw == null && (b.easyPace || b.easy_pace)) {
-      const easyPace = parsePaceToSecPerMi(b.easyPace ?? b.easy_pace);
-      if (easyPace) return easyPace - 30; // Marathon is faster than easy, typically ~30s/mi
-    }
-  } else if (which === 'threshold') {
-    // Threshold not in legacy - estimate from 5K pace + 20s.
-    //
-    // ⛔ AND IT IS HELD TO THE SAME BAND AS EVERY OTHER INFERENCE (2026-08-19). This is the RAW
-    // stale-5K path — reached when the athlete has a typed 5K and no `effort_paces` at all — and it
-    // was the one place a threshold pace was still derived from a number that nothing measures and
-    // nothing dates. `+20 s/mi` off a 5K the athlete could run two years ago prescribes a session
-    // they cannot run today. Same invariant, same helper, no second rule.
-    const fkp = secPerMiFromBaseline(b, 'fivek');
-    if (fkp) {
-      const bounded = boundInferredThresholdSecPerMi(fkp + 20, (b as any)._measuredEasySecPerMi);
-      if (bounded.replaced) console.log(`[Paces] 5K+20 (${fkp + 20}s/mi) contradicted the measured easy pace — held to ${bounded.sec_per_mi}s/mi`);
-      return bounded.sec_per_mi;
-    }
+    console.log('[Paces] No 5K on file — 5K-pace work ships without a pace target (D-285)');
     return null;
-  } else {
-    raw = b.easyPace ?? b.easy_pace;
   }
-  return parsePaceToSecPerMi(raw);
+  // ⛔ RACE PACE = the plan's ENTERED goal time ÷ distance (`_racePaceSecPerMi`, set at the
+  // baselines-load block from the linked goal). Entered, not derived. No goal time → no target.
+  if (which === 'marathon') {
+    const rp = (b as any)._racePaceSecPerMi;
+    if (typeof rp === 'number' && Number.isFinite(rp) && rp > 0) {
+      console.log(`[Paces] Using race pace from the goal time: ${rp}s/mi`);
+      return rp;
+    }
+    console.log('[Paces] No goal time on the plan — race-pace work ships without a pace target (D-285)');
+    return null;
+  }
+  const resolvedThr = (b as any)._resolvedThresholdSecPerMi;
+  const derived = pacesFromThresholdSecPerMi(
+    typeof resolvedThr === 'number' && Number.isFinite(resolvedThr) && resolvedThr > 0 ? resolvedThr : null,
+  );
+  if (!derived) {
+    console.log(`[Paces] No threshold pace on file — '${which}' ships without a pace target (D-285)`);
+    return null;
+  }
+  if (which === 'easy') {
+    // Reached only when the easy resolver abstained; the resolver's own derived-from-threshold tier
+    // normally answers first with this exact number.
+    console.log(`[Paces] Using easy pace from threshold: ${derived.easy}s/mi`);
+    return derived.easy;
+  }
+  return null;
 }
 
 // Strength helpers: map exercise name to baseline key and compute prescribed weight
@@ -1542,8 +1510,7 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
     const m = lower.match(/tempo_(\d+)min_threshold/);
     const sec = m ? parseInt(m[1],10)*60 : 1500;
     // Threshold pace is ~5K pace + 15-20 sec
-    const fkp = secPerMiFromBaseline(baselines,'fivek');
-    const pace = fkp != null ? (fkp + 20) : undefined;
+    const pace = secPerMiFromBaseline(baselines, 'threshold') ?? undefined;   // threshold IS the anchor (2026-09-02); was 5K + 20
     out.push({ id: uid(), kind:'work', duration_s: sec, pace_sec_per_mi: pace }); 
     return out;
   }
@@ -1553,8 +1520,7 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
     const m = lower.match(/tempo_(\d+)mi_threshold/);
     if (m) {
       const miles = parseInt(m[1],10);
-      const fkp = secPerMiFromBaseline(baselines,'fivek');
-      const pace = fkp != null ? (fkp + 20) : undefined;
+      const pace = secPerMiFromBaseline(baselines, 'threshold') ?? undefined;   // threshold IS the anchor (2026-09-02); was 5K + 20
       out.push({ id: uid(), kind:'work', distance_m: milesToMeters(miles), pace_sec_per_mi: pace });
       return out;
     }
@@ -1708,8 +1674,10 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
       const reps = parseInt(m[1], 10);
       const miles = parseFloat(m[2]);
       const rest_s = m[3] ? parseInt(m[3], 10) : 60;
-      const fkp = secPerMiFromBaseline(baselines, 'fivek');
-      const thresholdPace = fkp != null ? (fkp + 20) : undefined;
+      // ⛔ THRESHOLD IS THE ANCHOR (2026-09-02). This read `5K + 20` — a private copy of the seed
+      // rule — so an athlete with a MEASURED threshold and no typed 5K got NO pace on their cruise
+      // intervals (measured before/after 2026-09-02: learned thr 400 → work=[-]). One authority now.
+      const thresholdPace = secPerMiFromBaseline(baselines, 'threshold') ?? undefined;
       const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
       for (let i = 0; i < reps; i++) {
         out.push({ id: uid(), kind: 'work', distance_m: milesToMeters(miles), pace_sec_per_mi: thresholdPace });
@@ -3765,7 +3733,7 @@ Deno.serve(async (req) => {
     try {
       // `weight` rides along for D1 — planned bodyweight sets are priced at the athlete's own body
       // weight, exactly as the completed side prices them, or the two stop reconciling.
-      const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness, locked_baselines, equipment, effort_paces, effort_score, effort_paces_source, units, weight').eq('user_id', userId).maybeSingle();
+      const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness, locked_baselines, equipment, effort_source_distance, effort_source_time, units, weight').eq('user_id', userId).maybeSingle();
       plannedBodyweightLb = resolveBodyweightLb(ub as any);
       // ⛔ AND WHAT THE ATHLETE LIFTS ON EACH MOVEMENT (2026-08-29). Viada leaves hypertrophy work
       // auto-regulated, so an accessory is authored "By feel" with no weight and stays that way —
@@ -3776,20 +3744,25 @@ Deno.serve(async (req) => {
       // Audit: strength tier + raw baselines (generate-combined-plan uses effectiveProtocolTier; materialize uses equipment list for substitutions)
       const strengthEquipArr = Array.isArray(ub?.equipment?.strength) ? (ub.equipment.strength as string[]) : [];
       let explicitGoalEquipmentType: string | undefined;
+      // ⛔ RACE PACE IS THE ENTERED GOAL TIME ÷ THE RACE DISTANCE (Michael, 2026-09-02, final). Not a
+      // ratio off threshold, not the vDOT table. No goal time → no race-pace target (effort only).
+      let goalRacePaceSecPerMi: number | null = null;
       try {
         const planIdRef = rows[0]?.training_plan_id;
         if (planIdRef) {
           const { data: planRow } = await supabase.from('plans').select('goal_id').eq('id', planIdRef).maybeSingle();
           const gid = planRow?.goal_id as string | undefined;
           if (gid) {
-            const { data: goalRow } = await supabase.from('goals').select('training_prefs').eq('id', gid).maybeSingle();
+            const { data: goalRow } = await supabase.from('goals').select('training_prefs, target_time, distance').eq('id', gid).maybeSingle();
             const tp = goalRow?.training_prefs as Record<string, unknown> | null | undefined;
             const et = tp?.equipment_type ?? tp?.equipmentType;
             if (et != null && String(et).trim()) explicitGoalEquipmentType = String(et).trim();
+            goalRacePaceSecPerMi = goalRacePaceFromTargetTime(goalRow?.target_time, goalRow?.distance);
+            if (goalRacePaceSecPerMi != null) console.log(`[Paces] Goal race pace: ${goalRacePaceSecPerMi}s/mi (target_time ${goalRow?.target_time}s over ${goalRow?.distance})`);
           }
         }
       } catch (e) {
-        console.warn('[materialize] audit: could not load goal training_prefs.equipment_type:', e);
+        console.warn('[materialize] audit: could not load goal training_prefs / target_time:', e);
       }
       const hasFullBarbell = hasBarbellCapability(strengthEquipArr);
       const compoundSignals = hasCompound1RMSignals(ub?.performance_numbers);
@@ -3809,11 +3782,13 @@ Deno.serve(async (req) => {
       // ⛔ READ ONLY (2026-09-02, D-461). This used to recompute `effort_paces` from `effort_score` on
       // every materialization and WRITE the result back to user_baselines — a background process
       // rewriting the athlete's row. The row has one writer now; this reads what it finds.
-      const effortPaces = ub?.effort_paces;
+      // ⛔ `effort_paces` IS NOT READ HERE ANY MORE (2026-09-02, the threshold-anchor cut). D-461 made
+      // this a read-only consumer of the vDOT table; this cut removes the read. Every run pace comes
+      // off the resolved threshold (`secPerMiFromBaseline`); the typed 5K reaches it only as the
+      // resolver's seed.
       baselines = {
         ...(ub?.performance_numbers || {}),
         equipment: ub?.equipment || {},
-        effort_paces: effortPaces || undefined,
         isMetric: ub?.units === 'metric',
       } as any;
 
@@ -3851,11 +3826,7 @@ Deno.serve(async (req) => {
       // RECALCULATED the paces from `effort_score` and used the new ones for everything downstream;
       // handing the resolver the stale row would make it answer about a different set of numbers
       // than the chain below it reads, which is the divergence this whole file keeps deleting.
-      const thrResolved = resolveCurrentRunThresholdPace({
-        learned_fitness: ub?.learned_fitness ?? null,
-        performance_numbers: ub?.performance_numbers ?? null,
-        effort_paces: (effortPaces ?? null) as any,
-      } as any);
+      const thrResolved = resolveCurrentRunThresholdPace(ub as any);
       if (thrResolved.sec_per_mi != null) {
         (baselines as any)._resolvedThresholdSecPerMi = thrResolved.sec_per_mi;
         (baselines as any)._thresholdBasis = describeThresholdBasis(thrResolved).state;
@@ -3865,10 +3836,16 @@ Deno.serve(async (req) => {
         console.log('[Paces] No threshold pace on file — the chain below is the last word');
       }
 
-      // The MEASURED easy pace, carried so the legacy `5K + 20 s/mi` branch can be held to the same
-      // band the resolver holds its own wizard tier to. Same accessor, so there is one definition of
-      // "which easy pace counts" rather than a second copy of the rule down there.
-      (baselines as any)._measuredEasySecPerMi = resolveMeasuredEasyPaceSecPerMi(ub as any);
+
+      // ⛔ THE 5K, FOR 5K-PACE WORK ONLY (2026-09-02). A typed pace, or the race clock ÷ 3.107 — the
+      // one 5K resolver. It seeds nothing and derives nothing; it prices `_5kpace` tokens and that is
+      // all. The whole row goes in so a pre-D-461 wizard row (`effort_source_time`) still counts.
+      const fiveKResolved = resolveCurrent5kPace(ub as any);
+      if (fiveKResolved.sec_per_mi != null) {
+        (baselines as any)._fiveKSecPerMi = fiveKResolved.sec_per_mi;
+        console.log(`[Paces] Resolved 5K: ${fiveKResolved.sec_per_mi}s/mi (source=${fiveKResolved.source})`);
+      }
+      if (goalRacePaceSecPerMi != null) (baselines as any)._racePaceSecPerMi = goalRacePaceSecPerMi;
 
       // FTP via shared precedence helper. Quality-gated for plan baking — accepts learned
       // (≥medium) > manual but REJECTS 'learned-low' (low-confidence values shouldn't get
@@ -3991,12 +3968,6 @@ Deno.serve(async (req) => {
         overheadPress1RM: (baselines as any).overheadPress1RM,
         hipThrust: (baselines as any).hipThrust,
       });
-      if (ub?.effort_paces) {
-        console.log(`[Paces] Found effort_paces from PlanWizard:`, baselines.effort_paces);
-        console.log(`[Paces] Effort Score: ${ub?.effort_score || 'not set'}, Source: ${ub?.effort_paces_source || 'unknown'}`);
-      } else {
-        console.log(`[Paces] ⚠️  No effort_paces found - will fall back to legacy performance_numbers`);
-      }
       console.log(`🔍 [FTP DEBUG] User ${userId} baselines:`, baselines);
       console.log(`🔍 [FTP DEBUG] FTP value:`, baselines?.ftp);
       console.log(`🔍 [EQUIPMENT DEBUG] Equipment:`, baselines?.equipment);

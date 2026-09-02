@@ -100,3 +100,49 @@ generate-run-plan refuses a performance_build without it).
   or the marathon generator keeps the old table.
 - **B. The seed when only a 5K exists.** 5K+20 s/mi vs the pace table's steady lookup. One survives;
   the audit session recommends the table ratio (measured).
+
+## 6. Cut steps 1–3 BUILT (audit session, 2026-09-02 evening) — in the working tree, not committed
+
+Files (audit session's): NEW `src/lib/run-paces-from-threshold.ts` + `_shared/run-paces-from-threshold.test.ts`;
+EDITED `src/lib/resolve-current-run-pace.ts`, `src/lib/resolve-current-5k-pace.ts`, `_shared/arc-context.ts`,
+`materialize-plan/index.ts`, three resolver test files.
+
+Threshold is the anchor. Threshold resolver: chosen > learned > typed > seeded-from-5K (typed 5K, or
+`effort_source_time` on pre-D-461 rows, + 20 s/mi, bounded by measured easy) > derived-from-easy >
+learned-low. Easy resolver: chosen > learned > typed > derived-from-threshold (×1.19) > learned-low.
+`effort_paces` is no longer read by either resolver or by materialize-plan. Materializer: 'fivek' =
+threshold − 20; 'marathon' = threshold × 1.093; cruise/tempo tokens read threshold directly (they had a
+private 5K+20 copy — a learned-threshold athlete with no typed 5K got NO pace on cruise intervals).
+Ratios measured off PACE_TABLE (marathon 1.0934 mean, 0.45% spread; interval 0.915; rep 0.860).
+Tests 151/151; tsc 314 = HEAD; deno check importers unchanged.
+
+### TWO FINDINGS THAT CHANGE RULINGS A AND B (code-measured)
+1. **Ruling B's premise is false.** The "pace table ratio" is not a ratio: VDOT_TABLE's 5K times and
+   PACE_TABLE's paces disagree, so threshold ÷ 5K-race-pace runs 1.20 (16:00 5K) → 0.81 (40:00 5K).
+   Below ~31:00 the table prescribes a threshold FASTER than the athlete's 5K race pace; at 22:00 it is
+   53 s/mi slower (Daniels: ~25). Kept the app's own documented rule, 5K + 20 s/mi
+   (DOCTRINE-threshold-run.md). **Needs Michael's re-ruling.**
+2. **Ruling A's before/after cannot match for faster runners.** Today's marathon race pace = VDOT_TABLE
+   marathon time ÷ 26.2, and race ÷ threshold runs 1.0965 (vdot 30) → 0.9295 (vdot 80): from vdot 44
+   up (5K under ~22 min) the marathon plan prescribes M pace FASTER than T pace. After the cut M = T ×
+   1.093, always slower than T. 22:00 5K athlete: before 484, after 486. Learned-threshold-400 athlete:
+   before no M pace at all, after 437.
+
+Before/after (work-step paces, sec/mi; '-' = no target): learned thr 400 / easy 510: easy 510→510,
+cruise −→400, 5K intervals −→380, marathon −→437. Typed 5K 22:00 only: easy −→530, cruise 445→445,
+intervals 425→425, marathon −→486. Pre-D-461 wizard row (effort_source_time 1320): easy 570→530,
+cruise 458→445, intervals 438→425, marathon 484→486. Nothing on file: all '-' both sides.
+
+Deploy closure when it ships: materialize-plan + every importer of resolve-current-run-pace /
+resolve-current-5k-pace (21 functions). Not started: step 4 (other 24 effort_paces readers;
+generate-run-plan performance_build still refuses without effort_paces.race), the checkpoint,
+rulings 1/2/6/7 from the package.
+
+
+## 7. Re-rulings (Michael, 2026-09-02 evening)
+- **Easy is NOT a pace source.** Easy days = a heart-rate zone off threshold HR. The easy pace shown is a
+  reference band derived from threshold pace only. No learned/typed/chosen easy-pace chain; the easy
+  pace field comes off Baselines.
+- **Threshold pace = learned or entered. Nothing else.** Ruling B is void: no 5K seeding at all. An
+  athlete with neither gets no pace on hard runs, effort target only, until a test / race / entry.
+- **5K time's only pace job:** 5K race pace by division. Marathon race pace = threshold × 1.093 (A stands).

@@ -139,7 +139,7 @@ function resolveThresholdPaceSecPerMi(input: RaceReadinessInput): { pace: number
   const resolved = resolveCurrentRunThresholdPace({
     learned_fitness: input.learnedFitness as never,
     performance_numbers: input.performanceNumbers as never,
-    effort_paces: input.effortPaces as never,
+    // `effort_paces` is no longer a resolver input (2026-09-02): threshold is learned or entered only.
   });
   if (resolved.sec_per_mi != null) {
     return { pace: resolved.sec_per_mi, source: resolved.source === 'learned' ? 'observed' : 'plan_targets' };

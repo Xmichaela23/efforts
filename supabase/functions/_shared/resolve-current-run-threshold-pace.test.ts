@@ -46,23 +46,23 @@ Deno.test('no learned → typed manual is used (an assertion, not an estimate)',
   assertEquals(r.is_estimate, false);
 });
 
-Deno.test('effort_paces.threshold is an INFERENCE — is_estimate:true, and BELOW a typed value', () => {
-  const wizardOnly = resolveCurrentRunThresholdPace({ effort_paces: { threshold: 605 } });
-  assertEquals(wizardOnly.sec_per_mi, 605);
-  assertEquals(wizardOnly.source, 'effort_paces');
-  assertEquals(wizardOnly.is_estimate, true);
-  // a typed value outranks the wizard pace (this is the coach inversion being fixed)
-  const withManual = resolveCurrentRunThresholdPace({ performance_numbers: { threshold_pace_sec_per_mi: 610 }, effort_paces: { threshold: 605 } });
+Deno.test('a typed 5K does NOT seed threshold — learned or entered, nothing else (Michael, 2026-09-02)', () => {
+  const fiveKOnly = resolveCurrentRunThresholdPace({ performance_numbers: { fiveK_pace: 585, fiveK: '30:18' } });
+  assertEquals(fiveKOnly.sec_per_mi, null);
+  assertEquals(fiveKOnly.source, null);
+  // a typed threshold beside a 5K is simply the typed threshold
+  const withManual = resolveCurrentRunThresholdPace({ performance_numbers: { threshold_pace_sec_per_mi: 610, fiveK_pace: 585 } });
+  assertEquals(withManual.sec_per_mi, 610);
   assertEquals(withManual.source, 'manual');
 });
 
-Deno.test('effort_paces.z4 is the threshold proxy when .threshold is absent', () => {
-  const r = resolveCurrentRunThresholdPace({ effort_paces: { z4: 608 } });
-  assertEquals(r.sec_per_mi, 608);
-  assertEquals(r.source, 'effort_paces');
+Deno.test('the vDOT table (effort_paces) is NOT read any more — a row carrying only it resolves to nothing', () => {
+  const r = resolveCurrentRunThresholdPace({ effort_paces: { steady: 608, threshold: 608, z4: 608 } } as never);
+  assertEquals(r.sec_per_mi, null);
+  assertEquals(r.source, null);
 });
 
-Deno.test('learned-low (thin) is used below the wizard inference', () => {
+Deno.test('learned-low (thin) is used when nothing trusted or typed exists', () => {
   const r = resolveCurrentRunThresholdPace({ ...learned(372, 'low') });
   assertEquals(r.source, 'learned-low');
   assertEquals(r.sec_per_mi, 599);
@@ -76,8 +76,8 @@ Deno.test('choice=manual outranks even a high-confidence learned pace', () => {
 });
 
 Deno.test('choice=learned SKIPS the manual tier (a declined typed number cannot resurface)', () => {
-  const r = resolveCurrentRunThresholdPace({ performance_numbers: { threshold_pace_sec_per_mi: 620, threshold_pace_source: 'learned' }, effort_paces: { threshold: 605 } });
-  assertEquals(r.source, 'effort_paces'); // manual skipped → falls to the wizard inference
+  const r = resolveCurrentRunThresholdPace({ performance_numbers: { threshold_pace_sec_per_mi: 620, threshold_pace_source: 'learned', fiveK_pace: 585 } });
+  assertEquals(r.sec_per_mi, null); // manual skipped, no 5K tier → nothing, honestly
 });
 
 // ═══ LAW 2 — WE DO NOT INVENT ════════════════════════════════════════════════
