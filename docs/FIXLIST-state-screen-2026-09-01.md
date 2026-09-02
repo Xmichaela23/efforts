@@ -3,6 +3,50 @@
 Standard Focus) plus the open items in `DEBT-state-screen-structure-2026-08-29.md` and the
 "deployed but undrawn" list in `WORKORDER-the-progress-standard-2026-08-28.md`.**
 
+---
+
+## ✅ CLOSE-OUT — 2026-09-01 night. The arc is buttoned up; the logger/test work moves to a new chat.
+
+**PUSHED (origin/main = `d8f77067`) AND DEPLOYED (27 functions, all `2026-09-02 00:10:44 UTC`,
+`coach` v513, `compute-snapshot` v180):**
+- Rounds 0–2 (extraction, duplicate deletions, wrong-on-screen fixes) — shipped earlier in the arc.
+- The weekly lifting block, in full: leads with session cost → coverage → off-plan; the per-muscle
+  dose list and the heavy/speed pattern rows and the no-known-max note are gone; session names spelled
+  out ("Speed day, upper body"); cost rows state recovery time; the >10% change line compares closed
+  plan weeks; the block reads the PLAN'S WEEK (not a rolling 7 days).
+- The deadlift-fold bug (merge the series, not the cards).
+- The INVENTORY deploy-closure generator (folder-driven).
+
+**VERIFIED ON HIS DEVICE:** the deadlift card; and the plan-week lifting block ("the new code is
+working on the iPhone") after his snapshot was recomputed on v179 for his account. Everything else on
+the block: DEPLOYED, not yet device-verified by him.
+
+**BUILT, NOT COMMITTED, NOT PUSHED — carries to the logger/test chat, must not be lost:**
+- Logger test-day parts **A + B** — `src/components/StrengthLogger.tsx`. See
+  `docs/SPEC-test-day-2026-09-01.md` (its START-HERE header). Build green.
+
+**UNCOMMITTED IN THE TREE, by path:**
+- `src/components/StrengthLogger.tsx` — A/B above (mine).
+- `docs/FIXLIST-state-screen-2026-09-01.md` — this file (mine).
+- `docs/SPEC-test-day-2026-09-01.md` — the test-day spec, cold-pickup ready (mine + PM).
+- `docs/SPEC-state-screen-round-3-2026-09-01.md`, `docs/POLISH-PUNCH-LIST.md`,
+  `docs/FOUNDATION-READINESS.md`, `docs/HANDOFF-logger-test-day-2026-09-01.md` — PM's.
+- `ios/debug.xcconfig` — nobody's, pre-existing, stays unstaged.
+
+**STILL OPEN ON STATE (not regressions — deferred, none blocking):**
+- Round 3 sport-block consolidation (one block per sport) — item 1c-round3 / 3.5a. Not built.
+- Round 4 copy pass.
+- The >10% change line shows TEN buckets for him; capping to the three largest is put to Michael,
+  not ruled, not built.
+- Server-side leftovers (S-items): `LIFT_DISPLAY` still emits "Squat" (S2); `performed-ledger`
+  still emits both name spellings (S5); `strength-read.ts` / `RunFitnessRow` bannered-unreachable.
+- The off-plan marker: a plan test session carries no `planned_name`, so State's off-plan read is
+  UNKNOWN there — the honest marker is the `amrap` set; a server change to key off it. Ties to the
+  logger arc, not State.
+
+⛔ **NOTHING in this close-out is committed or pushed without Michael's typed word** — the docs
+included.
+
 ⛔ **EVERY ITEM BELOW IS AN OPTICS OBSERVATION OFF A SCREENSHOT.** None has been code-traced.
 Trace before treating any of them as a defect — several may be an unrendered field rather than a
 wrong one, which is the failure mode this screen has produced four times.
@@ -601,9 +645,40 @@ before reordering ships.** No block may read whether another block is rendered.
       The ruling is that it should speak only about off-plan work — the same server split. Not
       narrowed by approximation, not deleted; a comment on the render says so.
       Build green, eslint clean, no type errors in the file.
-- [x] 3-lift-plan-week. **BUILT 2026-09-01 (night). SERVER + CLIENT. 27-function deploy, payload
-      178 → 179. Approved by Michael (the move); the closed-week basis ruled by the PM. NOT
-      committed, NOT pushed, NOT deployed — awaiting his word.**
+- [ ] NOTES-2026-09-01-night. **Three things established late, recorded so tomorrow does not
+      rediscover them. None is a task unless ruled.**
+      · **PHONE ≠ WEB WAS NOT A PIPELINE FAULT.** `npm run ios` = `vite build && cap sync ios`;
+        `webDir: 'dist'`; no `server.url`. The 17:11 local run rebuilt dist from d8f77067 and synced
+        it into `ios/App/App/public` (verified: that bundle carries the night's copy). Xcode's last
+        DEVICE build in DerivedData was 14:30:29 local with an older bundle — Run was never pressed
+        after the sync. Fix was ⌘R with the phone connected. `ios/debug.xcconfig`'s unstaged
+        `CAPACITOR_DEBUG` removal only toggles Capacitor's debug logging; it selects no bundle.
+        **SUGGESTION, not ruled:** a visible build stamp (short sha + build time, e.g. in Settings) so
+        a build can be told apart by eye; tonight the only marker was a line of copy.
+      · **REFRESH ON STATE DOES NOT RECOMPUTE THE SNAPSHOT.** Pull-to-refresh calls the coach with
+        `skip_cache: true`; the coach reads `state_trends_v1` off the snapshot row and never invokes
+        `compute-snapshot`. The lifting card moves only when a snapshot is written: any ingest,
+        re-analyze of a completed workout, the post-import pipeline, or a direct call to
+        `compute-snapshot` with `{ user_id }` (done tonight for Michael, by his typed id and go; the
+        installed CLI has no `functions invoke`, so it was an HTTPS POST with the app's public key).
+        ⚠️ SECURITY (FOUNDATION-READINESS, B1-class): that function has no per-function JWT override
+        and does not check the caller — the public anon key + any `user_id` recomputes that
+        athlete's derived snapshot. Derived data only. File, do not act tonight.
+      · **`offPlan.known === false` ON HIS TEST SESSION** — no row carried `planned_name` although
+        the session was prefilled from the plan. Almost certainly the parked logger problem
+        (POLISH-PUNCH-LIST: "THE LOGGER DOES NOT BEHAVE LIKE A TEST ON A TEST DAY"): the logger's
+        baseline-test branch matches "upper"/"lower" in a `1rm_test` session's NAME and REBUILDS the
+        session from a hardcoded lift list (`StrengthLogger.tsx:1077-1085`, `:2884-2893`), so the
+        rows it writes were never the plan's rows and carry no marker. Silence is the correct output
+        meanwhile. Trace with the logger fix, not as a State item.
+- [x] 3-lift-plan-week. **DONE 2026-09-01 (night). SERVER + CLIENT. Approved by Michael (the move);
+      the closed-week basis ruled by the PM. PUSHED (main d8f77067), DEPLOYED (27 functions, all
+      stamped 2026-09-02 00:10:44 UTC, coach v513, compute-snapshot v180), his snapshot recomputed on
+      v179 by his typed go, and VERIFIED ON HIS PHONE ("the new code is working on the iPhone").
+      Live read after the recompute: `since 2026-08-31`, one session ("Test: Upper", 10 work sets),
+      both speed days gone; `weekChange.basis = 'last_week'`, comparable, TEN buckets flagged —
+      so the change line DOES appear for him (two closed weeks of logged lifting exist even in plan
+      week 1); a cap to the largest movers is put to him, not ruled, not built.**
       Michael: *"is this a rolling week?"* It was — as-of minus six days under the label "THIS WEEK'S
       LIFTING" / "nothing this week for …", stacked under a planned-vs-actual bar that IS the plan's
       week. Field practice: rolling windows for load/fatigue (ACWR — the load plate at the top stays

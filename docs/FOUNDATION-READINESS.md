@@ -52,3 +52,26 @@ The pure-math `_shared/` core (ACWR, workload, reconcile, week-optimizer) is wel
 `TARGET-ARCHITECTURE.md` (the destination this hardens toward) · `TRUTH-MAP.md` (per-fact authority) · `CONSTITUTION.md` · `SCREEN-CONNECTIVITY.md` (hygiene flags) · existing: Q-105/Q-106, Q-141, Q-054/Q-057, D-140–143, D-186, D-194.
 
 ## Owed at session close: file the [NEW] items as numbered Q-NNN (security/scale/ops) so they enter the tracked backlog.
+
+---
+
+## B1-class — `compute-snapshot` accepts any `user_id` with the public anon key (found 2026-09-01)
+
+**Found while recomputing Michael's own snapshot on his instruction.** The installed CLI has no
+`functions invoke`, so the function was called over HTTPS with the app's **public anon key** (the one
+in `src/lib/supabase.ts`) and a `user_id` in the body. HTTP 200, snapshot rewritten.
+
+**The hole:** `compute-snapshot` has no per-function JWT verification override and does not check
+that the caller owns the `user_id` it is handed. Anyone holding the anon key — which ships in the
+client and is public by design — can force a recompute of **any athlete's** derived snapshot.
+
+**Severity, stated honestly:** derived data only. It reads what is already stored and rewrites the
+athlete's own snapshot row; it returns that athlete's computed state to the caller, which IS a
+cross-user read of derived training data. No raw workout or account data leaks through this path.
+⚠️ Pre-launch, Michael is the only user, so this is not live risk today — it is a **gate on a second
+paying user**, alongside the existing B1 items.
+
+**The fix shape:** verify the caller's JWT and require the `user_id` to match it, or make the
+function service-key-only and give the client a thin authenticated wrapper. ⛔ Check the other
+functions that take a `user_id` in the body before fixing this one in isolation — the pattern is
+likely not unique to `compute-snapshot`.

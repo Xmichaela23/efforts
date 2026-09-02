@@ -1100,3 +1100,131 @@ reason, and the measurement there is worse: **all 30 5K weeks change, every one 
 That frame is passing over p220 and p223's own printed movements — `incline bench press`,
 `preacher curl`, `larsen press`, `seated calf raise`, `skull crusher` — in favour of substitutes, at
 every kit. A real defect on the frozen frame, parked behind the same freeze.
+
+---
+
+## ⛔ AN ADDED MOVEMENT IS PERMANENT BY DEFAULT AND INVISIBLE AFTERWARDS (filed 2026-09-01)
+
+**Michael, on his own live adjustment:** *"that thing is a fucking cancer… like you paperclip
+maximized"*. He is describing a real design fault, and the fault is NOT the movement — it is the
+shape of the control.
+
+**What happens today:** one tap on a row adds a movement as a `plan_adjustment` scoped to *rest of
+plan* — every matching lifting day, indefinitely. Traced during the 2026-09-01 State arc.
+
+**The four things wrong with that, separately:**
+1. **Permanent is the DEFAULT outcome of a single tap.** An athlete adding something for one session
+   gets a standing rule.
+2. **Nothing on screen says a standing rule is active.** No list, no badge, no "you have 1 addition
+   running". It surfaces only as extra rows appearing in sessions.
+3. **The way out lives under a DIFFERENT control than the way in.** It was added with Add; it is
+   removed with **Swap → Rest of plan** (`StrengthLogger.tsx:5566`). Nobody would look there.
+4. **No expiry and no scope choice at the moment of the tap** — "just today" vs "rest of plan" is the
+   choice that would have prevented all of this, and it is not offered.
+
+**What it should be:** the scope is chosen when the addition is made (this session / rest of plan),
+active additions are visible somewhere the athlete will find them, and undo sits with the thing it
+undoes.
+
+⚠️ **A parallel removal path was built on 2026-09-01 without reading that the swap already carried
+one, and was reverted in full** (ENGINE-STATE §D). **Read the control that exists before building one
+beside it** — the fix here is scope-at-creation and visibility, NOT a third path.
+
+⛔ **NEVER name the specific movement to Michael.** Refer to "anything you add outside the plan".
+
+---
+
+## ⛔⛔ THE LOGGER DOES NOT BEHAVE LIKE A TEST ON A TEST DAY (filed 2026-09-01, LIVE, HIS OWN SESSION)
+
+**Michael, having just done his lower test:** *"It didn't ask me if I wanted to move it to my
+baseline. It's like this thing doesn't know it's a test."* And, on the row itself: *"we need to make
+this clearer in our logger because it capped me."*
+
+⛔ **PARKED BY HIM THE SAME NIGHT — the State screen comes first.** Filed here so it is not lost.
+**He called it a big problem and it is.**
+
+**What happened, live:** he squatted **80 lb × 9** on his test day — ~104 estimated, against a known
+125. He then did **105 × 6** (~126) unprompted. Nothing on screen told him the first set was too
+light for a test, nothing told him what he was trying to beat, and nothing asked whether the result
+should become his baseline.
+
+**The four things to establish before building anything** (a trace was started 2026-09-01 and not
+finished):
+1. **What a test row actually prescribes and displays.** If it shows a weight and a rep target — the
+   accessory shape, "target 8–10 · 1–2 in reserve" — it is telling him to stop at a rep count on the
+   one session whose purpose is finding a limit. That is the "capped me".
+2. **Whether a completed set on a `1rm_test` session writes to `user_baselines` silently.** If it
+   does, a light set quietly re-prices the whole block downward. ⚠️ 9 reps produces an estimate the
+   system elsewhere calls unreliable past 5 — check whether the test path honours the ten-rep ceiling.
+3. **Whether anything guards a test result far below the known max** (104 against 125). Apparently
+   not.
+4. **Whether the athlete is ever asked.** He expected to be. He was not.
+
+**The shape of the fix, not yet ruled:** a test row says *work up to a heavy set of 1–5 reps*, states
+the current max so he knows what he is chasing, says plainly that this set sets his number for the
+block, and confirms before it replaces a baseline.
+
+⛔ **Sources, already established:** p215's pretest ramps 0.75 / 0.825 / 0.8625 of PREDICTED max, last
+set for max clean reps. ME is 1–5 reps at 90–100% (`intents.ts`). Nine reps at 80 lb is neither.
+⛔ **Never write his data. Fix forward.** His logged sets stand as logged.
+
+### ⛔ HIS RULING, 2026-09-01: **"Too light. It should be a ladder."**
+
+**Evidence from his own live session, both lifts, same night:**
+- **Squat:** no squat number on file, so the generic test started him at the BAR and told him to aim
+  3–6 reps and stop at RPE 9. He did **80 × 9** (~104 estimated, against a known 125). Then **105 × 6**
+  (~126) on his own initiative, unprompted by the screen.
+- **Deadlift:** a number IS on file (150 — the warm-ups read 75 = 50%, 105 = 70%, working set 130 =
+  87%), so it prescribed **one all-out set at 130** with the same "aim ~3–6, stop at ~RPE 9" hint.
+  ⛔ **His State screen reads 180.** A 3–6 rep set at 130 estimates ~156. **The test could only have
+  confirmed a lower number than he already holds.**
+
+⛔ **THE STRUCTURAL FAULT HE NAMED:** the test is ONE all-out set at a percentage of a number already
+on file. If that number is stale or absent, the test cannot find a higher one — it can only confirm
+or lower. **A test must climb until it finds the edge.**
+
+**What a ladder means here, for whoever builds it:** successive heavier attempts with real rest,
+continuing while the reps stay clean, stopping on a rep-count drop or form break. ⚠️ **Viada's own
+p215 pretest IS a ramp — 0.75 / 0.825 / 0.8625, last set for max clean reps — but it is deliberately
+submaximal and fixed at three steps.** The gap between his ruling and the book's protocol is real and
+needs settling from the page before anything is built: a fixed submaximal ramp and an open-ended
+ladder are different instruments.
+⚠️ **And one branch already has a loop the other lacks** — the no-number-on-file path says *"if you
+got more than ~8, it was too light — rest, add weight, and go again"*, while the number-on-file path
+does not. The loop exists; it is on the wrong branch.
+
+### ⛔ AND THE LADDER ENDS WITH A QUESTION — his ruling, same night: **"when you tap out it should then ask"**
+
+The ladder climbs until the athlete stops. **At that moment the app asks whether the last clean set
+becomes the number**, and the athlete answers. It does not decide silently in either direction.
+
+**Why he said it:** *"It didn't ask me if I wanted to move it to my baseline. It's like this thing
+doesn't know it's a test."* He expected to be asked and was not.
+
+**What the ask settles, and it is both writers at once:**
+1. `user_baselines.performance_numbers` — which today only asks when the result is LOWER than the
+   stored number (`save-baseline-test` returns `needs_decision`) and writes silently when it is higher.
+2. **The block's working numbers** via `readTestWeek` / `rematerialize-standing-block` — which asks
+   nothing, has no rep ceiling and no comparison to the stored max. **This is the silent one.**
+
+⛔ **One question, one answer, both writers.** Two paths that can disagree about what the test said is
+the fault this arc has been removing everywhere else.
+⚠️ **The ask must state what it is replacing** — "your squat on file is 125; this set estimates 126"
+— so a confirm is informed rather than a reflex tap.
+
+### ⛔⛔ THE REASON THE LADDER WINS, and it is user-agnostic — his words: **"this is for people that actually know where they're starting from"**
+
+**The current test only works for an athlete who ALREADY HAS A NUMBER.** Both branches assume one:
+with a number it prescribes a single set at ~87% of it and can only CONFIRM or LOWER; with no number
+it starts at the bar with nothing to aim at. **Neither DISCOVERS a max.**
+
+⛔ **AND THAT IS THE CUSTOMER.** The athlete this product is for is an endurance athlete — a runner or
+rider who wants to get stronger with a programme and **has never tested a squat in their life**
+([[project_efforts_customer_and_base]], [[project_efforts_reading_viada_inverted]]). For them the
+ladder is not a refinement; **it is the only way the app ever learns their numbers at all.** Every
+prescribed weight in a twelve-week block derives from that first test.
+
+⚠️ **So this is not Michael's edge case.** His own session exposed it — one lift with a stale number,
+one with none, and both tests underread — but the failure is structural and it lands hardest on a
+first-time lifter, who has no way to know the number was wrong. Judge the fix against a new athlete
+with an empty profile, never against Michael's numbers ([[feedback_user_agnostic_design]]).
