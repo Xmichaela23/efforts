@@ -31,6 +31,7 @@ import StrengthCalibrationNotice from '@/components/StrengthCalibrationNotice';
 // server field changed. Run keeps its own plate for one more pass (see StateTrendsBlock).
 import { EnduranceReadCards } from '@/components/context/StrengthReadCards';
 import ViadaWeekCard from '@/components/context/ViadaWeekCard';
+import EnduranceCheckpointSheet from '@/components/context/EnduranceCheckpointSheet';
 // ⛔ COLLAPSE TO ONE LINE PER SPORT (Round 3, 2026-09-01) — each sport shows a change-leading summary
 // and expands on tap. The summary wording is a set of pure functions so the confidence rule is pinned.
 import { changeMonth, efficiencySummary, strengthGlance } from '@/lib/sport-summary';
@@ -1268,6 +1269,9 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
 
   return (
     <div className="py-3">
+      {/* ⛔ THE SIX-WEEK CHECKPOINT (D-462 follow-up) sits above the sport plates: it is plan-level
+          (threshold pace, FTP, threshold HR), not one sport's. Renders only when the server says it is due. */}
+      <EnduranceCheckpointSheet enabled={hasActivePlan === true} />
       {/* Section clock label: PERFORMANCE is the SLOW clock. Per-row windows (8wk, steady runs,
           over 6wk, as-of dates) are receipts that inherit this and add specifics. */}
       {/* ⛔ THE "Fitness / trends over recent weeks" HEADING IS REMOVED (2026-09-01, cosmetic) — it
