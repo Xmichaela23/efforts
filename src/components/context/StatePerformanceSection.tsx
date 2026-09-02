@@ -33,7 +33,7 @@ import { EnduranceReadCards } from '@/components/context/StrengthReadCards';
 import ViadaWeekCard from '@/components/context/ViadaWeekCard';
 // ⛔ COLLAPSE TO ONE LINE PER SPORT (Round 3, 2026-09-01) — each sport shows a change-leading summary
 // and expands on tap. The summary wording is a set of pure functions so the confidence rule is pinned.
-import { changeMonth, efficiencySummary, pickStrengthLead, sinceMonthFromSeries, strengthSummary } from '@/lib/sport-summary';
+import { changeMonth, efficiencySummary, sinceMonthFromSeries, strengthGlance } from '@/lib/sport-summary';
 import { getStoredUserId } from '@/lib/supabase';
 import TrendSparkline from '@/components/context/TrendSparkline';
 import { liftStatusLine } from '@/lib/strength-calibration-copy';
@@ -1435,6 +1435,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   // S2: `stateDisplay` is the server-assembled display contract from the coach payload. When present the
   // hook renders it (no in-browser queries/assembly); absent → legacy live path (safe rollout fallback).
   const { cards, bikeFitness, runFitness, strengthFitness, swimRest, swimVolume, fitnessMode, fitnessAnchors, cadenceCounts, posture: declaredPosture, activeDisciplines, loading } = useStateTrends(stateDisplay);
+  const { useImperial } = useAppContext(); // for the collapsed run pace-at-HR glance
   // ⛔ SLICE b — ONE READ, and it must sit ABOVE the early return or the hook order changes between
   // renders. It self-silences on any plan that is not a strength block (`not_a_strength_block`), so
   // calling it unconditionally costs one function invoke and buys a stable hook list.
@@ -1460,12 +1461,15 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   const summaryLifts = strengthFitness ? foldVariantSlots(strengthFitness.perLift.filter((l) => l.isPrimary && l.latestE1rm != null)) : [];
   const summaryFor = (disc: string): string => {
     if (disc === 'strength') {
-      // ⛔ Lead off the lift that MOVED (confident change), not the freshly-tested one — see
-      // `pickStrengthLead`. No confident change → strongest number, no delta. Two numbers, no verdict
-      // word (D-420).
-      const lead = pickStrengthLead(summaryLifts as Array<{ displayName: string; latestE1rm: number | null; series?: Array<{ value: number }> }>);
-      if (!lead) return (strengthFitness?.sessionsThisWeek ?? 0) > 0 ? `${strengthFitness!.sessionsThisWeek} sessions this week` : 'no lifts logged';
-      return strengthSummary(lead.name, lead.latest, lead.prior);
+      // ⛔ NOT PR-BASED (Michael 2026-09-01: the program is form / bar speed / slow gain under
+      // cross-training stress). Opening week lists the working numbers; mid-block leads the lift that
+      // moved most "since week N"; flat is fine, no PR flag. See `strengthGlance`.
+      const line = strengthGlance(
+        summaryLifts as Array<{ displayName: string; latestE1rm: number | null; series?: Array<{ value: number; week?: number }> }>,
+        planWeek,
+      );
+      if (line) return line;
+      return (strengthFitness?.sessionsThisWeek ?? 0) > 0 ? `${strengthFitness!.sessionsThisWeek} sessions this week` : 'no lifts logged';
     }
     if (disc === 'run') {
       // ⛔ THE EASY-RUN GROUP, NOT THE POOLED SERIES (the false "down 22%"). The pooled efficiency
@@ -1474,20 +1478,37 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       // group's own verdict (no direction → count).
       const groups = (runFitness?.efficiency as { groups?: Array<{ group: string; runs: number; direction: string | null; pctChange: number | null; series: Array<{ date: string; recent: boolean }> }> } | undefined)?.groups;
       const easy = Array.isArray(groups) ? groups.find((g) => g.group === 'easy') : undefined;
+      // THE REAL NUMBER LEADS (Michael 2026-09-01: the count-only line "told the user nothing"):
+      // recent easy-run pace at the HR it was run at — the easy group's own recent pace/HR live on
+      // the top-level efficiency object (it IS the easy group's headline).
+      const ef = runFitness?.efficiency;
+      const runVal = ef?.recentPaceSecPerKm != null
+        ? `${formatPace(ef.recentPaceSecPerKm, useImperial)}${ef.recentHrAvg != null ? ` at ${ef.recentHrAvg} bpm` : ''}`
+        : null;
       if (easy) {
-        return efficiencySummary({ label: 'pace per heartbeat', verdict: easy.direction, pctChange: easy.pctChange, sampleCount: easy.runs, sinceMonth: sinceMonthFromSeries(easy.series), noun: 'easy run' });
+        return efficiencySummary({ label: 'pace per heartbeat', value: runVal, verdict: easy.direction, pctChange: easy.pctChange, sampleCount: easy.runs, sinceMonth: sinceMonthFromSeries(easy.series), noun: 'easy run' });
       }
-      const e = runFitness?.efficiency;
-      if (!e) return 'no runs logged';
-      return efficiencySummary({ label: 'pace per heartbeat', verdict: e.verdict, pctChange: e.pctChange, sampleCount: e.sampleCount, sinceMonth: '', noun: 'run' });
+      if (!ef) return 'no runs logged';
+      return efficiencySummary({ label: 'pace per heartbeat', value: runVal, verdict: ef.verdict, pctChange: ef.pctChange, sampleCount: ef.sampleCount, sinceMonth: '', noun: 'run' });
     }
     if (disc === 'bike') {
       // ⛔ LEAD OFF EFFICIENCY (watts per heartbeat) — it is on the object and is the metric Michael
       // named. NOT power+FTP: the FTP watts are resolved elsewhere (resolveCurrentFtp), and pulling
       // them in here would be a second source for a number this audit exists to de-duplicate.
-      const e = bikeFitness?.efficiency;
+      // THE REAL NUMBER LEADS (Michael 2026-09-01: "bike tells the user nothing"). Follow the
+      // server's own lead: when power leads, the recent watts (single-source, from the power series —
+      // NOT a client FTP resolve); otherwise the aerobic read is HR-at-easy-power, so show that bpm.
+      const bf = bikeFitness;
+      if (bf?.lead === 'power' && bf.power) {
+        const p = bf.power;
+        const recentW = p.recentValue ?? (Array.isArray(p.series) ? [...p.series].reverse().find((pt) => pt.recent)?.value ?? null : null);
+        const powerVal = recentW != null ? `${Math.round(recentW)} W` : null;
+        return efficiencySummary({ label: 'power', value: powerVal, verdict: p.verdict, pctChange: p.pctChange, sampleCount: p.sampleCount, sinceMonth: changeMonth(asOf, p.windowDays), noun: 'ride' });
+      }
+      const e = bf?.efficiency;
       if (!e) return 'no rides logged';
-      return efficiencySummary({ label: 'watts per heartbeat', verdict: e.verdict, pctChange: e.pctChange, sampleCount: e.sampleCount, sinceMonth: changeMonth(asOf, e.windowDays), noun: 'ride' });
+      const effVal = e.recentValue != null ? `${e.recentValue} bpm at easy power` : null;
+      return efficiencySummary({ label: 'watts per heartbeat', value: effVal, verdict: e.verdict, pctChange: e.pctChange, sampleCount: e.sampleCount, sinceMonth: changeMonth(asOf, e.windowDays), noun: 'ride' });
     }
     if (disc === 'swim') {
       const w = Math.round((swimVolume?.windowDays ?? 56) / 7);
