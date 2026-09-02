@@ -74,6 +74,13 @@ band; marathon pace = goal time ÷ distance; 5K work = typed 5K by division. Not
 entered — accepted by Michael. Michael's own threshold: learned 12:12/mi is built on easy running (two
 sub-max hard runs on file); he was told to enter ~10:50 as "my number" and let the checkpoint correct it.
 
+**PUSHED f138c39b + DEPLOYED 2026-09-02 (late):** HR-zone easy steps / effort targets / Garmin HEART_RATE
+(materialize-plan 351, send-workout-to-garmin 108), endurance-checkpoint v1 (new) + the State sheet,
+gate reads resolved maxes (generate-strength-plan, create-goal), load points follow the athlete's rating
+on every cardio sport (calculate-workload 55), loadByDiscipline on the display (compute-snapshot 187,
+coach 521 = payload v183), learn-fitness-profile 90, plain-word ⓘ on EF / decoupling / load / ACWR /
+threshold / FTP. NOT device-verified. iOS not rebuilt.
+
 **STEP 4 (the 24 remaining effort_paces readers, incl. the marathon builder) is PARKED by Michael
 2026-09-02** ("not worried about marathon unless we have to pick now") — see the PARKED block at the top
 of `POLISH-PUNCH-LIST.md` and `AUDIT-plan-materialization-2026-09-02.md` §8. **UNCOMMITTED IN THE TREE,
