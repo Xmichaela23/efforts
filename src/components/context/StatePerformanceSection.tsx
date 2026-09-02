@@ -31,6 +31,10 @@ import StrengthCalibrationNotice from '@/components/StrengthCalibrationNotice';
 // server field changed. Run keeps its own plate for one more pass (see StateTrendsBlock).
 import { EnduranceReadCards } from '@/components/context/StrengthReadCards';
 import ViadaWeekCard from '@/components/context/ViadaWeekCard';
+// ⛔ COLLAPSE TO ONE LINE PER SPORT (Round 3, 2026-09-01) — each sport shows a change-leading summary
+// and expands on tap. The summary wording is a set of pure functions so the confidence rule is pinned.
+import { efficiencySummary, strengthSummary } from '@/lib/sport-summary';
+import { getStoredUserId } from '@/lib/supabase';
 import TrendSparkline from '@/components/context/TrendSparkline';
 import { liftStatusLine } from '@/lib/strength-calibration-copy';
 import { Activity, Bike, Waves, Dumbbell, type LucideIcon } from 'lucide-react';
@@ -377,7 +381,7 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
               <span className="text-white/45">{recencyOf(fitness.loadFloor.newest_ride_age_days) ?? buildingRecency}</span>
             )}
             <span className="basis-full">
-              {'from your rides — a few more hard rides add the power read'}
+              {'A few more hard rides add the power read.'}
             </span>
           </span>
         ) : (
@@ -524,19 +528,12 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
           recentLabel="recent 6 weeks in color"
         />
       )}
-      {/* Q-255: when the row leads with LOAD, the chart is the LOAD — the same 42-day fitness tally the
-          words read (Strava's fitness chart). Picture and verdict move together by construction. */}
-      {building && fitness.loadFloor?.series && (
-        <TrendSparkline
-          series={fitness.loadFloor.series}
-          color={getDisciplineColor('bike')}
-          dotNoun="ride"
-          fmtVal={(v) => String(Math.round(v))}
-          unit=" fitness"
-          minSpanFraction={0.15}
-          recentLabel="recent 6 weeks in color"
-        />
-      )}
+      {/* ⛔ THE CTL/"fitness" CHART IS REMOVED (2026-09-01). Its axis read "10–23 fitness" — the same
+          Banister/Coggan load model whose words we removed, drawn as a graph an athlete cannot read,
+          and duplicating the load plate at the top of the screen. The ride EFFICIENCY series now
+          renders under this same bike plate (Round 3 pass 1), so the bike still leads with a chart an
+          athlete CAN read. The power chart above stays (watts, real). The model is untouched
+          server-side. */}
     </Row>
   );
 }
@@ -861,14 +858,13 @@ const DISCIPLINE_ICON: Record<string, LucideIcon> = { run: Activity, strength: D
 // Discipline name is a HEADER above the content (2026-07-23) — the content (and its 12-week charts) then
 // spans the FULL row width instead of being indented past a ~94px label gutter, so the sparklines get the
 // horizontal room to breathe. The colored discipline icon still tags the header.
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  const Icon = DISCIPLINE_ICON[label.toLowerCase()];
+// ⛔ THE INNER SPORT HEADING IS GONE (2026-09-01, Round 3). Every sport row now renders inside the
+// collapse wrapper, whose header already shows the sport icon + name; the Row's own "BIKE" title made
+// an expanded block read "BIKE" twice. Row keeps its padding/border and its content layout — ONLY the
+// duplicate title line is dropped. `label` stays on the signature (callers pass it) but is unused now.
+function Row({ label: _label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="py-2.5 border-b border-white/[0.055] last:border-0">
-      <div className="text-[13.5px] font-semibold tracking-[0.12em] uppercase flex items-center gap-2 text-white/85 mb-2">
-        {Icon && <Icon size={16} strokeWidth={2.25} style={{ color: getDisciplineColor(label) }} className="shrink-0" />}
-        {label}
-      </div>
       <div className="text-[13px] text-white/80 flex flex-wrap gap-x-3 gap-y-1 leading-none tabular-nums">
         {children}
       </div>
@@ -1325,30 +1321,26 @@ function RestTag({ rest }: { rest: PerfSummary | null | undefined }) {
 // — swim count, total distance, longest swim — over the 8wk window. Garmin/Strava fallback: volume, not
 // a fitness score. No dot, no arrow, no verdict. useImperial → yards (imperial) or meters (metric).
 function SwimVolumeRow({ vol }: { vol: SwimVolume }) {
-  const { useImperial } = useAppContext();
-  const toDisp = (m: number) => (useImperial ? Math.round(m * 1.09361) : m);
-  const unit = useImperial ? 'yd' : 'm';
   const weeks = Math.round((vol.windowDays || 56) / 7);
+  // ⛔ THE CUMULATIVE TOTAL IS GONE (2026-09-01, Michael twice: it "reads as an achievement while
+  // actually recording that he stopped"). Total and longest yardage were a running sum that only
+  // grows — meaningless as a state read. Swim is a MINIMAL placement block (never a feature), so it
+  // states recency and stops.
+  // ⚠️ TRUE "last swim, N ago" NEEDS A SERVER FIELD — `SwimVolume` carries no last-swim date, only a
+  // fixed window and a count. Until that field exists (filed as S7), this states swims-in-window,
+  // which is the honest client-only read. See the FIXLIST.
   if (!vol.swims) {
     return (
       <Row label="swim">
-        <span className="text-white/60 text-[13px]">no swims logged</span>
-        <span className="text-white/45 text-[12px]">· last {weeks}wk</span>
+        <span className="text-white/60 text-[13px]">no swims in the last {weeks}wk</span>
       </Row>
     );
   }
   return (
     <Row label="swim">
-      {/* Swim is DESCRIBED, not graded (no dot, no verdict) — tiles suit that: three plain facts,
-          no claim about them. */}
-      <ReadoutTiles
-        columns={3}
-        tiles={[
-          { value: String(vol.swims), label: vol.swims === 1 ? 'swim' : 'swims', note: `last ${weeks}wk` },
-          { value: `${toDisp(vol.totalDistanceM).toLocaleString()} ${unit}`, label: 'total' },
-          { value: `${toDisp(vol.longestM).toLocaleString()} ${unit}`, label: 'longest' },
-        ]}
-      />
+      <span className="text-white/70 text-[13px]">
+        <span className="text-white/85">{vol.swims}</span> {vol.swims === 1 ? 'swim' : 'swims'} in the last {weeks}wk
+      </span>
     </Row>
   );
 }
@@ -1439,7 +1431,7 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
 // always-visible week-execution trade sentence. (The old always-visible `PostureLine` — orphaned since
 // it was written, F10 — is removed 2026-07-24 now that the ⓘ carries this.)
 
-export default function StatePerformanceSection({ strengthDetail, stateDisplay, primaryDiscipline, planWeek, block, strengthFatigue, hasActivePlan }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; primaryDiscipline?: string | null; planWeek?: number | null; block?: BlockCard | null; strengthFatigue?: boolean; hasActivePlan?: boolean }) {
+export default function StatePerformanceSection({ strengthDetail, stateDisplay, primaryDiscipline, planWeek, block, strengthFatigue, hasActivePlan, asOf }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; primaryDiscipline?: string | null; planWeek?: number | null; block?: BlockCard | null; strengthFatigue?: boolean; hasActivePlan?: boolean; asOf?: string | null }) {
   // S2: `stateDisplay` is the server-assembled display contract from the coach payload. When present the
   // hook renders it (no in-browser queries/assembly); absent → legacy live path (safe rollout fallback).
   const { cards, bikeFitness, runFitness, strengthFitness, swimRest, swimVolume, fitnessMode, fitnessAnchors, cadenceCounts, posture: declaredPosture, activeDisciplines, loading } = useStateTrends(stateDisplay);
@@ -1447,6 +1439,50 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   // renders. It self-silences on any plan that is not a strength block (`not_a_strength_block`), so
   // calling it unconditionally costs one function invoke and buys a stable hook list.
   const calibration = useStrengthCalibration(true);
+
+  // ⛔ COLLAPSE TO ONE LINE PER SPORT (Round 3, 2026-09-01). Default collapsed — the four sports fit
+  // one screen; tap a sport to expand into its detail. Which are open is remembered per athlete in
+  // localStorage (a per-viewer convenience; wrapped in try/catch for private mode). ⚠️ NOT tabs — the
+  // point of the screen is seeing all four at once.
+  const expandKey = `state.sportsExpanded.${getStoredUserId() ?? 'anon'}`;
+  const [expandedSports, setExpandedSports] = React.useState<Set<string>>(() => {
+    try { const raw = localStorage.getItem(expandKey); return new Set<string>(raw ? JSON.parse(raw) : []); } catch { return new Set<string>(); }
+  });
+  const toggleSport = (d: string) => setExpandedSports((prev) => {
+    const next = new Set(prev);
+    if (next.has(d)) next.delete(d); else next.add(d);
+    try { localStorage.setItem(expandKey, JSON.stringify([...next])); } catch { /* private window / blocked storage */ }
+    return next;
+  });
+
+  // The change-leading summary for a sport's collapsed line — wording via the pure `sport-summary`
+  // helpers (confidence rule pinned there). Leads with what MOVED; the level lives in the detail.
+  const summaryLifts = strengthFitness ? foldVariantSlots(strengthFitness.perLift.filter((l) => l.isPrimary && l.latestE1rm != null)) : [];
+  const summaryFor = (disc: string): string => {
+    if (disc === 'strength') {
+      if (summaryLifts.length === 0) return (strengthFitness?.sessionsThisWeek ?? 0) > 0 ? `${strengthFitness!.sessionsThisWeek} sessions this week` : 'no lifts logged';
+      const rep = summaryLifts.reduce((a, b) => ((a.newestAgeDays ?? 1e9) <= (b.newestAgeDays ?? 1e9) ? a : b));
+      const series = (rep as { series?: Array<{ value: number }> }).series;
+      const prior = series && series.length >= 2 ? series[series.length - 2].value : null;
+      return strengthSummary(rep.displayName, rep.latestE1rm, prior);
+    }
+    if (disc === 'run') {
+      const e = runFitness?.efficiency;
+      if (!e) return 'no runs logged';
+      return efficiencySummary({ label: 'pace per heartbeat', verdict: e.verdict, pctChange: e.pctChange, sampleCount: e.sampleCount, asOf, windowDays: (e as { windowDays?: number }).windowDays, noun: 'run' });
+    }
+    if (disc === 'bike') {
+      if (!bikeFitness) return 'no rides logged';
+      const leadPower = bikeFitness.lead != null ? bikeFitness.lead !== 'efficiency' : bikeFitness.power.verdict !== 'needs_data';
+      const lead = leadPower ? bikeFitness.power : bikeFitness.efficiency;
+      return efficiencySummary({ label: leadPower ? 'power' : 'watts per heartbeat', verdict: lead.verdict, pctChange: lead.pctChange, sampleCount: lead.sampleCount, asOf, windowDays: (lead as { windowDays?: number }).windowDays, noun: 'ride' });
+    }
+    if (disc === 'swim') {
+      const w = Math.round((swimVolume?.windowDays ?? 56) / 7);
+      return (swimVolume?.swims ?? 0) > 0 ? `${swimVolume!.swims} ${swimVolume!.swims === 1 ? 'swim' : 'swims'} in the last ${w}wk` : `no swims in the last ${w}wk`;
+    }
+    return '';
+  };
   if (loading || cards.length === 0) return null;
 
   // The bike row shows the dual Power · Efficiency read when either has substance; otherwise it
@@ -1615,9 +1651,21 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
           // shared recipe in src/lib/readout-plate.ts) — this is the one place on State where a
           // card belongs to exactly one discipline, so it is the one place the plate takes a
           // colour. Everything multi-sport above and below sits on the neutral plate in StateTab.
+          // ⛔ COLLAPSED BY DEFAULT — the sport's change-leading one-liner; tap the header to expand
+          // into `inner` (the full detail). All four sports fit one screen this way.
+          const Icon = DISCIPLINE_ICON[card.discipline];
+          const open = expandedSports.has(card.discipline);
           return (
             <div key={card.discipline} className="galaxy-card readout-texture rounded-2xl px-3 mb-2" style={readoutPlateStyle(getDisciplineColorRgb(card.discipline), { galaxy: true })}>
-              {inner}
+              <button type="button" onClick={() => toggleSport(card.discipline)} className="w-full flex items-center gap-3 py-2.5 text-left" aria-expanded={open} aria-label={`${card.discipline} details`}>
+                <span className="flex items-center gap-2 shrink-0 text-[13.5px] font-semibold tracking-[0.12em] uppercase text-white/85">
+                  {Icon && <Icon size={16} strokeWidth={2.25} style={{ color: getDisciplineColor(card.discipline) }} className="shrink-0" />}
+                  {card.discipline}
+                </span>
+                <span className="flex-1 min-w-0 text-right text-[12px] text-white/60 truncate">{summaryFor(card.discipline)}</span>
+                <span className="text-white/45 text-[11px] shrink-0">{open ? '▾' : '▸'}</span>
+              </button>
+              {open && <div className="pb-1">{inner}</div>}
             </div>
           );
         };

@@ -580,6 +580,12 @@ touched. None of them is done; none was quietly tolerated.
       all three call sites AND feeding those inputs to the server printer, which does not have them.
       **Server change, 27-function deploy.** Filed as known-and-deliberate: wherever the server printer
       renders the headline it will keep the plan-blind wording until this ships.
+- [ ] S7. **Swim recency needs a server field.** `SwimVolume` carries `{ swims, totalDistanceM,
+      longestM, windowDays }` — a count and a window, no LAST-SWIM date. Michael's ruling was to
+      replace the cumulative total with recency ("last swim, N ago"). The cumulative total + longest
+      are REMOVED now (client), and the block states swims-in-window instead — honest with the data on
+      hand. True "last swim 3 weeks ago" needs `lastSwimDate` / `lastSwimAgeDays` on `SwimVolume`
+      (`assemble.ts`), 27-function closure + payload bump. Filed, not built.
 - [ ] S4. **`RunFitnessRow` (~330 lines) is unreachable** since 1b. Bannered, not deleted. It holds
       the measured heat cost (D-346), the conditions caption, the ⓘ definition and the Q-179 posture
       sentence — content that exists nowhere else. Retiring it is a product call.
@@ -657,6 +663,24 @@ cards cover it — one block reading another block's presence. If either can be 
 leave the athlete with NEITHER. **Round 1b removes the need for the gate; the gate must be gone
 before reordering ships.** No block may read whether another block is rendered.
 
+- [x] 3-collapse. **BUILT 2026-09-01 (night). Client-only. NOT committed.** The three named fixes +
+      collapse + change-leading summary: (1) bike CTL/"fitness" chart removed (the ride efficiency
+      series on the bike plate is the readable chart); (2) dangling "from your rides —" → "A few more
+      hard rides add the power read."; (3) swim cumulative total + longest removed → "N swims in the
+      last Nwk" (true "last swim N ago" filed S7 — needs a server field); (4) each sport COLLAPSES to
+      one line, default collapsed, tap to expand, remembered per athlete in localStorage — not tabs;
+      (5) the collapsed line LEADS WITH THE CHANGE (`src/lib/sport-summary.ts`): strength "deadlift
+      185, up from 180" (two numbers, no verdict word — D-420), run/bike "…per heartbeat up 4% since
+      {window month}" with the direction gated by the verdict, else number + count. 5 fixtures green.
+      ✅ DOUBLE HEADING FIXED (2026-09-01): the shared `Row` no longer renders its own title (the
+      collapse header owns it) — ONLY the duplicate title line dropped, padding/border/content layout
+      unchanged, uniform across bike/strength/swim; run never had an inner heading. Guarded: nothing
+      else on any row moved.
+- [ ] 3-reorder. **DRAG TO REORDER — NOT BUILT, needs a ruling.** No dnd library in the repo; HTML5
+      native drag is unreliable in the iOS WKWebView (his phone) so it would look broken; a
+      dependency-free custom pointer-drag is sizable and unverifiable here; adding a dep is blocked by
+      "no speculative npm deps" without approval. Awaits: approve a small dnd dep, or greenlight a
+      custom pointer-drag as its own build.
 - [ ] 3a. Whole blocks only — drag to reorder, tap to hide, reset to default. No reordering INSIDE a
       block.
 - [ ] 3.5b. The order persists per athlete. Field pattern: Garmin Connect and TrainingPeaks dashboards.
