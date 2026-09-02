@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { calibrationFromPaces, saveCalibration } from '@/lib/run-pace-calibration';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { X, Target, Calendar, CalendarRange, TrendingUp, ChevronRight, ChevronDown, Flag, Dumbbell, Activity, Bike, Waves, Loader2, Trash2, Pause, Play, Link2, List, Crosshair, Plus, Gauge } from 'lucide-react';
 // The one discipline palette (`SPORT_COLORS`). Never hand-pick a hex for a discipline.
@@ -1130,28 +1131,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
 
   // --- Quick Calibration (two-pace baseline) ---
 
-  // ⛔ MARKED FOR DELETION (STATE-race-builder §2.6, marked 2026-08-26): `PACE_BY_VDOT` below is a
-  // byte-for-byte duplicate of `PACE_TABLE` in `effort-score.ts` — numerically identical TODAY, a
-  // coincidence that will not survive an edit to one. The deletion is "import the one table", not
-  // a copy tweak. `VDOT_5K` has live readers in this function; it goes only if the whole
-  // calibration block moves onto the shared table.
-  const VDOT_5K: [number, number][] = [
-    [30,1860],[31,1800],[32,1740],[33,1686],[34,1632],[35,1584],[36,1536],[37,1488],
-    [38,1446],[39,1404],[40,1362],[41,1326],[42,1290],[43,1254],[44,1222],[45,1188],
-    [46,1158],[47,1128],[48,1098],[49,1072],[50,1044],[51,1020],[52,996],[53,972],
-    [54,951],[55,930],[56,909],[57,891],[58,873],[59,855],[60,838],[65,762],[70,696],
-    [75,642],[80,594],[85,552],
-  ];
-  const PACE_BY_VDOT: [number, number, number, number, number, number][] = [
-    // vdot, base, race, steady, power, speed  (sec/mile)
-    [30,744,682,622,568,534],[32,708,648,592,540,508],[34,672,618,564,516,484],
-    [36,642,588,538,492,462],[38,612,562,514,470,442],[40,585,537,491,449,422],
-    [42,560,514,470,430,404],[44,536,492,450,412,387],[45,525,482,441,403,379],[46,514,472,432,395,371],
-    [48,494,453,415,379,357],[50,474,436,399,365,343],[52,456,419,383,351,330],
-    [54,439,403,369,338,318],[56,423,388,355,325,306],[58,408,375,343,314,295],
-    [60,394,362,331,303,285],[65,362,332,304,278,262],[70,334,306,280,256,241],
-    [75,309,284,260,238,224],[80,287,264,241,221,208],
-  ];
+  // ⛔ The inline vDOT tables that lived here are GONE (2026-09-02, D-461) — the calibration uses the
+  // one engine in `effort-score.ts` via `run-pace-calibration.ts`, same as the strength wizard.
 
   function parsePace(s: string): number | null {
     const m = s.trim().match(/^(\d{1,2}):(\d{2})$/);
@@ -1163,68 +1144,19 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     return `${m}:${String(s).padStart(2, '0')}`;
   }
 
-  function vdotFrom5KTime(timeSec: number): number {
-    if (timeSec >= VDOT_5K[0][1]) return VDOT_5K[0][0];
-    if (timeSec <= VDOT_5K[VDOT_5K.length - 1][1]) return VDOT_5K[VDOT_5K.length - 1][0];
-    for (let i = 0; i < VDOT_5K.length - 1; i++) {
-      const [v1, t1] = VDOT_5K[i], [v2, t2] = VDOT_5K[i + 1];
-      if (timeSec <= t1 && timeSec >= t2) {
-        return Math.round((v1 + ((t1 - timeSec) / (t1 - t2)) * (v2 - v1)) * 10) / 10;
-      }
-    }
-    return 40;
-  }
-
-  function pacesFromVdot(vdot: number): { base: number; race: number; steady: number; power: number; speed: number } {
-    const tbl = PACE_BY_VDOT;
-    if (vdot <= tbl[0][0]) return { base: tbl[0][1], race: tbl[0][2], steady: tbl[0][3], power: tbl[0][4], speed: tbl[0][5] };
-    if (vdot >= tbl[tbl.length - 1][0]) { const l = tbl[tbl.length - 1]; return { base: l[1], race: l[2], steady: l[3], power: l[4], speed: l[5] }; }
-    for (let i = 0; i < tbl.length - 1; i++) {
-      if (vdot >= tbl[i][0] && vdot <= tbl[i + 1][0]) {
-        const f = (vdot - tbl[i][0]) / (tbl[i + 1][0] - tbl[i][0]);
-        return {
-          base:   Math.round(tbl[i][1] - f * (tbl[i][1] - tbl[i + 1][1])),
-          race:   Math.round(tbl[i][2] - f * (tbl[i][2] - tbl[i + 1][2])),
-          steady: Math.round(tbl[i][3] - f * (tbl[i][3] - tbl[i + 1][3])),
-          power:  Math.round(tbl[i][4] - f * (tbl[i][4] - tbl[i + 1][4])),
-          speed:  Math.round(tbl[i][5] - f * (tbl[i][5] - tbl[i + 1][5])),
-        };
-      }
-    }
-    return { base: 585, race: 537, steady: 491, power: 449, speed: 422 };
-  }
-
   const isMetric = !useImperial;
   const paceUnit = isMetric ? '/km' : '/mi';
 
   async function handleCalibrationSave() {
-    const easyRaw = parsePace(calEasyPace);
-    const fiveKRaw = parsePace(calFiveKPace);
-    if (!easyRaw || !fiveKRaw) return;
-
+    // ⛔ ONE CALIBRATION, ONE WRITER (D-461). This used to carry its own vDOT tables and upsert the
+    // effort columns directly — a second 5K on file beside the one Baselines keeps.
+    const result = calibrationFromPaces({ easyPace: calEasyPace, fiveKPace: calFiveKPace, isMetric });
+    if (!result) return;
     setCalSaving(true);
     try {
-      const toSecPerMile = (v: number) => isMetric ? Math.round(v * 1.60934) : v;
-      const fiveKPerMile = toSecPerMile(fiveKRaw);
-      const easyPerMile = toSecPerMile(easyRaw);
-      const fiveKTimeSec = Math.round(fiveKPerMile * 3.10686);
-      const vdot = vdotFrom5KTime(fiveKTimeSec);
-      const paces = pacesFromVdot(vdot);
-
       const userId = readStoredUserId();
       if (!userId) return;
-
-      await supabase.from('user_baselines').upsert({
-        user_id: userId,
-        effort_score: vdot,
-        effort_source_distance: 5000,
-        effort_source_time: fiveKTimeSec,
-        effort_paces: paces,
-        effort_paces_source: 'calculated',
-        effort_score_status: 'self_reported',
-        effort_updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id' });
-
+      await saveCalibration(supabase, userId, result);
       const { data: bl } = await supabase.from('user_baselines').select('*').eq('user_id', userId).maybeSingle();
       setCurrentBaselines(bl);
       setShowCalibration(false);
@@ -2169,9 +2101,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                 if (fiveKS >= easyS) return <p className="text-xs text-red-400/70">5K pace should be faster than easy pace</p>;
                 const ratio = easyS / fiveKS;
                 if (ratio > 1.8) return <p className="text-xs text-amber-400/60">That's a large gap — double-check your paces</p>;
-                const fiveKTime = Math.round((isMetric ? fiveKS * 1.60934 : fiveKS) * 3.10686);
-                const vdot = vdotFrom5KTime(fiveKTime);
-                const paces = pacesFromVdot(vdot);
+                const paces = calibrationFromPaces({ easyPace: calEasyPace, fiveKPace: calFiveKPace, isMetric })?.paces
+                  ?? { base: 585, race: 537, steady: 491, power: 449, speed: 422 };
                 const fmt = (s: number) => fmtPace(isMetric ? s / 1.60934 : s);
                 return (
                   <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 space-y-1">

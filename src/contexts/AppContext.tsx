@@ -4,7 +4,8 @@ import { supabase, getStoredUserId } from '@/lib/supabase';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import { Capacitor } from '@capacitor/core';
 import { parseLocalDate } from '@/lib/dateUtils';
-import { deriveFiveKPaceFromRaceTime } from '@/lib/resolve-current-5k-pace';
+import { deriveFiveKPaceFromRaceTime, resolveFiveKRaceTimeSec } from '@/lib/resolve-current-5k-pace';
+import { effortFieldsFromFiveKTimeSec } from '@/lib/run-pace-calibration';
 import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
 
 export interface WorkoutInterval {
@@ -378,6 +379,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         injury_regions: data.injuryRegions,
         training_background: data.trainingBackground,
         equipment: data.equipment,
+        // ⛔ THE ONE DERIVATION (D-461). The 5K on this row is the only 5K; the wizard-era effort columns
+        // are derived from it here and nowhere else. No 5K on the row → the columns are left as they are.
+        ...(() => {
+          const sec = resolveFiveKRaceTimeSec({ performance_numbers: perf } as never);
+          return sec != null ? effortFieldsFromFiveKTimeSec(sec) : {};
+        })(),
         // Only written when the caller carried it (loaded rows always do) — a caller without the field
         // must not wipe a lock it never saw.
         ...(data.locked_baselines !== undefined ? { locked_baselines: data.locked_baselines } : {}),

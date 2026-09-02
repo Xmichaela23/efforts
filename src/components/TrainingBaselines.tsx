@@ -1740,208 +1740,74 @@ return (
                             <h3 className="text-sm font-medium text-white/90">Cycling</h3>
                           </div>
                           <div className="space-y-3">
-                            {/* FTP Input with Smart Status */}
+                            {/**
+                              * ⛔ THE SAME ROW AS RUN AND STRENGTH (Michael 2026-09-02, "go"). FTP had this switch
+                              * first (Q-240: typing is choosing; `ftp_source: 'manual'` = my number, absent/'learned'
+                              * = auto) — only the clothes change. The resolver (`resolveCurrentFtp`) is untouched and
+                              * still what the zones below and the plan targets read.
+                              */}
                             {(() => {
                               const manualFtp = data.performanceNumbers?.ftp;
                               const learnedFtp = learnedFitness?.ride_ftp_estimated?.value;
-                              // FTP fracture #2: the FTP the app USES is the single resolver's answer (learned-first when
-                              // confident) — so Baselines agrees with Athletic Record / the cycling analyzer / the coach.
-                              // The input still edits the TYPED anchor; `effectiveFtp` (zones + status) is what the app uses.
                               const resolved = resolveCurrentFtp({ learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers } as any);
-                              const effectiveFtp = resolved.value ?? manualFtp ?? learnedFtp;
-                              const learnedLeading = resolved.source === 'learned' || resolved.source === 'learned-low';
-                              const learnedImproved = !!manualFtp && learnedLeading; // resolver chose confident learned over the typed value
-                              
+                              const mine = (data.performanceNumbers as any)?.ftp_source === 'manual';
+                              const rideThr = learnedFitness?.ride_threshold_hr;
+                              const noHardRides = rideThr?.is_estimate === true;
+                              const status = mine
+                                ? 'your number. Your rides don\'t change it.'
+                                : learnedFtp
+                                  ? `auto. From your best 20-minute power.${noHardRides ? ' No hard rides on file, so this is your best easy 20 minutes — likely lower than your real FTP.' : ''}`
+                                  : manualFtp
+                                    ? 'auto. Your typed number, until your rides measure one.'
+                                    : 'auto. Nothing on file yet.';
+                              const setMine = () => setData(prev => {
+                                const pn: any = { ...prev.performanceNumbers, ftp_source: 'manual' };
+                                if (!(pn.ftp > 0) && resolved.value) pn.ftp = Math.round(Number(resolved.value));
+                                return { ...prev, performanceNumbers: pn };
+                              });
+                              const setAuto = () => setData(prev => {
+                                const pn: any = { ...prev.performanceNumbers };
+                                delete pn.ftp_source;
+                                return { ...prev, performanceNumbers: pn };
+                              });
                               return (
-                                <div className="space-y-1">
-                                  {/**
-                                    * ⛔ SHOW THE NUMBER IN USE, NOT ONLY THE ONE YOU TYPED (2026-08-20).
-                                    *
-                                    * The input below holds the athlete's own value and nothing else —
-                                    * deliberately, because falling back to the learned number made the
-                                    * field impossible to clear (see its comment). But that left the ONLY
-                                    * prominent number on the card being 176 while the power zones under
-                                    * it were built from 156. The card whose job is saying which number is
-                                    * in use was showing the one that wasn't.
-                                    *
-                                    * Same shape as the easy-pace block: resolved value and its receipt on
-                                    * top, your own number under it, the picker under that.
-                                    */}
-                                  {resolved.value != null && (
-                                    <div className="px-3 py-2.5 rounded-xl bg-white/[0.09] border border-white/25 text-left mb-1.5">
-                                      <div className="flex items-baseline gap-2">
-                                        <span className="text-2xl font-semibold text-white tabular-nums">{Math.round(Number(resolved.value))}</span>
-                                        <span className="text-[12px] text-white/60">watts</span>
-                                      </div>
-                                      <p className="text-[12px] text-white/60 mt-1 leading-snug">
-                                        {/* FTP has no `manual-chosen` tier — Q-240 folds the athlete's
-                                            choice into `ftp_source`, so `manual` is the only asserted one. */}
-                                        {resolved.source === 'manual'
-                                          ? 'you entered this'
-                                          : 'from your best 20-minute power'}
-                                      </p>
-                                    </div>
-                                  )}
-                                  <div className="flex items-center gap-2">
-                                    <label className="text-sm text-white/75 font-medium" htmlFor="ftp-input">Your number</label>
-                                    <input
-                                      id="ftp-input"
-                                      ref={ftpInputRef}
-                                      type="number"
-                                      // ⛔ THE FIELD EDITS YOUR TYPED NUMBER ONLY. It used to fall back to the
-                                      // LEARNED value (`manualFtp || learnedFtp || ''`), which made it
-                                      // impossible to change: clearing the box parsed to NaN -> ftp removed ->
-                                      // the value prop immediately re-rendered the learned 176, so every attempt
-                                      // to backspace and retype snapped straight back. The learned number is a
-                                      // PLACEHOLDER now — visible, clearly not yours, and it cannot fight you
-                                      // for the field.
-                                      value={manualFtp ?? ''}
-                                      onChange={(e) => setData(prev => {
-                                        const typed = parseInt(e.target.value);
-                                        const next: any = { ...prev.performanceNumbers };
-                                        if (Number.isFinite(typed) && typed > 0) {
-                                          next.ftp = typed;
-                                          // ⛔ TYPING IS CHOOSING (Q-240). An athlete who enters a number has
-                                          // asserted it; making them also tap a pill to be believed is the
-                                          // same "the app decided" complaint one step later. Reversible: the
-                                          // pills stay, and "Use my rides" hands it straight back.
-                                          next.ftp_source = 'manual';
-                                        } else {
-                                          delete next.ftp;
-                                          // No typed number left to prefer — drop the preference with it
-                                          // rather than leaving a pointer to a value that is gone.
-                                          if (next.ftp_source === 'manual') delete next.ftp_source;
-                                        }
-                                        return { ...prev, performanceNumbers: next };
-                                      })}
-                                      placeholder={learnedFtp ? String(Math.round(Number(learnedFtp))) : '250'}
-                                      className="w-20 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
-                                      style={{ fontFamily: 'Inter, sans-serif' }}
-                                    />
-                                    <span className="text-[12px] text-white/60">watts</span>
+                                <div
+                                  className="rounded-xl border px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1"
+                                  style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: mine ? `${SPORT_COLORS.cycling}55` : 'rgba(255,255,255,0.15)' }}
+                                >
+                                  <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                                    <span className="text-lg font-semibold tabular-nums text-white">{resolved.value != null ? Math.round(Number(resolved.value)) : '—'}</span>
+                                    <span className="text-[11px] text-white/50">watts</span>
                                   </div>
-                                  
-                                  {/* Status helper text */}
-                                  <div className="text-[12px] text-white/60 pl-8">
-                                    {!manualFtp && !learnedFtp && (
-                                      <span>Enter your FTP or we'll learn it from your workouts</span>
-                                    )}
-                                    {!manualFtp && learnedFtp && (
-                                      <span className="text-teal-400/70">
-                                        Auto-learned from workouts •{' '}
-                                        <button
-                                          type="button"
-                                          onClick={focusFtpInput}
-                                          className="underline hover:text-teal-300 cursor-pointer"
-                                        >
-                                          Edit to override
-                                        </button>
-                                      </span>
-                                    )}
-                                    {/* ⛔ Q-240 — THE ATHLETE CHOOSES, AND THEIR CHOICE WINS (2026-08-01).
-                                        Cycling was the only baseline where the app decided: a confident
-                                        learned estimate outranked the typed number, and the only lever was
-                                        "Clear entry" — which deletes your number without giving you the one
-                                        you wanted. Running has had this control since Q-174; this is the same
-                                        pattern, the same stored-preference shape, honoured by the same single
-                                        resolver. Absent a choice, nothing changes for anyone.
-                                        Shown only when BOTH numbers exist — with one there is nothing to
-                                        choose between, and the lines below still say where it came from. */}
-                                    {manualFtp && learnedFtp && (
-                                      <div className="flex flex-col gap-1.5 mt-0.5 w-[17rem] max-w-full">
-                                        <div className="flex items-stretch gap-1.5">
-                                          {([
-                                            { key: 'learned', label: 'Use my rides', val: `${learnedFtp} W` },
-                                            { key: 'manual', label: 'Use my number', val: `${manualFtp} W` },
-                                          ] as const).map(({ key, label, val }) => {
-                                            // Absent choice === 'learned' (the historical precedence).
-                                            const chosen = (data.performanceNumbers as any)?.ftp_source ?? 'learned';
-                                            const active = chosen === key;
-                                            return (
-                                              <button
-                                                key={key}
-                                                type="button"
-                                                onClick={() => setData(prev => ({
-                                                  ...prev,
-                                                  performanceNumbers: { ...prev.performanceNumbers, ftp_source: key },
-                                                }))}
-                                                // Sport-coloured selection — the cycling twin of the run
-                                                // pills above; see the note there.
-                                                className={`flex-1 min-h-[2.75rem] px-2.5 py-1.5 rounded-lg text-[11px] leading-tight border transition-colors text-left ${
-                                                  active
-                                                    ? 'text-white'
-                                                    : 'bg-white/[0.04] border-white/10 text-white/45 hover:text-white/70'
-                                                }`}
-                                                style={active ? {
-                                                  backgroundColor: `${SPORT_COLORS.cycling}26`,
-                                                  borderColor: `${SPORT_COLORS.cycling}80`,
-                                                } : undefined}
-                                                title={key === 'manual'
-                                                  ? 'Your entered FTP is used, even if your rides estimate a different one.'
-                                                  : 'Tracks what your hard rides estimate, and keeps updating.'}
-                                              >
-                                                <span className="block">{label}</span>
-                                                <span className="block tabular-nums text-white/50">{val}</span>
-                                              </button>
-                                            );
-                                          })}
-                                        </div>
-                                        {/* ⚠️ NAMES THE BLAST RADIUS. This is not a display toggle: the same
-                                            resolver feeds the coach, the analyzers, the plan generators and
-                                            every power zone. The athlete deserves to know the choice moves
-                                            all of them. */}
-                                        {/**
-                                          * ⛔ SAY WHEN THE NUMBER RESTS ON EASY RIDING (2026-08-20).
-                                          *
-                                          * FTP is 95% of the best 20-minute power across the athlete's
-                                          * rides. That is only an FTP if one of those twenty minutes was
-                                          * actually hard — otherwise it is their best EASY twenty
-                                          * minutes wearing an FTP's name, and every power zone and plan
-                                          * target below is built on it.
-                                          *
-                                          * ⚠️ THE SIGNAL IS ALREADY COMPUTED, so this invents nothing.
-                                          * `analyzeRides` marks `ride_threshold_hr` as an estimate when
-                                          * it finds no hard rides — the exact same condition. If there
-                                          * were no hard efforts to detect a threshold heart rate from,
-                                          * there were none to produce a maximal twenty minutes either.
-                                          */}
-                                        {(() => {
-                                          const rideThr = learnedFitness?.ride_threshold_hr;
-                                          const noHardRides = rideThr?.is_estimate === true;
-                                          const onLearned = ((data.performanceNumbers as any)?.ftp_source ?? 'learned') === 'learned';
-                                          if (!noHardRides || !onLearned || !learnedFtp) return null;
-                                          return (
-                                            <span className="text-[12px] text-white/60 leading-snug">
-                                              No hard rides on file, so this is your best easy 20 minutes — likely lower than your real FTP. A test, or one hard ride, moves it.
-                                            </span>
-                                          );
-                                        })()}
-                                        <span className="text-[11px] text-white/55 leading-snug">
-                                          Sets your power zones and the targets in your plan.
-                                        </span>
-                                      </div>
-                                    )}
-                                    {manualFtp && !learnedFtp && !learnedImproved && (
-                                      <span className="flex items-center gap-1">
-                                        <span>Manual</span>
-                                        {learnedFtp && (
-                                          <button
-                                            onClick={() => setData(prev => {
-                                              const { ftp, ...rest } = prev.performanceNumbers as any;
-                                              return { ...prev, performanceNumbers: rest };
-                                            })}
-                                            className="text-white/50 hover:text-white/70 underline"
-                                          >
-                                            • Clear to use auto-learned ({learnedFtp}W)
-                                          </button>
-                                        )}
-                                      </span>
-                                    )}
-                                  </div>
+                                  <input
+                                    id="ftp-input"
+                                    ref={ftpInputRef}
+                                    type="number"
+                                    inputMode="numeric"
+                                    aria-label="FTP, my number, watts"
+                                    value={manualFtp ?? ''}
+                                    onChange={(e) => setData(prev => {
+                                      const typed = parseInt(e.target.value);
+                                      const next: any = { ...prev.performanceNumbers };
+                                      if (Number.isFinite(typed) && typed > 0) {
+                                        next.ftp = typed;
+                                        next.ftp_source = 'manual'; // typing is choosing (Q-240)
+                                      } else {
+                                        delete next.ftp;
+                                        if (next.ftp_source === 'manual') delete next.ftp_source;
+                                      }
+                                      return { ...prev, performanceNumbers: next };
+                                    })}
+                                    placeholder={learnedFtp ? String(Math.round(Number(learnedFtp))) : '250'}
+                                    className="w-[4.5rem] h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40 text-center shrink-0"
+                                    style={{ fontFamily: 'Inter, sans-serif' }}
+                                  />
+                                  <AutoMinePill mine={mine} onAuto={setAuto} onMine={setMine} color={SPORT_COLORS.cycling} label="FTP" />
+                                  <div className="basis-full text-[11px] text-white/55 leading-snug">{status} Sets your power zones and the targets in your plan.</div>
                                 </div>
                               );
                             })()}
-                            
+
                             {/* Power Zones from the RESOLVED FTP (learned-first) — the same source the app uses, so the
                                 zones on Baselines match the analyzer/coach instead of being manual-first (FTP fracture #2). */}
                             {resolveCurrentFtp({ learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers } as any).value && (

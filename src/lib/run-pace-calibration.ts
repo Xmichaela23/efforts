@@ -77,7 +77,47 @@ export type CalibrationResult = {
   paces: TrainingPaces;
   /** The 5K time implied by the typed 5K pace, in seconds — stored as `effort_source_time`. */
   fiveKTimeSec: number;
+  /** The typed easy pace, sec/MILE — stored as `performance_numbers.easyPace` (the typed seed). */
+  easyPaceSecPerMi: number;
 };
+
+/** seconds → "mm:ss" race clock, the shape `performance_numbers.fiveK` has always held. */
+export function formatRaceClock(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.round(sec % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/**
+ * ⛔ THE ONE DERIVATION (2026-09-02, D-461). Every pace the app derives from a 5K comes from this
+ * function and nowhere else. Input: the 5K as a race clock in seconds. Output: the `effort_*` columns
+ * on `user_baselines`, which the 25-odd readers of `effort_paces` keep reading unchanged.
+ *
+ * Before this there were FOUR writers (the race wizard with its own inline vDOT tables, the strength
+ * wizard, `generate-run-plan`, and `materialize-plan` recomputing and writing back on every build) and
+ * TWO stored 5Ks (`performance_numbers.fiveK` from Baselines, `effort_source_time` from the wizards).
+ * Now: the 5K lives in `performance_numbers.fiveK`, and whoever saves it calls this.
+ */
+export function effortFieldsFromFiveKTimeSec(fiveKTimeSec: number): {
+  effort_score: number;
+  effort_source_distance: number;
+  effort_source_time: number;
+  effort_paces: TrainingPaces;
+  effort_paces_source: 'calculated';
+  effort_score_status: 'self_reported';
+  effort_updated_at: string;
+} {
+  const score = calculateEffortScore(5000, fiveKTimeSec);
+  return {
+    effort_score: score,
+    effort_source_distance: 5000,
+    effort_source_time: Math.round(fiveKTimeSec),
+    effort_paces: getPacesFromScore(score),
+    effort_paces_source: 'calculated',
+    effort_score_status: 'self_reported',
+    effort_updated_at: new Date().toISOString(),
+  };
+}
 
 /**
  * Two self-reported paces → the effort score and training paces the plan will be built from.
@@ -105,7 +145,7 @@ export function calibrationFromPaces(input: {
   const fiveKPerMile = toSecPerMile(fiveKRaw);
   const fiveKTimeSec = Math.round(fiveKPerMile * 3.10686);
   const score = calculateEffortScore(5000, fiveKTimeSec);
-  return { score, paces: getPacesFromScore(score), fiveKTimeSec };
+  return { score, paces: getPacesFromScore(score), fiveKTimeSec, easyPaceSecPerMi: toSecPerMile(easyRaw) };
 }
 
 /**
@@ -120,15 +160,16 @@ export async function saveCalibration(
   userId: string,
   result: CalibrationResult,
 ): Promise<{ error: string | null }> {
+  // ⛔ WRITES THE 5K WHERE BASELINES KEEPS IT, then the ONE derivation (D-461). The typed easy pace
+  // lands as the typed seed too — it used to be validated and thrown away.
+  const { data: row } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', userId).maybeSingle();
+  const pn = { ...((row?.performance_numbers as Record<string, unknown> | null) ?? {}) } as Record<string, unknown>;
+  pn.fiveK = formatRaceClock(result.fiveKTimeSec);
+  pn.easyPace = `${formatPaceInput(result.easyPaceSecPerMi)}/mi`;
   const { error } = await supabase.from('user_baselines').upsert({
     user_id: userId,
-    effort_score: result.score,
-    effort_source_distance: 5000,
-    effort_source_time: result.fiveKTimeSec,
-    effort_paces: result.paces,
-    effort_paces_source: 'calculated',
-    effort_score_status: 'self_reported',
-    effort_updated_at: new Date().toISOString(),
+    performance_numbers: pn,
+    ...effortFieldsFromFiveKTimeSec(result.fiveKTimeSec),
   }, { onConflict: 'user_id' });
   return { error: error ? error.message : null };
 }

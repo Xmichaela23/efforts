@@ -1529,3 +1529,32 @@ hard one "Hard Run"; neither reached the classifier, so the one attached hard ru
 finding on the account: 20 of 23 runs point at planned rows that no longer exist (plans rebuilt) — the
 plan cannot tag what it no longer has; those runs are easy by ruling until re-attached.
 
+## D-461 — One 5K, one derivation, one writer (2026-09-02)
+
+**Ruling (Michael).** *"Shouldn't the 5K pace just run once in Baselines?"* — and on hearing the trace:
+*"let's clean that up."*
+
+**What was there.** Two stored 5Ks (`performance_numbers.fiveK` from Baselines; `effort_source_time`
+from the wizards). Three vDOT engines (`src/lib/effort-score.ts`, `generate-run-plan/effort-score.ts`,
+and inline tables in `GoalsScreen.tsx`). Four writers of the derived `effort_*` columns: the race
+wizard's calibration, the strength wizard's calibration (`run-pace-calibration.ts saveCalibration`),
+`generate-run-plan` (on a performance_build), and `materialize-plan`, which recomputed the paces from
+`effort_score` on EVERY materialization and wrote them back to the athlete's row. The typed easy pace
+from the wizard was validated and discarded.
+
+**What it is now.** The 5K lives in `performance_numbers.fiveK` only. `effortFieldsFromFiveKTimeSec`
+(`run-pace-calibration.ts`) is the one derivation. Two entry points call it, both writing the same row
+the same way: the Baselines save (`AppContext.saveUserBaselines`, whenever a 5K is on the row) and
+`saveCalibration` (both wizards; it now also writes `performance_numbers.fiveK` and `.easyPace`).
+`generate-run-plan` and `materialize-plan` no longer write to `user_baselines`. The Goals screen's
+inline vDOT tables are deleted. The 25 readers of `effort_paces` are untouched — they read a cache with
+one writer instead of four.
+
+**Not done, deliberately.** (1) `effort_paces` is still a stored cache rather than computed on read;
+deleting it touches ~25 readers and the plan builders. (2) `generate-run-plan/effort-score.ts` is
+still a second copy of the vDOT engine, server-side. (3) The wizards still ASK for a 5K pace instead of
+prefilling from Baselines. Each is its own cut.
+
+**Legacy rows.** A row with `effort_*` but no `fiveK` keeps its columns until a 5K is entered — the
+Baselines save leaves them alone rather than nulling them.
+

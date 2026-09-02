@@ -50,7 +50,6 @@ export function stampsTargetRir(protocolTracksRir: boolean, slotIntent: unknown)
 }
 
 import { resolvePlanPhase } from '../_shared/plan-phase.ts';
-import { getPacesFromScore } from '../generate-run-plan/effort-score.ts';
 import {
   swimDrillDisplayName,
   swimDrillEquipmentFromTokens,
@@ -3807,39 +3806,10 @@ Deno.serve(async (req) => {
       console.log('[materialize] effectiveProtocolTier (same rule as generate-combined-plan):', effectiveProtocolTier);
       
       // Recalculate effort_paces from effort_score if source is 'calculated' (fixes outdated paces)
-      let effortPaces = ub?.effort_paces;
-      if (ub?.effort_score && ub?.effort_paces_source === 'calculated' && effortPaces) {
-        // Recalculate all paces from effort_score using shared calculation function
-        // This fixes plans created before the race pace calculation fix
-        const score = Number(ub.effort_score);
-        if (Number.isFinite(score) && score > 0) {
-          try {
-            const recalculatedPaces = getPacesFromScore(score);
-            
-            // Always recalculate if stored pace differs (even by 1 second) to ensure consistency
-            if (Math.abs((effortPaces.race || 0) - recalculatedPaces.race) > 0) {
-              console.log(`[Paces] 🔧 Recalculating paces from effort_score ${score}: race ${effortPaces.race}s/mi → ${recalculatedPaces.race}s/mi`);
-              effortPaces = recalculatedPaces; // Use all recalculated paces for consistency
-              
-              // Also update user_baselines to persist the correction
-              try {
-                await supabase.from('user_baselines').update({
-                  effort_paces: recalculatedPaces,
-                  effort_updated_at: new Date().toISOString()
-                }).eq('user_id', userId);
-                console.log(`[Paces] ✅ Updated user_baselines.effort_paces with corrected race pace`);
-              } catch (updateErr) {
-                console.error(`[Paces] ⚠️  Failed to update user_baselines:`, updateErr);
-                // Continue - baselines object is already updated in memory
-              }
-            }
-          } catch (e) {
-            console.error(`[Paces] ⚠️  Error recalculating paces from effort_score:`, e);
-            // Continue with stored paces if recalculation fails
-          }
-        }
-      }
-      
+      // ⛔ READ ONLY (2026-09-02, D-461). This used to recompute `effort_paces` from `effort_score` on
+      // every materialization and WRITE the result back to user_baselines — a background process
+      // rewriting the athlete's row. The row has one writer now; this reads what it finds.
+      const effortPaces = ub?.effort_paces;
       baselines = {
         ...(ub?.performance_numbers || {}),
         equipment: ub?.equipment || {},

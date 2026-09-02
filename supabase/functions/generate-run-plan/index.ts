@@ -565,29 +565,8 @@ Deno.serve(async (req: Request) => {
     }
 
     // Save Effort Score and paces to user_baselines (for Performance Build plans)
-    if (request.approach === 'performance_build' && effortScore && effortPaces) {
-      const { error: baselinesError } = await supabase
-        .from('user_baselines')
-        .upsert({
-          user_id: request.user_id,
-          effort_score: effortScore,
-          effort_source_distance: request.effort_source_distance || null,
-          effort_source_time: request.effort_source_time || null,
-          effort_score_status: request.effort_score_status || 'estimated',
-          effort_paces: effortPaces,
-          effort_paces_source: request.effort_paces_source || 'calculated',
-          effort_updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id'
-        });
-
-      if (baselinesError) {
-        console.warn('Failed to save Effort Score to baselines:', baselinesError);
-        // Non-fatal - continue with plan generation
-      } else {
-        console.log(`[EffortScore] Saved to user_baselines: ${effortScore}, paces_source: ${request.effort_paces_source || 'calculated'}`);
-      }
-    }
+    // ⛔ NO WRITE TO user_baselines HERE (2026-09-02, D-461). The plan carries its own effort fields in
+    // its config; the athlete's row is written by the Baselines save and the calibration only.
 
     // Generate preview
     const preview = generatePreview(plan, phaseStructure);

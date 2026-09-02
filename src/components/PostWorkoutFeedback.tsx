@@ -75,17 +75,20 @@ const FEELING_OPTIONS = [
   { value: 'exhausted', label: 'Exhausted', description: 'Really pushed it' },
 ];
 
+// ⛔ THE TALK TEST, NOT ADJECTIVES (Michael 2026-09-02). "Moderate" told nobody anything; "full
+// sentences" does. 3 = conversational is the easy-day anchor: an easy run logged at 3 with a high
+// heart rate reads as heat, not effort. Standard 1–10 session-RPE anchoring.
 const RPE_DESCRIPTIONS: Record<number, string> = {
-  1: 'Very light',
-  2: 'Light',
-  3: 'Moderate',
-  4: 'Somewhat hard',
-  5: 'Hard',
-  6: 'Hard',
-  7: 'Very hard',
-  8: 'Very hard',
-  9: 'Extremely hard',
-  10: 'Max effort',
+  1: 'Could sing',
+  2: 'Could sing',
+  3: 'Conversational — full sentences',
+  4: 'Short sentences',
+  5: 'A few words',
+  6: 'A few words',
+  7: 'One word',
+  8: 'One word',
+  9: 'Almost max',
+  10: 'Max',
 };
 
 export default function PostWorkoutFeedback({
@@ -588,8 +591,10 @@ export default function PostWorkoutFeedback({
           ))}
         </div>
         <div className="flex justify-between mt-1 text-xs text-white/40 font-light">
-          <span>Easy</span>
-          <span>Max</span>
+          <span>1–2 could sing</span>
+          <span>3 conversational</span>
+          <span>5–6 a few words</span>
+          <span>10 max</span>
         </div>
       </div>
 

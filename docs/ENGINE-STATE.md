@@ -60,6 +60,13 @@ all three plan-weight spots route through it; coach payload 180→181; run card 
    · resolver + athlete-snapshot 33. tsc / deno type-error counts unchanged vs HEAD (all pre-existing);
    vite build clean.
 
+**LATER THE SAME DAY — D-461, one 5K / one derivation / one writer (built, see D-461 for the
+map):** `generate-run-plan` and `materialize-plan` no longer write `effort_*` to `user_baselines`;
+the Baselines save and the wizards' `saveCalibration` are the only writers, both through
+`effortFieldsFromFiveKTimeSec`. Plus the Baselines screen rows: strength, easy pace, threshold pace,
+5K, FTP all share one `auto | my number` row (`AutoMinePill`); "locked" renamed. Deploy for D-461:
+`generate-run-plan`, `materialize-plan`.
+
 **DEPLOY LIST (when Michael says go), in this order:** `supabase db push` → `compute-snapshot`, `coach`,
 `materialize-plan`, `generate-run-plan`, `generate-triathlon-plan`, `create-goal-and-materialize-plan`,
 `generate-combined-plan`, `get-arc-context`, `workout-detail`, `compute-facts`. Those ten change behaviour. The full transitive closure of
