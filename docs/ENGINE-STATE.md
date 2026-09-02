@@ -22,9 +22,11 @@
    3–4 wrong causes first). CODE-VERIFIED source: `assemble.ts:1095` — `efficiency.verdict` = `runRoute`
    (the familiar-routes regression, `heat-adjust.ts routeTrend`), which fits heat + time JOINTLY. On this
    athlete heat and time are COLLINEAR (hot runs = recent runs), so β_time is unidentifiable and the regression
-   blames time. Fix: make routeTrend WITHHOLD when temp↔day correlation is high (can't separate heat from
-   fitness), rather than assert a decline. ⚠️ Verify by recomputing 45d122e7 and seeing the verdict leave
-   'sliding'. (A run-efficiency noise guard was added at `run.ts computeRunEfficiencyState` — real + safe, but
+   blames time. Fix (Michael's call 2026-09-02): make routeTrend WITHHOLD AND FLAG when temp↔day correlation
+   is high (can't separate heat from fitness) — the athlete sees "can't read your trend through the heat",
+   NOT a blank and NOT a false decline. Do NOT remove the heat feature; this is the "refuse when not
+   separable" branch the design already intends (heat-adjust.ts), just not firing on the rendered verdict.
+   ⚠️ Verify by recomputing 45d122e7 and seeing the verdict leave 'sliding'. (A run-efficiency noise guard was added at `run.ts computeRunEfficiencyState` — real + safe, but
    it is BYPASSED whenever `runRoute` exists, so it did not fix this. Keep it.)
 2. **Baselines LOCK-SWITCH UI.** The `locked_baselines` map is already threaded through the resolver +
    `LiveBaselinesFallback`; there is NO writer/UI yet. Build the auto/locked toggle on `TrainingBaselines.tsx`
