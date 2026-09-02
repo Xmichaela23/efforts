@@ -1475,7 +1475,8 @@ return (
                           {/* ⛔ A GRID, NOT `flex-wrap` (2026-08-20). Four blocks of different widths in
                               a wrapping flex row left ragged columns and dead space — "a little jammed".
                               Each fact gets one cell and they line up. */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-2 items-start">
+                          {/* ⛔ STACKED, EQUAL WEIGHT (Michael 2026-09-02): three numbers, three identical rows. */}
+                          <div className="flex flex-col gap-4 mt-2">
                             {/**
                               * ⛔ ONE EASY-PACE BLOCK (2026-08-20). There were TWO — a display card showing
                               * the resolved value, and a separate "Easy pace (manual)" input with the
@@ -1524,16 +1525,13 @@ return (
                                 }));
                                 return (
                                   <div
-                                    className="rounded-xl border px-3 py-2 flex items-center gap-3"
+                                    className="rounded-xl border px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1"
                                     style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: mine ? `${SPORT_COLORS.run}55` : 'rgba(255,255,255,0.15)' }}
                                   >
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-baseline gap-1.5">
-                                        <span className="text-lg font-semibold tabular-nums text-white">
-                                          {resolvedEasy.sec_per_mi ? formatPaceSecPerMi(resolvedEasy.sec_per_mi) : '—'}
-                                        </span>
-                                      </div>
-                                      <div className="text-[11px] text-white/55 leading-snug">{status}</div>
+                                    <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                                      <span className="text-lg font-semibold tabular-nums text-white">
+                                        {resolvedEasy.sec_per_mi ? formatPaceSecPerMi(resolvedEasy.sec_per_mi) : '—'}
+                                      </span>
                                     </div>
                                     <input
                                       type="text"
@@ -1549,6 +1547,7 @@ return (
                                       style={{ fontFamily: 'Inter, sans-serif' }}
                                     />
                                     <AutoMinePill mine={mine} onAuto={setAuto} onMine={setMine} color={SPORT_COLORS.run} label="Easy pace" />
+                                    <div className="basis-full text-[11px] text-white/55 leading-snug">{status}</div>
                                   </div>
                                 );
                               })()}
@@ -1557,150 +1556,176 @@ return (
                                 an absence they have to notice. Fixed width + min-height for the same
                                 reason the easy card has them: the states carry different amounts of
                                 provenance and the page jumped when they swapped. */}
-                            <div className="flex flex-col gap-1.5 w-[17rem] max-w-full">
+                            <div className="flex flex-col gap-1.5">
                               <label className="text-sm text-white/75 font-medium">Threshold pace</label>
-                              <div className="px-3 py-2.5 rounded-xl bg-white/[0.09] border border-white/25 text-left min-h-[6.5rem]">
-                                <div className="flex items-baseline justify-between gap-2">
-                                  <span className="text-2xl font-semibold text-white tabular-nums">
-                                    {thrBasis.showNumber ? formatPaceSecPerMi(resolvedThr.sec_per_mi) : '—'}
-                                  </span>
-                                  {/* Confidence dots belong to a MEASURED value. A derived one has no
-                                      sample count, and borrowing the measured one's dots would dress an
-                                      inference as a measurement. */}
-                                  {thrBasis.state === 'measured' && hasThrLearned && (
-                                    <span className="text-[10px] text-white/35" title="Model confidence">{getConfidenceDots(thrLearned.confidence)}</span>
-                                  )}
-                                </div>
-                                {/* THE STATE, SAID PLAINLY. One owner for these words: `describeThresholdBasis`. */}
-                                <p className="text-[12px] text-white/70 mt-1 leading-snug">{thrBasis.label}</p>
-                                {thrBasis.note && (
-                                  <p className="text-[12px] text-white/55 mt-0.5 leading-snug">{thrBasis.note}</p>
-                                )}
-                                {thrBasis.state === 'measured' && learnedBasisLine(thrLearned, 'run') && (
-                                  <p className="text-[12px] text-white/60 mt-1 leading-snug">{learnedBasisLine(thrLearned, 'run')}</p>
-                                )}
-                                {/* ⛔ WHEN IT IS NOT MEASURED, OFFER THE TEST. Abstaining is the right
-                                    behaviour — Garmin greys the number out too — but abstaining
-                                    SILENTLY is not. The 12-minute protocol has been built end to end
-                                    for months and the run card never offered it, while the bike card
-                                    right beside it schedules an FTP test. This is that button. */}
-                                {thrBasis.state !== 'measured' && thrBasis.state !== 'stated' && (
-                                  <div className="mt-2 pt-2 border-t border-white/[0.06]">
-                                    {scheduledRunTest ? (
-                                      <div className="flex items-center justify-between gap-2">
-                                        <span className="text-[11px] text-white/55">
-                                          Threshold test on {new Date(scheduledRunTest.date + 'T12:00:00').toLocaleDateString()}
-                                        </span>
-                                        <button
-                                          type="button"
-                                          onClick={() => void deleteRunTest()}
-                                          className="text-[12px] text-white/60 hover:text-white/70 underline underline-offset-2"
-                                        >
-                                          Remove
-                                        </button>
-                                      </div>
-                                    ) : showRunTestDatePicker ? (
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <input
-                                          type="date"
-                                          value={runTestDate}
-                                          min={new Date().toISOString().split('T')[0]}
-                                          onChange={(e) => setRunTestDate(e.target.value)}
-                                          className="h-8 px-2 text-[11px] bg-white/[0.06] border border-white/15 rounded-lg text-white"
-                                        />
-                                        <button
-                                          type="button"
-                                          onClick={() => void scheduleRunTest()}
-                                          className="h-8 px-3 text-[11px] font-medium rounded-lg text-white"
-                                          style={{ backgroundColor: `${SPORT_COLORS.run}26`, border: `1px solid ${SPORT_COLORS.run}80` }}
-                                        >
-                                          Schedule
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => setShowRunTestDatePicker(false)}
-                                          className="h-8 px-2 text-[11px] text-white/45 hover:text-white/70"
-                                        >
-                                          Cancel
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <button
-                                        type="button"
-                                        onClick={() => setShowRunTestDatePicker(true)}
-                                        className="text-[11px] font-medium px-2.5 py-1.5 rounded-lg text-white/80 hover:text-white bg-white/[0.05] border border-white/15 text-left"
-                                      >
-                                        Schedule a threshold test
-                                        <span className="block text-[11px] text-white/55 mt-0.5">12 min — measures it properly</span>
-                                      </button>
-                                    )}
+                              {/**
+                                * ⛔ SAME ROW AS EASY PACE AND STRENGTH (Michael 2026-09-02: "add my number to
+                                * threshold"). The resolver already honoured a typed `threshold_pace_min_per_mi`
+                                * and a `threshold_pace_source` choice; only the input and the switch were missing.
+                                * The threshold-test offer keeps its place under the row.
+                                */}
+                              {(() => {
+                                const mine = (data.performanceNumbers as any)?.threshold_pace_source === 'manual';
+                                const typed = (data.performanceNumbers as any)?.threshold_pace_min_per_mi || '';
+                                const measuredLines = thrBasis.state === 'measured'
+                                  ? [learnedBasisLine(thrLearned, 'run'), learnedAsOfLine(thrLearned)].filter(Boolean).join(' ')
+                                  : '';
+                                const status = mine
+                                  ? 'your number. Your runs don\'t change it.'
+                                  : thrBasis.state === 'stated'
+                                    ? 'auto. Your typed number, until your runs measure one.'
+                                    : `auto. ${thrBasis.label}${thrBasis.note ? ` ${thrBasis.note}` : ''}${measuredLines ? ` ${measuredLines}` : ''}`;
+                                const setMine = () => setData(prev => {
+                                  const pn: any = { ...prev.performanceNumbers, threshold_pace_source: 'manual' };
+                                  if (!pn.threshold_pace_min_per_mi && resolvedThr.sec_per_mi) pn.threshold_pace_min_per_mi = formatPaceSecPerMi(resolvedThr.sec_per_mi).replace('/mi', '');
+                                  return { ...prev, performanceNumbers: pn };
+                                });
+                                const setAuto = () => setData(prev => ({
+                                  ...prev,
+                                  performanceNumbers: { ...prev.performanceNumbers, threshold_pace_source: 'learned' },
+                                }));
+                                return (
+                                  <div
+                                    className="rounded-xl border px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1"
+                                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: mine ? `${SPORT_COLORS.run}55` : 'rgba(255,255,255,0.15)' }}
+                                  >
+                                    <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                                      <span className="text-lg font-semibold tabular-nums text-white">
+                                        {thrBasis.showNumber ? formatPaceSecPerMi(resolvedThr.sec_per_mi) : '—'}
+                                      </span>
+                                    </div>
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      aria-label="Threshold pace, my number, minutes per mile"
+                                      value={typed}
+                                      onChange={(e) => setData(prev => ({
+                                        ...prev,
+                                        performanceNumbers: { ...prev.performanceNumbers, threshold_pace_min_per_mi: e.target.value },
+                                      }))}
+                                      placeholder={hasThrLearned ? formatPace(thrLearned.value) : '9:30'}
+                                      className="w-[4.5rem] h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40 text-center shrink-0"
+                                      style={{ fontFamily: 'Inter, sans-serif' }}
+                                    />
+                                    <AutoMinePill mine={mine} onAuto={setAuto} onMine={setMine} color={SPORT_COLORS.run} label="Threshold pace" />
+                                    <div className="basis-full text-[11px] text-white/55 leading-snug">{status}</div>
+                                    <div className="basis-full">
+                                      {thrBasis.state !== 'measured' && thrBasis.state !== 'stated' && (
+                                        <div className="mt-2 pt-2 border-t border-white/[0.06]">
+                                          {scheduledRunTest ? (
+                                            <div className="flex items-center justify-between gap-2">
+                                              <span className="text-[11px] text-white/55">
+                                                Threshold test on {new Date(scheduledRunTest.date + 'T12:00:00').toLocaleDateString()}
+                                              </span>
+                                              <button
+                                                type="button"
+                                                onClick={() => void deleteRunTest()}
+                                                className="text-[12px] text-white/60 hover:text-white/70 underline underline-offset-2"
+                                              >
+                                                Remove
+                                              </button>
+                                            </div>
+                                          ) : showRunTestDatePicker ? (
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                              <input
+                                                type="date"
+                                                value={runTestDate}
+                                                min={new Date().toISOString().split('T')[0]}
+                                                onChange={(e) => setRunTestDate(e.target.value)}
+                                                className="h-8 px-2 text-[11px] bg-white/[0.06] border border-white/15 rounded-lg text-white"
+                                              />
+                                              <button
+                                                type="button"
+                                                onClick={() => void scheduleRunTest()}
+                                                className="h-8 px-3 text-[11px] font-medium rounded-lg text-white"
+                                                style={{ backgroundColor: `${SPORT_COLORS.run}26`, border: `1px solid ${SPORT_COLORS.run}80` }}
+                                              >
+                                                Schedule
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => setShowRunTestDatePicker(false)}
+                                                className="h-8 px-2 text-[11px] text-white/45 hover:text-white/70"
+                                              >
+                                                Cancel
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={() => setShowRunTestDatePicker(true)}
+                                              className="text-[11px] font-medium px-2.5 py-1.5 rounded-lg text-white/80 hover:text-white bg-white/[0.05] border border-white/15 text-left"
+                                            >
+                                              Schedule a threshold test
+                                              <span className="block text-[11px] text-white/55 mt-0.5">12 min — measures it properly</span>
+                                            </button>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                )}
-                                {thrBasis.state === 'measured' && learnedAsOfLine(thrLearned) && (
-                                  <p className="text-[12px] text-white/50 mt-0.5 leading-snug">{learnedAsOfLine(thrLearned)}</p>
-                                )}
-                              </div>
+                                );
+                              })()}
                             </div>
                             {/* ⛔ THE 5K SITS LAST, AND THAT IS THE INFORMATION ORDER (2026-08-20).
                                 Three cells in a two-column grid left an orphan row and a tall empty
                                 space beneath a small input. Pairing the two TALL cards puts them side
                                 by side and drops the 5K underneath — which is also the right reading
                                 order: the paces you train by first, the seed they came from last. */}
-                            <div className="flex flex-col gap-1.5 min-w-[12rem]">
+                            <div className="flex flex-col gap-1.5">
                               <label className="text-sm text-white/75 font-medium">5K Time</label>
-                              <input
-                                type="text"
-                                value={data.performanceNumbers?.fiveK || ''}
-                                onChange={(e) => setData(prev => ({
+                              {/**
+                                * ⛔ SAME ROW (Michael 2026-09-02: "add my number to 5K time"). There is no learned
+                                * 5K in the resolver; the training-side number is the Arc's implied 5K (the nudge
+                                * that used to sit here as Yes / No). `auto` = take what your runs suggest and keep
+                                * taking it; `my number` = the race clock you typed. `fiveK_source` records the
+                                * choice; `fiveK` stays the value every downstream pace derives from.
+                                */}
+                              {(() => {
+                                const implied = nudge?.implied_5k_label ?? null;
+                                const mine = (data.performanceNumbers as any)?.fiveK_source !== 'learned';
+                                const typed = data.performanceNumbers?.fiveK || '';
+                                const shown = !mine && implied ? implied : (typed || null);
+                                const status = mine
+                                  ? `your number. Your runs don\'t change it.${implied && nudge?.should_prompt ? ` Your runs suggest ~${implied}.` : ''}`
+                                  : implied
+                                    ? `auto. From your runs (~${implied}).`
+                                    : 'auto. Your runs haven\'t suggested one yet.';
+                                const setMine = () => setData(prev => ({
                                   ...prev,
-                                  performanceNumbers: {
-                                    ...prev.performanceNumbers,
-                                    fiveK: e.target.value
-                                  }
-                                }))}
-                                placeholder="25:00"
-                                className="w-24 h-12 px-3 text-lg font-medium bg-white/[0.09] backdrop-blur-lg border border-white/30 rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:border-teal-500/50 text-center"
-                                style={{ fontFamily: 'Inter, sans-serif' }}
-                              />
-                              {showFiveKNudge && nudge && (
-                                <div className="mt-1 flex flex-col gap-2 pl-0.5">
-                                  {/* ⛔ THE DIRECTION IS SAID (2026-08-19). This read "Training data
-                                      suggests ~X. Update?" for a flag that could only fire one way.
-                                      It fires both ways now, and the stale-fast case — a saved 5K
-                                      FASTER than recent running — is the one that sets every derived
-                                      pace above current fitness. An athlete shown a slower number
-                                      with no reason will decline it. */}
-                                  <p className="text-[11px] text-white/55 leading-snug max-w-[18rem]">
-                                    {nudge.direction === 'stale-fast'
-                                      ? `Your recent runs suggest ~${nudge.implied_5k_label}, slower than the ${nudge.manual_5k_label} on file. Paces built from the saved time come out faster than current fitness. Update?`
-                                      : `Your recent runs suggest ~${nudge.implied_5k_label}, faster than the ${nudge.manual_5k_label} on file. Update?`}
-                                  </p>
-                                  <div className="flex items-center gap-2">
-                                    {/* Sport-coloured, like every other selection on this card — the
-                                        generic teal said "a button", not "this is your running data". */}
-                                    <button
-                                      type="button"
-                                      onClick={() => void handleFiveKNudgeYes()}
-                                      disabled={saving}
-                                      className="text-[11px] font-medium px-2.5 py-1 rounded-xl text-white disabled:opacity-50"
-                                      style={{
-                                        backgroundColor: `${SPORT_COLORS.run}26`,
-                                        border: `1px solid ${SPORT_COLORS.run}80`,
-                                      }}
-                                    >
-                                      Yes
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => void handleFiveKNudgeNo()}
-                                      disabled={saving}
-                                      className="text-[11px] font-medium px-2.5 py-1 rounded-xl bg-white/[0.06] text-white/70 border border-white/15 hover:bg-white/10 disabled:opacity-50"
-                                    >
-                                      No
-                                    </button>
+                                  performanceNumbers: { ...prev.performanceNumbers, fiveK_source: 'manual' },
+                                }));
+                                const setAuto = () => setData(prev => {
+                                  const pn: any = { ...prev.performanceNumbers, fiveK_source: 'learned' };
+                                  if (implied) pn.fiveK = implied; // the number every derived pace reads follows the choice
+                                  return { ...prev, performanceNumbers: pn };
+                                });
+                                return (
+                                  <div
+                                    className="rounded-xl border px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1"
+                                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: mine ? `${SPORT_COLORS.run}55` : 'rgba(255,255,255,0.15)' }}
+                                  >
+                                    <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                                      <span className="text-lg font-semibold tabular-nums text-white">{shown ?? '—'}</span>
+                                    </div>
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      aria-label="5K time, my number"
+                                      value={typed}
+                                      onChange={(e) => setData(prev => ({
+                                        ...prev,
+                                        performanceNumbers: { ...prev.performanceNumbers, fiveK: e.target.value, fiveK_source: 'manual' },
+                                      }))}
+                                      placeholder={implied ?? '25:00'}
+                                      className="w-[4.5rem] h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40 text-center shrink-0"
+                                      style={{ fontFamily: 'Inter, sans-serif' }}
+                                    />
+                                    <AutoMinePill mine={mine} onAuto={setAuto} onMine={setMine} color={SPORT_COLORS.run} label="5K time" />
+                                    <div className="basis-full text-[11px] text-white/55 leading-snug">{status}</div>
                                   </div>
-                                </div>
-                              )}
+                                );
+                              })()}
                             </div>
                           </div>
                         </div>
@@ -2133,48 +2158,6 @@ return (
                             <span className="text-xs text-white/50">1RM ({data.units === 'metric' ? 'kg' : 'lbs'})</span>
                           </div>
                           
-                          {/* Baseline Test Note */}
-                          <div 
-                            className="p-3 rounded-xl backdrop-blur-lg border"
-                            style={{ 
-                              backgroundColor: `${SPORT_COLORS.strength}10`,
-                              borderColor: `${SPORT_COLORS.strength}30`
-                            }}
-                          >
-                            <p className="text-xs text-white/90 mb-2">
-                              Don't know your numbers? Or want to retest?
-                            </p>
-                            <p className="text-xs text-white/70 mb-2">
-                              Log a{' '}
-                              <button
-                                onClick={() => onOpenBaselineTest?.('Baseline Test: Lower Body')}
-                                className="underline font-medium hover:opacity-80"
-                                style={{ color: SPORT_COLORS.strength }}
-                              >
-                                Lower
-                              </button>
-                              ,{' '}
-                              <button
-                                onClick={() => onOpenBaselineTest?.('Baseline Test: Upper Body')}
-                                className="underline font-medium hover:opacity-80"
-                                style={{ color: SPORT_COLORS.strength }}
-                              >
-                                Upper
-                              </button>
-                              {' '}or{' '}
-                              <button
-                                onClick={() => onOpenBaselineTest?.('Baseline Test: Full Body')}
-                                className="underline font-medium hover:opacity-80"
-                                style={{ color: SPORT_COLORS.strength }}
-                              >
-                                Full Body
-                              </button>
-                              {' '}baseline test. One all-out AMRAP set per lift after guided warmups — we'll help you find your working weight and estimate your 1RM from it; the number firms up over the first few weeks. Same test the Get Strong block ends with, so entry and retest match.
-                            </p>
-                            <p className="text-xs text-white/60 italic">
-                              Tip: Retest every 8-12 weeks to track progress.
-                            </p>
-                          </div>
                           
                           {/**
                             * ⛔ AUTO / LOCKED — the Garmin switch (Michael's ruling 2026-09-02, PLAN-strength-numbers).
@@ -2258,16 +2241,13 @@ return (
                               return (
                                 <div
                                   key={lift.key}
-                                  className="rounded-xl border px-3 py-2 flex items-center gap-3"
+                                  className="rounded-xl border px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1"
                                   style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: isLocked ? `${SPORT_COLORS.strength}55` : 'rgba(255,255,255,0.15)' }}
                                 >
                                   <div className="w-14 shrink-0 text-xs text-white/70">{lift.label}</div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-baseline gap-1.5">
-                                      <span className="text-lg font-semibold tabular-nums text-white">{resolved.value != null ? resolved.value : '—'}</span>
-                                      <span className="text-[11px] text-white/50">{unit}</span>
-                                    </div>
-                                    <div className="text-[11px] text-white/55 leading-snug">{status}{suggestion ? ` ${suggestion}` : ''}</div>
+                                  <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                                    <span className="text-lg font-semibold tabular-nums text-white">{resolved.value != null ? resolved.value : '—'}</span>
+                                    <span className="text-[11px] text-white/50">{unit}</span>
                                   </div>
                                   <input
                                     type="number"
@@ -2281,9 +2261,53 @@ return (
                                     style={{ fontFamily: 'Inter, sans-serif' }}
                                   />
                                   <AutoMinePill mine={isLocked} onAuto={setAuto} onMine={setLocked} color={SPORT_COLORS.strength} label={lift.label} />
+                                  {/* the receipt gets the whole width — squeezed beside the input it wrapped one word per line */}
+                                  <div className="basis-full text-[11px] text-white/55 leading-snug pl-[4.25rem]">{status}{suggestion ? ` ${suggestion}` : ''}</div>
                                 </div>
                               );
                             })}
+                          </div>
+                          {/* Baseline Test Note — below the numbers (Michael, 2026-09-02) */}
+                          <div 
+                            className="p-3 rounded-xl backdrop-blur-lg border"
+                            style={{ 
+                              backgroundColor: `${SPORT_COLORS.strength}10`,
+                              borderColor: `${SPORT_COLORS.strength}30`
+                            }}
+                          >
+                            <p className="text-xs text-white/90 mb-2">
+                              Don't know your numbers? Or want to retest?
+                            </p>
+                            <p className="text-xs text-white/70 mb-2">
+                              Log a{' '}
+                              <button
+                                onClick={() => onOpenBaselineTest?.('Baseline Test: Lower Body')}
+                                className="underline font-medium hover:opacity-80"
+                                style={{ color: SPORT_COLORS.strength }}
+                              >
+                                Lower
+                              </button>
+                              ,{' '}
+                              <button
+                                onClick={() => onOpenBaselineTest?.('Baseline Test: Upper Body')}
+                                className="underline font-medium hover:opacity-80"
+                                style={{ color: SPORT_COLORS.strength }}
+                              >
+                                Upper
+                              </button>
+                              {' '}or{' '}
+                              <button
+                                onClick={() => onOpenBaselineTest?.('Baseline Test: Full Body')}
+                                className="underline font-medium hover:opacity-80"
+                                style={{ color: SPORT_COLORS.strength }}
+                              >
+                                Full Body
+                              </button>
+                              {' '}baseline test. One all-out AMRAP set per lift after guided warmups — we'll help you find your working weight and estimate your 1RM from it; the number firms up over the first few weeks. Same test the Get Strong block ends with, so entry and retest match.
+                            </p>
+                            <p className="text-xs text-white/60 italic">
+                              Tip: Retest every 8-12 weeks to track progress.
+                            </p>
                           </div>
                           <div className="space-y-4 mt-4 pt-4 border-t border-white/10">
                             <h4 className="text-sm font-medium text-white/80">Equipment Access</h4>
