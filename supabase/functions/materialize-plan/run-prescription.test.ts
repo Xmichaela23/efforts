@@ -6,7 +6,7 @@
  * Athlete-agnostic: synthetic numbers, never tuned to the primary user.
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { expandRunToken, stampRunPrescription } from './index.ts';
+import { expandRunToken, stampRunPrescription, toV3Step } from './index.ts';
 
 const HR = { lower: 136, upper: 144 };   // Friel Z2 off an LTHR of 160
 const baselines: any = { _resolvedThresholdSecPerMi: 450, _resolvedEasySecPerMi: 536, _fiveKSecPerMi: 425, _easyHrRange: HR };
@@ -76,4 +76,19 @@ Deno.test('strides carry neither a zone nor an effort target', () => {
     assertEquals(s.target_rpe, undefined);
     assertEquals(s.hr_range, undefined);
   }
+});
+
+// ═══ THE WHITELIST TRAP — the fields must survive the v3 normalization the calendar row is written in ═══
+Deno.test('v3 round-trip: prescription, hr_range and target_rpe reach computed.steps (found dropped 2026-09-02)', () => {
+  const row = { type: 'run', date: '2026-09-05' };
+  const easy = expand('run_easy_30min').map((st) => toV3Step(st, row));
+  for (const s of easy) {
+    assertEquals(s.prescription, 'heart_rate');
+    assertEquals(s.hr_range, HR);
+  }
+  const hard = expand('cruise_4x1mi_threshold').map((st) => toV3Step(st, row));
+  const w = hard.filter((s) => s.kind === 'work');
+  assertEquals(w.length, 4);
+  for (const s of w) assertEquals(s.target_rpe, { lo: 5, hi: 6 });
+  for (const s of hard.filter((x) => x.kind === 'recovery')) assertEquals(s.hr_range, HR);
 });

@@ -3567,7 +3567,7 @@ function mmss(sec: number): string {
   return `${m}:${String(ss).padStart(2,'0')}`;
 }
 
-function toV3Step(st: any, row?: any): any {
+export function toV3Step(st: any, row?: any): any {
   const out: any = { id: st?.id || uid() };
   
   // Duration: explicit or calculated from distance + pace
@@ -3712,6 +3712,21 @@ function toV3Step(st: any, row?: any): any {
   if (st?.strength) out.strength = st.strength;
   if (typeof st?.planned_index === 'number') out.planned_index = st.planned_index;
   if (st?.kind) out.kind = st.kind;
+  /**
+   * ⛔ THE PRESCRIPTION FIELDS RIDE THROUGH (2026-09-02, found on the verification pass the same
+   * evening they shipped). This object is a WHITELIST — the same trap the strength rows hit five
+   * times (`load_basis`, `slot_intent`, …). `stampRunPrescription` put `prescription`, `hr_range`
+   * and `target_rpe` on the expanded step, and this function rebuilt the step without them, so the
+   * calendar row, the phone summary and the Garmin push all read `computed.steps` and found nothing.
+   * Deployed inert for a few hours. Carried now; the round-trip test pins it.
+   */
+  if (st?.prescription === 'heart_rate') out.prescription = 'heart_rate';
+  if (st?.hr_range && typeof st.hr_range.lower === 'number' && typeof st.hr_range.upper === 'number') {
+    out.hr_range = { lower: Math.round(st.hr_range.lower), upper: Math.round(st.hr_range.upper) };
+  }
+  if (st?.target_rpe && typeof st.target_rpe.lo === 'number' && typeof st.target_rpe.hi === 'number') {
+    out.target_rpe = { lo: st.target_rpe.lo, hi: st.target_rpe.hi };
+  }
   return out;
 }
 
