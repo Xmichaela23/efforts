@@ -1592,3 +1592,9 @@ pace is NOT threshold × 1.093: it is the plan's entered goal time ÷ 26.2 — e
 goal time → effort target only. (3) Easy = threshold × 1.19 STAYS, as the industry's zone math, and
 only as a reference band under a heart-rate prescription. The audit session applies (1) and (2).
 
+**Checkpoint, no undo on accept — a decision (2026-09-02).** Accepting the six-week checkpoint re-prices
+the unstarted endurance rows off the learned-or-entered numbers; there is no older number to return to
+without pinning one, which this entry rules out. "Keep the block as built" before accepting is the
+reversal path; Garmin and TrainingPeaks apply a threshold change the same way. Completed sessions never
+change.
+
