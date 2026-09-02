@@ -188,6 +188,16 @@ function SpineCard({ series }: { series: SpineSeries }) {
           hours" / "no second-half number — its pace changed on purpose") was unreadable on a glance.
           The signal still exists server-side; it is just not surfaced here as prose. */}
 
+      {/* ⛔ DECOUPLING AS A NUMBER, NOT A VERDICT (2026-09-02, Michael: same as TrainingPeaks).
+          TrainingPeaks' Pa:Hr is one percent per run: how much heart rate drifted against pace.
+          The prose that read it for the athlete was cut on 2026-09-01; the number itself is the
+          field's second run fact and is shown bare. Withheld sessions (pace changed by prescription)
+          show nothing — a number for a non-steady effort is not the same number. */}
+      {!isRide && latest.driftPct != null && !latest.fadeWithheld && (
+        <div className="text-[11px] text-white/55 mt-1">
+          decoupling <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span> on the latest run · lower is better
+        </div>
+      )}
       {latest.durationMin != null && latest.durationMin > 0 && (
         <div className="text-[11px] text-white/55 mt-1">{latest.durationMin} min long</div>
       )}

@@ -1844,6 +1844,11 @@ async function buildCombinedPlan(
       ...(arcForCombined.performance_numbers
         ? { performance_numbers: arcForCombined.performance_numbers }
         : {}),
+      // AUTO/LOCKED switch (2026-09-02): the lock map rides with the typed numbers so the pinned
+      // snapshot resolves locked > trusted-learned > typed, same as every other reader.
+      ...((arcForCombined as any).locked_baselines
+        ? { locked_baselines: (arcForCombined as any).locked_baselines }
+        : {}),
       // Learned fitness signals (FTP estimate + run threshold/easy paces) — passed through
       // so `buildAthleteSnapshot` can pin bike.ftp_w + run paces at plan-creation time
       // (Tier 1 item 2 of the running→cycling delta map). Without this, the snapshot's

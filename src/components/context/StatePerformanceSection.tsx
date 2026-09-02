@@ -7,7 +7,7 @@
 
 import { trustedMaxReps } from '@/lib/estimate-1rm';
 import React from 'react';
-import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary, RunFitness, DecouplingBand, StrengthFitness, StateDisplayV1, SwimVolume, FitnessMode, FitnessAnchor } from '@shared/state-trend';
+import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary, DecouplingBand, StrengthFitness, StateDisplayV1, SwimVolume, FitnessMode, FitnessAnchor } from '@shared/state-trend';
 import type { CoachWeekContextV1 } from '@/hooks/useCoachWeekContext';
 import { useStateTrends } from '@/hooks/useStateTrends';
 import { useAppContext } from '@/contexts/AppContext';
@@ -89,23 +89,6 @@ const NUMERIC: Record<TrendVerdict, { word: string; cls: string; arr: string }> 
 //   settled lower — dropped, then levelled off (sliding + recentlyFlat)   ← the split nobody else draws
 // Only the sliding verdict splits; "sliding" as a bare word is retired everywhere in favour of "easing
 // off" (its non-alarming default). Falls back to VERDICT for improving/holding/needs_data/withheld.
-// ── THE RUN EFFICIENCY ROW GETS ITS OWN WORDS BACK (2026-08-01, Michael) ─────────────────────────
-//
-// ⛔ A SEPARATE MAP, NOT WORDS ADDED TO `NUMERIC`. `NUMERIC` is shared with the bike `Signal`, and the
-// bike is deliberately staying wordless until it has a confidence interval of its own. Adding words
-// there would have silently changed the bike row too.
-//
-// The words are PLAIN-LANGUAGE, not trend jargon: efficiency is speed per heartbeat, so "faster at the
-// same effort" says what the number means to a runner. The arrow and the signed percent still ride
-// alongside — the word replaces nothing, it explains.
-const RUN_EFF_WORDS: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
-  improving: { word: 'Faster at the same effort', cls: 'text-emerald-400', arr: '' },
-  holding: { word: '', cls: 'text-white/70', arr: '' }, // ⛔ no word (2026-09-01) — see VERDICT.holding
-  // Neutral, not amber — a decline here is a direction, and heat or a base block routinely cause it.
-  sliding: { word: 'Slower at the same effort', cls: 'text-white/70', arr: '' },
-  needs_data: { word: 'Need a few more runs', cls: 'text-white/60', arr: '' },
-  withheld: { word: 'Too soon to tell', cls: 'text-white/60', arr: '' },
-};
 
 // "newest today" / "newest 3d ago" — the ONE fact a count-and-window line cannot carry: whether the
 // ride you just finished is in there yet. Distinct from `asOf()`, which prints a calendar date.
@@ -117,23 +100,6 @@ const RUN_EFF_WORDS: Record<TrendVerdict, { word: string; cls: string; arr: stri
 function recencyOf(ageDays: number | null | undefined): string | null {
   if (ageDays == null || ageDays < 0) return null;
   return ageDays <= 0 ? 'newest today' : `newest ${Math.round(ageDays)}d ago`;
-}
-
-// `wordMap` selects the vocabulary: VERDICT keeps the words (swim, rest), NUMERIC drops them
-// (bike), RUN_EFF_WORDS spells them out (run efficiency). The recentlyFlat SPLIT survives all three —
-// it is the arrow that carries it, and on the run row it gets its own phrase.
-function verdictLabel(
-  verdict: TrendVerdict,
-  recentlyFlat?: boolean,
-  wordMap: Record<TrendVerdict, { word: string; cls: string; arr: string }> = VERDICT,
-): { word: string; cls: string; arr: string } {
-  if (verdict === 'sliding' && recentlyFlat) {
-    if (wordMap === NUMERIC) return { word: '', cls: 'text-white/70', arr: '' };  // bike: the number carries the drop
-    // "Dropped, then levelled" is the split nobody else draws — on the run row it gets said out loud.
-    if (wordMap === RUN_EFF_WORDS) return { word: 'Slower, then level', cls: 'text-white/70', arr: '' };
-    return { word: 'dropped, then level', cls: 'text-white/55', arr: '' };
-  }
-  return wordMap[verdict];
 }
 
 // D-160: pctChange is the RAW metric delta (classify.ts keeps it raw so the UI knows real direction).
@@ -154,18 +120,6 @@ function verdictSignedPct(verdict: string, pct: number | null | undefined, dp = 
   return `${pct > 0 ? '+' : pct < 0 ? '−' : ''}${mag(pct)}%`;
 }
 
-// The 95% CI the verdict was gated on, in whole percent. `assemble.ts:473` carries it from
-// `routeTrend`, and `heat-adjust.ts:203` documents it as the CI **of pct** — the same number rendered
-// beside the arrow (`assemble.ts:391`: `pctChange: runRoute.pct`). So the range brackets the figure
-// shown, not a different estimate.
-//
-// ⚠️ NULL IS A REAL ANSWER. `ci` is null on the linear_k fallback and on the non-route path. Show
-// nothing rather than a fabricated interval — a made-up range is worse than no range.
-function ciRange(ci: [number, number] | null | undefined): string | null {
-  if (!ci || ci.length !== 2 || ci.some((n) => !Number.isFinite(n))) return null;
-  const fmt = (n: number) => `${n < 0 ? '−' : '+'}${Math.abs(Math.round(n))}%`;
-  return `range ${fmt(ci[0])} to ${fmt(ci[1])}`;
-}
 
 // ── THE BLOCK, STATED — read from the card, translated by nobody ──────────────────────────────────
 //
@@ -203,7 +157,7 @@ function blockContextLine(planWeek: number | null | undefined, block: BlockCard 
 }
 
 // ── THE AEROBIC READ'S OWN WORDS (2026-08-01) ───────────────────────────────────────────────────
-// A SEPARATE MAP, for the same reason `RUN_EFF_WORDS` is separate: `NUMERIC` is the POWER read's
+// A SEPARATE MAP, for the same reason `the run words (deleted 2026-09-02, D-460)` is separate: `NUMERIC` is the POWER read's
 // vocabulary and stays wordless. These words are plain-language — heart rate at a given power is
 // "how hard your body is working to hold the same pace on the bike", so that is what they say. They
 // are earned by the noise gate (Q-241), which is the same bar run durability and strength clear;
@@ -974,330 +928,15 @@ function NoBaselineTag({ hint }: { hint?: string }) {
   );
 }
 
-// RUN row — State v3: DECOUPLING as a DOT (where you are in your 12wk range) + an ARROW (which way). The
-// dot answers the LEVEL, the arrow answers the TREND — so "needs work" and "improving" can no longer read
-// as the app arguing with itself. The old clipped verdict ("aerobic base needs work ↑ improving 6%") is
-// gone. efficiency_index stays a quiet secondary arrow.
-// Mirrors STATE_TREND_WINDOWS.runDirectionMinRuns (assemble.ts): steady runs in the 6wk window needed
-// before a DIRECTION arrow is drawn. The LEVEL dot needs no such floor — one steady run reads a level.
-const RUN_TREND_MIN_RUNS = 8;
-// RUN row — LEADS WITH EFFICIENCY (2026-07-21, Michael): grade-adjusted "faster at the same heart rate"
-// (GAP-pace ÷ HR on steady runs, terrain-honest). Replaces the durability DOT-lead, which was confusing
-// — a confident dot off a single run that couldn't answer "am I improving". Efficiency answers exactly
-// that: a rising trend = fitter. Durability (decoupling) is demoted to a quiet secondary read. No dot;
-// a clear verdict + arrow + %, and an honest "N of 8 runs to read it" until there's a trend.
-// THE LONG VIEW (Michael 2026-07-22) — a 12-week efficiency sparkline that answers "am I trending up over
-// the block?" while the verdict above answers "is my current training working?". Plots the SAME series the
-// verdict reads (recent-6wk in the run color = the slice the verdict judges; older weeks dim for context),
-// so chart and word are one truth. FILLS AS YOU BUILD: a new user sees a few points on the 12-week canvas
-// with an honest coverage label ("building · N of 12 weeks"), never a fabricated smooth line. <2 points →
-// no line (can't imply a trend through one dot). Tap to expand. TP charts LOAD; this charts OUTPUT.
-// Generalized 2026-07-23 so the same visual serves run efficiency AND per-lift strength e1RM (Michael's
-// big-4 chart). Props default to the run row's exact look/copy; strength passes color + nouns + a lb formatter.
-// ⛔ TrendSparkline MOVED to ./TrendSparkline.tsx (Round 3 pass 2) — the one chart language,
-// shared by run, ride, bike and strength. Imported at the top of this file.
-
 /**
- * ⛔⛔ UNREACHABLE SINCE 2026-09-01 — NOTHING RENDERS THIS. FIXLIST item 1b removed the run card from
- * the Fitness section entirely, so there is no longer a call site.
- *
- * ⚠️ IT WAS ALREADY DARK FOR ALMOST EVERY ATHLETE BEFORE THAT. `runSpineCovers` had suppressed it
- * since 2026-08-29 for anyone whose payload carried an endurance spine — which is anyone with a
- * single logged run (`compute-snapshot/index.ts` emits a spine group at one point; `SpineCard`
- * renders at one point). Only a coach payload cached before v174 ever reached this component.
- *
- * ⛔ NOT DELETED, DELIBERATELY, AND NOT MY CALL TO DELETE. It carries content that exists nowhere
- * else on the screen: the measured heat cost in seconds per mile per 10°F off the athlete's own
- * runs (D-346), the temperature-spread caption, the ⓘ definition tap-down, and the Q-179 posture
- * sentence. Retiring ~330 lines of that is a product decision, not a cleanup. Left standing with
- * this banner so the next session cannot mistake it for live code.
+ * ⛔ <RunFitnessRow> IS DELETED (2026-09-02, Michael: "I don't want to do things different, use
+ * different metrics — I want to be the same [as TrainingPeaks]"). It had been unrendered since Round 3
+ * pass 2 (the run plate is <EnduranceReadCards>), and it was the only place the run efficiency
+ * VERDICT, its percent, the confidence range, the fitted-line receipt and the "heat costs you" line
+ * reached a screen. TrainingPeaks draws none of those: Efficiency Factor per run, decoupling per
+ * run, a chart, compare like sessions by eye. The server still computes the verdict
+ * (`runFitness.efficiency.verdict`); nothing on the client reads it now. Bike row untouched this pass.
  */
-function RunFitnessRow({ fitness, postureSentence }: { fitness: RunFitness; postureSentence?: string | null; showAxis?: boolean; mode?: FitnessMode; anchor?: FitnessAnchor }) {
-  const { useImperial } = useAppContext();
-  const eff = fitness.efficiency;
-  const dur = fitness.decoupling;
-  // ⛔ TWO CUES, TWO ANSWERS (2026-08-01, Michael). ⓘ = *what is this metric*. "more" = *what is it
-  // saying about me right now*. They were one blob behind the metric word, so an athlete who
-  // wanted the definition got the whole read, and an athlete who wanted the read had to tap a
-  // glyph that promised a definition. Different questions, different cues, opened separately.
-  const [explainOpen, setExplainOpen] = React.useState(false);   // ⓘ — definition only
-  const [detailOpen, setDetailOpen] = React.useState(false);     // more — the read
-  // ⛔ THE GAP TOGGLE IS GONE (D-346, 2026-07-31). It offered raw-vs-grade-adjusted pace, which made
-  // sense when the row's pace was the raw number the watch showed. The pace now comes from the
-  // verdict's own pool and is ALREADY grade-adjusted, so `recentGapPaceSecPerKm` is deliberately null
-  // and the toggle could never render. Left in place it was dead code advertising a distinction that
-  // no longer exists.
-  const shownPace = eff.recentPaceSecPerKm;
-  const v = verdictLabel(eff.verdict, eff.recentlyFlat, RUN_EFF_WORDS);   // word + arrow + whole percent
-  // ⚠️ The conditions line: the temperature SPREAD across the plotted runs. Shown, never corrected —
-  // it is what lets the athlete discount a hot month without the app claiming to have done it for them.
-  // ⛔ WHAT HEAT COSTS YOU, IN SECONDS PER MILE (D-346, 2026-07-31).
-  //
-  // The regression already LEARNED this athlete's heat coefficient to remove it from the verdict —
-  // and then threw the most interesting number in the feature away. Michael: *"help them understand
-  // the costs of heat and other factors."* Garmin corrects silently and never tells you the size of
-  // it; TrainingPeaks says "consider temperature". Nobody hands the athlete their own number.
-  //
-  // ⚠️ ROUNDED TO 5s AND HEDGED, BECAUSE THE FIT MOVES. Measured across his windows the coefficient
-  // ran −0.22 / −0.26 / −0.34 %/°F (90d / 6mo / 12mo) — real, and inside the published band of
-  // 1–3% per 5°C (≈0.11–0.33 %/°F), but ±25% depending on the window. "About 20 seconds" is honest;
-  // "20.4 seconds" would be a precision we do not have.
-  //
-  // ⛔ PLAUSIBILITY GUARD. Only a NEGATIVE coefficient inside the literature band renders. An unstable
-  // fit can come back POSITIVE — hotter reading as faster — which happened on a thin route pool during
-  // development, and shipping that would tell an athlete heat makes them quicker.
-  const heatCost = React.useMemo(() => {
-    const coef = eff.route?.heatCoefPctPerF;
-    const paceKm = eff.recentPaceSecPerKm;
-    if (coef == null || paceKm == null || !(paceKm > 0)) return null;
-    if (!(coef < 0)) return null;                       // wrong sign → unstable fit, say nothing
-    const mag = Math.abs(coef);
-    if (mag < 0.08 || mag > 0.45) return null;          // outside the published band → do not assert
-    const secPerMi = (mag / 100) * (paceKm * 1.60934) * 10;   // per 10°F
-    const rounded = Math.round(secPerMi / 5) * 5;
-    if (rounded < 5) return null;                        // below the rounding floor — nothing to say
-    return `Heat costs you about ${rounded}s a mile per 10°F warmer, measured on your own runs.`;
-  }, [eff.route, eff.recentPaceSecPerKm]);
-  // ⛔ "grade-adjusted" IS GONE FROM HERE (2026-08-01, Michael — jargon). The caption's job is the
-  // CONDITIONS the plotted runs were done in; the METHOD is now stated in a plain sentence beside the
-  // heat line, where the athlete is already being told what the number does and does not include.
-  // ⚠️ Sub-8°F spread returns null rather than a bare method word — with the jargon removed there was
-  // nothing left to say, and a caption that says nothing is worse than no caption.
-  const routeCaption = React.useMemo(() => {
-    const temps = (eff.route?.series ?? []).map((p) => p.tempF).filter((t): t is number => t != null);
-    if (temps.length < 2) return null;
-    const lo = Math.round(Math.min(...temps)), hi = Math.round(Math.max(...temps));
-    return hi - lo >= 8 ? `${lo}–${hi}°F across these runs` : null;
-  }, [eff.route]);
-  // ⛔ THE READ, HOISTED (2026-08-01). Lives here rather than inline so the "more" cue can be shown
-  // only when there IS something behind it — a cue that opens an empty panel is worse than no cue.
-  // Same numbers, same `ciRange`, same rounding as everywhere else on this row.
-  const trendDetail = React.useMemo(() => {
-    const wks = eff.route?.spanDays != null ? Math.max(1, Math.round(eff.route.spanDays / 7)) : null;
-    const over = wks != null ? ` over ${wks} weeks` : '';
-    const rng = ciRange(eff.route?.ci);
-    const mag = eff.pctChange != null ? Math.abs(Math.round(eff.pctChange)) : null;
-    if (eff.verdict === 'holding') return `No real change in speed-for-effort${over}.`;
-    if (eff.verdict === 'sliding' && eff.recentlyFlat) {
-      return mag == null
-        ? 'Dropped earlier, steady for the last few weeks.'
-        : `About ${mag}% less speed per heartbeat${over}${rng ? ` (${rng})` : ''} — most of that drop was earlier; the last few weeks have held steady.`;
-    }
-    if (eff.verdict === 'improving' && mag != null) return `About ${mag}% more speed per heartbeat${over}${rng ? ` (${rng})` : ''}.`;
-    // ⚠️ The SLIDING branch names the ordinary causes because a decline here is routinely correct, and
-    // a bare "slower" invites the athlete to read a problem the number cannot support. Possibilities,
-    // never a finding.
-    if (eff.verdict === 'sliding' && mag != null) return `About ${mag}% less speed per heartbeat${over}${rng ? ` (${rng})` : ''}. Heat, fatigue, or a base block can all cause this.`;
-    return null;
-  }, [eff.verdict, eff.recentlyFlat, eff.pctChange, eff.route]);
-  const hasDetail = !!(postureSentence || trendDetail || shownPace != null);
-  const hasTrend = eff.verdict !== 'needs_data' && eff.verdict !== 'withheld';
-  // ⛔ THE WINDOW LABEL DESCRIBES THE POOL THAT WAS ACTUALLY READ (D-346, 2026-07-31).
-  //
-  // It was hardcoded to 42 days. When the verdict moved to the grade-adjusted all-runs pool the data
-  // became ~90 days and the label kept saying "over 6wk" — so the row reported 26 runs over six weeks
-  // when it meant thirteen. Michael caught it on the shipped screen. **A stale label on fresh data is
-  // the same fault as a stale doc: it is believed precisely because everything around it is right.**
-  const evidence = eff.sampleCount != null
-    ? trendEvidence({
-        windowDays: eff.route?.spanDays ?? 42,
-        sampleCount: eff.sampleCount,
-        newestAgeDays: eff.newestAgeDays,
-        discipline: 'run' as Discipline,
-      })
-    : null;
-  // Durability shows as a quiet secondary ONLY when it has a real read (not needs_data/withheld).
-  // ⛔ SILENCED WHILE ITS INPUT IS KNOWN BAD (D-346, 2026-07-31).
-  //
-  // "pace fading on long efforts" is the DECOUPLING band, and decoupling still runs through
-  // `isSteadyAerobic(workout_type)` — the gate that reads `steady_state` on every run ever logged. His
-  // 24.9% hill session is in that pool, which is what pushes the band to `needs_work`. So the sentence
-  // is a claim about long steady efforts computed partly from a hill session.
-  //
-  // ⚠️ It sat directly beneath a verdict that had just been cleaned of exactly that — **the clean
-  // number lending its credibility to the dirty one.** Saying nothing is the honest state until the
-  // decoupling gate is fixed; D-346 carries that as the remaining work.
-  const durWord = null;
-  return (
-    <Row label="run">
-      <span className="basis-full flex items-baseline justify-between gap-2">
-        <button type="button" onClick={() => setExplainOpen((o) => !o)} className="inline-flex items-baseline gap-1 text-white/55 text-[13px]">
-          efficiency <span className="text-white/50 text-[11px]">{explainOpen ? '▾' : 'ⓘ'}</span>
-        </button>
-        {hasTrend ? (
-          <span className={`inline-flex items-baseline gap-1 text-[13px] ${v.cls}`}>
-            {v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}
-            {eff.pctChange != null && <span className="text-white/60">{verdictSignedPct(eff.verdict, eff.pctChange, 0)}</span>}
-          </span>
-        ) : (
-          // Honest: efficiency is a TREND, so one run can't read it. Say how close — not a confident dot.
-          //
-          // ⛔ TWO DIFFERENT REASONS FOR SILENCE, AND THEY MUST NOT SHARE COPY (D-346, 2026-07-31).
-          // The verdict now comes from the route engine (same route, heat de-confounded, gated on a
-          // confidence interval). When THAT withholds, the athlete has plenty of runs — the interval
-          // simply still straddles zero. Quoting the old "N of 8 steady runs" floor would name a
-          // threshold that no longer decides anything, which is how a screen starts lying quietly.
-          eff.route
-            ? <span className="text-white/60 text-[12px]">
-                {/* ⛔ THE FIRST THREE WORDS CARRIED THE OPPOSITE MEANING TO THE REST OF THE SENTENCE
-                    (2026-08-28, Michael reading his own screen: *"I'm just still seeing that not
-                    enough runs thing"*). It opened "Too soon to tell" — which is the wait-for-more-
-                    data complaint — and then said the runs are there and the movement is inside the
-                    scatter. He read the opening. This branch means the athlete has PLENTY of runs, so
-                    the sentence now leads with the count.
-                    ⚠️ AND IT IS NOT A FAULT TO REPORT. On easy training this is the EXPECTED state:
-                    zone-2 running produces small true movement against normal day-to-day variation,
-                    so the guard withholding a direction is the correct outcome. The line describes
-                    the training, never the data. ⛔ Do not reintroduce "too soon", "not yet" or "need
-                    more" here — the other branch below is the one that means those things.
-                    ⚠️ SEE Q-289 for the larger version of this, still open: when the noise guard
-                    fires elsewhere the screen says "holding", which is a CLAIM, and nothing on the
-                    payload records that it was suppressed.
-                    ⛔ AND THE COUNT IS NOW THE EASY GROUP'S, NOT EVERY RUN (2026-08-28, item 2). The
-                    verdict is fitted within one session-type group — easy against easy — so naming a
-                    total that includes quality sessions and long runs would quote a population the
-                    number never read. That was already the fault in the old line: it said "23 runs"
-                    when 23 runs were never what fed it. ⚠️ The other groups are not lost; they carry
-                    their own trend on `efficiency.groups` and are not yet rendered. */}
-                Reading {eff.route.points} easy runs — the change is smaller than the normal spread between them
-              </span>
-            : <span className="text-white/60 text-[12px]">Need a few more runs — {eff.sampleCount ?? 0} of {RUN_TREND_MIN_RUNS} steady runs to read a trend</span>
-        )}
-      </span>
-      {/* ⛔ THE RANGE IS ALWAYS-VISIBLE, NOT TAP-ONLY (2026-08-01, Michael — extends [D-356]).
-          "A shown number always shows its uncertainty" cannot be satisfied by a range the athlete has
-          to go looking for. The headline percent is on screen without a tap, so its interval is too.
-          It stays in the ⓘ expand as well — this ADDS a copy, it does not move it.
-          ⚠️ BOTH READ THE SAME `ciRange(eff.route.ci)`. One helper, one rounding, so the visible line
-          and the expand can never print different numbers for the same interval — which is the only
-          way this could go wrong, and would be worse than not showing it at all.
-          ⚠️ A `holding` range may straddle zero ("−3% to +2%"). That is shown deliberately: it is the
-          honest picture of a verdict that means "no real change", and hiding it would make a flat read
-          look more certain than it is. */}
-      {hasTrend && (() => {
-        const rng = ciRange(eff.route?.ci);
-        const line = [rng, evidence].filter(Boolean).join(' · ');
-        if (!line && !hasDetail) return null;
-        return (
-          <span className="basis-full flex items-baseline justify-between gap-2 text-white/55 text-[12px]">
-            <span>{line}</span>
-            {/* ⛔ THE SECOND CUE, AND IT IS DELIBERATELY A WORD NOT A GLYPH. ⓘ promises a definition;
-                "more" promises the read. Two glyphs would have been two mysteries. Gated on
-                `hasDetail` so it never opens an empty panel. */}
-            {hasDetail && (
-              <button type="button" onClick={() => setDetailOpen((o) => !o)} className="shrink-0 text-white/50">
-                {detailOpen ? 'less' : 'more'}
-              </button>
-            )}
-          </span>
-        );
-      })()}
-      {/* THE READ — plan context first, then what the trend is saying. Opened by "more", never by ⓘ. */}
-      {detailOpen && (
-        <>
-          {postureSentence && (
-            <p className="basis-full text-[12px] text-white/80 leading-snug mt-1 max-w-[min(100%,340px)]">
-              {postureSentence}
-            </p>
-          )}
-          {trendDetail && (
-            <p className="basis-full text-[12px] text-white/55 leading-snug mt-1 max-w-[min(100%,340px)]">
-              {trendDetail}
-            </p>
-          )}
-          {/* ⛔ PACE MOVED UNDER "more" (2026-08-01, Michael: "just let it be what it is — speed per
-              heartbeat"). It was added as the "what" under the index's "why", back when the row led
-              with an efficiency INDEX that meant nothing to a human. The row no longer shows an index —
-              it shows a direction and a percent — so a pace-at-HR sitting on the always-visible line
-              was a second, more concrete-looking number competing with the one the row is actually
-              about. It is a translation of the metric, so it belongs with the explanation.
-              ⚠️ Still the verdict's OWN pool and already grade-adjusted — it cannot disagree with the
-              number above it. */}
-          {shownPace != null && (
-            <p className="basis-full text-[12px] text-white/55 leading-snug mt-1 max-w-[min(100%,340px)]">
-              Recently about {formatPace(shownPace, useImperial)}{eff.recentHrAvg != null ? ` at ${eff.recentHrAvg} bpm` : ''}.
-            </p>
-          )}
-        </>
-      )}
-      {/* ⛔ WHAT THE NUMBER ALREADY ACCOUNTS FOR, IN PLAIN WORDS (2026-08-01, Michael). This replaces
-          "grade-adjusted" in the chart caption — correct, and jargon. It sits beside the heat line
-          because the two answer the same question: what has already been taken out of this number, so
-          the athlete knows what NOT to explain away. Heat is stated as a COST (measured on their own
-          runs); hills are stated as REMOVED, because they are.
-          ⚠️ Gated on `eff.route` — the grade adjustment is the ROUTE engine's. On the non-route
-          fallback the claim would not be true, and it stays silent rather than overclaiming. */}
-      {hasTrend && eff.route && (
-        <span className="basis-full text-white/55 text-[12px]">Evened out for hills, so a hilly week doesn't read as slower.</span>
-      )}
-      {heatCost && <span className="basis-full text-white/55 text-[12px]">{heatCost}</span>}
-      {/* THE LONG VIEW — the arc behind the verdict.
-          ⛔ WHEN A ROUTE VERDICT EXISTS THE CHART PLOTS **THE ROUTE'S OWN RUNS** (D-346, 2026-07-31).
-          Chart and verdict then read the identical rows and cannot contradict each other — the old
-          sparkline drew every run the broken gate let through, hill sessions included, while the
-          verdict came from elsewhere. Same route also makes the dots comparable without modelling
-          anything away: it is literally the same ground.
-          ⚠️ CONDITIONS ARE CAPTIONED, NOT CORRECTED — Intervals.icu's pattern (weather shown so a
-          reader can interpret a poor point). Nobody in the field heat-adjusts an efficiency chart. */}
-      {/* ⛔ THE CHART MOVED UP THE SCREEN (2026-08-29, Michael: *"I never trusted those old rows"*).
-          The efficiency cards at the top of State now draw this same read per session type — easy,
-          quality, ride — each with its own line, its own date range and the field's own name for the
-          number. Two charts of one metric on one screen is how a reader stops believing either.
-          ⚠️ THE VERDICT SENTENCE STAYS. It carries the direction across the whole population of runs
-          ("reading 20 easy runs — the change is smaller than the normal spread between them"), which
-          the card does not compute. The words are not the duplicate; the picture was. */}
-      {/* durability — the SECONDARY read now (fatigue resistance within a run), quiet, only when real */}
-      {durWord && (
-        <span className="basis-full text-[12px] text-white/55">{durWord}{dur.stale ? ` · last steady run ${dur.newestAgeDays}d ago` : ''}</span>
-      )}
-      {/* PROJECTED RACE TIMES (Michael 2026-07-22) — goal-free VDOT off current fitness, for the varied
-          runner the efficiency row can't serve. Longer distances unlock as the long run grows (a marathon
-          estimate off short runs is a fantasy). Locked rows shown dim so the progression is visible. */}
-      {Array.isArray(fitness.projections) && fitness.projections.length > 0 && (
-        <span className="basis-full flex flex-col gap-1 mt-1.5">
-          <span className="text-white/45 text-[11px] uppercase tracking-wider">projected race times</span>
-          {/* ⛔ THE BASIS, BESIDE THE NUMBER (D-346, 2026-07-31). These print to the SECOND off a
-              threshold pace that can rest on three runs — internally consistent, but a precision the
-              input does not support, and the last thing on this row without a receipt. Naming the
-              source and the sample count lets the reader weight it; it is the same move the verdict
-              and the chart already make. */}
-          {(fitness as any).projectionBasis?.samples && (
-            <span className="text-white/40 text-[11px]">
-              from your measured threshold pace · {(fitness as any).projectionBasis.samples} runs
-            </span>
-          )}
-          {/* 3-column grid: distance | finish time (right-aligned number column) | pace — so the times
-              stack into one clean edge. Locked rows span the two value columns with a left-aligned note. */}
-          {fitness.projections.map((p) => (
-            <span key={p.distance} className="grid grid-cols-[4.5rem_auto_1fr] items-baseline gap-x-2 text-[12px]">
-              <span className={p.unlocked ? 'text-white/65' : 'text-white/45'}>{p.label}</span>
-              {p.unlocked ? (
-                <>
-                  <span className="text-white/80 text-right">{p.display}</span>
-                  <span className="text-white/50 text-right">{p.paceDisplay}</span>
-                </>
-              ) : (
-                <span className="col-span-2 text-white/45 text-right">unlocks at ~{p.unlockLongRunMiles} mi long run</span>
-              )}
-            </span>
-          ))}
-        </span>
-      )}
-      {/* ⓘ — THE DEFINITION, AND NOTHING ELSE (2026-08-01, Michael). It used to open the posture
-          sentence and the trend read as well, so the one cue that promises "what is this metric"
-          answered three questions at once. The read moved to "more" above.
-          ⛔ THE DEFINITION DESCRIBES THE POOL ACTUALLY READ (D-346): every run, terrain handled by the
-          grade adjustment rather than by excluding sessions — not "on steady runs", and not a
-          comparison against six weeks ago. The ⓘ is where an athlete checks whether to believe the
-          number; a stale explanation there is worse than none. */}
-      {explainOpen && (
-        <p className="basis-full text-[12px] text-white/55 leading-snug mt-1 max-w-[min(100%,340px)]">
-          Efficiency is your speed per heartbeat, adjusted for hills and for heat — rising means faster at the same effort.
-        </p>
-      )}
-    </Row>
-  );
-}
 
 // D-194: swim rest-fraction (work:rest) trend — a quiet secondary read on the swim row, shown only
 // when it has a verdict. "resting less to cover the same distance" = improving (lowerIsBetter, so the
@@ -1495,7 +1134,9 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       const runVal = ef.recentPaceSecPerKm != null
         ? `${formatPace(ef.recentPaceSecPerKm, useImperial)}${ef.recentHrAvg != null ? ` at ${ef.recentHrAvg} bpm` : ''}`
         : null;
-      return [efficiencySummary({ label: 'pace per heartbeat', value: runVal, verdict: ef.verdict, pctChange: ef.pctChange, sampleCount: ef.sampleCount, sinceMonth: '', noun: 'run' })];
+      // No verdict word here either (2026-09-02, same ruling): the number and the count, nothing graded.
+      const n = Number(ef.sampleCount) || 0;
+      return [runVal ?? `${n} run${n === 1 ? '' : 's'}`];
     }
     if (disc === 'bike') {
       // THE REAL NUMBER LEADS (Michael 2026-09-01: "bike tells the user nothing"). Follow the server's

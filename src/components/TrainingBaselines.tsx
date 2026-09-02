@@ -17,6 +17,7 @@ import { frielRunZones } from '@/lib/friel-zones';
 import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace, describeThresholdBasis } from '@/lib/resolve-current-run-pace';
 import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
 import { ageEstimateMaxHr, resolveCurrentMaxHr } from '@/lib/resolve-current-max-hr';
+import { resolveStrengthCapacity } from '@shared/state-trend/capacity-resolver';
 
 interface TrainingBaselinesProps {
 onClose: () => void;
@@ -78,10 +79,25 @@ equipment: {
    * invisible on this screen and a 5K-derived pace reads as "not enough data".
    */
   effort_paces?: Record<string, unknown> | null;
+  /** AUTO/LOCKED switch (2026-09-02): per-lift values the athlete locked. Key present = locked to that
+   *  value (learning never touches it); absent = auto (trusted logged value, else the typed seed). */
+  locked_baselines?: Record<string, number> | null;
 }
+
+/** The five lifts the Baselines screen owns. `learnedKey` = `learned_fitness.strength_1rms` entry;
+ *  pull-ups are rep-based with no learned aggregate (Q-102). Order matches the old input row. */
+const STRENGTH_LIFT_FIELDS = [
+  { key: 'squat', label: 'Squat', placeholder: '225', learnedKey: 'squat', reps: false },
+  { key: 'deadlift', label: 'DL', placeholder: '315', learnedKey: 'deadlift', reps: false },
+  { key: 'bench', label: 'Bench', placeholder: '185', learnedKey: 'bench_press', reps: false },
+  { key: 'overheadPress1RM', label: 'OHP', placeholder: '135', learnedKey: 'overhead_press', reps: false },
+  { key: 'pullupMaxReps', label: 'Pull-ups', placeholder: '8', learnedKey: null, reps: true },
+] as const;
 
 export default function TrainingBaselines({ onClose, onOpenBaselineTest }: TrainingBaselinesProps) {
 const { saveUserBaselines, loadUserBaselines } = useAppContext();
+// A lift switched to "locked" before a number exists — the input is in lock mode, nothing saved yet.
+const [lockDrafts, setLockDrafts] = useState<Record<string, boolean>>({});
 const { addPlannedWorkout } = usePlannedWorkouts() as any;
 
 // FTP Test workout template - let user pick date
@@ -2161,100 +2177,133 @@ return (
                             </p>
                           </div>
                           
-                          <div className="flex flex-wrap gap-3">
-                            <div className="flex items-center gap-1">
-                              <label className="text-xs text-white/60">Squat</label>
-                                      <input
-                                        type="number"
-                                        value={data.performanceNumbers?.squat || ''}
-                                        onChange={(e) => setData(prev => ({
-                                          ...prev,
-                                          performanceNumbers: {
-                                            ...prev.performanceNumbers,
-                                            squat: parseInt(e.target.value) || undefined
-                                          }
-                                        }))}
-                                placeholder="225"
-                                className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
-                                style={{ fontFamily: 'Inter, sans-serif' }}
-                                      />
+                          {/**
+                            * ⛔ AUTO / LOCKED — the Garmin switch (Michael's ruling 2026-09-02, PLAN-strength-numbers).
+                            *
+                            * Each lift is either AUTO (default: the trusted number from your logged sets, the typed
+                            * number only until logs exist) or LOCKED (you set it; learning never moves it until you
+                            * switch back). The number shown big is the one the app USES — the same resolver the
+                            * coach, the State card and a new plan's weights read (`capacity-resolver.ts`, locked >
+                            * trusted-learned > typed). What the input edits FOLLOWS the switch: in auto it edits the
+                            * typed seed, in locked it edits the locked value. Tapping "locked" seeds the lock with the
+                            * number in use; tapping "auto" removes the lock and keeps the typed seed.
+                            * ⚠️ `locked_baselines` is saved with the rest of the row on Save (AppContext.saveUserBaselines).
+                            */}
+                          <div className="space-y-2">
+                            {STRENGTH_LIFT_FIELDS.map((lift) => {
+                              const typedRaw = (data.performanceNumbers as any)?.[lift.key];
+                              const lockedMap = (data.locked_baselines ?? {}) as Record<string, number>;
+                              const lockedRaw = lockedMap[lift.key];
+                              const isLocked = lockedRaw != null || !!lockDrafts[lift.key];
+                              const resolved = resolveStrengthCapacity({
+                                key: lift.key,
+                                typed: data.performanceNumbers as any,
+                                learnedStrength1rms: learnedFitness?.strength_1rms ?? null,
+                                locked: data.locked_baselines ?? null,
+                                asOf: new Date().toISOString().slice(0, 10),
+                              });
+                              const learnedEntry = lift.learnedKey ? learnedFitness?.strength_1rms?.[lift.learnedKey] : null;
+                              const learnedVal = Number(learnedEntry?.value);
+                              const learnedSets = Number(learnedEntry?.sample_count);
+                              const unit = lift.reps ? 'reps' : (data.units === 'metric' ? 'kg' : 'lb');
+                              const status = isLocked
+                                ? 'locked. Your lifts don\'t change it.'
+                                : resolved.source === 'learned'
+                                  ? `auto. From your lifts${Number.isFinite(learnedSets) && learnedSets > 0 ? ` (${learnedSets} sets)` : ''}.`
+                                  : resolved.source === 'typed'
+                                    ? (lift.reps
+                                      ? 'auto. Your typed number.'
+                                      : 'auto. Your typed number, until three logged sets pass the trust gate.')
+                                    : 'auto. Nothing on file yet.';
+                              const sug = resolved.suggestion;
+                              const suggestion = sug && sug.divergencePct > 0
+                                ? `Your lifts suggest ${Math.round(sug.computed)}.`
+                                : null;
+                              const inputValue = isLocked
+                                ? (lockedRaw ?? '')
+                                : (lift.reps ? (typedRaw ?? '') : (typedRaw || ''));
+                              const placeholder = isLocked
+                                ? (resolved.value != null ? String(resolved.value) : lift.placeholder)
+                                : (Number.isFinite(learnedVal) && learnedVal > 0 ? String(Math.round(learnedVal)) : lift.placeholder);
+                              const setLocked = () => {
+                                const seed = resolved.value;
+                                setLockDrafts((d) => ({ ...d, [lift.key]: true }));
+                                if (seed != null) {
+                                  setData((prev) => ({ ...prev, locked_baselines: { ...(prev.locked_baselines ?? {}), [lift.key]: seed } }));
+                                }
+                              };
+                              const setAuto = () => {
+                                setLockDrafts((d) => { const n = { ...d }; delete n[lift.key]; return n; });
+                                setData((prev) => {
+                                  const next = { ...(prev.locked_baselines ?? {}) } as Record<string, number>;
+                                  delete next[lift.key];
+                                  return { ...prev, locked_baselines: Object.keys(next).length ? next : null };
+                                });
+                              };
+                              const onInput = (raw: string) => {
+                                const n = raw === '' ? NaN : Math.max(0, parseInt(raw) || 0);
+                                const valid = lift.reps ? Number.isFinite(n) : Number.isFinite(n) && n > 0;
+                                if (isLocked) {
+                                  setData((prev) => {
+                                    const next = { ...(prev.locked_baselines ?? {}) } as Record<string, number>;
+                                    if (valid) next[lift.key] = n; else delete next[lift.key];
+                                    return { ...prev, locked_baselines: Object.keys(next).length ? next : null };
+                                  });
+                                } else {
+                                  setData((prev) => ({
+                                    ...prev,
+                                    performanceNumbers: { ...prev.performanceNumbers, [lift.key]: valid ? n : undefined },
+                                  }));
+                                }
+                              };
+                              const segBase = 'px-2.5 h-7 text-[11px] leading-7 transition-colors';
+                              const segOn = 'text-white';
+                              const segOff = 'text-white/45 hover:text-white/70';
+                              return (
+                                <div
+                                  key={lift.key}
+                                  className="rounded-xl border px-3 py-2 flex items-center gap-3"
+                                  style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: isLocked ? `${SPORT_COLORS.strength}55` : 'rgba(255,255,255,0.15)' }}
+                                >
+                                  <div className="w-14 shrink-0 text-xs text-white/70">{lift.label}</div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-baseline gap-1.5">
+                                      <span className="text-lg font-semibold tabular-nums text-white">{resolved.value != null ? resolved.value : '—'}</span>
+                                      <span className="text-[11px] text-white/50">{unit}</span>
                                     </div>
-                            <div className="flex items-center gap-1">
-                              <label className="text-xs text-white/60">DL</label>
-                                      <input
-                                        type="number"
-                                        value={data.performanceNumbers?.deadlift || ''}
-                                        onChange={(e) => setData(prev => ({
-                                          ...prev,
-                                          performanceNumbers: {
-                                            ...prev.performanceNumbers,
-                                            deadlift: parseInt(e.target.value) || undefined
-                                          }
-                                        }))}
-                                placeholder="315"
-                                className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
-                                style={{ fontFamily: 'Inter, sans-serif' }}
-                                      />
-                                    </div>
-                            <div className="flex items-center gap-1">
-                              <label className="text-xs text-white/60">Bench</label>
-                                      <input
-                                        type="number"
-                                        value={data.performanceNumbers?.bench || ''}
-                                        onChange={(e) => setData(prev => ({
-                                          ...prev,
-                                          performanceNumbers: {
-                                            ...prev.performanceNumbers,
-                                            bench: parseInt(e.target.value) || undefined
-                                          }
-                                        }))}
-                                placeholder="185"
-                                className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
-                                style={{ fontFamily: 'Inter, sans-serif' }}
-                                      />
-                                    </div>
-                            <div className="flex items-center gap-1">
-                              <label className="text-xs text-white/60">OHP</label>
-                                      <input
-                                        type="number"
-                                        value={data.performanceNumbers?.overheadPress1RM || ''}
-                                        onChange={(e) => setData(prev => ({
-                                          ...prev,
-                                          performanceNumbers: {
-                                            ...prev.performanceNumbers,
-                                            overheadPress1RM: parseInt(e.target.value) || undefined
-                                          }
-                                        }))}
-                                placeholder="135"
-                                className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
-                                style={{ fontFamily: 'Inter, sans-serif' }}
-                                      />
-                                    </div>
-                            {/* Pull-ups — rep-based, NOT %1RM (Q-102). Max clean reps; 0 is a valid baseline. */}
-                            <div className="flex items-center gap-1">
-                              <label className="text-xs text-white/60">Pull-ups</label>
-                                      <input
-                                        type="number"
-                                        min={0}
-                                        value={data.performanceNumbers?.pullupMaxReps ?? ''}
-                                        onChange={(e) => {
-                                          const raw = e.target.value;
-                                          setData(prev => ({
-                                            ...prev,
-                                            performanceNumbers: {
-                                              ...prev.performanceNumbers,
-                                              // preserve 0 ("goal: your first pull-up"); blank clears
-                                              pullupMaxReps: raw === '' ? undefined : Math.max(0, parseInt(raw) || 0)
-                                            }
-                                          }));
-                                        }}
-                                placeholder="8"
-                                className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
-                                style={{ fontFamily: 'Inter, sans-serif' }}
-                                      />
-                              <span className="text-[11px] text-white/55">reps</span>
-                                    </div>
+                                    <div className="text-[11px] text-white/55 leading-snug">{status}{suggestion ? ` ${suggestion}` : ''}</div>
                                   </div>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    inputMode="numeric"
+                                    aria-label={`${lift.label} ${isLocked ? 'locked value' : 'typed number'}`}
+                                    value={inputValue}
+                                    onChange={(e) => onInput(e.target.value)}
+                                    placeholder={placeholder}
+                                    className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40 shrink-0"
+                                    style={{ fontFamily: 'Inter, sans-serif' }}
+                                  />
+                                  <div className="flex rounded-full border border-white/20 overflow-hidden shrink-0" role="group" aria-label={`${lift.label} auto or locked`}>
+                                    <button
+                                      type="button"
+                                      onClick={setAuto}
+                                      aria-pressed={!isLocked}
+                                      className={`${segBase} ${!isLocked ? segOn : segOff}`}
+                                      style={{ backgroundColor: !isLocked ? `${SPORT_COLORS.strength}40` : 'transparent' }}
+                                    >auto</button>
+                                    <button
+                                      type="button"
+                                      onClick={setLocked}
+                                      aria-pressed={isLocked}
+                                      className={`${segBase} ${isLocked ? segOn : segOff}`}
+                                      style={{ backgroundColor: isLocked ? `${SPORT_COLORS.strength}40` : 'transparent' }}
+                                    >locked</button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                           <div className="space-y-4 mt-4 pt-4 border-t border-white/10">
                             <h4 className="text-sm font-medium text-white/80">Equipment Access</h4>
                             

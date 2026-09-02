@@ -168,6 +168,8 @@ export interface AthleteState {
    * if athlete's learned values shift mid-plan).
    */
   learned_fitness?: Record<string, unknown>;
+  /** AUTO/LOCKED switch (2026-09-02): per-lift values the athlete locked. Passed through to `buildAthleteSnapshot`. */
+  locked_baselines?: Record<string, unknown>;
   /** Athlete bodyweight in pounds (for spec §5 conservative-default 1RM fallback). */
   bodyweight_lb?: number;
   /**

@@ -1176,6 +1176,10 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
         method: runRoute.method,
         heatCoefPctPerF: runRoute.heatCoefPctPerF,
         spanDays: runRoute.spanDays,
+        // ⛔ THE REASON RIDES WITH THE WITHHOLD (2026-09-02). A summer where every easy run is hot and
+        // the hot ones are the recent ones cannot separate heat from fitness; the engine now says so
+        // by name instead of fitting anyway and blaming time (which put a false −22% on this row).
+        withheld: runRoute.withheld ?? null,
       } : null,
       /**
        * ⛔ EVERY GROUP, INCLUDING THE ONES THAT DO NOT LEAD (2026-08-28, work order item 2).
@@ -1202,6 +1206,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
           direction: fit ? fit.direction : null,
           pctChange: fit && fit.direction !== 'still_learning' ? fit.pct : null,
           ci: fit ? fit.ci : null,
+          withheld: fit?.withheld ?? null,
           // the group's own recent pace + HR (real recorded pace, median of its last five) — lets the
           // card show easy and hard on their own pools; null when the group carries no real pace.
           ...recentGroupPaceHr(rows as Array<Record<string, unknown>>),

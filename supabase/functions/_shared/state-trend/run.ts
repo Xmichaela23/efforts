@@ -95,6 +95,9 @@ const MAX_EFF_INDEX = 5;
  */
 export type RunSessionGroup = 'easy' | 'long' | 'quality';
 export function runSessionGroup(workoutType?: string | null): RunSessionGroup {
+  // ⛔ A WORD MAP, NOT A CLASSIFIER (2026-09-02, D-460 addendum). `workoutType` is the PLAN's word
+  // (`run_facts.workout_type`, written from the attached planned session's name/tags) or null. No
+  // caller passes the analyser's HR-derived guess any more. Null → easy, by ruling, with no math.
   const wt = String(workoutType || '').toLowerCase().trim();
   // ⛔ UNKNOWN GROUPS AS EASY, AND IT MUST BE TESTED BEFORE `isSteadyAerobic`. That predicate answers
   // a DIFFERENT question — "may this run carry a durability number?" — and it returns false on an
@@ -386,6 +389,11 @@ export interface RunFitness {
       method: string;
       heatCoefPctPerF: number | null;
       spanDays: number | null;
+      /** WHY a fit with enough runs still withheld (2026-09-02). `heat_confounded_with_time` = every
+       *  run was hot and the hot ones were the late ones, so heat and the calendar are one axis and
+       *  the fit cannot tell "hotter" from "later". Null when the verdict is a real read or when
+       *  `direction` is still_learning for the ordinary reason (movement inside the scatter). */
+      withheld?: string | null;
       /** One point per run — the same rows the verdict read, so chart and verdict cannot disagree.
        *  `tempF` rides along so conditions are SHOWN beside the reading as well as fitted. */
       series?: Array<{ date: string; value: number; tempF: number | null; recent: boolean }>;
@@ -403,6 +411,8 @@ export interface RunFitness {
       direction: string | null;
       pctChange: number | null;
       ci: [number, number] | null;
+      /** same meaning as `route.withheld`, for this group's own fit */
+      withheld?: string | null;
       series: Array<{ date: string; value: number; recent: boolean }>;
       /** The group's OWN recent pace + HR — median of its last five runs' REAL recorded pace (never the
        *  index reconstruction). Null when the group has no run carrying a real pace. Lets the card show

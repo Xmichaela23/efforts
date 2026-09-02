@@ -209,17 +209,21 @@ export function spineDirectionToTrend(v: TrendVerdict | null | undefined): 'up' 
 /** Build the PRIMARY_LIFTS→baseline-1RM map from user_baselines. Typed performance_numbers first,
  *  learned_fitness.strength_1rms fills gaps. Keys match PRIMARY_LIFTS canonical — used by BOTH the
  *  server (compute-snapshot) and the client live path so the strength dot's frame is identical. */
-export function buildStrengthBaselines(perfRaw: any, learnedRaw: any): Record<string, number> | null {
+export function buildStrengthBaselines(perfRaw: any, learnedRaw: any, lockedRaw?: any): Record<string, number> | null {
   const perf = perfRaw || {};
   const learned = learnedRaw || {};
+  // AUTO/LOCKED (2026-09-02): a value the athlete LOCKED on the Baselines screen is their asserted
+  // number and outranks the typed seed. ⚠️ Typed-before-learned below is unchanged (D-231 for this
+  // band); the resolver's learned-first flip has not been applied here — see the 2026-09-02 handoff.
+  const locked = lockedRaw && typeof lockedRaw === 'object' && !Array.isArray(lockedRaw) ? lockedRaw : {};
   const num = (v: any) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : undefined; };
   const m: Record<string, number> = {};
   const put = (k: string, ...cands: any[]) => { const v = cands.map(num).find((x) => x != null); if (v != null) m[k] = v; };
-  put('squat', perf.squat, perf.squat1RM, perf.squat_1rm, learned.squat);
-  put('bench_press', perf.bench, perf.bench1RM, perf.bench_1rm, learned.bench);
-  put('deadlift', perf.deadlift, perf.deadlift1RM, perf.deadlift_1rm, learned.deadlift);
-  put('trap_bar_deadlift', perf.deadlift, perf.deadlift1RM, learned.deadlift);
-  put('overhead_press', perf.overhead, perf.overheadPress1RM, perf.overhead_1rm, learned.overhead);
+  put('squat', locked.squat, perf.squat, perf.squat1RM, perf.squat_1rm, learned.squat);
+  put('bench_press', locked.bench, perf.bench, perf.bench1RM, perf.bench_1rm, learned.bench);
+  put('deadlift', locked.deadlift, perf.deadlift, perf.deadlift1RM, perf.deadlift_1rm, learned.deadlift);
+  put('trap_bar_deadlift', locked.deadlift, perf.deadlift, perf.deadlift1RM, learned.deadlift);
+  put('overhead_press', locked.overheadPress1RM, perf.overhead, perf.overheadPress1RM, perf.overhead_1rm, learned.overhead);
   return Object.keys(m).length ? m : null;
 }
 

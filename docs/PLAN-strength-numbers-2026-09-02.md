@@ -73,3 +73,15 @@ TRUTH-MAP fracture #1 (strength contradicts itself), now confirmed on live data.
 ## Open decision for Michael
 The override storage shape in **C** (per-lift `{value, source, set_at}`). Everything else follows the FTP
 pattern already in the app.
+
+## Status (2026-09-02, second session)
+- A, B: deployed + verified (first session).
+- C: BUILT — edited, not pushed, not deployed. Storage shape decided: flat `{ lift: number }` (D-459),
+  not `{value, source, set_at}` — presence is provenance, `updated_at` dates it. Migration + client row +
+  every server reader wired; see the ENGINE-STATE banner for the deploy order (migration first).
+- 4 (performance-screen set edit, outlier guard): not started.
+- Separate job from the same banner — the run "declining −22%" — fixed at `heat-adjust.ts` (D-458),
+  verified by local replay on the account, prod recompute pending deploy.
+- Ruling, same session (D-460): the run read is TrainingPeaks' facts only — no verdict, no fitted line,
+  no CI, no heat line. D-458's gate stays in code, unread. Bike left alone this pass.
+

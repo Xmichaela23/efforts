@@ -160,6 +160,44 @@ Deno.test("regression_time_only: all-cool history (no heat confound) trends on t
   assertEquals(t.direction, "improving");
   assertEquals(t.heatCoefPctPerF, null);
 });
+// ── Heat confounded with time (2026-09-02) ───────────────────────────────────────────────────────────
+// Twelve weekly runs across one summer: every run is hot and the hot ones are the late ones, so heat
+// and the calendar are one axis. Raw heat spread clears HEAT_SPREAD_MIN; the part time does not explain
+// does not. Efficiency falls purely with heat (fitness flat) — a joint fit would split that fall
+// between heat and time by accident. The honest answer is neither "declining" nor "holding".
+const SUMMER_WEEKS = Array.from({ length: 12 }, (_, i) => {
+  const d = new Date(Date.UTC(2026, 5, 7 + i * 7)); // 2026-06-07 … 2026-08-23
+  return d.toISOString().slice(0, 10);
+});
+const SUMMER_RAMP = SUMMER_WEEKS.map((_, i) => 64 + i * 2.4); // 64 → 90°F, monotone with the calendar
+function summerHist(hr: number[]): RouteHeatRow[] {
+  return SUMMER_WEEKS.map((d, i) => ({ date: d, pace_s_per_km: 300, hr: hr[i], temp_f: SUMMER_RAMP[i], intent: "easy_run" }));
+}
+
+Deno.test("withhold: heat rises in step with the calendar → still_learning + NAMED reason, never a direction", () => {
+  const hrFlatFitness = SUMMER_RAMP.map((t) => Math.round(150 * (1 + 0.005 * ht(t)))); // decline is all heat
+  const t = routeTrend(summerHist(hrFlatFitness))!;
+  assert(t, "enough runs to fit — must not be null");
+  assertEquals(t.direction, "still_learning");
+  assertEquals(t.withheld, "heat_confounded_with_time");
+  assertEquals(t.ci, null);
+  assertEquals(t.heatCoefPctPerF, null);
+  assertEquals(t.points, 12);
+});
+
+Deno.test("withhold: the same confounded window with a GENUINE decline is withheld too — the fit cannot tell which it is", () => {
+  const hrGettingWorse = SUMMER_RAMP.map((t, i) => Math.round((150 + i * 1.5) * (1 + 0.005 * ht(t))));
+  const t = routeTrend(summerHist(hrGettingWorse))!;
+  assertEquals(t.direction, "still_learning");
+  assertEquals(t.withheld, "heat_confounded_with_time");
+});
+
+Deno.test("withhold does NOT fire on a seasonal arc — heat and the calendar are not one axis there", () => {
+  const t = routeTrend(hist(flatHR, SEASON_TEMP))!;
+  assertEquals(t.withheld, undefined);
+  assertEquals(t.method, "regression");
+});
+
 Deno.test("fallback: weather-uniform route (heat present but under-identified) → linear_k", () => {
   const narrowTemp = [62, 64, 66, 63, 65, 62, 64, 66, 63, 65]; // heatTerm 2–6, SD < 4
   const t = routeTrend(hist(new Array(10).fill(150), narrowTemp, 10))!;

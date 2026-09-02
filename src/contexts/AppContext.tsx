@@ -121,6 +121,8 @@ interface BaselineData {
    * dropped on the way out, so client surfaces resolved paces with the wizard tier invisible.
    */
   effort_paces?: Record<string, any> | null;
+  /** AUTO/LOCKED switch (2026-09-02): per-lift values the athlete locked. Key present = locked; absent = auto. */
+  locked_baselines?: Record<string, number> | null;
 }
 
 interface AppContextType {
@@ -376,6 +378,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         injury_regions: data.injuryRegions,
         training_background: data.trainingBackground,
         equipment: data.equipment,
+        // Only written when the caller carried it (loaded rows always do) — a caller without the field
+        // must not wipe a lock it never saw.
+        ...(data.locked_baselines !== undefined ? { locked_baselines: data.locked_baselines } : {}),
       };
       const { data: existingData } = await supabase.from('user_baselines').select('id').eq('user_id', userId).single();
       if (existingData) {
@@ -492,6 +497,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // it, so every client surface resolving a pace was handed two of the resolver's three inputs
         // and could not see the wizard/VDOT tier at all. Purely additive.
         effort_paces: data.effort_paces || null,
+        // The lock map rides with the row so the Baselines screen can edit it and the resolver can read it.
+        locked_baselines: data.locked_baselines || null,
       };
     } catch (error) {
       console.error('Error in loadUserBaselines:', error);

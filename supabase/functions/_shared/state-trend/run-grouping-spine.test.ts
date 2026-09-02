@@ -51,6 +51,35 @@ Deno.test('⛔⛔ THE HEADLINE VERDICT IS FITTED ON THE EASY GROUP ALONE', () =>
   assertEquals(grouped.runFitness.efficiency.route.series.length, easy.length);
 });
 
+Deno.test('⛔ HEAT IN STEP WITH THE CALENDAR → the headline is WITHHELD AND NAMED, never sliding (2026-09-02)', () => {
+  /**
+   * The live −22%: eighteen easy runs, all between 69 and 89°F, the hottest ones the latest. Heat
+   * and time were one axis, the joint fit split the heat cost between them, and the row read
+   * "declining". Here the decline is PURELY heat (fitness flat) on a monotone summer ramp. The screen
+   * must show a withheld verdict with the reason attached — not a direction, not a percent.
+   */
+  const temps = Array.from({ length: 14 }, (_, i) => 64 + i * 2);            // 64 → 90°F, with the calendar
+  const rows = temps.map((t, i) => ({
+    date: `2026-${i < 9 ? '06' : '07'}-${String((i % 9) * 3 + 1).padStart(2, '0')}`,
+    pace_s_per_km: 330,
+    hr: Math.round(140 * (1 + 0.005 * Math.max(0, t - 60))),                  // heat-inflated HR only
+    temp_f: t, intent: null, workout_type: 'easy',
+  }));
+  const out = assembleStateTrends(base({ runEffHistory: rows })) as any;
+  assertEquals(out.runFitness.efficiency.verdict, 'withheld');
+  assertEquals(out.runFitness.efficiency.pctChange, null);
+  assertEquals(out.runFitness.efficiency.route.withheld, 'heat_confounded_with_time');
+  assertEquals(out.runFitness.efficiency.route.direction, 'still_learning');
+  // ⚠️ The receipt keeps the count so the card can say "18 easy runs, all hot" rather than "too few".
+  assertEquals(out.runFitness.efficiency.route.points, rows.length);
+  const easyGroup = out.runFitness.efficiency.groups.find((g: any) => g.group === 'easy');
+  assertEquals(easyGroup.withheld, 'heat_confounded_with_time');
+  // The display map must carry it through to the payload the client renders.
+  const v1 = toStateTrendsV1(out) as any;
+  assertEquals(v1.run.efficiency.route.withheld, 'heat_confounded_with_time');
+  assertEquals(v1.display.runFitness.efficiency.route.withheld, 'heat_confounded_with_time');
+});
+
 Deno.test('⛔ EVERY GROUP IS CARRIED — nothing is deleted for what kind of session it was', () => {
   const rows = [
     ...Array.from({ length: 9 }, (_, i) => effRow(`2026-08-0${(i % 9) + 1}`, 330 - i, 140, 'easy')),

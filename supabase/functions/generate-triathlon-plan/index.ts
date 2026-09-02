@@ -134,14 +134,18 @@ Deno.serve(async (req: Request) => {
     // capacity / bio land in follow-up commits.
     let athleteSnapshotPerformanceNumbers: Record<string, unknown> | null = null;
     let athleteSnapshotLearnedFitness: Record<string, unknown> | null = null;
+    let athleteSnapshotLockedBaselines: Record<string, unknown> | null = null; // AUTO/LOCKED switch (2026-09-02)
     try {
       const { data: ubForSnap } = await supabase
         .from('user_baselines')
-        .select('performance_numbers, learned_fitness')
+        .select('performance_numbers, learned_fitness, locked_baselines')
         .eq('user_id', request.user_id)
         .maybeSingle();
       if (ubForSnap?.performance_numbers && typeof ubForSnap.performance_numbers === 'object') {
         athleteSnapshotPerformanceNumbers = ubForSnap.performance_numbers as Record<string, unknown>;
+      }
+      if (ubForSnap?.locked_baselines && typeof ubForSnap.locked_baselines === 'object') {
+        athleteSnapshotLockedBaselines = ubForSnap.locked_baselines as Record<string, unknown>;
       }
       if (ubForSnap?.learned_fitness && typeof ubForSnap.learned_fitness === 'object') {
         athleteSnapshotLearnedFitness = ubForSnap.learned_fitness as Record<string, unknown>;
@@ -153,6 +157,7 @@ Deno.serve(async (req: Request) => {
       athleteState: {
         performance_numbers: athleteSnapshotPerformanceNumbers,
         learned_fitness: athleteSnapshotLearnedFitness,
+        locked_baselines: athleteSnapshotLockedBaselines,
       },
       source: 'request',
     });

@@ -907,6 +907,9 @@ serve(async (req: Request) => {
          *
          * ⚠️ FALLS BACK, NEVER BLANKS: no `run_facts` word → the analyser's, exactly as before.
          */
+        // ⛔ THE PLAN'S WORD OR NOTHING (2026-09-02, Michael: "just let the plan tag it, don't do any more
+        // math than necessary"). The analyser's HR-derived `steady_state | intervals | hill_repeats`
+        // fallback is gone from every grouping site below; an untagged run groups as easy, no inference.
         const runTypeByDate = new Map<string, string>();
         for (const f of (runFactsR.data ?? []) as any[]) {
           const v = f.run_facts?.efficiency_index;
@@ -947,7 +950,7 @@ serve(async (req: Request) => {
                  * instead, and `assemble.ts` uses it to PARTITION the pool into groups.
                  */
                 intent: null,
-                workout_type: runTypeByDate.get(r.date) ?? hrs?.workoutType ?? null,
+                workout_type: runTypeByDate.get(r.date) ?? null,
               });
             }
           }
@@ -963,7 +966,7 @@ serve(async (req: Request) => {
             decoupling_confounded: hrs?.decouplingConfounded ?? null, // heat/RPE-confounded → excluded from the durability substrate
             // ⛔ THE PLAN'S OWN WORD FIRST (2026-08-28) — see `runTypeByDate` above. The analyser's
             // three-word field is the fallback, so nothing that read this before reads less now.
-            workout_type: runTypeByDate.get(r.date) ?? hrs?.workoutType ?? null,
+            workout_type: runTypeByDate.get(r.date) ?? null,
             duration_minutes: hrs?.durationMinutes ?? null,
             classified_type: r.workout_analysis?.classified_type ?? null,
           };
@@ -1367,7 +1370,7 @@ serve(async (req: Request) => {
             if (!f || (f.hr == null && f.efficiency == null)) continue;
             const hrs = r?.workout_analysis?.heart_rate_summary ?? null;
             const group = sport === "run"
-              ? runSessionGroup(runTypeByDate.get(date) ?? hrs?.workoutType ?? null)
+              ? runSessionGroup(runTypeByDate.get(date) ?? null) // plan tag or easy — no analyser guess (2026-09-02)
               : "all";
             /**
              * ⛔⛔ THE FADE NUMBER IS WITHHELD WHEN THE SESSION WAS NOT STEADY — RULED 2026-08-28.
@@ -1673,9 +1676,10 @@ serve(async (req: Request) => {
         try {
           // `effort_paces` added 2026-08-19: it is the wizard/VDOT tier of the pace resolvers, and without
           // it the resolver answers with one of its three inputs missing. Same row, no extra query.
-          const r = await supabase.from("user_baselines").select("performance_numbers, learned_fitness, effort_paces").eq("user_id", userId).maybeSingle();
+          const r = await supabase.from("user_baselines").select("performance_numbers, learned_fitness, effort_paces, locked_baselines").eq("user_id", userId).maybeSingle();
           ub = r.data;
-          strengthBaselines = buildStrengthBaselines(ub?.performance_numbers, ub?.learned_fitness?.strength_1rms);
+          // A LOCKED value is the athlete's asserted number and outranks the typed seed here too (2026-09-02).
+          strengthBaselines = buildStrengthBaselines(ub?.performance_numbers, ub?.learned_fitness?.strength_1rms, ub?.locked_baselines);
         } catch { /* non-fatal */ }
 
         // ── AUTO-DERIVED FITNESS BASELINES (run/bike/swim) → fitness_baselines (idempotent) ──────────

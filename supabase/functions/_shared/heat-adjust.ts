@@ -196,9 +196,19 @@ const HEAT_SPREAD_MIN = 4;           // °F SD of heatTerm (air temp) needed to 
 
 export type TrendDirection = "improving" | "holding" | "declining" | "still_learning";
 
+/**
+ * Why a fit that HAD enough runs still declined to name a direction. Set only with
+ * `direction: "still_learning"`; the card reads it to say WHY rather than "too few runs".
+ *  • `heat_confounded_with_time` — heat rose (or fell) in step with the calendar, so the joint fit
+ *    cannot tell "hotter" from "later". Neither heat nor fitness can be read from this window alone.
+ */
+export type RouteWithheldReason = "heat_confounded_with_time";
+
 export interface RouteTrend {
   method: "regression" | "regression_time_only" | "linear_k" | "half_vs_half";
   direction: TrendDirection;
+  /** present only when the engine withheld a verdict for a NAMED reason (see RouteWithheldReason). */
+  withheld?: RouteWithheldReason;
   pct: number;                    // % efficiency change over the route's observed span (point estimate)
   ci: [number, number] | null;   // 95% CI of pct (regression paths); null on the linear_k fallback
   points: number;                // # comparable runs used
@@ -216,6 +226,17 @@ function sd(a: number[]): number {
   if (a.length < 2) return 0;
   const m = mean(a);
   return Math.sqrt(a.reduce((s, x) => s + (x - m) * (x - m), 0) / (a.length - 1));
+}
+function corr(a: number[], b: number[]): number {
+  const ma = mean(a), mb = mean(b);
+  let n = 0, da = 0, db = 0;
+  for (let i = 0; i < a.length; i++) {
+    n += (a[i] - ma) * (b[i] - mb);
+    da += (a[i] - ma) * (a[i] - ma);
+    db += (b[i] - mb) * (b[i] - mb);
+  }
+  const d = Math.sqrt(da * db);
+  return d > 0 ? n / d : 0;
 }
 function median(a: number[]): number {
   const s = [...a].sort((x, y) => x - y);
@@ -387,7 +408,39 @@ export function routeTrend(
   if (reg.length >= MIN_REGRESSION_N) {
     const heatSpread = sd(reg.map((p) => p.ht));
     if (heatSpread < HEAT_CONSTANT_EPS) return regressionTrend(reg, false); // heat constant/absent → time-only
-    if (heatSpread >= HEAT_SPREAD_MIN) return regressionTrend(reg, true);   // well-identified → joint
+    if (heatSpread >= HEAT_SPREAD_MIN) {
+      // ⛔ THE SPREAD THAT IDENTIFIES β_heat IN A JOINT FIT IS THE PART TIME DOES NOT EXPLAIN (2026-09-02).
+      //
+      // Frisch–Waugh–Lovell — the theorem this file already leans on above — says the joint fit reads
+      // β_heat off the residual of heat after time is partialled out, and β_time off the residual of
+      // time after heat. So the raw SD of heat is the wrong number to gate on: a window where every
+      // run is hot AND the hot runs are the recent ones has plenty of raw spread and almost none the
+      // fit can use. In that window "hotter" and "later" are one axis, and the fit splits the decline
+      // between them by arithmetic accident — on a real account it put −22% on time with the heat term
+      // barely identified. That is not a finding about fitness and it is not one about heat.
+      //
+      // The identifying spread is SD(heat)·√(1−r²), r = corr(heat, day). Gated on the SAME floor as
+      // the raw spread — no new constant. Under it the verdict is WITHHELD AND NAMED, never a
+      // direction, and never silently swapped for a time-only fit that would just re-blame time.
+      // ⚠️ A seasonal arc (hot summer / cool winter across a year) is unaffected: heat and the calendar
+      // are not collinear there, r is small, and the partial spread ≈ the raw spread.
+      const r = corr(reg.map((p) => p.ht), reg.map((p) => p.day));
+      const partialSpread = heatSpread * Math.sqrt(Math.max(0, 1 - r * r));
+      if (partialSpread < HEAT_SPREAD_MIN) {
+        const days = reg.map((p) => p.day);
+        return {
+          method: "regression",
+          direction: "still_learning",
+          withheld: "heat_confounded_with_time",
+          pct: 0,
+          ci: null,
+          points: reg.length,
+          heatCoefPctPerF: null,
+          spanDays: Math.round(Math.max(...days) - Math.min(...days)),
+        };
+      }
+      return regressionTrend(reg, true);   // well-identified → joint
+    }
     // else: heat present but under-identified → fall through to calibrated-k (don't guess β_heat)
   }
 

@@ -3766,7 +3766,7 @@ Deno.serve(async (req) => {
     try {
       // `weight` rides along for D1 — planned bodyweight sets are priced at the athlete's own body
       // weight, exactly as the completed side prices them, or the two stop reconciling.
-      const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness, equipment, effort_paces, effort_score, effort_paces_source, units, weight').eq('user_id', userId).maybeSingle();
+      const { data: ub } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness, locked_baselines, equipment, effort_paces, effort_score, effort_paces_source, units, weight').eq('user_id', userId).maybeSingle();
       plannedBodyweightLb = resolveBodyweightLb(ub as any);
       // ⛔ AND WHAT THE ATHLETE LIFTS ON EACH MOVEMENT (2026-08-29). Viada leaves hypertrophy work
       // auto-regulated, so an accessory is authored "By feel" with no weight and stays that way —

@@ -1442,3 +1442,85 @@ composer do not share a membership.
 Wiring `all_rounder` its own picks over p274's `braced` and `focused` cells — the athlete currently
 has four controls over 22 slots, and no say at all over the braced supersets p275 prescribes. That
 is a source-reading job before it is a code job (Michael: don't start it).
+
+## D-458 — Run efficiency: withhold and NAME it when heat moves with the calendar (2026-09-02)
+
+> ⛔ **SUPERSEDED THE SAME DAY BY D-460.** Michael, on reading the comparison to TrainingPeaks: *"I don't
+> want to do things different, use different metrics — all the problems we have are because you
+> extrapolate and add features."* The verdict, the fitted line, the confidence range and the heat model
+> are ours; TrainingPeaks has none of them. The gate below stays in `heat-adjust.ts` (tested, harmless)
+> and the server still emits `withheld` + reason, but **no screen reads the run verdict now** — the run
+> plate and the workout page show the field's three facts only. Everything below is history.
+
+**What.** `heat-adjust.ts routeTrend` fits `efficiency ~ heat + time` jointly. The gate that decides
+whether heat is identifiable used the RAW spread of the heat term (SD ≥ 4°F). In a joint fit the spread
+that identifies β_heat is the part time does not explain — SD(heat)·√(1−r²), r = corr(heat, day)
+(Frisch–Waugh–Lovell). The gate now uses that, on the same 4°F floor; no new constant. Under it the
+engine returns `still_learning` with `withheld: 'heat_confounded_with_time'`; `assemble.ts` maps it to
+verdict `withheld`, pctChange null, and carries the reason on `efficiency.route.withheld` (and per group).
+The card says "Reading N easy runs, all in the heat — heat and fitness can't be told apart yet."
+
+**Why.** Live −22% on 45d122e7: 18 easy runs, all 69–89°F, hottest last. corr(heat, day) 0.65, VIF 1.7 —
+NOT textbook collinearity, so a VIF gate would not fire and a lower one would be tuned to one athlete.
+Raw heat SD 4.57 passed; partial SD 3.49 did not. The fit split a heat-driven fall between heat and
+time and reported −21.7% [−40.7, −2.7]. Neither "declining" nor a silent fallback to time-only (which
+re-blames time) is honest; withhold-and-say-why is. A seasonal arc (hot summer / cool winter) has low r
+and is unaffected — pinned in `heat-adjust.test.ts`.
+
+**Rejected.** VIF/|r| threshold (does not fire here at any standard cutoff); dropping to the old trend
+(`runEfficiency.trend`, uncorrected — would show the same decline by another path); removing the heat
+feature (Michael: withhold and flag, keep heat).
+
+**Verification.** Local replay of compute-snapshot's exact pool → withheld. Prod recompute pending deploy.
+
+## D-459 — Baselines AUTO / LOCKED: storage shape and the one input (2026-09-02)
+
+**What.** `user_baselines.locked_baselines jsonb`, flat `{ <canonical lift>: number }`. Key present =
+locked to that value; absent = auto. No `{value, source, set_at}` per lift — the resolver needs only the
+number, provenance is the key's presence, and `updated_at` on the row already dates the write. On the
+Baselines screen each lift is one row: the number in use, a source line, ONE input whose meaning follows
+the switch (auto → edits the typed seed; locked → edits the locked value), and an auto/locked pill.
+Tapping locked seeds the lock with the number in use; tapping auto deletes the key and keeps the seed.
+
+**Why.** Garmin/TrainingPeaks auto-detect on/off, Michael's ruling (PLAN-strength-numbers §C). One input
+per lift keeps the strength tab Strong/Hevy-familiar; two numbers per lift was the confusion this thread
+started from. Typed stays a SEED (not a lock) so a new athlete's signup number yields to logs without a tap.
+
+**Readers.** Every consumer of the resolver fetches the map (see the 2026-09-02 banner list). Migration
+must land before function deploy — selects name the column.
+
+## D-460 — The run read is TrainingPeaks', nothing more (2026-09-02)
+
+**Ruling (Michael).** *"I don't want to do things different, use different metrics. I want to be the
+same. Our graph chart should show specifics, but all the problems we have are because you extrapolate
+and add features."* Then: *"this is what I want — we gotta stop adding features that make our numbers
+messy."*
+
+**What the run read is now.** Exactly TrainingPeaks' facts: (1) Efficiency Factor per run —
+grade-adjusted pace ÷ average heart rate — one dot per run on a dated chart, per session type
+(easy / long / hard cards, already the shape of `EnduranceReadCards`); (2) the latest run's number and
+the recent easy-run pace at heart rate; (3) decoupling (Pa:Hr) as a bare percent on the latest run,
+shown only when the session was steady. No verdict word, no percent change, no fitted line, no
+confidence range, no heat coefficient, no "heat costs you", no withheld state.
+
+**What went.** `<RunFitnessRow>` deleted (it was already unrendered since Round 3 pass 2, and was the
+only client reader of the verdict, CI, route receipt and heat line). The run summary line's verdict
+fallback → count/pace only. `workout-detail` no longer emits `discipline_trend` for run, so the
+workout page's "run trend ↓ sliding −22%" line is gone; run joins swim as described-not-graded there.
+
+**What stays, unread.** The server still computes `runFitness.efficiency` (verdict, route, groups,
+D-458's withhold). Left in place so nothing downstream breaks; no screen consumes it. Removing the
+computation is a later, separate cut.
+
+**Not touched by ruling.** The bike row has the same shape of problem (verdict + percent from a
+fitted trend) and is left alone this pass.
+
+**Addendum (same day, Michael: "just let the plan tag it, don't do any more math than necessary").**
+The easy / long / hard bucket comes from the attached PLAN session's words only
+(`compute-facts classifyRunIntent`, step 1). Removed: inference from the file's interval structure,
+from the athlete's own run name, and — at every grouping site in `compute-snapshot` — the analyser's
+heart-rate-derived `steady_state | intervals | hill_repeats` fallback. Untagged run → easy. ⚠️ Forward-
+only: `run_facts.workout_type` is rewritten when a run is recomputed. ⚠️ Not touched: the decoupling
+substrate's `workout_intent` (`compute-facts:~858`) still reads the analyser's word first — a
+different path, same shape of inference, flagged for the follow-up.
+

@@ -236,6 +236,8 @@ export interface ArcContext {
    * `user_baselines.performance_numbers` — e.g. `swimPace100`, FTP, 5K; used for projections + AL.
    */
   performance_numbers: Record<string, unknown> | null;
+  /** `user_baselines.locked_baselines` — per-lift values the athlete LOCKED (auto off). Key present = locked. */
+  locked_baselines: Record<string, unknown> | null;
   /** `user_baselines.effort_paces` — Plan Wizard / Daniels-style pace anchors (steady, race, etc.). */
   effort_paces: Record<string, unknown> | null;
   /** `user_baselines.units` — 'imperial' | 'metric'; coach uses this for weight unit display. */
@@ -1093,7 +1095,7 @@ export async function getArcContext(
     await Promise.all([
     supabase
       .from('user_baselines')
-      .select('athlete_identity, learned_fitness, disciplines, training_background, performance_numbers, equipment, effort_paces, units, dismissed_suggestions')
+      .select('athlete_identity, learned_fitness, disciplines, training_background, performance_numbers, equipment, effort_paces, units, dismissed_suggestions, locked_baselines')
       .eq('user_id', userId)
       .maybeSingle(),
     supabase
@@ -1176,6 +1178,8 @@ export async function getArcContext(
   const athlete_identity = parseJsonObject(baseline?.athlete_identity);
   const learned_fitness = parseJsonObject(baseline?.learned_fitness);
   const performance_numbers = parseJsonObject(baseline?.performance_numbers);
+  // AUTO/LOCKED switch (2026-09-02): per-lift values the athlete locked. Threads into the strength resolver.
+  const locked_baselines = parseJsonObject(baseline?.locked_baselines);
   const five_k_nudge = buildFiveKNudge(performance_numbers, learned_fitness);
   const rawDisc = baseline?.disciplines;
   const disciplines = Array.isArray(rawDisc) ? rawDisc.map((d) => String(d)) : null;
@@ -1490,6 +1494,7 @@ export async function getArcContext(
     training_background,
     equipment,
     performance_numbers,
+    locked_baselines,
     effort_paces,
     units,
     dismissed_suggestions,

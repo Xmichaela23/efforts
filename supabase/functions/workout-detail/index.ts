@@ -471,7 +471,11 @@ async function runSessionDetailPipelineAndPersist(
       // Swim is DESCRIBED, not graded (no honest fitness instrument — pace/rest are fins/set-structure
       // contaminated; the State swim row shows volume facts, no verdict). So the single-session view
       // shows no swim trend line either — "described, not graded" holds on BOTH screens, not one.
-      if (st && disc && disc !== 'swim' && st[disc]) {
+      // ⛔ RUN IS NOT GRADED EITHER (2026-09-02, Michael: "I want to be the same as TrainingPeaks").
+      // TrainingPeaks shows Efficiency Factor and decoupling per run and draws no verdict; the
+      // "run trend ↓ sliding −22%" line this produced was ours. The State run plate shows the
+      // dots and the numbers only; this screen matches it. Bike unchanged this pass.
+      if (st && disc && disc !== 'swim' && disc !== 'run' && st[disc]) {
         disciplineTrend = { discipline: disc, verdict: st[disc].verdict, pct_change: st[disc].pctChange ?? null };
       }
     } catch {}

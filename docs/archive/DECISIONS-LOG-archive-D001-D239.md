@@ -4693,6 +4693,14 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ## D-231 — Canonical Capacity Resolver: typed is SSOT, learned suggests, one resolver is the sole answer
 
+> ⛔ **REVERSED 2026-09-02 (PLAN-strength-numbers-2026-09-02 §A/§C, D-459).** `capacity-resolver.ts`
+> precedence is now **LOCKED > trusted-LEARNED (auto) > typed seed**. Typed is a seed until three logged
+> sets pass the trust gate (`isTrustedAggregate`); a value the athlete LOCKS on the Baselines screen
+> (`user_baselines.locked_baselines`) wins and holds. The "one resolver is the sole answer" half of this
+> entry still stands and now covers the plan weights too (`athlete-snapshot.ts`, `materialize-plan`).
+> The Fixture-1 guard ("a low speed/deload set must not drop the number") is kept by the trust gate +
+> slot_intent, not by typed-wins. **Everything below is history.**
+
 - **Date:** 2026-07-02
 - **Decision (ratified, build gated — see below):** there will be **one canonical resolver function** — the sole answer to "how strong/fast is this athlete for lift/discipline X." **Precedence:**
   1. **Typed `performance_numbers` wins when fresher than the last retest** — the athlete's declared/tested capacity is the anchor. It is what the plan already prescribes off (`materialize-plan mergeAnchor1RmLb`), and it is what judgement must also use.

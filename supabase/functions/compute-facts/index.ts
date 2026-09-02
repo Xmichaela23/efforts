@@ -1025,17 +1025,10 @@ function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null): string |
     if (STEADY.test(planText)) return steadyWord(planText);
   }
 
-  // 2. THE FILE, when nothing is attached. A structured session with real work intervals is not
-  //    steady, whatever it was called.
-  const ivs = Array.isArray(w.computed?.intervals) ? w.computed!.intervals : [];
-  const work = ivs.filter((i: any) => i?.planned_label && !/(warm|cool|rest|recovery)/i.test(String(i.planned_label)));
-  if (work.length >= 2) return 'interval';
-
-  // 3. The athlete's own name for it, last — it is free text and often just "Morning Run".
-  const own = String((w as any)?.name ?? '');
-  if (NONSTEADY.test(own)) return 'interval';
-  if (STEADY.test(own)) return steadyWord(own);
-
+  // ⛔ NOTHING ELSE (2026-09-02, Michael: "just let the plan tag it, don't do any more math than
+  // necessary"). Steps 2 and 3 used to infer intent from the file's interval structure and from the
+  // athlete's own run name. Both gone: no plan word → null → `runSessionGroup` files it as easy.
+  // No inference from heart rate, pace, intervals or names. The bucket is the plan's or it is easy.
   return null;
 }
 

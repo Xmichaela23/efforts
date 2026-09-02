@@ -7,31 +7,75 @@
 
 **Full plan for this thread: `docs/PLAN-strength-numbers-2026-09-02.md`.** Read it before touching strength/pace numbers.
 
-**SHIPPED + VERIFIED today (deployed to prod, confirmed on the real account 45d122e7):**
-- **Deadlift 225 → 185.** The learned-max writer skipped the ≤10-rep trust gate, so a 105×35 set stored
-  a fake 225. Fixed in `compute-facts` (pure `aggregateLearnedStrengthMaxes`). Tested.
-- **Single source of truth for strength numbers (auto/locked switch — REVERSES D-231 typed-wins).**
-  `capacity-resolver.ts` precedence is now LOCKED > trusted-LEARNED (auto) > typed seed. All three plan-weight
-  spots route through it (`athlete-snapshot.ts` resolveLive + extractPerformanceNumbers, materialize legacy).
-  Coach anchor_1rm reads the resolved value; COACH_PAYLOAD_VERSION 180→181. 74 tests incl. a DELOAD-GUARD.
-  ⛔ Only affects NEW plans (existing plans keep frozen pins). Back-annotate D-231 next session.
-- **Run card:** "quality"→"hard", fade/decoupling gibberish removed, real recorded pace surfaced.
+**SHIPPED + VERIFIED earlier today (deployed, confirmed on 45d122e7):** deadlift 225 → 185 (trust gate in
+`compute-facts`); resolver precedence LOCKED > trusted-LEARNED > typed (`capacity-resolver.ts`, D-231 reversed);
+all three plan-weight spots route through it; coach payload 180→181; run card copy.
 
-**OPEN — the two next jobs:**
-1. **The false "run efficiency declining −22%".** NOT heat, NOT the noise guard (both ruled out — I chased
-   3–4 wrong causes first). CODE-VERIFIED source: `assemble.ts:1095` — `efficiency.verdict` = `runRoute`
-   (the familiar-routes regression, `heat-adjust.ts routeTrend`), which fits heat + time JOINTLY. On this
-   athlete heat and time are COLLINEAR (hot runs = recent runs), so β_time is unidentifiable and the regression
-   blames time. Fix (Michael's call 2026-09-02): make routeTrend WITHHOLD AND FLAG when temp↔day correlation
-   is high (can't separate heat from fitness) — the athlete sees "can't read your trend through the heat",
-   NOT a blank and NOT a false decline. Do NOT remove the heat feature; this is the "refuse when not
-   separable" branch the design already intends (heat-adjust.ts), just not firing on the rendered verdict.
-   ⚠️ Verify by recomputing 45d122e7 and seeing the verdict leave 'sliding'. (A run-efficiency noise guard was added at `run.ts computeRunEfficiencyState` — real + safe, but
-   it is BYPASSED whenever `runRoute` exists, so it did not fix this. Keep it.)
-2. **Baselines LOCK-SWITCH UI.** The `locked_baselines` map is already threaded through the resolver +
-   `LiveBaselinesFallback`; there is NO writer/UI yet. Build the auto/locked toggle on `TrainingBaselines.tsx`
-   (Garmin model: default auto, tap to lock, locked wins + holds). Separate: a Performance-screen edit of a
-   mis-logged set (fixes junk like the 609-lb barbell row on 2026-02-16 at source).
+**EDITED, NOT PUSHED, NOT DEPLOYED (2026-09-02, second session) — the two jobs from the previous banner:**
+
+0. ⛔ **RULING AFTER ITEM 1 WAS BUILT (Michael, same session): the run read is TrainingPeaks' and
+   nothing more — D-460.** No verdict, no percent, no fitted line, no confidence range, no heat line,
+   no withheld state. `<RunFitnessRow>` deleted (it was already unrendered; the run plate is
+   `EnduranceReadCards`: Efficiency Factor per run, dated dot chart per session type). Added: decoupling
+   as a bare percent on the latest steady run (`StrengthReadCards.tsx SpineCard`). `workout-detail`
+   emits no `discipline_trend` for run any more (that was the "run trend ↓ sliding −22%" on the workout
+   page). Run summary line: pace/count only. **Bucket = plan tag or easy, no inference** (Michael:
+   "just let the plan tag it") — `classifyRunIntent` reads the plan's words only; the analyser's HR
+   guess is out of every grouping site in `compute-snapshot`. **Item 1 below shipped as code but is now UNREAD — D-458
+   is superseded; keep the gate, read nothing.** Bike row: same shape of problem, left alone by ruling.
+
+1. **The false run "declining −22%" — fixed at the source, `heat-adjust.ts routeTrend` (now unread, see 0).** The previous
+   banner said "collinear"; that was the right neighbourhood and the wrong test. Measured on the
+   account's exact compute-snapshot pool (18 easy runs, 69–89°F, 75 days): corr(heat, day) = 0.65,
+   VIF 1.7 — textbook collinearity does NOT fire. What fails is heat's IDENTIFYING spread in a joint
+   fit, the part time does not explain (Frisch–Waugh–Lovell, the theorem the file already cites):
+   raw SD 4.57°F clears the existing 4°F floor, partial SD 4.57·√(1−0.65²) = 3.49 does not. Gate is
+   now on the partial spread, same constant. Under it the fit returns `still_learning` +
+   `withheld: 'heat_confounded_with_time'`; `assemble.ts` maps that to verdict `withheld`, pctChange
+   null, and carries the reason on `efficiency.route.withheld` (+ per group). Card copy
+   (`StatePerformanceSection.tsx`): "Reading N easy runs, all in the heat — heat and fitness can't be
+   told apart yet. Cooler runs will separate them." Heat feature untouched; a seasonal arc still fits.
+   **Local replay on 45d122e7 (`scratchpad/replay.ts`, same query as compute-snapshot): declining
+   −21.7% [−40.7, −2.7] → withheld.** ⚠️ NOT recomputed in prod yet — needs compute-snapshot deployed,
+   then a recompute, then the State row read on a device. D-458.
+2. **Baselines AUTO / LOCKED switch — built.** Migration `20260902120000_user_baselines_locked_baselines.sql`
+   adds `user_baselines.locked_baselines jsonb` (flat `{ squat|deadlift|bench|overheadPress1RM|pullupMaxReps: number }`,
+   key present = locked). ⛔ **APPLY THE MIGRATION BEFORE DEPLOYING FUNCTIONS** — every reader now names
+   the column in its select, and PostgREST errors on an unknown column: `materialize-plan` would get
+   `ub = null` and prescribe default weights. Client: `TrainingBaselines.tsx` strength tab is one row
+   per lift — the number IN USE (resolver), a source line ("auto. From your lifts (6 sets)." /
+   "auto. Your typed number, until…" / "locked. Your lifts don't change it." + "Your lifts suggest N."),
+   one input whose meaning follows the switch (auto → typed seed, locked → locked value), and an
+   auto/locked pill. `AppContext` loads + saves the map. Server readers now fetch and pass it: coach
+   (both `resolveStrengthCapacity` calls, via `arc.locked_baselines`), `arc-context` (select + field),
+   `materialize-plan` select, `compute-snapshot` (`buildStrengthBaselines` takes locked FIRST),
+   `generate-run-plan` / `generate-triathlon-plan` pin it, `create-goal-and-materialize-plan` passes it
+   in `athlete_state` → `generate-combined-plan` (`types.ts`). D-459.
+3. **Suites:** heat-adjust 27 · state-trend 323 (new spine test pins `withheld` through `toStateTrendsV1`)
+   · resolver + athlete-snapshot 33. tsc / deno type-error counts unchanged vs HEAD (all pre-existing);
+   vite build clean.
+
+**DEPLOY LIST (when Michael says go), in this order:** `supabase db push` → `compute-snapshot`, `coach`,
+`materialize-plan`, `generate-run-plan`, `generate-triathlon-plan`, `create-goal-and-materialize-plan`,
+`generate-combined-plan`, `get-arc-context`, `workout-detail`, `compute-facts`. Those ten change behaviour. The full transitive closure of
+the touched `_shared` files (`heat-adjust`, `state-trend/{assemble,run,strength}`, `arc-context`) is 31
+functions — `arc-context` is imported nearly everywhere — redeploy them too if the closure is to stay
+honest (`docs/INVENTORY.md`). Client: web via push; iOS needs `npm run ios`.
+
+**VERIFY after deploy:** recompute 45d122e7 → State run plate shows the easy/hard cards with Efficiency Factor, the dot chart and a decoupling percent, NO verdict word or percent anywhere on run (State and the workout page);
+Baselines strength tab shows deadlift 185 "auto. From your lifts"; lock a lift, save, reload → still
+locked; coach per-lift anchor reads the locked number.
+
+**OPEN / side findings, NOT pursued (traced, not fixed):**
+- `buildStrengthBaselines` (`state-trend/strength.ts`, the State e1RM band's frame) is still
+  typed-before-learned; only the lock was put in front. Same question the resolver already answers —
+  should route through `resolveStrengthNumbers`. One fork, say so before touching either.
+- `generate-strength-plan/index.ts:222` entry gate reads typed `performance_numbers` only — an athlete
+  with learned/locked numbers and no typed ones is refused "missing lifts".
+- The account's easy pool carries runs at HR 144–146 tagged `steady_state` by the analyser fallback
+  (no `run_facts.workout_type`); they are hot-day runs, and they sit in the headline group.
+- Performance-screen edit of a mis-logged set (the 609-lb row) — not started.
+- D-231 back-annotated (it lives in `docs/archive/DECISIONS-LOG-archive-D001-D239.md`, not the live log).
 
 ---
 
