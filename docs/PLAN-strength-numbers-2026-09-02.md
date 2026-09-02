@@ -34,10 +34,19 @@ TRUTH-MAP fracture #1 (strength contradicts itself), now confirmed on live data.
   `isTrustedAggregate`), typed as seed/fallback. Rewrite `capacity-resolver.test.ts` to the new precedence.
   Back-annotate D-231, add a new D-entry. ⚠️ Changes the coach's per-lift judgement (now grades against real
   strength — a correction).
-- **B. Route the PLAN prescription through the resolver.** `materialize-plan` reads typed raw
-  (`mergeAnchor1RmLb`), NOT the resolver — so plan weights won't move until this is wired. This is what makes
-  prescribed weights climb 150→185 to match reality. Higher risk (touches plan gen) — do after A, verify with
-  a recompute.
+- **B. Route the PLAN prescription through the resolver.** FULLY TRACED 2026-09-02. Three typed-wins spots,
+  and B only affects NEW plans (existing plans freeze their 1RMs in `plans.config.athlete_snapshot`, so they
+  keep whatever was pinned — typed — until regenerated):
+  1. `_shared/athlete-snapshot.ts` `resolveLivePerformanceNumbers` (the inner `merge`) — the LIVE path for a
+     plan with no pinned snapshot. Typed-wins mirror of mergeAnchor1RmLb → route through `resolveStrengthCapacity`.
+  2. `_shared/athlete-snapshot.ts` `extractPerformanceNumbers` — what gets FROZEN into a new plan's snapshot at
+     creation. Reads `performance_numbers` (typed) ONLY, never learned → pin the RESOLVED value instead.
+  3. `materialize-plan` `mergeAnchor1RmLb` — legacy fallback, overridden by the snapshot block right after it,
+     so lowest priority; route or leave.
+  ⚠️ Needs the `locked` map + `asOf` threaded into `LiveBaselinesFallback`. ⚠️ Trust-gate side effect: a lift
+  with only thin/untrusted learned data + no typed now falls to the conservative default instead of a noisy
+  learned number (better, but verify). Verify by regenerating a plan and checking prescribed weights move
+  150→185 for the account. Higher risk (plan gen, `@ts-nocheck`) — its own careful pass with tests.
 - **C. The AUTO / LOCKED switch (Michael's ruling 2026-09-02, = the Garmin model).** Each number is either
   **auto** (default — the trusted learned value) or **locked** (the user set it; learning never touches it
   until they change it or flip back to auto). No date arbitration, no silent picking — the user owns the choice.
