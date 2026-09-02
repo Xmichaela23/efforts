@@ -2,7 +2,7 @@
  * THE COLLAPSED SPORT LINE — right population, confidence-gated, consistent grammar (2026-09-01).
  *   deno test --allow-read src/lib/sport-summary.test.ts --no-check
  */
-import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { changeMonth, dirWord, efficiencySummary, sinceMonthFromSeries, strengthGlance } from './sport-summary.ts';
 
 Deno.test('changeMonth = start of the window (asOf − windowDays)', () => {
@@ -52,45 +52,45 @@ Deno.test('⛔ no direction (incl. the false −22% case once it is the HOLDING 
   );
 });
 
-Deno.test('⛔ strength is NOT PR-based: opening week lists the working numbers, no "tested" claim', () => {
+Deno.test('⛔ strength is NOT PR-based: one line per lift; opening lists the working numbers, no "tested" claim', () => {
   const lifts = [
     { displayName: 'Deadlift', latestE1rm: 185, series: [{ value: 185, week: 1 }] },
     { displayName: 'Back Squat', latestE1rm: 125, series: [{ value: 125, week: 1 }] },
     { displayName: 'Bench Press', latestE1rm: 160, series: [{ value: 160, week: 1 }] },
   ];
-  assertEquals(strengthGlance(lifts, 1), 'Deadlift 185 · Back Squat 125 · Bench Press 160');
+  assertEquals(strengthGlance(lifts, 1), ['Deadlift 185', 'Back Squat 125', 'Bench Press 160']);
   // no active plan (null) → still just the working numbers
-  assertEquals(strengthGlance(lifts, null), 'Deadlift 185 · Back Squat 125 · Bench Press 160');
+  assertEquals(strengthGlance(lifts, null), ['Deadlift 185', 'Back Squat 125', 'Bench Press 160']);
 });
 
-Deno.test('mid-block: lead the lift that moved MOST since the block opened; slow gain, no PR flag', () => {
+Deno.test('mid-block: each lift shows its creep since the block opened; slow gain, no PR flag', () => {
   const lifts = [
-    { displayName: 'Back Squat', latestE1rm: 125, series: [{ value: 125, week: 1 }] },                       // flat
+    { displayName: 'Back Squat', latestE1rm: 125, series: [{ value: 125, week: 1 }] },                       // flat → bare number
     { displayName: 'Deadlift', latestE1rm: 185, series: [{ value: 180, week: 1 }, { value: 185, week: 4 }] }, // +5
     { displayName: 'Bench Press', latestE1rm: 162, series: [{ value: 160, week: 1 }, { value: 162, week: 4 }] }, // +2
   ];
-  assertEquals(strengthGlance(lifts, 4), 'Deadlift 185 · +5 since week 1');
+  assertEquals(strengthGlance(lifts, 4), ['Back Squat 125', 'Deadlift 185  +5', 'Bench Press 162  +2']);
 });
 
-Deno.test('mid-block: a real drop is shown honestly; nothing moved → "even since week N"', () => {
+Deno.test('mid-block: a real drop shows honestly; flat shows the bare number', () => {
   assertEquals(
     strengthGlance([{ displayName: 'Squat', latestE1rm: 120, series: [{ value: 130, week: 2 }, { value: 120, week: 5 }] }], 5),
-    'Squat 120 · -10 since week 2',
+    ['Squat 120  -10'],
   );
   assertEquals(
     strengthGlance([{ displayName: 'Deadlift', latestE1rm: 185, series: [{ value: 185, week: 1 }, { value: 185, week: 4 }] }], 4),
-    'Deadlift 185 · even since week 1',
+    ['Deadlift 185'],
   );
 });
 
-Deno.test('mid-block but no block-start point to compare → strongest number, no invented delta', () => {
+Deno.test('mid-block but no block-start point to compare → bare number, no invented delta', () => {
   const lifts = [
     { displayName: 'Back Squat', latestE1rm: 125, series: [{ value: 125 }] }, // older-block point, no week
     { displayName: 'Deadlift', latestE1rm: 185, series: [{ value: 185 }] },
   ];
-  assertEquals(strengthGlance(lifts, 4), 'Deadlift 185');
+  assertEquals(strengthGlance(lifts, 4), ['Back Squat 125', 'Deadlift 185']);
 });
 
-Deno.test('strengthGlance: no lifts → null', () => {
-  assert(strengthGlance([], 4) === null);
+Deno.test('strengthGlance: no lifts → []', () => {
+  assertEquals(strengthGlance([], 4), []);
 });

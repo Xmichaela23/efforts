@@ -11,7 +11,7 @@
 // barrel here would create a load-order cycle.
 import { computeStrengthState, strengthVolumeToSeries, computeStrengthVolumeState, computeE1rmBand, type LiftSeries, type PullupProgress, type StrengthFitness, type StrengthPerLift, type StrengthVolumeRow } from './strength.ts';
 import { computeBikeFitness, isProvisionalTrend, bikeEfficiencyRideEligible, bikePowerChartSeries, type BikeFitness } from './bike-fitness.ts';
-import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, recentEfficiencyPaceHr, decouplingToSeries, computeRunDecouplingState, runSessionGroup, type RunSessionGroup, type RunFitness } from './run.ts';
+import { computeRunState, routeMetricsToSeries, computeRunEfficiencyState, efficiencyIndexToSeries, recentGroupPaceHr, decouplingToSeries, computeRunDecouplingState, runSessionGroup, type RunSessionGroup, type RunFitness } from './run.ts';
 import { positionInRange, placeAnchorOnBand } from './position-in-range.ts';
 // ⛔ THE BOOK'S OWN TABLE, read not restated — see `setMintsAMax`. p218's ME band lives in one place.
 import { prescribe } from '../strength-grid/intents.ts';
@@ -982,9 +982,6 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   const runDecoupling = computeRunDecouplingState(runDecoupSeries, asOf, runSteadyCadence, STATE_TREND_WINDOWS.runDirectionMinRuns);
   const runEffSeries = efficiencyIndexToSeries(inp.runJoined);
   const runEfficiency = computeRunEfficiencyState(runEffSeries, asOf, runEffSeries.length / WEEKS_90D);
-  // The "what" under the "why": recent steady-run pace + HR (pace-at-HR), derived from the SAME index the
-  // verdict reads so the two lines can't disagree. STATE_TREND_WINDOWS.runDays = the efficiency window.
-  const runEffPaceHr = recentEfficiencyPaceHr(inp.runJoined, asOf, STATE_TREND_WINDOWS.runDays);
   // 12-WEEK efficiency chart series (the "long view") — the SAME points the verdict reads, over a wider 84d
   // window than the verdict's 42d, so the recent tail of the chart IS the verdict's data (no contradiction
   // possible). Each point flagged `recent` when inside the 42d verdict window. Fills as the athlete trains.
@@ -1140,29 +1137,12 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
       // returns 13:08 @ 135, dragged by the hill and the jog it cannot identify.
       // ⚠️ GAP twin is dropped: these paces ARE grade-adjusted, so a raw-vs-GAP toggle has nothing to
       // toggle between. Offering one would imply a distinction that no longer exists.
-      ...(runRoute && runEffHeadlineRows.length > 0 ? (() => {
-        // ⚠️ SAME POOL AS THE VERDICT — the D-346 rule this block was written for, now applied to the
-        // GROUP as well as to the metric. A median over the last five EASY runs; a quality session
-        // can no longer drag the line that describes easy running.
-        const rows = runEffHeadlineRows.slice(-5) as Array<Record<string, number>>;
-        const median = (get: (r: Record<string, number>) => number): number => {
-          const xs = rows.map((r) => Number(get(r) || 0)).filter((n) => n > 0).sort((a, b) => a - b);
-          if (xs.length === 0) return 0;
-          const mid = xs.length / 2;
-          return xs.length % 2 ? xs[(xs.length - 1) / 2] : (xs[mid - 1] + xs[mid]) / 2;
-        };
-        const pace = median((r) => r.pace_s_per_km);
-        const hr = median((r) => r.hr);
-        return {
-          recentPaceSecPerKm: pace > 0 ? Math.round(pace) : null,
-          recentGapPaceSecPerKm: null,
-          recentHrAvg: hr > 0 ? Math.round(hr) : null,
-        };
-      })() : {
-        recentPaceSecPerKm: runEffPaceHr.paceSecPerKm,
-        recentGapPaceSecPerKm: runEffPaceHr.gapPaceSecPerKm,
-        recentHrAvg: runEffPaceHr.hrAvg,
-      }),
+      // ⛔ REAL PACE ONLY (2026-09-01). The median of the last five EASY runs' recorded pace + HR.
+      // The old else-branch fell back to `recentEfficiencyPaceHr` — pace back-derived from the index —
+      // which is what put 13:21/mi on the screen when there was no route pace. There is no fallback to
+      // a reconstruction now: no real pace → null → the card shows the run count, never a fake number.
+      ...recentGroupPaceHr(runEffHeadlineRows as Array<Record<string, unknown>>),
+      recentGapPaceSecPerKm: null,
       series: effChartSeries,
       /** ⚠️ Present only when the route engine answered — lets the row say WHY it is withholding
        *  ("not enough runs on one route yet") instead of quoting the old steady-run floor. */
@@ -1222,6 +1202,9 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
           direction: fit ? fit.direction : null,
           pctChange: fit && fit.direction !== 'still_learning' ? fit.pct : null,
           ci: fit ? fit.ci : null,
+          // the group's own recent pace + HR (real recorded pace, median of its last five) — lets the
+          // card show easy and hard on their own pools; null when the group carries no real pace.
+          ...recentGroupPaceHr(rows as Array<Record<string, unknown>>),
           series: rows
             .map((r: any) => ({
               date: String(r?.date ?? ''),

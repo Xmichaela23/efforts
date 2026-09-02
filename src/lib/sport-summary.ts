@@ -13,9 +13,9 @@
  *   · BIKE leads off EFFICIENCY (watts per heartbeat), the metric on the object, not power+FTP
  *     (resolved elsewhere — a second source this audit exists to remove).
  *   · STRENGTH is block-phase aware and NOT PR-based (Michael 2026-09-01: the program is form / bar
- *     speed / slow incremental gain under cross-training stress). Opening week lists the working
- *     numbers; mid-block leads the lift that moved most "since week N". No PR flag; flat is fine.
- *     See `strengthGlance`.
+ *     speed / slow incremental gain under cross-training stress). One line per lift so every number
+ *     shows; opening lists the working numbers, mid-block adds the creep since the block opened
+ *     ("+5"). No PR flag; flat is fine. See `strengthGlance`.
  */
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -81,57 +81,37 @@ export function efficiencySummary(args: {
  * stressors", not personal records). No ↑ marker, no all-time-high flag — a flat week is the design,
  * not a miss.
  *
- * · OPENING (no active plan, or plan week ≤ 1): just the working numbers — "Deadlift 185 · Squat 125
- *   · Bench 160". These are whatever the athlete is starting from: a fresh pretest if they tested, or
- *   their carried baselines if they skipped it (Michael 2026-09-01: some jump in without testing). We
- *   never LABEL it "tested", because we don't know that it was.
- * · MID-BLOCK (plan week > 1): the lift that moved MOST since the block opened — "Deadlift 185 · +5
- *   since week 1". A drop is shown honestly ("-5"); no movement reads "even since week 1", never a
- *   manufactured gain. The block-start reading is the earliest current-block point (smallest week
- *   index the series carries); "since week N" states that week, so it is true whether the block
- *   opened on a test or on a baseline.
+ * ONE LINE PER LIFT so every number shows (Michael 2026-09-01: "we should see all the numbers").
+ * · OPENING (no active plan, or plan week ≤ 1): "Deadlift 185" — the working number the athlete is
+ *   starting from, a fresh pretest OR carried baselines (some jump in without testing), so we never
+ *   LABEL it "tested".
+ * · MID-BLOCK (plan week > 1): "Deadlift 185  +5" — the current number and how far it has crept since
+ *   the block opened. A drop shows honestly ("-5"); no movement shows just the number (flat is the
+ *   design here, not a miss). The block-start reading is the earliest current-block point (smallest
+ *   week index the series holds); older-block points carry no week and are never compared across.
  *
- * Empty → null (caller falls back to the session count).
+ * Empty → [] (caller falls back to the session count).
  */
 export function strengthGlance(
   lifts: ReadonlyArray<{ displayName: string; latestE1rm: number | null; series?: ReadonlyArray<{ value: number; week?: number }> }>,
   planWeek: number | null | undefined,
-): string | null {
-  const primary = lifts.filter((l) => l.latestE1rm != null);
-  if (!primary.length) return null;
+): string[] {
+  const primary = lifts.filter((l) => l.latestE1rm != null).slice(0, 6);
+  if (!primary.length) return [];
   const numberOf = (l: { latestE1rm: number | null }) => Math.round(l.latestE1rm as number);
 
-  // The block-start reading = the earliest CURRENT-BLOCK point (smallest week index the series holds).
-  // Points from an older block carry no week and are skipped, so this never compares across blocks.
-  const blockStart = (l: { series?: ReadonlyArray<{ value: number; week?: number }> }): { week: number; value: number } | null => {
+  const blockStartValue = (l: { series?: ReadonlyArray<{ value: number; week?: number }> }): number | null => {
     const pts = (l.series ?? []).filter((p) => typeof p.week === 'number');
     if (!pts.length) return null;
-    const first = pts.reduce((a, b) => ((a.week as number) <= (b.week as number) ? a : b));
-    return { week: first.week as number, value: first.value };
+    return pts.reduce((a, b) => ((a.week as number) <= (b.week as number) ? a : b)).value;
   };
 
-  const week = Number(planWeek);
-  // Opening: no plan, or the first week — list the numbers the athlete is starting from.
-  if (!(week > 1)) {
-    return primary.slice(0, 3).map((l) => `${l.displayName} ${numberOf(l)}`).join(' · ');
-  }
-
-  // Mid-block: lead the lift that moved most vs its own block start.
-  const moved = primary
-    .map((l) => {
-      const bs = blockStart(l);
-      return { l, week: bs?.week ?? null, delta: bs ? numberOf(l) - Math.round(bs.value) : null };
-    })
-    .filter((x) => x.delta != null)
-    .sort((a, b) => Math.abs(b.delta as number) - Math.abs(a.delta as number))[0];
-
-  if (!moved) {
-    // In-block but nothing to compare against yet — the strongest number, no invented delta.
-    const top = primary.reduce((a, b) => (numberOf(a) >= numberOf(b) ? a : b));
-    return `${top.displayName} ${numberOf(top)}`;
-  }
-  const d = moved.delta as number;
-  const w = moved.week ?? 1;
-  const since = d === 0 ? `even since week ${w}` : `${d > 0 ? '+' : '-'}${Math.abs(d)} since week ${w}`;
-  return `${moved.l.displayName} ${numberOf(moved.l)} · ${since}`;
+  const opening = !(Number(planWeek) > 1);
+  return primary.map((l) => {
+    const n = numberOf(l);
+    if (opening) return `${l.displayName} ${n}`;
+    const bs = blockStartValue(l);
+    const d = bs != null ? n - Math.round(bs) : 0;
+    return d !== 0 ? `${l.displayName} ${n}  ${d > 0 ? '+' : '-'}${Math.abs(d)}` : `${l.displayName} ${n}`;
+  });
 }

@@ -33,7 +33,7 @@ import { EnduranceReadCards } from '@/components/context/StrengthReadCards';
 import ViadaWeekCard from '@/components/context/ViadaWeekCard';
 // ⛔ COLLAPSE TO ONE LINE PER SPORT (Round 3, 2026-09-01) — each sport shows a change-leading summary
 // and expands on tap. The summary wording is a set of pure functions so the confidence rule is pinned.
-import { changeMonth, efficiencySummary, sinceMonthFromSeries, strengthGlance } from '@/lib/sport-summary';
+import { changeMonth, efficiencySummary, strengthGlance } from '@/lib/sport-summary';
 import { getStoredUserId } from '@/lib/supabase';
 import TrendSparkline from '@/components/context/TrendSparkline';
 import { liftStatusLine } from '@/lib/strength-calibration-copy';
@@ -1459,62 +1459,65 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   // The change-leading summary for a sport's collapsed line — wording via the pure `sport-summary`
   // helpers (confidence rule pinned there). Leads with what MOVED; the level lives in the detail.
   const summaryLifts = strengthFitness ? foldVariantSlots(strengthFitness.perLift.filter((l) => l.isPrimary && l.latestE1rm != null)) : [];
-  const summaryFor = (disc: string): string => {
+  // Returns the collapsed plate's lines — one string per line so the plate can stack them (all lifts;
+  // easy + hard runs) instead of truncating one line (Michael 2026-09-01: "we should see all the numbers").
+  const summaryLines = (disc: string): string[] => {
     if (disc === 'strength') {
       // ⛔ NOT PR-BASED (Michael 2026-09-01: the program is form / bar speed / slow gain under
-      // cross-training stress). Opening week lists the working numbers; mid-block leads the lift that
-      // moved most "since week N"; flat is fine, no PR flag. See `strengthGlance`.
-      const line = strengthGlance(
+      // cross-training stress). One line per lift; opening lists the working numbers, mid-block adds
+      // the creep since the block opened. Flat is fine, no PR flag. See `strengthGlance`.
+      const lines = strengthGlance(
         summaryLifts as Array<{ displayName: string; latestE1rm: number | null; series?: Array<{ value: number; week?: number }> }>,
         planWeek,
       );
-      if (line) return line;
-      return (strengthFitness?.sessionsThisWeek ?? 0) > 0 ? `${strengthFitness!.sessionsThisWeek} sessions this week` : 'no lifts logged';
+      if (lines.length) return lines;
+      return [(strengthFitness?.sessionsThisWeek ?? 0) > 0 ? `${strengthFitness!.sessionsThisWeek} sessions this week` : 'no lifts logged'];
     }
     if (disc === 'run') {
-      // ⛔ THE EASY-RUN GROUP, NOT THE POOLED SERIES (the false "down 22%"). The pooled efficiency
-      // can be swung 22% by one hot/hilly quality run; easy-run efficiency is "am I getting more
-      // efficient". The group carries its own direction / pct / count; the confidence gate is the
-      // group's own verdict (no direction → count).
-      const groups = (runFitness?.efficiency as { groups?: Array<{ group: string; runs: number; direction: string | null; pctChange: number | null; series: Array<{ date: string; recent: boolean }> }> } | undefined)?.groups;
-      const easy = Array.isArray(groups) ? groups.find((g) => g.group === 'easy') : undefined;
-      // THE REAL NUMBER LEADS (Michael 2026-09-01: the count-only line "told the user nothing"):
-      // recent easy-run pace at the HR it was run at — the easy group's own recent pace/HR live on
-      // the top-level efficiency object (it IS the easy group's headline).
+      // ⛔ EASY AND HARD ON THEIR OWN POOLS (Michael 2026-09-01: "show both easy and hard runs"). Each
+      // group carries its OWN recent pace + HR (real recorded pace, never the index reconstruction);
+      // no real pace for a group → its run count, never a fabricated number. Term is "hard", not
+      // "quality" — plainer for this audience, and it pairs with "easy".
+      const groups = runFitness?.efficiency?.groups;
+      const lineFor = (g: string, label: string): string | null => {
+        const grp = Array.isArray(groups) ? groups.find((x) => x.group === g) : undefined;
+        if (!grp || (grp.runs ?? 0) === 0) return null;
+        if (grp.recentPaceSecPerKm != null) {
+          return `${label} ${formatPace(grp.recentPaceSecPerKm, useImperial)}${grp.recentHrAvg != null ? ` at ${grp.recentHrAvg} bpm` : ''}`;
+        }
+        return `${label} · ${grp.runs} run${grp.runs === 1 ? '' : 's'}`;
+      };
+      const lines = [lineFor('easy', 'easy'), lineFor('quality', 'hard')].filter((x): x is string => !!x);
+      if (lines.length) return lines;
+      // No grouped data yet — fall back to the top-level read.
       const ef = runFitness?.efficiency;
-      const runVal = ef?.recentPaceSecPerKm != null
+      if (!ef) return ['no runs logged'];
+      const runVal = ef.recentPaceSecPerKm != null
         ? `${formatPace(ef.recentPaceSecPerKm, useImperial)}${ef.recentHrAvg != null ? ` at ${ef.recentHrAvg} bpm` : ''}`
         : null;
-      if (easy) {
-        return efficiencySummary({ label: 'pace per heartbeat', value: runVal, verdict: easy.direction, pctChange: easy.pctChange, sampleCount: easy.runs, sinceMonth: sinceMonthFromSeries(easy.series), noun: 'easy run' });
-      }
-      if (!ef) return 'no runs logged';
-      return efficiencySummary({ label: 'pace per heartbeat', value: runVal, verdict: ef.verdict, pctChange: ef.pctChange, sampleCount: ef.sampleCount, sinceMonth: '', noun: 'run' });
+      return [efficiencySummary({ label: 'pace per heartbeat', value: runVal, verdict: ef.verdict, pctChange: ef.pctChange, sampleCount: ef.sampleCount, sinceMonth: '', noun: 'run' })];
     }
     if (disc === 'bike') {
-      // ⛔ LEAD OFF EFFICIENCY (watts per heartbeat) — it is on the object and is the metric Michael
-      // named. NOT power+FTP: the FTP watts are resolved elsewhere (resolveCurrentFtp), and pulling
-      // them in here would be a second source for a number this audit exists to de-duplicate.
-      // THE REAL NUMBER LEADS (Michael 2026-09-01: "bike tells the user nothing"). Follow the
-      // server's own lead: when power leads, the recent watts (single-source, from the power series —
-      // NOT a client FTP resolve); otherwise the aerobic read is HR-at-easy-power, so show that bpm.
+      // THE REAL NUMBER LEADS (Michael 2026-09-01: "bike tells the user nothing"). Follow the server's
+      // own lead: power leading → recent watts (single-source, from the power series, NOT a client FTP
+      // resolve); otherwise the aerobic read is HR-at-easy-power, so show that bpm.
       const bf = bikeFitness;
       if (bf?.lead === 'power' && bf.power) {
         const p = bf.power;
         const recentW = p.recentValue ?? (Array.isArray(p.series) ? [...p.series].reverse().find((pt) => pt.recent)?.value ?? null : null);
         const powerVal = recentW != null ? `${Math.round(recentW)} W` : null;
-        return efficiencySummary({ label: 'power', value: powerVal, verdict: p.verdict, pctChange: p.pctChange, sampleCount: p.sampleCount, sinceMonth: changeMonth(asOf, p.windowDays), noun: 'ride' });
+        return [efficiencySummary({ label: 'power', value: powerVal, verdict: p.verdict, pctChange: p.pctChange, sampleCount: p.sampleCount, sinceMonth: changeMonth(asOf, p.windowDays), noun: 'ride' })];
       }
       const e = bf?.efficiency;
-      if (!e) return 'no rides logged';
+      if (!e) return ['no rides logged'];
       const effVal = e.recentValue != null ? `${e.recentValue} bpm at easy power` : null;
-      return efficiencySummary({ label: 'watts per heartbeat', value: effVal, verdict: e.verdict, pctChange: e.pctChange, sampleCount: e.sampleCount, sinceMonth: changeMonth(asOf, e.windowDays), noun: 'ride' });
+      return [efficiencySummary({ label: 'watts per heartbeat', value: effVal, verdict: e.verdict, pctChange: e.pctChange, sampleCount: e.sampleCount, sinceMonth: changeMonth(asOf, e.windowDays), noun: 'ride' })];
     }
     if (disc === 'swim') {
       const w = Math.round((swimVolume?.windowDays ?? 56) / 7);
-      return (swimVolume?.swims ?? 0) > 0 ? `${swimVolume!.swims} ${swimVolume!.swims === 1 ? 'swim' : 'swims'} in the last ${w}wk` : `no swims in the last ${w}wk`;
+      return [(swimVolume?.swims ?? 0) > 0 ? `${swimVolume!.swims} ${swimVolume!.swims === 1 ? 'swim' : 'swims'} in the last ${w}wk` : `no swims in the last ${w}wk`];
     }
-    return '';
+    return [];
   };
   if (loading || cards.length === 0) return null;
 
@@ -1692,8 +1695,12 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                   {Icon && <Icon size={16} strokeWidth={2.25} style={{ color: getDisciplineColor(card.discipline) }} className="shrink-0" />}
                   {card.discipline}
                 </span>
-                <span className="flex-1 min-w-0 text-right text-[12px] text-white/60 truncate">{summaryFor(card.discipline)}</span>
-                <span className="text-white/45 text-[11px] shrink-0">{open ? '▾' : '▸'}</span>
+                <span className="flex-1 min-w-0 flex flex-col items-end gap-0.5 text-[12px] text-white/60">
+                  {summaryLines(card.discipline).map((line, i) => (
+                    <span key={i} className="text-right leading-tight">{line}</span>
+                  ))}
+                </span>
+                <span className="text-white/45 text-[11px] shrink-0 self-center">{open ? '▾' : '▸'}</span>
               </button>
               {open && <div className="pb-1">{inner}</div>}
             </div>

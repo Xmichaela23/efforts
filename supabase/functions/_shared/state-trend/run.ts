@@ -133,51 +133,26 @@ export function efficiencyIndexToSeries(
     .filter((p) => p.date && Number.isFinite(p.value) && p.value >= MIN_EFF_INDEX && p.value <= MAX_EFF_INDEX);
 }
 
-export interface EffPaceHr { paceSecPerKm: number | null; gapPaceSecPerKm: number | null; hrAvg: number | null; runs: number; }
-
-/** The recent steady-run PACE + HR behind the efficiency verdict — the plain-language "what" under the
- *  index "why" (Michael 2026-07-22, "another line for pace"). FIELD-STANDARD SPLIT (Strava/TrainingPeaks):
- *  the efficiency VERDICT is grade-adjusted (terrain-honest, TP's NGP÷HR), but the pace we SHOW defaults to
- *  RAW — what the watch recorded — because that's the number every platform displays. We carry BOTH so the
- *  client can offer a GAP toggle (Strava does the same). Pace is back-derived from each stored index and
- *  hr_avg: index = (1000/pace)/hr × 100  ⇒  pace_s_per_km = 100000 / (index × hr) — `efficiency_index` for
- *  raw, `gap_efficiency_index` for grade-adjusted. Averages the last `endpointN` in-window steady runs —
- *  the SAME points classifyTrend's recentAvg uses. `gapPaceSecPerKm` is null unless EVERY recent run has a
- *  finite GAP index (no toggle rather than a half-adjusted average). */
-export function recentEfficiencyPaceHr(
-  rows: Array<{ date?: string; metric_date?: string; efficiency_index?: number | null; gap_efficiency_index?: number | null; hr_avg?: number | null; workout_type?: string | null; duration_minutes?: number | null }> | null | undefined,
-  asOf: string,
-  windowDays = 42,
-  endpointN = 2,
-  group: RunSessionGroup = 'easy',
-): EffPaceHr {
-  const start = new Date(new Date(asOf + 'T12:00:00Z').getTime() - windowDays * 86_400_000).toISOString().slice(0, 10);
-  const pts = (Array.isArray(rows) ? rows : [])
-    // ⛔ GROUPED, NOT FILTERED, AND NO DURATION WINDOW (2026-08-28) — see `efficiencyIndexToSeries`.
-    // This line is the RECEIPT under the verdict, so it must read the SAME pool the verdict read;
-    // when they diverged, the row printed "pace ~13:32/mi at 140 bpm" under a verdict cleaned of
-    // exactly the session that produced 140. One pool, or the clean number vouches for a dirty one.
-    .filter((r) => runSessionGroup(r.workout_type) === group)
-    .map((r) => ({
-      date: r.date ?? r.metric_date ?? '',
-      idxRaw: Number(r.efficiency_index ?? r.gap_efficiency_index), // RAW = what the watch showed (GAP only as fallback)
-      idxGap: Number(r.gap_efficiency_index),                       // grade-adjusted (may be NaN on flat/no-GAP runs)
-      hr: Number(r.hr_avg),
-    }))
-    .filter((p) => p.date && p.date > start && p.date <= asOf &&
-      Number.isFinite(p.idxRaw) && p.idxRaw >= MIN_EFF_INDEX && p.idxRaw <= MAX_EFF_INDEX &&
-      Number.isFinite(p.hr) && p.hr > 0)
-    .sort((a, b) => a.date.localeCompare(b.date));
-  if (!pts.length) return { paceSecPerKm: null, gapPaceSecPerKm: null, hrAvg: null, runs: 0 };
-  const recent = pts.slice(-Math.min(endpointN, pts.length));
-  const avg = (a: number[]) => a.reduce((s, n) => s + n, 0) / a.length;
-  const allGap = recent.every((p) => Number.isFinite(p.idxGap) && p.idxGap >= MIN_EFF_INDEX && p.idxGap <= MAX_EFF_INDEX);
-  return {
-    paceSecPerKm: avg(recent.map((p) => 100000 / (p.idxRaw * p.hr))),
-    gapPaceSecPerKm: allGap ? avg(recent.map((p) => 100000 / (p.idxGap * p.hr))) : null,
-    hrAvg: Math.round(avg(recent.map((p) => p.hr))),
-    runs: pts.length,
+/** The recent pace + HR for a run group — the MEDIAN of the group's last five runs' REAL recorded
+ *  pace (`pace_s_per_km`) and HR. Replaces the old `recentEfficiencyPaceHr`, which back-derived pace
+ *  from the efficiency index (`100000/(index×hr)`) and produced nonsense like 13:21/mi whenever the
+ *  index was low or synthetic (Michael 2026-09-01: "LLM slop got us those numbers, clean them up").
+ *  The rows here carry the athlete's actual pace; median-of-five resists a single outlier. Returns
+ *  null pace when the group has no run with a real pace — the caller then shows the count, never a
+ *  reconstructed number. */
+export function recentGroupPaceHr(
+  rows: ReadonlyArray<Record<string, unknown>> | null | undefined,
+): { recentPaceSecPerKm: number | null; recentHrAvg: number | null } {
+  const last5 = (Array.isArray(rows) ? rows : []).slice(-5);
+  const median = (get: (r: Record<string, unknown>) => unknown): number => {
+    const xs = last5.map((r) => Number(get(r) || 0)).filter((n) => n > 0).sort((a, b) => a - b);
+    if (!xs.length) return 0;
+    const mid = xs.length / 2;
+    return xs.length % 2 ? xs[(xs.length - 1) / 2] : (xs[mid - 1] + xs[mid]) / 2;
   };
+  const pace = median((r) => r.pace_s_per_km);
+  const hr = median((r) => r.hr);
+  return { recentPaceSecPerKm: pace > 0 ? Math.round(pace) : null, recentHrAvg: hr > 0 ? Math.round(hr) : null };
 }
 
 export function computeRunEfficiencyState(series: TrendPoint[], asOf: string, sessionsPerWeek: number): RunState {
@@ -421,6 +396,11 @@ export interface RunFitness {
       pctChange: number | null;
       ci: [number, number] | null;
       series: Array<{ date: string; value: number; recent: boolean }>;
+      /** The group's OWN recent pace + HR — median of its last five runs' REAL recorded pace (never the
+       *  index reconstruction). Null when the group has no run carrying a real pace. Lets the card show
+       *  "easy 9:10/mi at 138" and "hard 7:20/mi at 158" on their own pools. */
+      recentPaceSecPerKm?: number | null;
+      recentHrAvg?: number | null;
     }>;
     /** 12-WEEK CHART series — the "long view" (Michael 2026-07-22). Same efficiency points the verdict
      *  reads, over a WIDER 84d window (verdict is 42d), so the chart's recent tail IS the verdict's data —
