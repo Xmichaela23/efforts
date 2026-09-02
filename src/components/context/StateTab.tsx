@@ -951,11 +951,9 @@ export default function StateTab({
         {wsv.plan.has_active_plan === true && <StateNextBlock nextSessions={nextSessions} />}
       </div>
 
-      {wsv.plan.plan_name && (
-        <div className="mt-2 px-0.5 text-[12px] text-white/60 uppercase tracking-widest">
-          {wsv.plan.plan_name}
-        </div>
-      )}
+      {/* ⛔ THE ORPHAN "STANDARD FOCUS" PLAN-NAME LABEL IS REMOVED (2026-09-01, cosmetic) — it sat
+          alone at the bottom of the scroll with nothing around it. The plan is identified where it is
+          acted on (the plan/adjust surfaces), not as a trailing label here. */}
 
       <input
         ref={stateCourseFileRef}

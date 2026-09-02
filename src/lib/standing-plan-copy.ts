@@ -62,7 +62,11 @@ export type StandingWorkingNumberLine = {
  * the number IS matters on this screen; where it comes from lives on the plan.
  */
 export function standingWorkingNumberLine(x: StandingWorkingNumberLine): string {
-  return `${x.movement} — ${x.weight} lb × ${x.reps} sets the block at ${Math.round(x.workingNumber)} lb.`;
+  // ⛔ LABEL IT THE WORKING WEIGHT, not "the block at N" (2026-09-01, audit item 4). The block number
+  // (~96% of the tested max, p215 H2) sat next to the Performance tab's tested max with nothing saying
+  // which was which — "sets the block at 176" beside "185" read as a contradiction. Naming it the
+  // working weight, derived from the max, makes them two labelled quantities instead of two numbers.
+  return `${x.movement} — ${x.weight} lb × ${x.reps} sets the working weight at ${Math.round(x.workingNumber)} lb (about 96% of the tested max).`;
 }
 
 /**

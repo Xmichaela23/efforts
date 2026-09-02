@@ -33,7 +33,7 @@ import { EnduranceReadCards } from '@/components/context/StrengthReadCards';
 import ViadaWeekCard from '@/components/context/ViadaWeekCard';
 // ⛔ COLLAPSE TO ONE LINE PER SPORT (Round 3, 2026-09-01) — each sport shows a change-leading summary
 // and expands on tap. The summary wording is a set of pure functions so the confidence rule is pinned.
-import { efficiencySummary, strengthSummary } from '@/lib/sport-summary';
+import { changeMonth, efficiencySummary, pickStrengthLead, sinceMonthFromSeries, strengthSummary } from '@/lib/sport-summary';
 import { getStoredUserId } from '@/lib/supabase';
 import TrendSparkline from '@/components/context/TrendSparkline';
 import { liftStatusLine } from '@/lib/strength-calibration-copy';
@@ -1460,22 +1460,34 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   const summaryLifts = strengthFitness ? foldVariantSlots(strengthFitness.perLift.filter((l) => l.isPrimary && l.latestE1rm != null)) : [];
   const summaryFor = (disc: string): string => {
     if (disc === 'strength') {
-      if (summaryLifts.length === 0) return (strengthFitness?.sessionsThisWeek ?? 0) > 0 ? `${strengthFitness!.sessionsThisWeek} sessions this week` : 'no lifts logged';
-      const rep = summaryLifts.reduce((a, b) => ((a.newestAgeDays ?? 1e9) <= (b.newestAgeDays ?? 1e9) ? a : b));
-      const series = (rep as { series?: Array<{ value: number }> }).series;
-      const prior = series && series.length >= 2 ? series[series.length - 2].value : null;
-      return strengthSummary(rep.displayName, rep.latestE1rm, prior);
+      // ⛔ Lead off the lift that MOVED (confident change), not the freshly-tested one — see
+      // `pickStrengthLead`. No confident change → strongest number, no delta. Two numbers, no verdict
+      // word (D-420).
+      const lead = pickStrengthLead(summaryLifts as Array<{ displayName: string; latestE1rm: number | null; series?: Array<{ value: number }> }>);
+      if (!lead) return (strengthFitness?.sessionsThisWeek ?? 0) > 0 ? `${strengthFitness!.sessionsThisWeek} sessions this week` : 'no lifts logged';
+      return strengthSummary(lead.name, lead.latest, lead.prior);
     }
     if (disc === 'run') {
+      // ⛔ THE EASY-RUN GROUP, NOT THE POOLED SERIES (the false "down 22%"). The pooled efficiency
+      // can be swung 22% by one hot/hilly quality run; easy-run efficiency is "am I getting more
+      // efficient". The group carries its own direction / pct / count; the confidence gate is the
+      // group's own verdict (no direction → count).
+      const groups = (runFitness?.efficiency as { groups?: Array<{ group: string; runs: number; direction: string | null; pctChange: number | null; series: Array<{ date: string; recent: boolean }> }> } | undefined)?.groups;
+      const easy = Array.isArray(groups) ? groups.find((g) => g.group === 'easy') : undefined;
+      if (easy) {
+        return efficiencySummary({ label: 'pace per heartbeat', verdict: easy.direction, pctChange: easy.pctChange, sampleCount: easy.runs, sinceMonth: sinceMonthFromSeries(easy.series), noun: 'easy run' });
+      }
       const e = runFitness?.efficiency;
       if (!e) return 'no runs logged';
-      return efficiencySummary({ label: 'pace per heartbeat', verdict: e.verdict, pctChange: e.pctChange, sampleCount: e.sampleCount, asOf, windowDays: (e as { windowDays?: number }).windowDays, noun: 'run' });
+      return efficiencySummary({ label: 'pace per heartbeat', verdict: e.verdict, pctChange: e.pctChange, sampleCount: e.sampleCount, sinceMonth: '', noun: 'run' });
     }
     if (disc === 'bike') {
-      if (!bikeFitness) return 'no rides logged';
-      const leadPower = bikeFitness.lead != null ? bikeFitness.lead !== 'efficiency' : bikeFitness.power.verdict !== 'needs_data';
-      const lead = leadPower ? bikeFitness.power : bikeFitness.efficiency;
-      return efficiencySummary({ label: leadPower ? 'power' : 'watts per heartbeat', verdict: lead.verdict, pctChange: lead.pctChange, sampleCount: lead.sampleCount, asOf, windowDays: (lead as { windowDays?: number }).windowDays, noun: 'ride' });
+      // ⛔ LEAD OFF EFFICIENCY (watts per heartbeat) — it is on the object and is the metric Michael
+      // named. NOT power+FTP: the FTP watts are resolved elsewhere (resolveCurrentFtp), and pulling
+      // them in here would be a second source for a number this audit exists to de-duplicate.
+      const e = bikeFitness?.efficiency;
+      if (!e) return 'no rides logged';
+      return efficiencySummary({ label: 'watts per heartbeat', verdict: e.verdict, pctChange: e.pctChange, sampleCount: e.sampleCount, sinceMonth: changeMonth(asOf, e.windowDays), noun: 'ride' });
     }
     if (disc === 'swim') {
       const w = Math.round((swimVolume?.windowDays ?? 56) / 7);
@@ -1593,12 +1605,9 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
     <div className="py-3">
       {/* Section clock label: PERFORMANCE is the SLOW clock. Per-row windows (8wk, steady runs,
           over 6wk, as-of dates) are receipts that inherit this and add specifics. */}
-      <div className="mb-2.5 px-1 flex items-baseline gap-2">
-        {/* Named "Fitness" (not "Performance") so it can't be confused with the per-workout Performance
-            tab that grades a single session. This card is the multi-week fitness TREND. */}
-        <span className="text-[12px] font-semibold tracking-[0.12em] text-white/65 uppercase">Fitness</span>
-        <span className="text-[12px] text-white/50 lowercase">trends over recent weeks</span>
-      </div>
+      {/* ⛔ THE "Fitness / trends over recent weeks" HEADING IS REMOVED (2026-09-01, cosmetic) — it
+          stacked directly under StateTab's "trends · the arc behind this week", two headings for one
+          section. StateTab's heading is the single one now. */}
       {/* NO aggregate roll-up (Michael 2026-07-04): a cross-discipline headline ("Building — bike up,
           run up") is a lossy, cherry-picking, clock-mismatched summary (run 6wk vs bike 8wk). Fitness
           is handed to the individual sport rows below — each owns its own verdict AND its own window. */}
