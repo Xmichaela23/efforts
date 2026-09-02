@@ -1331,9 +1331,12 @@ are several specific movements the athlete wants to improve.
 
 # PART H — THE WORKING NUMBER AND THE PRETEST (p215)
 
-⚠️ **READ 2026-08-22 OFF THE PAGE; THE IMAGE IS PENDING IN `book-sources/`.** Every figure below was
-verified against that photograph in the planning chat. Until `p215.jpg` lands this is the one part of
-the corpus that cannot be re-checked against an image in the folder — see Part G item 7.
+✅ **IMAGE FILED 2026-09-02: `book-sources/p215.png`** (Michael's photo, pasted in chat and read again
+against this part). Confirmed off the page: Epley E×(1+0.0333×F), Brzycki E×[36/(37−F)], averaged →
+"predicted true 1RM G"; G×0.96 = "training 1-rep max". Pretest ramp confirmed: 75% of predicted max
+for 6 (A); B = 0.1×A; C = B/2; D = A+B for 5; E = D+C for max reps (F). Worked example on the page:
+225 predicted → 190×6 → Epley 227.9, Brzycki 220.6, average 224.25, training max 215.52.
+*(Was: read 2026-08-22 off the page in the planning chat, image pending — see Part G item 7.)*
 
 ## H1. The pretest protocol
 
