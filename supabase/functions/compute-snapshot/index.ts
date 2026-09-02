@@ -1910,10 +1910,11 @@ serve(async (req: Request) => {
 
       workload_total: Math.round(current.workloadTotal),
       workload_by_discipline: current.workloadByDisc,
-      // The typical week per sport — mean of the prior weeks that had any of it — so a surface can put
-      // this week's run points against the athlete's own usual, the way Strava shows Relative Effort
-      // against its weekly range (2026-09-02). Facts; no verdict.
-      workload_by_discipline_typical: workloadByDiscTypical,
+      // ⛔ NO `workload_by_discipline_typical` COLUMN. It was written here on 2026-09-02 and the column
+      // does not exist on `athlete_snapshot`, so every snapshot upsert returned 500 until the write was
+      // pulled the same evening. The typical-per-sport map rides INSIDE `state_trends_v1.display.loadByDiscipline`
+      // (typed on StateDisplayV1), which is what the State card reads. Add the column by hand first if it
+      // is ever wanted as its own field.
       acwr,
       session_count: current.sessionCount,
       session_count_planned: sessionCountPlanned,
