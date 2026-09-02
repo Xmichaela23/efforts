@@ -994,7 +994,9 @@ async function updateLearnedStrengthFromExerciseLog(
  * rather than being guessed into it — the same failure direction the gate already chose.
  */
 function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null): string | null {
-  const NONSTEADY = /interval|repeat|hill|tempo|threshold|vo2|speed|track|fartlek|stride|race|surge/i;
+  // `quality` / `hard` added 2026-09-02: the race generators name the session "Quality Run" and the
+  // standing plan names it "Hard Run" (session-vocabulary.ts) — neither was in this list.
+  const NONSTEADY = /interval|repeat|hill|tempo|threshold|vo2|speed|track|fartlek|stride|race|surge|quality|hard/i;
   const STEADY = /easy|long|lsd|recovery|base|aerobic|steady|shakeout|conversational/i;
   /**
    * ⛔ THE LONG RUN IS ITS OWN WORD NOW (2026-08-28, work order item 2).
@@ -1014,7 +1016,20 @@ function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null): string |
   const LONG = /long|lsd|marathon\s*prep|endurance\s*run/i;
   const steadyWord = (text: string): string => (LONG.test(text) ? 'long' : 'easy');
 
-  // 1. THE PLAN. Its own words, in the order they are most likely to name the intent.
+  // 0. THE PLAN'S OWN TAG (2026-09-02). A standing-plan session carries `family:run_<family>` in
+  //    `tags` (`session-vocabulary.ts`), which is the plan naming the session type outright — no
+  //    word-matching needed. Read it first. Families are the book's (endurance-library/types.ts):
+  //    sprint_power / mlss / near_threshold = hard; lsd = long; vt1 = easy.
+  const tagList = Array.isArray(planned?.tags) ? planned!.tags!.map((t) => String(t).toLowerCase()) : [];
+  const familyTag = tagList.find((t) => t.startsWith('family:run_'));
+  if (familyTag) {
+    const fam = familyTag.slice('family:'.length);
+    if (fam === 'run_sprint_power' || fam === 'run_mlss' || fam === 'run_near_threshold') return 'interval';
+    if (fam === 'run_lsd') return 'long';
+    if (fam === 'run_vt1') return 'easy';
+  }
+
+  // 1. THE PLAN'S WORDS (race plans and older rows without a family tag).
   const planText = [
     planned?.name,
     Array.isArray(planned?.tags) ? planned!.tags!.join(' ') : null,
