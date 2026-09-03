@@ -307,7 +307,7 @@ export default function AdherenceChips({
         <div className="w-full pt-1 pb-2">
           {weekLabel && <div className="readout-label mb-2 text-center text-[11px] uppercase">{weekLabel}</div>}
           <div className="flex items-center justify-center gap-6 text-center mb-3">
-            <div className="grid grid-cols-4 gap-1 w-full">
+            <div className="flex items-start justify-between w-full px-3">
               {chipText('Workload', loadValue, loadSubtitle)}
               {chip('Pace', paceAdherence, paceDeltaSec != null ? fmtDeltaPer100(paceDeltaSec) : '—')}
               {chipText('Duration', durationValue, 'of plan')}
@@ -323,7 +323,7 @@ export default function AdherenceChips({
         <div className="w-full pt-1 pb-2">
           {weekLabel && <div className="readout-label mb-2 text-center text-[11px] uppercase">{weekLabel}</div>}
           <div className="flex items-center justify-center gap-6 text-center mb-3">
-            <div className="grid grid-cols-4 gap-1 w-full">
+            <div className="flex items-start justify-between w-full px-3">
               {chipText('Workload', loadValue, loadSubtitle)}
               {/* 2026-09-03: Execution and Drift on rides too (Michael: "drift really important on the
                   performance screens for running and riding"). Power / Easy reads live in Insights. */}
@@ -352,7 +352,7 @@ export default function AdherenceChips({
       <div className="w-full pt-1 pb-2">
         {weekLabel && <div className="readout-label mb-2 text-center text-[11px] uppercase">{weekLabel}</div>}
         <div className="flex items-center justify-center gap-6 text-center mb-3">
-          <div className="grid grid-cols-4 gap-1 w-full">
+          <div className="flex items-start justify-between w-full px-3">
             {chipText('Workload', loadValue, loadSubtitle)}
             {executionScore != null && chip('Execution', executionScore, executionSubtitle)}
             {chipText('Duration', durationValue, 'of plan')}
