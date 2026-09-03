@@ -249,7 +249,7 @@ function SpineCard({ series }: { series: SpineSeries }) {
           <span className="text-white/55 text-[11px]">
             drift <span className="tabular-nums text-white/75">{(latest.driftPct > 0 ? '+' : '')}{latest.driftPct.toFixed(1)}%</span> · latest run{latest.driftWholeSession ? ' · intervals' : ''} · line {DRIFT_LIMITS.hybridPct}%{driftVsLine(latest.driftPct) ? <> · <span className="text-white/75">{driftVsLine(latest.driftPct)}</span></> : null}{conditions ? <span className="text-white/45"> · {conditions}</span> : null}
           </span>
-          <p className="mt-1 text-[12px] text-white/45 leading-snug max-w-[min(100%,340px)]">{DECOUPLING_EXPLAIN}</p>
+          {/* 2026-09-03: no sentence under the drift line — the line states the number and the 5% line; a sentence explaining it read as machine copy (Michael). */}
         </div>
       )}
       {basedOn && (
