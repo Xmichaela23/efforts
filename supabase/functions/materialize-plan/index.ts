@@ -1360,7 +1360,7 @@ function uid(): string { try { return crypto.randomUUID(); } catch { return `${D
  * No pace targets — the athlete discovers their pace; that's the point of the test.
  * Steps use duration_s or distance_m matching the session's test protocol.
  */
-function buildAssessmentSteps(tags: string[]): { id: string; kind: string; duration_s?: number; distance_m?: number; label: string }[] {
+function buildAssessmentSteps(tags: string[], tokens: string[] = []): { id: string; kind: string; duration_s?: number; distance_m?: number; label: string }[] {
   // Swim CSS Test: 400 yd warmup → 3 min rest → 400 yd TT → 3 min rest → 200 yd TT → 200 yd cool-down
   if (tags.includes('css_test')) {
     return [
@@ -1372,32 +1372,52 @@ function buildAssessmentSteps(tags: string[]): { id: string; kind: string; durat
       { id: uid(), kind: 'cooldown', distance_m: 183, label: 'Easy cool-down — 200 yd' },
     ];
   }
-  // Bike FTP Test: 10 min easy → 2 × 1 min hard / 1 min easy → 20 min TT → 5 min cool-down
+  // ⛔ THE BOOK'S OWN TESTS, step for step (pp.210 and 212, read off the page 2026-09-02; SOURCE Part H0).
+  // This branch OVERRIDES the row's steps_preset tokens (the `assessment` tag bypasses token expansion at
+  // the call site), so the protocol has to live HERE — the Baselines description and these steps must agree.
+  // "The 20-Minute Test" (p212): 5–10 min easy · 3 × 1 min high turnover / 1 min rest · 3 min easy ·
+  // 3 min at 9/10 · 6–8 min easy · 20 min best effort (FTP = avg watts × 0.95, read by
+  // compute-workout-analysis) · cool-down (the page gives none; 5 min, OURS).
   if (tags.includes('ftp_test')) {
     return [
-      { id: uid(), kind: 'warmup',   duration_s: 600,  label: 'Easy spin — 10 min' },
-      { id: uid(), kind: 'work',     duration_s: 60,   label: 'Hard effort opener — 1 min' },
+      { id: uid(), kind: 'warmup',   duration_s: 480,  label: 'Easy spin — 8 min' },
+      { id: uid(), kind: 'work',     duration_s: 60,   label: 'High turnover — 1 min (fast pedal, easy resistance)' },
       { id: uid(), kind: 'recovery', duration_s: 60,   label: 'Easy — 1 min' },
-      { id: uid(), kind: 'work',     duration_s: 60,   label: 'Hard effort opener — 1 min' },
+      { id: uid(), kind: 'work',     duration_s: 60,   label: 'High turnover — 1 min (fast pedal, easy resistance)' },
       { id: uid(), kind: 'recovery', duration_s: 60,   label: 'Easy — 1 min' },
-      { id: uid(), kind: 'work',     duration_s: 1200, label: '20-min FTP time trial — max sustainable effort' },
+      { id: uid(), kind: 'work',     duration_s: 60,   label: 'High turnover — 1 min (fast pedal, easy resistance)' },
+      { id: uid(), kind: 'recovery', duration_s: 60,   label: 'Easy — 1 min' },
+      { id: uid(), kind: 'recovery', duration_s: 180,  label: 'Easy — 3 min' },
+      { id: uid(), kind: 'work',     duration_s: 180,  label: 'Hard — 3 min at 9 out of 10' },
+      { id: uid(), kind: 'recovery', duration_s: 420,  label: 'Easy — 7 min' },
+      { id: uid(), kind: 'work',     duration_s: 1200, label: '20-minute test — best effort you can hold the whole way. This is the test.' },
       { id: uid(), kind: 'cooldown', duration_s: 300,  label: 'Easy cool-down — 5 min' },
     ];
   }
-  // Run 12-min TT: 15 min easy → 4 × 30 sec strides / 30 sec walk → 12 min TT → 10 min cool-down
+  // "Establishing your VO2 max pace and threshold pace" (p210): 6–8 min easy jog · 2 × 100 m strides
+  // (slow to near full tilt) · 3 × 30 s at a fast (mile-PR) pace with 1 min easy between · 1 min rest ·
+  // the trial, 12 min (<2 yrs) / 10 (2–4) / 8 (4+), 9.5/10 to start and 10/10 to finish · easy cool-down.
+  // Threshold = 88% of the trial's SPEED (compute-workout-analysis run_test). The trial length comes
+  // from a `run_tt_{n}min` token on the row when there is one; 12 min otherwise.
   if (tags.includes('run_test')) {
+    const ttTok = (tokens || []).map((t) => String(t).toLowerCase()).find((t) => /^run_tt_\d+min$/.test(t));
+    const ttMin = ttTok ? parseInt(ttTok.match(/^run_tt_(\d+)min$/)![1], 10) : 12;
+    const ttSec = Number.isFinite(ttMin) && ttMin > 0 ? ttMin * 60 : 720;
     return [
-      { id: uid(), kind: 'warmup',   duration_s: 900, label: 'Easy warmup — 15 min' },
-      { id: uid(), kind: 'work',     duration_s: 30,  label: 'Stride — fast' },
-      { id: uid(), kind: 'recovery', duration_s: 30,  label: 'Walk recovery' },
-      { id: uid(), kind: 'work',     duration_s: 30,  label: 'Stride — fast' },
-      { id: uid(), kind: 'recovery', duration_s: 30,  label: 'Walk recovery' },
-      { id: uid(), kind: 'work',     duration_s: 30,  label: 'Stride — fast' },
-      { id: uid(), kind: 'recovery', duration_s: 30,  label: 'Walk recovery' },
-      { id: uid(), kind: 'work',     duration_s: 30,  label: 'Stride — fast' },
-      { id: uid(), kind: 'recovery', duration_s: 30,  label: 'Walk recovery' },
-      { id: uid(), kind: 'work',     duration_s: 720, label: '12-min time trial — max sustainable effort' },
-      { id: uid(), kind: 'cooldown', duration_s: 600, label: 'Easy cool-down — 10 min' },
+      { id: uid(), kind: 'warmup',   duration_s: 420, label: 'Easy jog — 7 min' },
+      { id: uid(), kind: 'work',     duration_s: 20,  label: 'Stride — about 100 m (20 s), slow to near full tilt' },
+      { id: uid(), kind: 'recovery', duration_s: 60,  label: 'Easy — 1 min' },
+      { id: uid(), kind: 'work',     duration_s: 20,  label: 'Stride — about 100 m (20 s), slow to near full tilt' },
+      { id: uid(), kind: 'recovery', duration_s: 60,  label: 'Easy — 1 min' },
+      { id: uid(), kind: 'work',     duration_s: 30,  label: 'Fast — 30 s at your mile-PR pace' },
+      { id: uid(), kind: 'recovery', duration_s: 60,  label: 'Easy walk or jog — 1 min' },
+      { id: uid(), kind: 'work',     duration_s: 30,  label: 'Fast — 30 s at your mile-PR pace' },
+      { id: uid(), kind: 'recovery', duration_s: 60,  label: 'Easy walk or jog — 1 min' },
+      { id: uid(), kind: 'work',     duration_s: 30,  label: 'Fast — 30 s at your mile-PR pace' },
+      { id: uid(), kind: 'recovery', duration_s: 60,  label: 'Easy walk or jog — 1 min' },
+      { id: uid(), kind: 'recovery', duration_s: 60,  label: 'Rest — 1 min' },
+      { id: uid(), kind: 'work',     duration_s: ttSec, label: `Time trial — ${Math.round(ttSec / 60)} min. Start at 9.5 out of 10, finish at 10. Even the whole way.` },
+      { id: uid(), kind: 'cooldown', duration_s: 540, label: 'Easy cool-down — 9 min' },
     ];
   }
   return [];
@@ -4134,7 +4154,7 @@ Deno.serve(async (req) => {
 
         // Assessment sessions bypass token expansion — inject pre-built steps directly.
         if (rowTags.includes('assessment')) {
-          const assessSteps = buildAssessmentSteps(rowTags);
+          const assessSteps = buildAssessmentSteps(rowTags, tokens);
           if (assessSteps.length > 0) {
             const withIndex = assessSteps.map((st, idx) => ({ ...st, planned_index: idx }));
             const v3 = withIndex.map((st: any) => toV3Step(st, row));
