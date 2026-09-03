@@ -27,7 +27,7 @@ export default function StateWeekExecution({ wsv, week }: { wsv: any; week: any 
   const partialWeek = endDays != null && endDays < 0;
   // Header: only claim "planned vs actual" when there IS a plan to compare against (F26).
   const showsPlanned = hasPlan && totalPlanned > 0;
-  const sectionLabel = showsPlanned ? 'this week · planned vs actual' : 'this week';
+  const sectionLabel = showsPlanned ? 'this week · sessions planned vs done' : 'this week'; // 2026-09-03: it counts sessions, not load — the label says so
   return (
     <>
       {/* Rule 4 (DESIGN_GUIDELINES "Layout Rules"): section labels are UPPERCASE, tracked — the same

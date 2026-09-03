@@ -147,7 +147,7 @@ export function EnduranceReadCards(
  * empty this card, which is the whole reason the spine exists beside the overlay.
  */
 // ⓘ copy, Michael 2026-09-02 (voice-checked): what the two run numbers mean, in plain words.
-const EF_EXPLAIN = 'How much speed each heartbeat buys you on easy runs. Higher means the same heart rate is moving you faster. It creeps up with fitness over weeks and drops on hot days.';
+const EF_EXPLAIN = 'Pace divided by heart rate. Higher means faster at the same heart rate.'; // 2026-09-03: Michael cut the paragraph
 const DECOUPLING_EXPLAIN = `Heart rate in the second half against the first, at the same pace. The book's line is 5%. TrainingPeaks calls it decoupling.`; // 2026-09-03: Michael cut the paragraph
 
 /** "1.9 of room" / "0.4 over" against p107's line. */
