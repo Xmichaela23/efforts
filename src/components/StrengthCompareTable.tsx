@@ -286,7 +286,12 @@ export default function StrengthCompareTable({ planned, completed, completedWork
 
   const completedMap = new Map<string, StrengthExercise>();
   completed.forEach(c => {
-    completedMap.set(keyOf(slotFor(c)), c);
+    // 2026-09-03 (Michael's core pick: logged under its own name with `substituted_for` = the plan's original,
+    // while the plan row had ALREADY been renamed to the swap) — pair on whichever key the plan actually
+    // carries: the exercise's own name when the plan has it, else the slot it filled. One row, sets attached.
+    const selfKey = keyOf(c?.name);
+    const slotKey = keyOf(slotFor(c));
+    completedMap.set(selfKey && plannedMap.has(selfKey) ? selfKey : slotKey, c);
   });
 
   // Is there a prescription to compare against at all? Everything that grades, labels or totals
@@ -433,7 +438,11 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     // that was never made — the same lie `sets: 1` told when it rendered "1×25" (Michael: *"25 chin
     // ups? lol i can do 5"*). The total goes on the row HEADER, where it cannot be lost and cannot
     // be mistaken for a per-set target, and the sets below it are simply what was done.
-    const assistanceTotalReps = p?.load_prescribed === false && pReps > 0 ? pReps : null;
+    // 2026-09-03 (Michael: "18 of 2 reps", "Planned 6 total"): a rep TOTAL is only a total when the plan asked for one
+    // number and no set structure. A banded row (3×6-12) is a band, and the header says the band.
+    const assistanceTotalReps = p?.load_prescribed === false && pReps > 0 && Number.isInteger(Number(pReps)) && !(pSets > 1) ? pReps : null;
+    const assistanceBand = p?.load_prescribed === false && assistanceTotalReps == null && pSets > 0 && p?.reps != null
+      ? `${pSets}×${String(p.reps).replace(/\+$/, '')}` : null;
     const completedSets: StrengthSet[] = cSetsArr;
     // D-095: PREVIOUS column — last session's actual per-set data for this exercise.
     // ⚠️ Keyed by `canonicalize`, matching how `workout-detail` builds the map.
@@ -578,6 +587,11 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                 {r.assistanceTotalReps != null && (
                   <span className="text-sm text-white/80">
                     <span className="text-white/50">Planned </span>{r.assistanceTotalReps} total · by feel
+                  </span>
+                )}
+                {r.assistanceTotalReps == null && (r as any).assistanceBand && (
+                  <span className="text-sm text-white/80">
+                    <span className="text-white/50">Planned </span>{(r as any).assistanceBand} · by feel
                   </span>
                 )}
               </div>

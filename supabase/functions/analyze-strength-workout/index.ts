@@ -554,7 +554,14 @@ function calculateExerciseAdherence(match: any, userUnits: string, planUnits: st
     rirConsistency = Math.sqrt(variance);
 
     if (exerciseTargetRIR !== null) {
-      rirAdherence = Math.round((avgExecutedRIR - exerciseTargetRIR) * 10) / 10;
+      // 2026-09-03 (Michael's chest-supported row went 15 → 20 → 25 lb and finished at target, and the
+      // average still said "too much in the tank"): when the athlete raised the weight during the exercise,
+      // the LAST set is the read — that is where they arrived. Otherwise the average, as before.
+      const wts = executedRIRSets.map((st: any) => Number(st?.weight)).filter((w: number) => Number.isFinite(w) && w > 0);
+      const raisedWeight = wts.length >= 2 && wts[wts.length - 1] > wts[0];
+      const lastRir = Number(executedRIRSets[executedRIRSets.length - 1]?.rir);
+      const readRir = raisedWeight && Number.isFinite(lastRir) ? lastRir : avgExecutedRIR;
+      rirAdherence = Math.round((readRir - exerciseTargetRIR) * 10) / 10;
     }
   }
 
