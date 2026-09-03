@@ -13,6 +13,7 @@ type IntervalRow = {
   planned_label: string;
   planned_duration_s: number | null;
   planned_pace_range?: { lower_sec_per_mi: number; upper_sec_per_mi: number };
+  planned_power_range?: { lower_w: number; upper_w: number };
   planned_pace_display?: string | null;
   executed: {
     duration_s: number | null;
@@ -299,6 +300,22 @@ export default function EnduranceIntervalTable({
             const execCell = isRide
               ? (iv.executed.power_watts != null ? `${Math.round(iv.executed.power_watts)} W` : '—')
               : fmtPaceSec(paceCellSec);
+            // In range / faster / slower against the planned band (pace: faster = lower sec/mi; watts: above).
+            const bandClass = (() => {
+              if (iv.not_done || isGoalRace) return '';
+              if (isRide) {
+                const pr = iv.planned_power_range; const w = iv.executed.power_watts;
+                if (!pr || w == null || !(pr.lower_w > 0)) return '';
+                if (w < pr.lower_w * 0.97) return 'text-amber-400';
+                if (w > pr.upper_w * 1.05) return 'text-sky-300';
+                return 'text-emerald-400';
+              }
+              const r = iv.planned_pace_range; const a = paceCellSec;
+              if (!r || a == null || !(r.lower_sec_per_mi > 0)) return '';
+              if (a > r.upper_sec_per_mi + 5) return 'text-amber-400';
+              if (a < r.lower_sec_per_mi - 5) return 'text-sky-300';
+              return 'text-emerald-400';
+            })();
             const distStr = fmtDist(iv.executed.distance_m, isSwim, useImperial);
             const durStr = iv.executed.duration_s != null && iv.executed.duration_s > 0
               ? fmtTime(iv.executed.duration_s) : '—';
@@ -389,7 +406,11 @@ export default function EnduranceIntervalTable({
                   <div className="flex flex-col">
                     <div className="flex items-center justify-between w-full min-h-[2.1rem]">
                       <span className="text-[13px] font-medium truncate pr-2">{String(iv.planned_label ?? '')}</span>
-                      {pct != null && !isGoalRace && hasPlanned && (
+                      {/* 2026-09-03 (Michael: "go follow industry standards"): no per-row percentage on a planned
+                          session. TrainingPeaks and Garmin show planned beside actual and colour the actual
+                          (in range / faster / slower); one score for the session lives in the header. The
+                          goal-race view keeps its own comparison. */}
+                      {pct != null && isGoalRace && hasPlanned && (
                         <div className="flex items-center gap-1">
                           <span className={`text-[11px] font-semibold whitespace-nowrap ${pctClass}`}>{pct}%</span>
                           {cvIndicator}
@@ -403,7 +424,7 @@ export default function EnduranceIntervalTable({
                     )}
                   </div>
                 </td>
-                <td className="px-2 py-1.5 font-medium">{iv.not_done ? <span className="text-white/40">not done</span> : execCell}</td>
+                <td className={`px-2 py-1.5 font-medium ${bandClass}`}>{iv.not_done ? <span className="text-white/40">not done</span> : execCell}</td>
                 <td className="px-2 py-1.5">{iv.not_done ? '—' : distStr}</td>
                 <td className="px-2 py-1.5">
                   <div className="font-medium">{iv.not_done ? '—' : durStr}</div>

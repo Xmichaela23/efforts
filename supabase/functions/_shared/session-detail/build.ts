@@ -530,6 +530,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         ),
         planned_duration_s: fin(iv?.planned_duration_s),
         planned_pace_range: hasRange ? { lower_sec_per_mi: Number(lower), upper_sec_per_mi: Number(upper) } : undefined,
+        planned_power_range: hasPowerRange ? { lower_w: Number(pwLower), upper_w: Number(pwUpper) } : undefined,
         planned_pace_display: (() => {
           if (typeof sr?.planned_pace_display === 'string') return sr.planned_pace_display;
           if (hasRange) return fmtPaceRange(Number(lower), Number(upper));
