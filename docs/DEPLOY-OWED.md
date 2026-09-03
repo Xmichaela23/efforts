@@ -1,5 +1,25 @@
 # Deploy-Owed / Post-Deploy Verification
 
+> ## ⚠️ 2026-09-03 (evening) — YOUR WEEK READS THE BUILT PLAN; TWO EFFECT NOTES. **DEPLOYED, NOT DEVICE-VERIFIED.**
+>
+> **PUSHED:** `origin/main == c7c21af2` (also on `state-screen-round-1`).
+> **EDGE FUNCTIONS DEPLOYED**, versions read back from `supabase functions list`: `generate-strength-plan`
+> **217** · `materialize-plan` **356** · `compute-snapshot` **191** · `rematerialize-standing-block` **93** ·
+> `endurance-checkpoint` **3** — every function that imports `_shared/standing-plan`.
+> **CLIENT: DEPLOYED AND CONFIRMED OFF THE SERVED BUNDLE.** `https://efforts.work` → `/assets/index-DbFZf90n.js`
+> carries `Limits and why`, which exists only in today's Endurance focus card.
+>
+> **What to look for on the Your week card (D-464):**
+> 1. Long ride on Sat, nothing else tapped → the hard-ride row reads **"Tue — placed · top-end intensity"** and
+>    the strip's Tue dot is the ride. Before today it read "Mon — sustained threshold" over a Tuesday ride.
+> 2. Tap the third hard run onto Wed (where the engine put the first) → the conflict line lights with
+>    "Wed has the hard run and the near-threshold run on it. Six to eight hours between them…". No move.
+> 3. Long run Mon, hard run tapped Tue → "No day this week is clear. The program's week rests on Tue, and the
+>    near-threshold run took it."
+> 4. Mark a tapped day as a day off → the chip moves to the server's day; **no "moved to" sentence** anywhere.
+> ⚠️ **Expected:** the conflict line reads "Balanced week" for ~half a second after each tap until the preview
+> returns — that is the phone's pre-fill, by design.
+
 > ## ⚠️ 2026-08-28 (later) — THE ENDURANCE READ. **DEPLOYED, NOT VERIFIED.**
 >
 > ⛔ **SECOND DEPLOY OF THE SAME EVENING. NEITHER HAS BEEN SEEN WORKING.** The entry below is the

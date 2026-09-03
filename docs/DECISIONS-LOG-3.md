@@ -1617,3 +1617,44 @@ line says "(incl. warm-ups)". Not a Viada rule, not a Garmin/TrainingPeaks featu
 
 **Threshold precedence stands (D-462):** a "my number" threshold outranks a test result until the athlete flips
 the row to auto; the save re-prices. The test never silently overrides what the athlete typed.
+
+## D-464 — No hard gates on the week; notes state the training effect; the Your week card reads the built plan (2026-09-03, PUSHED `c7c21af2` on main + DEPLOYED + client live, NOT device-verified)
+
+**The ruling.** A tapped day is built exactly as tapped — two hard sessions on one day, three, the rest day
+taken. Nothing moves and nothing blocks except the one absolute: a day marked "can't train" never gets a run
+or ride. The plan's job is to say the direct training effect in a note, never "X moved to Y" (the chip shows
+where it landed). Field backing, checked: TrainingPeaks stacks silently; TrainerRoad stacks and warns on
+recovery; Runna and Garmin Coach hard-block one plan session per day. Efforts sits with the first two.
+Book backing: pp.139–145 rules 6 (two-a-days, 6–8 h apart), 7 (a rest day is not always needed), 8 (the
+seven-day cycle is an artificial constraint); the All Rounder as written (p274) has one hard session per
+day and one rest day, which is why a departure is owed a sentence.
+
+**Two engines were drawing one screen.** The sweep (63,840 composed weeks) found the server honours every
+tap and never puts endurance on a day off, but the Your week card mixed the phone's own solver
+(`suggest-hard-days.ts` → `week-model`) with the server preview: the hard-ride chip read Mon over a ride the
+plan built on Tue because `IS_HARD_SESSION_NAME` could not see "Anaerobic Ride"; the "moved to" sentence named
+the wrong day 30/42 times; the row label ("sustained threshold") was decided client-side over an anaerobic
+ride; the "High fatigue risk" line read the phone's week. Now chips, dots, row label and conflict line all
+read the preview, by `family:` tag (`src/lib/preview-week-read.ts`); the phone's solve is the pre-fill only.
+
+**Two new conflict rules (`week-conflicts.ts`), through `placement_compromises` like the existing four:**
+`two_hard_one_day` — any two of hard/long endurance on one day, names the day and both sessions, "Six to eight
+hours between them, and the second one runs on legs that have already worked."; `no_rest_day` — names the
+frame's rest day under the rotation and what took it. The generic "Two runs land on one day" spacing note
+steps aside on a day the new rule names. Three notes reworded without our own words (lift on a day off, club
+ride shorter than the plan's, one long session only). The wizard no longer composes a relocation note.
+
+**The sweep is permanent:** `week-notes-sweep.test.ts`, 2,856 weeks across `all_rounder` + `strength_5k`
+(every long day × every single hard tap on every slot × every single day off + fully-pinned samples).
+Asserts nothing endurance on a day off, taps honoured, every stacked day named, seven used days flagged,
+no "moved to" text, voice check, no "pinned / sport mix / carries a lifting day".
+
+**Copy, same day.** Endurance focus intro is three lines in Michael's words + a "Limits and why" tap opening
+five page-backed lines (p107 floor + drift stop; p239 5 h long ride; rule 5 one-third cut; p247 3–4%; p275
+rides cost less). The "rarely more than 2 h" line was cut as an observation, not a rule. Your week subtitle:
+"The week below is the program's. Any day can move. What a move costs shows up in the notes. A run club or
+ride club can take a hard session or the long day." pp.190–191 (thermoregulation) filed in SOURCE Part K1.
+
+**Open, not started:** the book-vocabulary debt — ~25 files still recognise a session by its printed name
+rather than its tag (heaviest in `compose.ts` and `accessory-picks.ts`); only the Your week path was fixed.
+

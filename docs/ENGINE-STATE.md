@@ -6,6 +6,18 @@
 > below is the standing-plan/book engine thread — still valid for that work. The 2026-09-02 banner this
 > replaces is folded into D-458–D-463 and `docs/AUDIT-plan-materialization-2026-09-02.md`.
 
+### SHIPPED 2026-09-03 (later, the wizard thread) — D-464
+- **Your week reads the built plan.** Chips, dots, row label and the "High fatigue risk" line all come off
+  the server preview by `family:` tag (`src/lib/preview-week-read.ts`); the phone's solver is the pre-fill
+  only. The name regex is gone. **Not device-verified** — the check: long ride Sat, nothing tapped → the
+  hard-ride row reads "Tue — placed", "top-end intensity", and the strip's Tue dot agrees.
+- **No hard gates; notes state the effect.** New `two_hard_one_day` and `no_rest_day` conflicts
+  (`week-conflicts.ts`) reach `placement_compromises`; the "moved to" note is gone from the screen.
+  `week-notes-sweep.test.ts` holds it down across 2,856 tap combinations.
+- **Deployed:** `generate-strength-plan` 217 · `materialize-plan` 356 · `compute-snapshot` 191 ·
+  `rematerialize-standing-block` 93 · `endurance-checkpoint` 3; client `index-DbFZf90n.js` on efforts.work.
+- **Open:** ~25 files still match a session by its printed name (book-vocabulary debt, D-464).
+
 ### THE JOB
 **Michael runs the book's threshold time trial today (2026-09-03), launched from Baselines.** Your first job is
 to see it land and say, in three states, what happened:
