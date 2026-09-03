@@ -2091,7 +2091,15 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
  * assert the two agree. `expandRunToken` has been exported for the same reason since the
  * lap-button hill tests; the bike half was the one nothing could reach.
  */
-export function expandBikeToken(tok: string, baselines: Baselines): any[] {
+export /**
+ * ⛔ A RIDE RECOVERY STEP CARRIES WATTS (Michael 2026-09-02, from the Kickr: "by feel is a little weird
+ * when it's controlling the trainer"). A recovery step with no target leaves an ERG trainer with nothing
+ * to hold, so the athlete freewheels or guesses. 45–55% of FTP is OURS: Coggan's active-recovery zone
+ * (Z1, under 55%) is where every ERG platform parks a recovery. Not a training dose — a held resistance.
+ */
+const RIDE_RECOVERY_PCT = { lo: 0.45, hi: 0.55 } as const;
+
+function expandBikeToken(tok: string, baselines: Baselines): any[] {
   const out: any[] = []; const lower = String(tok ?? '').toLowerCase(); const ftp = typeof baselines.ftp==='number'? baselines.ftp: undefined;
   console.log(`🔍 [BIKE DEBUG] Token: ${tok}, FTP: ${ftp}`);
   const pctRange = (lo:number, hi:number)=> {
@@ -2170,7 +2178,7 @@ export function expandBikeToken(tok: string, baselines: Baselines): any[] {
           const secs = parseInt(m2[2], 10);
           const at = m2[3];
           if (at === 'racepace') out.push({ id: uid(), kind: 'work', duration_s: secs });
-          else if (at === 'vt1' || at === 'easy') out.push({ id: uid(), kind: 'recovery', duration_s: secs });
+          else if (at === 'vt1' || at === 'easy') out.push({ id: uid(), kind: 'recovery', duration_s: secs, power_range: pctRange(RIDE_RECOVERY_PCT.lo, RIDE_RECOVERY_PCT.hi) });
           else if (isRec) {
             const pct = parseInt(at, 10) / 100;
             out.push({ id: uid(), kind: 'recovery', duration_s: secs, power_range: pctRange(pct, pct) });
@@ -2179,7 +2187,7 @@ export function expandBikeToken(tok: string, baselines: Baselines): any[] {
             out.push({ id: uid(), kind: 'work', duration_s: secs, power_range: pctRange(pct, pct) });
           }
         }
-        if (rest_s > 0 && r < rounds - 1) out.push({ id: uid(), kind: 'recovery', duration_s: rest_s });
+        if (rest_s > 0 && r < rounds - 1) out.push({ id: uid(), kind: 'recovery', duration_s: rest_s, power_range: pctRange(RIDE_RECOVERY_PCT.lo, RIDE_RECOVERY_PCT.hi) });
       }
       return out;
     }
@@ -2190,7 +2198,7 @@ export function expandBikeToken(tok: string, baselines: Baselines): any[] {
     const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60;
     for(let i=0;i<reps;i++){
       out.push({ id: uid(), kind:'work', duration_s: work, power_range: pctRange(0.85,0.95) });
-      if(rest && i < reps - 1) out.push({ id: uid(), kind:'recovery', duration_s: rest });
+      if(rest && i < reps - 1) out.push({ id: uid(), kind:'recovery', duration_s: rest, power_range: pctRange(RIDE_RECOVERY_PCT.lo, RIDE_RECOVERY_PCT.hi) });
     }
     return out;
   }

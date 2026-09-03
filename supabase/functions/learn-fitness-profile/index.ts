@@ -916,6 +916,9 @@ export function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
       thresholdHRValue ?? null,
       // The invariant's reference — the easy pace THIS pass just learned, in the same sec/km unit.
       Number.isFinite(Number(easy_pace?.value)) ? Number(easy_pace!.value) : null,
+      // ⛔ the hard-effort gate's anchor — the OBSERVED max, a measurement, never the LTHR estimate
+      // (2026-09-02: four months of easy running had been written as a high-confidence threshold).
+      observedMaxHR ?? null,
     );
     console.log(`  📊 Run critical speed: ${fit.csSecPerKm ?? 'abstained'} — ${fit.reason}`);
     if (fit.csSecPerKm != null) {

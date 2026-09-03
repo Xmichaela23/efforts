@@ -446,8 +446,10 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       }
       // CYCLING: apply POWER range from computed when available
       if (sport === 'CYCLING') {
-        // Do not attach power targets to REST/RECOVERY steps
-        if (upper === 'REST' || upper === 'RECOVERY') return
+        // A REST/RECOVERY step goes up WITH a power target when the row carries one (2026-09-02: a
+        // recovery spin at 45–55% FTP so an ERG trainer holds resistance) and with none otherwise.
+        const recHasPower = !!((cs as any)?.power_range || (cs as any)?.powerRange || (cs as any)?.powerTarget || (cs as any)?.target_watts)
+        if ((upper === 'REST' || upper === 'RECOVERY') && !recHasPower) return
         const userFTP: number | undefined = ((): number | undefined => {
           const n = Number((workout as any)?.user_ftp)
           return Number.isFinite(n) && n > 0 ? Math.round(n) : undefined

@@ -114,6 +114,7 @@ const { saveUserBaselines, loadUserBaselines } = useAppContext();
 const [lockDrafts, setLockDrafts] = useState<Record<string, boolean>>({});
 const [thresholdInfoOpen, setThresholdInfoOpen] = useState(false);
 const [ftpInfoOpen, setFtpInfoOpen] = useState(false);
+const [lthrInfoOpen, setLthrInfoOpen] = useState(false);
 const { addPlannedWorkout } = usePlannedWorkouts() as any;
 
 // FTP Test workout template - let user pick date
@@ -910,7 +911,7 @@ const handleSave = async () => {
     try {
       const prevPn = (JSON.parse(originalData || '{}')?.performanceNumbers ?? {}) as Record<string, unknown>;
       const nextPn = ((dataToSave as any)?.performanceNumbers ?? {}) as Record<string, unknown>;
-      const WATCH = ['threshold_pace_min_per_mi', 'threshold_pace_source', 'ftp', 'ftp_source', 'fiveK', 'fiveK_source', 'threshold_heart_rate'];
+      const WATCH = ['threshold_pace_min_per_mi', 'threshold_pace_source', 'ftp', 'ftp_source', 'fiveK', 'fiveK_source', 'threshold_heart_rate', 'lthr_source'];
       const changed = WATCH.some((k) => String(prevPn[k] ?? '') !== String(nextPn[k] ?? '')) || !!(manualRunLTHR || manualRideLTHR);
       if (changed) {
         const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } });
@@ -1671,6 +1672,86 @@ return (
                                 space beneath a small input. Pairing the two TALL cards puts them side
                                 by side and drops the 5K underneath — which is also the right reading
                                 order: the paces you train by first, the seed they came from last. */}
+                            {/**
+                              * ⛔ THRESHOLD HEART RATE, THE SECOND OF THE TWO NUMBERS A RUNNER NEEDS (Michael 2026-09-02,
+                              * from his own screen: the LTHR box was buried in the Heart Rate Zones card as "est. from max",
+                              * a formula shown as if it were his, with zones built on it). Same row as threshold pace:
+                              * the number in use, one input, auto / my number, the zones printed underneath from it.
+                              * Storage unchanged: `configured_hr_zones.manual_run_lthr` (typed) + `performance_numbers.lthr_source`
+                              * (choice) — what `resolveCurrentLthr` already reads. An estimate never shows as the number in use.
+                              */}
+                            <div className="flex flex-col gap-1.5">
+                              <label className="text-sm text-white/75 font-medium">
+                                Threshold heart rate{' '}
+                                <button type="button" onClick={() => setLthrInfoOpen((o) => !o)} aria-label="What is threshold heart rate?" className="text-white/45 text-[11px] bg-transparent border-none p-0 cursor-pointer">{lthrInfoOpen ? '▾' : 'ⓘ'}</button>
+                              </label>
+                              {lthrInfoOpen && (
+                                <p className="text-[12px] text-white/55 leading-snug max-w-[min(100%,340px)]">The heart rate you can hold for about an hour. Easy days are a zone below it; hard days sit near it.</p>
+                              )}
+                              {(() => {
+                                const resolved = resolveCurrentLthr({
+                                  learned_fitness: learnedFitness,
+                                  performance_numbers: data.performanceNumbers,
+                                  configured_hr_zones: { manual_run_lthr: manualRunLTHR },
+                                } as never, { sport: 'run' });
+                                const mine = (data.performanceNumbers as any)?.lthr_source === 'manual';
+                                const learnedRaw = learnedFitness?.run_threshold_hr;
+                                const learnedMeasured = learnedRaw && learnedRaw.is_estimate !== true && Number(learnedRaw.value) > 0 ? Number(learnedRaw.value) : null;
+                                const status = mine
+                                  ? 'your number. Your runs don\'t change it.'
+                                  : learnedMeasured != null && resolved.bpm != null
+                                    ? `auto. Measured from your hard runs${learnedRaw?.sample_count ? ` (${learnedRaw.sample_count} runs)` : ''}.`
+                                    : manualRunLTHR != null
+                                      ? 'auto. Your typed number, until your runs measure one.'
+                                      : 'auto. Nothing measured yet — easy running can\'t measure it. Enter it, or run hard once.';
+                                const setMine = () => {
+                                  if (manualRunLTHR == null && resolved.bpm != null) setManualRunLTHR(Math.round(resolved.bpm));
+                                  setData((prev) => ({ ...prev, performanceNumbers: { ...prev.performanceNumbers, lthr_source: 'manual' } }));
+                                };
+                                const setAuto = () => setData((prev) => ({ ...prev, performanceNumbers: { ...prev.performanceNumbers, lthr_source: 'learned' } }));
+                                const zones = resolved.bpm != null ? frielRunZones(Math.round(resolved.bpm)) : [];
+                                return (
+                                  <>
+                                    <div
+                                      className="rounded-xl border px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1"
+                                      style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: mine ? `${SPORT_COLORS.run}55` : 'rgba(255,255,255,0.15)' }}
+                                    >
+                                      <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                                        <span className="text-lg font-semibold tabular-nums text-white">{resolved.bpm != null ? Math.round(resolved.bpm) : '—'}</span>
+                                        <span className="text-[11px] text-white/50">bpm</span>
+                                      </div>
+                                      <input
+                                        type="number"
+                                        inputMode="numeric"
+                                        aria-label="Threshold heart rate, my number, bpm"
+                                        value={manualRunLTHR ?? ''}
+                                        onChange={(e) => {
+                                          const v = parseInt(e.target.value);
+                                          setManualRunLTHR(Number.isFinite(v) && v > 0 ? v : null);
+                                          setData((prev) => ({ ...prev, performanceNumbers: { ...prev.performanceNumbers, lthr_source: Number.isFinite(v) && v > 0 ? 'manual' : (prev.performanceNumbers as any)?.lthr_source } }));
+                                        }}
+                                        placeholder={learnedMeasured != null ? String(Math.round(learnedMeasured)) : '165'}
+                                        className="w-[4.5rem] h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40 text-center shrink-0"
+                                        style={{ fontFamily: 'Inter, sans-serif' }}
+                                      />
+                                      <AutoMinePill mine={mine} onAuto={setAuto} onMine={setMine} color={SPORT_COLORS.run} label="Threshold heart rate" />
+                                      <div className="basis-full text-[11px] text-white/55 leading-snug">{status}</div>
+                                    </div>
+                                    {zones.length > 0 && (
+                                      <div className="mt-1 space-y-0.5">
+                                        {zones.map((z) => (
+                                          <div key={z.name} className="flex items-baseline justify-between text-[12px] px-1">
+                                            <span className="text-white/60">{z.name} {z.label}</span>
+                                            <span className="tabular-nums text-white/75">{z.min}–{z.max} bpm</span>
+                                          </div>
+                                        ))}
+                                        <div className="text-[11px] text-white/40 px-1">zones from your threshold heart rate (Friel)</div>
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
                             <div className="flex flex-col gap-1.5">
                               <label className="text-sm text-white/75 font-medium">5K Time</label>
                               {/**
@@ -2307,7 +2388,8 @@ return (
                       renders ONLY on the run/cycle tabs and ONLY for the active sport (active-sport gate on
                       each push below). Swim has no valid HR anchor (run HR ≠ swim HR by ~10–15 bpm); swim
                       zones derive from CSS (Layer C). Strength uses e1RM/RIR, not HR zones. */}
-                  {(activeSport === 'running' || activeSport === 'cycling') && (
+                  {/* Run's threshold heart rate + zones live on the run tab now (2026-09-02); this card is the bike's. */}
+                  {activeSport === 'cycling' && (
                   <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] mt-5">
                     <div className="flex items-center justify-between mb-3">
                       <div>
@@ -2339,7 +2421,7 @@ return (
                         manualLTHR: number | null; setManualLTHR: (v: number | null) => void;
                       }[] = [];
 
-                      if (activeSport === 'running') {
+                      if ((activeSport as string) === 'running') { // unreachable while the card is bike-only; kept for the bike branch's shape
                         sportSections.push({
                           key: 'run', label: 'Running',
                           icon: <Activity className="h-4 w-4" style={{ color: SPORT_COLORS.run }} />,

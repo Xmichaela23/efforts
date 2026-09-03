@@ -126,6 +126,21 @@ const DURATION_BUCKETS_S = [180, 360, 720, 1200, 2100, 3600];
  * an absent reading is no longer fatal.
  */
 const HARD_EFFORT_HR_FRACTION = 0.92;
+/**
+ * ⛔ THE HARD-EFFORT GATE IS BACK, ON A RELIABLE ANCHOR (2026-09-02, Michael: "if somebody has had a weird
+ * summer I don't want them getting prescribed 12-minute easy zones"). The 2026-08-20 removal was right
+ * about its reason — the LTHR ESTIMATE inverted the gate — and wrong about its conclusion: with no gate
+ * at all, four months of easy running fit a clean curve, passed the easy-pace invariant (because the
+ * easy pace was heat-inflated too), and was written as a HIGH-confidence 12:12 threshold. The curve's
+ * shape cannot tell "everything easy" from "everything hard".
+ *
+ * The anchor is now the athlete's OBSERVED MAX heart rate — a measurement, not a formula. A best
+ * effort that averages under 85% of it is not a threshold effort (LT sits at ~85–92% of max in trained
+ * runners). Two such windows are required, or the fit abstains and says what to do instead.
+ * ⚠️ OURS: the 85%. ⚠️ Applied only when the windows carry heart rate — a strapless runner keeps the
+ * shape-only fit, capped at moderate confidence as before.
+ */
+const HARD_EFFORT_MAX_FRACTION = 0.85;
 
 /**
  * ⛔ THE DOWNHILL GATE. A fast stretch that drops 40 metres is gravity, not fitness, and it is the
@@ -183,6 +198,8 @@ export function fitRunCriticalSpeed(
   efforts: RunEffort[],
   thresholdHrBpm: number | null,
   easyPaceSecPerKm: number | null,
+  /** the athlete's observed max HR — the hard-effort gate's anchor (see HARD_EFFORT_MAX_FRACTION) */
+  maxHrObservedBpm: number | null = null,
 ): RunCsResult {
   const wellFormed = (efforts || []).filter((e) =>
     e && Number.isFinite(e.distanceM) && e.distanceM > 0 && Number.isFinite(e.timeS) && e.timeS > 0
@@ -301,6 +318,18 @@ export function fitRunCriticalSpeed(
    * compare against, and only as a tie-break. `high` needs corroboration; without it the fit tops out
    * at `moderate`, which is visible on the card and still steers a plan.
    */
+  // ── GATE: was anything in the window actually HARD? (see HARD_EFFORT_MAX_FRACTION) ──
+  const withHr = pts.filter((p) => p.avgHr != null && Number.isFinite(p.avgHr));
+  const hardRef = (maxHrObservedBpm != null && Number.isFinite(maxHrObservedBpm) && maxHrObservedBpm > 0)
+    ? maxHrObservedBpm * HARD_EFFORT_MAX_FRACTION
+    : ((thresholdHrBpm != null && Number.isFinite(thresholdHrBpm) && thresholdHrBpm > 0) ? thresholdHrBpm * HARD_EFFORT_HR_FRACTION : null);
+  if (hardRef != null && withHr.length >= 2) {
+    const hard = withHr.filter((p) => (p.avgHr as number) >= hardRef).length;
+    if (hard < 2) {
+      return abstain(`no hard effort in the window — every best effort averaged under ${Math.round(hardRef)} bpm; enter your threshold pace, or run the 12-minute test`, pts.length);
+    }
+  }
+
   const hrCorroborated = thresholdHrBpm != null && Number.isFinite(thresholdHrBpm) && thresholdHrBpm > 0
     ? pts.filter((p) => p.avgHr != null && p.avgHr >= thresholdHrBpm * HARD_EFFORT_HR_FRACTION).length
     : 0;
