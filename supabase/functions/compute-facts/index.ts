@@ -16,6 +16,7 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { extractWarmupEasy } from "../_shared/run-warmup-easy.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   calculateStrengthWorkload,
@@ -110,6 +111,7 @@ interface PlannedRow {
   strength_exercises: any[] | null;
   steps_preset: any[] | null;
   workload_planned: number | null;
+  computed?: any | null;
 }
 
 interface Baselines {
@@ -1173,6 +1175,19 @@ function buildRunFacts(w: WorkoutRow, baselines: Baselines | null, planned?: Pla
 
   facts.workout_type = classifyRunIntent(w, planned);
 
+  // OURS (2026-09-03): the easy read from a hard run's WARM-UP, for a block with no easy runs (All
+  // Rounder). Window = the plan's first step when it is a warm-up of >= 6 min; the first 3 min are
+  // dropped for heart-rate lag; cool-downs are never used. `_shared/run-warmup-easy.ts` has the why.
+  try {
+    const st0: any = Array.isArray(planned?.computed?.steps) ? planned!.computed.steps[0] : null;
+    const kind0 = String(st0?.kind ?? st0?.intensity ?? '').toLowerCase();
+    const warmS = Number(st0?.seconds ?? st0?.duration_s);
+    if (st0 && /warm/.test(kind0) && Number.isFinite(warmS) && warmS >= 360 && samples.length > 0) {
+      const we = extractWarmupEasy(samples, warmS, dur > 0 ? dur * 60 : 0);
+      if (we) facts.warmup_easy = we;
+    }
+  } catch { /* a missing warm-up read is a null, never a failed fact row */ }
+
   // Interval adherence from computed.intervals
   if (w.computed?.intervals && Array.isArray(w.computed.intervals)) {
     const workIntervals = w.computed.intervals.filter(
@@ -1506,7 +1521,7 @@ serve(async (req: Request) => {
     if (w.planned_id) {
       const { data: pw } = await supabase
         .from("planned_workouts")
-        .select("id, training_plan_id, week_number, type, name, description, tags, intervals, strength_exercises, steps_preset, workload_planned")
+        .select("id, training_plan_id, week_number, type, name, description, tags, intervals, strength_exercises, steps_preset, workload_planned, computed")
         .eq("id", w.planned_id)
         .maybeSingle();
       planned = (pw as PlannedRow | null) ?? null;

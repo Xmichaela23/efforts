@@ -1124,7 +1124,10 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         const grp = Array.isArray(groups) ? groups.find((x) => x.group === g) : undefined;
         if (!grp || (grp.runs ?? 0) === 0) return null;
         if (grp.recentPaceSecPerKm != null) {
-          return `${label} ${formatPace(grp.recentPaceSecPerKm, useImperial)}${grp.recentHrAvg != null ? ` at ${grp.recentHrAvg} bpm` : ''}`;
+          // OURS (2026-09-03): easy runs read off the warm-ups of hard runs when a block has none of its own.
+          const fromWarm = Number((grp as any).recentFromWarmups) || 0;
+          const tag = g === 'easy' && fromWarm > 0 ? ' (incl. warm-ups)' : '';
+          return `${label}${tag} ${formatPace(grp.recentPaceSecPerKm, useImperial)}${grp.recentHrAvg != null ? ` at ${grp.recentHrAvg} bpm` : ''}`;
         }
         return `${label} · ${grp.runs} run${grp.runs === 1 ? '' : 's'}`;
       };

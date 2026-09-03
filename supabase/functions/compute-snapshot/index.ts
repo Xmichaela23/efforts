@@ -923,7 +923,12 @@ serve(async (req: Request) => {
         // math than necessary"). The analyser's HR-derived `steady_state | intervals | hill_repeats`
         // fallback is gone from every grouping site below; an untagged run groups as easy, no inference.
         const runTypeByDate = new Map<string, string>();
+        // OURS (2026-09-03): easy read taken from a HARD run's warm-up (`run_facts.warmup_easy`), so a
+        // block with no easy runs still feeds the easy pool. See `_shared/run-warmup-easy.ts`.
+        const runWarmupByDate = new Map<string, { pace_s_per_km: number; hr_avg: number; seconds: number }>();
         for (const f of (runFactsR.data ?? []) as any[]) {
+          const we = f.run_facts?.warmup_easy;
+          if (we && Number(we.pace_s_per_km) > 0 && Number(we.hr_avg) > 0) runWarmupByDate.set(f.date, we);
           const v = f.run_facts?.efficiency_index;
           if (typeof v === "number") runEffIndexByDate.set(f.date, v);
           const h = f.run_facts?.hr_avg;
@@ -963,6 +968,21 @@ serve(async (req: Request) => {
                  */
                 intent: null,
                 workout_type: runTypeByDate.get(r.date) ?? null,
+              });
+            }
+            // The warm-up of a run that is NOT easy joins the easy pool as its own point (OURS, 2026-09-03).
+            const we = runWarmupByDate.get(r.date);
+            const wordForDay = String(runTypeByDate.get(r.date) ?? '').toLowerCase();
+            const isEasyDay = wordForDay === '' || wordForDay === 'easy' || wordForDay === 'recovery';
+            if (we && !isEasyDay) {
+              runEffHistory.push({
+                date: r.date,
+                pace_s_per_km: Number(we.pace_s_per_km),
+                hr: Number(we.hr_avg),
+                temp_f: Number.isFinite(tF) ? tF : null,
+                intent: null,
+                workout_type: 'easy',
+                source: 'warmup',
               });
             }
           }

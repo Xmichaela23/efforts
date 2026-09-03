@@ -419,6 +419,10 @@ export interface RunFitness {
        *  "easy 9:10/mi at 138" and "hard 7:20/mi at 158" on their own pools. */
       recentPaceSecPerKm?: number | null;
       recentHrAvg?: number | null;
+      /** OURS (2026-09-03): how many of this group's runs are warm-up reads off a hard run, and how many of the
+       *  last five behind `recentPaceSecPerKm` are. The client says "incl. warm-ups" when any are. */
+      warmupRuns?: number;
+      recentFromWarmups?: number;
     }>;
     /** 12-WEEK CHART series — the "long view" (Michael 2026-07-22). Same efficiency points the verdict
      *  reads, over a WIDER 84d window (verdict is 42d), so the chart's recent tail IS the verdict's data —
