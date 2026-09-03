@@ -6968,7 +6968,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 {pending.length} {pending.length === 1 ? 'set has' : 'sets have'} numbers but {pending.length === 1 ? 'is' : 'are'} not marked done
               </h3>
               <p className="text-sm text-white/70 leading-snug">
-                Sets that aren't marked done are saved, but they don't count toward your volume or training load.
+                Sets that aren't marked done are saved, but they don't count toward your volume or workload.
               </p>
               <ul className="mt-3 space-y-1 text-sm text-white/72">
                 {shown.map((p) => (

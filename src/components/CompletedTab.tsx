@@ -1181,7 +1181,7 @@ const formatMovingTime = () => {
      value: workoutData.metrics?.normalized_power ? `${workoutData.metrics.normalized_power} W` : 'N/A'
    },
    {
-     label: 'Training Load',
+     label: 'Workload',
      value: workoutData.metrics?.training_stress_score ? String(Math.round(workoutData.metrics.training_stress_score)) : 'N/A'
    },
    {

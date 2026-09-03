@@ -160,7 +160,7 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact, hasActi
           </p>
           <p>
             <span className="text-white/70">The load read</span> (e.g. "balanced") combines all of it — your
-            training load<span className="italic"> and</span> ACWR together with how your body's handling it
+            workload<span className="italic"> and</span> ACWR together with how your body's handling it
             (heart rate, effort, readiness) — so it can differ from the bare ratio on purpose.
           </p>
         </div>
