@@ -282,3 +282,85 @@ reclaimed vertical on type size and leading, never on fitting more in.
 ⚠️ **Air in this layout comes from the grid and the type scale, not from container
 padding.** Removing card insets without raising the type scale and the gutters will read
 as cramped, which is the opposite of the intent.
+
+## A number on STATE needs something to measure against
+
+⛔ **A LEVEL IS NOT A READING. STATE ANSWERS "HOW AM I DOING", AND A BARE NUMBER CANNOT.**
+
+Written 2026-09-03, from the screen after the layout pass. Every number on it was correct,
+every row was aligned, and the screen still could not answer whether the athlete was
+getting better or worse — because each row stated a POSITION and nothing stated MOTION.
+
+The one row that worked is the pattern:
+
+```
+effort      5.1 of 10
+            usual 4.7
+```
+
+Two numbers, and the second one does all the work. Nobody has to know what a good effort
+rating is; "usual 4.7" makes 5.1 legible on its own.
+
+The rows that did not:
+
+```
+aerobic efficiency    1.450        ← better or worse than last month? unanswerable
+                      last 5 runs     (a window is not a comparison)
+
+heart rate at easy power  130 bpm  ← same problem
+                          3 rides     (a count is not a comparison)
+```
+
+**THE RULE: a number that carries a verdict gets a reference beside it — the athlete's own
+typical, their block-start value, or their last-N average. Never a population norm** (the
+soreness rule already says this: a 3 means different things to different people).
+
+⚠️ **THIS MATTERS MOST FOR A NUMBER NOBODY CAN READ COLD.** `StrengthReadCards.tsx:205`
+deliberately refuses to print the unit for aerobic efficiency — *"nobody knows 'speed per
+beat'"* — and that call is right. But it leaves the number floating, and a floating number
+is worse than a jargon one. **The comparison is what replaces the unit.** With `usual
+1.412` beside it, 1.450 reads correctly to someone who never learns what it measures.
+
+⚠️ **A WINDOW IS NOT A COMPARISON.** "last 5 runs", "3 rides", "rolling 7d" say how the
+number was computed. They are receipts, and they belong — but they do not tell the athlete
+whether the number is good. Keep them; add the reference as well.
+
+## Direction is a fact, valence is a verdict
+
+The comparison above says where you are against your own normal. An ARROW says which way it
+is moving, and that is a second thing worth having — but it comes with a rule the app has
+already ruled on twice, in the same direction:
+
+- `StatePerformanceSection.tsx:52` (2026-08-01) — **arrow and number, no word.** `↓ −15.2%`
+  replaced `↓ easing off −15.2%`; the word was the row's only editorial.
+- `StatePerformanceSection.tsx:59` — **the down arrow is NOT coloured.** *"Amber made a
+  decline read as a WARNING on a row that is only reporting a direction — and a decline is
+  routinely correct (a deload, a taper, a base block)."* It sits at `text-white/70`, the
+  same as holding, so **the three states differ by ARROW, never by alarm.**
+- `StatePerformanceSection.tsx:46` (Q-289) — **no arrow at all when the verdict cannot call
+  a direction.** Holding meant both genuinely-flat and too-noisy-to-call, so the row shows
+  the number and the count and stops. No glyph is invented to fill the space.
+
+⛔ **AND THE REASON THIS RULE HAS TO BE WRITTEN DOWN: a coloured glyph routes around the
+copy voice entirely.** `voiceViolation()` inspects SENTENCES. A green up-arrow makes the
+same claim as "nice work, that's trending up" with no text for the gate to read. Every
+protection `COPY-VOICE.md` provides stops at the moment the claim stops being a sentence.
+
+✅ **SETTLED 2026-09-03 (same day, on the Mac), so nobody re-checks it:**
+
+- **The empty arrow maps are deliberate, and the comment above them is stale.** Commit
+  `d9f28e59` (2026-09-01, "state: copy pass to the confidence rule") dropped the verdict
+  arrows everywhere; the maps kept the `arr` slot and the comment kept describing glyphs that
+  no longer draw. So the arrow work was a build, not a wiring job.
+- **The median is the number; the direction is the server's verdict.** The aerobic headline
+  (`recentMedian` in `sport-summary.ts`) says where you are. The direction comes from
+  `runFitness.efficiency.verdict` — the route engine's call (D-346), still emitted after
+  version 182 took it off every screen. The closed run row (`summaryRows` in
+  `StatePerformanceSection.tsx`) reads it again: `↑` improving, `↓` sliding, nothing for
+  holding / withheld / needs_data, signed percent only beside a glyph, the down arrow at the
+  same neutral colour as the value. Michael's word for the arrow: *"we have a good number
+  now so I'm ok with the arrow"* (2026-09-03). Shipped in `8b00fbaf`.
+
+⚠️ **STILL OPEN — the rule above, on the two rows that fail it:** aerobic efficiency and the
+bike row print a window, not a reference. "usual 1.412" beside the aerobic number is not
+built.
