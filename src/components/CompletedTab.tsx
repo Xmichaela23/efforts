@@ -113,7 +113,14 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
     compact: boolean;
     workoutData: any;
   } | null>(null); // Track previous map props to prevent unnecessary re-renders
-  const norm = useWorkoutData(hydrated||workoutData);
+  // 2026-09-03: `hydrated` is initialised ONCE from the first props and never re-synced, so a fuller row
+  // arriving later (with computed.overall — the grade-adjusted pace) was ignored and the tile read "—".
+  // Merge: hydrated wins where it has a value, props fill what it lacks, computed merged one level down.
+  const merged = useMemo(() => {
+    const h: any = hydrated || {}; const p: any = workoutData || {};
+    return { ...p, ...h, computed: { ...(p?.computed || {}), ...(h?.computed || {}) } };
+  }, [hydrated, workoutData]);
+  const norm = useWorkoutData(merged);
 
   // NOTE: Hooks MUST run before any early returns.
   // Details screen can render this component in a loading pass first.
