@@ -69,7 +69,25 @@ export function dirWord(verdict: string | null | undefined): 'up' | 'down' | '' 
  * caller each (StatePerformanceSection); the row forms replace that call site outright rather than
  * becoming a second vocabulary beside the first. Their tests move with them.
  */
-export type SportRow = { name: string; value: string; note?: string };
+export type SportRow = {
+  name: string;
+  value: string;
+  note?: string;
+  /** Direction glyph beside the value (↑ / ↓) — only when the verdict can call one; never for holding / withheld. */
+  arrow?: string;
+  arrowCls?: string;
+};
+
+/**
+ * Median of the last `n` values — the headline rule for a spine series (2026-09-03, Michael: "based on
+ * whatever it's based on, for the most recent runs"): never whichever point came last (one warm-up was
+ * the headline over 22 runs). Shared by the open run card and the closed run row so both print ONE number.
+ */
+export function recentMedian(values: number[], n = 5): number | null {
+  const s = values.slice(-n).sort((a, b) => a - b);
+  if (!s.length) return null;
+  return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+}
 
 /**
  * `strengthGlance`, split into columns. Same rules — block-phase aware, NOT PR-based, one row per

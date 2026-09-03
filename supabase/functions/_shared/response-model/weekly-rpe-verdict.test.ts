@@ -34,11 +34,12 @@ Deno.test('easier ≥1.0 → "Noticeably easier than usual"', () => {
   assertEquals(rpeFeelVerdict(4.3, 5.5, -1.2), 'Noticeably easier than usual — you rated 4.3 avg vs 5.5 typical');
 });
 
-// ── tap/expand provenance: source + cross-discipline + windows; "average" once; null when no data ──
-Deno.test('rpeProvenance: names your own ratings, cross-discipline, 7d vs 28d', () => {
+// ── provenance (prints open under the effort row since 2026-09-03): source + cross-discipline + windows,
+//    NO numbers — the effort row already carries both; null when no data ──
+Deno.test('rpeProvenance: names your own ratings, cross-discipline, 7d vs 28d, no numbers', () => {
   assertEquals(
     rpeProvenance(4.8, 4.3),
-    "Last 7 days you've rated effort 4.8 on average, vs your 28-day typical of 4.3 — across all disciplines (a hard lift moves this number too).",
+    'Your own ratings, last 7 days against your 28-day typical, across all disciplines. A hard lift moves this number too.',
   );
   assertEquals(rpeProvenance(null, 4.3), null);
 });

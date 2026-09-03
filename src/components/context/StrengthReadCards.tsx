@@ -19,6 +19,7 @@
  */
 
 import React from 'react';
+import { recentMedian } from '@/lib/sport-summary';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { DRIFT_LIMITS } from '@shared/state-trend';
 // ⛔ THE ONE CHART LANGUAGE (Round 3 pass 2, 2026-09-01). The endurance cards used to draw their own
@@ -161,8 +162,10 @@ function driftVsLine(pct: number): string {
 }
 
 function SpineCard({ series }: { series: SpineSeries }) {
-  const [efOpen, setEfOpen] = React.useState(false);
-  const [decOpen, setDecOpen] = React.useState(false);
+  // ⛔ ONE TAP, NOT THREE (Michael 2026-09-03: "too many clicks … should be one click"). The row tap
+  // opens the card; everything the card has is printed on it. The ⓘ toggles that hid the EF and
+  // decoupling explanations behind a second tap are gone — NN/g's progressive-disclosure rule is one
+  // level, and Garmin / Strava / TrainingPeaks / Whoop all print the explanation on the detail page.
   const pts = series.points;
   const latest = pts[pts.length - 1];
   const prior = pts.length > 1 ? pts[pts.length - 2] : null;
@@ -173,9 +176,8 @@ function SpineCard({ series }: { series: SpineSeries }) {
   // 2026-09-03 (Michael: "it should say, based on whatever it's based on, for the most recent runs"): the headline
   // is the MEDIAN of the last five points, never whichever point came last (one warm-up was the headline over 22
   // runs), and the line under it says what it is based on and how many of those are warm-ups.
-  const recent = eff.slice(-5);
-  const recentSorted = recent.map((p) => p.value).sort((a, b) => a - b);
-  const headline = recentSorted.length ? (recentSorted.length % 2 ? recentSorted[(recentSorted.length - 1) / 2] : (recentSorted[recentSorted.length / 2 - 1] + recentSorted[recentSorted.length / 2]) / 2) : null;
+  // Shared with the closed run row (sport-summary.recentMedian) so the plate and the row print one number.
+  const headline = recentMedian(eff.map((p) => p.value), 5);
   const recentPts = pts.slice(-Math.max(1, Math.min(5, pts.length)));
   const recentWarmups = recentPts.filter((p) => p.fromWarmup).length;
   const basedOn = recentPts.length
@@ -206,18 +208,14 @@ function SpineCard({ series }: { series: SpineSeries }) {
             */}
           <div className="flex items-baseline gap-1.5 mt-1">
             <span className="readout-num text-[26px] leading-none">{fmtEff(headline ?? latest.efficiency, isRide)}</span>
-            <button type="button" onClick={() => setEfOpen((o) => !o)} aria-label="What is efficiency factor?" className="text-[12px] text-white/60 bg-transparent border-none p-0 cursor-pointer">
-              efficiency factor <span className="text-white/45 text-[11px]">{efOpen ? '▾' : 'ⓘ'}</span>
-            </button>
+            <span className="text-[12px] text-white/60">efficiency factor</span>
           </div>
           <div className="text-[11px] text-white/55 mt-0.5">
             {isRide ? 'watts per heartbeat' : 'pace per heartbeat'} · higher is better
           </div>
-          {efOpen && (
-            <p className="mt-1 text-[12px] text-white/55 leading-snug max-w-[min(100%,340px)]">
-              {isRide ? EF_EXPLAIN.replace('speed', 'power').replace('easy runs', 'rides').replace('moving you faster', 'making more power') : EF_EXPLAIN}
-            </p>
-          )}
+          <p className="mt-1 text-[12px] text-white/45 leading-snug max-w-[min(100%,340px)]">
+            {isRide ? EF_EXPLAIN.replace('speed', 'power').replace('easy runs', 'rides').replace('moving you faster', 'making more power') : EF_EXPLAIN}
+          </p>
           {/**
             * ⛔⛔ "last time 1.720" IS DELETED, AND THE SOURCE SAYS WHY. TrainingPeaks' instruction is
             * to compare SIMILAR sessions over several weeks — a rising line means the aerobic base is
@@ -248,10 +246,10 @@ function SpineCard({ series }: { series: SpineSeries }) {
           show nothing — a number for a non-steady effort is not the same number. */}
       {!isRide && latest.driftPct != null && !latest.fadeWithheld && (
         <div className="text-[11px] text-white/55 mt-1">
-          <button type="button" onClick={() => setDecOpen((o) => !o)} aria-label="What is decoupling?" className="bg-transparent border-none p-0 cursor-pointer text-white/55 text-[11px]">
-            {latest.driftPct <= 0 ? <>heart rate fell <span className="tabular-nums text-white/75">{Math.abs(latest.driftPct).toFixed(1)}%</span> in the second half</> : <>heart rate drift <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span></>} on the latest run{latest.driftWholeSession ? ' (whole session, intervals included)' : ''} · line {DRIFT_LIMITS.hybridPct}%{driftVsLine(latest.driftPct) ? <> · <span className="text-white/75">{driftVsLine(latest.driftPct)}</span></> : null}{conditions ? <span className="text-white/45"> · {conditions}</span> : null} <span className="text-white/45">{decOpen ? '▾' : 'ⓘ'}</span>
-          </button>
-          {decOpen && <p className="mt-1 text-[12px] text-white/55 leading-snug max-w-[min(100%,340px)]">{DECOUPLING_EXPLAIN}</p>}
+          <span className="text-white/55 text-[11px]">
+            {latest.driftPct <= 0 ? <>heart rate fell <span className="tabular-nums text-white/75">{Math.abs(latest.driftPct).toFixed(1)}%</span> in the second half</> : <>heart rate drift <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span></>} on the latest run{latest.driftWholeSession ? ' (whole session, intervals included)' : ''} · line {DRIFT_LIMITS.hybridPct}%{driftVsLine(latest.driftPct) ? <> · <span className="text-white/75">{driftVsLine(latest.driftPct)}</span></> : null}{conditions ? <span className="text-white/45"> · {conditions}</span> : null}
+          </span>
+          <p className="mt-1 text-[12px] text-white/45 leading-snug max-w-[min(100%,340px)]">{DECOUPLING_EXPLAIN}</p>
         </div>
       )}
       {basedOn && (
@@ -325,7 +323,7 @@ function EnduranceCard({ session }: { session: NamedSession }) {
 }
 
 /** Watts per beat reads to two decimals; metres-per-second per beat needs three. */
-function fmtEff(v: number, isRide: boolean): string {
+export function fmtEff(v: number, isRide: boolean): string {
   return isRide ? v.toFixed(2) : v.toFixed(3);
 }
 

@@ -19,6 +19,7 @@ import RescheduleValidationPopup from '@/components/RescheduleValidationPopup';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import LoadBar from '@/components/LoadBar';
+import { weekExecTotals } from '@/lib/week-exec-totals';
 import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 import { fetchWeekUnified } from '@/lib/fetchWeekUnified';
 import { formatPlannedSwimDistanceChip } from '@/utils/swimPlanTokens';
@@ -1545,7 +1546,18 @@ export default function WorkoutCalendar({
             // (Michael 2026-08-15, third showing). The spectral grid wraps the whole data block.
             <div className="galaxy-card readout-texture readout-texture--nova rounded-xl border border-white/[0.10] mt-3 mb-4 pb-3 space-y-2">
               {wsv && (
-                <LoadBar load={wsv.load} loadStatus={loadStatus} weekIntent={wsv?.week?.intent} compact />
+                // Same three inputs State passes (hasActivePlan · planned · done) — without them the
+                // programme-aware read fell back to the bare status word, so Home and State could
+                // print different load words for the same week (2026-09-03).
+                <LoadBar
+                  load={wsv.load}
+                  loadStatus={loadStatus}
+                  weekIntent={wsv?.week?.intent}
+                  hasActivePlan={(wsv as any)?.plan?.has_active_plan === true}
+                  plannedThisWeek={weekExecTotals(wsv).planned}
+                  doneThisWeek={weekExecTotals(wsv).done}
+                  compact
+                />
               )}
               {metrics.length > 0 && (
                 // Second column starts at 58% so Bike/Swim line up with the verdict word above

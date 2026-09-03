@@ -30,7 +30,9 @@ export default function StateWeekExecution({ wsv, week }: { wsv: any; week: any 
   const sectionLabel = showsPlanned ? 'this week · planned vs actual' : 'this week';
   return (
     <>
-      <div className="px-4 pt-3 text-[12px] text-white/50 lowercase tracking-[0.12em]">{sectionLabel}</div>
+      {/* Rule 4 (DESIGN_GUIDELINES "Layout Rules"): section labels are UPPERCASE, tracked — the same
+          voice as BODY / STRENGTH, not a second lowercase system for the same job. */}
+      <div className="px-4 pt-3 text-[12px] font-semibold tracking-[0.12em] uppercase text-white/55">{sectionLabel}</div>
       {counts.length > 0 && <WeekMixBar counts={counts} hasPlan={hasPlan} partialWeek={partialWeek} />}
       {accent?.sentence && <WeekAccentLine sentence={accent.sentence} detail={accent.trace?.detail ?? null} />}
     </>

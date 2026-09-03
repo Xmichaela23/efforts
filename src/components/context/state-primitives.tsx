@@ -208,6 +208,8 @@ export type VisibleSignal = {
   trend_icon?: string;
   trend_tone: string;
   detail: string;
+  /** coach payload v189 — the VALUE slot (e.g. "5.1 of 10"); `detail` is then the note under it. */
+  value_display?: string | null;
   samples: number;
   provenance?: string | null;
   soreness_flag?: string | null;

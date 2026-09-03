@@ -35,6 +35,7 @@ import StateRaceBlock from './StateRaceBlock';
 import StateWeekExecution from './StateWeekExecution';
 import StateReadinessRow from './StateReadinessRow';
 import StateBodyBlock from './StateBodyBlock';
+import { weekExecTotals as weekExecTotalsOf } from '@/lib/week-exec-totals';
 import StateRaceDayBar from './StateRaceDayBar';
 import StateLastRaceCard from './StateLastRaceCard';
 import StateHeaderBlock from './StateHeaderBlock';
@@ -360,13 +361,8 @@ export default function StateTab({
   const week = wsv.week;
   // ⛔ THE SAME planned-vs-done SOURCE THE BAR READS (2026-09-01) — `wsv.week_execution_v1.counts`,
   // summed across disciplines, handed to the programme-aware load read. No second notion of "missed".
-  const weekExecTotals = (() => {
-    const counts = ((wsv as any).week_execution_v1?.counts ?? []) as Array<{ planned?: number; done?: number }>;
-    return {
-      planned: counts.reduce((s, c) => s + (Number(c?.planned) || 0), 0),
-      done: counts.reduce((s, c) => s + (Number(c?.done) || 0), 0),
-    };
-  })();
+  // Shared with Home's LoadBar (src/lib/week-exec-totals.ts) so both screens read one week the same way.
+  const weekExecTotals = weekExecTotalsOf(wsv);
   const load = wsv.load;
   const rm = ((data as any)?.response_model ?? (wsv as any)?.response_model) as {
     visible_signals: Array<VisibleSignal>;
@@ -863,7 +859,8 @@ export default function StateTab({
 
       </div>
 
-      <div className="px-1 mb-1 mt-3 text-[12px] text-white/50 lowercase">trends · the arc behind this week</div>
+      {/* Rule 4: one label system — uppercase, tracked, like BODY / STRENGTH. */}
+      <div className="px-1 mb-1 mt-3 text-[12px] font-semibold tracking-[0.12em] uppercase text-white/55">trends · the arc behind this week</div>
 
       {/* ⛔ ORDER: WHAT IS TRUE NOW, THEN WHAT IS TRENDING (2026-08-29, Michael: *"shouldn't
           ACWR be at the top?"*). It is the field's order and it was inverted here: TrainingPeaks

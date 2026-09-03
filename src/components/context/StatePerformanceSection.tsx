@@ -29,13 +29,13 @@ import StrengthCalibrationNotice from '@/components/StrengthCalibrationNotice';
 // lines under strength — so nothing about a sport appears in two places on the screen. Both were
 // moved from other blocks (the trends plate and the LOAD section); no card was restyled and no
 // server field changed. Run keeps its own plate for one more pass (see StateTrendsBlock).
-import { EnduranceConditionsLine, EnduranceReadCards } from '@/components/context/StrengthReadCards';
+import { EnduranceConditionsLine, EnduranceReadCards, fmtEff } from '@/components/context/StrengthReadCards';
 import ViadaWeekCard from '@/components/context/ViadaWeekCard';
 import EnduranceCheckpointSheet from '@/components/context/EnduranceCheckpointSheet';
 import LoadWeeksCard from '@/components/context/LoadWeeksCard';
 // ⛔ COLLAPSE TO ONE LINE PER SPORT (Round 3, 2026-09-01) — each sport shows a change-leading summary
 // and expands on tap. The summary wording is a set of pure functions so the confidence rule is pinned.
-import { changeMonth, efficiencyRow, strengthGlanceRows, type SportRow } from '@/lib/sport-summary';
+import { changeMonth, efficiencyRow, recentMedian, strengthGlanceRows, type SportRow } from '@/lib/sport-summary';
 import { getStoredUserId } from '@/lib/supabase';
 import TrendSparkline from '@/components/context/TrendSparkline';
 import { liftStatusLine } from '@/lib/strength-calibration-copy';
@@ -242,13 +242,13 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
     return () => { cancelled = true; };
   }, [anchor?.value, loadUserBaselines]);
 
-  const [powerInfoOpen, setPowerInfoOpen] = React.useState(false);
+  // ⛔ NO SECOND-LEVEL TAPS ON THIS SCREEN (Michael 2026-09-03: one click). The power ⓘ, the
+  // "more" receipt and the label ⓘ are all printed open now; see StrengthReadCards.SpineCard.
   // ⛔ SAME RULE AS THE RUN ROW (2026-08-01, Michael): the headline and ONE receipt line stay
   // visible; everything else goes behind "more". The CONTENTS differ because the rows have
   // different material — run's detail is a read (plan context, trend, pace), bike's is extra
   // provenance (FTP basis, as-of, anchor label, the power-trend note). Same rule, not same items.
   // ⚠️ Bike keeps NO words and NO range — it still has no confidence interval (D-356).
-  const [detailOpen, setDetailOpen] = React.useState(false);
   const src = fitness.efficiency.basis === 'personal' ? 'personal'
     : fitness.efficiency.basis === 'coggan_ftp' ? 'est (FTP)' : null;
   // D-232 glass-box: the shared evidence tail (window · rides · recency) is the LEAD sub-trend's
@@ -379,15 +379,10 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
         // ⛔ This replaced a separate "power trend ⓘ" button that sat at the bottom of the row saying the
         // same thing in different words. One question, one place to tap.
         <>
-          <button type="button" onClick={() => setPowerInfoOpen((o) => !o)} className="basis-full inline-flex items-baseline gap-1 text-left text-white/45 text-[12px]">
-            No hard efforts yet, so there is no threshold read
-            <span className="text-white/40 text-[11px]">{powerInfoOpen ? '▾' : 'ⓘ'}</span>
-          </button>
-          {powerInfoOpen && (
-            <p className="basis-full text-[12px] text-white/55 leading-snug mt-1 max-w-[min(100%,340px)]">
-              A threshold, sweet-spot, tempo or climbing ride records a 20-minute power max, and that is what an FTP read is built from. Easy rides carry no max to read, so the bike is read on heart rate at the same power until one is logged.
-            </p>
-          )}
+          <span className="basis-full text-left text-white/45 text-[12px]">No hard efforts yet, so there is no threshold read</span>
+          <p className="basis-full text-[12px] text-white/45 leading-snug mt-1 max-w-[min(100%,340px)]">
+            A threshold, sweet-spot, tempo or climbing ride records a 20-minute power max, and that is what an FTP read is built from. Easy rides carry no max to read, so the bike is read on heart rate at the same power until one is logged.
+          </p>
         </>
       ) : (
         <span className="basis-full text-white/45 text-[12px]">Not enough hard rides yet for a threshold read</span>
@@ -397,13 +392,10 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
           Your heart rate at the same power{(fitness.efficiency.sampleCount ?? 0) > 0 ? `, from ${fitness.efficiency.sampleCount} easy ${fitness.efficiency.sampleCount === 1 ? 'ride' : 'rides'}` : ''}
         </span>
       )}
-      {/* The one receipt that stays: window · rides · recency. The "more" cue rides with it. */}
+      {/* The receipt: window · rides · recency. The provenance lines below it print open (one tap). */}
       {(tail || src || asOf(lead.newestAgeDays) || (showDot && anchor?.label)) && (
         <span className="basis-full flex items-baseline justify-between gap-2 text-white/55 text-[12px]">
           <span>{tail}</span>
-          <button type="button" onClick={() => setDetailOpen((o) => !o)} className="shrink-0 text-white/50">
-            {detailOpen ? 'less' : 'more'}
-          </button>
         </span>
       )}
       {/* ⚠️ THE EMPTY STATE STAYS VISIBLE. "no baseline set · accept your FTP to anchor" names an
@@ -412,7 +404,7 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
       {trendOnly && <NoBaselineTag hint={src === 'est (FTP)' ? 'accept your FTP to anchor' : undefined} />}
       {/* WHERE THE NUMBER COMES FROM — basis, freshness, anchor. True and worth having, but three lines
           of provenance stacked under a one-line verdict buried the verdict. */}
-      {detailOpen && (
+      {(
         <span className="basis-full flex flex-col gap-0.5 mt-0.5 text-[12px] text-white/45">
           {/* WHERE YOU SIT — the dot/arrow legend, which is about this athlete rather than about the
               metric, so it lives here rather than in the ⓘ. Only when there IS a dot to explain. */}
@@ -882,20 +874,13 @@ function FitnessDotBlock({ label, range, verdict, pctChange, provisional, wordMa
   wordMap?: Record<TrendVerdict, { word: string; cls: string; arr: string }>;
   showAxis?: boolean; // the "weaker / frame / stronger" grammar renders on the FIRST band only (item 7)
   frame?: string;
-  explain?: string; // when set, the label becomes a tap-ⓘ that reveals this plain-language definition
+  explain?: string; // when set, this plain-language definition prints under the row (no tap — one level only)
 }) {
   const v = wordMap[verdict];
-  const [explainOpen, setExplainOpen] = React.useState(false);
   return (
     <>
       <span className="basis-full flex items-baseline justify-between gap-2">
-        {explain ? (
-          <button type="button" onClick={() => setExplainOpen((o) => !o)} className="inline-flex items-baseline gap-1 text-white/55 text-[13px]">
-            {label} <span className="text-white/50 text-[11px]">{explainOpen ? '▾' : 'ⓘ'}</span>
-          </button>
-        ) : (
-          <span className="text-white/55 text-[13px]">{label}</span>
-        )}
+        <span className="text-white/55 text-[13px]">{label}</span>
         {verdict !== 'needs_data' && (
           // ⛔ `withheld` PRINTS NO NUMBER. "Too few to read −0.4%" reads as a result with a caveat
           // attached, and the number is the part people take away — so the row would say the opposite
@@ -913,8 +898,8 @@ function FitnessDotBlock({ label, range, verdict, pctChange, provisional, wordMa
       ) : !range.confident ? (
         <span className="basis-full text-center text-[11px] text-white/45">thin data</span>
       ) : null}
-      {explain && explainOpen && (
-        <p className="basis-full text-[12px] text-white/60 leading-snug mt-1 max-w-[min(100%,340px)]">{explain}</p>
+      {explain && (
+        <p className="basis-full text-[12px] text-white/45 leading-snug mt-1 max-w-[min(100%,340px)]">{explain}</p>
       )}
     </>
   );
@@ -1141,6 +1126,33 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         return { name: label, value: `${grp.runs} run${grp.runs === 1 ? '' : 's'}` };
       };
       const rows = [rowFor('easy', 'easy'), rowFor('quality', 'hard')].filter((x): x is SportRow => !!x);
+      // ⛔ AEROBIC EFFICIENCY IS THE TOP NUMBER, WITH ITS DIRECTION (Michael 2026-09-03: "we have a good
+      // number now so I'm ok with the arrow"). The number is the SAME headline the open card prints — the
+      // median of the last five points of the spine's 'aerobic' series (recentMedian) — so plate and row
+      // never disagree. The direction is the server's run efficiency verdict (`runFitness.efficiency`,
+      // route-engine-owned, D-346), read here again after v182 took it off every screen.
+      // ⚠️ ARROW RULES, unchanged from 2026-08-01 / 2026-09-01: ↑ improving, ↓ sliding, NOTHING for
+      // holding / needs_data / withheld (a direction the engine can't call gets no glyph). The down arrow
+      // is neutral-coloured — a drop is routinely correct (deload, taper, heat) and must not read as an
+      // alarm. Signed percent beside it only when there is a direction; a percent next to "no reading"
+      // is a claim in disguise.
+      const aero = ((stateDisplay as { enduranceSpine?: Array<{ sport?: string; group?: string; points?: Array<{ efficiency?: number | null }> }> } | null | undefined)?.enduranceSpine)
+        ?.find((s) => s?.sport === 'run' && s?.group === 'aerobic');
+      const aeroVals = (aero?.points ?? []).map((p) => p?.efficiency).filter((v): v is number => v != null);
+      const aeroHead = recentMedian(aeroVals, 5);
+      if (aeroHead != null) {
+        const ef = runFitness?.efficiency;
+        const dir = ef?.verdict === 'improving' ? 'up' : ef?.verdict === 'sliding' ? 'down' : null;
+        const pct = dir && ef?.pctChange != null && Number.isFinite(Number(ef.pctChange)) ? Number(ef.pctChange) : null;
+        const n = Math.min(5, aeroVals.length);
+        rows.unshift({
+          name: 'aerobic efficiency',
+          value: fmtEff(aeroHead, false),
+          note: [pct != null ? `${pct > 0 ? '+' : ''}${Math.round(pct)}%` : '', `last ${n} run${n === 1 ? '' : 's'}`].filter(Boolean).join(' · '),
+          arrow: dir === 'up' ? '↑' : dir === 'down' ? '↓' : undefined,
+          arrowCls: dir === 'up' ? NUMERIC.improving.cls : NUMERIC.sliding.cls,
+        });
+      }
       // ⛔ THE WEEK'S RUN POINTS AGAINST THE ATHLETE'S TYPICAL (Michael 2026-09-02: run load scored Strava's
       // way). Read off the display contract — `loadByDiscipline.run = { week, typical }` from compute-snapshot
       // (`workload_by_discipline` / `workload_by_discipline_typical`). Absent on rows from before it shipped.
@@ -1394,7 +1406,10 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                     <React.Fragment key={`${r.name}-${i}`}>
                       <span className="text-[12px] text-white/55 leading-tight min-w-0">{r.name}</span>
                       <span className="flex flex-col items-end text-right">
-                        <span className="text-[15px] text-white/90 leading-tight tabular-nums">{r.value}</span>
+                        <span className="text-[15px] text-white/90 leading-tight tabular-nums">
+                          {r.arrow && <span className={`${r.arrowCls ?? 'text-white/70'} mr-1`}>{r.arrow}</span>}
+                          {r.value}
+                        </span>
                         {r.note && <span className="text-[11px] text-white/40 leading-tight tabular-nums whitespace-nowrap">{r.note}</span>}
                       </span>
                     </React.Fragment>

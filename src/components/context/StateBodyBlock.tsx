@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Chip, trendColor, fmtBodyAsOf, type VisibleSignal } from './state-primitives';
 
 /**
@@ -14,7 +14,7 @@ export default function StateBodyBlock({
   readinessRpeDriver: string | null;
   onOpenAdjust: () => void;
 }) {
-  const [expandedSignal, setExpandedSignal] = useState<string | null>(null);
+  // ⛔ NO TAP-TO-REVEAL (Michael 2026-09-03: one click). Provenance prints under its row.
   return (
   <div className="px-3 py-3">
     <div className="flex items-start gap-3">
@@ -28,20 +28,25 @@ export default function StateBodyBlock({
         )}
         {visibleSignals.map((s) => (
           <div key={s.label}>
-            {/* D-232 progressive disclosure: tap the row to reveal one line of provenance
-                (source = your own ratings · cross-discipline · 7d vs 28d). Only when provenance exists. */}
-            <button
-              type="button"
-              disabled={!s.provenance}
-              onClick={() => s.provenance && setExpandedSignal(expandedSignal === s.label ? null : s.label)}
-              className="w-full flex items-start gap-3 text-left"
-            >
-              <span className="text-[13px] text-white/70 shrink-0 w-[104px]">{s.label}</span>
-              <div className="flex-1 flex items-start gap-2 min-w-0">
-                <span className={`flex-1 text-[13px] text-left leading-snug ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
-                {s.provenance && <span className="text-white/50 text-[11px] shrink-0 mt-0.5">{expandedSignal === s.label ? '▾' : '▸'}</span>}
+            {/* ⛔ SAME GRAMMAR AS THE SPORT ROWS BELOW (Layout Rules §1, 2026-09-03): name left, value
+                right, note under the value. Only when the server sends a value slot (payload v189+);
+                an older cached row still carries one sentence in `detail` and renders the old way. */}
+            {s.value_display ? (
+              <div className="w-full grid grid-cols-[1fr_auto] items-baseline gap-x-3">
+                <span className="text-[12px] text-white/55 leading-tight min-w-0">{s.label}</span>
+                <span className="flex flex-col items-end text-right">
+                  <span className={`text-[15px] leading-tight tabular-nums ${s.trend_tone === 'neutral' ? 'text-white/90' : trendColor(s.trend, s.trend_tone)}`}>{s.value_display}</span>
+                  {s.detail && <span className="text-[11px] text-white/40 leading-tight whitespace-nowrap">{s.detail}</span>}
+                </span>
               </div>
-            </button>
+            ) : (
+              <div className="w-full flex items-start gap-3 text-left">
+                <span className="text-[13px] text-white/70 shrink-0 w-[104px]">{s.label}</span>
+                <div className="flex-1 flex items-start gap-2 min-w-0">
+                  <span className={`flex-1 text-[13px] text-left leading-snug ${trendColor(s.trend, s.trend_tone)}`}>{s.detail}</span>
+                </div>
+              </div>
+            )}
             {/* ⛔ THE PERSISTENCE LINE POINTS AT A DOOR, IT DOES NOT OPEN ONE ITSELF (D-354).
                 Soreness above this athlete's OWN normal for 4 of the last 6 sessions. It states
                 the fact and offers the Adjust tab; nothing changes unless the athlete goes and
@@ -61,14 +66,14 @@ export default function StateBodyBlock({
             {/* Whoop pairing (verdict + its driver, together): the RPE driver — which session
                 moved the week — sits WITH the "how hard it feels" verdict, dim + always-visible.
                 RPE-clause only (server guarantees no non-RPE factor reaches this row). */}
-            {s.label === 'How hard it feels' && readinessRpeDriver && (
+            {s.label === 'effort' && readinessRpeDriver && (
               <p className="text-[13px] text-white/65 leading-snug mt-0.5">{readinessRpeDriver}</p>
             )}
             {fmtBodyAsOf(s.as_of_date) && (
               <p className="text-[12px] text-white/45 leading-snug mt-0.5">{fmtBodyAsOf(s.as_of_date)}</p>
             )}
-            {expandedSignal === s.label && s.provenance && (
-              <p className="text-[12px] text-white/60 leading-snug mt-1 max-w-[min(100%,320px)]">{s.provenance}</p>
+            {s.provenance && (
+              <p className="text-[12px] text-white/45 leading-snug mt-1 max-w-[min(100%,320px)]">{s.provenance}</p>
             )}
           </div>
         ))}
