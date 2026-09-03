@@ -1072,13 +1072,14 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   // localStorage (a per-viewer convenience; wrapped in try/catch for private mode). ⚠️ NOT tabs — the
   // point of the screen is seeing all four at once.
   const expandKey = `state.sportsExpanded.${getStoredUserId() ?? 'anon'}`;
-  const [expandedSports, setExpandedSports] = React.useState<Set<string>>(() => {
-    try { const raw = localStorage.getItem(expandKey); return new Set<string>(raw ? JSON.parse(raw) : []); } catch { return new Set<string>(); }
+  // 2026-09-03 (Michael: "when you leave and come back, what was opened should close"): open state lives for the
+  // visit only — nothing is remembered between visits.
+  const [expandedSports, setExpandedSports] = React.useState<Set<string>>(() => new Set<string>());
   });
   const toggleSport = (d: string) => setExpandedSports((prev) => {
     const next = new Set(prev);
     if (next.has(d)) next.delete(d); else next.add(d);
-    try { localStorage.setItem(expandKey, JSON.stringify([...next])); } catch { /* private window / blocked storage */ }
+    void expandKey; // no longer persisted
     return next;
   });
 
@@ -1417,7 +1418,8 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                 </span>
                 {/* ⛔ A CHEVRON THAT OPENS A ROW IS AN AFFORDANCE, NOT DECORATION (rule 5) — it was
                     white/45, near-invisible, and the only signal these rows open at all. */}
-                <span className="text-white/70 text-[11px] shrink-0 self-center">{open ? '▾' : '▸'}</span>
+                {/* a clear cue that the row opens (Michael 2026-09-03): a proper chevron that turns when open */}
+                <span className={`text-white/80 text-[20px] leading-none shrink-0 self-center transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true">›</span>
               </button>
               {open && <div className="px-3 pb-2">{inner}</div>}
             </div>
