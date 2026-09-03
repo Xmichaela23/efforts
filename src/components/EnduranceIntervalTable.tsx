@@ -300,20 +300,21 @@ export default function EnduranceIntervalTable({
             const execCell = isRide
               ? (iv.executed.power_watts != null ? `${Math.round(iv.executed.power_watts)} W` : '—')
               : fmtPaceSec(paceCellSec);
-            // In range / faster / slower against the planned band (pace: faster = lower sec/mi; watts: above).
+            // Against the planned band, Garmin's colours (Michael 2026-09-03 read blue as slower, and Garmin
+            // agrees): green in the target, blue BELOW it (slower / fewer watts), red ABOVE it (faster / more).
             const bandClass = (() => {
               if (iv.not_done || isGoalRace) return '';
               if (isRide) {
                 const pr = iv.planned_power_range; const w = iv.executed.power_watts;
                 if (!pr || w == null || !(pr.lower_w > 0)) return '';
-                if (w < pr.lower_w * 0.97) return 'text-amber-400';
-                if (w > pr.upper_w * 1.05) return 'text-sky-300';
+                if (w < pr.lower_w * 0.97) return 'text-sky-300';
+                if (w > pr.upper_w * 1.05) return 'text-red-400';
                 return 'text-emerald-400';
               }
               const r = iv.planned_pace_range; const a = paceCellSec;
               if (!r || a == null || !(r.lower_sec_per_mi > 0)) return '';
-              if (a > r.upper_sec_per_mi + 5) return 'text-amber-400';
-              if (a < r.lower_sec_per_mi - 5) return 'text-sky-300';
+              if (a > r.upper_sec_per_mi + 5) return 'text-sky-300';
+              if (a < r.lower_sec_per_mi - 5) return 'text-red-400';
               return 'text-emerald-400';
             })();
             const distStr = fmtDist(iv.executed.distance_m, isSwim, useImperial);
