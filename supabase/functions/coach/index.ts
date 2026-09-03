@@ -2736,7 +2736,9 @@ Deno.serve(async (req) => {
         const clauses: string[] = [];
         // The RPE half keeps its verdict sentence; only the SCALE is added, so "3.6" stops being a
         // number with no denominator (Michael: "and the range").
-        if (rpeRow.detail) clauses.push(String(rpeRow.detail).replace(/ avg /, ' of 10 avg '));
+        // Terminal full stop: the verdict sentence carries none, and the soreness clause that follows
+        // ran straight on ("...vs 4.7 typical Soreness normal for you" — seen on the phone 2026-09-03).
+        if (rpeRow.detail) clauses.push(String(rpeRow.detail).replace(/ avg /, ' of 10 avg ').replace(/([^.!?])$/, '$1.'));
         if (sore.level && sore.recent != null) {
           clauses.push(sore.level === 'elevated'
             ? `Soreness above your normal: ${sore.recent.toFixed(1)} of 7.`

@@ -1372,7 +1372,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
           const rows = summaryRows(card.discipline);
           return (
             <div key={card.discipline}>
-              <button type="button" onClick={() => toggleSport(card.discipline)} className="w-full flex items-start gap-3 px-3 py-2.5 text-left" aria-expanded={open} aria-label={`${card.discipline} details`}>
+              <button type="button" onClick={() => toggleSport(card.discipline)} className="w-full flex items-start gap-3 px-3 py-3 text-left outline-none focus:outline-none" aria-expanded={open} aria-label={`${card.discipline} details`}>
                 {/* The discipline label is the ROW's name, so it steps DOWN (rule 3): the numbers on
                     the right are the payload and carry the larger size. It was 13.5px against a 12px
                     value — the label was bigger than the thing it labelled. */}
@@ -1384,12 +1384,19 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                     every row's cells are children of the SAME grid. Names left, numbers right: two
                     straight edges (rule 2). The old markup right-aligned the whole line, so the
                     numbers lined up and the names zigzagged. */}
-                <span className="flex-1 min-w-0 grid grid-cols-[1fr_auto_auto] items-baseline gap-x-3 gap-y-[3px]">
+                {/* ⛔ TWO COLUMNS, NOT THREE (Michael 2026-09-03, on the phone: "loa…" and "heart rate at
+                    easy …"). A third column for the note starved the name column — a long note
+                    ("143 bpm · incl. warm-ups") pushed the name to nothing and `truncate` cut it. The
+                    note now sits UNDER its value, right-aligned and dim, so the name keeps the whole
+                    left column and never truncates. Two straight edges still hold (rule 2). */}
+                <span className="flex-1 min-w-0 grid grid-cols-[1fr_auto] items-baseline gap-x-3 gap-y-[6px]">
                   {rows.map((r, i) => (
                     <React.Fragment key={`${r.name}-${i}`}>
-                      <span className="text-[12px] text-white/50 leading-tight truncate min-w-0">{r.name}</span>
-                      <span className="text-[15px] text-white/90 leading-tight tabular-nums text-right">{r.value}</span>
-                      <span className="text-[11px] text-white/40 leading-tight tabular-nums text-right min-w-[42px]">{r.note ?? ''}</span>
+                      <span className="text-[12px] text-white/55 leading-tight min-w-0">{r.name}</span>
+                      <span className="flex flex-col items-end text-right">
+                        <span className="text-[15px] text-white/90 leading-tight tabular-nums">{r.value}</span>
+                        {r.note && <span className="text-[11px] text-white/40 leading-tight tabular-nums whitespace-nowrap">{r.note}</span>}
+                      </span>
                     </React.Fragment>
                   ))}
                 </span>
@@ -1425,7 +1432,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         // uses in StateTab. Glass depth on the OUTSIDE, grid on the inside. Neutral, because this
         // plate is now multi-sport: the sport colour lives on each row's icon.
         return (
-          <div className="galaxy-card readout-texture readout-texture--spectral rounded-2xl divide-y divide-white/[0.055]" style={readoutPlateStyle(undefined, { galaxy: true })}>
+          <div className="galaxy-card readout-texture readout-texture--spectral rounded-2xl divide-y divide-white/[0.10]" style={readoutPlateStyle(undefined, { galaxy: true })}>
             {active.map((card) => renderCard(card, card.discipline === firstAxisDisc))}
             {/* ⚠️ RESTING ROWS ARE RECESSED, NOT DISABLED (rule 5). They were `opacity-45` — which
                 dimmed a row that is still a button, still tappable, still holding real numbers. A
