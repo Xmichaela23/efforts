@@ -232,10 +232,10 @@ export function restateFromTest(args: {
     if (isDone(row)) continue;
     const date = String(row?.date ?? '').slice(0, 10);
     if (week < args.afterWeek) continue;
-    if (week === args.afterWeek) {
-      // ⚠️ NO CUTOFF MEANS THE OLD RULE — the whole cut week is left alone rather than guessed at.
-      if (!cutoff || !date || date <= cutoff) continue;
-    }
+    // 2026-09-03: rows on or before the test-day cutoff keep their WEIGHTS (the test is not over), but a change
+    // to the plan's SHAPE — the superset mark, the book's word, the reserve — reaches every unstarted row,
+    // test week included. Michael tapped rebuild and the Pull day did not change.
+    const shapeOnly = week === args.afterWeek && (!cutoff || !date || date <= cutoff);
     const day = weekdayOf(row?.date);
     if (!day || !row?.id) continue;
     const wanted = bySlot.get(`${week}|${day}`);
@@ -254,6 +254,17 @@ export function restateFromTest(args: {
       // differently between runs; silently deleting a movement the athlete can already see on their
       // calendar is a bigger change than this function is allowed to make.
       if (!fresh) return ex;
+      // shape fields the composer stamps that a calendar row may predate; carried whenever they differ
+      const shape: Record<string, unknown> = {};
+      const fr = fresh as Record<string, unknown>; const er = ex as Record<string, unknown>;
+      if (typeof fr.superset_group === 'string' && fr.superset_group !== er.superset_group) shape.superset_group = fr.superset_group;
+      if (typeof fr.slot_intent === 'string' && er.slot_intent == null) shape.slot_intent = fr.slot_intent;
+      if (typeof fr.target_rir === 'number' && er.target_rir == null) shape.target_rir = fr.target_rir;
+      if (shapeOnly) {
+        if (Object.keys(shape).length === 0) return ex;
+        touched = true;
+        return { ...ex, ...shape };
+      }
       const to = topWorkWeight(fresh);
       /**
        * ⚠️ ONLY A PRESCRIBED WEIGHT REPLACES ANYTHING. A HYP row carries no percentage by design
@@ -291,7 +302,11 @@ export function restateFromTest(args: {
       const repsKey = (v: unknown) => (Array.isArray(v) ? v.map((n) => Number(n)).join(',') : '');
       const repsMove = repsKey((fresh as Record<string, unknown>).last_reps)
         !== repsKey((ex as Record<string, unknown>).last_reps);
-      if (!weightMoves && !setsMove && !repsMove) return ex;
+      if (!weightMoves && !setsMove && !repsMove) {
+        if (Object.keys(shape).length === 0) return ex;
+        touched = true;
+        return { ...ex, ...shape };
+      }
       touched = true;
       if (weightMoves || setsMove) {
         changes.push({
@@ -310,6 +325,7 @@ export function restateFromTest(args: {
        */
       return {
         ...ex,
+        ...shape,
         ...(weightMoves
           ? {
             weight: fresh.weight,
