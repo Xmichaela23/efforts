@@ -1658,3 +1658,30 @@ ride club can take a hard session or the long day." pp.190–191 (thermoregulati
 **Open, not started:** the book-vocabulary debt — ~25 files still recognise a session by its printed name
 rather than its tag (heaviest in `compose.ts` and `accessory-picks.ts`); only the Your week path was fixed.
 
+## D-465 — The Performance screen follows the field: Execution + Drift in the header, no per-row scores, one drift, one word (2026-09-03)
+
+**Header (runs and rides): Workload · Execution · Duration · Drift.** Execution = the work intervals'
+pace-or-power score blended, averaged with moving time ÷ planned time (existing analyser numbers, never
+shown before). The pace/GAP percentage that sat in the header is gone. **No per-row percentages** on a
+planned session: TrainingPeaks and Garmin show planned beside actual and colour the actual — green in the
+target, blue below, red above (Garmin's convention; Michael read blue as slower). One score per session.
+
+**Drift, one definition, never withheld (Michael: "drift is going to be important").** Heart rate in the
+second half of the session against the first, split by time, after the planned warm-up (else 3 min) —
+`_shared/hr-drift-halves.ts`, written by BOTH analysers as `hr_drift_v1`. Session-detail and State read the
+same precedence: the analyser's pace-to-heart-rate decoupling when it computed one, else `hr_drift_v1`.
+Interval days print the number and say "whole session, intervals included". The book's 5% line (p107) is
+written for steady sessions; the label carries that. The durability TREND still uses steady runs only.
+
+**A session cut short is laid out for the part done** (compute-workout-summary): steps beyond the end of
+the recording are emitted `not_done`; a short recording is not a mismatch; a power-targeted ride step keeps
+its planned window. The ride analyser never calls a plan "easy" because no interval was graded.
+
+**One word: Workload** on every screen (load points / run points / run load / Training Load renamed).
+**Details:** IF tile removed (a rated session's IF is the rating table); Grade-Adj Pace for runs; moving
+time keeps seconds from the Strava import onward (`metrics.moving_time_seconds`).
+
+**Strength logger and plan card speak the book (p218):** ME / DE / SKILL / HYP leads each exercise with
+its reps and reserve, read from the composer's own `slot_intent` / `target_rir`; the rep target sits greyed
+in the reps box; Previous and the suggested weight read the same log.
+

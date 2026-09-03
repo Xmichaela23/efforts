@@ -1,85 +1,71 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-03 01:40 — the night before his threshold trial)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-03 evening — the Performance / Details / State clean-up day)
 
-> ⚠️ Two live threads. THIS block is the State-screen / baselines / tests thread. The 2026-09-01 banner
-> below is the standing-plan/book engine thread — still valid for that work. The 2026-09-02 banner this
-> replaces is folded into D-458–D-463 and `docs/AUDIT-plan-materialization-2026-09-02.md`.
-
-### SHIPPED 2026-09-03 (later, the wizard thread) — D-464
-- **Your week reads the built plan.** Chips, dots, row label and the "High fatigue risk" line all come off
-  the server preview by `family:` tag (`src/lib/preview-week-read.ts`); the phone's solver is the pre-fill
-  only. The name regex is gone. **Not device-verified** — the check: long ride Sat, nothing tapped → the
-  hard-ride row reads "Tue — placed", "top-end intensity", and the strip's Tue dot agrees.
-- **No hard gates; notes state the effect.** New `two_hard_one_day` and `no_rest_day` conflicts
-  (`week-conflicts.ts`) reach `placement_compromises`; the "moved to" note is gone from the screen.
-  `week-notes-sweep.test.ts` holds it down across 2,856 tap combinations.
-- **Deployed:** `generate-strength-plan` 217 · `materialize-plan` 356 · `compute-snapshot` 191 ·
-  `rematerialize-standing-block` 93 · `endurance-checkpoint` 3; client `index-DbFZf90n.js` on efforts.work.
-- **Open:** ~25 files still match a session by its printed name (book-vocabulary debt, D-464).
+> ⚠️ Two live threads. THIS block is the State-screen / baselines / tests / Performance-screen thread. The
+> 2026-09-01 banner below is the standing-plan/book engine thread — still valid for that work. The
+> scheduler work of 2026-09-03 (no hard gates, effect notes, Your week reads the built plan) is D-464 and
+> belongs to the other session; do not re-open it.
 
 ### THE JOB
-**Michael runs the book's threshold time trial today (2026-09-03), launched from Baselines.** Your first job is
-to see it land and say, in three states, what happened:
-1. The planned row (tags `assessment, run_test`) → Garmin: steps come from `materialize-plan/index.ts`
-   `buildAssessmentSteps` (p210, step for step; the `assessment` tag BYPASSES `steps_preset`, so the protocol
-   lives there, not in the Baselines token list). Verified on a throwaway account, server side; **the Garmin
-   push is NOT device-verified.**
-2. The trial lap → `compute-workout-analysis` run_test: lap 450–780 s and >500 m; **threshold pace = lap pace
-   ÷ 0.88** (p210: threshold speed = 88% of vVO2 speed); writes `learned_fitness.run_threshold_pace_sec_per_km`
-   (source "Run time trial — 88% of vVO2 speed (Viada p210)") + `run_vvo2_pace_sec_per_km` with the lap HR.
-   No threshold HR is written from a VO2 effort. Verified on a throwaway: 2300 m in 12:00 → 9:33/mi.
-3. **His Baselines threshold row is "my number" 9:30 and OUTRANKS the learned value.** Nothing re-prices
-   until he flips the row to auto and saves (`TrainingBaselines.tsx` WATCH list → `endurance-checkpoint
-   {reprice:true}`). He was told this. If the line on Baselines does not show the test result on the auto
-   side, the reader did not fire — check the attach (planned_id) and the laps first.
+**Michael's threshold time trial from Baselines (p210) is still the one thing not seen on a device.** When
+it lands: (1) the Garmin push carries 14 timed steps (`materialize-plan` `buildAssessmentSteps`, the
+`assessment` tag BYPASSES `steps_preset`); (2) `compute-workout-analysis` run_test reads the 450–780 s lap
+and writes threshold pace = lap pace ÷ 0.88; (3) his Baselines threshold row is "my number" 9:30 and
+outranks it until he flips to auto and saves (re-price follows). Verified on a throwaway account server
+side (2300 m in 12:00 → 9:33/mi).
 
-### SHIPPED TONIGHT (all PUSHED + DEPLOYED; device-verified only where it says so)
-- **Tests on the book (pp.210–213, read off the page; `book-sources/p210–p214.jpg`, SOURCE Part H0):** run
-  trial (p210) and FTP 20-minute test (p212) as Garmin-sendable steps in `buildAssessmentSteps`; Baselines
-  descriptions from the page; run reader ÷0.88; `run_tt_{n}min` / `run_rest_{n}min` tokens; the trial
-  length reads from a `run_tt_{n}min` token when present (12 min default; 10 / 8 by training age). FTP read-back
-  = best 20-min power × 0.95 in `learn-fitness-profile` (already there).
-- **`learn-fitness-profile`:** threshold = best sustained 20-minute effort on file, only up, whole history; a
-  time-trial result outranks it; observed max HR gates the critical-speed fit (`src/lib/run-critical-speed.ts`).
-- **Easy running read off the WARM-UP of a hard run (OURS, D-463):** `_shared/run-warmup-easy.ts` (first 3 min
-  dropped for HR lag; cool-downs never used) → `run_facts.warmup_easy` (compute-facts, when the linked plan
-  row's first step is a warm-up ≥ 6 min) → joins the easy pool in compute-snapshot on hard days
-  (`source:'warmup'`) → State's easy line says "(incl. warm-ups)". **Verified on 45d122e7:** Sep 2 warm-up
-  11:14/mi at 136, Aug 31 13:41/mi at 136; easy line 13:21 → 12:52 at 143 (two of the last five).
-- **Strength Performance screen set editor:** it already existed (`StrengthCompareTable.tsx` `saveEditSet` →
-  `workouts.strength_exercises` → `recompute-workout`, which deletes+reinserts that workout's `exercise_log`).
-  The pencil sat at 20% opacity; now the word EDIT, and the set text is a tap target. Seen on efforts.work.
-- Deployed: materialize-plan, compute-workout-analysis, learn-fitness-profile, compute-facts, compute-snapshot,
-  workout-detail, coach, analyze-running-workout, analyze-cycling-workout.
+### SHIPPED 2026-09-03 (all PUSHED to main + DEPLOYED; Michael saw the web screens; see D-463, D-465)
+- **Performance screen, runs and rides:** header = Workload · Execution · Duration · Drift (one grid,
+  one baseline, one non-wrapping line each: "usual 49–57" · "efforts & time" · "of plan" · "3.9 under 5%").
+  Per-row percentages are GONE; the actual pace/watts is coloured against the planned band, Garmin's
+  way (green in target, blue below, red above). `EnduranceIntervalTable.tsx`, `AdherenceChips.tsx`.
+- **Drift, one definition, never withheld:** `_shared/hr-drift-halves.ts` (heart rate second half vs
+  first, by time, after the planned warm-up else 3 min) → both analysers write `workout_analysis.hr_drift_v1`;
+  session-detail prefers the analyser's pace-to-HR decoupling, else hr_drift_v1 (basis 'hr',
+  `whole_session` on interval days); State's spine points use the same precedence (`driftReadForPoint`
+  in compute-snapshot) → State and Performance agree (Sep 2 run −1.6%, Aug 31 −2.9%). The "HR drift N bpm
+  vs your typical" bullet and the bare "Typical vs similar workouts." line are gone.
+- **A session cut short is laid out for the part done:** compute-workout-summary emits `not_done` rows,
+  clamps the walk, drops the short-recording mismatch (only 2.5× LONGER is judged, and a planned total
+  under 10 min is not judged), keeps a power-targeted ride step at its planned window (45 s is 45 s),
+  stamps `alignment_mode:'aligned'`/`mismatch_reason:null`. Sept 1 Anaerobic Ride: 20 rows, 6 efforts
+  measured (175–201 W), 4 not done, execution 79, drift 1.1%. "Prescribed easy" no longer fires on a ride
+  whose plan carried power targets.
+- **One word for the number: Workload.** "run points", "run load", "load points", "Training Load",
+  "training stress" all renamed. State run card: third summary line removed; chart title "run workload"
+  with one label "85 this week · usual 124".
+- **Details:** IF tile gone (it was the rating translated); runs show Grade-Adj Pace. The tile read "—"
+  for three pushes because `useWorkoutData` returns EARLY on the server's `display_metrics` — the number
+  had to be added THERE (`workout-detail` ~1851, `gap_pace_s_per_km`) and State's pace pool now reads the
+  analyser's `avg_gap_s_per_mi` first. Moving time keeps seconds from now on (Strava import writes
+  `metrics.moving_time_seconds`; older rows stay whole-minute).
+- **Strength logger + plan card:** the book's word leads each exercise (ME/DE/SKILL/HYP, p218) with its
+  reps and reserve on both surfaces, read from the composer's `slot_intent`/`target_rir` (nothing
+  hand-written client-side); the rep target sits greyed in the reps box; Previous falls back to
+  `exercise_log` so it agrees with the suggested weight; "Assist / Added"; the set editor shows EDIT.
+- **Warm-up easy read** (D-463) live on State: "easy (incl. warm-ups) 12:52/mi at 143".
 
-### FACTS THAT SETTLED TONIGHT (so you do not re-derive them)
-- The "easy 13:21/mi at 143" he did not believe was RIGHT: median of his last five untagged runs, which were
-  short and hilly (Aug 6 176 m climb / 14:38, Aug 13 147 m / 12:57, Aug 28 102 m / 14:01). Flat runs sit at
-  10:40–11:50. The easy/hard lines are ALREADY grade-adjusted (`compute-snapshot` pushes `gapPaceSecPerKm`).
-- `workouts.distance` is KILOMETRES. Every pace in this thread was converted; do not read it as miles.
-- He talks in full sentences at 145 bpm → 145 is under VT1 (p211) → his LTHR is well above 145; the 152 the
-  learner found from history cannot be it (no all-out effort on file). The trial gives pace, not LTHR.
-- `estimate1RM` already averages Epley + Brzycki (p215). The LOGGER's Baselines strength test
-  (`StrengthLogger.tsx` `createBaselineTestExercise`) is still the old ramp (empty bar / ~57% / ~80% / AMRAP
-  at stored×0.88), NOT p215's 75%×6 → +10%×5 → +5% max reps. Unbuilt; an edit was attempted and did not apply.
+### FACTS THAT SETTLED (do not re-derive)
+- `workouts.distance` is KILOMETRES. `useWorkoutData` returns early on `display_metrics` — put a new
+  number in `workout-detail`'s display_metrics or it never reaches Details.
+- Execution = (pace-or-power score on the work intervals, blended) ÷ 2 + (moving time ÷ planned) ÷ 2.
+- IF on a rated cardio session is the rating table (6 → 0.80), not pace vs threshold (D-462 rule).
+- His 13:21 easy line was RIGHT: median of five short hilly untagged runs (the lines are grade-adjusted).
+- `Number(null)` is 0 — every drift read checks `typeof`.
 
-### NEXT, IN ORDER (he ruled or asked for each)
-1. See the trial land (above).
-2. Logger strength baseline test → p215 ramp, seeded from the resolved predicted max.
-3. Talk test (p211) as a schedulable, Garmin-sendable test with a reader (last completed 30-s step → VT1
-   pace/HR). His call whether the easy zone then uses VT1 HR (book) or stays Friel % of LTHR (D-462).
-4. Test week at the start of every block: talk test, run trial, FTP test. He said "don't get hung up on
-   the scheduler" — offer the plan with a test week; do not over-engineer placement.
-5. Plyo least-technical-first vs p89 order — open for Michael (`docs/WORKORDER-plyo-screen-2026-09-02.md` §4).
-6. Performance-screen: delete a set / rename an exercise are NOT there; outlier guard (one wild set does not
-   set a record) not built.
+### NEXT, IN ORDER
+1. See the threshold trial land (above), then flip the Baselines row to auto.
+2. Logger strength baseline test → p215 ramp (75%×6 → +10%×5 → +5% max reps) seeded from the predicted max.
+3. Talk test (p211) as a schedulable, Garmin-sendable test with a reader.
+4. Test week at the start of every block (talk test, run trial, FTP test) — "don't get hung up on the scheduler".
+5. Plyo least-technical-first vs p89 (open, `docs/WORKORDER-plyo-screen-2026-09-02.md` §4).
+6. Performance screen: delete a set / rename an exercise; the outlier guard.
 
-### RULES THAT BIT TONIGHT
-- The `assessment` tag bypasses `steps_preset`. Any test protocol change goes in `buildAssessmentSteps`.
-- Never `git add -A`; explicit paths, three sessions share the repo. Commit/push/deploy on his word.
-- Read-only diagnosis on his account is fine; never write his data by hand; throwaway accounts for tests.
-- Parked and never to be mentioned: the marathon builder / step 4 of the pace cut; the 5K plan; Wendler.
+### RULES THAT BIT
+- Three sessions share the repo: explicit paths, never `git add -A`; deploys bundle whatever is on disk.
+- Verify by data, not by screenshot: pull the row, replicate the read, THEN change code (the GAP tile).
+- Parked, never mentioned: the marathon builder / pace-cut step 4; the 5K plan; Wendler.
 
 ## 🧭 NEXT SESSION — START HERE (written 2026-09-01 — the night the engine was held to the book)
 

@@ -75,7 +75,8 @@ own, after the engine work.
 
 ---
 
-## ⏳ AWAITING MICHAEL — THE THRESHOLD TRIAL ON A DEVICE (2026-09-03, PUSHED `6e1af7a0`, **DEPLOYED**; NOT DEVICE-VERIFIED)
+## ⏳ AWAITING MICHAEL — THE THRESHOLD TRIAL ON A DEVICE (2026-09-03, PUSHED `1efbde86`, **DEPLOYED**; NOT DEVICE-VERIFIED)
+- Also from 2026-09-03 (seen on efforts.work, not on the phone build): Performance header Execution/Drift, coloured interval rows, not-done rows on the Sept 1 ride, Details Grade-Adj Pace, logger book-word lines.
 - Schedule the run test from Baselines, send it to Garmin: expect 14 timed steps (7 min jog … 12-min trial … 9 min cool-down).
 - After the run: Baselines threshold row shows the result on the AUTO side; flip to auto, save → "N upcoming sessions updated".
 - State easy line reads "easy (incl. warm-ups) …" after the next plan run syncs.

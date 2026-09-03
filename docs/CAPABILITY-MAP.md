@@ -104,6 +104,15 @@
 
 ---
 
+### Added 2026-09-03 — the Performance screen, drift, the book's tests
+- **Heart-rate drift, one definition** — `_shared/hr-drift-halves.ts` → `workout_analysis.hr_drift_v1` (both analysers); read by session-detail (`decouplingV1`) and compute-snapshot (`driftReadForPoint`). Never withheld; interval days labelled whole-session. D-465.
+- **Cut-short session layout** — compute-workout-summary emits `not_done` rows; `steps_not_done` on computed; session-detail appends them to the table. D-465.
+- **Execution score in the header** — `AdherenceChips.tsx` (`execution_score` existed in `performance.execution_adherence` all along). D-465.
+- **Book's endurance tests, Garmin-sendable** — `materialize-plan` `buildAssessmentSteps` (p210 run trial, p212 FTP); reader `compute-workout-analysis` run_test (÷0.88). D-463.
+- **Easy read off a hard run's warm-up** — `_shared/run-warmup-easy.ts` → `run_facts.warmup_easy` → easy pool point (`source:'warmup'`). D-463.
+- **Book's word on strength rows** — composer stamps `slot_intent`/`target_rir`; `strengthFormatter.ts` + `StrengthLogger.tsx` print them. D-465.
+- **Details display numbers** — `workout-detail` `display_metrics` is the ONLY thing `useWorkoutData` reads when present; add new Details numbers there (`gap_pace_s_per_km` added 2026-09-03).
+
 ## FACTS — who owns each number
 
 | fact | resolver | routed? | live fracture |
