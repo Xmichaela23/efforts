@@ -965,7 +965,9 @@ serve(async (req: Request) => {
           // computed.overall.gap_pace_s_per_mi (Minetti, now one-source), NOT
           // workout_analysis.overall.avg_gap_s_per_mi (which is empty — the per-sample analysis GAP isn't
           // persisted there; a separate follow-up). Falls to null → raw efficiency_index for flat/no-GAP.
-          const gapPaceSecPerMi = Number(r.computed?.overall?.gap_pace_s_per_mi);
+          // 2026-09-03: the analyser's grade-adjusted pace first (`avg_gap_s_per_mi`, the number Performance and
+          // Details show); the summary's own pass (`gap_pace_s_per_mi`) only when the analyser has not run.
+          const gapPaceSecPerMi = Number(r.computed?.overall?.avg_gap_s_per_mi ?? r.computed?.overall?.gap_pace_s_per_mi);
           const gapPaceSecPerKm = Number.isFinite(gapPaceSecPerMi) && gapPaceSecPerMi > 0 ? gapPaceSecPerMi * MI_PER_KM : null;
           const gapEfficiencyIndex = computeEfficiencyIndex(gapPaceSecPerKm, runHrByDate.get(r.date) ?? null);
           // The efficiency-trend row: GRADE-ADJUSTED pace ÷ HR, with the day's temperature carried so the
