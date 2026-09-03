@@ -6315,7 +6315,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           // this branch and rendered NO REPS FIELD AT ALL — the athlete had
                           // nowhere to type, so the one signal the whole progression reads could
                           // not be entered on those rows.
-                          if (set.reps === undefined && !set.amrap && !set.repMaxTest && !exIsBaselineTest && !exHasRepTotal && !exOpenRepBand) {
+                          // 2026-09-03 (Michael: "shouldn't 2-4 be greyed in there?"): a planned set with a rep target shows it
+                          // greyed in the box, the way the weight and the reserve already do. Tap to type.
+                          const repTargetGhost = (!exIsPlyo && exercise.target_reps) ? String(exercise.target_reps).replace(/\+$/, '') : null;
+                          if (set.reps === undefined && !set.amrap && !set.repMaxTest && !exIsBaselineTest && !exHasRepTotal && !exOpenRepBand && !repTargetGhost) {
                             return <span aria-hidden="true" />;
                           }
                           // ⚠️ A TYPED ZERO SHOWS AS 0 — it is the failed attempt, a real result
@@ -6350,7 +6353,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                     placeholder sits where the eyes already are. */}
                                 {shown === '' && set.amrap && !done
                                   ? <span className="text-strength/60 text-[12px] tracking-wide">AMRAP</span>
-                                  : (shown === '' ? ' ' : shown)}
+                                  : (shown === '' || shown === '—')
+                                    ? (repTargetGhost && !done ? <span className={ghostCls}>{repTargetGhost}</span> : (shown === '' ? '\u00a0' : shown))
+                                    : shown}
                               </span>
                             </button>
                           );
