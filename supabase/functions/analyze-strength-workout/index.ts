@@ -557,10 +557,18 @@ function calculateExerciseAdherence(match: any, userUnits: string, planUnits: st
       // 2026-09-03 (Michael's chest-supported row went 15 → 20 → 25 lb and finished at target, and the
       // average still said "too much in the tank"): when the athlete raised the weight during the exercise,
       // the LAST set is the read — that is where they arrived. Otherwise the average, as before.
-      const wts = executedRIRSets.map((st: any) => Number(st?.weight)).filter((w: number) => Number.isFinite(w) && w > 0);
-      const raisedWeight = wts.length >= 2 && wts[wts.length - 1] > wts[0];
-      const lastRir = Number(executedRIRSets[executedRIRSets.length - 1]?.rir);
-      const readRir = raisedWeight && Number.isFinite(lastRir) ? lastRir : avgExecutedRIR;
+      // (Michael, same day, on a bodyweight row logged 10@5 → 12@2 → 12@2: "it's gotta be smarter and see
+      // that it was corrected.") Any correction counts — weight up, reps up, or the reserve brought down
+      // across the sets. Then the LAST set is the read. Uniform sets keep the average.
+      const first = executedRIRSets[0]; const last = executedRIRSets[executedRIRSets.length - 1];
+      const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+      const corrected = executedRIRSets.length >= 2 && (
+        ((num(last?.weight) ?? 0) > (num(first?.weight) ?? 0))
+        || ((num(last?.reps) ?? 0) > (num(first?.reps) ?? 0))
+        || ((num(last?.rir) ?? 99) < (num(first?.rir) ?? 99))
+      );
+      const lastRir = num(last?.rir);
+      const readRir = corrected && lastRir != null ? lastRir : avgExecutedRIR;
       rirAdherence = Math.round((readRir - exerciseTargetRIR) * 10) / 10;
     }
   }
