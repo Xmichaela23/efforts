@@ -8,7 +8,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
 import { resolvePlannedDurationMinutes } from '@/utils/resolvePlannedDuration';
-import { formatStrengthExercise } from '@/utils/strengthFormatter';
+import { formatStrengthExercise, formatStrengthExerciseLines } from '@/utils/strengthFormatter';
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
 import { isWorkoutKitAvailable, scheduleSwimOnWatch, buildSwimPayloadFromWorkout } from '@/services/workoutkit';
 import { Capacitor } from '@capacitor/core';
@@ -224,6 +224,13 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       };
       const isSwim = String((workout as any)?.type||'').toLowerCase()==='swim'
       // Client is DUMB: just sum server-computed durations, no recalculation
+      // 2026-09-03: a strength session is formatted as a LIST so a printed superset (p274) comes out as one line
+      // plus its sentence; per-step formatting could not see the pair.
+      const allStrength = v3.length > 0 && v3.every((st:any)=> st?.strength && typeof st.strength==='object');
+      if (allStrength) {
+        const unitsAll = (String((workout as any)?.units||'').toLowerCase()==='metric') ? 'metric' : 'imperial';
+        lines.push(...formatStrengthExerciseLines(v3.map((st:any)=>st.strength), unitsAll));
+      }
       v3.forEach((st:any)=>{
         const secs = typeof st?.seconds==='number' ? st.seconds : undefined;
         if (typeof secs==='number' && secs>0) totalSecsFromSteps += Math.max(1, Math.round(secs));
@@ -291,7 +298,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         // Strength step formatting (using shared formatter)
         if (st?.strength && typeof st.strength==='object') {
           const units = (String((workout as any)?.units||'').toLowerCase()==='metric') ? 'metric' : 'imperial';
-          lines.push(formatStrengthExercise(st.strength, units));
+          if (!allStrength) lines.push(formatStrengthExercise(st.strength, units));
           return;
         }
 

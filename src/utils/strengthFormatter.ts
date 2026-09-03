@@ -163,6 +163,16 @@ export function formatStrengthExerciseLines(
 ): string[] {
   const out: string[] = [];
   const list = Array.isArray(items) ? items : [];
+  // The plan copy says it too (Michael 2026-09-03: "it needs to be in the plan copy"): one sentence per pair,
+  // before the list, in the words the logger uses.
+  const seen = new Set<string>();
+  for (let i = 0; i < list.length - 1; i += 1) {
+    const g = typeof list[i]?.superset_group === 'string' ? list[i].superset_group : null;
+    if (!g || seen.has(g) || list[i + 1]?.superset_group !== g) continue;
+    seen.add(g);
+    const nm = (x: any) => String(x?.execution_name || x?.name || '').replace(/_/g, ' ').trim();
+    out.push(`Superset: ${nm(list[i])} with ${nm(list[i + 1])} — one set of each, rest, then again.`);
+  }
   for (let i = 0; i < list.length; i += 1) {
     const e = list[i];
     const g = typeof e?.superset_group === 'string' && e.superset_group ? e.superset_group : null;

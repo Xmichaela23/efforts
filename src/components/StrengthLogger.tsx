@@ -5398,7 +5398,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               way Strong and Hevy bracket a pair. Swap still works on either half. */}
           {exercise.superset_group && exercises[exerciseIndex + 1]?.superset_group === exercise.superset_group && exercises[exerciseIndex - 1]?.superset_group !== exercise.superset_group && (
             <div className="mx-1 mt-3 mb-1 px-1.5 text-[11px] uppercase tracking-wider text-white/55">
-              Superset · one set of each, rest, then again
+              Superset · {String((exercise.execution_name || exercise.name || '')).trim()} with {String((exercises[exerciseIndex + 1]?.execution_name || exercises[exerciseIndex + 1]?.name || '')).trim()} · one set of each, rest, then again
             </div>
           )}
           {/* ⛔ HOW ASSISTANCE IS MEANT TO BE PERFORMED — ONCE FOR THE WHOLE BLOCK, above the first
@@ -5458,7 +5458,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               Jump is not assistance and is not a main lift either, and it should not claim the
               accent by default. */}
           <div
-            className={`galaxy-card backdrop-blur-xl border-2 rounded-2xl mx-3 mb-2 ${isMainLiftCard || isMobilityMode ? themeColors.border : 'border-white/[0.12]'}`}
+            className={`galaxy-card backdrop-blur-xl border-2 rounded-2xl mx-3 mb-2 ${isMainLiftCard || isMobilityMode ? themeColors.border : 'border-white/[0.12]'}${exercise.superset_group ? ' border-l-[6px] border-l-strength' : ''}`}
             style={{
               // The deep-space treatment now comes from `.galaxy-card` in index.css — the wizard's
               // own nebula/stars/grain recipe, not a second hand-rolled gradient. The card supplies
