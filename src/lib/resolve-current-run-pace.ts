@@ -430,8 +430,8 @@ export function describeThresholdBasis(resolved: ResolvedThresholdPace | null | 
     default:
       return {
         state: 'unknown',
-        label: 'Not enough data yet.',
-        note: 'A few more easy runs with heart rate, or a 5K time, gives this a number.',
+        label: 'No hard runs on file.',
+        note: 'Easy running alone cannot measure this. Enter your threshold pace, or run the 12-minute test.',
         showNumber: false,
       };
   }
