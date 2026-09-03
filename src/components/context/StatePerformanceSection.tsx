@@ -336,9 +336,8 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
             {(recencyOf(fitness.loadFloor.newest_ride_age_days) ?? buildingRecency) && (
               <span className="text-white/45">{recencyOf(fitness.loadFloor.newest_ride_age_days) ?? buildingRecency}</span>
             )}
-            <span className="basis-full">
-              {'A few more hard rides add the power read.'}
-            </span>
+            {/* 2026-09-03 (Michael: "bike is the missing stepchild"): no sentence here — the count and the
+                recency above are the facts; the power read appears when it exists. */}
           </span>
         ) : (
         <span className="inline-flex items-baseline gap-1.5 flex-wrap text-white/60">
@@ -443,19 +442,9 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
             // The threshold wording belongs to a REAL power read. `leadIsPower` alone is true in the
             // building state too (lead 'none' falls back to power), which put "Your estimated FTP is
             // 176 W" under a row that had made no measurement at all.
-            if (!(leadIsPower && assertsLead)) {
-              // AEROBIC or BUILDING: the FTP is the band's definition, not the measurement.
-              if (src === 'est (FTP)') {
-                return <span>{ftp != null ? `Easy power is set from your estimated FTP of ${ftp} W` : 'Easy power is set from an estimated FTP'} — not one you confirmed.</span>;
-              }
-              return <span>{ftp != null ? `Easy power is set from your tested FTP of ${ftp} W.` : 'Easy power is set from your own tested FTP.'}</span>;
-            }
-            if (src === 'est (FTP)') {
-              return <span>{ftp != null ? `Your estimated FTP is ${ftp} W` : 'Your FTP is an estimate'} — not one you confirmed.</span>;
-            }
-            return <span>{ftp != null ? `Your tested FTP is ${ftp} W.` : 'Measured against your own tested FTP.'}</span>;
+            // 2026-09-03: one fact, no sentence — the Baselines row is where an FTP gets confirmed.
+            return <span>{ftp != null ? `FTP ${ftp} W · ${src === 'est (FTP)' ? 'estimated' : 'tested'}` : (src === 'est (FTP)' ? 'FTP estimated' : 'FTP tested')}</span>;
           })()}
-          {asOf(lead.newestAgeDays) && <span>Newest qualifying ride {asOf(lead.newestAgeDays)}.</span>}
           {showDot && anchor?.label && <span>{anchor.label}</span>}
         </span>
       )}
