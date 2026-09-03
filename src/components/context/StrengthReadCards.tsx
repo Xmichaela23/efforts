@@ -148,7 +148,7 @@ export function EnduranceReadCards(
  */
 // ⓘ copy, Michael 2026-09-02 (voice-checked): what the two run numbers mean, in plain words.
 const EF_EXPLAIN = 'Pace divided by heart rate. Higher means faster at the same heart rate.'; // 2026-09-03: Michael cut the paragraph
-const DECOUPLING_EXPLAIN = `Heart rate in the second half against the first, at the same pace. The book's line is 5%. TrainingPeaks calls it decoupling.`; // 2026-09-03: Michael cut the paragraph
+const DECOUPLING_EXPLAIN = `Second-half heart rate against the first, same pace. The book's line is 5%.`; // 2026-09-03: Michael cut the paragraph
 
 /** "1.9 of room" / "0.4 over" against p107's line. */
 function driftVsLine(pct: number): string {
@@ -214,7 +214,7 @@ function SpineCard({ series }: { series: SpineSeries }) {
             {isRide ? 'watts per heartbeat' : 'pace per heartbeat'} · higher is better
           </div>
           <p className="mt-1 text-[12px] text-white/45 leading-snug max-w-[min(100%,340px)]">
-            {isRide ? EF_EXPLAIN.replace('speed', 'power').replace('easy runs', 'rides').replace('moving you faster', 'making more power') : EF_EXPLAIN}
+            {isRide ? 'Power divided by heart rate. Higher means more power at the same heart rate.' : EF_EXPLAIN}
           </p>
           {/**
             * ⛔⛔ "last time 1.720" IS DELETED, AND THE SOURCE SAYS WHY. TrainingPeaks' instruction is
@@ -247,7 +247,7 @@ function SpineCard({ series }: { series: SpineSeries }) {
       {!isRide && latest.driftPct != null && !latest.fadeWithheld && (
         <div className="text-[11px] text-white/55 mt-1">
           <span className="text-white/55 text-[11px]">
-            {latest.driftPct <= 0 ? <>heart rate fell <span className="tabular-nums text-white/75">{Math.abs(latest.driftPct).toFixed(1)}%</span> in the second half</> : <>heart rate drift <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span></>} on the latest run{latest.driftWholeSession ? ' (whole session, intervals included)' : ''} · line {DRIFT_LIMITS.hybridPct}%{driftVsLine(latest.driftPct) ? <> · <span className="text-white/75">{driftVsLine(latest.driftPct)}</span></> : null}{conditions ? <span className="text-white/45"> · {conditions}</span> : null}
+            drift <span className="tabular-nums text-white/75">{(latest.driftPct > 0 ? '+' : '')}{latest.driftPct.toFixed(1)}%</span> · latest run{latest.driftWholeSession ? ' · intervals' : ''} · line {DRIFT_LIMITS.hybridPct}%{driftVsLine(latest.driftPct) ? <> · <span className="text-white/75">{driftVsLine(latest.driftPct)}</span></> : null}{conditions ? <span className="text-white/45"> · {conditions}</span> : null}
           </span>
           <p className="mt-1 text-[12px] text-white/45 leading-snug max-w-[min(100%,340px)]">{DECOUPLING_EXPLAIN}</p>
         </div>
@@ -317,7 +317,7 @@ function EnduranceCard({ session }: { session: NamedSession }) {
       {/* ⛔ ROW 3 (fade / second-half drift) REMOVED (2026-09-01, Michael: "gobbely gook nonsense") —
           same reason as the spine card above. The decoupling signal stays server-side, off the card. */}
 
-      {durLabel && <div className="text-[11px] text-white/55 mt-1">same {durLabel} session</div>}
+      {durLabel && prior?.efficiency != null && <div className="text-[11px] text-white/55 mt-1">same {durLabel} session</div>}
     </div>
   );
 }
