@@ -36,11 +36,8 @@ Deno.test('easier ≥1.0 → "Noticeably easier than usual"', () => {
 
 // ── provenance (prints open under the effort row since 2026-09-03): source + cross-discipline + windows,
 //    NO numbers — the effort row already carries both; null when no data ──
-Deno.test('rpeProvenance: names your own ratings, cross-discipline, 7d vs 28d, no numbers', () => {
-  assertEquals(
-    rpeProvenance(4.8, 4.3),
-    'Your own ratings, last 7 days against your 28-day typical, across all disciplines. A hard lift moves this number too.',
-  );
+Deno.test('rpeProvenance: null — no sentence under the effort row (2026-09-03)', () => {
+  assertEquals(rpeProvenance(4.8, 4.3), null);
   assertEquals(rpeProvenance(null, 4.3), null);
 });
 

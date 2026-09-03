@@ -72,9 +72,8 @@ export default function StateBodyBlock({
             {fmtBodyAsOf(s.as_of_date) && (
               <p className="text-[12px] text-white/45 leading-snug mt-0.5">{fmtBodyAsOf(s.as_of_date)}</p>
             )}
-            {s.provenance && (
-              <p className="text-[12px] text-white/45 leading-snug mt-1 max-w-[min(100%,320px)]">{s.provenance}</p>
-            )}
+            {/* ⛔ NO PROVENANCE SENTENCE (Michael 2026-09-03: "AI slop talk in there"). The row is the
+                value and its note; the window and source do not print. */}
           </div>
         ))}
         {/* The BODY 'Cross-training' row is DELETED (D-354). BODY is only what the athlete

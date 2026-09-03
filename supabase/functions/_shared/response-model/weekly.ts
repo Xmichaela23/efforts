@@ -626,10 +626,10 @@ export function rpeFeelVerdict(
 // new metric — disclosure of the same one fact (logged RPE, recent vs typical).
 export function rpeProvenance(currentAvg: number | null, baselineAvg: number | null): string | null {
   if (currentAvg == null || baselineAvg == null) return null;
-  // ⛔ NO NUMBERS HERE (2026-09-03). This line prints OPEN under the effort row now (one tap on
-  // State, no tap-to-reveal), and the effort row already carries both numbers — repeating them here
-  // put the same two figures on screen twice in two paragraphs. Source and windows only.
-  return 'Your own ratings, last 7 days against your 28-day typical, across all disciplines. A hard lift moves this number too.';
+  // ⛔ NULL ON PURPOSE (Michael 2026-09-03, on the phone: "AI slop talk in there"). The sentence that
+  // named the source and windows printed as a paragraph under a one-line row; the row is the value
+  // and its note, and nothing else. Kept as a function so the signature and the null gate stand.
+  return null;
 }
 
 // Color escalation for the "How hard it feels" row: magnitude drives tone, but only HARDER escalates —
