@@ -141,18 +141,18 @@ export default function AdherenceChips({
       const line = DRIFT_LIMITS.hybridPct;
       const d = Math.round((driftPct - line) * 10) / 10;
       // 2026-09-03, Michael: one short line per chip, plain words.
-      const room = d > 0 ? `${d.toFixed(1)} over the ${line}% line` : `${Math.abs(d).toFixed(1)} under the ${line}% line`;
+      const room = d > 0 ? `${d.toFixed(1)} over ${line}%` : `${Math.abs(d).toFixed(1)} under ${line}%`;
       const t = (sd as any)?.weather?.temperature_f;
       const heat = typeof t === 'number' && Number.isFinite(t) ? ` · ${Math.round(t)}°F` : '';
-      const scope = decoupling?.whole_session ? ' · whole session' : '';
+      // one line only; "whole session" and "hills" are said in the Heart rate row below
       void heat;
-      return `${room}${decoupling?.basis === 'raw' ? ' · hills' : ''}${scope}`;
+      return room;
     })();
     // 2026-09-03 (Michael: "we add an execution score, right? Drift?"): the header is Workload · Execution ·
     // Duration · Drift on every planned run and ride. The pace/GAP percentage that sat here was the blended
     // interval pace score and read as a mystery number; it lives per row in the interval table. Easy and
     // Power reads live in the Insights text.
-    const executionSubtitle = 'efforts and time';
+    const executionSubtitle = 'efforts & time';
 
     const completedDurS = sd.completed_totals?.duration_s ?? null;
     const plannedDurS = sd.planned_totals?.duration_s ?? null;
@@ -162,10 +162,12 @@ export default function AdherenceChips({
     const chip = (label: string, pct: number | null, text: string) => {
       if (pct == null) return null;
       return (
-        <div className="flex flex-col items-center px-2">
-          <div className="text-sm font-semibold text-gray-100">{pct}%</div>
-          <div className="text-[12px] text-gray-300">{label}</div>
-          <div className="text-[12px] text-gray-400">{text}</div>
+        // 2026-09-03: same markup as chipText so the four readouts sit on one baseline (the percentage
+        // chip used to be smaller and lower-case, which read as a different kind of thing).
+        <div className="flex flex-col items-center px-1 min-w-0">
+          <div className="readout-num text-xl whitespace-nowrap">{pct}%</div>
+          <div className="readout-label text-[11px] uppercase text-center whitespace-nowrap">{label}</div>
+          <div className="text-[10px] text-white/40 text-center leading-snug whitespace-nowrap">{text}</div>
         </div>
       );
     };
@@ -185,10 +187,10 @@ export default function AdherenceChips({
     const chipText = (label: string, value: string | null, text: string) => {
       if (!value) return null;
       return (
-        <div className="flex flex-col items-center px-2 min-w-0">
+        <div className="flex flex-col items-center px-1 min-w-0">
           <div className="readout-num text-xl whitespace-nowrap">{value}</div>
-          <div className="readout-label text-[11px] uppercase text-center">{label}</div>
-          <div className="text-[11px] text-white/40 text-center leading-snug">{text}</div>
+          <div className="readout-label text-[11px] uppercase text-center whitespace-nowrap">{label}</div>
+          <div className="text-[10px] text-white/40 text-center leading-snug whitespace-nowrap">{text}</div>
         </div>
       );
     };
@@ -305,7 +307,7 @@ export default function AdherenceChips({
         <div className="w-full pt-1 pb-2">
           {weekLabel && <div className="readout-label mb-2 text-center text-[11px] uppercase">{weekLabel}</div>}
           <div className="flex items-center justify-center gap-6 text-center mb-3">
-            <div className="flex items-start gap-3">
+            <div className="grid grid-cols-4 gap-1 w-full">
               {chipText('Workload', loadValue, loadSubtitle)}
               {chip('Pace', paceAdherence, paceDeltaSec != null ? fmtDeltaPer100(paceDeltaSec) : '—')}
               {chipText('Duration', durationValue, 'of plan')}
@@ -321,11 +323,11 @@ export default function AdherenceChips({
         <div className="w-full pt-1 pb-2">
           {weekLabel && <div className="readout-label mb-2 text-center text-[11px] uppercase">{weekLabel}</div>}
           <div className="flex items-center justify-center gap-6 text-center mb-3">
-            <div className="flex items-start gap-3">
+            <div className="grid grid-cols-4 gap-1 w-full">
               {chipText('Workload', loadValue, loadSubtitle)}
               {/* 2026-09-03: Execution and Drift on rides too (Michael: "drift really important on the
                   performance screens for running and riding"). Power / Easy reads live in Insights. */}
-              {executionScore != null && chip('Execution', executionScore, 'efforts and time')}
+              {executionScore != null && chip('Execution', executionScore, 'efforts & time')}
               {chipText('Duration', durationValue, 'of plan')}
               {driftValue != null && chipText('Drift', driftValue, driftSubtitle)}
             </div>
@@ -350,7 +352,7 @@ export default function AdherenceChips({
       <div className="w-full pt-1 pb-2">
         {weekLabel && <div className="readout-label mb-2 text-center text-[11px] uppercase">{weekLabel}</div>}
         <div className="flex items-center justify-center gap-6 text-center mb-3">
-          <div className="flex items-start gap-3">
+          <div className="grid grid-cols-4 gap-1 w-full">
             {chipText('Workload', loadValue, loadSubtitle)}
             {executionScore != null && chip('Execution', executionScore, executionSubtitle)}
             {chipText('Duration', durationValue, 'of plan')}
