@@ -96,6 +96,10 @@ import { resolveCurrentRunThresholdPace } from "../../../src/lib/resolve-current
  * ⚠️ `Number(null)` is 0 — the checks are on typeof, never on Number.isFinite alone.
  */
 function driftReadForPoint(hrs: any, wa: any, factDrift: number | null | undefined, steady: boolean): { driftPct: number | null; driftBasis: 'gap' | 'raw' | 'hr' | null; driftWholeSession: boolean; fadeWithheld: boolean } {
+  // "whole session" the same way session-detail decides it: an interval session (more than two planned steps)
+  // or the analyser's mixed-effort flag.
+  const steps = Number(wa?.fact_packet_v1?.derived?.interval_execution?.total_steps);
+  if (Number.isFinite(steps) && steps > 2) steady = false;
   const dec = typeof hrs?.decouplingPct === 'number' && Number.isFinite(hrs.decouplingPct) ? hrs.decouplingPct : null;
   const v1 = typeof wa?.hr_drift_v1?.pct === 'number' && Number.isFinite(wa.hr_drift_v1.pct) ? wa.hr_drift_v1.pct : null;
   if (dec != null) return { driftPct: Math.round(dec * 10) / 10, driftBasis: hrs?.decouplingBasis === 'raw' ? 'raw' : 'gap', driftWholeSession: !steady, fadeWithheld: false };
