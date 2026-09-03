@@ -2680,6 +2680,30 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           }
           if (Object.keys(previousByName).length >= currentNames.size) break;
         }
+        // 2026-09-03 (Michael: the row said 95 from history while Previous said never): the ten-workout
+        // window above misses a lift last done months ago, but the suggested weight reads the whole
+        // log. Fill the gaps from the same log (`exercise_log`, latest set per movement) so the two
+        // columns cannot disagree about whether you have done this before.
+        try {
+          const missing = [...currentNames].filter((nn) => !previousByName[nn]);
+          if (missing.length > 0) {
+            const { data: logRows } = await supabase
+              .from('exercise_log')
+              .select('date,exercise_name,canonical_name,best_weight,best_reps')
+              .eq('user_id', userId)
+              .lt('date', todayDate)
+              .order('date', { ascending: false })
+              .limit(400);
+            for (const lr of (Array.isArray(logRows) ? logRows : [])) {
+              const cands = [normalizeExerciseName(String((lr as any)?.exercise_name || '')), normalizeExerciseName(String((lr as any)?.canonical_name || ''))];
+              const nn = cands.find((c) => c && missing.includes(c) && !previousByName[c]);
+              if (!nn) continue;
+              const w = Number((lr as any)?.best_weight); const r = Number((lr as any)?.best_reps);
+              if (!(Number.isFinite(w) && w > 0) && !(Number.isFinite(r) && r > 0)) continue;
+              previousByName[nn] = [{ weight: Number.isFinite(w) && w > 0 ? w : 0, ...(Number.isFinite(r) && r > 0 ? { reps: r } : {}), completed: false }];
+            }
+          }
+        } catch { /* the ten-workout window stands */ }
         if (Object.keys(previousByName).length === 0) return;
         // This fetch feeds the D-122 "last:" anchor (always) AND the unplanned-only
         // last-actual fallback below.
@@ -5845,7 +5869,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // The LOAD column. An assist-capable movement always has one — the band IS the
                   // load (D-351) — so it survives the bodyweight test that would otherwise hide it.
                   const exShowWeight = exIsAssistCapable || !(exIsBodyweight || exIsPlyo);
-                  const exWeightLabel = exIsAssistCapable ? 'Assist / +'
+                  const exWeightLabel = exIsAssistCapable ? 'Assist / Added' /* 2026-09-03: band assist left, added weight right */
                     : exEquip === 'band' ? 'Band lb'
                     : exEquip === 'dumbbell' ? 'Lb/hand'
                     : 'Lb';
@@ -5957,7 +5981,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     : slotIntent === 'DE'
                       ? 'suppressed'
                       : null;
-                  const cardCue = standingCue === 'suppressed' ? null : (standingCue ?? titleCue);
+                  const cardCueRaw = standingCue === 'suppressed' ? null : (standingCue ?? titleCue);
+                  // 2026-09-03 (Michael: "make sure the entire app understands the language of the book"): the
+                  // book's word for the set leads the line — ME / DE / SKILL / HYP with its reps and reserve
+                  // (p218's table). Same word on the plan card (strengthFormatter). DE says "move the bar fast"
+                  // because that is the whole point of the set (p218).
+                  const bookWord = (slotIntent === 'ME' || slotIntent === 'DE' || slotIntent === 'SKILL' || slotIntent === 'HYP') ? slotIntent : null;
+                  const intentLine = (() => {
+                    if (!bookWord || bookWord === 'ME' || !exercise?.target_reps) return null;
+                    const reps = String(exercise.target_reps).replace(/\+$/, '');
+                    const rir = exercise?.target_rir != null ? ` · ${formatRirTarget(exercise.target_rir)} in reserve` : '';
+                    const speed = bookWord === 'DE' ? ' · move the bar fast' : '';
+                    return `${bookWord} · ${reps} reps${rir}${speed}`;
+                  })();
+                  const cardCue = cardCueRaw && bookWord === 'ME' ? `ME · ${cardCueRaw}` : cardCueRaw;
                   /**
                    * ⛔ THE ADVANCE NUDGE — extracted to `@/lib/advance-nudge` on 2026-08-26, in the
                    * change that narrowed its scope. The rule it now enforces is a RULING — *a row the
@@ -6031,6 +6068,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         * dimmer at `white/45` because it speaks for a whole group from outside the
                         * card; matching THAT would have put the rule below the observation under it.
                         */}
+                      {intentLine && (
+                        <div className="px-1.5 pt-0.5 pb-1 text-[12px] font-medium text-white/70 leading-snug">
+                          {intentLine}
+                        </div>
+                      )}
                       {cardCue && (
                         <div className="px-1.5 pt-0.5 pb-2 text-[12px] font-medium text-white/70 leading-snug">
                           {cardCue}

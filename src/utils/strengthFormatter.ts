@@ -28,8 +28,19 @@ export function formatStrengthExercise(
   const sets = Number(exercise?.sets) || 0;
   const reps = exercise?.reps;
   
-  const parts: string[] = [name];
+  // 2026-09-03: the book's word for the set leads (ME / DE / SKILL / HYP, p218), and the reserve the row
+  // carries is printed — the same words the logger shows under the same set.
+  const intent = String(exercise?.slot_intent || '').toUpperCase();
+  const bookWord = (intent === 'ME' || intent === 'DE' || intent === 'SKILL' || intent === 'HYP') ? intent : null;
+  const rirText = (() => {
+    const r = Number(exercise?.target_rir);
+    if (!Number.isFinite(r) || r < 0) return null;
+    const lo = Math.floor(r), hi = Math.ceil(r);
+    return lo === hi ? String(lo) : `${lo}-${hi}`;
+  })();
+  const parts: string[] = [bookWord ? `${bookWord} · ${name}` : name];
   if (sets > 0 && reps != null) parts.push(`${sets}×${reps}`);
+  if (rirText && bookWord !== 'ME') parts.push(`· ${rirText} in reserve`);
   
   const weightDisplay = exercise?.weight_display;
   if (weightDisplay && weightDisplay !== 'Bodyweight' && weightDisplay !== 'Band') {
@@ -59,7 +70,7 @@ export function formatStrengthExercise(
    */
   if (!weightDisplay && !exercise?.baseline_missing) {
     const why: Record<string, string> = {
-      auto_regulated: 'your call — pick a weight that leaves 1-2 reps in reserve',
+      auto_regulated: `your call — pick a weight that leaves ${rirText ?? '1-2'} in reserve`,
       no_tested_lift: 'no tested lift for this pattern, so it stays your call',
       per_side: 'per side — your call, so one number cannot mislead you',
       awaiting_test: 'weights arrive once you log the test',
