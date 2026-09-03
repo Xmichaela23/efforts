@@ -760,7 +760,9 @@ export default function StateTab({
       {/* State-as-hub lens switcher (D-316): Status = the screen you know; Adjust/Schedule are new. */}
       <StateHubTabs value={stateLens} onChange={setStateLens} />
 
-      {stateLens === 'adjust' && <StateAdjustLens perLift={perLift} />}
+      {/* 2026-09-03 (Michael: "the compounds are the only ones that are prescribed"): the Adjust tab lists the
+          coached lifts only — the ones the plan prescribes a number for — never the whole logged list. */}
+      {stateLens === 'adjust' && <StateAdjustLens perLift={perLiftMain} />}
       {stateLens === 'schedule' && (
         <div className="px-2 py-10 text-center text-white/40 text-[13px] leading-snug">
           Schedule — rearrange your week: drag a session and everything re-flows around it. Coming next.
