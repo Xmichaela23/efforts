@@ -643,6 +643,13 @@ async function updateWorkoutFromStravaActivity(userId: string, activityData: any
       // Parity fields using existing columns
       moving_time: activityData.moving_time != null ? Math.round(activityData.moving_time / 60) : null,
       elapsed_time: activityData.elapsed_time != null ? Math.round(activityData.elapsed_time / 60) : null,
+      // 2026-09-03: the minute columns above round every moving time to :00 on the Details screen. Keep
+      // Strava's seconds the way the Garmin import does (`metrics.moving_time_seconds`; read first by
+      // getDurationSeconds on the client and by compute-workout-summary).
+      metrics: {
+        moving_time_seconds: Number.isFinite(Number(activityData.moving_time)) ? Math.round(Number(activityData.moving_time)) : null,
+        elapsed_time_seconds: Number.isFinite(Number(activityData.elapsed_time)) ? Math.round(Number(activityData.elapsed_time)) : null,
+      },
       elevation_gain: Number.isFinite(activityData.total_elevation_gain) ? Math.round(activityData.total_elevation_gain) : null,
       avg_heart_rate: Number.isFinite(activityData.average_heartrate) ? Math.round(activityData.average_heartrate) : null,
       max_heart_rate: Number.isFinite(activityData.max_heartrate) ? Math.round(activityData.max_heartrate) : null,

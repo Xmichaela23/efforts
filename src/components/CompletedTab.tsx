@@ -333,6 +333,12 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, o
             const computed = typeof data.computed === 'string' ? JSON.parse(data.computed) : data.computed;
             const series = computed?.analysis?.series || null;
             const hasSeries = series && Array.isArray(series?.distance_m) && series.distance_m.length > 1;
+            // 2026-09-03: the row this tab was handed can carry no `computed.overall` (the calendar's light
+            // shape), which left the grade-adjusted pace tile at "—" while the number sat in the DB. Adopt
+            // `overall` whenever we have it and the tab does not; the series logic below is unchanged.
+            if (computed?.overall) {
+              setHydrated((prev: any) => (prev?.computed?.overall ? prev : { ...prev, computed: { ...(prev?.computed || {}), overall: computed.overall } }));
+            }
             
             console.log('🔍 [CompletedTab] DB check result:', {
               workoutId,

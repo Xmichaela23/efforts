@@ -1,4 +1,9 @@
 export const getDurationSeconds = (workout: any): number | null => {
+  // 2026-09-03 (Michael: "45:00"): moving time in SECONDS when the import kept them (Garmin writes
+  // metrics.moving_time_seconds; the Strava import now does too). The minute columns round every
+  // moving time to :00, and computed.overall.duration_s_moving is built from those minutes on Strava rows.
+  const secs = Number(workout?.metrics?.moving_time_seconds);
+  if (Number.isFinite(secs) && secs > 0) return secs;
   // Prefer computed (already in seconds)
   const computed = workout?.computed?.overall?.duration_s_moving;
   if (Number.isFinite(computed)) return Number(computed);

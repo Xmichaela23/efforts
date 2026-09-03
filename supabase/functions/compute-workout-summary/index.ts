@@ -669,6 +669,14 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error:'workout not found' }), { status:404, headers:{'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*'}});
     }
 
+    // 2026-09-03: when the import kept moving time in SECONDS (metrics.moving_time_seconds — Garmin, and
+    // now Strava), use them; the `moving_time` minute column rounded every session to :00. Fractional
+    // minutes here, since every reader below does `mvMin < 1000 ? mvMin * 60 : mvMin`.
+    try {
+      const mvS = Number((w as any)?.metrics?.moving_time_seconds);
+      if (Number.isFinite(mvS) && mvS > 0) (w as any).moving_time = mvS / 60;
+    } catch { /* keep the minute column */ }
+
     // sport from workouts.type (fallback 'run' for walk/undefined)
     // Treat mobility like strength for compute purposes (no interval alignment/tolerances).
     const sportRaw = String((w as any)?.type || 'run').toLowerCase();
