@@ -611,6 +611,36 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     }
   }
 
+  // 2026-09-03: steps the recording never reached (a session cut short) are shown as "not done" rows, so the
+  // table says what the plan still held. They come from computed.intervals (`not_done`), not from the
+  // analyser's breakdown, which grades only what was done.
+  try {
+    const compIv: any[] = Array.isArray((input as any)?.completedComputed?.intervals) ? (input as any).completedComputed.intervals : [];
+    let nd = 0;
+    for (const iv of compIv) {
+      if (iv?.not_done !== true) continue;
+      nd += 1;
+      const kind = String(iv?.role || iv?.kind || '').toLowerCase();
+      const t: IntervalRow['interval_type'] = kind.includes('warm') ? 'warmup' : kind.includes('cool') ? 'cooldown' : (kind.includes('recover') || kind.includes('rest')) ? 'recovery' : 'work';
+      const pr = iv?.planned?.power_range;
+      const prLo = Number(pr?.lower), prHi = Number(pr?.upper);
+      const tp = fin(iv?.planned?.target_pace_s_per_mi);
+      intervals.push({
+        id: String(iv?.planned_step_id ?? `not-done-${nd}`),
+        interval_type: t,
+        planned_label: String(iv?.planned_label ?? ''),
+        planned_duration_s: fin(iv?.planned?.duration_s),
+        planned_pace_display: Number.isFinite(prLo) && prLo > 0
+          ? `${Math.round(prLo)}${Number.isFinite(prHi) && prHi !== prLo ? `-${Math.round(prHi)}` : ''} W`
+          : (tp != null ? fmtPaceRange(tp, tp) : null),
+        executed: { duration_s: null, distance_m: null, avg_hr: null, actual_pace_sec_per_mi: null, actual_gap_sec_per_mi: null, power_watts: null },
+        pace_adherence_pct: null,
+        duration_adherence_pct: null,
+        not_done: true,
+      });
+    }
+  } catch { /* a missing not-done row is nothing lost */ }
+
   let intervalDisplayMode = (() => {
     const m = String(intervalDisplay?.mode || '');
     if (m === 'interval_compare_ready' || m === 'overall_only' || m === 'awaiting_recompute') return m as any;
@@ -776,20 +806,35 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   // cannot diverge. { pct, basis, assessment } from the analyzer's heart_rate_summary.
   const decouplingV1 = (() => {
     const hrs = (wa as any)?.heart_rate_summary;
-    if (!hrs || typeof hrs !== 'object') return null;
-    const pct = (hrs as any)?.decouplingPct;
-    const basis = (hrs as any)?.decouplingBasis ?? null;
-    const assessment = (hrs as any)?.decouplingAssessment ?? null;
+    const wholeSession = shouldSuppressSessionHrDrift(factPacket, intervals);
+    const hasHrs = !!hrs && typeof hrs === 'object';
+    const pct = hasHrs ? (hrs as any)?.decouplingPct : null;
+    const basis = hasHrs ? ((hrs as any)?.decouplingBasis ?? null) : null;
+    const assessment = hasHrs ? ((hrs as any)?.decouplingAssessment ?? null) : null;
+    // Heat/effort-confounded flag — the SAME one State reads to EXCLUDE a run from the durability
+    // verdict. Threaded here so the per-workout row can't scold "aerobic base needs work" off a
+    // number the app itself flagged unreliable (a hot run's decoupling). audit 2026-07-17.
+    const confounded = hasHrs && (hrs as any)?.decouplingConfounded === true;
+    if (typeof pct === 'number' && Number.isFinite(pct)) {
+      return {
+        pct: Math.round(pct * 10) / 10,
+        basis: (basis === 'gap' || basis === 'raw') ? basis : null,
+        assessment: (['good','needs_work'] as const).includes(assessment as any) ? assessment : null,
+        confounded,
+        whole_session: wholeSession,
+      };
+    }
+    // ⛔ NEVER WITHHELD (Michael 2026-09-03: "drift is going to be important"). When the pace-to-heart-rate
+    // read was not computed (intervals, short session, a ride), fall back to heart rate alone: second half
+    // against first, as a percentage — the book's own measure (p107, the 5% line).
+    // `hr_drift_v1` is written by BOTH analysers from `_shared/hr-drift-halves.ts` (halves by time, first
+    // 3 min skipped) — one definition for runs and rides.
+    const rideDrift = (wa as any)?.hr_drift_v1;
+    if (rideDrift && typeof rideDrift.pct === 'number' && Number.isFinite(rideDrift.pct)) {
+      return { pct: Math.round(rideDrift.pct * 10) / 10, basis: 'hr' as const, assessment: null, confounded: false, whole_session: wholeSession };
+    }
     if (pct == null && basis == null && assessment == null) return null;
-    return {
-      pct: typeof pct === 'number' && Number.isFinite(pct) ? Math.round(pct * 10) / 10 : null,
-      basis: (basis === 'gap' || basis === 'raw') ? basis : null,
-      assessment: (['good','needs_work'] as const).includes(assessment as any) ? assessment : null,
-      // Heat/effort-confounded flag — the SAME one State reads to EXCLUDE a run from the durability
-      // verdict. Threaded here so the per-workout row can't scold "aerobic base needs work" off a
-      // number the app itself flagged unreliable (a hot run's decoupling). audit 2026-07-17.
-      confounded: (hrs as any)?.decouplingConfounded === true,
-    };
+    return { pct: null, basis: (basis === 'gap' || basis === 'raw') ? basis : null, assessment: null, confounded, whole_session: wholeSession };
   })();
 
   // ── Analysis detail rows ───────────────────────────────────────────────────
@@ -1527,7 +1572,7 @@ export function buildAnalysisDetailRows(
   factPacket: any, flagsV1: any[], hasBullets: boolean, comp: any, gapAdjusted: boolean = false,
   intervals: IntervalRow[] = [], sport: string = '', vsSimilar: any = null,
   weatherTempF: number | null = null,
-  decoupling: { pct: number | null; basis: 'gap' | 'raw' | null; assessment: 'excellent' | 'good' | 'moderate' | 'high' | null; confounded?: boolean } | null = null,
+  decoupling: { pct: number | null; basis: 'gap' | 'raw' | 'hr' | null; assessment: 'excellent' | 'good' | 'moderate' | 'high' | null; confounded?: boolean; whole_session?: boolean } | null = null,
   /** The provider's own elevation total (metres) — the number the DETAILS tab renders. See the TERRAIN
    *  row below: without this, the two tabs derived elevation separately and printed different numbers. */
   providerElevationGainM: number | null = null,
@@ -1908,10 +1953,22 @@ export function buildAnalysisDetailRows(
       // speaks when there IS a measurement being withheld — no drift data, no row, no padding.
       const withheldForPaceSpread = !decouplingShown && sport !== 'swim'
         && signal != null && Math.abs(signal) >= 3;
-      if (withheldForPaceSpread) {
+      // 2026-09-03: the number is never withheld. On an interval session it is heart rate alone across the
+      // whole session, intervals included — said plainly so it is not read as a steady-run drift.
+      const pctAny = typeof decoupling?.pct === 'number' && Number.isFinite(decoupling.pct) ? decoupling.pct : null;
+      if (!decouplingShown && pctAny != null) {
+        const line = 5;
+        const d = Math.round((pctAny - line) * 10) / 10;
+        const room = d > 0 ? `${d.toFixed(1)} over the ${line}% line` : `${Math.abs(d).toFixed(1)} of room to ${line}%`;
+        const scope = decoupling?.whole_session
+          ? ' — whole session, intervals included, so not a steady-run read'
+          : (decoupling?.basis === 'hr' ? ' — heart rate alone, second half against first'
+            : (decoupling?.basis === 'raw' ? ' — hills mixed in' : ''));
+        rows.push({ label: 'Heart rate', value: `Drift ${pctAny.toFixed(1)}% (${room})${scope}` });
+      } else if (withheldForPaceSpread) {
         rows.push({
           label: 'Heart rate',
-          value: 'Not read on this session — the pace varied too much across it for a drift number to mean anything',
+          value: 'Not read on this session — no usable heart-rate data across it',
         });
       }
     } else if (driftExplanation === 'pace_driven' && rawAbsDrift != null && Math.abs(rawAbsDrift) >= 5) {

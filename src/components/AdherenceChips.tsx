@@ -133,6 +133,25 @@ export default function AdherenceChips({
     const isSwim = /swim/i.test(sportType);
     const isPoolSwim = !!sd.classification?.is_pool_swim;
 
+    const decoupling = (sd.classification as any)?.decoupling as { pct: number | null; basis: 'gap' | 'raw' | 'hr' | null; whole_session?: boolean } | null | undefined;
+    const driftPct = decoupling?.pct ?? null;
+    const driftValue = driftPct != null ? `${driftPct.toFixed(1)}%` : null;
+    const driftSubtitle = (() => {
+      if (driftPct == null) return 'Heart-rate drift';
+      const line = DRIFT_LIMITS.hybridPct;
+      const d = Math.round((driftPct - line) * 10) / 10;
+      const room = d > 0 ? `${d.toFixed(1)} over the ${line}% line` : `${Math.abs(d).toFixed(1)} of room to ${line}%`;
+      const t = (sd as any)?.weather?.temperature_f;
+      const heat = typeof t === 'number' && Number.isFinite(t) ? ` · ${Math.round(t)}°F` : '';
+      const scope = decoupling?.whole_session ? ' · incl. intervals' : (decoupling?.basis === 'hr' ? ' · heart rate only' : '');
+      return `${room}${decoupling?.basis === 'raw' ? ' · hills mixed in' : ''}${scope}${heat}`;
+    })();
+    // 2026-09-03 (Michael: "we add an execution score, right? Drift?"): the header is Workload · Execution ·
+    // Duration · Drift on every planned run and ride. The pace/GAP percentage that sat here was the blended
+    // interval pace score and read as a mystery number; it lives per row in the interval table. Easy and
+    // Power reads live in the Insights text.
+    const executionSubtitle = isStructured ? 'Intervals + time vs plan' : (intensityAdherence != null ? 'Effort + time vs plan' : 'Pace + time vs plan');
+
     const completedDurS = sd.completed_totals?.duration_s ?? null;
     const plannedDurS = sd.planned_totals?.duration_s ?? null;
     const durationDelta = (completedDurS != null && plannedDurS != null && plannedDurS > 0)
@@ -302,12 +321,11 @@ export default function AdherenceChips({
           <div className="flex items-center justify-center gap-6 text-center mb-3">
             <div className="flex items-start gap-3">
               {chipText('Workload', loadValue, loadSubtitle)}
-              {/* Power when watts were prescribed; Easy when the prescription was an intensity. Never
-                  both — a session asked one of those two questions, not both. */}
-              {powerAdherence != null
-                ? chip('Power', powerAdherence, 'Time in range')
-                : chipText('Easy', easyValue, easySubtitle)}
+              {/* 2026-09-03: Execution and Drift on rides too (Michael: "drift really important on the
+                  performance screens for running and riding"). Power / Easy reads live in Insights. */}
+              {executionScore != null && chip('Execution', executionScore, powerAdherence != null ? 'Power + time vs plan' : 'Effort + time vs plan')}
               {chipText('Duration', durationValue, 'Moving time vs plan')}
+              {driftValue != null && chipText('Drift', driftValue, driftSubtitle)}
             </div>
           </div>
         </div>
@@ -325,18 +343,6 @@ export default function AdherenceChips({
     // that difference so the user can see if they need to dial back or have room"). p107: terminate an easy
     // session at 10%; 5% for hybrid athletes training many sessions a week — our whole audience. The chip
     // states the measurement and the room; it does not judge. Terrain-confounded ('raw') reads say so.
-    const decoupling = (sd.classification as any)?.decoupling as { pct: number | null; basis: 'gap' | 'raw' | null } | null | undefined;
-    const driftPct = decoupling?.pct ?? null;
-    const driftValue = driftPct != null ? `${driftPct.toFixed(1)}%` : null;
-    const driftSubtitle = (() => {
-      if (driftPct == null) return 'Heart-rate drift';
-      const line = DRIFT_LIMITS.hybridPct;
-      const d = Math.round((driftPct - line) * 10) / 10;
-      const room = d > 0 ? `${d.toFixed(1)} over the ${line}% line` : `${Math.abs(d).toFixed(1)} of room to ${line}%`;
-      const t = (sd as any)?.weather?.temperature_f;
-      const heat = typeof t === 'number' && Number.isFinite(t) ? ` · ${Math.round(t)}°F` : '';
-      return `${room}${decoupling?.basis === 'raw' ? ' · hills mixed in' : ''}${heat}`;
-    })();
 
     return (
       <div className="w-full pt-1 pb-2">
@@ -344,20 +350,9 @@ export default function AdherenceChips({
         <div className="flex items-center justify-center gap-6 text-center mb-3">
           <div className="flex items-start gap-3">
             {chipText('Workload', loadValue, loadSubtitle)}
+            {executionScore != null && chip('Execution', executionScore, executionSubtitle)}
             {chipText('Duration', durationValue, 'Moving time vs plan')}
             {driftValue != null && chipText('Drift', driftValue, driftSubtitle)}
-            {/* An easy run had the Pace chip hidden and NOTHING put in its place — the athlete was
-                told the session was not judged on pace, and then shown no read at all on whether they
-                held it easy. The ride solved this on 2026-08-01; this is the same chip, the run's own
-                ceiling, in the slot the pace chip vacated. Never both: a session prescribed a pace or
-                prescribed an intensity, and only one of those questions was asked of it. */}
-            {/* ⚠️ THE SERVER DECIDES WHICH QUESTION THIS SESSION WAS ASKED. `intensity_adherence` is
-                only emitted when the analyzer judged the run against an easy prescription, so its
-                presence IS the verdict — the client does not re-derive it from `is_easy_like` (which
-                is a separate, looser display flag and would drift the moment the rule changes). */}
-            {intensityAdherence != null
-              ? chipText('Easy', easyValue, easySubtitle)
-              : (showPaceChip && chip(paceChipLabel, paceAdherence, paceChipSubtitle))}
           </div>
         </div>
       </div>

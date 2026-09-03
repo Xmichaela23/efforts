@@ -145,22 +145,37 @@ const VARIABLE_PACE_PACKET = (driftBpm: number) => {
   return p;
 };
 
-Deno.test('⛔ a suppressed heart-rate read says WHY, instead of vanishing', () => {
+// 2026-09-03 (Michael: "drift is going to be important" — never withheld). A raw-basis percentage on a
+// variable-pace session is SHOWN, with the number against the 5% line and "hills mixed in" said plainly,
+// instead of the old "pace varied too much" apology. Still no bpm line beside it.
+Deno.test('a raw-basis drift on a variable-pace session is shown against the 5% line, with the caveat', () => {
   const rows = buildAnalysisDetailRows(
     VARIABLE_PACE_PACKET(5), [], false, null, false, [], 'run', null, null, RAW,
   );
   const hr = rows.find((r) => r.label === 'Heart rate');
-  assertEquals(!!hr, true, 'the row must still render');
-  assertStringIncludes(hr!.value, 'pace varied too much');
-  // It states a fact about the RUN, never the app apologising for itself (D-359 §3).
-  assertEquals(/too few|not enough|insufficient|unavailable/i.test(hr!.value), false);
-  // And it does not smuggle the number it just declined to interpret.
+  assertEquals(!!hr, true, 'the row must render');
+  assertStringIncludes(hr!.value, '6.0%');
+  assertStringIncludes(hr!.value, '1.0 over the 5% line');
+  assertStringIncludes(hr!.value, 'hills mixed in');
   assertEquals(/\d+ bpm/.test(hr!.value), false);
+  assertEquals(rows.filter((r) => r.label === 'Heart rate').length, 1);
+});
+
+Deno.test('interval session: the whole-session number is shown and labelled as such', () => {
+  const p = VARIABLE_PACE_PACKET(5);
+  (p as any).derived.interval_execution = { total_steps: 12 };
+  const rows = buildAnalysisDetailRows(
+    p, [], false, null, false, [], 'run', null, null, { pct: 4.5, basis: 'hr' as const, assessment: null, whole_session: true },
+  );
+  const hr = rows.find((r) => r.label === 'Heart rate');
+  assertStringIncludes(hr!.value, '4.5%');
+  assertStringIncludes(hr!.value, '0.5 of room to 5%');
+  assertStringIncludes(hr!.value, 'intervals included');
 });
 
 Deno.test('no drift measured at all → no row, not an apology', () => {
   const rows = buildAnalysisDetailRows(
-    VARIABLE_PACE_PACKET(0), [], false, null, false, [], 'run', null, null, RAW,
+    VARIABLE_PACE_PACKET(0), [], false, null, false, [], 'run', null, null, null,
   );
   assertEquals(rows.find((r) => r.label === 'Heart rate'), undefined);
 });

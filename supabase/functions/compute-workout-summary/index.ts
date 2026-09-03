@@ -1414,6 +1414,8 @@ Deno.serve(async (req) => {
       const computed = {
         version: COMPUTED_VERSION,
         intervals: outIntervals,
+        // 2026-09-03: how many planned steps the recording never reached (a session cut short); 0 = all laid out.
+        steps_not_done: outIntervals.filter((x: any) => x?.not_done === true).length,
         overall: {
           duration_s_moving: overallSec,
           distance_m: Math.round(overallMeters),
@@ -1605,9 +1607,14 @@ Deno.serve(async (req) => {
       }
 
       // 3) Duration ratio check (uses moving time to avoid pause false-positives)
-      if (plannedTotalSec > 0 && executedMovingSec > 0) {
+      // 2026-09-03: a SHORT recording is no longer a mismatch — a session cut short is laid out for the part
+      // done and the rest emitted as `not_done` (see the walk). Only a recording far LONGER than the plan
+      // (2.5×) is judged unrelated here; a planned total under two minutes is not judged at all.
+      // ⚠️ Stored reasons like `duration_ratio_38.26` (2026-09-03, a 42-min ride against a 66-min plan) show the
+      // planned total once arrived here in MINUTES; a total under ten minutes is not judged at all.
+      if (plannedTotalSec >= 600 && executedMovingSec > 0) {
         const ratio = executedMovingSec / plannedTotalSec;
-        if (ratio < 0.40 || ratio > 2.5) {
+        if (ratio > 2.5) {
           return { mismatch: true, reason: `duration_ratio_${ratio.toFixed(2)}` };
         }
       }
@@ -1728,7 +1735,7 @@ Deno.serve(async (req) => {
     const hasDistanceProgression = rows.length > 1 && rows.some(r => (r.d || 0) > 1);
     const isPoolSwim = sport === 'swim' && !hasDistanceProgression;
 
-    type Info = { st:any; startIdx:number; endIdx:number|null; measured:boolean; role:'warmup'|'cooldown'|'recovery'|'work'|'pre_extra'|'post_extra' };
+    type Info = { st:any; startIdx:number; endIdx:number|null; measured:boolean; role:'warmup'|'cooldown'|'recovery'|'work'|'pre_extra'|'post_extra'; notDone?: boolean };
     const infos: Info[] = [];
 
     for (let i=0;i<plannedSteps.length;i+=1) {
@@ -1756,7 +1763,21 @@ Deno.serve(async (req) => {
       
       // Guard: some interval steps surface tiny duration hints (e.g., 0:30) without distance.
       // For work reps, prefer distance; if distance is missing and duration < 60s, treat as unspecified
-      if (role === 'work' && (!targetMeters || targetMeters <= 0) && (targetSeconds != null && targetSeconds < 60)) {
+      // ⛔ A SESSION CUT SHORT IS LAID OUT FOR THE PART THE ATHLETE DID (Michael 2026-09-03, his Sept 1
+      // Anaerobic Ride: 42 of 66 min, five of ten efforts done, and the screen showed nothing). A step whose
+      // planned start lies at or beyond the end of the recording is emitted as `not_done`; it is never
+      // measured, never walked into the rows, and never redistributed as a recovery share.
+      const lastRowT = rows.length ? Number(rows[rows.length - 1].t || 0) : 0;
+      if (rows.length && idx >= rows.length - 1 && startT >= lastRowT - 1
+          && ((targetMeters && targetMeters > 0) || (targetSeconds && targetSeconds > 0))) {
+        infos.push({ st, startIdx: rows.length - 1, endIdx: rows.length - 1, measured: true, role, notDone: true });
+        continue;
+      }
+      // 2026-09-03: a RIDE step with a power target is measured by its time however short (his 45-s
+      // efforts at 185 W were being thrown away as "unspecified" and re-labelled recovery). The tiny-hint
+      // rule stays for runs, where a 0:30 hint without distance is a stride the athlete paces by feel.
+      const hasPowerTarget = !!((st as any)?.power_range || (st as any)?.powerRange || (st as any)?.powerTarget || (st as any)?.power_target);
+      if (role === 'work' && (!targetMeters || targetMeters <= 0) && (targetSeconds != null && targetSeconds < 60) && !(sport === 'ride' && hasPowerTarget)) {
         targetSeconds = null;
       }
 
@@ -1823,7 +1844,7 @@ Deno.serve(async (req) => {
               for (let k=0;k<slots;k+=1) {
                 const share = plannedSecs[k]/sum; const thisT = tCursor + share * totalT;
                 let e = totalStart+1; while (e < rows.length && rows[e].t < thisT) e += 1;
-                infos[i+k].startIdx = totalStart; infos[i+k].endIdx = Math.max(totalStart+1, e); infos[i+k].role = 'recovery';
+                infos[i+k].startIdx = totalStart; infos[i+k].endIdx = Math.min(rows.length - 1, Math.max(totalStart+1, e)); infos[i+k].role = 'recovery';
                 totalStart = infos[i+k].endIdx!; tCursor = thisT;
               }
             } else {
@@ -1907,7 +1928,28 @@ Deno.serve(async (req) => {
     const outIntervals: any[] = [];
     for (const info of infos) {
       const st = info.st;
-      let sIdx = info.startIdx; let eIdx = info.endIdx != null ? info.endIdx : Math.min(rows.length-1, info.startIdx+1);
+      if (info.notDone) {
+        const stND = info.st;
+        outIntervals.push({
+          planned_step_id: stND?.id ?? null,
+          planned_label: formatPlannedLabel(stND, sport),
+          kind: stND?.type || stND?.kind || null,
+          role: info.role,
+          planned: {
+            duration_s: deriveSecondsFromPlannedStep(stND),
+            distance_m: deriveMetersFromPlannedStep(stND),
+            target_pace_s_per_mi: derivePlannedPaceSecPerMi(stND),
+            power_range: (stND as any)?.power_range || (stND as any)?.powerRange
+          },
+          executed: { duration_s: null, distance_m: null, avg_pace_s_per_mi: null, avg_hr: null, avg_cadence_spm: null, avg_power_w: null, adherence_percentage: null },
+          pass_state: 'skip',
+          not_done: true,
+          sample_idx_start: null,
+          sample_idx_end: null
+        });
+        continue;
+      }
+      let sIdx = Math.min(rows.length-1, info.startIdx); let eIdx = info.endIdx != null ? Math.min(rows.length-1, info.endIdx) : Math.min(rows.length-1, info.startIdx+1);
       if (eIdx <= sIdx) eIdx = Math.min(rows.length-1, sIdx+1);
 
       // For distance-based work steps only, trim edges with very low speed to avoid jog bleed
@@ -1927,7 +1969,9 @@ Deno.serve(async (req) => {
       let segSecRaw = Math.max(0, endT - startT);
 
       // Heuristic: if first work rep collapses to a tiny slice (<60s), expand to the intended rep window
-      if (info.role === 'work' && segSecRaw < 60) {
+      // 2026-09-03: a ride step with a power target keeps its planned window (a 45-s effort is 45 s, not 90).
+      const stHasPower = !!((st as any)?.power_range || (st as any)?.powerRange || (st as any)?.powerTarget || (st as any)?.power_target);
+      if (info.role === 'work' && segSecRaw < 60 && !(sport === 'ride' && stHasPower)) {
         const intendedM = deriveMetersFromPlannedStep(st);
         const limitIdx = rows.length - 1;
         if (intendedM && intendedM > 0) {
@@ -2160,7 +2204,12 @@ Deno.serve(async (req) => {
     const existingOverall = existingComputed?.overall || {};
     const computed: any = {
       version: COMPUTED_VERSION,
+      // 2026-09-03: say which path built this; the overall-only branch's stale reason must not survive a re-run.
+      alignment_mode: 'aligned',
+      mismatch_reason: null,
       intervals: outIntervals,
+      // 2026-09-03: how many planned steps the recording never reached (a session cut short); 0 = all laid out.
+      steps_not_done: outIntervals.filter((x: any) => x?.not_done === true).length,
       planned_steps_light: plannedSnapshot,
       overall: {
         // Use our calculated values, but preserve existing if ours are missing/zero

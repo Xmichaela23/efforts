@@ -367,8 +367,14 @@ export type SessionDetailV1 = {
      */
     decoupling: {
       pct: number | null;
-      basis: 'gap' | 'raw' | null;
+      /** 'gap' / 'raw' = pace-to-heart-rate decoupling (TrainingPeaks' Pa:Hr); 'hr' = heart rate alone,
+       *  second half against first (the book's own drift, p107) — the fallback so the number is NEVER
+       *  withheld (Michael 2026-09-03: "drift is going to be important"). */
+      basis: 'gap' | 'raw' | 'hr' | null;
       assessment: 'excellent' | 'good' | 'moderate' | 'high' | null;
+      /** true when the session had intervals: the number covers the whole session, intervals included,
+       *  so it is not the same read as a steady run. Stated on the screen, never hidden. */
+      whole_session?: boolean;
     } | null;
     /** D-264 step-0 receipt: HR drift (bpm) as it flows through the fixed pipeline
      *  (buildActualSession → session), proving the nested key reaches session_detail. */
@@ -741,6 +747,8 @@ export type IntervalRow = {
   };
   pace_adherence_pct: number | null;
   duration_adherence_pct: number | null;
+  /** 2026-09-03: the recording ended before this planned step (a session cut short). Executed fields are null. */
+  not_done?: boolean;
 }
 
 // -----------------------------------------------------------------------------

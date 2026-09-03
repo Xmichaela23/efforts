@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { hrDriftHalvesPct, warmupSkipSeconds } from '../_shared/hr-drift-halves.ts';
 import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
 import { resolveRideEasyCeiling } from '../_shared/ride-easy-hr.ts';
 import { timeUnderCeiling } from '../_shared/time-under-ceiling.ts';
@@ -1777,6 +1778,7 @@ Deno.serve(async (req) => {
     // the user sees only 4 of 6 segments on a 2x15 SS ride.
     const allIntervalsWithPower = intervals.filter(i => {
       if (!i.executed) return false;
+      if ((i as any).not_done === true) return false; // 2026-09-03: a step the recording never reached is not a 0 W effort
       if (i.power_range) return true;
       const r = String(i.role || i.kind || '').toLowerCase();
       return /recover|rest/.test(r);
@@ -2714,7 +2716,12 @@ Deno.serve(async (req) => {
       // passed to the insight. The cross-domain carryover gauge below reads the same column and has
       // NEVER RUN because of the missing SELECT; it stays off behind an explicit flag rather than
       // switching itself on as a side effect of this change. See CARRYOVER_RPE_GAUGE_ENABLED.
-      const _bikePrescription = (!hasGradedPower && easyRead && easyCeiling.ceiling != null)
+      // 2026-09-03 (Michael's Sept 1 Anaerobic Ride read "Prescribed easy, ridden at tempo"): with no graded
+      // intervals — the layout had refused a cut-short ride — the absence of a power grade was taken as
+      // "the plan was easy". The PLAN says what it was: steps carrying a power target were never easy.
+      const _plannedHasPowerSteps = Array.isArray((plannedWorkout as any)?.computed?.steps)
+        && (plannedWorkout as any).computed.steps.some((st: any) => st?.powerRange || st?.power_range || st?.powerTarget || st?.power_target);
+      const _bikePrescription = (!hasGradedPower && !_plannedHasPowerSteps && easyRead && easyCeiling.ceiling != null)
         ? {
             easy: true,
             underMin: easyRead.under_s / 60,
@@ -2971,6 +2978,15 @@ Deno.serve(async (req) => {
         workout_analysis: {
           ...(existingAnalysis || {}),
           ...(analysisPayload || {}),
+          // 2026-09-03: the ride's heart-rate drift as a percentage (late window vs early window, heart rate
+          // alone) — read by session-detail as the Drift chip / Heart rate row so a ride is never without one.
+          hr_drift_v1: (() => {
+            try {
+              const smp = extractSensorData(workout as any) || [];
+              const totalS = Number((workout as any)?.moving_time ?? (workout as any)?.duration ?? 0);
+              return hrDriftHalvesPct(smp, totalS > 0 && totalS < 1000 ? totalS * 60 : totalS, { skipStartS: warmupSkipSeconds((workout as any)?.computed) });
+            } catch { return null; }
+          })(),
           classified_type: cyclingFactPacketV1?.facts?.classified_type || null,
           fact_packet_v1: cyclingFactPacketV1,
           flags_v1: cyclingFlagsV1,

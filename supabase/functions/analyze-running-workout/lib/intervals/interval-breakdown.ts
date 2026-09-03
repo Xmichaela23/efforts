@@ -43,7 +43,8 @@ export function generateIntervalBreakdown(
 ): any {
   // For steady-state runs, workIntervals might be empty but allIntervals has the data
   // Use allIntervals if workIntervals is empty
-  const intervalsToAnalyze = workIntervals.length > 0 ? workIntervals : (allIntervals || []).filter(i => i.executed);
+  // 2026-09-03: steps the recording never reached (`not_done`, a session cut short) are not graded as misses.
+  const intervalsToAnalyze = (workIntervals.length > 0 ? workIntervals : (allIntervals || []).filter(i => i.executed)).filter((i: any) => i?.not_done !== true);
   
   if (intervalsToAnalyze.length === 0) {
     return { available: false, message: 'No intervals to analyze' };

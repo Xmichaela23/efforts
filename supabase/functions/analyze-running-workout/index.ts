@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { hrDriftHalvesPct, warmupSkipSeconds } from '../_shared/hr-drift-halves.ts';
 import { extractSensorData } from '../../lib/analysis/sensor-data/extractor.ts';
 import { generateIntervalBreakdown } from './lib/intervals/interval-breakdown.ts';
 import { getWorkIntervals } from './lib/intervals/build-intervals.ts';
@@ -2637,7 +2638,7 @@ Deno.serve(async (req) => {
           if (vs && typeof vs.sample_size === 'number' && vs.sample_size >= 3 && typeof vs.assessment === 'string') {
             const map: Record<string, string> = {
               better_than_usual: 'Better than usual vs similar workouts.',
-              typical: 'Typical vs similar workouts.',
+              // 2026-09-03: 'typical' printed a bare sentence with no number in it; only a difference is worth a line.
               worse_than_usual: 'Worse than usual vs similar workouts.',
             };
             const msg = map[String(vs.assessment)] || null;
@@ -2739,9 +2740,10 @@ Deno.serve(async (req) => {
         }
 
         // Historical drift baseline
-        if (Number.isFinite(histAvg) && histAvg > 0 && Number.isFinite(driftBpm) && driftBpm > 0) {
-          bullets.push(`HR drift ${Math.round(driftBpm)} bpm vs your typical ~${Math.round(histAvg)} bpm for similar runs.`);
-        }
+        // 2026-09-03: the "HR drift N bpm vs your typical" sentence is gone — it contradicted the Heart rate
+        // row on interval days (one said 3 bpm, the other said not read). Drift has ONE writer now: the
+        // session-detail Heart rate row and the Drift chip, as a percentage against the 5% line.
+        void histAvg; void driftBpm;
 
         // Conditions / terrain / pacing fluctuations (only when we have real signal).
         // Keep this to a single concise bullet so it stays high-signal.
@@ -3189,6 +3191,16 @@ Deno.serve(async (req) => {
         session_state_v1: sessionStateV1,
         mile_by_mile_terrain: detailedAnalysis?.mile_by_mile_terrain || null,  // Include terrain breakdown
         heart_rate_summary: heartRateSummaryOut,
+        // 2026-09-03: heart-rate drift as a percentage, halves by time, first 3 min skipped — the one
+        // definition shared with rides (`_shared/hr-drift-halves.ts`). Read by session-detail when the
+        // pace-to-heart-rate decoupling was not computed (intervals), so the Drift chip is never empty.
+        hr_drift_v1: (() => {
+          try {
+            const smp = (typeof effectiveSensorData !== 'undefined' && Array.isArray(effectiveSensorData)) ? effectiveSensorData : (workout.sensor_data?.samples || []);
+            const totalS = Number(workout?.moving_time ?? workout?.duration ?? 0);
+            return hrDriftHalvesPct(smp, totalS > 0 && totalS < 1000 ? totalS * 60 : totalS, { skipStartS: warmupSkipSeconds((workout as any)?.computed) });
+          } catch { return null; }
+        })(),
         is_goal_race: goalRaceCompletionMatch.matched === true,
         race_debrief_text: race_debrief_text ?? null,
         // Snapshot the course strategy zones used for this debrief so the

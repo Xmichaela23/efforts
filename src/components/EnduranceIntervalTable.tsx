@@ -24,6 +24,8 @@ type IntervalRow = {
   };
   pace_adherence_pct: number | null;
   duration_adherence_pct: number | null;
+  /** the recording ended before this planned step (a session cut short) */
+  not_done?: boolean;
 };
 
 export type GoalRaceReferenceMode = 'projection' | 'goal';
@@ -401,10 +403,10 @@ export default function EnduranceIntervalTable({
                     )}
                   </div>
                 </td>
-                <td className="px-2 py-1.5 font-medium">{execCell}</td>
-                <td className="px-2 py-1.5">{distStr}</td>
+                <td className="px-2 py-1.5 font-medium">{iv.not_done ? <span className="text-white/40">not done</span> : execCell}</td>
+                <td className="px-2 py-1.5">{iv.not_done ? '—' : distStr}</td>
                 <td className="px-2 py-1.5">
-                  <div className="font-medium">{durStr}</div>
+                  <div className="font-medium">{iv.not_done ? '—' : durStr}</div>
                 </td>
                 <td className="px-1 py-1.5 text-[13px]">
                   <div className="text-right">
