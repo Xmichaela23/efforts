@@ -495,7 +495,7 @@ export default function StrengthCompareTable({ planned, completed, completedWork
     const slotIntentWord = SLOT_INTENT_WORD[
       String((p as any)?.slot_intent ?? (c as any)?.slot_intent ?? '').toUpperCase()
     ] ?? null;
-    return { name: displayName, slotIntentWord, swappedWith, pSets, pReps, pDuration, pW, pVol: pVolFromSets, cSets, cRepsAvg, cRepsTotal, cWAvg, cVol, status, pairs, isBodyweight, targetRir, actualRir, serverRir, previousDate, previousDaysAgo, hasPrevious: previousSets.length > 0, difficulty, assistanceTotalReps } as any;
+    return { name: displayName, slotIntentWord, swappedWith, pSets, pReps, pDuration, pW, pVol: pVolFromSets, cSets, cRepsAvg, cRepsTotal, cWAvg, cVol, status, pairs, isBodyweight, targetRir, actualRir, serverRir, previousDate, previousDaysAgo, hasPrevious: previousSets.length > 0, difficulty, assistanceTotalReps, assistanceBand } as any;
   });
 
   // ⛔ THE `totals` REDUCER IS DELETED, NOT ORPHANED. It fed the "vs plan" row at the bottom of this
