@@ -76,7 +76,10 @@ export default function StateBodyBlock({
                 value and its note; the window and source do not print. */}
           </div>
         ))}
-        {/* The BODY 'Cross-training' row is DELETED (D-354). BODY is only what the athlete
+        {/* ⛔ BODY IS REPORTED-ONLY (Michael 2026-09-03): "it's solely a reported number, we shouldn't
+            pull from anything else, this is the only place where we can see how overall training is
+            being handled". Effort · soreness · logged · as of. No measured row, ever.
+            The BODY 'Cross-training' row is DELETED (D-354). BODY is only what the athlete
             REPORTS — effort and soreness. This row compared declared targets against GPS
             mileage, which the athlete already knows. The server no longer sends the field. */}
       </div>

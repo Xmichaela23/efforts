@@ -755,15 +755,13 @@ function computeVisibleSignals(endurance: EnduranceResponse, strength: StrengthR
       as_of_date: endurance.rpe.newest_session_date ?? null,
     });
   }
-  if (endurance.cardiac_efficiency.sufficient) {
-    out.push({
-      label: 'Aerobic fitness', category: 'endurance',
-      trend: endurance.cardiac_efficiency.trend, trend_icon: trendIcon(endurance.cardiac_efficiency.trend), trend_tone: trendTone(endurance.cardiac_efficiency.trend),
-      detail: humanDetail(endurance.cardiac_efficiency.delta, 'sec/mi', 'improving', 'declining', 'stable'),
-      samples: endurance.cardiac_efficiency.samples,
-      samples_label: samplesLabel(endurance.cardiac_efficiency.samples, 'endurance'),
-    });
-  }
+  // ⛔ NO MEASURED ROW IN BODY (Michael 2026-09-03): "it's solely a reported number, we shouldn't pull
+  // from anything else, this is the only place where we can see how overall training is being
+  // handled". The 'Aerobic fitness' signal that used to be pushed here (pace at easy HR, computed) is
+  // gone — measured fitness lives on the Trends run card as "aerobic efficiency". BODY is effort ·
+  // soreness · logged · as of, all from what the athlete typed after a session.
+  // (The inputs behind it were never wired anyway — coach passed null for both sides — so nothing on
+  // any screen changes by removing it.)
 
   for (const l of strength.per_lift) {
     if (!l.sufficient) continue;

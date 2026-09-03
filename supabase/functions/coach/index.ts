@@ -2710,6 +2710,10 @@ Deno.serve(async (req) => {
     // (docs/SCIENCE-concurrent-training-interference.md) — so an HR-based fatigue read can be actively
     // backwards in the exact case it is wanted. The subjective measures outperform it (BJSM review),
     // which is why BODY now reads REPORTED effort and soreness instead.
+    // ⛔ REPORTED-ONLY, RULED AGAIN 2026-09-03 (Michael): "it's solely a reported number, we shouldn't pull
+    // from anything else, this is the only place where we can see how overall training is being handled".
+    // No measured row goes in BODY — the computed 'Aerobic fitness' signal was removed from the response
+    // model the same day. Measured fitness lives on the Trends run card.
     //
     // Within-session fading (decoupling) is a RUN signal, not a body signal — it is sport-specific and
     // confounded by heat, hills and hydration — and it already renders on the RUN row.
@@ -2757,12 +2761,18 @@ Deno.serve(async (req) => {
         }
         const extra: any[] = [];
         if (sore.level && sore.recent != null) {
+          // ⛔ THE ROW SAYS HOW MANY ENTRIES IT RESTS ON (Michael 2026-09-03, sanity audit: the week's
+          // "average" was ONE entry and read as a week). Under 3 entries the value prints with its count
+          // and NO "normal for you" — one tap is not a comparison. `logged` under effort does the same.
+          const nEnt = sore.recentCount;
+          const entries = `${nEnt} entr${nEnt === 1 ? 'y' : 'ies'}`;
+          const thin = nEnt < 3;
           extra.push({
             label: 'soreness', category: 'endurance', trend: 'stable', trend_icon: '—',
-            trend_tone: sore.level === 'elevated' ? 'warning' : 'neutral',
+            trend_tone: !thin && sore.level === 'elevated' ? 'warning' : 'neutral',
             value_display: `${sore.recent.toFixed(1)} of 7`,
-            detail: sore.level === 'elevated' ? 'above your normal' : 'normal for you',
-            samples: sore.logged, samples_label: `${sore.logged} session${sore.logged === 1 ? '' : 's'}`,
+            detail: thin ? entries : `${entries} · ${sore.level === 'elevated' ? 'above your normal' : 'normal for you'}`,
+            samples: nEnt, samples_label: entries,
           });
         } else if (sore.logged > 0 && !sore.baselineOk) {
           // NO SILENT DROP — say what it needs, never what to do.
