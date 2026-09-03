@@ -55,8 +55,16 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
     // Prefer server-provided display_metrics (smart server, dumb client)
     const dm = workoutData?.display_metrics;
     if (dm && typeof dm === 'object' && Object.keys(dm).length > 0) {
+      // 2026-09-03: the server's display numbers did not carry the grade-adjusted pace, and this early
+      // return meant nothing below ever ran — the Details tile read "—" with the number sitting in
+      // computed.overall. Fill it from there when the server did not send it (still a READ, never a derive).
+      const gapFromComputed = (() => {
+        const g = Number(workoutData?.computed?.overall?.avg_gap_s_per_mi ?? workoutData?.computed?.overall?.gap_pace_s_per_mi);
+        return Number.isFinite(g) && g > 0 ? g / 1.60934 : null;
+      })();
       return {
         ...dm,
+        gap_pace_s_per_km: (dm as WorkoutDataNormalized).gap_pace_s_per_km ?? gapFromComputed,
         avg_power_pedaling_w: (dm as WorkoutDataNormalized).avg_power_pedaling_w ?? null,
         pct_time_pedaling: (dm as WorkoutDataNormalized).pct_time_pedaling ?? null,
       } as WorkoutDataNormalized;

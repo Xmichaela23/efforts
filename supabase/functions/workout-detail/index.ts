@@ -1800,8 +1800,12 @@ Deno.serve(async (req) => {
     const getDistM = () => { const distKm = Number.isFinite(d?.distance) ? Number(d.distance) * 1000 : null; const distM = d?.computed?.overall?.distance_m ?? null; return Number.isFinite(distM) && distM > 0 ? Number(distM) : (Number.isFinite(distKm) ? Number(distKm) : null); };
     const distM = (_isSwim && _swimSc?.distanceMeters != null) ? _swimSc.distanceMeters : getDistM();
     const distKm = Number.isFinite(distM) && distM > 0 ? distM / 1000 : null;
+    // 2026-09-03: moving time in SECONDS when the import kept them (metrics.moving_time_seconds — Garmin,
+    // and now Strava); the minute column rounded every Details moving time to :00.
+    const _mvSecs = Number(d?.metrics?.moving_time_seconds);
     const durS = (_isSwim && _swimSc?.movingSeconds != null)
       ? _swimSc.movingSeconds
+      : (!_isSwim && Number.isFinite(_mvSecs) && _mvSecs > 0) ? _mvSecs
       : (Number.isFinite(d?.computed?.overall?.duration_s_moving) ? Number(d.computed.overall.duration_s_moving) : (Number.isFinite(d?.moving_time ?? d?.metrics?.moving_time) ? Number(d.moving_time ?? d.metrics.moving_time) * 60 : null));
     const elapsedS = (_isSwim && _swimSc?.elapsedSeconds != null)
       ? _swimSc.elapsedSeconds
@@ -1848,7 +1852,11 @@ Deno.serve(async (req) => {
     const work_kj = Number.isFinite(d?.total_work) ? Number(d.total_work) : null;
     const rawSeries = d?.computed?.analysis?.series || null;
     const series = rawSeries ? bucketSeries(rawSeries, MAX_SERIES_POINTS) : null;
-    (detail as any).display_metrics = { distance_m: distM, distance_km: distKm, duration_s: durS, elapsed_s: elapsedS, elevation_gain_m: elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, avg_power_pedaling_w, pct_time_pedaling, sport: (d?.type || null), series };
+    // 2026-09-03: grade-adjusted pace rides along (the client's Details tile read nothing else once
+    // display_metrics existed). A READ of computed.overall — never derived here.
+    const _gapSecPerMi = Number(d?.computed?.overall?.avg_gap_s_per_mi ?? d?.computed?.overall?.gap_pace_s_per_mi);
+    const gap_pace_s_per_km = (!_isSwim && Number.isFinite(_gapSecPerMi) && _gapSecPerMi > 0) ? _gapSecPerMi / 1.60934 : null;
+    (detail as any).display_metrics = { gap_pace_s_per_km, distance_m: distM, distance_km: distKm, duration_s: durS, elapsed_s: elapsedS, elevation_gain_m: elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, avg_power_pedaling_w, pct_time_pedaling, sport: (d?.type || null), series };
 
     if (scope === 'workout') {
       return new Response(JSON.stringify({
