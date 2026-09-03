@@ -6089,8 +6089,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         );
                       })()}
                       <div style={gridStyle} className="px-1.5 pt-1 pb-1.5 border-b border-white/10">
-                        <span className={labelCls}>{exIsPlyo ? 'Drill' : 'Set'}</span>
-                        <span className={labelCls}>Previous</span>
+                        <span className={labelCls}>{exIsPlyo ? '' : 'Set'}</span>
+                        <span className={labelCls}>{exIsPlyo ? '' : 'Previous'}</span>
                         {exShowWeight && <span className={`${labelCls} text-center`}>{exWeightLabel}</span>}
                         <span className={`${labelCls} text-center`}>{exIsPlyo ? 'Efforts' : 'Reps'}</span>
                         {exShowRir && <span className={`${labelCls} text-center`}>RIR</span>}
@@ -6157,7 +6157,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // rep total). A fixed the previous program main set is prescribed off the training max — the
                         // target IS the number, so "previous" there is noise. rir_tracked !== false
                         // marks the accessories; set.amrap marks the top set.
-                        const showPrevious = set.amrap === true || exercise.rir_tracked !== false;
+                        const showPrevious = !exIsPlyo && (set.amrap === true || exercise.rir_tracked !== false);
                         // ⛔ NO RESERVE IN THIS COLUMN, AND THE COLUMN IS NOT WIDENED (Michael's
                         // screenshots, 2026-08-27: "12 reps @ …", "55 × 6 @ R…", "8 reps @ R…").
                         //
@@ -6322,9 +6322,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           // the progression reads, and rendering it empty would make the one
                           // session that undoes a jump look like a set nobody touched.
                           const repsEntered = set.reps_entered === true;
-                          const shown = (set.reps === 0 && !repsEntered)
+                          // ⛔ A DRILL'S EFFORTS CELL OPENS EMPTY (Michael 2026-09-02: "4 what?"). The plan's `reps` on a
+                          // plyo row is a capacity, not a prescription; showing it reads as a target.
+                          const shown = (exIsPlyo && !repsEntered)
                             ? ''
-                            : (set.reps ?? ((set.amrap || set.repMaxTest || exIsBaselineTest || exHasRepTotal || exOpenRepBand) ? '' : '—'));
+                            : (set.reps === 0 && !repsEntered)
+                              ? ''
+                              : (set.reps ?? ((set.amrap || set.repMaxTest || exIsBaselineTest || exHasRepTotal || exOpenRepBand) ? '' : '—'));
                           return (
                             <button
                               type="button"
@@ -6333,7 +6337,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 setIndex,
                                 field: 'reps',
                                 title: 'Reps',
-                                initialValue: (set.reps === 0 && !repsEntered) ? '' : String(set.reps ?? ''),
+                                initialValue: ((exIsPlyo && !repsEntered) || (set.reps === 0 && !repsEntered)) ? '' : String(set.reps ?? ''),
                                 allowDecimal: false,
                               })}
                               className={numCls}
@@ -6497,7 +6501,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               {/* `pb-1.5` matches the number cells' own bottom padding, so the index,
                                   the Previous anchor and every typed number sit on one line. */}
                               <span className={`text-[13px] tabular-nums leading-none pb-1.5 ${done ? rowAccent.num : 'text-white/70'}`} style={{ fontFamily: 'Inter, sans-serif' }}>
-                                {setIndex + 1}
+                                {exIsPlyo ? '' : setIndex + 1}
                               </span>
 
                               {priorTxt ? (
@@ -6811,7 +6815,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   * ⚠️ ONLY WHERE A SCORED SET EXISTS. Every other row on the session — the
                   * accessories, and any lift the athlete added themselves — keeps Add Set.
                   */}
-                {!exercise.sets.some((s) => s.amrap === true || s.repMaxTest === true) && (
+                {!(equipmentForExercise(exercise.name) === 'plyo' || isPlyometric(exercise.name)) && !exercise.sets.some((s) => s.amrap === true || s.repMaxTest === true) && (
                 <GalaxyButton
                   variant="secondary"
                   size="sm"
@@ -6844,7 +6848,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // standing ME/DE cue detection reads `exercise.notes` for exactly this text.
                   const isSlotText = /^\d+\s*[x×]\s*(ME|DE|HYP|SKILL)\b/i.test(String(exercise.notes || '').trim());
                   // Show notes section for mobility mode, or if athlete-written notes exist
-                  if (isMobilityMode || (exercise.notes && !isSlotText)) {
+                  // A drill's notes are the plan's stop rule, already printed above its row — no second box (2026-09-02).
+                  const notesRowIsPlyo = equipmentForExercise(exercise.name) === 'plyo' || isPlyometric(exercise.name);
+                  if (isMobilityMode || (exercise.notes && !isSlotText && !notesRowIsPlyo)) {
                     return (
                       <div className="mt-3 pt-3 border-t border-white/10">
                         <Textarea
