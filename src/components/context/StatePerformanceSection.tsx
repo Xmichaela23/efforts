@@ -1418,7 +1418,8 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                 {/* ⛔ A CHEVRON THAT OPENS A ROW IS AN AFFORDANCE, NOT DECORATION (rule 5) — it was
                     white/45, near-invisible, and the only signal these rows open at all. */}
                 {/* a clear cue that the row opens (Michael 2026-09-03): a proper chevron that turns when open */}
-                <span className={`text-white/80 text-[20px] leading-none shrink-0 self-center transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true">›</span>
+                {/* down = opens in place (iOS/Material accordion); a right chevron would promise another screen */}
+                <span className={`text-white/80 text-[16px] leading-none shrink-0 self-center transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true">⌄</span>
               </button>
               {open && <div className="px-3 pb-2">{inner}</div>}
             </div>
