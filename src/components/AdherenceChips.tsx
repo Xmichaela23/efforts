@@ -165,7 +165,7 @@ export default function AdherenceChips({
         // 2026-09-03: same markup as chipText so the four readouts sit on one baseline (the percentage
         // chip used to be smaller and lower-case, which read as a different kind of thing).
         <div className="flex flex-col items-center px-1 min-w-0">
-          <div className="readout-num text-xl whitespace-nowrap">{pct}%</div>
+          <div className="readout-num text-lg whitespace-nowrap">{pct}%</div>
           <div className="readout-label text-[11px] uppercase text-center whitespace-nowrap">{label}</div>
           <div className="text-[10px] text-white/40 text-center leading-snug whitespace-nowrap">{text}</div>
         </div>
@@ -188,7 +188,7 @@ export default function AdherenceChips({
       if (!value) return null;
       return (
         <div className="flex flex-col items-center px-1 min-w-0">
-          <div className="readout-num text-xl whitespace-nowrap">{value}</div>
+          <div className="readout-num text-lg whitespace-nowrap">{value}</div>
           <div className="readout-label text-[11px] uppercase text-center whitespace-nowrap">{label}</div>
           <div className="text-[10px] text-white/40 text-center leading-snug whitespace-nowrap">{text}</div>
         </div>
