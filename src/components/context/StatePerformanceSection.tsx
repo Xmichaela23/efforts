@@ -15,7 +15,7 @@ import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/lib/trend-receipt';
 import { foldVariantSlots } from '@/lib/fold-lift-slots';
 import { formatPace } from '@/utils/workoutFormatting';
-import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
+import { getDisciplineColor } from '@/lib/context-utils';
 import { readoutPlateStyle } from '@/lib/readout-plate';
 import ReadoutTiles from '@/components/context/ReadoutTiles';
 // [Step 7] Shared with the server emitter — see tracked-max-lifts.ts.
@@ -35,7 +35,7 @@ import EnduranceCheckpointSheet from '@/components/context/EnduranceCheckpointSh
 import LoadWeeksCard from '@/components/context/LoadWeeksCard';
 // ⛔ COLLAPSE TO ONE LINE PER SPORT (Round 3, 2026-09-01) — each sport shows a change-leading summary
 // and expands on tap. The summary wording is a set of pure functions so the confidence rule is pinned.
-import { changeMonth, efficiencySummary, strengthGlance } from '@/lib/sport-summary';
+import { changeMonth, efficiencyRow, strengthGlanceRows, type SportRow } from '@/lib/sport-summary';
 import { getStoredUserId } from '@/lib/supabase';
 import TrendSparkline from '@/components/context/TrendSparkline';
 import { liftStatusLine } from '@/lib/strength-calibration-copy';
@@ -1100,19 +1100,25 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   // The change-leading summary for a sport's collapsed line — wording via the pure `sport-summary`
   // helpers (confidence rule pinned there). Leads with what MOVED; the level lives in the detail.
   const summaryLifts = strengthFitness ? foldVariantSlots(strengthFitness.perLift.filter((l) => l.isPrimary && l.latestE1rm != null)) : [];
-  // Returns the collapsed plate's lines — one string per line so the plate can stack them (all lifts;
-  // easy + hard runs) instead of truncating one line (Michael 2026-09-01: "we should see all the numbers").
-  const summaryLines = (disc: string): string[] => {
+  // ⛔ THE COLLAPSED SPORT ROW — ONE GRAMMAR FOR ALL FOUR SPORTS (2026-09-03, DESIGN_GUIDELINES
+  // "Layout Rules" §1). Every sport returns the same three slots — name · value · note — so the
+  // renderer aligns names down one column and numbers down another (rule 2) and sizes the number
+  // above its label (rule 3). The WORDING rules are unchanged and still pinned in the pure
+  // `sport-summary` helpers; only the packaging moved.
+  // ⚠️ STILL ONE ROW PER THING, NOT A TRUNCATED LINE (Michael 2026-09-01: "we should see all the
+  // numbers") — every lift, easy AND hard runs. The list gained columns, it did not get shorter.
+  const summaryRows = (disc: string): SportRow[] => {
     if (disc === 'strength') {
       // ⛔ NOT PR-BASED (Michael 2026-09-01: the program is form / bar speed / slow gain under
-      // cross-training stress). One line per lift; opening lists the working numbers, mid-block adds
-      // the creep since the block opened. Flat is fine, no PR flag. See `strengthGlance`.
-      const lines = strengthGlance(
+      // cross-training stress). One row per lift; opening lists the working numbers, mid-block puts
+      // the creep since the block opened in the note. Flat is fine, no PR flag.
+      const rows = strengthGlanceRows(
         summaryLifts as Array<{ displayName: string; latestE1rm: number | null; series?: Array<{ value: number; week?: number }> }>,
         planWeek,
       );
-      if (lines.length) return lines;
-      return [(strengthFitness?.sessionsThisWeek ?? 0) > 0 ? `${strengthFitness!.sessionsThisWeek} sessions this week` : 'no lifts logged'];
+      if (rows.length) return rows;
+      const n = strengthFitness?.sessionsThisWeek ?? 0;
+      return [n > 0 ? { name: 'sessions', value: String(n), note: 'this week' } : { name: 'lifts', value: 'none logged' }];
     }
     if (disc === 'run') {
       // ⛔ EASY AND HARD ON THEIR OWN POOLS (Michael 2026-09-01: "show both easy and hard runs"). Each
@@ -1120,53 +1126,60 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       // no real pace for a group → its run count, never a fabricated number. Term is "hard", not
       // "quality" — plainer for this audience, and it pairs with "easy".
       const groups = runFitness?.efficiency?.groups;
-      const lineFor = (g: string, label: string): string | null => {
+      const rowFor = (g: string, label: string): SportRow | null => {
         const grp = Array.isArray(groups) ? groups.find((x) => x.group === g) : undefined;
         if (!grp || (grp.runs ?? 0) === 0) return null;
         if (grp.recentPaceSecPerKm != null) {
           // OURS (2026-09-03): easy runs read off the warm-ups of hard runs when a block has none of its own.
           const fromWarm = Number((grp as any).recentFromWarmups) || 0;
-          const tag = g === 'easy' && fromWarm > 0 ? ' (incl. warm-ups)' : '';
-          return `${label}${tag} ${formatPace(grp.recentPaceSecPerKm, useImperial)}${grp.recentHrAvg != null ? ` at ${grp.recentHrAvg} bpm` : ''}`;
+          const note = [
+            grp.recentHrAvg != null ? `${grp.recentHrAvg} bpm` : '',
+            g === 'easy' && fromWarm > 0 ? 'incl. warm-ups' : '',
+          ].filter(Boolean).join(' · ');
+          return { name: label, value: formatPace(grp.recentPaceSecPerKm, useImperial), note: note || undefined };
         }
-        return `${label} · ${grp.runs} run${grp.runs === 1 ? '' : 's'}`;
+        return { name: label, value: `${grp.runs} run${grp.runs === 1 ? '' : 's'}` };
       };
-      const lines = [lineFor('easy', 'easy'), lineFor('quality', 'hard')].filter((x): x is string => !!x);
+      const rows = [rowFor('easy', 'easy'), rowFor('quality', 'hard')].filter((x): x is SportRow => !!x);
       // ⛔ THE WEEK'S RUN POINTS AGAINST THE ATHLETE'S TYPICAL (Michael 2026-09-02: run load scored Strava's
       // way). Read off the display contract — `loadByDiscipline.run = { week, typical }` from compute-snapshot
       // (`workload_by_discipline` / `workload_by_discipline_typical`). Absent on rows from before it shipped.
       // 2026-09-03: the third line ("N run points this week · usual M") is gone — the workload chart directly
       // below says the same thing once, under the one name (Workload) the Performance screen uses.
-      if (lines.length) return lines;
+      if (rows.length) return rows;
       // No grouped data yet — fall back to the top-level read.
       const ef = runFitness?.efficiency;
-      if (!ef) return ['no runs logged'];
-      const runVal = ef.recentPaceSecPerKm != null
-        ? `${formatPace(ef.recentPaceSecPerKm, useImperial)}${ef.recentHrAvg != null ? ` at ${ef.recentHrAvg} bpm` : ''}`
-        : null;
+      if (!ef) return [{ name: 'runs', value: 'none logged' }];
       // No verdict word here either (2026-09-02, same ruling): the number and the count, nothing graded.
+      if (ef.recentPaceSecPerKm != null) {
+        return [{ name: 'pace', value: formatPace(ef.recentPaceSecPerKm, useImperial), note: ef.recentHrAvg != null ? `${ef.recentHrAvg} bpm` : undefined }];
+      }
       const n = Number(ef.sampleCount) || 0;
-      return [runVal ?? `${n} run${n === 1 ? '' : 's'}`];
+      return [{ name: 'runs', value: String(n) }];
     }
     if (disc === 'bike') {
       // THE REAL NUMBER LEADS (Michael 2026-09-01: "bike tells the user nothing"). Follow the server's
       // own lead: power leading → recent watts (single-source, from the power series, NOT a client FTP
       // resolve); otherwise the aerobic read is HR-at-easy-power, so show that bpm.
+      // ⚠️ The metric NAME now always renders (it is the row's left column), where the sentence form
+      // dropped it whenever a real value existed. Plain words per COPY-VOICE rule 9.
       const bf = bikeFitness;
       if (bf?.lead === 'power' && bf.power) {
         const p = bf.power;
         const recentW = p.recentValue ?? (Array.isArray(p.series) ? [...p.series].reverse().find((pt) => pt.recent)?.value ?? null : null);
         const powerVal = recentW != null ? `${Math.round(recentW)} W` : null;
-        return [efficiencySummary({ label: 'power', value: powerVal, verdict: p.verdict, pctChange: p.pctChange, sampleCount: p.sampleCount, sinceMonth: changeMonth(asOf, p.windowDays), noun: 'ride' })];
+        return [efficiencyRow({ label: 'power', value: powerVal, verdict: p.verdict, pctChange: p.pctChange, sampleCount: p.sampleCount, sinceMonth: changeMonth(asOf, p.windowDays), noun: 'ride' })];
       }
       const e = bf?.efficiency;
-      if (!e) return ['no rides logged'];
-      const effVal = e.recentValue != null ? `${e.recentValue} bpm at easy power` : null;
-      return [efficiencySummary({ label: 'watts per heartbeat', value: effVal, verdict: e.verdict, pctChange: e.pctChange, sampleCount: e.sampleCount, sinceMonth: changeMonth(asOf, e.windowDays), noun: 'ride' })];
+      if (!e) return [{ name: 'rides', value: 'none logged' }];
+      const effVal = e.recentValue != null ? `${e.recentValue} bpm` : null;
+      return [efficiencyRow({ label: 'heart rate at easy power', value: effVal, verdict: e.verdict, pctChange: e.pctChange, sampleCount: e.sampleCount, sinceMonth: changeMonth(asOf, e.windowDays), noun: 'ride' })];
     }
     if (disc === 'swim') {
+      // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
       const w = Math.round((swimVolume?.windowDays ?? 56) / 7);
-      return [(swimVolume?.swims ?? 0) > 0 ? `${swimVolume!.swims} ${swimVolume!.swims === 1 ? 'swim' : 'swims'} in the last ${w}wk` : `no swims in the last ${w}wk`];
+      const n = swimVolume?.swims ?? 0;
+      return [{ name: 'swims', value: n > 0 ? String(n) : 'none', note: `last ${w}wk` }];
     }
     return [];
   };
@@ -1343,29 +1356,48 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
             if (card.discipline === 'strength') return <>{row}{strengthDetail}<ViadaWeekCard week={viadaWeek} hasPlan={hasActivePlan === true} /></>;
             return row;
           })();
-          // Each discipline's card wears its own READOUT PLATE keyed to its sport (2026-08-15,
-          // shared recipe in src/lib/readout-plate.ts) — this is the one place on State where a
-          // card belongs to exactly one discipline, so it is the one place the plate takes a
-          // colour. Everything multi-sport above and below sits on the neutral plate in StateTab.
-          // ⛔ COLLAPSED BY DEFAULT — the sport's change-leading one-liner; tap the header to expand
-          // into `inner` (the full detail). All four sports fit one screen this way.
+          // ⛔ DEPTH BELONGS TO THE PLATE, NOT THE ROW (2026-09-03, DESIGN_GUIDELINES "Layout Rules").
+          // Each sport USED TO wear its own `rounded-2xl` plate with a sport-keyed tint and an `mb-2`
+          // gap — four floating cards. That cost height, broke alignment (rows inside ONE container
+          // align for free; separate cards do not) and made the eye re-orient four times. The sports
+          // are now four ROWS inside the single neutral plate below, split by hairlines, exactly the
+          // way the LOAD section is already built.
+          // ⚠️ THE PER-SPORT PLATE TINT IS GONE ON PURPOSE. The sport colour still reads — it is on
+          // the icon, where it always was — and the tint was saying the same thing twice. Do NOT
+          // reintroduce it as a per-row background; that is the rule this change exists to keep.
+          // ⛔ COLLAPSED BY DEFAULT — the sport's rows; tap the header to expand into `inner` (the
+          // full detail). All four sports fit one screen this way.
           const Icon = DISCIPLINE_ICON[card.discipline];
           const open = expandedSports.has(card.discipline);
+          const rows = summaryRows(card.discipline);
           return (
-            <div key={card.discipline} className="galaxy-card readout-texture rounded-2xl px-3 mb-2" style={readoutPlateStyle(getDisciplineColorRgb(card.discipline), { galaxy: true })}>
-              <button type="button" onClick={() => toggleSport(card.discipline)} className="w-full flex items-center gap-3 py-2.5 text-left" aria-expanded={open} aria-label={`${card.discipline} details`}>
-                <span className="flex items-center gap-2 shrink-0 text-[13.5px] font-semibold tracking-[0.12em] uppercase text-white/85">
-                  {Icon && <Icon size={16} strokeWidth={2.25} style={{ color: getDisciplineColor(card.discipline) }} className="shrink-0" />}
-                  {card.discipline}
+            <div key={card.discipline}>
+              <button type="button" onClick={() => toggleSport(card.discipline)} className="w-full flex items-start gap-3 px-3 py-2.5 text-left" aria-expanded={open} aria-label={`${card.discipline} details`}>
+                {/* The discipline label is the ROW's name, so it steps DOWN (rule 3): the numbers on
+                    the right are the payload and carry the larger size. It was 13.5px against a 12px
+                    value — the label was bigger than the thing it labelled. */}
+                <span className="flex items-center gap-2 shrink-0 w-[92px] pt-[3px]">
+                  {Icon && <Icon size={15} strokeWidth={2.25} style={{ color: getDisciplineColor(card.discipline) }} className="shrink-0" />}
+                  <span className="text-[10.5px] font-semibold tracking-[0.14em] uppercase text-white/55">{card.discipline}</span>
                 </span>
-                <span className="flex-1 min-w-0 flex flex-col items-end gap-0.5 text-[12px] text-white/60">
-                  {summaryLines(card.discipline).map((line, i) => (
-                    <span key={i} className="text-right leading-tight">{line}</span>
+                {/* ⛔ ONE GRID FOR THE WHOLE SPORT, NOT A GRID PER ROW — the columns only line up if
+                    every row's cells are children of the SAME grid. Names left, numbers right: two
+                    straight edges (rule 2). The old markup right-aligned the whole line, so the
+                    numbers lined up and the names zigzagged. */}
+                <span className="flex-1 min-w-0 grid grid-cols-[1fr_auto_auto] items-baseline gap-x-3 gap-y-[3px]">
+                  {rows.map((r, i) => (
+                    <React.Fragment key={`${r.name}-${i}`}>
+                      <span className="text-[12px] text-white/50 leading-tight truncate min-w-0">{r.name}</span>
+                      <span className="text-[15px] text-white/90 leading-tight tabular-nums text-right">{r.value}</span>
+                      <span className="text-[11px] text-white/40 leading-tight tabular-nums text-right min-w-[42px]">{r.note ?? ''}</span>
+                    </React.Fragment>
                   ))}
                 </span>
-                <span className="text-white/45 text-[11px] shrink-0 self-center">{open ? '▾' : '▸'}</span>
+                {/* ⛔ A CHEVRON THAT OPENS A ROW IS AN AFFORDANCE, NOT DECORATION (rule 5) — it was
+                    white/45, near-invisible, and the only signal these rows open at all. */}
+                <span className="text-white/70 text-[11px] shrink-0 self-center">{open ? '▾' : '▸'}</span>
               </button>
-              {open && <div className="pb-1">{inner}</div>}
+              {open && <div className="px-3 pb-2">{inner}</div>}
             </div>
           );
         };
@@ -1389,21 +1421,31 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         // ⚠️ FROM `active` ONLY, and resting cards keep `false` exactly as before — a dimmed card
         // never carried the axis, and that does not change here.
         const firstAxisDisc = active.find((c) => c.discipline === 'bike' || c.discipline === 'swim')?.discipline;
+        // ⛔ ONE PLATE, HAIRLINE DIVIDERS — the same `divide-y` construction the LOAD section already
+        // uses in StateTab. Glass depth on the OUTSIDE, grid on the inside. Neutral, because this
+        // plate is now multi-sport: the sport colour lives on each row's icon.
         return (
-          <>
+          <div className="galaxy-card readout-texture readout-texture--spectral rounded-2xl divide-y divide-white/[0.055]" style={readoutPlateStyle(undefined, { galaxy: true })}>
             {active.map((card) => renderCard(card, card.discipline === firstAxisDisc))}
-            {resting.length > 0 && (
-              <div className="opacity-45 mt-1">
-                {resting.map((card) => renderCard(card, false))}
+            {/* ⚠️ RESTING ROWS ARE RECESSED, NOT DISABLED (rule 5). They were `opacity-45` — which
+                dimmed a row that is still a button, still tappable, still holding real numbers. A
+                dropped discipline is never graded or penalised (Michael's rule) and it must not be
+                made unreadable either. 0.72 recedes without hiding; the chevron keeps full contrast
+                because the row still opens. */}
+            {resting.map((card) => (
+              <div key={`resting-${card.discipline}`} className="opacity-[0.72]">
+                {renderCard(card, false)}
               </div>
-            )}
-          </>
+            ))}
+          </div>
         );
       })()}
       {/* defensive: if there's no strength trend card at all, still surface the per-lift detail —
           on the strength plate, since the detail is single-discipline content */}
       {strengthDetail && !cards.some((c) => c.discipline === 'strength') && (
-        <div className="galaxy-card readout-texture rounded-2xl px-3 mb-2" style={readoutPlateStyle(getDisciplineColorRgb('strength'), { galaxy: true })}>
+        // ⚠️ NEUTRAL PLATE, matching the sports plate above (2026-09-03) — it used a strength-keyed
+        // tint back when every sport wore its own; one screen, one plate language.
+        <div className="galaxy-card readout-texture readout-texture--spectral rounded-2xl px-3 mt-2" style={readoutPlateStyle(undefined, { galaxy: true })}>
           {strengthDetail}
         </div>
       )}

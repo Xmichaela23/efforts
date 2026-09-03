@@ -1,9 +1,10 @@
 /**
- * THE COLLAPSED SPORT LINE — right population, confidence-gated, consistent grammar (2026-09-01).
+ * THE COLLAPSED SPORT ROW — right population, confidence-gated, ONE grammar for every sport.
+ * Row shape (name · value · note) per DESIGN_GUIDELINES "Layout Rules" §1, 2026-09-03.
  *   deno test --allow-read src/lib/sport-summary.test.ts --no-check
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { changeMonth, dirWord, efficiencySummary, sinceMonthFromSeries, strengthGlance } from './sport-summary.ts';
+import { changeMonth, dirWord, efficiencyRow, sinceMonthFromSeries, strengthGlanceRows } from './sport-summary.ts';
 
 Deno.test('changeMonth = start of the window (asOf − windowDays)', () => {
   assertEquals(changeMonth('2026-09-01', 42), 'Jul');
@@ -21,65 +22,74 @@ Deno.test('⛔ direction word only when the verdict supports one', () => {
   for (const v of ['holding', 'needs_data', 'withheld', 'still_learning', null]) assertEquals(dirWord(v), '');
 });
 
-Deno.test('efficiency line leads with the change when the verdict calls a direction', () => {
+Deno.test('efficiency ROW: a direction becomes the value when there is no real number', () => {
   assertEquals(
-    efficiencySummary({ label: 'pace per heartbeat', verdict: 'improving', pctChange: 4.2, sampleCount: 10, sinceMonth: 'Jul', noun: 'easy run' }),
-    'pace per heartbeat up 4% since Jul',
+    efficiencyRow({ label: 'pace per heartbeat', verdict: 'improving', pctChange: 4.2, sampleCount: 10, sinceMonth: 'Jul', noun: 'easy run' }),
+    { name: 'pace per heartbeat', value: 'up 4% since Jul' },
   );
 });
 
-Deno.test('efficiency line leads with the REAL VALUE when one is passed', () => {
+Deno.test('efficiency ROW: the REAL VALUE takes the number column, the change becomes the note', () => {
   assertEquals(
-    efficiencySummary({ label: 'pace per heartbeat', value: '8:30/mi at 145 bpm', verdict: 'improving', pctChange: 4.2, sampleCount: 10, sinceMonth: 'Jul', noun: 'easy run' }),
-    '8:30/mi at 145 bpm · up 4% since Jul',
+    efficiencyRow({ label: 'pace per heartbeat', value: '8:30/mi', verdict: 'improving', pctChange: 4.2, sampleCount: 10, sinceMonth: 'Jul', noun: 'easy run' }),
+    { name: 'pace per heartbeat', value: '8:30/mi', note: 'up 4% since Jul' },
   );
-  // no direction → value · count, never a bare count
+  // no direction → value + count, never a bare count
   assertEquals(
-    efficiencySummary({ label: 'power', value: '210 W', verdict: 'holding', pctChange: null, sampleCount: 6, sinceMonth: 'Jul', noun: 'ride' }),
-    '210 W · 6 rides',
-  );
-});
-
-Deno.test('⛔ no direction (incl. the false −22% case once it is the HOLDING easy group) → number and count', () => {
-  // The pooled series called "sliding −22", but the easy group holds → the line states the count, not a collapse.
-  assertEquals(
-    efficiencySummary({ label: 'pace per heartbeat', verdict: 'holding', pctChange: -22, sampleCount: 9, sinceMonth: 'Jul', noun: 'easy run' }),
-    'pace per heartbeat · 9 easy runs',
-  );
-  assertEquals(
-    efficiencySummary({ label: 'watts per heartbeat', verdict: 'needs_data', pctChange: null, sampleCount: 5, sinceMonth: '', noun: 'ride' }),
-    'watts per heartbeat · 5 rides',
+    efficiencyRow({ label: 'power', value: '210 W', verdict: 'holding', pctChange: null, sampleCount: 6, sinceMonth: 'Jul', noun: 'ride' }),
+    { name: 'power', value: '210 W', note: '6 rides' },
   );
 });
 
-Deno.test('⛔ strength is NOT PR-based: one line per lift; opening lists the working numbers, no "tested" claim', () => {
+Deno.test('⛔ no direction (incl. the false −22% case once it is the HOLDING easy group) → the count, never a collapse', () => {
+  // The pooled series called "sliding −22", but the easy group holds → the row states the count.
+  assertEquals(
+    efficiencyRow({ label: 'pace per heartbeat', verdict: 'holding', pctChange: -22, sampleCount: 9, sinceMonth: 'Jul', noun: 'easy run' }),
+    { name: 'pace per heartbeat', value: '9 easy runs' },
+  );
+  assertEquals(
+    efficiencyRow({ label: 'watts per heartbeat', verdict: 'needs_data', pctChange: null, sampleCount: 5, sinceMonth: '', noun: 'ride' }),
+    { name: 'watts per heartbeat', value: '5 rides' },
+  );
+});
+
+Deno.test('⛔ strength is NOT PR-based: one ROW per lift; opening lists the working numbers, no "tested" claim', () => {
   const lifts = [
     { displayName: 'Deadlift', latestE1rm: 185, series: [{ value: 185, week: 1 }] },
     { displayName: 'Back Squat', latestE1rm: 125, series: [{ value: 125, week: 1 }] },
     { displayName: 'Bench Press', latestE1rm: 160, series: [{ value: 160, week: 1 }] },
   ];
-  assertEquals(strengthGlance(lifts, 1), ['Deadlift 185', 'Back Squat 125', 'Bench Press 160']);
+  const opening = [
+    { name: 'Deadlift', value: '185' },
+    { name: 'Back Squat', value: '125' },
+    { name: 'Bench Press', value: '160' },
+  ];
+  assertEquals(strengthGlanceRows(lifts, 1), opening);
   // no active plan (null) → still just the working numbers
-  assertEquals(strengthGlance(lifts, null), ['Deadlift 185', 'Back Squat 125', 'Bench Press 160']);
+  assertEquals(strengthGlanceRows(lifts, null), opening);
 });
 
-Deno.test('mid-block: each lift shows its creep since the block opened; slow gain, no PR flag', () => {
+Deno.test('mid-block: the creep since the block opened is the NOTE; slow gain, no PR flag', () => {
   const lifts = [
-    { displayName: 'Back Squat', latestE1rm: 125, series: [{ value: 125, week: 1 }] },                       // flat → bare number
+    { displayName: 'Back Squat', latestE1rm: 125, series: [{ value: 125, week: 1 }] },                       // flat → no note
     { displayName: 'Deadlift', latestE1rm: 185, series: [{ value: 180, week: 1 }, { value: 185, week: 4 }] }, // +5
     { displayName: 'Bench Press', latestE1rm: 162, series: [{ value: 160, week: 1 }, { value: 162, week: 4 }] }, // +2
   ];
-  assertEquals(strengthGlance(lifts, 4), ['Back Squat 125', 'Deadlift 185  +5', 'Bench Press 162  +2']);
+  assertEquals(strengthGlanceRows(lifts, 4), [
+    { name: 'Back Squat', value: '125' },
+    { name: 'Deadlift', value: '185', note: '+5' },
+    { name: 'Bench Press', value: '162', note: '+2' },
+  ]);
 });
 
-Deno.test('mid-block: a real drop shows honestly; flat shows the bare number', () => {
+Deno.test('mid-block: a real drop shows honestly; flat carries no note', () => {
   assertEquals(
-    strengthGlance([{ displayName: 'Squat', latestE1rm: 120, series: [{ value: 130, week: 2 }, { value: 120, week: 5 }] }], 5),
-    ['Squat 120  -10'],
+    strengthGlanceRows([{ displayName: 'Squat', latestE1rm: 120, series: [{ value: 130, week: 2 }, { value: 120, week: 5 }] }], 5),
+    [{ name: 'Squat', value: '120', note: '-10' }],
   );
   assertEquals(
-    strengthGlance([{ displayName: 'Deadlift', latestE1rm: 185, series: [{ value: 185, week: 1 }, { value: 185, week: 4 }] }], 4),
-    ['Deadlift 185'],
+    strengthGlanceRows([{ displayName: 'Deadlift', latestE1rm: 185, series: [{ value: 185, week: 1 }, { value: 185, week: 4 }] }], 4),
+    [{ name: 'Deadlift', value: '185' }],
   );
 });
 
@@ -88,9 +98,12 @@ Deno.test('mid-block but no block-start point to compare → bare number, no inv
     { displayName: 'Back Squat', latestE1rm: 125, series: [{ value: 125 }] }, // older-block point, no week
     { displayName: 'Deadlift', latestE1rm: 185, series: [{ value: 185 }] },
   ];
-  assertEquals(strengthGlance(lifts, 4), ['Back Squat 125', 'Deadlift 185']);
+  assertEquals(strengthGlanceRows(lifts, 4), [
+    { name: 'Back Squat', value: '125' },
+    { name: 'Deadlift', value: '185' },
+  ]);
 });
 
-Deno.test('strengthGlance: no lifts → []', () => {
-  assertEquals(strengthGlance([], 4), []);
+Deno.test('strengthGlanceRows: no lifts → []', () => {
+  assertEquals(strengthGlanceRows([], 4), []);
 });

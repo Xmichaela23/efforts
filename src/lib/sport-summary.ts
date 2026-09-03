@@ -1,7 +1,10 @@
 /**
- * THE COLLAPSED SPORT LINE — leads with the CHANGE, gated on confidence (2026-09-01, Round 3).
+ * THE COLLAPSED SPORT ROW — leads with the CHANGE, gated on confidence (2026-09-01, Round 3).
  *
- * ⛔ ONE RULE FOR ALL FOUR LINES: lead with the subject; show a DIRECTION only where the server's
+ * ⚠️ The row shape (name · value · note) arrived 2026-09-03; the two sentence builders this file
+ * used to export are gone with their only call site. Everything below still governs the WORDING.
+ *
+ * ⛔ ONE RULE FOR ALL FOUR SPORTS: lead with the subject; show a DIRECTION only where the server's
  * verdict already calls one (improving / sliding); otherwise show the number and the count and stop.
  * No invented threshold, no direction from a bare percentage. This is the same confidence gate the
  * cards use — `dirWord` maps only the two directional verdicts; needs_data / withheld / holding / null
@@ -48,60 +51,37 @@ export function dirWord(verdict: string | null | undefined): 'up' | 'down' | '' 
 }
 
 /**
- * An endurance line that ALWAYS LEADS WITH THE REAL NUMBER (2026-09-01, Michael: the count-only line
- * "told the user nothing"). `value` is the meaningful current read in units the athlete feels — run
- * "8:30/mi at 145 bpm", bike "210 W at 150 bpm". Then: the change when the verdict calls a direction
- * ("· up 4% since Jul"), otherwise the count ("· 18 runs"). Never a bare count with no number, never
- * an invented direction.
- * ⚠️ Falls back to the old count-led form only when `value` is empty (not enough recent data to state
- * a number) — better a count than nothing.
+ * ⛔ THE ROW SHAPE — ONE GRAMMAR FOR EVERY SPORT (2026-09-03, DESIGN_GUIDELINES "Layout Rules" §1).
+ *
+ * WHAT THIS REPLACED: `strengthGlance` and `efficiencySummary` returned SENTENCES, and each sport
+ * composed its own — strength a list of "Name 160", run a pace with a heart rate, bike a heart rate
+ * with a ride count, swim a count with a window. Four adjacent rows, four grammars, so the reader
+ * re-learned the format on every row. That was the single largest readability cost on STATE.
+ *
+ * These return the SAME THREE SLOTS for every sport, so the renderer can put names in one column and
+ * numbers in another and get two straight edges (rule 2):
+ *
+ *   name   — what this is. Left column, dim, lowercase.
+ *   value  — the number the athlete came for. Right column, bright, one size up (rule 3).
+ *   note   — the comparison, count or window. After the value, dim. Optional.
+ *
+ * ⚠️ THE STRING FORMS ARE NOT KEPT ALONGSIDE. `strengthGlance` / `efficiencySummary` had exactly one
+ * caller each (StatePerformanceSection); the row forms replace that call site outright rather than
+ * becoming a second vocabulary beside the first. Their tests move with them.
  */
-export function efficiencySummary(args: {
-  label: string;
-  value?: string | null;
-  verdict: string | null | undefined;
-  pctChange: number | null | undefined;
-  sampleCount: number | null | undefined;
-  sinceMonth: string;
-  noun: string;
-}): string {
-  const dir = dirWord(args.verdict);
-  const n = Number(args.sampleCount) || 0;
-  const directional = !!dir && args.pctChange != null && Number.isFinite(args.pctChange);
-  const change = directional
-    ? `${dir} ${Math.abs(Math.round(args.pctChange as number))}%${args.sinceMonth ? ` since ${args.sinceMonth}` : ''}`
-    : `${n} ${args.noun}${n === 1 ? '' : 's'}`;
-  const value = (args.value ?? '').trim();
-  // With a real value the change is a second clause (value · change). Without one, a DIRECTION reads
-  // as a phrase continuing the label ("pace per heartbeat up 4%"), a COUNT as its own clause ("· 9 runs").
-  if (value) return `${value} · ${change}`;
-  return directional ? `${args.label} ${change}` : `${args.label} · ${change}`;
-}
+export type SportRow = { name: string; value: string; note?: string };
 
 /**
- * THE STRENGTH GLANCE — block-phase aware, and NOT built on PRs (2026-09-01, Michael: the program
- * from the book is "about form and speed and slow incremental gain… you've got so many cross
- * stressors", not personal records). No ↑ marker, no all-time-high flag — a flat week is the design,
- * not a miss.
- *
- * ONE LINE PER LIFT so every number shows (Michael 2026-09-01: "we should see all the numbers").
- * · OPENING (no active plan, or plan week ≤ 1): "Deadlift 185" — the working number the athlete is
- *   starting from, a fresh pretest OR carried baselines (some jump in without testing), so we never
- *   LABEL it "tested".
- * · MID-BLOCK (plan week > 1): "Deadlift 185  +5" — the current number and how far it has crept since
- *   the block opened. A drop shows honestly ("-5"); no movement shows just the number (flat is the
- *   design here, not a miss). The block-start reading is the earliest current-block point (smallest
- *   week index the series holds); older-block points carry no week and are never compared across.
- *
- * Empty → [] (caller falls back to the session count).
+ * `strengthGlance`, split into columns. Same rules — block-phase aware, NOT PR-based, one row per
+ * lift, flat is fine — only the packaging changes: the lift name is the `name`, its working number
+ * the `value`, and the creep since the block opened the `note`.
  */
-export function strengthGlance(
+export function strengthGlanceRows(
   lifts: ReadonlyArray<{ displayName: string; latestE1rm: number | null; series?: ReadonlyArray<{ value: number; week?: number }> }>,
   planWeek: number | null | undefined,
-): string[] {
+): SportRow[] {
   const primary = lifts.filter((l) => l.latestE1rm != null).slice(0, 6);
   if (!primary.length) return [];
-  const numberOf = (l: { latestE1rm: number | null }) => Math.round(l.latestE1rm as number);
 
   const blockStartValue = (l: { series?: ReadonlyArray<{ value: number; week?: number }> }): number | null => {
     const pts = (l.series ?? []).filter((p) => typeof p.week === 'number');
@@ -111,10 +91,40 @@ export function strengthGlance(
 
   const opening = !(Number(planWeek) > 1);
   return primary.map((l) => {
-    const n = numberOf(l);
-    if (opening) return `${l.displayName} ${n}`;
+    const n = Math.round(l.latestE1rm as number);
+    if (opening) return { name: l.displayName, value: String(n) };
     const bs = blockStartValue(l);
     const d = bs != null ? n - Math.round(bs) : 0;
-    return d !== 0 ? `${l.displayName} ${n}  ${d > 0 ? '+' : '-'}${Math.abs(d)}` : `${l.displayName} ${n}`;
+    // Flat shows the number alone — no "+0", and no marker for a week that did not move.
+    return d !== 0
+      ? { name: l.displayName, value: String(n), note: `${d > 0 ? '+' : '-'}${Math.abs(d)}` }
+      : { name: l.displayName, value: String(n) };
   });
+}
+
+/**
+ * `efficiencySummary`, split into columns. The confidence gate is unchanged: a DIRECTION only where
+ * the server's verdict already calls one, otherwise the count. What moves is where each part sits.
+ *
+ * ⚠️ With no real value the COUNT becomes the value — better a count in the number column than an
+ * empty one. That is the same fallback the sentence form had, kept.
+ */
+export function efficiencyRow(args: {
+  label: string;
+  value?: string | null;
+  verdict: string | null | undefined;
+  pctChange: number | null | undefined;
+  sampleCount: number | null | undefined;
+  sinceMonth: string;
+  noun: string;
+}): SportRow {
+  const dir = dirWord(args.verdict);
+  const n = Number(args.sampleCount) || 0;
+  const directional = !!dir && args.pctChange != null && Number.isFinite(args.pctChange);
+  const change = directional
+    ? `${dir} ${Math.abs(Math.round(args.pctChange as number))}%${args.sinceMonth ? ` since ${args.sinceMonth}` : ''}`
+    : `${n} ${args.noun}${n === 1 ? '' : 's'}`;
+  const value = (args.value ?? '').trim();
+  if (value) return { name: args.label, value, note: change };
+  return { name: args.label, value: change };
 }
