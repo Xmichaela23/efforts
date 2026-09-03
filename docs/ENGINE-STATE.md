@@ -46,6 +46,34 @@ side (2300 m in 12:00 → 9:33/mi).
   `exercise_log` so it agrees with the suggested weight; "Assist / Added"; the set editor shows EDIT.
 - **Warm-up easy read** (D-463) live on State: "easy (incl. warm-ups) 12:52/mi at 143".
 
+### THE OTHER MAC SESSION'S WORK, SAME DAY (michaelambp-59; folded in here 2026-09-03 evening so one banner tells the truth)
+- **State restyle, PUSHED + DEPLOYED (coach #536 from `d2e8c072`; origin/main = what runs):** uppercase section
+  labels; sport rows two-column with the note under its value; BODY as three rows (effort / soreness / logged, as-of)
+  from `response_model.visible_signals` — `effort` gains `value_display` ("5.1 of 10") + detail "usual 4.7 · about as
+  hard as usual"; NEW signals `soreness` (value_display "2.0 of 7", detail normal/above/"N of 5 logged") and `logged`
+  ("8 sessions", as_of_date); provenance sentence removed; every second-level tap on State prints open; the closed run
+  row leads with aerobic efficiency + ↑/↓ from `runFitness.efficiency.verdict`; Home LoadBar gets planned/done via
+  `src/lib/week-exec-totals.ts`. `COACH_PAYLOAD_VERSION` 189, `COACH_CLIENT_MIN_PAYLOAD_VERSION` 189.
+- **Body is REPORTED-ONLY — Michael's ruling, LOCAL ONLY (`ad100a43`, not pushed, not deployed):** *"it's solely a
+  reported number, we shouldn't pull from anything else; this is the only place where we can see how overall training
+  is being handled."* The dead 'Aerobic fitness' visible signal is removed from `computeVisibleSignals`; the soreness
+  row prints its entry count ("2.0 of 7 · 1 entry", no comparison under 3 entries; "· 3 entries · normal for you" from
+  3). Load stays the headline; Body under it. Measured fitness lives on the Trends run card only. Ships with
+  `git push origin main` + `supabase functions deploy coach`.
+- **Sanity audit of the top of State (this session, fresh recompute from his rows): all matched.** 7-day load 308
+  (strength 158 / run 116 / bike 34 = 51/38/11); 28-day 1537 → usual week 384 → ACWR 0.80 (band 0.8–1.3 = balanced;
+  he sits on the edge); effort 5.1 over 8 rated vs 4.7 over 30; soreness = ONE entry (Sep 2 = 2). ⚠️ **The
+  planned-vs-actual bar is a SESSION-COUNT mix, not load** (`coach/index.ts` ~5613): green = planned rides ÷ planned
+  sessions. Michael has not yet said whether that bar should mean sessions or load — OPEN.
+- ⚠️ **Unverified on a device:** the aerobic efficiency top row + arrow on the closed run card; the open-card
+  flattening and bike "more" receipt; Home LoadBar's planned/done; the soreness entry-count wording.
+- ⚠️ **Still open from the design doc (`DESIGN_GUIDELINES.md`, "Direction is a fact, valence is a verdict"):** aerobic
+  efficiency and the bike row print a window, not a reference — "usual 1.412" is not built.
+- Copy debt he called out and did not yet approve a cut for: the two ⓘ explainers on the run card (efficiency factor,
+  drift) read as slop. Proposed cut: "Pace divided by heart rate. Higher means faster at the same heart rate." /
+  "Heart rate in the second half against the first, at the same pace. The book's line is 5%. TrainingPeaks calls it
+  decoupling."
+
 ### FACTS THAT SETTLED (do not re-derive)
 - `workouts.distance` is KILOMETRES. `useWorkoutData` returns early on `display_metrics` — put a new
   number in `workout-detail`'s display_metrics or it never reaches Details.
