@@ -166,3 +166,119 @@
 - ❌ Mix different opacity levels inconsistently
 - ❌ Use green for completed workouts (use cyan-600/700)
 - ❌ Make duration text look like buttons (use plain white text, not pills)
+
+---
+
+# Layout Rules (added 2026-09-03)
+
+The section above governs MATERIAL — glass, blur, borders, colour. This section governs
+LAYOUT — where things sit and how they line up. Material was already specified; layout
+was not, and that is where the readability problems live.
+
+**The finding these rules come from:** the app's look is ahead of its legibility. Nothing
+here is a taste judgement. Every rule below is a case of similar items being drawn in
+dissimilar ways, which is what makes a screen feel like fumbling even when every
+individual element is attractive.
+
+## The five rules
+
+### 1. Parallel rows use one shape
+
+Rows that sit next to each other and answer the same kind of question must be built
+identically: **value · comparison · count**, same order, every discipline.
+
+The violation, on STATE's trends section as of this writing — four adjacent rows, four
+different grammars:
+
+| row | shape it used |
+|---|---|
+| STRENGTH | a list of lift names with numbers |
+| RUN | a pace with a heart rate |
+| BIKE | a heart rate with a session count |
+| SWIM | a count with a time window |
+
+The reader re-learns the format on every row. This is the single largest readability cost
+on the screen.
+
+### 2. Two columns, two straight edges
+
+Name/value pairs get the name **left-aligned** in one column and the number
+**right-aligned** in another. Never right-align both — the numbers line up and the names
+zigzag, which is what the STRENGTH card did.
+
+### 3. Two type sizes, used consistently
+
+The number is the payload. It gets one clear step UP. The label gets one step DOWN. Two
+sizes, no more. If the label and the value are the same size, nothing tells the eye where
+to land.
+
+### 4. One label system
+
+Section labels are **UPPERCASE, tracked**. Pick that one and use it everywhere.
+
+STATE currently runs two systems for the same job — `TODAY` / `BODY` / `STRENGTH`
+alongside `this week · planned vs actual` and `trends · the arc behind this week`. Both are
+section headers; both should look like section headers.
+
+### 5. Interactive things are never dim
+
+Anything tappable carries the same contrast as the content around it. Dimming means
+inactive, and it may not mean anything else. Chevrons that open a row are part of the
+affordance, not decoration — if the row opens, the chevron must be visible.
+
+## Depth belongs to the plate, not the row
+
+⛔ **This is the rule the trends section breaks, and it is the one that costs vertical
+space.**
+
+The LOAD section is built correctly: **one** glass plate, rows inside separated by
+hairlines (`divide-y divide-white/[0.055]`). Depth on the outside, grid on the inside.
+
+The trends section renders STRENGTH / RUN / BIKE / SWIM as **four separate floating
+cards**, each with its own padding, its own glow, and a gap to the next. That costs
+height, breaks alignment (rows in one container align for free; separate cards do not),
+and makes the eye re-orient four times.
+
+**Make the trends section match the LOAD plate.** One plate, four rows, hairline dividers.
+
+⚠️ The four cards each carry a faint tint of their sport's colour. That tint is lost in a
+single plate — and that is FINE: the sport colour is already on the icon and the label, so
+the tint says the same thing twice. Do not reintroduce it as a per-row background.
+
+## No prose in a value slot
+
+A row is label + value. If the server sends a paragraph into the value slot, the row wraps
+to five lines while every neighbour is one line, and the screen ends up with two voices.
+
+**Split the facts into separate signals server-side.** The client already renders one row
+per signal, so three signals draw three rows with no client change.
+
+```
+BODY   effort      5.1 / 10     usual 4.8
+       soreness    1.5 / 7      normal
+       logged      8 sessions
+```
+
+Not:
+
+```
+BODY   What you've logged    About as hard as usual — you rated 5.1 of 10
+                             avg vs 4.8 typical Soreness normal for you:
+                             1.5 of 7. Logged on 8 sessions.
+```
+
+## What the aesthetic is, so it stops drifting
+
+**Reference: Blade Runner (1982), not Minority Report.** Light coming from BEHIND dark
+glass, not through clear glass. Black ground, warm bloom, glowing numerals.
+
+Keep: the black ground, the top bloom, the glow on numbers, glass depth on outer plates,
+the sport colours, the wordmark.
+
+Tighten: corner radii come DOWN, they do not go to zero. Row-level cards become rows in a
+plate. Square-and-airy is the target; square-and-cramped is the failure mode — spend
+reclaimed vertical on type size and leading, never on fitting more in.
+
+⚠️ **Air in this layout comes from the grid and the type scale, not from container
+padding.** Removing card insets without raising the type scale and the gutters will read
+as cramped, which is the opposite of the intent.
