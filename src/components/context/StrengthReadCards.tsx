@@ -82,8 +82,19 @@ const GROUP_LABEL: Record<string, string> = {
 /** ⛔ THE SPINE LEADS, THE OVERLAY FOLLOWS — easy first, then long, then quality, then rides. */
 const GROUP_ORDER = ['easy', 'long', 'quality', 'all'];
 
+/** 2026-09-03 (Michael: the hills-and-heat line "feels lost in the threshold line" — it should blanket easy and
+ *  hard). The run plate renders it ONCE, as the card's last line under the workload chart, via this export;
+ *  the ride plate keeps it inline. Same words as before, copy unchanged. */
+export function EnduranceConditionsLine() {
+  return (
+    <div className="px-3 pb-3 text-[11px] text-white/55">
+      Hills and heat can have an impact. Trust your RPE, but be honest.
+    </div>
+  );
+}
+
 export function EnduranceReadCards(
-  { sessions, spine, sport }: { sessions?: NamedSession[] | null; spine?: SpineSeries[] | null; sport?: 'run' | 'ride' },
+  { sessions, spine, sport, footer = true }: { sessions?: NamedSession[] | null; spine?: SpineSeries[] | null; sport?: 'run' | 'ride'; footer?: boolean },
 ) {
   // ⛔ ONE OWNER PER SPORT (Round 3 pass 1, 2026-09-01). `sport` filters this to a single discipline
   // so the ride cards can render under the bike plate and the run cards under the run block, each
@@ -117,7 +128,7 @@ export function EnduranceReadCards(
     <>
       {spineList.map((s) => <SpineCard key={`spine:${s.sport}:${s.group}`} series={s} />)}
       {list.map((s) => <EnduranceCard key={`${s.sport}:${s.family}`} session={s} />)}
-      {hasLine && (
+      {hasLine && footer && (
         <div className="px-3 pb-3 text-[11px] text-white/55">
           {/* ⛔ "watch the line over a few weeks" cut (2026-09-01) — a coaching instruction. The fact
               before it is real and stays: conditions move this more than fitness does. */}

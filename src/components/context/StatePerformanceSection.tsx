@@ -29,7 +29,7 @@ import StrengthCalibrationNotice from '@/components/StrengthCalibrationNotice';
 // lines under strength — so nothing about a sport appears in two places on the screen. Both were
 // moved from other blocks (the trends plate and the LOAD section); no card was restyled and no
 // server field changed. Run keeps its own plate for one more pass (see StateTrendsBlock).
-import { EnduranceReadCards } from '@/components/context/StrengthReadCards';
+import { EnduranceConditionsLine, EnduranceReadCards } from '@/components/context/StrengthReadCards';
 import ViadaWeekCard from '@/components/context/ViadaWeekCard';
 import EnduranceCheckpointSheet from '@/components/context/EnduranceCheckpointSheet';
 import LoadWeeksCard from '@/components/context/LoadWeeksCard';
@@ -1311,8 +1311,10 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
               <>
                 {/* 2026-09-03 (Michael): the reads first (efficiency, drift — how you responded), the workload chart
                     (how much, how hard) below them. */}
-                <EnduranceReadCards sessions={enduranceSessions} spine={enduranceSpine} sport="run" />
+                <EnduranceReadCards sessions={enduranceSessions} spine={enduranceSpine} sport="run" footer={false} />
                 <LoadWeeksCard sport="run" load={(stateDisplay as any)?.loadByDiscipline?.run ?? null} />
+                {/* the conditions line blankets the whole run card — easy, hard, and the chart — once, at the end */}
+                {(enduranceSpine ?? []).some((s: any) => s?.sport === 'run' && (s?.points?.length ?? 0) >= 2) && <EnduranceConditionsLine />}
               </>
             );
             // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
