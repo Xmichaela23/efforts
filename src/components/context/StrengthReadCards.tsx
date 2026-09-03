@@ -148,7 +148,7 @@ export function EnduranceReadCards(
  */
 // ⓘ copy, Michael 2026-09-02 (voice-checked): what the two run numbers mean, in plain words.
 const EF_EXPLAIN = 'How much speed each heartbeat buys you on easy runs. Higher means the same heart rate is moving you faster. It creeps up with fitness over weeks and drops on hot days.';
-const DECOUPLING_EXPLAIN = `Did your heart rate creep up as the run went on? This is how much higher it was in the second half than in the first, at the same pace. The book's rule for athletes training many sessions a week: stop an easy session when it reaches ${DRIFT_LIMITS.hybridPct}%. Under the line is room; over it is the sign to dial back next time. Heat, tiredness, or a run that was too long push it up. TrainingPeaks calls this decoupling.`;
+const DECOUPLING_EXPLAIN = `Heart rate in the second half against the first, at the same pace. The book's line is 5%. TrainingPeaks calls it decoupling.`; // 2026-09-03: Michael cut the paragraph
 
 /** "1.9 of room" / "0.4 over" against p107's line. */
 function driftVsLine(pct: number): string {
