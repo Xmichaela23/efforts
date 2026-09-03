@@ -1376,19 +1376,6 @@ const formatMovingTime = () => {
             </div>
           </div>
 
-          {/* Grade-adjusted pace — what this run would have been on the flat. Server-computed
-              (Minetti/GAP); the client only reads it. Shown for runs when the server has it;
-              absent when there was no usable elevation, and we say nothing rather than guess. */}
-          {String(norm.sport || '').includes('run') && norm.gap_pace_s_per_km ? (
-            <div className="px-0.5 py-1">
-              <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
-                {formatPace(norm.gap_pace_s_per_km, useImperial)}
-              </div>
-              <div className="text-xs text-muted-foreground font-normal">
-                <div className="text-xs font-light" style={metricLabelStyle}>Grade-Adj Pace</div>
-              </div>
-            </div>
-          ) : null}
 
           <div className="px-0.5 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
@@ -1464,15 +1451,19 @@ const formatMovingTime = () => {
             </div>
           </div>
 
-          {/* Row 5: IF, RPE, Gear */}
-          <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
-              {(workoutData as any)?.intensity_factor ? (workoutData as any).intensity_factor.toFixed(2) : 'N/A'}
+          {/* Row 5: Grade-Adj Pace (runs), RPE, Gear */}
+          {/* 2026-09-03 (Michael): IF is gone — it was the rating translated (a 6 = 0.80) and few outside
+              TrainingPeaks know the term. Runs get grade-adjusted pace here instead, the way Strava does. */}
+          {String(norm.sport || '').includes('run') ? (
+            <div className="px-0.5 py-1">
+              <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
+                {norm.gap_pace_s_per_km ? formatPace(norm.gap_pace_s_per_km, useImperial) : '—'}
+              </div>
+              <div className="text-xs text-muted-foreground font-normal">
+                <div className="text-xs font-light" style={metricLabelStyle}>Grade-Adj Pace</div>
+              </div>
             </div>
-            <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs font-light" style={metricLabelStyle}>IF</div>
-            </div>
-          </div>
+          ) : null}
 
           <div className="px-0.5 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
@@ -1698,7 +1689,7 @@ const formatMovingTime = () => {
             </div>
           </div>
 
-          {/* Row 5 - Calories, Workload, IF */}
+          {/* Row 5 - Calories, Workload, Grade-Adj Pace (runs) */}
           <div className="px-0.5 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
               {norm.calories ? `${norm.calories}` : 'N/A'}
@@ -1717,14 +1708,18 @@ const formatMovingTime = () => {
             </div>
           </div>
 
-          <div className="px-0.5 py-1">
-            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
-              {norm.intensity_factor ? norm.intensity_factor.toFixed(2) : 'N/A'}
+          {/* 2026-09-03 (Michael): IF is gone — it was the rating translated (a 6 = 0.80) and few outside
+              TrainingPeaks know the term. Runs get grade-adjusted pace here instead, the way Strava does. */}
+          {String(norm.sport || '').includes('run') ? (
+            <div className="px-0.5 py-1">
+              <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
+                {norm.gap_pace_s_per_km ? formatPace(norm.gap_pace_s_per_km, useImperial) : '—'}
+              </div>
+              <div className="text-xs text-muted-foreground font-normal">
+                <div className="text-xs font-light" style={metricLabelStyle}>Grade-Adj Pace</div>
+              </div>
             </div>
-            <div className="text-xs text-muted-foreground font-normal">
-              <div className="text-xs font-light" style={metricLabelStyle}>IF</div>
-            </div>
-          </div>
+          ) : null}
 
           {/* Row 6 — pedaling power + subjective */}
           <div className="px-0.5 py-1">
