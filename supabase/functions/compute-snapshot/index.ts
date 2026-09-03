@@ -1482,12 +1482,34 @@ serve(async (req: Request) => {
               tempF: (() => { const t = Number(r?.weather_data?.temperature); return Number.isFinite(t) ? Math.round(t) : null; })(),
               elevationGainM: f.elevM ?? null,
             });
-            // 2026-09-03, same evening: warm-up points were pushed into the easy efficiency series here and the
-            // block's headline became a 7-minute warm-up at 1.75 (heart rate still climbing reads as a high
-            // pace-per-heartbeat). Michael: "7 minutes long, not associated with anything." Warm-ups stay on
-            // the easy PACE line (runEffHistory, `source:'warmup'`) and out of this series. `warmByDate` above
-            // is kept for that line's readers.
-            void warmByDate;
+            // 2026-09-03 (Michael, ruled after the "7 min long" screenshot): a warm-up read of at least six
+            // usable minutes IS an easy point — the card shows a median of the recent points and says how many
+            // are warm-ups, so one warm-up can never be the headline and never reads as a run.
+            if (sport === "run" && group !== "easy") {
+              const we = warmByDate.get(date);
+              const ef = we ? computeEfficiencyIndex(Number(we.pace_s_per_km), Number(we.hr_avg)) : null;
+              if (we && ef != null) {
+                groups.set("easy", groups.get("easy") ?? []);
+                groups.get("easy")!.push({
+                  date,
+                  hrAvg: Math.round(Number(we.hr_avg)),
+                  durationMin: Math.max(1, Math.round(Number(we.seconds) / 60)),
+                  efficiency: ef,
+                  driftPct: null, driftBasis: null, driftWholeSession: false, fadeWithheld: false,
+                  keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
+                  tempF: (() => { const t = Number(r?.weather_data?.temperature); return Number.isFinite(t) ? Math.round(t) : null; })(),
+                  elevationGainM: null,
+                  fromWarmup: true,
+                });
+              }
+            }
+          }
+          for (const [sport, groups] of bySport) {
+            for (const [group, points] of groups) {
+              points.sort((a, b) => a.date.localeCompare(b.date));
+              if (points.length === 0) continue;
+              enduranceSpine.push({ sport, group, points });
+            }
           }
         } catch (e: any) {
           console.log("[compute-snapshot] endurance spine failed (non-fatal):", e?.message || e);

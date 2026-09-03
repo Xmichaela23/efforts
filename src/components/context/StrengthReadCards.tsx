@@ -62,7 +62,7 @@ const DRIFT_KEY_SESSION_PCT = 5;
 
 type NamedPoint = {
   week: number; date: string; hrAvg: number; durationMin: number | null;
-  efficiency: number | null; driftPct: number | null; driftBasis?: 'gap' | 'raw' | 'hr' | null; driftWholeSession?: boolean; keySessionWithin24h: boolean;
+  efficiency: number | null; driftPct: number | null; driftBasis?: 'gap' | 'raw' | 'hr' | null; driftWholeSession?: boolean; fromWarmup?: boolean; keySessionWithin24h: boolean;
 };
 type NamedSession = {
   family: string; sport: string; label: string; points: NamedPoint[];
@@ -71,7 +71,7 @@ type NamedSession = {
 
 type SpinePoint = {
   date: string; hrAvg: number | null; durationMin: number | null;
-  efficiency: number | null; driftPct: number | null; driftBasis?: 'gap' | 'raw' | 'hr' | null; driftWholeSession?: boolean; fadeWithheld: boolean; keySessionWithin24h: boolean;
+  efficiency: number | null; driftPct: number | null; driftBasis?: 'gap' | 'raw' | 'hr' | null; driftWholeSession?: boolean; fromWarmup?: boolean; fadeWithheld: boolean; keySessionWithin24h: boolean;
  tempF?: number | null; elevationGainM?: number | null; };
 type SpineSeries = { sport: string; group: string; points: SpinePoint[] };
 
@@ -170,6 +170,17 @@ function SpineCard({ series }: { series: SpineSeries }) {
   const color = getDisciplineColor(isRide ? 'ride' : 'run');
   const label = GROUP_LABEL[series.group] ?? `${series.sport} sessions`;
   const eff = pts.map((p) => ({ date: p.date, value: p.efficiency })).filter((p) => p.value != null) as Array<{ date: string; value: number }>;
+  // 2026-09-03 (Michael: "it should say, based on whatever it's based on, for the most recent runs"): the headline
+  // is the MEDIAN of the last five points, never whichever point came last (one warm-up was the headline over 22
+  // runs), and the line under it says what it is based on and how many of those are warm-ups.
+  const recent = eff.slice(-5);
+  const recentSorted = recent.map((p) => p.value).sort((a, b) => a - b);
+  const headline = recentSorted.length ? (recentSorted.length % 2 ? recentSorted[(recentSorted.length - 1) / 2] : (recentSorted[recentSorted.length / 2 - 1] + recentSorted[recentSorted.length / 2]) / 2) : null;
+  const recentPts = pts.slice(-Math.max(1, Math.min(5, pts.length)));
+  const recentWarmups = recentPts.filter((p) => p.fromWarmup).length;
+  const basedOn = recentPts.length
+    ? `based on the last ${recentPts.length} ${recentPts.length === 1 ? 'session' : 'sessions'}${recentWarmups > 0 ? ` · ${recentWarmups} ${recentWarmups === 1 ? 'is a warm-up' : 'are warm-ups'}` : ''}`
+    : null;
   // the day's conditions as facts — heat and climb move drift, and whether the athlete was pushing is theirs to read
   const conditions = [
     latest.tempF != null ? `${latest.tempF}°F` : null,
@@ -194,7 +205,7 @@ function SpineCard({ series }: { series: SpineSeries }) {
             * name; nobody knows "speed per beat".
             */}
           <div className="flex items-baseline gap-1.5 mt-1">
-            <span className="readout-num text-[26px] leading-none">{fmtEff(latest.efficiency, isRide)}</span>
+            <span className="readout-num text-[26px] leading-none">{fmtEff(headline ?? latest.efficiency, isRide)}</span>
             <button type="button" onClick={() => setEfOpen((o) => !o)} aria-label="What is efficiency factor?" className="text-[12px] text-white/60 bg-transparent border-none p-0 cursor-pointer">
               efficiency factor <span className="text-white/45 text-[11px]">{efOpen ? '▾' : 'ⓘ'}</span>
             </button>
@@ -243,8 +254,8 @@ function SpineCard({ series }: { series: SpineSeries }) {
           {decOpen && <p className="mt-1 text-[12px] text-white/55 leading-snug max-w-[min(100%,340px)]">{DECOUPLING_EXPLAIN}</p>}
         </div>
       )}
-      {latest.durationMin != null && latest.durationMin > 0 && (
-        <div className="text-[11px] text-white/55 mt-1">{latest.durationMin} min long</div>
+      {basedOn && (
+        <div className="text-[11px] text-white/55 mt-1">{basedOn}</div>
       )}
     </div>
   );
