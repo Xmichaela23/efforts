@@ -140,17 +140,19 @@ export default function AdherenceChips({
       if (driftPct == null) return 'Heart-rate drift';
       const line = DRIFT_LIMITS.hybridPct;
       const d = Math.round((driftPct - line) * 10) / 10;
-      const room = d > 0 ? `${d.toFixed(1)} over the ${line}% line` : `${Math.abs(d).toFixed(1)} of room to ${line}%`;
+      // 2026-09-03, Michael: one short line per chip, plain words.
+      const room = d > 0 ? `${d.toFixed(1)} over the ${line}% line` : `${Math.abs(d).toFixed(1)} under the ${line}% line`;
       const t = (sd as any)?.weather?.temperature_f;
       const heat = typeof t === 'number' && Number.isFinite(t) ? ` · ${Math.round(t)}°F` : '';
-      const scope = decoupling?.whole_session ? ' · incl. intervals' : (decoupling?.basis === 'hr' ? ' · heart rate only' : '');
-      return `${room}${decoupling?.basis === 'raw' ? ' · hills mixed in' : ''}${scope}${heat}`;
+      const scope = decoupling?.whole_session ? ' · whole session' : '';
+      void heat;
+      return `${room}${decoupling?.basis === 'raw' ? ' · hills' : ''}${scope}`;
     })();
     // 2026-09-03 (Michael: "we add an execution score, right? Drift?"): the header is Workload · Execution ·
     // Duration · Drift on every planned run and ride. The pace/GAP percentage that sat here was the blended
     // interval pace score and read as a mystery number; it lives per row in the interval table. Easy and
     // Power reads live in the Insights text.
-    const executionSubtitle = isStructured ? 'Intervals + time vs plan' : (intensityAdherence != null ? 'Effort + time vs plan' : 'Pace + time vs plan');
+    const executionSubtitle = 'efforts and time';
 
     const completedDurS = sd.completed_totals?.duration_s ?? null;
     const plannedDurS = sd.planned_totals?.duration_s ?? null;
@@ -259,7 +261,7 @@ export default function AdherenceChips({
       const hi = sd.load?.typical_high;
       if (lo == null || hi == null) return 'What it cost';
       // Non-breaking space before the range so "typically" can wrap but "68–117" never splits.
-      return lo === hi ? `typically\u00a0${lo}` : `typically\u00a0${lo}–${hi}`;
+      return lo === hi ? `usual\u00a0${lo}` : `usual\u00a0${lo}–${hi}`;
     })();
 
     const fmtDeltaTime = (s: number) => {
@@ -306,7 +308,7 @@ export default function AdherenceChips({
             <div className="flex items-start gap-3">
               {chipText('Workload', loadValue, loadSubtitle)}
               {chip('Pace', paceAdherence, paceDeltaSec != null ? fmtDeltaPer100(paceDeltaSec) : '—')}
-              {chipText('Duration', durationValue, 'Moving time vs plan')}
+              {chipText('Duration', durationValue, 'of plan')}
             </div>
           </div>
         </div>
@@ -323,8 +325,8 @@ export default function AdherenceChips({
               {chipText('Workload', loadValue, loadSubtitle)}
               {/* 2026-09-03: Execution and Drift on rides too (Michael: "drift really important on the
                   performance screens for running and riding"). Power / Easy reads live in Insights. */}
-              {executionScore != null && chip('Execution', executionScore, powerAdherence != null ? 'Power + time vs plan' : 'Effort + time vs plan')}
-              {chipText('Duration', durationValue, 'Moving time vs plan')}
+              {executionScore != null && chip('Execution', executionScore, 'efforts and time')}
+              {chipText('Duration', durationValue, 'of plan')}
               {driftValue != null && chipText('Drift', driftValue, driftSubtitle)}
             </div>
           </div>
@@ -351,7 +353,7 @@ export default function AdherenceChips({
           <div className="flex items-start gap-3">
             {chipText('Workload', loadValue, loadSubtitle)}
             {executionScore != null && chip('Execution', executionScore, executionSubtitle)}
-            {chipText('Duration', durationValue, 'Moving time vs plan')}
+            {chipText('Duration', durationValue, 'of plan')}
             {driftValue != null && chipText('Drift', driftValue, driftSubtitle)}
           </div>
         </div>
