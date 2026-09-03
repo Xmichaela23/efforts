@@ -74,7 +74,7 @@ no-deploy.**
 |---|---|
 | `swim-drill-tokens.ts` | `generate-combined-plan` · `generate-triathlon-plan` · `materialize-plan` |
 
-### `supabase/functions/_shared/` — 106 files · anything in it → 56 functions
+### `supabase/functions/_shared/` — 108 files · anything in it → 56 functions
 
 `activate-plan` · `adapt-plan` · `analyze-cycling-workout` · `analyze-running-workout` · `analyze-strength-workout` · `analyze-swim-workout` · `arc-setup-chat` · `auto-attach-planned` · `backfill-planned-workload` · `backfill-routes` · `backfill-strength-load` · `calculate-workload` · `coach` · `complete-race` · `compute-adaptation-metrics` · `compute-core-verdict` · `compute-facts` · `compute-snapshot` · `compute-workout-analysis` · `compute-workout-summary` · `course-detail` · `course-strategy` · `course-upload` · `create-goal-and-materialize-plan` · `delete-plan` · `detach-planned` · `detect-cores` · `disconnect-connection` · `end-plan` · `endurance-checkpoint` · `fetch-strava-route` · `generate-combined-plan` · `generate-run-plan` · `generate-strength-plan` · `generate-triathlon-plan` · `get-arc-context` · `get-week` · `import-strava-history` · `ingest-activity` · `learn-fitness-profile` · `match-cores` · `materialize-plan` · `planning-context` · `readiness` · `recompute-athlete-memory` · `recompute-workout` · `refresh-goal-race-projections` · `rematerialize-standing-block` · `rematerialize-strength-block` · `resolve-exercise-weight` · `save-baseline-test` · `strava-webhook` · `sweep-user-history` · `sweep-week` · `weekly-workload` · `workout-detail`
 
@@ -125,6 +125,7 @@ no-deploy.**
 | `gps-points.ts` | `detect-cores` · `match-cores` |
 | `group-ride-route-snapshot.ts` | `adapt-plan` · `analyze-cycling-workout` · `analyze-running-workout` · `arc-setup-chat` · `coach` · `complete-race` · `compute-adaptation-metrics` · `compute-snapshot` · `compute-workout-analysis` · `course-detail` · `course-strategy` · `create-goal-and-materialize-plan` · `delete-plan` · `end-plan` · `endurance-checkpoint` · `fetch-strava-route` · `generate-combined-plan` · `generate-run-plan` · `generate-strength-plan` · `generate-triathlon-plan` · `get-arc-context` · `import-strava-history` · `learn-fitness-profile` · `materialize-plan` · `planning-context` · `refresh-goal-race-projections` · `rematerialize-standing-block` · `strava-webhook` · `workout-detail` |
 | `heat-adjust.ts` | `adapt-plan` · `analyze-cycling-workout` · `analyze-running-workout` · `arc-setup-chat` · `coach` · `complete-race` · `compute-adaptation-metrics` · `compute-core-verdict` · `compute-facts` · `compute-snapshot` · `compute-workout-analysis` · `course-detail` · `course-strategy` · `create-goal-and-materialize-plan` · `delete-plan` · `end-plan` · `endurance-checkpoint` · `generate-combined-plan` · `generate-run-plan` · `generate-strength-plan` · `generate-triathlon-plan` · `get-arc-context` · `import-strava-history` · `learn-fitness-profile` · `materialize-plan` · `planning-context` · `refresh-goal-race-projections` · `rematerialize-standing-block` · `strava-webhook` · `workout-detail` |
+| `hr-drift-halves.ts` | `analyze-cycling-workout` · `analyze-running-workout` |
 | `hr-plausibility.ts` | `compute-facts` |
 | `hr-quality.ts` | `coach` |
 | `infer-race-course-leg.ts` | `course-upload` |
@@ -167,6 +168,7 @@ no-deploy.**
 | `riegel.ts` | `analyze-running-workout` · `workout-detail` |
 | `route-intelligence.ts` | `backfill-routes` · `compute-facts` |
 | `route-match.ts` | `backfill-routes` · `compute-facts` |
+| `run-warmup-easy.ts` | `analyze-cycling-workout` · `analyze-running-workout` · `compute-facts` |
 | `schedule-session-constraints.ts` | `adapt-plan` · `arc-setup-chat` · `create-goal-and-materialize-plan` · `generate-combined-plan` · `generate-run-plan` · `generate-triathlon-plan` |
 | `session-load.ts` | `compute-facts` |
 | `stack-tagging-validator.ts` | `generate-combined-plan` |

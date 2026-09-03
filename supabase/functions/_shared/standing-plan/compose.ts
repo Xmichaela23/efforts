@@ -1641,6 +1641,10 @@ function exerciseForSlot(
         ...(targetRir != null ? { target_rir: targetRir } : {}),
         slot_intent: slot.intent,
         source_row: noteForWeek(slot, args.week),
+        ...(/superset/i.test(String(slot.sourceText || '')) ? { superset_group: noteForWeek(slot, args.week) } : {}),
+      // 2026-09-03 (Michael: supersets are the book's layout, p274): both rows of a printed superset share one
+      // mark, so the card prints them as a pair and the logger lays them out as one block.
+      ...(/superset/i.test(String(slot.sourceText || '')) ? { superset_group: noteForWeek(slot, args.week) } : {}),
       },
       movement,
       sets,
@@ -1895,6 +1899,9 @@ function exerciseForSlot(
       ],
       slot_intent: slot.intent,
       source_row: noteForWeek(slot, args.week),
+      // 2026-09-03 (Michael: supersets are the book's layout, p274): both rows of a printed superset share one
+      // mark, so the card prints them as a pair and the logger lays them out as one block.
+      ...(/superset/i.test(String(slot.sourceText || '')) ? { superset_group: noteForWeek(slot, args.week) } : {}),
     },
     movement,
     sets,

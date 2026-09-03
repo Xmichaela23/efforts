@@ -2721,6 +2721,7 @@ export function expandTokensForRow(
             // box); the intent now travels as `slot_intent` and the logger's ME/DE cues read it.
             // Unlisted it dies here, and every standing cue falls back to the legacy notes regex.
             ...((['ME','DE','SKILL','HYP'].includes(String((ex as any)?.slot_intent))) ? { slot_intent: (ex as any).slot_intent } : {}),
+            ...(typeof (ex as any)?.superset_group === 'string' && (ex as any).superset_group ? { superset_group: (ex as any).superset_group } : {}), // 2026-09-03: the pair mark travels
             // ⛔ AND CARRY LAST TIME'S RESULT (2026-08-26) — the same whitelist, the fifth time. The
             // heavy slot prints a rep BAND and nothing else, so a block that is progressing correctly
             // looks frozen for eight weeks; `last_reps` is what the athlete actually got, and both the
@@ -3113,6 +3114,7 @@ export function expandTokensForRow(
             // box); the intent now travels as `slot_intent` and the logger's ME/DE cues read it.
             // Unlisted it dies here, and every standing cue falls back to the legacy notes regex.
             ...((['ME','DE','SKILL','HYP'].includes(String((ex as any)?.slot_intent))) ? { slot_intent: (ex as any).slot_intent } : {}),
+            ...(typeof (ex as any)?.superset_group === 'string' && (ex as any).superset_group ? { superset_group: (ex as any).superset_group } : {}), // 2026-09-03: the pair mark travels
             // ⛔ AND CARRY LAST TIME'S RESULT (2026-08-26) — the same whitelist, the fifth time. The
             // heavy slot prints a rep BAND and nothing else, so a block that is progressing correctly
             // looks frozen for eight weeks; `last_reps` is what the athlete actually got, and both the

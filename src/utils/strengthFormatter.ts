@@ -150,3 +150,38 @@ export function getStrengthExercisesFromWorkout(workout: any): any[] {
   
   return [];
 }
+
+/**
+ * 2026-09-03 (Michael: supersets are the book's layout, p274). Consecutive rows sharing `superset_group` print
+ * as ONE line: "HYP · Tate Press + Drag Curl · superset · 3×6-12 · 1 in reserve — your call…". Rows without a
+ * mark print through `fmtOne` (default `formatStrengthExercise`).
+ */
+export function formatStrengthExerciseLines(
+  items: any[],
+  units: 'imperial' | 'metric' = 'imperial',
+  fmtOne: (e: any) => string = (e) => formatStrengthExercise(e, units),
+): string[] {
+  const out: string[] = [];
+  const list = Array.isArray(items) ? items : [];
+  for (let i = 0; i < list.length; i += 1) {
+    const e = list[i];
+    const g = typeof e?.superset_group === 'string' && e.superset_group ? e.superset_group : null;
+    const next = list[i + 1];
+    if (g && next && next.superset_group === g) {
+      const nameOf = (x: any) => String(x?.execution_name || x?.name || '').replace(/_/g, ' ').trim();
+      const intent = String(e?.slot_intent || next?.slot_intent || '').toUpperCase();
+      const bookWord = (intent === 'ME' || intent === 'DE' || intent === 'SKILL' || intent === 'HYP') ? `${intent} · ` : '';
+      const sets = Number(e?.sets) || 0;
+      const reps = e?.reps;
+      const r = Number(e?.target_rir);
+      const rirText = Number.isFinite(r) && r >= 0 ? (Math.floor(r) === Math.ceil(r) ? String(Math.floor(r)) : `${Math.floor(r)}-${Math.ceil(r)}`) : null;
+      const tail = (!e?.weight_display && String(e?.load_basis || '') === 'auto_regulated') ? ` — your call — pick a weight that leaves ${rirText ?? '1-2'} in reserve` : '';
+      out.push(`${bookWord}${nameOf(e)} + ${nameOf(next)} · superset${sets > 0 && reps != null ? ` · ${sets}×${reps}` : ''}${rirText ? ` · ${rirText} in reserve` : ''}${tail}`);
+      i += 1;
+      continue;
+    }
+    out.push(fmtOne(e));
+  }
+  return out;
+}
+

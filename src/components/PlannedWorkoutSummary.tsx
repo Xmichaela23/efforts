@@ -3,7 +3,7 @@ import { normalizePlannedSession, Baselines as NormalizerBaselines, ExportHints 
 import { normalizeStructuredSession } from '@/services/plans/normalizer';
 // ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
 import { plannedDurationMinutes } from '@/lib/planned-session/duration';
-import { formatStrengthExercise } from '@/utils/strengthFormatter';
+import { formatStrengthExercise, formatStrengthExerciseLines } from '@/utils/strengthFormatter';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
@@ -362,11 +362,11 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
         // Use shared formatter for consistent display
         return formatStrengthExercise(s, 'imperial');
       });
-      if (comp.length) return asLines(comp);
+      if (comp.length) return formatStrengthExerciseLines(comp, 'imperial');
       // Fallback: authored exercises
       const ex: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
       if (!ex.length) return [];
-      return ex.map((e:any)=>{
+      return formatStrengthExerciseLines(ex, 'imperial', (e:any)=>{
         // Fallback for non-materialized exercises - use shared formatter
         // Special handling for string weights (e.g., "70% 1RM" from raw JSON)
         if (typeof e?.weight === 'string' && e.weight.trim()) {

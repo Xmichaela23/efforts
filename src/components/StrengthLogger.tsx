@@ -217,6 +217,8 @@ interface LoggedExercise {
   rir_tracked?: boolean;
   target_reps?: string; // Target reps from prescription, e.g. "4-6" or "8" (display only)
   slot_intent?: string; // Standing-plan slot intent as data ('ME'|'DE'|'SKILL'|'HYP'), 2026-08-26
+  /** 2026-09-03: rows of one printed superset (p274) share this mark; the logger lays them out as one block. */
+  superset_group?: string;
   // D-322: the working %1RM the PLAN authored for this slot (0.785 = "78.5% 1RM"), carried
   // straight off `computed.steps[].strength.percent_1rm`. Its one job is to let a SWAP derive
   // the substitute's weight at the intensity the block actually intended, instead of
@@ -2480,6 +2482,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             // The composer's slot intent, as data (2026-08-26). New rows carry it; rows
             // materialized before then fall back to the notes regex in the cue detection.
             slot_intent: typeof s?.slot_intent === 'string' ? s.slot_intent : undefined,
+            superset_group: typeof s?.superset_group === 'string' && s.superset_group ? s.superset_group : undefined,
             // ⛔ IS THIS ROW ONE OF THE BLOCK'S ASSISTANCE SLOTS? The composer marks them
             // `load_prescribed: false` — assistance in the previous program is never priced off a percentage
             // ("the engine prescribes NO weight for assistance work. Ever."). Carried through so the
@@ -5390,6 +5393,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           const cardGlow = isMainLiftCard || isMobilityMode ? [0.40, 0.05] : [0.22, 0.035];
           return (
           <React.Fragment key={exercise.id}>
+          {/* 2026-09-03 (Michael: supersets are the book's layout, p274). The first row of a pair opens the
+              block: one line saying how a superset is done — one set of each, then rest, then again — the
+              way Strong and Hevy bracket a pair. Swap still works on either half. */}
+          {exercise.superset_group && exercises[exerciseIndex + 1]?.superset_group === exercise.superset_group && exercises[exerciseIndex - 1]?.superset_group !== exercise.superset_group && (
+            <div className="mx-1 mt-3 mb-1 px-1.5 text-[11px] uppercase tracking-wider text-white/55">
+              Superset · one set of each, rest, then again
+            </div>
+          )}
           {/* ⛔ HOW ASSISTANCE IS MEANT TO BE PERFORMED — ONCE FOR THE WHOLE BLOCK, above the first
               assistance card. It is a section note, not a property of any one exercise.
               An assistance row prescribes a rep TOTAL and no weight — the block saying "get this
