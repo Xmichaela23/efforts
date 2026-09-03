@@ -796,15 +796,19 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                         ) : (
                           <>
                             <div className="col-span-5 text-white/90">{fmt(p, r.isBodyweight, true)}</div>
-                            <div className="col-span-4 text-white/90">{fmt(c, false, true)}</div>
+                            <div
+                              className={`col-span-4 text-white/90 ${c && workoutId ? 'cursor-pointer' : ''}`}
+                              onClick={c && workoutId ? () => startEditSet(r.name, idx, c) : undefined}
+                            >{fmt(c, false, true)}</div>
                           </>
                         )}
                         {c && workoutId && (
                           <div className="col-span-1 flex justify-end">
                             <button
                               onClick={() => startEditSet(r.name, idx, c)}
-                              className="text-white/20 hover:text-white/60 transition-colors text-xs leading-none"
+                              className="text-white/55 hover:text-white/90 transition-colors text-sm leading-none px-1"
                               title="Edit this set"
+                              aria-label="Edit this set"
                             >✎</button>
                           </div>
                         )}
