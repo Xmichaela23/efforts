@@ -88,6 +88,22 @@ import { deriveSnapshotWatermark } from "./watermark.ts";
 // raw column. The spine had its own private chain for threshold pace — see the block below.
 import { resolveCurrentRunThresholdPace } from "../../../src/lib/resolve-current-run-pace.ts";
 
+/**
+ * ONE drift read for every State point (2026-09-03) — the same precedence session-detail uses for the
+ * Performance screen: the analyser's pace-to-heart-rate decoupling when it computed one, else
+ * `hr_drift_v1` (heart rate second half vs first, by time, after the warm-up), else the facts' whole-session
+ * drift on a steady day. Never withheld; an interval day is labelled whole-session instead of hidden.
+ * ⚠️ `Number(null)` is 0 — the checks are on typeof, never on Number.isFinite alone.
+ */
+function driftReadForPoint(hrs: any, wa: any, factDrift: number | null | undefined, steady: boolean): { driftPct: number | null; driftBasis: 'gap' | 'raw' | 'hr' | null; driftWholeSession: boolean; fadeWithheld: boolean } {
+  const dec = typeof hrs?.decouplingPct === 'number' && Number.isFinite(hrs.decouplingPct) ? hrs.decouplingPct : null;
+  const v1 = typeof wa?.hr_drift_v1?.pct === 'number' && Number.isFinite(wa.hr_drift_v1.pct) ? wa.hr_drift_v1.pct : null;
+  if (dec != null) return { driftPct: Math.round(dec * 10) / 10, driftBasis: hrs?.decouplingBasis === 'raw' ? 'raw' : 'gap', driftWholeSession: !steady, fadeWithheld: false };
+  if (v1 != null) return { driftPct: Math.round(v1 * 10) / 10, driftBasis: 'hr', driftWholeSession: !steady, fadeWithheld: false };
+  if (steady && typeof factDrift === 'number' && Number.isFinite(factDrift)) return { driftPct: factDrift, driftBasis: 'hr', driftWholeSession: false, fadeWithheld: false };
+  return { driftPct: null, driftBasis: null, driftWholeSession: !steady, fadeWithheld: !steady };
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -1445,14 +1461,7 @@ serve(async (req: Request) => {
               // decoupling when the analyser computed it, else `hr_drift_v1` (heart rate second half vs first,
               // by time, after the warm-up — `_shared/hr-drift-halves.ts`). Never withheld; an interval day is
               // labelled whole-session on the card instead of hidden. `f.drift` is the last resort.
-              ...((): { driftPct: number | null; driftBasis: 'gap' | 'raw' | 'hr' | null; driftWholeSession: boolean; fadeWithheld: boolean } => {
-                const dec = Number(hrs?.decouplingPct);
-                const v1 = Number(r?.workout_analysis?.hr_drift_v1?.pct);
-                if (Number.isFinite(dec)) return { driftPct: Math.round(dec * 10) / 10, driftBasis: (hrs?.decouplingBasis === 'raw' ? 'raw' : 'gap'), driftWholeSession: !steady, fadeWithheld: false };
-                if (Number.isFinite(v1)) return { driftPct: Math.round(v1 * 10) / 10, driftBasis: 'hr', driftWholeSession: !steady, fadeWithheld: false };
-                if (steady && f.drift != null) return { driftPct: f.drift, driftBasis: 'hr', driftWholeSession: false, fadeWithheld: false };
-                return { driftPct: null, driftBasis: null, driftWholeSession: !steady, fadeWithheld: !steady };
-              })(),
+              ...driftReadForPoint(hrs, r?.workout_analysis, f.drift, steady),
               keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
               // conditions, shown never corrected: the day's temperature and the climb
               tempF: (() => { const t = Number(r?.weather_data?.temperature); return Number.isFinite(t) ? Math.round(t) : null; })(),
@@ -1499,7 +1508,7 @@ serve(async (req: Request) => {
              */
             for (const fam of FAMILIES) {
               const { data: linkRows } = await supabase
-                .from("workouts").select("date,planned_id")
+                .from("workouts").select("date,planned_id,workout_analysis")
                 .eq("user_id", userId).in("type", fam.types).eq("workout_status", "completed")
                 .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", asOf);
               const linked = (Array.isArray(linkRows) ? linkRows : [])
@@ -1540,7 +1549,8 @@ serve(async (req: Request) => {
                   hrAvg: hr != null ? Math.round(hr) : 0,
                   durationMin: hit.durationMin,
                   efficiency: f?.efficiency ?? null,
-                  driftPct: f?.drift ?? null,
+                  // 2026-09-03: the same drift read as every other State point and the Performance screen.
+                  ...driftReadForPoint((r as any)?.workout_analysis?.heart_rate_summary ?? null, (r as any)?.workout_analysis, f?.drift ?? null, (r as any)?.workout_analysis?.heart_rate_summary?.decouplingMixedEffort !== true),
                   keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
                 });
               }
