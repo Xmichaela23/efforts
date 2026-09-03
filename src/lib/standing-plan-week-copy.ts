@@ -237,18 +237,24 @@ const COUNT_WORDS: Record<number, string> = { 1: 'One', 2: 'Two', 3: 'Three', 4:
  * this, with the same words and the same reason.
  */
 export function perSessionIntroFor(
-  frame: FrameId = 'all_rounder',
-  column: ColumnKind = 'standard',
+  _frame: FrameId = 'all_rounder',
+  _column: ColumnKind = 'standard',
 ): string[] {
-  const hard = frameSlots(frame, column).filter((x) => x.role === 'hard').length;
-  const word = COUNT_WORDS[hard] ?? String(hard);
+  /**
+   * ⛔ MICHAEL'S WORDING (2026-09-03), tightened to the book. The hard sessions are prescribed as
+   * sets and rounds (pp.229–239), so their length falls out of the prescription. The easy sessions
+   * and the long day are the athlete's own volume (p107 floor: under 10–15 min is not worth doing;
+   * p275: the long day "can be a hike, a long ride, a team sport day"). The club line points at the
+   * Your week card, where a club is placed. ⚠️ THREE PEER LINES, no header line: the old opener
+   * ("Standard Focus runs endurance alongside the lifting") was cut as saying nothing.
+   */
   return [
-    'Standard Focus runs endurance alongside the lifting, every week.',
-    'Each session takes a sport and a length.',
-    'The easy and long sessions are at conversation pace, so their length is whatever you hold comfortably.',
-    `The ${word.toLowerCase()} hard session${hard === 1 ? '' : 's'} ${hard === 1 ? 'is' : 'are'} the programme's, at a set length.`,
+    "The hard sessions are written by the program, set by set, so their length can't be changed.",
+    'The easy sessions and the long day are as long as your current volume allows.',
+    'A hard session or the long day can be your run club or ride club. You set that on the Your week card.',
   ];
 }
+
 
 /**
  * ⛔ WHERE THE WEEKLY NUMBER WENT. The hours boxes are gone from this frame (Michael, 2026-08-30) and
@@ -346,6 +352,23 @@ export const ENDURANCE_WEEK_INTRO_CONSEQUENCE: string[] = [
 ];
 
 /** His block whole, in order — for the test that pins it verbatim. */
+/** The tap under the three intro lines. Opens `ENDURANCE_LIMITS_AND_WHY`. */
+export const ENDURANCE_LIMITS_LABEL = 'Limits and why';
+
+/**
+ * ⛔ THE LIST BEHIND "Limits and why" (Michael, 2026-09-03). Every line has a page: p107 (the
+ * 10–15 min floor; cardiac drift 5% ends the session for hybrid athletes), p239 (cycling endurance
+ * level 3: 3.5–5 h), pp.139–145 rule 5 (VT1 after a hard leg session can be cut by a third),
+ * p247 (3–4% off squat and deadlift the day after a hard run), p275 (rides cost the legs less).
+ * ⚠️ The "rarely more than 2 h" line was cut on Michael's call: an observation, not a rule.
+ */
+export const ENDURANCE_LIMITS_AND_WHY: string[] = [
+  "Easy sessions: under 15 minutes isn't worth doing. Stop when your heart rate drifts 5% at the same pace.",
+  'Long ride: up to 5 hours.',
+  'An easy run the day after heavy legs can be cut by a third with the same result.',
+  ...ENDURANCE_WEEK_INTRO_CONSEQUENCE.slice().reverse(),
+];
+
 export const ENDURANCE_WEEK_INTRO: string[] = [
   ...ENDURANCE_WEEK_INTRO_STRUCTURE,
   ...ENDURANCE_WEEK_INTRO_CONSEQUENCE,

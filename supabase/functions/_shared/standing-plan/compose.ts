@@ -3805,19 +3805,6 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * chapter (pp.69-125, no page photographed); rule 6 gives the same two figures on a page that WAS
    * read, in the context of a session before resistance work. Naming one alone would overstate it.
    */
-  for (const sport of ['run', 'ride'] as const) {
-    const perDay = new Map<string, number>();
-    for (const x of sessions.filter((y) => y.type === sport)) {
-      perDay.set(x.day, (perDay.get(x.day) ?? 0) + 1);
-    }
-    if (![...perDay.values()].some((n) => n > 1)) continue;
-    const text = `Two ${sport === 'run' ? 'runs' : 'rides'} land on one day. The source leaves six to `
-      + 'eight hours between them, or four to six when the first is under an hour.';
-    if (!notes.some((n) => n.text === text)) {
-      notes.push({ kind: 'warning', text, cite: 'Viada pp.69-125, p139-145' });
-    }
-  }
-
   const conflicts = weekConflicts({
     sessions,
     frame: args.frame,
@@ -3827,6 +3814,24 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   for (const c of conflicts) {
     if (!notes.some((n) => n.text === c.text)) {
       notes.push({ kind: 'warning', text: c.text, cite: 'Viada p130, p131' });
+    }
+  }
+
+  for (const sport of ['run', 'ride'] as const) {
+    const perDay = new Map<string, number>();
+    for (const x of sessions.filter((y) => y.type === sport)) {
+      perDay.set(x.day, (perDay.get(x.day) ?? 0) + 1);
+    }
+    // ⚠️ A DAY THE CONFLICT ENGINE ALREADY NAMES (two hard sessions, or hard beside long) gets its
+    // own sentence with the day in it — this generic one steps aside there, or the athlete reads two
+    // sentences about one day.
+    const namedByConflict = new Set(conflicts.filter((c) => c.rule === 'two_hard_one_day').flatMap((c) => c.days));
+    for (const d of [...perDay.keys()]) if (namedByConflict.has(d as never)) perDay.delete(d);
+    if (![...perDay.values()].some((n) => n > 1)) continue;
+    const text = `Two ${sport === 'run' ? 'runs' : 'rides'} land on one day. The source leaves six to `
+      + 'eight hours between them, or four to six when the first is under an hour.';
+    if (!notes.some((n) => n.text === text)) {
+      notes.push({ kind: 'warning', text, cite: 'Viada pp.69-125, p139-145' });
     }
   }
 

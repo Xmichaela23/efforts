@@ -149,7 +149,10 @@ import {
   accessoryCostLine, INTENT_ALLOCATION_NOTE, interlockLine, RUN_GROUND_NOTE, RUN_GROUND_OPTIONS,
   SESSION_PRESCRIPTION, singleSlotOptions, SINGLE_SLOT_NOTE,
 } from '@/lib/hard-day-menus';
-import { relocationPhrase, solveWizardWeek } from '@/lib/suggest-hard-days';
+import { solveWizardWeek } from '@/lib/suggest-hard-days';
+import {
+  conflictsOf, familyOf, hardIntensityOf, placedHardDays, placedHardSessions, type PreviewCompromise,
+} from '@/lib/preview-week-read';
 import { resolveCurrent5kPace } from '@/lib/resolve-current-5k-pace';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 
@@ -566,7 +569,8 @@ const DAY_SHORT: Record<DayName, string> = {
  * for the same slots and a Club session carries its own; dropping them would trade this bug for
  * its mirror image.
  */
-const IS_HARD_SESSION_NAME = /Hard|Hill|Threshold|Intervals|Repeat|Club/i;
+// ⛔ THE NAME REGEX IS GONE (2026-09-03). A placed hard session is read by its `family:` tag —
+// see `src/lib/preview-week-read.ts` and the note there on the Tuesday anaerobic ride.
 
 /**
  * ⛔ THE MASTER STRIP — THE PLACED WEEK AT A GLANCE (Michael, round 3, 2026-08-25).
@@ -1877,6 +1881,9 @@ type PreviewSession = {
   day: string;
   name: string;
   duration?: number;
+  /** ⛔ CARRIED NOW (2026-09-03): `family:` / `sport:` / `intensity:` from the composer — the card
+   *  identifies a placed hard session by these, never by its name. */
+  tags?: string[];
   /** ⛔ CARRIED NOW. Without it the grid cannot tell a lift from a run. The composer has always
    *  emitted it; this type simply dropped it on the way in. */
   type?: string;
@@ -1888,7 +1895,9 @@ type PreviewPlan = {
   /** `place-week`'s own words for every clearance the week could not honour. */
   /** ⛔ TAGGED: `breach` = a rule was broken; `cost` = the shape the athlete chose cost something.
    *  One channel, two meanings — the reader must not have to infer which. */
-  placement_compromises?: Array<{ kind: 'breach' | 'cost'; text: string }>;
+  /** ⚠️ `rule` / `days` travel too (2026-09-03): a compromise with a conflict rule is the
+   *  "High fatigue risk" line; the rest are trade-off notes. */
+  placement_compromises?: Array<{ kind: 'breach' | 'cost'; text: string; rule?: string; days?: string[] }>;
 };
 
 /**
@@ -1923,6 +1932,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   /** ⛔ Distinguishes "the preview could not be built" from "the week is empty". They are not the same. */
   const [previewFailed, setPreviewFailed] = React.useState(false);
   const [previewNotes, setPreviewNotes] = React.useState<string[]>([]);
+  // ⛔ THE SAME LIST WITH ITS STRUCTURE (2026-09-03) — the conflict line reads `rule` off it.
+  const [previewCompromises, setPreviewCompromises] = React.useState<PreviewCompromise[]>([]);
   /** ⛔ Standing Plan only: whether this block COULD open without a test week, and why not. */
   const [previewSkip, setPreviewSkip] = React.useState<
     { available: boolean; summary: string; window_days: number } | null
@@ -2477,34 +2488,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const placedDays = useMemo<Record<number, DayName | undefined>>(() => {
     const out: Record<number, DayName | undefined> = {};
     if (!previewWeek?.length) return out;
-    const byDiscipline: Record<'run' | 'bike', DayName[]> = { run: [], bike: [] };
-    for (const s of previewWeek) {
-      const hard = IS_HARD_SESSION_NAME.test(String((s as { name?: string }).name ?? ''));
-      if (!hard) continue;
-      const t = String((s as { type?: string }).type ?? '');
-      /**
-       * ⛔ THE ENGINE SPEAKS `Monday`; THIS SCREEN SPEAKS `monday` (2026-08-25). `WEEK_DAYS` is
-       * Title Case on the wire and `DAY_SHORT` / `DAYS` are lowercase, so the raw value indexed
-       * nothing: the row read `Run undefined · Ride undefined` and the day chip could not match
-       * its own selection. Same trap the deleted `strengthRoles` had already hit and named.
-       */
-      const d = (String((s as { day?: string }).day ?? '').toLowerCase() || undefined) as DayName | undefined;
-      if (!d) continue;
-      if (t === 'run') byDiscipline.run.push(d);
-      else if (t === 'ride') byDiscipline.bike.push(d);
-    }
-    const seen: Record<'run' | 'bike', number> = { run: 0, bike: 0 };
-    /**
-     * ⛔⛔ EVERY SLOT, PINNED OR NOT (round 2, 2026-08-25). This read `if (!h.day) out[i] = …`, so a
-     * slot the athlete had pinned kept the PICK and never learned where the week actually put it.
-     * That is what let the chips glow Fri/Tue over a week holding Mon/Wed.
-     */
-    state.hardDays.forEach((h, i) => {
-      const list = byDiscipline[h.discipline];
-      const n = seen[h.discipline]++;
-      out[i] = list[n];
-    });
+    // ⛔ BY TAG, NOT BY NAME (2026-09-03) — `preview-week-read.ts` carries the reason.
+    placedHardDays(previewWeek, state.hardDays).forEach((d, i) => { out[i] = d; });
     return out;
+  }, [previewWeek, state.hardDays]);
+  /** The family each hard slot was built as, off the same preview — what the row label prints. */
+  const placedFamilies = useMemo<Array<string | undefined>>(() => {
+    if (!previewWeek?.length) return [];
+    return placedHardSessions(previewWeek, state.hardDays).map((x) => (x ? familyOf(x) : undefined));
   }, [previewWeek, state.hardDays]);
   /**
    * ⛔ THE PLACED WEEK, GROUPED BY DAY — the master strip's only input (round 3, 2026-08-25).
@@ -2549,30 +2540,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * placed week to read, and a chip showing the athlete's own tap beats a row of empty chips.
    */
   const dayForSlot = (i: number): DayName | '' => {
-    /**
-     * ⛔⛔ THE PIN WINS HERE TOO (pins-win, 2026-08-25). Round 2 made this `placedDays[i] || pick`,
-     * which was right while the engine could overrule a choice. It cannot any more — `compose.ts`
-     * puts the endurance session on the day that was tapped — so the pin IS the placement and
-     * reading the placed week first only introduces a window where they disagree.
-     *
-     * ⚠️ AND THE WINDOW IS REAL, NOT THEORETICAL: it was caught on the dev preview, which calls the
-     * DEPLOYED composer. Between a tap and the next solve the chip read `Mon — yours` about a day
-     * the athlete had not picked, which is the worst of both — the engine's answer wearing the
-     * athlete's label.
-     * ⚠️ THE ENGINE'S DAY IS STILL THE FALLBACK for a slot nobody has touched, which is the normal
-     * case and the whole point of arriving with the week already arranged.
-     */
-    /**
-     * ⛔⛔ A BLOCKED DAY IS RESOLVED HERE, NOT IN STATE (Michael, 2026-08-25 afternoon). The athlete's
-     * answer stays exactly where they put it; what the chip SHOWS is the day the engine re-solved it
-     * onto. A chip still glowing on the day off would be the screen showing a day the plan does not
-     * have — the exact lie the "picked Thu, placed Mon" line was killed for.
-     *
-     * ⚠️ THE CLIENT SOLVE IS READ FIRST HERE, ahead of `placedDays`, and only in this branch. The
-     * placed week is the SERVER's, which is a round trip behind — and in the one moment the athlete
-     * has just blocked a day, being a round trip behind means showing them the day they blocked.
-     */
     const pick = state.hardDays[i]?.day as DayName | '' | undefined;
+    /**
+     * ⛔ THE BUILT WEEK WINS ONCE IT EXISTS (Michael, 2026-09-03: chips, dots and the warning line
+     * all read the server's answer; the phone's solver is the pre-fill only). Before the preview
+     * has come back, a blocked tap shows the phone's replacement so the chip is never on a day off.
+     */
+    if (previewWeek?.length && placedDays[i]) return placedDays[i]!;
     if (pick && isBlockedDay(pick)) {
       return (suggestedHardDays[i] as DayName | undefined) || placedDays[i] || '';
     }
@@ -2829,7 +2803,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const longRowDay = longRowMoved
     ? ((scheduleRunShown ? suggestedLongDays.run : suggestedLongDays.ride) || longRowOwn)
     : longRowOwn;
-  const scheduleHealthState = wizardWeek.health;
+  /**
+   * ⛔ THE CONFLICT LINE READS THE BUILT WEEK (Michael, 2026-09-03). It read the phone's own
+   * solver, which could say "balanced" over a week the server had built with two hard runs on a
+   * Wednesday. Now: once the preview is back, the collisions are the compromises carrying a
+   * conflict rule, in the plan's own words. Before it is back, the phone's solve stands in.
+   */
+  const previewConflicts = useMemo(() => conflictsOf(previewCompromises), [previewCompromises]);
+  const scheduleHealthState = previewWeek?.length
+    ? { ok: previewConflicts.length === 0, collisions: previewConflicts.map((c) => c.text) }
+    : wizardWeek.health;
   const [healthOpen, setHealthOpen] = useState(false);
   /** The engine's own list of pins it could not reach — see the override row on the week step. */
   const [overridesOpen, setOverridesOpen] = useState(false);
@@ -2918,47 +2901,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     }
 
     /**
-     * ⛔⛔ WHAT A DAY OFF MOVED, AND WHERE TO (Michael, 2026-08-25 afternoon). *"The note says what
-     * moved and why."*
-     *
-     * ⛔ THE MOVE IS THE ENGINE'S, READ BACK — `solveWizardWeek` returns `relocations` from
-     * `resolveAroundPins`, the same call that placed the week. This screen composes no prose and
-     * decides nothing about which session went where; it renders the fact through the copy table.
-     * ⚠️ THE ENGINE'S OWN SENTENCE WINS when the preview has come back with one, exactly like the
-     * lifting note below — one sentence per day off, and the built week's version is the truer one.
+     * ⛔ NO "X is a day off — moved to Y" AND NO CLIENT-SIDE LIFT NOTE (Michael, 2026-09-03: notes
+     * state the direct training effect, never a move; the chip already shows where it landed).
+     * The lift-on-a-day-off cost is the server's own compromise below, in its words.
      */
-    for (const r of wizardWeek.relocations) {
-      const from = DAY_SHORT[DAYS[r.from]];
-      if (previewNotes.some((n) => /is a day off/i.test(n) && new RegExp(`\\b${DAYS[r.from]}\\b`, 'i').test(n))) {
-        continue;
-      }
-      add('session_moved_off_unavailable_day', {
-        day: from,
-        session: relocationPhrase(r.session),
-        movedTo: DAY_SHORT[DAYS[r.to]],
-      });
-    }
-
-    /**
-     * ⚠️ A LIFT ON A DAY THE ATHLETE BLOCKED — and it is now the case the rotation could not solve,
-     * not the case nobody tried (`chooseDayMap` scores all seven rotations as of 2026-08-25).
-     *
-     * ⛔ THE ENGINE'S OWN SENTENCE WINS WHEN IT HAS ONE. `chooseDayMap` knows WHICH pin took the
-     * only rotation that would have cleared the day and names it; this screen cannot know that, and
-     * rendering both would be two sentences about one day, the weaker one first.
-     */
-    for (const d of unavailableDays) {
-      const lifts = (previewWeek ?? []).filter((x) => {
-        const day = String((x as { day?: string }).day ?? '').toLowerCase();
-        return day === d && String((x as { type?: string }).type ?? '') === 'strength';
-      });
-      if (lifts.length === 0) continue;
-      const enginesOwn = previewNotes.some((n) =>
-        /carr(?:ies|y) (?:a )?lifting day/i.test(n) && new RegExp(`\\b${d}\\b`, 'i').test(n));
-      if (enginesOwn) continue;
-      add('lift_on_unavailable_day', { day: DAY_SHORT[d] });
-    }
-
     /**
      * ⛔ THE ENGINE'S OWN SENTENCES, KEPT VERBATIM AND KEPT LAST. `placement_compromises` still
      * carries the notes this screen has no independent way to compose — the sport the frame has no
@@ -2966,17 +2912,20 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
      * than Y" LINE IS DROPPED: the rotation is now the no-pins default rather than the ceiling, so
      * that line describes a step, not the week that was built.
      */
+    const conflictTexts = new Set(previewConflicts.map((c) => c.text));
     for (const n of previewNotes) {
       const t = n.trim();
       if (/^The hard session is on/i.test(t)) continue;
       if (/^The long run is on/i.test(t)) continue;
+      // ⚠️ A conflict is the "High fatigue risk" line above, not a trade-off twice.
+      if (conflictTexts.has(t)) continue;
       if (seen.has(t)) continue;
       seen.add(t);
       out.push({ tier: 'tradeoff', text: t });
     }
     return out;
-  }, [previewWeek, previewNotes, unavailableDays, state.longClub, state.longClubMinutes,
-    scheduleRunShown, wizardWeek.relocations]);
+  }, [previewWeek, previewNotes, previewConflicts, state.longClub, state.longClubMinutes,
+    scheduleRunShown]);
 
   const breachNotes = weekNotes.filter((n) => n.tier === 'breach');
 
@@ -4041,6 +3990,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       Array.isArray(plan?.placement_compromises)
         // Tolerate the old flat-string shape while any cached plan still carries it.
         ? plan!.placement_compromises!.map((c: any) => (typeof c === 'string' ? c : c?.text)).filter(Boolean)
+        : [],
+    );
+    setPreviewCompromises(
+      Array.isArray(plan?.placement_compromises)
+        ? (plan!.placement_compromises! as unknown[])
+          .map((c) => (typeof c === 'string' ? { text: c } : c as PreviewCompromise))
+          .filter((c) => !!c && typeof c.text === 'string')
         : [],
     );
     setPreviewing(false);
@@ -6709,7 +6665,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
              * ⚠️ IT ALSO NAMES THE SPLIT the card now has: the days are the question, the rest of
              * the week is the answer under it.
              */
-            : 'Place the days you can’t move — ride and run clubs, long days. The lifting is placed around them.'}
+            : 'The week below is the program’s. Any day can move. What a move costs shows up in the notes. A run club or ride club can take a hard session or the long day.'}
           onBack={back} onContinue={next}
           // ⚠️ THE HARD-DAY STEP NEVER BLOCKS. Its own row is optional — "None" is a real answer —
           // and `scheduleCanContinue` is about the per-week COUNTS, which live on the other step.
@@ -6832,9 +6788,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             {state.hardDays.map((h, i) => {
               const dayVal = dayForSlot(i);
               const rgb = getDisciplineColorRgb(h.discipline === 'bike' ? 'bike' : 'run');
+              /**
+               * ⛔ THE LABEL IS WHAT THE PLAN BUILT (Michael, 2026-09-03). It said "sustained
+               * threshold" over an anaerobic ride because the phone decided the role itself; the
+               * server never read it. Once the preview is back the family tag decides; before that
+               * the phone's guess stands in.
+               */
+              const builtIntensity = hardIntensityOf(placedFamilies[i] ?? '');
+              const intensity = builtIntensity ?? (hardRoleOf(i) === 'threshold' ? 'threshold' : 'top-end');
               const label = `${h.discipline === 'bike' ? 'Hard ride' : 'Hard run'}${
                 h.ownership === 'club' ? ' — club session'
-                  : hardRoleOf(i) === 'threshold' ? ' — sustained threshold'
+                  : intensity === 'threshold' ? ' — sustained threshold'
                     : ' — top-end intensity'}`;
               return (
                 <div key={`hard-card-${i}`} className="rounded-xl border border-white/10 px-3 py-3 space-y-2">

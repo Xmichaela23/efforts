@@ -2110,6 +2110,7 @@ gloss will be wrong on three of the four programs that define it.
   which is what Part G gap #2 has been calling an inference. **Each needs its page re-read before use.**
 
 ---
+- **2026-09-03 — pp.190–191 THERMOREGULATION READ OFF THE PAGE (Part K1).** Gap #9's "190 thermoregulation" entry closes as read. No temperature, heart-rate or pace rule for heat exists in the book; the rule is hydration and recovery between exposures, per kilogram. p197 hydration still unread.
 
 ## ⚠️ B4c. RELAYED FINDINGS — pp.108–151, read off photographs 2026-08-26 by a session that died before transcribing
 
@@ -2226,3 +2227,61 @@ is now closed.
 ⚠️ Roughly 35 frames of the pp.69–151 shoot were still unread when the session ended. Nothing found
 so far contradicts the corpus's existing "no program is both strength-leading and run+ride" finding,
 the 2h30-vs-p247 long-run conflict, or the shipped lifting progression.
+
+## K1. ⛔ THERMOREGULATION — pp.190–191, read off the photographs 2026-09-03
+
+Michael photographed both pages (Part 1, "The science and principles behind hybrid training",
+chapter 7 "Advanced concepts"). Read directly. Gap #9's "190 thermoregulation" entry is now READ.
+
+### What the pages say
+
+- **The question he opens with (p190):** hybrid athletes carry more muscle than endurance-focused
+  athletes and may wonder if that makes heat harder. Does body composition change your ability to
+  regulate temperature? Are larger athletes more prone to overheating and heat injury? Does more
+  body fat help in the cold?
+- **Cooling in the heat is almost all sweat (p190).** *"In the heat, human thermoregulation has a
+  minimal radiant component."* You are not really shedding heat into the air; **air is a poor
+  conductor.** Cooling comes from *"the evaporation of water from the surface of the skin that
+  absorbs heat from the body as it changes from liquid to gas."* Maximum cooling capacity is
+  **joules per surface area of skin**, or **millilitres of sweat**. **Subcutaneous fat is irrelevant**
+  to this; **exposed skin and circulation matter as much as surface area.** (In the cold, by
+  contrast, you *can* lose real heat by letting it escape into the air.)
+- **The surface-area argument (p190–191):** larger, more muscular athletes have less surface area per
+  unit of heat-generating mass (square-cube law: double the diameter, surface ×2, volume ×3). A very
+  large athlete may have twice the volume of a smaller one but only ~30% more skin. *"The principle
+  seems sound. In reality, it's more complex."*
+- **What actually favours the larger athlete (p191):** they may store more water per unit of mass and
+  may tolerate more absolute water loss. Skeletal muscle tolerates dehydration better than other
+  tissues, so a higher muscle percentage means a greater percentage of body water can go before
+  trouble. Larger humans *"can sweat more over the same time periods, and that equates to potentially
+  greater sustained cooling time."* Research also shows that in high-heat, humid environments (where
+  active cooling is less efficient) those with more surface area per unit of mass **may struggle
+  more**, not less.
+- **The net (p191):** larger individuals may produce more absolute heat over time, especially moving
+  their bodies at the same speed as a smaller person (more load at the same speed), but *"contrary to
+  popular belief, larger athletes are not always at a disadvantage in the heat!"*
+- **⛔ THE PRACTICAL RULE, VERBATIM (p191):** *"hybrid athletes should not necessarily avoid the heat
+  or believe they will inherently perform worse in it, but they should realize that their ability to
+  tolerate higher temperatures may be much more dependent on proper hydration and ventilation than
+  their (often) smaller counterparts. Indeed, recovery seems to be the more important factor here,
+  with larger athletes able to tolerate heat equally as well as their smaller counterparts, but
+  requiring more hydration on a per-kilogram basis to recover for subsequent exposures."*
+
+### What it does NOT say
+
+- ⚠️ **No temperature threshold, no pace or heart-rate adjustment for heat, no "cut the session"
+  rule.** The p107 cardiac-drift termination rule (5% for hybrid athletes) is the only heat-adjacent
+  session rule in the corpus, and it is stated as a drift rule, not a weather rule. Heat as a
+  confound on drift is field practice (TrainingPeaks: decoupling only reads as fitness on a steady,
+  flat run in moderate conditions), not the book.
+- ⚠️ **No hydration quantity here.** p197 "hydration and nutrition" is still unread and is where a
+  per-kilogram number would live if one exists.
+- Nothing about sun exposure or grade. p191's only mechanism is heat production vs. evaporative
+  cooling and recovery between exposures.
+
+### Where it touches the app
+
+- The hot-day flag on a run's decoupling (average temperature above 27 °C / 81 °F) is ours, not the
+  book's. The book gives no temperature.
+- The one thing the page would justify on a screen: a note that a hot run costs the next day's
+  recovery more than it costs today's pace, and that hydration after it is the lever. Not built.

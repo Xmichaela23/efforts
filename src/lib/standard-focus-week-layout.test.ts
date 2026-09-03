@@ -359,13 +359,12 @@ Deno.test('⛔ A QUALITY SLOT IGNORES A MINUTES KEY — the frame owns the page\
 
 Deno.test('⛔ THE PER-SESSION HEADER STATES WHAT IS ASKED AND WHAT THE PROGRAMME DECIDES', () => {
   const lines = perSessionIntroFor('all_rounder');
-  assert(/alongside the lifting/.test(lines[0]));
-  assert(/sport and a length/.test(lines[1]));
-  assert(/conversation pace/.test(lines[2]));
-  // ⛔ THE HARD COUNT IS DERIVED — p274 has three quality sessions, p246 two. A literal is one
-  // frame's answer on a shared line, which is the defect this area keeps producing.
-  assert(/three hard sessions are the programme's/.test(lines[3]), lines[3]);
-  // ⛔ NO IMPERATIVE ANYWHERE — the screen's own standing rule.
+  assertEquals(lines.length, 3, 'three peer lines, no opener');
+  assert(/written by the program, set by set/.test(lines[0]), lines[0]);
+  assert(/easy sessions and the long day/.test(lines[1]), lines[1]);
+  assert(/run club or ride club/.test(lines[2]) && /Your week card/.test(lines[2]), lines[2]);
+  assertEquals(/alongside the lifting/.test(lines.join(' ')), false, 'the empty opener is back');
+  assertEquals(/conversation pace/.test(lines.join(' ')), false, 'the long day is the athlete\'s (p275), not "whatever you hold comfortably"');
   for (const line of [...lines, WEEKLY_VOLUME_IS_THE_SUM_LINE]) {
     assert(!/^(Add|Pick|Set|Choose|Try|Hold|Keep)\b/.test(line), `imperative: "${line}"`);
   }

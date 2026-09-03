@@ -155,8 +155,8 @@ const RULES: Record<RuleId, Row> = {
     tier: 'tradeoff',
     explain: 'The lifting days keep a fixed order and spacing. The week is rotated to leave a day '
       + 'off clear, and the endurance moves off it either way.',
-    warn: (f) => `${f.day ?? 'That day'} carries a lifting day. No arrangement of this week's `
-      + 'lifting days clears it alongside the other pinned days.',
+    warn: (f) => `${f.day ?? 'That day'} has a lifting day on it. The lifting days don't fit `
+      + 'around your other days any other way.',
     source: 'day-map.ts chooseDayMap — the rotation is scored for blocked days; compose.ts moves the endurance',
   },
 
@@ -188,7 +188,7 @@ const RULES: Record<RuleId, Row> = {
   club_long_short: {
     tier: 'tradeoff',
     warn: (f) =>
-      `The club ride comes up about ${f.shortMinutes ?? 0} minutes short of the week's long-ride target.`,
+      `The club ride is about ${f.shortMinutes ?? 0} minutes shorter than the plan's long ride.`,
     source: 'handoff slice 2b — informed note, never a block',
   },
 };

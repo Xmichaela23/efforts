@@ -184,6 +184,6 @@ Deno.test('⛔ EVERY CONFLICT SENTENCE PASSES THE VOICE CHECK', () => {
     }
   }
   assert(seen > 0, 'the sweep found no conflicts at all — the fixtures stopped stacking');
-  // ⛔ ALL FOUR RULES ARE REACHED, or this test is green about sentences it never read.
-  assertEquals(rules.size, 4, `only reached: ${[...rules].join(', ')}`);
+  // ⛔ ALL SIX RULES ARE REACHED, or this test is green about sentences it never read.
+  assertEquals(rules.size, 6, `only reached: ${[...rules].join(', ')}`);
 });

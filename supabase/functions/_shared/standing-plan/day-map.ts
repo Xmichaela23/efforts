@@ -443,9 +443,8 @@ export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind =
     const kept = longSlotSport === 'ride' ? 'ride' : 'run';
     compromises.push({
       kind: 'cost',
-      text: `This week has one long session and it is a ${kept}, so the long `
-        + `${orphanPin.sport} pinned to ${orphanPin.day} is not in it. The sport mix decides which `
-        + 'one the long day is.',
+      text: `This week has one long session, and it's a ${kept}. The long `
+        + `${orphanPin.sport} on ${orphanPin.day} isn't in it.`,
     });
   }
   if (!chosen.testSafe) {

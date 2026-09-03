@@ -69,7 +69,8 @@ import {
   FIXED_SPORT_LINE,
   RUN_HOURS_LAND_ON_THE_LONG_RUN_LINE,
   perSessionIntroFor,
-  WEEKLY_VOLUME_IS_THE_SUM_LINE,
+  ENDURANCE_LIMITS_LABEL,
+  ENDURANCE_LIMITS_AND_WHY,
   sessionLengthLabel,
   SESSION_LENGTH_LABEL,
   SESSION_LENGTH_VARIES,
@@ -185,6 +186,8 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
    * ⚠️ NOTHING IS OPEN ON ARRIVAL: the screen's whole claim is that it is already answered.
    */
   const [open, setOpen] = React.useState<SlotKey | null>(null);
+  // ⛔ "Limits and why" — the page-backed limits sit behind one tap so the screen stays three lines.
+  const [limitsOpen, setLimitsOpen] = React.useState(false);
   // ⚠️ DECLARED BEFORE `slotsNow`, WHICH READS IT INSIDE A `useMemo` FACTORY THAT RUNS DURING
   // THIS RENDER — below it, that is a temporal-dead-zone throw rather than a stale value.
   const frame: FrameId = props.frame ?? 'strength_5k';
@@ -831,29 +834,46 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           about"; that is the tidy-up this note exists to stop. */}
       <div className="flex flex-col gap-3">
         <div>
-          <p className="text-white/90 text-[15px] leading-snug">{introLines[0]}</p>
+          {/* ⚠️ ON THE DAY-ORDERED FRAME THE THREE LINES ARE PEERS (2026-09-03) — no opener, no
+              indent. The other frame keeps its header-plus-list shape. */}
+          <p className={dayOrdered ? 'text-white/85 text-[14px] leading-snug' : 'text-white/90 text-[15px] leading-snug'}>{introLines[0]}</p>
           {/* ⚠️ A LIST BECAUSE HE WROTE ONE — one line per slot, not a paragraph. No bullet glyphs:
               he wrote bare lines and a bullet is punctuation he did not use. */}
-          <div className="mt-1.5 space-y-0.5">
+          <div className={dayOrdered ? 'mt-0.5 space-y-0.5' : 'mt-1.5 space-y-0.5'}>
             {introLines.slice(1).map((line) => (
-              <p key={line} className="text-white/70 text-[14px] leading-snug pl-3">{line}</p>
+              <p key={line} className={dayOrdered ? 'text-white/85 text-[14px] leading-snug' : 'text-white/70 text-[14px] leading-snug pl-3'}>{line}</p>
             ))}
           </div>
         </div>
         {/* ⚠️ SEPARATED BY SPACE AND WEIGHT BOTH — the gap says "different kind of thing" and the
             lighter tone says "this is not more of the list". */}
         <div className="space-y-0.5">
-          {ENDURANCE_WEEK_INTRO_CONSEQUENCE.map((line) => (
+          {dayOrdered ? (
+            /* ⛔ THE LIMITS SIT BEHIND ONE TAP (Michael, 2026-09-03): the screen carries three lines
+               and a link, the page-backed numbers open on request. Same pattern as the
+               "trade-offs in this week" line on the Your week card. */
+            <div>
+              <button
+                type="button"
+                onClick={() => setLimitsOpen((v) => !v)}
+                aria-expanded={limitsOpen}
+                className="flex items-center gap-1 text-white/60 text-[13px] leading-relaxed"
+                data-testid="endurance-limits-toggle"
+              >
+                <span>{ENDURANCE_LIMITS_LABEL}</span>
+                <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${limitsOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {limitsOpen ? (
+                <div className="mt-1 space-y-0.5" data-testid="endurance-limits-list">
+                  {ENDURANCE_LIMITS_AND_WHY.map((line) => (
+                    <p key={line} className="text-white/60 text-[13px] leading-relaxed">{line}</p>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : ENDURANCE_WEEK_INTRO_CONSEQUENCE.map((line) => (
             <p key={line} className="text-white/60 text-[13px] leading-relaxed">{line}</p>
           ))}
-          {/* ⛔ WHERE THE WEEKLY NUMBER WENT. The hours boxes are gone from this frame and volume is
-              no longer an ask — an athlete who arrives looking for that field finds the answer here
-              rather than a control that has vanished. ⚠️ No number in it, deliberately. */}
-          {dayOrdered ? (
-            <p className="text-white/60 text-[13px] leading-relaxed" data-testid="weekly-volume-is-sum">
-              {WEEKLY_VOLUME_IS_THE_SUM_LINE}
-            </p>
-          ) : null}
         </div>
       </div>
 

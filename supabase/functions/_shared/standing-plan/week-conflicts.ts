@@ -389,5 +389,60 @@ export function weekConflicts(args: {
     }
   }
 
+  // ⛔ TWO HARD ENDURANCE SESSIONS ON ONE DAY, OR A HARD ONE BESIDE THE LONG ONE (Michael,
+  //    2026-09-03: "no hard gates — build what's tapped, say the direct effect"). The clearance
+  //    model above says nothing here: two hard runs on one day breach no tissue clearance, so a
+  //    tapped hard day that lands on the engine's own hard day built silently. The effect is the
+  //    book's: B3 leaves 6–8 h between two-a-days, and rule 5 (pp.139–145) puts the session that
+  //    tolerates pre-fatigue last. ⚠️ Same sport or not — a hard run beside a hard ride is the
+  //    same two-a-day.
+  {
+    const anchors = typed.filter((t) =>
+      t.load === 'hard_cardio' || t.load === 'long_run' || t.load === 'long_ride');
+    const byDay = new Map<Weekday, TypedSession[]>();
+    for (const t of anchors) {
+      const d = t.s.day as Weekday;
+      if (!WEEKDAYS.includes(d)) continue;
+      byDay.set(d, [...(byDay.get(d) ?? []), t]);
+    }
+    for (const [day, xs] of byDay) {
+      if (xs.length < 2) continue;
+      const names = xs.map(phraseFor);
+      const list = names.length === 2
+        ? `${names[0]} and ${names[1]}`
+        : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+      push({
+        kind: 'cost',
+        rule: 'two_hard_one_day',
+        days: [day],
+        sessions: xs.map((t) => t.s.name),
+        text: `${day} has ${list} on it. Six to eight hours between them, and the second one runs `
+          + 'on legs that have already worked.',
+      });
+    }
+  }
+
+  // ⛔ NO CLEAR DAY LEFT (same ruling). The frame keeps one rest day; a pin can take it, and the
+  //    week builds anyway. The book allows it — rule 7, a rest day is not always needed — and the
+  //    All Rounder as written still has one, so the athlete is told the shape changed.
+  {
+    const used = new Set(typed.map((t) => t.s.day as Weekday).filter((d) => WEEKDAYS.includes(d)));
+    const restFrameDay = FRAMES[args.frame].columns[args.column].find((d) => d.rest)?.day ?? null;
+    if (used.size >= 7 && restFrameDay != null) {
+      // ⚠️ THE DAY NAMED IS THE FRAME'S OWN REST DAY under this rotation, and the sessions are
+      // whatever took it — that is the tap the athlete can undo.
+      const restDay = weekdayForFrameDay(restFrameDay, args.dayOffset);
+      const took = typed.filter((t) => t.s.day === restDay);
+      push({
+        kind: 'cost',
+        rule: 'no_rest_day',
+        days: [restDay],
+        sessions: took.map((t) => t.s.name),
+        text: `No day this week is clear. The program's week rests on ${restDay}, and `
+          + `${took.length === 1 ? phraseFor(took[0]) : 'the sessions placed there'} took it.`,
+      });
+    }
+  }
+
   return out;
 }
