@@ -1789,6 +1789,8 @@ export interface NamedSessionPoint {
   driftPct: number | null;
   /** ⛔ True when the plan puts a key session inside 24 hours of this one, so p107's tighter 5%
    *  line is the one that applies. Resolved by the caller off the plan, never guessed from the day. */
+  /** 2026-09-03: this easy point is the warm-up of a hard run (D-463), not a whole easy run. */
+  fromWarmup?: boolean;
   keySessionWithin24h: boolean;
 }
 
@@ -1872,6 +1874,8 @@ export interface SpineSessionPoint {
   fadeWithheld: boolean;
   /** ⛔ True when the plan puts a key session inside 24 hours, so p107's tighter 5% line applies
    *  rather than the standard 10%. An athlete with no plan gets `false` everywhere — correct, not missing. */
+  /** 2026-09-03: this easy point is the warm-up of a hard run (D-463), not a whole easy run. */
+  fromWarmup?: boolean;
   keySessionWithin24h: boolean;
   /** The day's temperature (°F) and the climb (m) — facts beside the drift, never a correction
    *  (Michael 2026-09-02: hills and heat matter; whether they were pushing is the athlete's call). */

@@ -1415,6 +1415,15 @@ serve(async (req: Request) => {
             .eq("workout_status", "completed")
             .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", asOf);
           const bySport = new Map<string, Map<string, SpineSessionPoint[]>>();
+          // 2026-09-03 (Michael: "easy runs should start reacting to the warm-ups, right?"): the warm-up read
+          // off a hard run (`run_facts.warmup_easy`, D-463) becomes an EASY point in this series too, so the
+          // easy-runs block (efficiency factor, count, trend) keeps moving in a block with no easy runs.
+          // Marked `fromWarmup` so the card can say so.
+          const warmByDate = new Map<string, { pace_s_per_km: number; hr_avg: number; seconds: number }>();
+          for (const f of (runFactsR.data ?? []) as any[]) {
+            const we = f?.run_facts?.warmup_easy;
+            if (we && Number(we.pace_s_per_km) > 0 && Number(we.hr_avg) > 0) warmByDate.set(String(f.date).slice(0, 10), we);
+          }
           for (const r of (Array.isArray(spineRows) ? spineRows : []) as any[]) {
             const t = String(r?.type || "").toLowerCase();
             const sport = t.includes("run") ? "run" : "ride";
@@ -1473,6 +1482,24 @@ serve(async (req: Request) => {
               tempF: (() => { const t = Number(r?.weather_data?.temperature); return Number.isFinite(t) ? Math.round(t) : null; })(),
               elevationGainM: f.elevM ?? null,
             });
+            if (sport === "run" && group !== "easy") {
+              const we = warmByDate.get(date);
+              const ef = we ? computeEfficiencyIndex(Number(we.pace_s_per_km), Number(we.hr_avg)) : null;
+              if (we && ef != null) {
+                groups.set("easy", groups.get("easy") ?? []);
+                groups.get("easy")!.push({
+                  date,
+                  hrAvg: Math.round(Number(we.hr_avg)),
+                  durationMin: Math.max(1, Math.round(Number(we.seconds) / 60)),
+                  efficiency: ef,
+                  driftPct: null, driftBasis: null, driftWholeSession: false, fadeWithheld: false,
+                  keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
+                  tempF: (() => { const t = Number(r?.weather_data?.temperature); return Number.isFinite(t) ? Math.round(t) : null; })(),
+                  elevationGainM: null,
+                  fromWarmup: true,
+                });
+              }
+            }
           }
           for (const [sport, groups] of bySport) {
             for (const [group, points] of groups) {

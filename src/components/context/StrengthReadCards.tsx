@@ -166,7 +166,7 @@ function SpineCard({ series }: { series: SpineSeries }) {
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-[13px] text-white/80">{label}</span>
         {/* ⚠️ THE COUNT, NOT A WEEK NUMBER. This card has no block axis by construction. */}
-        <span className="text-[11px] text-white/60 tabular-nums">{pts.length} logged</span>
+        <span className="text-[11px] text-white/60 tabular-nums">{pts.length} logged{pts.some((p: any) => p?.fromWarmup) ? ` · ${pts.filter((p: any) => p?.fromWarmup).length} from warm-ups` : ''}</span>
       </div>
 
       {latest.efficiency != null && (
