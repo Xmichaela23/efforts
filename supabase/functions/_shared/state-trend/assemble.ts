@@ -1865,6 +1865,10 @@ export interface SpineSessionPoint {
    * ⛔ THE SURFACE MUST SAY THIS OUT LOUD. Rendered as a gap it reads as missing data, and the athlete
    * concludes the app is broken. It is a different number for a different kind of session.
    */
+  /** 2026-09-03: 'gap' / 'raw' = pace-to-heart-rate decoupling; 'hr' = heart rate alone, second half vs first (the same
+   *  read the Performance screen shows). `driftWholeSession` = the session had intervals; the card says so. */
+  driftBasis?: 'gap' | 'raw' | 'hr' | null;
+  driftWholeSession?: boolean;
   fadeWithheld: boolean;
   /** ⛔ True when the plan puts a key session inside 24 hours, so p107's tighter 5% line applies
    *  rather than the standard 10%. An athlete with no plan gets `false` everywhere — correct, not missing. */

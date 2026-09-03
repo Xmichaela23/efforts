@@ -62,7 +62,7 @@ const DRIFT_KEY_SESSION_PCT = 5;
 
 type NamedPoint = {
   week: number; date: string; hrAvg: number; durationMin: number | null;
-  efficiency: number | null; driftPct: number | null; keySessionWithin24h: boolean;
+  efficiency: number | null; driftPct: number | null; driftBasis?: 'gap' | 'raw' | 'hr' | null; driftWholeSession?: boolean; keySessionWithin24h: boolean;
 };
 type NamedSession = {
   family: string; sport: string; label: string; points: NamedPoint[];
@@ -71,7 +71,7 @@ type NamedSession = {
 
 type SpinePoint = {
   date: string; hrAvg: number | null; durationMin: number | null;
-  efficiency: number | null; driftPct: number | null; fadeWithheld: boolean; keySessionWithin24h: boolean;
+  efficiency: number | null; driftPct: number | null; driftBasis?: 'gap' | 'raw' | 'hr' | null; driftWholeSession?: boolean; fadeWithheld: boolean; keySessionWithin24h: boolean;
  tempF?: number | null; elevationGainM?: number | null; };
 type SpineSeries = { sport: string; group: string; points: SpinePoint[] };
 
@@ -223,7 +223,7 @@ function SpineCard({ series }: { series: SpineSeries }) {
       {!isRide && latest.driftPct != null && !latest.fadeWithheld && (
         <div className="text-[11px] text-white/55 mt-1">
           <button type="button" onClick={() => setDecOpen((o) => !o)} aria-label="What is decoupling?" className="bg-transparent border-none p-0 cursor-pointer text-white/55 text-[11px]">
-            heart rate drift <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span> on the latest run · the line is {DRIFT_LIMITS.hybridPct}% · <span className="text-white/75">{driftVsLine(latest.driftPct)}</span>{conditions ? <span className="text-white/45"> · {conditions}</span> : null} <span className="text-white/45">{decOpen ? '▾' : 'ⓘ'}</span>
+            heart rate drift <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span> on the latest run{latest.driftWholeSession ? ' (whole session, intervals included)' : ''} · the line is {DRIFT_LIMITS.hybridPct}% · <span className="text-white/75">{driftVsLine(latest.driftPct)}</span>{conditions ? <span className="text-white/45"> · {conditions}</span> : null} <span className="text-white/45">{decOpen ? '▾' : 'ⓘ'}</span>
           </button>
           {decOpen && <p className="mt-1 text-[12px] text-white/55 leading-snug max-w-[min(100%,340px)]">{DECOUPLING_EXPLAIN}</p>}
         </div>

@@ -1441,8 +1441,18 @@ serve(async (req: Request) => {
               efficiency: f.efficiency,
               // ⛔ The switch above. Null here means "this session was not steady enough to fade-read",
               // which is a different fact from "we did not measure it" — `fadeWithheld` says which.
-              driftPct: steady ? f.drift : null,
-              fadeWithheld: !steady,
+              // 2026-09-03: ONE drift read with the Performance screen (session-detail): the pace-to-heart-rate
+              // decoupling when the analyser computed it, else `hr_drift_v1` (heart rate second half vs first,
+              // by time, after the warm-up — `_shared/hr-drift-halves.ts`). Never withheld; an interval day is
+              // labelled whole-session on the card instead of hidden. `f.drift` is the last resort.
+              ...((): { driftPct: number | null; driftBasis: 'gap' | 'raw' | 'hr' | null; driftWholeSession: boolean; fadeWithheld: boolean } => {
+                const dec = Number(hrs?.decouplingPct);
+                const v1 = Number(r?.workout_analysis?.hr_drift_v1?.pct);
+                if (Number.isFinite(dec)) return { driftPct: Math.round(dec * 10) / 10, driftBasis: (hrs?.decouplingBasis === 'raw' ? 'raw' : 'gap'), driftWholeSession: !steady, fadeWithheld: false };
+                if (Number.isFinite(v1)) return { driftPct: Math.round(v1 * 10) / 10, driftBasis: 'hr', driftWholeSession: !steady, fadeWithheld: false };
+                if (steady && f.drift != null) return { driftPct: f.drift, driftBasis: 'hr', driftWholeSession: false, fadeWithheld: false };
+                return { driftPct: null, driftBasis: null, driftWholeSession: !steady, fadeWithheld: !steady };
+              })(),
               keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
               // conditions, shown never corrected: the day's temperature and the climb
               tempF: (() => { const t = Number(r?.weather_data?.temperature); return Number.isFinite(t) ? Math.round(t) : null; })(),
