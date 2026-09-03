@@ -154,9 +154,10 @@ function driftVsLine(pct: number): string {
   const line = DRIFT_LIMITS.hybridPct;
   // 2026-09-03 (Michael read "−1.6% · 6.6 of room" as wrong): a FALL in heart rate has no room to compute —
   // it is simply under the line. Room and over are printed only for a rise.
-  if (pct <= 0) return 'under the line';
+  // (Michael, same day: "I don't know if it's even worth saying you've got room.") It is not. The line
+  // is stated; being over it is stated; nothing else.
   const d = Math.round((pct - line) * 10) / 10;
-  return d > 0 ? `${d.toFixed(1)} over` : `${Math.abs(d).toFixed(1)} of room`;
+  return d > 0 ? `${d.toFixed(1)} over the line` : '';
 }
 
 function SpineCard({ series }: { series: SpineSeries }) {
@@ -180,7 +181,7 @@ function SpineCard({ series }: { series: SpineSeries }) {
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-[13px] text-white/80">{label}</span>
         {/* ⚠️ THE COUNT, NOT A WEEK NUMBER. This card has no block axis by construction. */}
-        <span className="text-[11px] text-white/60 tabular-nums">{pts.length} logged{pts.some((p: any) => p?.fromWarmup) ? ` · ${pts.filter((p: any) => p?.fromWarmup).length} from warm-ups` : ''}</span>
+        <span className="text-[11px] text-white/60 tabular-nums">{pts.length} logged</span>
       </div>
 
       {latest.efficiency != null && (
@@ -237,7 +238,7 @@ function SpineCard({ series }: { series: SpineSeries }) {
       {!isRide && latest.driftPct != null && !latest.fadeWithheld && (
         <div className="text-[11px] text-white/55 mt-1">
           <button type="button" onClick={() => setDecOpen((o) => !o)} aria-label="What is decoupling?" className="bg-transparent border-none p-0 cursor-pointer text-white/55 text-[11px]">
-            {latest.driftPct <= 0 ? <>heart rate fell <span className="tabular-nums text-white/75">{Math.abs(latest.driftPct).toFixed(1)}%</span> in the second half</> : <>heart rate drift <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span></>} on the latest run{latest.driftWholeSession ? ' (whole session, intervals included)' : ''} · the line is {DRIFT_LIMITS.hybridPct}% · <span className="text-white/75">{driftVsLine(latest.driftPct)}</span>{conditions ? <span className="text-white/45"> · {conditions}</span> : null} <span className="text-white/45">{decOpen ? '▾' : 'ⓘ'}</span>
+            {latest.driftPct <= 0 ? <>heart rate fell <span className="tabular-nums text-white/75">{Math.abs(latest.driftPct).toFixed(1)}%</span> in the second half</> : <>heart rate drift <span className="tabular-nums text-white/75">{latest.driftPct.toFixed(1)}%</span></>} on the latest run{latest.driftWholeSession ? ' (whole session, intervals included)' : ''} · line {DRIFT_LIMITS.hybridPct}%{driftVsLine(latest.driftPct) ? <> · <span className="text-white/75">{driftVsLine(latest.driftPct)}</span></> : null}{conditions ? <span className="text-white/45"> · {conditions}</span> : null} <span className="text-white/45">{decOpen ? '▾' : 'ⓘ'}</span>
           </button>
           {decOpen && <p className="mt-1 text-[12px] text-white/55 leading-snug max-w-[min(100%,340px)]">{DECOUPLING_EXPLAIN}</p>}
         </div>

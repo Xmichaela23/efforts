@@ -169,7 +169,7 @@ Deno.test('interval session: the whole-session number is shown and labelled as s
   );
   const hr = rows.find((r) => r.label === 'Heart rate');
   assertStringIncludes(hr!.value, '4.5%');
-  assertStringIncludes(hr!.value, '0.5 of room to 5%');
+  assertStringIncludes(hr!.value, 'line 5%');
   assertStringIncludes(hr!.value, 'intervals included');
 });
 

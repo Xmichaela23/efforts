@@ -1960,7 +1960,7 @@ export function buildAnalysisDetailRows(
       if (!decouplingShown && pctAny != null) {
         const line = 5;
         const d = Math.round((pctAny - line) * 10) / 10;
-        const room = pctAny <= 0 ? `heart rate fell, under the ${line}% line` : (d > 0 ? `${d.toFixed(1)} over the ${line}% line` : `${Math.abs(d).toFixed(1)} of room to ${line}%`);
+        const room = pctAny <= 0 ? `heart rate fell · line ${line}%` : (d > 0 ? `${d.toFixed(1)} over the ${line}% line` : `line ${line}%`);
         const scope = decoupling?.whole_session
           ? ' — whole session, intervals included, so not a steady-run read'
           : (decoupling?.basis === 'hr' ? ' — heart rate alone, second half against first'

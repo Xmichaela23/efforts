@@ -142,7 +142,7 @@ export default function AdherenceChips({
       const d = Math.round((driftPct - line) * 10) / 10;
       // 2026-09-03, Michael: one short line per chip, plain words.
       // a FALL in heart rate has no room to compute (2026-09-03) — it is under the line, full stop
-      const room = driftPct <= 0 ? `fell · under ${line}%` : (d > 0 ? `${d.toFixed(1)} over ${line}%` : `${Math.abs(d).toFixed(1)} under ${line}%`);
+      const room = driftPct <= 0 ? `fell · line ${line}%` : (d > 0 ? `${d.toFixed(1)} over the ${line}% line` : `line ${line}%`);
       const t = (sd as any)?.weather?.temperature_f;
       const heat = typeof t === 'number' && Number.isFinite(t) ? ` · ${Math.round(t)}°F` : '';
       // one line only; "whole session" and "hills" are said in the Heart rate row below
