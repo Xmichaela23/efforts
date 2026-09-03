@@ -1075,7 +1075,6 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   // 2026-09-03 (Michael: "when you leave and come back, what was opened should close"): open state lives for the
   // visit only — nothing is remembered between visits.
   const [expandedSports, setExpandedSports] = React.useState<Set<string>>(() => new Set<string>());
-  });
   const toggleSport = (d: string) => setExpandedSports((prev) => {
     const next = new Set(prev);
     if (next.has(d)) next.delete(d); else next.add(d);
