@@ -42,6 +42,16 @@ export type WorkoutDataNormalized = {
 
 export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
   return useMemo(() => {
+    // 2026-09-03: some rows reach this hook with `computed` / `metrics` still as JSON STRINGS (the list
+    // query hands them through untouched). Every read below does `.computed?.overall`, which is undefined
+    // on a string — the grade-adjusted pace tile sat at "—" for exactly this reason while the number was
+    // there. Parse once, here, so no reader has to know.
+    for (const key of ['computed', 'metrics', 'workout_analysis'] as const) {
+      const v = workoutData?.[key];
+      if (typeof v === 'string' && v.length > 1) {
+        try { workoutData = { ...workoutData, [key]: JSON.parse(v) }; } catch { /* leave it */ }
+      }
+    }
     // Prefer server-provided display_metrics (smart server, dumb client)
     const dm = workoutData?.display_metrics;
     if (dm && typeof dm === 'object' && Object.keys(dm).length > 0) {
