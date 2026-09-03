@@ -34,7 +34,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Barbell Row                    4x2-4        @ 130           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 70wx5 100wx3 115wx2 130x4 130x4 130x4 130x4 · note: 70% of what this lift's own max works out to — about 80% of your bench press — derived, not tested.
       -      Hanging Leg Raise              3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Your pick for core.
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -93,7 +93,7 @@ WEEK 02  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Barbell Row                    4x2-4        @ 130           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 70wx5 100wx3 115wx2 130x4 130x4 130x4 130x4 · note: 70% of what this lift's own max works out to — about 80% of your bench press — derived, not tested.
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -147,7 +147,7 @@ WEEK 03  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Barbell Row                    4x2-4        @ 130           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 70wx5 100wx3 115wx2 130x4 130x4 130x4 130x4 · note: 70% of what this lift's own max works out to — about 80% of your bench press — derived, not tested.
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -201,7 +201,7 @@ WEEK 04  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Barbell Row                    4x2-4        @ 130           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 70wx5 100wx3 115wx2 130x4 130x4 130x4 130x4 · note: 70% of what this lift's own max works out to — about 80% of your bench press — derived, not tested.
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -255,7 +255,7 @@ WEEK 05  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Barbell Row                    4x2-4        @ 130           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 70wx5 100wx3 115wx2 130x4 130x4 130x4 130x4 · note: 70% of what this lift's own max works out to — about 80% of your bench press — derived, not tested.
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -309,7 +309,7 @@ WEEK 06  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Barbell Row                    4x2-4        @ 130           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 70wx5 100wx3 115wx2 130x4 130x4 130x4 130x4 · note: 70% of what this lift's own max works out to — about 80% of your bench press — derived, not tested.
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -363,7 +363,7 @@ WEEK 07  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Barbell Row                    4x2-4        @ 130           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 70wx5 100wx3 115wx2 130x4 130x4 130x4 130x4 · note: 70% of what this lift's own max works out to — about 80% of your bench press — derived, not tested.
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -416,7 +416,7 @@ WEEK 08  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Barbell Row                    4x2-4        @ 130           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 70wx5 100wx3 115wx2 130x4 130x4 130x4 130x4 · note: 70% of what this lift's own max works out to — about 80% of your bench press — derived, not tested.
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -469,7 +469,7 @@ WEEK 09  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Barbell Row                    4x2-4        @ 130           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 70wx5 100wx3 115wx2 130x4 130x4 130x4 130x4 · note: 70% of what this lift's own max works out to — about 80% of your bench press — derived, not tested.
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -522,7 +522,7 @@ WEEK 10  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Barbell Row                    4x2-4        @ 130           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 70wx5 100wx3 115wx2 130x4 130x4 130x4 130x4 · note: 70% of what this lift's own max works out to — about 80% of your bench press — derived, not tested.
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -575,7 +575,7 @@ WEEK 11  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Barbell Row                    4x2-4        @ 130           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 70wx5 100wx3 115wx2 130x4 130x4 130x4 130x4 · note: 70% of what this lift's own max works out to — about 80% of your bench press — derived, not tested.
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -628,7 +628,7 @@ WEEK 12  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Barbell Row                    4x2-4        @ 130           | 70% · RIR 3.5 · derived_ratio · plan 45wx5 70wx5 100wx3 115wx2 130x4 130x4 130x4 130x4 · note: 70% of what this lift's own max works out to — about 80% of your bench press — derived, not tested.
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated

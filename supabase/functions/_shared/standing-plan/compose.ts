@@ -1539,9 +1539,9 @@ function exerciseForSlot(
    * to keep those apart.
    */
   const derived = (() => {
-    if (movementIsTested || testedLift == null) return null;
+    if (movementIsTested) return null;
     if (slot.intent !== 'ME' && slot.intent !== 'DE') return null;
-    if (args.competitionLifts[pattern] == null) return null;
+    // (the no-tested-lift case is handled below, after the catalogue entry is read)
     const cfg = resolveExerciseConfig(movement).config;
     /**
      * ⛔ THE MOVEMENT'S OWN REFERENCE, CHECKED AGAINST WHAT THIS PATTERN ACTUALLY TESTED — see
@@ -1550,7 +1550,21 @@ function exerciseForSlot(
      * press on a push day, however the day was filled.
      */
     const ownLift = cfg ? TESTED_LIFT_FOR_REF[String(cfg.primaryRef)] : undefined;
-    if (!cfg || !ownLift || !TESTED_LIFTS_FOR_PATTERN[pattern].includes(ownLift)) return null;
+    if (!cfg || !ownLift) return null;
+    // 2026-09-03 (Michael: "are we being too strict to arrive at a number to prescribe somebody?"): a
+    // pattern with NO tested lift (pull_upper) may price a LOADED DE row off the lift its catalogue entry
+    // references, at that entry's ratio — a barbell row at ~80% of bench, the field's own band (a strict
+    // row ≈ 75–85% of bench). Gate 3 still holds for BODYWEIGHT movements (displayFormat 'bodyweight',
+    // ratio 0): the 205-lb pull-up cannot come back through here. ME on such a pattern stays by feel.
+    // ⚠️ only when the athlete HAS named competition lifts — a block with none prescribes nothing at all.
+    const anyNamed = Object.values(args.competitionLifts ?? {}).some((v) => v != null && v !== '');
+    const crossPattern = args.competitionLifts[pattern] == null;
+    if (crossPattern) {
+      if (!anyNamed || slot.intent !== 'DE' || cfg.displayFormat === 'bodyweight') return null;
+    } else {
+      if (testedLift == null) return null;
+      if (!TESTED_LIFTS_FOR_PATTERN[pattern].includes(ownLift)) return null;
+    }
     /**
      * ⛔⛔ ONE NUMBER, ONE BAR — A PER-HAND OR UNILATERAL MOVEMENT STAYS BY FEEL. The catalogue marks
      * a dumbbell bench `displayFormat: 'perHand'` with `ratioIsTotal: true`, so its 0.8 is the TOTAL
@@ -1588,7 +1602,7 @@ function exerciseForSlot(
     // ⚠️ THE NUMBER COMES FROM THE LIFT THE MOVEMENT REFERENCES, which is the whole point of the
     // change above — an overhead press prices off the tested press, not off the bench.
     const w = args.workingNumbers?.[ownLift];
-    return w ? { working: w, ratio, refLift: ownLift } : null;
+    return w ? { working: w, ratio, refLift: ownLift } : null; // the ratio is applied where the weight is priced (byRatio below)
   })();
 
   const working = movementIsTested ? args.workingNumbers?.[testedLift] : derived?.working;

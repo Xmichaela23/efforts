@@ -442,8 +442,13 @@ Deno.test('every prescribed weight is either the tested lift\'s own or a labelle
           const cfg = resolveExerciseConfig(e.name).config;
           assert(cfg?.primaryRef != null, `${where} has no primaryRef and was still weighted`);
           assertEquals(cfg!.displayFormat === 'perHand', false, `${where} is per-hand and was weighted`);
-          // ⛔⛔ AND NEVER A PULL. Its pattern names no competition lift, which is what excludes it.
-          assert(!/pull ?up|chin ?up|row/i.test(e.name), `${where} is a pull and carries a weight`);
+          // ⛔⛔ AND NEVER A BODYWEIGHT PULL. 2026-09-03 (Michael: "are we being too strict to arrive at a
+          // number?"): a LOADED pull on a DE slot may carry a weight derived off its reference lift's ratio
+          // (a barbell row at ~80% of bench), labelled derived_ratio above. A pull-up or chin-up never does.
+          assert(!/pull ?up|chin ?up/i.test(e.name), `${where} is a bodyweight pull and carries a weight`);
+          if (/row/i.test(e.name)) {
+            assertEquals((e as { slot_intent?: string }).slot_intent, 'DE', `${where} is a weighted row outside a DE slot`);
+          }
         }
       }
     }

@@ -2739,12 +2739,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             if (!untouched) return set;
             const prior = priorSets[i] ?? priorSets[priorSets.length - 1];
             if (!prior) return set;
+            // 2026-09-03 (Michael: "the greyed is confusing"): on a PLANNED row the boxes show the plan's
+            // target (reps band, reserve) greyed — last session's reps and reserve stay in the Previous
+            // column. Only the weight carries over as a starting point.
+            const plannedRow = !!(ex as any)?.target_reps;
             return {
               ...set,
               weight: prior.weight ?? set.weight,
-              ...(typeof prior.reps === 'number' ? { reps: prior.reps } : {}),
+              ...(!plannedRow && typeof prior.reps === 'number' ? { reps: prior.reps } : {}),
               ...(typeof prior.duration_seconds === 'number' ? { duration_seconds: prior.duration_seconds } : {}),
-              ...(typeof prior.rir === 'number' ? { rir: prior.rir, rir_autofilled: true } : {}),
+              ...(!plannedRow && typeof prior.rir === 'number' ? { rir: prior.rir, rir_autofilled: true } : {}),
               ...(prior.resistance_level ? { resistance_level: prior.resistance_level } : {}),
               from_previous: true,
               prefilled: true, // D-204: prior-session prefill; cleared on first athlete edit/Done
@@ -4271,6 +4275,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const ex = exercises.find((e) => e.id === exerciseId);
       const set = ex?.sets[setIndex];
       if (!ex || !set) return;
+      // 2026-09-03 (Michael: the superset "launched the timer when one exercise is done"): in a pair the
+      // rest comes AFTER the pair. Done on the first exercise starts nothing — the athlete moves to the
+      // second; done on the second starts the timer. Hevy and Strong behave the same on grouped sets.
+      if (ex.superset_group) {
+        const idx = exercises.findIndex((e) => e.id === exerciseId);
+        const next = exercises[idx + 1];
+        if (next && next.superset_group === ex.superset_group) return;
+      }
       if (set.duration_seconds !== undefined) return;          // no rest after a duration hold
       if (setIndex >= ex.sets.length - 1) return;              // no rest after the last set
       const restKey = `${exerciseId}-${setIndex}`;
