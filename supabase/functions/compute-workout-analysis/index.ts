@@ -774,6 +774,11 @@ async function extractAssessmentBaseline(
       Number(L?.totalDistanceInMeters ?? L?.distanceInMeters ?? L?.dist_m ?? L?.distance ?? 0);
     const lapTime = (L: any) =>
       Number(L?.totalTimerTimeInSeconds ?? L?.totalElapsedTimeInSeconds ?? L?.time_s ?? L?.elapsed_time ?? 0);
+    // the lap's average heart rate — the threshold HEART RATE the 12-minute test sets alongside its pace (2026-09-02)
+    const lapHr = (L: any) => {
+      const v = Number(L?.averageHeartRateInBeatsPerMinute ?? L?.avg_heart_rate ?? L?.avg_hr ?? L?.averageHeartRate ?? L?.avgHr ?? NaN);
+      return Number.isFinite(v) && v > 100 && v < 220 ? Math.round(v) : null;
+    };
 
     // ── Swim CSS test ────────────────────────────────────────────────────────
     // Protocol: 400 yd warmup → rest → 400 yd TT → rest → 200 yd TT → 200 yd cool-down
@@ -845,14 +850,19 @@ async function extractAssessmentBaseline(
       const ttLap = laps.find((L) => {
         const t = lapTime(L);
         const d = lapDist(L);
-        return t >= 660 && t <= 780 && d > 500;
+        // p210: 12 min (beginner) / 10 min (intermediate) / 8 min (advanced) — accept any of the three
+        return t >= 450 && t <= 780 && d > 500;
       });
 
       if (ttLap) {
         const t = lapTime(ttLap);
         const d = lapDist(ttLap);
-        const paceSecPerKm = Math.round(t / (d / 1000));
-        console.log(`[assessment] Run TT: ${d}m in ${t}s = ${paceSecPerKm} sec/km threshold pace`);
+        // ⛔ p210, READ OFF THE PAGE 2026-09-02: the trial gives vVO2 speed; THRESHOLD SPEED = 88% OF IT.
+        // Threshold pace is therefore the trial pace ÷ 0.88. The reader used the trial pace as threshold
+        // directly for months — a threshold set ~14% too fast.
+        const vvo2PaceSecPerKm = Math.round(t / (d / 1000));
+        const paceSecPerKm = Math.round(vvo2PaceSecPerKm / 0.88);
+        console.log(`[assessment] Run TT: ${d}m in ${t}s = ${vvo2PaceSecPerKm} sec/km vVO2 pace → threshold ${paceSecPerKm} sec/km (88% of speed, p210)`);
 
         /**
          * ⛔ THE INVARIANT APPLIES TO A TEST RESULT TOO (2026-08-20). This is now the PRIMARY way an
@@ -872,12 +882,16 @@ async function extractAssessmentBaseline(
           console.warn(`[assessment] run TT ${paceSecPerKm} s/km is not faster than easy pace ${easySecPerKm} — not a threshold reading, skipped`);
         }
         if (paceSecPerKm > 180 && paceSecPerKm < 600 && !slowerThanEasy) {
+          const ttHr = lapHr(ttLap);
           const newLF = {
             ...existingLF,
+            // ⚠️ NO threshold HEART RATE from this trial: it is a VO2-pace effort (p210), and its average heart
+            // rate sits above threshold. The page derives pace only. The lap HR is kept as a fact beside it.
+            run_vvo2_pace_sec_per_km: { value: vvo2PaceSecPerKm, confidence: 'high', source: 'Run time trial (p210)', sample_count: 1, as_of: new Date().toISOString().slice(0, 10), lap_avg_hr: ttHr, lap_seconds: t, lap_meters: d },
             run_threshold_pace_sec_per_km: {
               value: paceSecPerKm,
               confidence: 'high',
-              source: 'Run 12-min time trial',
+              source: 'Run time trial — 88% of vVO2 speed (Viada p210)',
               sample_count: 1,
               // ⛔ `as_of` IS THE FIELD EVERY READER USES (Q-173). This wrote only `tested_at`, so the
               // resolver reported NO DATE for the app's most authoritative threshold reading — the one
@@ -892,7 +906,7 @@ async function extractAssessmentBaseline(
             .from('user_baselines')
             .update({ learned_fitness: newLF, updated_at: new Date().toISOString() })
             .eq('user_id', String(w.user_id));
-          console.log(`[assessment] ✅ run_threshold_pace_sec_per_km = ${paceSecPerKm} written`);
+          console.log(`[assessment] ✅ run_threshold_pace_sec_per_km = ${paceSecPerKm} written (vVO2 ${vvo2PaceSecPerKm}${ttHr != null ? `, lap HR ${ttHr}` : ''})`);
         } else {
           console.warn(`[assessment] run pace ${paceSecPerKm} outside 180–600 range — skipped`);
         }

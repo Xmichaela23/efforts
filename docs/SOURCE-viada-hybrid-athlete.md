@@ -1329,6 +1329,40 @@ are several specific movements the athlete wants to improve.
 
 ---
 
+# PART H0 — THE ENDURANCE PRETESTS (pp.210–213), READ OFF THE PAGE 2026-09-02
+
+✅ Images filed: `book-sources/p210.jpg`–`p214.jpg` (from `~/Downloads/IMG_4322–4326`). Read directly.
+
+## H0.1 "Establishing your VO2 max pace and threshold pace" (p210)
+1. Easy 6–8 min jog. 2. 2 × 100 m strides (slow → near full tilt). 3. 3 rounds of 30 s at a "fast run"
+(mile PR) pace, 1 min easy walk/jog between. 4. 1 min additional rest. 5. **Time trial: 9.5/10 to
+begin, ending at 10/10** — record distance after **12 minutes (beginner, <2 years), 10 minutes
+(intermediate, 2–4 years), 8 minutes (advanced, 4+ years)**. 6. **vVO2 speed (mph) = miles × 5
+(beginner) / × 6 (intermediate) / × 7.5 (advanced).** **Threshold speed = 88% of vVO2 speed.**
+7. Pace = 60 / speed (min/mile; decimal × 0.6 → seconds). Note on the page: build your own chart from
+75% up to 125% of threshold, converted back to pace.
+⛔ **THE 12-MINUTE TEST IS HIS, FOR BEGINNERS — and the threshold is NOT the trial's pace. It is 88%
+of the trial's SPEED.** The app's test read the 12-minute lap's pace as threshold directly; corrected
+2026-09-02 (`compute-workout-analysis` run_test): threshold pace = lap pace ÷ 0.88; the lap pace is
+stored as vVO2 pace.
+
+## H0.2 "VT1 heart rate zone and pace (any modality)" (p211) — the talk test, as a protocol
+Pick a 20-word sentence (~9 s at normal cadence). 5–10 min easy walk/jog; 1 min rest; begin at an
+extremely easy pace; recite the sentence aloud; **increase speed by 0.2 mph / 0:15 min/mile / 15 W,
+hold 30 s, recite again; repeat**; when it becomes difficult to recite it without taking a breath,
+stop. **Record the VT1 pace/speed/wattage at the last level you could complete, and the heart rate
+you noted there.** ⚠️ This is the book's OWN easy-zone anchor — VT1 heart rate from a talk-test ramp,
+not a percentage of threshold HR. Not built (2026-09-02); the app's easy zone is Friel's % of LTHR
+(OURS by choice, D-462). A VT1 test that writes `learned_fitness.run_vt1_hr` would be the book's way.
+
+## H0.3 FTP test protocols (pp.212–213) — cycling
+"The 20-Minute Test": 5–10 min easy; 3 × 1 min high turnover / 1 min rest; 3 min easy; 3 min at 9/10;
+6–8 min easy; **20 min best effort; FTP = 20-min average watts × 0.95** (calories: × 0.79). "The Ramp
+Test": simple option — start ~50% of FTP, +25 W (recreational male) / +20 W (high-level male) / +15 W
+(female) every minute until a full minute cannot be completed, **FTP = highest completed level ×
+0.78**; complex option — +6/+5/+4 W every 15 s, **FTP = average of the four final power numbers ×
+0.74**. p214 = the 1RM (Part H).
+
 # PART H — THE WORKING NUMBER AND THE PRETEST (p215)
 
 ✅ **IMAGE FILED 2026-09-02: `book-sources/p215.png`** (Michael's photo, pasted in chat and read again

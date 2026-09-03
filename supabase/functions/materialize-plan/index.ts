@@ -1498,6 +1498,20 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
   }
   
   // easy run TIME based: run_easy_Xmin (CHECK FIRST to avoid matching "min" in distance pattern)
+  // ⛔ THE BOOK'S TIME TRIAL STEP (p210, 2026-09-02): one timed step, NO pace target — "9.5/10 to begin,
+  // ending at 10/10". The reader (compute-workout-analysis run_test) takes 88% of the trial's speed as
+  // threshold pace. 12 / 10 / 8 minutes by training age; the reader accepts any of the three.
+  if (/^run_tt_\d+min$/.test(lower)) {
+    const m = lower.match(/^run_tt_(\d+)min$/); const sec = m ? parseInt(m[1],10)*60 : 720;
+    out.push({ id: uid(), kind:'work', duration_s: sec, label: `Time trial — ${Math.round(sec/60)} min, all out and even` });
+    return out;
+  }
+  // a plain rest, no target (p210 step 4: "1 minute additional rest")
+  if (/^run_rest_\d+min$/.test(lower)) {
+    const m = lower.match(/^run_rest_(\d+)min$/); const sec = m ? parseInt(m[1],10)*60 : 60;
+    out.push({ id: uid(), kind:'recovery', duration_s: sec, label: `Rest — ${Math.round(sec/60)} min` });
+    return out;
+  }
   if (/run_easy_\d+min/.test(lower)) {
     const m = lower.match(/run_easy_(\d+)min/); const sec = m ? parseInt(m[1],10)*60 : 1800; out.push({ id: uid(), kind:'work', duration_s: sec, pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined }); return out;
   }

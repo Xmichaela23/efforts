@@ -312,7 +312,32 @@ Deno.serve(async (req) => {
     // ANALYZE RUNS
     // ==========================================================================
 
-    const runProfile = analyzeRuns(runs);
+    // ⛔ THE THRESHOLD IS YOUR BEST SUSTAINED 20-MINUTE EFFORT, EVER ON FILE (Michael 2026-09-02, "we need
+    // to figure it out" / "I'm not entering"). Not a 90-day refit, not a whole-run median: the one window
+    // TrainingPeaks reads. Both numbers come off the same run. It only goes up. So the curves are read
+    // across the athlete's whole history (18 months), and the prior learned values ride along for the
+    // only-up comparison.
+    const allRunCurves: WorkoutRecord[] = await (async () => {
+      try {
+        const { data } = await supabase
+          .from('workouts')
+          .select('id, type, date, computed, avg_heart_rate, workout_status')
+          .eq('user_id', user_id)
+          .eq('workout_status', 'completed')
+          .in('type', ['run', 'running'])
+          .gte('date', eighteenMoAgoISO);
+        return (data ?? []) as WorkoutRecord[];
+      } catch { return []; }
+    })();
+    const priorLearned = await (async () => {
+      try {
+        const { data } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', user_id).maybeSingle();
+        const raw = data?.learned_fitness;
+        const obj = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        return (obj && typeof obj === 'object') ? (obj as Record<string, any>) : null;
+      } catch { return null; }
+    })();
+    const runProfile = analyzeRuns(runs, allRunCurves, priorLearned);
 
     // ==========================================================================
     // ANALYZE RIDES
@@ -557,7 +582,7 @@ interface RunAnalysisResult {
   threshold_pace: LearnedMetric | null;
 }
 
-export function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
+export function analyzeRuns(runs: WorkoutRecord[], allRunCurves: WorkoutRecord[] = [], priorLearned: Record<string, any> | null = null): RunAnalysisResult {
   if (runs.length < 3) {
     return {
       easy_hr: null,
@@ -939,6 +964,50 @@ export function analyzeRuns(runs: WorkoutRecord[]): RunAnalysisResult {
           );
         })),
       };
+    }
+  }
+
+  // ⛔ BEST SUSTAINED 20 MINUTES — THE ONE RULE (2026-09-02). Overrides the critical-speed fit and the
+  // whole-run-average threshold HR above. Threshold pace = that window's pace; threshold HR = that
+  // window's average heart rate; same run, so they cannot disagree. ONLY UP: a prior best-20 value with a
+  // faster pace is kept. NO WINDOW: the whole history on file. A window under 85% of the observed max is
+  // still the best we have, but it is marked 'medium' (an effort that was not all-out under-reads).
+  {
+    let best: { date: string; paceSecPerKm: number; avgHr: number | null } | null = null;
+    for (const r of allRunCurves) {
+      const w = (r.computed as { pace_curve?: RunPaceCurve } | null)?.pace_curve?.['1200'];
+      if (!w || !(Number(w.distanceM) > 0) || !(Number(w.timeS) > 0)) continue;
+      const paceSecPerKm = (Number(w.timeS) / Number(w.distanceM)) * 1000;
+      if (!Number.isFinite(paceSecPerKm) || paceSecPerKm < 120 || paceSecPerKm > 900) continue;
+      const hr = Number(w.avgHr);
+      if (!best || paceSecPerKm < best.paceSecPerKm) best = { date: String(r.date ?? '').slice(0, 10), paceSecPerKm, avgHr: Number.isFinite(hr) && hr > 60 ? Math.round(hr) : null };
+    }
+    const priorPace = priorLearned?.run_threshold_pace_sec_per_km;
+    const priorHr = priorLearned?.run_threshold_hr;
+    // a prior MEASURED threshold — a best-20 read or the 12-minute test — is kept when it is faster (only up)
+    const priorIsBest20 = priorPace && /best 20-minute|time trial/.test(String(priorPace.source ?? '')) && Number(priorPace.value) > 0;
+    // ⛔ A TEST BEATS AN INFERENCE (p210): a prior written by the time trial stands regardless of what the
+    // best-20 read says; only a newer trial (or "my number") replaces it. A prior best-20 read stands
+    // only while it is faster (only up).
+    const priorIsTrial = priorPace && /time trial/.test(String(priorPace.source ?? '')) && Number(priorPace.value) > 0;
+    if (best && priorIsTrial) {
+      threshold_pace = priorPace as LearnedMetric;
+      if (priorHr && /time trial/.test(String(priorHr.source ?? ''))) { threshold_hr = priorHr as LearnedMetric; thresholdHRValue = Number(priorHr.value) || thresholdHRValue; }
+      console.log(`  📊 Threshold: the time trial stands (${priorPace.value}s/km, ${priorPace.as_of})`);
+    } else if (best && priorIsBest20 && Number(priorPace.value) < best.paceSecPerKm) {
+      threshold_pace = priorPace as LearnedMetric;            // only up: the earlier best still stands
+      if (priorHr && /best 20-minute|time trial/.test(String(priorHr.source ?? ''))) { threshold_hr = priorHr as LearnedMetric; thresholdHRValue = Number(priorHr.value) || thresholdHRValue; }
+      console.log(`  📊 Threshold: prior best 20-minute effort stands (${priorPace.value}s/km, ${priorPace.as_of})`);
+    } else if (best) {
+      const hard = observedMaxHR != null && best.avgHr != null && best.avgHr >= observedMaxHR * 0.85;
+      const paceMi = Math.round(best.paceSecPerKm * 1.60934);
+      const label = `best 20-minute effort on ${best.date} (${Math.floor(paceMi / 60)}:${String(paceMi % 60).padStart(2, '0')}/mi${best.avgHr != null ? ` at ${best.avgHr} bpm` : ''})`;
+      threshold_pace = { value: Math.round(best.paceSecPerKm), confidence: hard ? 'high' : 'medium', source: label, sample_count: 1, as_of: best.date };
+      if (best.avgHr != null) {
+        threshold_hr = { value: best.avgHr, confidence: hard ? 'high' : 'medium', source: label, sample_count: 1, as_of: best.date };
+        thresholdHRValue = best.avgHr;
+      }
+      console.log(`  📊 Threshold: ${label}${hard ? '' : ' — under 85% of observed max, medium'}`);
     }
   }
 
