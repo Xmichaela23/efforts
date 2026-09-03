@@ -24,16 +24,18 @@ export function LoadWeeksCard({ sport, load }: { sport: 'run' | 'ride' | 'swim';
   return (
     <div className="px-3 py-3 border-t border-white/[0.055] first:border-t-0">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[13px] text-white/80">{noun} load</span>
-        <span className="text-[11px] text-white/60 tabular-nums">{load.week != null ? `${load.week} points this week` : 'no points yet this week'}</span>
+        {/* 2026-09-03 (Michael: "too many confusing thingies"): ONE name for the number — Workload, the same word the
+            Performance screen uses — and one label line. "run points" / "run load" are gone. */}
+        <span className="text-[13px] text-white/80">{noun} workload</span>
+        <span className="text-[11px] text-white/60 tabular-nums">{load.week != null ? `${load.week} this week` : 'none yet this week'}{typical != null ? ` · usual ${typical}` : ''}</span>
       </div>
       <div className="text-[11px] text-white/55 mt-0.5">
-        {typical != null ? `your usual week is ${typical}` : 'no usual week yet'}{' '}
-        <button type="button" onClick={() => setOpen((o) => !o)} aria-label="What are load points?" className="bg-transparent border-none p-0 cursor-pointer text-white/45">{open ? '▾' : 'ⓘ'}</button>
+        {'what is workload'}{' '}
+        <button type="button" onClick={() => setOpen((o) => !o)} aria-label="What is workload?" className="bg-transparent border-none p-0 cursor-pointer text-white/45">{open ? '▾' : 'ⓘ'}</button>
       </div>
       {open && <p className="mt-1 text-[12px] text-white/55 leading-snug max-w-[min(100%,340px)]">{LOAD_EXPLAIN}</p>}
       {weeks.length > 0 && (
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full mt-2" style={{ height: H }} role="img" aria-label={`${noun} points, last ${weeks.length} weeks`}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full mt-2" style={{ height: H }} role="img" aria-label={`${noun} workload, last ${weeks.length} weeks`}>
           {typical != null && (
             <line x1={PAD} x2={W - PAD} y1={y(typical)} y2={y(typical)} stroke="rgba(255,255,255,0.35)" strokeDasharray="3 3" strokeWidth={1} />
           )}

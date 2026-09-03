@@ -1135,11 +1135,8 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       // ⛔ THE WEEK'S RUN POINTS AGAINST THE ATHLETE'S TYPICAL (Michael 2026-09-02: run load scored Strava's
       // way). Read off the display contract — `loadByDiscipline.run = { week, typical }` from compute-snapshot
       // (`workload_by_discipline` / `workload_by_discipline_typical`). Absent on rows from before it shipped.
-      const runLoad = (stateDisplay as any)?.loadByDiscipline?.run as { week?: number | null; typical?: number | null } | undefined;
-      if (runLoad && runLoad.week != null && Number.isFinite(Number(runLoad.week))) {
-        const typ = runLoad.typical != null && Number.isFinite(Number(runLoad.typical)) ? ` · usual ${Math.round(Number(runLoad.typical))}` : '';
-        lines.push(`${Math.round(Number(runLoad.week))} run points this week${typ}`);
-      }
+      // 2026-09-03: the third line ("N run points this week · usual M") is gone — the workload chart directly
+      // below says the same thing once, under the one name (Workload) the Performance screen uses.
       if (lines.length) return lines;
       // No grouped data yet — fall back to the top-level read.
       const ef = runFitness?.efficiency;

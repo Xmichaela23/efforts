@@ -150,12 +150,12 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact, hasActi
         <div className="mt-2 space-y-1.5 text-[11px] leading-snug text-white/45">
           {/* Copy: Michael 2026-09-02 (voice-checked). Load points on runs follow the athlete's rating first. */}
           <p>
-            <span className="text-white/70">Load points</span> — hours times intensity, on a scale where one hour
+            <span className="text-white/70">Workload</span> — hours times intensity, on a scale where one hour
             at threshold is 100. On runs your rating sets the intensity when you gave one; otherwise heart rate
             against your threshold, or power against FTP. The bar splits your rolling-7-day total by sport.
           </p>
           <p>
-            <span className="text-white/70">ACWR</span> — last 7 days of points divided by your average week over
+            <span className="text-white/70">ACWR</span> — last 7 days of workload divided by your average week over
             the last 4. 1.0 is a normal week for you. Around 1.3 or more is a bigger jump than you usually take.
           </p>
           <p>
