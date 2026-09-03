@@ -32,4 +32,4 @@
 // change (`per_lift[].verdict_label` and `.verdict_tone` move), so a cached row does not merely
 // lack a field — it carries the OLD command. Without the floor, a main lift keeps showing
 // "back off weight" computed from accessory RIR for another 24h.
-export const COACH_CLIENT_MIN_PAYLOAD_VERSION = 188; // 2026-09-03: warm-up easy points + one drift read on the State card
+export const COACH_CLIENT_MIN_PAYLOAD_VERSION = 189; // 2026-09-03: BODY is three signals (effort · soreness · logged); a 188 row still holds the paragraph, and the client reads coach_cache directly so the server bump alone does not reach the screen. 188: warm-up easy points + one drift read on the State card
