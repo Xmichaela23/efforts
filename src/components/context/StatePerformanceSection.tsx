@@ -1309,8 +1309,10 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
             // own gate means a run-less plate never reaches here (hasRunContent filters it out above).
             if (card.discipline === 'run') return (
               <>
-                <LoadWeeksCard sport="run" load={(stateDisplay as any)?.loadByDiscipline?.run ?? null} />
+                {/* 2026-09-03 (Michael): the reads first (efficiency, drift — how you responded), the workload chart
+                    (how much, how hard) below them. */}
                 <EnduranceReadCards sessions={enduranceSessions} spine={enduranceSpine} sport="run" />
+                <LoadWeeksCard sport="run" load={(stateDisplay as any)?.loadByDiscipline?.run ?? null} />
               </>
             );
             // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
