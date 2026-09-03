@@ -32,4 +32,4 @@
 // change (`per_lift[].verdict_label` and `.verdict_tone` move), so a cached row does not merely
 // lack a field — it carries the OLD command. Without the floor, a main lift keeps showing
 // "back off weight" computed from accessory RIR for another 24h.
-export const COACH_CLIENT_MIN_PAYLOAD_VERSION = 187; // 2026-09-03: warm-up easy points + one drift read on the State card
+export const COACH_CLIENT_MIN_PAYLOAD_VERSION = 188; // 2026-09-03: warm-up easy points + one drift read on the State card

@@ -77,10 +77,10 @@ type SpineSeries = { sport: string; group: string; points: SpinePoint[] };
 
 /** ⛔ THE SPINE'S GROUPS IN THE ATHLETE'S OWN WORDS. No invented vocabulary on a screen. */
 const GROUP_LABEL: Record<string, string> = {
-  easy: 'easy runs', long: 'long runs', quality: 'hard runs', all: 'rides',
+  easy: 'easy runs', long: 'long runs', quality: 'hard runs', aerobic: 'aerobic efficiency', all: 'rides',
 };
 /** ⛔ THE SPINE LEADS, THE OVERLAY FOLLOWS — easy first, then long, then quality, then rides. */
-const GROUP_ORDER = ['easy', 'long', 'quality', 'all'];
+const GROUP_ORDER = ['aerobic', 'easy', 'long', 'quality', 'all'];
 
 /** 2026-09-03 (Michael: the hills-and-heat line "feels lost in the threshold line" — it should blanket easy and
  *  hard). The run plate renders it ONCE, as the card's last line under the workload chart, via this export;
@@ -179,7 +179,7 @@ function SpineCard({ series }: { series: SpineSeries }) {
   const recentPts = pts.slice(-Math.max(1, Math.min(5, pts.length)));
   const recentWarmups = recentPts.filter((p) => p.fromWarmup).length;
   const basedOn = recentPts.length
-    ? `based on the last ${recentPts.length} ${recentPts.length === 1 ? 'session' : 'sessions'}${recentWarmups > 0 ? ` · ${recentWarmups} ${recentWarmups === 1 ? 'is a warm-up' : 'are warm-ups'}` : ''}`
+    ? `based on the last ${recentPts.length} ${recentPts.length === 1 ? 'run' : 'runs'}${recentWarmups > 0 ? ` · ${recentWarmups} ${recentWarmups === 1 ? 'warm-up' : 'warm-ups'}` : ''}`
     : null;
   // the day's conditions as facts — heat and climb move drift, and whether the athlete was pushing is theirs to read
   const conditions = [

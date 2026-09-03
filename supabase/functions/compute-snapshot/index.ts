@@ -1434,9 +1434,14 @@ serve(async (req: Request) => {
             // measured nothing on; inventing a zero would draw a crash.
             if (!f || (f.hr == null && f.efficiency == null)) continue;
             const hrs = r?.workout_analysis?.heart_rate_summary ?? null;
-            const group = sport === "run"
-              ? runSessionGroup(runTypeByDate.get(date) ?? null) // plan tag or easy — no analyser guess (2026-09-02)
-              : "all";
+            // 2026-09-03 (Michael, ruled with the field: Garmin never waits for an easy run): runs feed ONE aerobic
+            // series. An easy day contributes the whole run; a hard day contributes its WARM-UP read (D-463) and
+            // never its whole-run number (intervals are not a steady aerobic read). Each point says which it was
+            // (`fromWarmup`, `durationMin`), and the card headlines a median of the last five. The easy/hard
+            // split stays on the PACE lines (runEffHistory), which are facts, not a trend.
+            const runWord = runSessionGroup(runTypeByDate.get(date) ?? null);
+            const group = sport === "run" ? "aerobic" : "all";
+            const runIsEasyDay = sport !== "run" || runWord === "easy" || runWord === "long";
             /**
              * ⛔⛔ THE FADE NUMBER IS WITHHELD WHEN THE SESSION WAS NOT STEADY — RULED 2026-08-28.
              * **Decided on WHAT THE SESSION ACTUALLY WAS, not on its duration and not on its plan.**
@@ -1465,7 +1470,7 @@ serve(async (req: Request) => {
             bySport.set(sport, bySport.get(sport) ?? new Map());
             const groups = bySport.get(sport)!;
             groups.set(group, groups.get(group) ?? []);
-            groups.get(group)!.push({
+            if (runIsEasyDay) groups.get(group)!.push({
               date,
               hrAvg: f.hr != null ? Math.round(f.hr) : null,
               durationMin: Number.isFinite(Number(hrs?.durationMinutes)) ? Math.round(Number(hrs.durationMinutes)) : null,
@@ -1485,20 +1490,20 @@ serve(async (req: Request) => {
             // 2026-09-03 (Michael, ruled after the "7 min long" screenshot): a warm-up read of at least six
             // usable minutes IS an easy point — the card shows a median of the recent points and says how many
             // are warm-ups, so one warm-up can never be the headline and never reads as a run.
-            if (sport === "run" && group !== "easy") {
+            if (sport === "run" && !runIsEasyDay) {
               const we = warmByDate.get(date);
               const ef = we ? computeEfficiencyIndex(Number(we.pace_s_per_km), Number(we.hr_avg)) : null;
               if (we && ef != null) {
-                groups.set("easy", groups.get("easy") ?? []);
-                groups.get("easy")!.push({
+                groups.get(group)!.push({
                   date,
                   hrAvg: Math.round(Number(we.hr_avg)),
                   durationMin: Math.max(1, Math.round(Number(we.seconds) / 60)),
                   efficiency: ef,
-                  driftPct: null, driftBasis: null, driftWholeSession: false, fadeWithheld: false,
+                  // the hard run's own drift rides on its warm-up point, labelled whole-session (one drift read, D-465)
+                  ...driftReadForPoint(hrs, r?.workout_analysis, f.drift, steady),
                   keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
                   tempF: (() => { const t = Number(r?.weather_data?.temperature); return Number.isFinite(t) ? Math.round(t) : null; })(),
-                  elevationGainM: null,
+                  elevationGainM: f.elevM ?? null,
                   fromWarmup: true,
                 });
               }
