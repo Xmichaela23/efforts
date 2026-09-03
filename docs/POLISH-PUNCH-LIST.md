@@ -75,6 +75,12 @@ own, after the engine work.
 
 ---
 
+## ⏳ AWAITING MICHAEL — THE THRESHOLD TRIAL ON A DEVICE (2026-09-03, PUSHED `6e1af7a0`, **DEPLOYED**; NOT DEVICE-VERIFIED)
+- Schedule the run test from Baselines, send it to Garmin: expect 14 timed steps (7 min jog … 12-min trial … 9 min cool-down).
+- After the run: Baselines threshold row shows the result on the AUTO side; flip to auto, save → "N upcoming sessions updated".
+- State easy line reads "easy (incl. warm-ups) …" after the next plan run syncs.
+- Performance screen: "EDIT" on each completed set opens the editor (seen on efforts.work 2026-09-03).
+
 ## ⏳ AWAITING MICHAEL — THE GEAR GATE (2026-08-26, PUSHED `64509824`, **DEPLOYED**; NOT DEVICE-VERIFIED)
 
 - [x] **Deployed and verified against the API**, 2026-08-26 18:50:23 UTC (commit 18:30:28 UTC):

@@ -1,124 +1,73 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (2026-09-02 — the STATE-SCREEN NUMBERS thread)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-03 01:40 — the night before his threshold trial)
 
-> ⚠️ There are TWO live threads. THIS block is the State-screen / baseline-numbers cleanup. The
-> 2026-09-01 banner below it is the separate standing-plan/book engine thread — still valid for that work.
+> ⚠️ Two live threads. THIS block is the State-screen / baselines / tests thread. The 2026-09-01 banner
+> below is the standing-plan/book engine thread — still valid for that work. The 2026-09-02 banner this
+> replaces is folded into D-458–D-463 and `docs/AUDIT-plan-materialization-2026-09-02.md`.
 
-**Full plan for this thread: `docs/PLAN-strength-numbers-2026-09-02.md`.** Read it before touching strength/pace numbers.
+### THE JOB
+**Michael runs the book's threshold time trial today (2026-09-03), launched from Baselines.** Your first job is
+to see it land and say, in three states, what happened:
+1. The planned row (tags `assessment, run_test`) → Garmin: steps come from `materialize-plan/index.ts`
+   `buildAssessmentSteps` (p210, step for step; the `assessment` tag BYPASSES `steps_preset`, so the protocol
+   lives there, not in the Baselines token list). Verified on a throwaway account, server side; **the Garmin
+   push is NOT device-verified.**
+2. The trial lap → `compute-workout-analysis` run_test: lap 450–780 s and >500 m; **threshold pace = lap pace
+   ÷ 0.88** (p210: threshold speed = 88% of vVO2 speed); writes `learned_fitness.run_threshold_pace_sec_per_km`
+   (source "Run time trial — 88% of vVO2 speed (Viada p210)") + `run_vvo2_pace_sec_per_km` with the lap HR.
+   No threshold HR is written from a VO2 effort. Verified on a throwaway: 2300 m in 12:00 → 9:33/mi.
+3. **His Baselines threshold row is "my number" 9:30 and OUTRANKS the learned value.** Nothing re-prices
+   until he flips the row to auto and saves (`TrainingBaselines.tsx` WATCH list → `endurance-checkpoint
+   {reprice:true}`). He was told this. If the line on Baselines does not show the test result on the auto
+   side, the reader did not fire — check the attach (planned_id) and the laps first.
 
-**SHIPPED + VERIFIED earlier today (deployed, confirmed on 45d122e7):** deadlift 225 → 185 (trust gate in
-`compute-facts`); resolver precedence LOCKED > trusted-LEARNED > typed (`capacity-resolver.ts`, D-231 reversed);
-all three plan-weight spots route through it; coach payload 180→181; run card copy.
+### SHIPPED TONIGHT (all PUSHED + DEPLOYED; device-verified only where it says so)
+- **Tests on the book (pp.210–213, read off the page; `book-sources/p210–p214.jpg`, SOURCE Part H0):** run
+  trial (p210) and FTP 20-minute test (p212) as Garmin-sendable steps in `buildAssessmentSteps`; Baselines
+  descriptions from the page; run reader ÷0.88; `run_tt_{n}min` / `run_rest_{n}min` tokens; the trial
+  length reads from a `run_tt_{n}min` token when present (12 min default; 10 / 8 by training age). FTP read-back
+  = best 20-min power × 0.95 in `learn-fitness-profile` (already there).
+- **`learn-fitness-profile`:** threshold = best sustained 20-minute effort on file, only up, whole history; a
+  time-trial result outranks it; observed max HR gates the critical-speed fit (`src/lib/run-critical-speed.ts`).
+- **Easy running read off the WARM-UP of a hard run (OURS, D-463):** `_shared/run-warmup-easy.ts` (first 3 min
+  dropped for HR lag; cool-downs never used) → `run_facts.warmup_easy` (compute-facts, when the linked plan
+  row's first step is a warm-up ≥ 6 min) → joins the easy pool in compute-snapshot on hard days
+  (`source:'warmup'`) → State's easy line says "(incl. warm-ups)". **Verified on 45d122e7:** Sep 2 warm-up
+  11:14/mi at 136, Aug 31 13:41/mi at 136; easy line 13:21 → 12:52 at 143 (two of the last five).
+- **Strength Performance screen set editor:** it already existed (`StrengthCompareTable.tsx` `saveEditSet` →
+  `workouts.strength_exercises` → `recompute-workout`, which deletes+reinserts that workout's `exercise_log`).
+  The pencil sat at 20% opacity; now the word EDIT, and the set text is a tap target. Seen on efforts.work.
+- Deployed: materialize-plan, compute-workout-analysis, learn-fitness-profile, compute-facts, compute-snapshot,
+  workout-detail, coach, analyze-running-workout, analyze-cycling-workout.
 
-**EDITED, NOT PUSHED, NOT DEPLOYED (2026-09-02, second session) — the two jobs from the previous banner:**
+### FACTS THAT SETTLED TONIGHT (so you do not re-derive them)
+- The "easy 13:21/mi at 143" he did not believe was RIGHT: median of his last five untagged runs, which were
+  short and hilly (Aug 6 176 m climb / 14:38, Aug 13 147 m / 12:57, Aug 28 102 m / 14:01). Flat runs sit at
+  10:40–11:50. The easy/hard lines are ALREADY grade-adjusted (`compute-snapshot` pushes `gapPaceSecPerKm`).
+- `workouts.distance` is KILOMETRES. Every pace in this thread was converted; do not read it as miles.
+- He talks in full sentences at 145 bpm → 145 is under VT1 (p211) → his LTHR is well above 145; the 152 the
+  learner found from history cannot be it (no all-out effort on file). The trial gives pace, not LTHR.
+- `estimate1RM` already averages Epley + Brzycki (p215). The LOGGER's Baselines strength test
+  (`StrengthLogger.tsx` `createBaselineTestExercise`) is still the old ramp (empty bar / ~57% / ~80% / AMRAP
+  at stored×0.88), NOT p215's 75%×6 → +10%×5 → +5% max reps. Unbuilt; an edit was attempted and did not apply.
 
-0. ⛔ **RULING AFTER ITEM 1 WAS BUILT (Michael, same session): the run read is TrainingPeaks' and
-   nothing more — D-460.** No verdict, no percent, no fitted line, no confidence range, no heat line,
-   no withheld state. `<RunFitnessRow>` deleted (it was already unrendered; the run plate is
-   `EnduranceReadCards`: Efficiency Factor per run, dated dot chart per session type). Added: decoupling
-   as a bare percent on the latest steady run (`StrengthReadCards.tsx SpineCard`). `workout-detail`
-   emits no `discipline_trend` for run any more (that was the "run trend ↓ sliding −22%" on the workout
-   page). Run summary line: pace/count only. **Bucket = plan tag or easy, no inference** (Michael:
-   "just let the plan tag it") — `classifyRunIntent` reads the plan's words only; the analyser's HR
-   guess is out of every grouping site in `compute-snapshot`. `classifyRunIntent` reads the standing
-   plan's `family:run_*` tag first (mlss / near_threshold / sprint_power → hard, lsd → long, vt1 → easy),
-   then the plan's words (`quality` / `hard` added). **DEPLOYED + RECOMPUTED 2026-09-02:** 45d122e7 has 23
-   runs in 90d; 20 carry a `planned_id` whose planned row no longer exists (plans rebuilt) and 2 were never
-   attached — all 22 group as easy by ruling; the one attached Hard Run (08-31) groups as quality. Re-
-   attaching runs to live planned sessions is the only way an old run changes bucket. **Item 1 below shipped as code but is now UNREAD — D-458
-   is superseded; keep the gate, read nothing.** Bike row: same shape of problem, left alone by ruling.
+### NEXT, IN ORDER (he ruled or asked for each)
+1. See the trial land (above).
+2. Logger strength baseline test → p215 ramp, seeded from the resolved predicted max.
+3. Talk test (p211) as a schedulable, Garmin-sendable test with a reader (last completed 30-s step → VT1
+   pace/HR). His call whether the easy zone then uses VT1 HR (book) or stays Friel % of LTHR (D-462).
+4. Test week at the start of every block: talk test, run trial, FTP test. He said "don't get hung up on
+   the scheduler" — offer the plan with a test week; do not over-engineer placement.
+5. Plyo least-technical-first vs p89 order — open for Michael (`docs/WORKORDER-plyo-screen-2026-09-02.md` §4).
+6. Performance-screen: delete a set / rename an exercise are NOT there; outlier guard (one wild set does not
+   set a record) not built.
 
-1. **The false run "declining −22%" — fixed at the source, `heat-adjust.ts routeTrend` (now unread, see 0).** The previous
-   banner said "collinear"; that was the right neighbourhood and the wrong test. Measured on the
-   account's exact compute-snapshot pool (18 easy runs, 69–89°F, 75 days): corr(heat, day) = 0.65,
-   VIF 1.7 — textbook collinearity does NOT fire. What fails is heat's IDENTIFYING spread in a joint
-   fit, the part time does not explain (Frisch–Waugh–Lovell, the theorem the file already cites):
-   raw SD 4.57°F clears the existing 4°F floor, partial SD 4.57·√(1−0.65²) = 3.49 does not. Gate is
-   now on the partial spread, same constant. Under it the fit returns `still_learning` +
-   `withheld: 'heat_confounded_with_time'`; `assemble.ts` maps that to verdict `withheld`, pctChange
-   null, and carries the reason on `efficiency.route.withheld` (+ per group). Card copy
-   (`StatePerformanceSection.tsx`): "Reading N easy runs, all in the heat — heat and fitness can't be
-   told apart yet. Cooler runs will separate them." Heat feature untouched; a seasonal arc still fits.
-   **Local replay on 45d122e7 (`scratchpad/replay.ts`, same query as compute-snapshot): declining
-   −21.7% [−40.7, −2.7] → withheld.** ⚠️ NOT recomputed in prod yet — needs compute-snapshot deployed,
-   then a recompute, then the State row read on a device. D-458.
-2. **Baselines AUTO / LOCKED switch — built.** Migration `20260902120000_user_baselines_locked_baselines.sql`
-   adds `user_baselines.locked_baselines jsonb` (flat `{ squat|deadlift|bench|overheadPress1RM|pullupMaxReps: number }`,
-   key present = locked). ⛔ **APPLY THE MIGRATION BEFORE DEPLOYING FUNCTIONS** — every reader now names
-   the column in its select, and PostgREST errors on an unknown column: `materialize-plan` would get
-   `ub = null` and prescribe default weights. Client: `TrainingBaselines.tsx` strength tab is one row
-   per lift — the number IN USE (resolver), a source line ("auto. From your lifts (6 sets)." /
-   "auto. Your typed number, until…" / "locked. Your lifts don't change it." + "Your lifts suggest N."),
-   one input whose meaning follows the switch (auto → typed seed, locked → locked value), and an
-   auto/locked pill. `AppContext` loads + saves the map. Server readers now fetch and pass it: coach
-   (both `resolveStrengthCapacity` calls, via `arc.locked_baselines`), `arc-context` (select + field),
-   `materialize-plan` select, `compute-snapshot` (`buildStrengthBaselines` takes locked FIRST),
-   `generate-run-plan` / `generate-triathlon-plan` pin it, `create-goal-and-materialize-plan` passes it
-   in `athlete_state` → `generate-combined-plan` (`types.ts`). D-459.
-3. **Suites:** heat-adjust 27 · state-trend 323 (new spine test pins `withheld` through `toStateTrendsV1`)
-   · resolver + athlete-snapshot 33. tsc / deno type-error counts unchanged vs HEAD (all pre-existing);
-   vite build clean.
-
-**LATER THE SAME DAY — D-461, one 5K / one derivation / one writer (built, see D-461 for the
-map):** `generate-run-plan` and `materialize-plan` no longer write `effort_*` to `user_baselines`;
-the Baselines save and the wizards' `saveCalibration` are the only writers, both through
-`effortFieldsFromFiveKTimeSec`. Plus the Baselines screen rows: strength, easy pace, threshold pace,
-5K, FTP all share one `auto | my number` row (`AutoMinePill`); "locked" renamed. Deploy for D-461:
-`generate-run-plan`, `materialize-plan`.
-
-**D-462 PUSHED 4f5f9bbe + DEPLOYED 2026-09-02 (all 31 functions in the arc-context closure, one deploy).**
-Threshold is the only pace anchor (learned or entered); easy = HR zone with a threshold × 1.19 reference
-band; marathon pace = goal time ÷ distance; 5K work = typed 5K by division. Not verified on a device.
-⚠️ An athlete with only easy runs on file now gets NO run paces anywhere until a threshold is measured or
-entered — accepted by Michael. Michael's own threshold: learned 12:12/mi is built on easy running (two
-sub-max hard runs on file); he was told to enter ~10:50 as "my number" and let the checkpoint correct it.
-
-**PUSHED f138c39b + DEPLOYED 2026-09-02 (late):** HR-zone easy steps / effort targets / Garmin HEART_RATE
-(materialize-plan 351, send-workout-to-garmin 108), endurance-checkpoint v1 (new) + the State sheet,
-gate reads resolved maxes (generate-strength-plan, create-goal), load points follow the athlete's rating
-on every cardio sport (calculate-workload 55), loadByDiscipline on the display (compute-snapshot 187,
-coach 521 = payload v183), learn-fitness-profile 90, plain-word ⓘ on EF / decoupling / load / ACWR /
-threshold / FTP. NOT device-verified. iOS not rebuilt.
-
-**STEP 4 (the 24 remaining effort_paces readers, incl. the marathon builder) is PARKED by Michael
-2026-09-02** ("not worried about marathon unless we have to pick now") — see the PARKED block at the top
-of `POLISH-PUNCH-LIST.md` and `AUDIT-plan-materialization-2026-09-02.md` §8. **UNCOMMITTED IN THE TREE,
-awaiting Michael's commit word:** the HR-zone / effort-target / Garmin HEART_RATE slice (materialize-plan
-`stampRunPrescription`, session-vocabulary row sentence, send-workout-to-garmin) + the sheet display
-(`PlannedWorkoutSummary`). Redeploy for it: materialize-plan, send-workout-to-garmin, coach,
-generate-strength-plan, rematerialize-standing-block, create-goal-and-materialize-plan.
-
-**THE AUDIT SESSION (michaelambp-4f) OWNS THE PACE CUT + SIX-WEEK CHECKPOINT** — see
-`docs/AUDIT-plan-materialization-2026-09-02.md` §5–§6. Steps 1–3 (threshold is the anchor; effort_paces
-unread by the resolvers and the materializer) are BUILT IN THE WORKING TREE, uncommitted, awaiting
-Michael's re-ruling on two measured findings (the pace table is not a ratio; marathon M pace was
-faster than T for sub-22 5K runners). D-461 is pushed 297befeb + deployed (materialize-plan 349,
-generate-run-plan 220).
-
-**DEPLOY LIST (when Michael says go), in this order:** `supabase db push` → `compute-snapshot`, `coach`,
-`materialize-plan`, `generate-run-plan`, `generate-triathlon-plan`, `create-goal-and-materialize-plan`,
-`generate-combined-plan`, `get-arc-context`, `workout-detail`, `compute-facts`. Those ten change behaviour. The full transitive closure of
-the touched `_shared` files (`heat-adjust`, `state-trend/{assemble,run,strength}`, `arc-context`) is 31
-functions — `arc-context` is imported nearly everywhere — redeploy them too if the closure is to stay
-honest (`docs/INVENTORY.md`). Client: web via push; iOS needs `npm run ios`.
-
-**VERIFY after deploy:** recompute 45d122e7 → State run plate shows the easy/hard cards with Efficiency Factor, the dot chart and a decoupling percent, NO verdict word or percent anywhere on run (State and the workout page);
-Baselines strength tab shows deadlift 185 "auto. From your lifts"; lock a lift, save, reload → still
-locked; coach per-lift anchor reads the locked number.
-
-**OPEN / side findings, NOT pursued (traced, not fixed):**
-- `buildStrengthBaselines` (`state-trend/strength.ts`, the State e1RM band's frame) is still
-  typed-before-learned; only the lock was put in front. Same question the resolver already answers —
-  should route through `resolveStrengthNumbers`. One fork, say so before touching either.
-- `generate-strength-plan/index.ts:222` entry gate reads typed `performance_numbers` only — an athlete
-  with learned/locked numbers and no typed ones is refused "missing lifts".
-- The account's easy pool carries runs at HR 144–146 tagged `steady_state` by the analyser fallback
-  (no `run_facts.workout_type`); they are hot-day runs, and they sit in the headline group.
-- Performance-screen edit of a mis-logged set (the 609-lb row) — not started.
-- D-231 back-annotated (it lives in `docs/archive/DECISIONS-LOG-archive-D001-D239.md`, not the live log).
-
----
+### RULES THAT BIT TONIGHT
+- The `assessment` tag bypasses `steps_preset`. Any test protocol change goes in `buildAssessmentSteps`.
+- Never `git add -A`; explicit paths, three sessions share the repo. Commit/push/deploy on his word.
+- Read-only diagnosis on his account is fine; never write his data by hand; throwaway accounts for tests.
+- Parked and never to be mentioned: the marathon builder / step 4 of the pace cut; the 5K plan; Wendler.
 
 ## 🧭 NEXT SESSION — START HERE (written 2026-09-01 — the night the engine was held to the book)
 

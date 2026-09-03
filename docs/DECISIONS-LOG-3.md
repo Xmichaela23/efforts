@@ -1598,3 +1598,22 @@ without pinning one, which this entry rules out. "Keep the block as built" befor
 reversal path; Garmin and TrainingPeaks apply a threshold change the same way. Completed sessions never
 change.
 
+## D-463 — The book's tests, sendable; easy running read off a hard run's warm-up (2026-09-03)
+
+**Tests (pp.210–213, read off the page).** Every test launched from Baselines is the book's protocol, step for
+step, and every step is a TIMED step so Garmin takes it as-is: run trial p210 (7 min jog · 2 strides · 3×30 s
+fast with 1 min easy · 1 min rest · 12/10/8-min trial · 9 min cool-down), FTP p212 (8 min easy · 3×1 min high
+turnover/1 min easy · 3 min easy · 3 min at 9/10 · 7 min easy · 20 min best effort · 5 min cool-down, OURS).
+Threshold pace = trial pace ÷ 0.88 (p210); FTP = 20-min average × 0.95 (p212). The protocol lives in
+`materialize-plan` `buildAssessmentSteps` because the `assessment` tag bypasses token expansion. Strides are
+20 s not 100 m so no pace is needed to size them. Verified on a throwaway account, server side.
+
+**Warm-up easy read — OURS.** An All Rounder block has no easy runs, so the easy line went stale. The plan's
+warm-up step is read from the samples with the first 3 minutes dropped (heart-rate lag, 2–3 min, field
+standard); cool-downs are never used (post-effort HR stays elevated, so they read slow); at least 3 min of
+moving, HR-bearing samples or nothing. It joins the easy pool as its own point on hard days and the State
+line says "(incl. warm-ups)". Not a Viada rule, not a Garmin/TrainingPeaks feature — labelled OURS in
+`_shared/run-warmup-easy.ts`. Verified on 45d122e7 (easy line 13:21 → 12:52 at 143).
+
+**Threshold precedence stands (D-462):** a "my number" threshold outranks a test result until the athlete flips
+the row to auto; the save re-prices. The test never silently overrides what the athlete typed.
