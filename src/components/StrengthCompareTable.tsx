@@ -806,10 +806,10 @@ export default function StrengthCompareTable({ planned, completed, completedWork
                           <div className="col-span-1 flex justify-end">
                             <button
                               onClick={() => startEditSet(r.name, idx, c)}
-                              className="text-white/75 hover:text-white transition-colors text-base leading-none px-1"
+                              className="text-white/50 hover:text-white/90 transition-colors text-[11px] uppercase tracking-wider leading-none px-1"
                               title="Edit this set"
                               aria-label="Edit this set"
-                            >✎</button>
+                            >edit</button>
                           </div>
                         )}
                       </div>
