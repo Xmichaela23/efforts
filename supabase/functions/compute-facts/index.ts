@@ -1435,6 +1435,7 @@ function computeWorkload(w: WorkoutRow, baselines: Baselines | null, hrCorrupt =
       avgHr: hrCorrupt ? null : w.avg_heart_rate,
       thresholdHr,
       avgPower: w.avg_power,
+      normalizedPower: w.normalized_power ?? (w as any)?.computed?.analysis?.power?.normalized_power ?? null,
       ftp,
       avgPace: w.avg_pace,
     });

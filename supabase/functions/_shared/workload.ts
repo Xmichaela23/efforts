@@ -725,6 +725,8 @@ export interface PerfIntensityInput {
   avgHr?: number | null;
   thresholdHr?: number | null; // LTHR — threshold HR, NOT resting HR
   avgPower?: number | null;
+  /** normalized power (TrainingPeaks' IF numerator); falls back to avgPower when absent */
+  normalizedPower?: number | null;
   ftp?: number | null;
   avgPace?: number | null;     // swim: seconds per 100m
 }
@@ -733,16 +735,13 @@ export function inferIntensityFromPerformance(inp: PerfIntensityInput): number {
   const type = (inp.type || '').toLowerCase();
   const isRide = type === 'ride' || type === 'bike';
 
-  // Bike: power vs FTP (the primary output metric).
-  if (isRide && inp.avgPower && inp.ftp) {
-    const ifactor = inp.avgPower / inp.ftp;
-    if (ifactor >= 1.05) return 1.15;
-    if (ifactor >= 0.95) return 1.00;
-    if (ifactor >= 0.85) return 0.90;
-    if (ifactor >= 0.75) return 0.80;
-    if (ifactor >= 0.60) return 0.70;
-    if (ifactor >= 0.55) return 0.65;
-    return 0.55;
+  // Bike: intensity factor, raw — TrainingPeaks' IF = normalized power ÷ FTP (average power only when no
+  // normalized power is on file). ⛔ NO STEPS (2026-09-04, Michael: "fix"). This used to snap the ratio to a
+  // seven-rung ladder (0.55 … 1.15), OURS, so 109 W and 120 W scored the same and a 146 W and a 181 W FTP
+  // gave the identical workload of 56. TSS = hours × IF² × 100 wants the ratio itself. Ledger: STATE-NUMBERS.md.
+  if (isRide && inp.ftp && (inp.normalizedPower || inp.avgPower)) {
+    const p = (inp.normalizedPower && inp.normalizedPower > 0) ? inp.normalizedPower : (inp.avgPower as number);
+    if (p > 0) return Math.round((p / inp.ftp) * 1000) / 1000;
   }
 
   // Run / bike: HR vs THRESHOLD HR (LTHR). Never resting HR.

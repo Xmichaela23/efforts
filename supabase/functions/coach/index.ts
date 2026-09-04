@@ -2230,6 +2230,7 @@ Deno.serve(async (req) => {
       type: String(r?.type || ''),
       workload: safeNum(r?.workload_actual),
       avgPower: r?.avg_power ?? null,   // null when the row lacks the signal → sRPE cascade, not a drop
+      normalizedPower: r?.normalized_power ?? r?.computed?.analysis?.power?.normalized_power ?? null,
       avgHr: r?.avg_heart_rate ?? null,
       avgPace: r?.avg_pace ?? null,
       ftp: ftpForBins,

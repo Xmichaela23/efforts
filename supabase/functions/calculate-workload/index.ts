@@ -60,6 +60,8 @@ interface WorkoutData {
   // Performance data for intensity inference
   avg_pace?: number; // seconds per km or seconds per mile
   avg_power?: number; // watts (cycling)
+  normalized_power?: number | null; // watts (cycling) — TrainingPeaks' IF numerator
+  computed?: any;
   avg_heart_rate?: number; // bpm
   functional_threshold_power?: number; // watts (for cycling intensity zones)
   threshold_heart_rate?: number; // bpm (LTHR, for HR-vs-threshold intensity + zones)
@@ -149,6 +151,7 @@ function getSessionIntensity(workout: WorkoutData, sessionRPE?: number): number 
       avgHr: workout.avg_heart_rate,
       thresholdHr: workout.threshold_heart_rate,
       avgPower: workout.avg_power,
+      normalizedPower: workout.normalized_power ?? workout.computed?.analysis?.power?.normalized_power ?? null,
       ftp: workout.functional_threshold_power,
       avgPace: workout.avg_pace,
     });
@@ -342,7 +345,7 @@ serve(async (req) => {
     if (!finalWorkoutData) {
       const { data: workout, error: workoutError } = await supabaseClient
         .from('workouts')
-        .select('type, duration, strength_exercises, mobility_exercises, workout_status, moving_time, avg_pace, avg_power, avg_heart_rate, max_heart_rate, functional_threshold_power, threshold_heart_rate, rpe, workout_metadata')
+        .select('type, duration, strength_exercises, mobility_exercises, workout_status, moving_time, avg_pace, avg_power, normalized_power, computed, avg_heart_rate, max_heart_rate, functional_threshold_power, threshold_heart_rate, rpe, workout_metadata')
         .eq('id', workout_id)
         .single()
       
@@ -489,6 +492,7 @@ serve(async (req) => {
       avgHr: finalWorkoutData.avg_heart_rate,
       thresholdHr: finalWorkoutData.threshold_heart_rate,
       avgPower: finalWorkoutData.avg_power,
+      normalizedPower: finalWorkoutData.normalized_power ?? finalWorkoutData.computed?.analysis?.power?.normalized_power ?? null,
       ftp: finalWorkoutData.functional_threshold_power,
       avgPace: finalWorkoutData.avg_pace,
     }) === 0

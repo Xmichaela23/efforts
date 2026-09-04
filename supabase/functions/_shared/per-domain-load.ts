@@ -64,6 +64,7 @@ export interface SliceSession {
   workload: number | null | undefined; // sRPE load (workouts.workload_actual)
   avgHr?: number | null;
   avgPower?: number | null;
+  normalizedPower?: number | null;
   avgPace?: number | null;   // swim: sec/100m
   ftp?: number | null;
   thresholdHr?: number | null; // LTHR
@@ -99,7 +100,7 @@ export function classifySession(s: SliceSession): SessionClassification {
   let hrq: HrQuality | 'n/a' = 'n/a';
 
   if (t === 'ride' && s.avgPower && s.ftp) {
-    intensity = inferIntensityFromPerformance({ type: 'ride', avgPower: s.avgPower, ftp: s.ftp });
+    intensity = inferIntensityFromPerformance({ type: 'ride', avgPower: s.avgPower, normalizedPower: s.normalizedPower ?? null, ftp: s.ftp });
     bin = 'power';
   } else {
     // HR path — run's primary, and ride's fallback when power is absent. Gate on hr_quality.

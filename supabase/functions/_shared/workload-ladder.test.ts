@@ -19,7 +19,8 @@ Deno.test('ride with power scores off power vs FTP (not TRIMP)', () => {
   // 176 W on a 176 FTP → IF ~1.0 → intensity 1.00
   assertEquals(inferIntensityFromPerformance({ type: 'ride', avgPower: 176, ftp: 176 }), 1.0);
   // 132 W on 176 FTP → IF 0.75 → 0.80
-  assertEquals(inferIntensityFromPerformance({ type: 'ride', avgPower: 132, ftp: 176 }), 0.80);
+  assertEquals(inferIntensityFromPerformance({ type: 'ride', avgPower: 132, ftp: 176 }), 0.75); // raw 132/176, no steps
+  assertEquals(inferIntensityFromPerformance({ type: 'ride', avgPower: 109, normalizedPower: 131, ftp: 167 }), 0.784); // NP wins over avg
   // power present but NO ftp → falls through (no output signal here)
   assertEquals(inferIntensityFromPerformance({ type: 'ride', avgPower: 200 }), 0);
 });
@@ -91,6 +92,6 @@ Deno.test('power ride load = duration × power-IF² (output-based, RHR-free)', (
   assertEquals(intensity, 1.0);
   const load = calculateDurationWorkload(60, intensity); // 1 h at IF 1.0 → 100
   assertEquals(load, 100);
-  // 167 W / 176 FTP = 0.949 → below the 0.95 cut → 0.90 bucket → 60min → round(0.81*100)=81
-  assertEquals(calculateDurationWorkload(60, inferIntensityFromPerformance({ type: 'ride', avgPower: 167, ftp: 176 })), 81);
+  // 167 W / 176 FTP = 0.949 raw → 60 min → round(0.949² × 100) = 90 (TrainingPeaks TSS, no steps)
+  assertEquals(calculateDurationWorkload(60, inferIntensityFromPerformance({ type: 'ride', avgPower: 167, ftp: 176 })), 90);
 });
