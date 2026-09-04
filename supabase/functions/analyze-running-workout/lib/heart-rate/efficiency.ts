@@ -61,17 +61,7 @@ export function calculateEfficiency(
   
   console.log('📈 [EFFICIENCY] Samples with pace and HR:', samplesWithBoth.length);
   
-  // ⛔ 10 MINUTES, NOT 20 (2026-09-03, Michael: "some users won't do long slow runs, they may have 2
-  // hard runs programmed in a week"). The 20-minute floor (in since 2026-02-03) is TrainingPeaks'
-  // BENCHMARK condition — the length they want for a session you schedule specifically to test aerobic
-  // endurance. Applied as an existence gate it silently withheld the pace-to-heart-rate read from every
-  // run an athlete actually does on a hybrid program, and the screen then said the athlete needed more
-  // data. That is the app reporting its own gate as the athlete's shortfall.
-  //
-  // ⚠️ THE SECOND GATE IS UNCHANGED and is the real one: ≥10 minutes AFTER the warm-up, split into
-  // halves. A run that cannot produce two comparable halves still returns nothing — the number is never
-  // fabricated, it is only no longer refused to a session that can support it.
-  if (samplesWithBoth.length < 600) { // Need at least 10 min of data
+  if (samplesWithBoth.length < 1200) { // Need at least 20 min of data
     console.log('📈 [EFFICIENCY] Insufficient data for efficiency calculation');
     return undefined;
   }
@@ -80,12 +70,7 @@ export function calculateEfficiency(
   const warmupSkip = Math.min(WARMUP_SKIP_SECONDS, Math.floor(samplesWithBoth.length * 0.15));
   const samplesAfterWarmup = samplesWithBoth.slice(warmupSkip);
   
-  // ⚠️ Scaled with the floor above: 10 min of usable samples cannot also yield 10 min AFTER a warm-up.
-  // Six minutes is the same minimum `hr-drift-halves` uses for the heart-rate-only read, so the two
-  // drift reads now become available at the same session length instead of one silently outranking the
-  // other. Halves of a six-minute window are three minutes each — thin, and the card says which read
-  // it is showing.
-  if (samplesAfterWarmup.length < 360) { // Need 6 min after warmup
+  if (samplesAfterWarmup.length < 600) { // Need 10 min after warmup
     return undefined;
   }
   
