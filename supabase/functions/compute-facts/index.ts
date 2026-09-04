@@ -998,7 +998,7 @@ async function updateLearnedStrengthFromExerciseLog(
  * ⚠️ AND `null` IS A REAL ANSWER. An unattached, unstructured run stays excluded from the steady read
  * rather than being guessed into it — the same failure direction the gate already chose.
  */
-function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null, thresholdHrBpm?: number | null): string | null {
+function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null, thresholdHrBpm?: number | null, avgHrBpm?: number | null): string | null {
   // `quality` / `hard` added 2026-09-02: the race generators name the session "Quality Run" and the
   // standing plan names it "Hard Run" (session-vocabulary.ts) — neither was in this list.
   const NONSTEADY = /interval|repeat|hill|tempo|threshold|vo2|speed|track|fartlek|stride|race|surge|quality|hard/i;
@@ -1053,7 +1053,8 @@ function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null, threshold
   //    dragged the easy row to 12:44/mi. No name-matching on the athlete's own titles.
   const detected = String((w.computed as any)?.analysis?.heart_rate?.workout_type ?? '').toLowerCase();
   if (detected === 'intervals' || detected === 'hill_repeats') return 'interval';
-  const avgHr = toNum(w.avg_heart_rate);
+  // the resolved average (the same number the facts row prints); the column is null on some imports
+  const avgHr = toNum(avgHrBpm) ?? toNum(w.avg_heart_rate);
   if (avgHr != null && thresholdHrBpm != null && thresholdHrBpm > 0) {
     return avgHr / thresholdHrBpm >= 0.90 ? 'interval' : 'easy';
   }
@@ -1186,7 +1187,7 @@ function buildRunFacts(w: WorkoutRow, baselines: Baselines | null, planned?: Pla
     facts.efficiency_index = Math.round((1000 / facts.pace_avg_s_per_km) / facts.hr_avg * 10000) / 100;
   }
 
-  facts.workout_type = classifyRunIntent(w, planned, resolveCurrentLthr({ learned_fitness: baselines?.learned_fitness, performance_numbers: baselines?.performance_numbers } as any)?.bpm ?? null);
+  facts.workout_type = classifyRunIntent(w, planned, resolveCurrentLthr({ learned_fitness: baselines?.learned_fitness, performance_numbers: baselines?.performance_numbers } as any)?.bpm ?? null, runScalars.avgHr ?? null);
 
   // OURS (2026-09-03): the easy read from a hard run's WARM-UP, for a block with no easy runs (All
   // Rounder). Window = the plan's first step when it is a warm-up of >= 6 min; the first 3 min are
