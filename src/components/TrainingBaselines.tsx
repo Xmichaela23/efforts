@@ -1847,12 +1847,10 @@ return (
                               const learnedFtp = learnedFitness?.ride_ftp_estimated?.value;
                               const resolved = resolveCurrentFtp({ learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers } as any);
                               const mine = (data.performanceNumbers as any)?.ftp_source === 'manual';
-                              const rideThr = learnedFitness?.ride_threshold_hr;
-                              const noHardRides = rideThr?.is_estimate === true;
                               const status = mine
                                 ? 'your number. Your rides don\'t change it.'
                                 : learnedFtp
-                                  ? `auto. From your best 20-minute power.${noHardRides ? ' No hard rides on file, so this is your best easy 20 minutes — likely lower than your real FTP.' : ''}`
+                                  ? 'auto. From your rides — your power curve and your heart rate at threshold. Sets your power zones and the targets in your plan.'
                                   : manualFtp
                                     ? 'auto. Your typed number, until your rides measure one.'
                                     : 'auto. Nothing on file yet.';

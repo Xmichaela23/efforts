@@ -4518,9 +4518,18 @@ halves) on Aug 28 / Aug 24 / Aug 9 — 18.6 / 2.4 / 5.1, all match stored; both 
 (run 1.720 / +6.2%, ride 0.770 / −6.0%); dot counts match (20 runs, 8 rides). Grade-adjusted drift is
 the field standard — TrainingPeaks computes Pa:Hr on NGP, not raw pace.
 
-**OPEN, named and not built:** the weekly "how your sessions went" line still prints "HR drifted — build
-aerobic base" off a 7-day average, and the ride bands there (3 / 5 / 8%, red "aerobic strain") have no
-source. Michael: the wrong diagnosis; it should say what the per-workout row says. Also: the typed FTP
-(176) is ignored because `ftp_source` has no bike-side UI; the 15-minute floor on the HR signal rejects
-12 of 19 rides (own number, defensible, unreviewed).
+**CLOSED THE SAME NIGHT (Michael: "kill the line"):** the weekly "how your sessions went" verdicts —
+"HR drifted — build aerobic base" off a 7-day average, and the ride bands (3 / 5 / 8%, red "aerobic
+strain") with no source — are gone; `efficiency_label` is null on every row, the numbers stay
+(payload 192). The FTP caption on Training Baselines said "from your best 20-minute power"; it now says
+what the method is.
+
+**Two corrections to the first draft of this entry.** (a) The typed FTP is NOT ignored: the auto / my
+number switch exists on the bike row (Q-240) and the athlete has it on auto — 167 showing beside a typed
+176 is the switch doing its job. (b) The "15-minute floor" is not ride length — every ride on file is
+longer. It is 15 minutes of usable aerobic steady riding INSIDE a ride, after the 10-minute warm-up skip,
+with coasting minutes and above-threshold minutes removed; stop-and-go city rides of 45 minutes carried
+5–14 such minutes. The floor is the spec's own (13 residual degrees of freedom, so the projection's
+standard error means what it says), and the power-curve signal carries the estimate when the HR read
+abstains. Unreviewed, not wrong.
 
