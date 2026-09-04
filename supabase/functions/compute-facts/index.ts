@@ -61,6 +61,7 @@ import { resolveSwimScalars } from "../_shared/swim/swim-scalars.ts";
 import { resolveRouteCluster } from "../_shared/route-intelligence.ts";
 import { dewPointF } from "../_shared/heat-adjust.ts";
 import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolveCurrentFtp } from "../../../src/lib/resolve-current-ftp.ts";
 // Q-169: the ONE definition of "is this heartbeat easy" (threshold-anchored, %max-bootstrapped).
 import { resolveRunEasyHrBand, isEasyHr, runEasyPaceEligible } from "../_shared/easy-hr.ts";
@@ -997,7 +998,7 @@ async function updateLearnedStrengthFromExerciseLog(
  * ⚠️ AND `null` IS A REAL ANSWER. An unattached, unstructured run stays excluded from the steady read
  * rather than being guessed into it — the same failure direction the gate already chose.
  */
-function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null): string | null {
+function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null, thresholdHrBpm?: number | null): string | null {
   // `quality` / `hard` added 2026-09-02: the race generators name the session "Quality Run" and the
   // standing plan names it "Hard Run" (session-vocabulary.ts) — neither was in this list.
   const NONSTEADY = /interval|repeat|hill|tempo|threshold|vo2|speed|track|fartlek|stride|race|surge|quality|hard/i;
@@ -1044,10 +1045,20 @@ function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null): string |
     if (STEADY.test(planText)) return steadyWord(planText);
   }
 
-  // ⛔ NOTHING ELSE (2026-09-02, Michael: "just let the plan tag it, don't do any more math than
-  // necessary"). Steps 2 and 3 used to infer intent from the file's interval structure and from the
-  // athlete's own run name. Both gone: no plan word → null → `runSessionGroup` files it as easy.
-  // No inference from heart rate, pace, intervals or names. The bucket is the plan's or it is easy.
+  // 2. THE GRADER — for a run with NO plan word (2026-09-04, Michael: "can't we grade it? it should be obvious
+  //    what it is"). Garmin grades every activity from the recording; so do we, from two sourced reads:
+  //    the analyser's interval detection, and Friel's heart-rate zones of threshold HR — zone 3 and above
+  //    (≥ 90% LTHR) is a hard session, zones 1–2 are easy. This replaces the 2026-09-02 "no plan word → easy"
+  //    default, which filed unlinked hard runs (Aug 28: 16 × 0.1 mi at 144 bpm on a 152 LTHR) as easy and
+  //    dragged the easy row to 12:44/mi. No name-matching on the athlete's own titles.
+  const detected = String((w.computed as any)?.analysis?.heart_rate?.workout_type ?? '').toLowerCase();
+  if (detected === 'intervals' || detected === 'hill_repeats') return 'interval';
+  const avgHr = toNum(w.avg_heart_rate);
+  if (avgHr != null && thresholdHrBpm != null && thresholdHrBpm > 0) {
+    return avgHr / thresholdHrBpm >= 0.90 ? 'interval' : 'easy';
+  }
+  // No plan word, no interval detection, no heart rate against a threshold: nothing to grade with → null,
+  // and `runSessionGroup` files it as easy (unchanged).
   return null;
 }
 
@@ -1175,7 +1186,7 @@ function buildRunFacts(w: WorkoutRow, baselines: Baselines | null, planned?: Pla
     facts.efficiency_index = Math.round((1000 / facts.pace_avg_s_per_km) / facts.hr_avg * 10000) / 100;
   }
 
-  facts.workout_type = classifyRunIntent(w, planned);
+  facts.workout_type = classifyRunIntent(w, planned, resolveCurrentLthr({ learned_fitness: baselines?.learned_fitness, performance_numbers: baselines?.performance_numbers } as any)?.bpm ?? null);
 
   // OURS (2026-09-03): the easy read from a hard run's WARM-UP, for a block with no easy runs (All
   // Rounder). Window = the plan's first step when it is a warm-up of >= 6 min; the first 3 min are

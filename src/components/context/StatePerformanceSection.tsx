@@ -1090,7 +1090,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         rows.unshift({
           name: 'aerobic efficiency',
           value: fmtEff(aeroFit.end, false),
-          note: `${aeroFit.weeks}-week trend · from ${fmtEff(aeroFit.start, false)} · ${aeroFit.n} runs`,
+          note: `${aeroFit.weeks}-week trend · from ${fmtEff(aeroFit.start, false)}`,
         });
       } else if (aeroLast != null) {
         rows.unshift({ name: 'aerobic efficiency', value: fmtEff(aeroLast.value, false), note: `${fmtDayShort(aeroLast.date)} run · too few for a trend` });
@@ -1151,7 +1151,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         rows.push({
           name: 'efficiency factor',
           value: fmtEff(efFit.end, true),
-          note: `${efFit.weeks}-week trend · from ${fmtEff(efFit.start, true)} · ${efFit.n} rides`,
+          note: `${efFit.weeks}-week trend · from ${fmtEff(efFit.start, true)}`,
         });
       } else if (efLast != null) {
         rows.push({ name: 'efficiency factor', value: fmtEff(efLast.value, true), note: `${fmtDayShort(efLast.date)} ride · too few for a trend` });
