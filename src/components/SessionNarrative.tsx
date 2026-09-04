@@ -205,7 +205,12 @@ export default function SessionNarrative({
   const summaryBullets = Array.isArray(sd?.summary?.bullets) ? sd!.summary!.bullets! : [];
   const narrativeText = (typeof sd?.narrative_text === 'string' && sd.narrative_text.trim()) || '';
   const raceDebriefText = (typeof sd?.race_debrief_text === 'string' && sd.race_debrief_text.trim()) || '';
-  const hasNarrative = narrativeText.length > 0;
+  // ⛔ THE NARRATIVE NO LONGER RENDERS (see the block below), so it no longer COUNTS as content
+  // either. It used to suppress the summary bullets and the technical rows — "show these only when
+  // there is no paragraph" — and leaving that in would have left the section blank on exactly the
+  // sessions the paragraph used to fill. `narrativeText` still resolves for anything that reads it.
+  const hasNarrative = false;
+  void narrativeText;
   const hasRaceDebrief = raceDebriefText.length > 0;
 
   // Parse labeled sections: [LABEL]\ntext\n\n[LABEL]\ntext...
@@ -392,14 +397,21 @@ export default function SessionNarrative({
           )}
         </div>
       )}
-      {hasNarrative && (
-        <div>
-          <span className="readout-label text-xs font-medium uppercase tracking-wide">
-            Insights
-          </span>
-          <p className="text-sm text-gray-300 leading-relaxed mt-1">{narrativeText}</p>
-        </div>
-      )}
+      {/**
+        * ⛔ THE INSIGHTS PARAGRAPH IS GONE (2026-09-03, Michael: "cut the paragraph… still have that
+        * nonsense paragraph").
+        *
+        * It was prose composed over numbers that are printed, measured, on the rows directly beneath it
+        * — heart rate, efficiency, pacing, terrain. Every time it disagreed with one of them the
+        * paragraph was the thing that was wrong: it announced "heart rate stayed in step with the
+        * power" above a row reading 7.4%, and called an 0.98 intensity factor "an aerobic-base load".
+        * Both were fixed at the source the same day and it still read as filler, because a sentence
+        * restating the number under it adds nothing and can only ever be a second chance to be wrong.
+        *
+        * ⚠️ THE COMPOSER STAYS (`_shared/insights/*`, `workout_analysis.ai_summary`). It is not deleted
+        * — the coach and the week read from it, and `narrativeText` still resolves. This is a RENDER
+        * decision on the session screen only.
+        */}
       {!hasNarrative && hasSummaryBullets && (
         <div>
           <span className="readout-label text-xs font-medium uppercase tracking-wide">
