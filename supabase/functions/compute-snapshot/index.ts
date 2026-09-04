@@ -981,12 +981,10 @@ serve(async (req: Request) => {
         // math than necessary"). The analyser's HR-derived `steady_state | intervals | hill_repeats`
         // fallback is gone from every grouping site below; an untagged run groups as easy, no inference.
         const runTypeByDate = new Map<string, string>();
-        // OURS (2026-09-03): easy read taken from a HARD run's warm-up (`run_facts.warmup_easy`), so a
-        // block with no easy runs still feeds the easy pool. See `_shared/run-warmup-easy.ts`.
-        const runWarmupByDate = new Map<string, { pace_s_per_km: number; hr_avg: number; seconds: number }>();
+        // 2026-09-04: the warm-up stand-in (a hard run's warm-up read joining the easy pool, `run_facts.warmup_easy`)
+        // was OURS and is gone — TrainingPeaks' Efficiency Factor is one number per workout, and an easy row is
+        // easy runs. The facts still carry `warmup_easy`; nothing on State reads it.
         for (const f of (runFactsR.data ?? []) as any[]) {
-          const we = f.run_facts?.warmup_easy;
-          if (we && Number(we.pace_s_per_km) > 0 && Number(we.hr_avg) > 0) runWarmupByDate.set(f.date, we);
           const v = f.run_facts?.efficiency_index;
           if (typeof v === "number") runEffIndexByDate.set(f.date, v);
           const h = f.run_facts?.hr_avg;
@@ -1028,21 +1026,6 @@ serve(async (req: Request) => {
                  */
                 intent: null,
                 workout_type: runTypeByDate.get(r.date) ?? null,
-              });
-            }
-            // The warm-up of a run that is NOT easy joins the easy pool as its own point (OURS, 2026-09-03).
-            const we = runWarmupByDate.get(r.date);
-            const wordForDay = String(runTypeByDate.get(r.date) ?? '').toLowerCase();
-            const isEasyDay = wordForDay === '' || wordForDay === 'easy' || wordForDay === 'recovery';
-            if (we && !isEasyDay) {
-              runEffHistory.push({
-                date: r.date,
-                pace_s_per_km: Number(we.pace_s_per_km),
-                hr: Number(we.hr_avg),
-                temp_f: Number.isFinite(tF) ? tF : null,
-                intent: null,
-                workout_type: 'easy',
-                source: 'warmup',
               });
             }
           }
@@ -1463,15 +1446,8 @@ serve(async (req: Request) => {
             .eq("workout_status", "completed")
             .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", asOf);
           const bySport = new Map<string, Map<string, SpineSessionPoint[]>>();
-          // 2026-09-03 (Michael: "easy runs should start reacting to the warm-ups, right?"): the warm-up read
-          // off a hard run (`run_facts.warmup_easy`, D-463) becomes an EASY point in this series too, so the
-          // easy-runs block (efficiency factor, count, trend) keeps moving in a block with no easy runs.
-          // Marked `fromWarmup` so the card can say so.
-          const warmByDate = new Map<string, { pace_s_per_km: number; hr_avg: number; seconds: number }>();
-          for (const f of (runFactsR.data ?? []) as any[]) {
-            const we = f?.run_facts?.warmup_easy;
-            if (we && Number(we.pace_s_per_km) > 0 && Number(we.hr_avg) > 0) warmByDate.set(String(f.date).slice(0, 10), we);
-          }
+          // 2026-09-04: a hard run's warm-up no longer joins this series as an easy point (that stand-in was OURS).
+          // TrainingPeaks' EF is one number per workout; the aerobic series is easy and long days, whole.
           for (const r of (Array.isArray(spineRows) ? spineRows : []) as any[]) {
             const t = String(r?.type || "").toLowerCase();
             const sport = t.includes("run") ? "run" : "ride";
@@ -1492,11 +1468,9 @@ serve(async (req: Request) => {
             // rides out until every one was recomputed. Same predicate, same fields, one answer.
             const countsTowardTrend: boolean | undefined = sport !== "ride" ? undefined
               : bikeEfficiencyRideEligible(r?.workout_analysis?.classified_type ?? null, bfv?.in_band_s ?? null, bfv?.w20 ?? null, bfv?.band_hi ?? null);
-            // 2026-09-03 (Michael, ruled with the field: Garmin never waits for an easy run): runs feed ONE aerobic
-            // series. An easy day contributes the whole run; a hard day contributes its WARM-UP read (D-463) and
-            // never its whole-run number (intervals are not a steady aerobic read). Each point says which it was
-            // (`fromWarmup`, `durationMin`), and the card headlines a median of the last five. The easy/hard
-            // split stays on the PACE lines (runEffHistory), which are facts, not a trend.
+            // Runs feed ONE aerobic series: an easy or long day contributes the whole run; a hard day contributes
+            // nothing (intervals are not a steady aerobic read, and its warm-up stand-in was ours — gone 2026-09-04).
+            // The easy/hard split stays on the PACE lines (runEffHistory), which are facts, not a trend.
             const runWord = runSessionGroup(runTypeByDate.get(date) ?? null);
             const group = sport === "run" ? "aerobic" : "all";
             const runIsEasyDay = sport !== "run" || runWord === "easy" || runWord === "long";
@@ -1545,27 +1519,6 @@ serve(async (req: Request) => {
               elevationGainM: elevGainM(r),
               ...(countsTowardTrend === undefined ? {} : { countsTowardTrend }),
             });
-            // 2026-09-03 (Michael, ruled after the "7 min long" screenshot): a warm-up read of at least six
-            // usable minutes IS an easy point — the card shows a median of the recent points and says how many
-            // are warm-ups, so one warm-up can never be the headline and never reads as a run.
-            if (sport === "run" && !runIsEasyDay) {
-              const we = warmByDate.get(date);
-              const ef = we ? computeEfficiencyIndex(Number(we.pace_s_per_km), Number(we.hr_avg)) : null;
-              if (we && ef != null) {
-                groups.get(group)!.push({
-                  date,
-                  hrAvg: Math.round(Number(we.hr_avg)),
-                  durationMin: Math.max(1, Math.round(Number(we.seconds) / 60)),
-                  efficiency: ef,
-                  // the hard run's own drift rides on its warm-up point, labelled whole-session (one drift read, D-465)
-                  ...driftReadForPoint(hrs, r?.workout_analysis, f.drift),
-                  keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
-                  tempF: (() => { const t = Number(r?.weather_data?.temperature); return Number.isFinite(t) ? Math.round(t) : null; })(),
-                  elevationGainM: elevGainM(r),
-                  fromWarmup: true,
-                });
-              }
-            }
           }
           for (const [sport, groups] of bySport) {
             for (const [group, points] of groups) {

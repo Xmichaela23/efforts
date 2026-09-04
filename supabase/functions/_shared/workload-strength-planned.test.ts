@@ -1,89 +1,54 @@
-// Planned strength workload — same tonnage basis as actual. Run: deno test workload-strength-planned.test.ts
+// Strength workload — Friel's TSS estimate on both sides (2026-09-04). Run: deno test workload-strength-planned.test.ts --no-check
+//
+// FIELD — Joe Friel, "Estimating Training Stress Score" (trainingpeaks.com): TSS per hour = RPE × 10 on the
+// 1–10 scale. RIR → RPE is Zourdos 2016 (RPE = 10 − RIR). Nothing logged → 0, never a guess.
 import { assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
-import { calculatePlannedStrengthWorkload, calculateStrengthWorkload } from './workload.ts';
+import { calculatePlannedStrengthWorkload, calculateStrengthWorkload, strengthSessionRpe } from './workload.ts';
 
-// ── THE INVARIANT: do exactly what's prescribed → planned load == done load ─────────────────────────
+// ── Friel's own worked examples ───────────────────────────────────────────────────────────────────
+Deno.test('30 min at RPE 6 = 30 · 90 min at RPE 4 = 60 (Friel, verbatim)', () => {
+  assertEquals(calculateStrengthWorkload(30, [], 6), 30);
+  assertEquals(calculateStrengthWorkload(90, [], 4), 60);
+  assertEquals(calculateStrengthWorkload(60, [], 10), 100); // an hour at RPE 10 = 100, the scale's anchor
+});
+
+// ── THE INVARIANT: do exactly what's prescribed, for the planned minutes → planned load == done load ──
 Deno.test('prescribed == performed → planned workload equals actual workload', () => {
-  // Materialized prescription (weights already resolved to lb by materialize-plan).
   const prescription = [
     { name: 'Bench Press', sets: 5, reps: 5, weight: 113, target_rir: 3 },
     { name: 'Barbell Row', sets: 3, reps: 5, weight: 95, target_rir: 3 },
   ];
-  // The athlete does it EXACTLY (same weights, reps, RIR).
   const mkSets = (n: number, reps: number, weight: number, rir: number) =>
     Array.from({ length: n }, () => ({ reps, weight, rir, completed: true }));
   const performed = [
     { name: 'Bench Press', sets: mkSets(5, 5, 113, 3) },
     { name: 'Barbell Row', sets: mkSets(3, 5, 95, 3) },
   ];
-  const planned = calculatePlannedStrengthWorkload(prescription);
-  const actual = calculateStrengthWorkload(performed);
-  assertEquals(planned, actual); // the whole point: identical work → identical load
+  const planned = calculatePlannedStrengthWorkload(45, prescription);
+  const actual = calculateStrengthWorkload(45, performed);
+  assertEquals(planned, actual);
+  assertEquals(planned, Math.round((45 / 60) * 70)); // 3 RIR → RPE 7 → 70/hr
 });
 
-// ── It is TONNAGE-based, not the old duration 56 ────────────────────────────────────────────────────
-Deno.test('planned load reflects real tonnage (not a duration constant)', () => {
-  // Michael's real Upper A prescription: bench 5x5, row 3x5. Lands in the ~30 range, nowhere near 56.
-  const w = calculatePlannedStrengthWorkload([
-    { name: 'Bench Press', sets: 5, reps: 5, weight: 113, target_rir: 3 },
-    { name: 'Barbell Row', sets: 3, reps: 5, weight: 95, target_rir: 3 },
-    { name: 'Farmers Carry', sets: 3, reps: '40 m', weight: 0, target_rir: 3 }, // carry → 0 tonnage
-  ]);
-  assertEquals(w >= 25 && w <= 40, true); // tonnage-based; the stale duration read was 56
+// ── RIR → RPE (Zourdos): the rating wins when the athlete gave one ────────────────────────────────
+Deno.test('strengthSessionRpe: the session rating first, else 10 − average logged RIR, else null', () => {
+  const sets = [{ rir: 2, completed: true }, { rir: 4, completed: true }, { rir: 0, completed: false }];
+  assertEquals(strengthSessionRpe([{ sets }], 8.5), 8.5);
+  assertEquals(strengthSessionRpe([{ sets }]), 7); // (2 + 4) / 2 = 3 RIR → RPE 7; the skipped set does not count
+  assertEquals(strengthSessionRpe([{ sets: [{ reps: 5, weight: 100, completed: true }] }]), null);
+  assertEquals(strengthSessionRpe([]), null);
 });
 
-// ── Carries contribute 0 on BOTH sides (consistent — capturing carry load is a separate fix) ─────────
-Deno.test('a carry adds 0 tonnage on planned exactly as on actual', () => {
-  const plannedNoCarry = calculatePlannedStrengthWorkload([{ sets: 5, reps: 5, weight: 113, target_rir: 3 }]);
-  const plannedWithCarry = calculatePlannedStrengthWorkload([
-    { sets: 5, reps: 5, weight: 113, target_rir: 3 },
-    { name: 'Farmers Carry', sets: 3, reps: '40 m', weight: 0, target_rir: 3 },
-  ]);
-  // Carry adds no tonnage; the only delta is the averaged intensity (both target_rir 3 here → none).
-  assertEquals(plannedNoCarry, plannedWithCarry);
+// ── Nothing logged → 0 points, never a guessed intensity ─────────────────────────────────────────
+Deno.test('no rating and no RIR → 0 · no minutes → 0', () => {
+  assertEquals(calculateStrengthWorkload(60, [{ sets: [{ reps: 5, weight: 100, completed: true }] }]), 0);
+  assertEquals(calculateStrengthWorkload(0, [], 7), 0);
+  assertEquals(calculatePlannedStrengthWorkload(60, [{ target_rir: null }]), 0);
 });
 
-// ── Heavier-than-prescribed → actual exceeds planned (the honest direction) ──────────────────────────
-Deno.test('lifting heavier than prescribed makes actual EXCEED planned (not the reverse)', () => {
-  const prescription = [{ name: 'Bench Press', sets: 5, reps: 5, weight: 113, target_rir: 3 }];
-  const performedHeavier = [{
-    name: 'Bench Press',
-    sets: Array.from({ length: 5 }, () => ({ reps: 5, weight: 120, rir: 3, completed: true })),
-  }];
-  const planned = calculatePlannedStrengthWorkload(prescription);
-  const actual = calculateStrengthWorkload(performedHeavier);
+// ── Harder than prescribed (lower RIR) → actual exceeds planned (the honest direction) ────────────
+Deno.test('lifting closer to failure than prescribed makes actual EXCEED planned', () => {
+  const planned = calculatePlannedStrengthWorkload(45, [{ target_rir: 3 }]);
+  const actual = calculateStrengthWorkload(45, [{ sets: Array.from({ length: 5 }, () => ({ reps: 5, weight: 120, rir: 1, completed: true })) }]);
   assertEquals(actual > planned, true);
-});
-
-// ─────────────────────────────────────────────────────────────────────────────────────────────────
-// 2026-08-29 — AN AUTO-REGULATED ROW IS SCORED AT WHAT THE ATHLETE LIFTS ON IT
-//
-// Michael: "we can leave it open but what the user lifts and reports should count." Viada
-// auto-regulates hypertrophy work, so the prescription stays "By feel"; the SCORE stops pretending
-// the row was either bodyweight (the old lie) or nothing (the new one).
-// ─────────────────────────────────────────────────────────────────────────────────────────────────
-
-Deno.test('⛔ a "By feel" row is priced at the athlete\'s own last logged weight', () => {
-  const withHistory = calculatePlannedStrengthWorkload(
-    [{ name: 'Barbell Curl', sets: 3, reps: 10, weight: 'By feel' }],
-    { bodyweightLb: 160, lastWeightByMovement: { barbell_curl: 55 } },
-  );
-  const withoutHistory = calculatePlannedStrengthWorkload(
-    [{ name: 'Barbell Curl', sets: 3, reps: 10, weight: 'By feel' }],
-    { bodyweightLb: 160 },
-  );
-  // 55 x 10 x 3 against 45 x 10 x 3 — history beats the bar fallback, and both beat bodyweight.
-  assertEquals(withHistory > withoutHistory, true, `${withoutHistory} → ${withHistory}`);
-});
-
-Deno.test('⛔ A NAMED WEIGHT IS NEVER OVERRIDDEN BY HISTORY — the prescription wins', () => {
-  const a = calculatePlannedStrengthWorkload(
-    [{ name: 'Barbell Curl', sets: 3, reps: 10, weight: 65 }],
-    { bodyweightLb: 160, lastWeightByMovement: { barbell_curl: 55 } },
-  );
-  const b = calculatePlannedStrengthWorkload(
-    [{ name: 'Barbell Curl', sets: 3, reps: 10, weight: 65 }],
-    { bodyweightLb: 160 },
-  );
-  assertEquals(a, b);
 });

@@ -1400,3 +1400,29 @@ That is the same frame that made the endurance read plan-locked ([[Q-294]]) and 
 derivation slot that already exists, applied to the question "what does the app know without a plan".
 
 Related: [[Q-294]], [[Q-291]], [[Q-292]].
+
+
+## Q-298 — Three things D-466 could not close: intervals.icu's eFTP model is unverified; the coach still speaks the Garmin 28/28 and ACWR vocabulary State no longer prints; strength sessions with heart rate get no hrTSS (2026-09-04)
+
+Tagged **unverified / intentional / deferred**, in that order.
+
+1. **UNVERIFIED — intervals.icu eFTP.** `bike-ftp-estimator.ts` fits P = CP + W′/t on the best 2–20 min
+   efforts and prints 0.97 × CP. The claim that this is "what intervals.icu does" comes from forum snippets
+   ("multiple modelling algorithms including eFTP, Morton's 3P, and Monod & Scherrer"), not from a page read
+   whole — `intervals.icu`, `forum.intervals.icu` and `trainerroad.com` are blocked by this container's
+   egress proxy. What would close it: someone with a browser reads intervals.icu's "How is eFTP calculated"
+   thread (David Tinker's own answer) and either confirms the 2-parameter fit + fraction or names the model;
+   then the code copies it exactly and the OURS-vs-FIELD label on the row is settled.
+2. **INTENTIONAL, for now — two vocabularies.** State prints TrainingPeaks' per-workout numbers with no
+   verdict. The coach's narrative still reads `runFitness.efficiency.verdict` / `bikeFitness.*` (the Garmin
+   28/28 rule, `state-trend/classify.ts`) and ACWR + the reconciled load status (Gabbett, D-260). So the coach
+   can say "sliding" beside a State row that shows a number and a date. Left because the coach's copy was out
+   of the ruling's scope (the State screen). If the one-reference rule extends to the coach, the verdict words
+   go and the coach reads form / the EF line instead. Do not "fix" from State's side.
+3. **DEFERRED — hrTSS for strength.** TrainingPeaks scores any workout with heart rate by hrTSS before falling
+   to an RPE estimate. A strength session here is scored by Friel's RPE estimate even when the watch recorded
+   heart rate, because the app holds no strength threshold heart rate (Friel's table is by zones of LTHR,
+   sport-specific). Adding one is a baselines change, not a State change.
+
+Also filed here so it is not rediscovered: `strengthSessionRpe` and `calculatePlannedStrengthWorkload` test
+`typeof` on RIR, because `Number(null)` is 0 and 0 RIR is RPE 10 — the same trap the drift reads hit.

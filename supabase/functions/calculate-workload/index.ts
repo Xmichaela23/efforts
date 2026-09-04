@@ -28,7 +28,7 @@ import {
   getDefaultIntensityForType,
   getStepsIntensity,
   mapRPEToIntensity,
-  getStrengthIntensity,
+  strengthSessionRpe,
   calculateStrengthWorkload,
   resolveBodyweightLb,
   getMobilityIntensity,
@@ -82,10 +82,10 @@ interface WorkoutData {
  *   - TRIMP routing for cardio with HR
  */
 function calculateWorkload(workout: WorkoutData, sessionRPE?: number, bodyweightLb: number | null = null): number {
-  if (workout.type === 'strength' && workout.strength_exercises && workout.strength_exercises.length > 0) {
-    // D1 (2026-08-01): a calisthenic set is priced at the athlete's own body weight instead of
-    // scoring zero. Null (never recorded) → unchanged from today.
-    return calculateStrengthWorkload(workout.strength_exercises, sessionRPE, { bodyweightLb });
+  if (workout.type === 'strength') {
+    // Friel's TSS estimate (TrainingPeaks): minutes ÷ 60 × RPE × 10 — the rating, else RPE = 10 − logged RIR.
+    // 2026-09-04: replaces the tonnage pricing (D1 bodyweight, ÷10,000, the RIR band table — all ours for load).
+    return calculateStrengthWorkload(Number(workout.duration) || 0, workout.strength_exercises ?? [], sessionRPE);
   }
 
   if (workout.type === 'mobility') {
@@ -141,8 +141,9 @@ function cardioIntensityInput(w: WorkoutData & Record<string, any>) {
 }
 
 function getSessionIntensity(workout: WorkoutData, sessionRPE?: number): number {
-  if (workout.type === 'strength' && workout.strength_exercises) {
-    return getStrengthIntensity(workout.strength_exercises, sessionRPE);
+  if (workout.type === 'strength') {
+    const rpe = strengthSessionRpe(workout.strength_exercises ?? [], sessionRPE);
+    return rpe == null ? 0 : mapRPEToIntensity(rpe);
   }
   if (workout.type === 'pilates_yoga') {
     const metadata = workout.workout_metadata || {};

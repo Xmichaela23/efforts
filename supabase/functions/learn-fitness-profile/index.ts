@@ -43,7 +43,6 @@ import {
   bestPerDuration,
   compoundFtp,
   fitCriticalPower,
-  rateLimitFtp,
   type CompoundFtp,
 } from '../../../src/lib/bike-ftp-estimator.ts';
 
@@ -1491,29 +1490,11 @@ export function analyzeRides(
     // the way TrainerRoad and intervals.icu assemble it.
     const b = fitCriticalPower(bestPerDuration(rides.map((r) => r.computed?.power_curve ?? null)));
 
-    /**
-     * ⛔ THE HARD CEILING READS 18 MONTHS, NOT 90 DAYS. The ceiling is the best 20 minutes the athlete
-     * actually pedalled — the one number in here that does not extrapolate. Read over the 90-day
-     * window it would BE the sag this estimator exists to remove (an easy quarter has a low best-20
-     * and the ceiling would drag the estimate down to tier 1's own answer). Read over the athlete's
-     * history it is a ceiling and nothing else: it can only ever lower the estimate, never raise it,
-     * and a detrained athlete is caught by the two signals, which are recent. 18 months is the window
-     * the run threshold already reads its best 20-minute effort across.
-     */
-    const ceilingPool = allRideCurves.length ? allRideCurves : rides;
-    let ceiling20: number | null = null;
-    for (const r of ceilingPool) {
-      const p20 = Number(r.computed?.power_curve?.['20min']);
-      if (Number.isFinite(p20) && p20 > 50 && (ceiling20 == null || p20 > ceiling20)) ceiling20 = p20;
-    }
-
-    const raw = compoundFtp(b, ceiling20);
-    if (raw) {
-      // The rate limit walks from whatever FTP the athlete had last learn — including a STEP 4 value
-      // from before this estimator existed — at ≤5% per learn, so no athlete's zones move in one step.
-      const prev = Number(priorLearned?.ride_ftp_estimated?.value);
-      ftp_compound = rateLimitFtp(Number.isFinite(prev) ? prev : null, raw);
-      console.log(`  ⚡ FTP: ${ftp_compound.value}W (${ftp_compound.confidence}) — curve ${b.value ?? '—'}W/${b.confidence ?? 'abstain'} (${b.n} durations), ceiling ${ceiling20 ?? '—'}W`);
+    // 2026-09-04 (Michael: one absolute reference per metric): the best-20-minute hard ceiling and the ±5%-per-
+    // learn rate limit were OURS on top of the intervals.icu / TrainerRoad read. Both deleted — the fit is the number.
+    ftp_compound = compoundFtp(b);
+    if (ftp_compound) {
+      console.log(`  ⚡ FTP: ${ftp_compound.value}W (${ftp_compound.confidence}) — curve ${b.value ?? '—'}W/${b.confidence ?? 'abstain'} (${b.n} durations)`);
       ftp_estimated = {
         value: ftp_compound.value,
         confidence: ftp_compound.confidence,

@@ -4,52 +4,28 @@
  * ⚠️ The row shape (name · value · note) arrived 2026-09-03; the two sentence builders this file
  * used to export are gone with their only call site. Everything below still governs the WORDING.
  *
- * ⛔ ONE RULE FOR ALL FOUR SPORTS: lead with the subject; show a DIRECTION only where the server's
- * verdict already calls one (improving / sliding); otherwise show the number and the count and stop.
- * No invented threshold, no direction from a bare percentage. This is the same confidence gate the
- * cards use — `dirWord` maps only the two directional verdicts; needs_data / withheld / holding / null
- * all fall through to the count.
+ * ⛔ ONE RULE FOR ALL FOUR SPORTS (2026-09-04, Michael: one absolute reference per metric): the endurance
+ * rows print the LAST workout's number and the day it came from — TrainingPeaks' per-workout Efficiency
+ * Factor — and no direction. The ↑→↓ arrow, the 28-day average and the percent-since were Garmin's rule
+ * laid over a TrainingPeaks number; they are gone (the `efficiencyRow` / `dirWord` helpers with them).
  *
- * ⛔ AND THE RIGHT POPULATION (the fault that told an athlete his running collapsed 22%):
- *   · RUN leads off the EASY-RUN group, not the pooled series — a hot/hilly quality run must not swing
- *     the easy-efficiency read. The caller passes the easy group's own direction / pct / count.
- *   · BIKE leads off EFFICIENCY (watts per heartbeat), the metric on the object, not power+FTP
- *     (resolved elsewhere — a second source this audit exists to remove).
+ * ⛔ THE RIGHT POPULATION still holds: the run number comes off the aerobic (easy-day) series, the bike off
+ * steady rides only, so a hot/hilly quality run never becomes the headline.
  *   · STRENGTH is block-phase aware and NOT PR-based (Michael 2026-09-01: the program is form / bar
  *     speed / slow incremental gain under cross-training stress). One line per lift so every number
  *     shows; opening lists the working numbers, mid-block adds the creep since the block opened
  *     ("+5"). No PR flag; flat is fine. See `strengthGlance`.
  */
 
-import { TREND_HALF_DAYS } from '../../supabase/functions/_shared/state-trend/thresholds.ts';
-
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-function monthOfIso(iso: string | null | undefined): string {
+/** "Sep 2" — the day a per-workout number belongs to (TrainingPeaks names the workout its EF / Pa:Hr came from). */
+export function fmtDayShort(iso: string | null | undefined): string {
   if (!iso) return '';
   const t = Date.parse(`${String(iso).slice(0, 10)}T12:00:00Z`);
-  return Number.isNaN(t) ? '' : (MON[new Date(t).getUTCMonth()] ?? '');
-}
-
-/** Month at the start of the verdict window — asOf minus windowDays (bike efficiency carries windowDays). */
-export function changeMonth(asOf: string | null | undefined, windowDays: number | null | undefined): string {
-  if (!asOf || !(Number(windowDays) > 0)) return '';
-  const t = Date.parse(`${String(asOf).slice(0, 10)}T12:00:00Z`);
-  return Number.isNaN(t) ? '' : monthOfIso(new Date(t - Number(windowDays) * 86_400_000).toISOString());
-}
-
-/** The month the coloured recent window opens — the first `recent` point's month (run groups carry no windowDays). */
-export function sinceMonthFromSeries(series: ReadonlyArray<{ date: string; recent?: boolean }> | null | undefined): string {
-  if (!Array.isArray(series) || series.length === 0) return '';
-  const firstRecent = series.find((p) => p.recent) ?? series[0];
-  return monthOfIso(firstRecent?.date);
-}
-
-/** The direction word the verdict supports, or '' when it supports none (confidence gate). */
-export function dirWord(verdict: string | null | undefined): 'up' | 'down' | '' {
-  if (verdict === 'improving') return 'up';
-  if (verdict === 'sliding') return 'down';
-  return '';
+  if (Number.isNaN(t)) return '';
+  const d = new Date(t);
+  return `${MON[d.getUTCMonth()] ?? ''} ${d.getUTCDate()}`;
 }
 
 /**
@@ -70,37 +46,31 @@ export function dirWord(verdict: string | null | undefined): 'up' | 'down' | '' 
  * ⚠️ THE STRING FORMS ARE NOT KEPT ALONGSIDE. `strengthGlance` / `efficiencySummary` had exactly one
  * caller each (StatePerformanceSection); the row forms replace that call site outright rather than
  * becoming a second vocabulary beside the first. Their tests move with them.
+ *
+ * ⛔ NO ARROW SLOT (2026-09-04). The ↑→↓ glyph was Garmin's three trend states on a TrainingPeaks number.
+ * One reference per metric: the endurance rows print the last workout's number and its date; the open
+ * card's line is the trend.
  */
 export type SportRow = {
   name: string;
   value: string;
   note?: string;
-  /** Direction glyph beside the value (↑ / ↓ / →) — Garmin's three states; none for needs_data. */
-  arrow?: string;
-  arrowCls?: string;
 };
 
-/** First day of Garmin's recent half: dates AFTER asOf − 28 are "the last 4 weeks". */
-export function recentHalfStart(asOf: string): string {
-  return new Date(Date.parse(`${String(asOf).slice(0, 10)}T12:00:00Z`) - TREND_HALF_DAYS * 86_400_000).toISOString().slice(0, 10);
-}
-
-/** The points inside the recent half — the same split the server's verdict makes. */
-export function recentHalfPoints<T extends { date: string }>(points: ReadonlyArray<T>, asOf: string): T[] {
-  const start = recentHalfStart(asOf);
-  return points.filter((p) => String(p.date).slice(0, 10) > start);
-}
-
 /**
- * THE HEADLINE — the average of the last 28 days (2026-09-04, docs/SPEC-state-nothing-invented-2026-09-04.md).
- * FIELD — Garmin: the number shown is the current 4-week estimate, the same number the trend arrow's recent
- * half is built on, so the number and its arrow are one read. Replaces the median of the last five (ours).
- * Shared by the open card and the closed row so both print ONE number. Null when the recent half is empty.
+ * THE HEADLINE — the LAST workout's number (2026-09-04, Michael: one absolute reference per metric).
+ * FIELD — TrainingPeaks: Efficiency Factor and Pa:Hr / Pw:Hr are per-workout numbers printed in the workout
+ * summary; the dashboard trends them one dot per workout. Replaces the average of the last 28 days (Garmin's
+ * window under a TrainingPeaks formula) which replaced the median of the last five (ours).
+ * Shared by the open card and the closed row so both print ONE number. Null when there are no points.
  */
-export function recentAverage(points: ReadonlyArray<{ date: string; value: number }>, asOf: string): number | null {
-  const recent = recentHalfPoints(points, asOf).map((p) => p.value).filter((v) => Number.isFinite(v));
-  if (!recent.length) return null;
-  return recent.reduce((a, b) => a + b, 0) / recent.length;
+export function latestPoint<T extends { date: string; value: number }>(points: ReadonlyArray<T>): T | null {
+  let best: T | null = null;
+  for (const p of points) {
+    if (!p || !Number.isFinite(p.value) || !p.date) continue;
+    if (best == null || String(p.date).slice(0, 10) >= String(best.date).slice(0, 10)) best = p;
+  }
+  return best;
 }
 
 /**
@@ -132,31 +102,4 @@ export function strengthGlanceRows(
       ? { name: l.displayName, value: String(n), note: `${d > 0 ? '+' : '-'}${Math.abs(d)}` }
       : { name: l.displayName, value: String(n) };
   });
-}
-
-/**
- * `efficiencySummary`, split into columns. The confidence gate is unchanged: a DIRECTION only where
- * the server's verdict already calls one, otherwise the count. What moves is where each part sits.
- *
- * ⚠️ With no real value the COUNT becomes the value — better a count in the number column than an
- * empty one. That is the same fallback the sentence form had, kept.
- */
-export function efficiencyRow(args: {
-  label: string;
-  value?: string | null;
-  verdict: string | null | undefined;
-  pctChange: number | null | undefined;
-  sampleCount: number | null | undefined;
-  sinceMonth: string;
-  noun: string;
-}): SportRow {
-  const dir = dirWord(args.verdict);
-  const n = Number(args.sampleCount) || 0;
-  const directional = !!dir && args.pctChange != null && Number.isFinite(args.pctChange);
-  const change = directional
-    ? `${dir} ${Math.abs(Math.round(args.pctChange as number))}%${args.sinceMonth ? ` since ${args.sinceMonth}` : ''}`
-    : `${n} ${args.noun}${n === 1 ? '' : 's'}`;
-  const value = (args.value ?? '').trim();
-  if (value) return { name: args.label, value, note: change };
-  return { name: args.label, value: change };
 }

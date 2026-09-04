@@ -249,14 +249,12 @@ export function fitCriticalPower(points: ReadonlyArray<{ seconds: number; watts:
 export type CompoundFtp = {
   value: number;
   confidence: Confidence;
-  /** the receipt — which signal, which convention, which guardrail fired */
+  /** the receipt — which signal, which convention */
   source: string;
   sample_count: number;
   signals: {
     power_duration: { value: number | null; confidence: Confidence | null; n: number; reason: string; cp: number | null; w_prime_j: number | null; r2: number | null };
   };
-  /** best 20-minute power actually recorded in the ceiling window, watts */
-  ceiling_20min: number | null;
 };
 
 /**
@@ -264,44 +262,17 @@ export type CompoundFtp = {
  * power-duration fit and nothing else — the read TrainerRoad's AI FTP Detection and intervals.icu's eFTP
  * both make, from power alone, with no heart-rate signal and no steady-minutes rule. A heart-rate-at-
  * threshold read (the Garmin/Firstbeat shape) was built beside it the same day and removed the same
- * night; its 15-block floor was OURS and Michael ruled it out. Then the hard ceiling: never above the
- * best 20-minute power actually recorded — the fit extrapolates, that number does not.
+ * night; its 15-block floor was OURS and Michael ruled it out.
+ *
+ * ⛔ AND NO GUARDRAIL OF OURS ON TOP (2026-09-04, Michael: one absolute reference per metric). Two were
+ * built here and are deleted: a hard ceiling at the best 20-minute power on file, and a ±5%-per-learn
+ * rate limit. Neither is intervals.icu's or TrainerRoad's rule; both were ours. The fit's own gates
+ * (≥ 3 durations, W′ in range, r² ≥ 0.9) are the model's, and they are the only gates.
  */
-export function compoundFtp(b: SignalBResult, ceiling20min: number | null | undefined): CompoundFtp | null {
+export function compoundFtp(b: SignalBResult): CompoundFtp | null {
   const signals: CompoundFtp['signals'] = {
     power_duration: { value: b.value, confidence: b.confidence, n: b.n, reason: b.reason, cp: b.cp, w_prime_j: b.wPrime, r2: b.r2 },
   };
-  const ceiling = typeof ceiling20min === 'number' && Number.isFinite(ceiling20min) && ceiling20min > 0 ? Math.round(ceiling20min) : null;
   if (b.value == null || b.confidence == null) return null;
-  let value = b.value as number;
-  const confidence = b.confidence as Confidence;
-  let source = `power-duration fit (${b.reason})`;
-  if (ceiling != null && value > ceiling) {
-    source = `${ceiling} W = best 20-min actually recorded (hard ceiling); estimate ${value} W was above it — ${source}`;
-    value = ceiling;
-  }
-  return { value, confidence, source, sample_count: b.n, signals, ceiling_20min: ceiling };
-}
-
-/**
- * ⛔ RATE LIMIT. Real FTP does not move 20% between two learns; a single odd ride must not drag every
- * zone with it. The published value may move at most one noise-floor step (5%) per update against the
- * previous published value of THIS estimator. Coggan's own guidance is to re-test every 4-8 weeks and
- * treat sub-5% moves as noise, so 5% per learn (learns run weekly and on demand) bounds the estimate to
- * the pace real fitness changes at. A capped value is still the honest direction — it just arrives
- * over more than one update.
- */
-export const FTP_MAX_STEP_FRACTION = 0.05;
-
-export function rateLimitFtp(prevValue: number | null | undefined, next: CompoundFtp): CompoundFtp {
-  if (!(typeof prevValue === 'number' && Number.isFinite(prevValue) && prevValue > 0)) return next;
-  const maxUp = Math.round(prevValue * (1 + FTP_MAX_STEP_FRACTION));
-  const maxDown = Math.round(prevValue * (1 - FTP_MAX_STEP_FRACTION));
-  if (next.value > maxUp) {
-    return { ...next, value: maxUp, source: `${maxUp} W, rate-limited from ${next.value} W (max +${FTP_MAX_STEP_FRACTION * 100}% per learn from ${prevValue} W) — ${next.source}` };
-  }
-  if (next.value < maxDown) {
-    return { ...next, value: maxDown, source: `${maxDown} W, rate-limited from ${next.value} W (max -${FTP_MAX_STEP_FRACTION * 100}% per learn from ${prevValue} W) — ${next.source}` };
-  }
-  return next;
+  return { value: b.value as number, confidence: b.confidence as Confidence, source: `power-duration fit (${b.reason})`, sample_count: b.n, signals };
 }

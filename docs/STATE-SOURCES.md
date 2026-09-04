@@ -18,15 +18,15 @@ stated and it is a decision Michael can reverse.
 | Drift per session = first half vs second half, warm-up skipped, 5% line | `analyze-running-workout/lib/heart-rate/efficiency.ts`, `ride-physiology.ts` | FIELD — Friel; TrainingPeaks Pa:Hr / Pw:Hr; the 5% line is Friel and Viada p107 (a plan rule — reports and flags only, never a filter: D-372) |
 | Drift is a trend, one dot per session | `StrengthReadCards.tsx`, `TrendSparkline.tsx` | FIELD — TrainingPeaks dashboard trend; intervals.icu per-activity points |
 | 12-week trend window | `TrendSparkline.tsx` | FIELD — TrainingPeaks 90-day default |
-| Headline = average of the last 28 days | `sport-summary.ts recentAverage`, `StrengthReadCards.tsx`, `StatePerformanceSection.tsx` | FIELD — Garmin: the number shown is the current 4-week estimate, the same half the trend arrow reads |
+| Headline = the LAST steady session's EF / drift, with its date | `sport-summary.ts latestPoint`, `StrengthReadCards.tsx`, `StatePerformanceSection.tsx` | FIELD — TrainingPeaks: EF and Pa:Hr are per-workout numbers in the workout summary; the dashboard trends them. (2026-09-04 evening, one reference per metric: replaces the 28-day average, which was Garmin's window under a TrainingPeaks formula) |
 | One colour on the line, a dot per session | `TrendSparkline.tsx` | FIELD — TrainingPeaks / intervals.icu |
-| Ride counts for the efficiency trend when it has ≥ 10 min in the aerobic band — any type, any intensity | `bike-fitness.ts MIN_EFFICIENCY_IN_BAND_S` | FIELD — Garmin: the fitness estimate updates from any ride with ≥10 min at aerobic intensity. (The type gate and the 90%-FTP "hard ride" exclusion were removed 2026-09-04: a zone boundary used as a filter; 3 of 13 rides counted.) |
+| Ride counts for the efficiency trend when it has ≥ 10 min in the aerobic band — any type, any intensity | `bike-fitness.ts MIN_EFFICIENCY_IN_BAND_S` | FIELD — Garmin: the fitness estimate updates from any ride with ≥10 min at aerobic intensity. (The type gate and the 90%-FTP "hard ride" exclusion were removed 2026-09-04.) ⚠️ The one Garmin rule left on the screen: it picks which rides are steady, it does not compute the number |
+| Easy / hard pace rows = median of the group's last five runs' recorded pace and HR | `run.ts recentGroupPaceHr` | Recorded values. The warm-up stand-in (a hard run's warm-up joining the easy pool, `warmup_easy`) was **OURS** and was removed 2026-09-04 evening from `compute-snapshot` (both the spine and `runEffHistory`) |
 | e1RM = w × 36 ÷ (37 − reps) | `compute-facts`, `estimate-1rm.ts` | FIELD — Brzycki |
 | Lift chart shows up to 52 weeks | `assemble.ts STATE_TREND_WINDOWS` | FIELD — Hevy / Fitbod ranges |
-| Trend arrow ↑ → ↓: the average of the last 28 days against the average of the 28 days before; higher ↑, lower ↓; the same digits at the metric's displayed precision (efficiency 3 decimals, drift 0.1%, pace to the second, watts and e1RM whole) →; blank only when one half has no session | `state-trend/classify.ts`, `thresholds.ts TREND_HALF_DAYS`, each caller's `precision` | FIELD — Garmin VO2 max / Training Status: the last 4 weeks against the 4 before, recomputed on every activity; VO2 max is shown as a whole number and the arrow reads → (maintaining) when the shown number has not moved. No percent band, no noise gate, no freshness decay, no cadence floor (all four were ours — Q-052 — deleted 2026-09-04) |
-| The run row's arrow reads the aerobic spine — the same points the headline averages; the heat-adjusted fit (D-346) is a receipt, not the verdict | `assemble.ts runEffSeries` | FIELD — Garmin, as above (ruling 2026-09-04) |
+| Trend arrow ↑ → ↓ | — | **OFF THE STATE SCREEN (2026-09-04 evening).** It was Garmin's three states (28 days vs the 28 before) over TrainingPeaks' EF — two products on one number. `state-trend/classify.ts` still computes the 28/28 verdict for the coach's copy; no State row renders it |
 | 56-day window, every discipline | `thresholds.ts TREND_WINDOW_DAYS` | FIELD — Garmin, two 4-week halves |
-| "provisional" tag: 3–4 sessions in the window, or all inside 21 days | `bike-fitness.ts isProvisionalTrend` | **OURS** — not in the 2026-09-04 sweep; flagged, untouched |
+| "provisional" tag: 3–4 sessions in the window, or all inside 21 days | `bike-fitness.ts isProvisionalTrend` | **OURS** — no longer rendered on State (2026-09-04 evening); still on the payload |
 | Race-projection gate: ≥ 8 observed runs | `assemble.ts projectionMinRuns`, `compute-snapshot` | **OURS** — a count with no outside source; gates a projected race time, not an arrow (was the run direction floor) |
 
 ## FTP
@@ -35,8 +35,9 @@ stated and it is a decision Michael can reverse.
 |---|---|---|
 | Power-curve read: critical-power fit over 2–20 min, ≥ 3 durations, W′ 5–40 kJ, r² ≥ 0.9, FTP = 0.97 × CP | `src/lib/bike-ftp-estimator.ts` | FIELD — Hill 1993, Jones 2010, Vanhatalo 2011; TrainerRoad / intervals.icu practice |
 | Power only — no heart-rate read, no steady-minutes rule | `bike-ftp-estimator.ts compoundFtp` | FIELD — TrainerRoad AI FTP Detection and intervals.icu eFTP are power-only (Michael, 2026-09-04: "just do what intervals.icu and TrainerRoad do"). A heart-rate read with a 15-minute floor (OURS) was built and removed the same night. |
-| Hard ceiling = best 20-min actually pedalled, 18 months | learner STEP 5 | **OURS** — the one number that does not extrapolate; 18 months = the run threshold's own window |
-| Rate limit ± 5% per learn | `bike-ftp-estimator.ts rateLimitFtp` | **OURS** — no athlete's zones move in one step |
+| Hard ceiling = best 20-min actually pedalled, 18 months | — | **DELETED 2026-09-04 evening** (was OURS) — `compoundFtp` takes the fit alone |
+| Rate limit ± 5% per learn | — | **DELETED 2026-09-04 evening** (was OURS) — `rateLimitFtp` is gone |
+| ⚠️ intervals.icu's eFTP model | `bike-ftp-estimator.ts fitCriticalPower` | UNVERIFIED — intervals.icu and TrainerRoad pages are blocked from the build container; the 2-parameter CP fit on 2–20 min and 0.97 × CP are cited to Hill / Jones / Vanhatalo and Morgan 2019, not to intervals.icu's page. Q-298 |
 | Proposed, then accepted; auto is the default | resolver, checkpoint, Baselines | FIELD — TrainerRoad (validated on 22,000 athletes; default auto with accept) |
 | Fallback when both reads abstain: 95% × best 20-min | learner STEP 4 | FIELD — Coggan 20-min test |
 
@@ -44,8 +45,14 @@ stated and it is a decision Michael can reverse.
 
 | Number | Where | Source |
 |---|---|---|
-| Fitness 42-day / fatigue 7-day / form | `ride-physiology.ts` | FIELD — Banister; TrainingPeaks PMC |
-| ACWR | `workload.ts`, reconciler | FIELD — Gabbett; the verdict bands are the reconciler's (see DECISIONS-LOG) |
+| Fitness (CTL, 42-day EWMA) · fatigue (ATL, 7-day) · form (yesterday's CTL − ATL), over the athlete's whole history | `_shared/fitness-fatigue.ts computeFitnessFatigue`, coach `load.fitness_fatigue`, `LoadBar.tsx` | FIELD — TrainingPeaks Performance Management Chart, exactly (2026-09-04 evening: THE load read on State; the coach's fetch widened from 84 days to all history) |
+| Form zone word: transitional > +25, fresh +5..+25, grey zone −10..+5, optimal −30..−10, high risk < −30; a value on the line takes the zone below | `fitness-fatigue.ts formZone` | FIELD — Friel "Managing Training Using TSB", as the TrainingPeaks PMC legend reproduces it. The on-the-line rule is a reading of a printed range, stated in the code |
+| ACWR and the reconciled load word ("balanced") | `_shared/acwr.ts`, `load-status-reconcile.ts`, coach payload | **OFF THE STATE SCREEN (2026-09-04 evening)** — Gabbett's ratio and the app's reconciler are neither product's rule; both still feed the coach |
+| Strength workload = minutes ÷ 60 × RPE × 10; RPE = session rating, else 10 − avg logged RIR; nothing → 0 | `workload.ts calculateStrengthWorkload`, `strengthSessionRpe`, planned mirror `calculatePlannedStrengthWorkload` | FIELD — Friel "Estimating Training Stress Score" (TrainingPeaks); RIR → RPE Zourdos 2016. Replaces tonnage ÷ 10,000 × intensity² (OURS) 2026-09-04 evening. ⚠️ Stored strength points are on the old scale until `backfill-strength-load` runs. ⚠️ No hrTSS for a strength session with heart rate: the app holds no strength threshold heart rate; the rating rung applies |
+| Rating fallback for cardio: TSS per hour = rating × 10 | `workload.ts mapRPEToIntensity` | FIELD — Friel's table (RPE 1 → 10/hr … 10 → 100/hr) |
+
+## BODY
+Effort and soreness rows: **REMOVED from State 2026-09-04 evening** (Foster + our 7-vs-28 comparison; Hooper + our z-score — neither product's rule). Server computation untouched, coach still reads it.
 
 ## Not yet swept
-Easy/hard pace rows, BODY effort and soreness, the week-execution bars. Add rows when touched.
+The week-execution bars (a count). Add rows when touched.

@@ -4276,7 +4276,8 @@ Deno.serve(async (req) => {
               // ⚠️ `name` now rides along: pricing a set has to ask the exercise whether a band on
               // it is the load or is assistance (D1), and the name is the only way to ask.
               .map((st:any) => ({ name: st.strength.name, sets: st.strength.sets, reps: st.strength.reps, weight: st.strength.weight, target_rir: st.strength.target_rir }));
-            const plannedLoad = calculatePlannedStrengthWorkload(strengthEx, { bodyweightLb: plannedBodyweightLb, lastWeightByMovement });
+            // Friel's TSS estimate (TrainingPeaks): the planned minutes × (10 − target RIR) × 10 per hour (2026-09-04).
+            const plannedLoad = calculatePlannedStrengthWorkload(finalDuration, strengthEx);
             if (plannedLoad > 0) update.workload_planned = plannedLoad;
           }
 

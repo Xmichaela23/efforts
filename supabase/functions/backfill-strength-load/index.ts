@@ -209,7 +209,7 @@ serve(async (req) => {
     // path prices. A row that was never materialized has nothing to price and is skipped, not zeroed.
     let pQuery = admin
       .from('planned_workouts')
-      .select('id, date, name, type, workload_planned, strength_exercises')
+      .select('id, date, name, type, duration, workload_planned, strength_exercises')
       .eq('user_id', userId)
       .in('type', STRENGTH_TYPES);
     if (since) pQuery = pQuery.gte('date', since);
@@ -227,7 +227,7 @@ serve(async (req) => {
       pProcessed++;
       const exercises = parseExercises(row.strength_exercises);
       if (exercises.length === 0) { pSkipped++; continue; }
-      const next = calculatePlannedStrengthWorkload(exercises, { bodyweightLb, lastWeightByMovement });
+      const next = calculatePlannedStrengthWorkload(Number(row.duration) || 0, exercises);
       if (!(next > 0)) { pSkipped++; continue; }
       if (next === row.workload_planned) { pSkipped++; continue; } // already on the new basis
       if (pSample.length < 10) pSample.push({ date: row.date, before: row.workload_planned, after: next });

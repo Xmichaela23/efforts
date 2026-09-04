@@ -510,6 +510,8 @@ export type CoachWeekContextV1 = {
       chronic28_actual_load: number | null;
       acwr: number | null;
       label: string | null;
+      /** TrainingPeaks' Performance Management Chart — fitness (CTL 42d), fatigue (ATL 7d), form (yesterday's CTL − ATL). The LOAD read on State (2026-09-04). */
+      fitness_fatigue?: { fitness: number | null; fatigue: number | null; form: number | null } | null;
       running_acwr: number | null;
       run_only_week_load: number | null;
       run_only_week_load_pct: number | null;

@@ -3,7 +3,7 @@
  * Run: deno test supabase/functions/_shared/fitness-fatigue.test.ts --no-check
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { computeFitnessFatigue } from './fitness-fatigue.ts';
+import { computeFitnessFatigue, formZone } from './fitness-fatigue.ts';
 import { type LoadRow } from './acwr.ts';
 
 const ASOF = '2026-07-09';
@@ -17,7 +17,7 @@ function series(loadForOffset: (off: number) => number, days = 84): LoadRow[] {
   return rows;
 }
 
-// ── The zero-seed ramp artifact — declared, not hidden ────────────────────
+// ── The zero seed (TrainingPeaks' own, absent a typed start value) — declared, not hidden ──
 Deno.test('steady 50/day × 84d → fitness < fatigue, form NEGATIVE (zero-seed ramp, not real fatigue)', () => {
   const r = computeFitnessFatigue(series(() => 50), { asOfDate: ASOF });
   if (!(r.fitness! < r.fatigue!)) throw new Error(`fitness should be under-seeded < fatigue, got ${r.fitness}/${r.fatigue}`);
@@ -54,7 +54,7 @@ Deno.test('real ~8-week series → finite fitness/fatigue/form, provisional prov
   if (r.fitness == null || r.fatigue == null || r.form == null) throw new Error('expected finite values');
   assertEquals(r.provenance.days_of_history >= 56, true);
   assertEquals(r.provenance.stream, 'total');
-  assertEquals(r.provenance.note.includes('drives no verdict'), true);
+  assertEquals(r.provenance.note.includes('TrainingPeaks PMC'), true);
   console.log(`[real ~8wk] fitness=${r.fitness} fatigue=${r.fatigue} form=${r.form}`);
 });
 
@@ -69,4 +69,26 @@ Deno.test('empty rows → nulls; single day → form 0 (no prior), fitness raise
 Deno.test('rest decays fatigue faster than fitness: big session 20d ago, nothing since → fitness > fatigue', () => {
   const r = computeFitnessFatigue([{ date: ymd(20), workload: 200 }], { asOfDate: ASOF });
   if (!(r.fitness! > r.fatigue!)) throw new Error(`after 20d rest, fitness should exceed fatigue, got ${r.fitness}/${r.fatigue}`);
+});
+
+// ── TrainingPeaks' Form zones (Friel), a value on the line takes the zone below it ────────
+Deno.test('formZone: transitional > 25, fresh (5, 25], grey (−10, 5], optimal [−30, −10], high risk < −30', () => {
+  assertEquals(formZone(30), 'transitional');
+  assertEquals(formZone(25), 'fresh');
+  assertEquals(formZone(10), 'fresh');
+  assertEquals(formZone(5), 'grey zone');
+  assertEquals(formZone(0), 'grey zone');
+  assertEquals(formZone(-10), 'optimal');
+  assertEquals(formZone(-20), 'optimal');
+  assertEquals(formZone(-30), 'optimal');
+  assertEquals(formZone(-31), 'high risk');
+  assertEquals(formZone(null), null);
+});
+
+// ── TrainingPeaks' EWMA step, one day: CTL += (TSS − CTL) / 42, ATL += (TSS − ATL) / 7 ────
+Deno.test('one 100-point day from zero → fitness 2.4, fatigue 14.3, form 0 (yesterday was empty)', () => {
+  const r = computeFitnessFatigue([{ date: ASOF, workload: 100 }], { asOfDate: ASOF });
+  assertEquals(r.fitness, 2.4);
+  assertEquals(r.fatigue, 14.3);
+  assertEquals(r.form, 0);
 });

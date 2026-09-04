@@ -14,6 +14,17 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — 2026-09-04 evening (D-466, on branch `claude/chat-archival-behavior-ee4r3z`, NOT on main, NOT deployed)
+
+- [ ] **Merge the branch to main** (fast-forward from `291b3147`), then deploy the 26 functions listed in the
+      ENGINE-STATE banner, then run `backfill-strength-load` so stored strength points move to Friel's scale.
+- [ ] **Look for on State:** LOAD line reads `fitness N · fatigue N · form ±N zone` (no "balanced", no ACWR);
+      no BODY block; run row `aerobic efficiency 1.xxx · Sep N run` with NO arrow; bike row `efficiency factor
+      0.xx · Sep N ride`; open card drift line names one session; easy row no longer says "incl. warm-ups";
+      composition strip says "last 7 days".
+- [ ] **Check one number by hand:** fitness = 42-day EWMA of `workouts.workload_actual` (completed) from the
+      first workout — `_shared/fitness-fatigue.ts` — against what the bar shows.
+
 ## 🅿️ PARKED 2026-09-02 — THE MARATHON BUILDER STILL RUNS ON THE OLD PACE TABLE (step 4 of the threshold-anchor cut)
 
 **Michael, 2026-09-02:** *"not worried about marathon unless we have to pick now to avoid confusion."*

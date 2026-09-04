@@ -1,25 +1,25 @@
 /**
- * Fitness–Fatigue–Form (Banister) — a SIBLING load signal, evaluation-only (2026-07-09).
+ * Fitness · Fatigue · Form — TrainingPeaks' Performance Management Chart, exactly (2026-09-04).
  *
- * NOT a replacement for ACWR and NOT a verdict. Emitted into the payload so it can be
- * WATCHED over the coming weeks against the composition + body-response reads; it drives
- * nothing. THE LAW holds — the reconciler mints verdicts; this is one more observable input.
+ * ⛔ ONE REFERENCE, WHOLE (Michael 2026-09-04: every State number copies one product's rule, never a
+ * hodgepodge). This is the number the LOAD section of State prints. FIELD — TrainingPeaks help centre,
+ * "Performance Management Chart" / "Fitness (CTL)" / "The Science of the Performance Manager":
+ *   fitness (CTL) = exponentially weighted average of daily TSS, 42-day constant
+ *   fatigue (ATL) = exponentially weighted average of daily TSS,  7-day constant
+ *   form    (TSB) = YESTERDAY's fitness − YESTERDAY's fatigue
+ *   zones (Friel, "Managing Training Using TSB", reproduced by TrainingPeaks): above +25 transitional,
+ *   +5 to +25 fresh, −10 to +5 grey zone, −30 to −10 optimal, below −30 high risk.
+ * The EWMA step is TrainingPeaks' own: CTL_today = CTL_yesterday + (TSS_today − CTL_yesterday) / 42.
+ * The series starts at zero from the athlete's FIRST logged session (TrainingPeaks seeds from the start of
+ * the athlete's history, or a typed start value; no start value is typed here) — so the caller must hand
+ * this function the WHOLE history, not a window (the coach fetched 84 days until 2026-09-04, which
+ * under-stated fitness for every athlete with more history than that).
  *
- * Model: the standard EWMA form of Banister (TrainingPeaks CTL/ATL/TSB), so Form is readable:
- *   fitness (CTL) = 42-day EWMA of daily load  — the slow "chronic" accumulation
- *   fatigue (ATL) =  7-day EWMA of daily load  — the fast "acute" accumulation
- *   form    (TSB) = fitness − fatigue ENTERING the day (prior-day convention) — freshness
+ * HISTORY: born 2026-07-09 as a "sibling signal, evaluation-only" beside ACWR; ACWR (Gabbett — neither
+ * Garmin nor TrainingPeaks) is off the State screen since 2026-09-04 and this is the load read.
  *
  * SINGLE SOURCE (D-264): consumes the exact same `LoadRow[]` (workouts.workload_actual, D-236)
- * that ACWR consumes — not `session_load`, not a second series. Same column, longer window.
- *
- * SCAFFOLD (not built): single-stream / total load in v1. Per-pathway is just calling this once
- * per slice's rows later; the `LoadRow[]` signature already supports it.
- *
- * PROVISIONAL: generic decay constants (42/7), no per-athlete k1/k2 fit, seeded from ZERO. The
- * zero seed under-states early fitness over an 84-day ramp, biasing Form NEGATIVE — so Form's
- * absolute value is unreliable until the series settles; the week-over-week TREND is the usable
- * read. All of this is declared in `provenance` so a consumer can never mistake it for calibrated.
+ * that ACWR consumes — not `session_load`, not a second series. Same column, whole history.
  */
 
 import { type LoadRow } from './acwr.ts';
@@ -36,13 +36,13 @@ export interface FitnessFatigue {
   form: number | null;
   provenance: {
     method: 'banister_ewma_v1';
-    /** ALWAYS false in v1 — generic constants, no per-athlete fit. */
+    /** ALWAYS false — TrainingPeaks' constants (42 / 7), no per-athlete fit; TrainingPeaks does not fit one either. */
     calibrated: false;
     tau_fitness_days: number;
     tau_fatigue_days: number;
     /** 'total' (single-stream v1) — per-domain scaffolded, not built. */
     stream: 'total';
-    /** 'zero' — ramp-up from zero under-states early fitness → Form biased negative early. */
+    /** 'zero' — the series starts at zero on the first logged session, as TrainingPeaks does without a typed start value. */
     seed: 'zero';
     days_of_history: number;
     note: string;
@@ -64,7 +64,7 @@ function daysBetween(a: string, b: string): number {
   return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86_400_000);
 }
 
-const NOTE = 'provisional/uncalibrated — evaluation only, drives no verdict';
+const NOTE = 'TrainingPeaks PMC: 42/7-day EWMA of daily workload, seeded at zero from the first logged session';
 
 /**
  * Compute Banister fitness/fatigue/form from a daily load series (same LoadRow[] as ACWR).
@@ -114,4 +114,21 @@ export function computeFitnessFatigue(
     form: r1(ctlPrior - atlPrior),             // freshness entering asOf (TSB, prior-day convention)
     provenance: prov(daysBetween(earliest, asOf) + 1),
   };
+}
+
+/**
+ * TrainingPeaks' Form (TSB) zones — Friel, "Managing Training Using TSB", as TrainingPeaks reproduces them
+ * in the Performance Management Chart legend. The published ranges are "+5 to +25" fresh, "−10 to −30"
+ * optimal, "−10 to +5" grey zone, above +25 transitional, below −30 high risk; the boundary value itself
+ * is not assigned in print, so a value exactly on a line takes the zone BELOW it (the more cautious read).
+ */
+export type FormZone = 'transitional' | 'fresh' | 'grey zone' | 'optimal' | 'high risk';
+
+export function formZone(form: number | null | undefined): FormZone | null {
+  if (form == null || !Number.isFinite(form)) return null;
+  if (form > 25) return 'transitional';
+  if (form > 5) return 'fresh';
+  if (form > -10) return 'grey zone';
+  if (form >= -30) return 'optimal';
+  return 'high risk';
 }

@@ -404,3 +404,14 @@ Plus: **`START-HERE.md`** (the one-page onboarding — read it first) and **`LIF
 | **A run's intent (steady vs hard)** | ⛔ **FOUR FIELDS, AND THE READER USES A FIFTH.** The gate reads `workout_analysis.heart_rate_summary.workoutType`. Also written: `classified_type`, `run_facts.workout_type`, `route_progress_metrics.workout_intent` | ⛔ **THIS ROW WAS WRONG THE DAY IT WAS WRITTEN — corrected 2026-07-31 ([D-346]).** D-345 wrote `run_facts.workout_type`, which **no gate reads**, and the claim "was never written, so every run was excluded" was false: the field the gate actually reads was populated all along, with `steady_state`, **on all 25 runs** — so nothing was ever excluded and hill sessions counted as steady. Three sessions in three days each wrote the intent to a different unread field |
 | **Per-set difficulty ("the three words")** | — | ⛔ **REMOVED 2026-07-30** (D-344). The rep COUNT is the verdict; nothing ever read the word. Session RPE STAYS — `calculate-workload` reads it |
 | **Strength session narrative** | — | ⛔ **DELETED for strength 2026-07-30**. Made three protocol-blind claims on a correctly-executed session. Run/ride/swim keep theirs |
+
+
+## State screen numbers — one reference per metric (2026-09-04 evening, D-466)
+
+| capability | entry point | status |
+|---|---|---|
+| **LOAD read on State = TrainingPeaks PMC** (fitness / fatigue / form + Friel zone word) | `_shared/fitness-fatigue.ts` → coach `load.fitness_fatigue` → `src/components/LoadBar.tsx` | PUSHED to branch, not deployed. Existed since 2026-07-09 unrendered — do not rebuild a CTL |
+| **Endurance headline = last steady session's EF / drift** | `src/lib/sport-summary.ts latestPoint`, `StatePerformanceSection.tsx`, `StrengthReadCards.tsx SpineCard` | PUSHED to branch. No arrow, no 28-day average on State; `state-trend/classify.ts` (Garmin 28/28) feeds the coach only |
+| **Strength workload = Friel RPE estimate** | `_shared/workload.ts calculateStrengthWorkload / calculatePlannedStrengthWorkload / strengthSessionRpe` | PUSHED to branch. Stored rows on the old tonnage scale until `backfill-strength-load` |
+| **FTP estimate = CP fit alone** | `src/lib/bike-ftp-estimator.ts compoundFtp`, `learn-fitness-profile` STEP 5 | PUSHED to branch. Ceiling and 5% cap deleted; intervals.icu model unverified (Q-298) |
+| BODY block (effort / soreness) | — | REMOVED from State 2026-09-04; server rows still feed the coach |

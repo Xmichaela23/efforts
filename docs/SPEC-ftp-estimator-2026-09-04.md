@@ -1,6 +1,7 @@
 # SPEC — Compound FTP estimator (bike)
 
 **Status:** BUILT AND LIVE (2026-09-04, commits 5f8b39b4 + d62ae9b4). **Later the same day, POWER ONLY:** Signal A (heart-rate-at-threshold) was removed on Michael's ruling — "just do what intervals.icu and TrainerRoad do"; its 15-block floor was OURS. The estimate is Signal B alone, with the ceiling and rate limit. One method — this value IS `ride_ftp_estimated`; 95%-of-best-20 survives only as the thin-data fallback. Reference athlete reads 167 W (high). See D-372 for the two things the build got wrong first and the ruling that fixed them.
+**2026-09-04 evening (one reference per metric):** the two guardrails this spec added on top of the fit — the best-20-minute hard ceiling and the ±5%-per-learn rate limit — were OURS and are DELETED (`compoundFtp(b)`, no `rateLimitFtp`; D-466). The fit is the number. intervals.icu's exact model remains unverified from this container (Q-298).
 **Date:** 2026-09-04
 
 ---

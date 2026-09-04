@@ -19,7 +19,7 @@
  */
 
 import React from 'react';
-import { recentAverage, recentHalfPoints } from '@/lib/sport-summary';
+import { fmtDayShort, latestPoint } from '@/lib/sport-summary';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { DRIFT_LIMITS } from '@shared/state-trend';
 // ⛔ THE ONE CHART LANGUAGE (Round 3 pass 2, 2026-09-01). The endurance cards used to draw their own
@@ -173,30 +173,23 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
   const trendPts = pts.filter((p) => p.countsTowardTrend !== false);
   const leftOut = pts.length - trendPts.length;
   const eff = trendPts.map((p) => ({ date: p.date, value: p.efficiency })).filter((p) => p.value != null) as Array<{ date: string; value: number }>;
-  // THE HEADLINE = the average of the last 28 days (Garmin; docs/SPEC-state-nothing-invented-2026-09-04.md),
-  // the same half the arrow's verdict reads. Shared with the closed row (sport-summary.recentAverage) so
-  // the plate and the row print one number. The line under it says what it is based on.
-  const asOf = asOfIn ?? pts[pts.length - 1]?.date ?? '';
-  const headline = recentAverage(eff, asOf);
-  const recentPts = recentHalfPoints(trendPts, asOf);
-  const recentWarmups = recentPts.filter((p) => p.fromWarmup).length;
-  // ⛔ THE CARD'S OWN SPORT NAMES THE SESSIONS (2026-09-03, Michael: "kill any run crossover"). This
-  // read "based on the last 5 runs" on the BIKE card — the word was hard-coded when only runs reached
-  // here. ⚠️ Warm-ups are a RUN fact (easy runs read off the warm-ups of hard runs when a block has
-  // none of its own); a ride carries no such borrow, and `fromWarmup` is never set on one.
+  // ⛔ THE HEADLINE IS TRAININGPEAKS', WHOLE (Michael 2026-09-04: one absolute reference per metric, never a
+  // TrainingPeaks formula under a Garmin window). FIELD — TrainingPeaks: EF is a per-workout number in the
+  // workout summary; the dashboard trends it one dot per workout over the date range. So the headline is
+  // the LAST steady session's efficiency factor, the line under it names that session, and the chart below
+  // is the trend. The 28-day average and the ↑→↓ arrow (both Garmin's rule) are gone from this card.
+  const effLast = latestPoint(eff);
+  const headline = effLast?.value ?? null;
   const noun = isRide ? 'ride' : 'run';
-  // a ride card says which rides the trend is built from and how many hard rides it leaves out — the caveat is
-  // printed, never a blank space (TrainingPeaks explains the same exclusion in its help centre)
-  const basedOn = recentPts.length
-    ? `average of the last 4 weeks · ${recentPts.length} ${isRide ? 'steady ' : ''}${recentPts.length === 1 ? noun : `${noun}s`}${recentWarmups > 0 ? ` · ${recentWarmups} ${recentWarmups === 1 ? 'warm-up' : 'warm-ups'}` : ''}${leftOut > 0 ? ` · ${leftOut} ${leftOut === 1 ? 'ride' : 'rides'} under 10 min in the aerobic band, not in the trend` : ''}`
+  // which session the number is — and, on a ride card, how many hard rides the trend leaves out (the caveat is
+  // printed, never a blank space; TrainingPeaks explains the same exclusion in its help centre)
+  const basedOn = effLast
+    ? `${fmtDayShort(effLast.date)} ${isRide ? 'steady ' : ''}${noun}${leftOut > 0 ? ` · ${leftOut} ${leftOut === 1 ? 'ride' : 'rides'} under 10 min in the aerobic band, not in the trend` : ''}`
     : (leftOut > 0 ? `no rides with 10 min in the aerobic band yet · ${leftOut} not in the trend` : null);
   /**
-   * ⛔ DRIFT IS A TREND HERE, NOT THE LATEST SESSION (2026-09-04, Michael: "replace the latest session line
-   * with a drift trend"). This card used to print one session's drift with its temperature and climb and
-   * "2.4 over the line" — a single-session verdict on the trend screen. Friel, on TrainingPeaks: the trend
-   * over time "is often a clearer indicator of aerobic development than single test results"; TrainingPeaks
-   * trends Pa:Hr / Pw:Hr on a dashboard across a base block. One session's drift stays on the session itself,
-   * where its conditions sit beside it.
+   * ⛔ DRIFT IS TRAININGPEAKS' Pa:Hr / Pw:Hr, WHOLE (2026-09-04). One percent per session — first half of a steady
+   * effort against the second — printed in the workout summary and trended on a dashboard. The number shown is
+   * the LAST steady session's; the line is the trend. The 28-day average (Garmin's window) is gone.
    *
    * Which sessions: the same steady points the efficiency line is built from, that carry the RATIO read
    * (pace to heart rate on a run, power to heart rate on a ride). Heart-rate-alone drift ('hr') is one side
@@ -207,8 +200,7 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
     .filter((p) => p.driftPct != null && !p.fadeWithheld && !p.driftWholeSession
       && (p.driftBasis === 'gap' || p.driftBasis === 'raw' || p.driftBasis === 'power'))
     .map((p) => ({ date: p.date, value: p.driftPct as number }));
-  const driftRecent = recentHalfPoints(driftPts, asOf);
-  const driftMedian = recentAverage(driftPts, asOf);
+  const driftLast = latestPoint(driftPts);
   const driftWhat = isRide ? 'power to heart rate' : 'pace to heart rate';
   const fmtDrift = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`;
 
@@ -271,9 +263,9 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
       {driftPts.length >= 2 && (
         <DatedChart points={driftPts} color={color} dotNoun={isRide ? 'steady ride' : 'run'} fmtVal={fmtDrift} unit="%" />
       )}
-      {driftMedian != null && (
+      {driftLast != null && (
         <div className="text-[11px] text-white/55 mt-1">
-          drift <span className="tabular-nums text-white/75">{fmtDrift(driftMedian)}%</span> · {driftWhat} · lower is better · average of the last 4 weeks · {driftRecent.length} steady {driftRecent.length === 1 ? noun : `${noun}s`} · line {DRIFT_LIMITS.hybridPct}%
+          drift <span className="tabular-nums text-white/75">{fmtDrift(driftLast.value)}%</span> · {driftWhat} · lower is better · {fmtDayShort(driftLast.date)} {isRide ? 'steady ride' : 'run'} · line {DRIFT_LIMITS.hybridPct}%
         </div>
       )}
       {basedOn && (

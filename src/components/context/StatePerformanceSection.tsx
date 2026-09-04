@@ -35,7 +35,7 @@ import EnduranceCheckpointSheet from '@/components/context/EnduranceCheckpointSh
 import LoadWeeksCard from '@/components/context/LoadWeeksCard';
 // ⛔ COLLAPSE TO ONE LINE PER SPORT (Round 3, 2026-09-01) — each sport shows a change-leading summary
 // and expands on tap. The summary wording is a set of pure functions so the confidence rule is pinned.
-import { changeMonth, efficiencyRow, recentAverage, recentHalfPoints, strengthGlanceRows, type SportRow } from '@/lib/sport-summary';
+import { fmtDayShort, latestPoint, strengthGlanceRows, type SportRow } from '@/lib/sport-summary';
 import { getStoredUserId } from '@/lib/supabase';
 import TrendSparkline from '@/components/context/TrendSparkline';
 import { liftStatusLine } from '@/lib/strength-calibration-copy';
@@ -183,7 +183,6 @@ function Signal({ label, sig }: { label: string; sig: BikeSignal }) {
         {v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}
       </span>
       {sig.pctChange != null && sig.verdict !== 'needs_data' && <span className="text-white/60">{verdictSignedPct(sig.verdict, sig.pctChange)}</span>}
-      {sig.provisional && <span className="text-white/50 text-[12px]">prov</span>}
     </span>
   );
 }
@@ -562,7 +561,6 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
                   <span className="text-white/85 text-[14px] truncate">{l.displayName}</span>
                   {/* PR tags wear the sport colour, not green — green means bike (Michael 2026-08-15). */}
                   {isPR(l) && <span className="text-strength text-[10px] uppercase tracking-wide font-semibold">PR</span>}
-                  {l.provisional && <span className="text-white/40 text-[10px]">provisional</span>}
                 </span>
                 {/* ⛔ THE AMBIENT STATUS — SLICE b, AND IT IS ALWAYS ON. climbing · holding · reset,
                     with the training max it refers to.
@@ -832,7 +830,7 @@ function FitnessDotBlock({ label, range, verdict, pctChange, provisional, wordMa
           // of what the engine decided. Withheld means we are not making a claim; the percent IS the
           // claim. (Only the bike lead passes `pctChange` here today — the card caller at :1035 omits
           // it — so this changes the bike row and nothing else.)
-          <span className={`inline-flex items-baseline gap-0.5 text-[13px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}{pctChange != null && <span className="text-white/60 ml-0.5">{verdictSignedPct(verdict, pctChange)}</span>}{provisional && <span className="text-white/50 text-[12px] ml-1">provisional</span>}</span>
+          <span className={`inline-flex items-baseline gap-0.5 text-[13px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}{pctChange != null && <span className="text-white/60 ml-0.5">{verdictSignedPct(verdict, pctChange)}</span>}</span>
         )}
       </span>
       <FitnessDot pct={range.positionPct} confident={range.confident} />
@@ -939,7 +937,7 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
       <Row label={card.discipline}>
         {range ? (
           <>
-            <FitnessDotBlock label={metricLabel ? metricLabel.toLowerCase() : card.discipline} range={range} verdict={card.headlineVerdict} provisional={PROVISIONAL_PERF.has(card.discipline)} showAxis={showAxis} />
+            <FitnessDotBlock label={metricLabel ? metricLabel.toLowerCase() : card.discipline} range={range} verdict={card.headlineVerdict} showAxis={showAxis} />
             {evidence && <span className="basis-full text-white/55 text-[12px]">{evidence}</span>}
           </>
         ) : (
@@ -1078,45 +1076,30 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         const grp = Array.isArray(groups) ? groups.find((x) => x.group === g) : undefined;
         if (!grp || (grp.runs ?? 0) === 0) return null;
         if (grp.recentPaceSecPerKm != null) {
-          // OURS (2026-09-03): easy runs read off the warm-ups of hard runs when a block has none of its own.
-          const fromWarm = Number((grp as any).recentFromWarmups) || 0;
-          const note = [
-            grp.recentHrAvg != null ? `${grp.recentHrAvg} bpm` : '',
-            g === 'easy' && fromWarm > 0 ? 'incl. warm-ups' : '',
-          ].filter(Boolean).join(' · ');
-          return { name: label, value: formatPace(grp.recentPaceSecPerKm, useImperial), note: note || undefined };
+          // 2026-09-04: the warm-up stand-in (easy rows read off the warm-ups of hard runs) was OURS and is gone —
+          // an easy row is easy runs, a hard row is hard runs, recorded pace and heart rate, nothing borrowed.
+          return { name: label, value: formatPace(grp.recentPaceSecPerKm, useImperial), note: grp.recentHrAvg != null ? `${grp.recentHrAvg} bpm` : undefined };
         }
         return { name: label, value: `${grp.runs} run${grp.runs === 1 ? '' : 's'}` };
       };
       const rows = [rowFor('easy', 'easy'), rowFor('quality', 'hard')].filter((x): x is SportRow => !!x);
-      // ⛔ AEROBIC EFFICIENCY IS THE TOP NUMBER, WITH ITS DIRECTION (Michael 2026-09-03: "we have a good
-      // number now so I'm ok with the arrow"). The number is the SAME headline the open card prints — the
-      // average of the last 28 days of the spine's 'aerobic' series (recentAverage) — so plate and row
-      // never disagree. The direction is the server's run efficiency verdict (`runFitness.efficiency`,
-      // route-engine-owned, D-346), read here again after v182 took it off every screen.
-      // ⚠️ ARROW RULES, unchanged from 2026-08-01 / 2026-09-01: ↑ improving, ↓ sliding, NOTHING for
-      // holding / needs_data / withheld (a direction the engine can't call gets no glyph). The down arrow
-      // is neutral-coloured — a drop is routinely correct (deload, taper, heat) and must not read as an
-      // alarm. Signed percent beside it only when there is a direction; a percent next to "no reading"
-      // is a claim in disguise.
+      // ⛔ AEROBIC EFFICIENCY IS THE TOP NUMBER, TRAININGPEAKS' WAY AND NOTHING ELSE'S (Michael 2026-09-04:
+      // one absolute reference per metric, never "the formula is TrainingPeaks and the window is Garmin's").
+      // FIELD — TrainingPeaks: Efficiency Factor is a PER-WORKOUT number, printed in the workout summary
+      // (graded pace ÷ average heart rate); the dashboard trends it as one dot per workout over the date
+      // range. So the row prints the LAST steady run's EF and says which run. No 28-day average (Garmin's
+      // window) and no ↑→↓ arrow (Garmin's three states) — both were the other product's rule on this
+      // product's number. The chart on the open card is the trend; TrainingPeaks' instruction is to read
+      // the line, not one run against the last.
       const aero = ((stateDisplay as { enduranceSpine?: Array<{ sport?: string; group?: string; points?: Array<{ date?: string; efficiency?: number | null }> }> } | null | undefined)?.enduranceSpine)
         ?.find((s) => s?.sport === 'run' && s?.group === 'aerobic');
       const aeroPts = (aero?.points ?? []).filter((p): p is { date: string; efficiency: number } => p?.efficiency != null && !!p?.date).map((p) => ({ date: p.date, value: p.efficiency }));
-      // THE HEADLINE = the average of the last 28 days (Garmin), the half the arrow reads — one number on plate and row.
-      const headAsOf = asOf ?? aeroPts[aeroPts.length - 1]?.date ?? '';
-      const aeroVals = recentHalfPoints(aeroPts, headAsOf);
-      const aeroHead = recentAverage(aeroPts, headAsOf);
-      if (aeroHead != null) {
-        const ef = runFitness?.efficiency;
-        const dir = ef?.verdict === 'improving' ? 'up' : ef?.verdict === 'sliding' ? 'down' : ef?.verdict === 'holding' ? 'flat' : null;
-        const pct = dir && ef?.pctChange != null && Number.isFinite(Number(ef.pctChange)) ? Number(ef.pctChange) : null;
-        const n = aeroVals.length;
+      const aeroLast = latestPoint(aeroPts);
+      if (aeroLast != null) {
         rows.unshift({
           name: 'aerobic efficiency',
-          value: fmtEff(aeroHead, false),
-          note: [pct != null ? `${pct > 0 ? '+' : ''}${Math.round(pct)}%` : '', `4 weeks · ${n} run${n === 1 ? '' : 's'}`].filter(Boolean).join(' · '),
-          arrow: dir === 'up' ? '↑' : dir === 'down' ? '↓' : dir === 'flat' ? '→' : undefined, // ↑ → ↓ are Garmin's three trend states
-          arrowCls: dir === 'up' ? NUMERIC.improving.cls : dir === 'down' ? NUMERIC.sliding.cls : NUMERIC.holding.cls,
+          value: fmtEff(aeroLast.value, false),
+          note: `${fmtDayShort(aeroLast.date)} run`,
         });
       }
       // ⛔ THE WEEK'S RUN POINTS AGAINST THE ATHLETE'S TYPICAL (Michael 2026-09-02: run load scored Strava's
@@ -1150,16 +1133,13 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       // both are facts — no verdict word, per the 2026-09-02 ruling.
       const bf = bikeFitness;
       const rows: SportRow[] = [];
-      // ⛔ ONE NUMBER, TWO SURFACES. The headline is the SAME median-of-the-last-five the open rides
-      // card prints (recentAverage over the ride spine), exactly as run's row shares its headline with
-      // the run card — the plate and the row cannot disagree.
+      // ⛔ ONE NUMBER, TWO SURFACES. The headline is the SAME number the open rides card prints — the last
+      // steady ride's efficiency factor (TrainingPeaks: EF is per workout) — so the plate and the row
+      // cannot disagree. Steady rides only: the same `countsTowardTrend` filter the open card applies.
       const rideSpine = ((stateDisplay as { enduranceSpine?: Array<{ sport?: string; group?: string; points?: Array<{ date?: string; efficiency?: number | null; countsTowardTrend?: boolean }> }> } | null | undefined)?.enduranceSpine)
         ?.find((s) => s?.sport === 'ride');
-      // steady rides only — the same `countsTowardTrend` filter the open card applies, so plate and row stay one number
       const efPts = (rideSpine?.points ?? []).filter((p): p is { date: string; efficiency: number; countsTowardTrend?: boolean } => p?.countsTowardTrend !== false && p?.efficiency != null && !!p?.date).map((p) => ({ date: p.date, value: p.efficiency }));
-      const efAsOf = asOf ?? efPts[efPts.length - 1]?.date ?? '';
-      const efVals = recentHalfPoints(efPts, efAsOf);
-      const efHead = recentAverage(efPts, efAsOf);
+      const efLast = latestPoint(efPts);
       // ⛔ FTP LEADS, EFFICIENCY FACTOR FOLLOWS (2026-09-03, checked against the field, not recalled).
       // The rider's first number is FTP and their second is watts per kilo; efficiency factor barely
       // appears in mainstream cycling apps — it is a coach's metric (TrainerRoad's W/kg material,
@@ -1172,20 +1152,13 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       const ftpBasis = bf?.efficiency?.basis === 'personal' ? 'tested'
         : bf?.efficiency?.basis === 'coggan_ftp' ? 'estimated' : null;
       if (ftp != null) rows.push({ name: 'FTP', value: `${ftp} W`, note: ftpBasis ?? undefined });
-      if (efHead != null) {
-        // ⚠️ THE ARROW ONLY, NEVER THE PERCENT. The direction is the server's aerobic verdict — same
-        // power, lower heart rate, which is the same physiology a rising watts-per-beat states. Its
-        // `pctChange` belongs to the BPM series, so printing it beside a watts-per-beat number would
-        // attach one series' movement to another's value. Arrow rules as everywhere: ↑ improving,
-        // ↓ sliding, nothing for holding / needs_data / withheld.
-        const dir = bf?.efficiency?.verdict === 'improving' ? 'up' : bf?.efficiency?.verdict === 'sliding' ? 'down' : bf?.efficiency?.verdict === 'holding' ? 'flat' : null;
-        const n = efVals.length;
+      if (efLast != null) {
+        // TrainingPeaks' way, whole (2026-09-04): the last steady ride's EF and its date. No arrow — the
+        // ↑→↓ states were Garmin's rule on a TrainingPeaks number. The open card's line is the trend.
         rows.push({
           name: 'efficiency factor',
-          value: fmtEff(efHead, true),
-          note: `4 weeks · ${n} ride${n === 1 ? '' : 's'}`,
-          arrow: dir === 'up' ? '↑' : dir === 'down' ? '↓' : dir === 'flat' ? '→' : undefined, // ↑ → ↓ are Garmin's three trend states
-          arrowCls: dir === 'up' ? NUMERIC.improving.cls : dir === 'down' ? NUMERIC.sliding.cls : NUMERIC.holding.cls,
+          value: fmtEff(efLast.value, true),
+          note: `${fmtDayShort(efLast.date)} ride`,
         });
       }
       if (rows.length) return rows;

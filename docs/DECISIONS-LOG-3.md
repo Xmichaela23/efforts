@@ -1600,6 +1600,12 @@ change.
 
 ## D-463 — The book's tests, sendable; easy running read off a hard run's warm-up (2026-09-03)
 
+> **2026-09-04 evening — the warm-up half of this decision is REVERSED (D-466).** The easy read off a hard run's
+> warm-up was ours (no product does it) and is gone from `compute-snapshot` (both the aerobic spine and
+> `runEffHistory`), from `assemble.ts` (`warmupRuns` / `recentFromWarmups`) and from the State row ("incl.
+> warm-ups"). `run_facts.warmup_easy` is still written; nothing on State reads it. The tests half (sendable
+> threshold trial) stands. Everything below on warm-ups is history.
+
 **Tests (pp.210–213, read off the page).** Every test launched from Baselines is the book's protocol, step for
 step, and every step is a TIMED step so Garmin takes it as-is: run trial p210 (7 min jog · 2 strides · 3×30 s
 fast with 1 min easy · 1 min rest · 12/10/8-min trial · 9 min cool-down), FTP p212 (8 min easy · 3×1 min high
@@ -1685,3 +1691,73 @@ time keeps seconds from the Strava import onward (`metrics.moving_time_seconds`)
 its reps and reserve, read from the composer's own `slot_intent` / `target_rir`; the rep target sits greyed
 in the reps box; Previous and the suggested weight read the same log.
 
+
+## D-466 — One absolute reference per State number: TrainingPeaks whole for load and trends, intervals.icu whole for FTP, nothing of ours left but a zone midpoint (2026-09-04 evening, PUSHED to branch `claude/chat-archival-behavior-ee4r3z`; NOT on main, NOT deployed, NOT device-verified)
+
+**Michael, 2026-09-04:** *"I want the numbers and the formulas to be the exact numbers and formulas used in
+Garmin or TrainingPeaks and not a hodgepodge of the two … each metric has to have an absolute reference
+point."* The morning's ledger (`STATE-NUMBERS.md`, first cut) had five numbers built from two products at once:
+a TrainingPeaks formula under a Garmin window, with a Garmin arrow on top. This entry is the ruling applied,
+number by number. It **supersedes the 28/28 half of the morning's nothing-invented spec** (that spec file is
+deleted; its substance is here) and the FTP guardrails of `SPEC-ftp-estimator-2026-09-04.md`.
+
+**Trends — TrainingPeaks, whole.** Efficiency Factor and Pa:Hr / Pw:Hr are per-workout numbers in the
+TrainingPeaks workout summary, trended one dot per workout on a dashboard. So the run and bike rows and the open
+cards print the **last steady session's** number with its date (`sport-summary.ts latestPoint`, `fmtDayShort`),
+the chart is the trend (90 days, one colour), and the **↑→↓ arrow is off the screen** — it was Garmin's three
+states (28 days vs the 28 before) over a number Garmin does not have. The 28-day-average headline (also Garmin's)
+goes with it. `state-trend/classify.ts` still computes the 28/28 verdict; only the coach's copy reads it now
+(a second vocabulary beside State's — Q-298 names it). The `SportRow.arrow` slot and the `efficiencyRow` /
+`dirWord` / `changeMonth` / `sinceMonthFromSeries` / `recentAverage` / `recentHalfPoints` helpers are deleted
+with their only callers. The "provisional" tag (ours: 3–4 sessions or a 21-day span) is no longer rendered.
+
+**Load — TrainingPeaks, whole.** The LOAD line is the Performance Management Chart: fitness (42-day EWMA of
+daily workload), fatigue (7-day), form (yesterday's fitness − yesterday's fatigue), with Friel's Form zone word
+(transitional > +25, fresh +5..+25, grey zone −10..+5, optimal −30..−10, high risk < −30; a value on the line
+takes the zone below — the ranges are printed, the boundary is not). This was **starved, not absent**:
+`_shared/fitness-fatigue.ts` has computed it since 2026-07-09 as an "evaluation-only sibling signal" and the
+coach shipped it as `load.fitness_fatigue`; nothing rendered it, and the coach fetched only 84 days, which
+under-seeds a 42-day average. The fetch is now the whole history (TrainingPeaks seeds at zero from the first
+workout), `formZone()` is added beside it, `LoadBar.tsx` prints the three numbers, and `COACH_PAYLOAD_VERSION`
+/ `COACH_CLIENT_MIN_PAYLOAD_VERSION` are 195. **ACWR and the reconciled load word ("balanced") are off the
+screen** — Gabbett's ratio and the app's own reconciler (D-260) are neither product's rule. Both stay on the
+payload for the coach. The 7-day composition strip stays (TrainingPeaks' TSS-by-sport split), relabelled
+"last 7 days".
+
+**Strength workload — Friel's estimate, the same TrainingPeaks rule cardio already fell back to.** Points =
+minutes ÷ 60 × RPE × 10 (Friel, "Estimating Training Stress Score": his own examples 30 min at RPE 6 = 30,
+90 min at RPE 4 = 60). RPE = the session rating; else 10 − the average logged reps-in-reserve (Zourdos 2016);
+nothing logged → 0. The planned side mirrors it from the planned minutes and the target RIR, so prescribed ==
+performed still reconciles. **Replaces** (tonnage ÷ 10,000) × intensity² × 100 and the RIR-to-intensity band
+table, both ours. `strengthSetVolume` and the band / bodyweight pricing (D-351, D1) stay for the VOLUME facts;
+they no longer price load. Ripple, stated: every stored strength `workload_actual` / `workload_planned` is on
+the old scale until `backfill-strength-load` re-prices it (it calls `calculate-workload`, so it needs no code of
+its own beyond the planned `duration` it now selects); a strength session with no rating and no RIR scores 0;
+no hrTSS for a strength session with heart rate, because the app holds no strength threshold heart rate.
+
+**BODY — removed from State.** Effort (Foster's session RPE under our 7-vs-28 comparison) and soreness
+(Hooper's scale under our z-score) are neither product's fitness-screen rule. `StateBodyBlock.tsx` is deleted
+with its only mount; the server rows still feed the coach.
+
+**FTP — the fit alone.** The best-20-minute ceiling and the ±5%-per-learn rate limit were ours on top of the
+intervals.icu / TrainerRoad read; both deleted (`compoundFtp(b)`, `rateLimitFtp` gone, `ceiling_20min` off the
+type). ⚠️ intervals.icu's exact eFTP model could not be read from this container (its pages and TrainerRoad's
+are blocked by the egress proxy); the CP fit and 0.97 × CP stay cited to Hill / Jones / Vanhatalo and Morgan
+2019 — a **hypothesis about intervals.icu's method, not a finding.** Q-298.
+
+**What is still ours:** inside Friel's heart-rate table, where a two-value zone (Z1, Z2, Z5b) splits — at the
+midpoint. Friel prints the range, not the split. Nothing else on the screen.
+
+**What did NOT change:** cardio TSS / rTSS / sTSS and the Friel HR / rating fallbacks (`d635ac52`, this
+afternoon — already TrainingPeaks); Garmin's 10-minute-in-the-aerobic-band rule for which rides count (it picks
+steady rides; it does not compute the number); Brzycki e1RM; the swim count; the week-execution bars.
+
+**Rejected:** keeping the arrow "because Michael said he was ok with it on 09-03" — that approval predates the
+one-reference ruling; making ACWR Garmin's load ratio (Garmin's band could not be verified from here, and the
+PMC already existed); an hrTSS rung for strength (no strength threshold HR exists in the app — it would have
+been a guess).
+
+**Verification that would settle it:** deploy the list in ENGINE-STATE's banner, run `backfill-strength-load`,
+open State: LOAD reads three numbers and a zone word; the run row reads "aerobic efficiency 1.xxx · Sep N run"
+with no arrow; the open card's drift line names one session; no BODY block. Then recompute fitness by hand from
+`workouts.workload_actual` for one athlete and compare.

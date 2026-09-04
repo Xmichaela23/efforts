@@ -182,88 +182,28 @@ export function mapRPEToIntensity(rpe: number): number {
 // Strength workload
 // ---------------------------------------------------------------------------
 
-export function getStrengthIntensity(exercises: any[], sessionRPE?: number): number {
-  if (!Array.isArray(exercises) || exercises.length === 0) {
-    if (typeof sessionRPE === 'number' && sessionRPE >= 1 && sessionRPE <= 10) {
-      return mapRPEToIntensity(sessionRPE);
+/**
+ * The RPE a strength session is scored at — FIELD, two published steps:
+ *   1. the athlete's own session rating (Foster's session RPE, 1–10), when they gave one;
+ *   2. else the sets' logged reps-in-reserve → RPE = 10 − RIR (Zourdos et al. 2016, the RIR-based RPE
+ *      scale: RPE 10 = 0 RIR, RPE 8 = 2 RIR), averaged over the completed sets that carry one.
+ * Nothing logged → null → the session scores 0 points (TrainingPeaks leaves TSS empty on a workout with
+ * no data; it never guesses). 2026-09-04: replaces OUR RIR-to-intensity band table (0.95 … 0.70).
+ */
+export function strengthSessionRpe(exercises: any[], sessionRPE?: number | null): number | null {
+  if (typeof sessionRPE === 'number' && sessionRPE >= 1 && sessionRPE <= 10) return sessionRPE;
+  const rirs: number[] = [];
+  for (const ex of Array.isArray(exercises) ? exercises : []) {
+    for (const st of Array.isArray(ex?.sets) ? ex.sets : []) {
+      if (st?.completed === false) continue;
+      // ⚠️ typeof, not Number(): Number(null) is 0, and 0 RIR is RPE 10 — a blank must stay blank.
+      const rir = typeof st?.rir === 'number' ? st.rir : (typeof st?.rir === 'string' && st.rir.trim() !== '' ? Number(st.rir) : NaN);
+      if (Number.isFinite(rir) && rir >= 0) rirs.push(rir);
     }
-    return 0.75;
   }
-
-  if (typeof sessionRPE === 'number' && sessionRPE >= 1 && sessionRPE <= 10) {
-    return mapRPEToIntensity(sessionRPE);
-  }
-
-  const intensities = exercises.map(ex => {
-    let base = 0.75;
-
-    if (Array.isArray(ex.sets) && ex.sets.length > 0) {
-      const completedSets = ex.sets.filter((s: any) => s.completed !== false);
-      if (completedSets.length === 0) return base;
-
-      const rirValues = completedSets
-        .map((s: any) => (typeof s.rir === 'number' && s.rir >= 0 ? s.rir : null))
-        .filter((rir: number | null) => rir !== null) as number[];
-
-      if (rirValues.length > 0) {
-        const avgRIR = rirValues.reduce((a: number, b: number) => a + b, 0) / rirValues.length;
-        if (avgRIR <= 1) base = 0.95;
-        else if (avgRIR <= 2) base = 0.90;
-        else if (avgRIR <= 3) base = 0.85;
-        else if (avgRIR <= 4) base = 0.80;
-        else if (avgRIR <= 5) base = 0.75;
-        else base = 0.70;
-      } else {
-        const avgWeight = completedSets.reduce((sum: number, s: any) => sum + (Number(s.weight) || 0), 0) / completedSets.length;
-        const avgReps = completedSets.reduce((sum: number, s: any) => sum + (Number(s.reps) || 0), 0) / completedSets.length;
-
-        if (completedSets[0].duration_seconds && completedSets[0].duration_seconds > 0) {
-          base = INTENSITY_FACTORS.strength['core_'];
-          const avgDuration = completedSets.reduce((sum: number, s: any) => sum + (Number(s.duration_seconds) || 0), 0) / completedSets.length;
-          if (avgDuration > 90) base *= 1.05;
-          return base;
-        }
-
-        if (avgWeight > 0) {
-          if (avgReps <= 5 && avgWeight > 50) base = 0.90;
-          else if (avgReps <= 5) base = 0.85;
-          else if (avgReps >= 13) base = 0.70;
-          else base = 0.80;
-        }
-
-        if (avgReps <= 5) base *= 1.05;
-        else if (avgReps >= 13) base *= 0.90;
-      }
-
-      return base;
-    }
-
-    if (ex.duration_seconds && ex.duration_seconds > 0) {
-      base = INTENSITY_FACTORS.strength['core_'];
-      if (ex.duration_seconds > 90) base *= 1.05;
-      return base;
-    }
-
-    if (ex.weight && typeof ex.weight === 'string' && ex.weight.includes('% 1RM')) {
-      const pct = parseInt(ex.weight);
-      const roundedPct = Math.floor(pct / 5) * 5;
-      const key = `@pct${roundedPct}`;
-      base = INTENSITY_FACTORS.strength[key] || 0.75;
-    } else if (ex.weight && typeof ex.weight === 'string' && ex.weight.toLowerCase().includes('bodyweight')) {
-      base = INTENSITY_FACTORS.strength['bodyweight'];
-    }
-
-    // D-322: parse, don't type-check. A rep RANGE ("5-8") is a string, and the old
-    // type-check silently fell to the 8-rep default — flipping the intensity multiplier
-    // the wrong way for a heavy 5. Takes the BOTTOM of the range, the day-one prescription.
-    const reps = typeof ex.reps === 'number' ? ex.reps : (Number.parseInt(String(ex.reps ?? ''), 10) || 8);
-    if (reps <= 5) base *= 1.05;
-    else if (reps >= 13) base *= 0.90;
-
-    return base;
-  });
-
-  return intensities.reduce((a: number, b: number) => a + b, 0) / intensities.length;
+  if (!rirs.length) return null;
+  const avgRir = rirs.reduce((a, b) => a + b, 0) / rirs.length;
+  return Math.max(1, Math.min(10, 10 - avgRir));
 }
 
 // ---------------------------------------------------------------------------
@@ -550,120 +490,44 @@ export function strengthSetVolume(
   return bw > 0 ? bw * reps : 0;
 }
 
-export function calculateStrengthWorkload(exercises: any[], sessionRPE?: number, opts: StrengthVolumeOpts = {}): number {
-  if (!Array.isArray(exercises) || exercises.length === 0) return 0;
-
-  let totalVolume = 0;
-  exercises.forEach(ex => {
-    if (Array.isArray(ex.sets) && ex.sets.length > 0) {
-      // Asked once per EXERCISE, not per set — a band means the same thing on every set of a row.
-      const bandIsAssistance = isBandAssistedMovement(String(ex?.name ?? ''));
-      const bandIsLoad = typeForExercise(String(ex?.name ?? '')) === 'band';
-      const bodyIsLoad = typeForExercise(String(ex?.name ?? '')) === 'bodyweight' || bandIsAssistance;
-      const barLb = barLbForExercise(String(ex?.name ?? ''));
-      ex.sets.forEach((set: any) => {
-        if (set.completed !== false) {
-          totalVolume += strengthSetVolume(set, { ...opts, bandIsAssistance, bandIsLoad, bodyIsLoad, barLb });
-        }
-      });
-    }
-  });
-
-  const volumeFactor = totalVolume / 10000;
-  const effectiveVolumeFactor = Math.max(volumeFactor, 0.1);
-  const intensity = getStrengthIntensity(exercises, sessionRPE);
-
-  return Math.round(effectiveVolumeFactor * Math.pow(intensity, 2) * 100);
-}
-
-// RIR → strength intensity, the ONE band table both sides use. (Actual reads it inline in
-// getStrengthIntensity from logged RIR; planned reads it here from the prescription's target RIR.)
-export function rirToStrengthIntensity(rir: number): number {
-  if (rir <= 1) return 0.95;
-  if (rir <= 2) return 0.90;
-  if (rir <= 3) return 0.85;
-  if (rir <= 4) return 0.80;
-  if (rir <= 5) return 0.75;
-  return 0.70;
+/**
+ * ⛔ STRENGTH WORKLOAD IS FRIEL'S TSS ESTIMATE, EXACTLY (2026-09-04, Michael: one absolute reference per
+ * metric). TrainingPeaks scores a session with no power / pace / heart-rate read from its DURATION and
+ * its RPE — Joe Friel, "Estimating Training Stress Score", trainingpeaks.com: TSS per hour = RPE × 10 on
+ * the 1–10 scale (a 30-minute session at RPE 6 = 30; 90 minutes at RPE 4 = 60 — his own worked
+ * examples). So: minutes ÷ 60 × RPE × 10, through the one `calculateDurationWorkload` every sport uses.
+ *
+ * WHAT THIS REPLACED, AND WHY: (tonnage ÷ 10,000) × intensity² × 100, with the ÷10,000 and the
+ * RIR-to-intensity map both OURS — a formula no product publishes, sitting inside a Load section whose
+ * every other number is TrainingPeaks'. The tonnage machinery (`strengthSetVolume`, band and bodyweight
+ * pricing) stays for the VOLUME facts; it no longer prices load.
+ *
+ * ⚠️ RIPPLE: every stored strength `workload_actual` is on the old scale until re-priced
+ * (`backfill-strength-load`), and a session with neither a rating nor a logged RIR scores 0.
+ */
+export function calculateStrengthWorkload(durationMinutes: number, exercises: any[], sessionRPE?: number | null): number {
+  const rpe = strengthSessionRpe(exercises, sessionRPE);
+  if (rpe == null || !(Number(durationMinutes) > 0)) return 0;
+  return calculateDurationWorkload(Number(durationMinutes), mapRPEToIntensity(rpe));
 }
 
 /**
- * PLANNED strength workload — the SAME tonnage basis as `calculateStrengthWorkload` (actual), computed
- * from the MATERIALIZED prescription (resolved weight in lb × sets × reps). This finishes a half-done
- * migration: actual moved to tonnage long ago; planned stayed on the CLOCK (`calculateDurationWorkload`)
- * and so a session read e.g. 56 planned / 25 done for the identical work. The clock is meaningless for
- * lifting — only the weight moved counts, on both sides.
- *
- * Carries (no resolved weight, distance/time "reps") contribute 0 tonnage here EXACTLY as they do on the
- * actual side today, so planned and actual reconcile for the weighted lifts. Capturing carry load is a
- * separate fix owed on BOTH sides (planned "Heavy" + the actual logger's weight:0) — see Q-180.
- *
- * Intensity mirrors actual's method: band each exercise's target RIR, then average the bands.
+ * PLANNED strength workload — the SAME Friel estimate as `calculateStrengthWorkload` (actual), from the
+ * session's planned minutes and the prescription's target RIR (RPE = 10 − RIR, Zourdos 2016), averaged
+ * over the rows that carry one. No target RIR anywhere → 0. Do exactly what is prescribed, for the
+ * planned minutes, and planned equals done — the invariant `workload-strength-planned.test.ts` guards.
+ * 2026-09-04: replaces the tonnage mirror (resolved lb × sets × reps ÷ 10,000 × intensity²).
  */
 export function calculatePlannedStrengthWorkload(
-  exercises: Array<{ name?: string | null; sets?: number | any[]; reps?: number | string; weight?: number | string | null; target_rir?: number | null }>,
-  opts: StrengthVolumeOpts = {},
+  durationMinutes: number,
+  exercises: Array<{ target_rir?: number | null }>,
 ): number {
-  if (!Array.isArray(exercises) || exercises.length === 0) return 0;
-  let totalVolume = 0;
-  const intensities: number[] = [];
-  for (const ex of exercises) {
-    const sets = Number(ex.sets) || 0; // materialized prescription: sets is a COUNT
-    const reps = typeof ex.reps === 'number' ? ex.reps : Number.parseInt(String(ex.reps ?? ''), 10);
-    // ⛔ THE SAME SET RULE AS ACTUAL, OR THE TWO SIDES STOP RECONCILING (D1, 2026-08-01).
-    //
-    // This function exists because planned and actual once used different bases and a session read
-    // 56 planned / 25 done for identical work. Bodyweight scoring landed the app right back there:
-    // if the completed chin-ups start counting and the prescribed ones do not, every strength
-    // session on every screen reads as heavier than planned — and `workload-strength-planned.test.ts`
-    // pins prescribed == performed, so it fails the moment one side moves alone. One rule, priced
-    // per set here exactly as it is priced per set there.
-    if (sets > 0 && Number.isFinite(reps) && reps > 0) {
-      const bandIsAssistance = isBandAssistedMovement(String(ex?.name ?? ''));
-      // ⚠️ THE TWO SIDES SPEAK DIFFERENT DIALECTS ABOUT A BAND, and this is where they are made to
-      // agree. A logged set names the band in `resistance_level`; a PRESCRIPTION has no such field —
-      // it puts a word where the number goes ("Band", "Bodyweight", "Heavy barbell", D-094). So a
-      // prescribed band row is translated into the same shape the actual side reads. Without this it
-      // resolves to "no weight, no band" and gets priced as full bodyweight, against a token on the
-      // completed side — the mismatch this function was written to end, re-created one layer down.
-      const plannedIsBand = /band/i.test(String(ex.weight ?? ''));
-      // ⚠️ AND THE TYPE AXIS CATCHES WHAT THE WORD MISSES. `plannedIsBand` only fires when the
-      // prescription literally says "band" in the weight slot; a Band Face Pull prescribed
-      // "By feel" (every assistance row in a Get Stronger block) says nothing of the kind, so it
-      // fell to the bodyweight rule on the PLANNED side while the completed side took the token —
-      // the exact planned-vs-actual mismatch this function exists to prevent, one layer down.
-      const bandIsLoad = typeForExercise(String(ex?.name ?? '')) === 'band';
-      // ⚠️ THE SAME FLAG ON BOTH SIDES, for the reason stated at the top of this block: if the
-      // completed curl stops pricing bodyweight and the prescribed one does not, prescribed ==
-      // performed breaks and every session reads as under plan.
-      const bodyIsLoad = typeForExercise(String(ex?.name ?? '')) === 'bodyweight' || bandIsAssistance;
-      const barLb = barLbForExercise(String(ex?.name ?? ''));
-      /**
-       * ⛔ AN AUTO-REGULATED ROW IS PRICED AT WHAT THE ATHLETE LIFTS ON IT (2026-08-29).
-       *
-       * The prescription stays open — that is Viada's instruction for hypertrophy work and it is not
-       * changed here. This is the SCORING side: a row the plan declined to load is scored at the
-       * athlete's own last logged weight so plan-versus-done compares two real numbers.
-       * ⚠️ ONLY WHEN THE PRESCRIPTION NAMED NOTHING. A row that says 135 is priced at 135, always —
-       * history never overrides a prescription.
-       */
-      const plannedWeight = (() => {
-        const named = Number(ex.weight);
-        if (Number.isFinite(named) && named > 0) return ex.weight;
-        if (plannedIsBand || bandIsAssistance || bodyIsLoad) return ex.weight;
-        const last = opts.lastWeightByMovement?.[canonicalize(String(ex?.name ?? ''))];
-        return Number.isFinite(last) && (last as number) > 0 ? last : ex.weight;
-      })();
-      totalVolume += sets * strengthSetVolume(
-        { weight: plannedWeight, reps, resistance_level: plannedIsBand ? 'band' : null },
-        { ...opts, bandIsAssistance, bandIsLoad, bodyIsLoad, barLb },
-      );
-    }
-    if (typeof ex.target_rir === 'number' && ex.target_rir >= 0) intensities.push(rirToStrengthIntensity(ex.target_rir));
-  }
-  const effectiveVolumeFactor = Math.max(totalVolume / 10000, 0.1);
-  const intensity = intensities.length ? intensities.reduce((a, b) => a + b, 0) / intensities.length : 0.75;
-  return Math.round(effectiveVolumeFactor * Math.pow(intensity, 2) * 100);
+  const rirs = (Array.isArray(exercises) ? exercises : [])
+    .map((ex) => (typeof ex?.target_rir === 'number' ? ex.target_rir : NaN)) // Number(null) is 0 = RPE 10; a blank stays blank
+    .filter((r) => Number.isFinite(r) && r >= 0);
+  if (!rirs.length || !(Number(durationMinutes) > 0)) return 0;
+  const rpe = Math.max(1, Math.min(10, 10 - rirs.reduce((a, b) => a + b, 0) / rirs.length));
+  return calculateDurationWorkload(Number(durationMinutes), mapRPEToIntensity(rpe));
 }
 
 // ---------------------------------------------------------------------------

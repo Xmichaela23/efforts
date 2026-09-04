@@ -1182,9 +1182,6 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
           // the group's own recent pace + HR (real recorded pace, median of its last five) — lets the
           // card show easy and hard on their own pools; null when the group carries no real pace.
           ...recentGroupPaceHr(rows as Array<Record<string, unknown>>),
-          // OURS (2026-09-03): warm-up reads off hard runs feed the easy pool when a block has no easy runs.
-          warmupRuns: rows.filter((r: any) => r?.source === 'warmup').length,
-          recentFromWarmups: rows.slice(-5).filter((r: any) => r?.source === 'warmup').length,
           series: rows
             .map((r: any) => ({
               date: String(r?.date ?? ''),

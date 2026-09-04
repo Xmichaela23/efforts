@@ -1413,8 +1413,8 @@ function computeWorkload(w: WorkoutRow, baselines: Baselines | null, hrCorrupt =
   const sessionRPE = meta.session_rpe;
 
   if (type === "strength") {
-    // D1: bodyweight sets are priced at the athlete's own weight. Null → today's behaviour.
-    return calculateStrengthWorkload(w.strength_exercises ?? [], sessionRPE, { bodyweightLb });
+    // Friel's TSS estimate (TrainingPeaks): minutes ÷ 60 × RPE × 10 — the rating, else RPE = 10 − logged RIR (2026-09-04).
+    return calculateStrengthWorkload(dur, w.strength_exercises ?? [], sessionRPE);
   }
   if (type === "mobility") {
     return calculateMobilityWorkload(w.mobility_exercises ?? []);

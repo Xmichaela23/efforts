@@ -1,13 +1,18 @@
 import React from 'react';
 import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
-import { loadRead } from '@/lib/load-read';
+import { formZone } from '@shared/fitness-fatigue';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export interface LoadBarData {
-  acwr: number | null;
-  /** The ACWR ratio rests on a chronic base too short to trust (Gabbett ~4wk; Garmin/COROS/Intervals
-   *  gate on an established base). Rendered "· provisional" so a bare high number isn't read as a real spike. */
+  /**
+   * TrainingPeaks' Performance Management Chart — THE load read (2026-09-04, Michael: one reference per metric).
+   * fitness = 42-day exponential average of daily workload (CTL), fatigue = 7-day (ATL), form = yesterday's
+   * fitness − yesterday's fatigue (TSB). Server-computed (`_shared/fitness-fatigue.ts`) over the whole history.
+   */
+  fitness_fatigue?: { fitness: number | null; fatigue: number | null; form: number | null } | null;
+  /** Kept on the payload for the coach; NOT rendered here since 2026-09-04 (ACWR is Gabbett's — neither Garmin nor TrainingPeaks). */
+  acwr?: number | null;
   acwr_provisional?: boolean;
   wtd_actual_load: number | null;
   wtd_planned_load?: number | null;
@@ -25,20 +30,18 @@ export interface LoadBarStatus {
 
 interface LoadBarProps {
   load: LoadBarData;
-  loadStatus: LoadBarStatus | null;
+  /** Kept for the callers' sake (State and Home pass it); NOT read since 2026-09-04 — the reconciled load word is off the bar. */
+  loadStatus?: LoadBarStatus | null;
   weekIntent?: string | null;
-  /** compact variant (calendar) — verdict + ACWR only, no composition strip. */
+  /** compact variant (calendar) — the three numbers only, no composition strip. */
   compact?: boolean;
-  /** ⛔ PROGRAMME-AWARE LOAD READ (2026-09-01). Whether a plan is active, and this week's planned vs
-   *  done session totals (from `wsv.week_execution_v1.counts`, the SAME source the planned-vs-actual
-   *  bar reads — no second notion of "missed"). Absent → treated as no plan. */
   hasActivePlan?: boolean;
   plannedThisWeek?: number;
   doneThisWeek?: number;
 }
 
-// ⛔ loadRead moved to src/lib/load-read.ts (2026-09-01) so the LOAD word and the glance HEADLINE
-// share ONE programme-aware decision and cannot drift. Imported below.
+// ⛔ THE LOAD WORD IS OFF THIS BAR (2026-09-04). `loadRead` (src/lib/load-read.ts) still gates the glance
+// headline on StateTab; the bar prints TrainingPeaks' three numbers and nothing the app decided.
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -62,22 +65,26 @@ function Dot() {
   return <span className="text-white/30 select-none">·</span>;
 }
 
+// TrainingPeaks' Form zones (Friel): the word beside the form number — fresh and optimal read plain, the
+// grey zone dim, transitional dim, high risk flagged.
+const FORM_ZONE_CLS: Record<string, string> = {
+  fresh: 'text-white/85', optimal: 'text-white/85', 'grey zone': 'text-white/55',
+  transitional: 'text-white/60', 'high risk': 'text-[#FF5A5F]',
+};
+
 // ── LoadBar ──────────────────────────────────────────────────────────────────
-// The load section, composition-forward (2026-07-09). Research verdict: a glance surface leads with
-// a VERDICT + an aggregate BREAKDOWN, never a per-day bar chart — every major app (TrainingPeaks,
-// WHOOP, Garmin, Intervals.icu) keeps per-day granularity one tap deeper. So: the reconciled verdict
-// leads, the weekly composition (which discipline carried the load — our differentiator) is the primary
-// visual, ACWR is demoted to a reference number, and per-day detail lives in the calendar drill-down.
+// The load section: TrainingPeaks' fitness · fatigue · form on the first line (2026-09-04), then the weekly
+// composition (which discipline carried the load — our differentiator, and the same "TSS by sport" split
+// TrainingPeaks draws on its dashboard) as the primary visual. Per-day detail lives in the calendar.
 
-export default function LoadBar({ load, loadStatus, weekIntent, compact, hasActivePlan, plannedThisWeek, doneThisWeek }: LoadBarProps) {
-  const isTaperOrPeak = weekIntent === 'taper' || weekIntent === 'peak';
-
-  // ⛔ THE READ IS PROGRAMME-AWARE (2026-09-01) — see `loadRead`. It reads the reconciled two-key
-  // status (D-260 sole authority) plus this week's planned-vs-done, and states a FACT or nothing —
-  // never an imperative. `week` (test week) counts as prescribed-light/hard like taper/peak.
-  const prescribedShaped = isTaperOrPeak || weekIntent === 'test';
-  const read = loadRead(loadStatus?.status, prescribedShaped, hasActivePlan === true, plannedThisWeek ?? 0, doneThisWeek ?? 0);
-  const showVerdict = read != null;
+export default function LoadBar({ load, compact }: LoadBarProps) {
+  // ⛔ THE LOAD READ IS TRAININGPEAKS' PMC, WHOLE (2026-09-04, Michael: "each metric has to have an absolute
+  // reference point", never a hodgepodge). Fitness · Fatigue · Form, and Friel's Form zone word beside form.
+  // WHAT THIS REPLACED: the reconciled load word ("balanced" — the app's own reconciler, D-260) and the
+  // ACWR ratio (Gabbett). Neither is Garmin's or TrainingPeaks' rule; both stay on the payload for the coach.
+  const ff = load.fitness_fatigue ?? null;
+  const zone = formZone(ff?.form);
+  const fmt1 = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? null : Math.round(v));
 
   // Weekly COMPOSITION — aggregate the 7-day load by discipline (from by_type; fall back to the
   // day's dominant_type). This is the primary load visual; the per-day rhythm lives in the calendar.
@@ -109,62 +116,27 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact, hasActi
     leftover -= 1;
   }
   const dominant = comp[0]?.type ?? null;
-  const [showAcwrInfo, setShowAcwrInfo] = React.useState(false);
 
   return (
     <div className="px-3 py-3">
-      {/* Verdict leads; ACWR is the demoted reference number (D-260: ACWR describes, never decides). */}
+      {/* Fitness · Fatigue · Form — TrainingPeaks' three numbers on one line, the Form zone word beside form. */}
       <div className="flex items-center justify-between">
-        {/* readout-label/readout-num (index.css): instrument typography off the plate's accent —
-            neutral white here, since LOAD sits on the multi-sport plate. */}
         <span className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase">LOAD</span>
-        <div className="flex items-center gap-2">
-          {read && (
-            <span className={`text-[15px] font-semibold tracking-tight ${read.cls}`}>{read.text}</span>
-          )}
-          {load.acwr != null && (
-            <>
-              {showVerdict && <Dot />}
-              {/* ACWR is a BARE reference number — no zone word ("optimal"/"pushing"). The zone label
-                  editorializes and competes with the engine's verdict (a 1.2 "optimal" next to a
-                  "build more" verdict reads as a contradiction). One voice: the verdict judges, ACWR
-                  is just the datapoint (D-260). */}
-              <span className="text-[11px] tabular-nums text-white/40 leading-none">ACWR {load.acwr.toFixed(1)}</span>
-              {load.acwr_provisional && (
-                <span className="text-[10px] text-white/30 leading-none">· provisional</span>
-              )}
-              <button
-                type="button"
-                aria-label="What is ACWR?"
-                onClick={() => setShowAcwrInfo((v) => !v)}
-                className="text-white/30 hover:text-white/60 text-[10px] leading-none bg-transparent border-none cursor-pointer p-0"
-              >
-                {showAcwrInfo ? '▾' : 'ⓘ'}
-              </button>
-            </>
-          )}
-        </div>
+        {ff && fmt1(ff.fitness) != null ? (
+          <div className="flex items-center gap-2 text-[11px] text-white/45 leading-none">
+            <span>fitness <span className="readout-num text-[13px] text-white/85">{fmt1(ff.fitness)}</span></span>
+            <Dot />
+            <span>fatigue <span className="readout-num text-[13px] text-white/85">{fmt1(ff.fatigue)}</span></span>
+            <Dot />
+            <span>
+              form <span className="readout-num text-[13px] text-white/85">{(ff.form ?? 0) > 0 ? '+' : ''}{fmt1(ff.form)}</span>
+              {zone && <span className={`ml-1 ${FORM_ZONE_CLS[zone] ?? 'text-white/55'}`}>{zone}</span>}
+            </span>
+          </div>
+        ) : (
+          <span className="text-[11px] text-white/40 leading-none">no sessions logged yet</span>
+        )}
       </div>
-
-      {showAcwrInfo && (
-        <div className="mt-2 space-y-1.5 text-[11px] leading-snug text-white/45">
-          {/* Copy: Michael 2026-09-02 (voice-checked). Load points on runs follow the athlete's rating first. */}
-          <p>
-            <span className="text-white/70">Workload</span> — hours times intensity, on a scale where one hour
-            at threshold is 100. On runs your rating sets the intensity when you gave one; otherwise heart rate
-            against your threshold, or power against FTP. The bar splits your rolling-7-day total by sport.
-          </p>
-          <p>
-            <span className="text-white/70">ACWR</span> — last 7 days of workload divided by your average week over
-            the last 4. 1.0 is a normal week for you. Around 1.3 or more is a bigger jump than you usually take.
-          </p>
-          <p>
-            <span className="text-white/70">The load read</span> (e.g. "balanced") combines all of it — your
-            workload<span className="italic"> and</span> ACWR together with how your body's handling it
-            (heart rate, effort, readiness) — so it can differ from the bare ratio on purpose.
-          </p>
-        </div>
-      )}
 
       {/* Composition strip — the primary load visual (full surface only). */}
       {!compact && comp.length > 0 && total > 0 && (
@@ -174,7 +146,7 @@ export default function LoadBar({ load, loadStatus, weekIntent, compact, hasActi
             {/* The composition below is the ROLLING last-7-days load (daily_load_7d). Show that same
                 window's total here — NOT wtd_actual_load (week-to-date), which is a different window and
                 mislabeled this number as WTD over a 7-day bar. `total` is the sum the bar itself represents. */}
-            <span className="readout-num text-[11px]">{Math.round(total)} pts · rolling 7d</span>
+            <span className="readout-num text-[11px]">{Math.round(total)} pts · last 7 days</span>
           </div>
           <div className="flex h-6 rounded-md overflow-hidden gap-[2px]">
             {comp.map((c) => {

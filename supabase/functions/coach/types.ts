@@ -532,7 +532,7 @@ export type CoachWeekContextResponseV1 = {
        *  measured body metrics and actual-vs-planned load. Carries its own `basis` receipt. Surfaces
        *  render it; none of them re-decides "are you overloaded". */
       overload?: import('../_shared/load-status-reconcile.ts').OverloadVerdict | null;
-      /** Banister fitness/fatigue/form — SIBLING signal, evaluation-only, drives no verdict (2026-07-09). */
+      /** TrainingPeaks' PMC — fitness (CTL) / fatigue (ATL) / form (TSB). THE load read on State (2026-09-04); computed over the whole history. */
       fitness_fatigue?: import('../_shared/fitness-fatigue.ts').FitnessFatigue | null;
       run_only_week_load: number | null;
       run_only_week_load_pct: number | null;

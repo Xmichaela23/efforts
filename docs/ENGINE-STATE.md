@@ -1,99 +1,63 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-03 evening — the Performance / Details / State clean-up day)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-04 evening — the "one absolute reference per State number" session)
 
-> ⚠️ Two live threads. THIS block is the State-screen / baselines / tests / Performance-screen thread. The
-> 2026-09-01 banner below is the standing-plan/book engine thread — still valid for that work. The
-> scheduler work of 2026-09-03 (no hard gates, effect notes, Your week reads the built plan) is D-464 and
-> belongs to the other session; do not re-open it.
+> ⚠️ Two live threads. THIS block is the State-screen thread. The 2026-09-01 banner below is the
+> standing-plan / book engine thread — still valid for that work; do not re-open the scheduler.
 
 ### THE JOB
-**Michael's threshold time trial from Baselines (p210) is still the one thing not seen on a device.** When
-it lands: (1) the Garmin push carries 14 timed steps (`materialize-plan` `buildAssessmentSteps`, the
-`assessment` tag BYPASSES `steps_preset`); (2) `compute-workout-analysis` run_test reads the 450–780 s lap
-and writes threshold pace = lap pace ÷ 0.88; (3) his Baselines threshold row is "my number" 9:30 and
-outranks it until he flips to auto and saves (re-price follows). Verified on a throwaway account server
-side (2300 m in 12:00 → 9:33/mi).
+**Get D-466 onto main, deployed, and seen on a device — it is on a branch and nowhere else.** Branch
+`claude/chat-archival-behavior-ee4r3z`, based on `291b3147` (main's tip at 21:24 PT). Michael's ruling, 2026-09-04:
+every State number copies ONE product's rule, whole. What it changed, in `docs/DECISIONS-LOG-3.md` D-466 and the
+rewritten `docs/STATE-NUMBERS.md` / `docs/STATE-SOURCES.md`:
+- **LOAD = TrainingPeaks' PMC** (fitness / fatigue / form + Friel's zone word), `LoadBar.tsx` reading
+  `load.fitness_fatigue` — which `_shared/fitness-fatigue.ts` has computed since July and nothing rendered
+  (starved, not absent). The coach now fetches the whole history for it (`coach/index.ts` ~2247). ACWR and
+  "balanced" are off the screen. Payload version 195 both sides.
+- **Trends = TrainingPeaks per-workout numbers**: the last steady session's EF / drift with its date, no arrow,
+  no 28-day average (`sport-summary.ts latestPoint`; `StatePerformanceSection.tsx` ~1090 and ~1150;
+  `StrengthReadCards.tsx SpineCard`). The Garmin 28/28 classifier still runs for the coach only.
+- **Strength workload = Friel's RPE estimate** (`workload.ts calculateStrengthWorkload(minutes, exercises, rpe)`,
+  planned mirror, 4 callers). Stored strength points are on the OLD scale until `backfill-strength-load` runs.
+- **BODY removed** (`StateBodyBlock.tsx` deleted). **FTP guardrails removed** (ceiling + 5% cap).
+- **Warm-up stand-in removed** from `compute-snapshot` (D-463 back-annotated).
 
-### SHIPPED 2026-09-03 (all PUSHED to main + DEPLOYED; Michael saw the web screens; see D-463, D-465)
-- **Performance screen, runs and rides:** header = Workload · Execution · Duration · Drift (one grid,
-  one baseline, one non-wrapping line each: "usual 49–57" · "efforts & time" · "of plan" · "3.9 under 5%").
-  Per-row percentages are GONE; the actual pace/watts is coloured against the planned band, Garmin's
-  way (green in target, blue below, red above). `EnduranceIntervalTable.tsx`, `AdherenceChips.tsx`.
-- **Drift, one definition, never withheld:** `_shared/hr-drift-halves.ts` (heart rate second half vs
-  first, by time, after the planned warm-up else 3 min) → both analysers write `workout_analysis.hr_drift_v1`;
-  session-detail prefers the analyser's pace-to-HR decoupling, else hr_drift_v1 (basis 'hr',
-  `whole_session` on interval days); State's spine points use the same precedence (`driftReadForPoint`
-  in compute-snapshot) → State and Performance agree (Sep 2 run −1.6%, Aug 31 −2.9%). The "HR drift N bpm
-  vs your typical" bullet and the bare "Typical vs similar workouts." line are gone.
-- **A session cut short is laid out for the part done:** compute-workout-summary emits `not_done` rows,
-  clamps the walk, drops the short-recording mismatch (only 2.5× LONGER is judged, and a planned total
-  under 10 min is not judged), keeps a power-targeted ride step at its planned window (45 s is 45 s),
-  stamps `alignment_mode:'aligned'`/`mismatch_reason:null`. Sept 1 Anaerobic Ride: 20 rows, 6 efforts
-  measured (175–201 W), 4 not done, execution 79, drift 1.1%. "Prescribed easy" no longer fires on a ride
-  whose plan carried power targets.
-- **One word for the number: Workload.** "run points", "run load", "load points", "Training Load",
-  "training stress" all renamed. State run card: third summary line removed; chart title "run workload"
-  with one label "85 this week · usual 124".
-- **Details:** IF tile gone (it was the rating translated); runs show Grade-Adj Pace. The tile read "—"
-  for three pushes because `useWorkoutData` returns EARLY on the server's `display_metrics` — the number
-  had to be added THERE (`workout-detail` ~1851, `gap_pace_s_per_km`) and State's pace pool now reads the
-  analyser's `avg_gap_s_per_mi` first. Moving time keeps seconds from now on (Strava import writes
-  `metrics.moving_time_seconds`; older rows stay whole-minute).
-- **Strength logger + plan card:** the book's word leads each exercise (ME/DE/SKILL/HYP, p218) with its
-  reps and reserve on both surfaces, read from the composer's `slot_intent`/`target_rir` (nothing
-  hand-written client-side); the rep target sits greyed in the reps box; Previous falls back to
-  `exercise_log` so it agrees with the suggested weight; "Assist / Added"; the set editor shows EDIT.
-- **Warm-up easy read** (D-463) live on State: "easy (incl. warm-ups) 12:52/mi at 143".
+### TO DEPLOY (every function touched PLUS every importer of a touched `_shared` file — the 17-function trap)
+`_shared/workload.ts` changed (strength), so its 26 importers all carry a stale copy until redeployed:
+`coach compute-snapshot calculate-workload compute-facts learn-fitness-profile materialize-plan backfill-strength-load
+generate-triathlon-plan recompute-athlete-memory backfill-planned-workload analyze-swim-workout ingest-activity
+generate-run-plan analyze-cycling-workout recompute-workout activate-plan weekly-workload workout-detail get-week
+analyze-strength-workout analyze-running-workout create-goal-and-materialize-plan validate-reschedule
+compute-workout-analysis sweep-user-history`. Then `backfill-strength-load` for the reference athlete. Then a client
+build (Netlify on push to main).
 
-### THE OTHER MAC SESSION'S WORK, SAME DAY (michaelambp-59; folded in here 2026-09-03 evening so one banner tells the truth)
-- **State restyle, PUSHED + DEPLOYED (coach #536 from `d2e8c072`; origin/main = what runs):** uppercase section
-  labels; sport rows two-column with the note under its value; BODY as three rows (effort / soreness / logged, as-of)
-  from `response_model.visible_signals` — `effort` gains `value_display` ("5.1 of 10") + detail "usual 4.7 · about as
-  hard as usual"; NEW signals `soreness` (value_display "2.0 of 7", detail normal/above/"N of 5 logged") and `logged`
-  ("8 sessions", as_of_date); provenance sentence removed; every second-level tap on State prints open; the closed run
-  row leads with aerobic efficiency + ↑/↓ from `runFitness.efficiency.verdict`; Home LoadBar gets planned/done via
-  `src/lib/week-exec-totals.ts`. `COACH_PAYLOAD_VERSION` 189, `COACH_CLIENT_MIN_PAYLOAD_VERSION` 189.
-- **Body is REPORTED-ONLY — Michael's ruling, LOCAL ONLY (`ad100a43`, not pushed, not deployed):** *"it's solely a
-  reported number, we shouldn't pull from anything else; this is the only place where we can see how overall training
-  is being handled."* The dead 'Aerobic fitness' visible signal is removed from `computeVisibleSignals`; the soreness
-  row prints its entry count ("2.0 of 7 · 1 entry", no comparison under 3 entries; "· 3 entries · normal for you" from
-  3). Load stays the headline; Body under it. Measured fitness lives on the Trends run card only. Ships with
-  `git push origin main` + `supabase functions deploy coach`.
-- **Sanity audit of the top of State (this session, fresh recompute from his rows): all matched.** 7-day load 308
-  (strength 158 / run 116 / bike 34 = 51/38/11); 28-day 1537 → usual week 384 → ACWR 0.80 (band 0.8–1.3 = balanced;
-  he sits on the edge); effort 5.1 over 8 rated vs 4.7 over 30; soreness = ONE entry (Sep 2 = 2). ⚠️ **The
-  planned-vs-actual bar is a SESSION-COUNT mix, not load** (`coach/index.ts` ~5613): green = planned rides ÷ planned
-  sessions. Michael has not yet said whether that bar should mean sessions or load — OPEN.
-- ⚠️ **Unverified on a device:** the aerobic efficiency top row + arrow on the closed run card; the open-card
-  flattening and bike "more" receipt; Home LoadBar's planned/done; the soreness entry-count wording.
-- ⚠️ **Still open from the design doc (`DESIGN_GUIDELINES.md`, "Direction is a fact, valence is a verdict"):** aerobic
-  efficiency and the bike row print a window, not a reference — "usual 1.412" is not built.
-- Copy debt he called out and did not yet approve a cut for: the two ⓘ explainers on the run card (efficiency factor,
-  drift) read as slop. Proposed cut: "Pace divided by heart rate. Higher means faster at the same heart rate." /
-  "Heart rate in the second half against the first, at the same pace. The book's line is 5%. TrainingPeaks calls it
-  decoupling."
+### VERIFIED / NOT
+- **Verified here (test output, not a device):** 75 deno tests green across workload, fitness-fatigue, FTP
+  estimator, sport-summary; the state-trend and athlete-snapshot suites green; `npm run build` clean. The
+  compute-snapshot / materialize-plan suites could not run (their deno.land / jsr imports are blocked from this
+  container) — those files were parse-checked only.
+- **NOT verified:** anything on a device. The LOAD line's three numbers have never been rendered anywhere.
+- **Hypothesis, not a finding:** that the CP fit + 0.97 is intervals.icu's eFTP (Q-298 #1).
+
+### STILL OPEN FROM 2026-09-03 (carried, not re-derived)
+- Michael's threshold time trial from Baselines (p210) is still the one thing not seen on a device: the Garmin push
+  carries 14 timed steps (`materialize-plan buildAssessmentSteps`); `compute-workout-analysis` run_test reads the
+  450–780 s lap and writes threshold pace = lap pace ÷ 0.88; his Baselines row "my number" 9:30 outranks it until
+  he flips to auto.
+- The planned-vs-actual bar is a SESSION-COUNT mix, not load (`coach/index.ts` ~5613) — Michael has not ruled.
+- Logger strength baseline test → p215 ramp; talk test (p211); test week at the start of every block; plyo
+  least-technical-first vs p89 (`docs/WORKORDER-plyo-screen-2026-09-02.md` §4).
 
 ### FACTS THAT SETTLED (do not re-derive)
-- `workouts.distance` is KILOMETRES. `useWorkoutData` returns early on `display_metrics` — put a new
-  number in `workout-detail`'s display_metrics or it never reaches Details.
-- Execution = (pace-or-power score on the work intervals, blended) ÷ 2 + (moving time ÷ planned) ÷ 2.
-- IF on a rated cardio session is the rating table (6 → 0.80), not pace vs threshold (D-462 rule).
-- His 13:21 easy line was RIGHT: median of five short hilly untagged runs (the lines are grade-adjusted).
-- `Number(null)` is 0 — every drift read checks `typeof`.
-
-### NEXT, IN ORDER
-1. See the threshold trial land (above), then flip the Baselines row to auto.
-2. Logger strength baseline test → p215 ramp (75%×6 → +10%×5 → +5% max reps) seeded from the predicted max.
-3. Talk test (p211) as a schedulable, Garmin-sendable test with a reader.
-4. Test week at the start of every block (talk test, run trial, FTP test) — "don't get hung up on the scheduler".
-5. Plyo least-technical-first vs p89 (open, `docs/WORKORDER-plyo-screen-2026-09-02.md` §4).
-6. Performance screen: delete a set / rename an exercise; the outlier guard.
+- `workouts.distance` is KILOMETRES. `useWorkoutData` returns early on `display_metrics`.
+- `Number(null)` is 0 — every RIR and drift read checks `typeof`.
+- Friel's TSS table is RPE × 10 per hour; it covers strength. The PMC is CTL 42 / ATL 7 / TSB = yesterday's.
+- TrainingPeaks, intervals.icu, TrainerRoad and joefriel pages are blocked from this container; search
+  snippets got the tables above, not the eFTP model.
 
 ### RULES THAT BIT
-- Three sessions share the repo: explicit paths, never `git add -A`; deploys bundle whatever is on disk.
-- Verify by data, not by screenshot: pull the row, replicate the read, THEN change code (the GAP tile).
-- Parked, never mentioned: the marathon builder / pace-cut step 4; the 5K plan; Wendler.
+- A session that archives loses its working tree; commit to the branch as you go.
+- Verify by data, not by screenshot; every number has a source or says "ours" in the same breath.
 
 ## 🧭 NEXT SESSION — START HERE (written 2026-09-01 — the night the engine was held to the book)
 

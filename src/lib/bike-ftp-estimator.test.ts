@@ -9,7 +9,6 @@ import {
   bestPerDuration,
   fitCriticalPower,
   compoundFtp,
-  rateLimitFtp,
   POWER_CURVE_DURATIONS,
   type SignalBResult,
 } from './bike-ftp-estimator.ts';
@@ -88,27 +87,13 @@ Deno.test('Signal B — abstains when the points do not describe one curve', () 
 const sigB = (value: number | null, confidence: SignalBResult['confidence'], n = 4): SignalBResult => ({ value, confidence, n, reason: 'b', cp: value, wPrime: 20000, r2: 0.97, points: [] });
 
 Deno.test('compound — the power-duration fit is the estimate, confidence carried through', () => {
-  const c = compoundFtp(sigB(200, 'medium'), null)!;
+  const c = compoundFtp(sigB(200, 'medium'))!;
   assertEquals(c.value, 200);
   assertEquals(c.confidence, 'medium');
   assert(/power-duration fit/.test(c.source));
 });
 
 Deno.test('compound — the fit abstains ⇒ null, never a fabricated number', () => {
-  assertEquals(compoundFtp(sigB(null, null, 1), 220), null);
+  assertEquals(compoundFtp(sigB(null, null, 1)), null);
 });
 
-Deno.test('compound — hard ceiling: never above the best 20-min actually recorded', () => {
-  const c = compoundFtp(sigB(218, 'high'), 190)!;
-  assertEquals(c.value, 190);
-  assertEquals(c.ceiling_20min, 190);
-  assert(/hard ceiling/.test(c.source));
-});
-
-Deno.test('rateLimit — at most 5% per learn in either direction, untouched with no prior', () => {
-  const next = compoundFtp(sigB(200, 'high'), null)!;
-  assertEquals(rateLimitFtp(168, next).value, 176);
-  assertEquals(rateLimitFtp(240, next).value, 228);
-  assertEquals(rateLimitFtp(198, next).value, 200);
-  assertEquals(rateLimitFtp(null, next).value, 200);
-});

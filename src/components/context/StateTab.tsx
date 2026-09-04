@@ -34,7 +34,6 @@ import StateSwimNudge from './StateSwimNudge';
 import StateRaceBlock from './StateRaceBlock';
 import StateWeekExecution from './StateWeekExecution';
 import StateReadinessRow from './StateReadinessRow';
-import StateBodyBlock from './StateBodyBlock';
 import { weekExecTotals as weekExecTotalsOf } from '@/lib/week-exec-totals';
 import StateRaceDayBar from './StateRaceDayBar';
 import StateLastRaceCard from './StateLastRaceCard';
@@ -830,12 +829,11 @@ export default function StateTab({
 
         {showAmberRecordBar && <StateRaceDayBar />}
 
-        {/* BODY */}
-        <StateBodyBlock
-          visibleSignals={visibleSignals}
-          readinessRpeDriver={readinessRpeDriver}
-          onOpenAdjust={() => setStateLens('adjust')}
-        />
+        {/* ⛔ BODY (effort · soreness · logged) IS OFF THIS SCREEN (2026-09-04, Michael: every State number copies
+            Garmin's or TrainingPeaks' rule, whole). Effort was Foster's session RPE under OUR 7-vs-28-day
+            comparison; soreness was Hooper's scale under OUR z-score. Neither product prints either on a
+            fitness screen. The server rows (`endurance.rpe`, `resolveCurrentSoreness`) still feed the coach;
+            StateBodyBlock.tsx is deleted with its only mount. */}
 
         {/* READINESS — athlete-reported energy/soreness/sleep (Q-049 Phase 1, D-144).
             Raw + distinct sliders; shown ONLY when a recent check-in exists (no-data
