@@ -49,7 +49,7 @@ import { computeSafetyFloor, resolvePlanPrimary, computePrimaryAdherence, resolv
 import { computeReadinessState } from '../_shared/response-model/readiness-state.ts';
 import { computeWtdLoadSummary } from '../_shared/adherence-plan.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
-import { rollupFitnessDirection, rollupFitness, rollupHrResponse, capRollupTone, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey, decouplingLabel, decouplingBandDisplay, bikeRideIntensityAerobic, bikeEfficiencyDisplay, composeWeekAccent, overReachCandidate, rirCandidate, bannerCandidate, tradeCandidate, upkeepCandidate, resolveAerobicCarriers, leverCandidate, anchorDescentCandidate, type WeekAccent } from '../_shared/state-trend/index.ts';
+import { rollupFitnessDirection, rollupFitness, rollupHrResponse, capRollupTone, type FitnessDirection, resolveStrengthCapacity, canonicalizeLiftKey, decouplingLabel, decouplingBandDisplay, bikeEfficiencyDisplay, composeWeekAccent, overReachCandidate, rirCandidate, bannerCandidate, tradeCandidate, upkeepCandidate, resolveAerobicCarriers, leverCandidate, anchorDescentCandidate, type WeekAccent } from '../_shared/state-trend/index.ts';
 import {
   computeWeeklyResponse,
   type WeeklyResponseState,
@@ -1736,13 +1736,9 @@ Deno.serve(async (req) => {
         const hra = wa?.granular_analysis?.heart_rate_analysis || {};
         const driftBpm = safeNum(hra?.hr_drift_bpm);
         const earlyAvg = safeNum(hra?.early_avg_hr);
-        // Intensity gate (D-275-bike / Q-117): a ride RIDDEN at threshold contaminates within-ride HR-drift
-        // via cardiac lag, so a hard-ridden "endurance" ride mustn't inflate the steady-type durability avg.
-        // SAME threshold the spine HR-at-power read uses (bikeRideIntensityAerobic) → both bike engines agree
-        // on "too hard to count as aerobic." Power-targeted types already show execution %, not drift, below.
-        const bf = wa?.bike_fitness_v1 || {};
-        const riddenAerobic = bikeRideIntensityAerobic(safeNum(bf.w20), safeNum(bf.band_hi));
-        if (driftBpm != null && earlyAvg != null && earlyAvg > 0 && riddenAerobic) {
+        // 2026-09-04: the 90%-FTP "ridden hard" gate is gone (a zone boundary used as a filter — D-372's
+        // rule); every ride with a drift read contributes. Drift reports; it does not decide which rides count.
+        if (driftBpm != null && earlyAvg != null && earlyAvg > 0) {
           rideAgg[rt].driftPct.push((driftBpm / earlyAvg) * 100);
         }
         const ifv = safeNum(facts.intensity_factor);

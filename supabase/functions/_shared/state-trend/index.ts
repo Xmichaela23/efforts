@@ -30,7 +30,6 @@ export {
   computeEfficiencyTrend,
   isProvisionalTrend,
   bikeEfficiencyRideEligible,
-  bikeRideIntensityAerobic,
   bikeEfficiencyDisplay,
   POWER_BINS,
   type BikeEffortRide,

@@ -188,8 +188,8 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
   // a ride card says which rides the trend is built from and how many hard rides it leaves out — the caveat is
   // printed, never a blank space (TrainingPeaks explains the same exclusion in its help centre)
   const basedOn = recentPts.length
-    ? `average of the last 4 weeks · ${recentPts.length} ${isRide ? 'steady ' : ''}${recentPts.length === 1 ? noun : `${noun}s`}${recentWarmups > 0 ? ` · ${recentWarmups} ${recentWarmups === 1 ? 'warm-up' : 'warm-ups'}` : ''}${leftOut > 0 ? ` · ${leftOut} hard ${leftOut === 1 ? 'ride' : 'rides'} not in the trend` : ''}`
-    : (leftOut > 0 ? `no steady rides yet · ${leftOut} hard ${leftOut === 1 ? 'ride' : 'rides'} not in the trend` : null);
+    ? `average of the last 4 weeks · ${recentPts.length} ${isRide ? 'steady ' : ''}${recentPts.length === 1 ? noun : `${noun}s`}${recentWarmups > 0 ? ` · ${recentWarmups} ${recentWarmups === 1 ? 'warm-up' : 'warm-ups'}` : ''}${leftOut > 0 ? ` · ${leftOut} ${leftOut === 1 ? 'ride' : 'rides'} under 10 min in the aerobic band, not in the trend` : ''}`
+    : (leftOut > 0 ? `no rides with 10 min in the aerobic band yet · ${leftOut} not in the trend` : null);
   /**
    * ⛔ DRIFT IS A TREND HERE, NOT THE LATEST SESSION (2026-09-04, Michael: "replace the latest session line
    * with a drift trend"). This card used to print one session's drift with its temperature and climb and

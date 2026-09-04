@@ -18,7 +18,7 @@
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { assembleStateTrends } from './assemble.ts';
-import { bikeEfficiencyRideEligible, bikeRideIntensityAerobic, bikeEfficiencyDisplay } from './bike-fitness.ts';
+import { bikeEfficiencyRideEligible, bikeEfficiencyDisplay } from './bike-fitness.ts';
 
 // ── the BIKE "sessions went" row now renders the SPINE efficiency verdict via this shared vocab (D-275-bike
 //    follow-on) — so it matches the PERFORMANCE bike Efficiency row instead of a rival HR-drift verdict. ──
@@ -31,15 +31,15 @@ Deno.test('bikeEfficiencyDisplay: spine efficiency verdict → word/tone (matche
 });
 
 // ── the SHARED intensity gate (both bike engines: spine HR-at-power + coach HR-drift use this ONE line) ──
-Deno.test('bikeRideIntensityAerobic: best-20 below Z4 floor (90% FTP) = aerobic; threshold effort = not', () => {
-  assert(bikeRideIntensityAerobic(131, 132));   // 131W vs FTP 176 → 74%, easy → aerobic
-  assert(bikeRideIntensityAerobic(140, 132));   // 80% → still aerobic
-  assert(!bikeRideIntensityAerobic(165, 132));  // 94% FTP = threshold effort → NOT (Michael's May-30 ride)
-  assert(bikeRideIntensityAerobic(null, 132));  // can't assess → don't over-drop
-  assert(bikeRideIntensityAerobic(165, null));  // no band → can't assess
+Deno.test('bikeEfficiencyRideEligible: Garmin\'s rule only — ≥10 min in the aerobic band, any type, any intensity', () => {
+  assert(bikeEfficiencyRideEligible('endurance', 900, 130, 132));
+  assert(bikeEfficiencyRideEligible('threshold', 1200, 155, 132));   // type no longer gates
+  assert(bikeEfficiencyRideEligible('climbing', 900, 180, 132));     // intensity no longer gates
+  assert(bikeEfficiencyRideEligible('endurance', 900, 165, 132));    // the 94%-FTP "endurance" ride counts (2026-09-03)
+  assert(bikeEfficiencyRideEligible(null, 900, 120, 132));           // no type on file still counts
+  assert(!bikeEfficiencyRideEligible('endurance', 200, 120, 132));   // under 10 min in band → out
+  assert(!bikeEfficiencyRideEligible('endurance', null, 120, 132));
 });
-
-const AS_OF = '2026-07-04';
 
 function assemble(bikeRows: any[]) {
   return assembleStateTrends({
@@ -53,20 +53,6 @@ function assemble(bikeRows: any[]) {
     cadenceCounts: { bike: 5 }, // low cadence → minSessions floor 3, so 4–5 rides render
   } as any);
 }
-
-// ── the eligibility gate, unit-level ── (bandHi 132 → FTP 176 → Z4 floor ~158W)
-Deno.test('bikeEfficiencyRideEligible: aerobic type + ≥600s dwell + no threshold effort', () => {
-  assert(bikeEfficiencyRideEligible('endurance', 900, 130, 132));      // aerobic, long, easy → ✓
-  assert(bikeEfficiencyRideEligible('endurance_long', 1800, 140, 132));
-  assert(bikeEfficiencyRideEligible('recovery', 700, 100, 132));
-  assert(bikeEfficiencyRideEligible('endurance', 900, null, 132));     // w20 absent → can't assess intensity, keep
-  assert(!bikeEfficiencyRideEligible('climbing', 900, 180, 132));      // hard type
-  assert(!bikeEfficiencyRideEligible('threshold', 1200, 155, 132));    // hard type
-  assert(!bikeEfficiencyRideEligible('sweet_spot', 1300, 160, 132));   // hard type
-  assert(!bikeEfficiencyRideEligible('endurance', 200, 120, 132));     // aerobic but too little dwell
-  assert(!bikeEfficiencyRideEligible('endurance', 900, 165, 132));     // labeled endurance but RIDDEN hard (165 ≥ 158) → contaminated
-  assert(!bikeEfficiencyRideEligible(null, 900, 120, 132));
-});
 
 // ── D-237 preserved: corrupt-HR excluded from efficiency (now on AEROBIC rides, the real substrate) ──
 function enduranceRides(corruptR3: boolean) {
@@ -89,7 +75,7 @@ Deno.test('without the corrupt flag, efficiency keeps all 5 aerobic rides', () =
 
 // ══ THE FIX — the contamination regression: hard rides (climbing/threshold) + short-dwell rides no longer
 //    pollute the aerobic efficiency trend. Before: all counted → a climbing block read as "improving". ══
-Deno.test('efficiency substrate excludes climbing/threshold + short-dwell; only clean aerobic rides count', () => {
+Deno.test('efficiency substrate excludes short-dwell only; type and intensity no longer gate', () => {
   const mixed = [
     { date: '2026-05-20', classified_type: 'endurance',      w20: 130, hr_at_band: 135, in_band_s: 900,  band_hi: 132, band_source: 'coggan_ftp' }, // ✓
     { date: '2026-05-28', classified_type: 'climbing',       w20: 185, hr_at_band: 153, in_band_s: 432,  band_hi: 132, band_source: 'coggan_ftp' }, // ✗ hard type
@@ -99,12 +85,12 @@ Deno.test('efficiency substrate excludes climbing/threshold + short-dwell; only 
     { date: '2026-06-28', classified_type: 'endurance',      w20: 133, hr_at_band: 134, in_band_s: 900,  band_hi: 132, band_source: 'coggan_ftp' }, // ✓
   ];
   const r = assemble(mixed).bikeFitness;
-  assertEquals(r.efficiency.sampleCount, 3);   // only the 3 clean aerobic rides — climbing/threshold/short dropped
+  assertEquals(r.efficiency.sampleCount, 5);   // only the 168 s ride is out; climbing and threshold now count (Garmin's rule)
 });
 
 // ══ Michael's exact contaminant: a ride LABELED endurance but RIDDEN hard (165W ≈ 94% FTP) — its
 //    cardiac-lag-inflated in-band HR faked a -4.7% "improving". The intensity gate must drop it. ══
-Deno.test('a hard-ridden "endurance" ride (best-20 at threshold) is excluded from efficiency', () => {
+Deno.test('a hard-ridden "endurance" ride (best-20 at threshold) COUNTS — the 90%-FTP gate is gone', () => {
   const rides = [
     { date: '2026-05-23', classified_type: 'endurance',      w20: 131, hr_at_band: 132, in_band_s: 1329, band_hi: 132, band_source: 'coggan_ftp' }, // ✓ easy
     { date: '2026-05-30', classified_type: 'endurance',      w20: 165, hr_at_band: 145, in_band_s: 1278, band_hi: 132, band_source: 'coggan_ftp' }, // ✗ 165 ≥ 158 (threshold effort)
@@ -113,5 +99,5 @@ Deno.test('a hard-ridden "endurance" ride (best-20 at threshold) is excluded fro
     { date: '2026-07-03', classified_type: 'endurance',      w20: 114, hr_at_band: 131, in_band_s: 991,  band_hi: 132, band_source: 'coggan_ftp' }, // ✓
   ];
   const r = assemble(rides).bikeFitness;
-  assertEquals(r.efficiency.sampleCount, 4);   // the 165W "endurance" ride dropped → no fake improvement from its 145bpm
+  assertEquals(r.efficiency.sampleCount, 5);   // 2026-09-04: zone boundaries are not filters; every ride with 10 min in band counts
 });

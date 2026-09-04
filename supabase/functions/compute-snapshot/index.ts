@@ -1487,8 +1487,10 @@ serve(async (req: Request) => {
             const powerDec = sport === "ride" ? (r?.computed?.analysis?.efficiency?.aerobic_decoupling_pct ?? null) : null;
             // does this ride feed the efficiency TREND — the analyser's stamp, else the same predicate on the same fields
             const bfv = r?.workout_analysis?.bike_fitness_v1 ?? null;
+            // Evaluated LIVE from the stored fields, never read off the analyser's stamp: the rule changed on
+            // 2026-09-04 (Garmin's 10-minute inclusion only) and a stamp written under the old gates would keep
+            // rides out until every one was recomputed. Same predicate, same fields, one answer.
             const countsTowardTrend: boolean | undefined = sport !== "ride" ? undefined
-              : typeof bfv?.counts_toward_trend === "boolean" ? bfv.counts_toward_trend
               : bikeEfficiencyRideEligible(r?.workout_analysis?.classified_type ?? null, bfv?.in_band_s ?? null, bfv?.w20 ?? null, bfv?.band_hi ?? null);
             // 2026-09-03 (Michael, ruled with the field: Garmin never waits for an easy run): runs feed ONE aerobic
             // series. An easy day contributes the whole run; a hard day contributes its WARM-UP read (D-463) and

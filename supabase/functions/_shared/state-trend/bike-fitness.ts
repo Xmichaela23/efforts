@@ -31,32 +31,27 @@ export const POWER_BINS: Record<string, Set<string>> = {
 // a May CLIMBING block, not declining fitness; aerobic-only, HR-at-band is flat/slightly-up, NOT -5.5%
 // improving). Gate the efficiency substrate to steady-aerobic types + a minimum in-band dwell so a
 // few-second in-band sample can't count. Q-117 status #2 closed. Mirrors run's isSteadyAerobic.
-export const BIKE_EFFICIENCY_AEROBIC_TYPES = new Set(['endurance', 'endurance_long', 'recovery']);
-export const MIN_EFFICIENCY_IN_BAND_S = 600; // OURS — ≥10 min of aerobic-band dwell for a per-ride HR-at-power read to mean anything; no field source. Ledger: docs/STATE-SOURCES.md
-// A ride labeled "endurance" but RIDDEN hard still contaminates the HR-at-power read: a threshold-level
-// segment jacks in-band HR via cardiac lag (verified on Michael's data — a 165W/94%-FTP "endurance" ride
-// read 145bpm and single-handedly faked a -4.7% "improving"). So also require NO threshold-or-harder
-// effort: best-20-min power below the Coggan Z4 floor (~90% FTP). FTP is derived from the aerobic band
-// ceiling (band_hi = 75% FTP → FTP = band_hi / 0.75), so the gate is per-ride and FTP-change-safe.
-const THRESHOLD_FTP_FRACTION = 0.90; // Coggan Z4 (threshold) floor — at/above = a hard effort, not steady aerobic
-/** Was the ride ridden as a steady aerobic effort (no threshold-level work)? SHARED by both bike engines
- *  — the spine HR-at-power efficiency AND the coach's within-ride HR-drift row — so "how hard is too hard
- *  to count as an aerobic read" has ONE definition. Best-20-min < 90% FTP (FTP = band_hi / 0.75). Absent
- *  w20/band_hi → true (can't assess intensity; don't over-drop). */
-export function bikeRideIntensityAerobic(w20?: number | null, bandHi?: number | null): boolean {
-  if (!(Number(w20) > 0) || !(Number(bandHi) > 0)) return true;
-  const ftp = Number(bandHi) / 0.75;
-  return Number(w20) < ftp * THRESHOLD_FTP_FRACTION;
-}
+// ⛔ WHICH RIDES FEED THE EFFICIENCY TREND — GARMIN'S RULE, AND ONLY GARMIN'S (2026-09-04, Michael: "not a
+// single thing on this page should be invented"; "here we go again" when the last gate surfaced).
+// Garmin updates its fitness estimate from any ride with at least 10 minutes at aerobic intensity
+// (≥70% max HR). That is the inclusion rule here: ≥10 min in the aerobic band, and the ride counts.
+//
+// Two gates that used to sit beside it are gone, both borrowed thresholds used as filters:
+//  - a TYPE gate (endurance / endurance_long / recovery only) — on the reference athlete it dropped 7 of
+//    13 rides because the classifier calls stop-and-go city rides tempo / threshold / climbing;
+//  - an INTENSITY gate (best-20-min ≥ 90% FTP = "hard", out) — Coggan's 90% is where zone 4 STARTS,
+//    a zone boundary, not a rule any product uses to throw rides out of an efficiency trend. It dropped
+//    the athlete's best ride (0.98) and left the arrow resting on one ride.
+// Net: 3 of 13 rides counted; now 11 of 13. Ledger: docs/STATE-SOURCES.md.
+export const MIN_EFFICIENCY_IN_BAND_S = 600; // FIELD — Garmin: ≥10 min at aerobic intensity before a ride informs the estimate
+
 export function bikeEfficiencyRideEligible(
-  classifiedType: string | null | undefined,
+  _classifiedType: string | null | undefined,
   inBandS: number | null | undefined,
-  w20?: number | null,
-  bandHi?: number | null,
+  _w20?: number | null,
+  _bandHi?: number | null,
 ): boolean {
-  if (!classifiedType || !BIKE_EFFICIENCY_AEROBIC_TYPES.has(String(classifiedType))) return false;
-  if (!(Number(inBandS) >= MIN_EFFICIENCY_IN_BAND_S)) return false;
-  return bikeRideIntensityAerobic(w20, bandHi);
+  return Number(inBandS) >= MIN_EFFICIENCY_IN_BAND_S;
 }
 
 const PROVISIONAL_MAX_N = 4; // n ∈ {minSessions..4} → provisional (near the floor)
