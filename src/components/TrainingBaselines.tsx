@@ -1885,7 +1885,7 @@ return (
                               const status = mine
                                 ? 'your number. Your rides don\'t change it.'
                                 : learnedFtp
-                                  ? 'auto. From your rides — your power curve and your heart rate at threshold. Sets your power zones and the targets in your plan.'
+                                  ? 'auto. From your rides — your power curve and your heart rate at threshold.'
                                   : manualFtp
                                     ? 'auto. Your typed number, until your rides measure one.'
                                     : 'auto. Nothing on file yet.';
