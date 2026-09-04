@@ -12,6 +12,11 @@
  * the one every other surface uses. And the two are DIFFERENT QUANTITIES on different scales, which is
  * why a cross-sport mix-up was not merely the wrong session but the wrong axis.
  *
+ * ⛔ THE CLIMB IS NOT HERE. `workouts.elevation_gain` is the one column every sport writes and the one
+ * the session Details screen shows; `compute-facts` copies it into `run_facts.elevation_gain_m` for RUNS
+ * ONLY. This module used to read that copy, which gave a run its climb and a ride nothing. The spine
+ * reads the workout row directly now (`elevGainM` in index.ts) — one source, both sports (2026-09-03).
+ *
  * ⚠️ ONE FACTS OBJECT PER ROW. A run row carries `run_facts` and a null `ride_facts`; a ride the reverse.
  * The read below picks the sport's own object — there is no cross-sport fallback any more, because a
  * per-workout key leaves nothing for one to fall back to.
@@ -31,8 +36,6 @@ export interface EnduranceFactRead {
   drift: number | null;
   /** Average heart rate, bpm. */
   hr: number | null;
-  /** Climb in metres, rounded. */
-  elevM: number | null;
 }
 
 /** One workout's endurance facts, or null when the row carries neither sport's facts. */
@@ -44,13 +47,11 @@ export function readEnduranceFact(row: EnduranceFactRow | null | undefined): End
   const eff = Number(isRun ? rf!.efficiency_index : bf!.efficiency_factor);
   const drift = Number(isRun ? rf!.hr_drift_pct : bf!.hr_drift_pct);
   const hr = Number(isRun ? rf!.hr_avg : bf!.avg_hr);
-  const e = Number(isRun ? rf!.elevation_gain_m : bf!.elevation_gain_m);
   return {
     efficiency: Number.isFinite(eff) && eff > 0 ? eff : null,
     // ⚠️ Finiteness alone — a `> 0` test would silently drop the sessions where heart rate fell.
     drift: Number.isFinite(drift) ? drift : null,
     hr: Number.isFinite(hr) && hr > 0 ? hr : null,
-    elevM: Number.isFinite(e) && e > 0 ? Math.round(e) : null,
   };
 }
 

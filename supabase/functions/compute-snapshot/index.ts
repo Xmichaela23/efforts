@@ -91,6 +91,20 @@ import { deriveSnapshotWatermark } from "./watermark.ts";
 import { resolveCurrentRunThresholdPace } from "../../../src/lib/resolve-current-run-pace.ts";
 
 /**
+ * The session's climb in metres, off the workout row — `workouts.elevation_gain`, the one column every
+ * sport writes and the number the session Details screen shows. ⛔ NOT `run_facts.elevation_gain_m`:
+ * that is a COPY, `compute-facts` writes it for runs only and never for rides, so reading the copy gave
+ * a run its climb and a ride nothing — and before the facts index was keyed by workout id, it gave a
+ * ride the RUN's climb. (2026-09-03, Michael: "everything should have a single source of truth… why do
+ * we need a second copy?") The day's temperature beside it on the same point was already read straight
+ * off this row; the climb now reads the same way.
+ */
+function elevGainM(r: any): number | null {
+  const e = Number(r?.elevation_gain);
+  return Number.isFinite(e) && e > 0 ? Math.round(e) : null;
+}
+
+/**
  * ONE drift read for every State point (2026-09-03) — the same precedence session-detail uses for the
  * Performance screen: the analyser's pace-to-heart-rate decoupling when it computed one, else
  * `hr_drift_v1` (heart rate second half vs first, by time, after the warm-up), else the facts' whole-session
@@ -1345,7 +1359,7 @@ serve(async (req: Request) => {
          * 62 ft of climb under a 958 ft ride. The read itself (as stored, never re-derived) lives in
          * `./endurance-facts.ts` with the fixture that pins a run and a ride on one date.
          */
-        const endFactByWorkout = new Map<string, { efficiency: number | null; drift: number | null; hr: number | null; elevM: number | null }>();
+        const endFactByWorkout = new Map<string, { efficiency: number | null; drift: number | null; hr: number | null }>();
         const keyDates = new Set<string>();
         try {
           const { data: factRows } = await supabase
@@ -1428,7 +1442,14 @@ serve(async (req: Request) => {
         let enduranceSpine: EnduranceSpineSeries[] = [];
         try {
           const { data: spineRows } = await supabase
-            .from("workouts").select("id,date,type,workout_analysis,computed,weather_data")
+            // ⛔ `elevation_gain` COMES OFF THE WORKOUT, NOT OUT OF A FACTS COPY (2026-09-03, Michael:
+            // "everything should have a single source of truth… why do we need a second copy?").
+            // `workouts.elevation_gain` is the one column, present for every sport, and it is what the
+            // session Details screen shows. `compute-facts` copies it into `run_facts.elevation_gain_m`
+            // and does NOT copy it for rides — so reading the copy gave runs a climb and rides nothing,
+            // and before the workout-id key it gave a ride the RUN's climb. The temperature two lines
+            // below was already read straight off this row; the climb now reads the same way.
+            .from("workouts").select("id,date,type,workout_analysis,computed,weather_data,elevation_gain")
             .eq("user_id", userId).in("type", ["run", "running", "ride", "bike", "cycling"])
             .eq("workout_status", "completed")
             .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", asOf);
@@ -1511,7 +1532,7 @@ serve(async (req: Request) => {
               keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
               // conditions, shown never corrected: the day's temperature and the climb
               tempF: (() => { const t = Number(r?.weather_data?.temperature); return Number.isFinite(t) ? Math.round(t) : null; })(),
-              elevationGainM: f.elevM ?? null,
+              elevationGainM: elevGainM(r),
               ...(countsTowardTrend === undefined ? {} : { countsTowardTrend }),
             });
             // 2026-09-03 (Michael, ruled after the "7 min long" screenshot): a warm-up read of at least six
@@ -1530,7 +1551,7 @@ serve(async (req: Request) => {
                   ...driftReadForPoint(hrs, r?.workout_analysis, f.drift, steady),
                   keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
                   tempF: (() => { const t = Number(r?.weather_data?.temperature); return Number.isFinite(t) ? Math.round(t) : null; })(),
-                  elevationGainM: f.elevM ?? null,
+                  elevationGainM: elevGainM(r),
                   fromWarmup: true,
                 });
               }
