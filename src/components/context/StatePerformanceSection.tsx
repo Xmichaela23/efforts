@@ -1174,6 +1174,18 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         ?.find((s) => s?.sport === 'ride');
       const efVals = (rideSpine?.points ?? []).map((p) => p?.efficiency).filter((v): v is number => v != null);
       const efHead = recentMedian(efVals, 5);
+      // ⛔ FTP LEADS, EFFICIENCY FACTOR FOLLOWS (2026-09-03, checked against the field, not recalled).
+      // The rider's first number is FTP and their second is watts per kilo; efficiency factor barely
+      // appears in mainstream cycling apps — it is a coach's metric (TrainerRoad's W/kg material,
+      // Roadman's FTP benchmarks). The first cut of this row put efficiency factor on top to MIRROR
+      // THE RUN ROW, which is our internal consistency, not the rider's priority. ⚠️ Watts per kilo is
+      // not offered: no athlete body weight is stored anywhere in the app.
+      // ⚠️ "estimated" is not decoration — it is the line that says the number is worth testing, and
+      // the book gives two tests we can send (20 min × 0.95, or the ramp; pp.212–213).
+      const ftp = bikeAnchorValue != null ? Math.round(bikeAnchorValue) : fallbackFtp;
+      const ftpBasis = bf?.efficiency?.basis === 'personal' ? 'tested'
+        : bf?.efficiency?.basis === 'coggan_ftp' ? 'estimated' : null;
+      if (ftp != null) rows.push({ name: 'FTP', value: `${ftp} W`, note: ftpBasis ?? undefined });
       if (efHead != null) {
         // ⚠️ THE ARROW ONLY, NEVER THE PERCENT. The direction is the server's aerobic verdict — same
         // power, lower heart rate, which is the same physiology a rising watts-per-beat states. Its
@@ -1190,13 +1202,6 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
           arrowCls: dir === 'up' ? NUMERIC.improving.cls : NUMERIC.sliding.cls,
         });
       }
-      // ⛔ THE THRESHOLD NUMBER, WITH ITS PROVENANCE. Estimated vs tested is the difference between a
-      // number read off hard rides and one the athlete tested for, and the book gives two tests for it
-      // (20 min × 0.95, or the ramp) — so the word is a fact the rider can act on, not decoration.
-      const ftp = bikeAnchorValue != null ? Math.round(bikeAnchorValue) : fallbackFtp;
-      const ftpBasis = bf?.efficiency?.basis === 'personal' ? 'tested'
-        : bf?.efficiency?.basis === 'coggan_ftp' ? 'estimated' : null;
-      if (ftp != null) rows.push({ name: 'FTP', value: `${ftp} W`, note: ftpBasis ?? undefined });
       if (rows.length) return rows;
       // Nothing measurable yet — the ride count, never a fabricated number.
       const n = Number(bf?.efficiency?.sampleCount ?? 0) || 0;
