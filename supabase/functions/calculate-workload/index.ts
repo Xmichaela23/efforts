@@ -298,8 +298,11 @@ serve(async (req) => {
           // FTP resolved via shared precedence helper: learned (≥medium confidence) wins,
           // else manual, else learned-low. Permissive — workload computation benefits
           // from any non-null FTP. See src/lib/resolve-current-ftp.ts for full semantics.
+          // `lthrLearnedObj`, not `learned` — that binding is block-scoped to the learned_fitness block above.
+          // Referencing it here threw at runtime, the enclosing `catch {}` swallowed it, and userFtp stayed
+          // null: every ride fell to the heart-rate rung (found 2026-09-04, user_ftp: null in the response).
           const ftpResolved = resolveCurrentFtp({
-            learned_fitness: learned,
+            learned_fitness: lthrLearnedObj,
             performance_numbers: perfNumbers,
           });
           if (ftpResolved.value) {
