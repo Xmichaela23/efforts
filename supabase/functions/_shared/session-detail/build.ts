@@ -1765,10 +1765,15 @@ export function buildAnalysisDetailRows(
       const dec = Number((comp?.analysis?.efficiency as any)?.aerobic_decoupling_pct);
       if (isAerobicRide && Number.isFinite(dec)) {
         const d = Math.round(dec * 10) / 10;
-        const desc = d < 5 ? 'Held steady with the power'
-          : d <= 10 ? 'Moderate drift over the ride'
-          : 'Notable drift late in the ride';
-        rows.push({ label: 'Heart rate', value: `${desc} (drift ${d}%)` });
+        // ⛔ NAMED FOR WHAT IT MEASURES (2026-09-03, WORKORDER-bike-state-audit §2). This number is POWER
+        // AGAINST HEART RATE — the first-half power-to-heart-rate ratio against the second — and a positive
+        // value means that ratio fell. "Moderate drift over the ride" read as heart rate climbing; on the Sep 3
+        // ride heart rate FELL (139 → 129) and power fell faster (155 → 136 W), so the ratio still fell 7.4%.
+        // The sentence now says which ratio moved and which way; the bare number stays as the receipt.
+        const desc = d < 5 ? 'Power to heart rate held steady'
+          : d <= 10 ? 'Power to heart rate fell over the ride'
+          : 'Power to heart rate fell hard over the ride';
+        rows.push({ label: 'Heart rate', value: `${desc} (${d}%)` });
       }
     }
   } catch { /* */ }

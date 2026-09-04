@@ -43,6 +43,7 @@ import { RATE_ANCHOR } from "../_shared/standing-plan/frames.ts";
 // `weekByDate` and already imports `standing-plan/`, so resolving here costs one function.
 import { isTestWeek } from "../_shared/standing-plan/working-number.ts";
 import { resolveAcwrAsOf } from "./acwr-as-of.ts";
+import { indexEnduranceFactsByWorkout } from "./endurance-facts.ts";
 import { fetchAthleteTimezone, resolveAthleteTimezone } from "../_shared/athlete-timezone.ts";
 import {
   assembleStateTrends,
@@ -52,6 +53,7 @@ import {
   runSessionGroup,
   type EnduranceSpineSeries,
   type SpineSessionPoint,
+  bikeEfficiencyRideEligible,
   deriveProvisionalBaselines,
   reconcileBaseline,
   disciplineOf,
@@ -94,15 +96,28 @@ import { resolveCurrentRunThresholdPace } from "../../../src/lib/resolve-current
  * `hr_drift_v1` (heart rate second half vs first, by time, after the warm-up), else the facts' whole-session
  * drift on a steady day. Never withheld; an interval day is labelled whole-session instead of hidden.
  * ⚠️ `Number(null)` is 0 — the checks are on typeof, never on Number.isFinite alone.
+ *
+ * ⛔ THE BIKE'S RATIO READ (2026-09-03, WORKORDER-bike-state-audit §2/§3). The cycling analyser never writes
+ * `heart_rate_summary.decouplingPct`, so every ride fell through to `hr_drift_v1` — heart rate ALONE — and
+ * the card printed p107's 5% line beside it. p107's two arms are both ratios of output to heart rate; heart
+ * rate alone is one side of the ratio and the rule does not govern it. The ride's power-to-heart-rate
+ * decoupling DOES exist — `computed.analysis.efficiency.aerobic_decoupling_pct`, written by
+ * `_shared/cycling-v1/ride-physiology.ts`, the number the Performance screen prints — so it is read here
+ * FIRST for a ride, with the same precedence the run gives its pace-to-heart-rate number. Basis `'power'`.
+ * The Sep 3 ride is the case that makes the two disagree in sign: power fell 155 → 136 W while heart rate
+ * fell 139 → 129, so heart-rate-alone is −7.2% and power-to-heart-rate is +7.4%. Both true; the card now
+ * names which one it is printing.
  */
-function driftReadForPoint(hrs: any, wa: any, factDrift: number | null | undefined, steady: boolean): { driftPct: number | null; driftBasis: 'gap' | 'raw' | 'hr' | null; driftWholeSession: boolean; fadeWithheld: boolean } {
+function driftReadForPoint(hrs: any, wa: any, factDrift: number | null | undefined, steady: boolean, powerDecouplingPct?: number | null): { driftPct: number | null; driftBasis: 'gap' | 'raw' | 'power' | 'hr' | null; driftWholeSession: boolean; fadeWithheld: boolean } {
   // "whole session" the same way session-detail decides it: an interval session (more than two planned steps)
   // or the analyser's mixed-effort flag.
   const steps = Number(wa?.fact_packet_v1?.derived?.interval_execution?.total_steps);
   if (Number.isFinite(steps) && steps > 2) steady = false;
   const dec = typeof hrs?.decouplingPct === 'number' && Number.isFinite(hrs.decouplingPct) ? hrs.decouplingPct : null;
+  const pdec = typeof powerDecouplingPct === 'number' && Number.isFinite(powerDecouplingPct) ? powerDecouplingPct : null;
   const v1 = typeof wa?.hr_drift_v1?.pct === 'number' && Number.isFinite(wa.hr_drift_v1.pct) ? wa.hr_drift_v1.pct : null;
   if (dec != null) return { driftPct: Math.round(dec * 10) / 10, driftBasis: hrs?.decouplingBasis === 'raw' ? 'raw' : 'gap', driftWholeSession: !steady, fadeWithheld: false };
+  if (pdec != null) return { driftPct: Math.round(pdec * 10) / 10, driftBasis: 'power', driftWholeSession: !steady, fadeWithheld: false };
   if (v1 != null) return { driftPct: Math.round(v1 * 10) / 10, driftBasis: 'hr', driftWholeSession: !steady, fadeWithheld: false };
   if (steady && typeof factDrift === 'number' && Number.isFinite(factDrift)) return { driftPct: factDrift, driftBasis: 'hr', driftWholeSession: false, fadeWithheld: false };
   return { driftPct: null, driftBasis: null, driftWholeSession: !steady, fadeWithheld: !steady };
@@ -1322,36 +1337,22 @@ serve(async (req: Request) => {
          * ruling, Q-294). The plan-linked overlay reads the same two maps, so there is one query and
          * one definition rather than a second copy that could drift.
          */
-        const endFactByDate = new Map<string, { efficiency: number | null; drift: number | null; hr: number | null; elevM: number | null }>();
+        /**
+         * ⛔⛔ KEYED BY `workout_id`, NOT BY DATE (2026-09-03, WORKORDER-bike-state-audit §1). This was a
+         * `Map<date, …>` — one entry per calendar day, last row written wins — and on a day with both a
+         * run and a ride the ride's spine point carried the run's efficiency index (a different QUANTITY
+         * on a different scale), the run's heart rate and the run's climb. Sep 3: the bike card printed
+         * 62 ft of climb under a 958 ft ride. The read itself (as stored, never re-derived) lives in
+         * `./endurance-facts.ts` with the fixture that pins a run and a ride on one date.
+         */
+        const endFactByWorkout = new Map<string, { efficiency: number | null; drift: number | null; hr: number | null; elevM: number | null }>();
         const keyDates = new Set<string>();
         try {
           const { data: factRows } = await supabase
-            .from("workout_facts").select("date,discipline,run_facts,ride_facts")
+            .from("workout_facts").select("workout_id,date,discipline,run_facts,ride_facts")
             .eq("user_id", userId).in("discipline", ["run", "ride"])
             .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", asOf);
-          for (const f of (Array.isArray(factRows) ? factRows : []) as any[]) {
-            const rf = f?.run_facts, bf = f?.ride_facts;
-            const src = rf ?? bf;
-            if (!src) continue;
-            /**
-             * ⛔ THE FACTS ARE READ AS STORED, NEVER RE-DERIVED. `run_facts.efficiency_index` is
-             * metres per second per beat; `ride_facts.efficiency_factor` is normalised power over
-             * average heart rate — TrainingPeaks' EF exactly, already published by the analyser. A
-             * second derivation here would fork the definition from the one every other surface uses.
-             */
-            const eff = Number(rf?.efficiency_index ?? bf?.efficiency_factor);
-            const drift = Number(src?.hr_drift_pct);
-            const hr = Number(rf?.hr_avg ?? bf?.avg_hr);
-            endFactByDate.set(String(f.date).slice(0, 10), {
-              efficiency: Number.isFinite(eff) && eff > 0 ? eff : null,
-              // ⚠️ Drift may legitimately be NEGATIVE (HR fell across the session), so the guard is
-              // finiteness alone. A `> 0` test here would silently drop the best sessions.
-              drift: Number.isFinite(drift) ? drift : null,
-              hr: Number.isFinite(hr) && hr > 0 ? hr : null,
-              // the climb, as a fact beside the drift (Michael 2026-09-02: hills and heat matter; the athlete deciphers)
-              elevM: (() => { const e = Number(rf?.elevation_gain_m ?? bf?.elevation_gain_m); return Number.isFinite(e) && e > 0 ? Math.round(e) : null; })(),
-            });
-          }
+          for (const [id, read] of indexEnduranceFactsByWorkout((Array.isArray(factRows) ? factRows : []) as any[])) endFactByWorkout.set(id, read);
           /**
            * ⛔ WHICH DAYS CARRY A KEY SESSION — p107's tighter 5% line applies when one falls within
            * 24 hours. Read off the PLAN, never guessed from the weekday: the frame's rotation decides
@@ -1403,14 +1404,31 @@ serve(async (req: Request) => {
          * linked; the spine does not need to guess because it does not care.
          *
          * ⚠️ GROUPED BY SESSION TYPE, using `runSessionGroup` — the SAME predicate the efficiency
-         * trend groups on (item 2). Not a second rule. Rides carry one group: the bike has no
-         * equivalent session-type classifier, and inventing one here would be exactly the second
-         * vocabulary this codebase keeps growing.
+         * trend groups on (item 2). Not a second rule. Rides carry one group ('all', every ride), and
+         * each ride point says whether it COUNTS TOWARD THE TREND (`countsTowardTrend`) — see below.
+         *
+         * ⛔ "THE BIKE HAS NO SESSION-TYPE CLASSIFIER" WAS TRUE WHEN WRITTEN AND IS NOT TRUE NOW
+         * (2026-09-03, WORKORDER-bike-state-audit §4). `bikeEfficiencyRideEligible`
+         * (`_shared/state-trend/bike-fitness.ts`) already gates the HR-at-power efficiency read, the
+         * coach's 7d bike drift row, and the session screen's heart-rate-at-easy-power line; the
+         * analyser stamps its verdict on every ride as `bike_fitness_v1.counts_toward_trend`. The rides
+         * card was the only bike surface not reading it, so its efficiency trend took every ride —
+         * threshold, climbing, group rides — the exact contamination the gate exists to reject.
+         * ⚠️ THE SPLIT IS THE FIELD'S (TrainingPeaks help centre, "Aerobic Decoupling and Efficiency
+         * Factor"): the PER-SESSION number prints for every ride and the caveat is explained; the TREND
+         * is built from steady aerobic rides only. So the point is NEVER dropped — its drift line and
+         * its count stay — and `countsTowardTrend: false` tells the card to leave it out of the
+         * efficiency series. Runs leave the field undefined: their aerobic series is already filtered
+         * to easy days and warm-ups, and undefined reads as "counts".
+         * ⛔ THE ANALYSER'S STAMP FIRST, THE SAME PREDICATE SECOND, NEVER A THIRD. A ride analysed
+         * before the field existed has no stamp; it is read through `bikeEfficiencyRideEligible` on the
+         * same four fields the trend's own substrate reads (`bikeRows`, above) — one predicate, one
+         * outcome, not a second opinion.
          */
         let enduranceSpine: EnduranceSpineSeries[] = [];
         try {
           const { data: spineRows } = await supabase
-            .from("workouts").select("date,type,workout_analysis,weather_data")
+            .from("workouts").select("id,date,type,workout_analysis,computed,weather_data")
             .eq("user_id", userId).in("type", ["run", "running", "ride", "bike", "cycling"])
             .eq("workout_status", "completed")
             .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", asOf);
@@ -1429,11 +1447,19 @@ serve(async (req: Request) => {
             const sport = t.includes("run") ? "run" : "ride";
             const date = String(r?.date || "").slice(0, 10);
             if (date.length !== 10) continue;
-            const f = endFactByDate.get(date);
+            // ⛔ THIS WORKOUT'S OWN FACTS — by id, never by date (§1 above).
+            const f = endFactByWorkout.get(String(r?.id ?? ""));
             // ⚠️ A POINT NEEDS SOMETHING TO PLOT. No heart rate and no efficiency is a session we
             // measured nothing on; inventing a zero would draw a crash.
             if (!f || (f.hr == null && f.efficiency == null)) continue;
             const hrs = r?.workout_analysis?.heart_rate_summary ?? null;
+            // the ride's power-to-heart-rate decoupling, as the Performance screen reads it (null on a run)
+            const powerDec = sport === "ride" ? (r?.computed?.analysis?.efficiency?.aerobic_decoupling_pct ?? null) : null;
+            // does this ride feed the efficiency TREND — the analyser's stamp, else the same predicate on the same fields
+            const bfv = r?.workout_analysis?.bike_fitness_v1 ?? null;
+            const countsTowardTrend: boolean | undefined = sport !== "ride" ? undefined
+              : typeof bfv?.counts_toward_trend === "boolean" ? bfv.counts_toward_trend
+              : bikeEfficiencyRideEligible(r?.workout_analysis?.classified_type ?? null, bfv?.in_band_s ?? null, bfv?.w20 ?? null, bfv?.band_hi ?? null);
             // 2026-09-03 (Michael, ruled with the field: Garmin never waits for an easy run): runs feed ONE aerobic
             // series. An easy day contributes the whole run; a hard day contributes its WARM-UP read (D-463) and
             // never its whole-run number (intervals are not a steady aerobic read). Each point says which it was
@@ -1481,11 +1507,12 @@ serve(async (req: Request) => {
               // decoupling when the analyser computed it, else `hr_drift_v1` (heart rate second half vs first,
               // by time, after the warm-up — `_shared/hr-drift-halves.ts`). Never withheld; an interval day is
               // labelled whole-session on the card instead of hidden. `f.drift` is the last resort.
-              ...driftReadForPoint(hrs, r?.workout_analysis, f.drift, steady),
+              ...driftReadForPoint(hrs, r?.workout_analysis, f.drift, steady, powerDec),
               keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
               // conditions, shown never corrected: the day's temperature and the climb
               tempF: (() => { const t = Number(r?.weather_data?.temperature); return Number.isFinite(t) ? Math.round(t) : null; })(),
               elevationGainM: f.elevM ?? null,
+              ...(countsTowardTrend === undefined ? {} : { countsTowardTrend }),
             });
             // 2026-09-03 (Michael, ruled after the "7 min long" screenshot): a warm-up read of at least six
             // usable minutes IS an easy point — the card shows a median of the recent points and says how many
@@ -1549,7 +1576,7 @@ serve(async (req: Request) => {
              */
             for (const fam of FAMILIES) {
               const { data: linkRows } = await supabase
-                .from("workouts").select("date,planned_id,workout_analysis")
+                .from("workouts").select("id,date,planned_id,workout_analysis,computed")
                 .eq("user_id", userId).in("type", fam.types).eq("workout_status", "completed")
                 .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", asOf);
               const linked = (Array.isArray(linkRows) ? linkRows : [])
@@ -1578,7 +1605,8 @@ serve(async (req: Request) => {
                 // ⚠️ Outside the block → no week → not emitted. Same rule as the lift line: a session
                 // from a previous block is not week 1 of this one.
                 if (!Number.isFinite(week)) continue;
-                const f = endFactByDate.get(date);
+                // this workout's own facts — by id, never by date (§1 above)
+                const f = endFactByWorkout.get(String((r as any)?.id ?? ""));
                 const hr = f?.hr ?? null;
                 // ⚠️ A POINT NEEDS SOMETHING TO PLOT. No heart rate and no efficiency is a session we
                 // measured nothing on; inventing a zero would draw a crash.
@@ -1591,7 +1619,7 @@ serve(async (req: Request) => {
                   durationMin: hit.durationMin,
                   efficiency: f?.efficiency ?? null,
                   // 2026-09-03: the same drift read as every other State point and the Performance screen.
-                  ...driftReadForPoint((r as any)?.workout_analysis?.heart_rate_summary ?? null, (r as any)?.workout_analysis, f?.drift ?? null, (r as any)?.workout_analysis?.heart_rate_summary?.decouplingMixedEffort !== true),
+                  ...driftReadForPoint((r as any)?.workout_analysis?.heart_rate_summary ?? null, (r as any)?.workout_analysis, f?.drift ?? null, (r as any)?.workout_analysis?.heart_rate_summary?.decouplingMixedEffort !== true, (r as any)?.computed?.analysis?.efficiency?.aerobic_decoupling_pct ?? null),
                   keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
                 });
               }

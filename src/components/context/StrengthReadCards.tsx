@@ -63,7 +63,7 @@ const DRIFT_KEY_SESSION_PCT = 5;
 
 type NamedPoint = {
   week: number; date: string; hrAvg: number; durationMin: number | null;
-  efficiency: number | null; driftPct: number | null; driftBasis?: 'gap' | 'raw' | 'hr' | null; driftWholeSession?: boolean; fromWarmup?: boolean; keySessionWithin24h: boolean;
+  efficiency: number | null; driftPct: number | null; driftBasis?: 'gap' | 'raw' | 'power' | 'hr' | null; driftWholeSession?: boolean; fromWarmup?: boolean; keySessionWithin24h: boolean;
 };
 type NamedSession = {
   family: string; sport: string; label: string; points: NamedPoint[];
@@ -72,8 +72,10 @@ type NamedSession = {
 
 type SpinePoint = {
   date: string; hrAvg: number | null; durationMin: number | null;
-  efficiency: number | null; driftPct: number | null; driftBasis?: 'gap' | 'raw' | 'hr' | null; driftWholeSession?: boolean; fromWarmup?: boolean; fadeWithheld: boolean; keySessionWithin24h: boolean;
- tempF?: number | null; elevationGainM?: number | null; };
+  efficiency: number | null; driftPct: number | null; driftBasis?: 'gap' | 'raw' | 'power' | 'hr' | null; driftWholeSession?: boolean; fromWarmup?: boolean; fadeWithheld: boolean; keySessionWithin24h: boolean;
+ tempF?: number | null; elevationGainM?: number | null;
+ /** rides only: false = a hard ride, kept on the card and left out of the efficiency trend (server-decided). */
+ countsTowardTrend?: boolean; };
 type SpineSeries = { sport: string; group: string; points: SpinePoint[] };
 
 /** ⛔ THE SPINE'S GROUPS IN THE ATHLETE'S OWN WORDS. No invented vocabulary on a screen. */
@@ -172,22 +174,32 @@ function SpineCard({ series }: { series: SpineSeries }) {
   const isRide = series.sport === 'ride';
   const color = getDisciplineColor(isRide ? 'ride' : 'run');
   const label = GROUP_LABEL[series.group] ?? `${series.sport} sessions`;
-  const eff = pts.map((p) => ({ date: p.date, value: p.efficiency })).filter((p) => p.value != null) as Array<{ date: string; value: number }>;
+  // ⛔ THE TREND TAKES STEADY RIDES ONLY; THE CARD KEEPS EVERY RIDE (2026-09-03, WORKORDER-bike-state-audit §4).
+  // The server stamps each ride point with `countsTowardTrend` — `bikeEfficiencyRideEligible`, the same gate the
+  // heart-rate-at-power read, the coach's bike drift row and the session screen already use. A hard ride's
+  // watts-per-beat is real but is not an aerobic read; TrainingPeaks prints it per session and builds the trend
+  // from steady sessions only. So: the efficiency series, its headline and "based on" come from `trendPts`; the
+  // logged count and the latest ride's drift line come from every point. Undefined = counts (every run).
+  const trendPts = pts.filter((p) => p.countsTowardTrend !== false);
+  const leftOut = pts.length - trendPts.length;
+  const eff = trendPts.map((p) => ({ date: p.date, value: p.efficiency })).filter((p) => p.value != null) as Array<{ date: string; value: number }>;
   // 2026-09-03 (Michael: "it should say, based on whatever it's based on, for the most recent runs"): the headline
   // is the MEDIAN of the last five points, never whichever point came last (one warm-up was the headline over 22
   // runs), and the line under it says what it is based on and how many of those are warm-ups.
   // Shared with the closed run row (sport-summary.recentMedian) so the plate and the row print one number.
   const headline = recentMedian(eff.map((p) => p.value), 5);
-  const recentPts = pts.slice(-Math.max(1, Math.min(5, pts.length)));
+  const recentPts = trendPts.slice(-Math.max(1, Math.min(5, trendPts.length)));
   const recentWarmups = recentPts.filter((p) => p.fromWarmup).length;
   // ⛔ THE CARD'S OWN SPORT NAMES THE SESSIONS (2026-09-03, Michael: "kill any run crossover"). This
   // read "based on the last 5 runs" on the BIKE card — the word was hard-coded when only runs reached
   // here. ⚠️ Warm-ups are a RUN fact (easy runs read off the warm-ups of hard runs when a block has
   // none of its own); a ride carries no such borrow, and `fromWarmup` is never set on one.
   const noun = isRide ? 'ride' : 'run';
+  // a ride card says which rides the trend is built from and how many hard rides it leaves out — the caveat is
+  // printed, never a blank space (TrainingPeaks explains the same exclusion in its help centre)
   const basedOn = recentPts.length
-    ? `based on the last ${recentPts.length} ${recentPts.length === 1 ? noun : `${noun}s`}${recentWarmups > 0 ? ` · ${recentWarmups} ${recentWarmups === 1 ? 'warm-up' : 'warm-ups'}` : ''}`
-    : null;
+    ? `based on the last ${recentPts.length} ${isRide ? 'steady ' : ''}${recentPts.length === 1 ? noun : `${noun}s`}${recentWarmups > 0 ? ` · ${recentWarmups} ${recentWarmups === 1 ? 'warm-up' : 'warm-ups'}` : ''}${leftOut > 0 ? ` · ${leftOut} hard ${leftOut === 1 ? 'ride' : 'rides'} not in the trend` : ''}`
+    : (leftOut > 0 ? `no steady rides yet · ${leftOut} hard ${leftOut === 1 ? 'ride' : 'rides'} not in the trend` : null);
   // the day's conditions as facts — heat and climb move drift, and whether the athlete was pushing is theirs to read
   const conditions = [
     latest.tempF != null ? `${latest.tempF}°F` : null,
@@ -249,14 +261,25 @@ function SpineCard({ series }: { series: SpineSeries }) {
           The prose that read it for the athlete was cut on 2026-09-01; the number itself is the
           field's second run fact and is shown bare. Withheld sessions (pace changed by prescription)
           show nothing — a number for a non-steady effort is not the same number. */}
-      {latest.driftPct != null && !latest.fadeWithheld && (
-        <div className="text-[11px] text-white/55 mt-1">
-          <span className="text-white/55 text-[11px]">
-            drift <span className="tabular-nums text-white/75">{(latest.driftPct > 0 ? '+' : '')}{latest.driftPct.toFixed(1)}%</span> · latest {isRide ? 'ride' : 'run'}{latest.driftWholeSession ? ' · intervals' : ''} · line {DRIFT_LIMITS.hybridPct}%{driftVsLine(latest.driftPct) ? <> · <span className="text-white/75">{driftVsLine(latest.driftPct)}</span></> : null}{conditions ? <span className="text-white/45"> · {conditions}</span> : null}
-          </span>
-          {/* 2026-09-03: no sentence under the drift line — the line states the number and the 5% line; a sentence explaining it read as machine copy (Michael). */}
-        </div>
-      )}
+      {/* ⛔ THE NUMBER IS NAMED FOR WHAT IT MEASURES, AND THE 5% LINE SITS ONLY BESIDE A RATIO (2026-09-03,
+          WORKORDER-bike-state-audit §2/§3). p107's two arms are both output against heart rate — pace to heart
+          rate on a run, power to heart rate on a ride. Heart rate alone (second half vs first) is one side of
+          that ratio; the rule does not govern it, so no line is printed beside it. The Sep 3 ride had both
+          numbers with opposite signs (heart rate −7.2%, power to heart rate +7.4%) under one word, "drift". */}
+      {latest.driftPct != null && !latest.fadeWithheld && (() => {
+        const ratio = latest.driftBasis === 'gap' || latest.driftBasis === 'raw' || latest.driftBasis === 'power';
+        const what = latest.driftBasis === 'power' ? 'power to heart rate'
+          : latest.driftBasis === 'gap' || latest.driftBasis === 'raw' ? 'pace to heart rate'
+          : 'heart rate, second half vs first';
+        return (
+          <div className="text-[11px] text-white/55 mt-1">
+            <span className="text-white/55 text-[11px]">
+              drift <span className="tabular-nums text-white/75">{(latest.driftPct > 0 ? '+' : '')}{latest.driftPct.toFixed(1)}%</span> · {what} · latest {isRide ? 'ride' : 'run'}{latest.driftWholeSession ? ' · intervals' : ''}{ratio ? <> · line {DRIFT_LIMITS.hybridPct}%</> : null}{ratio && driftVsLine(latest.driftPct) ? <> · <span className="text-white/75">{driftVsLine(latest.driftPct)}</span></> : null}{conditions ? <span className="text-white/45"> · {conditions}</span> : null}
+            </span>
+            {/* 2026-09-03: no sentence under the drift line — the line states the number and the 5% line; a sentence explaining it read as machine copy (Michael). */}
+          </div>
+        );
+      })()}
       {basedOn && (
         <div className="text-[11px] text-white/55 mt-1">{basedOn}</div>
       )}

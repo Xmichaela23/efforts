@@ -398,32 +398,14 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor, fallbackFtp = null }:
               their read was taken in, or that confirming their FTP would move it.
               What was true in the complaint is that it must not read as the verdict's own number —
               hence "Easy power is set from…", which states the basis and claims nothing about the trend. */}
-          {src && (() => {
-            // ⚠️ NO METRIC-STRING GUARD. The first cut gated on `anchor.metric === 'ftp'` — a string
-            // that comes from the `fitness_baselines` row and was never verified to be that exact
-            // word. It silently rendered nothing. This branch is already inside `src`, which is
-            // derived from `efficiency.basis === 'coggan_ftp'`, so the bike anchor here IS the FTP;
-            // the value alone is the honest gate.
-            const ftp = ftpNow; // one resolve for the row — the headline and this line cannot disagree
-            // ⛔ STATES THE BASELINE, DOES NOT CLAIM WHAT THE MEASUREMENT USED (2026-08-01).
-            //
-            // The first version read "Measured against an estimated FTP of 212 W" — and that was a
-            // claim I could not back. `anchor.value` is the `fitness_baselines` record. The per-ride
-            // power BAND is `workout_analysis.bike_fitness_v1.band_source` (read at
-            // compute-snapshot:715), computed by analyze-cycling-workout at ANALYSIS time from
-            // whatever FTP resolved then. Two separately derived numbers — probably equal, not
-            // verified equal, and rides analysed at different times need not even agree with each
-            // other.
-            //
-            // ⚠️ So the sentence states the FTP ON RECORD and says the basis is an estimate. Both are
-            // true independently. Naming the number the measurement used would need that number
-            // carried through per ride — a real question, not a copy fix.
-            // The threshold wording belongs to a REAL power read. `leadIsPower` alone is true in the
-            // building state too (lead 'none' falls back to power), which put "Your estimated FTP is
-            // 176 W" under a row that had made no measurement at all.
-            // 2026-09-03: one fact, no sentence — the Baselines row is where an FTP gets confirmed.
-            return <span>{ftp != null ? `FTP ${ftp} W · ${src === 'est (FTP)' ? 'estimated' : 'tested'}` : (src === 'est (FTP)' ? 'FTP estimated' : 'FTP tested')}</span>;
-          })()}
+          {/* ⛔ THE FTP LINE IS GONE FROM THE OPEN CARD (2026-09-03, WORKORDER-bike-state-audit §5.1).
+              The collapsed bike row prints `FTP 168 W · estimated` and stays on screen when the card
+              opens, so this line put the same fact twice, two lines apart. The row is the ruled place
+              for it (FTP leads the rider's numbers, checked against the field 2026-09-03); the row and
+              the verdict share one resolve (`ftpNow` / `bikeAnchorValue`), so nothing here is lost.
+              ⚠️ The provenance it carried — the per-ride power band is `bike_fitness_v1.band_source`,
+              computed at analysis time from whatever FTP resolved then, and is not verified equal to
+              the FTP on record — is still true and still an open question, not a copy fix. */}
           {showDot && anchor?.label && <span>{anchor.label}</span>}
         </span>
       )}
@@ -1170,9 +1152,10 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       // ⛔ ONE NUMBER, TWO SURFACES. The headline is the SAME median-of-the-last-five the open rides
       // card prints (recentMedian over the ride spine), exactly as run's row shares its headline with
       // the run card — the plate and the row cannot disagree.
-      const rideSpine = ((stateDisplay as { enduranceSpine?: Array<{ sport?: string; group?: string; points?: Array<{ efficiency?: number | null }> }> } | null | undefined)?.enduranceSpine)
+      const rideSpine = ((stateDisplay as { enduranceSpine?: Array<{ sport?: string; group?: string; points?: Array<{ efficiency?: number | null; countsTowardTrend?: boolean }> }> } | null | undefined)?.enduranceSpine)
         ?.find((s) => s?.sport === 'ride');
-      const efVals = (rideSpine?.points ?? []).map((p) => p?.efficiency).filter((v): v is number => v != null);
+      // steady rides only — the same `countsTowardTrend` filter the open card applies, so plate and row stay one number
+      const efVals = (rideSpine?.points ?? []).filter((p) => p?.countsTowardTrend !== false).map((p) => p?.efficiency).filter((v): v is number => v != null);
       const efHead = recentMedian(efVals, 5);
       // ⛔ FTP LEADS, EFFICIENCY FACTOR FOLLOWS (2026-09-03, checked against the field, not recalled).
       // The rider's first number is FTP and their second is watts per kilo; efficiency factor barely

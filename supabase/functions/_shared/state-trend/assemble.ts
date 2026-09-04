@@ -1867,11 +1867,21 @@ export interface SpineSessionPoint {
    * ⛔ THE SURFACE MUST SAY THIS OUT LOUD. Rendered as a gap it reads as missing data, and the athlete
    * concludes the app is broken. It is a different number for a different kind of session.
    */
-  /** 2026-09-03: 'gap' / 'raw' = pace-to-heart-rate decoupling; 'hr' = heart rate alone, second half vs first (the same
-   *  read the Performance screen shows). `driftWholeSession` = the session had intervals; the card says so. */
-  driftBasis?: 'gap' | 'raw' | 'hr' | null;
+  /** 2026-09-03: 'gap' / 'raw' = pace-to-heart-rate decoupling; 'power' = power-to-heart-rate decoupling (a ride, the
+   *  number its Performance screen prints); 'hr' = heart rate alone, second half vs first. p107's 5% line governs the
+   *  RATIO bases only — the card prints the line beside 'gap' / 'raw' / 'power' and never beside 'hr'.
+   *  `driftWholeSession` = the session had intervals; the card says so. */
+  driftBasis?: 'gap' | 'raw' | 'power' | 'hr' | null;
   driftWholeSession?: boolean;
   fadeWithheld: boolean;
+  /**
+   * 2026-09-03 (WORKORDER-bike-state-audit §4): does this RIDE feed the efficiency TREND. The analyser's
+   * `bike_fitness_v1.counts_toward_trend` (`bikeEfficiencyRideEligible`: steady aerobic type, ≥10 min in the aerobic
+   * band, no threshold-level effort). `false` = the point stays on the card (its drift, its count) and is left out of
+   * the efficiency series and its headline — TrainingPeaks' split: the per-session number prints, the trend is built
+   * from steady rides only. Undefined (every run, and any pre-field payload) reads as "counts".
+   */
+  countsTowardTrend?: boolean;
   /** ⛔ True when the plan puts a key session inside 24 hours, so p107's tighter 5% line applies
    *  rather than the standard 10%. An athlete with no plan gets `false` everywhere — correct, not missing. */
   /** 2026-09-03: this easy point is the warm-up of a hard run (D-463), not a whole easy run. */
@@ -1893,8 +1903,9 @@ export interface SpineSessionPoint {
  * can only ever be the layer that APPEARS when a block exists.
  *
  * ⚠️ `group` is `runSessionGroup`'s — easy / long / quality — the same predicate the efficiency trend
- * groups on, never a second rule. Rides carry the single group `all`: the bike has no equivalent
- * session-type classifier and inventing one here would grow a second vocabulary beside the first.
+ * groups on, never a second rule. Rides carry the single group `all` (every ride), and each ride point
+ * carries `countsTowardTrend` from `bikeEfficiencyRideEligible` — the bike's steady-aerobic classifier,
+ * which this comment once said did not exist. It did (`bike-fitness.ts`); see `SpineSessionPoint`.
  */
 export interface EnduranceSpineSeries {
   /** 'run' | 'ride'. */

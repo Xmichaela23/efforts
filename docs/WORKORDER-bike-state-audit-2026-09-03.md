@@ -156,6 +156,28 @@ it. Do not write a second predicate.
 
 ---
 
+## §4b. WITHDRAWN — the trigger ride's power recording was partial
+
+⛔ **A section proposing an app-wide recording-completeness detector stood here and is withdrawn
+(Michael: *"what could you possibly have added? tuning this entire app to a malfunction?"*). He is
+right.** One power meter cut out on one ride and I wrote a check that would run on every ride for
+every athlete. No reference app does this; TrainingPeaks and Garmin both compute their power numbers
+from whatever was recorded and say nothing.
+
+**What is still worth knowing, and it is a fact about the trigger ride only, not a build item:**
+Michael's power meter stopped during the Sep 3 ride and he finished about 200 ft above home
+(consistent with +958 / −756). So that ride's `avg_power_w` (146), `normalized_power_w` (164),
+`intensity_factor` (0.98), TSS (109), execution score and `aerobic_decoupling_pct` (7.4) are computed
+from an incomplete power record.
+
+⚠️ **THE CONSEQUENCE FOR THIS DOCUMENT: do not use the Sep 3 ride's power-derived numbers as the
+expected output of any fix.** §2's arithmetic (155 → 136 W across the halves) is real as stored and
+still demonstrates the two-numbers-one-word defect, which is a LABELLING defect and holds whatever the
+watts were. But "he went past the book's 5% line" does not follow from a partial recording, and the
+ride is not a good fixture for anything power-based.
+
+---
+
 ## §5. SMALLER, ORDERED AFTER THE ABOVE
 
 1. **FTP prints twice.** The collapsed bike row gained an `FTP 168 W · estimated` line today
@@ -208,3 +230,31 @@ screenshot rather than from the stored row or the page.**
   `20260903200000_workouts_strava_shared_activity_id.sql` — the receipt column the automatic Strava
   share reads to avoid double-posting. Everything else works without it.
 - **NOT BUILT:** every item in §1–§5 of this document.
+
+---
+
+## §8. BUILT — terminal session, 2026-09-03 (edited on disk, NOT committed, NOT pushed, NOT deployed)
+
+Every §1–§5 item is built. Each claim below was traced this session, not inherited from §1–§7.
+
+| item | what changed | where |
+|---|---|---|
+| §1 | facts index keyed by `workout_id` (the table's primary key), never by date; spine and overlay queries select `id` and look up by it; the cross-sport `??` fallbacks are gone (one facts object per row) | `compute-snapshot/endurance-facts.ts` (new, pure), `compute-snapshot/index.ts` |
+| §1 fixture | a run and a ride on one date each read their own climb / efficiency / heart rate, in either row order — 5 tests, green | `compute-snapshot/endurance-facts.test.ts` |
+| §2 | a ride's State point reads power-to-heart-rate decoupling FIRST (`computed.analysis.efficiency.aerobic_decoupling_pct`, the Performance screen's number), basis `'power'`; heart-rate-only `hr_drift_v1` is the fallback. The card names the basis in words: "power to heart rate" / "pace to heart rate" / "heart rate, second half vs first". Performance screen ride row now reads "Power to heart rate fell over the ride (7.4%)" instead of "Moderate drift over the ride" | `compute-snapshot/index.ts` `driftReadForPoint`, `state-trend/assemble.ts` type, `StrengthReadCards.tsx`, `session-detail/build.ts` |
+| §3 | `line 5%` and "over the line" print ONLY beside a ratio basis (`gap` / `raw` / `power`); never beside heart-rate-only | `StrengthReadCards.tsx` SpineCard |
+| §4 | every ride point carries `countsTowardTrend`: the analyser's `bike_fitness_v1.counts_toward_trend` stamp, else `bikeEfficiencyRideEligible` on the same four fields the trend substrate reads. No new predicate. The card keeps every ride (count, latest drift line) and builds the efficiency series, its headline and "based on the last N steady rides · K hard rides not in the trend" from the eligible ones. The collapsed row's efficiency-factor median applies the same filter, so plate and row stay one number | `compute-snapshot/index.ts`, `assemble.ts`, `StrengthReadCards.tsx`, `StatePerformanceSection.tsx` |
+| §5.1 | the open bike card's `FTP 168 W · estimated` line is removed; the collapsed row's stays (it remains on screen when the card opens) | `StatePerformanceSection.tsx` |
+| §5.2 | the chart's expand toggle is gone — static sparkline, no button, no "tap to expand" | `TrendSparkline.tsx` |
+| §5.3 | the caption prints the capped span (`last 12 weeks`), the same number the "building" gate uses | `TrendSparkline.tsx` |
+
+**Checks run:** `deno test` state-trend (296 pass), session-detail (118 pass), compute-snapshot (acwr / watermark / gate / endurance-facts pass; `index.test.ts` fails on `--allow-net` at module load — pre-existing, identical on a clean stash). `deno check compute-snapshot/index.ts`: the same 4 type errors before and after, none in touched code. `npm run build` green. `eslint` on the three touched client files: only pre-existing `no-explicit-any` lines. `tsc --noEmit`: nothing in touched files.
+
+**To deploy (every function that bundles a touched `_shared` file):** `compute-snapshot`, `workout-detail`, `coach`, `analyze-cycling-workout`.
+
+**Not verified on a device:** all of it. What to look for on the Sep 3 ride: the rides card drift line reads `drift +7.4% · power to heart rate · latest ride · line 5% · 2.4 over the line · … · 958 ft of climb`; the Performance screen heart-rate row reads `Power to heart rate fell over the ride (7.4%)`; one FTP line on the bike plate; no "tap to expand" under any chart.
+
+**Side findings, not acted on:**
+1. `session-detail/build.ts` still withholds the ride heart-rate row on a non-aerobic ride (`isAerobicRide` gate, 2026-08-02). §4's field rule says the per-session number prints always; that row is the Performance screen, not the State bike section, so it was left as ruled. Same shape as §4 — one decision should cover both.
+2. The run row's `Moderate drift over the run` has the same ambiguity §2 fixed on the ride (pace-to-heart-rate ratio, "drift" reads as heart rate rising). Approved copy from 2026-08-02; untouched.
+3. Old `state_trends` payloads in cache carry no `countsTowardTrend` and no `'power'` basis; they render exactly as before until recomputed (undefined = counts; basis falls to the heart-rate wording only when the server says `'hr'`).
