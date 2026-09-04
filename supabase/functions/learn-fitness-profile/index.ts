@@ -356,16 +356,22 @@ Deno.serve(async (req) => {
 
     // Every ride's power curve on file (18 months), for the compound FTP's hard ceiling — the best
     // 20 minutes actually pedalled. Only `computed.power_curve['20min']` is read from these rows.
+    // ⛔ ONE NUMBER PER RIDE, NOT THE ANALYSIS BLOB (2026-09-04). The first cut selected `computed`
+    // wholesale for 18 months of rides — megabytes per athlete — and the function died on
+    // WORKER_RESOURCE_LIMIT the first time it ran in prod. Only the best 20-minute power is read here,
+    // so only that is fetched; the shape `{ computed: { power_curve: { '20min' } } }` is rebuilt so
+    // `analyzeRides` reads it the same way it reads a full row.
     const allRideCurves: WorkoutRecord[] = await (async () => {
       try {
         const { data } = await supabase
           .from('workouts')
-          .select('id, type, date, computed, workout_status')
+          .select('id, type, date, p20:computed->power_curve->>20min')
           .eq('user_id', user_id)
           .eq('workout_status', 'completed')
           .in('type', ['ride', 'cycling', 'bike', 'virtualride', 'indoorcycling', 'gravelride', 'mountainbikeride'])
           .gte('date', eighteenMoAgoISO);
-        return (data ?? []) as WorkoutRecord[];
+        return ((data ?? []) as Array<{ id: string; type: string; date: string; p20: string | null }>)
+          .map((r) => ({ id: r.id, type: r.type, date: r.date, computed: { power_curve: { '20min': Number(r.p20) } } })) as unknown as WorkoutRecord[];
       } catch { return []; }
     })();
     const rideProfile = analyzeRides(rides, allRideCurves, priorLearned);
