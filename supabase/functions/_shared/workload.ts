@@ -849,8 +849,9 @@ export function calculateDurationWorkload(
 export type WorkloadMethod =
   | 'trimp_hr_based'         // RETIRED D-238 (historical rows only) — resting-HR TRIMP
   | 'trimp_resting_assumed'  // RETIRED D-238 (historical rows only) — TRIMP w/ assumed resting HR (W2)
-  | 'power_intensity'        // measured: power vs FTP
-  | 'hr_intensity'           // measured: HR vs threshold
+  | 'power_intensity'        // measured: TSS — normalized power vs FTP
+  | 'pace_intensity'         // measured: rTSS (threshold pace vs NGP) or sTSS (CSS vs pace)
+  | 'hr_intensity'           // measured: Friel's HR zones of LTHR → TSS per hour
   | 'steps_preset'           // structured prescription
   | 'volume_based'           // strength (sets × reps × load)
   | 'duration_intensity'     // duration × inferred intensity
@@ -889,11 +890,25 @@ export function classifyWorkloadMethod(args: {
   rpeAvailable: boolean;
   /** @deprecated D-238 — resting HR is never used in load; ignored. */
   restingAssumed?: boolean;
+  /** The rung resolveCardioIntensity fired — THE label source for cardio (2026-09-04, one rule). */
+  cardioMethod?: CardioIntensityMethod;
 }): { method: WorkloadMethod; estimated: boolean } {
   const t = (args.type || '').toLowerCase();
   const isCardio = t === 'run' || t === 'ride' || t === 'bike' || t === 'swim';
 
   if (t === 'strength') return { method: 'volume_based', estimated: false };
+  // Cardio: the label is the rung the one rule fired, never a second reading of the inputs. A second
+  // classifier here labelled a run scored off pace as "hr_intensity" (found 2026-09-04).
+  if (isCardio && args.cardioMethod) {
+    if (args.hasStepsPreset && !['power', 'pace', 'hr'].includes(args.cardioMethod)) return { method: 'steps_preset', estimated: false };
+    switch (args.cardioMethod) {
+      case 'power': return { method: 'power_intensity', estimated: false };
+      case 'pace': return { method: 'pace_intensity', estimated: false };
+      case 'hr': return { method: 'hr_intensity', estimated: false };
+      case 'rating': return { method: 'srpe_estimated', estimated: true };
+      default: return { method: 'duration_default', estimated: true };
+    }
+  }
   // D-238: OUTPUT-FIRST. Power (ride) then threshold HR (LTHR) — measured signals. No TRIMP /
   // resting-HR tier. Mirror inferIntensityFromPerformance's order so label ↔ number agree.
   if ((t === 'ride' || t === 'bike') && args.hasFtp && args.hasAvgPower) return { method: 'power_intensity', estimated: false };

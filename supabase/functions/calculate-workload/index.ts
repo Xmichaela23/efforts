@@ -498,7 +498,8 @@ serve(async (req) => {
     const _wt = String(finalWorkoutData.type || '').toLowerCase()
     const _isCardio = _wt === 'run' || _wt === 'ride' || _wt === 'bike' || _wt === 'swim'
     const _rpeVal = sessionRPE ?? (finalWorkoutData.workout_metadata || {}).session_rpe
-    const noPerformanceInference = _isCardio && !['power', 'hr', 'pace'].includes(resolveCardioIntensity(cardioIntensityInput(finalWorkoutData as any)).method)
+    const _cardioMethod = _isCardio ? resolveCardioIntensity({ ...cardioIntensityInput(finalWorkoutData as any), rpe: _rpeVal }).method : undefined
+    const noPerformanceInference = _isCardio && !['power', 'hr', 'pace'].includes(_cardioMethod as string)
     const rpeAvailable = typeof _rpeVal === 'number' && _rpeVal >= 1 && _rpeVal <= 10
     const { method: workloadMethodClassified, estimated: workloadEstimated } = classifyWorkloadMethod({
       type: _wt,
@@ -509,6 +510,7 @@ serve(async (req) => {
       hasStepsPreset: Boolean(finalWorkoutData.steps_preset?.length),
       noPerformanceInference,
       rpeAvailable,
+      cardioMethod: _cardioMethod,
     })
     
     // If workout is attached to a planned workout, fetch planned workload for comparison
