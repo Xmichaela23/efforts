@@ -180,8 +180,13 @@ function SpineCard({ series }: { series: SpineSeries }) {
   const headline = recentMedian(eff.map((p) => p.value), 5);
   const recentPts = pts.slice(-Math.max(1, Math.min(5, pts.length)));
   const recentWarmups = recentPts.filter((p) => p.fromWarmup).length;
+  // ⛔ THE CARD'S OWN SPORT NAMES THE SESSIONS (2026-09-03, Michael: "kill any run crossover"). This
+  // read "based on the last 5 runs" on the BIKE card — the word was hard-coded when only runs reached
+  // here. ⚠️ Warm-ups are a RUN fact (easy runs read off the warm-ups of hard runs when a block has
+  // none of its own); a ride carries no such borrow, and `fromWarmup` is never set on one.
+  const noun = isRide ? 'ride' : 'run';
   const basedOn = recentPts.length
-    ? `based on the last ${recentPts.length} ${recentPts.length === 1 ? 'run' : 'runs'}${recentWarmups > 0 ? ` · ${recentWarmups} ${recentWarmups === 1 ? 'warm-up' : 'warm-ups'}` : ''}`
+    ? `based on the last ${recentPts.length} ${recentPts.length === 1 ? noun : `${noun}s`}${recentWarmups > 0 ? ` · ${recentWarmups} ${recentWarmups === 1 ? 'warm-up' : 'warm-ups'}` : ''}`
     : null;
   // the day's conditions as facts — heat and climb move drift, and whether the athlete was pushing is theirs to read
   const conditions = [

@@ -158,38 +158,23 @@ function blockContextLine(planWeek: number | null | undefined, block: BlockCard 
   return where;
 }
 
-// ── THE AEROBIC READ'S OWN WORDS (2026-08-01) ───────────────────────────────────────────────────
-// A SEPARATE MAP, for the same reason `the run words (deleted 2026-09-02, D-460)` is separate: `NUMERIC` is the POWER read's
-// vocabulary and stays wordless. These words are plain-language — heart rate at a given power is
-// "how hard your body is working to hold the same pace on the bike", so that is what they say. They
-// are earned by the noise gate (Q-241), which is the same bar run durability and strength clear;
-// a confidence interval was never the requirement, beating your own scatter was.
-const BIKE_AEROBIC_WORDS: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
-  improving: { word: 'Easier at the same power', cls: 'text-emerald-400', arr: '' },
-  holding: { word: '', cls: 'text-white/70', arr: '' }, // ⛔ no word (2026-09-01) — see VERDICT.holding
-  // Neutral, never amber: heat, a hard block or a poor night all do this, and none of them is a fault.
-  sliding: { word: 'Harder at the same power', cls: 'text-white/70', arr: '' },
-  needs_data: { word: 'Need a few more rides', cls: 'text-white/60', arr: '' },
-  withheld: { word: 'Too few rides to read', cls: 'text-white/60', arr: '' },
-};
-
-// THE AEROBIC LEAD — the row for the athlete who never does a hard effort. Leads with the NUMBER in
-// its own unit (heart rate at their easy power), because a bare direction is unreadable to someone
-// who has no idea what it is a direction OF.
-function AerobicSignal({ sig }: { sig: BikeSignal }) {
-  const v = BIKE_AEROBIC_WORDS[sig.verdict];
-  const asserts = sig.verdict !== 'needs_data' && sig.verdict !== 'withheld';
-  return (
-    <span className="inline-flex items-baseline gap-1.5 flex-wrap">
-      {sig.recentValue != null && <span className="text-white/85">{sig.recentValue} bpm at easy power</span>}
-      <span className={`inline-flex items-baseline gap-0.5 ${v.cls}`}>
-        {v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}
-      </span>
-      {asserts && sig.pctChange != null && <span className="text-white/60">{verdictSignedPct(sig.verdict, sig.pctChange)}</span>}
-    </span>
-  );
-}
-
+// ⛔ THE AEROBIC READ'S HEART-RATE WORDS AND ITS SIGNAL ARE DELETED (2026-09-03, Michael: "lose the
+// heart rate sentence, keep it strict to the book").
+//
+// WHAT WAS HERE: `BIKE_AEROBIC_WORDS` ("Easier at the same power" / "Harder at the same power") and
+// `AerobicSignal`, which led the bike card with "130 bpm at easy power" for a rider whose riding
+// carries no threshold effort to price an FTP from.
+//
+// WHY IT IS GONE: the book gives the bike no heart-rate read at all. p172 states power is the method
+// for controlling cycling intensity and FTP is the number every ride prescription is a percentage of;
+// the 5% drift line (p107) is written for steady running. A bpm at easy power is also the weaker half
+// of a number the card already prints — 130 bpm at 90 W and at 150 W read the same, where efficiency
+// factor (watts per heartbeat, on the rides card below) carries both.
+//
+// ⚠️ THE THREE-STATE ROW SURVIVES, MINUS ITS HEADLINE NUMBER. The aerobic state still exists on the
+// server and still NAMES ITS REASON ("No hard efforts yet, so there is no threshold read") — that was
+// always the point of the state, and it is untouched. What it no longer does is assert a heart-rate
+// number as the bike's read.
 // One labelled signal ("Power: improving +2%") for the bike dual read.
 function Signal({ label, sig }: { label: string; sig: BikeSignal }) {
   const v = NUMERIC[sig.verdict];   // bike: arrow + number, no word
@@ -218,7 +203,7 @@ function asOf(ageDays: number | null | undefined): string | null {
 
 // Bike row — Power leads, Efficiency alongside (disagreement surfaced, never collapsed). The
 // efficiency basis carries the zone-band source (coggan_ftp = estimated; personal = from test).
-function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitness; showAxis?: boolean; mode: FitnessMode; anchor?: FitnessAnchor }) {
+function BikeFitnessRow({ fitness, showAxis, mode, anchor, fallbackFtp = null }: { fitness: BikeFitness; showAxis?: boolean; mode: FitnessMode; anchor?: FitnessAnchor; fallbackFtp?: number | null }) {
   // ⛔ THE FTP ON RECORD, SERVER-FIRST WITH A CLIENT FALLBACK (2026-08-01).
   //
   // `anchor.value` is the authority — but `fitnessAnchors` is assembled by compute-snapshot and only
@@ -229,18 +214,9 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
   // the measurement was computed against — which a client-side read cannot promise. It now reports
   // the FTP ON RECORD, and that is exactly what `resolveCurrentFtp` returns. Same resolver the coach
   // and the analyzers use (D-... FTP fracture #2), never a second read of the raw column.
-  const { loadUserBaselines } = useAppContext();
-  const [fallbackFtp, setFallbackFtp] = React.useState<number | null>(null);
-  React.useEffect(() => {
-    if (anchor?.value != null) return;            // server already told us; don't ask twice
-    let cancelled = false;
-    void loadUserBaselines?.().then((b: any) => {
-      if (cancelled || !b) return;
-      const r = resolveCurrentFtp({ learned_fitness: b.learned_fitness, performance_numbers: b.performanceNumbers });
-      if (r?.value != null) setFallbackFtp(Math.round(r.value));
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [anchor?.value, loadUserBaselines]);
+  // ⛔ 2026-09-03: THE RESOLVE MOVED UP to the section (`useBikeFallbackFtp`) and arrives as a prop.
+  // The collapsed bike row prints FTP too now, and two independent resolves could print two numbers
+  // for one fact — the exact fracture the FTP work exists to close. One resolve, both surfaces.
 
   // ⛔ NO SECOND-LEVEL TAPS ON THIS SCREEN (Michael 2026-09-03: one click). The power ⓘ, the
   // "more" receipt and the label ⓘ are all printed open now; see StrengthReadCards.SpineCard.
@@ -347,7 +323,10 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
         </span>
         )
       ) : aerobicLead ? (
-        <AerobicSignal sig={fitness.efficiency} />
+        // ⛔ NO HEADLINE NUMBER ON THE AEROBIC READ (2026-09-03) — see the deleted AerobicSignal above.
+        // The reason line below says why there is no threshold read, the FTP on record prints under it,
+        // and the rides card carries efficiency factor. Nothing here asserts a heart rate.
+        null
       ) : showDot ? (
         // The headline names the NUMBER, not the metric's category: "212 W threshold" is what a rider
         // wants off a glance, and it is `anchor.value` — the same FTP the verdict was computed against
@@ -380,17 +359,17 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor }: { fitness: BikeFitn
         <>
           <span className="basis-full text-left text-white/45 text-[12px]">No hard efforts yet, so there is no threshold read</span>
           <p className="basis-full text-[12px] text-white/45 leading-snug mt-1 max-w-[min(100%,340px)]">
-            A threshold, sweet-spot, tempo or climbing ride records a 20-minute power max, and that is what an FTP read is built from. Easy rides carry no max to read, so the bike is read on heart rate at the same power until one is logged.
+            {/* 2026-09-03: the heart-rate clause is cut — the bike is read on power (p172), and the
+                book's two FTP tests are the 20-minute effort × 0.95 and the ramp (pp.212–213). */}
+            A threshold, sweet-spot, tempo or climbing ride records a 20-minute power max, and that is what an FTP read is built from. Easy rides carry no max to read.
           </p>
         </>
       ) : (
         <span className="basis-full text-white/45 text-[12px]">Not enough hard rides yet for a threshold read</span>
       ))}
-      {aerobicLead && (
-        <span className="basis-full text-white/45 text-[12px]">
-          Your heart rate at the same power{(fitness.efficiency.sampleCount ?? 0) > 0 ? `, from ${fitness.efficiency.sampleCount} easy ${fitness.efficiency.sampleCount === 1 ? 'ride' : 'rides'}` : ''}
-        </span>
-      )}
+      {/* ⛔ "Your heart rate at the same power, from N easy rides" DELETED (2026-09-03, Michael:
+          "lose the heart rate sentence, keep it strict to the book"). It described a read the card no
+          longer makes. The ride count it carried is not lost — the rides card states its own. */}
       {/* The receipt: window · rides · recency. The provenance lines below it print open (one tap). */}
       {(tail || src || asOf(lead.newestAgeDays) || (showDot && anchor?.label)) && (
         <span className="basis-full flex items-baseline justify-between gap-2 text-white/55 text-[12px]">
@@ -1050,7 +1029,22 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   // S2: `stateDisplay` is the server-assembled display contract from the coach payload. When present the
   // hook renders it (no in-browser queries/assembly); absent → legacy live path (safe rollout fallback).
   const { cards, bikeFitness, runFitness, strengthFitness, swimRest, swimVolume, fitnessMode, fitnessAnchors, cadenceCounts, posture: declaredPosture, activeDisciplines, loading } = useStateTrends(stateDisplay);
-  const { useImperial } = useAppContext(); // for the collapsed run pace-at-HR glance
+  const { useImperial, loadUserBaselines } = useAppContext(); // for the collapsed run pace-at-HR glance
+  // ⛔ ONE FTP RESOLVE FOR THE WHOLE SECTION (2026-09-03). The collapsed bike row and the open bike
+  // card both print the FTP on record; resolving it twice could print two numbers for one fact.
+  // Server anchor first (`fitnessAnchors.bike`), this only fills the gap until the next ingest.
+  const bikeAnchorValue = fitnessAnchors?.bike?.value ?? null;
+  const [fallbackFtp, setFallbackFtp] = React.useState<number | null>(null);
+  React.useEffect(() => {
+    if (bikeAnchorValue != null) return;            // server already told us; don't ask twice
+    let cancelled = false;
+    void loadUserBaselines?.().then((b: any) => {
+      if (cancelled || !b) return;
+      const r = resolveCurrentFtp({ learned_fitness: b.learned_fitness, performance_numbers: b.performanceNumbers });
+      if (r?.value != null) setFallbackFtp(Math.round(r.value));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [bikeAnchorValue, loadUserBaselines]);
   // ⛔ SLICE b — ONE READ, and it must sit ABOVE the early return or the hook order changes between
   // renders. It self-silences on any plan that is not a strength block (`not_a_strength_block`), so
   // calling it unconditionally costs one function invoke and buys a stable hook list.
@@ -1159,22 +1153,54 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       return [{ name: 'runs', value: String(n) }];
     }
     if (disc === 'bike') {
-      // THE REAL NUMBER LEADS (Michael 2026-09-01: "bike tells the user nothing"). Follow the server's
-      // own lead: power leading → recent watts (single-source, from the power series, NOT a client FTP
-      // resolve); otherwise the aerobic read is HR-at-easy-power, so show that bpm.
-      // ⚠️ The metric NAME now always renders (it is the row's left column), where the sentence form
-      // dropped it whenever a real value existed. Plain words per COPY-VOICE rule 9.
+      // ⛔ THE BIKE READS ON POWER, NOT HEART RATE (Michael 2026-09-03; the book, p172: power is the
+      // method for controlling cycling intensity and FTP is the number every ride prescription is a
+      // percentage of — it gives the bike no heart-rate read at all).
+      //
+      // ⛔ WHAT THIS REPLACED, AND WHY IT WAS THE WEAKER NUMBER. The row led with "heart rate at easy
+      // power · 130 bpm": what the heart did, with no mention of how much power produced it. 130 bpm at
+      // 90 W and 130 bpm at 150 W printed the same line. Efficiency factor carries BOTH — it IS watts
+      // per heartbeat — so the number the row led with was the weaker half of one it already had.
+      //
+      // ⚠️ SAME GRAMMAR AS THE RUN ROW: the read leads (efficiency factor, mirroring aerobic
+      // efficiency), the threshold number sits under it (FTP, mirroring the pace lines). Two rows, and
+      // both are facts — no verdict word, per the 2026-09-02 ruling.
       const bf = bikeFitness;
-      if (bf?.lead === 'power' && bf.power) {
-        const p = bf.power;
-        const recentW = p.recentValue ?? (Array.isArray(p.series) ? [...p.series].reverse().find((pt) => pt.recent)?.value ?? null : null);
-        const powerVal = recentW != null ? `${Math.round(recentW)} W` : null;
-        return [efficiencyRow({ label: 'power', value: powerVal, verdict: p.verdict, pctChange: p.pctChange, sampleCount: p.sampleCount, sinceMonth: changeMonth(asOf, p.windowDays), noun: 'ride' })];
+      const rows: SportRow[] = [];
+      // ⛔ ONE NUMBER, TWO SURFACES. The headline is the SAME median-of-the-last-five the open rides
+      // card prints (recentMedian over the ride spine), exactly as run's row shares its headline with
+      // the run card — the plate and the row cannot disagree.
+      const rideSpine = ((stateDisplay as { enduranceSpine?: Array<{ sport?: string; group?: string; points?: Array<{ efficiency?: number | null }> }> } | null | undefined)?.enduranceSpine)
+        ?.find((s) => s?.sport === 'ride');
+      const efVals = (rideSpine?.points ?? []).map((p) => p?.efficiency).filter((v): v is number => v != null);
+      const efHead = recentMedian(efVals, 5);
+      if (efHead != null) {
+        // ⚠️ THE ARROW ONLY, NEVER THE PERCENT. The direction is the server's aerobic verdict — same
+        // power, lower heart rate, which is the same physiology a rising watts-per-beat states. Its
+        // `pctChange` belongs to the BPM series, so printing it beside a watts-per-beat number would
+        // attach one series' movement to another's value. Arrow rules as everywhere: ↑ improving,
+        // ↓ sliding, nothing for holding / needs_data / withheld.
+        const dir = bf?.efficiency?.verdict === 'improving' ? 'up' : bf?.efficiency?.verdict === 'sliding' ? 'down' : null;
+        const n = Math.min(5, efVals.length);
+        rows.push({
+          name: 'efficiency factor',
+          value: fmtEff(efHead, true),
+          note: `last ${n} ride${n === 1 ? '' : 's'}`,
+          arrow: dir === 'up' ? '↑' : dir === 'down' ? '↓' : undefined,
+          arrowCls: dir === 'up' ? NUMERIC.improving.cls : NUMERIC.sliding.cls,
+        });
       }
-      const e = bf?.efficiency;
-      if (!e) return [{ name: 'rides', value: 'none logged' }];
-      const effVal = e.recentValue != null ? `${e.recentValue} bpm` : null;
-      return [efficiencyRow({ label: 'heart rate at easy power', value: effVal, verdict: e.verdict, pctChange: e.pctChange, sampleCount: e.sampleCount, sinceMonth: changeMonth(asOf, e.windowDays), noun: 'ride' })];
+      // ⛔ THE THRESHOLD NUMBER, WITH ITS PROVENANCE. Estimated vs tested is the difference between a
+      // number read off hard rides and one the athlete tested for, and the book gives two tests for it
+      // (20 min × 0.95, or the ramp) — so the word is a fact the rider can act on, not decoration.
+      const ftp = bikeAnchorValue != null ? Math.round(bikeAnchorValue) : fallbackFtp;
+      const ftpBasis = bf?.efficiency?.basis === 'personal' ? 'tested'
+        : bf?.efficiency?.basis === 'coggan_ftp' ? 'estimated' : null;
+      if (ftp != null) rows.push({ name: 'FTP', value: `${ftp} W`, note: ftpBasis ?? undefined });
+      if (rows.length) return rows;
+      // Nothing measurable yet — the ride count, never a fabricated number.
+      const n = Number(bf?.efficiency?.sampleCount ?? 0) || 0;
+      return [{ name: 'rides', value: n > 0 ? String(n) : 'none logged' }];
     }
     if (disc === 'swim') {
       // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
@@ -1314,8 +1340,11 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
             // bike plate looks exactly as before for an athlete with no rides.
             if (card.discipline === 'bike' && bikeHasSubstance) return (
               <>
-                <BikeFitnessRow fitness={bikeFitness!} showAxis={showAxis} mode={fitnessMode.bike ?? 'trend_only'} anchor={fitnessAnchors.bike} />
-                <EnduranceReadCards sessions={enduranceSessions} spine={enduranceSpine} sport="ride" />
+                <BikeFitnessRow fitness={bikeFitness!} showAxis={showAxis} mode={fitnessMode.bike ?? 'trend_only'} anchor={fitnessAnchors.bike} fallbackFtp={fallbackFtp} />
+                {/* ⛔ NO CONDITIONS FOOTER ON THE BIKE (Michael 2026-09-03: "kill the hills and heat, kill
+                    any run crossover"). "Hills and heat can have an impact. Trust your RPE" is written for
+                    a runner reading pace; a ride is read on power, which heat and gradient do not inflate. */}
+                <EnduranceReadCards sessions={enduranceSessions} spine={enduranceSpine} sport="ride" footer={false} />
               </>
             );
             // ⛔ RUN OWNS ITS PLATE (Round 3 pass 2) — the run efficiency cards, and ONLY those. No
@@ -1353,7 +1382,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
             // verdict still owns its rides; strength with lifting but no e1RM trend still owns its
             // week. Each is gated by its own content, so nothing new appears.
             const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} showAxis={showAxis} />;
-            if (card.discipline === 'bike') return <>{row}<EnduranceReadCards sessions={enduranceSessions} spine={enduranceSpine} sport="ride" /></>;
+            if (card.discipline === 'bike') return <>{row}<EnduranceReadCards sessions={enduranceSessions} spine={enduranceSpine} sport="ride" footer={false} /></>;
             if (card.discipline === 'strength') return <>{row}{strengthDetail}<ViadaWeekCard week={viadaWeek} hasPlan={hasActivePlan === true} /></>;
             return row;
           })();
