@@ -135,7 +135,16 @@ function driftReadForPoint(hrs: any, wa: any, factDrift: number | null | undefin
   // 3 that were left. TrainingPeaks prints Pa:Hr on every run; Friel reads it on steady efforts, and the
   // run's TYPE says whether it was steady — a 45-minute easy run with stops and hills is still an easy run.
   const steps = Number(wa?.fact_packet_v1?.derived?.interval_execution?.total_steps);
-  const steady = !(Number.isFinite(steps) && steps > 2);
+  // ⛔ A DRIFT READ NEEDS A STEADY EFFORT — Friel's condition on Pa:Hr / Pw:Hr, and the analyser already
+  // tests for it: `decouplingMixedEffort` is its pace-variance verdict that this session was NOT a steady
+  // effort (an unlinked interval run the classifier called "steady_state" — 2026-08-28, 16 × 0.1 mi cruise
+  // intervals from the plan, imported without its link — carries it). Earlier on 2026-09-04 that flag was
+  // taken out of this decision as "a hedge, not a filter"; that was wrong: it is the steady-effort test
+  // itself, and without it the interval run's 18.6% headlined the drift chart. Michael: "it didn't fall
+  // apart — it was intervals, programmed, part of the plan." Both signals decide: planned steps, or the
+  // measured variance.
+  const mixed = hrs?.decouplingMixedEffort === true;
+  const steady = !(Number.isFinite(steps) && steps > 2) && !mixed;
   const dec = typeof hrs?.decouplingPct === 'number' && Number.isFinite(hrs.decouplingPct) ? hrs.decouplingPct : null;
   const pdec = typeof powerDecouplingPct === 'number' && Number.isFinite(powerDecouplingPct) ? powerDecouplingPct : null;
   const v1 = typeof wa?.hr_drift_v1?.pct === 'number' && Number.isFinite(wa.hr_drift_v1.pct) ? wa.hr_drift_v1.pct : null;
