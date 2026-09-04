@@ -279,7 +279,7 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
           Friel's guidance is to compare like with like. Ledger: docs/STATE-SOURCES.md. */}
       {pts.some((p) => typeof p.tempF === 'number' && p.tempF >= 72) && (
         <div className="text-[11px] text-white/45 mt-1 leading-snug">
-          Heat raises heart rate at the same {isRide ? 'power' : 'pace'}, so efficiency reads lower and drift reads higher on hot days. TrainingPeaks doesn't correct for it; compare hot days with hot days.
+          Heat raises heart rate at the same {isRide ? 'power' : 'pace'}, so efficiency reads lower and drift reads higher on hot days.
         </div>
       )}
     </div>
