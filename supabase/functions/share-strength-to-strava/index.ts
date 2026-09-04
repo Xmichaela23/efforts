@@ -26,7 +26,7 @@ serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders() });
     if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
-    const { workoutId } = await req.json().catch(() => ({}));
+    const { workoutId, auto } = await req.json().catch(() => ({}));
     if (!workoutId) return json({ error: 'Missing workoutId' }, 400);
 
     // ⛔ THE CALLER'S OWN VERIFIED JWT DECIDES WHOSE WORKOUT THIS IS — never a userId from the body.
@@ -35,14 +35,38 @@ serve(async (req) => {
     // service key both fail it, because neither carries a `sub`.
     const { userId, supabase } = await requireUser(req);
 
+    // ⛔ AN AUTOMATIC POST IS RE-CHECKED HERE, NEVER TRUSTED FROM THE CALLER (2026-09-03). The switch
+    // lives on `users.preferences.strava_auto_share_strength` and the SERVER reads it, so a stale
+    // client — an old tab, a cached bundle, a session that started before the athlete turned it off —
+    // cannot post to a feed the athlete has closed. A button press (`auto` absent) is the athlete
+    // asking in the moment and needs no preference.
+    if (auto === true) {
+      const { data: prefRow } = await supabase
+        .from('users')
+        .select('preferences')
+        .eq('id', userId)
+        .maybeSingle();
+      const on = (prefRow?.preferences as Record<string, unknown> | null)?.strava_auto_share_strength === true;
+      if (!on) return json({ ok: true, skipped: 'auto_off' });
+    }
+
     const { data: workout, error: wErr } = await supabase
       .from('workouts')
-      .select('id, user_id, name, type, date, timestamp, duration, moving_time, elapsed_time, workout_status, strength_exercises, metrics')
+      .select('id, user_id, name, type, date, timestamp, duration, moving_time, elapsed_time, workout_status, strength_exercises, metrics, strava_shared_activity_id')
       .eq('id', workoutId)
       .eq('user_id', userId)
       .maybeSingle();
 
     if (wErr || !workout) return json({ error: 'Workout not found' }, 404);
+
+    // ⛔ AN AUTOMATIC POST NEVER DOUBLE-POSTS. A button press may (the athlete is asked to confirm and
+    // may genuinely want a second copy); a save that fires twice must not put the same lift in the feed
+    // twice. ⚠️ The receipt column is read defensively: on a database that has not taken the migration
+    // yet the field is simply absent, and an automatic post proceeds as it did before it existed.
+    const priorShare = String((workout as Record<string, unknown>).strava_shared_activity_id ?? '');
+    if (auto === true && /^\d+$/.test(priorShare)) {
+      return json({ ok: true, skipped: 'already_shared', activityId: priorShare });
+    }
     if (String(workout.type ?? '').toLowerCase() !== 'strength') {
       return json({ error: 'Only strength sessions are shared this way — rides and runs already come FROM Strava.' }, 400);
     }

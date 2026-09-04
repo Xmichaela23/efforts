@@ -68,6 +68,11 @@ const Connections: React.FC = () => {
   const navigate = useNavigate();
   const [sourcePreference, setSourcePreference] = useState<'garmin' | 'strava' | 'both'>('both');
   const [swimOverride, setSwimOverride] = useState(false); // D-173: route swims to Garmin (per-discipline)
+  // ⛔ OFF UNTIL THE ATHLETE TURNS IT ON (2026-09-03). Posting to Strava puts a session in front of
+  // other people; the first one is a decision, not a default. The server holds the same preference and
+  // re-checks it — `share-strength-to-strava` refuses an automatic post when this is off, so the switch
+  // cannot be bypassed by a stale client.
+  const [autoShareLifts, setAutoShareLifts] = useState(false);
   const [savingPreference, setSavingPreference] = useState(false);
   
   // Apple Health state (only relevant on iOS native app)
@@ -168,6 +173,7 @@ const Connections: React.FC = () => {
         setSourcePreference(userData.preferences.source_preference);
       }
       setSwimOverride((userData?.preferences as any)?.swim_source_override === 'garmin');
+      setAutoShareLifts((userData?.preferences as Record<string, unknown> | null)?.strava_auto_share_strength === true);
     } catch (error) {
       console.error('Error loading source preference:', error);
     }
@@ -190,6 +196,29 @@ const Connections: React.FC = () => {
     } catch (error) {
       setSwimOverride(!next); // revert
       toast({ title: 'Error', description: 'Could not save swim source.', variant: 'destructive' });
+    }
+  };
+
+  // Post every finished lifting session to Strava, without being asked each time.
+  const toggleAutoShareLifts = async () => {
+    const next = !autoShareLifts;
+    setAutoShareLifts(next); // optimistic
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser?.id) throw new Error('Not authenticated');
+      const { data: userData } = await supabase.from('users').select('preferences').eq('id', authUser.id).single();
+      const currentPrefs = userData?.preferences || {};
+      const { error } = await supabase.from('users')
+        .update({ preferences: { ...currentPrefs, strava_auto_share_strength: next } })
+        .eq('id', authUser.id);
+      if (error) throw error;
+      toast({
+        title: next ? 'Lifts post to Strava' : 'Automatic posting off',
+        description: next ? 'Every finished lifting session goes up on its own. You can still post one at a time.' : undefined,
+      });
+    } catch {
+      setAutoShareLifts(!next); // revert
+      toast({ title: 'Error', description: 'Could not save that.', variant: 'destructive' });
     }
   };
 
@@ -1340,6 +1369,33 @@ const Connections: React.FC = () => {
         swimOverride={swimOverride}
         onToggleSwimOverride={toggleSwimOverride}
       />
+
+      {/* ⛔ THE ONE PLACE LIFTS GO OUT (2026-09-03). Only when Strava is connected — a switch for a
+          connection you do not have is a promise the app cannot keep. Off by default: the first post to
+          a feed other people read is the athlete's decision. Runs and rides are not offered here because
+          they arrive FROM Strava; posting one back would put it in the feed twice. */}
+      {!!connections.find((c) => c.provider === 'strava')?.connected && (
+        <div className="rounded-2xl border border-white/[0.10] bg-white/[0.04] p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[13px] text-white/85">Post lifts to Strava</div>
+              <div className="text-[11px] text-white/45 leading-snug mt-0.5">
+                Every finished lifting session goes up on its own, with your exercises, sets and weights
+                written out. Runs and rides already come from Strava, so they stay put.
+              </div>
+            </div>
+            <button
+              onClick={toggleAutoShareLifts}
+              role="switch"
+              aria-checked={autoShareLifts}
+              aria-label="Post lifts to Strava automatically"
+              className={`shrink-0 w-11 h-6 rounded-full relative transition-colors ${autoShareLifts ? 'bg-emerald-500/60' : 'bg-white/15'}`}
+            >
+              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${autoShareLifts ? 'right-0.5' : 'left-0.5'}`} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="text-center text-sm text-white/70">
         <p>

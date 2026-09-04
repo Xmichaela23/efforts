@@ -4721,6 +4721,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       void supabase.functions.invoke('auto-attach-planned', {
         body: { workout_id: savedWorkoutId }
       }).catch(() => { /* server-side attach paths cover this; never block the save UI on it */ });
+
+      // ⛔ POST THIS LIFT TO STRAVA — ONLY IF THE ATHLETE TURNED THAT ON (2026-09-03). `auto: true`
+      // makes the SERVER re-read `users.preferences.strava_auto_share_strength` and refuse when it is
+      // off, so this call is safe to make unconditionally and a stale client can never post to a feed
+      // the athlete has closed. The server also refuses to post the same session twice on this path.
+      // ⚠️ Fire-and-forget, like the two above: a save is never blocked, delayed or failed by Strava.
+      void supabase.functions.invoke('share-strength-to-strava', {
+        body: { workoutId: savedWorkoutId, auto: true }
+      }).catch(() => { /* the athlete can still post it by hand from the session */ });
     } catch (e) {
       // Only update state if component is still mounted
       if (isMountedRef.current) {
