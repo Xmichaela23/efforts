@@ -285,7 +285,8 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor, fallbackFtp = null }:
   // Traced from `learn-fitness-profile` (STEP 4): tier 1 is best 20-min power × 0.95, gated on
   // hard efforts and 20–120 min rides. Coggan's field protocol — the same arithmetic as a 20-minute
   // test, taken from 20 minutes the athlete already rode hard rather than asking them to test.
-  const ftpMethod = src === 'est (FTP)' ? ' FTP is estimated from your hard rides — 95% of your best 20 minutes.' : '';
+  // 2026-09-04: the estimate is the power-duration fit (TrainerRoad / intervals.icu), not 95% of a best 20.
+  const ftpMethod = src === 'est (FTP)' ? ' FTP is estimated from your rides: your best power at each length from 2 to 20 minutes, fitted to a curve. It changes only when you accept a new number.' : '';
   // The dot and the "accept your FTP" tag belong to a REAL read; a withheld or absent one gets neither.
   const showDot = anchored && range != null && assertsLead && leadIsPower;
   const trendOnly = !anchored && assertsLead && leadIsPower;
@@ -335,7 +336,7 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor, fallbackFtp = null }:
           // basis IS the estimate (`src === 'est (FTP)'`, from `efficiency.basis === 'coggan_ftp'`).
           // It passes the ⓘ test (D-357): it describes HOW THE METRIC IS MADE, true for anyone,
           // not where this athlete sits.
-          ? `Power = how much power you are producing on rides, measured against your FTP.${ftpMethod}`
+          ? `Power = your best 20-minute power on similar terrain, shown against your FTP.${ftpMethod}`
           : `Efficiency = how much power you hold per heartbeat on steady rides. Rising means the same work at a lower heart rate — getting fitter.${ftpMethod}`} />
       ) : (
         <Signal label={ftpNow != null ? `${ftpNow} W threshold` : 'Power'} sig={lead} />
@@ -379,7 +380,7 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor, fallbackFtp = null }:
         <span className="basis-full flex flex-col gap-0.5 mt-0.5 text-[12px] text-white/45">
           {/* WHERE YOU SIT — the dot/arrow legend, which is about this athlete rather than about the
               metric, so it lives here rather than in the ⓘ. Only when there IS a dot to explain. */}
-          {showDot && <span>The dot is where you sit against your own baseline; the arrow is the direction.</span>}
+          {showDot && <span>The dot is where this number sits in your last 12 weeks.</span>}
           {/* ⛔ THE NUMBER THE READ WAS COMPUTED AGAINST, not one resolved here. It rides on the anchor
               (`FitnessAnchor.value`) so the FTP shown and the FTP behind the verdict are the same
               number by construction. Resolving it client-side would give one that is *probably* the

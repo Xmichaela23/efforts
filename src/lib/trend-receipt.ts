@@ -10,14 +10,15 @@ export type Discipline = 'run' | 'bike' | 'swim' | 'strength';
 
 /** "6wk" from 42, "8wk" from 56. */
 export function windowLabel(days: number): string {
-  return `${Math.max(1, Math.round(days / 7))}wk`;
+  const w = Math.max(1, Math.round(days / 7));
+  return `${w} ${w === 1 ? 'week' : 'weeks'}`; // 2026-09-04 (Michael: unclear) — words, not "8wk"
 }
 
 /** "4d ago" / "today". Bare (the noun is already in the "5 runs" count) for row-width. Empty when unknown. */
 export function recencyLabel(ageDays: number | null | undefined): string {
   if (ageDays == null) return '';
-  if (ageDays <= 0) return 'today';
-  return `${ageDays}d ago`;
+  if (ageDays <= 0) return 'newest today';
+  return `newest ${ageDays} ${ageDays === 1 ? 'day' : 'days'} ago`;
 }
 
 /** singular noun: "run" / "ride" / "swim" / "session". */
@@ -42,7 +43,7 @@ export function trendEvidence(args: {
    *  and recency still belong here — they are not stated anywhere else. */
   omitCount?: boolean;
 }): string {
-  const parts = [`over ${windowLabel(args.windowDays)}`];
+  const parts = [`last ${windowLabel(args.windowDays)}`]; // 2026-09-04 (Michael: unclear) — "last 8 weeks", not "over 8wk"
   if (!args.omitCount) parts.push(unitLabel(args.discipline, args.sampleCount));
   const rec = recencyLabel(args.newestAgeDays);
   if (rec) parts.push(rec);

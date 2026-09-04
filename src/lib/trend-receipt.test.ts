@@ -16,13 +16,13 @@ Deno.test('trendHeadline: improving/sliding/holding', () => {
 });
 
 // ── helpers ─────────────────────────────────────────────────────────────────────────────────────
-Deno.test('windowLabel: 42→6wk, 56→8wk', () => {
-  assertEquals(windowLabel(42), '6wk');
-  assertEquals(windowLabel(56), '8wk');
+Deno.test('windowLabel: 42→6 weeks, 56→8 weeks', () => {
+  assertEquals(windowLabel(42), '6 weeks');
+  assertEquals(windowLabel(56), '8 weeks');
 });
 Deno.test('recencyLabel: today / Nd ago / unknown', () => {
-  assertEquals(recencyLabel(0), 'today');
-  assertEquals(recencyLabel(4), '4d ago');
+  assertEquals(recencyLabel(0), 'newest today');
+  assertEquals(recencyLabel(4), 'newest 4 days ago');
   assertEquals(recencyLabel(null), '');
 });
 Deno.test('unitLabel: pluralization', () => {
@@ -37,25 +37,25 @@ const RUN = { windowDays: 42, discipline: 'run' as const };
 Deno.test('run improving — the exact 2026-07-02 case', () => {
   assertEquals(
     trendReceipt({ ...RUN, verdict: 'improving', pctChange: -6.5, sampleCount: 5, newestAgeDays: 4 }),
-    '↑6.5% over 6wk · 5 runs · 4d ago',
+    '↑6.5% last 6 weeks · 5 runs · newest 4 days ago',
   );
 });
 Deno.test('run sliding', () => {
   assertEquals(
     trendReceipt({ ...RUN, verdict: 'sliding', pctChange: 4.2, sampleCount: 4, newestAgeDays: 9 }),
-    '↓4.2% over 6wk · 4 runs · 9d ago',
+    '↓4.2% last 6 weeks · 4 runs · newest 9 days ago',
   );
 });
 Deno.test('run holding', () => {
   assertEquals(
     trendReceipt({ ...RUN, verdict: 'holding', pctChange: 0.8, sampleCount: 6, newestAgeDays: 2 }),
-    'Holding over 6wk · 6 runs · 2d ago',
+    'Holding last 6 weeks · 6 runs · newest 2 days ago',
   );
 });
 Deno.test('run needs_data (TOO FEW) — declares "easy-pace runs" (D-237), not bare "runs"', () => {
   assertEquals(
     trendReceipt({ ...RUN, verdict: 'needs_data', pctChange: null, sampleCount: 2, newestAgeDays: 5 }),
-    'Nothing to compare yet — 2 easy-pace runs in 6wk; needs one in each 4-week half',
+    'Nothing to compare yet — 2 easy-pace runs in 6 weeks; needs one in each 4-week half',
   );
 });
 
@@ -64,13 +64,13 @@ Deno.test('run needs_data (TOO FEW) — declares "easy-pace runs" (D-237), not b
 Deno.test('run needs_data ignores a cached floor and says what a blank now means', () => {
   assertEquals(
     trendReceipt({ ...RUN, verdict: 'needs_data', pctChange: null, sampleCount: 3, newestAgeDays: 4, floor: 4 }),
-    'Nothing to compare yet — 3 easy-pace runs in 6wk; needs one in each 4-week half',
+    'Nothing to compare yet — 3 easy-pace runs in 6 weeks; needs one in each 4-week half',
   );
 });
 Deno.test('singular "run" pluralization', () => {
   assertEquals(
     trendReceipt({ ...RUN, verdict: 'needs_data', pctChange: null, sampleCount: 1, newestAgeDays: 2 }),
-    'Nothing to compare yet — 1 easy-pace run in 6wk; needs one in each 4-week half',
+    'Nothing to compare yet — 1 easy-pace run in 6 weeks; needs one in each 4-week half',
   );
 });
 
@@ -78,19 +78,19 @@ Deno.test('singular "run" pluralization', () => {
 Deno.test('swim needs_data (STALE) — 6 swims but too old → cites recency, not the count floor', () => {
   assertEquals(
     trendReceipt({ windowDays: 56, discipline: 'swim', verdict: 'needs_data', pctChange: null, sampleCount: 6, newestAgeDays: 20, stale: true }),
-    'Last swim 20d ago — too old to trend (6 in 8wk)',
+    'Last swim 20d ago — too old to trend (6 in 8 weeks)',
   );
 });
 Deno.test('stale without a known age → still never says "need X" (no contradiction)', () => {
   assertEquals(
     trendReceipt({ windowDays: 56, discipline: 'swim', verdict: 'needs_data', pctChange: null, sampleCount: 6, newestAgeDays: null, stale: true }),
-    'No recent swims to trend (6 in 8wk)',
+    'No recent swims to trend (6 in 8 weeks)',
   );
 });
 Deno.test('run improving — newest today', () => {
   assertEquals(
     trendReceipt({ ...RUN, verdict: 'improving', pctChange: -3.1, sampleCount: 5, newestAgeDays: 0 }),
-    '↑3.1% over 6wk · 5 runs · today',
+    '↑3.1% last 6 weeks · 5 runs · newest today',
   );
 });
 
@@ -103,20 +103,20 @@ Deno.test('bike sub-trend verdicts', () => {
 Deno.test('bike shared evidence tail', () => {
   assertEquals(
     trendEvidence({ windowDays: 56, sampleCount: 12, newestAgeDays: 2, discipline: 'bike' }),
-    'over 8wk · 12 rides · 2d ago',
+    'last 8 weeks · 12 rides · newest 2 days ago',
   );
 });
 Deno.test('bike full row composition (Power · Efficiency + shared tail)', () => {
   const power = subTrendVerdict('Power', 'improving', 3.6);
   const eff = subTrendVerdict('Efficiency', 'improving', 5.2);
   const tail = trendEvidence({ windowDays: 56, sampleCount: 12, newestAgeDays: 2, discipline: 'bike' });
-  assertEquals(`${power} · ${eff} ${tail}`, 'Power ↑3.6% · Efficiency ↑5.2% over 8wk · 12 rides · 2d ago');
+  assertEquals(`${power} · ${eff} ${tail}`, 'Power ↑3.6% · Efficiency ↑5.2% last 8 weeks · 12 rides · newest 2 days ago');
 });
 
 // ── SWIM needs_data (the "none this week" case → still says the window count) ────────────────────
 Deno.test('swim needs_data', () => {
   assertEquals(
     trendReceipt({ windowDays: 56, discipline: 'swim', verdict: 'needs_data', pctChange: null, sampleCount: 0, newestAgeDays: null }),
-    'Nothing to compare yet — 0 swims in 8wk; needs one in each 4-week half',
+    'Nothing to compare yet — 0 swims in 8 weeks; needs one in each 4-week half',
   );
 });
