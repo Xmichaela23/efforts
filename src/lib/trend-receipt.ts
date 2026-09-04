@@ -60,12 +60,12 @@ export function trendReceipt(args: {
   sampleCount: number;
   newestAgeDays: number | null | undefined;
   discipline: Discipline;
-  stale?: boolean; // needs_data is a staleness decay (enough samples, too old) — cite recency, not count
-  floor?: number; // minSessions floor for the needs_data message
+  stale?: boolean; // kept for old cached rows; the server no longer decays a trend for age
+  floor?: number; // kept for old cached rows; the only floor is now one session in each 4-week half
 }): string {
   // estimate-ok: `floor` is the real minSessions from the trend cache; the `= 3` covers only
   // old cache / strength no-series rows (documented default, cf. the run-cadence fix).
-  const { verdict, pctChange, windowDays, sampleCount, newestAgeDays, discipline, stale, floor = 3 } = args;
+  const { verdict, pctChange, windowDays, sampleCount, newestAgeDays, discipline, stale } = args;
   const win = windowLabel(windowDays);
   if (verdict === 'needs_data') {
     // Two distinct causes, honestly distinguished: STALE (enough samples, newest too old) cites recency
@@ -76,12 +76,12 @@ export function trendReceipt(args: {
         : `No recent ${unitNoun(discipline)}s to trend (${sampleCount} in ${win})`;
     }
     // D-237: run's trend counts only comparable-EASY runs — declare that, so "N runs" doesn't read as
-    // total-run scarcity (the athlete may run often but rarely easy). The floor is now scaled off
-    // easy-run cadence too (assemble.ts), so this fires only when easy runs are genuinely too few.
+    // total-run scarcity. Garmin's rule (2026-09-04): the last 4 weeks against the 4 before, so the
+    // only way to have nothing is a 4-week half with no session in it.
     const tooFewLabel = discipline === 'run'
       ? `${sampleCount} easy-pace run${sampleCount === 1 ? '' : 's'}`
       : unitLabel(discipline, sampleCount);
-    return `Not enough data yet — ${tooFewLabel} in ${win} (need ${floor})`;
+    return `Nothing to compare yet — ${tooFewLabel} in ${win}; needs one in each 4-week half`;
   }
   const evidence = trendEvidence(args);
   const pct = pctChange == null ? null : Math.abs(pctChange);

@@ -86,13 +86,19 @@ Deno.test('computeStrengthVolumeState: falling volume → sliding (less training
   assertEquals(t.verdict, 'sliding');
 });
 
-// Wider band: a small volume wobble (<8%) reads holding, not a direction.
-Deno.test('computeStrengthVolumeState: small wobble (<8%) → holding', () => {
-  const series = [
+// Garmin's rule, no band of ours: the recent 28-day average against the 28 before. Higher → improving;
+// the same digits at whole lb → holding (→).
+Deno.test('computeStrengthVolumeState: last 28 days vs the 28 before — higher → improving; same whole lb → holding', () => {
+  const up = computeStrengthVolumeState([
     { date: '2026-05-25', value: 12000 },
     { date: '2026-06-08', value: 12300 },
     { date: '2026-06-22', value: 12100 },
-  ];
-  const t = computeStrengthVolumeState(series, AS_OF, series.length / WEEKS_90D);
-  assert(t.verdict === 'holding' || t.verdict === 'needs_data');
+  ], AS_OF, 3 / WEEKS_90D);
+  assertEquals(up.verdict, 'improving');
+  assertEquals(up.pctChange, 1.7);
+  const flat = computeStrengthVolumeState([
+    { date: '2026-05-25', value: 12000 },
+    { date: '2026-06-22', value: 12000.4 },
+  ], AS_OF, 2 / WEEKS_90D);
+  assertEquals(flat.verdict, 'holding');
 });

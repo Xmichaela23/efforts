@@ -56,7 +56,9 @@ Deno.test('⛔ HEAT IN STEP WITH THE CALENDAR → the headline is WITHHELD AND N
    * The live −22%: eighteen easy runs, all between 69 and 89°F, the hottest ones the latest. Heat
    * and time were one axis, the joint fit split the heat cost between them, and the row read
    * "declining". Here the decline is PURELY heat (fitness flat) on a monotone summer ramp. The screen
-   * must show a withheld verdict with the reason attached — not a direction, not a percent.
+   * carries the route's reason as a receipt. The verdict itself is Garmin's 28/28 rule over the aerobic
+   * spine (ruling 1, 2026-09-04); with no spine in this fixture the fallback easy-group series reads,
+   * and its pace is flat (330 s/km) so the index is flat → holding. The route no longer overrides it.
    */
   const temps = Array.from({ length: 14 }, (_, i) => 64 + i * 2);            // 64 → 90°F, with the calendar
   const rows = temps.map((t, i) => ({
@@ -66,8 +68,6 @@ Deno.test('⛔ HEAT IN STEP WITH THE CALENDAR → the headline is WITHHELD AND N
     temp_f: t, intent: null, workout_type: 'easy',
   }));
   const out = assembleStateTrends(base({ runEffHistory: rows })) as any;
-  assertEquals(out.runFitness.efficiency.verdict, 'withheld');
-  assertEquals(out.runFitness.efficiency.pctChange, null);
   assertEquals(out.runFitness.efficiency.route.withheld, 'heat_confounded_with_time');
   assertEquals(out.runFitness.efficiency.route.direction, 'still_learning');
   // ⚠️ The receipt keeps the count so the card can say "18 easy runs, all hot" rather than "too few".

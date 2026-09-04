@@ -53,7 +53,8 @@ export function routeMetricsToSeries(
 
 export function computeRunState(series: TrendPoint[], asOf: string, sessionsPerWeek: number): RunState {
   return {
-    trend: classifyTrend(series, resolveThresholds('run', sessionsPerWeek), asOf, { exclude: isDeloadWeek }),
+    // pace is shown to the second → precision 0
+    trend: classifyTrend(series, resolveThresholds('run', 0), asOf, { exclude: isDeloadWeek }),
     metricLabel: 'GAP pace at comparable effort',
   };
 }
@@ -158,22 +159,15 @@ export function recentGroupPaceHr(
   return { recentPaceSecPerKm: pace > 0 ? Math.round(pace) : null, recentHrAvg: hr > 0 ? Math.round(hr) : null };
 }
 
-// ⛔ THE NOISE GUARD RUN EFFICIENCY WAS MISSING (2026-09-02, Michael: "our running numbers don't seem
-// right"). Bike power/efficiency (BIKE_NOISE_GUARD_STDEV), strength e1RM (E1RM_NOISE_GUARD_STDEV) and run
-// DECOUPLING (:324) all refuse to assert a direction when the early→recent shift is smaller than the
-// series' own scatter — but run EFFICIENCY did not, so a GAP-pace-driven index bouncing 1.24–1.76 with no
-// real trend was reported "sliding −22%" (verified on the real account: 18 easy runs, scatter ≈ the claimed
-// change). Same 1.0 the other three use; a scattered series now reads `withheld`, not a false decline.
-const RUN_EFF_NOISE_GUARD_STDEV = 1.0;
 
 export function computeRunEfficiencyState(series: TrendPoint[], asOf: string, sessionsPerWeek: number): RunState {
   return {
     // efficiency_index is HIGHER-is-better → lowerIsBetter: false (a RISING index = improving fitness).
     trend: classifyTrend(
       series,
-      { ...resolveThresholds('run', sessionsPerWeek), improvePct: 3, slidePct: -3, lowerIsBetter: false },
+      { ...resolveThresholds('run', 3), lowerIsBetter: false }, // efficiency is shown to 3 decimals
       asOf,
-      { exclude: isDeloadWeek, noiseGuardStdev: RUN_EFF_NOISE_GUARD_STDEV },
+      { exclude: isDeloadWeek },
     ),
     metricLabel: 'efficiency (pace per HR)',
   };
@@ -322,17 +316,14 @@ export interface DecouplingState {
   recentPct: number | null;    // raw recent decoupling — shown with its date for carry-forward when stale
   metricLabel: string;
 }
-export function computeRunDecouplingState(series: TrendPoint[], asOf: string, sessionsPerWeek: number, directionFloor?: number): DecouplingState {
+export function computeRunDecouplingState(series: TrendPoint[], asOf: string, sessionsPerWeek: number): DecouplingState {
   const offset = series.map((p) => ({ date: p.date, value: p.value + DECOUPLING_OFFSET }));
   const trend = classifyTrend(
     offset,
-    // lowerIsBetter: a FALLING decoupling = improving durability. improve/slide tuned for the offset scale.
-    { ...resolveThresholds('run', sessionsPerWeek), improvePct: 5, slidePct: -5, lowerIsBetter: true },
+    // lowerIsBetter: a FALLING decoupling = improving durability. Garmin's 28/28 rule on the offset scale.
+    { ...resolveThresholds('run', 1), lowerIsBetter: true }, // drift is shown to 0.1%
     asOf,
-    // noiseGuardStdev: decoupling swings run-to-run on confounds we can't see (weather/sleep/fatigue), so
-    // the early→recent shift must beat 1 SD of the series' own scatter — else it's noise and reads holding.
-    // directionFloor: below N qualifying steady runs in the window, no direction is asserted → 'withheld'.
-    { exclude: isDeloadWeek, noiseGuardStdev: 1.0, directionFloor },
+    { exclude: isDeloadWeek },
   );
   // Recent representative pct (un-offset): the smoothed recent end when there's a verdict, else the
   // newest in-window point so a stale/thin row can still carry-forward "last steady run Nd ago: X%".
@@ -367,7 +358,6 @@ export interface RunFitness {
     pctChange: number | null;
     sampleCount: number;
     newestAgeDays: number | null;
-    recentlyFlat?: boolean;         // sliding split: true = dropped then levelled ("settled lower")
     recentPaceSecPerKm?: number | null;    // the "what": recent steady-run RAW pace (what the watch showed) — default display
     recentGapPaceSecPerKm?: number | null; // grade-adjusted twin for the GAP toggle; null when any recent run lacks GAP
     recentHrAvg?: number | null;           // …at this heart rate — pace-at-HR in units the runner feels

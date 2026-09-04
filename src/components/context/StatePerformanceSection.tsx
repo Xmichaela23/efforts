@@ -35,7 +35,7 @@ import EnduranceCheckpointSheet from '@/components/context/EnduranceCheckpointSh
 import LoadWeeksCard from '@/components/context/LoadWeeksCard';
 // ⛔ COLLAPSE TO ONE LINE PER SPORT (Round 3, 2026-09-01) — each sport shows a change-leading summary
 // and expands on tap. The summary wording is a set of pure functions so the confidence rule is pinned.
-import { changeMonth, efficiencyRow, recentMedian, strengthGlanceRows, type SportRow } from '@/lib/sport-summary';
+import { changeMonth, efficiencyRow, recentAverage, recentHalfPoints, strengthGlanceRows, type SportRow } from '@/lib/sport-summary';
 import { getStoredUserId } from '@/lib/supabase';
 import TrendSparkline from '@/components/context/TrendSparkline';
 import { liftStatusLine } from '@/lib/strength-calibration-copy';
@@ -46,7 +46,6 @@ const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> 
   holding: { word: '', cls: 'text-white/70', arr: '' }, // ⛔ NO WORD, NO ARROW (2026-09-01): "holding" meant both genuinely-flat AND too-noisy-to-call (Q-289). When the verdict can't call a direction, the row shows the number + count and stops.
   sliding: { word: 'down', cls: 'text-amber-300', arr: '' }, // ⛔ "easing off" told the athlete they CHOSE to ease off when the number simply dropped — interpretive and flattering (2026-09-01). State the measurement: down.
   needs_data: { word: 'needs data', cls: 'text-white/60', arr: '' },
-  withheld: { word: 'too few to read', cls: 'text-white/60', arr: '' },
 };
 
 // ── ARROW + NUMBER, NO WORD (2026-08-01, Michael from his own screen) ────────────────────────────
@@ -78,7 +77,6 @@ const NUMERIC: Record<TrendVerdict, { word: string; cls: string; arr: string }> 
   sliding: { word: '', cls: 'text-white/70', arr: '' },
   // Not verdicts — these two say "there is no reading", which no arrow can express. Words stay.
   needs_data: { word: 'needs data', cls: 'text-white/60', arr: '' },
-  withheld: { word: 'too few to read', cls: 'text-white/60', arr: '' },
 };
 
 // PRECISE VERDICT WORDS (2026-07-22, Michael — "all the words for every scenario has to be precise").
@@ -184,8 +182,7 @@ function Signal({ label, sig }: { label: string; sig: BikeSignal }) {
       <span className={`inline-flex items-baseline gap-0.5 ${v.cls}`}>
         {v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}
       </span>
-      {/* `withheld` prints no number — see FitnessDotBlock: the percent would BE the claim we just declined to make. */}
-      {sig.pctChange != null && sig.verdict !== 'needs_data' && sig.verdict !== 'withheld' && <span className="text-white/60">{verdictSignedPct(sig.verdict, sig.pctChange)}</span>}
+      {sig.pctChange != null && sig.verdict !== 'needs_data' && <span className="text-white/60">{verdictSignedPct(sig.verdict, sig.pctChange)}</span>}
       {sig.provisional && <span className="text-white/50 text-[12px]">prov</span>}
     </span>
   );
@@ -260,7 +257,7 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor, fallbackFtp = null }:
   // written before `lead` existed.
   const assertsLead = fitness.lead != null
     ? fitness.lead !== 'none'
-    : (lead.verdict !== 'needs_data' && lead.verdict !== 'withheld');
+    : lead.verdict !== 'needs_data';
   const aerobicLead = assertsLead && !leadIsPower;
   const building = !assertsLead;
   // The shared evidence tail. ⛔ THE COUNT IS DROPPED ON THE AEROBIC READ — its own line above already
@@ -423,7 +420,6 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor, fallbackFtp = null }:
           fmtVal={(v) => String(Math.round(v))}
           unit=" W"
           minSpanFraction={0.15}
-          recentLabel="recent 6 weeks in color"
         />
       )}
       {/* ⛔ THE CTL/"fitness" CHART IS REMOVED (2026-09-01). Its axis read "10–23 fitness" — the same
@@ -445,7 +441,6 @@ const VOLUME_WORD: Record<TrendVerdict, { word: string; cls: string; arr: string
   holding: { word: 'steady', cls: 'text-white/70', arr: '' }, // NEUTRAL — steady volume is not a caution
   sliding: { word: 'down', cls: 'text-white/50', arr: '' },
   needs_data: { word: 'needs data', cls: 'text-white/60', arr: '' },
-  withheld: { word: 'too few to read', cls: 'text-white/60', arr: '' },
 };
 
 // STRENGTH row — PER-LIFT estimated 1RM read (Strong/Hevy + RTS/RP, verified vs field + science 2026-07-19).
@@ -837,7 +832,7 @@ function FitnessDotBlock({ label, range, verdict, pctChange, provisional, wordMa
           // of what the engine decided. Withheld means we are not making a claim; the percent IS the
           // claim. (Only the bike lead passes `pctChange` here today — the card caller at :1035 omits
           // it — so this changes the bike row and nothing else.)
-          <span className={`inline-flex items-baseline gap-0.5 text-[13px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}{pctChange != null && verdict !== 'withheld' && <span className="text-white/60 ml-0.5">{verdictSignedPct(verdict, pctChange)}</span>}{provisional && <span className="text-white/50 text-[12px] ml-1">provisional</span>}</span>
+          <span className={`inline-flex items-baseline gap-0.5 text-[13px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}{pctChange != null && <span className="text-white/60 ml-0.5">{verdictSignedPct(verdict, pctChange)}</span>}{provisional && <span className="text-white/50 text-[12px] ml-1">provisional</span>}</span>
         )}
       </span>
       <FitnessDot pct={range.positionPct} confident={range.confident} />
@@ -1096,7 +1091,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       const rows = [rowFor('easy', 'easy'), rowFor('quality', 'hard')].filter((x): x is SportRow => !!x);
       // ⛔ AEROBIC EFFICIENCY IS THE TOP NUMBER, WITH ITS DIRECTION (Michael 2026-09-03: "we have a good
       // number now so I'm ok with the arrow"). The number is the SAME headline the open card prints — the
-      // median of the last five points of the spine's 'aerobic' series (recentMedian) — so plate and row
+      // average of the last 28 days of the spine's 'aerobic' series (recentAverage) — so plate and row
       // never disagree. The direction is the server's run efficiency verdict (`runFitness.efficiency`,
       // route-engine-owned, D-346), read here again after v182 took it off every screen.
       // ⚠️ ARROW RULES, unchanged from 2026-08-01 / 2026-09-01: ↑ improving, ↓ sliding, NOTHING for
@@ -1104,21 +1099,24 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       // is neutral-coloured — a drop is routinely correct (deload, taper, heat) and must not read as an
       // alarm. Signed percent beside it only when there is a direction; a percent next to "no reading"
       // is a claim in disguise.
-      const aero = ((stateDisplay as { enduranceSpine?: Array<{ sport?: string; group?: string; points?: Array<{ efficiency?: number | null }> }> } | null | undefined)?.enduranceSpine)
+      const aero = ((stateDisplay as { enduranceSpine?: Array<{ sport?: string; group?: string; points?: Array<{ date?: string; efficiency?: number | null }> }> } | null | undefined)?.enduranceSpine)
         ?.find((s) => s?.sport === 'run' && s?.group === 'aerobic');
-      const aeroVals = (aero?.points ?? []).map((p) => p?.efficiency).filter((v): v is number => v != null);
-      const aeroHead = recentMedian(aeroVals, 5);
+      const aeroPts = (aero?.points ?? []).filter((p): p is { date: string; efficiency: number } => p?.efficiency != null && !!p?.date).map((p) => ({ date: p.date, value: p.efficiency }));
+      // THE HEADLINE = the average of the last 28 days (Garmin), the half the arrow reads — one number on plate and row.
+      const headAsOf = asOf ?? aeroPts[aeroPts.length - 1]?.date ?? '';
+      const aeroVals = recentHalfPoints(aeroPts, headAsOf);
+      const aeroHead = recentAverage(aeroPts, headAsOf);
       if (aeroHead != null) {
         const ef = runFitness?.efficiency;
-        const dir = ef?.verdict === 'improving' ? 'up' : ef?.verdict === 'sliding' ? 'down' : null;
+        const dir = ef?.verdict === 'improving' ? 'up' : ef?.verdict === 'sliding' ? 'down' : ef?.verdict === 'holding' ? 'flat' : null;
         const pct = dir && ef?.pctChange != null && Number.isFinite(Number(ef.pctChange)) ? Number(ef.pctChange) : null;
-        const n = Math.min(5, aeroVals.length);
+        const n = aeroVals.length;
         rows.unshift({
           name: 'aerobic efficiency',
           value: fmtEff(aeroHead, false),
-          note: [pct != null ? `${pct > 0 ? '+' : ''}${Math.round(pct)}%` : '', `last ${n} run${n === 1 ? '' : 's'}`].filter(Boolean).join(' · '),
-          arrow: dir === 'up' ? '↑' : dir === 'down' ? '↓' : undefined,
-          arrowCls: dir === 'up' ? NUMERIC.improving.cls : NUMERIC.sliding.cls,
+          note: [pct != null ? `${pct > 0 ? '+' : ''}${Math.round(pct)}%` : '', `4 weeks · ${n} run${n === 1 ? '' : 's'}`].filter(Boolean).join(' · '),
+          arrow: dir === 'up' ? '↑' : dir === 'down' ? '↓' : dir === 'flat' ? '→' : undefined, // ↑ → ↓ are Garmin's three trend states
+          arrowCls: dir === 'up' ? NUMERIC.improving.cls : dir === 'down' ? NUMERIC.sliding.cls : NUMERIC.holding.cls,
         });
       }
       // ⛔ THE WEEK'S RUN POINTS AGAINST THE ATHLETE'S TYPICAL (Michael 2026-09-02: run load scored Strava's
@@ -1153,13 +1151,15 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       const bf = bikeFitness;
       const rows: SportRow[] = [];
       // ⛔ ONE NUMBER, TWO SURFACES. The headline is the SAME median-of-the-last-five the open rides
-      // card prints (recentMedian over the ride spine), exactly as run's row shares its headline with
+      // card prints (recentAverage over the ride spine), exactly as run's row shares its headline with
       // the run card — the plate and the row cannot disagree.
-      const rideSpine = ((stateDisplay as { enduranceSpine?: Array<{ sport?: string; group?: string; points?: Array<{ efficiency?: number | null; countsTowardTrend?: boolean }> }> } | null | undefined)?.enduranceSpine)
+      const rideSpine = ((stateDisplay as { enduranceSpine?: Array<{ sport?: string; group?: string; points?: Array<{ date?: string; efficiency?: number | null; countsTowardTrend?: boolean }> }> } | null | undefined)?.enduranceSpine)
         ?.find((s) => s?.sport === 'ride');
       // steady rides only — the same `countsTowardTrend` filter the open card applies, so plate and row stay one number
-      const efVals = (rideSpine?.points ?? []).filter((p) => p?.countsTowardTrend !== false).map((p) => p?.efficiency).filter((v): v is number => v != null);
-      const efHead = recentMedian(efVals, 5);
+      const efPts = (rideSpine?.points ?? []).filter((p): p is { date: string; efficiency: number; countsTowardTrend?: boolean } => p?.countsTowardTrend !== false && p?.efficiency != null && !!p?.date).map((p) => ({ date: p.date, value: p.efficiency }));
+      const efAsOf = asOf ?? efPts[efPts.length - 1]?.date ?? '';
+      const efVals = recentHalfPoints(efPts, efAsOf);
+      const efHead = recentAverage(efPts, efAsOf);
       // ⛔ FTP LEADS, EFFICIENCY FACTOR FOLLOWS (2026-09-03, checked against the field, not recalled).
       // The rider's first number is FTP and their second is watts per kilo; efficiency factor barely
       // appears in mainstream cycling apps — it is a coach's metric (TrainerRoad's W/kg material,
@@ -1178,14 +1178,14 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         // `pctChange` belongs to the BPM series, so printing it beside a watts-per-beat number would
         // attach one series' movement to another's value. Arrow rules as everywhere: ↑ improving,
         // ↓ sliding, nothing for holding / needs_data / withheld.
-        const dir = bf?.efficiency?.verdict === 'improving' ? 'up' : bf?.efficiency?.verdict === 'sliding' ? 'down' : null;
-        const n = Math.min(5, efVals.length);
+        const dir = bf?.efficiency?.verdict === 'improving' ? 'up' : bf?.efficiency?.verdict === 'sliding' ? 'down' : bf?.efficiency?.verdict === 'holding' ? 'flat' : null;
+        const n = efVals.length;
         rows.push({
           name: 'efficiency factor',
           value: fmtEff(efHead, true),
-          note: `last ${n} ride${n === 1 ? '' : 's'}`,
-          arrow: dir === 'up' ? '↑' : dir === 'down' ? '↓' : undefined,
-          arrowCls: dir === 'up' ? NUMERIC.improving.cls : NUMERIC.sliding.cls,
+          note: `4 weeks · ${n} ride${n === 1 ? '' : 's'}`,
+          arrow: dir === 'up' ? '↑' : dir === 'down' ? '↓' : dir === 'flat' ? '→' : undefined, // ↑ → ↓ are Garmin's three trend states
+          arrowCls: dir === 'up' ? NUMERIC.improving.cls : dir === 'down' ? NUMERIC.sliding.cls : NUMERIC.holding.cls,
         });
       }
       if (rows.length) return rows;
@@ -1340,7 +1340,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                 {/* ⛔ NO CONDITIONS FOOTER ON THE BIKE (Michael 2026-09-03: "kill the hills and heat, kill
                     any run crossover"). "Hills and heat can have an impact. Trust your RPE" is written for
                     a runner reading pace; a ride is read on power, which heat and gradient do not inflate. */}
-                <EnduranceReadCards sessions={enduranceSessions} spine={enduranceSpine} sport="ride" footer={false} />
+                <EnduranceReadCards asOf={asOf ?? null} sessions={enduranceSessions} spine={enduranceSpine} sport="ride" footer={false} />
               </>
             );
             // ⛔ RUN OWNS ITS PLATE (Round 3 pass 2) — the run efficiency cards, and ONLY those. No
@@ -1350,7 +1350,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
               <>
                 {/* 2026-09-03 (Michael): the reads first (efficiency, drift — how you responded), the workload chart
                     (how much, how hard) below them. */}
-                <EnduranceReadCards sessions={enduranceSessions} spine={enduranceSpine} sport="run" footer={false} />
+                <EnduranceReadCards asOf={asOf ?? null} sessions={enduranceSessions} spine={enduranceSpine} sport="run" footer={false} />
                 <LoadWeeksCard sport="run" load={(stateDisplay as any)?.loadByDiscipline?.run ?? null} />
                 {/* the conditions line blankets the whole run card — easy, hard, and the chart — once, at the end */}
                 {(enduranceSpine ?? []).some((s: any) => s?.sport === 'run' && (s?.points?.length ?? 0) >= 2) && <EnduranceConditionsLine />}
@@ -1378,7 +1378,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
             // verdict still owns its rides; strength with lifting but no e1RM trend still owns its
             // week. Each is gated by its own content, so nothing new appears.
             const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} showAxis={showAxis} />;
-            if (card.discipline === 'bike') return <>{row}<EnduranceReadCards sessions={enduranceSessions} spine={enduranceSpine} sport="ride" footer={false} /></>;
+            if (card.discipline === 'bike') return <>{row}<EnduranceReadCards asOf={asOf ?? null} sessions={enduranceSessions} spine={enduranceSpine} sport="ride" footer={false} /></>;
             if (card.discipline === 'strength') return <>{row}{strengthDetail}<ViadaWeekCard week={viadaWeek} hasPlan={hasActivePlan === true} /></>;
             return row;
           })();

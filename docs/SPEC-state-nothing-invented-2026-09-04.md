@@ -1,6 +1,6 @@
 # SPEC — Nothing on the State screen is invented
 
-**Status:** specified, not built. One terminal session.
+**Status:** BUILT, NOT DEPLOYED (2026-09-04). Server + client edited; `_shared/state-trend` fixtures green; nothing deployed. Acceptance 2 pending a deploy (compute-snapshot, coach) and a client build. Rulings 2026-09-04: (1) the run arrow is the 28/28 rule over the aerobic spine — the D-346 heat fit no longer overrides it; (2) "the same" = identical digits at the metric's displayed precision (Garmin: VO2 max shown whole, → when the shown number does not move).
 **Date:** 2026-09-04 · Michael: *"not a single thing on this page should be invented"*
 **Rule:** CLAUDE.md rule 5; ledger `docs/STATE-SOURCES.md`. Every number below is a copy of a named
 product's rule or is deleted. No new constants. No "ours".

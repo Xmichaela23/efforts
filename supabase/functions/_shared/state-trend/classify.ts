@@ -1,8 +1,21 @@
 // The shared trend primitive — the single classifier every discipline calls.
 // Pure: no Date.now / Math.random. The caller passes `asOf` (today) so the window is
 // deterministic and testable. This file knows nothing about strength/bike specifics.
+//
+// ⛔ GARMIN'S RULE, AND NOTHING ELSE (2026-09-04, docs/SPEC-state-nothing-invented-2026-09-04.md).
+// Split the qualifying points by DATE into the last 28 days and the 28 days before. Average each half.
+// Higher → improving, lower → sliding, the same → holding. If either half has no session there is
+// nothing to compare → needs_data. That is the whole test. The percent bands, the endpoint smoothing,
+// the signal-vs-noise gate, the volume floor (`withheld`), the freshness decay and the "recently flat"
+// read that used to live here were ours (Q-052) and are gone. Ledger: docs/STATE-SOURCES.md.
+//
+// "The same" is judged at the precision the METRIC is displayed at (`thresholds.precision`): two averages
+// that print identical digits are the same → holding. FIELD — Garmin: VO2 max is shown as a whole
+// number and Training Status reads → (maintaining) when the shown number has not moved. Nothing else
+// is rounded.
 
 import type { TrendPoint, TrendResult, TrendThresholds, TrendVerdict } from './types.ts';
+import { TREND_HALF_DAYS } from './thresholds.ts';
 
 const MS_PER_DAY = 86_400_000;
 
@@ -24,28 +37,11 @@ function ageDays(dateISO: string, asOf: string): number {
 export interface ClassifyOpts {
   /** Points matching this predicate are dropped before trending (e.g. deload weeks). */
   exclude?: (p: TrendPoint) => boolean;
-  /** Points averaged at each end for the noise guard (default 2 — see below). */
-  endpointWindow?: number;
-  /** SIGNAL-VS-NOISE gate (opt-in). When set, a directional verdict (improving/sliding) must have an
-   *  early→recent shift of at least this many WITHIN-WINDOW standard deviations, else it reads holding.
-   *  For metrics with big per-session scatter (run decoupling swings 3–11% run to run on confounds we
-   *  can't see — weather, sleep, fatigue), a fixed dead-band isn't enough; the shift has to clear the
-   *  data's OWN noise. Uses only the series — no new inputs. ~1.0 = "the shift beats one SD of scatter". */
-  noiseGuardStdev?: number;
-  /** DATA-SUFFICIENCY / VOLUME gate (opt-in). Below this many in-window qualifying samples, the series has
-   *  enough to COMPUTE a direction but too few to ASSERT one → verdict 'withheld' (a distinct state, NOT
-   *  'holding'). Data-sufficiency only (a count), never plan-adherence. Run durability passes this. */
-  directionFloor?: number;
 }
 
 /**
- * Classify a dated metric series as improving / holding / sliding / needs_data.
- *
- * Noise guard (three layers, so no single session flips a verdict):
- *  1. min-session gate → below `minSessions` → needs_data (never a guess);
- *  2. endpoint smoothing → compare the AVERAGE of the 2 earliest vs the 2 most-recent
- *     in-window points, not raw first-vs-last, so one PR or one bad day can't anchor an end;
- *  3. dead-band → the gap between `slidePct` and `improvePct` reads as holding.
+ * Classify a dated metric series as improving / holding / sliding / needs_data by Garmin's rule:
+ * the average of the last 28 days against the average of the 28 days before.
  */
 export function classifyTrend(
   rawPoints: TrendPoint[],
@@ -53,9 +49,9 @@ export function classifyTrend(
   asOf: string,
   opts: ClassifyOpts = {},
 ): TrendResult {
-  const { windowDays, improvePct, slidePct, minSessions, lowerIsBetter, freshnessDays } = thresholds;
-  const endpointN = opts.endpointWindow ?? 2;
+  const { windowDays, lowerIsBetter, precision } = thresholds;
   const windowStart = isoMinusDays(asOf, windowDays);
+  const recentStart = isoMinusDays(asOf, TREND_HALF_DAYS);
 
   const inWindow = rawPoints
     .filter((p) => Number.isFinite(p.value) && p.value > 0)
@@ -63,88 +59,35 @@ export function classifyTrend(
     .filter((p) => !opts.exclude?.(p))
     .sort((a, b) => a.date.localeCompare(b.date));
 
+  const recent = inWindow.filter((p) => p.date > recentStart);
+  const early = inWindow.filter((p) => p.date <= recentStart);
   const newestAgeDays = inWindow.length ? ageDays(inWindow[inWindow.length - 1].date, asOf) : null;
 
   const base = {
-    window: { days: windowDays, start: windowStart, end: asOf },
+    window: { days: windowDays, start: windowStart, end: asOf, recentStart },
     sampleCount: inWindow.length,
+    earlyCount: early.length,
+    recentCount: recent.length,
     points: inWindow,
     newestAgeDays,
-    minSessions, // carried so the receipt cites the REAL floor, not a default 3
+    stale: false,
+    minSessions: 1,
   };
 
-  if (inWindow.length < minSessions) {
-    return { ...base, verdict: 'needs_data', pctChange: null, earlyAvg: null, recentAvg: null, stale: false };
+  if (recent.length === 0 || early.length === 0) {
+    return { ...base, verdict: 'needs_data', pctChange: null, earlyAvg: null, recentAvg: null };
   }
 
-  const k = Math.min(endpointN, inWindow.length);
-  const earlyAvg = avg(inWindow.slice(0, k).map((p) => p.value));
-  const recentAvg = avg(inWindow.slice(-k).map((p) => p.value));
-  const pctChange =
-    earlyAvg > 0 ? Math.round(((recentAvg - earlyAvg) / earlyAvg) * 1000) / 10 : null;
+  const earlyAvg = avg(early.map((p) => p.value));
+  const recentAvg = avg(recent.map((p) => p.value));
+  const pctChange = Math.round(((recentAvg - earlyAvg) / earlyAvg) * 1000) / 10;
 
-  // For "lower is better" metrics (pace), a drop is improvement → flip the sign for the
-  // verdict. pctChange itself stays raw so the UI can show the real direction of change.
-  const effective = pctChange == null ? null : lowerIsBetter ? -pctChange : pctChange;
-
+  // The same digits at the displayed precision → holding (Garmin's →); otherwise the sign decides.
+  const same = recentAvg.toFixed(precision) === earlyAvg.toFixed(precision);
   let verdict: TrendVerdict;
-  if (effective == null) verdict = 'needs_data';
-  else if (effective >= improvePct) verdict = 'improving';
-  else if (effective <= slidePct) verdict = 'sliding';
-  else verdict = 'holding';
+  if (same) verdict = 'holding';
+  else if ((recentAvg > earlyAvg) !== !!lowerIsBetter) verdict = 'improving';
+  else verdict = 'sliding';
 
-  // SIGNAL-VS-NOISE gate: a directional verdict must clear the series' OWN run-to-run scatter, not just
-  // the fixed dead-band. Otherwise decoupling swinging 3–11% (weather/sleep/fatigue we can't see) reads
-  // as "improving" off a fraction-of-a-point wobble. If the early→recent shift is under noiseGuardStdev
-  // standard deviations, it's noise → hold. Data-only; no new inputs (Michael's rule).
-  if (opts.noiseGuardStdev != null && (verdict === 'improving' || verdict === 'sliding')) {
-    const vals = inWindow.map((p) => p.value);
-    const mean = avg(vals);
-    const sd = Math.sqrt(vals.reduce((a, v) => a + (v - mean) ** 2, 0) / vals.length);
-    if (sd > 0 && Math.abs(recentAvg - earlyAvg) < opts.noiseGuardStdev * sd) {
-      verdict = 'holding';
-    }
-  }
-
-  // VOLUME / DATA-SUFFICIENCY gate: above the min-session floor we can COMPUTE a direction, but below
-  // `directionFloor` in-window qualifying samples we won't ASSERT one — a handful of runs can't earn
-  // "improving" (nor "holding" — stable is a claim too). Withhold: state the count, claim nothing. This
-  // is the app knowing its running is too thin to read, instead of contradicting the accent's own warning.
-  if (opts.directionFloor != null && verdict !== 'needs_data' && inWindow.length < opts.directionFloor) {
-    verdict = 'withheld';
-  }
-
-  // STALENESS GATE: a real verdict whose newest qualifying point is older than freshnessDays
-  // is not a CURRENT trend — decay to needs_data (honest) rather than assert a stale direction.
-  // A stale "improving" is worse than an honest needs_data. The result still carries
-  // newestAgeDays + stale=true so a consumer can say "last data Nd ago" if desired.
-  if (
-    verdict !== 'needs_data' &&
-    freshnessDays != null &&
-    newestAgeDays != null &&
-    newestAgeDays > freshnessDays
-  ) {
-    return { ...base, verdict: 'needs_data', pctChange: null, earlyAvg: null, recentAvg: null, stale: true };
-  }
-
-  // "STILL MOVING vs FLATTENED" (2026-07-22, Michael — precise words for every scenario). The verdict is
-  // the NET early→recent change; it can't tell a metric STILL declining from one that DROPPED then HELD.
-  // Read the trend of the SECOND HALF of the window alone: if it isn't itself clearing the improve/slide
-  // bands, the recent portion is FLAT — it moved, then settled. Lets the display say "settled lower"
-  // (dropped, holding) vs "easing off" (still declining) — a precision the big apps don't do. Only
-  // meaningful on a moving verdict.
-  let recentlyFlat = false;
-  if ((verdict === 'sliding' || verdict === 'improving') && inWindow.length >= 4) {
-    const secondHalf = inWindow.slice(Math.floor(inWindow.length / 2));
-    if (secondHalf.length >= 2) {
-      const rk = Math.min(endpointN, Math.max(1, Math.floor(secondHalf.length / 2)));
-      const rEarly = avg(secondHalf.slice(0, rk).map((p) => p.value));
-      const rLate = avg(secondHalf.slice(-rk).map((p) => p.value));
-      const rPct = rEarly > 0 ? ((rLate - rEarly) / rEarly) * 100 : 0;
-      const rEff = lowerIsBetter ? -rPct : rPct;
-      recentlyFlat = rEff < improvePct && rEff > slidePct; // recent half sits inside the holding band
-    }
-  }
-
-  return { ...base, verdict, pctChange, earlyAvg, recentAvg, stale: false, recentlyFlat };
+  return { ...base, verdict, pctChange, earlyAvg, recentAvg };
 }

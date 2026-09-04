@@ -1,8 +1,8 @@
 /**
  * Bike POWER chart series (bikePowerChartSeries) — the cyclist's e1RM/efficiency-analog sparkline.
  *
- * Charts the w20 points of the WINNING terrain bin over 12 weeks (84d), recent-flagged inside the bike
- * verdict window (56d). User-agnostic fixtures (synthetic rides, not any real athlete) proving: it charts
+ * Charts the w20 points of the WINNING terrain bin over 12 weeks (84d), recent-flagged inside Garmin's
+ * recent 28-day half (2026-09-04) — the half the headline averages. User-agnostic fixtures (synthetic rides, not any real athlete) proving: it charts
  * only the named bin's rides, orders + rounds them, flags recent correctly, fills as data grows, and never
  * mixes terrain bins (a climb's w20 is not comparable to a flat's).
  *
@@ -33,7 +33,7 @@ Deno.test('charts only the winning bin, ordered ascending, watts rounded', () =>
   ];
   const s = bikePowerChartSeries(rides, ASOF, 'flat_sustained');
   assertEquals(s.map((p) => p.value), [238, 246, 251]); // d40, d10, d3 → ascending, rounded
-  assert(s.every((p) => p.recent)); // all inside the 56d verdict window
+  assertEquals(s.map((p) => p.recent), [false, true, true]); // d40 is in the prior half; d10, d3 in the recent 28 days
 });
 
 Deno.test('recent flag = inside the 56d verdict window; older points dim', () => {
@@ -93,8 +93,8 @@ Deno.test('structured rider: power LEADS and the chart fills, recent-flagged', (
   const s = bf.power.series ?? [];
   assertEquals(s.length, 6);                                  // all 6 rides inside 84d
   assertEquals(s.map((p) => p.value), [225, 232, 238, 244, 250, 256]); // ascending, rounded watts
-  assert(s.slice(-3).every((p) => p.recent), 'the recent efforts are flagged for color');
-  assert(s[0].recent === false, 'the oldest (78d) is outside the 56d window → dim');
+  assert(s.slice(-2).every((p) => p.recent), 'the last 28 days (d22, d6) are the recent half');
+  assert(s.slice(0, 4).every((p) => p.recent === false), 'd78..d36 sit before the recent half');
 });
 
 Deno.test('endurance-only rider (the Michael case): power is needs_data → NO power chart', () => {

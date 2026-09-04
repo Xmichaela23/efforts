@@ -75,11 +75,8 @@ export function computeBikeState(
   rideType: string | null = null,
 ): BikeState {
   return {
-    // noiseGuardStdev: the same gate as the State bike row (`bike-fitness.ts`, Q-241) and as run
-    // durability / strength e1RM. This is the SESSION-detail direction (analyze-cycling-workout reads
-    // it), and a session card asserting a direction the State row won't is the divergence the spine
-    // exists to prevent — one government, states as arms.
-    trend: classifyTrend(series, resolveThresholds('bike', sessionsPerWeek), asOf, { exclude: isDeloadWeek, noiseGuardStdev: 1.0 }),
+    // Garmin's 28/28 rule (classify.ts) — the same read the State bike row makes.
+    trend: classifyTrend(series, resolveThresholds('bike', 0), asOf, { exclude: isDeloadWeek }), // watts are shown whole
     metricLabel: 'power at threshold',
     rideType,
   };

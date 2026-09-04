@@ -18,15 +18,17 @@ stated and it is a decision Michael can reverse.
 | Drift per session = first half vs second half, warm-up skipped, 5% line | `analyze-running-workout/lib/heart-rate/efficiency.ts`, `ride-physiology.ts` | FIELD — Friel; TrainingPeaks Pa:Hr / Pw:Hr; the 5% line is Friel and Viada p107 (a plan rule — reports and flags only, never a filter: D-372) |
 | Drift is a trend, one dot per session | `StrengthReadCards.tsx`, `TrendSparkline.tsx` | FIELD — TrainingPeaks dashboard trend; intervals.icu per-activity points |
 | 12-week trend window | `TrendSparkline.tsx` | FIELD — TrainingPeaks 90-day default |
-| **Headline = median of the last 5 steady sessions** | `sport-summary.ts recentMedian` | **OURS** — a headline needs one number; nobody in the field prints one (they plot every session). Median so one bad day cannot own it. Display choice. |
-| **"Recent 6 weeks in colour"** | `StrengthReadCards.tsx RECENT_WINDOW_MS` | **OURS** — display choice, half the window. |
+| Headline = average of the last 28 days | `sport-summary.ts recentAverage`, `StrengthReadCards.tsx`, `StatePerformanceSection.tsx` | FIELD — Garmin: the number shown is the current 4-week estimate, the same half the trend arrow reads |
+| One colour on the line, a dot per session | `TrendSparkline.tsx` | FIELD — TrainingPeaks / intervals.icu |
 | Hard ride left out of the aerobic trend when best-20-min ≥ 90% FTP | `bike-fitness.ts THRESHOLD_FTP_FRACTION` | FIELD — Coggan zone 4 floor |
-| **Ride needs ≥ 10 min in the aerobic band to count for efficiency** | `bike-fitness.ts MIN_EFFICIENCY_IN_BAND_S` | **OURS** — a floor for a per-ride HR-at-power read to mean anything. |
+| Ride needs ≥ 10 min in the aerobic band to count for efficiency | `bike-fitness.ts MIN_EFFICIENCY_IN_BAND_S` | FIELD — Garmin: VO2 max updates only from a ride with ≥ 10 min at ≥ 70% max HR |
 | e1RM = w × 36 ÷ (37 − reps) | `compute-facts`, `estimate-1rm.ts` | FIELD — Brzycki |
 | Lift chart shows up to 52 weeks | `assemble.ts STATE_TREND_WINDOWS` | FIELD — Hevy / Fitbod ranges |
-| **Trend verdict cut-offs (improving/sliding): ±2% run & bike, +2.5/−2 strength, ±1.5 swim; 6-week run/strength, 8-week bike/swim windows** | `state-trend/thresholds.ts UNIVERSAL` | **OURS** — from the June 2026 audit (Q-052), no outside source. Drives the arrows. |
-| **Freshness (how long a trend stays current): 7–35 days scaled to the athlete's own cadence** | `state-trend/thresholds.ts BASE_FRESH / REF_SPW` | **OURS** — Q-052, calibrated on the development cohort. |
-| Signal-vs-noise: a direction must clear 1 SD of its own scatter | `bike-fitness.ts`, `run.ts`, `strength.ts` | FIELD-adjacent — 20-min power CV ≈ 2.9% (IJSPP 2019); 1.0 SD is the bar all three disciplines share |
+| Trend arrow ↑ → ↓: the average of the last 28 days against the average of the 28 days before; higher ↑, lower ↓; the same digits at the metric's displayed precision (efficiency 3 decimals, drift 0.1%, pace to the second, watts and e1RM whole) →; blank only when one half has no session | `state-trend/classify.ts`, `thresholds.ts TREND_HALF_DAYS`, each caller's `precision` | FIELD — Garmin VO2 max / Training Status: the last 4 weeks against the 4 before, recomputed on every activity; VO2 max is shown as a whole number and the arrow reads → (maintaining) when the shown number has not moved. No percent band, no noise gate, no freshness decay, no cadence floor (all four were ours — Q-052 — deleted 2026-09-04) |
+| The run row's arrow reads the aerobic spine — the same points the headline averages; the heat-adjusted fit (D-346) is a receipt, not the verdict | `assemble.ts runEffSeries` | FIELD — Garmin, as above (ruling 2026-09-04) |
+| 56-day window, every discipline | `thresholds.ts TREND_WINDOW_DAYS` | FIELD — Garmin, two 4-week halves |
+| "provisional" tag: 3–4 sessions in the window, or all inside 21 days | `bike-fitness.ts isProvisionalTrend` | **OURS** — not in the 2026-09-04 sweep; flagged, untouched |
+| Race-projection gate: ≥ 8 observed runs | `assemble.ts projectionMinRuns`, `compute-snapshot` | **OURS** — a count with no outside source; gates a projected race time, not an arrow (was the run direction floor) |
 
 ## FTP
 

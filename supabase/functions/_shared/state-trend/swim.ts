@@ -46,11 +46,8 @@ export function computeSwimState(
   droppedImplausible = 0,
 ): SwimState {
   return {
-    // SIGNAL-VS-NOISE gate (noiseGuardStdev) — swim pace swings hard on fins/paddles/set-type we can't
-    // fully see, so a directional verdict must clear the series' OWN scatter or it reads holding. The
-    // swim ROW no longer shows this verdict (it shows volume facts); the gate keeps the backend/coach
-    // from asserting a false swim direction that would contradict the facts line. Same gate as run.
-    trend: classifyTrend(series, resolveThresholds('swim', sessionsPerWeek), asOf, { exclude: isDeloadWeek, noiseGuardStdev: 1.0 }),
+    // Garmin's 28/28 rule (classify.ts). The swim ROW shows volume facts, not this verdict.
+    trend: classifyTrend(series, resolveThresholds('swim', 0), asOf, { exclude: isDeloadWeek }), // pace/100 shown to the second
     metricLabel: 'pace per 100',
     droppedImplausible,
   };
@@ -105,9 +102,9 @@ export function computeSwimRestState(
   droppedOutOfBand = 0,
 ): SwimRestState {
   return {
-    // Same gates as pace (min-session, staleness, dead-band). lowerIsBetter (rest shrinking = better)
-    // is already true in the swim threshold config, so the swim thresholds apply unchanged.
-    trend: classifyTrend(series, resolveThresholds('swim', sessionsPerWeek), asOf, { exclude: isDeloadWeek }),
+    // Same rule as pace. lowerIsBetter (rest shrinking = better) is already true for swim.
+    // a fraction; not printed on the row — the two decimals it is stored at
+    trend: classifyTrend(series, resolveThresholds('swim', 2), asOf, { exclude: isDeloadWeek }),
     metricLabel: 'rest fraction',
     droppedOutOfBand,
   };

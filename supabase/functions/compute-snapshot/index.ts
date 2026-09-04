@@ -1946,7 +1946,14 @@ serve(async (req: Request) => {
           console.log("[compute-snapshot] fitness baseline derive/persist failed (non-fatal):", e?.message || e);
         }
 
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, testWeekDates, expectedByCanonical, namedSessions, enduranceSpine, blockDurationWeeks, measuredDates, allOutByLift, strengthEffortRead, pullupProgress, loggedSessions, weekStartDow });
+        // The bike efficiency arrow reads the SAME efficiency-factor points the card and row print (the
+        // steady rides on the spine), not the heart-rate-at-power read — one pool for number and arrow.
+        const bikeEffHistory = enduranceSpine
+          .filter((s) => s.sport === 'ride')
+          .flatMap((s) => s.points as Array<{ date: string; efficiency: number | null; countsTowardTrend?: boolean }>)
+          .filter((p) => p.efficiency != null && Number.isFinite(Number(p.efficiency)) && p.countsTowardTrend !== false)
+          .map((p) => ({ date: p.date, value: Number(p.efficiency) }));
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeEffHistory, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, testWeekDates, expectedByCanonical, namedSessions, enduranceSpine, blockDurationWeeks, measuredDates, allOutByLift, strengthEffortRead, pullupProgress, loggedSessions, weekStartDow });
         // VDOT race projections (goal-free) — computed HERE, not in the shared assembler, because they need
         // learned_fitness + the VDOT engine and we keep that OFF the client-math fallback path (dumb client).
         // Threshold pace: learned first, then performance_numbers. Long-run distance is estimated inside
@@ -2011,7 +2018,7 @@ serve(async (req: Request) => {
           // stamped `confidence: high` — a race prediction to the second off three samples is exactly
           // the false precision this row has spent the day removing everywhere else.
           //
-          // ⚠️ THE FLOOR IS THE APP'S OWN, NOT A NEW NUMBER. `runDirectionMinRuns` (8) is already what
+          // ⚠️ THE FLOOR IS THE APP'S OWN, NOT A NEW NUMBER. `projectionMinRuns` (8, once the run direction floor) is what
           // State requires before it will assert a run direction, and `MIN_REGRESSION_N` (8) is what the
           // heat fit requires before it will claim a coefficient. Picking a different bar here would be
           // hand-picking; 8 is the bar this app already set for "enough to say something out loud".
@@ -2020,7 +2027,7 @@ serve(async (req: Request) => {
           // measurement — projecting race times off an aspiration and printing them to the second is a
           // fabricated number wearing a measured one's clothes.
           const projRobust = projSrc === 'observed'
-            && Number.isFinite(Number(projSamples)) && Number(projSamples) >= STATE_TREND_WINDOWS.runDirectionMinRuns;
+            && Number.isFinite(Number(projSamples)) && Number(projSamples) >= STATE_TREND_WINDOWS.projectionMinRuns;
           if (proj && result?.runFitness && projRobust) {
             (result.runFitness as any).projections = proj.projections;
             // The receipt: what the estimate rests on. `observed` = a measured threshold pace from N

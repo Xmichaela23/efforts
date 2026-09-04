@@ -4,7 +4,7 @@
  *   deno test --allow-read src/lib/sport-summary.test.ts --no-check
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { changeMonth, dirWord, efficiencyRow, sinceMonthFromSeries, strengthGlanceRows } from './sport-summary.ts';
+import { changeMonth, dirWord, efficiencyRow, recentAverage, recentHalfPoints, recentHalfStart, sinceMonthFromSeries, strengthGlanceRows } from './sport-summary.ts';
 
 Deno.test('changeMonth = start of the window (asOf − windowDays)', () => {
   assertEquals(changeMonth('2026-09-01', 42), 'Jul');
@@ -106,4 +106,20 @@ Deno.test('mid-block but no block-start point to compare → bare number, no inv
 
 Deno.test('strengthGlanceRows: no lifts → []', () => {
   assertEquals(strengthGlanceRows([], 4), []);
+});
+
+// ── THE HEADLINE = the average of the last 28 days (Garmin), the same half the arrow reads ────────
+Deno.test('recentHalfStart: dates after asOf − 28 are the recent half', () => {
+  assertEquals(recentHalfStart('2026-09-04'), '2026-08-07');
+  assertEquals(recentHalfPoints([{ date: '2026-08-07' }, { date: '2026-08-08' }], '2026-09-04').map((p) => p.date), ['2026-08-08']);
+});
+
+Deno.test('recentAverage: the mean of the recent-half points, whatever came last; null when the half is empty', () => {
+  const pts = [
+    { date: '2026-07-20', value: 1.5 }, // prior half — not in the headline
+    { date: '2026-08-10', value: 1.7 }, { date: '2026-08-20', value: 1.8 }, { date: '2026-09-01', value: 1.6 }, // one bad day, averaged not anchored
+  ];
+  assertEquals(Math.round(recentAverage(pts, '2026-09-04')! * 1000) / 1000, 1.7);
+  assertEquals(recentAverage([{ date: '2026-07-20', value: 1.5 }], '2026-09-04'), null);
+  assertEquals(recentAverage([], '2026-09-04'), null);
 });

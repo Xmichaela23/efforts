@@ -19,7 +19,7 @@
  */
 
 import React from 'react';
-import { recentMedian } from '@/lib/sport-summary';
+import { recentAverage, recentHalfPoints } from '@/lib/sport-summary';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { DRIFT_LIMITS } from '@shared/state-trend';
 // ⛔ THE ONE CHART LANGUAGE (Round 3 pass 2, 2026-09-01). The endurance cards used to draw their own
@@ -97,7 +97,7 @@ export function EnduranceConditionsLine() {
 }
 
 export function EnduranceReadCards(
-  { sessions, spine, sport, footer = true }: { sessions?: NamedSession[] | null; spine?: SpineSeries[] | null; sport?: 'run' | 'ride'; footer?: boolean },
+  { sessions, spine, sport, footer = true, asOf }: { sessions?: NamedSession[] | null; spine?: SpineSeries[] | null; sport?: 'run' | 'ride'; footer?: boolean; /** the server's as-of day; the last point's date when absent */ asOf?: string | null },
 ) {
   // ⛔ ONE OWNER PER SPORT (Round 3 pass 1, 2026-09-01). `sport` filters this to a single discipline
   // so the ride cards can render under the bike plate and the run cards under the run block, each
@@ -129,7 +129,7 @@ export function EnduranceReadCards(
     || list.some((s) => (s.points ?? []).length >= 2);
   return (
     <>
-      {spineList.map((s) => <SpineCard key={`spine:${s.sport}:${s.group}`} series={s} />)}
+      {spineList.map((s) => <SpineCard key={`spine:${s.sport}:${s.group}`} series={s} asOf={asOf ?? null} />)}
       {list.map((s) => <EnduranceCard key={`${s.sport}:${s.family}`} session={s} />)}
       {hasLine && footer && (
         <div className="px-3 pb-3 text-[11px] text-white/55">
@@ -153,7 +153,7 @@ const EF_EXPLAIN = 'Pace divided by heart rate. Higher means faster at the same 
 const DECOUPLING_EXPLAIN = `Second-half heart rate against the first, same pace. The book's line is 5%.`; // 2026-09-03: Michael cut the paragraph
 
 
-function SpineCard({ series }: { series: SpineSeries }) {
+function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string | null }) {
   // ⛔ ONE TAP, NOT THREE (Michael 2026-09-03: "too many clicks … should be one click"). The row tap
   // opens the card; everything the card has is printed on it. The ⓘ toggles that hid the EF and
   // decoupling explanations behind a second tap are gone — NN/g's progressive-disclosure rule is one
@@ -173,12 +173,12 @@ function SpineCard({ series }: { series: SpineSeries }) {
   const trendPts = pts.filter((p) => p.countsTowardTrend !== false);
   const leftOut = pts.length - trendPts.length;
   const eff = trendPts.map((p) => ({ date: p.date, value: p.efficiency })).filter((p) => p.value != null) as Array<{ date: string; value: number }>;
-  // 2026-09-03 (Michael: "it should say, based on whatever it's based on, for the most recent runs"): the headline
-  // is the MEDIAN of the last five points, never whichever point came last (one warm-up was the headline over 22
-  // runs), and the line under it says what it is based on and how many of those are warm-ups.
-  // Shared with the closed run row (sport-summary.recentMedian) so the plate and the row print one number.
-  const headline = recentMedian(eff.map((p) => p.value), 5);
-  const recentPts = trendPts.slice(-Math.max(1, Math.min(5, trendPts.length)));
+  // THE HEADLINE = the average of the last 28 days (Garmin; docs/SPEC-state-nothing-invented-2026-09-04.md),
+  // the same half the arrow's verdict reads. Shared with the closed row (sport-summary.recentAverage) so
+  // the plate and the row print one number. The line under it says what it is based on.
+  const asOf = asOfIn ?? pts[pts.length - 1]?.date ?? '';
+  const headline = recentAverage(eff, asOf);
+  const recentPts = recentHalfPoints(trendPts, asOf);
   const recentWarmups = recentPts.filter((p) => p.fromWarmup).length;
   // ⛔ THE CARD'S OWN SPORT NAMES THE SESSIONS (2026-09-03, Michael: "kill any run crossover"). This
   // read "based on the last 5 runs" on the BIKE card — the word was hard-coded when only runs reached
@@ -188,7 +188,7 @@ function SpineCard({ series }: { series: SpineSeries }) {
   // a ride card says which rides the trend is built from and how many hard rides it leaves out — the caveat is
   // printed, never a blank space (TrainingPeaks explains the same exclusion in its help centre)
   const basedOn = recentPts.length
-    ? `based on the last ${recentPts.length} ${isRide ? 'steady ' : ''}${recentPts.length === 1 ? noun : `${noun}s`}${recentWarmups > 0 ? ` · ${recentWarmups} ${recentWarmups === 1 ? 'warm-up' : 'warm-ups'}` : ''}${leftOut > 0 ? ` · ${leftOut} hard ${leftOut === 1 ? 'ride' : 'rides'} not in the trend` : ''}`
+    ? `average of the last 4 weeks · ${recentPts.length} ${isRide ? 'steady ' : ''}${recentPts.length === 1 ? noun : `${noun}s`}${recentWarmups > 0 ? ` · ${recentWarmups} ${recentWarmups === 1 ? 'warm-up' : 'warm-ups'}` : ''}${leftOut > 0 ? ` · ${leftOut} hard ${leftOut === 1 ? 'ride' : 'rides'} not in the trend` : ''}`
     : (leftOut > 0 ? `no steady rides yet · ${leftOut} hard ${leftOut === 1 ? 'ride' : 'rides'} not in the trend` : null);
   /**
    * ⛔ DRIFT IS A TREND HERE, NOT THE LATEST SESSION (2026-09-04, Michael: "replace the latest session line
@@ -207,8 +207,8 @@ function SpineCard({ series }: { series: SpineSeries }) {
     .filter((p) => p.driftPct != null && !p.fadeWithheld && !p.driftWholeSession
       && (p.driftBasis === 'gap' || p.driftBasis === 'raw' || p.driftBasis === 'power'))
     .map((p) => ({ date: p.date, value: p.driftPct as number }));
-  const driftRecent = driftPts.slice(-Math.max(1, Math.min(5, driftPts.length)));
-  const driftMedian = recentMedian(driftRecent.map((p) => p.value), 5);
+  const driftRecent = recentHalfPoints(driftPts, asOf);
+  const driftMedian = recentAverage(driftPts, asOf);
   const driftWhat = isRide ? 'power to heart rate' : 'pace to heart rate';
   const fmtDrift = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`;
 
@@ -267,13 +267,13 @@ function SpineCard({ series }: { series: SpineSeries }) {
           The prose that read it for the athlete was cut on 2026-09-01; the number itself is the
           field's second run fact and is shown bare. Withheld sessions (pace changed by prescription)
           show nothing — a number for a non-steady effort is not the same number. */}
-      {/* the drift trend — the number the field trends (Pa:Hr / Pw:Hr), as a line and a recent median, no verdict */}
+      {/* the drift trend — the number the field trends (Pa:Hr / Pw:Hr), as a line and the last-4-weeks average, no verdict */}
       {driftPts.length >= 2 && (
         <DatedChart points={driftPts} color={color} dotNoun={isRide ? 'steady ride' : 'run'} fmtVal={fmtDrift} unit="%" />
       )}
       {driftMedian != null && (
         <div className="text-[11px] text-white/55 mt-1">
-          drift <span className="tabular-nums text-white/75">{fmtDrift(driftMedian)}%</span> · {driftWhat} · lower is better · median of the last {driftRecent.length} steady {driftRecent.length === 1 ? noun : `${noun}s`} · line {DRIFT_LIMITS.hybridPct}%
+          drift <span className="tabular-nums text-white/75">{fmtDrift(driftMedian)}%</span> · {driftWhat} · lower is better · average of the last 4 weeks · {driftRecent.length} steady {driftRecent.length === 1 ? noun : `${noun}s`} · line {DRIFT_LIMITS.hybridPct}%
         </div>
       )}
       {basedOn && (
@@ -371,20 +371,13 @@ function SessionChart({ points, color, valueOf }: {
  * language across the whole screen. It kept its own SVG (dates-only caption, no expand) until now;
  * the endurance cards read better matching the strength model, and the four caption phrasings the
  * screen carried collapse to the one `TrendSparkline` prints.
- * ⚠️ `recent` IS COMPUTED HERE — the endurance points carry no recent flag (unlike the e1RM series),
- * so the last-six-weeks tail is coloured by date, the same "recent 6 weeks in color" the other charts
- * use. `dotNoun` names the reading for the expanded caption; the callers pass their sport's word.
+ * `dotNoun` names the reading for the expanded caption; the callers pass their sport's word.
  * ⚠️ NO UNIT PASSED — efficiency is an index, so the range is suppressed (the shape is the message),
  * exactly as before.
  */
-const RECENT_WINDOW_MS = 42 * 86_400_000; // OURS — display choice, half the 12-week window. Ledger: docs/STATE-SOURCES.md
+// The chart is one colour now (2026-09-04); `recent` is carried only because the series type asks for it.
 function DatedChart({ points, color, dotNoun = 'session', fmtVal, unit }: { points: Array<{ date: string; value: number }>; color: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string }) {
-  const lastT = Date.parse(`${points[points.length - 1].date}T12:00:00Z`);
-  const series = points.map((p) => ({
-    date: p.date,
-    value: p.value,
-    recent: lastT - Date.parse(`${p.date}T12:00:00Z`) <= RECENT_WINDOW_MS,
-  }));
+  const series = points.map((p) => ({ date: p.date, value: p.value, recent: true }));
   return <TrendSparkline series={series} color={color} dotNoun={dotNoun} {...(fmtVal ? { fmtVal } : {})} {...(unit ? { unit } : {})} />;
 }
 

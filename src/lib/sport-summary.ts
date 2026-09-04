@@ -21,6 +21,8 @@
  *     ("+5"). No PR flag; flat is fine. See `strengthGlance`.
  */
 
+import { TREND_HALF_DAYS } from '../../supabase/functions/_shared/state-trend/thresholds.ts';
+
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function monthOfIso(iso: string | null | undefined): string {
@@ -73,22 +75,32 @@ export type SportRow = {
   name: string;
   value: string;
   note?: string;
-  /** Direction glyph beside the value (↑ / ↓) — only when the verdict can call one; never for holding / withheld. */
+  /** Direction glyph beside the value (↑ / ↓ / →) — Garmin's three states; none for needs_data. */
   arrow?: string;
   arrowCls?: string;
 };
 
+/** First day of Garmin's recent half: dates AFTER asOf − 28 are "the last 4 weeks". */
+export function recentHalfStart(asOf: string): string {
+  return new Date(Date.parse(`${String(asOf).slice(0, 10)}T12:00:00Z`) - TREND_HALF_DAYS * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** The points inside the recent half — the same split the server's verdict makes. */
+export function recentHalfPoints<T extends { date: string }>(points: ReadonlyArray<T>, asOf: string): T[] {
+  const start = recentHalfStart(asOf);
+  return points.filter((p) => String(p.date).slice(0, 10) > start);
+}
+
 /**
- * Median of the last `n` values — the headline rule for a spine series (2026-09-03, Michael: "based on
- * whatever it's based on, for the most recent runs"): never whichever point came last (one warm-up was
- * the headline over 22 runs). Shared by the open run card and the closed run row so both print ONE number.
+ * THE HEADLINE — the average of the last 28 days (2026-09-04, docs/SPEC-state-nothing-invented-2026-09-04.md).
+ * FIELD — Garmin: the number shown is the current 4-week estimate, the same number the trend arrow's recent
+ * half is built on, so the number and its arrow are one read. Replaces the median of the last five (ours).
+ * Shared by the open card and the closed row so both print ONE number. Null when the recent half is empty.
  */
-// OURS — no field source: TrainingPeaks / intervals.icu plot every session and print no headline. A
-// headline needs one number; the median stops one bad day owning it. Ledger: docs/STATE-SOURCES.md.
-export function recentMedian(values: number[], n = 5): number | null {
-  const s = values.slice(-n).sort((a, b) => a - b);
-  if (!s.length) return null;
-  return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+export function recentAverage(points: ReadonlyArray<{ date: string; value: number }>, asOf: string): number | null {
+  const recent = recentHalfPoints(points, asOf).map((p) => p.value).filter((v) => Number.isFinite(v));
+  if (!recent.length) return null;
+  return recent.reduce((a, b) => a + b, 0) / recent.length;
 }
 
 /**

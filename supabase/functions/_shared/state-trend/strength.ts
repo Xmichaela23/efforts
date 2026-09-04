@@ -106,15 +106,9 @@ export function strengthVolumeToSeries(
     .filter((p) => p.date && Number.isFinite(p.value) && p.value > 0);
 }
 
-/** Volume trend. HIGHER = more training (a load fact, NOT fitness) → lowerIsBetter false; wider
- *  bands (±8%) than e1RM because session-to-session volume swings (upper vs lower day). */
+/** Volume trend. HIGHER = more training (a load fact, NOT fitness) → lowerIsBetter false. Garmin's 28/28 rule. */
 export function computeStrengthVolumeState(series: TrendPoint[], asOf: string, sessionsPerWeek: number): TrendResult {
-  return classifyTrend(
-    series,
-    { ...resolveThresholds('strength', sessionsPerWeek), improvePct: 8, slidePct: -8, lowerIsBetter: false },
-    asOf,
-    { exclude: isDeloadWeek },
-  );
+  return classifyTrend(series, { ...resolveThresholds('strength', 0), lowerIsBetter: false }, asOf, { exclude: isDeloadWeek }); // volume in whole lb
 }
 
 // Per-lift e1RM DIRECTION, serialized onto the spine (D-270). computeStrengthState already produces
@@ -340,15 +334,6 @@ export interface StrengthFitness {
   pullups?: PullupProgress | null;
 }
 
-// SIGNAL-VS-NOISE guard for e1RM (2026-07-19). e1RM off working sets scatters ~4-8% session to
-// session — RIR-estimate wobble (the e1RM offset is only as steady as the logged RIR; D-339 moved the
-// formula itself to the standard, `src/lib/estimate-1rm.ts`), best-set
-// selection, and thin per-lift cadence (often n=3-4 in the 6wk window). Without a guard a lift whose
-// e1RM moved LESS than its own scatter still earns "improving"/"sliding" off the dead-band alone. This
-// is the same gate run decoupling already uses (run.ts, noiseGuardStdev 1.0): a directional verdict must
-// clear ~1 within-window SD or it reads holding. Data-only, no new inputs (Michael's rule). Measured
-// live on real data: a squat reading "sliding" −2.5% on σ=4.1% scatter — noise wearing a verdict.
-const E1RM_NOISE_GUARD_STDEV = 1.0;
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 // THE PROTOCOL'S OWN GAUGE (Slice 2, 2026-08-12) — the previous program progress is the ALL-OUT SET, not the
@@ -411,28 +396,7 @@ export interface AllOutTrendInput {
  */
 export const ALL_OUT_WINDOW_DAYS = 84;
 
-/**
- * ⛔ THREE READINGS, EXPLICITLY — not `resolveThresholds`' cadence-scaled floor, which climbs to 5
- * for a 4x/week lifter. That scaling is right for a per-session series and wrong here: no amount of
- * training frequency produces more than about one all-out set per lift per week, so a floor of 5
- * would silence the gauge for exactly the athletes training hardest. Three is the shared primitive's
- * own lower clamp (`thresholds.ts:54`), i.e. the floor the trend layer already considers minimal.
- */
-const ALL_OUT_MIN_SESSIONS = 3;
 
-/**
- * ⛔ FRESHNESS SCALES TO THE MEASUREMENT'S OWN CADENCE — 56 days, and the number is the BOOK's, not
- * a preference. A the previous program cycle is four weeks (p26/p28 lay out Week I-IV, then the maxes step up and it
- * repeats), and this app prescribes the all-out set on the anchor cycle only, so two consecutive
- * readings can legitimately sit a leader cycle apart. Two cycles = 56 days is therefore the point at
- * which "this is your current direction" stops being true.
- *
- * ⚠️ WITHOUT THIS THE GAUGE IS DEAD ON ARRIVAL, and it fails INVISIBLY: `resolveThresholds` scales
- * freshness to SESSION cadence — 7 days for a 3x/week lifter — so an all-out set performed 8 days ago
- * decayed to `needs_data` and the row went blank. Measured, not theorised: it is what this fixture
- * caught on the first run.
- */
-const ALL_OUT_FRESHNESS_DAYS = 56;
 
 /** Is this lift's working weight WAVED off a training max — i.e. is it "the big exercise" (p100)?
  *  `coached` is true on exactly the `barbell_main` row (D-373): the main-lift slots and their
@@ -511,11 +475,11 @@ export function computeStrengthState(
   sessionsPerWeek: number,
   opts: StrengthStateOpts = {},
 ): StrengthState {
-  const thresholds = resolveThresholds('strength', sessionsPerWeek); // per-lift cadence (Q-052)
+  const thresholds = resolveThresholds('strength', 0); // e1RM is shown whole
   const readsAmrap = opts.effortRead === 'amrap';
 
   const lifts: LiftVerdict[] = series.map((s) => {
-    const e1rmTrend = classifyTrend(s.points, thresholds, asOf, { exclude: isDeloadWeek, noiseGuardStdev: E1RM_NOISE_GUARD_STDEV });
+    const e1rmTrend = classifyTrend(s.points, thresholds, asOf, { exclude: isDeloadWeek });
 
     // Only a WAVED main lift on an 'amrap' protocol changes gauge. Accessories and every 'rir' /
     // 'none' protocol keep the e1RM read exactly as before.
@@ -531,9 +495,11 @@ export function computeStrengthState(
     const allOutPoints = allOutToPoints(opts.allOutByLift?.[s.canonical], opts.phaseByDate);
     const trend = classifyTrend(
       allOutPoints,
-      { ...thresholds, windowDays: ALL_OUT_WINDOW_DAYS, minSessions: ALL_OUT_MIN_SESSIONS, freshnessDays: ALL_OUT_FRESHNESS_DAYS },
+      // D-420: a direction off the all-out set may only be read over whole cycles (≥2 waves) — the 84-day
+      // window stays for the receipts even though the direction itself is retired. No floor, no freshness.
+      { ...thresholds, windowDays: ALL_OUT_WINDOW_DAYS },
       asOf,
-      { exclude: isDeloadWeek, noiseGuardStdev: E1RM_NOISE_GUARD_STDEV },
+      { exclude: isDeloadWeek },
     );
 
     // D-420: the all-out set is still the RIGHT substrate for a the previous program lift — it is what the record and

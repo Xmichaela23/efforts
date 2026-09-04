@@ -7,7 +7,10 @@
 // A distinct fourth direction-state — NOT 'holding' ("stable" is itself a claim sparse data can't back).
 // Only produced when a caller passes classify's `directionFloor` opt (run durability this round). Consumers
 // that roll up direction must treat it as non-directional (like needs_data), never as a movement.
-export type TrendVerdict = 'improving' | 'holding' | 'sliding' | 'needs_data' | 'withheld';
+// ⛔ GARMIN'S THREE STATES (2026-09-04, docs/SPEC-state-nothing-invented-2026-09-04.md): improving ↑,
+// holding → ("maintaining"), sliding ↓; needs_data = one 28-day half has no session. `withheld` is gone
+// with the volume floor that produced it.
+export type TrendVerdict = 'improving' | 'holding' | 'sliding' | 'needs_data';
 
 /** One dated metric reading. `value` is the discipline's metric (e1RM lbs, 20-min W, …). */
 export interface TrendPoint {
@@ -19,37 +22,34 @@ export interface TrendPoint {
 
 /** Per-discipline trend config. The numbers are Michael-approved (2026-06-13). */
 export interface TrendThresholds {
-  windowDays: number; // trailing window the trend is measured over
-  improvePct: number; // (effective) change >= this → improving
-  slidePct: number; // (effective) change <= this (negative) → sliding
-  minSessions: number; // qualifying points below this → needs_data
+  /** Two 28-day halves — 56, Garmin's recent-4-weeks-vs-the-4-before (the only window there is). */
+  windowDays: number;
+  /** At least one session in each half; the only floor. Carried for the receipt. */
+  minSessions: number;
+  /** Decimals the metric is DISPLAYED at (efficiency 3, drift 1, pace/watts/e1RM 0). Two averages that
+   *  print the same digits are "the same" → holding. FIELD — Garmin: VO2 max is shown whole; Training
+   *  Status shows → (maintaining) when the shown number has not moved. */
+  precision: number;
   /** When the metric is "lower is better" (pace: sec/km, sec/100m), a DECREASE is improving.
    *  The primitive flips the sign for verdict assignment; `pctChange` in the result stays raw. */
   lowerIsBetter?: boolean;
-  /** STALENESS GATE: if the NEWEST qualifying point is older than this many days, the trend is
-   *  no longer current → decays to needs_data (honest), even with enough in-window points. Window
-   *  membership alone is not recency. Omit to disable the gate for a discipline. */
-  freshnessDays?: number;
 }
 
 /** Result of running a series through the shared primitive. */
 export interface TrendResult {
   verdict: TrendVerdict;
-  pctChange: number | null; // null when needs_data
-  window: { days: number; start: string; end: string };
-  sampleCount: number; // qualifying points inside the window after filtering
-  earlyAvg: number | null; // noise-guard endpoint averages (null when needs_data)
-  recentAvg: number | null;
+  pctChange: number | null; // recent half vs prior half, one decimal; null when needs_data
+  window: { days: number; start: string; end: string; /** first day of the recent 28-day half */ recentStart: string };
+  sampleCount: number; // qualifying points inside the 56-day window after filtering
+  earlyAvg: number | null; // average of the prior 28 days (null when needs_data)
+  recentAvg: number | null; // average of the last 28 days — the headline number
+  earlyCount: number; // sessions in the prior half
+  recentCount: number; // sessions in the recent half
   points: TrendPoint[]; // the qualifying points actually used (in-window, post-exclude)
   /** Age in days of the newest in-window qualifying point (null when there are none). */
   newestAgeDays: number | null;
-  /** True when an otherwise-real verdict was decayed to needs_data by the staleness gate. */
+  /** Always false — the freshness gate is gone (Garmin recomputes on every activity). Kept so consumers keep their shape. */
   stale: boolean;
-  /** STILL-MOVING vs FLATTENED: on a moving verdict (improving/sliding), true when the SECOND HALF of
-   *  the window sits inside the holding band — the metric moved, then settled. Lets the display split
-   *  "settled lower" (dropped, now holding) from "easing off" (still declining). Absent on needs_data. */
-  recentlyFlat?: boolean;
-  /** The cadence-scaled min-session floor used for the needs_data gate — carried so the
-   *  glass-box receipt cites the REAL threshold ("need 4"), not a hardcoded default. */
+  /** Always 1 — the only floor is one session per half. Kept for the receipt's shape. */
   minSessions: number;
 }

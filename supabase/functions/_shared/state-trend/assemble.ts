@@ -16,6 +16,7 @@ import { positionInRange, placeAnchorOnBand } from './position-in-range.ts';
 // ⛔ THE BOOK'S OWN TABLE, read not restated — see `setMintsAMax`. p218's ME band lives in one place.
 import { prescribe } from '../strength-grid/intents.ts';
 import { computeLoadFloor } from './load-floor.ts';
+import type { TrendPoint } from './types.ts';
 // [Step 7] The ONE list of lifts that carry a tracked max — shared with the client renderer so the
 // emitted series and the drawn sparkline cannot disagree about which four. Path precedent:
 // `_shared/response-model/weekly.ts` imports `src/lib/` the same way (bundled at deploy time).
@@ -46,7 +47,7 @@ import { getExerciseConfig } from '../../../../src/lib/exercise-config.ts';
 // ⛔ The workout screen's engine. D-346: State reads THIS, it does not mint its own run verdict.
 import { routeTrend, type RouteTrend } from '../heat-adjust.ts';
 import { computeEfficiencyIndex } from '../efficiency-index.ts';
-import { ADHERENCE_WINDOW_DAYS } from './thresholds.ts';
+import { ADHERENCE_WINDOW_DAYS, TREND_HALF_DAYS } from './thresholds.ts';
 
 const DAY = 86_400_000;
 export const ORDER = ['strength', 'bike', 'run', 'swim'] as const;
@@ -141,7 +142,6 @@ export const STATE_TREND_WINDOWS = {
    */
   defaultBlockWeeks: 12,
   bikeLimit: 30, // latest 30 rides carrying workout_analysis
-  runDays: 42, // GAP pace 6wk
   swimDays: 56, // pace/100 8wk
   cadenceDays: 90, // sessions/week
   adherenceDays: ADHERENCE_WINDOW_DAYS,
@@ -156,39 +156,13 @@ export const STATE_TREND_WINDOWS = {
   // descent candidate), not a scold. `baselineWindowDays` (24wk) is retired — the derivation reads
   // cadenceDays now. Kept below only as a dated record of the superseded decision.
   baselineWindowDays: 168, // ⟳ SUPERSEDED 2026-07-17 — no longer read; the anchor rolls on cadenceDays. See the note above.
-  // NEW RULE (2026-07-16, not inherited): the minimum qualifying steady runs IN THE TREND WINDOW to ASSERT
-  // a durability direction. Below it, the direction is 'withheld' (stated as a count, no claim) — a handful
-  // of runs can't earn "improving" (nor "holding"). Data-sufficiency only, never plan-adherence. 8 ≈ ~1.3
-  // steady runs/wk over the 6wk window — enough that the early/recent 2-run endpoint averages aren't the
-  // whole series. Judgment call; calibrate with real data, don't tune to one athlete.
-  runDirectionMinRuns: 8,
-  // The bike half of the same rule (2026-08-01, Michael: "we can just say that when someone drops a
-  // discipline, as long as the engine is right for when they pick back up"). Below this many qualifying
-  // rides IN THE WINDOW the bike direction is 'withheld' — the row says "too few to read" instead of
-  // stepping straight from silence to a confident arrow, which is what it did before.
-  //
-  // ⛔ 8 IS DERIVED, NOT FELT. The literature, and the arithmetic it forces (Q-241, D-359):
-  //   · A 20-min cycling TT re-tested a week apart has a CV of ~2.9% in trained, familiarised cyclists
-  //     (Nimmerichter/Sparks-type protocols, IJSPP 2019 n=8: TEM 4.6 W, ICC 0.99; a second n=25 study:
-  //     CV 2.9%, ICC 0.97). Our substrate is NOT that: it is the best 20-min inside an ordinary ride,
-  //     so pacing, motivation, drafting, heat and terrain all sit ON TOP of that number. ~3% is the
-  //     OPTIMISTIC typical error here, not the expected one.
-  //   · Hopkins: the typical error of a MEAN falls with √n. The verdict compares the mean of the 2
-  //     oldest points to the mean of the 2 newest, so the error on that comparison is TE × √(2/n) per end.
-  //   · At TE 3%: n=2 per end → ±3.0% on the comparison, which is WIDER THAN THE ENTIRE ±2.0% verdict
-  //     band. n=3 → ±2.45%. n=4 → ±2.12%, the first point where a band-clearing move is at least the
-  //     size of its own measurement error. 4 per end × 2 ends = 8.
-  //   · It lands on run's 8 from a completely different direction, which is a check, not a coincidence.
-  //   · Coaching practice agrees at the other end: FTP is re-tested every 4-8 weeks because a threshold
-  //     change needs a BLOCK to appear. 8 rides across the 56d window ≈ 1/wk in that bin — the minimum
-  //     training density at which a coach would entertain "your threshold moved" at all.
-  // What the field does NOT give us is a published count: Strava and TrainingPeaks draw a curve and never
-  // assert a direction (nothing to gate), and Garmin gates on RECENCY and qualifying activity — 1-2 weeks
-  // of history with ~2 qualifying sessions a week, else "No Status". We already have Garmin's half (the
-  // 21d staleness decay). The count is ours because the CLAIM is ours.
-  // ⚠️ The number that is still soft is the ±2.0% band itself, not this floor — it sits at or below the
-  // measurement error of the substrate. That is now the honest next question, and it is filed, not fixed.
-  bikeDirectionMinRides: 8,
+  // ⛔ THE DIRECTION FLOORS ARE GONE (2026-09-04, docs/SPEC-state-nothing-invented-2026-09-04.md): no
+  // trend on the State screen withholds a direction on a count any more — Garmin's rule reads whenever
+  // both 28-day halves have a session. The one reader left is the RACE-PROJECTION gate in compute-snapshot,
+  // which was written against this number because it equals `MIN_REGRESSION_N` (8), the bar the heat fit
+  // already sets before it claims a coefficient. OURS — a count with no outside source; it gates a
+  // projected race time, not an arrow. Ledger: docs/STATE-SOURCES.md.
+  projectionMinRuns: 8,
 };
 
 // Pure asOf-relative window boundary (mirrors classify.ts's isoMinusDays; kept local to avoid a cycle).
@@ -609,6 +583,8 @@ export interface StateTrendInputs {
   exerciseRows: ExerciseLogLite[]; // 12wk exercise_log
   strengthVolumeRows?: StrengthVolumeRow[]; // per-strength-workout total_volume_lbs (the volume trend)
   bikeRows: Array<{ date: string; classified_type: string | null; w20: number | null; hr_at_band: number | null; in_band_s?: number | null; band_hi?: number | null; band_source: string | null; hr_corrupt?: boolean }>;
+  /** ride efficiency factor per steady ride (the number the bike row prints) — owns the efficiency arrow when present */
+  bikeEffHistory?: Array<{ date: string; value: number }>;
   /** Q-255: current bike CTL/TSB (+ a prior CTL for the trend) for the always-on load floor.
    *  Optional — absent keeps today's behaviour exactly (no floor on the row). */
   bikeLoad?: import('./load-floor.ts').LoadFloorInput | null;
@@ -934,7 +910,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     // efficiency" trend reads ride-type MIX as fitness (the fabricated -5.5% "improving" — Q-117 #2).
     .filter((r) => bikeEfficiencyRideEligible(r.classified_type, r.in_band_s, r.w20, r.band_hi))
     .map((r) => ({ date: r.date, value: Number(r.hr_at_band) }));
-  const bikeFitness = computeBikeFitness(binRides, hrPts, asOf, spw.bike, STATE_TREND_WINDOWS.bikeDirectionMinRides);
+  const bikeFitness = computeBikeFitness(binRides, hrPts, asOf, spw.bike, inp.bikeEffHistory);
   bikeFitness.efficiency.basis = inp.bikeRows.map((r) => r.band_source).find((s) => s) ?? null;
   // Q-255: the always-on load floor — verdict words off CTL/TSB the app already computes per ride.
   // Absent input → null → the row renders exactly as before.
@@ -978,16 +954,24 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   const runDecoupSeries = decouplingToSeries(inp.runJoined);
   const runSteadyCadence = runDecoupSeries.length / WEEKS_90D;
   // TREND uses the FULLER series (keeps sub-zero readings for slope) — untouched by Fix A.
-  // VOLUME GATE: below runDirectionMinRuns qualifying runs in the window, the direction is 'withheld'.
-  const runDecoupling = computeRunDecouplingState(runDecoupSeries, asOf, runSteadyCadence, STATE_TREND_WINDOWS.runDirectionMinRuns);
-  const runEffSeries = efficiencyIndexToSeries(inp.runJoined);
+  const runDecoupling = computeRunDecouplingState(runDecoupSeries, asOf, runSteadyCadence);
+  // ⛔ THE RUN ARROW READS THE HEADLINE'S OWN POOL (Michael, 2026-09-04, ruling 1): the aerobic spine
+  // series the card averages for its number — Garmin's 28/28 rule over the same points. The heat-adjusted
+  // route (D-346) no longer overrides this verdict; it travels below as a receipt (coefficient, span, reason).
+  const aeroSpine = (inp.enduranceSpine ?? []).find((s) => s.sport === 'run' && s.group === 'aerobic');
+  const runEffSeries: TrendPoint[] = aeroSpine
+    ? (aeroSpine.points ?? [])
+        .filter((p) => (p as { countsTowardTrend?: boolean }).countsTowardTrend !== false && p.efficiency != null && !!p.date)
+        .map((p) => ({ date: String(p.date), value: Number(p.efficiency) }))
+    : efficiencyIndexToSeries(inp.runJoined);
   const runEfficiency = computeRunEfficiencyState(runEffSeries, asOf, runEffSeries.length / WEEKS_90D);
   // 12-WEEK efficiency chart series (the "long view") — the SAME points the verdict reads, over a wider 84d
   // window than the verdict's 42d, so the recent tail of the chart IS the verdict's data (no contradiction
   // possible). Each point flagged `recent` when inside the 42d verdict window. Fills as the athlete trains.
   const CHART_WINDOW_DAYS = 84;
   const _chartStart = new Date(new Date(asOf + 'T12:00:00Z').getTime() - CHART_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10);
-  const _verdictStart = new Date(new Date(asOf + 'T12:00:00Z').getTime() - STATE_TREND_WINDOWS.runDays * 86_400_000).toISOString().slice(0, 10);
+  // `recent` on a chart point = inside Garmin's recent 28-day half — the half the headline averages.
+  const _verdictStart = new Date(new Date(asOf + 'T12:00:00Z').getTime() - TREND_HALF_DAYS * 86_400_000).toISOString().slice(0, 10);
   const effChartSeries = runEffSeries
     .filter((p) => p.date > _chartStart && p.date <= asOf)
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -1092,29 +1076,17 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
       // "Holding" is a finding; this is the absence of one, and swapping them is how a score starts to lie.
       // ⚠️ `pctChange` is nulled with it — a percentage beside "too few to read" is a claim in disguise.
       // ⚠️ NO ROUTE VERDICT → the old trend stands, so a treadmill athlete keeps their row.
-      verdict: runRoute
-        ? (runRoute.direction === 'improving' ? 'improving'
-          : runRoute.direction === 'declining' ? 'sliding'
-          : runRoute.direction === 'holding' ? 'holding'
-          : 'withheld')
-        : runEfficiency.trend.verdict,
-      pctChange: runRoute
-        ? (runRoute.direction === 'still_learning' ? null : runRoute.pct)
-        : runEfficiency.trend.pctChange,
-      sampleCount: runRoute ? runRoute.points : runEfficiency.trend.sampleCount,
+      // Garmin's 28/28 rule over the aerobic spine (ruling 1, 2026-09-04) — the route below is a receipt.
+      verdict: runEfficiency.trend.verdict,
+      pctChange: runEfficiency.trend.pctChange,
+      sampleCount: runEfficiency.trend.sampleCount,
       // ⚠️ THE RECENCY STAMP COMES FROM THE VERDICT'S POOL TOO. Left on the old trend it reported
       // "1d ago" off the polluted series while the verdict's newest run was today — a third label
       // describing a different set of runs than the number beside it.
       // ⚠️ THE HEADLINE POOL, NOT ALL RUNS (2026-08-28). "How old is this reading" has to mean the
       // newest run the VERDICT actually read; quoting the newest run of any kind would age-stamp a
       // number that session never touched.
-      newestAgeDays: runRoute && runEffHeadlineRows.length > 0
-        ? Math.max(0, Math.round(
-            (Date.parse(asOf + 'T12:00:00Z')
-              - Date.parse(String(runEffHeadlineRows[runEffHeadlineRows.length - 1]?.date) + 'T12:00:00Z')
-            ) / 86_400_000))
-        : runEfficiency.trend.newestAgeDays,
-      recentlyFlat: runEfficiency.trend.recentlyFlat,
+      newestAgeDays: runEfficiency.trend.newestAgeDays,
       // ⛔ THE RECEIPT READS THE SAME POOL AS THE VERDICT (D-346, 2026-07-31).
       //
       // Michael, from the shipped screen: the row said *"pace ~13:32/mi at 140 bpm"* while his easy runs
@@ -1972,7 +1944,7 @@ export interface StateTrendsV1 {
    *  ("building aerobic base"), not just the improving/sliding direction the base verdict carries. */
   run: DisciplineTrendCache & {
     decoupling: { verdict: string; band: string | null; recentPct: number | null; provisional: boolean; stale: boolean; newestAgeDays: number | null; sampleCount: number };
-    efficiency: { verdict: string; pctChange: number | null; sampleCount: number; newestAgeDays: number | null; recentlyFlat?: boolean; recentPaceSecPerKm?: number | null; recentGapPaceSecPerKm?: number | null; recentHrAvg?: number | null; series?: Array<{ date: string; value: number; recent: boolean }>; route?: { direction: string; points: number; ci: [number, number] | null; method: string; heatCoefPctPerF: number | null; spanDays: number | null } | null };
+    efficiency: { verdict: string; pctChange: number | null; sampleCount: number; newestAgeDays: number | null; recentPaceSecPerKm?: number | null; recentGapPaceSecPerKm?: number | null; recentHrAvg?: number | null; series?: Array<{ date: string; value: number; recent: boolean }>; route?: { direction: string; points: number; ci: [number, number] | null; method: string; heatCoefPctPerF: number | null; spanDays: number | null } | null };
   };
   /** D-194: `rest` = the rest-fraction (work:rest) trend, nested like bike's power/efficiency. */
   swim: DisciplineTrendCache & { rest: DisciplineTrendCache };
@@ -2016,7 +1988,7 @@ export function rollupFitness(v1: StateTrendsV1 | null | undefined): FitnessRoll
   ] as const)
     .map(([key, d]) => ({ key, verdict: d?.verdict, provisional: !!d?.provisional }))
     // 'withheld' is non-directional (like needs_data) — a withheld direction never drives the composite.
-    .filter((d) => d.verdict && d.verdict !== 'needs_data' && d.verdict !== 'withheld');
+    .filter((d) => d.verdict && d.verdict !== 'needs_data');
 
   const dirOf = (set: Array<{ verdict?: string }>): FitnessDirection => {
     const vs = set.map((d) => d.verdict);
@@ -2095,14 +2067,14 @@ export function rollupHrResponse(v1: StateTrendsV1 | null | undefined): HrRespon
   //
   // ⚠️ Falls back to decoupling when efficiency has no read, so a treadmill athlete keeps the row.
   const runEff = v1.run?.efficiency as { verdict?: string; provisional?: boolean; newestAgeDays?: number | null; route?: unknown } | undefined;
-  const runD = (runEff && runEff.route && runEff.verdict && runEff.verdict !== 'needs_data' && runEff.verdict !== 'withheld')
+  const runD = (runEff && runEff.route && runEff.verdict && runEff.verdict !== 'needs_data')
     ? runEff
     : v1.run?.decoupling;
   const bikeE = v1.bike?.efficiency as (StateTrendsV1['bike']['efficiency'] & { newestAgeDays?: number | null }) | undefined;
   const all: Array<{ discipline: 'run' | 'bike'; verdict?: string; provisional: boolean; newestAgeDays: number | null }> = [];
   if (runD) all.push({ discipline: 'run', verdict: runD.verdict, provisional: !!runD.provisional, newestAgeDays: runD.newestAgeDays ?? null });
   if (bikeE) all.push({ discipline: 'bike', verdict: bikeE.verdict, provisional: !!bikeE.provisional, newestAgeDays: bikeE.newestAgeDays ?? null });
-  const contributors = all.filter((c) => c.verdict && c.verdict !== 'needs_data' && c.verdict !== 'withheld') as HrResponseRollup['contributors'];
+  const contributors = all.filter((c) => c.verdict && c.verdict !== 'needs_data') as HrResponseRollup['contributors'];
   if (contributors.length === 0) return { verdict: 'needs_data', contributors: [], asOfAgeDays: null, stalestAgeDays: null };
 
   const solid = contributors.filter((c) => !c.provisional);

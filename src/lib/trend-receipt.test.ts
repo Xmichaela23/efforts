@@ -55,23 +55,22 @@ Deno.test('run holding', () => {
 Deno.test('run needs_data (TOO FEW) — declares "easy-pace runs" (D-237), not bare "runs"', () => {
   assertEquals(
     trendReceipt({ ...RUN, verdict: 'needs_data', pctChange: null, sampleCount: 2, newestAgeDays: 5 }),
-    'Not enough data yet — 2 easy-pace runs in 6wk (need 3)',
+    'Nothing to compare yet — 2 easy-pace runs in 6wk; needs one in each 4-week half',
   );
 });
 
-// ── BUG FIX (Michael 2026-07-03): the receipt must cite the REAL cadence-scaled floor, not a
-//    hardcoded 3. A ~2.6 runs/wk athlete has minSessions=4, so 3 runs is genuinely too-few —
-//    but the copy said "(need 3)", claiming 3 was enough while the gate held out for 4. ────────
-Deno.test('run needs_data cites the REAL floor + easy-pace label: 3 easy runs, floor 4', () => {
+// ── Garmin's rule (2026-09-04): there is no count floor — a blank means a 4-week half with nothing in it.
+//    A `floor` from an old cached row is ignored; the copy never says "need N". ────────
+Deno.test('run needs_data ignores a cached floor and says what a blank now means', () => {
   assertEquals(
     trendReceipt({ ...RUN, verdict: 'needs_data', pctChange: null, sampleCount: 3, newestAgeDays: 4, floor: 4 }),
-    'Not enough data yet — 3 easy-pace runs in 6wk (need 4)',
+    'Nothing to compare yet — 3 easy-pace runs in 6wk; needs one in each 4-week half',
   );
 });
-Deno.test('floor omitted → back-compat default 3; singular "run" pluralization', () => {
+Deno.test('singular "run" pluralization', () => {
   assertEquals(
     trendReceipt({ ...RUN, verdict: 'needs_data', pctChange: null, sampleCount: 1, newestAgeDays: 2 }),
-    'Not enough data yet — 1 easy-pace run in 6wk (need 3)',
+    'Nothing to compare yet — 1 easy-pace run in 6wk; needs one in each 4-week half',
   );
 });
 
@@ -118,6 +117,6 @@ Deno.test('bike full row composition (Power · Efficiency + shared tail)', () =>
 Deno.test('swim needs_data', () => {
   assertEquals(
     trendReceipt({ windowDays: 56, discipline: 'swim', verdict: 'needs_data', pctChange: null, sampleCount: 0, newestAgeDays: null }),
-    'Not enough data yet — 0 swims in 8wk (need 3)',
+    'Nothing to compare yet — 0 swims in 8wk; needs one in each 4-week half',
   );
 });

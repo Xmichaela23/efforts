@@ -14,8 +14,7 @@ import { getDisciplineColor } from '@/lib/context-utils';
  * The ruling was applied to the sport rows and this toggle, inside them, survived. It is gone: the chart
  * is static, and what it shows is what there is.
  *
- * ⚠️ CAPTION, STANDARDISED: "last N weeks · recent 6 weeks in color"; building → `buildingLabel`. The
- * `recentLabel` default is the full "recent 6 weeks in color" so no call site needs to override it.
+ * ⚠️ CAPTION, STANDARDISED: "last N weeks" (one colour, 2026-09-04); building → `buildingLabel`.
  * ⚠️ N IS THE 12-WEEK MODEL'S, CAPPED (2026-09-03, §5.3). The label printed the uncapped data span
  * (13, off a 90-day fetch window ≈ 12.8 weeks) while its own "building" test used the span capped at
  * 12 — "last 13 weeks" under a 12-week model. The label, the gate and the model now agree at 12.
@@ -37,9 +36,9 @@ import { getDisciplineColor } from '@/lib/context-utils';
  * "1.24–1.90" means nothing to a reader — the shape is the message. Strength passes a lb unit and
  * keeps its range, where the numbers are self-explanatory.
  */
-export default function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, recentLabel = 'recent 6 weeks in color', caption, buildingLabel = (w: number) => `building · ${w} of 12 weeks` }: {
+export default function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, caption, buildingLabel = (w: number) => `building · ${w} of 12 weeks` }: {
   series?: Array<{ date: string; value: number; recent: boolean; tempF?: number | null }>;
-  color?: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string; minSpanFraction?: number; recentLabel?: string;
+  color?: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string; minSpanFraction?: number;
   buildingLabel?: (spanWeeks: number) => string;
   caption?: string | null;
 }) {
@@ -59,10 +58,9 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
   const dMin = center - dRange / 2;
   const x = (i: number) => PAD_X + (i / (pts.length - 1)) * (W - 2 * PAD_X);
   const y = (v: number) => PAD_Y + (1 - (v - dMin) / dRange) * (H - 2 * PAD_Y); // higher = higher on chart
-  const firstRecent = pts.findIndex((p) => p.recent);
-  const recentStart = firstRecent <= 0 ? 0 : firstRecent - 1; // include the join point so the segments connect
-  const dimPoly = pts.map((p, i) => `${x(i)},${y(p.value)}`).join(' ');
-  const recentPoly = firstRecent >= 0 ? pts.slice(recentStart).map((p, i) => `${x(recentStart + i)},${y(p.value)}`).join(' ') : '';
+  // ⛔ ONE COLOUR (2026-09-04, docs/SPEC-state-nothing-invented-2026-09-04.md): the "recent 6 weeks in
+  // colour" split was ours. TrainingPeaks and intervals.icu draw one line, a dot per session.
+  const poly = pts.map((p, i) => `${x(i)},${y(p.value)}`).join(' ');
   const last = pts[pts.length - 1];
   const spanWeeksRaw = Math.max(1, Math.ceil((Date.parse(last.date + 'T12:00:00Z') - Date.parse(pts[0].date + 'T12:00:00Z')) / (7 * 86_400_000)));
   const spanWeeks = Math.min(12, spanWeeksRaw);
@@ -70,17 +68,16 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
   return (
     <span className="basis-full flex flex-col gap-1 mt-1.5">
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="block" aria-hidden="true">
-        <polyline points={dimPoly} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth={1.25} vectorEffect="non-scaling-stroke" />
-        {recentPoly && <polyline points={recentPoly} fill="none" stroke={runColor} strokeOpacity={0.9} strokeWidth={1.75} vectorEffect="non-scaling-stroke" />}
+        <polyline points={poly} fill="none" stroke={runColor} strokeOpacity={0.9} strokeWidth={1.75} vectorEffect="non-scaling-stroke" />
         {/* one dot per session (2026-09-04, Michael): TrainingPeaks and intervals.icu plot each workout as a point
             and draw the line through them — a line through three readings must look like three readings */}
         {pts.map((p, i) => i < pts.length - 1 && (
-          <circle key={p.date + i} cx={x(i)} cy={y(p.value)} r={1.6} fill={p.recent ? runColor : 'rgba(255,255,255,0.35)'} />
+          <circle key={p.date + i} cx={x(i)} cy={y(p.value)} r={1.6} fill={runColor} fillOpacity={0.8} />
         ))}
         <circle cx={x(pts.length - 1)} cy={y(last.value)} r={2.5} fill={runColor} />
       </svg>
       <span className="text-[10px] text-white/45 flex items-center justify-between">
-        <span>{building ? buildingLabel(spanWeeks) : `last ${spanWeeks} weeks · ${recentLabel}`}</span>
+        <span>{building ? buildingLabel(spanWeeks) : `last ${spanWeeks} weeks`}</span>
         {unit ? <span className="tabular-nums text-white/30">{fmtVal(minV)}–{fmtVal(maxV)}{unit}</span> : <span />}
       </span>
       {caption && <span className="text-[10px] text-white/40">{caption}</span>}

@@ -155,9 +155,11 @@ Deno.test('computeRunDecouplingState: FALLING pct → improving (LOWER decouplin
     { date: '2026-06-29', value: 3 },
   ];
   const { trend, band, recentPct } = computeRunDecouplingState(series, AS_OF, series.length / WEEKS_90D);
-  assertEquals(trend.verdict, 'improving');     // falling decoupling reads IMPROVING
-  assertEquals(band, 'sound');                  // recent ~3% (<5%) → aerobic base sound
-  assert(recentPct != null && recentPct < 5);
+  assertEquals(trend.verdict, 'improving');     // falling decoupling reads IMPROVING (Garmin 28/28: 12 → 6.25)
+  // The recent representative is the average of the last 28 days (06-08..06-29 = 6.25%), the same number
+  // the headline prints — still over Friel's 5% line, so the band says so.
+  assertEquals(recentPct, 6.3);
+  assertEquals(band, 'needs_work');
 });
 
 // ══ DIRECTION PIN #2 — RISING decoupling = SLIDING (durability declining), NOT "improving" ══
@@ -174,18 +176,19 @@ Deno.test('computeRunDecouplingState: RISING pct → sliding (durability declini
   assertEquals(band, 'needs_work');             // recent ~11% (>5%) → aerobic base needs work
 });
 
-// ── Honesty gate: STALE input → needs_data (never a confident current verdict), but the real value
-//    + its age survive so the render can carry-forward "last steady run Nd ago: X%" (not extrapolate). ──
-Deno.test('computeRunDecouplingState: stale (newest > freshness) → needs_data + stale, value carried', () => {
-  // 3 steady points ~37–41d old: inside the 42d window but past the (thin-cadence) freshness ceiling.
+// ── No freshness decay any more (Garmin recomputes per activity): points all in the PRIOR half and none
+//    in the recent 28 days → needs_data because one half is empty; the real value + age survive for
+//    carry-forward "last steady run Nd ago: X%". ──
+Deno.test('computeRunDecouplingState: nothing in the recent half → needs_data (not stale), value carried', () => {
   const series = [
     { date: '2026-05-23', value: 8 },
     { date: '2026-05-24', value: 7 },
-    { date: '2026-05-26', value: 6 }, // newest ≈ 38d old
+    { date: '2026-05-26', value: 6 }, // newest ≈ 38d old — before the recent half opens (06-05)
   ];
   const { trend, recentPct, band } = computeRunDecouplingState(series, AS_OF, series.length / WEEKS_90D);
-  assertEquals(trend.verdict, 'needs_data');    // NOT a current trend off stale data
-  assertEquals(trend.stale, true);
+  assertEquals(trend.verdict, 'needs_data');
+  assertEquals(trend.stale, false);
+  assertEquals([trend.earlyCount, trend.recentCount], [3, 0]);
   assert(trend.newestAgeDays != null && trend.newestAgeDays >= 35);
   assertEquals(recentPct, 6);                   // real last value survives for carry-forward…
   assertEquals(band, 'needs_work');             // …with its band (6% > 5%), shown dimmed + "limited data"
