@@ -89,6 +89,7 @@ import { deriveSnapshotWatermark } from "./watermark.ts";
 // ⛔ THE ANCHOR RULE (TRUTH-MAP §5): a reference anchor is read through its resolver, never off the
 // raw column. The spine had its own private chain for threshold pace — see the block below.
 import { resolveCurrentRunThresholdPace } from "../../../src/lib/resolve-current-run-pace.ts";
+import { appliedLearnedFtp } from "../../../src/lib/resolve-current-ftp.ts";
 
 /**
  * The session's climb in metres, off the workout row — `workouts.elevation_gain`, the one column every
@@ -1865,7 +1866,10 @@ serve(async (req: Request) => {
               workout_type: hrs?.workoutType ?? null, duration_minutes: hrs?.durationMinutes ?? null,
             };
           });
-          const ftp = ub?.learned_fitness?.ride_ftp_estimated ?? null;
+          // The number the app RUNS ON: accepted if the athlete has said yes to one, else the live estimate
+          // (2026-09-04, docs/SPEC-ftp-accept-2026-09-04.md — State's bike row shows the accepted value,
+          // never the pending proposal). Same precedence as the resolver's tier 1, one place.
+          const ftp = appliedLearnedFtp(ub?.learned_fitness) as any;
           // as-of date of the FTP estimate = when the learned profile was last computed (ride_ftp_estimated
           // itself carries no date; learned_fitness.last_updated is its stamp). Drives the bike anchor label.
           const bikeFtpEstimate = ftp && Number(ftp.value) > 0

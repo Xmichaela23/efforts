@@ -12,7 +12,7 @@ import { refreshGroupRideRouteSnapshotsForUser } from '@/lib/refresh-group-ride-
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import { fiveKNudgeDismissKey, type ArcFiveKLearnedDivergence } from '@/lib/arc-types';
-import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
+import { resolveCurrentFtp, pendingFtpProposal, acceptEstimatedFtp } from '@/lib/resolve-current-ftp';
 import { frielRunZones } from '@/lib/friel-zones';
 import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace, describeThresholdBasis } from '@/lib/resolve-current-run-pace';
 import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
@@ -114,6 +114,40 @@ const { saveUserBaselines, loadUserBaselines } = useAppContext();
 const [lockDrafts, setLockDrafts] = useState<Record<string, boolean>>({});
 const [thresholdInfoOpen, setThresholdInfoOpen] = useState(false);
 const [ftpInfoOpen, setFtpInfoOpen] = useState(false);
+// ⛔ THE LEARNER PROPOSES, THE ATHLETE ACCEPTS (2026-09-04, docs/SPEC-ftp-accept-2026-09-04.md). When the
+// live estimate differs from the accepted number, the bike row shows `measured 171 · use it` beside the
+// applied value. Tapping writes `learned_fitness.ride_ftp_accepted` (re-read first so a learner run is
+// not clobbered) and re-prices the unstarted endurance rows the same way a saved number does. Not a
+// modal, not a banner; nothing moves until the tap.
+const [ftpAccepting, setFtpAccepting] = useState(false);
+const [ftpAcceptNote, setFtpAcceptNote] = useState<string>('');
+const acceptMeasuredFtp = async () => {
+  const userId = getStoredUserId();
+  if (!userId || ftpAccepting) return;
+  setFtpAccepting(true);
+  try {
+    const { data: row } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', userId).maybeSingle();
+    let lf: Record<string, unknown> | null = null;
+    const raw = row?.learned_fitness;
+    if (typeof raw === 'string') { try { lf = JSON.parse(raw); } catch { lf = null; } }
+    else if (raw && typeof raw === 'object') lf = raw as Record<string, unknown>;
+    const next = acceptEstimatedFtp(lf, 'baselines');
+    if (!next) return;
+    const { error } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', userId);
+    if (error) { console.error('[TrainingBaselines] FTP accept failed:', error); return; }
+    setLearnedFitness(next);
+    const acceptedW = Math.round(Number((next.ride_ftp_accepted as { value: number }).value));
+    let note = `${acceptedW} watts in use.`;
+    try {
+      const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } });
+      const n = rp?.success && rp?.repriced ? Number(rp.rows_repriced) || 0 : 0;
+      if (n > 0) note += ` ${n} upcoming ${n === 1 ? 'session' : 'sessions'} updated.`;
+    } catch (e) { console.warn('[TrainingBaselines] re-price after FTP accept failed:', e); }
+    setFtpAcceptNote(note);
+  } finally {
+    setFtpAccepting(false);
+  }
+};
 const [lthrInfoOpen, setLthrInfoOpen] = useState(false);
 const { addPlannedWorkout } = usePlannedWorkouts() as any;
 
@@ -1846,6 +1880,7 @@ return (
                               const manualFtp = data.performanceNumbers?.ftp;
                               const learnedFtp = learnedFitness?.ride_ftp_estimated?.value;
                               const resolved = resolveCurrentFtp({ learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers } as any);
+                              const proposal = pendingFtpProposal({ learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers } as any);
                               const mine = (data.performanceNumbers as any)?.ftp_source === 'manual';
                               const status = mine
                                 ? 'your number. Your rides don\'t change it.'
@@ -1869,9 +1904,25 @@ return (
                                   className="rounded-xl border px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1"
                                   style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: mine ? `${SPORT_COLORS.cycling}55` : 'rgba(255,255,255,0.15)' }}
                                 >
-                                  <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
+                                  <div className="flex-1 min-w-0 flex items-baseline gap-1.5 flex-wrap">
                                     <span className="text-lg font-semibold tabular-nums text-white">{resolved.value != null ? Math.round(Number(resolved.value)) : '—'}</span>
                                     <span className="text-[11px] text-white/50">watts</span>
+                                    {proposal && !mine && (
+                                      <>
+                                        <span className="text-[11px] text-white/50">· measured {Math.round(proposal.measured)}</span>
+                                        <button
+                                          type="button"
+                                          onClick={acceptMeasuredFtp}
+                                          disabled={ftpAccepting}
+                                          aria-label={`Use the measured FTP, ${Math.round(proposal.measured)} watts`}
+                                          // eslint-disable-next-line efforts/consistent-button-shape -- same pill as AutoMinePill beside it
+                                          className="text-[11px] px-2.5 h-7 leading-7 rounded-full border bg-transparent cursor-pointer disabled:opacity-50 shrink-0"
+                                          style={{ borderColor: `${SPORT_COLORS.cycling}88`, color: SPORT_COLORS.cycling }}
+                                        >
+                                          {ftpAccepting ? 'working…' : 'use it'}
+                                        </button>
+                                      </>
+                                    )}
                                   </div>
                                   <input
                                     id="ftp-input"
@@ -1892,12 +1943,12 @@ return (
                                       }
                                       return { ...prev, performanceNumbers: next };
                                     })}
-                                    placeholder={learnedFtp ? String(Math.round(Number(learnedFtp))) : '250'}
+                                    placeholder={resolved.value ? String(Math.round(Number(resolved.value))) : '250'}
                                     className="w-[4.5rem] h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40 text-center shrink-0"
                                     style={{ fontFamily: 'Inter, sans-serif' }}
                                   />
                                   <AutoMinePill mine={mine} onAuto={setAuto} onMine={setMine} color={SPORT_COLORS.cycling} label="FTP" />
-                                  <div className="basis-full text-[11px] text-white/55 leading-snug">{status} Sets your power zones and the targets in your plan.</div>
+                                  <div className="basis-full text-[11px] text-white/55 leading-snug">{status} Sets your power zones and the targets in your plan.{ftpAcceptNote ? ` ${ftpAcceptNote}` : ''}</div>
                                 </div>
                               );
                             })()}

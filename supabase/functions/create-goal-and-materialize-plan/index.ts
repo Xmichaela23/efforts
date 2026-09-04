@@ -1,5 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
+import { resolveCurrentFtp, appliedLearnedFtp } from '../../../src/lib/resolve-current-ftp.ts';
 // D-326 layer 2 — the verdict supplier. Pure grouping + selection; the query in the strength branch
 // is the only database part.
 import {
@@ -3527,8 +3527,10 @@ Deno.serve(async (req: Request) => {
       };
 
       const triLearned = parseLearnedFitnessForSeed(triBaseline?.learned_fitness);
-      if (learnedPaceUsable(triLearned?.ride_ftp_estimated)) {
-        triGenerateBody.ftp = Number((triLearned.ride_ftp_estimated as { value: number }).value);
+      // Accepted FTP if the athlete has one, else the estimate (docs/SPEC-ftp-accept-2026-09-04.md).
+      const triLearnedFtp = appliedLearnedFtp(triLearned as any);
+      if (learnedPaceUsable(triLearnedFtp)) {
+        triGenerateBody.ftp = Number((triLearnedFtp as { value: number }).value);
         console.log('[create-goal] tri ftp source: learned_fitness vs performance_numbers (using learned_fitness)');
       } else {
         console.log('[create-goal] tri ftp source: learned_fitness vs performance_numbers (using performance_numbers)');

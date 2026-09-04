@@ -501,6 +501,32 @@ Deno.serve(async (req) => {
       console.log(`  FTP ratchet floor: kept prior ${priorFtp.value}W (${priorFtp.confidence}) over new ${newFtp.value}W (${newFtp.confidence})`);
     }
 
+    // ⛔ THE LEARNER PROPOSES, THE ATHLETE ACCEPTS (2026-09-04, docs/SPEC-ftp-accept-2026-09-04.md).
+    // `ride_ftp_accepted` is the athlete's answer, written by the checkpoint card or the Baselines row,
+    // never by this learner — EXCEPT the one-time seed below. It is carried over verbatim on every
+    // learn: `mergedLearned` is rebuilt from this run's profile, so without this line the first learn
+    // after an accept would drop it and every zone would snap back to the live estimate.
+    const priorAccepted = existing?.ride_ftp_accepted as Record<string, unknown> | undefined;
+    if (priorAccepted && Number(priorAccepted.value) > 0) {
+      mergedLearned.ride_ftp_accepted = priorAccepted;
+    } else {
+      // THE SEED. An athlete with a confident estimate and no accepted value is running on the
+      // estimate today (resolver tier 1 fallback). Seeding accepted = estimated changes nothing they
+      // see — same watt number, same source — and turns the seam on: from here the estimate only
+      // proposes. Through the app on its own next run, not a DB write. Low-confidence never seeds
+      // (learned-low never proposes, and a low number must not become "the number they said yes to").
+      const seedFrom = mergedLearned.ride_ftp_estimated as LearnedMetric | undefined;
+      if (seedFrom && Number(seedFrom.value) > 0 && (seedFrom.confidence === 'medium' || seedFrom.confidence === 'high')) {
+        mergedLearned.ride_ftp_accepted = {
+          ...seedFrom,
+          accepted_at: new Date().toISOString(),
+          accepted_from: seedFrom.value,
+          accepted_via: 'seed',
+        };
+        console.log(`  FTP accepted seeded from estimate: ${seedFrom.value}W (${seedFrom.confidence})`);
+      }
+    }
+
     const existingIdentity = parseJsonb((existingBaselines as any)?.athlete_identity);
     const userConfirmed = existingIdentity?.confirmed_by_user === true;
 

@@ -1,6 +1,6 @@
 # SPEC — FTP is proposed, then accepted (bike)
 
-**Status:** specified, not built. One terminal session.
+**Status:** BUILT, NOT DEPLOYED (2026-09-04). Resolver unit tests green (32/32, incl. the four acceptance-1 paths + the seed's blank-FTP failure mode); anchor-resolver lint green with the compute-snapshot ledger entry paid off. Acceptance 2 (throwaway accounts) and 3 (reference athlete) need the edge functions deployed — `learn-fitness-profile`, `endurance-checkpoint`, `compute-snapshot`, `create-goal-and-materialize-plan` — and the client; waiting on Michael. The accept write is one helper in the resolver file (`acceptEstimatedFtp`), called by both surfaces.
 **Date:** 2026-09-04 · follows D-372 and `docs/SPEC-ftp-estimator-2026-09-04.md`
 **Michael's call:** "follow their lead" — TrainerRoad. A detected FTP is shown to the athlete and takes
 only when accepted. Ours applies itself today.

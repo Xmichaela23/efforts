@@ -22,7 +22,7 @@ import {
   type Anchors, type HardSession, type LiveNumbers,
 } from '../_shared/standing-plan/endurance-checkpoint.ts';
 import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
-import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
+import { resolveCurrentFtp, pendingFtpProposal, acceptEstimatedFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 
 const corsHeaders = {
@@ -105,9 +105,16 @@ Deno.serve(async (req: Request) => {
     const thr = resolveCurrentRunThresholdPace(ub as any);
     const ftp = resolveCurrentFtp(ub as any);
     const lthr = resolveCurrentLthr(ub as any, { sport: 'run' });
+    // ⛔ THE FTP THE CARD SHOWS IS THE PROPOSAL (2026-09-04, docs/SPEC-ftp-accept-2026-09-04.md). The
+    // resolver now returns the ACCEPTED number, and the unstarted rows were priced off it — so "what
+    // the app measures now" is the live estimate when it differs, else the resolved value. "Use the
+    // measured numbers" writes the acceptance below BEFORE re-pricing, so the per-row materializer
+    // (which reads the resolver) prices off the number the athlete just said yes to.
+    const ftpProposal = pendingFtpProposal(ub as any);
     const live: LiveNumbers = {
       threshold_sec_per_mi: thr.sec_per_mi, threshold_source: thr.source,
-      ftp_w: ftp.source === 'learned' || ftp.source === 'manual' ? ftp.value : null, ftp_source: ftp.source,
+      ftp_w: ftpProposal ? ftpProposal.measured : (ftp.source === 'learned' || ftp.source === 'manual' ? ftp.value : null),
+      ftp_source: ftpProposal ? 'learned' : ftp.source,
       lthr_bpm: lthr.bpm, lthr_source: lthr.source,
     };
 
@@ -164,7 +171,22 @@ Deno.serve(async (req: Request) => {
 
     // ── APPLY: re-price the unstarted endurance rows, then record the answer ──
     let repriced = 0;
+    let ftpAccepted: number | null = null;
     if (decision === 'accept') {
+      // Accept the FTP first — one write, the same shape the Baselines row writes. Re-read the JSONB
+      // so a learner run between the read above and now is not clobbered.
+      if (ftpProposal) {
+        try {
+          const { data: fresh } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', userId).maybeSingle();
+          const lf = (fresh?.learned_fitness && typeof fresh.learned_fitness === 'object') ? fresh.learned_fitness as Record<string, unknown> : null;
+          const next = acceptEstimatedFtp(lf, 'checkpoint');
+          if (next) {
+            const { error: accErr } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', userId);
+            if (accErr) console.warn(`[checkpoint] FTP not accepted: ${accErr.message}`);
+            else ftpAccepted = Number((next.ride_ftp_accepted as { value: number }).value);
+          }
+        } catch (e) { console.warn('[checkpoint] FTP accept failed:', (e as Error)?.message ?? String(e)); }
+      }
       for (const r of pending) {
         try {
           const { error } = await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(r.id) } });
@@ -175,6 +197,7 @@ Deno.serve(async (req: Request) => {
     const record = {
       week: due.week, answered_at: new Date().toISOString(), decision,
       live, on_plan: onPlan, rows_repriced: repriced,
+      ...(ftpAccepted != null ? { ftp_accepted_w: ftpAccepted } : {}),
     };
     const { error: cfgErr } = await supabase
       .from('plans')
@@ -183,8 +206,8 @@ Deno.serve(async (req: Request) => {
       .eq('user_id', userId);
     if (cfgErr) console.warn(`[checkpoint] answer not recorded: ${cfgErr.message}`);
 
-    console.log(`[checkpoint] plan=${plan.id} week=${due.week} decision=${decision} repriced=${repriced}/${pending.length}`);
-    return json({ success: true, due: true, week: due.week, current_week: currentWeek, applied: true, decision, rows_repriced: repriced, numbers, evidence });
+    console.log(`[checkpoint] plan=${plan.id} week=${due.week} decision=${decision} repriced=${repriced}/${pending.length} ftp_accepted=${ftpAccepted ?? '—'}`);
+    return json({ success: true, due: true, week: due.week, current_week: currentWeek, applied: true, decision, rows_repriced: repriced, ftp_accepted_w: ftpAccepted, numbers, evidence });
   } catch (e) {
     const msg = (e as Error)?.message ?? String(e);
     const status = (e as any)?.status === 401 || /jwt|auth/i.test(msg) ? 401 : 500;

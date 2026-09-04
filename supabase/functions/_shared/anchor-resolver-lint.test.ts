@@ -157,10 +157,8 @@ const LEDGER: Record<string, Reason> = {
   'ftp::supabase/functions/_shared/arc-setup-prompt.ts': 'prompt-text',
   'ftp::supabase/functions/_shared/block-adaptation/index.ts': 'comparator',
   'ftp::supabase/functions/adapt-plan/index.ts': 'comparator',
-  // Feeds `deriveBike` (`state-trend/baseline-derive.ts:102`) — a provisional baseline candidate
-  // labelled "FTP est", the bike twin of the run's decoupling crown and the swim's hard efforts.
-  // It also needs `learned_fitness.last_updated`, which the resolver does not carry.
-  'ftp::supabase/functions/compute-snapshot/index.ts': 'measurement-source',
+  // compute-snapshot's bike anchor (`deriveBike`) was routed 2026-09-04 through `appliedLearnedFtp`
+  // (accepted-else-estimate, the resolver's own tier-1 rule) — the entry is paid off.
   // Remaining raw read is the TRI lane (`:3243`), deprioritised — Michael's working plans are Strong
   // Focus and the marathon. The limiter-sport inference (`:696`) is routed.
   'ftp::supabase/functions/create-goal-and-materialize-plan/index.ts': 'presence-gate',

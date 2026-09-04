@@ -7,10 +7,24 @@
  *
  * Precedence:
  *   0. performance_numbers.ftp_source — THE ATHLETE'S CHOICE, and it outranks everything below.
- *   1. learned_fitness.ride_ftp_estimated.value if confidence ∈ {medium, high}  → 'learned'
+ *   1. learned_fitness.ride_ftp_accepted.value if present                         → 'learned'
+ *      else learned_fitness.ride_ftp_estimated.value if confidence ∈ {medium, high} → 'learned'
  *   2. performance_numbers.ftp if present (>0)                                    → 'manual'
  *   3. learned_fitness.ride_ftp_estimated.value (any confidence, fallback)        → 'learned-low'
  *   4. otherwise                                                                  → null
+ *
+ * ⛔ THE LEARNER PROPOSES, THE ATHLETE ACCEPTS (2026-09-04, `docs/SPEC-ftp-accept-2026-09-04.md`,
+ * TrainerRoad's lead). `ride_ftp_estimated` is the live measurement — it keeps moving, rate-limited,
+ * every learn. `ride_ftp_accepted` is the number the athlete said yes to, and it is what the app runs
+ * on. Tier 1 reads the ACCEPTED value first; only when there is none does it fall back to the estimate
+ * exactly as before, so an athlete who has never accepted gets byte-identical numbers to before this
+ * seam existed. Nothing downstream reads the proposal: every zone, target, coach line and Garmin push
+ * goes through this function, and this function returns the accepted number.
+ *
+ * `pendingFtpProposal` is the other half: the measured value when it differs from the accepted one,
+ * null otherwise. Never on 'my number' (the estimate is not theirs to accept — they chose), never
+ * from a low-confidence estimate (`learned-low` never proposes), never with no accepted value on file
+ * (then the estimate already applies and there is nothing to accept).
  *
  * ⛔ TIER 0 — Q-240 (2026-08-01, Michael: "yes choose auto or your entry"). Until this, cycling was
  * the only baseline where the app decided and the athlete could not answer back. Running has had
@@ -47,11 +61,28 @@ export type ResolvedFtp = {
   source: FtpSource | null;
 };
 
+type LearnedMetricLike = {
+  value?: number | string | null;
+  confidence?: 'low' | 'medium' | 'high' | string | null;
+} | null;
+
+/** The accepted FTP as stored: the estimate it was accepted from, plus when and from what. */
+export type AcceptedFtp = {
+  value: number;
+  confidence: 'low' | 'medium' | 'high' | string;
+  source?: string;
+  sample_count?: number;
+  /** ISO timestamp of the tap (or the seed). */
+  accepted_at: string;
+  /** `ride_ftp_estimated.value` at the moment of acceptance. */
+  accepted_from: number;
+  /** 'checkpoint' | 'baselines' | 'seed' — where the yes came from. */
+  accepted_via?: string;
+};
+
 type LearnedFitnessLike = {
-  ride_ftp_estimated?: {
-    value?: number | string | null;
-    confidence?: 'low' | 'medium' | 'high' | string | null;
-  } | null;
+  ride_ftp_estimated?: LearnedMetricLike;
+  ride_ftp_accepted?: (Partial<AcceptedFtp> & { value?: number | string | null }) | null;
 } | null | undefined;
 
 export type FtpPreference = 'learned' | 'manual';
@@ -81,13 +112,26 @@ function asPositiveFinite(v: unknown): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+function isConfident(confidence: unknown): boolean {
+  const c = String(confidence ?? '').toLowerCase();
+  return c === 'medium' || c === 'high';
+}
+
 export function resolveCurrentFtp(baselines: BaselinesLike): ResolvedFtp {
   if (!baselines) return NULL_RESULT;
 
-  const learnedRaw = baselines.learned_fitness?.ride_ftp_estimated;
-  const learnedValue = asPositiveFinite(learnedRaw?.value);
-  const learnedConfidence = String(learnedRaw?.confidence ?? '').toLowerCase();
-  const learnedHighEnough = learnedConfidence === 'medium' || learnedConfidence === 'high';
+  const estimatedRaw = baselines.learned_fitness?.ride_ftp_estimated;
+  const estimatedValue = asPositiveFinite(estimatedRaw?.value);
+  const estimatedHighEnough = isConfident(estimatedRaw?.confidence);
+
+  // THE ACCEPTED NUMBER. Only ever written from a medium/high estimate (checkpoint accept, Baselines
+  // accept, or the one-time seed), so it is 'learned' by construction; its stored confidence is the
+  // estimate's at the time and is not re-checked here — the athlete said yes to it.
+  const acceptedValue = asPositiveFinite(baselines.learned_fitness?.ride_ftp_accepted?.value);
+
+  // What "auto" means: the accepted number if there is one, else the live estimate as before.
+  const learnedValue = acceptedValue ?? estimatedValue;
+  const learnedHighEnough = acceptedValue != null ? true : estimatedHighEnough;
 
   const manualValue = asPositiveFinite(baselines.performance_numbers?.ftp);
 
@@ -113,4 +157,69 @@ export function resolveCurrentFtp(baselines: BaselinesLike): ResolvedFtp {
     return { value: learnedValue, source: 'learned-low' };
   }
   return NULL_RESULT;
+}
+
+export type FtpProposal = {
+  /** The live estimate the athlete has not accepted yet. */
+  measured: number;
+  /** The number the app is running on right now (the accepted value). */
+  applied: number;
+  confidence: string;
+};
+
+/**
+ * The measured FTP the athlete has not said yes to — or null when there is nothing to accept.
+ *
+ * Null when: no estimate; estimate below medium confidence (learned-low never proposes); no accepted
+ * value on file (the estimate already applies — see tier 1); the athlete is on "my number" with a
+ * number behind it (the estimate is not theirs to accept); or the estimate equals the accepted value.
+ * Both values are compared after rounding to the watt — the screen prints whole watts and must not
+ * show `167 · measured 167 · use it`.
+ */
+export function pendingFtpProposal(baselines: BaselinesLike): FtpProposal | null {
+  if (!baselines) return null;
+  const estimatedRaw = baselines.learned_fitness?.ride_ftp_estimated;
+  const measured = asPositiveFinite(estimatedRaw?.value);
+  if (measured == null || !isConfident(estimatedRaw?.confidence)) return null;
+  const applied = asPositiveFinite(baselines.learned_fitness?.ride_ftp_accepted?.value);
+  if (applied == null) return null;
+  const preference = String(baselines.performance_numbers?.ftp_source ?? '').toLowerCase();
+  if (preference === 'manual' && asPositiveFinite(baselines.performance_numbers?.ftp)) return null;
+  if (Math.round(measured) === Math.round(applied)) return null;
+  return { measured, applied, confidence: String(estimatedRaw?.confidence ?? '').toLowerCase() };
+}
+
+/**
+ * The learned metric the app is running on — accepted if present, else the estimate. For the few
+ * readers that need the metric object (confidence, as-of) rather than the resolved watt number:
+ * State's bike anchor and the tri generator's seed. Same precedence as tier 1, one place.
+ */
+export function appliedLearnedFtp(learned: LearnedFitnessLike): LearnedMetricLike | null {
+  const accepted = learned?.ride_ftp_accepted;
+  if (asPositiveFinite(accepted?.value) != null) return accepted as LearnedMetricLike;
+  const estimated = learned?.ride_ftp_estimated ?? null;
+  return asPositiveFinite(estimated?.value) != null ? estimated : null;
+}
+
+/**
+ * THE ONE WRITE. Returns a new `learned_fitness` object with `ride_ftp_accepted` set from the live
+ * estimate, or null when there is nothing to accept (no estimate, or below medium confidence —
+ * learned-low never proposes, so it can never be accepted either). Both accept surfaces (the week-6
+ * checkpoint and the Baselines bike row) call this and write the result back; neither reads the raw
+ * column itself. Callers re-read `learned_fitness` immediately before calling so a learner run in
+ * between is not clobbered.
+ */
+export function acceptEstimatedFtp(
+  learned: Record<string, unknown> | null | undefined,
+  via: 'checkpoint' | 'baselines',
+  now: Date = new Date(),
+): Record<string, unknown> | null {
+  if (!learned || typeof learned !== 'object') return null;
+  const est = (learned as { ride_ftp_estimated?: LearnedMetricLike }).ride_ftp_estimated;
+  const value = asPositiveFinite(est?.value);
+  if (value == null || !isConfident(est?.confidence)) return null;
+  return {
+    ...learned,
+    ride_ftp_accepted: { ...est, value, accepted_at: now.toISOString(), accepted_from: value, accepted_via: via },
+  };
 }
