@@ -1095,7 +1095,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             const garminUrl = garminConnectId ? `https://connect.garmin.com/modern/activity/${garminConnectId}` : null;
             return (
               <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                <span className="text-gray-400 text-xs">via</span>
+                <span className="text-gray-400 text-sm">via</span>
                 {/**
                   * ⛔ THE ATTRIBUTION IS "Garmin [device model]" AND NOTHING ELSE (2026-09-03).
                   *
@@ -1113,7 +1113,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   * ⛔ WHAT THIS REPLACED: a hand-drawn blue triangle polygon in Garmin's #007CC3 standing
                   * in for their mark — an invented, stylized mark, which the guidelines do not permit.
                   */}
-                <span className="text-[#007CC3] font-light text-xs">
+                {/* text-sm, not text-xs (2026-09-03, Michael: "the garmin is real small"). Garmin's own
+                    rule is "appropriately sized text"; at 12px against a 14px date line it read as fine
+                    print, which is the opposite of the visual association their guidelines ask for. */}
+                <span className="text-[#007CC3] font-light text-sm">
                   {deviceName ? `Garmin ${deviceName}` : 'Garmin'}
                 </span>
                 {garminUrl && (
