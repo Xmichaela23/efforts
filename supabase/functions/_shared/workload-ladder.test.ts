@@ -8,7 +8,7 @@
  */
 import { assertEquals, assert } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
-  inferIntensityFromPerformance,
+  inferIntensityFromPerformance, resolveCardioIntensity,
   classifyWorkloadMethod,
   calculateDurationWorkload,
 } from './workload.ts';
@@ -94,4 +94,17 @@ Deno.test('power ride load = duration × power-IF² (output-based, RHR-free)', (
   assertEquals(load, 100);
   // 167 W / 176 FTP = 0.949 raw → 60 min → round(0.949² × 100) = 90 (TrainingPeaks TSS, no steps)
   assertEquals(calculateDurationWorkload(60, inferIntensityFromPerformance({ type: 'ride', avgPower: 167, ftp: 176 })), 90);
+});
+
+// --- THE ONE RULE: measured beats self-reported (TrainingPeaks), 2026-09-04 ---
+Deno.test('resolveCardioIntensity: power beats the rating; the rating only fires with nothing measured', () => {
+  const powered = resolveCardioIntensity({ type: 'ride', avgPower: 109, normalizedPower: 131, ftp: 167, rpe: 4 });
+  assertEquals(powered.method, 'power');
+  assertEquals(powered.intensity, 0.784);
+  const hrOnly = resolveCardioIntensity({ type: 'ride', avgHr: 135, thresholdHr: 153, rpe: 4 });
+  assertEquals(hrOnly.method, 'hr');
+  const rated = resolveCardioIntensity({ type: 'ride', rpe: 4 });
+  assertEquals(rated, { intensity: 0.70, method: 'rating' });
+  const bare = resolveCardioIntensity({ type: 'run' });
+  assertEquals(bare.method, 'default');
 });

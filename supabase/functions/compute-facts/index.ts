@@ -25,6 +25,7 @@ import {
   calculateMobilityWorkload,
   calculatePilatesYogaWorkload,
   inferIntensityFromPerformance,
+  resolveCardioIntensity,
   calculateDurationWorkload,
   getStepsIntensity,
   getDefaultIntensityForType,
@@ -1421,16 +1422,16 @@ function computeWorkload(w: WorkoutRow, baselines: Baselines | null, hrCorrupt =
     return calculatePilatesYogaWorkload(dur, sessionRPE);
   }
 
-  // Cardio (D-238): OUTPUT-FIRST — power(FTP)/pace, then HR vs LTHR. No TRIMP, no resting HR.
-  // (This is the fallback path; the canonical load is calculate-workload's workload_actual,
-  // preferred above. When HR is corrupt, `avgHr` is withheld so it can't feed intensity.)
+  // Cardio: THE ONE RULE — _shared/workload.ts resolveCardioIntensity (measured beats self-reported). This is
+  // the fallback path; the canonical load is calculate-workload's workload_actual, preferred above. A
+  // corrupt heart rate is passed as null so it cannot feed intensity; the order itself is not touched here.
   const isCardio = type === "run" || type === "ride" || type === "bike" || type === "swim";
   if (isCardio && dur > 0) {
     const lf: any = baselines?.learned_fitness ?? {};
     const thresholdHr = (type === "run" ? lf?.running?.threshold_hr : lf?.cycling?.threshold_hr)
       ?? baselines?.performance_numbers?.threshold_heart_rate ?? null;
     const ftp = resolveCurrentFtp(baselines)?.value ?? null;
-    const outIntensity = inferIntensityFromPerformance({
+    const { intensity } = resolveCardioIntensity({
       type,
       avgHr: hrCorrupt ? null : w.avg_heart_rate,
       thresholdHr,
@@ -1438,11 +1439,12 @@ function computeWorkload(w: WorkoutRow, baselines: Baselines | null, hrCorrupt =
       normalizedPower: w.normalized_power ?? (w as any)?.computed?.analysis?.power?.normalized_power ?? null,
       ftp,
       avgPace: w.avg_pace,
+      rpe: sessionRPE ?? (w as any)?.rpe ?? null,
     });
-    if (outIntensity > 0) return calculateDurationWorkload(dur, outIntensity);
+    return calculateDurationWorkload(dur, intensity);
   }
 
-  // Estimate path (no output signal): sRPE if a logged RPE exists, else the flat default.
+  // Non-cardio estimate path: sRPE if a logged RPE exists, else the flat default.
   if (typeof sessionRPE === "number" && sessionRPE >= 1 && sessionRPE <= 10) {
     return calculateDurationWorkload(dur, mapRPEToIntensity(sessionRPE));
   }

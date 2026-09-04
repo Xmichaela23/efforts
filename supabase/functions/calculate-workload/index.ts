@@ -35,6 +35,7 @@ import {
   calculateMobilityWorkload,
   calculatePilatesYogaWorkload,
   inferIntensityFromPerformance,
+  resolveCardioIntensity,
   calculateDurationWorkload,
   classifyWorkloadMethod,
 } from '../_shared/workload.ts'
@@ -125,16 +126,11 @@ function getSessionIntensity(workout: WorkoutData, sessionRPE?: number): number 
   if (workout.type === 'mobility' && workout.mobility_exercises) {
     return getMobilityIntensity(workout.mobility_exercises);
   }
-  /**
-   * ⛔ MEASURED BEATS SELF-REPORTED (Michael, 2026-09-04: "TrainingPeaks — anything over self-reported is
-   * better"). Power, then heart rate, then pace decide a cardio session's intensity; the athlete's rating
-   * is used only when none of those is on file. This reverses the 2026-09-02 rule (Strava's: a rating
-   * replaces the measurement), under which every one of the reference athlete's 19 rated rides scored
-   * off a 4-out-of-10 rating (→ 0.70) while its power said 0.78. TrainingPeaks scores TSS from power
-   * whenever power exists; sRPE is its fallback, not its override.
-   */
+  // Cardio: THE ONE RULE lives in _shared/workload.ts resolveCardioIntensity (measured beats self-reported —
+  // power, heart rate, pace, then the rating, then the default). Nothing here re-orders it.
   if (workout.type === 'run' || workout.type === 'ride' || workout.type === 'bike' || workout.type === 'swim') {
-    const inferred = inferIntensityFromPerformance({
+    if (workout.steps_preset && workout.steps_preset.length > 0) return getStepsIntensity(workout.steps_preset, workout.type);
+    return resolveCardioIntensity({
       type: workout.type,
       avgHr: workout.avg_heart_rate,
       thresholdHr: workout.threshold_heart_rate,
@@ -142,21 +138,11 @@ function getSessionIntensity(workout: WorkoutData, sessionRPE?: number): number 
       normalizedPower: workout.normalized_power ?? workout.computed?.analysis?.power?.normalized_power ?? null,
       ftp: workout.functional_threshold_power,
       avgPace: workout.avg_pace,
-    });
-    if (inferred > 0) return inferred;
-    const rated = Number(workout.rpe ?? (workout.workout_metadata || {}).session_rpe);
-    if (Number.isFinite(rated) && rated >= 1 && rated <= 10) return mapRPEToIntensity(rated);
+      rpe: sessionRPE ?? workout.rpe ?? (workout.workout_metadata || {}).session_rpe,
+    }).intensity;
   }
   if (workout.steps_preset && workout.steps_preset.length > 0) {
     return getStepsIntensity(workout.steps_preset, workout.type);
-  }
-  if (workout.type === 'run' || workout.type === 'ride' || workout.type === 'bike' || workout.type === 'swim') {
-    // sRPE (D-237): no HR/power/pace, but a logged RPE → RPE-derived intensity (session-RPE
-    // is a field-standard load proxy, r≈0.68–0.74) instead of the flat default. Kept on the
-    // same intensity² scale via mapRPEToIntensity so ACWR stays comparable. The flat default
-    // is reserved for the double-missing (no HR AND no RPE) case.
-    const rpe = sessionRPE ?? (workout.workout_metadata || {}).session_rpe ?? workout.rpe;
-    if (typeof rpe === 'number' && rpe >= 1 && rpe <= 10) return mapRPEToIntensity(rpe);
   }
   return getDefaultIntensityForType(workout.type);
 }

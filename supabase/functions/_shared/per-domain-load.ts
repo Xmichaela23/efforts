@@ -14,7 +14,7 @@
  */
 
 import { computeAcwr, type LoadRow } from './acwr.ts';
-import { inferIntensityFromPerformance } from './workload.ts';
+import { resolveCardioIntensity } from './workload.ts';
 import { assessHrQuality, type HrQuality, type HrSample } from './hr-quality.ts';
 
 export type SliceKey = 'strength' | 'hard_cardio' | 'easy_cardio';
@@ -94,22 +94,21 @@ export function classifySession(s: SliceSession): SessionClassification {
   // Swim: pace-binned but UNANCHORED (no CSS threshold) → always easy, never hard on a guess.
   if (t === 'swim') return { slice: 'easy_cardio', bin_signal: 'pace_unanchored', hr_quality: 'n/a', intensity: null };
 
-  // Run / ride: primary signal. HR gated by measured quality ANY time HR is used (fix 1).
-  let bin: BinSignal = 'srpe';
-  let intensity = 0;
-  let hrq: HrQuality | 'n/a' = 'n/a';
-
-  if (t === 'ride' && s.avgPower && s.ftp) {
-    intensity = inferIntensityFromPerformance({ type: 'ride', avgPower: s.avgPower, normalizedPower: s.normalizedPower ?? null, ftp: s.ftp });
-    bin = 'power';
-  } else {
-    // HR path — run's primary, and ride's fallback when power is absent. Gate on hr_quality.
-    hrq = assessHrQuality(s.samples ?? null, s.avgHr ?? null).hr_quality;
-    if (s.avgHr && s.thresholdHr && hrq === 'ok') {
-      intensity = inferIntensityFromPerformance({ type: t, avgHr: s.avgHr, thresholdHr: s.thresholdHr });
-      bin = 'hr';
-    }
-  }
+  // Run / ride: THE ONE RULE (_shared/workload.ts resolveCardioIntensity) decides the order; this function
+  // only decides which signals are TRUSTED — a heart rate that fails the measured-quality gate is passed
+  // as null, never re-ordered. The rung that fired is the bin.
+  const hrq: HrQuality | 'n/a' = assessHrQuality(s.samples ?? null, s.avgHr ?? null).hr_quality;
+  const r = resolveCardioIntensity({
+    type: t,
+    avgPower: s.avgPower ?? null,
+    normalizedPower: s.normalizedPower ?? null,
+    ftp: s.ftp ?? null,
+    avgHr: hrq === 'ok' ? (s.avgHr ?? null) : null,
+    thresholdHr: s.thresholdHr ?? null,
+    rpe: null, // slices never guess hard off a rating; below the measured rungs they read easy
+  });
+  const intensity = (r.method === 'power' || r.method === 'hr') ? r.intensity : 0;
+  const bin: BinSignal = r.method === 'power' ? 'power' : r.method === 'hr' ? 'hr' : 'srpe';
 
   if (!(intensity > 0)) {
     // No trusted intensity signal → sRPE fallback; never inflate hard on a guess → easy.

@@ -776,6 +776,42 @@ export function inferIntensityFromPerformance(inp: PerfIntensityInput): number {
 }
 
 // ---------------------------------------------------------------------------
+// THE ONE CARDIO INTENSITY RULE (2026-09-04, Michael: "rules need a single source of truth")
+// ---------------------------------------------------------------------------
+/**
+ * ⛔ EVERY cardio intensity decision goes through here — calculate-workload (the canonical load),
+ * compute-facts (its fallback), per-domain-load (the hard/easy slices). Nothing else may order the
+ * signals. The order is TrainingPeaks': MEASURED BEATS SELF-REPORTED.
+ *
+ *   1. power   — ride: normalized power ÷ FTP (average power if NP is absent), raw IF
+ *   2. hr      — run / ride: heart rate ÷ threshold heart rate (the run ladder — OURS, STATE-NUMBERS.md)
+ *   3. pace    — swim: seconds per 100 m
+ *   4. rating  — the athlete's 1–10, mapped (OURS, STATE-NUMBERS.md)
+ *   5. default — the sport's flat default
+ *
+ * A caller that distrusts a signal (corrupt heart rate, failed HR quality) passes it as null; it does
+ * not re-order anything. `method` says which rung fired, for receipts and the ACWR "estimated" flag.
+ */
+export type CardioIntensityMethod = 'power' | 'hr' | 'pace' | 'rating' | 'default';
+export function resolveCardioIntensity(
+  inp: PerfIntensityInput & { rpe?: number | null },
+): { intensity: number; method: CardioIntensityMethod } {
+  const type = (inp.type || '').toLowerCase();
+  const measured = inferIntensityFromPerformance(inp);
+  if (measured > 0) {
+    const isRide = type === 'ride' || type === 'bike';
+    const method: CardioIntensityMethod =
+      isRide && inp.ftp && (inp.normalizedPower || inp.avgPower) ? 'power'
+      : type === 'swim' ? 'pace'
+      : 'hr';
+    return { intensity: measured, method };
+  }
+  const rpe = Number(inp.rpe);
+  if (Number.isFinite(rpe) && rpe >= 1 && rpe <= 10) return { intensity: mapRPEToIntensity(rpe), method: 'rating' };
+  return { intensity: getDefaultIntensityForType(type), method: 'default' };
+}
+
+// ---------------------------------------------------------------------------
 // Duration-based cardio workload (no HR)
 // ---------------------------------------------------------------------------
 
