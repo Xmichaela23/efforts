@@ -72,6 +72,11 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="block" aria-hidden="true">
         <polyline points={dimPoly} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth={1.25} vectorEffect="non-scaling-stroke" />
         {recentPoly && <polyline points={recentPoly} fill="none" stroke={runColor} strokeOpacity={0.9} strokeWidth={1.75} vectorEffect="non-scaling-stroke" />}
+        {/* one dot per session (2026-09-04, Michael): TrainingPeaks and intervals.icu plot each workout as a point
+            and draw the line through them — a line through three readings must look like three readings */}
+        {pts.map((p, i) => i < pts.length - 1 && (
+          <circle key={p.date + i} cx={x(i)} cy={y(p.value)} r={1.6} fill={p.recent ? runColor : 'rgba(255,255,255,0.35)'} />
+        ))}
         <circle cx={x(pts.length - 1)} cy={y(last.value)} r={2.5} fill={runColor} />
       </svg>
       <span className="text-[10px] text-white/45 flex items-center justify-between">

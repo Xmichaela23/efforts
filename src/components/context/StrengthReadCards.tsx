@@ -152,16 +152,6 @@ export function EnduranceReadCards(
 const EF_EXPLAIN = 'Pace divided by heart rate. Higher means faster at the same heart rate.'; // 2026-09-03: Michael cut the paragraph
 const DECOUPLING_EXPLAIN = `Second-half heart rate against the first, same pace. The book's line is 5%.`; // 2026-09-03: Michael cut the paragraph
 
-/** "1.9 of room" / "0.4 over" against p107's line. */
-function driftVsLine(pct: number): string {
-  const line = DRIFT_LIMITS.hybridPct;
-  // 2026-09-03 (Michael read "−1.6% · 6.6 of room" as wrong): a FALL in heart rate has no room to compute —
-  // it is simply under the line. Room and over are printed only for a rise.
-  // (Michael, same day: "I don't know if it's even worth saying you've got room.") It is not. The line
-  // is stated; being over it is stated; nothing else.
-  const d = Math.round((pct - line) * 10) / 10;
-  return d > 0 ? `${d.toFixed(1)} over the line` : '';
-}
 
 function SpineCard({ series }: { series: SpineSeries }) {
   // ⛔ ONE TAP, NOT THREE (Michael 2026-09-03: "too many clicks … should be one click"). The row tap
@@ -200,11 +190,27 @@ function SpineCard({ series }: { series: SpineSeries }) {
   const basedOn = recentPts.length
     ? `based on the last ${recentPts.length} ${isRide ? 'steady ' : ''}${recentPts.length === 1 ? noun : `${noun}s`}${recentWarmups > 0 ? ` · ${recentWarmups} ${recentWarmups === 1 ? 'warm-up' : 'warm-ups'}` : ''}${leftOut > 0 ? ` · ${leftOut} hard ${leftOut === 1 ? 'ride' : 'rides'} not in the trend` : ''}`
     : (leftOut > 0 ? `no steady rides yet · ${leftOut} hard ${leftOut === 1 ? 'ride' : 'rides'} not in the trend` : null);
-  // the day's conditions as facts — heat and climb move drift, and whether the athlete was pushing is theirs to read
-  const conditions = [
-    latest.tempF != null ? `${latest.tempF}°F` : null,
-    latest.elevationGainM != null && latest.elevationGainM > 0 ? `${Math.round(latest.elevationGainM * 3.281)} ft of climb` : null,
-  ].filter(Boolean).join(' · ');
+  /**
+   * ⛔ DRIFT IS A TREND HERE, NOT THE LATEST SESSION (2026-09-04, Michael: "replace the latest session line
+   * with a drift trend"). This card used to print one session's drift with its temperature and climb and
+   * "2.4 over the line" — a single-session verdict on the trend screen. Friel, on TrainingPeaks: the trend
+   * over time "is often a clearer indicator of aerobic development than single test results"; TrainingPeaks
+   * trends Pa:Hr / Pw:Hr on a dashboard across a base block. One session's drift stays on the session itself,
+   * where its conditions sit beside it.
+   *
+   * Which sessions: the same steady points the efficiency line is built from, that carry the RATIO read
+   * (pace to heart rate on a run, power to heart rate on a ride). Heart-rate-alone drift ('hr') is one side
+   * of that ratio; p107's line does not govern it, so it is not in this trend. Interval days (whole-session)
+   * and withheld reads are not steady efforts and are left out for the same reason they were before.
+   */
+  const driftPts = trendPts
+    .filter((p) => p.driftPct != null && !p.fadeWithheld && !p.driftWholeSession
+      && (p.driftBasis === 'gap' || p.driftBasis === 'raw' || p.driftBasis === 'power'))
+    .map((p) => ({ date: p.date, value: p.driftPct as number }));
+  const driftRecent = driftPts.slice(-Math.max(1, Math.min(5, driftPts.length)));
+  const driftMedian = recentMedian(driftRecent.map((p) => p.value), 5);
+  const driftWhat = isRide ? 'power to heart rate' : 'pace to heart rate';
+  const fmtDrift = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`;
 
   return (
     <div className="px-3 py-3 border-t border-white/[0.055] first:border-t-0">
@@ -261,25 +267,15 @@ function SpineCard({ series }: { series: SpineSeries }) {
           The prose that read it for the athlete was cut on 2026-09-01; the number itself is the
           field's second run fact and is shown bare. Withheld sessions (pace changed by prescription)
           show nothing — a number for a non-steady effort is not the same number. */}
-      {/* ⛔ THE NUMBER IS NAMED FOR WHAT IT MEASURES, AND THE 5% LINE SITS ONLY BESIDE A RATIO (2026-09-03,
-          WORKORDER-bike-state-audit §2/§3). p107's two arms are both output against heart rate — pace to heart
-          rate on a run, power to heart rate on a ride. Heart rate alone (second half vs first) is one side of
-          that ratio; the rule does not govern it, so no line is printed beside it. The Sep 3 ride had both
-          numbers with opposite signs (heart rate −7.2%, power to heart rate +7.4%) under one word, "drift". */}
-      {latest.driftPct != null && !latest.fadeWithheld && (() => {
-        const ratio = latest.driftBasis === 'gap' || latest.driftBasis === 'raw' || latest.driftBasis === 'power';
-        const what = latest.driftBasis === 'power' ? 'power to heart rate'
-          : latest.driftBasis === 'gap' || latest.driftBasis === 'raw' ? 'pace to heart rate'
-          : 'heart rate, second half vs first';
-        return (
-          <div className="text-[11px] text-white/55 mt-1">
-            <span className="text-white/55 text-[11px]">
-              drift <span className="tabular-nums text-white/75">{(latest.driftPct > 0 ? '+' : '')}{latest.driftPct.toFixed(1)}%</span> · {what} · latest {isRide ? 'ride' : 'run'}{latest.driftWholeSession ? ' · intervals' : ''}{ratio ? <> · line {DRIFT_LIMITS.hybridPct}%</> : null}{ratio && driftVsLine(latest.driftPct) ? <> · <span className="text-white/75">{driftVsLine(latest.driftPct)}</span></> : null}{conditions ? <span className="text-white/45"> · {conditions}</span> : null}
-            </span>
-            {/* 2026-09-03: no sentence under the drift line — the line states the number and the 5% line; a sentence explaining it read as machine copy (Michael). */}
-          </div>
-        );
-      })()}
+      {/* the drift trend — the number the field trends (Pa:Hr / Pw:Hr), as a line and a recent median, no verdict */}
+      {driftPts.length >= 2 && (
+        <DatedChart points={driftPts} color={color} dotNoun={isRide ? 'steady ride' : 'run'} fmtVal={fmtDrift} unit="%" />
+      )}
+      {driftMedian != null && (
+        <div className="text-[11px] text-white/55 mt-1">
+          drift <span className="tabular-nums text-white/75">{fmtDrift(driftMedian)}%</span> · {driftWhat} · lower is better · median of the last {driftRecent.length} steady {driftRecent.length === 1 ? noun : `${noun}s`} · line {DRIFT_LIMITS.hybridPct}%
+        </div>
+      )}
       {basedOn && (
         <div className="text-[11px] text-white/55 mt-1">{basedOn}</div>
       )}
@@ -382,14 +378,14 @@ function SessionChart({ points, color, valueOf }: {
  * exactly as before.
  */
 const RECENT_WINDOW_MS = 42 * 86_400_000;
-function DatedChart({ points, color, dotNoun = 'session' }: { points: Array<{ date: string; value: number }>; color: string; dotNoun?: string }) {
+function DatedChart({ points, color, dotNoun = 'session', fmtVal, unit }: { points: Array<{ date: string; value: number }>; color: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string }) {
   const lastT = Date.parse(`${points[points.length - 1].date}T12:00:00Z`);
   const series = points.map((p) => ({
     date: p.date,
     value: p.value,
     recent: lastT - Date.parse(`${p.date}T12:00:00Z`) <= RECENT_WINDOW_MS,
   }));
-  return <TrendSparkline series={series} color={color} dotNoun={dotNoun} />;
+  return <TrendSparkline series={series} color={color} dotNoun={dotNoun} {...(fmtVal ? { fmtVal } : {})} {...(unit ? { unit } : {})} />;
 }
 
 export default EnduranceReadCards;

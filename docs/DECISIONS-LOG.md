@@ -4463,3 +4463,64 @@ wrong copy — four plan generators exist because of it. A 1,261-line file named
 beside a working composer **is** that trap: it reads as a description of what the app does, and it
 described what the app used to do. The return is not performance. It is that the next session is not
 lied to.
+
+## D-372 — DRIFT REPORTS AND FLAGS; IT NEVER DECIDES. FTP IS ONE METHOD. NP COUNTS COASTING. (2026-09-04, Michael) — **VERIFIED ON DEVICE AND AGAINST STORED DATA**
+
+One night, four connected calls, all live. Commits `d9ffe621`, `5f8b39b4`, `d62ae9b4`, and the State-card
+commit that carries this entry.
+
+**1. Normalized power counts coasting, whichever way the ride arrived.** Strava sends a coasting
+second as `power: 0`; Garmin-direct omits the field. D-112 taught the extractor to keep zeros, so every
+Strava ride was right and the first Garmin-direct ride since January (Sep 3) read NP 164 W against
+Garmin's 136 / Strava's 131 — its 30-second windows averaged pedalling samples only. Fix: on a ride
+that produced any power, an absent sample is 0 W (`compute-workout-analysis`, on the rows, not in the
+shared extractor — runs and swims mean "no power meter" by the same absence). Sep 3 now reads 131 W,
+Strava to the watt. Variability index, power-zone time and the power graph moved with it; the power
+curve, pedalling power and ride efficiency were already excluding non-pedalling on their own and did not.
+The dead `/* */` copy of `normalizeSamples` that swallowed this edit once (and D-112's once) is deleted.
+
+**2. Bike FTP is one method — the whole power curve and the heart-rate line, not one best 20 minutes**
+(`docs/SPEC-ftp-estimator-2026-09-04.md`). Reference athlete: old 168, typed 176 ignored, Garmin 204,
+all-time best 20-min 208 W (2025-09-06), best since 185. New: 167 W high, the two signals agreeing
+independently (curve 167, HR line 169); the 18-month back-run holds 166–176 through the easy block
+where the old method abstained and fell to 157. Garmin's 204 is 98% of the all-time best 20-min against a
+current best of 177 — it carries last year. Two things the first build got wrong, both ruled by Michael:
+- *The curve fit was run to 60 min.* The critical-power model holds to ~20 (Hill 1993, Jones 2010,
+  Vanhatalo 2011); at 60 it bent, r² 0.871, abstained. Capped at 2–20 min: r² 0.993.
+- *Decoupling gated the HR signal at 5%, then weighted it.* Both removed — see 3.
+
+**3. THE RULING: aerobic decoupling reports and flags. It never gates, filters, weights or excludes.**
+Michael: *"all it's supposed to do is report decoupling and flag when it's over 5%."* The 5% is a PLAN
+rule — `SOURCE-viada-hybrid-athlete.md` p107: a session is terminated at 10% cardiac drift, 5% for hybrid
+athletes — and a reporting threshold (compute-snapshot already filed `decoupling_mixed_effort` as "a
+confidence hedge — NOT a filter"). Drift grows with intensity and duration, so any drift cutoff deletes
+the hardest rides and keeps the easiest: the gate rejected 9 of 19 rides, the lone survivor was the
+softest, and the "median" of one ride read 138 W. A real FTP test would fail a 5% gate outright. Michael:
+*"it paperclip-maximized it"* — a number that means "end the session" was reused wherever the shape fit.
+The same rule caught a second instance the same night: the analyser's mixed-effort stamp (pace varied)
+was marking 19 of 22 easy/steady runs "whole-session" and the State drift line was drawn through the
+3 left. Now only a real interval session (>2 planned steps) is whole-session. Sourced: TrainingPeaks
+prints Pa:Hr / Pw:Hr per workout with no verdict; Friel's reading applies to steady aerobic efforts and
+*"the trend … is often a clearer indicator of aerobic development than single test results."*
+
+**4. State shows a drift TREND, not the latest session.** The run and ride cards printed one session's
+drift with its temperature, climb and "2.4 over the line" — a single-session verdict on the trend
+screen. Replaced with a second line (same steady sessions the efficiency line uses, ratio basis only:
+pace-to-HR on a run, power-to-HR on a ride; heart-rate-alone and interval days out) and one caption:
+`drift +6.2% · pace to heart rate · lower is better · median of the last 5 steady runs · line 5%`.
+Every session is a dot on both lines (TrainingPeaks and intervals.icu plot per workout) — a line through
+three readings must look like three readings. Cache gates bumped to 191 on both sides so the new
+points reach the screen.
+
+**VERIFIED, not "it compiles":** efficiency per session recomputed from pace and heart rate — 7 of 7
+match; drift per session re-run through the app's own pipeline (extract → grade-adjust → skip warm-up →
+halves) on Aug 28 / Aug 24 / Aug 9 — 18.6 / 2.4 / 5.1, all match stored; both headline medians match
+(run 1.720 / +6.2%, ride 0.770 / −6.0%); dot counts match (20 runs, 8 rides). Grade-adjusted drift is
+the field standard — TrainingPeaks computes Pa:Hr on NGP, not raw pace.
+
+**OPEN, named and not built:** the weekly "how your sessions went" line still prints "HR drifted — build
+aerobic base" off a 7-day average, and the ride bands there (3 / 5 / 8%, red "aerobic strain") have no
+source. Michael: the wrong diagnosis; it should say what the per-workout row says. Also: the typed FTP
+(176) is ignored because `ftp_source` has no bike-side UI; the 15-minute floor on the HR signal rejects
+12 of 19 rides (own number, defensible, unreviewed).
+

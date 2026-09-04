@@ -1,6 +1,6 @@
 # SPEC — Compound FTP estimator (bike)
 
-**Status:** specified, not built. One terminal session.
+**Status:** BUILT AND LIVE (2026-09-04, commits 5f8b39b4 + d62ae9b4). One method — this value IS `ride_ftp_estimated`; 95%-of-best-20 survives only as the thin-data fallback. Reference athlete reads 167 W (high). See D-372 for the two things the build got wrong first and the ruling that fixed them.
 **Date:** 2026-09-04
 
 ---

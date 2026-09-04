@@ -126,11 +126,15 @@ function elevGainM(r: any): number | null {
  * fell 139 → 129, so heart-rate-alone is −7.2% and power-to-heart-rate is +7.4%. Both true; the card now
  * names which one it is printing.
  */
-function driftReadForPoint(hrs: any, wa: any, factDrift: number | null | undefined, steady: boolean, powerDecouplingPct?: number | null): { driftPct: number | null; driftBasis: 'gap' | 'raw' | 'power' | 'hr' | null; driftWholeSession: boolean; fadeWithheld: boolean } {
-  // "whole session" the same way session-detail decides it: an interval session (more than two planned steps)
-  // or the analyser's mixed-effort flag.
+function driftReadForPoint(hrs: any, wa: any, factDrift: number | null | undefined, powerDecouplingPct?: number | null): { driftPct: number | null; driftBasis: 'gap' | 'raw' | 'power' | 'hr' | null; driftWholeSession: boolean; fadeWithheld: boolean } {
+  // "whole session" = an interval session (more than two planned steps). ⛔ NOT the analyser's mixed-effort
+  // flag (2026-09-04, Michael: "why only 2 runs?"). That flag is a pace-variance stamp the snapshot itself
+  // files as "a confidence hedge — NOT a filter" (decoupling_mixed_effort, below), yet passing it in here
+  // marked 19 of 22 easy and steady runs whole-session and the State drift trend drew a line through the
+  // 3 that were left. TrainingPeaks prints Pa:Hr on every run; Friel reads it on steady efforts, and the
+  // run's TYPE says whether it was steady — a 45-minute easy run with stops and hills is still an easy run.
   const steps = Number(wa?.fact_packet_v1?.derived?.interval_execution?.total_steps);
-  if (Number.isFinite(steps) && steps > 2) steady = false;
+  const steady = !(Number.isFinite(steps) && steps > 2);
   const dec = typeof hrs?.decouplingPct === 'number' && Number.isFinite(hrs.decouplingPct) ? hrs.decouplingPct : null;
   const pdec = typeof powerDecouplingPct === 'number' && Number.isFinite(powerDecouplingPct) ? powerDecouplingPct : null;
   const v1 = typeof wa?.hr_drift_v1?.pct === 'number' && Number.isFinite(wa.hr_drift_v1.pct) ? wa.hr_drift_v1.pct : null;
@@ -1517,7 +1521,6 @@ serve(async (req: Request) => {
              * Same athlete, same distance, different number. **That is the design — the surface must
              * say so rather than letting it read as missing data.**
              */
-            const steady = hrs?.decouplingMixedEffort !== true;
             bySport.set(sport, bySport.get(sport) ?? new Map());
             const groups = bySport.get(sport)!;
             groups.set(group, groups.get(group) ?? []);
@@ -1532,7 +1535,7 @@ serve(async (req: Request) => {
               // decoupling when the analyser computed it, else `hr_drift_v1` (heart rate second half vs first,
               // by time, after the warm-up — `_shared/hr-drift-halves.ts`). Never withheld; an interval day is
               // labelled whole-session on the card instead of hidden. `f.drift` is the last resort.
-              ...driftReadForPoint(hrs, r?.workout_analysis, f.drift, steady, powerDec),
+              ...driftReadForPoint(hrs, r?.workout_analysis, f.drift, powerDec),
               keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
               // conditions, shown never corrected: the day's temperature and the climb
               tempF: (() => { const t = Number(r?.weather_data?.temperature); return Number.isFinite(t) ? Math.round(t) : null; })(),
@@ -1552,7 +1555,7 @@ serve(async (req: Request) => {
                   durationMin: Math.max(1, Math.round(Number(we.seconds) / 60)),
                   efficiency: ef,
                   // the hard run's own drift rides on its warm-up point, labelled whole-session (one drift read, D-465)
-                  ...driftReadForPoint(hrs, r?.workout_analysis, f.drift, steady),
+                  ...driftReadForPoint(hrs, r?.workout_analysis, f.drift),
                   keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
                   tempF: (() => { const t = Number(r?.weather_data?.temperature); return Number.isFinite(t) ? Math.round(t) : null; })(),
                   elevationGainM: elevGainM(r),
@@ -1644,7 +1647,7 @@ serve(async (req: Request) => {
                   durationMin: hit.durationMin,
                   efficiency: f?.efficiency ?? null,
                   // 2026-09-03: the same drift read as every other State point and the Performance screen.
-                  ...driftReadForPoint((r as any)?.workout_analysis?.heart_rate_summary ?? null, (r as any)?.workout_analysis, f?.drift ?? null, (r as any)?.workout_analysis?.heart_rate_summary?.decouplingMixedEffort !== true, (r as any)?.computed?.analysis?.efficiency?.aerobic_decoupling_pct ?? null),
+                  ...driftReadForPoint((r as any)?.workout_analysis?.heart_rate_summary ?? null, (r as any)?.workout_analysis, f?.drift ?? null, (r as any)?.computed?.analysis?.efficiency?.aerobic_decoupling_pct ?? null),
                   keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
                 });
               }
