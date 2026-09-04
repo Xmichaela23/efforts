@@ -9,7 +9,6 @@ import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { Calendar, Clock, Dumbbell, Activity, X, Copy, ArrowLeftRight } from 'lucide-react';
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
 // ⛔ SAME RULE AS THE CALENDAR AND THE WORKOUT VIEW — one definition of "missed a planned slot".
-import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
 // ⛔ SWAP WHAT IS HELD, NOT WHAT IS TRAINED — the posture gate. One reader, shared with State.
 import { useDeclaredPosture } from '@/hooks/useDeclaredPosture';
 import { useResolvedFtp } from '@/hooks/useResolvedFtp';
@@ -1779,19 +1778,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       * session owed says so here, so the athlete does not have to open it to find out.
                       * Tapping the card opens the activity, where the link button lives.
                       */}
-                    {isCompleted && isUnmatchedAgainstPlan(
-                      workout as never,
-                      (Array.isArray(unifiedItems) ? unifiedItems : [])
-                        .map((it: { planned?: unknown }) => it?.planned ?? null)
-                        .filter(Boolean) as never,
-                    ) && (
-                      <span
-                        className="absolute top-2 right-2 text-[10px] text-amber-300/85"
-                        title="Didn't match a planned session — tap to link it"
-                      >
-                        unlinked
-                      </span>
-                    )}
+                    {/* ⛔ THE "unlinked" TAG IS REMOVED (2026-09-03, Michael: "we don't need that"). It was
+                        pinned `absolute top-2 right-2`, which is the same row the provider line uses, so it
+                        printed ON TOP of "Garmin Connect (Forerunner 965)". And it said nothing new: opening
+                        the activity leads with "Didn't match your planned session — link it?", which is both
+                        the same fact and the place the linking actually happens. `isUnmatchedAgainstPlan`
+                        still has its other callers; only this card's copy of the signal is gone. */}
                     {/**
                       * ⛔ PLANNED ROWS USE THE SHARED HEADER (2026-08-09) — the same component the
                       * drawer and the full planned screen render, so all three agree on the title's
