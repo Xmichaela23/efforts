@@ -11,8 +11,11 @@ import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
 import { runEasyZone3FloorBpm } from '../_shared/easy-hr.ts';
 import { paceToGAP } from '../_shared/gap.ts'; // ONE canonical Grade-Adjusted Pace (Minetti) — no inline copy
+// The bike FTP estimator's two per-ride substrates: the widened power-curve durations and the
+// heart-rate/power minute-blocks. Pure, shared with the learner (docs/SPEC-ftp-estimator-2026-09-04.md).
+import { POWER_CURVE_DURATIONS, buildHrPowerBlocks, type HrPowerBlocks } from '../../../src/lib/bike-ftp-estimator.ts';
 
-const ANALYSIS_VERSION = 'v0.2.0'; // Ride: absent power sample = coasting second, filled as 0 W (D-112 follow-up)
+const ANALYSIS_VERSION = 'v0.2.1'; // Ride: power curve widened to 12 durations + hr_power_blocks written (FTP estimator substrate)
 
 
 function smoothEMA(values: (number|null)[], alpha = 0.25): (number|null)[] {
@@ -33,16 +36,13 @@ function smoothEMA(values: (number|null)[], alpha = 0.25): (number|null)[] {
 // =============================================================================
 // POWER CURVE CALCULATION (Peak Performance Tracking)
 // =============================================================================
-// Calculates best average power for various durations (5s, 1min, 5min, 20min, 60min)
-// Used for tracking fitness improvements and comparing peak efforts over time
+// Calculates best average power for the durations in `POWER_CURVE_DURATIONS` (5s … 60min, twelve
+// of them since 2026-09-04). Used for tracking fitness, comparing peak efforts, and — the reason it
+// was widened — the critical-power fit in `bike-ftp-estimator.ts`, which needs the curve sampled where
+// it bends (2-12 min) and where FTP lives (30-45 min), not just 5 / 20 / 60.
 
-interface PowerCurve {
-  '5s'?: number;
-  '1min'?: number;
-  '5min'?: number;
-  '20min'?: number;
-  '60min'?: number;
-}
+/** Keyed by the labels in `POWER_CURVE_DURATIONS`; `_hr` rides beside them (the HR during each window). */
+type PowerCurve = Record<string, number>;
 
 interface BestEfforts {
   '1mi'?: { pace_s_per_mi: number; duration_s: number; avg_hr?: number };
@@ -119,15 +119,7 @@ function calculatePowerCurve(powerData: (number | null)[], hrData?: (number | nu
   
   const curve: PowerCurve = {};
   const curveHr: Record<string, number> = {};
-  const durations: { label: keyof PowerCurve; seconds: number }[] = [
-    { label: '5s', seconds: 5 },
-    { label: '1min', seconds: 60 },
-    { label: '5min', seconds: 300 },
-    { label: '20min', seconds: 1200 },
-    { label: '60min', seconds: 3600 }
-  ];
-  
-  for (const { label, seconds } of durations) {
+  for (const { label, seconds } of POWER_CURVE_DURATIONS) {
     if (validCount >= seconds) {
       lastWindow = null;
       const best = rollingMaxAverage(powerData, seconds);
@@ -2073,12 +2065,27 @@ Deno.serve(async (req) => {
     let powerCurve: PowerCurve | null = null;
     let bestEfforts: BestEfforts | null = null;
     let paceCurve: RunPaceCurve | null = null;
+    let hrPowerBlocks: HrPowerBlocks | null = null;
     
     if (w.type === 'ride' || w.type === 'cycling' || w.type === 'bike') {
       // Calculate power curve for bikes
       powerCurve = calculatePowerCurve(power_watts, hr_bpm);
       if (powerCurve) {
         console.log(`⚡ Power curve saved for bike workout`);
+      }
+      /**
+       * ⛔ THE HEART-RATE/POWER BLOCKS — the substrate of the FTP estimator's Signal A (2026-09-04,
+       * docs/SPEC-ftp-estimator-2026-09-04.md). One (heart rate, power) pair per steady pedalled
+       * minute after the first ten. The LEARNER regresses them and reads the line at the athlete's
+       * threshold heart rate; this function cannot, because threshold heart rate is learned and moves.
+       *
+       * ⚠️ IT JUDGES NOTHING. Every ride with heart rate and power gets blocks, easy ones included —
+       * an easy ride informing the FTP is the whole point of the build. The gates (span, r², decoupling,
+       * extrapolation) live in the learner, where all the rides are in view at once.
+       */
+      hrPowerBlocks = buildHrPowerBlocks(time_s, hr_bpm, power_watts);
+      if (hrPowerBlocks) {
+        console.log(`⚡ HR/power blocks: ${hrPowerBlocks.hr.length} steady minutes`);
       }
     }
     
@@ -2115,7 +2122,10 @@ Deno.serve(async (req) => {
       // Peak performance metrics (null if not calculated/applicable)
       power_curve: powerCurve,
       best_efforts: bestEfforts,
-      pace_curve: paceCurve
+      pace_curve: paceCurve,
+      // Rides only; null on every other sport and on a ride with no HR or no power. The learner treats
+      // absent and null the same, so recomputing an old ride simply fills it in.
+      hr_power_blocks: hrPowerBlocks
     };
 
     console.log('📝 About to UPDATE:', {

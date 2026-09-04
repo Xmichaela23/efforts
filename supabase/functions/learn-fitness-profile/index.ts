@@ -38,6 +38,17 @@ import {
 } from '../_shared/athlete-identity-inference.ts';
 import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
 import { fitSwimCss } from '../_shared/swim/swim-css-learner.ts';
+// The compound bike FTP (docs/SPEC-ftp-estimator-2026-09-04.md): two open signals, guardrails, receipt.
+import {
+  bestPerDuration,
+  compoundFtp,
+  estimateFtpFromHrPower,
+  fitCriticalPower,
+  rateLimitFtp,
+  type CompoundFtp,
+  type RideForSignalA,
+} from '../../../src/lib/bike-ftp-estimator.ts';
+
 // Q-169: the ONE definition of "is this heartbeat easy" — threshold-anchored (Friel Z2), %max-bootstrapped.
 // The RUN sites use it; the BIKE band (65-75% max + power filter) is deliberately NOT routed through it.
 import { resolveRunEasyHrBand, isEasyHr } from '../_shared/easy-hr.ts';
@@ -343,7 +354,21 @@ Deno.serve(async (req) => {
     // ANALYZE RIDES
     // ==========================================================================
 
-    const rideProfile = analyzeRides(rides);
+    // Every ride's power curve on file (18 months), for the compound FTP's hard ceiling — the best
+    // 20 minutes actually pedalled. Only `computed.power_curve['20min']` is read from these rows.
+    const allRideCurves: WorkoutRecord[] = await (async () => {
+      try {
+        const { data } = await supabase
+          .from('workouts')
+          .select('id, type, date, computed, workout_status')
+          .eq('user_id', user_id)
+          .eq('workout_status', 'completed')
+          .in('type', ['ride', 'cycling', 'bike', 'virtualride', 'indoorcycling', 'gravelride', 'mountainbikeride'])
+          .gte('date', eighteenMoAgoISO);
+        return (data ?? []) as WorkoutRecord[];
+      } catch { return []; }
+    })();
+    const rideProfile = analyzeRides(rides, allRideCurves, priorLearned);
     const swimProfile = analyzeSwims(allWorkouts, swimPaceById);
 
     // D-199 CSS learner — fit a swim THRESHOLD from CLEAN continuous efforts (swimPaceById is already
@@ -1032,13 +1057,19 @@ interface RideAnalysisResult {
   ftp_estimated: LearnedMetric | null;
 }
 
-export function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
+export function analyzeRides(
+  rides: WorkoutRecord[],
+  /** every completed ride on file (18 months) — only `computed.power_curve` is read, for the ceiling */
+  allRideCurves: WorkoutRecord[] = [],
+  /** the previous `learned_fitness`, for the compound estimate's rate limit and threshold fallback */
+  priorLearned: Record<string, any> | null = null,
+): RideAnalysisResult {
   if (rides.length < 3) {
     return {
       easy_hr: null,
       threshold_hr: null,
       max_hr_observed: null,
-      ftp_estimated: null
+      ftp_estimated: null,
     };
   }
 
@@ -1256,7 +1287,12 @@ export function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
   }
 
   // ==========================================================================
-  // STEP 4: Estimate FTP from power data
+  // STEP 4: THE THIN-DATA FALLBACK for FTP — 95% of the single best 20-minute effort
+  //
+  // ⛔ NOT THE ESTIMATOR ANY MORE (2026-09-04). STEP 5 below is the one FTP method; this tier only
+  // supplies a value when STEP 5 abstains (too few rides with heart rate AND power, too few curve
+  // durations — the first weeks of a new athlete). One method, one fallback for thin data, the way
+  // TrainerRoad's detection hands back to a test result until it has enough rides.
   // 
   // FTP estimation hierarchy:
   // 1. Pre-calculated 20-min best power × 0.95 (most accurate)
@@ -1405,11 +1441,91 @@ export function analyzeRides(rides: WorkoutRecord[]): RideAnalysisResult {
     }
   }
 
+  // ==========================================================================
+  // STEP 5: THE FTP ESTIMATOR — two open signals, guardrails, receipt
+  // (docs/SPEC-ftp-estimator-2026-09-04.md; maths in src/lib/bike-ftp-estimator.ts)
+  //
+  // ⛔ WHY IT REPLACED STEP 4. "95% × the single best 20-minute effort in the window" can only report
+  // what the athlete already produced: a season of easy riding has no qualifying effort and the number
+  // sags, not because fitness fell but because nothing measured it. Signal A reads the
+  // heart-rate-to-power line of EVERY ride, easy ones included, at the learned threshold heart rate;
+  // Signal B fits the critical-power curve to the best effort at each 2-20 min duration — the read
+  // TrainerRoad, Xert, intervals.icu and WKO all make, since an app never gets a test, only rides.
+  //
+  // Back-run over the reference athlete's 18 months (2026-09-04): STEP 4 abstained May-July and fell
+  // to 157 in mid-August; this held 166-176 through the same easy block and reads 167 (high) today,
+  // the two signals agreeing independently (B 167, A 169). Over the last month the two methods track
+  // within 2 W; the difference is the long easy stretch, which is the case the estimator exists for.
+  //
+  // When this produces a value it IS `ftp_estimated`; STEP 4's value survives only when this abstains.
+  // ==========================================================================
+  let ftp_compound: CompoundFtp | null = null;
+  {
+    // The threshold heart rate the line is read at. The fresh learn first; the prior learned value
+    // when this learn produced none. A fabricated one (`is_estimate`, 90% of max) is still a heart
+    // rate the line can be read at, but the read cannot be worth more than the anchor: cap at low.
+    const thrFresh = threshold_hr?.value && threshold_hr.value > 0 ? threshold_hr : null;
+    const thrPrior = (priorLearned?.ride_threshold_hr?.value > 0) ? priorLearned?.ride_threshold_hr : null;
+    const thr = thrFresh ?? thrPrior;
+    const thrIsEstimate = !!thr?.is_estimate;
+
+    // Every ride with blocks contributes. Aerobic decoupling travels for the RECEIPT only — it reports
+    // and flags (compute-snapshot, analyze-cycling-workout); it does not decide which rides count or
+    // how much.
+    const ridesForA: RideForSignalA[] = rides.map((r) => ({
+      date: String(r.date ?? ''),
+      blocks: r.computed?.hr_power_blocks ?? null,
+      decouplingPct: r.computed?.analysis?.efficiency?.aerobic_decoupling_pct ?? null,
+    }));
+    const a = estimateFtpFromHrPower(ridesForA, thr?.value ?? null);
+    if (thrIsEstimate && a.confidence) {
+      a.confidence = 'low';
+      a.reason += '; threshold HR is itself an estimate (90% of max)';
+    }
+
+    // Signal B: the best at each duration across the 90-day window — different rides supply different
+    // durations, the way TrainerRoad and Xert assemble it.
+    const b = fitCriticalPower(bestPerDuration(rides.map((r) => r.computed?.power_curve ?? null)));
+
+    /**
+     * ⛔ THE HARD CEILING READS 18 MONTHS, NOT 90 DAYS. The ceiling is the best 20 minutes the athlete
+     * actually pedalled — the one number in here that does not extrapolate. Read over the 90-day
+     * window it would BE the sag this estimator exists to remove (an easy quarter has a low best-20
+     * and the ceiling would drag the estimate down to tier 1's own answer). Read over the athlete's
+     * history it is a ceiling and nothing else: it can only ever lower the estimate, never raise it,
+     * and a detrained athlete is caught by the two signals, which are recent. 18 months is the window
+     * the run threshold already reads its best 20-minute effort across.
+     */
+    const ceilingPool = allRideCurves.length ? allRideCurves : rides;
+    let ceiling20: number | null = null;
+    for (const r of ceilingPool) {
+      const p20 = Number(r.computed?.power_curve?.['20min']);
+      if (Number.isFinite(p20) && p20 > 50 && (ceiling20 == null || p20 > ceiling20)) ceiling20 = p20;
+    }
+
+    const raw = compoundFtp(a, b, ceiling20);
+    if (raw) {
+      // The rate limit walks from whatever FTP the athlete had last learn — including a STEP 4 value
+      // from before this estimator existed — at ≤5% per learn, so no athlete's zones move in one step.
+      const prev = Number(priorLearned?.ride_ftp_estimated?.value);
+      ftp_compound = rateLimitFtp(Number.isFinite(prev) ? prev : null, raw);
+      console.log(`  ⚡ FTP: ${ftp_compound.value}W (${ftp_compound.confidence}) — A ${a.value ?? '—'}W/${a.confidence ?? 'abstain'} (${a.n} rides), B ${b.value ?? '—'}W/${b.confidence ?? 'abstain'} (${b.n} durations), ceiling ${ceiling20 ?? '—'}W`);
+      ftp_estimated = {
+        value: ftp_compound.value,
+        confidence: ftp_compound.confidence,
+        source: ftp_compound.source,
+        sample_count: ftp_compound.sample_count,
+      };
+    } else {
+      console.log(`  ⚡ FTP estimator abstained — A: ${a.reason}; B: ${b.reason}` + (ftp_estimated ? `; falling back to STEP 4: ${ftp_estimated.value}W (${ftp_estimated.confidence})` : ''));
+    }
+  }
+
   return {
     easy_hr,
     threshold_hr,
     max_hr_observed,
-    ftp_estimated
+    ftp_estimated,
   };
 }
 
