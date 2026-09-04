@@ -40,6 +40,7 @@ import {
 } from '../_shared/workload.ts'
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts'
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts'
+import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts'
 
 interface WorkoutData {
   type: 'run' | 'bike' | 'swim' | 'strength' | 'mobility';
@@ -62,6 +63,9 @@ interface WorkoutData {
   avg_power?: number; // watts (cycling)
   normalized_power?: number | null; // watts (cycling) — TrainingPeaks' IF numerator
   computed?: any;
+  distance?: number | null; // km (or metres when ≥ 1000 — the facts convention)
+  threshold_pace_sec_per_km?: number | null; // run functional threshold pace (rTSS)
+  css_sec_per_100m?: number | null; // swim critical swim speed (sTSS)
   avg_heart_rate?: number; // bpm
   functional_threshold_power?: number; // watts (for cycling intensity zones)
   threshold_heart_rate?: number; // bpm (LTHR, for HR-vs-threshold intensity + zones)
@@ -113,6 +117,29 @@ function calculateWorkload(workout: WorkoutData, sessionRPE?: number, bodyweight
  * Strength/mobility/pilates_yoga delegate to shared helpers.
  * Cardio adds performance-inference (HR, power, pace) that only this function has.
  */
+
+/** The one input shape for resolveCardioIntensity, built from a workout row + injected thresholds. */
+function cardioIntensityInput(w: WorkoutData & Record<string, any>) {
+  const minutes = Number(w.moving_time ?? w.duration) || 0;
+  const distRaw = Number(w.distance) || 0;
+  const distM = distRaw > 0 ? (distRaw < 1000 ? distRaw * 1000 : distRaw) : 0;
+  const paceSecPerKm = minutes > 0 && distM > 0 ? (minutes * 60) / (distM / 1000) : null;
+  const gapMi = Number(w.computed?.overall?.avg_gap_s_per_mi);
+  return {
+    type: String(w.type || ''),
+    avgHr: w.avg_heart_rate ?? null,
+    thresholdHr: w.threshold_heart_rate ?? null,
+    avgPower: w.avg_power ?? null,
+    normalizedPower: w.normalized_power ?? w.computed?.analysis?.power?.normalized_power ?? null,
+    ftp: w.functional_threshold_power ?? null,
+    ngpSecPerKm: Number.isFinite(gapMi) && gapMi > 0 ? gapMi / 1.609344 : paceSecPerKm,
+    thresholdPaceSecPerKm: w.threshold_pace_sec_per_km ?? null,
+    swimPaceSecPer100m: minutes > 0 && distM > 0 ? (minutes * 60) / (distM / 100) : null,
+    cssSecPer100m: w.css_sec_per_100m ?? null,
+    avgPace: w.avg_pace ?? null,
+  };
+}
+
 function getSessionIntensity(workout: WorkoutData, sessionRPE?: number): number {
   if (workout.type === 'strength' && workout.strength_exercises) {
     return getStrengthIntensity(workout.strength_exercises, sessionRPE);
@@ -129,16 +156,7 @@ function getSessionIntensity(workout: WorkoutData, sessionRPE?: number): number 
   // power, heart rate, pace, then the rating, then the default). Nothing here re-orders it.
   if (workout.type === 'run' || workout.type === 'ride' || workout.type === 'bike' || workout.type === 'swim') {
     if (workout.steps_preset && workout.steps_preset.length > 0) return getStepsIntensity(workout.steps_preset, workout.type);
-    return resolveCardioIntensity({
-      type: workout.type,
-      avgHr: workout.avg_heart_rate,
-      thresholdHr: workout.threshold_heart_rate,
-      avgPower: workout.avg_power,
-      normalizedPower: workout.normalized_power ?? workout.computed?.analysis?.power?.normalized_power ?? null,
-      ftp: workout.functional_threshold_power,
-      avgPace: workout.avg_pace,
-      rpe: sessionRPE ?? workout.rpe ?? (workout.workout_metadata || {}).session_rpe,
-    }).intensity;
+    return resolveCardioIntensity({ ...cardioIntensityInput(workout as any), rpe: sessionRPE ?? workout.rpe ?? (workout.workout_metadata || {}).session_rpe }).intensity;
   }
   if (workout.steps_preset && workout.steps_preset.length > 0) {
     return getStepsIntensity(workout.steps_preset, workout.type);
@@ -325,7 +343,7 @@ serve(async (req) => {
     if (!finalWorkoutData) {
       const { data: workout, error: workoutError } = await supabaseClient
         .from('workouts')
-        .select('type, duration, strength_exercises, mobility_exercises, workout_status, moving_time, avg_pace, avg_power, normalized_power, computed, avg_heart_rate, max_heart_rate, functional_threshold_power, threshold_heart_rate, rpe, workout_metadata')
+        .select('type, duration, strength_exercises, mobility_exercises, workout_status, moving_time, distance, avg_pace, avg_power, normalized_power, computed, avg_heart_rate, max_heart_rate, functional_threshold_power, threshold_heart_rate, rpe, workout_metadata')
         .eq('id', workout_id)
         .single()
       
@@ -416,6 +434,16 @@ serve(async (req) => {
       }
     }
     
+    // rTSS / sTSS thresholds (TrainingPeaks): the run's functional threshold pace and the swim's CSS, from the
+    // same baselines the FTP and LTHR came from — one resolver each, never a local read.
+    try {
+      const tp = resolveCurrentRunThresholdPace({ learned_fitness: lthrLearnedObj, performance_numbers: lthrPerfObj } as any);
+      if (tp?.sec_per_km && tp.sec_per_km > 0) finalWorkoutData.threshold_pace_sec_per_km = tp.sec_per_km;
+      const cssRaw: any = (lthrLearnedObj as any)?.swim_css_sec_per_100m;
+      const css = Number(typeof cssRaw === 'object' && cssRaw ? cssRaw.value : cssRaw);
+      if (Number.isFinite(css) && css > 0) finalWorkoutData.css_sec_per_100m = css;
+    } catch { /* thresholds are optional; the resolver falls to the next rung */ }
+
     // Inject max HR for TRIMP calculation (sport-specific)
     if (!finalWorkoutData.max_heart_rate) {
       if ((workoutType === 'run') && runMaxHr) {
@@ -467,15 +495,7 @@ serve(async (req) => {
     const _wt = String(finalWorkoutData.type || '').toLowerCase()
     const _isCardio = _wt === 'run' || _wt === 'ride' || _wt === 'bike' || _wt === 'swim'
     const _rpeVal = sessionRPE ?? (finalWorkoutData.workout_metadata || {}).session_rpe
-    const noPerformanceInference = _isCardio && !['power', 'hr', 'pace'].includes(resolveCardioIntensity({
-      type: _wt,
-      avgHr: finalWorkoutData.avg_heart_rate,
-      thresholdHr: finalWorkoutData.threshold_heart_rate,
-      avgPower: finalWorkoutData.avg_power,
-      normalizedPower: finalWorkoutData.normalized_power ?? finalWorkoutData.computed?.analysis?.power?.normalized_power ?? null,
-      ftp: finalWorkoutData.functional_threshold_power,
-      avgPace: finalWorkoutData.avg_pace,
-    }).method)
+    const noPerformanceInference = _isCardio && !['power', 'hr', 'pace'].includes(resolveCardioIntensity(cardioIntensityInput(finalWorkoutData as any)).method)
     const rpeAvailable = typeof _rpeVal === 'number' && _rpeVal >= 1 && _rpeVal <= 10
     const { method: workloadMethodClassified, estimated: workloadEstimated } = classifyWorkloadMethod({
       type: _wt,

@@ -13,8 +13,10 @@ the reason is stated, and it is Michael's to keep or remove. The code-level ledg
 | **balanced** | Acute:chronic ratio in a band. ≤ 1.3 reads balanced; ≥ 1.2 the coach starts saying "elevated"; < 0.8 "light week". | Gabbett's ACWR bands (0.8–1.3 = the "sweet spot") |
 | **ACWR 0.8** | Last 7 days of workload points ÷ average of the last 28 days, rounded to 2 decimals. | Gabbett, coupled ACWR (7-day acute over 28-day chronic) |
 | **313 pts · rolling 7d** | Sum of every session's workload points in the last 7 days. | TrainingPeaks TSS is summed the same way |
-| **Workload points per session** (ride) | Hours × IF² × 100, IF = normalized power ÷ FTP, raw. If you rated the ride, your rating is used instead (Strava's rule for perceived exertion). | TrainingPeaks TSS, exactly. **The rating-to-intensity map is ours** (Strava doesn't publish theirs). |
-| **Workload points per session** (run / swim) | Hours × intensity² × 100; run intensity = heart rate ÷ threshold heart rate snapped to a step; swim from pace. If rated, the rating. | TrainingPeaks' shape. **The run steps and the rating map are ours.** |
+| **Workload points per session** (ride) | TSS = hours × IF² × 100, IF = normalized power ÷ FTP. | TrainingPeaks TSS, exactly |
+| **Workload points per session** (run) | rTSS = hours × IF² × 100, IF = threshold pace ÷ grade-adjusted pace (plain pace when the run has no grade data). | TrainingPeaks rTSS, exactly |
+| **Workload points per session** (swim) | sTSS = hours × IF³ × 100, IF = CSS ÷ session pace per 100 m. | TrainingPeaks sTSS, exactly (the swim IF is cubed) |
+| **When there's no power / pace / threshold** | Heart rate → Friel's zones of threshold HR → Friel's TSS-per-hour table (Z1 10–20, Z2 40–50, Z3 60, Z4–5a 70, Z5b 80–90, Z5c 100). No heart rate → your rating: TSS per hour = rating × 10. Nothing at all → 0, no points. Measured always beats self-reported. | Friel's "Estimating TSS" table (TrainingPeaks). **Ours:** where the low/high halves of Z1, Z2 and Z5b split — at the zone midpoint; Friel doesn't print it. |
 | **Workload points per session** (strength) | (Total weight lifted ÷ 10,000) × intensity² × 100, intensity from reps-in-reserve or RPE. | Foster's session-RPE is the field method for strength load. **The ÷10,000 volume factor and the RIR-to-intensity map are ours.** |
 | **strength 41% · run 30% · bike 29%** | Each sport's share of the 7-day points. | Arithmetic |
 
@@ -81,7 +83,7 @@ The header says what every line below it covers: 12 weeks. TrainingPeaks' dashbo
 
 ## What is still ours, in one list
 
-1. The run intensity steps and the rating-to-intensity map in the workload formula (the ride now uses TrainingPeaks' raw IF).
+1. In the heart-rate fallback for workload: where a Friel zone's low/high halves split (the zone midpoint).
 2. The strength volume factor (÷ 10,000) and the RIR-to-intensity map.
 3. The 7-day vs 28-day comparison behind "usual" effort.
 4. The z-score behind "normal for you" soreness.

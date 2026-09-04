@@ -60,6 +60,7 @@ import { detectSwimEquipment } from "../_shared/swim/swim-equipment.ts";
 import { resolveSwimScalars } from "../_shared/swim/swim-scalars.ts";
 import { resolveRouteCluster } from "../_shared/route-intelligence.ts";
 import { dewPointF } from "../_shared/heat-adjust.ts";
+import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolveCurrentFtp } from "../../../src/lib/resolve-current-ftp.ts";
 // Q-169: the ONE definition of "is this heartbeat easy" (threshold-anchored, %max-bootstrapped).
 import { resolveRunEasyHrBand, isEasyHr, runEasyPaceEligible } from "../_shared/easy-hr.ts";
@@ -1431,6 +1432,11 @@ function computeWorkload(w: WorkoutRow, baselines: Baselines | null, hrCorrupt =
     const thresholdHr = (type === "run" ? lf?.running?.threshold_hr : lf?.cycling?.threshold_hr)
       ?? baselines?.performance_numbers?.threshold_heart_rate ?? null;
     const ftp = resolveCurrentFtp(baselines)?.value ?? null;
+    const distM = (() => { const d = Number(w.distance); return d > 0 ? (d < 1000 ? d * 1000 : d) : 0; })();
+    const paceSecPerKm = dur > 0 && distM > 0 ? (dur * 60) / (distM / 1000) : null;
+    const gapMi = Number((w as any)?.computed?.overall?.avg_gap_s_per_mi);
+    const cssRaw: any = lf?.swim_css_sec_per_100m;
+    const css = Number(typeof cssRaw === 'object' && cssRaw ? cssRaw.value : cssRaw);
     const { intensity } = resolveCardioIntensity({
       type,
       avgHr: hrCorrupt ? null : w.avg_heart_rate,
@@ -1438,6 +1444,10 @@ function computeWorkload(w: WorkoutRow, baselines: Baselines | null, hrCorrupt =
       avgPower: w.avg_power,
       normalizedPower: w.normalized_power ?? (w as any)?.computed?.analysis?.power?.normalized_power ?? null,
       ftp,
+      ngpSecPerKm: Number.isFinite(gapMi) && gapMi > 0 ? gapMi / 1.609344 : paceSecPerKm,
+      thresholdPaceSecPerKm: resolveCurrentRunThresholdPace(baselines as any)?.sec_per_km ?? null,
+      swimPaceSecPer100m: dur > 0 && distM > 0 ? (dur * 60) / (distM / 100) : null,
+      cssSecPer100m: Number.isFinite(css) && css > 0 ? css : null,
       avgPace: w.avg_pace,
       rpe: sessionRPE ?? (w as any)?.rpe ?? null,
     });

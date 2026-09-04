@@ -167,15 +167,15 @@ export function getStepsIntensity(steps: string[], type: string): number {
 // RPE → intensity mapping
 // ---------------------------------------------------------------------------
 
+/**
+ * Friel's "Estimating TSS" table (trainingbible.com 2009, reproduced by TrainingPeaks): TSS per hour by
+ * RPE on the 1-10 scale is RPE × 10 — RPE 1 = 10/hr … RPE 6 = 60/hr … RPE 10 = 100/hr. Since load =
+ * hours × intensity² × 100, the intensity that reproduces that table is sqrt(RPE × 10 / 100).
+ * 2026-09-04 (Michael: "exactly like TrainingPeaks, not ours"): replaces a seven-rung ladder of ours.
+ */
 export function mapRPEToIntensity(rpe: number): number {
-  if (rpe >= 9) return 0.95;
-  if (rpe >= 8) return 0.90;
-  if (rpe >= 7) return 0.85;
-  if (rpe >= 6) return 0.80;
-  if (rpe >= 5) return 0.75;
-  if (rpe >= 4) return 0.70;
-  if (rpe >= 3) return 0.65;
-  return 0.60;
+  const r = Math.max(1, Math.min(10, rpe));
+  return Math.round(Math.sqrt((r * 10) / 100) * 1000) / 1000;
 }
 
 // ---------------------------------------------------------------------------
@@ -728,7 +728,15 @@ export interface PerfIntensityInput {
   /** normalized power (TrainingPeaks' IF numerator); falls back to avgPower when absent */
   normalizedPower?: number | null;
   ftp?: number | null;
-  avgPace?: number | null;     // swim: seconds per 100m
+  avgPace?: number | null;     // legacy swim: seconds per 100m
+  /** run: Normalized Graded Pace (TrainingPeaks NGP), seconds per km; plain pace when no grade data */
+  ngpSecPerKm?: number | null;
+  /** run: functional threshold pace, seconds per km */
+  thresholdPaceSecPerKm?: number | null;
+  /** swim: this session's pace, seconds per 100 m */
+  swimPaceSecPer100m?: number | null;
+  /** swim: critical swim speed (threshold), seconds per 100 m */
+  cssSecPer100m?: number | null;
 }
 
 export function inferIntensityFromPerformance(inp: PerfIntensityInput): number {
@@ -744,32 +752,37 @@ export function inferIntensityFromPerformance(inp: PerfIntensityInput): number {
     if (p > 0) return Math.round((p / inp.ftp) * 1000) / 1000;
   }
 
-  // Run / bike: HR vs THRESHOLD HR (LTHR). Never resting HR.
-  if ((type === 'run' || isRide) && inp.avgHr && inp.thresholdHr) {
-    const p = inp.avgHr / inp.thresholdHr;
-    if (type === 'run') {
-      if (p >= 1.05) return 1.10;
-      if (p >= 0.95) return 1.00;
-      if (p >= 0.88) return 0.88;
-      if (p >= 0.80) return 0.80;
-      if (p >= 0.70) return 0.70;
-      return 0.60;
-    }
-    if (p >= 0.95) return 1.00;
-    if (p >= 0.90) return 0.90;
-    if (p >= 0.85) return 0.80;
-    if (p >= 0.75) return 0.70;
-    return 0.60;
+  // Run: rTSS — IF = threshold pace ÷ Normalized Graded Pace (as a speed ratio), load = hours × IF² × 100.
+  // TrainingPeaks: "rTSS uses NGP relative to functional threshold pace, with duration"; one hour at
+  // threshold = 100. Plain pace stands in for NGP only when the run carried no grade data.
+  if (type === 'run' && inp.thresholdPaceSecPerKm && inp.ngpSecPerKm && inp.ngpSecPerKm > 0) {
+    return Math.round((inp.thresholdPaceSecPerKm / inp.ngpSecPerKm) * 1000) / 1000;
   }
 
-  // Swim: pace (seconds per 100m).
-  if (type === 'swim' && inp.avgPace) {
-    const per100 = inp.avgPace / 60;
-    if (per100 < 1.5) return 1.00;
-    if (per100 < 2.0) return 0.95;
-    if (per100 < 2.5) return 0.85;
-    if (per100 < 3.0) return 0.75;
-    return 0.65;
+  // Swim: sTSS — IF = CSS ÷ session pace (per 100 m), load = hours × IF³ × 100 (TrainingPeaks cubes the
+  // swim IF: water resistance). Returned as IF^1.5 so the shared hours × intensity² × 100 reproduces IF³.
+  if (type === 'swim' && inp.cssSecPer100m && inp.swimPaceSecPer100m && inp.swimPaceSecPer100m > 0) {
+    const ifv = inp.cssSecPer100m / inp.swimPaceSecPer100m;
+    return Math.round(Math.pow(ifv, 1.5) * 1000) / 1000;
+  }
+
+  // Heart rate: Friel's zones as % of LTHR (run: Z1 <85, Z2 85-89, Z3 90-94, Z4 95-99, Z5a 100-102,
+  // Z5b 103-106, Z5c >106; bike: Z1 <81, Z2 81-89, Z3 90-93, Z4 94-99, Z5a-c as run) and Friel's
+  // "Estimating TSS" table of TSS per hour by zone (Z1 low 10 / high 20, Z2 low 40 / high 50, Z3 60,
+  // Z4-5a 70, Z5b low 80 / high 90, Z5c 100). Intensity = sqrt(TSS/hr ÷ 100).
+  // OURS, declared (STATE-NUMBERS.md): the table's low/high halves of Z1, Z2 and Z5b are split at the
+  // zone's midpoint — Friel does not print the split point.
+  if ((type === 'run' || isRide) && inp.avgHr && inp.thresholdHr) {
+    const pct = (inp.avgHr / inp.thresholdHr) * 100;
+    const z1Hi = type === 'run' ? 85 : 81;
+    let tssPerHour: number;
+    if (pct < z1Hi) tssPerHour = pct < (z1Hi - 5) ? 10 : 20;          // Z1 low / high (split 5 pts under the ceiling)
+    else if (pct < 90) tssPerHour = pct < (z1Hi + 90) / 2 ? 40 : 50;  // Z2 low / high at the midpoint
+    else if (pct < (type === 'run' ? 95 : 94)) tssPerHour = 60;       // Z3
+    else if (pct < 103) tssPerHour = 70;                              // Z4 + Z5a
+    else if (pct <= 106) tssPerHour = pct < 104.5 ? 80 : 90;          // Z5b low / high at the midpoint
+    else tssPerHour = 100;                                            // Z5c
+    return Math.round(Math.sqrt(tssPerHour / 100) * 1000) / 1000;
   }
 
   return 0; // no output signal → caller falls through to sRPE / duration default
@@ -784,10 +797,10 @@ export function inferIntensityFromPerformance(inp: PerfIntensityInput): number {
  * signals. The order is TrainingPeaks': MEASURED BEATS SELF-REPORTED.
  *
  *   1. power   — ride: normalized power ÷ FTP (average power if NP is absent), raw IF
- *   2. hr      — run / ride: heart rate ÷ threshold heart rate (the run ladder — OURS, STATE-NUMBERS.md)
- *   3. pace    — swim: seconds per 100 m
- *   4. rating  — the athlete's 1–10, mapped (OURS, STATE-NUMBERS.md)
- *   5. default — the sport's flat default
+ *   2. pace    — run: threshold pace ÷ NGP (rTSS); swim: CSS ÷ pace, cubed (sTSS)
+ *   3. hr      — Friel's zones of LTHR → Friel's TSS-per-hour table
+ *   4. rating  — Friel's table: TSS per hour = RPE × 10
+ *   5. nothing — 0, as TrainingPeaks records no TSS without data
  *
  * A caller that distrusts a signal (corrupt heart rate, failed HR quality) passes it as null; it does
  * not re-order anything. `method` says which rung fired, for receipts and the ACWR "estimated" flag.
@@ -802,13 +815,15 @@ export function resolveCardioIntensity(
     const isRide = type === 'ride' || type === 'bike';
     const method: CardioIntensityMethod =
       isRide && inp.ftp && (inp.normalizedPower || inp.avgPower) ? 'power'
-      : type === 'swim' ? 'pace'
+      : type === 'run' && inp.thresholdPaceSecPerKm && inp.ngpSecPerKm ? 'pace'
+      : type === 'swim' && inp.cssSecPer100m && inp.swimPaceSecPer100m ? 'pace'
       : 'hr';
     return { intensity: measured, method };
   }
   const rpe = Number(inp.rpe);
   if (Number.isFinite(rpe) && rpe >= 1 && rpe <= 10) return { intensity: mapRPEToIntensity(rpe), method: 'rating' };
-  return { intensity: getDefaultIntensityForType(type), method: 'default' };
+  // Nothing measured and nothing rated: TrainingPeaks records no TSS. So do we — 0, never a guessed 0.75.
+  return { intensity: 0, method: 'default' };
 }
 
 // ---------------------------------------------------------------------------

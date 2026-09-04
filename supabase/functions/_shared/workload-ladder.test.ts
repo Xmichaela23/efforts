@@ -26,10 +26,10 @@ Deno.test('ride with power scores off power vs FTP (not TRIMP)', () => {
 });
 
 Deno.test('run with HR scores off HR-vs-LTHR (threshold HR, never resting HR)', () => {
-  // 151 bpm at LTHR 151 → ratio 1.0 → 1.00
-  assertEquals(inferIntensityFromPerformance({ type: 'run', avgHr: 151, thresholdHr: 151 }), 1.0);
-  // 121/151 ≈ 0.80 → 0.80
-  assertEquals(inferIntensityFromPerformance({ type: 'run', avgHr: 121, thresholdHr: 151 }), 0.80);
+  // 151 bpm at LTHR 151 → 100% → Friel Z5a → 70 TSS/hr → sqrt(0.70)
+  assertEquals(inferIntensityFromPerformance({ type: 'run', avgHr: 151, thresholdHr: 151 }), 0.837);
+  // 121/151 = 80.1% → Friel run Z1 (high half) → 20 TSS/hr → sqrt(0.20)
+  assertEquals(inferIntensityFromPerformance({ type: 'run', avgHr: 121, thresholdHr: 151 }), 0.447);
   // HR present but NO threshold HR → no fabricated fallback → 0 (falls to sRPE/default)
   assertEquals(inferIntensityFromPerformance({ type: 'run', avgHr: 140 }), 0);
 });
@@ -42,9 +42,9 @@ Deno.test('no output signal → 0 (caller falls through to sRPE / default)', () 
 Deno.test('CROSS-DISCIPLINE TRAP: a run with Stryd power is NOT scored against cycling FTP', () => {
   // Michael's real shape: run avg_power 254 (running watts), cycling FTP 176, avgHr 135, LTHR 151.
   // The BUG would be 254/176 = 1.44 → 1.15 intensity (massive over-score). The power branch is
-  // ride-only, so the run must fall to HR%LTHR: 135/151 = 0.894 → 0.88 (NOT 1.15).
+  // ride-only, so the run must fall to HR%LTHR: 135/151 = 89.4% → Friel run Z2 (high half) → 50 TSS/hr → 0.707 (NOT 1.15).
   const run = inferIntensityFromPerformance({ type: 'run', avgPower: 254, ftp: 176, avgHr: 135, thresholdHr: 151 });
-  assertEquals(run, 0.88);
+  assertEquals(run, 0.707);
   assert(run < 1.0, 'run-power must never produce a power-based over-score');
   // and a run with power but NO HR/LTHR → 0 (run-power ignored, falls to sRPE/default), never 254/ftp.
   assertEquals(inferIntensityFromPerformance({ type: 'run', avgPower: 254, ftp: 176 }), 0);
@@ -104,7 +104,7 @@ Deno.test('resolveCardioIntensity: power beats the rating; the rating only fires
   const hrOnly = resolveCardioIntensity({ type: 'ride', avgHr: 135, thresholdHr: 153, rpe: 4 });
   assertEquals(hrOnly.method, 'hr');
   const rated = resolveCardioIntensity({ type: 'ride', rpe: 4 });
-  assertEquals(rated, { intensity: 0.70, method: 'rating' });
+  assertEquals(rated, { intensity: 0.632, method: 'rating' }); // Friel: RPE 4 = 40 TSS/hr → sqrt(0.40)
   const bare = resolveCardioIntensity({ type: 'run' });
-  assertEquals(bare.method, 'default');
+  assertEquals(bare, { intensity: 0, method: 'default' }); // no data → no TSS (TrainingPeaks)
 });
