@@ -100,7 +100,11 @@ import { resolveCurrentRunThresholdPace } from "../../../src/lib/resolve-current
  * off this row; the climb now reads the same way.
  */
 function elevGainM(r: any): number | null {
-  const e = Number(r?.elevation_gain);
+  // ⛔ THE SAME EXPRESSION THE DETAILS SCREEN READS — `workout-detail` builds its display metric as
+  // `elevation_gain ?? metrics.elevation_gain` (:1813), because the column is not always the one that
+  // got written. Reading only the column showed nothing on a ride whose value sits in `metrics`, which
+  // is exactly what happened on Sep 3 (Details said 958 ft, the State card said nothing).
+  const e = Number(r?.elevation_gain ?? r?.metrics?.elevation_gain);
   return Number.isFinite(e) && e > 0 ? Math.round(e) : null;
 }
 
@@ -1449,7 +1453,7 @@ serve(async (req: Request) => {
             // and does NOT copy it for rides — so reading the copy gave runs a climb and rides nothing,
             // and before the workout-id key it gave a ride the RUN's climb. The temperature two lines
             // below was already read straight off this row; the climb now reads the same way.
-            .from("workouts").select("id,date,type,workout_analysis,computed,weather_data,elevation_gain")
+            .from("workouts").select("id,date,type,workout_analysis,computed,weather_data,elevation_gain,metrics")
             .eq("user_id", userId).in("type", ["run", "running", "ride", "bike", "cycling"])
             .eq("workout_status", "completed")
             .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", asOf);
