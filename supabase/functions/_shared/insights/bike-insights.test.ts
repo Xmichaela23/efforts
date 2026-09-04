@@ -9,7 +9,27 @@ Deno.test('endurance WITH power — efficiency + load, no fabricated anything', 
   })!;
   console.log('\n  ENDURANCE (power):\n   ', s, '\n');
   assert(s.includes('205 W'));
-  assert(/aerobic engine carried it/.test(s));
+  // 2026-09-03: the clause states the measurement and stops. "The aerobic engine carried it, the watts
+  // didn't cost you HR" was the paragraph restating — louder — a figure printed two lines below it.
+  assert(/Heart rate held with the power/.test(s));
+  // 0.68 IS the endurance band, so the label is earned here.
+  assert(/62 TSS at 0\.68 intensity — an aerobic-base load\./.test(s));
+});
+
+Deno.test('an aerobic-family ride at threshold intensity is NOT called base work', () => {
+  // ⛔ THE REGRESSION THIS PINS (2026-09-03, Michael's ride): the label printed under EVERY
+  // aerobic-family ride whatever the intensity, so 0.98 — threshold on Coggan's scale, where the
+  // endurance band tops out at 0.75 — was announced as "an aerobic-base load".
+  const s = composeBikeInsight({
+    type: 'endurance', hasPower: true, durationMin: 68,
+    power: { np: 164, avg: 146, if: 0.98, tss: 109, vi: 1.04, ftp: 168 },
+    decoupling: { pct: 7.4 },
+  })!;
+  assert(!/aerobic-base load/.test(s));
+  assert(/109 TSS at 0\.98 intensity — harder than base work\./.test(s));
+  // And the heart-rate clause follows the number, not the other way round.
+  assert(/Heart rate climbed relative to the power/.test(s));
+  assert(!/didn't cost you HR/.test(s));
 });
 
 Deno.test('endurance HR-ONLY — honest lighter read, never a made-up watt', () => {

@@ -214,9 +214,22 @@ export function composeBikeInsight(inp: BikeInsightInput): string | null {
       // here: the EFFICIENCY row owns the figure (Friel aerobic decoupling); the paragraph makes the
       // qualitative claim. This is what feeds `hrHeld` — raw HR drift, a proxy for the row's decoupling —
       // so the DECISION stays honest even though we don't print a second, differing number.
-      if (hrHeld) parts.push(`Heart rate stayed in step with the power — the aerobic engine carried it, the watts didn't cost you HR.`);
-      else if (dcp != null) parts.push(`Heart rate crept up relative to the power over the ride.`);
-      if (iff != null && tss != null) parts.push(`${tss} TSS at ${r2(iff)} intensity — an aerobic-base load.`);
+      // ⛔ THE CLAIM IS THE NUMBER'S, NOT THE PARAGRAPH'S (2026-09-03). "The aerobic engine carried it,
+      // the watts didn't cost you HR" was a second, louder statement of a figure printed two lines
+      // below — and on a ride whose drift read 7.4% it said the opposite of the row under it. Both
+      // clauses now state what was measured and stop.
+      if (hrHeld) parts.push(`Heart rate held with the power across the ride.`);
+      else if (dcp != null) parts.push(`Heart rate climbed relative to the power across the ride.`);
+      // ⛔ "an aerobic-base load" WAS ASSERTED AT ANY INTENSITY. It printed under every aerobic-family
+      // ride, so an 0.98 intensity factor — threshold, by Coggan's own scale, where 0.75 or under is
+      // the endurance band — was announced as base work. The number is stated; the label is only
+      // attached where it is true, and above 0.85 the ride is named for what it was.
+      if (iff != null && tss != null) {
+        const band = iff <= 0.75 ? ' — an aerobic-base load.'
+          : iff <= 0.85 ? '.'
+          : ' — harder than base work.';
+        parts.push(`${tss} TSS at ${r2(iff)} intensity${band}`);
+      }
       parts.push(conditionsClause(inp));
     } else {
       // HR-only: no watts. The honest lighter read (again, no number — the HEART RATE row shows it).

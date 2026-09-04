@@ -2151,14 +2151,43 @@ Deno.serve(async (req) => {
     // `adherence_summary` shape so client renderers don't sport-branch).
     // HR drift % computed from cycling's hr_drift_bpm + early_avg_hr (cycling
     // stores absolute beats; running stores percent — convert here for symmetry).
-    const cyclingHrDriftPct = (
-      hrAnalysis?.available &&
-      typeof hrAnalysis?.hr_drift_bpm === 'number' &&
-      typeof hrAnalysis?.early_avg_hr === 'number' &&
-      hrAnalysis.early_avg_hr > 0
-    )
-      ? (hrAnalysis.hr_drift_bpm / hrAnalysis.early_avg_hr) * 100
-      : null;
+    // ⛔⛔ ONE DRIFT NUMBER FOR THE WHOLE RIDE (2026-09-03, Michael: "we cannot have bad drift data").
+    //
+    // ⛔ WHAT WENT WRONG. This function produced TWO drift figures from the same ride and put both on
+    // one screen. The paragraph read `hr_drift_bpm ÷ early_avg_hr` — an early-window-vs-late-window
+    // figure off `hrAnalysis` — and decided "heart rate stayed in step with the power" because that
+    // number came in under 5. The Heart rate row directly beneath it printed `hr_drift_v1` (halves by
+    // time, after the warm-up) and said 7.4%. Same ride, same fact, two numbers, and the prose
+    // contradicted the measurement under it.
+    //
+    // ⛔ THE RULE, AND IT IS THE SAME ONE THE RUN SIDE ALREADY KEEPS: `hr-drift-halves.ts` is the
+    // definition, it is computed ONCE, and every reader here takes it — the paragraph, the adherence
+    // summary, the decoupling write, and the stored `hr_drift_v1`. A second derivation of a printed
+    // number is how a screen ends up arguing with itself.
+    //
+    // ⚠️ COMPUTED FROM THE RESOLVED `sensorData`, not a second extraction. The stored value used to
+    // re-extract from the raw workout object, which is a different call that can yield a different
+    // sample set — the same fracture one layer down.
+    // ⚠️ THE OLD FIGURE SURVIVES ONLY AS A FALLBACK, for a ride whose samples cannot be read at all.
+    // Losing the read entirely is worse than a coarser one, but it is never preferred to the real one.
+    const rideDriftHalves = (() => {
+      try {
+        const totalS = Number((workout as any)?.moving_time ?? (workout as any)?.duration ?? 0);
+        return hrDriftHalvesPct(sensorData, totalS > 0 && totalS < 1000 ? totalS * 60 : totalS, {
+          skipStartS: warmupSkipSeconds((workout as any)?.computed),
+        });
+      } catch { return null; }
+    })();
+    const cyclingHrDriftPct = typeof rideDriftHalves?.pct === 'number'
+      ? rideDriftHalves.pct
+      : (
+        hrAnalysis?.available &&
+        typeof hrAnalysis?.hr_drift_bpm === 'number' &&
+        typeof hrAnalysis?.early_avg_hr === 'number' &&
+        hrAnalysis.early_avg_hr > 0
+      )
+        ? (hrAnalysis.hr_drift_bpm / hrAnalysis.early_avg_hr) * 100
+        : null;
     const adherenceSummary = generateCyclingAdherenceSummary({
       performance,
       intervalBreakdown,
@@ -2980,13 +3009,10 @@ Deno.serve(async (req) => {
           ...(analysisPayload || {}),
           // 2026-09-03: the ride's heart-rate drift as a percentage (late window vs early window, heart rate
           // alone) — read by session-detail as the Drift chip / Heart rate row so a ride is never without one.
-          hr_drift_v1: (() => {
-            try {
-              const smp = extractSensorData(workout as any) || [];
-              const totalS = Number((workout as any)?.moving_time ?? (workout as any)?.duration ?? 0);
-              return hrDriftHalvesPct(smp, totalS > 0 && totalS < 1000 ? totalS * 60 : totalS, { skipStartS: warmupSkipSeconds((workout as any)?.computed) });
-            } catch { return null; }
-          })(),
+          // ⛔ THE SAME OBJECT THE PARAGRAPH AND THE ADHERENCE SUMMARY READ — computed once, near the
+          // top of this function, off the RESOLVED sample set. It used to be recomputed here from a
+          // second extraction, which could see a different sample set than the analysis did.
+          hr_drift_v1: rideDriftHalves,
           classified_type: cyclingFactPacketV1?.facts?.classified_type || null,
           fact_packet_v1: cyclingFactPacketV1,
           flags_v1: cyclingFlagsV1,
