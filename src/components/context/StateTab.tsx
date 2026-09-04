@@ -860,7 +860,7 @@ export default function StateTab({
       </div>
 
       {/* Rule 4: one label system — uppercase, tracked, like BODY / STRENGTH. */}
-      <div className="px-1 mb-1 mt-3 text-[12px] font-semibold tracking-[0.12em] uppercase text-white/55">trends · the arc behind this week</div>
+      <div className="px-1 mb-1 mt-3 text-[12px] font-semibold tracking-[0.12em] uppercase text-white/55">trends · last 12 weeks</div>
 
       {/* ⛔ ORDER: WHAT IS TRUE NOW, THEN WHAT IS TRENDING (2026-08-29, Michael: *"shouldn't
           ACWR be at the top?"*). It is the field's order and it was inverted here: TrainingPeaks

@@ -1066,7 +1066,10 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         summaryLifts as Array<{ displayName: string; latestE1rm: number | null; series?: Array<{ value: number; week?: number }> }>,
         planWeek,
       );
-      if (rows.length) return rows;
+      // 2026-09-04 (Michael: "strength needs e1RM"): the run and bike rows say what their number is
+      // ("last 5 runs", "estimated"); the lift rows printed a bare number. It is the estimated one-rep
+      // max from the last logged set — not a tested max — so the note says so, with the creep beside it.
+      if (rows.length) return rows.map((r) => ({ ...r, note: r.note ? `e1RM · ${r.note}` : 'e1RM' }));
       const n = strengthFitness?.sessionsThisWeek ?? 0;
       return [n > 0 ? { name: 'sessions', value: String(n), note: 'this week' } : { name: 'lifts', value: 'none logged' }];
     }
