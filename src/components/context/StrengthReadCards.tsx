@@ -273,6 +273,15 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
       {driftPts.length >= 2 && (
         <div className="text-[11px] text-white/55 mt-1">drift · {driftWhat} · lower is better · line {DRIFT_LIMITS.hybridPct}% · each dot one {isRide ? 'steady ride' : 'run'}</div>
       )}
+      {/* HEAT (2026-09-04, Michael: "summer has an impact — put a note"). A fixed line, not generated: a fact with a
+          source, the same every time. Shown when any session in the window was 72°F or hotter — Garmin's own
+          heat cut-off (its fitness estimate is corrected above 72°F / 22°C); TrainingPeaks applies no correction and
+          Friel's guidance is to compare like with like. Ledger: docs/STATE-SOURCES.md. */}
+      {pts.some((p) => typeof p.tempF === 'number' && p.tempF >= 72) && (
+        <div className="text-[11px] text-white/45 mt-1 leading-snug">
+          Heat raises heart rate at the same {isRide ? 'power' : 'pace'}, so efficiency reads lower and drift reads higher on hot days. TrainingPeaks doesn't correct for it; compare hot days with hot days.
+        </div>
+      )}
     </div>
   );
 }

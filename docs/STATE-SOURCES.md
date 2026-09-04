@@ -30,6 +30,8 @@ stated and it is a decision Michael can reverse.
 | "provisional" tag: 3–4 sessions in the window, or all inside 21 days | `bike-fitness.ts isProvisionalTrend` | **OURS** — no longer rendered on State (2026-09-04 evening); still on the payload |
 | Race-projection gate: ≥ 8 observed runs | `assemble.ts projectionMinRuns`, `compute-snapshot` | **OURS** — a count with no outside source; gates a projected race time, not an arrow (was the run direction floor) |
 
+| Heat note on the run and ride cards, shown when a session in the window was ≥ 72°F | `StrengthReadCards.tsx` | FIELD — 72°F / 22°C is Garmin's heat-correction cut-off; TrainingPeaks applies no correction; Friel: compare like with like. The sentence is fixed text, not generated. |
+
 ## FTP
 
 | Number | Where | Source |
