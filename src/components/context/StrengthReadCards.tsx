@@ -241,6 +241,10 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
             */}
         </>
       )}
+      {/* which session the headline IS — directly under the number it names, not under the drift line (2026-09-04) */}
+      {basedOn && (
+        <div className="text-[11px] text-white/55 mt-1">{basedOn}</div>
+      )}
       {eff.length >= 2 && <DatedChart points={eff} color={color} dotNoun={isRide ? 'ride' : 'run'} />}
 
       {/* ⛔ THE "one session doesn't tell you much" CAUTION MOVED TO ONCE PER SPORT (Round 3 pass 2).
@@ -267,9 +271,6 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
         <div className="text-[11px] text-white/55 mt-1">
           drift <span className="tabular-nums text-white/75">{fmtDrift(driftLast.value)}%</span> · {driftWhat} · lower is better · {fmtDayShort(driftLast.date)} {isRide ? 'steady ride' : 'run'} · line {DRIFT_LIMITS.hybridPct}%
         </div>
-      )}
-      {basedOn && (
-        <div className="text-[11px] text-white/55 mt-1">{basedOn}</div>
       )}
     </div>
   );
