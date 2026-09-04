@@ -81,7 +81,7 @@ export function bodyRpeDriver(args: {
 /** FATIGUED "Why:" breakdown for the open-for-more expansion. Null when there's nothing to explain. */
 export function buildReadinessWhy(args: {
   signals: ReadinessSignalInput;
-  loadLabel: string;        // "load balanced" | "load elevated (ACWR 1.3)"
+  loadLabel: string;        // '' (nothing to add) | "form −34 (high risk)" — TrainingPeaks' zone, never ACWR (2026-09-04)
   concerningCount: number;  // assessment.signals_concerning
   rpeClause?: string;       // the driver-named (or receipt) RPE clause — replaces the bare verdict
   rpeUnderBody?: boolean;   // RPE driver is shown under BODY (readiness_rpe_driver) → drop it here (no dup)
@@ -103,7 +103,7 @@ export function buildReadinessWhy(args: {
   if (s.strength?.declining) drivers.push('strength fading');
   // Load ONLY when it's a real driver (elevated) — a "balanced" load is the headline's fact, not a
   // Why (one fact, one place; drop the "· load balanced" restatement).
-  const loadTail = args.loadLabel.includes('balanced') ? [] : [args.loadLabel];
+  const loadTail = args.loadLabel && !args.loadLabel.includes('balanced') ? [args.loadLabel] : []; // 2026-09-04: empty = nothing to add (the coach passes Friel's high-risk form zone or '')
   if (drivers.length) return `Why: ${[...drivers, ...loadTail].join(' · ')}`;
   // No NAMED driver → null. The old "N concerning signals" count fallback was a WHOOP-class non-answer
   // (it alarmed — amber — without informing, and under a "Balanced load" headline it flat contradicted

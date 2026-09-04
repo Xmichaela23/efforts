@@ -213,7 +213,8 @@ export type CoachWeekContextResponseV1 = {
     wtd_completion_ratio: number | null; // 0..1 (actual/planned)
     acute7_actual_load: number | null;
     chronic28_actual_load: number | null;
-    acwr: number | null; // (acute/7)/(chronic/28)
+    acwr: number | null; // (acute/7)/(chronic/28) — data only; nothing athlete-facing reads it (2026-09-04)
+    form: number | null; // TrainingPeaks' Form (TSB): yesterday's fitness − yesterday's fatigue — the load read (2026-09-04)
   };
   week: {
     planned_total_load: number | null; // full week planned load (week window)

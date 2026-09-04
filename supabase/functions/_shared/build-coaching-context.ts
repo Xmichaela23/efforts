@@ -138,7 +138,7 @@ export async function buildCoachingContext(
     lines.push("THIS WEEK SO FAR:");
     lines.push(`  Sessions: ${currentSnapshot.session_count ?? 0}${currentSnapshot.session_count_planned ? ' of ' + currentSnapshot.session_count_planned + ' planned' : ''}`);
     lines.push(`  Workload: ${currentSnapshot.workload_total ?? 0}${currentSnapshot.adherence_pct != null ? ' (' + currentSnapshot.adherence_pct + '% adherence)' : ''}`);
-    if (currentSnapshot.acwr != null) lines.push(`  ACWR: ${currentSnapshot.acwr}`);
+    // 2026-09-04: ACWR is not handed to the model — it is off every athlete-facing sentence
     if (currentSnapshot.workload_by_discipline) {
       const disc = Object.entries(currentSnapshot.workload_by_discipline)
         .filter(([, v]) => (v as number) > 0)
@@ -172,7 +172,6 @@ export async function buildCoachingContext(
     lines.push("");
     lines.push("LAST WEEK:");
     lines.push(`  Workload: ${priorSnapshot.workload_total ?? 0} (${priorSnapshot.session_count ?? 0} sessions)`);
-    if (priorSnapshot.acwr != null) lines.push(`  ACWR: ${priorSnapshot.acwr}`);
     if (priorSnapshot.run_long_run_duration) lines.push(`  Longest run: ${Math.round(priorSnapshot.run_long_run_duration)} min`);
   }
 

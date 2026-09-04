@@ -466,9 +466,9 @@ export function reconcileLoadStatus(
   const crossTrainingOverPlan = overload == null || overload.exceeded_plan;
   if (crossTrainingOverPlan && unweightedAcwr != null && (raw.running_acwr == null || raw.running_acwr < 1.1) && crossTrainingEstablished) {
     if (unweightedAcwr > 1.5) {
-      raise('high', `cross-training spiking total ACWR to ${unweightedAcwr.toFixed(2)}`);
+      raise('high', 'cross-training spiking total load');
     } else if (unweightedAcwr > 1.3) {
-      raise('elevated', `cross-training pushing total ACWR to ${unweightedAcwr.toFixed(2)}`);
+      raise('elevated', 'cross-training pushing total load up');
     }
   }
 
@@ -558,7 +558,7 @@ export function reconcileLoadStatus(
       'high';
     if (LOAD_RANK[buildBand] < LOAD_RANK[status]) {
       status = buildBand;
-      reasons.push(`build week — ACWR ${unweightedAcwr.toFixed(2)} within build tolerance`);
+      reasons.push('build week — within build tolerance');
     }
   }
 
@@ -597,7 +597,7 @@ export function reconcileLoadStatus(
       // INVARIANT: strength on plan ⇒ never under. (a) covered → cross-training evidence; (b) uncovered → headroom.
       status = 'on_target';
       reasons.push(covered
-        ? `${adh}; endurance load carried by cross-training (total ACWR ${acwrTxt})`
+        ? `${adh}; endurance load carried by cross-training`
         : `${adh}; you have headroom to add endurance`);
     } else if (!totalGenuinelyLow) {
       // strength behind plan, BUT total load maintained → attention, not a deficit; never 'under'.
@@ -607,7 +607,7 @@ export function reconcileLoadStatus(
       reasons.push(`${adh} — attention, not under-training (total load maintained)`);
     } else {
       // strength behind plan AND total load genuinely low → 'under' stands (genuine build-more); name it.
-      reasons.push(`${adh}; total load low (ACWR ${acwrTxt}) — build more`);
+      reasons.push(`${adh}; total load low`);
     }
   }
 
@@ -631,7 +631,7 @@ export function reconcileLoadStatus(
     : ((readiness === 'fresh' || readiness === 'adapting' || readiness === 'normal') && nDeclining < 2);
   if ((status === 'high' || status === 'elevated') && !strainCorroborated && bodyGenuinelyFine) {
     status = 'productive';
-    reasons.push(`load elevated (ACWR ${unweightedAcwr != null ? unweightedAcwr.toFixed(2) : 'n/a'}) and the body's absorbing it — productive`);
+    reasons.push(`load elevated and the body's absorbing it — productive`);
   } else if (status === 'high' && !strainCorroborated) {
     status = 'elevated';
     reasons.push('load high but body absorbing — no corroborated strain (two-key)');

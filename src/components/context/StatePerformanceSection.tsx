@@ -175,14 +175,11 @@ function blockContextLine(planWeek: number | null | undefined, block: BlockCard 
 // number as the bike's read.
 // One labelled signal ("Power: improving +2%") for the bike dual read.
 function Signal({ label, sig }: { label: string; sig: BikeSignal }) {
-  const v = NUMERIC[sig.verdict];   // bike: arrow + number, no word
+  // 2026-09-04: the label only — the 28/28 verdict arrow and percent are off State (one reference per metric).
+  void sig;
   return (
     <span className="inline-flex items-baseline gap-1">
       <span className="text-white/50">{label}</span>
-      <span className={`inline-flex items-baseline gap-0.5 ${v.cls}`}>
-        {v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}
-      </span>
-      {sig.pctChange != null && sig.verdict !== 'needs_data' && <span className="text-white/60">{verdictSignedPct(sig.verdict, sig.pctChange)}</span>}
     </span>
   );
 }
@@ -819,12 +816,15 @@ function FitnessDotBlock({ label, range, verdict, pctChange, provisional, wordMa
   frame?: string;
   explain?: string; // when set, this plain-language definition prints under the row (no tap — one level only)
 }) {
-  const v = wordMap[verdict];
+  // ⛔ NO VERDICT WORD, ARROW OR PERCENT (2026-09-04, one reference per metric): the 28/28 verdict was Garmin's
+  // rule on TrainingPeaks numbers and is off every State surface. The label and the dot (position in the
+  // 12-week range) stay; `verdict` / `pctChange` / `wordMap` are accepted and not rendered.
+  void wordMap; void pctChange;
   return (
     <>
       <span className="basis-full flex items-baseline justify-between gap-2">
         <span className="text-white/55 text-[13px]">{label}</span>
-        {verdict !== 'needs_data' && (
+        {false && verdict !== 'needs_data' && (
           // ⛔ `withheld` PRINTS NO NUMBER. "Too few to read −0.4%" reads as a result with a caveat
           // attached, and the number is the part people take away — so the row would say the opposite
           // of what the engine decided. Withheld means we are not making a claim; the percent IS the
@@ -943,20 +943,8 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
         ) : (
           <>
             {metricLabel && <span className="text-white/50 text-[13px]">{metricLabel}</span>}
-            {hasEvidence ? (
-              <>
-                <span className={`text-[13px] ${vCls}`}>{trendHeadline(card.headlineVerdict, perf!.pctChange)}</span>
-                <span className="text-white/55 text-[13px]">{evidence}</span>
-              </>
-            ) : (
-              <>
-                <span className={`inline-flex items-baseline gap-1 ${vCls}`}>
-                  {v.arr && <span>{v.arr}</span>}
-                  <span>{v.word}</span>
-                </span>
-                {perf?.pctChange != null && <span className={thinStale ? 'text-white/50' : 'text-white/60'}>{verdictSignedPct(card.headlineVerdict, perf.pctChange)}</span>}
-              </>
-            )}
+            {/* 2026-09-04: the evidence count only — no verdict word, arrow or percent (the 28/28 rule is off State) */}
+            {hasEvidence && <span className={`text-[13px] ${vCls}`}>{evidence}</span>}
           </>
         )}
         {thinStale && <span className="text-white/50 text-[12px]">limited data</span>}

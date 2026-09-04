@@ -21,7 +21,7 @@ export interface LoadedLegsInput {
   isNovel: boolean;                   // movement absent from ~6–8wk exercise history
   effortCurrent: number;              // 5.3 — endurance session-RPE avg this week (logged)
   effortBaseline: number;             // 4.4 — the athlete's typical (logged)
-  loadLabel: string;                  // "load balanced"
+  loadLabel: string;                  // '' (nothing to add) | "form −34 (high risk)" (2026-09-04)
   athleteReportedSoreness: boolean;   // Q-049 slider — declared truth → LEGS SORE
   planEvent: string | null;           // "Monday's opener" — plan-start within the clearing window, else null
 }
@@ -61,7 +61,7 @@ export function buildLoadedLegsDiagnosis(input: LoadedLegsInput): LoadedLegsDiag
   if (athleteReportedSoreness) {
     // LEGS SORE — the athlete DECLARED soreness (Q-049). State language is now his own truth.
     const rpePart = rpe ? ` (${rpe})` : '';
-    const why = `Why: ${dayName}'s lower-body work${rpePart} — you reported sore legs, ${effort} · ${loadLabel}`;
+    const why = `Why: ${dayName}'s lower-body work${rpePart} — you reported sore legs, ${effort}${loadLabel ? ` · ${loadLabel}` : ''}`;
     return { label: 'LEGS SORE', why, suggestion: soreSuggestion(planEvent) };
   }
 
@@ -72,7 +72,7 @@ export function buildLoadedLegsDiagnosis(input: LoadedLegsInput): LoadedLegsDiag
   // window (the lookback edge doesn't pin a last-performed date), NO reps-as-cause.
   const noveltyClause = isNovel && movement ? `${movement} (not in your recent training), ` : '';
   const mid = rpe ? `${noveltyClause}${rpe}` : noveltyClause.replace(/, $/, '');
-  const why = `Why: ${dayName}'s lower-body work — ${mid} — ${effort} · ${loadLabel}, nothing systemic`;
+  const why = `Why: ${dayName}'s lower-body work — ${mid} — ${effort}${loadLabel ? ` · ${loadLabel}` : ''}, nothing systemic`;
   return { label: 'LEGS LOADED', why, suggestion };
 }
 

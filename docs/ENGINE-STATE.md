@@ -21,15 +21,21 @@ rewritten `docs/STATE-NUMBERS.md` / `docs/STATE-SOURCES.md`:
   planned mirror, 4 callers). Stored strength points are on the OLD scale until `backfill-strength-load` runs.
 - **BODY removed** (`StateBodyBlock.tsx` deleted). **FTP guardrails removed** (ceiling + 5% cap).
 - **Warm-up stand-in removed** from `compute-snapshot` (D-463 back-annotated).
+- **The coach reads the same truth** (D-466 addendum): week verdict / title / kicker / label / receipts /
+  narrative facts read Form (TSB); ACWR withdrawn as an input everywhere it produced a sentence;
+  `fitness_direction` null, no 28/28 verdict spoken. State's dot blocks and the session screen's trend chip
+  print no verdict word. `metrics.form` is new on the coach payload.
 
-### TO DEPLOY (every function touched PLUS every importer of a touched `_shared` file — the 17-function trap)
-`_shared/workload.ts` changed (strength), so its 26 importers all carry a stale copy until redeployed:
-`coach compute-snapshot calculate-workload compute-facts learn-fitness-profile materialize-plan backfill-strength-load
-generate-triathlon-plan recompute-athlete-memory backfill-planned-workload analyze-swim-workout ingest-activity
-generate-run-plan analyze-cycling-workout recompute-workout activate-plan weekly-workload workout-detail get-week
-analyze-strength-workout analyze-running-workout create-goal-and-materialize-plan validate-reschedule
-compute-workout-analysis sweep-user-history`. Then `backfill-strength-load` for the reference athlete. Then a client
-build (Netlify on push to main).
+### TO DEPLOY — 33 functions, computed TRANSITIVELY (an index.ts that imports a module that imports a changed `_shared` file bundles the stale copy too)
+Changed shared files: `_shared/workload.ts`, `fitness-fatigue.ts`, `state-trend/assemble.ts` + `run.ts`,
+`response-model/readiness-receipts.ts` + `loaded-legs.ts`, `fact-packet/limiter.ts`, `build-coaching-context.ts`,
+`load-status-reconcile.ts`, `src/lib/bike-ftp-estimator.ts`, `coach/types.ts`. The closure over every function's
+import graph (script in the D-466 session, re-runnable) is:
+```
+supabase functions deploy activate-plan adapt-plan analyze-cycling-workout analyze-running-workout arc-setup-chat backfill-planned-workload backfill-strength-load calculate-workload coach complete-race compute-adaptation-metrics compute-facts compute-snapshot compute-workout-analysis course-detail course-strategy create-goal-and-materialize-plan delete-plan end-plan endurance-checkpoint generate-combined-plan generate-run-plan generate-strength-plan generate-triathlon-plan get-arc-context import-strava-history learn-fitness-profile materialize-plan planning-context refresh-goal-race-projections rematerialize-standing-block strava-webhook workout-detail --project-ref yyriamwvtvzlkumqrvpm
+```
+Then `backfill-strength-load` for the reference athlete (re-prices strength `workload_actual` / `workload_planned`
+onto Friel's scale — until it runs, fitness / fatigue mix two scales). Then a client build (Netlify on push to main).
 
 ### VERIFIED / NOT
 - **Verified here (test output, not a device):** 75 deno tests green across workload, fitness-fatigue, FTP

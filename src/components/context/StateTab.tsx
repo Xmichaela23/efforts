@@ -11,6 +11,7 @@ import { formatLocalDate } from '@/lib/dateUtils';
 // instead. See SPEC-strength-language, Step 2.
 import { capabilitiesForExercise } from '@/lib/exercise-role';
 import LoadBar from '@/components/LoadBar';
+import { formZone } from '@shared/fitness-fatigue';
 import { supabase, getStoredUserId, invokeFunctionFormData, invokeFunction } from '@/lib/supabase';
 import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 import CourseStrategyModal from '@/components/CourseStrategyModal';
@@ -22,8 +23,6 @@ import { shouldShowNudge } from '@/lib/nudge-policy';
 import StatePerformanceSection from '@/components/context/StatePerformanceSection';
 import StateHubTabs, { type StateLens } from '@/components/context/StateHubTabs';
 import StateAdjustLens from '@/components/context/StateAdjustLens';
-import { buildLoadHeadline, statusVolumeLabel } from '@/lib/load-headline';
-import { loadRead } from '@/lib/load-read';
 import { readoutPlateStyle } from '@/lib/readout-plate';
 import { useSwimBaselineNudge } from '@/hooks/useSwimBaselineNudge';
 import { useAppContext } from '@/contexts/AppContext';
@@ -661,22 +660,12 @@ export default function StateTab({
   // ⚠️ buildLoadHeadline itself stays plan-blind (it is shared with the server printer, 27-function
   // closure); the gate lives HERE, at the one call site, keyed off the shared decision, not a second
   // copy of the rule. The server-side alignment of the function is filed as a leftover.
-  const loadReadForHeadline = loadRead(
-    loadStatus?.status,
-    week.intent === 'taper' || week.intent === 'peak' || week.intent === 'test',
-    wsv.plan.has_active_plan === true,
-    weekExecTotals.planned,
-    weekExecTotals.done,
-  );
-  const loadHeadline = loadReadForHeadline?.kind === 'condition'
-    ? buildLoadHeadline({
-        loadLabel: statusVolumeLabel(loadStatus?.status),
-        readinessState: readiness,
-        readinessLabel, // D-232: refined chip label wins so the headline can't contradict the chip
-        fitnessDirection: (trends as any).fitness_direction,
-        isTaperOrPeak: week.intent === 'taper' || week.intent === 'peak',
-        acwr: load.acwr, // D-268 Phase 5: "headroom" only when load is genuinely light (server-computed acwr)
-      })
+  // ⛔ THE GLANCE HEADLINE READS TRAININGPEAKS' FORM, NOT THE APP'S LOAD WORD (2026-09-04, one truth with the
+  // LOAD line below it). It speaks only in Friel's "high risk" zone (form under −30); otherwise nothing.
+  // `loadRead` / `buildLoadHeadline` (the reconciled status → "Load a bit high") are no longer called here.
+  const formNow = load?.fitness_fatigue?.form ?? null;
+  const loadHeadline = formZone(formNow) === 'high risk' && formNow != null
+    ? `Form ${Math.round(formNow)} — high risk (TrainingPeaks)`
     : null;
 
 

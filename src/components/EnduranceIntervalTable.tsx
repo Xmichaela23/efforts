@@ -572,6 +572,8 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
   // D-166 refinement: render the discipline trend INSIDE the card (was orphaned between header + card).
   const dt = (sd as any)?.discipline_trend;
   const trendNode = (() => {
+    // ⛔ REMOVED 2026-09-04 (one reference per metric): the 28/28 discipline verdict is off every athlete surface.
+    if (dt) return null;
     if (!dt?.verdict) return null;
     const VERD: Record<string, { w: string; c: string; a: string }> = {
       improving: { w: 'improving', c: 'text-emerald-400', a: '↑' },

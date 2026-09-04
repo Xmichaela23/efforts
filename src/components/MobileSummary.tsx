@@ -18,6 +18,11 @@ import AppleHealthSwimEnrichment from './AppleHealthSwimEnrichment';
 // screen and coach read). The per-session screen shows the discipline's trend context without
 // re-deriving it. needs_data renders as an honest "building" state, never a false direction.
 function DisciplineTrendLine({ sd }: { sd: any }) {
+  // ⛔ REMOVED 2026-09-04 (one reference per metric): `discipline_trend` is the Garmin 28/28 verdict, which State
+  // no longer prints; the session screen may not print it either. The field stays on the contract, unread.
+  void sd;
+  return null;
+  // eslint-disable-next-line no-unreachable
   const dt = sd?.discipline_trend;
   if (!dt) return null;
   const VERD: Record<string, { w: string; c: string; a: string }> = {

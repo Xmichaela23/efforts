@@ -101,7 +101,7 @@ export function identifyPerformanceLimiter(input: LimiterInput): { primary: Limi
       if (prev != null && prev > 50) evidence.push(`Yesterday workload ${Math.round(prev)}`);
       const week = coerceNumber(input.training_load?.week_load_pct);
       if (week != null && week > 110) evidence.push(`Week at ${Math.round(week)}% of planned load`);
-      if (acwr != null && acwr > 1.3) evidence.push(`ACWR ${acwr.toFixed(2)} (elevated)`);
+      // 2026-09-04: no ACWR evidence — the ratio is off every athlete-facing sentence (State prints TrainingPeaks' form)
 
       const paceNorm = coerceNumber(input.pace_normalized_drift_bpm);
       const rawDrift = coerceNumber(input.hr_drift_bpm);

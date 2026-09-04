@@ -415,3 +415,4 @@ Plus: **`START-HERE.md`** (the one-page onboarding — read it first) and **`LIF
 | **Strength workload = Friel RPE estimate** | `_shared/workload.ts calculateStrengthWorkload / calculatePlannedStrengthWorkload / strengthSessionRpe` | PUSHED to branch. Stored rows on the old tonnage scale until `backfill-strength-load` |
 | **FTP estimate = CP fit alone** | `src/lib/bike-ftp-estimator.ts compoundFtp`, `learn-fitness-profile` STEP 5 | PUSHED to branch. Ceiling and 5% cap deleted; intervals.icu model unverified (Q-298) |
 | BODY block (effort / soreness) | — | REMOVED from State 2026-09-04; server rows still feed the coach |
+| **Coach load + trend copy = the same truth as State** | `coach/index.ts buildVerdict` (reads `metrics.form`), `training_state`, `narrativeFacts`; `fitness_direction` null | PUSHED to branch (D-466 addendum). ACWR and the 28/28 verdicts are computed but never spoken; do not re-wire a sentence to either |

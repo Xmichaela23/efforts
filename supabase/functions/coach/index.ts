@@ -41,7 +41,7 @@ import { offPlanAdherenceBanner, offPlanAdherenceResult } from '../_shared/off-p
 import { composeCoachWeekInsight } from '../_shared/insights/coach-week-insights.ts';
 import { composeCoachEye } from '../_shared/insights/cross-training-read.ts';
 import { computePerDomainLoad, type SliceSession } from '../_shared/per-domain-load.ts';
-import { computeFitnessFatigue } from '../_shared/fitness-fatigue.ts';
+import { computeFitnessFatigue, formZone } from '../_shared/fitness-fatigue.ts';
 import { assessAbsorption, steadyGate } from '../_shared/absorption.ts';
 import { computeSafetyFloor, resolvePlanPrimary, computePrimaryAdherence, resolvePrimarySport } from '../_shared/load-status-reconcile.ts';
 // Slice 1: the readiness tree, extracted from this file so it can be fixtured and so it reads the one
@@ -767,23 +767,23 @@ function buildVerdict(
   isPlanTransitionPeriod: boolean = false,
 ): { code: WeekVerdictCode; label: string; confidence: number; reason_codes: string[]; next: { code: NextActionCode; title: string; details: string } } {
   const reason_codes: string[] = [];
-  const acwr = metrics.acwr;
+  // ⛔ ONE TRUTH WITH STATE (2026-09-04, Michael): the week verdict reads TrainingPeaks' Form (TSB) — the
+  // number the State LOAD line prints — not ACWR. Friel's zones: below −30 is "high risk" (the only zone
+  // that reads as a warning); everything else is the athlete's call. The methodology `warn_acwr` /
+  // `high_acwr` thresholds are UNREAD from here on (left in the published config shape, like
+  // `min_execution_score_ok` below). The plan-transition suppression went with the ratio it protected.
+  const form = metrics.form;
+  const zone = formZone(form);
   const completion = metrics.wtd_completion_ratio;
-  // Early weeks of a new plan: the 7-day acute window overlaps with the final
-  // days of the previous training cycle, making ACWR unreliable. Suppress
-  // ACWR-only caution unless the ratio is critically high or execution is poor.
-  const isPlanWeek1 = isPlanTransitionPeriod;
   const methodology = getMethodology(methodologyId);
   const t = methodology.thresholds(ctx);
-  const warn = t.warn_acwr;
-  const high = t.high_acwr;
 
-  if (acwr == null) {
+  if (form == null) {
     return {
       code: 'insufficient_data',
       label: 'Not enough data yet',
       confidence: 0.4,
-      reason_codes: ['missing_acwr'],
+      reason_codes: ['missing_form'],
       next: {
         code: 'insufficient_data',
         title: 'Log a few sessions first',
@@ -792,8 +792,8 @@ function buildVerdict(
     };
   }
 
-  if (acwr >= high) {
-    reason_codes.push('acwr_high');
+  if (zone === 'high risk') {
+    reason_codes.push('form_high_risk');
     return {
       code: 'recover_overreaching',
       label: 'Recover',
@@ -831,20 +831,8 @@ function buildVerdict(
   // `min_execution_score_ok` remains in the methodology configs, now unread — flagged for the cleanup
   // sweep rather than removed here, since it is part of a published config shape.
 
-  if (acwr >= warn && !isPlanWeek1) {
-    reason_codes.push('acwr_elevated');
-    return {
-      code: 'caution_ramping_fast',
-      label: 'Caution',
-      confidence: 0.7,
-      reason_codes,
-      next: {
-        code: 'swap_quality_for_easy',
-        title: 'If needed, swap intensity for easy volume',
-        details: 'Keep the week moving forward without digging a deeper hole.',
-      },
-    };
-  }
+  // (There is no "elevated" zone in the PMC between optimal and high risk — the caution_ramping_fast
+  // branch that ACWR ≥ warn used to return is gone with it.)
 
   // Under-target is methodology-controlled (and often disabled for taper/recovery).
   if (t.under_target_completion_ratio != null && completion != null && completion < t.under_target_completion_ratio) {
@@ -878,7 +866,7 @@ function buildVerdict(
     };
   }
 
-  // In taper/recovery weeks, default next action leans conservative unless overridden by ACWR logic above.
+  // In taper/recovery weeks, default next action leans conservative unless overridden by the form read above.
   if (ctx.week_intent === 'recovery' || ctx.week_intent === 'taper') {
     return {
       code: 'on_track',
@@ -897,7 +885,7 @@ function buildVerdict(
     code: 'on_track',
     label: 'On track',
     confidence: 0.75,
-    reason_codes: ['acwr_ok'],
+    reason_codes: ['form_ok'],
     next: {
       code: 'proceed_as_planned',
       title: 'Proceed as planned',
@@ -2380,14 +2368,9 @@ Deno.serve(async (req) => {
       const out: Record<string, 'improving' | 'declining' | 'stable'> = {};
       try {
         const pl = latestSnapshot?.state_trends_v1?.strength?.per_lift;
-        if (Array.isArray(pl)) {
-          for (const l of pl) {
-            if (l?.direction === 'improving') out[l.canonical] = 'improving';
-            else if (l?.direction === 'sliding') out[l.canonical] = 'declining';
-            else if (l?.direction === 'holding') out[l.canonical] = 'stable';
-            // needs_data → omit (fall back to old behavior for that lift)
-          }
-        }
+        // 2026-09-04: the per-lift 28/28 direction is NOT read (one truth with State, which prints e1RM with no
+        // arrow, D-420). The map stays empty so every lift falls back to the response model's own read.
+        void pl;
       } catch {}
       return out;
     })();
@@ -2614,7 +2597,7 @@ Deno.serve(async (req) => {
       norms: responseModelNorms,
       lifts: liftSnapshots,
       crossDomainPairs,
-      acwr: acwrEarly,
+      acwr: null, // 2026-09-04: ACWR is withdrawn from every athlete-facing read (one truth with State's PMC); `acwr_status` reads 'unknown'
       weekVsPlanPct: wtdCompletionRatio != null ? Math.round(wtdCompletionRatio * 100) : null,
       // Slice 1: the two athlete-owned load facts the overload verdict is minted from.
       actualVsPlannedPct: loadVsPlanPct,
@@ -2988,7 +2971,8 @@ Deno.serve(async (req) => {
       wtd_completion_ratio: wtdCompletionRatio,
       acute7_actual_load: completedRolling.length ? acute7Load : null,
       chronic28_actual_load: completedRolling.length ? chronic28Load : null,
-      acwr,
+      acwr, // data only — no athlete-facing sentence reads it since 2026-09-04
+      form: fitnessFatigue.form, // TrainingPeaks' TSB — what the week verdict and every load sentence read now
     };
 
     const v = buildVerdict(metrics, methodologyId, methodologyCtx, reaction, isPlanTransitionPeriod);
@@ -3018,7 +3002,8 @@ Deno.serve(async (req) => {
       const kicker = `${intentLabel} • Response vs baseline`;
       const conf = rm.assessment.confidence === 'high' ? 0.85 : rm.assessment.confidence === 'medium' ? 0.65 : 0.4;
       const baseline_days = 28;
-      const load_ramp_acwr = metrics.acwr;
+      const load_ramp_acwr = null; // ACWR is off every athlete-facing surface (2026-09-04); the field stays null for old clients
+      const formZoneWord = formZone(metrics.form);
       const load_ramp = {
         acute7_total_load: completedRolling.length ? Math.round(acute7Load) : null,
         chronic28_total_load: completedRolling.length ? Math.round(chronic28Load) : null,
@@ -3081,20 +3066,17 @@ Deno.serve(async (req) => {
         };
       }
 
-      // Title and kicker must match the bar — both derived from the same ACWR value
+      // Title and kicker read the SAME number the State LOAD line prints — TrainingPeaks' Form and Friel's
+      // zone word (2026-09-04, one truth). No ACWR bands.
       const okTitle = (() => {
         if (weekIntent === 'recovery' || weekIntent === 'taper') return 'Recovery week';
-        if (load_ramp_acwr == null) return 'On Track';
-        if (load_ramp_acwr < 0.8) return 'Light week';
-        if (load_ramp_acwr <= 1.3) return 'On Track';
-        return 'High load'; // >1.3 but not caught by overreaching branch
+        if (!formZoneWord) return 'On Track';
+        return formZoneWord.charAt(0).toUpperCase() + formZoneWord.slice(1); // Fresh · Optimal · Grey zone · Transitional · High risk
       })();
       const okKicker = (() => {
         if (weekIntent === 'recovery' || weekIntent === 'taper') return `Recovery • ${intentLabel}`;
-        if (load_ramp_acwr == null) return kicker;
-        if (load_ramp_acwr < 0.8) return 'Light week — room to push';
-        if (load_ramp_acwr <= 1.3) return 'Building well — stay the course';
-        return 'Load is high — protect recovery';
+        if (!formZoneWord || metrics.form == null) return kicker;
+        return `Form ${metrics.form > 0 ? '+' : ''}${Math.round(metrics.form)} — ${formZoneWord} (TrainingPeaks)`;
       })();
       return {
         code: 'strain_ok' as const,
@@ -3126,8 +3108,12 @@ Deno.serve(async (req) => {
     // Q-162: the composite is only as confident as its inputs — a provisional (thin/clustered)
     // discipline can't ASSERT the headline direction; thinHeldOut names any mover we held out so the
     // narrative can be honest about the gap instead of the headline silently reading 'stable'.
+    // ⛔ 2026-09-04 (one truth with State): State prints per-workout numbers and NO direction; the Garmin 28/28
+    // verdicts (`state-trend/classify.ts`) are not spoken by the coach either. `fitness_direction` is null —
+    // the narrative core treats an empty direction as "no claim" (adapters/coach.ts). `rollupFitness` still
+    // exists for its `thinHeldOut` receipt; its direction is not read.
     const fitnessRollup = rollupFitness(latestSnapshot?.state_trends_v1);
-    const fitnessDirection: FitnessDirection = fitnessRollup.direction;
+    const fitnessDirection: FitnessDirection | null = null;
 
     // Q-111 §2: the ~6–8wk strength-movement history (5–56d back — excludes the recent trigger window so a
     // session isn't its own baseline), for the novel-movement fact (one detection, two surfaces). Distinct
@@ -3185,9 +3171,9 @@ Deno.serve(async (req) => {
       const rm = weeklyResponseModel;
       const e = rm.endurance;
       const effortUp = e.rpe.sufficient && e.rpe.trend === 'declining' && e.rpe.current_avg != null && e.rpe.baseline_avg != null;
-      const acwr = metrics.acwr;
-      const systemic = (acwr != null && acwr >= 1.2) || rm.assessment.signals_concerning >= 2;
-      const loadLabel = (acwr != null && acwr >= 1.2) ? `load elevated (ACWR ${acwr.toFixed(2)})` : 'load balanced';
+      const zoneWord = formZone(metrics.form);
+      const systemic = zoneWord === 'high risk' || rm.assessment.signals_concerning >= 2;
+      const loadLabel = zoneWord === 'high risk' && metrics.form != null ? `form ${Math.round(metrics.form)} (high risk)` : ''; // empty = nothing to add
       const daysAgo = (iso: string) => (parseISODateOnly(asOfDate).getTime() - parseISODateOnly(iso).getTime()) / 86400000;
 
       // Most recent LOWER-BODY strength session within 4 days (logged day + session RPE + its exercises).
@@ -3888,7 +3874,7 @@ Deno.serve(async (req) => {
             planPrimary,
             primaryAdherence,
           },
-          acwr ?? null,
+          null, // ACWR withdrawn (2026-09-04): the reconciler's cross-training-spike escalation no longer fires off the ratio
           keysNext48h,
           {
             count: unplannedWorkouts.length,
@@ -3896,7 +3882,7 @@ Deno.serve(async (req) => {
             plannedWeekLoad: plannedWtdLoad || 0,
           },
           snapshotBody.load_status.run_only_week_load_pct ?? null,
-          disciplineProfiles.map(p => ({ discipline: p.discipline, maturity: p.maturity, acwr: p.acwr })),
+          disciplineProfiles.map(p => ({ discipline: p.discipline, maturity: p.maturity, acwr: null })),
           isSpikeOnEmptyBase,
           absorption.corroborated_strain, // Item 3 (D-265): the two-key cap — ESCALATION path (separate from the BODY row)
           _driftUsable, // D-318: HR-drift-as-strain obeys the absorption steady-aerobic gate
@@ -3975,7 +3961,7 @@ Deno.serve(async (req) => {
         const rqTrend = snapshotBody?.weekly_trends?.run_quality;
         if (rqTrend?.trend === 'declining' && (rqTrend?.based_on_sessions ?? 0) >= 2) return true;
         const raceWeeksOut = goalContext.upcoming_races?.[0]?.weeks_out;
-        if (raceWeeksOut != null && raceWeeksOut <= 3 && acwr != null && acwr > 1.3) return true;
+        if (raceWeeksOut != null && raceWeeksOut <= 3 && formZone(fitnessFatigue.form) === 'high risk') return true;
         return false;
       })();
 
@@ -4998,43 +4984,29 @@ Deno.serve(async (req) => {
           );
         }
 
-        // ACWR
-        if (metrics.acwr != null) {
-          const acwrStatus = getAcwrStatus(metrics.acwr, activePlan ? {
-            hasActivePlan: true,
-            weekIntent: weekIntent as any,
-            isRecoveryWeek: weekIntent === 'recovery',
-            isTaperWeek: weekIntent === 'taper',
-          } : null);
-          const acwrRisk = getAcwrRiskFlag(metrics.acwr, isPlanTransitionPeriod);
-          const acwrLabel = isPlanTransitionPeriod
-            ? 'in plan transition (includes prior training cycle — ignore this ratio)'
-            : acwrStatus === 'undertrained'
-              ? 'under-reached'
-              : acwrStatus === 'optimal' || acwrStatus === 'optimal_recovery'
-                ? (acwrStatus === 'optimal_recovery' ? 'planned recovery zone' : 'in the optimal zone')
-                : acwrRisk === 'overreaching'
-                  ? 'overreaching'
-                  : acwrRisk === 'fast'
-                    ? 'ramping fast'
-                    : 'in the optimal zone';
-          narrativeFacts.push(`Training volume ratio (this week vs last 4 weeks): ${metrics.acwr.toFixed(2)} — ${acwrLabel}.`);
+        // LOAD — TrainingPeaks' Performance Management Chart, the SAME three numbers the State LOAD line prints
+        // (2026-09-04, one truth; ACWR and its zone words are gone from every athlete-facing sentence).
+        if (fitnessFatigue.fitness != null && fitnessFatigue.form != null) {
+          const zoneWord = formZone(fitnessFatigue.form);
+          narrativeFacts.push(`Load (TrainingPeaks PMC): fitness ${Math.round(fitnessFatigue.fitness)} (42-day), fatigue ${Math.round(fitnessFatigue.fatigue ?? 0)} (7-day), form ${fitnessFatigue.form > 0 ? '+' : ''}${Math.round(fitnessFatigue.form)}${zoneWord ? ` — ${zoneWord}` : ''}. Zones: above +25 transitional, +5 to +25 fresh, −10 to +5 grey zone, −30 to −10 optimal, below −30 high risk. Never say ACWR.`);
 
           // Taper/race-proximity ACWR reframe — the LLM must not normalize 1.0+ as "fine" during taper
           if ((weekIntent === 'taper' || weekIntent === 'peak') && goalContext.primary_event) {
             const raceWkOut = goalContext.upcoming_races.find(r => r.name === goalContext.primary_event!.name)?.weeks_out ?? null;
             const raceName_ = goalContext.primary_event.name;
             if (raceWkOut != null && raceWkOut <= 21) {
-              const acwrVal = metrics.acwr ?? null;
-              const acwrNote = acwrVal != null
-                ? (acwrVal >= 1.1
-                  ? `ACWR ${acwrVal.toFixed(2)} means last week's load is still in the system — this is not "optimal" during taper, it means the unloading hasn't fully happened yet.`
-                  : acwrVal < 0.85
-                  ? `ACWR ${acwrVal.toFixed(2)} — load has dropped well, the body is freshening.`
-                  : `ACWR ${acwrVal.toFixed(2)} — load is coming down appropriately.`)
+              // Friel: race day belongs in the fresh zone (+5 to +25). Form still negative in a taper means the
+              // unloading has not happened yet — said in the PMC's own terms, never ACWR.
+              const formVal = fitnessFatigue.form ?? null;
+              const acwrNote = formVal != null
+                ? (formVal < -10
+                  ? `Form ${Math.round(formVal)} is still negative — the unloading hasn't fully happened yet; race day belongs in the fresh zone (+5 to +25).`
+                  : formVal >= 5
+                  ? `Form +${Math.round(formVal)} is in the fresh zone — the taper is landing.`
+                  : `Form ${formVal > 0 ? '+' : ''}${Math.round(formVal)} is coming up toward the fresh zone.`)
                 : '';
               // Surface recent key sessions (up to 3 from acute7 window) so the LLM
-              // knows what drove the ACWR — e.g. yesterday's long run.
+              // knows what drove the fatigue — e.g. yesterday's long run.
               const recentSessions = (training_state.load_ramp.top_sessions_acute7 || []).slice(0, 3);
               const recentLine = recentSessions.length > 0
                 ? ` Recent sessions driving this load: ${recentSessions.map((s: any) => `${s.date} ${s.type}${s.name ? ` "${s.name}"` : ''} (${Math.round(s.workload_actual)} pts)`).join(', ')}.`
@@ -5341,13 +5313,10 @@ ${narrativeFacts.join('\n')}`;
           // while a discipline is sliding (e.g. the AERO "durability gap" row the athlete sees right
           // below the headline). Derived from the SAME spine verdicts the rows render → one source,
           // the headline can't contradict its own screen. Was hardcoded [] → rule 2 could never fire.
-          const atypicalFromSpine = spineVerdicts
-            .filter((v) => v.verdict === 'sliding')
-            .map((v) => ({
-              signal: `${v.discipline} fitness`,
-              state: 'sliding',
-              detail: v.pctChange != null ? `${v.pctChange > 0 ? '+' : ''}${v.pctChange}%` : undefined,
-            }));
+          // 2026-09-04: no 28/28 "sliding" is fed to the headline guard — the coach makes no direction claim
+          // (one truth with State, which prints the number and the line). `spineVerdicts` is unused by design.
+          void spineVerdicts;
+          const atypicalFromSpine: Array<{ signal: string; state: string; detail?: string }> = [];
           const coachCtx: NarrativeContext = {
             notableLeadSignals: [], atypicalSignals: atypicalFromSpine, anchors: {},
             hasTrendField: true, hasFitnessTrend: true, establishedCauses: [],
@@ -5541,7 +5510,7 @@ ${narrativeFacts.join('\n')}`;
         }
       }
 
-      const mr = await computeMarathonReadiness(userId, asOfDate, acwr ?? null, supabase, planCtx);
+      const mr = await computeMarathonReadiness(userId, asOfDate, null /* ACWR withdrawn from copy, 2026-09-04 */, supabase, planCtx);
       marathon_readiness = mr ?? undefined;
       // When athlete says they're sick/injured and readiness is needs_work, add a recovery-focused note
       if (marathon_readiness?.summary === 'needs_work' && athleteContextStr) {
@@ -5561,7 +5530,7 @@ ${narrativeFacts.join('\n')}`;
       { code: 'week_window', label: 'Week window', value: `${weekStartDate} → ${weekEndDate}` },
       { code: 'wtd_load', label: 'Week-to-date load', value: Math.round(actualWtdLoad), unit: 'pts' },
       { code: 'wtd_vs_plan', label: 'WTD vs planned', value: plannedWtdLoad > 0 ? `${Math.round((wtdCompletionRatio || 0) * 100)}%` : '—' },
-      { code: 'acwr', label: 'ACWR', value: acwr != null ? Number(acwr.toFixed(2)) : '—' },
+      { code: 'form', label: 'Form (TSB)', value: fitnessFatigue.form != null ? Math.round(fitnessFatigue.form) : '—' },
       { code: 'remaining_plan_load', label: 'Remaining planned load', value: Math.round(plannedRemainingLoad), unit: 'pts' },
     ];
 
@@ -5588,7 +5557,7 @@ ${narrativeFacts.join('\n')}`;
         : null,
       keySessionGapsDetails: reaction.key_session_gaps_details ?? [],
       keySessionsRemaining,
-      runningAcwr: runningAcwr,
+      runningAcwr: null, // ACWR withdrawn from every athlete-facing sentence (2026-09-04, one truth with State's PMC)
     });
 
     // ── STATE "how your sessions went" → neutral per-discipline counts + at most ONE accent.
@@ -5681,7 +5650,7 @@ ${narrativeFacts.join('\n')}`;
       const anchorDescent = anchorDescentCandidate({
         agedOutMonth: descentSignal?.agedOutMonth ?? null,
         aerobicCarriers,
-        creditSupported: aerobicCarriers.length > 0 && hrResp.verdict !== 'sliding',
+        creditSupported: aerobicCarriers.length > 0, // 2026-09-04: the 28/28 heart-rate verdict no longer gates this
       });
 
       // UPKEEP READ (D-297, docs/SCIENCE-upkeep-maintenance.md): DISCIPLINE-AGNOSTIC. Loop over WHATEVER
@@ -5739,7 +5708,7 @@ ${narrativeFacts.join('\n')}`;
       // (systemic load+body), RIR (strength grinding), and the banner's positive/behind reads. The
       // banner's 'carried' branch is also dropped — the coach's eye owns "aerobic held by other work".
       const accent: WeekAccent | null = composeWeekAccent([
-        overReachCandidate({ loadStatus: lsX?.status, readiness: readinessForLoad, runningAcwr: lsX?.acwr }), // D-416: systemic-only readiness
+        overReachCandidate({ loadStatus: lsX?.status, readiness: readinessForLoad, runningAcwr: null /* ACWR withdrawn, 2026-09-04 */ }), // D-416: systemic-only readiness
         leverCandidate(),
         anchorDescent,
         rirCandidate({ actualRir: rirActual, targetRir: rirTarget, sampleSize: rirN }),
@@ -5902,13 +5871,7 @@ ${narrativeFacts.join('\n')}`;
         acwr: acwr ?? null,
         acwr_provisional: (athleteSnapshot?.body_response?.load_status as any)?.acwr_provisional ?? false, // thin-base ratio → render "· provisional"
         overload: overloadVerdict, // Slice 1: THE verdict + its receipt, so a surface can show WHY without re-deciding
-        label: (() => {
-          if (acwr == null) return null;
-          if (acwr < 0.8) return 'build more';
-          if (acwr <= 1.3) return 'balanced';
-          if (acwr <= 1.5) return 'back off';
-          return 'rest now';
-        })(),
+        label: formZone(fitnessFatigue.form), // Friel's Form zone word — the same word the State LOAD line prints (2026-09-04); the ACWR bands are gone
         running_acwr: runningAcwr,
         cycling_acwr: cyclingAcwr,
         per_domain: perDomain, // D-263 bs3: strength/hard_cardio/easy_cardio slices (Q-140 input + Item-4 provenance)

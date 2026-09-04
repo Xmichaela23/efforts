@@ -1761,3 +1761,37 @@ been a guess).
 open State: LOAD reads three numbers and a zone word; the run row reads "aerobic efficiency 1.xxx · Sep N run"
 with no arrow; the open card's drift line names one session; no BODY block. Then recompute fitness by hand from
 `workouts.workload_actual` for one athlete and compare.
+
+### D-466 addendum — the coach reads the same truth (2026-09-04, later the same evening, Michael: "State and coach must read one truth")
+
+**Every athlete-facing sentence the coach builds from ACWR or from the Garmin 28/28 verdicts is gone in the same
+change, not deferred.** Traced from `coach/index.ts` outward (`docs` of the trace: this entry).
+
+- **Week verdict** (`buildVerdict`) reads TrainingPeaks' Form (TSB, `metrics.form`), not ACWR: "high risk"
+  (form below −30, Friel) → Recover; else the completion / key-session / recovery-week branches as before.
+  The `caution_ramping_fast` branch (ACWR ≥ warn) is gone with the ratio; the methodology `warn_acwr` /
+  `high_acwr` thresholds are unread.
+- **Training state title + kicker** are the Form zone word and "Form −12 — optimal (TrainingPeaks)";
+  `load_ramp_acwr` is null. **`load.label`** is the zone word. **Evidence receipt** `acwr` → `form`.
+  **Narrative facts** carry fitness / fatigue / form + the five zones and the instruction "Never say ACWR";
+  the taper note speaks in form ("race day belongs in the fresh zone, +5 to +25").
+- **Withdrawn as an input** (null passed): the weekly response model (`acwr_status` reads 'unknown'; the
+  readiness word can no longer be minted from the ratio), the marathon-readiness load item, the reconciler's
+  cross-training-spike escalation, `overReachCandidate` / the week accent ("Load is running 1.4× …" cannot
+  print), the fact-packet limiter's "ACWR 1.42 (elevated)" evidence, `build-coaching-context`'s ACWR lines.
+  The reconciler's interpretation strings no longer name the ratio.
+- **No direction claim anywhere:** `fitness_direction` is null (the narrative core reads an empty direction
+  as "no claim"), the "sliding" atypical-signal feed is empty, the per-lift 28/28 direction map is empty, the
+  heart-rate verdict no longer gates the anchor descent. `readiness-receipts` / `loaded-legs` take an empty
+  load label as "nothing to add" — the "· load balanced" tail is gone.
+- **Client, the same sweep:** the State dot blocks (`FitnessDotBlock`, `Signal`, `DisciplineRow`) print the
+  label, the dot and the evidence count — no verdict word, arrow or percent. The session screen's
+  "discipline trend ↑ improving" chip (`MobileSummary`, `EnduranceIntervalTable`) is removed. The State
+  glance headline no longer prints the reconciled load word; it speaks only in Friel's high-risk zone.
+- **Still computed, nowhere spoken:** `state-trend/classify.ts` (28/28), `_shared/acwr.ts`, the
+  `load.acwr` / `running_acwr` payload fields, `discipline_trend` on the session contract,
+  `LoadContext.acwr_status`. Data, not copy. If the next session wants them deleted, that is a payload-shape
+  change with its own version bump.
+
+Tests: 223 green across `load-status-reconcile`, `response-model/`, `week-accent`, `fact-packet/`,
+`fitness-fatigue`; client build clean.
