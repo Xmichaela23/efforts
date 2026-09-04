@@ -1539,6 +1539,34 @@ serve(async (req: Request) => {
         .maybeSingle();
       planned = (pw as PlannedRow | null) ?? null;
     }
+    // ⛔ THE PLAN'S WORD LIVES ON THE WORKOUT, NOT ONLY ON THE PLANNED ROW (2026-09-04, Michael: "every part of
+    // this screen should be reacting to a plan"). A replaced or deleted plan takes its planned rows with it, and
+    // a session the athlete was prescribed is left as an anonymous recording — the Aug 28 interval run read as
+    // "steady" with no plan to say otherwise. So: when the planned row is in hand, its identity is stamped onto
+    // the workout (`workout_metadata.plan_tags`), and when it is gone, the stamp stands in for it here.
+    const stampedPlan: PlannedRow | null = (() => {
+      const pt = (w.workout_metadata as any)?.plan_tags;
+      if (!pt || typeof pt !== 'object') return null;
+      return { id: String(pt.planned_id ?? ''), training_plan_id: pt.training_plan_id ?? null, week_number: pt.week_number ?? null,
+        type: pt.type ?? null, name: pt.name ?? null, description: pt.description ?? null, tags: Array.isArray(pt.tags) ? pt.tags : [],
+        intervals: null, strength_exercises: null, steps_preset: Array.isArray(pt.steps_preset) ? pt.steps_preset : null, workload_planned: null, computed: null } as unknown as PlannedRow;
+    })();
+    if (!planned && stampedPlan) planned = stampedPlan;
+    if (planned && w.planned_id && String((planned as any).id) === String(w.planned_id)) {
+      try {
+        const stamp = {
+          planned_id: String(w.planned_id), training_plan_id: (planned as any).training_plan_id ?? null, week_number: (planned as any).week_number ?? null,
+          type: (planned as any).type ?? null, name: (planned as any).name ?? null, description: (planned as any).description ?? null,
+          tags: Array.isArray((planned as any).tags) ? (planned as any).tags : [], steps_preset: Array.isArray((planned as any).steps_preset) ? (planned as any).steps_preset : null,
+          stamped_at: new Date().toISOString(),
+        };
+        const prev = (w.workout_metadata as any)?.plan_tags;
+        if (JSON.stringify({ ...prev, stamped_at: null }) !== JSON.stringify({ ...stamp, stamped_at: null })) {
+          await supabase.from("workouts").update({ workout_metadata: { ...(w.workout_metadata ?? {}), plan_tags: stamp } }).eq("id", w.id);
+          w.workout_metadata = { ...(w.workout_metadata ?? {}), plan_tags: stamp };
+        }
+      } catch { /* the stamp is a copy; facts proceed on the live planned row */ }
+    }
 
     // -----------------------------------------------------------------------
     // 4. Determine discipline

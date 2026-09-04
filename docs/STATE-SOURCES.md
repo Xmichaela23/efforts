@@ -32,6 +32,8 @@ stated and it is a decision Michael can reverse.
 
 | Heat note on the run and ride cards, shown when a session in the window was ≥ 72°F | `StrengthReadCards.tsx` | FIELD — 72°F / 22°C is Garmin's heat-correction cut-off; TrainingPeaks applies no correction; Friel: compare like with like. The sentence is fixed text, not generated. |
 
+| Which session a run was (easy / long / interval) | `compute-facts classifyRunIntent` | The plan's own tag on the planned session, stamped onto the workout (`workout_metadata.plan_tags`) so it survives a plan rebuild; no plan word → grouped as easy, no inference. Michael, 2026-09-02/04. |
+
 ## FTP
 
 | Number | Where | Source |
