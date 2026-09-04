@@ -4533,3 +4533,13 @@ with coasting minutes and above-threshold minutes removed; stop-and-go city ride
 standard error means what it says), and the power-curve signal carries the estimate when the HR read
 abstains. Unreviewed, not wrong.
 
+**Addendum, later 2026-09-04 — POWER ONLY.** Michael: *"I never want to hear the 15-minute window; just do
+what icu and TrainerRoad do."* The heart-rate-at-threshold read (Signal A) is removed from the FTP
+estimator, together with its per-ride heart-rate/power blocks and its 15-block floor (OURS). The estimate
+is the power-duration fit alone — what TrainerRoad's AI FTP Detection and intervals.icu's eFTP do, from
+power, with no steady-minutes rule — plus the 18-month ceiling and the ±5% rate limit. Consequence stated
+once and accepted: in the 18-month replay the curve fit had no answer from late May to late July 2026 (no
+hard efforts on the curve) and the heart-rate read carried the number through that stretch; with it gone,
+an easy stretch returns the fallback (95% of best 20-min) until a hard effort lands. Reference athlete
+today: unchanged, 167 W (the curve was already the read in use). `docs/STATE-SOURCES.md` updated.
+

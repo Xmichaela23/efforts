@@ -13,9 +13,9 @@ import { runEasyZone3FloorBpm } from '../_shared/easy-hr.ts';
 import { paceToGAP } from '../_shared/gap.ts'; // ONE canonical Grade-Adjusted Pace (Minetti) — no inline copy
 // The bike FTP estimator's two per-ride substrates: the widened power-curve durations and the
 // heart-rate/power minute-blocks. Pure, shared with the learner (docs/SPEC-ftp-estimator-2026-09-04.md).
-import { POWER_CURVE_DURATIONS, buildHrPowerBlocks, type HrPowerBlocks } from '../../../src/lib/bike-ftp-estimator.ts';
+import { POWER_CURVE_DURATIONS } from '../../../src/lib/bike-ftp-estimator.ts';
 
-const ANALYSIS_VERSION = 'v0.2.1'; // Ride: power curve widened to 12 durations + hr_power_blocks written (FTP estimator substrate)
+const ANALYSIS_VERSION = 'v0.2.2'; // Ride: power curve at 12 durations (FTP estimator substrate); hr_power_blocks no longer written (power-only FTP, 2026-09-04)
 
 
 function smoothEMA(values: (number|null)[], alpha = 0.25): (number|null)[] {
@@ -2065,27 +2065,12 @@ Deno.serve(async (req) => {
     let powerCurve: PowerCurve | null = null;
     let bestEfforts: BestEfforts | null = null;
     let paceCurve: RunPaceCurve | null = null;
-    let hrPowerBlocks: HrPowerBlocks | null = null;
     
     if (w.type === 'ride' || w.type === 'cycling' || w.type === 'bike') {
       // Calculate power curve for bikes
       powerCurve = calculatePowerCurve(power_watts, hr_bpm);
       if (powerCurve) {
         console.log(`⚡ Power curve saved for bike workout`);
-      }
-      /**
-       * ⛔ THE HEART-RATE/POWER BLOCKS — the substrate of the FTP estimator's Signal A (2026-09-04,
-       * docs/SPEC-ftp-estimator-2026-09-04.md). One (heart rate, power) pair per steady pedalled
-       * minute after the first ten. The LEARNER regresses them and reads the line at the athlete's
-       * threshold heart rate; this function cannot, because threshold heart rate is learned and moves.
-       *
-       * ⚠️ IT JUDGES NOTHING. Every ride with heart rate and power gets blocks, easy ones included —
-       * an easy ride informing the FTP is the whole point of the build. The gates (span, r², decoupling,
-       * extrapolation) live in the learner, where all the rides are in view at once.
-       */
-      hrPowerBlocks = buildHrPowerBlocks(time_s, hr_bpm, power_watts);
-      if (hrPowerBlocks) {
-        console.log(`⚡ HR/power blocks: ${hrPowerBlocks.hr.length} steady minutes`);
       }
     }
     
@@ -2123,9 +2108,6 @@ Deno.serve(async (req) => {
       power_curve: powerCurve,
       best_efforts: bestEfforts,
       pace_curve: paceCurve,
-      // Rides only; null on every other sport and on a ride with no HR or no power. The learner treats
-      // absent and null the same, so recomputing an old ride simply fills it in.
-      hr_power_blocks: hrPowerBlocks
     };
 
     console.log('📝 About to UPDATE:', {

@@ -38,15 +38,13 @@ import {
 } from '../_shared/athlete-identity-inference.ts';
 import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
 import { fitSwimCss } from '../_shared/swim/swim-css-learner.ts';
-// The compound bike FTP (docs/SPEC-ftp-estimator-2026-09-04.md): two open signals, guardrails, receipt.
+// The bike FTP estimator (docs/SPEC-ftp-estimator-2026-09-04.md): the power-duration fit, guardrails, receipt.
 import {
   bestPerDuration,
   compoundFtp,
-  estimateFtpFromHrPower,
   fitCriticalPower,
   rateLimitFtp,
   type CompoundFtp,
-  type RideForSignalA,
 } from '../../../src/lib/bike-ftp-estimator.ts';
 
 // Q-169: the ONE definition of "is this heartbeat easy" — threshold-anchored (Friel Z2), %max-bootstrapped.
@@ -1474,49 +1472,23 @@ export function analyzeRides(
   }
 
   // ==========================================================================
-  // STEP 5: THE FTP ESTIMATOR — two open signals, guardrails, receipt
+  // STEP 5: THE FTP ESTIMATOR — the power-duration fit, guardrails, receipt
   // (docs/SPEC-ftp-estimator-2026-09-04.md; maths in src/lib/bike-ftp-estimator.ts)
   //
   // ⛔ WHY IT REPLACED STEP 4. "95% × the single best 20-minute effort in the window" can only report
   // what the athlete already produced: a season of easy riding has no qualifying effort and the number
-  // sags, not because fitness fell but because nothing measured it. Signal A reads the
-  // heart-rate-to-power line of EVERY ride, easy ones included, at the learned threshold heart rate;
-  // Signal B fits the critical-power curve to the best effort at each 2-20 min duration — the read
-  // TrainerRoad, Xert, intervals.icu and WKO all make, since an app never gets a test, only rides.
-  //
-  // Back-run over the reference athlete's 18 months (2026-09-04): STEP 4 abstained May-July and fell
-  // to 157 in mid-August; this held 166-176 through the same easy block and reads 167 (high) today,
-  // the two signals agreeing independently (B 167, A 169). Over the last month the two methods track
-  // within 2 W; the difference is the long easy stretch, which is the case the estimator exists for.
+  // sags, not because fitness fell but because nothing measured it. This fits the critical-power curve
+  // to the best effort at each 2-20 min duration across the window — the read TrainerRoad's AI FTP
+  // Detection and intervals.icu's eFTP make, from power alone. ⛔ POWER ONLY (2026-09-04, Michael:
+  // "just do what intervals.icu and TrainerRoad do"): a heart-rate-at-threshold read was built beside
+  // it and removed the same night.
   //
   // When this produces a value it IS `ftp_estimated`; STEP 4's value survives only when this abstains.
   // ==========================================================================
   let ftp_compound: CompoundFtp | null = null;
   {
-    // The threshold heart rate the line is read at. The fresh learn first; the prior learned value
-    // when this learn produced none. A fabricated one (`is_estimate`, 90% of max) is still a heart
-    // rate the line can be read at, but the read cannot be worth more than the anchor: cap at low.
-    const thrFresh = threshold_hr?.value && threshold_hr.value > 0 ? threshold_hr : null;
-    const thrPrior = (priorLearned?.ride_threshold_hr?.value > 0) ? priorLearned?.ride_threshold_hr : null;
-    const thr = thrFresh ?? thrPrior;
-    const thrIsEstimate = !!thr?.is_estimate;
-
-    // Every ride with blocks contributes. Aerobic decoupling travels for the RECEIPT only — it reports
-    // and flags (compute-snapshot, analyze-cycling-workout); it does not decide which rides count or
-    // how much.
-    const ridesForA: RideForSignalA[] = rides.map((r) => ({
-      date: String(r.date ?? ''),
-      blocks: r.computed?.hr_power_blocks ?? null,
-      decouplingPct: r.computed?.analysis?.efficiency?.aerobic_decoupling_pct ?? null,
-    }));
-    const a = estimateFtpFromHrPower(ridesForA, thr?.value ?? null);
-    if (thrIsEstimate && a.confidence) {
-      a.confidence = 'low';
-      a.reason += '; threshold HR is itself an estimate (90% of max)';
-    }
-
-    // Signal B: the best at each duration across the 90-day window — different rides supply different
-    // durations, the way TrainerRoad and Xert assemble it.
+    // The best at each duration across the 90-day window — different rides supply different durations,
+    // the way TrainerRoad and intervals.icu assemble it.
     const b = fitCriticalPower(bestPerDuration(rides.map((r) => r.computed?.power_curve ?? null)));
 
     /**
@@ -1535,13 +1507,13 @@ export function analyzeRides(
       if (Number.isFinite(p20) && p20 > 50 && (ceiling20 == null || p20 > ceiling20)) ceiling20 = p20;
     }
 
-    const raw = compoundFtp(a, b, ceiling20);
+    const raw = compoundFtp(b, ceiling20);
     if (raw) {
       // The rate limit walks from whatever FTP the athlete had last learn — including a STEP 4 value
       // from before this estimator existed — at ≤5% per learn, so no athlete's zones move in one step.
       const prev = Number(priorLearned?.ride_ftp_estimated?.value);
       ftp_compound = rateLimitFtp(Number.isFinite(prev) ? prev : null, raw);
-      console.log(`  ⚡ FTP: ${ftp_compound.value}W (${ftp_compound.confidence}) — A ${a.value ?? '—'}W/${a.confidence ?? 'abstain'} (${a.n} rides), B ${b.value ?? '—'}W/${b.confidence ?? 'abstain'} (${b.n} durations), ceiling ${ceiling20 ?? '—'}W`);
+      console.log(`  ⚡ FTP: ${ftp_compound.value}W (${ftp_compound.confidence}) — curve ${b.value ?? '—'}W/${b.confidence ?? 'abstain'} (${b.n} durations), ceiling ${ceiling20 ?? '—'}W`);
       ftp_estimated = {
         value: ftp_compound.value,
         confidence: ftp_compound.confidence,
@@ -1549,7 +1521,7 @@ export function analyzeRides(
         sample_count: ftp_compound.sample_count,
       };
     } else {
-      console.log(`  ⚡ FTP estimator abstained — A: ${a.reason}; B: ${b.reason}` + (ftp_estimated ? `; falling back to STEP 4: ${ftp_estimated.value}W (${ftp_estimated.confidence})` : ''));
+      console.log(`  ⚡ FTP estimator abstained — ${b.reason}` + (ftp_estimated ? `; falling back to STEP 4: ${ftp_estimated.value}W (${ftp_estimated.confidence})` : ''));
     }
   }
 

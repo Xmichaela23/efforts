@@ -1,20 +1,20 @@
 /**
- * BIKE FTP, COMPOUNDED FROM TWO OPEN SIGNALS — specified in docs/SPEC-ftp-estimator-2026-09-04.md.
+ * BIKE FTP FROM THE POWER-DURATION CURVE — specified in docs/SPEC-ftp-estimator-2026-09-04.md.
  *
- * ⛔ WHAT IT REPLACES, AND WHY. The learned FTP is `95% × the single best 20-minute effort in the last
- * 90 days` (`learn-fitness-profile:analyzeRides` STEP 4, tier 1). It can only report what the athlete
- * already produced: a season of easy riding has no qualifying effort, so the estimate sags — not because
- * fitness fell, but because nothing measured it. Garmin does not have that problem, because its model
- * reads the heart-rate-to-power relationship of EVERY ride rather than the peak of the hardest one.
- * Firstbeat's model is proprietary and is not reproduced here; the two open signals it rests on are.
+ * ⛔ WHAT IT REPLACES, AND WHY. The learned FTP was `95% × the single best 20-minute effort in the last
+ * 90 days` (`learn-fitness-profile:analyzeRides` STEP 4, now the thin-data fallback). It can only report
+ * what the athlete already produced: a season of easy riding has no qualifying effort, so the estimate
+ * sags — not because fitness fell, but because nothing measured it.
  *
- *   SIGNAL A — power at threshold heart rate. Per ride, over aerobic steady minutes only, regress power
- *   on heart rate and evaluate the line at the athlete's learned threshold heart rate. An easy ride
- *   contributes. That is the whole point.
+ *   THE READ — the power-duration curve. Assemble the BEST value at each duration across the window
+ *   (different rides may supply different durations — TrainerRoad and intervals.icu both build it this
+ *   way), fit the two-parameter critical-power model P(t) = CP + W'/t over 2-20 min, and convert CP to
+ *   FTP. Power only, no heart rate, no steady-minutes rule — what TrainerRoad's AI FTP Detection and
+ *   intervals.icu's eFTP do.
  *
- *   SIGNAL B — the power-duration curve. Assemble the BEST value at each duration across the window
- *   (different rides may supply different durations — TrainerRoad and Xert both build it this way),
- *   fit the two-parameter critical-power model P(t) = CP + W'/t, and convert CP to FTP.
+ * ⛔ POWER ONLY (2026-09-04, Michael: "just do what intervals.icu and TrainerRoad do"). A second read —
+ * power at the learned threshold heart rate, the Garmin/Firstbeat shape — was built beside this the
+ * same day and removed the same night; its 15-block floor was OURS. Ledger: docs/STATE-SOURCES.md.
  *
  * ⛔ ATHLETE-AGNOSTIC. No constant below was chosen because it makes one athlete's number land. Every
  * cutoff is cited to published practice or derived from the data's own scatter, and the reason sits
@@ -94,187 +94,20 @@ export function confidenceRank(c: Confidence | string | null | undefined): numbe
 }
 
 // =============================================================================
-// SIGNAL A, PART 1 — THE PER-RIDE SUBSTRATE (written at analysis time)
+// SHARED RESULT SHAPE
 // =============================================================================
 
-/**
- * One ride's aerobic steady minutes, reduced to (heart rate, power) pairs the LEARNER can regress
- * against ANY threshold heart rate later.
- *
- * ⛔ WHY BLOCKS ARE STORED AND NOT A FIT. The fit has to be cut at the athlete's threshold heart rate,
- * and that number is LEARNED — it moves, and `compute-workout-analysis` sees one activity at a time.
- * Storing the minute-blocks lets the learner cut wherever the current threshold sits, re-fit when it
- * moves, and reconstruct the exact raw regression (the OLS on block means IS the OLS on the blocks).
- * A 4-hour ride is at most 240 pairs of integers — smaller than one of the series already stored.
- *
- * ⚠️ IT JUDGES NOTHING. The warm-up skip and the coasting exclusion are the only opinions here, and
- * both are about what a "steady minute" is, not about the athlete.
- */
-export type HrPowerBlocks = {
-  /** seconds per block */
-  block_s: number;
-  /** seconds skipped at the start of the ride before the first block */
-  skipped_s: number;
-  /** mean heart rate per block, bpm, integer */
-  hr: number[];
-  /** mean power per block, watts, integer */
-  w: number[];
-};
-
-/**
- * ⛔ SIXTY-SECOND BLOCKS. Heart rate follows power with a time constant of roughly 30-45 s at the onset
- * of exercise (the on-kinetics literature; the same lag the Efficiency Factor and Friel's decoupling
- * average over). One-minute means are long enough that the pair describes one steady state and short
- * enough that a 90-minute ride yields dozens of them.
- */
-export const HR_POWER_BLOCK_S = 60;
-
-/**
- * ⛔ THE FIRST TEN MINUTES ARE NOT READ. Heart rate lags power at the start and drifts upward through
- * the warm-up as body temperature rises (cardiac drift begins within the first ~10 min). The run's
- * pace-to-heart-rate read starts at 10 minutes for the same reason (commit 503120d4), so the two
- * sports agree on when a heart rate is settled enough to pair with an output.
- */
-export const HR_POWER_WARMUP_SKIP_S = 600;
-
-/**
- * ⛔ A STEADY MINUTE IS ONE THAT WAS PEDALLED. A block in which the athlete coasted for more than a few
- * seconds is not a steady state — the heart rate in it answers the effort before the coast. 90% of the
- * block's samples must carry pedalling power (> 0 W after `compute-workout-analysis` has filled missing
- * ride samples with 0; D-112 follow-up, commit d9ffe621).
- */
-export const HR_POWER_MIN_PEDALLING_FRACTION = 0.9;
-
-/**
- * ⛔ HEART RATE TRAILS POWER. The heart-rate response to a step in work rate has a time constant of
- * roughly 30-45 s (on-kinetics; the same lag the 30-s NP window and Friel's 60-s EF averaging exist to
- * absorb). Pairing minute k's power with minute k's heart rate smears the relationship on any ride
- * whose power moves — the heart rate that belongs to this minute's power arrives half a minute later.
- * So each block's heart rate is read over the window shifted LATER by one time constant. The
- * unshifted pairing was one of the reasons stop-and-go rides fitted at r² 0.02 on the first back-run.
- */
-export const HR_LAG_S = 30;
-
-/**
- * Build the per-ride block substrate from the index-aligned series. Returns null when the ride has
- * fewer than one usable block — the learner treats absent and null the same way.
- */
-export function buildHrPowerBlocks(
-  timeS: ReadonlyArray<number>,
-  hrBpm: ReadonlyArray<number | null | undefined>,
-  powerW: ReadonlyArray<number | null | undefined>,
-): HrPowerBlocks | null {
-  const n = Math.min(timeS.length, hrBpm.length, powerW.length);
-  if (n < 2) return null;
-  const t0 = timeS[0];
-  const hr: number[] = [];
-  const w: number[] = [];
-
-  let blockStart = t0 + HR_POWER_WARMUP_SKIP_S;
-  let i = 0;      // power cursor
-  let j = 0;      // heart-rate cursor, HR_LAG_S behind in time (i.e. reading later samples)
-  while (i < n && timeS[i] < blockStart) i += 1;
-  while (j < n && timeS[j] < blockStart + HR_LAG_S) j += 1;
-
-  while (i < n) {
-    const blockEnd = blockStart + HR_POWER_BLOCK_S;
-    let samples = 0, pedalled = 0, pSum = 0;
-    let firstT: number | null = null, lastT: number | null = null;
-    while (i < n && timeS[i] < blockEnd) {
-      const t = timeS[i];
-      const p = powerW[i];
-      i += 1;
-      if (!Number.isFinite(t)) continue;
-      samples += 1;
-      if (firstT == null) firstT = t;
-      lastT = t;
-      const pNum = typeof p === 'number' && Number.isFinite(p) ? p : 0;
-      if (pNum > 0) { pedalled += 1; pSum += pNum; }
-    }
-    // The heart rate for this minute's power is read one lag later.
-    let hrSamples = 0, hrSum = 0, hrCount = 0;
-    const hrEnd = blockEnd + HR_LAG_S;
-    while (j < n && timeS[j] < hrEnd) {
-      const h = hrBpm[j];
-      j += 1;
-      if (!Number.isFinite(timeS[j - 1])) continue;
-      hrSamples += 1;
-      if (typeof h === 'number' && Number.isFinite(h) && h > 0) { hrSum += h; hrCount += 1; }
-    }
-    blockStart = blockEnd;
-    if (samples === 0 || firstT == null || lastT == null) continue;
-    // The block has to be substantially covered: a paused recording that resumes 40 s later is not a
-    // minute of riding. Smart recording (Garmin) writes fewer rows than seconds, so the test is on the
-    // span the rows cover, not on how many rows there are.
-    if (lastT - firstT < HR_POWER_BLOCK_S * 0.75) continue;
-    if (pedalled / samples < HR_POWER_MIN_PEDALLING_FRACTION) continue;
-    if (hrSamples === 0 || hrCount / hrSamples < HR_POWER_MIN_PEDALLING_FRACTION) continue;
-    hr.push(Math.round(hrSum / hrCount));
-    w.push(Math.round(pSum / pedalled));
-  }
-
-  if (hr.length === 0) return null;
-  return { block_s: HR_POWER_BLOCK_S, skipped_s: HR_POWER_WARMUP_SKIP_S, hr, w };
-}
-
-// =============================================================================
-// SIGNAL A, PART 2 — THE PER-RIDE FIT (evaluated at learn time)
-// =============================================================================
-
-export type RideHrPowerFit = {
-  /** projected power at threshold heart rate, watts; null = abstained */
-  wattsAtThreshold: number | null;
-  slope: number | null;
-  intercept: number | null;
-  r2: number | null;
-  /** blocks that survived the aerobic cut */
-  nBlocks: number;
-  /** heart-rate span the line was fitted across, bpm */
-  hrSpanBpm: number;
-  /** how far above the highest fitted heart rate the projection reaches, bpm */
-  extrapolationBpm: number;
-  /** relative standard error of the projection (0.03 = ±3%) — the data's own scatter, in one number */
-  relSe: number | null;
+export type SignalResult = {
+  value: number | null;
+  confidence: Confidence | null;
+  /** how many durations stood the value up */
+  n: number;
   reason: string;
 };
 
-/**
- * ⛔ FIFTEEN STEADY MINUTES, from the spec (docs/SPEC-ftp-estimator-2026-09-04.md, Signal A: "require
- * ≥15 min of usable samples or the ride abstains"). It is a floor on how much of ONE ride a line may be
- * fitted through, not a borrowed threshold: 15 one-minute blocks leave 13 residual degrees of freedom,
- * where the t-multiplier on the projection's standard error has settled to ~2.2 (it is 4.3 at n=4 and
- * 12.7 at n=3) — below that the reported `relSe` stops meaning what it says. On the first back-run it
- * was the leading abstain reason (7 of 19 rides, several at 11-14 minutes): those rides are short OR
- * stop-and-go. Lowering it is a spec change, not a tuning knob.
- */
-export const HR_POWER_MIN_BLOCKS = 15; // OURS — Garmin's equivalent floor is 20 min at high intensity; 15 kept so this read still speaks through an easy stretch. Ledger: docs/STATE-SOURCES.md
-
-/**
- * ⛔ THE LINE NEEDS A SPAN TO HAVE A SLOPE. A ride held at one heart rate cannot say how power changes
- * with heart rate. The floor is one Friel heart-rate zone in width: his cycling zones are 7-8% of
- * threshold heart rate wide (Z2 = 82-89% LTHR, Z3 = 90-93%), so a fit that does not span at least one
- * zone is being asked to extrapolate from a point. Expressed as a fraction of threshold heart rate so it
- * scales with the athlete rather than being a fixed bpm.
- */
-export const HR_POWER_MIN_SPAN_FRACTION = 0.10;
-
-/**
- * ⛔ HOW FAR THE LINE MAY REACH. The regression is only evidence inside the heart rates it was fitted on;
- * the spec names over-extrapolation as this signal's main failure mode. The cap comes from the data's
- * own shape: a projection may reach no further above the highest fitted heart rate than the span the
- * line was fitted across (standard regression practice — extrapolating beyond the data by more than
- * its own range is not supported by it). A ride spanning 120-150 bpm may be read at 180; one spanning
- * 140-150 may be read at 160 and abstains for a threshold at 170.
- */
-export const HR_POWER_MAX_EXTRAPOLATION_OF_SPAN = 1.0;
-
-/**
- * ⛔ THE FIT HAS TO DESCRIBE THE RIDE. Below r² = 0.5 the line explains less than half of the power
- * variance and the "slope" is mostly noise. Steady aerobic riding pairs heart rate and power at 60-s
- * resolution with r² well above this (it is the premise of the Efficiency Factor); a ride that fails it
- * was intervals, stop-start or a heart-rate dropout, none of which is a steady-state read.
- */
-export const HR_POWER_MIN_R2 = 0.5;
+// =============================================================================
+// SHARED MATHS
+// =============================================================================
 
 /**
  * ⛔ AEROBIC DECOUPLING IS NOT READ HERE — NOT AS A GATE, NOT AS A WEIGHT (2026-09-04, after the first
@@ -310,142 +143,6 @@ function olsWithIntercept(x: ReadonlyArray<number>, y: ReadonlyArray<number>) {
   const sse = Math.max(0, syy - slope * sxy);
   const s2 = n > 2 ? sse / (n - 2) : 0; // residual variance
   return { n, mx, my, sxx, slope, intercept, r2, s2 };
-}
-
-/**
- * Fit one ride's blocks and read the line at `thresholdHr`. Only blocks AT OR BELOW threshold heart rate
- * are fitted (the aerobic cut) — the relationship above threshold is a different physiology.
- */
-export function fitRidePowerAtThresholdHr(
-  blocks: HrPowerBlocks | null | undefined,
-  thresholdHr: number,
-): RideHrPowerFit {
-  const abstain = (reason: string, extra: Partial<RideHrPowerFit> = {}): RideHrPowerFit => ({
-    wattsAtThreshold: null, slope: null, intercept: null, r2: null, nBlocks: 0, hrSpanBpm: 0,
-    extrapolationBpm: 0, relSe: null, reason, ...extra,
-  });
-  if (!blocks || !Array.isArray(blocks.hr) || !Array.isArray(blocks.w)) return abstain('no heart-rate/power blocks on the ride');
-  if (!(thresholdHr > 0)) return abstain('no threshold heart rate to read the line at');
-
-  const x: number[] = [], y: number[] = [];
-  const total = Math.min(blocks.hr.length, blocks.w.length);
-  for (let i = 0; i < total; i++) {
-    const h = blocks.hr[i], p = blocks.w[i];
-    if (!(h > 0) || !(p > 0)) continue;
-    if (h > thresholdHr) continue; // above threshold: not aerobic steady state
-    x.push(h); y.push(p);
-  }
-  const nBlocks = x.length;
-  if (nBlocks < HR_POWER_MIN_BLOCKS) {
-    return abstain(`${nBlocks} aerobic steady minutes, need ${HR_POWER_MIN_BLOCKS}`, { nBlocks });
-  }
-  const hrMax = Math.max(...x), hrMin = Math.min(...x);
-  const hrSpanBpm = hrMax - hrMin;
-  const minSpan = thresholdHr * HR_POWER_MIN_SPAN_FRACTION;
-  if (hrSpanBpm < minSpan) {
-    return abstain(`heart rate spanned ${hrSpanBpm} bpm, need ${Math.round(minSpan)} to fit a slope`, { nBlocks, hrSpanBpm });
-  }
-  const extrapolationBpm = Math.max(0, thresholdHr - hrMax);
-  if (extrapolationBpm > hrSpanBpm * HR_POWER_MAX_EXTRAPOLATION_OF_SPAN) {
-    return abstain(`threshold sits ${extrapolationBpm} bpm above the highest fitted heart rate; the line only spans ${hrSpanBpm}`, { nBlocks, hrSpanBpm, extrapolationBpm });
-  }
-  const f = olsWithIntercept(x, y);
-  if (!(f.slope > 0)) {
-    return abstain('power did not rise with heart rate', { nBlocks, hrSpanBpm, extrapolationBpm, slope: f.slope, r2: f.r2 });
-  }
-  if (f.r2 < HR_POWER_MIN_R2) {
-    return abstain(`fit r² ${f.r2.toFixed(2)} is below ${HR_POWER_MIN_R2}; not a steady-state ride`, { nBlocks, hrSpanBpm, extrapolationBpm, slope: f.slope, intercept: f.intercept, r2: f.r2 });
-  }
-  const watts = f.intercept + f.slope * thresholdHr;
-  // Standard error of the fitted mean at x0: s·sqrt(1/n + (x0-x̄)²/Sxx). Grows with scatter, with a
-  // narrow span, and with distance from the data — the three things that make a projection unreliable.
-  const se = Math.sqrt(f.s2 * (1 / f.n + ((thresholdHr - f.mx) ** 2) / f.sxx));
-  const relSe = watts > 0 ? se / watts : null;
-  return {
-    wattsAtThreshold: Math.round(watts),
-    slope: Number(f.slope.toFixed(3)),
-    intercept: Number(f.intercept.toFixed(1)),
-    r2: Number(f.r2.toFixed(3)),
-    nBlocks, hrSpanBpm, extrapolationBpm,
-    relSe: relSe == null ? null : Number(relSe.toFixed(4)),
-    reason: 'fit',
-  };
-}
-
-// =============================================================================
-// SIGNAL A, PART 3 — THE AGGREGATE ACROSS RIDES
-// =============================================================================
-
-export type RideForSignalA = {
-  /** ISO date, for the receipt */
-  date: string;
-  blocks: HrPowerBlocks | null | undefined;
-  /**
-   * `computed.analysis.efficiency.aerobic_decoupling_pct` — REPORTED in the receipt, never read by the
-   * fit or the median. Reporting is what the number is for (see the note above HR_POWER_FIRST_HALF_FIRST).
-   */
-  decouplingPct?: number | null;
-};
-
-export type SignalResult = {
-  value: number | null;
-  confidence: Confidence | null;
-  /** how many rides / durations stood the value up */
-  n: number;
-  reason: string;
-};
-
-export type SignalAResult = SignalResult & {
-  /** every ride's per-ride read, for the receipt and the back-run */
-  rides: Array<{ date: string; watts: number | null; reason: string; r2: number | null; relSe: number | null; decouplingPct: number | null }>;
-};
-
-/**
- * ⛔ FIVE PERCENT IS THE FIELD'S NOISE FLOOR ON FTP. Test-retest variation of a 20-min FTP test sits
- * around 3-5% (Coggan's guidance treats moves inside that as noise; TrainerRoad reports changes under
- * ~3% as no change). A set of rides whose middle half agrees within 5% is describing one number.
- */
-export const FTP_NOISE_FRACTION = 0.05;
-
-function median(v: number[]): number {
-  const s = [...v].sort((a, b) => a - b);
-  const mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
-}
-function quantile(v: number[], q: number): number {
-  const s = [...v].sort((a, b) => a - b);
-  const pos = (s.length - 1) * q;
-  const lo = Math.floor(pos), hi = Math.ceil(pos);
-  return s[lo] + (s[hi] - s[lo]) * (pos - lo);
-}
-
-export function estimateFtpFromHrPower(rides: ReadonlyArray<RideForSignalA>, thresholdHr: number | null | undefined): SignalAResult {
-  const out: SignalAResult['rides'] = [];
-  if (!(thresholdHr && thresholdHr > 0)) {
-    return { value: null, confidence: null, n: 0, reason: 'no learned ride threshold heart rate', rides: out };
-  }
-  const watts: number[] = [];
-  for (const r of rides) {
-    const f = fitRidePowerAtThresholdHr(r.blocks, thresholdHr);
-    out.push({ date: r.date, watts: f.wattsAtThreshold, reason: f.reason, r2: f.r2, relSe: f.relSe, decouplingPct: typeof r.decouplingPct === 'number' ? r.decouplingPct : null });
-    if (f.wattsAtThreshold != null) watts.push(f.wattsAtThreshold);
-  }
-  const n = watts.length;
-  if (n === 0) return { value: null, confidence: null, n, reason: 'no ride produced a usable heart-rate-to-power fit', rides: out };
-  // Median, not max: the spec's choice, because the max of many projections is the most optimistic
-  // ride, and optimism compounds through every zone downstream.
-  const med = median(watts);
-  const spread = n >= 3 ? (quantile(watts, 0.75) - quantile(watts, 0.25)) / med : Infinity;
-  let confidence: Confidence = 'low';
-  if (n >= 5 && spread <= FTP_NOISE_FRACTION) confidence = 'high';
-  else if (n >= 3 && spread <= FTP_NOISE_FRACTION * 2) confidence = 'medium';
-  return {
-    value: Math.round(med),
-    confidence,
-    n,
-    reason: `median of ${n} rides' power at ${Math.round(thresholdHr)} bpm` + (Number.isFinite(spread) ? ` (middle half within ${(spread * 100).toFixed(1)}%)` : ''),
-    rides: out,
-  };
 }
 
 // =============================================================================
@@ -556,7 +253,6 @@ export type CompoundFtp = {
   source: string;
   sample_count: number;
   signals: {
-    hr_power: { value: number | null; confidence: Confidence | null; n: number; reason: string };
     power_duration: { value: number | null; confidence: Confidence | null; n: number; reason: string; cp: number | null; w_prime_j: number | null; r2: number | null };
   };
   /** best 20-minute power actually recorded in the ceiling window, watts */
@@ -564,52 +260,27 @@ export type CompoundFtp = {
 };
 
 /**
- * Publish the higher-confidence signal. When both are confident and disagree by more than the noise
- * floor, publish the LOWER at medium — an FTP set too high poisons every zone, workout target and plan
- * downstream; one set too low only makes sessions easy. Then the hard ceiling: never above the best
- * 20-minute power actually recorded. Both signals extrapolate; that number does not.
+ * ⛔ POWER ONLY (2026-09-04, Michael: "just do what intervals.icu and TrainerRoad do"). The estimate is the
+ * power-duration fit and nothing else — the read TrainerRoad's AI FTP Detection and intervals.icu's eFTP
+ * both make, from power alone, with no heart-rate signal and no steady-minutes rule. A heart-rate-at-
+ * threshold read (the Garmin/Firstbeat shape) was built beside it the same day and removed the same
+ * night; its 15-block floor was OURS and Michael ruled it out. Then the hard ceiling: never above the
+ * best 20-minute power actually recorded — the fit extrapolates, that number does not.
  */
-export function compoundFtp(a: SignalAResult, b: SignalBResult, ceiling20min: number | null | undefined): CompoundFtp | null {
+export function compoundFtp(b: SignalBResult, ceiling20min: number | null | undefined): CompoundFtp | null {
   const signals: CompoundFtp['signals'] = {
-    hr_power: { value: a.value, confidence: a.confidence, n: a.n, reason: a.reason },
     power_duration: { value: b.value, confidence: b.confidence, n: b.n, reason: b.reason, cp: b.cp, w_prime_j: b.wPrime, r2: b.r2 },
   };
   const ceiling = typeof ceiling20min === 'number' && Number.isFinite(ceiling20min) && ceiling20min > 0 ? Math.round(ceiling20min) : null;
-
-  let value: number, confidence: Confidence, source: string, sample_count: number;
-  const aOk = a.value != null && a.confidence != null;
-  const bOk = b.value != null && b.confidence != null;
-  if (!aOk && !bOk) return null;
-  if (aOk && bOk) {
-    const av = a.value as number, bv = b.value as number;
-    const bothConfident = confidenceRank(a.confidence) >= 1 && confidenceRank(b.confidence) >= 1;
-    const disagree = Math.abs(av - bv) / Math.min(av, bv) > FTP_NOISE_FRACTION;
-    if (bothConfident && disagree) {
-      const lowerIsA = av <= bv;
-      value = Math.min(av, bv);
-      confidence = 'medium';
-      source = `${lowerIsA ? 'power at threshold HR' : 'power-duration fit'} ${value} W — the lower of two confident signals that disagree (${av} W HR-power vs ${bv} W curve)`;
-      sample_count = lowerIsA ? a.n : b.n;
-    } else if (confidenceRank(b.confidence) > confidenceRank(a.confidence)) {
-      value = bv; confidence = b.confidence as Confidence; sample_count = b.n;
-      source = `power-duration fit (${b.reason}); HR-power read ${av} W agrees within noise`;
-    } else {
-      value = av; confidence = a.confidence as Confidence; sample_count = a.n;
-      source = `power at threshold HR (${a.reason}); curve read ${bv} W` + (disagree ? '' : ' agrees within noise');
-    }
-  } else if (aOk) {
-    value = a.value as number; confidence = a.confidence as Confidence; sample_count = a.n;
-    source = `power at threshold HR (${a.reason}); no power-duration fit: ${b.reason}`;
-  } else {
-    value = b.value as number; confidence = b.confidence as Confidence; sample_count = b.n;
-    source = `power-duration fit (${b.reason}); no HR-power read: ${a.reason}`;
-  }
-
+  if (b.value == null || b.confidence == null) return null;
+  let value = b.value as number;
+  const confidence = b.confidence as Confidence;
+  let source = `power-duration fit (${b.reason})`;
   if (ceiling != null && value > ceiling) {
     source = `${ceiling} W = best 20-min actually recorded (hard ceiling); estimate ${value} W was above it — ${source}`;
     value = ceiling;
   }
-  return { value, confidence, source, sample_count, signals, ceiling_20min: ceiling };
+  return { value, confidence, source, sample_count: b.n, signals, ceiling_20min: ceiling };
 }
 
 /**

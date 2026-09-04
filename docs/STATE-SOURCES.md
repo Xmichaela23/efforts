@@ -33,9 +33,7 @@ stated and it is a decision Michael can reverse.
 | Number | Where | Source |
 |---|---|---|
 | Power-curve read: critical-power fit over 2–20 min, ≥ 3 durations, W′ 5–40 kJ, r² ≥ 0.9, FTP = 0.97 × CP | `src/lib/bike-ftp-estimator.ts` | FIELD — Hill 1993, Jones 2010, Vanhatalo 2011; TrainerRoad / intervals.icu practice |
-| Heart-rate read: power at learned threshold HR, OLS with intercept, 30 s HR lag, span ≥ 10% LTHR, extrapolation ≤ span, r² ≥ 0.5 | `bike-ftp-estimator.ts` | FIELD — the Garmin/Firstbeat shape; lag = HR on-kinetics; span = one Friel zone width |
-| **≥ 15 one-minute aerobic steady blocks per ride for the HR read** | `bike-ftp-estimator.ts HR_POWER_MIN_BLOCKS` | **OURS** — 13 residual degrees of freedom so the projection's standard error means what it says. Garmin's equivalent is 20 min at high intensity. Kept at 15 because this read is what holds the number through an easy stretch (back-run May–July 2026); 20 makes it speak less exactly there. |
-| Compound: higher confidence wins; both confident and > 5% apart → the lower at medium | `bike-ftp-estimator.ts compoundFtp` | **OURS** — an FTP set high poisons every zone; low only makes sessions easy. |
+| Power only — no heart-rate read, no steady-minutes rule | `bike-ftp-estimator.ts compoundFtp` | FIELD — TrainerRoad AI FTP Detection and intervals.icu eFTP are power-only (Michael, 2026-09-04: "just do what intervals.icu and TrainerRoad do"). A heart-rate read with a 15-minute floor (OURS) was built and removed the same night. |
 | Hard ceiling = best 20-min actually pedalled, 18 months | learner STEP 5 | **OURS** — the one number that does not extrapolate; 18 months = the run threshold's own window |
 | Rate limit ± 5% per learn | `bike-ftp-estimator.ts rateLimitFtp` | **OURS** — no athlete's zones move in one step |
 | Proposed, then accepted; auto is the default | resolver, checkpoint, Baselines | FIELD — TrainerRoad (validated on 22,000 athletes; default auto with accept) |
