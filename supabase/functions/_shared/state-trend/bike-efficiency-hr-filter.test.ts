@@ -41,6 +41,7 @@ Deno.test('bikeEfficiencyRideEligible: Garmin\'s rule only — ≥10 min in the 
   assert(!bikeEfficiencyRideEligible('endurance', null, 120, 132));
 });
 
+const AS_OF = '2026-07-04';
 function assemble(bikeRows: any[]) {
   return assembleStateTrends({
     asOf: AS_OF,
@@ -85,7 +86,7 @@ Deno.test('efficiency substrate excludes short-dwell only; type and intensity no
     { date: '2026-06-28', classified_type: 'endurance',      w20: 133, hr_at_band: 134, in_band_s: 900,  band_hi: 132, band_source: 'coggan_ftp' }, // ✓
   ];
   const r = assemble(mixed).bikeFitness;
-  assertEquals(r.efficiency.sampleCount, 5);   // only the 168 s ride is out; climbing and threshold now count (Garmin's rule)
+  assertEquals(r.efficiency.sampleCount, 4);   // the 432 s climb and the 168 s ride are out (under 10 min in band); the threshold ride now counts
 });
 
 // ══ Michael's exact contaminant: a ride LABELED endurance but RIDDEN hard (165W ≈ 94% FTP) — its
