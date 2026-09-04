@@ -11,11 +11,11 @@ product's rule or is deleted. No new constants. No "ours".
 
 | Today (OURS) | Becomes | Copied from |
 |---|---|---|
-| Trend arrow fires when recent vs early change ≥ ±2% (run/bike), +2.5/−2 (strength), ±1.5 (swim) | Average of the **last 28 days** vs average of the **28 days before**. Higher → ↑, lower → ↓, equal (at the metric's displayed precision) → no arrow. No percent band. | Garmin VO2 max / Training Status trend: recent 4 weeks against before, updated every activity |
+| Trend arrow fires when recent vs early change ≥ ±2% (run/bike), +2.5/−2 (strength), ±1.5 (swim) | Average of the **last 28 days** vs average of the **28 days before**. Higher → ↑, lower → ↓, equal (at the metric's displayed precision) → **→** (Garmin's "maintaining"). No percent band. Blank means only "not enough sessions in one of the halves". | Garmin VO2 max / Training Status trend: recent 4 weeks against before, updated every activity; ↑ → ↓ are Garmin's three states |
 | 6-week run/strength, 8-week bike/swim trend windows | 56 days for every discipline (two 28-day halves) | Garmin, as above |
 | Signal-vs-noise gate (1 SD of scatter), endpoint smoothing (2 points), "recently flat" | Deleted. The two 28-day averages are the whole test. | — |
 | Freshness: 7–35 days scaled to cadence | Deleted. The arrow is recomputed on every session and shows whenever both halves have at least one session. | Garmin recomputes per activity; TrainingPeaks / intervals.icu have no freshness rule |
-| minSessions 3–5 scaled to cadence | At least one session in each 28-day half, else no arrow. Nothing to average is the only floor. | — |
+| minSessions 3–5 scaled to cadence | At least one session in each 28-day half, else blank. Nothing to average is the only floor. | — |
 | Headline = median of the last 5 sessions | **Average of the last 28 days** — the same number the arrow's recent half uses, so the number and its arrow are one read | Garmin: the value shown is the current 4-week estimate |
 | "Recent 6 weeks in colour" on the line | One colour. The chart shows 12 weeks (TrainingPeaks 90 days), a dot per session. | TrainingPeaks / intervals.icu |
 | Ride counts for efficiency after ≥10 min in the aerobic band | Keep 10 min — **cite Garmin**: VO2 max updates only from a ride with ≥10 min at ≥70% max HR. Not ours; it was uncited. | Garmin VO2 max requirement |
@@ -51,7 +51,7 @@ sliding` (state-trend `display`, coach narrative facts) keeps working (same verd
 
 ## Acceptance
 
-1. Unit tests for the 28/28 rule: up, down, equal-at-precision, one half empty → no arrow.
+1. Unit tests for the 28/28 rule: up ↑, down ↓, equal-at-precision →, one half empty → blank.
 2. Reference athlete after deploy: screenshot the closed STRENGTH / RUN / BIKE rows with arrows, and
    the open cards with single-colour lines. Every headline equals the mean of that series' last 28
    days, recomputed by hand from the stored points (the same check done on 2026-09-04 for medians).
