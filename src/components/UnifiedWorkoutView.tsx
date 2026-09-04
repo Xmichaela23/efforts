@@ -190,6 +190,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const [assocOpen, setAssocOpen] = useState(false);
   const [undoing, setUndoing] = useState(false);
   const [updatedWorkoutData, setUpdatedWorkoutData] = useState<any | null>(null);
+  // Sharing a strength session out to Strava — see the button below for why it is manual only.
+  const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+  // The receipt from a previous share, when the row carries one, so the button can say so on reopen.
+  const priorShareId = String((workout as Record<string, unknown> | null)?.strava_shared_activity_id ?? '');
+  const [sharedUrl, setSharedUrl] = useState<string | null>(
+    /^\d+$/.test(priorShareId) ? `https://www.strava.com/activities/${priorShareId}` : null,
+  );
   const recomputeGuardRef = useRef<Set<string>>(new Set());
   // Suppress auto re-link fallback briefly after an explicit Unattach
   const suppressRelinkUntil = useRef<number>(0);
@@ -1027,7 +1035,64 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             )
           )}
         </div>
-        
+
+        {/**
+          * ⛔ SHARE A LIFT TO STRAVA — THE ATHLETE PRESSES IT, NOTHING ELSE DOES (2026-09-03, Michael:
+          * "can we work both ways on strava, upload lifts").
+          *
+          * ⚠️ STRENGTH ONLY, AND THAT IS NOT AN OVERSIGHT: runs and rides arrive FROM Strava, so
+          * posting one back would put the same session in the feed twice.
+          * ⚠️ WHAT LANDS THERE is a manual Weight Training entry — the session name, its duration, and
+          * the lifts as text. Strava has no structured lifting fields on the endpoint that creates an
+          * activity, and its muscle map is drawn from data only its named strength partners can send.
+          * ⛔ It publishes to a feed other people read, so it is a button and never automatic, and the
+          * confirm names that before anything is posted.
+          */}
+        {isCompleted && isStrengthFamily && (
+          <div className="flex items-center justify-end mt-2">
+            <button
+              type="button"
+              disabled={sharing}
+              onClick={async () => {
+                const wid = String((workout as Record<string, unknown> | null)?.id ?? '');
+                if (!wid || sharing) return;
+                if (sharedUrl && !window.confirm('This session is already on Strava. Post it again?')) return;
+                if (!sharedUrl && !window.confirm('Post this session to your Strava feed?')) return;
+                setSharing(true);
+                setShareError(null);
+                try {
+                  const { data, error } = await supabase.functions.invoke('share-strength-to-strava', {
+                    body: { workoutId: wid },
+                  });
+                  const payload = (data ?? {}) as { url?: string | null; error?: string };
+                  if (error || payload?.error) {
+                    setShareError(payload?.error || 'Could not post to Strava.');
+                  } else if (payload?.url) {
+                    setSharedUrl(payload.url);
+                  }
+                } catch (e) {
+                  setShareError(e instanceof Error ? e.message : 'Could not post to Strava.');
+                } finally {
+                  setSharing(false);
+                }
+              }}
+              className="px-3 py-1 rounded-xl bg-white/[0.06] border border-white/20 text-white/80 font-light text-xs hover:bg-white/[0.10] hover:text-white transition-all duration-300 disabled:opacity-50"
+            >
+              {sharing ? 'Posting…' : sharedUrl ? 'Posted to Strava' : 'Share to Strava'}
+            </button>
+          </div>
+        )}
+        {shareError && (
+          <p className="text-xs text-red-400 text-right mt-1">{shareError}</p>
+        )}
+        {sharedUrl && !shareError && (
+          <p className="text-xs text-right mt-1">
+            <a href={sharedUrl} target="_blank" rel="noopener noreferrer" className="text-[#FC5200] underline underline-offset-2">
+              View on Strava
+            </a>
+          </p>
+        )}
+
         {/* Row 2: Source attribution + View link */}
         {(() => {
           const source = (workout as any)?.source;

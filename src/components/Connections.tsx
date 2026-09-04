@@ -393,7 +393,12 @@ const Connections: React.FC = () => {
   const connectStrava = () => {
     const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
     const redirectUri = 'https://efforts.work/strava/callback';
-    const scope = 'read,activity:read_all,profile:read_all';
+    // ⛔ `activity:write` IS WHAT LETS A STRENGTH SESSION GO OUT (2026-09-03). Strava's
+    // `POST /api/v3/activities` — the only way to create an activity from outside — requires it.
+    // ⚠️ EVERY ATHLETE CONNECTED BEFORE THIS DATE HOLDS A READ-ONLY GRANT and must reconnect once;
+    // a scope added here does not widen a grant Strava already issued. `share-strength-to-strava`
+    // names that case in its error rather than reporting a bare 401.
+    const scope = 'read,activity:read_all,activity:write,profile:read_all';
     
     const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
     

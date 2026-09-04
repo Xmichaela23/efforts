@@ -952,7 +952,10 @@ const handleSave = async () => {
 const connectStrava = () => {
   const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
   const redirectUri = 'https://efforts.work/strava/callback';
-  const scope = 'read,activity:read_all';
+  // ⛔ THE SAME SCOPE STRING AS THE CONNECTIONS SCREEN (2026-09-03). Two entry points connect Strava,
+  // and the grant an athlete ends up with is whichever one they happened to use — so a narrower list
+  // here silently means "sharing a lift fails for anyone who connected from Baselines".
+  const scope = 'read,activity:read_all,activity:write,profile:read_all';
   
   if (!clientId || clientId === 'undefined') {
       setStravaMessage('Error: Strava client ID not configured.');
