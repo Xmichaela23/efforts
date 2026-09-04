@@ -1201,7 +1201,12 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
     }
     return [];
   };
-  if (loading || cards.length === 0) return null;
+  // ⛔ THE CHECKPOINT IS PLAN-LEVEL, NOT A TREND CARD (2026-09-04, found on a throwaway at week 8 of a
+  // block whose coach payload carried no trends contract yet): the six-week sheet sat below this gate,
+  // and `loading` here means "the server has not produced a trends display" — which for a new athlete
+  // is indefinite. The sheet asks the server its own question (`endurance-checkpoint`) and gates itself
+  // on the answer, so it renders regardless; the sport plates still wait for their contract.
+  if (loading || cards.length === 0) return <div className="py-3"><EnduranceCheckpointSheet enabled={hasActivePlan === true} /></div>;
 
   // The bike row shows the dual Power · Efficiency read when either has substance; otherwise it
   // falls through to the standard card (adherence).
