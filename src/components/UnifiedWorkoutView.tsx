@@ -26,7 +26,7 @@ import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 // planned session, so the control never appeared where the athlete actually opens one: from the
 // calendar, into this view. Same logic, correct surface.
 // ⛔ THE UNMATCHED CUE — one rule, unit-tested, shared with the calendar and Today's card.
-import { isUnmatchedAgainstPlan, unmatchedPrompt } from '@/lib/associate-candidates';
+import { unmatchedPrompt } from '@/lib/associate-candidates';
 // ⛔ SWAP WHAT IS HELD, NOT WHAT IS TRAINED — the posture gate. One reader, shared with State.
 import { useDeclaredPosture } from '@/hooks/useDeclaredPosture';
 import { useResolvedFtp } from '@/hooks/useResolvedFtp';
@@ -975,9 +975,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />
       {/* Header */}
       <div className="p-3">
-        {/* Row 1: Title + Attach/Unattach */}
-        <div className="flex items-center justify-between">
-          <h2 className="font-light tracking-normal text-base text-white">
+        {/* Row 1: Title + Attach/Unattach. gap-4 so the title never touches the button — with the
+            location in the title it can run to two lines and there was nothing holding them apart. */}
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="font-light tracking-normal text-base text-white min-w-0">
             {(() => {
               // ⛔ `ME: Upper` → `Heavy: Upper` at the last moment. Display only; the engine string
               // is untouched, and `plainIntent` is total so every other title passes through.
@@ -998,14 +999,16 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   boxShadow: `0 0 0 1px rgba(${sportRgb}, 0.10) inset, 0 0 18px rgba(${sportRgb}, 0.10)`,
                 }}
               >{/**
-                  * ⛔ "ATTACH" WAS A BARE VERB (2026-08-08). It appeared exactly when auto-attach
-                  * found nothing, and said nothing about WHY or what was still owed — so the athlete
-                  * had to open the activity to discover a miss, and then guess what it meant.
-                  * The copy now names the session the day is still owed.
+                  * ⛔ THE BUTTON SAYS "Attach" (2026-09-03, Michael: "should just say attach and not be
+                  * stupid"). It used to carry the whole sentence — "Didn't match your planned run — link
+                  * it?" — which wrapped to two lines, took half the header, and crowded the title beside
+                  * it. A control's label is the action; the explanation is not the label.
+                  * ⚠️ The sentence is NOT lost: `unmatchedPrompt` is still the button's `title`, and the
+                  * calendar's own marker carries the same read. The 2026-08-08 reason for it — that a bare
+                  * "Attach" never said what the day was owed — is answered by the sheet the button opens,
+                  * which lists the owed session by name.
                   */}
-                {isUnmatchedAgainstPlan(workout as never, sameDayPlannedRows as never)
-                  ? unmatchedPrompt(sameDayPlannedRows as never)
-                  : 'Attach'}</button>
+                Attach</button>
             ) : (
               <button
                 onClick={async()=>{
