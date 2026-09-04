@@ -8,6 +8,8 @@ import type { TrendThresholds } from './types.ts';
 
 export type Discipline = 'strength' | 'bike' | 'run' | 'swim';
 
+// OURS — the % cut-offs and windows below have no outside source (June 2026 audit, Q-052). They drive the
+// improving / sliding arrows. Ledger: docs/STATE-SOURCES.md.
 // Universal, scale-free per-discipline config. windowDays = training-block length (NOT cadence);
 // improvePct/slidePct = percent thresholds (a % is scale-free). Do NOT scale these per athlete.
 const UNIVERSAL: Record<Discipline, { windowDays: number; improvePct: number; slidePct: number; lowerIsBetter: boolean }> = {
@@ -17,6 +19,7 @@ const UNIVERSAL: Record<Discipline, { windowDays: number; improvePct: number; sl
   swim: { windowDays: 56, improvePct: 1.5, slidePct: -1.5, lowerIsBetter: true }, // 8wk, pace/100 (lower=better)
 };
 
+// OURS — freshness calibration, no outside source (Q-052, development cohort). Ledger: docs/STATE-SOURCES.md.
 // Calibration anchors for: freshnessDays = clamp(round(BASE_FRESH × REF_SPW / spw), 7, 35).
 // Freshness scales INVERSELY with the athlete's own per-discipline rate (train less often → a
 // trend stays "current" longer). REF_SPW is the cadence each BASE was tuned at. STRENGTH uses a

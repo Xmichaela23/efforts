@@ -51,7 +51,7 @@ export const POWER_BINS: Record<string, Set<string>> = {
 // improving). Gate the efficiency substrate to steady-aerobic types + a minimum in-band dwell so a
 // few-second in-band sample can't count. Q-117 status #2 closed. Mirrors run's isSteadyAerobic.
 export const BIKE_EFFICIENCY_AEROBIC_TYPES = new Set(['endurance', 'endurance_long', 'recovery']);
-export const MIN_EFFICIENCY_IN_BAND_S = 600; // ≥10 min of aerobic-band dwell for a trustworthy per-ride HR-at-power
+export const MIN_EFFICIENCY_IN_BAND_S = 600; // OURS — ≥10 min of aerobic-band dwell for a per-ride HR-at-power read to mean anything; no field source. Ledger: docs/STATE-SOURCES.md
 // A ride labeled "endurance" but RIDDEN hard still contaminates the HR-at-power read: a threshold-level
 // segment jacks in-band HR via cardiac lag (verified on Michael's data — a 165W/94%-FTP "endurance" ride
 // read 145bpm and single-handedly faked a -4.7% "improving"). So also require NO threshold-or-harder

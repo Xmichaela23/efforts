@@ -377,7 +377,7 @@ function SessionChart({ points, color, valueOf }: {
  * ⚠️ NO UNIT PASSED — efficiency is an index, so the range is suppressed (the shape is the message),
  * exactly as before.
  */
-const RECENT_WINDOW_MS = 42 * 86_400_000;
+const RECENT_WINDOW_MS = 42 * 86_400_000; // OURS — display choice, half the 12-week window. Ledger: docs/STATE-SOURCES.md
 function DatedChart({ points, color, dotNoun = 'session', fmtVal, unit }: { points: Array<{ date: string; value: number }>; color: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string }) {
   const lastT = Date.parse(`${points[points.length - 1].date}T12:00:00Z`);
   const series = points.map((p) => ({

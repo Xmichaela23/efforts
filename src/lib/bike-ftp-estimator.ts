@@ -247,7 +247,7 @@ export type RideHrPowerFit = {
  * was the leading abstain reason (7 of 19 rides, several at 11-14 minutes): those rides are short OR
  * stop-and-go. Lowering it is a spec change, not a tuning knob.
  */
-export const HR_POWER_MIN_BLOCKS = 15;
+export const HR_POWER_MIN_BLOCKS = 15; // OURS — Garmin's equivalent floor is 20 min at high intensity; 15 kept so this read still speaks through an easy stretch. Ledger: docs/STATE-SOURCES.md
 
 /**
  * ⛔ THE LINE NEEDS A SPAN TO HAVE A SLOPE. A ride held at one heart rate cannot say how power changes

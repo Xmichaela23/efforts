@@ -52,7 +52,7 @@ from a partial read, stated at full confidence — with the answer one grep away
 the loudest sentence written that day and the most wrong. **When you escalate to ⛔⛔ or "the whole
 ballgame", you are usually furthest from a page.** Rank the claim before you dress it up.
 
-## The four rules
+## The five rules
 
 1. ⛔ **NO ABSENCE CLAIM WITHOUT A NAMED SEARCH.** Never *"X doesn't exist"* / *"the source doesn't
    say"* / *"this gap is final"*. Only **"I grepped A, B and C and did not find X."** If you cannot
@@ -66,6 +66,13 @@ ballgame", you are usually furthest from a page.** Rank the claim before you dre
    them into a commit message.**
 4. ⛔ **LABEL THE EVIDENCE IN THE SENTENCE.** *"I read this page"* / *"I traced this code"* / *"I am
    inferring"*. **Michael cannot check the work, so anything unhedged becomes a fact in these docs.**
+5. ⛔ **EVERY NUMBER HAS A SOURCE, OR SAYS "OURS".** No threshold, window, formula or cut-off reaches an
+   athlete-facing screen without a field source cited beside it in the code (TrainingPeaks, Garmin,
+   TrainerRoad, Friel, Coggan, a paper) — or an explicit `// OURS — <reason>` and a row in
+   `docs/STATE-SOURCES.md`. Say "ours" in chat the FIRST time the number comes up. A number borrowed
+   from one context (a plan rule, a reporting threshold) is not licensed as a filter in another.
+   (2026-09-04, Michael: *"how many times do I have to find shit that's ours"* — three in one night,
+   each defended as standard first. D-372.)
 
 ## Where the line actually is
 

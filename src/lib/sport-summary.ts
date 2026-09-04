@@ -83,6 +83,8 @@ export type SportRow = {
  * whatever it's based on, for the most recent runs"): never whichever point came last (one warm-up was
  * the headline over 22 runs). Shared by the open run card and the closed run row so both print ONE number.
  */
+// OURS — no field source: TrainingPeaks / intervals.icu plot every session and print no headline. A
+// headline needs one number; the median stops one bad day owning it. Ledger: docs/STATE-SOURCES.md.
 export function recentMedian(values: number[], n = 5): number | null {
   const s = values.slice(-n).sort((a, b) => a - b);
   if (!s.length) return null;
