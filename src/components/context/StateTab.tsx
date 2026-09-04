@@ -12,6 +12,7 @@ import { formatLocalDate } from '@/lib/dateUtils';
 import { capabilitiesForExercise } from '@/lib/exercise-role';
 import LoadBar from '@/components/LoadBar';
 import { formZone } from '@shared/fitness-fatigue';
+import StateBodyBlock from './StateBodyBlock';
 import { supabase, getStoredUserId, invokeFunctionFormData, invokeFunction } from '@/lib/supabase';
 import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 import CourseStrategyModal from '@/components/CourseStrategyModal';
@@ -818,11 +819,13 @@ export default function StateTab({
 
         {showAmberRecordBar && <StateRaceDayBar />}
 
-        {/* ⛔ BODY (effort · soreness · logged) IS OFF THIS SCREEN (2026-09-04, Michael: every State number copies
-            Garmin's or TrainingPeaks' rule, whole). Effort was Foster's session RPE under OUR 7-vs-28-day
-            comparison; soreness was Hooper's scale under OUR z-score. Neither product prints either on a
-            fitness screen. The server rows (`endurance.rpe`, `resolveCurrentSoreness`) still feed the coach;
-            StateBodyBlock.tsx is deleted with its only mount. */}
+        {/* BODY — restored 2026-09-04 (Michael: "you got rid of body, I didn't ask for that"). Effort is Foster's
+            session RPE, soreness is Hooper's scale; the comparisons under them are OURS and say so in the ledger. */}
+        <StateBodyBlock
+          visibleSignals={visibleSignals}
+          readinessRpeDriver={readinessRpeDriver}
+          onOpenAdjust={() => setStateLens('adjust')}
+        />
 
         {/* READINESS — athlete-reported energy/soreness/sleep (Q-049 Phase 1, D-144).
             Raw + distinct sliders; shown ONLY when a recent check-in exists (no-data

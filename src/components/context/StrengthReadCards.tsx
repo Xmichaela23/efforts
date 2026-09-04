@@ -267,10 +267,11 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
       {driftPts.length >= 2 && (
         <DatedChart points={driftPts} color={color} dotNoun={isRide ? 'steady ride' : 'run'} fmtVal={fmtDrift} unit="%" />
       )}
-      {driftLast != null && (
-        <div className="text-[11px] text-white/55 mt-1">
-          drift <span className="tabular-nums text-white/75">{fmtDrift(driftLast.value)}%</span> · {driftWhat} · lower is better · {fmtDayShort(driftLast.date)} {isRide ? 'steady ride' : 'run'} · line {DRIFT_LIMITS.hybridPct}%
-        </div>
+      {/* ⛔ NO SINGLE-SESSION DRIFT NUMBER ON STATE (2026-09-04, Michael: "you're using the last run to give a drift
+          reading"). This is the trend screen; one run's drift lives on that run. TrainingPeaks' dashboard shows the
+          trend as a chart with no headline, which is what stays here. */}
+      {driftPts.length >= 2 && (
+        <div className="text-[11px] text-white/55 mt-1">drift · {driftWhat} · lower is better · line {DRIFT_LIMITS.hybridPct}% · each dot one {isRide ? 'steady ride' : 'run'}</div>
       )}
     </div>
   );
