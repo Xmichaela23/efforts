@@ -20,6 +20,7 @@
 
 import React from 'react';
 import { fmtDayShort, latestPoint } from '@/lib/sport-summary';
+import { fitTrend } from '@/lib/sport-summary';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { DRIFT_LIMITS } from '@shared/state-trend';
 // ⛔ THE ONE CHART LANGUAGE (Round 3 pass 2, 2026-09-01). The endurance cards used to draw their own
@@ -221,10 +222,20 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
             * normalized power ÷ average heart rate for a ride. A runner who tracks this knows the
             * name; nobody knows "speed per beat".
             */}
-          <div className="flex items-baseline gap-1.5 mt-1">
-            <span className="readout-num text-[26px] leading-none">{fmtEff(headline ?? latest.efficiency, isRide)}</span>
-            <span className="text-[12px] text-white/60">efficiency factor</span>
-          </div>
+          {/* ⛔ NO SINGLE-SESSION NUMBER AT THE TOP (2026-09-04, Michael: "remove it"). TrainingPeaks prints a
+              workout's EF on that workout, never as a fitness-screen headline; the dashboard is the chart. The
+              trend line's caption ("1.650 → 1.498 over 12 weeks") is the read. */}
+          {(() => {
+            const f = fitTrend(eff);
+            return f ? (
+              <div className="flex items-baseline gap-1.5 mt-1">
+                <span className="readout-num text-[26px] leading-none">{fmtEff(f.end, isRide)}</span>
+                <span className="text-[12px] text-white/60">efficiency factor · {f.weeks}-week trend</span>
+              </div>
+            ) : (
+              <div className="text-[12px] text-white/60 mt-1">efficiency factor</div>
+            );
+          })()}
           <div className="text-[11px] text-white/55 mt-0.5">
             {isRide ? 'watts per heartbeat' : 'pace per heartbeat'} · higher is better
           </div>
@@ -242,8 +253,8 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
         </>
       )}
       {/* which session the headline IS — directly under the number it names, not under the drift line (2026-09-04) */}
-      {basedOn && (
-        <div className="text-[11px] text-white/55 mt-1">{basedOn}</div>
+      {leftOut > 0 && (
+        <div className="text-[11px] text-white/55 mt-1">{leftOut} {leftOut === 1 ? 'ride' : 'rides'} under 10 min in the aerobic band, not in the trend</div>
       )}
       {eff.length >= 2 && <DatedChart points={eff} color={color} dotNoun={isRide ? 'ride' : 'run'} fmtVal={(v) => fmtEff(v, isRide)} trendWord="efficiency" />}
 

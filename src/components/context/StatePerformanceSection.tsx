@@ -35,7 +35,7 @@ import EnduranceCheckpointSheet from '@/components/context/EnduranceCheckpointSh
 import LoadWeeksCard from '@/components/context/LoadWeeksCard';
 // ⛔ COLLAPSE TO ONE LINE PER SPORT (Round 3, 2026-09-01) — each sport shows a change-leading summary
 // and expands on tap. The summary wording is a set of pure functions so the confidence rule is pinned.
-import { fmtDayShort, latestPoint, strengthGlanceRows, type SportRow } from '@/lib/sport-summary';
+import { fmtDayShort, latestPoint, strengthGlanceRows, type SportRow , fitTrend} from '@/lib/sport-summary';
 import { getStoredUserId } from '@/lib/supabase';
 import TrendSparkline from '@/components/context/TrendSparkline';
 import { liftStatusLine } from '@/lib/strength-calibration-copy';
@@ -1083,13 +1083,17 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       const aero = ((stateDisplay as { enduranceSpine?: Array<{ sport?: string; group?: string; points?: Array<{ date?: string; efficiency?: number | null }> }> } | null | undefined)?.enduranceSpine)
         ?.find((s) => s?.sport === 'run' && s?.group === 'aerobic');
       const aeroPts = (aero?.points ?? []).filter((p): p is { date: string; efficiency: number } => p?.efficiency != null && !!p?.date).map((p) => ({ date: p.date, value: p.efficiency }));
+      // The row reads the TREND LINE (WKO5's fitted line), start → end, never one run (2026-09-04, Michael).
+      const aeroFit = fitTrend(aeroPts);
       const aeroLast = latestPoint(aeroPts);
-      if (aeroLast != null) {
+      if (aeroFit != null) {
         rows.unshift({
           name: 'aerobic efficiency',
-          value: fmtEff(aeroLast.value, false),
-          note: `${fmtDayShort(aeroLast.date)} run`,
+          value: fmtEff(aeroFit.end, false),
+          note: `${aeroFit.weeks}-week trend · from ${fmtEff(aeroFit.start, false)} · ${aeroFit.n} runs`,
         });
+      } else if (aeroLast != null) {
+        rows.unshift({ name: 'aerobic efficiency', value: fmtEff(aeroLast.value, false), note: `${fmtDayShort(aeroLast.date)} run · too few for a trend` });
       }
       // ⛔ THE WEEK'S RUN POINTS AGAINST THE ATHLETE'S TYPICAL (Michael 2026-09-02: run load scored Strava's
       // way). Read off the display contract — `loadByDiscipline.run = { week, typical }` from compute-snapshot
@@ -1141,14 +1145,16 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       const ftpBasis = bf?.efficiency?.basis === 'personal' ? 'tested'
         : bf?.efficiency?.basis === 'coggan_ftp' ? 'estimated' : null;
       if (ftp != null) rows.push({ name: 'FTP', value: `${ftp} W`, note: ftpBasis ?? undefined });
-      if (efLast != null) {
-        // TrainingPeaks' way, whole (2026-09-04): the last steady ride's EF and its date. No arrow — the
-        // ↑→↓ states were Garmin's rule on a TrainingPeaks number. The open card's line is the trend.
+      const efFit = fitTrend(efPts);
+      if (efFit != null) {
+        // The row reads the TREND LINE (WKO5's fitted line), start → end, never one ride (2026-09-04, Michael).
         rows.push({
           name: 'efficiency factor',
-          value: fmtEff(efLast.value, true),
-          note: `${fmtDayShort(efLast.date)} ride`,
+          value: fmtEff(efFit.end, true),
+          note: `${efFit.weeks}-week trend · from ${fmtEff(efFit.start, true)} · ${efFit.n} rides`,
         });
+      } else if (efLast != null) {
+        rows.push({ name: 'efficiency factor', value: fmtEff(efLast.value, true), note: `${fmtDayShort(efLast.date)} ride · too few for a trend` });
       }
       if (rows.length) return rows;
       // Nothing measurable yet — the ride count, never a fabricated number.

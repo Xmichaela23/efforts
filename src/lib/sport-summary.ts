@@ -103,3 +103,24 @@ export function strengthGlanceRows(
       : { name: l.displayName, value: String(n) };
   });
 }
+
+/**
+ * ⛔ THE TRENDLINE — WKO5's fitted line through the dashboard dots (2026-09-04, Michael: "this line means
+ * nothing; it needs something that says what it is"). Least squares of value on date. Returns the line's
+ * start and end values and the span in weeks (capped at 12). Nothing about the last session, no verdict
+ * word; the caption prints "1.650 → 1.498". One definition — the chart and the closed rows both read it.
+ */
+export function fitTrend(points: ReadonlyArray<{ date: string; value: number }>): { start: number; end: number; weeks: number; n: number } | null {
+  const pts = [...points].filter((p) => Number.isFinite(p.value) && !!p.date).sort((a, b) => a.date.localeCompare(b.date));
+  if (pts.length < 3) return null;
+  const t0 = Date.parse(pts[0].date + 'T12:00:00Z');
+  const xs = pts.map((p) => (Date.parse(p.date + 'T12:00:00Z') - t0) / 86_400_000);
+  const ys = pts.map((p) => p.value);
+  const n = xs.length, mx = xs.reduce((a, b) => a + b, 0) / n, my = ys.reduce((a, b) => a + b, 0) / n;
+  let sxy = 0, sxx = 0;
+  for (let i = 0; i < n; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sxx += (xs[i] - mx) ** 2; }
+  if (sxx === 0) return null;
+  const slope = sxy / sxx, intercept = my - slope * mx;
+  const weeks = Math.min(12, Math.max(1, Math.ceil(xs[n - 1] / 7)));
+  return { start: intercept, end: intercept + slope * xs[n - 1], weeks, n };
+}

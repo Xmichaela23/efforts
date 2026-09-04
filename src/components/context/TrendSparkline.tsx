@@ -1,3 +1,4 @@
+import { fitTrend } from '@/lib/sport-summary';
 import React from 'react';
 import { getDisciplineColor } from '@/lib/context-utils';
 
@@ -73,18 +74,7 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
   // that says what it is"). TrainingPeaks' dashboard chart of Pa:Hr / EF is bare dots; WKO5, its analysis tool,
   // adds a fitted trendline. Least squares on (date, value); the caption prints the line's start and end
   // values — "8.1% → 5.2%" — nothing about the last session, no improving/sliding word.
-  const fit = (() => {
-    if (!trendline || pts.length < 3) return null;
-    const t0 = Date.parse(pts[0].date + 'T12:00:00Z');
-    const xs = pts.map((p) => (Date.parse(p.date + 'T12:00:00Z') - t0) / 86_400_000);
-    const ys = pts.map((p) => p.value);
-    const n = xs.length, mx = xs.reduce((a, b) => a + b, 0) / n, my = ys.reduce((a, b) => a + b, 0) / n;
-    let sxy = 0, sxx = 0;
-    for (let i = 0; i < n; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sxx += (xs[i] - mx) ** 2; }
-    if (sxx === 0) return null;
-    const slope = sxy / sxx, intercept = my - slope * mx;
-    return { start: intercept, end: intercept + slope * xs[n - 1] };
-  })();
+  const fit = trendline ? fitTrend(pts) : null;
   return (
     <span className="basis-full flex flex-col gap-1 mt-1.5">
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="block" aria-hidden="true">
