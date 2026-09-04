@@ -1539,33 +1539,26 @@ Deno.serve(async (req)=>{
       console.error('[ingest-activity] adapt-plan auto trigger error:', e);
     }
 
-    // Warm learned profile + memory + snapshot (Garmin/ongoing: bounded). Strava bulk import uses
-    // import-strava-history + strava-webhook chains — skip here for provider=strava to avoid duplicate work.
+    // Warm learned profile + memory + snapshot on every completed Garmin workout. Strava runs the same
+    // pipeline from its own chains (import-strava-history + strava-webhook) — skipped here so it fires once.
     try {
+      // ⛔ ONE RULE FOR WHEN THE ATHLETE'S NUMBERS ARE RE-READ (2026-09-03, Michael: "they should be
+      // identical"). Re-learn after ANY completed workout, whatever provider it arrived on — the same
+      // thing `strava-webhook` has always done on create.
+      //
+      // ⛔ WHAT WAS HERE AND WHY IT IS GONE. Garmin carried a hand-rolled throttle: re-learn on the
+      // athlete's 1st, 2nd, 5th and 10th completed workout, and after that AT MOST WEEKLY (off
+      // `athlete_identity.inferred_at`). It was written when Garmin was the only way in and a history
+      // backfill could flood the pipeline; Strava arrived later, past that problem, and simply ran it
+      // every time. The result was one question — "when do we re-read the athlete's numbers?" —
+      // answered four different ways by four ingest paths that do not know about each other, so the
+      // SAME RIDE moved an athlete's FTP today on Strava and up to a week later on Garmin.
+      // ⚠️ The `provider === 'garmin'` guard STAYS: Strava's own chains (`strava-webhook`,
+      // `import-strava-history`) already run this pipeline, and firing it here too would double the
+      // work on every Strava activity. Same rule, still one caller per provider.
       if (provider === 'garmin' && row.workout_status === 'completed') {
-        const { count } = await supabase
-          .from('workouts')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', userId)
-          .eq('workout_status', 'completed');
-        const n = typeof count === 'number' ? count : 0;
-        const { data: bl } = await supabase
-          .from('user_baselines')
-          .select('athlete_identity')
-          .eq('user_id', userId)
-          .maybeSingle();
-        const aid: any = bl?.athlete_identity || {};
-        const inferredAt = aid?.inferred_at ? new Date(aid.inferred_at).getTime() : 0;
-        const weekMs = 7 * 24 * 60 * 60 * 1000;
-        const needsWeekly = inferredAt > 0 && (Date.now() - inferredAt) > weekMs;
-        const neverInferred = !aid?.inferred_at;
-        const milestone = n === 1 || n === 2 || n === 5 || n === 10;
-        const runPipeline =
-          (milestone && n <= 10) || (n > 10 && (needsWeekly || neverInferred));
-        if (runPipeline) {
-          const { runPostImportAthletePipeline } = await import('../_shared/post-import-athlete-pipeline.ts');
-          await runPostImportAthletePipeline(String(userId), 'ingest-activity');
-        }
+        const { runPostImportAthletePipeline } = await import('../_shared/post-import-athlete-pipeline.ts');
+        await runPostImportAthletePipeline(String(userId), 'ingest-activity');
       }
     } catch (pipeErr) {
       console.error('[ingest-activity] post-import athlete pipeline:', pipeErr);
