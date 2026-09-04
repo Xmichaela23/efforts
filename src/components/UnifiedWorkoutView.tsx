@@ -190,22 +190,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const [assocOpen, setAssocOpen] = useState(false);
   const [undoing, setUndoing] = useState(false);
   const [updatedWorkoutData, setUpdatedWorkoutData] = useState<any | null>(null);
-  /**
-   * ⛔ THE GARMIN "View" LINK NEEDS THE CONNECT ACTIVITY ID, NOT THE SUMMARY ID (2026-09-03, Michael:
-   * "the view takes you to a dead page").
-   *
-   * `workouts.garmin_activity_id` is Garmin's PUSH `summaryId` (`ingest-activity` writes
-   * `summaryId || activityId`, and `garmin-webhook-activities` stores `garmin_activity_id: summaryId`).
-   * connect.garmin.com/modern/activity/<id> wants the numeric `activityId`, which is a DIFFERENT number
-   * and is kept beside it as `garmin_activities.activity_id` — the webhook's own comment at that write
-   * says "connect modern activity summary by numeric activityId". Building the URL from the summary id
-   * produced a page that does not exist.
-   *
-   * ⚠️ NO LINK RATHER THAN A DEAD ONE: when the numeric id cannot be resolved (an older row, a history
-   * import that never carried one), the View link is not rendered at all. The attribution stays either
-   * way — it is required whether or not there is somewhere to link to.
-   */
-  const [garminConnectId, setGarminConnectId] = useState<string | null>(null);
   const recomputeGuardRef = useRef<Set<string>>(new Set());
   // Suppress auto re-link fallback briefly after an explicit Unattach
   const suppressRelinkUntil = useRef<number>(0);
@@ -245,32 +229,30 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     .map((it: { planned?: unknown }) => (it?.planned ?? null))
     .filter(Boolean);
   
-  // Resolve the Connect activity id for the View link — see `garminConnectId` above for why the id on
-  // the workout row cannot be used. One read, keyed on the summary id, and it never blocks the render.
-  const garminSummaryId = String((workout as Record<string, unknown> | null)?.garmin_activity_id ?? '');
-  useEffect(() => {
-    const summaryId = garminSummaryId;
-    if (!summaryId) { setGarminConnectId(null); return; }
-    let cancelled = false;
-    void (async () => {
-      try {
-        // Scoped to the signed-in athlete, the way every other read of this table is — never on RLS alone.
-        const { data: auth } = await supabase.auth.getUser();
-        const uid = auth?.user?.id;
-        if (!uid) { if (!cancelled) setGarminConnectId(null); return; }
-        const { data } = await supabase
-          .from('garmin_activities')
-          .select('activity_id')
-          .eq('user_id', uid)
-          .eq('garmin_activity_id', summaryId)
-          .maybeSingle();
-        // Only a plain number is a Connect activity id; anything else would rebuild the dead link.
-        const id = data?.activity_id != null ? String(data.activity_id) : '';
-        if (!cancelled) setGarminConnectId(/^\d+$/.test(id) ? id : null);
-      } catch { if (!cancelled) setGarminConnectId(null); }
-    })();
-    return () => { cancelled = true; };
-  }, [garminSummaryId]);
+  /**
+   * ⛔ THE CONNECT ACTIVITY ID IS THE STORED ID WITH "-detail" STRIPPED (2026-09-03, Michael: "the view
+   * takes you to a dead page"). VERIFIED against his own rows and the activity he opened on Garmin.
+   *
+   * `workouts.garmin_activity_id` holds Garmin's push `summaryId`, and for an activity that arrived by
+   * the detail callback that string is the activity id with `-detail` appended:
+   *   stored  `24229821509-detail`
+   *   Connect `connect.garmin.com/app/activity/24229821509`
+   * `garmin_activities.activity_id` — the obvious place to look for the number — is NULL on every row:
+   * the webhook writes `activity.activityId || null` and Garmin's push does not carry that field.
+   * The codebase already knew about the suffix — `garmin-webhook-activities` normalizes it for Garmin's
+   * own endpoints ("range details often append '-detail'; summary endpoints expect the base id").
+   *
+   * ⚠️ NOT A PATH PROBLEM. `/modern/activity/<id>` answers 302 to `/app/activity/<id>` and loads, so the
+   * old-style URL was never the fault; the id in it did not exist.
+   * ⚠️ NO LINK RATHER THAN A DEAD ONE: anything that is not a plain number after the strip gets no View
+   * link. The attribution is unaffected — it is required whether or not there is somewhere to link to.
+   */
+  const garminConnectId = (() => {
+    const raw = String((workout as Record<string, unknown> | null)?.garmin_activity_id ?? '').trim();
+    const base = raw.replace(/-detail$/i, '');
+    return /^\d+$/.test(base) ? base : null;
+  })();
+
 
   // Listen for workout invalidation events to refresh data (both singular and plural events)
   useEffect(() => {
@@ -1091,8 +1073,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           }
 
           if (source === 'garmin' || garminId) {
-            // ⛔ THE NUMERIC CONNECT ID, NEVER THE SUMMARY ID ON THE WORKOUT ROW — see `garminConnectId`.
-            const garminUrl = garminConnectId ? `https://connect.garmin.com/modern/activity/${garminConnectId}` : null;
+            // ⛔ THE ID WITH "-detail" STRIPPED — see `garminConnectId`. `/app/activity/` is the address
+            // Garmin serves today; `/modern/activity/` only redirects to it, so link straight there.
+            const garminUrl = garminConnectId ? `https://connect.garmin.com/app/activity/${garminConnectId}` : null;
             return (
               <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                 <span className="text-gray-400 text-sm">via</span>
