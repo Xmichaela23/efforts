@@ -78,15 +78,16 @@ serve(async (req) => {
     const description = shareBody(exercises);
     if (!description) return json({ error: 'No completed sets on that session.' }, 400);
 
-    // ⛔ ELAPSED TIME IS REQUIRED BY STRAVA and must be seconds. `duration` on a workout row is
-    // MINUTES; the recorded seconds, when the logger kept them, are the better number. A session
-    // with neither gets a floor rather than a zero, which Strava rejects.
+    // ⛔ ELAPSED TIME IS REQUIRED BY STRAVA AND MUST BE SECONDS. ⚠️ EVERY DURATION COLUMN ON A
+    // WORKOUT ROW IS MINUTES: `ingest-activity` divides by 60 before writing `duration`,
+    // `moving_time` AND `elapsed_time` on both the Strava and the Garmin paths. Only the
+    // `metrics.*_seconds` fields are seconds, and they say so in their names. A first cut here read
+    // the columns as seconds and would have posted a 52-minute session to Strava as 52 seconds.
     const row = workout as Record<string, unknown>;
     const metrics = (row.metrics ?? {}) as Record<string, unknown>;
-    const secs = Number(row.elapsed_time)
-      || Number(row.moving_time)
-      || Number(metrics.total_duration_seconds)
-      || (Number(workout.duration) > 0 ? Math.round(Number(workout.duration) * 60) : 0);
+    const trueSeconds = Number(metrics.moving_time_seconds) || Number(metrics.total_elapsed_time_seconds) || 0;
+    const minutes = Number(row.elapsed_time) || Number(row.moving_time) || Number(workout.duration) || 0;
+    const secs = trueSeconds > 0 ? trueSeconds : (minutes > 0 ? Math.round(minutes * 60) : 0);
     const elapsed = secs > 0 ? secs : 1800;
 
     // Strava wants a local ISO time with no zone suffix. The row's timestamp is the session's own
