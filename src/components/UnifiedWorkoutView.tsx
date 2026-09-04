@@ -1049,9 +1049,21 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             return (
               <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                 <span className="text-gray-400 text-xs">via</span>
-                <svg width="8" height="10" viewBox="0 0 10 12" className="flex-shrink-0">
-                  <polygon points="5,0 10,10 0,10" fill="#007CC3"/>
-                </svg>
+                {/**
+                  * ⛔ GARMIN'S OWN TILE, NOT ONE WE DREW (2026-09-03). This was a hand-made blue triangle
+                  * (`<polygon points="5,0 10,10 0,10" fill="#007CC3"/>`) standing in for a Garmin mark —
+                  * an invented, stylized mark in Garmin's blue, which their API brand guidelines
+                  * (v 6.30.2025) do not permit: the tag logo must come from their files, unaltered, and an
+                  * app name may not be abbreviated, truncated or stylized. The file is the official Garmin
+                  * Connect app tile from `developer.garmin.com/downloads/brand/Garmin-Connect-Branding-Assets.zip`,
+                  * resized only. ⚠️ Never recolour, crop or animate it, and never show it where the data did
+                  * not come from a Garmin device.
+                  */}
+                <img
+                  src="/icons/garmin-connect-tile.png"
+                  alt="Garmin Connect"
+                  className="h-3.5 w-3.5 rounded-[3px] flex-shrink-0"
+                />
                 <span className="text-[#007CC3] font-light text-xs">Garmin Connect</span>
                 {deviceName && <span className="text-gray-400 text-xs">({deviceName})</span>}
                 {garminUrl && (

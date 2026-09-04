@@ -1889,6 +1889,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             </>
                           ) : providerAttr.source === 'garmin' ? (
                             <>
+                              {/* Garmin's own app tile, from their branding assets zip, resized only —
+                                  the Strava line above carries Strava's mark, and this row had none. */}
+                              <img
+                                src="/icons/garmin-connect-tile.png"
+                                alt="Garmin Connect"
+                                className="h-3.5 w-3.5 rounded-[3px] flex-shrink-0"
+                              />
                               <span className="text-xs font-light" style={{ color: 'rgba(0, 124, 195, 0.95)' }}>
                                 Garmin Connect
                               </span>

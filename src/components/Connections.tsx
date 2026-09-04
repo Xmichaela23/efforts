@@ -691,11 +691,15 @@ const Connections: React.FC = () => {
           </div>
         );
       case 'garmin':
+        // ⛔ GARMIN'S OWN APP TILE (2026-09-03). This was a generic circle-and-lines glyph tinted blue —
+        // not a Garmin mark at all. Their API brand guidelines (v 6.30.2025) are explicit for this screen:
+        // "when presenting to customers or authenticating an application that integrates with an official
+        // Garmin app, use the full app name and tile to display the connection." The file is the official
+        // Garmin Connect app tile from their branding assets zip, resized only — never recoloured, cropped
+        // or animated, and never shown where Garmin data is not present.
         return (
           <div className="flex items-center justify-center w-5 h-5">
-            <svg viewBox="0 0 24 24" className="w-5 h-5 text-blue-600">
-              <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-            </svg>
+            <img src="/icons/garmin-connect-tile.png" alt="Garmin Connect" className="w-5 h-5 rounded-[4px]" />
           </div>
         );
       default:
@@ -707,8 +711,11 @@ const Connections: React.FC = () => {
     switch (provider) {
       case 'strava':
         return 'Strava';
+      // ⛔ THE FULL APP NAME, NEVER ABBREVIATED (Garmin API brand guidelines v 6.30.2025: "do not
+      // abbreviate, truncate or stylize the Garmin app name"). This read "Garmin"; the app is
+      // "Garmin Connect", which is also what every other surface in this app already calls it.
       case 'garmin':
-        return 'Garmin';
+        return 'Garmin Connect';
       default:
         return provider.charAt(0).toUpperCase() + provider.slice(1);
     }
