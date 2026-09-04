@@ -34,7 +34,6 @@ import {
   getMobilityIntensity,
   calculateMobilityWorkload,
   calculatePilatesYogaWorkload,
-  inferIntensityFromPerformance,
   resolveCardioIntensity,
   calculateDurationWorkload,
   classifyWorkloadMethod,
@@ -468,7 +467,7 @@ serve(async (req) => {
     const _wt = String(finalWorkoutData.type || '').toLowerCase()
     const _isCardio = _wt === 'run' || _wt === 'ride' || _wt === 'bike' || _wt === 'swim'
     const _rpeVal = sessionRPE ?? (finalWorkoutData.workout_metadata || {}).session_rpe
-    const noPerformanceInference = _isCardio && inferIntensityFromPerformance({
+    const noPerformanceInference = _isCardio && !['power', 'hr', 'pace'].includes(resolveCardioIntensity({
       type: _wt,
       avgHr: finalWorkoutData.avg_heart_rate,
       thresholdHr: finalWorkoutData.threshold_heart_rate,
@@ -476,7 +475,7 @@ serve(async (req) => {
       normalizedPower: finalWorkoutData.normalized_power ?? finalWorkoutData.computed?.analysis?.power?.normalized_power ?? null,
       ftp: finalWorkoutData.functional_threshold_power,
       avgPace: finalWorkoutData.avg_pace,
-    }) === 0
+    }).method)
     const rpeAvailable = typeof _rpeVal === 'number' && _rpeVal >= 1 && _rpeVal <= 10
     const { method: workloadMethodClassified, estimated: workloadEstimated } = classifyWorkloadMethod({
       type: _wt,
