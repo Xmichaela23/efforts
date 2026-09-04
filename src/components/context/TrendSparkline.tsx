@@ -36,11 +36,15 @@ import { getDisciplineColor } from '@/lib/context-utils';
  * "1.24–1.90" means nothing to a reader — the shape is the message. Strength passes a lb unit and
  * keeps its range, where the numbers are self-explanatory.
  */
-export default function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, caption, buildingLabel = (w: number) => `building · ${w} of 12 weeks` }: {
+export default function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, caption, buildingLabel = (w: number) => `building · ${w} of 12 weeks`, trendline = false, trendWord }: {
   series?: Array<{ date: string; value: number; recent: boolean; tempF?: number | null }>;
   color?: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string; minSpanFraction?: number;
   buildingLabel?: (spanWeeks: number) => string;
   caption?: string | null;
+  /** Draw a least-squares line through the dots and say where it starts and ends (WKO5's chart trendline). */
+  trendline?: boolean;
+  /** The noun for the caption, e.g. 'efficiency' / 'drift'. */
+  trendWord?: string;
 }) {
   const pts = Array.isArray(series) ? series : [];
   if (pts.length < 2) {
@@ -65,6 +69,22 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
   const spanWeeksRaw = Math.max(1, Math.ceil((Date.parse(last.date + 'T12:00:00Z') - Date.parse(pts[0].date + 'T12:00:00Z')) / (7 * 86_400_000)));
   const spanWeeks = Math.min(12, spanWeeksRaw);
   const building = spanWeeks < 11;
+  // ⛔ THE TRENDLINE IS A FIT, NOT A VERDICT (2026-09-04, Michael: "this line means nothing; it needs something
+  // that says what it is"). TrainingPeaks' dashboard chart of Pa:Hr / EF is bare dots; WKO5, its analysis tool,
+  // adds a fitted trendline. Least squares on (date, value); the caption prints the line's start and end
+  // values — "8.1% → 5.2%" — nothing about the last session, no improving/sliding word.
+  const fit = (() => {
+    if (!trendline || pts.length < 3) return null;
+    const t0 = Date.parse(pts[0].date + 'T12:00:00Z');
+    const xs = pts.map((p) => (Date.parse(p.date + 'T12:00:00Z') - t0) / 86_400_000);
+    const ys = pts.map((p) => p.value);
+    const n = xs.length, mx = xs.reduce((a, b) => a + b, 0) / n, my = ys.reduce((a, b) => a + b, 0) / n;
+    let sxy = 0, sxx = 0;
+    for (let i = 0; i < n; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sxx += (xs[i] - mx) ** 2; }
+    if (sxx === 0) return null;
+    const slope = sxy / sxx, intercept = my - slope * mx;
+    return { start: intercept, end: intercept + slope * xs[n - 1] };
+  })();
   return (
     <span className="basis-full flex flex-col gap-1 mt-1.5">
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="block" aria-hidden="true">
@@ -75,7 +95,13 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
           <circle key={p.date + i} cx={x(i)} cy={y(p.value)} r={1.6} fill={runColor} fillOpacity={0.8} />
         ))}
         <circle cx={x(pts.length - 1)} cy={y(last.value)} r={2.5} fill={runColor} />
+        {fit && <line x1={x(0)} y1={y(fit.start)} x2={x(pts.length - 1)} y2={y(fit.end)} stroke="rgba(255,255,255,0.55)" strokeWidth={1} strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />}
       </svg>
+      {fit && (
+        <span className="text-[11px] text-white/70">
+          {trendWord ? `${trendWord} ` : ''}over {spanWeeks} {spanWeeks === 1 ? 'week' : 'weeks'}: <span className="tabular-nums">{fmtVal(fit.start)}{unit}</span> → <span className="tabular-nums">{fmtVal(fit.end)}{unit}</span>
+        </span>
+      )}
       <span className="text-[10px] text-white/45 flex items-center justify-between">
         <span>{building ? buildingLabel(spanWeeks) : `last ${spanWeeks} weeks`}</span>
         {unit ? <span className="tabular-nums text-white/30">{fmtVal(minV)}–{fmtVal(maxV)}{unit}</span> : <span />}

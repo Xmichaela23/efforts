@@ -245,7 +245,7 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
       {basedOn && (
         <div className="text-[11px] text-white/55 mt-1">{basedOn}</div>
       )}
-      {eff.length >= 2 && <DatedChart points={eff} color={color} dotNoun={isRide ? 'ride' : 'run'} />}
+      {eff.length >= 2 && <DatedChart points={eff} color={color} dotNoun={isRide ? 'ride' : 'run'} fmtVal={(v) => fmtEff(v, isRide)} trendWord="efficiency" />}
 
       {/* ⛔ THE "one session doesn't tell you much" CAUTION MOVED TO ONCE PER SPORT (Round 3 pass 2).
           It was printed under EVERY spine card (easy / long / quality / rides), which is the "said
@@ -265,7 +265,7 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
           show nothing — a number for a non-steady effort is not the same number. */}
       {/* the drift trend — the number the field trends (Pa:Hr / Pw:Hr), as a line and the last-4-weeks average, no verdict */}
       {driftPts.length >= 2 && (
-        <DatedChart points={driftPts} color={color} dotNoun={isRide ? 'steady ride' : 'run'} fmtVal={fmtDrift} unit="%" />
+        <DatedChart points={driftPts} color={color} dotNoun={isRide ? 'steady ride' : 'run'} fmtVal={fmtDrift} unit="%" trendWord="drift" />
       )}
       {/* ⛔ NO SINGLE-SESSION DRIFT NUMBER ON STATE (2026-09-04, Michael: "you're using the last run to give a drift
           reading"). This is the trend screen; one run's drift lives on that run. TrainingPeaks' dashboard shows the
@@ -370,9 +370,9 @@ function SessionChart({ points, color, valueOf }: {
  * exactly as before.
  */
 // The chart is one colour now (2026-09-04); `recent` is carried only because the series type asks for it.
-function DatedChart({ points, color, dotNoun = 'session', fmtVal, unit }: { points: Array<{ date: string; value: number }>; color: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string }) {
+function DatedChart({ points, color, dotNoun = 'session', fmtVal, unit, trendWord }: { points: Array<{ date: string; value: number }>; color: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string; trendWord?: string }) {
   const series = points.map((p) => ({ date: p.date, value: p.value, recent: true }));
-  return <TrendSparkline series={series} color={color} dotNoun={dotNoun} {...(fmtVal ? { fmtVal } : {})} {...(unit ? { unit } : {})} />;
+  return <TrendSparkline series={series} color={color} dotNoun={dotNoun} {...(fmtVal ? { fmtVal } : {})} {...(unit ? { unit } : {})} trendline={!!trendWord} trendWord={trendWord} />;
 }
 
 export default EnduranceReadCards;
