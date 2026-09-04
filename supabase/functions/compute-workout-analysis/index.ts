@@ -12,7 +12,7 @@ import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts'
 import { runEasyZone3FloorBpm } from '../_shared/easy-hr.ts';
 import { paceToGAP } from '../_shared/gap.ts'; // ONE canonical Grade-Adjusted Pace (Minetti) — no inline copy
 
-const ANALYSIS_VERSION = 'v0.1.9'; // NP zero-preserve + 30s Coggan startup trim (D-112)
+const ANALYSIS_VERSION = 'v0.2.0'; // Ride: absent power sample = coasting second, filled as 0 W (D-112 follow-up)
 
 
 function smoothEMA(values: (number|null)[], alpha = 0.25): (number|null)[] {
@@ -1175,49 +1175,11 @@ Deno.serve(async (req) => {
       gps = parseJson(ga.gps_track) || [];
     }
 
-  // Build minimal provider-agnostic analysis rows (time, dist, elev, hr, cadences, power, speed)
-  // OLD - Replaced by shared library: supabase/lib/analysis/sensor-data/extractor.ts
-  // Keeping as backup for rollback if needed
-  /*
-  function normalizeSamples(samplesIn: any[]): Array<{ t:number; d:number; elev?:number; hr?:number; cad_spm?:number; cad_rpm?:number; power_w?:number; v_mps?:number }> {
-    const out: Array<{ t:number; d:number; elev?:number; hr?:number; cad_spm?:number; cad_rpm?:number; power_w?:number; v_mps?:number }> = [];
-      for (let i=0;i<samplesIn.length;i+=1) {
-        const s = samplesIn[i] || {} as any;
-        const t = Number(
-          s.timerDurationInSeconds ?? s.clockDurationInSeconds ?? s.elapsed_s ?? s.offsetInSeconds ?? s.startTimeInSeconds ?? i
-        );
-        const d = Number(
-          s.totalDistanceInMeters ?? s.distanceInMeters ?? s.cumulativeDistanceInMeters ?? s.totalDistance ?? s.distance
-        );
-        const elev = (typeof s.elevationInMeters === 'number' && s.elevationInMeters) || (typeof s.altitudeInMeters === 'number' && s.altitudeInMeters) || (typeof s.altitude === 'number' && s.altitude) || undefined;
-        const hr = (typeof s.heartRate === 'number' && s.heartRate) || (typeof s.heart_rate === 'number' && s.heart_rate) || (typeof s.heartRateInBeatsPerMinute === 'number' && s.heartRateInBeatsPerMinute) || undefined;
-      const cad_spm = (typeof s.stepsPerMinute === 'number' && s.stepsPerMinute) || (typeof s.runCadence === 'number' && s.runCadence) || undefined;
-      // Bike cadence commonly lives in bikeCadenceInRPM/bikeCadence/cadence
-      const cad_rpm = (typeof s.bikeCadenceInRPM === 'number' && s.bikeCadenceInRPM)
-        || (typeof s.bikeCadence === 'number' && s.bikeCadence)
-        || (typeof s.cadence === 'number' && s.cadence)
-        || undefined;
-      const power_w = (typeof s.power === 'number' && s.power) || (typeof s.watts === 'number' && s.watts) || undefined;
-      const v_mps = (typeof s.speedMetersPerSecond === 'number' && s.speedMetersPerSecond) || (typeof s.v === 'number' && s.v) || undefined;
-      out.push({ t: Number.isFinite(t)?t:i, d: Number.isFinite(d)?d:NaN, elev, hr, cad_spm, cad_rpm, power_w, v_mps });
-      }
-      out.sort((a,b)=>(a.t||0)-(b.t||0));
-      if (!out.length) return out;
-      // Fill distance if missing by integrating speed if provided, else leave NaN and fix later
-      // Backfill NaNs with previous value
-      let lastD = Number.isFinite(out[0].d) ? out[0].d : 0;
-      out[0].d = lastD;
-      for (let i=1;i<out.length;i+=1) {
-        const d = out[i].d;
-        if (!Number.isFinite(d) || d < lastD) {
-          out[i].d = lastD; // enforce monotonic
-        } else {
-          lastD = d;
-        }
-      }
-      return out;
-    }
-  */
+  // Rows come from the SHARED sensor extractor: supabase/lib/analysis/sensor-data/extractor.ts
+  // (imported at the top of this file). A commented-out duplicate of `normalizeSamples` used to sit
+  // here as a rollback backup and was deleted 2026-09-04 — it read as live code, and edits landed in
+  // it silently twice: once during D-112, once again while fixing the Garmin coasting gap. A dead
+  // copy of a function that still has a live caller by the same name is not a backup, it is a trap.
 
     // Build rows from sensor samples; fallback to GPS if needed
     let rows = normalizeSamples(sensor);
@@ -1296,6 +1258,41 @@ Deno.serve(async (req) => {
     const hasRows = rows.length >= 2;
     const d0 = hasRows ? (rows[0].d || 0) : 0;
     const t0 = hasRows ? (rows[0].t || 0) : 0;
+
+    /**
+     * ⛔ ON A BIKE, A MISSING POWER SAMPLE IS A COASTING SECOND (2026-09-03). D-112 fixed the
+     * adjacent half of this — 0 W was being coerced to undefined and stripped — but Garmin does not
+     * send 0 for coasting. It omits the field. Verified on the 2026-09-03 ride: 4115 samples,
+     * 2754 carrying power, 1361 with none, and ZERO samples holding an explicit 0. So D-112 had
+     * nothing to preserve and NP still averaged its 30-second windows over pedalling only: 164 W,
+     * against Garmin's 136 W and Strava's 131 W. Filling the gaps with 0 gives 131 W — Strava to
+     * the watt. The 33% gap is the same 33% the "% time pedalling" readout already reports, which
+     * is why that number was right while NP was not.
+     *
+     * Filled here, on the rows, rather than in the shared extractor: the extractor also feeds runs
+     * and swims, where an absent power sample means "this device has no power meter", not "the
+     * athlete stopped pedalling". Only a ride that produced SOME power gets the fill, so a ride
+     * recorded without a power meter is not turned into an all-zero stream.
+     *
+     * Fixes NP, Variability Index (its divisor was the pedalling-only mean), power-zone time
+     * (coasting now lands in the bottom zone, as Garmin and TrainingPeaks both count it) and the
+     * power graph (it now drops to zero when you stop pedalling instead of bridging the gap).
+     *
+     * Deliberately unchanged, because each already excludes non-pedalling itself: the power curve
+     * and best-20-min (`rollingMaxAverage` filters `v > 0`, so outdoor descents cannot drag the
+     * window down and the FTP learner's input is untouched), avg pedalling power and % time
+     * pedalling (`> 25 W`, already reading missing as 0), and ride efficiency / decoupling (`p > 0`).
+     */
+    if (hasRows && /ride|bike|cycl/i.test(sport)) {
+      const anyPower = rows.some((r) => typeof r.power_w === 'number' && Number.isFinite(r.power_w as number));
+      if (anyPower) {
+        for (let i = 0; i < rows.length; i += 1) {
+          if (typeof rows[i].power_w !== 'number' || !Number.isFinite(rows[i].power_w as number)) {
+            rows[i].power_w = 0;
+          }
+        }
+      }
+    }
 
     // Series
     const time_s: number[] = [];
