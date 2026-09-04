@@ -1888,23 +1888,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                               )}
                             </>
                           ) : providerAttr.source === 'garmin' ? (
-                            <>
-                              {/* Garmin's own app tile, from their branding assets zip, resized only —
-                                  the Strava line above carries Strava's mark, and this row had none. */}
-                              <img
-                                src="/icons/garmin-connect-tile.png"
-                                alt="Garmin Connect"
-                                className="h-3.5 w-3.5 rounded-[3px] flex-shrink-0"
-                              />
-                              <span className="text-xs font-light" style={{ color: 'rgba(0, 124, 195, 0.95)' }}>
-                                Garmin Connect
-                              </span>
-                              {providerAttr.deviceName && (
-                                <span className="text-xs font-light" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                                  ({providerAttr.deviceName})
-                                </span>
-                              )}
-                            </>
+                            /* ⛔ "Garmin [device model]", the form their API brand guidelines set for data
+                               (v 6.30.2025). The logo is optional beside it, the text is not, and no
+                               typeface is specified. "Garmin Connect" is the app name and lives on the
+                               connection screen. Never absent: with no model, Garmin alone is the source. */
+                            <span className="text-xs font-light" style={{ color: 'rgba(0, 124, 195, 0.95)' }}>
+                              {providerAttr.deviceName ? `Garmin ${providerAttr.deviceName}` : 'Garmin'}
+                            </span>
                           ) : null}
                         </div>
                       ) : null}

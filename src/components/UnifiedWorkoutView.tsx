@@ -1050,22 +1050,25 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                 <span className="text-gray-400 text-xs">via</span>
                 {/**
-                  * ⛔ GARMIN'S OWN TILE, NOT ONE WE DREW (2026-09-03). This was a hand-made blue triangle
-                  * (`<polygon points="5,0 10,10 0,10" fill="#007CC3"/>`) standing in for a Garmin mark —
-                  * an invented, stylized mark in Garmin's blue, which their API brand guidelines
-                  * (v 6.30.2025) do not permit: the tag logo must come from their files, unaltered, and an
-                  * app name may not be abbreviated, truncated or stylized. The file is the official Garmin
-                  * Connect app tile from `developer.garmin.com/downloads/brand/Garmin-Connect-Branding-Assets.zip`,
-                  * resized only. ⚠️ Never recolour, crop or animate it, and never show it where the data did
-                  * not come from a Garmin device.
+                  * ⛔ THE ATTRIBUTION IS "Garmin [device model]" AND NOTHING ELSE (2026-09-03).
+                  *
+                  * Garmin's API brand guidelines (v 6.30.2025) set the form for DATA: every dashboard,
+                  * activity feed, overview card or summary view carrying Garmin device-sourced data must
+                  * show a "Garmin [device model]" attribution, and it "can include the Garmin tag logo
+                  * followed by the device model or simply be listed in appropriately sized text: 'Garmin
+                  * [device model]'." The logo is OPTIONAL; the text is the requirement, and no typeface is
+                  * specified ("appropriately sized text").
+                  *
+                  * ⚠️ "Garmin Connect" is the APP NAME, and it belongs on the screen that presents or
+                  * authenticates the CONNECTION (see Connections.tsx) — not on a workout's data line.
+                  * ⚠️ IT MUST NEVER BE ABSENT: when the API gives no device model, their rule is to list
+                  * Garmin as the data source, so the fallback is the bare word.
+                  * ⛔ WHAT THIS REPLACED: a hand-drawn blue triangle polygon in Garmin's #007CC3 standing
+                  * in for their mark — an invented, stylized mark, which the guidelines do not permit.
                   */}
-                <img
-                  src="/icons/garmin-connect-tile.png"
-                  alt="Garmin Connect"
-                  className="h-3.5 w-3.5 rounded-[3px] flex-shrink-0"
-                />
-                <span className="text-[#007CC3] font-light text-xs">Garmin Connect</span>
-                {deviceName && <span className="text-gray-400 text-xs">({deviceName})</span>}
+                <span className="text-[#007CC3] font-light text-xs">
+                  {deviceName ? `Garmin ${deviceName}` : 'Garmin'}
+                </span>
                 {garminUrl && (
                   <>
                     <span className="text-gray-300">•</span>
