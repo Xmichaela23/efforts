@@ -39,6 +39,12 @@ stated and it is a decision Michael can reverse.
 | Easy/hard row pace | `compute-snapshot`, `state-trend/run.ts` | FIELD — grade-adjusted pace (TrainingPeaks NGP) when the run has elevation; raw recorded pace otherwise (TrainingPeaks' own fallback), flagged "flat pace, no elevation". |
 | Which runs are graded interval vs easy | `compute-facts classifyRunIntent` reads `workout_analysis.classified_type` | FIELD — the analyser's auto-detection from interval structure + name (Garmin/Strava/TrainingPeaks all auto-detect); heart rate ≥90% LTHR is the secondary rung when no plan/detection — 90% is Friel's Z2/Z3 run-zone boundary (Z2 85-89, Z3 90-94), the same zone table workload.ts reads, FIELD not ours. |
 
+| One chart template: label · big number · qualifier · chart · "over N weeks: start → end" · coverage · key | `TrendSparkline.tsx` | Layout is the app's (2026-09-05, Michael: "burying the lead"). Numbers unchanged; the fitted line is WKO5's. |
+| Athlete-set row order (reorder, up/down arrows) | `StatePerformanceSection.tsx`, `user_baselines.ui_prefs.state_row_order` | FIELD — Garmin Connect reorderable cards; TrainingPeaks reorderable dashboard charts. Default = goal-led order. |
+| Deload week = the TAPER/DELOAD column, deployed by the athlete from Adjust | `rematerialize-standing-block` (`taper_weeks`), `compose.ts composeBlock` | FIELD — Viada p274 (the column), p120 (never scheduled: overreach-to-deload rejected), p247 (switch to it two weeks out from a race or meet) |
+| Adjust tab edits (lifts → `locked_baselines`; FTP → `performance_numbers.ftp` + `ftp_source`; threshold pace → `threshold_pace_min_per_mi` + source; threshold HR → `configured_hr_zones.manual_run_lthr` + `lthr_source`) | `StateAdjustLens.tsx` via `AppContext.saveUserBaselines` | The same save Training Baselines uses; no second write path. |
+| Post-ride / post-run popup: a new measured FTP or threshold pace shows with accept | `PostWorkoutFeedback.tsx` | FIELD — TrainerRoad and Garmin surface a detected FTP as a card with accept. The learner runs when the popup opens so the number is fresh. |
+
 ## FTP
 
 | Number | Where | Source |

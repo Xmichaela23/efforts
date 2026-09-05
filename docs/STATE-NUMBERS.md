@@ -93,3 +93,36 @@ states laid over TrainingPeaks' numbers, and Garmin has no efficiency factor to 
 ---
 
 **Deployed:** everything in this file is live on `main` (13f8c53d) and on the server as of 2026-09-04. Stored strength points were re-priced to Friel's scale by `backfill-strength-load` (117 sessions).
+
+## Every chart on State — one shape (2026-09-05)
+
+Every chart on the open cards (FTP, best 20-minute power, efficiency, drift, run and ride) is drawn by one
+template, and reads top to bottom:
+
+| Line | What it is | Source |
+|---|---|---|
+| **Small label, one big number, small qualifier** (e.g. FTP · **167 W** · estimated Sep 4; EFFICIENCY · **0.89** · higher is better; DRIFT · **+4.3%** · 5% line for multisport) | The lead. The big number is the fitted line's value today, or the last point when there is no line. The right-hand number is low to high in the window. | Layout is the app's. The numbers are TrainingPeaks / WKO5 as ledgered above. |
+| **The chart** | One dot per session or reading, a dashed fitted line through them. | TrainingPeaks dashboard dots; WKO5 fitted trendline |
+| **over N weeks: start → end** | Where the fitted line starts and ends. | WKO5 trendline |
+| **N of 12 weeks · receipts** | Coverage while the window is still filling, plus the ride/run count behind the number. | — |
+| **dots: … · dashed: the trend** | One key line naming the dots and the dashed line. | — |
+
+**Best 20-minute power** is titled and keyed ("does not set FTP"): TrainingPeaks' Peak Power (20 min) chart, display only.
+**Drift** says "5% line for multisport", never "lower is better": p107's 5% is a ceiling for an athlete training more than one sport, not a target.
+
+## The row order is yours (2026-09-05)
+
+"reorder" above the sport rows: up/down arrows move STRENGTH / RUN / BIKE / SWIM; the order is saved to your
+account (`user_baselines.ui_prefs.state_row_order`) and holds on every device. Default is the goal-led order.
+Precedent: Garmin Connect's reorderable cards, TrainingPeaks' reorderable dashboard charts.
+
+## The Adjust tab — everything that changes next week (2026-09-05)
+
+| Control | What it does | Source |
+|---|---|---|
+| **Rebuild upcoming sessions** | Rewrites the sessions you have not started from the plan and the numbers on file. Done sessions untouched. | — |
+| **Deload: make week N a deload week** | Next week composes from the TAPER/DELOAD column: max-effort sets become skill and speed sets, the extra lower-body sets come out, endurance drops a level. Tap again to put it back. | Viada p274 (the column); p120 (no scheduled deload — it is a tool you deploy); p247 (switch to it two weeks out from a race or meet) |
+| **Retest** | Lower / Upper lifts open the logger's test session now. Run threshold, FTP 20-min and FTP 5-min go on the calendar three and two days out; a scheduled one shows its day and can be removed. | Viada p210 (run), p212 (20-min FTP), course Module 3 (5-min all-out) |
+| **The numbers** (Squat, Deadlift, Bench, Overhead Press · Threshold pace, Threshold heart rate, Easy pace · FTP) | The number each session is priced from, with "auto" or "your number" beside it. Tap to set your own; it saves the same way Baselines saves. Easy pace is threshold pace × 1.19 and follows threshold. | The shared resolvers (locked > learned/accepted > typed) |
+| **Your rides measure N W · use N W** / **Your runs measure m:ss · use it** | A newer confident measurement than the one in use. Nothing changes until you take it; then the unstarted run and ride sessions re-price. The same card appears on the popup after the ride or run that produced it, and at the six-week checkpoint. | TrainerRoad's proposed-then-accepted FTP; Garmin's detected-threshold prompt |
+
