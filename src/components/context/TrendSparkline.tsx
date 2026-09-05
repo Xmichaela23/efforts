@@ -87,7 +87,7 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
       {title && (
         <span className="flex items-baseline justify-between gap-2">
           <span className="text-[15px] text-white/90">{title}</span>
-          {rangeLabel && <span className="text-[12px] tabular-nums text-white/50">{rangeLabel}</span>}
+          {rangeLabel && <span className="text-[12px] tabular-nums text-white/50 whitespace-nowrap shrink-0">{rangeLabel}</span>}
         </span>
       )}
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="block" aria-hidden="true">
