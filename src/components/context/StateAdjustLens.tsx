@@ -203,7 +203,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
             {deloadBusy ? 'Rebuilding…' : nextIsDeload ? `Week ${nextWeek}: deload on · make it standard` : `Make week ${nextWeek} a deload week`}
           </button>
           <p className="text-[11px] text-white/35 mt-2 leading-snug">
-            The book's deload week: max-effort sets become skill and speed sets, the extra lower-body sets come out, and the endurance sessions drop a level. Use it when a race is near or you need a break.
+            Max-effort sets become skill and speed sets, the extra lower-body sets come out, and the endurance sessions drop a level. Switch to it two weeks out from a race or a meet. It is not a scheduled light week: the standard week is built to be run indefinitely.
           </p>
           {deload.taperWeeks.length > 0 && <p className="text-[11px] text-white/45 mt-1">Deload weeks: {deload.taperWeeks.join(', ')}</p>}
           {deloadNote && <p className="text-[12px] text-white/60 mt-1.5">{deloadNote}</p>}
