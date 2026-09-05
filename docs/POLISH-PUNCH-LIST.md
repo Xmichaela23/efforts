@@ -1309,7 +1309,15 @@ a new athlete, never Michael's numbers.
 
 ---
 
-## ME lift loses its warm-up ramp while awaiting a test (follow-up)
+## [x] CLOSED 2026-09-05 — ME lift loses its warm-up ramp while awaiting a test
+
+**Fixed the same night.** The squat's stale `awaiting_test` came from a by-feel row's logged set being read as
+a ladder rung (plus a test set without the all-out flag being dropped). The re-pricer now takes the heaviest
+completed set of a tagged test session as the test, a by-feel week sets no rung, and the top step is held
+inside the 1–5 band (rematerialize-standing-block v101, commit 71935074 and after). Michael's Sep 11 and
+Sep 18 squat rows read 105 × 1-5 with the full 45/60/80/95 ramp. Kept below for the record.
+
+### (original filing)
 
 **Not fixed. Found 2026-09-04 on the reference athlete's Sep 4 "Lower body: Push".**
 
