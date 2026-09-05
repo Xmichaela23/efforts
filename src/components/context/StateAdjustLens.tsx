@@ -171,12 +171,12 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   };
   return (
     <div className="px-0.5 overflow-x-hidden">
-      <p className="text-[13px] text-white/55 mb-4 leading-snug">
+      <p className="text-[14px] text-white/70 mb-4 leading-snug">
         Everything here changes your training from today forward. Nothing applies on its own.
       </p>
 
       <section className="mb-5">
-        <div className="text-[12px] uppercase tracking-wider text-white/45 mb-2">The block</div>
+        <div className="text-[12px] uppercase tracking-wider text-white/60 mb-2">The block</div>
         <button
           type="button"
           disabled={rebuilding}
@@ -185,15 +185,15 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         >
           {rebuilding ? 'Rebuilding…' : 'Rebuild upcoming sessions'}
         </button>
-        <p className="text-[11px] text-white/35 mt-2 leading-snug">
+        <p className="text-[13px] text-white/60 mt-2 leading-snug">
           Rewrites the sessions you have not started from the plan. Same lifts, weights and days. Done sessions are not touched.
         </p>
-        {rebuildNote && <p className="text-[12px] text-white/60 mt-1.5">{rebuildNote}</p>}
+        {rebuildNote && <p className="text-[13px] text-white/75 mt-1.5">{rebuildNote}</p>}
       </section>
 
       {deload && nextWeek != null && nextWeek <= deload.weeks && (
         <section className="mb-5">
-          <div className="text-[12px] uppercase tracking-wider text-white/45 mb-2">Deload</div>
+          <div className="text-[12px] uppercase tracking-wider text-white/60 mb-2">Deload</div>
           <button
             type="button"
             disabled={deloadBusy}
@@ -202,17 +202,17 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
           >
             {deloadBusy ? 'Rebuilding…' : nextIsDeload ? `Week ${nextWeek}: deload on · make it standard` : `Make week ${nextWeek} a deload week`}
           </button>
-          <p className="text-[11px] text-white/35 mt-2 leading-snug">
+          <p className="text-[13px] text-white/60 mt-2 leading-snug">
             Max-effort sets become skill and speed sets, the extra lower-body sets come out, and the endurance sessions drop a level. Switch to it two weeks out from a race or a meet. It is not a scheduled light week: the standard week is built to be run indefinitely.
           </p>
           {deload.taperWeeks.length > 0 && <p className="text-[11px] text-white/45 mt-1">Deload weeks: {deload.taperWeeks.join(', ')}</p>}
-          {deloadNote && <p className="text-[12px] text-white/60 mt-1.5">{deloadNote}</p>}
+          {deloadNote && <p className="text-[13px] text-white/75 mt-1.5">{deloadNote}</p>}
         </section>
       )}
 
       {/* STRENGTH — the deepest steer (swap / add / adjust weight already built; re-homing here next) */}
       <section className="mb-5">
-        <div className="text-[12px] uppercase tracking-wider text-white/45 mb-2">Strength</div>
+        <div className="text-[12px] uppercase tracking-wider text-white/60 mb-2">Strength</div>
         {perLift.length === 0 ? (
           <p className="text-[13px] text-white/40 leading-snug">Logged lifts show up here.</p>
         ) : (
@@ -222,24 +222,24 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
             ))}
           </div>
         )}
-        <p className="text-[11px] text-white/35 mt-2.5 leading-snug">
+        <p className="text-[13px] text-white/60 mt-2.5 leading-snug">
           Tap a number to set your own. Swaps and added movements live in the logger.
         </p>
       </section>
 
       {/* ENDURANCE — the numbers the run and ride sessions are priced from, and the re-price. */}
       <section>
-        <div className="text-[12px] uppercase tracking-wider text-white/45 mb-2">Run · Bike</div>
+        <div className="text-[12px] uppercase tracking-wider text-white/60 mb-2">Run · Bike</div>
         <div className="space-y-1.5">
           <Row id="ftp" name="FTP" value={withSource(ftp?.value != null ? `${Math.round(ftp.value)} W` : null, ftp?.source)} hint="W" />
           <Row id="threshold" name="Threshold pace" value={withSource(fmtPace(thr?.sec_per_mi, metric), thr?.source)} hint={metric ? 'm:ss/km' : 'm:ss/mi'} />
           <Row id="lthr" name="Threshold heart rate" value={withSource(lthr?.bpm != null ? `${Math.round(lthr.bpm)} bpm` : null, lthr?.source)} hint="bpm" />
           <Row id="easy" name="Easy pace" value={fmtPace(easy?.sec_per_mi, metric) ? `${fmtPace(easy?.sec_per_mi, metric)} · from threshold` : null} editable={false} />
         </div>
-        <p className="text-[11px] text-white/35 mt-2 leading-snug">
+        <p className="text-[13px] text-white/60 mt-2 leading-snug">
           Tap a number to set your own. Easy days run on threshold heart rate; easy pace is threshold pace × 1.19. Rebuild above to apply.
         </p>
-        {saveNote && <p className="text-[12px] text-white/60 mt-1.5">{saveNote}</p>}
+        {saveNote && <p className="text-[13px] text-white/75 mt-1.5">{saveNote}</p>}
       </section>
     </div>
   );
