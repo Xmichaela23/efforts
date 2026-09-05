@@ -1,9 +1,12 @@
-// STATE v2 — PERFORMANCE section. Renders the two-part headline + per-discipline hybrid
-// cards (performance trend where data exists, adherence fallback otherwise). Styling mirrors
-// StateTab's Row/Chip convention (replicated locally to avoid touching StateTab internals).
+// STATE PERFORMANCE section — the trend rows (RUN / BIKE / STRENGTH / SWIM) and their open cards.
+// Styling mirrors StateTab's Row/Chip convention (replicated locally to avoid touching StateTab internals).
 //
-// NOT YET SHIPPED — under review. Run/swim performance is on PROVISIONAL thresholds and is
-// tagged as such; swim is additionally Q-038-clouded.
+// ⛔ EVERY NUMBER ON THIS SCREEN HAS A NAMED SOURCE. Before changing any value, window, formula or
+// threshold here, read docs/STATE-NUMBERS.md (plain English) and docs/STATE-SOURCES.md (code-level) —
+// each number is TrainingPeaks / WKO5 / Garmin / Friel / Viada or explicitly OURS with a ledger row.
+// CLAUDE.md rule 5: no number reaches this screen without a source. Change the ledger row first.
+//
+// LIVE on main + server as of 2026-09-04 (the earlier "not yet shipped / provisional" banner was stale).
 
 import { trustedMaxReps } from '@/lib/estimate-1rm';
 import React from 'react';
