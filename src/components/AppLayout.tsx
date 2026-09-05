@@ -873,6 +873,21 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     return () => window.removeEventListener('plans:goToDashboard', handler);
   }, []);
 
+  // ⛔ ONE OPENER FOR THE STRENGTH BASELINE TEST (2026-09-05): Training Baselines calls it as a prop; the State
+  // Adjust tab's Retest section reaches it through the `baselines:openTest` event. Same logger, same test mode.
+  const openBaselineTest = (testName: string) => {
+    const today = new Date().toISOString().split('T')[0];
+    setShowTrainingBaselines(false);
+    setLoggerScheduledWorkout({ name: testName, type: 'strength', date: today, workout_status: 'planned' });
+    setSelectedDate(today);
+    setShowStrengthLogger(true);
+  };
+  useEffect(() => {
+    const handler = (ev: any) => { const n = ev?.detail?.testName; if (typeof n === 'string' && n) openBaselineTest(n); };
+    window.addEventListener('baselines:openTest', handler as any);
+    return () => window.removeEventListener('baselines:openTest', handler as any);
+  }, []);
+
   // Handle week navigation from TodaysEffort
   useEffect(() => {
     const handler = (ev: any) => {
@@ -1616,18 +1631,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             <div className="pt-4 h-full overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + 1rem)' }}>
               <TrainingBaselines
                 onClose={handleBackToDashboard}
-                onOpenBaselineTest={(testName: string) => {
-                  const today = new Date().toISOString().split('T')[0];
-                  setShowTrainingBaselines(false);
-                  setLoggerScheduledWorkout({
-                    name: testName,
-                    type: 'strength',
-                    date: today,
-                    workout_status: 'planned'
-                  });
-                  setSelectedDate(today);
-                  setShowStrengthLogger(true);
-                }}
+                onOpenBaselineTest={openBaselineTest}
               />
             </div>
           ) : showGear ? (

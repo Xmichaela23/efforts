@@ -15,6 +15,8 @@ import { resolveStrengthCapacity, canonicalizeLiftKey } from '@shared/state-tren
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { resolveCurrentRunThresholdPace, resolveCurrentRunEasyPace } from '@/lib/resolve-current-run-pace';
 import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
+import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import { runThresholdTestRow, ftpTestRow, addDaysISO } from '@/lib/baseline-tests';
 
 // The numbers the block is priced from, read through the SAME resolvers Training Baselines and the plan
 // builder use (Michael, 2026-09-05: "add the current e1RM, FTP, running threshold pace, easy pace").
@@ -110,6 +112,47 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       } finally { setDeloadBusy(false); }
     })();
   };
+  // ⛔ RETEST (Michael, 2026-09-05: tests live on Adjust, not a tab). Run threshold and FTP tests are the SAME
+  // rows Training Baselines and the wizard schedule (`baseline-tests.ts`, same helper), 3 and 2 days out as
+  // Baselines defaults them. The lifts open the logger's test flow (Lower / Upper / Full Body), the same
+  // entry Baselines uses. A scheduled test is detected by its tag (`run_test` / `ftp_test`), the contract.
+  const { addPlannedWorkout } = usePlannedWorkouts() as any;
+  const [scheduled, setScheduled] = useState<{ run: { id: string; date: string } | null; ftp: { id: string; date: string } | null }>({ run: null, ftp: null });
+  const [testBusy, setTestBusy] = useState<string | null>(null);
+  const refreshScheduled = async () => {
+    const uid = getStoredUserId(); if (!uid) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const { data } = await supabase.from('planned_workouts').select('id, date, tags').eq('user_id', uid).eq('workout_status', 'planned').gte('date', today).order('date');
+    const rows = (data ?? []) as Array<{ id: string; date: string; tags?: string[] | null }>;
+    const find = (tag: string) => { const r = rows.find((x) => Array.isArray(x.tags) && x.tags.includes(tag)); return r ? { id: r.id, date: r.date } : null; };
+    setScheduled({ run: find('run_test'), ftp: find('ftp_test') });
+  };
+  useEffect(() => { void refreshScheduled(); }, []);
+  const scheduleTest = (kind: 'run' | 'ftp') => {
+    void (async () => {
+      setTestBusy(kind);
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        const row = kind === 'run' ? runThresholdTestRow(addDaysISO(today, 3)) : ftpTestRow(addDaysISO(today, 2));
+        await addPlannedWorkout(row as any);
+        await refreshScheduled();
+      } catch (e) { console.warn('[StateAdjustLens] schedule test failed:', e); }
+      finally { setTestBusy(null); }
+    })();
+  };
+  const removeTest = (kind: 'run' | 'ftp') => {
+    const t = scheduled[kind]; if (!t) return;
+    void (async () => {
+      setTestBusy(kind);
+      try { await supabase.from('planned_workouts').delete().eq('id', t.id); await refreshScheduled(); }
+      catch (e) { console.warn('[StateAdjustLens] remove test failed:', e); }
+      finally { setTestBusy(null); }
+    })();
+  };
+  const openLiftTest = (which: 'Lower' | 'Upper' | 'Full Body') => {
+    window.dispatchEvent(new CustomEvent('baselines:openTest', { detail: { testName: `Baseline Test: ${which}` } }));
+  };
+  const fmtDay = (iso: string) => new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [saveNote, setSaveNote] = useState<string | null>(null);
@@ -221,6 +264,27 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
           {deloadNote && <p className="text-[13px] text-white/75 mt-1.5">{deloadNote}</p>}
         </section>
       )}
+
+      <section className="mb-5">
+        <div className="text-[12px] uppercase tracking-wider text-white/60 mb-2">Retest</div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => openLiftTest('Lower')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80">Lower lifts</button>
+          <button type="button" onClick={() => openLiftTest('Upper')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80">Upper lifts</button>
+          {scheduled.run ? (
+            <button type="button" disabled={testBusy === 'run'} onClick={() => removeTest('run')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50">Run threshold · {fmtDay(scheduled.run.date)} · remove</button>
+          ) : (
+            <button type="button" disabled={testBusy === 'run'} onClick={() => scheduleTest('run')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50">Run threshold</button>
+          )}
+          {scheduled.ftp ? (
+            <button type="button" disabled={testBusy === 'ftp'} onClick={() => removeTest('ftp')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50">FTP · {fmtDay(scheduled.ftp.date)} · remove</button>
+          ) : (
+            <button type="button" disabled={testBusy === 'ftp'} onClick={() => scheduleTest('ftp')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50">FTP</button>
+          )}
+        </div>
+        <p className="text-[13px] text-white/60 mt-2 leading-snug">
+          Lifts open the test session in the logger now. Run threshold and FTP go on the calendar three and two days out. A logged test re-prices the block.
+        </p>
+      </section>
 
       {/* STRENGTH — the deepest steer (swap / add / adjust weight already built; re-homing here next) */}
       <section className="mb-5">
