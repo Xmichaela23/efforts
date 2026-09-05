@@ -5,8 +5,6 @@ metric**: each number copies ONE product's rule, whole — never "the formula is
 window is Garmin's". Plain English, one row per number, top of the screen to the bottom. **Source** names
 the product whose method this copies. The code-level ledger is `STATE-SOURCES.md`.
 
-Where this file says "not yet on a device", it means PUSHED to a branch, not deployed, not seen.
-
 ---
 
 ## LOAD (top of the screen) — TrainingPeaks, whole
@@ -55,9 +53,9 @@ states laid over TrainingPeaks' numbers, and Garmin has no efficiency factor to 
 
 | What you see | How it's calculated | Source |
 |---|---|---|
-| **aerobic efficiency 1.567 · Sep 2 run** | Efficiency factor of your LAST easy or long run: grade-adjusted pace ÷ average heart rate. The note says which run. | TrainingPeaks EF (Normalized Graded Pace ÷ HR), printed per workout in the workout summary |
-| **easy 11:45/mi · 136 bpm** | Average recorded pace and heart rate of your recent easy runs (median of the last five). | Recorded values. The warm-up stand-in (easy read off a hard run's warm-up) was ours and is gone |
-| **hard 11:13/mi · 144 bpm** | The same for hard runs. | Recorded values |
+| **aerobic efficiency 1.498 · 12-week trend · from 1.650** | The value where a straight line fitted through your easy-run efficiency factors sits TODAY, with where it sat 12 weeks ago. Efficiency factor per run = grade-adjusted pace ÷ average heart rate. Not any one run — the trend. | TrainingPeaks EF per workout; the fitted trendline is WKO5's chart trendline (least squares through the dots) |
+| **easy 12:40/mi · 134 bpm** | Median of your last five easy runs' pace and heart rate — grade-adjusted pace when the run has elevation, raw recorded pace otherwise (flagged "flat pace, no elevation"). | Recorded values; raw-pace fallback is TrainingPeaks' own when NGP can't be computed |
+| **hard 11:50/mi · 144 bpm** | The same for hard runs. Easy vs hard is the plan's tag on the run (stamped so it survives a plan rebuild), else the analyser's detected type, else heart rate at/above 90% of threshold = hard. | Recorded values; run type is the auto-detection Garmin/Strava/TrainingPeaks run |
 
 ### BIKE
 
@@ -66,7 +64,7 @@ states laid over TrainingPeaks' numbers, and Garmin has no efficiency factor to 
 | **FTP 167 W · estimated** | Best power at each duration from 2 to 20 minutes across the last 90 days of rides, fitted to the critical-power curve P = CP + W′/t; FTP = 0.97 × CP. The fit's own gates (≥ 3 durations, W′ 5–40 kJ, r² ≥ 0.9) are the only gates. | Hill 1993 / Jones 2010 / Vanhatalo 2011 for the curve; intervals.icu eFTP and TrainerRoad AI FTP Detection for "from power alone, from the curve". ⚠️ intervals.icu's exact model is not published on any page reachable from this session (see Q-298). **Removed 2026-09-04, both ours:** the 5%-per-update cap and the best-20-minute ceiling |
 | **"estimated"** | Label: the number came from your rides, not a test. | — |
 | **Accepting a new FTP** | A new estimate waits on Training Baselines and the week-6 checkpoint; zones and plan targets don't move until you accept. | TrainerRoad |
-| **efficiency factor 0.88 · Sep 1 ride** | Normalized power ÷ average heart rate of your LAST steady ride. | TrainingPeaks EF, per workout |
+| **efficiency factor 0.89 · 12-week trend · from 0.83** | The fitted-trendline value today with its 12-week-ago start, over your steady rides. Per ride = normalized power ÷ average heart rate. | TrainingPeaks EF per workout; WKO5 fitted trendline |
 | **Which rides count** | Any ride with at least 10 minutes in your aerobic zone. | Garmin's inclusion rule for its fitness estimate (the one Garmin rule left on the screen; it decides which rides are steady, not what the number is) |
 
 ### SWIM
@@ -79,9 +77,10 @@ states laid over TrainingPeaks' numbers, and Garmin has no efficiency factor to 
 
 | What you see | How it's calculated | Source |
 |---|---|---|
-| **The efficiency line** | One dot per session over 90 days, one colour. | TrainingPeaks dashboard chart |
-| **drift +2.1% · pace to heart rate · Sep 2 run · line 5%** | Your LAST steady session's decoupling: first half against second half, warm-up skipped, on grade-adjusted pace (run) or power (ride). The 5% line is printed and does nothing else. | TrainingPeaks Pa:Hr / Pw:Hr, per workout; 5% is TrainingPeaks' and Friel's line |
-| **The drift line** | One dot per session, 90 days. | TrainingPeaks trends Pa:Hr on a dashboard |
+| **The efficiency line** | One dot per session over 90 days, one colour, with a dashed fitted trendline through it. Caption: "efficiency over 12 weeks: 1.650 → 1.498" — the line's start and end. | TrainingPeaks dashboard chart; WKO5 trendline |
+| **drift · pace to heart rate · lower is better · line 5% · each dot one run** | The drift chart's caption. Drift per session = first half against second half, warm-up skipped, grade-adjusted pace (run) or power (ride); STEADY sessions only (intervals excluded by the plan tag or the measured mixed-effort test). No single-session number on this screen — a run's own drift lives on that run. The 5% line is printed and does nothing else. | TrainingPeaks Pa:Hr / Pw:Hr per workout; 5% is TrainingPeaks' and Friel's line; steady-only is Friel's condition |
+| **The drift line** | One dot per steady session, 90 days, dashed fitted trendline. Caption: "drift over 11 weeks: 8.1% → 5.2%". | TrainingPeaks trends Pa:Hr on a dashboard; WKO5 trendline |
+| **Heat note** (shown when a session in the window was ≥ 72°F) | "Heat raises heart rate at the same pace, so efficiency reads lower and drift reads higher on hot days." Fixed text, not generated. | 72°F / 22°C is Garmin's heat-correction cut-off; TrainingPeaks applies none |
 
 ---
 
@@ -90,8 +89,6 @@ states laid over TrainingPeaks' numbers, and Garmin has no efficiency factor to 
 1. Inside Friel's heart-rate table, where a two-value zone (Z1, Z2, Z5b) splits: at the zone midpoint. Friel prints the range, not the split.
 2. Nothing else on the screen. The six of this morning's list are gone: strength volume factor and RIR map (now Friel's RPE estimate), the 7-vs-28 effort comparison and the soreness z-score (BODY removed), the warm-up stand-in (removed), the 5% FTP cap (removed).
 
-## Not on a device yet
+---
 
-Everything dated 2026-09-04 in this file after the morning is on branch `claude/chat-archival-behavior-ee4r3z`,
-not on main, not deployed. Strength sessions already in the database keep their tonnage-scale points until
-`backfill-strength-load` re-prices them.
+**Deployed:** everything in this file is live on `main` (13f8c53d) and on the server as of 2026-09-04. Stored strength points were re-priced to Friel's scale by `backfill-strength-load` (117 sessions).
