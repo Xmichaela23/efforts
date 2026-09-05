@@ -1062,6 +1062,9 @@ function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null, threshold
   // the resolved average (the same number the facts row prints); the column is null on some imports
   const avgHr = toNum(avgHrBpm) ?? toNum(w.avg_heart_rate);
   if (avgHr != null && thresholdHrBpm != null && thresholdHrBpm > 0) {
+    // 90% LTHR is FRIEL'S run-zone boundary, not a number of ours: his run zones put Z2 (aerobic/easy)
+    // at 85-89% LTHR and Z3 (tempo/threshold) at 90-94% — the same zone table `workload.ts` reads for
+    // the HR TSS estimate. At/above Z3 = a hard effort, below = easy. Source: Friel run heart-rate zones.
     return avgHr / thresholdHrBpm >= 0.90 ? 'interval' : 'easy';
   }
   // No plan word, no interval detection, no heart rate against a threshold: nothing to grade with → null,
