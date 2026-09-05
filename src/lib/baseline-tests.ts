@@ -64,6 +64,34 @@ export function ftpTestRow(date: string): BaselineTestRow {
 }
 
 /**
+ * The 5-minute all-out FTP test (Viada, hybrid-coach course Module 3 "Aerobic Assessments"): "more
+ * repeatable because there's no strategy to it — go out as hard as you can and hang on until 5 minutes
+ * are up." The module extrapolates FTP as roughly 80% of the 5-minute average; this app does NOT add
+ * that as a second FTP formula. The 5-minute effort lands as the 5-minute point on the power-duration
+ * curve, and the one FTP rule (the critical-power fit over 2–20 min, TrainerRoad / intervals.icu
+ * practice) reads it from there. `ftp_test` keeps the analyser's delegation to the learner;
+ * `ftp_test_5min` tells the screens which protocol this is.
+ */
+export function ftp5MinTestRow(date: string): BaselineTestRow {
+  return {
+    name: 'FTP Test — 5-Minute All-Out (Viada, Module 3)',
+    type: 'ride',
+    date,
+    description: 'FTP test — the 5-minute all-out protocol. PREPARATION: no hard training 48 hours prior; indoor trainer recommended; a power meter or smart trainer is required. The test: start as hard as you can hold and hang on until five minutes are up. There is no pacing strategy, which is what makes it repeatable. Your 5-minute power feeds the power curve the FTP estimate is fitted from.',
+    duration: 40,
+    steps_preset: [
+      'warmup_bike_quality_8min_fastpedal',
+      'bike_race_prep_3x60s',
+      'bike_recovery_5min_Z1',
+      'bike_ftp_test_5min',
+      'cooldown_bike_easy_10min',
+    ],
+    workout_status: 'planned',
+    tags: ['ftp_test', 'ftp_test_5min', 'baseline_establishment', 'key_workout'],
+  };
+}
+
+/**
  * Where a week-one retest lands. OURS — the book says only "no hard training 48 hours prior"
  * (p210, p212); the day inside week one is this app's choice: the run test on the third day of the
  * block, the FTP test on the fifth, so neither sits on the first lifting day and they are two days

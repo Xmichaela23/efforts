@@ -16,7 +16,7 @@ import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { resolveCurrentRunThresholdPace, resolveCurrentRunEasyPace } from '@/lib/resolve-current-run-pace';
 import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
-import { runThresholdTestRow, ftpTestRow, addDaysISO } from '@/lib/baseline-tests';
+import { runThresholdTestRow, ftpTestRow, ftp5MinTestRow, addDaysISO } from '@/lib/baseline-tests';
 
 // The numbers the block is priced from, read through the SAME resolvers Training Baselines and the plan
 // builder use (Michael, 2026-09-05: "add the current e1RM, FTP, running threshold pace, easy pace").
@@ -117,30 +117,30 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   // Baselines defaults them. The lifts open the logger's test flow (Lower / Upper / Full Body), the same
   // entry Baselines uses. A scheduled test is detected by its tag (`run_test` / `ftp_test`), the contract.
   const { addPlannedWorkout } = usePlannedWorkouts() as any;
-  const [scheduled, setScheduled] = useState<{ run: { id: string; date: string } | null; ftp: { id: string; date: string } | null }>({ run: null, ftp: null });
+  const [scheduled, setScheduled] = useState<{ run: { id: string; date: string } | null; ftp: { id: string; date: string } | null; ftp5: { id: string; date: string } | null }>({ run: null, ftp: null, ftp5: null });
   const [testBusy, setTestBusy] = useState<string | null>(null);
   const refreshScheduled = async () => {
     const uid = getStoredUserId(); if (!uid) return;
     const today = new Date().toISOString().slice(0, 10);
     const { data } = await supabase.from('planned_workouts').select('id, date, tags').eq('user_id', uid).eq('workout_status', 'planned').gte('date', today).order('date');
     const rows = (data ?? []) as Array<{ id: string; date: string; tags?: string[] | null }>;
-    const find = (tag: string) => { const r = rows.find((x) => Array.isArray(x.tags) && x.tags.includes(tag)); return r ? { id: r.id, date: r.date } : null; };
-    setScheduled({ run: find('run_test'), ftp: find('ftp_test') });
+    const find = (tag: string, not?: string) => { const r = rows.find((x) => Array.isArray(x.tags) && x.tags.includes(tag) && !(not && x.tags.includes(not))); return r ? { id: r.id, date: r.date } : null; };
+    setScheduled({ run: find('run_test'), ftp: find('ftp_test', 'ftp_test_5min'), ftp5: find('ftp_test_5min') });
   };
   useEffect(() => { void refreshScheduled(); }, []);
-  const scheduleTest = (kind: 'run' | 'ftp') => {
+  const scheduleTest = (kind: 'run' | 'ftp' | 'ftp5') => {
     void (async () => {
       setTestBusy(kind);
       try {
         const today = new Date().toISOString().slice(0, 10);
-        const row = kind === 'run' ? runThresholdTestRow(addDaysISO(today, 3)) : ftpTestRow(addDaysISO(today, 2));
+        const row = kind === 'run' ? runThresholdTestRow(addDaysISO(today, 3)) : kind === 'ftp5' ? ftp5MinTestRow(addDaysISO(today, 2)) : ftpTestRow(addDaysISO(today, 2));
         await addPlannedWorkout(row as any);
         await refreshScheduled();
       } catch (e) { console.warn('[StateAdjustLens] schedule test failed:', e); }
       finally { setTestBusy(null); }
     })();
   };
-  const removeTest = (kind: 'run' | 'ftp') => {
+  const removeTest = (kind: 'run' | 'ftp' | 'ftp5') => {
     const t = scheduled[kind]; if (!t) return;
     void (async () => {
       setTestBusy(kind);
@@ -278,11 +278,16 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
           {scheduled.ftp ? (
             <button type="button" disabled={testBusy === 'ftp'} onClick={() => removeTest('ftp')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50">FTP · {fmtDay(scheduled.ftp.date)} · remove</button>
           ) : (
-            <button type="button" disabled={testBusy === 'ftp'} onClick={() => scheduleTest('ftp')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50">FTP</button>
+            <button type="button" disabled={testBusy === 'ftp'} onClick={() => scheduleTest('ftp')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50">FTP · 20 min</button>
+          )}
+          {scheduled.ftp5 ? (
+            <button type="button" disabled={testBusy === 'ftp5'} onClick={() => removeTest('ftp5')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50">FTP · 5 min · {fmtDay(scheduled.ftp5.date)} · remove</button>
+          ) : (
+            <button type="button" disabled={testBusy === 'ftp5'} onClick={() => scheduleTest('ftp5')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50">FTP · 5 min</button>
           )}
         </div>
         <p className="text-[13px] text-white/60 mt-2 leading-snug">
-          Lifts open the test session in the logger now. Run threshold and FTP go on the calendar three and two days out. A logged test re-prices the block.
+          Lifts open the test session in the logger now. Run threshold and FTP tests go on the calendar three and two days out. The 5-minute test is all-out with no pacing, so it repeats well; the 20-minute one is the classic. A logged test re-prices the block.
         </p>
       </section>
 
