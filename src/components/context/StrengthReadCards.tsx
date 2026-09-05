@@ -226,8 +226,8 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
       {/* the drift trend — the number the field trends (Pa:Hr / Pw:Hr), as a line and the last-4-weeks average, no verdict */}
       {driftPts.length >= 2 && (
         <DatedChart points={driftPts} color={color} dotNoun={isRide ? 'steady ride' : 'run'} fmtVal={fmtDrift} unit="%" trendWord="drift" divider
-          label="Drift" qualifier={`under ${DRIFT_LIMITS.hybridPct}% is the line`}
-          keyLine={`dots: one steady ${isRide ? 'ride' : 'run'}, first half vs second · dashed: the trend · ${DRIFT_LIMITS.hybridPct}% is the limit when you train more than one sport`} />
+          label="Drift" qualifier={`${DRIFT_LIMITS.hybridPct}% line for multisport`}
+          keyLine={`dots: one steady ${isRide ? 'ride' : 'run'}, first half vs second · dashed: the trend · ${DRIFT_LIMITS.hybridPct}% is the multisport limit`} />
       )}
       {/* ⛔ NO SINGLE-SESSION DRIFT NUMBER ON STATE (2026-09-04, Michael: "you're using the last run to give a drift
           reading"). This is the trend screen; one run's drift lives on that run. TrainingPeaks' dashboard shows the
