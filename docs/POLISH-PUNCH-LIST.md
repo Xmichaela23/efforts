@@ -1327,3 +1327,29 @@ before a tested number exists — not "by feel" with nothing to warm up on. Defi
 off the book; judge against a new athlete with no test on file, never Michael's numbers.
 
 **Note added 2026-09-04:** the test WAS done, so `awaiting_test` is stale on that lift — likely a by-product of materialising a plan on top of already-completed tests (the ramp builds off the test result, and the link between the completed test and the new plan's ME slot didn't carry). So this may be one bug (stale load_basis after a plan-on-plan rebuild) rather than a missing-ramp design gap. Check the materialise/rematerialise path's handling of a prior completed test before building the fallback ramp.
+
+---
+
+## Two aerobic assessments from the book we don't have (Viada, Module 3 "Aerobic Assessments")
+
+**Not built. Polish / feature material.** Source: the aerobic-assessments module.
+
+### 1. Five-minute FTP test — a second, more repeatable FTP protocol
+Viada: the 5-minute all-out test is "considered more repeatable because there's no strategy to it… you
+go out as hard as you can and simply hang on until 5 minutes are up," and **"roughly 80 percent of…
+the average number over that five minutes becomes"** your FTP. So **FTP ≈ 0.80 × 5-min average power.**
+We only have the 20-min × 0.95 fallback. This is a real alternate test the app could offer/detect — a
+5-minute max effort, FTP from 80% of it. (He also gives VT2/FTP as the 20–30 min test extrapolated at
+95%, which we already have as the fallback.)
+
+### 2. VT1 talk test — Zone-2 ceiling with no gear
+Viada, "highly recommend every coach uses this particularly for concurrent athletes": ramp up until the
+athlete can only say **5–10 words** before needing a breath — note the heart rate; that is **VT1, the
+upper bound of Zone 2.** "VT1 represents just as accurate, if not more accurate, a picture of Zone 2"
+than a heart-rate formula, and it may read higher than 220-age formulas allow ("entirely fine"). A
+no-equipment way to set the aerobic ceiling for interference-minimising Zone-2 work — the hybrid
+athlete's core need. Could be an in-app guided test that writes an easy-HR / Zone-2 baseline.
+
+Also noted (not a to-do): he does NOT test VO2max ("not truly practical"), and uses it only "to track
+readiness compared to your peaks" — the same read-current-against-your-own-peak idea behind the FTP
+history line.
