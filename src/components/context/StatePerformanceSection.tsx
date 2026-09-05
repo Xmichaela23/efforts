@@ -1462,13 +1462,13 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                 <span className="flex-1 min-w-0 grid grid-cols-[1fr_auto] items-baseline gap-x-3 gap-y-[6px]">
                   {rows.map((r, i) => (
                     <React.Fragment key={`${r.name}-${i}`}>
-                      <span className="text-[14px] text-white/70 leading-tight min-w-0">{r.name}</span>
+                      <span className="text-[14px] text-white/85 leading-tight min-w-0">{r.name}</span>
                       <span className="flex flex-col items-end text-right">
-                        <span className="text-[18px] text-white/95 leading-tight tabular-nums">
+                        <span className="text-[15px] text-white/90 leading-tight tabular-nums">
                           {r.arrow && <span className={`${r.arrowCls ?? 'text-white/70'} mr-1`}>{r.arrow}</span>}
                           {r.value}
                         </span>
-                        {r.note && <span className="text-[12px] text-white/55 leading-tight tabular-nums whitespace-nowrap">{r.note}</span>}
+                        {r.note && <span className="text-[12.5px] text-white/65 leading-tight tabular-nums whitespace-nowrap">{r.note}</span>}
                       </span>
                     </React.Fragment>
                   ))}
