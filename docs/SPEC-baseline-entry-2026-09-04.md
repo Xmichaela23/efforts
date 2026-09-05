@@ -1,6 +1,6 @@
 # SPEC — "Know your numbers?" baseline entry before a plan
 
-**Status:** specified, not built. One terminal session.
+**Status:** BUILT 2026-09-04 (D-467), pushed to nothing yet, deployed nowhere. Ruling the same day: the test week is optional again (reverses 08-30). Two corrections to the text below, found in code: the wizard is `NonRaceBuilder` (not `ArcSetupWizard`, which is the race wizard), and the standing plan never read `performance_numbers` for pricing — that read is new (`workingNumberFromFile`). Delete this file once D-467 is verified on a device.
 **Date:** 2026-09-04
 
 ## Why

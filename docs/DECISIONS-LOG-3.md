@@ -1795,3 +1795,38 @@ change, not deferred.** Traced from `coach/index.ts` outward (`docs` of the trac
 
 Tests: 223 green across `load-status-reconcile`, `response-model/`, `week-accent`, `fact-packet/`,
 `fitness-fatigue`; client build clean.
+
+## D-467 — The test week is optional again: "Know your numbers?" before the plan (2026-09-04)
+
+**Ruling (Michael, 2026-09-04):** *"we are not making it non-optional… that's the whole purpose of this
+change."* Reverses the 2026-08-30 always-test rule that lived only in `generate-strength-plan/index.ts`
+comments ("week one is the test week, for everyone, every block"). Spec: `docs/SPEC-baseline-entry-2026-09-04.md`.
+
+**What is built**
+1. `wizard-steps.ts` — a `numbers` step on every route, immediately before `confirm` (`KnowYourNumbersStep.tsx`,
+   rendered by `NonRaceBuilder`). One row per discipline the plan contains. A number on file → **Use current** /
+   **Retest in week one** (Use is the default). Nothing on file → an inline field or **Test in week one**. Skippable.
+2. Typed numbers go to `user_baselines.performance_numbers` through `saveUserBaselines` — Training Baselines' own
+   path, same keys (`squat`, `bench`, `deadlift`, `overheadPress1RM`, `pullupMaxReps` 0-valid per Q-102, `ftp`,
+   `threshold_pace_min_per_mi` per-mile "m:ss", `swimPace100`). Untouched fields are never written; a number on
+   file is never overwritten from this screen.
+3. Strength · Use current → `training_prefs.skip_test_week: true` (the wizard's own, previously unsent
+   `skipTestWeek` slot). `generate-strength-plan` now honours it: working numbers come from the resolved four on
+   file (`readBarbellMaxesResolved`: locked > trusted learned > typed) via `workingNumberFromFile` (working = 1RM ×
+   0.96, Viada p215, same shape as a test read, `cite` names the source), `skipTestWeek: true`, week one is a
+   normal week. Retest / absent → the test week, unchanged.
+4. The missing-lift refusal (`generate-strength-plan` and its mirror in `create-goal-and-materialize-plan`) now fires
+   ONLY when the athlete asked to skip the test. With the test week on, a lift with no number is a "By feel" test row
+   (`compose.ts` already did this) and the block re-prices from the logged test. The 65 lb floor still applies to
+   every lift that has a number. Before this, an athlete with empty baselines could not build Get Stronger at all.
+5. FTP / run threshold · Retest → after the plan is built (`useArcSetupComplete` `onBuilt`), the book's test session
+   is scheduled into week one through `addPlannedWorkout`, the same rows Training Baselines schedules; the bodies
+   moved to `src/lib/baseline-tests.ts` and Baselines reads them from there. Placement inside week one is OURS
+   (`RETEST_OFFSET_DAYS`: run test day 3, FTP test day 5; the book says only "no hard training 48 h prior").
+6. Swim: number on file or typed; no test is scheduled — the app has no swim test session.
+
+**Not changed:** `locked_baselines` (D-459) keeps its own path (raw number, no fraction). `test-skip.ts`
+(evidence-from-logged-sets skip offer) stays dead — the number on file is the athlete's answer.
+
+**Back-annotation:** the 2026-08-30 comment block in `generate-strength-plan/index.ts` is history; its text is kept
+above the new branch with a pointer here. No D-entry ever recorded the 08-30 ruling.

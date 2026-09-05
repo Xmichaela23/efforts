@@ -10,6 +10,7 @@ import { deriveSwimPaceBands, parsePaceToSeconds } from '@/lib/swimPaceZones';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { refreshGroupRideRouteSnapshotsForUser } from '@/lib/refresh-group-ride-route-snapshots';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import { runThresholdTestRow, ftpTestRow } from '@/lib/baseline-tests';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import { fiveKNudgeDismissKey, type ArcFiveKLearnedDivergence } from '@/lib/arc-types';
 import { resolveCurrentFtp, pendingFtpProposal, acceptEstimatedFtp } from '@/lib/resolve-current-ftp';
@@ -248,18 +249,8 @@ useEffect(() => {
  */
 const scheduleRunTest = async () => {
   try {
-    await addPlannedWorkout({
-      name: 'Threshold Time Trial (Viada p210)',
-      type: 'run',
-      date: runTestDate,
-      description: 'Threshold time trial (Viada p210). PREPARATION: no hard training 48 hours prior; flat route or track; heart rate strap on. WARM-UP: 6–8 min easy jog; 2 x 100 m strides, slow to near full tilt; 3 x 30 s at your fast (mile-PR) pace with 1 min easy walk/jog between; then 1 min rest. TRIAL: press lap and run 12 minutes (under 2 years of training), 10 minutes (2–4 years) or 8 minutes (4+ years) — start at 9.5 out of 10, finish at 10 out of 10, even the whole way; press lap at the end. COOL-DOWN: 8–10 min easy. RESULT: the app reads the trial lap, takes 88% of that speed as your threshold pace (the book\'s rule) and sets it.',
-      duration: 45,
-      // p210, step for step: easy jog · 2 × 100 m strides · 3 × 30 s fast with 1 min easy · 1 min rest ·
-      // the trial (12 min default; 10 / 8 by training age, see description) · cool-down. Sendable to Garmin.
-      steps_preset: ['warmup_run_7min_easy', 'strides_2x100m', 'interval_3x30s_115pct_R60s', 'run_rest_1min', 'run_tt_12min', 'cooldown_run_9min_easy'],
-      workout_status: 'planned',
-      tags: ['assessment', 'run_test', 'time_trial', 'baseline_establishment', 'key_workout'],
-    });
+    // the row lives in src/lib/baseline-tests.ts, shared with the wizard's Retest (2026-09-04)
+    await addPlannedWorkout(runThresholdTestRow(runTestDate) as any);
     setShowRunTestDatePicker(false);
     await checkScheduledRunTest();
   } catch {
@@ -279,29 +270,7 @@ const deleteRunTest = async () => {
 
 const scheduleFtpTest = async () => {
   try {
-    await addPlannedWorkout({
-      name: 'FTP Test — 20-Minute Protocol (Viada p212)',
-      type: 'ride',
-      date: ftpTestDate,
-      description: 'FTP test — the 20-minute protocol (Viada p212). PREPARATION: no hard training 48 hours prior; indoor trainer recommended; a power meter or smart trainer. WARM-UP: 5–10 min easy; 3 x 1 min at low resistance and high turnover with 1 min rest between; 3 min easy; 3 min at 9 out of 10; 6–8 min easy. TEST: press lap and ride 20 minutes at your best even effort; press lap at the end. COOL-DOWN: 5–10 min easy. RESULT: your FTP is the 20-minute average power x 0.95 (the book\'s rule); the app reads the lap and sets it.',
-      duration: 60,
-      // p212, step for step (2026-09-02): easy · 3 × 1 min high turnover / 1 min rest · 3 min easy ·
-      // 3 min at 9/10 · 6–8 min easy · 20 min best effort · easy. The learner reads the 20-min lap × 0.95.
-      steps_preset: [
-        'warmup_bike_quality_8min_fastpedal',
-        'bike_race_prep_3x60s',
-        'bike_recovery_3min_Z1',
-        'bike_vo2_1x3min_R0min',
-        'bike_recovery_7min_Z1',
-        'bike_ftp_test_20min',
-        'cooldown_bike_easy_8min'
-      ],
-      workout_status: 'planned',
-      tags: ['ftp_test', 'baseline_establishment', 'key_workout']
-    });
-    
-    setShowFtpDatePicker(false);
-    await checkScheduledFtpTest(); // Refresh the state
+    await addPlannedWorkout(ftpTestRow(ftpTestDate) as any);
     const displayDate = new Date(ftpTestDate + 'T12:00:00').toLocaleDateString();
     alert(`FTP Test scheduled for ${displayDate}. Rest up - no hard training before then!`);
   } catch (error) {

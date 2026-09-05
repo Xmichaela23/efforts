@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { Activity, AlertTriangle, Bike, Waves, Check, Dumbbell, Info, Footprints, Shuffle, Weight, Flag, Plus, Gauge, ChevronDown } from 'lucide-react';
 import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { StepLayout } from '@/components/wizard/StepLayout';
+import { KnowYourNumbersStep, paceEntryToPerMile, type NumbersChoice, type NumbersTyped } from '@/components/wizard/KnowYourNumbersStep';
+import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import { runThresholdTestRow, ftpTestRow, RETEST_OFFSET_DAYS, addDaysISO } from '@/lib/baseline-tests';
 // ⛔ THE ENDURANCE WEEK — one screen replacing `volume` + `hardday` on the strength path (2026-08-24).
 import EnduranceWeekCard from './EnduranceWeekCard';
 // ⛔ THE HARD SLOT'S SESSION CHOICES — one component, shared with anything that renders a slot.
@@ -1154,6 +1157,10 @@ export type NonRaceState = {
   /** ⛔ Standing Plan only: the athlete took the offer to open on logged numbers instead of a test
    *  week. Absent/false is the default and the default is the test. */
   skipTestWeek?: boolean;
+  /** "Know your numbers?" (SPEC-baseline-entry-2026-09-04): per-discipline use-current / retest, and
+   *  the inline entries as typed. Seeded with the on-file defaults when the step opens. */
+  numbersChoice?: NumbersChoice;
+  numbersTyped?: NumbersTyped;
   /**
    * ⛔ WHICH SPORT FILLS EACH OF THE FRAME'S FOUR ENDURANCE SLOTS (2026-08-24). The athlete's ONLY
    * endurance-shape choice on the Standing Plan — the program owns the count, so `runDays` and
@@ -1680,6 +1687,11 @@ function assemblePayload(
            * ⚠️ OMITTED ON THE 5K PATH, so that payload is byte-identical to what it sends today.
            */
           ...(isStrengthFocusPath && state.focus === 'standard' ? { focus: 'standard' } : {}),
+          // "Know your numbers?" — Use current on strength = no test week; the block prices off the numbers on
+          // file (`generate-strength-plan` reads `skip_test_week`; create-goal forwards it). Retest = the default
+          // test week. The endurance answers travel as data and are acted on client-side after the build.
+          ...(isStrengthFocusPath && state.numbersChoice?.strength === 'use' ? { skip_test_week: true } : {}),
+          ...(state.numbersChoice && Object.keys(state.numbersChoice).length > 0 ? { baseline_numbers: state.numbersChoice } : {}),
           ...(unavailableDays?.length ? { unavailable_days: [...unavailableDays] } : {}),
           // §0g — the engine's strength-day default travels in the channel NAMED for engine choices,
           // never inside `preferred_days`. Absent for Strength Focus: the solver places those days
@@ -2094,7 +2106,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // to change, and the alternative is a form. Five days with the long run on Sunday is what the
     // plan builds anyway when nothing is pinned — so the screen now SHOWS the default instead of
     // applying it silently, which is the honest half of that rule rather than the letter of it.
-    trainingDays: [], longRunDay: '', longRideDay: '', longClub: false, longClubMinutes: '', qualityDays: {}, hardDays: [], qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetRunHours: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, swimVolume: '', rideHours: '', rideDays: 0, startDate: planWeekStartISO(), skipTestWeek: false, slotSports: undefined, slotMinutes: undefined, enduranceExperience: undefined,
+    trainingDays: [], longRunDay: '', longRideDay: '', longClub: false, longClubMinutes: '', qualityDays: {}, hardDays: [], qualityRunTerrain: 'hill_3min', usualMiles: '', targetMiles: '', targetRunHours: '', targetTouched: false, runDays: 0, assistancePicks: normalizeAssistancePrefs(null), swimDays: 2, swimVolume: '', rideHours: '', rideDays: 0, startDate: planWeekStartISO(), skipTestWeek: false, numbersChoice: {}, numbersTyped: {}, slotSports: undefined, slotMinutes: undefined, enduranceExperience: undefined,
     // ⚠️ `fitness` starts BLANK and the race step gates Continue on it. A default here would be the
     // silent `intermediate` all over again, one screen further in.
     raceDate: '', raceDistance: RACE_DISTANCES[0], raceName: '', raceElevation: '', fitness: '',
@@ -2367,7 +2379,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         // resolve against the athlete's FTP and the rate line prints pounds off their squat. Both
         // live in that column, and a SELECT that omits it is the projection footgun this repo has
         // hit repeatedly — the resolver would abstain and the screen would show no ride cap at all.
-        .select('effort_score, effort_source_distance, effort_source_time, effort_paces, learned_fitness, performance_numbers')
+        .select('effort_score, effort_source_distance, effort_source_time, effort_paces, learned_fitness, performance_numbers, locked_baselines, units')
         .eq('user_id', uid).maybeSingle();
       if (cancelled) return;
       setPaceRow(data as PaceBenchmarkRow);
@@ -3547,7 +3559,64 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * volume step SAYS so — a fact, not a question. Same functions the server's gate runs, fed the
    * workouts already in context, so the line and the built tier cannot disagree.
    */
-  const { workouts: ctxWorkouts } = useAppContext();
+  const { workouts: ctxWorkouts, loadUserBaselines, saveUserBaselines } = useAppContext();
+  const { addPlannedWorkout } = usePlannedWorkouts() as { addPlannedWorkout: (row: Record<string, unknown>) => Promise<unknown> };
+  const [numbersSaving, setNumbersSaving] = React.useState(false);
+  const numbersInclude = {
+    strength: state.posture?.strength != null && state.posture?.strength !== 'out',
+    run: state.posture?.run != null && state.posture?.run !== 'out',
+    bike: state.posture?.bike != null && state.posture?.bike !== 'out',
+    swim: state.posture?.swim != null && state.posture?.swim !== 'out',
+  };
+  /**
+   * Continue off "Know your numbers?": anything typed lands in `performance_numbers` through
+   * `saveUserBaselines` — the path Training Baselines uses — keyed exactly as Baselines keys it, then the
+   * row is re-read so the on-file line reflects it. Untouched fields are not written. Never overwrites a
+   * number already on file (the field only renders where nothing is on file).
+   */
+  const commitTypedNumbers = async () => {
+    const typed = state.numbersTyped ?? {};
+    const metric = String((paceRow as { units?: string } | null)?.units ?? '').toLowerCase() === 'metric';
+    const patch: Record<string, unknown> = {};
+    for (const k of ['squat', 'bench', 'deadlift', 'overheadPress1RM', 'pullupMaxReps', 'ftp'] as const) {
+      const raw = typed[k]; if (raw == null || String(raw).trim() === '') continue;
+      const n = Math.max(0, parseInt(String(raw), 10) || 0);
+      if (k === 'pullupMaxReps' ? Number.isFinite(n) : n > 0) patch[k] = n;
+    }
+    if (typed.threshold_pace_min_per_mi && String(typed.threshold_pace_min_per_mi).trim() !== '') {
+      const v = paceEntryToPerMile(String(typed.threshold_pace_min_per_mi), metric);
+      if (v) patch.threshold_pace_min_per_mi = v;
+    }
+    if (typed.swimPace100 && /^\d{1,2}:\d{2}$/.test(String(typed.swimPace100).trim())) patch.swimPace100 = String(typed.swimPace100).trim();
+    if (Object.keys(patch).length === 0) return;
+    setNumbersSaving(true);
+    try {
+      const cur = await loadUserBaselines();
+      if (!cur) return;
+      await saveUserBaselines({ ...cur, performanceNumbers: { ...(cur.performanceNumbers ?? {}), ...patch } } as never);
+      const uid = getStoredUserId();
+      if (uid) {
+        const { data } = await supabase.from('user_baselines')
+          .select('effort_score, effort_source_distance, effort_source_time, effort_paces, learned_fitness, performance_numbers, locked_baselines, units')
+          .eq('user_id', uid).maybeSingle();
+        if (data) setPaceRow(data as PaceBenchmarkRow);
+      }
+      setState((st) => ({ ...st, numbersTyped: {} }));
+    } finally { setNumbersSaving(false); }
+  };
+  /**
+   * Retest on an endurance number = the book's test session in week one, the same planned row Training
+   * Baselines schedules. Runs after the plan exists (`onBuilt`). Placement is OURS (see RETEST_OFFSET_DAYS).
+   */
+  const scheduleRetests = async (planId: string | null) => {
+    const c = state.numbersChoice ?? {};
+    const start = state.startDate || planWeekStartISO();
+    const rows: Array<Record<string, unknown>> = [];
+    const inPlan = planId ? { training_plan_id: planId, week_number: 1 } : {};
+    if (numbersInclude.run && c.run === 'test') rows.push({ ...runThresholdTestRow(addDaysISO(start, RETEST_OFFSET_DAYS.run)), ...inPlan });
+    if (numbersInclude.bike && c.ftp === 'test') rows.push({ ...ftpTestRow(addDaysISO(start, RETEST_OFFSET_DAYS.ftp)), ...inPlan });
+    for (const r of rows) await addPlannedWorkout(r);
+  };
   /**
    * ⛔⛔ THE HISTORY READ, WITH ITS AS-OF DATE (2026-08-26 evening). It was called with the workouts
    * alone; the second argument is the date to measure back from, and without it every read returned
@@ -3940,7 +4009,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // and the block renders under CURRENT on that same screen — an acknowledgement in between
     // answers a question nobody asked, and on a short phone it pushed the plan itself down into the
     // region that collapses. The Arc season wizard keeps its banner; see the note on `complete()`.
-    void complete(payloadNow(), { announcePlanReady: false });
+    void complete(payloadNow(), { announcePlanReady: false, onBuilt: scheduleRetests });
   };
 
   /**
@@ -7526,6 +7595,20 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         </StepLayout>
       )}
 
+      {currentStep === 'numbers' && (
+        <KnowYourNumbersStep
+          step={stepNo('numbers')} totalSteps={steps.length}
+          row={paceRow as never}
+          include={numbersInclude}
+          choice={state.numbersChoice ?? {}}
+          typed={state.numbersTyped ?? {}}
+          onChoice={(next) => setState((st) => ({ ...st, numbersChoice: next }))}
+          onTyped={(next) => setState((st) => ({ ...st, numbersTyped: next }))}
+          onBack={back}
+          saving={numbersSaving}
+          onContinue={() => { void (async () => { try { await commitTypedNumbers(); } catch (e) { console.warn('[numbers] save failed:', e); } next(); })(); }}
+        />
+      )}
       {currentStep === 'confirm' && (
         <StepLayout
           step={stepNo('confirm')} totalSteps={steps.length} title="Build this plan?"

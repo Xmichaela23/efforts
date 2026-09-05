@@ -90,6 +90,7 @@ export type StepKey =
   // Do not reintroduce it, and do not keep a four-day branch "for later" — the option is gone from
   // the engine (`StrengthPrimaryArgs` has no `liftingDays`), so a card offering it would be a screen
   // asking a question nothing downstream can answer.
+  | 'numbers'
   | 'confirm';
 
 // ⛔ ONE DISCIPLINE, ONE SCREEN. Michael, 2026-07-25: *"everything should have its own card, no
@@ -268,7 +269,13 @@ export function getSteps(state: StepRouterState): StepKey[] {
   // Capacity (level + weekly miles + days-a-week) comes BEFORE the week anchors and strength — Runna
   // and the hybrid apps ask availability up front, since everything downstream is placed inside it
   // (2026-08-07). Order: goal → race → level(capacity) → days(anchors) → strength → intent → confirm.
-  if (isRaceGoal) return ['goal', 'race', 'level', 'intent', 'days', 'strength', 'confirm'];
+  /**
+   * 'numbers' — "Know your numbers?" (SPEC-baseline-entry-2026-09-04): the last screen before the
+   * commit, on EVERY route, because the choice (use the number on file / retest in week one) changes
+   * what the plan contains, so the confirm screen's week must already reflect it. Optional: the
+   * screen renders with defaults and Continue is never gated.
+   */
+  if (isRaceGoal) return ['goal', 'race', 'level', 'intent', 'days', 'strength', 'numbers', 'confirm'];
 
   // The drill-down only exists on the Train branch, and it stays in the array after a discipline is
   // picked so Back walks entry ← train ← flow instead of jumping to the door.
@@ -297,5 +304,5 @@ export function getSteps(state: StepRouterState): StepKey[] {
     ? [...door, ...(asksTier ? ['tier' as StepKey] : []),
         ...(skipsSportScope(state) ? [] : ['posture' as StepKey])]
     : [...door, 'posture', 'commitment', 'length'];
-  return [...head, ...scheduleSteps(state, isStrengthFocus, isRaceGoal), 'confirm'];
+  return [...head, ...scheduleSteps(state, isStrengthFocus, isRaceGoal), 'numbers', 'confirm'];
 }

@@ -94,6 +94,11 @@ export const usePlannedWorkouts = (options?: UsePlannedWorkoutsOptions) => {
         strength_exercises: workoutData.strength_exercises || [],
         mobility_exercises: (workoutData as any).mobility_exercises || [],
         steps_preset: (workoutData as any).steps_preset || null,
+        // ⛔ TAGS ARE THE CONTRACT (2026-09-04, found by the "Know your numbers?" acceptance run): `run_test` /
+        // `ftp_test` are what materialize-plan expands and what the analysers read the test lap from. This helper
+        // never persisted them, so every test Training Baselines scheduled since 2026-09-02 landed untagged — an
+        // ordinary hard session that measured nothing. Pass them through.
+        tags: Array.isArray((workoutData as any).tags) ? (workoutData as any).tags : [],
         workout_status: workoutData.workout_status || 'planned',
         source: workoutData.source || 'manual',
         training_plan_id: workoutData.training_plan_id,

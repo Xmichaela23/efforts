@@ -2537,14 +2537,18 @@ Deno.serve(async (req: Request) => {
               ((gsBaseline as Record<string, unknown> | null)?.locked_baselines ?? null) as Record<string, unknown> | null,
               new Date().toISOString().slice(0, 10),
             );
+            // ⛔ 2026-09-04 (SPEC-baseline-entry): the missing-lift refusal fires ONLY when the athlete
+            // asked to use the numbers on file instead of the week-one test (`skip_test_week: true`).
+            // With the test week on, a missing number is a "By feel" test row, not a refusal — the
+            // same rule `generate-strength-plan` applies; keep the two together.
             const gsMissing = missingBarbellLifts(gsMaxes).map((l) => LIFT_LABEL[l]);
-            if (gsMissing.length > 0) {
+            if (gsMissing.length > 0 && gsTp.skip_test_week === true) {
               const list = gsMissing.length === 1
                 ? gsMissing[0]
                 : `${gsMissing.slice(0, -1).join(', ')} and ${gsMissing[gsMissing.length - 1]}`;
               throw new AppError(
                 'missing_strength_baseline',
-                `Before this plan can be built we need your ${list} number${gsMissing.length > 1 ? 's' : ''}. Log a baseline test in Training Baselines.`,
+                `To use your current numbers instead of testing in week one we need your ${list} number${gsMissing.length > 1 ? 's' : ''} — or keep the week-one test.`,
                 409,
               );
             }
@@ -2555,7 +2559,7 @@ Deno.serve(async (req: Request) => {
             // Under 65, even the 35 lb women's bar cannot carry the program's lightest set —
             // that athlete needs a beginner program, not a lighter the previous program. The 65-84 band is
             // ADMITTED: those lifts floor at 35 and the plan copy names the women's-bar sets.
-            const gsLow = liftsBelowEntryMinimum(gsMaxes).map((l) => `${LIFT_LABEL[l]} (${gsMaxes[l as BarbellLift]} lb)`);
+            const gsLow = liftsBelowEntryMinimum(gsMaxes).filter((l) => gsMaxes[l as BarbellLift] > 0).map((l) => `${LIFT_LABEL[l]} (${gsMaxes[l as BarbellLift]} lb)`);
             if (gsLow.length > 0) {
               const list = gsLow.length === 1
                 ? gsLow[0]

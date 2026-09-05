@@ -203,6 +203,34 @@ export function workingNumberFromTest(
  * number comes from what the athlete actually does on the last step. A caller that skips the test
  * and derives a working number from the seed has rebuilt the thing this ruling removed.
  */
+/**
+ * A working number from a number ON FILE, not from a test set (SPEC-baseline-entry-2026-09-04).
+ *
+ * The athlete answered "Use current" on the wizard's "Know your numbers?" screen, so the block prices
+ * off the one-rep max already in Baselines (typed) or learned from logged sets, and week one is NOT
+ * the test week. The shape is the test's own shape, so the composer, the plan config and the restate
+ * cannot tell the two apart — only `cite` says where the number came from. The working fraction is
+ * the same p215 rule the test uses; the number on file is treated as the predicted true 1RM
+ * (`reps: 1`). ⚠️ This is NOT `locked_baselines` (D-459), which overrides the test with the raw
+ * number and no fraction; that stays its own path.
+ */
+export function workingNumberFromFile(
+  lift: TestedLift,
+  oneRepMax: number,
+  source: 'typed' | 'learned',
+): WorkingNumber | null {
+  if (!Number.isFinite(oneRepMax) || oneRepMax <= 0) return null;
+  return {
+    lift,
+    predicted1RM: oneRepMax,
+    workingNumber: oneRepMax * WORKING_MAX_FRACTION,
+    measured: { weight: oneRepMax, reps: 1 },
+    cite: source === 'typed'
+      ? 'user_baselines.performance_numbers — typed by the athlete; working fraction Viada p215 (book-sources/p215.png)'
+      : 'learned_fitness.strength_1rms — estimated from logged sets; working fraction Viada p215 (book-sources/p215.png)',
+  };
+}
+
 export function pretestSession(
   lift: TestedLift,
   predictedFromFile: number,

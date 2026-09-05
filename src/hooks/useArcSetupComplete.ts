@@ -199,7 +199,16 @@ export function useArcSetupComplete() {
    * plan, not a "we're done" banner — suppressing those would be hiding something the athlete needs.
    */
   const complete = useCallback(
-    async (payload: ArcSetupPayload, opts?: { announcePlanReady?: boolean }) => {
+    async (payload: ArcSetupPayload, opts?: {
+      announcePlanReady?: boolean;
+      /**
+       * Runs once the plan exists (plan id in hand), before the wizard navigates away. The "Know your
+       * numbers?" step schedules a week-one retest through it (SPEC-baseline-entry-2026-09-04) — the
+       * same planned rows Training Baselines writes, dated inside the block. A failure here does not
+       * undo the plan; it is logged and the athlete can schedule the test from Baselines.
+       */
+      onBuilt?: (planId: string | null) => Promise<void>;
+    }) => {
       const announcePlanReady = opts?.announcePlanReady !== false;
       setSaving(true);
       setError(null);
@@ -286,6 +295,9 @@ export function useArcSetupComplete() {
       }
 
       const planId = (data as { plan_id?: string | null }).plan_id ?? null;
+      if (opts?.onBuilt) {
+        try { await opts.onBuilt(planId); } catch (e) { console.warn('[arc-setup] onBuilt failed (plan is built):', e); }
+      }
       const scheduleSignals = (data as {
         schedule_signals?: {
           conflicts?: string[];

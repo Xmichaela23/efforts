@@ -58,6 +58,10 @@ import {
   PATTERN_FOR_TESTED_LIFT,
   flattenViadaPicks,
   normalizeViadaPrefs,
+  workingNumberFromFile,
+  TESTED_LIFTS,
+  type WorkingNumber,
+  type TestedLift,
 } from '../_shared/standing-plan/index.ts';
 /**
  * ⛔ THE ONE OWNER OF THE TRUSTED-REP CEILING (`_shared/strength/trusted-reps.ts`) — 8 reps general, 5 on the
@@ -227,14 +231,28 @@ Deno.serve(async (req: Request) => {
       ((ub as Record<string, unknown> | null)?.locked_baselines ?? null) as Record<string, unknown> | null,
       new Date().toISOString().slice(0, 10),
     );
+    /**
+     * ⛔ THE TEST WEEK IS OPTIONAL AGAIN (Michael, 2026-09-04, SPEC-baseline-entry-2026-09-04: "that's the
+     * whole purpose of this change"). This reverses the 2026-08-30 ruling recorded further down. Two
+     * answers reach this function on `skip_test_week`:
+     *   - absent / false → week one is the test week. A lift with NO number on file is NOT a reason to
+     *     refuse any more: the composer already writes that lift's test as "By feel" (three open steps)
+     *     and the block re-prices from the logged test. So the missing-lift refusal below fires ONLY
+     *     when the athlete asked to skip the test — you cannot price a block off numbers you don't have.
+     *   - true → "Use current": every lift prices off the number on file (typed, or learned from logged
+     *     sets) and there is no test week. All four numbers are required for that; if one is missing the
+     *     test week is built instead and the reason is logged.
+     * The 65 lb floor still applies to every lift that HAS a number.
+     */
+    const skipRequested = (body as Record<string, unknown>).skip_test_week === true;
     const missing = missingBarbellLifts(maxes);
-    if (missing.length > 0) {
+    if (missing.length > 0 && skipRequested) {
       const list = missing.map((l) => LIFT_LABEL[l]);
       const named = list.length === 1 ? list[0] : `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
       console.error(`[strength-plan] refused: missing ${named}`);
       return json({
         success: false,
-        error: `Missing ${named}. Every session in this plan loads off your maxes, so it cannot be built without them.`,
+        error: `Missing ${named}. To use your current numbers instead of testing in week one, every lift needs one — or keep the week-one test.`,
       }, 409);
     }
 
@@ -242,7 +260,7 @@ Deno.serve(async (req: Request) => {
     // `create-goal-and-materialize-plan` because this function is also invoked directly — same
     // shared reader and threshold (`barbell-maxes.ts`), so the two cannot drift apart. Under 65,
     // even the 35 lb women's bar cannot carry the lightest set; 65-84 is admitted and flagged.
-    const low = liftsBelowEntryMinimum(maxes).map((l) => `${LIFT_LABEL[l]} (${maxes[l]} lb)`);
+    const low = liftsBelowEntryMinimum(maxes).filter((l) => maxes[l] > 0).map((l) => `${LIFT_LABEL[l]} (${maxes[l]} lb)`);
     if (low.length > 0) {
       const named = low.length === 1 ? low[0] : `${low.slice(0, -1).join(', ')} and ${low[low.length - 1]}`;
       console.error(`[strength-plan] refused: below entry minimum — ${named}`);
@@ -644,12 +662,32 @@ Deno.serve(async (req: Request) => {
        * have no live caller. Left in place rather than deleted, with their tests, because removing
        * them is a separate call — flagged, not smuggled.
        */
-      if ((body as Record<string, unknown>).skip_test_week === true) {
-        console.log(
-          '[standing-plan] a caller asked to skip the test week; the option no longer exists and '
-          + 'week one is the test week.',
-        );
-      }
+      /**
+       * ⛔ REVERSED 2026-09-04 (Michael: the test week is optional; "we are not making it non-optional").
+       * The paragraph above is history. `skip_test_week: true` now means "Use current": the working
+       * numbers come from the numbers ON FILE — the same resolved four the test week seeds its ramp
+       * from (`maxes`: locked > trusted learned > typed) — and week one is a normal week. The composer
+       * refuses a skip with no working numbers (compose.ts), so a missing lift falls back to the test
+       * week here, loudly. The evidence-from-logged-sets reader (`test-skip.ts`) is NOT revived: the
+       * number on file is the athlete's answer; provenance is in each working number's `cite`.
+       */
+      const useCurrentNumbers = (() => {
+        if (!skipRequested) return null;
+        const pn = (ub?.performance_numbers ?? {}) as Record<string, unknown>;
+        const TYPED_KEY: Record<TestedLift, string> = { bench: 'bench', squat: 'squat', deadlift: 'deadlift', overheadPress: 'overheadPress1RM' };
+        const out: Partial<Record<TestedLift, WorkingNumber>> = {};
+        for (const lift of TESTED_LIFTS) {
+          const v = maxes[lift];
+          const typed = Number(pn[TYPED_KEY[lift]]);
+          const w = workingNumberFromFile(lift, v, Number.isFinite(typed) && Math.round(typed) === Math.round(v) ? 'typed' : 'learned');
+          if (w) out[lift] = w;
+        }
+        if (Object.keys(out).length < TESTED_LIFTS.length) {
+          console.warn(`[standing-plan] use-current asked but only ${Object.keys(out).length}/${TESTED_LIFTS.length} numbers on file — building the test week instead.`);
+          return null;
+        }
+        return out;
+      })();
 
       /**
        * ⛔ THE ATHLETE'S ACCESSORY PICKS, FLATTENED (A1, 2026-08-24). Twelve per-day choices become a
@@ -779,9 +817,9 @@ Deno.serve(async (req: Request) => {
            */
           // ⛔ ALWAYS UNDEFINED SINCE 2026-08-30 — the working numbers come from week one's test,
           // never from logged evidence. See the test-week block above.
-          workingNumbers: undefined,
-          // ⛔ NEVER TRUE SINCE 2026-08-30 — week one is the test week for every block.
-          skipTestWeek: false,
+          workingNumbers: useCurrentNumbers ?? undefined,
+          // true only for "Use current" (2026-09-04); the 2026-08-30 always-test rule is reversed
+          skipTestWeek: useCurrentNumbers != null,
           seed1RMs: {
             bench: maxes.bench,
             squat: maxes.squat,

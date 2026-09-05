@@ -93,7 +93,7 @@ Deno.test('⛔ AND THE 5K PATH IS UNCHANGED — tier first, exactly as it ships'
   for (const st of [strengthPath('run'), strengthPath(undefined)]) {
     assertEquals(landsOn(st), 'tier', 'the Strength Focus path no longer opens the tier screen');
     assertEquals(getSteps(st), [
-      'goal', 'train', 'tier', 'posture', 'endurance', 'accessory', 'schedule', 'confirm',
+      'goal', 'train', 'tier', 'posture', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm',
     ]);
   }
 });
@@ -114,7 +114,7 @@ Deno.test('⛔ THE FLOW IS COMPLETE WITHOUT A STANDARD-ONLY SCREEN', () => {
    */
   assertEquals(standard, run.filter((k) => k !== 'tier' && k !== 'posture'),
     'the two flows differ by more than the tier and sport-scope screens');
-  for (const required of ['endurance', 'schedule', 'confirm'] as const) {
+  for (const required of ['endurance', 'schedule', 'numbers', 'confirm'] as const) {
     assert(standard.includes(required), `Standard Focus never asks for ${required}`);
   }
 });

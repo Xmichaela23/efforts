@@ -65,3 +65,10 @@ Effort and soreness rows: **REMOVED from State 2026-09-04 evening** (Foster + ou
 
 ## Not yet swept
 The week-execution bars (a count). Add rows when touched.
+
+## Wizard · "Know your numbers?" (D-467)
+
+| Number | Where | Source |
+|---|---|---|
+| Working number from a number on file = 1RM × 0.96 | `working-number.ts workingNumberFromFile` | FIELD — Viada p215, the same fraction the test read uses |
+| Week-one retest placement: run test on day 3, FTP test on day 5 of the block | `src/lib/baseline-tests.ts RETEST_OFFSET_DAYS` | **OURS** — the book says only "no hard training 48 hours prior" (p210, p212); the day inside week one is this app's choice |
