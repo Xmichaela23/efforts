@@ -98,7 +98,8 @@ function mapImportToDb(workout: any, userId: string) {
     gps_track: workout.gps_track ?? null,
     sensor_data: workout.sensor_data ?? null,
     swim_data: workout.swim_data ?? null,
-    steps_preset: workout.steps_preset ?? null,
+    // steps_preset removed 2026-09-04: it is a planned_workouts column, not a workouts one — writing it
+    // here made the DB reject every imported row (400). A completed import carries no steps preset anyway.
     planned_id: workout.planned_id ?? null,
     computed,
   };
