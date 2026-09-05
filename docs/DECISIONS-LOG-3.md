@@ -1856,3 +1856,23 @@ and later squat rows priced off it.
 
 **Pre-existing, untouched:** `standing-plan-wiring.test.ts` "96% of the average" fails on the untouched tree too —
 its expected Epley uses 1/30 where the code uses 0.0333 (203.5 vs 203.4852).
+
+## D-469 — A by-feel set is not a ladder rung; the heavy set opens inside the band (2026-09-04)
+
+**Bug (Michael's squat, same plan as D-468, after the restate applied):** every squat row from week 2 read
+"105 × 6". The weight was right (working 119 × the ME percentage = 105, the same arithmetic as bench 135 and
+deadlift 155). The reps were not: the ME row "opens at the reps last achieved", and the ladder had recorded
+`recentReps [6]` from his Sep 4 squat — a set logged against a week-one row that was `awaiting_test`, "By feel",
+with no prescription at all. So a calibration set became a rung and every later heavy set opened at 6, above
+p218's 1–5 band.
+
+**Rules:**
+1. `me-history.ts earnedMeSets` — a composed ME row with `weight: null` (the by-feel weeks) is not in the ladder
+   index; a set logged against it earns no set and sets no opening reps. The test week's own read is where those
+   sets are measured.
+2. `compose.ts` — the opening rep count is clamped to the ME band (`p218`, 1–5): "open at the reps last achieved" is
+   a position inside the band, never a licence to prescribe outside it; a count above the band is the bar ladder's
+   business, not the rep target's.
+
+Tests: `me-ladder-by-feel.test.ts`. Deployed: `rematerialize-standing-block` v100 (03:57 UTC). The apply is the
+athlete's tap (see D-468). Expected after apply: squat rows "105 × 1-5" with the top step inside the band.

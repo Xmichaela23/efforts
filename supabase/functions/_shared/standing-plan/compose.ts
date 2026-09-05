@@ -1819,8 +1819,12 @@ function exerciseForSlot(
     ? (args.meLastRepsByPattern?.[pattern] ?? []).filter((n) => Number.isFinite(n))
     : [];
   const bandTop = p.kind === 'barbell' ? p.reps.hi : 1;
+  const bandLo = p.kind === 'barbell' ? p.reps.lo : 1;
+  // ⛔ THE ME SET OPENS INSIDE THE BAND, NEVER OUTSIDE IT (2026-09-04). "Open at the reps last
+  // achieved" is a position within p218's 1-5, not a licence to prescribe 6 because a logged set once
+  // had 6; a count above the band is a different set (the bar should move, and the bar ladder owns that).
   const openAt = slot.intent === 'ME'
-    ? (lastReps.length > 0 ? lastReps[lastReps.length - 1] : null)
+    ? (lastReps.length > 0 ? Math.min(bandTop, Math.max(bandLo, lastReps[lastReps.length - 1])) : null)
     : bandTop;
 
   /**

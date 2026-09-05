@@ -337,6 +337,15 @@ export function earnedMeSets(args: {
   for (const wk of args.composed) {
     for (const row of wk.meRows ?? []) {
       if (row.week > args.throughWeek) continue;
+      /**
+       * ⛔ A "BY FEEL" ROW EARNS NOTHING AND SETS NO RUNG (Michael's squat, 2026-09-04). A composed ME
+       * row with `weight: null` had no prescription — the by-feel week before the test is read. The set
+       * the athlete logged against it is calibration, not evidence for the ladder: read as a rung it
+       * became `recentReps [6]` at 105 and every later squat opened at 105 × 6, a rep count above the
+       * ME band, copied from a set that was never prescribed. Skip the row; the test week's own read
+       * (`readTestWeek`) is where those sets are measured.
+       */
+      if (row.weight == null) continue;
       index.set(`${row.week}|${row.day}|${row.movement.toLowerCase()}`, row);
     }
   }
