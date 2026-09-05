@@ -32,7 +32,7 @@ import StrengthCalibrationNotice from '@/components/StrengthCalibrationNotice';
 // lines under strength — so nothing about a sport appears in two places on the screen. Both were
 // moved from other blocks (the trends plate and the LOAD section); no card was restyled and no
 // server field changed. Run keeps its own plate for one more pass (see StateTrendsBlock).
-import { EnduranceConditionsLine, EnduranceReadCards, fmtEff } from '@/components/context/StrengthReadCards';
+import { EnduranceReadCards, fmtEff } from '@/components/context/StrengthReadCards';
 import ViadaWeekCard from '@/components/context/ViadaWeekCard';
 import EnduranceCheckpointSheet from '@/components/context/EnduranceCheckpointSheet';
 import LoadWeeksCard from '@/components/context/LoadWeeksCard';
@@ -1337,7 +1337,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                 {/* ⛔ NO CONDITIONS FOOTER ON THE BIKE (Michael 2026-09-03: "kill the hills and heat, kill
                     any run crossover"). "Hills and heat can have an impact. Trust your RPE" is written for
                     a runner reading pace; a ride is read on power, which heat and gradient do not inflate. */}
-                <EnduranceReadCards asOf={asOf ?? null} sessions={enduranceSessions} spine={enduranceSpine} sport="ride" footer={false} />
+                <EnduranceReadCards asOf={asOf ?? null} sessions={enduranceSessions} spine={enduranceSpine} sport="ride" />
               </>
             );
             // ⛔ RUN OWNS ITS PLATE (Round 3 pass 2) — the run efficiency cards, and ONLY those. No
@@ -1347,10 +1347,8 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
               <>
                 {/* 2026-09-03 (Michael): the reads first (efficiency, drift — how you responded), the workload chart
                     (how much, how hard) below them. */}
-                <EnduranceReadCards asOf={asOf ?? null} sessions={enduranceSessions} spine={enduranceSpine} sport="run" footer={false} />
+                <EnduranceReadCards asOf={asOf ?? null} sessions={enduranceSessions} spine={enduranceSpine} sport="run" />
                 <LoadWeeksCard sport="run" load={(stateDisplay as any)?.loadByDiscipline?.run ?? null} />
-                {/* the conditions line blankets the whole run card — easy, hard, and the chart — once, at the end */}
-                {(enduranceSpine ?? []).some((s: any) => s?.sport === 'run' && (s?.points?.length ?? 0) >= 2) && <EnduranceConditionsLine />}
               </>
             );
             // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
@@ -1375,7 +1373,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
             // verdict still owns its rides; strength with lifting but no e1RM trend still owns its
             // week. Each is gated by its own content, so nothing new appears.
             const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} showAxis={showAxis} />;
-            if (card.discipline === 'bike') return <>{row}<EnduranceReadCards asOf={asOf ?? null} sessions={enduranceSessions} spine={enduranceSpine} sport="ride" footer={false} /></>;
+            if (card.discipline === 'bike') return <>{row}<EnduranceReadCards asOf={asOf ?? null} sessions={enduranceSessions} spine={enduranceSpine} sport="ride" /></>;
             if (card.discipline === 'strength') return <>{row}{strengthDetail}<ViadaWeekCard week={viadaWeek} hasPlan={hasActivePlan === true} /></>;
             return row;
           })();

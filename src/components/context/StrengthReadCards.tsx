@@ -89,16 +89,9 @@ const GROUP_ORDER = ['aerobic', 'easy', 'long', 'quality', 'all'];
 /** 2026-09-03 (Michael: the hills-and-heat line "feels lost in the threshold line" — it should blanket easy and
  *  hard). The run plate renders it ONCE, as the card's last line under the workload chart, via this export;
  *  the ride plate keeps it inline. Same words as before, copy unchanged. */
-export function EnduranceConditionsLine() {
-  return (
-    <div className="px-3 pb-3 text-[11px] text-white/55">
-      Hills and heat can have an impact. Trust your RPE, but be honest.
-    </div>
-  );
-}
 
 export function EnduranceReadCards(
-  { sessions, spine, sport, footer = true, asOf }: { sessions?: NamedSession[] | null; spine?: SpineSeries[] | null; sport?: 'run' | 'ride'; footer?: boolean; /** the server's as-of day; the last point's date when absent */ asOf?: string | null },
+  { sessions, spine, sport, asOf }: { sessions?: NamedSession[] | null; spine?: SpineSeries[] | null; sport?: 'run' | 'ride'; /** the server's as-of day; the last point's date when absent */ asOf?: string | null },
 ) {
   // ⛔ ONE OWNER PER SPORT (Round 3 pass 1, 2026-09-01). `sport` filters this to a single discipline
   // so the ride cards can render under the bike plate and the run cards under the run block, each
@@ -125,22 +118,10 @@ export function EnduranceReadCards(
     .sort((a, b) => (GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group)) || a.sport.localeCompare(b.sport));
   if (list.length === 0 && spineList.length === 0) return null;
   // ⛔ THE CAUTION, ONCE FOR THE SPORT (Round 3 pass 2) — see SpineCard for why it moved here. Shown
-  // when any card carries a line to read (≥2 points); a lone reading has no trend to caution about.
-  const hasLine = spineList.some((s) => (s.points ?? []).filter((p) => p.efficiency != null).length >= 2)
-    || list.some((s) => (s.points ?? []).length >= 2);
   return (
     <>
       {spineList.map((s) => <SpineCard key={`spine:${s.sport}:${s.group}`} series={s} asOf={asOf ?? null} />)}
       {list.map((s) => <EnduranceCard key={`${s.sport}:${s.family}`} session={s} />)}
-      {hasLine && footer && (
-        <div className="px-3 pb-3 text-[11px] text-white/55">
-          {/* ⛔ "watch the line over a few weeks" cut (2026-09-01) — a coaching instruction. The fact
-              before it is real and stays: conditions move this more than fitness does. */}
-          {/* Michael 2026-09-02. By the book: p235 (effort at easy varies with fatigue, hydration and
-              environment; check by talk test), p123 (reported effort is one of the three signals). */}
-          Hills and heat can have an impact. Trust your RPE, but be honest.
-        </div>
-      )}
     </>
   );
 }
