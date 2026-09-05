@@ -60,7 +60,7 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
       : null;
   }
   const runColor = color ?? getDisciplineColor('run');
-  const W = 300, H = 42, PAD_Y = 6, PAD_X = 2;
+  const W = 300, H = 48, PAD_Y = 6, PAD_X = 2;
   const vals = pts.map((p) => p.value);
   const minV = Math.min(...vals), maxV = Math.max(...vals);
   const rawRange = maxV - minV;
@@ -86,8 +86,8 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
     <span className={`basis-full flex flex-col gap-1 ${divider ? 'mt-3 pt-3 border-t border-white/10' : 'mt-1.5'}`}>
       {title && (
         <span className="flex items-baseline justify-between gap-2">
-          <span className="text-[13px] text-white/80">{title}</span>
-          {rangeLabel && <span className="text-[10px] tabular-nums text-white/35">{rangeLabel}</span>}
+          <span className="text-[15px] text-white/90">{title}</span>
+          {rangeLabel && <span className="text-[12px] tabular-nums text-white/50">{rangeLabel}</span>}
         </span>
       )}
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="block" aria-hidden="true">
@@ -101,20 +101,20 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
         {fit && <line x1={x(0)} y1={y(fit.start)} x2={x(pts.length - 1)} y2={y(fit.end)} stroke="rgba(255,255,255,0.55)" strokeWidth={1} strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />}
       </svg>
       {fit && (
-        <span className="text-[11px] text-white/70">
+        <span className="text-[13px] text-white/85">
           {trendWord && !title ? `${trendWord} ` : ''}over {spanWeeks} {spanWeeks === 1 ? 'week' : 'weeks'}: <span className="tabular-nums">{fmtVal(fit.start)}{unit}</span> → <span className="tabular-nums">{fmtVal(fit.end)}{unit}</span>
         </span>
       )}
       {title ? (
-        building && <span className="text-[10px] text-white/45">{buildingLabel(spanWeeks)}</span>
+        building && <span className="text-[12px] text-white/55">{buildingLabel(spanWeeks)}</span>
       ) : (
         <span className="text-[10px] text-white/45 flex items-center justify-between">
           <span>{building ? buildingLabel(spanWeeks) : `last ${spanWeeks} weeks`}</span>
           {rangeLabel ? <span className="tabular-nums text-white/30">{rangeLabel}</span> : <span />}
         </span>
       )}
-      {provenance && <span className="text-[11px] text-white/55">{provenance}</span>}
-      {keyLine && <span className="text-[11px] text-white/45 leading-snug">{keyLine}</span>}
+      {provenance && <span className="text-[12px] text-white/65">{provenance}</span>}
+      {keyLine && <span className="text-[12px] text-white/60 leading-snug">{keyLine}</span>}
       {caption && <span className="text-[10px] text-white/40">{caption}</span>}
     </span>
   );
