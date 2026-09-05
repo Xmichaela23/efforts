@@ -137,7 +137,12 @@ export type BikePowerSilentReason = 'no_hard_efforts' | 'too_few_rides';
 export interface BikeFitness {
   power: BikeSignal; // LEADS the bike verdict
   efficiency: BikeSignal; // secondary read (HR-at-power)
-  range?: import('./position-in-range.ts').RangePosition | null; // State v3 DOT: lead metric in 12wk range
+  /** The bike's FTP over time — every `fitness_baselines` bike/ftp reading (superseded rows included)
+   *  inside the 12-week window, oldest first. Attached by compute-snapshot post-assembly, the way
+   *  `loadByDiscipline` is. FIELD — TrainingPeaks' threshold history ("track previous thresholds") and
+   *  WKO5's sFTP history chart plot FTP as a line over time. Replaced the 12-week min/max dot
+   *  (`range`, position-in-range, OURS) 2026-09-04 — docs/SPEC-ftp-trend-line-2026-09-04.md. */
+  ftpHistory?: Array<{ date: string; value: number; status: string }> | null;
   /** ⛔ THE SERVER DECIDES THE LEAD, THE CLIENT RENDERS IT. Both screens used to re-derive this from
    *  `power.verdict !== 'needs_data'`, which silently became wrong the moment `withheld` existed — two
    *  copies of one rule is the divergence the spine exists to prevent. 'none' = neither can assert. */

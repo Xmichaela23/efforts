@@ -74,13 +74,7 @@ const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> 
 // "→ −15.2%" — flat arrow, negative number — which is accurate but reads oddly at a glance.
 // If that pairing looks wrong on the screen, the fix is to give `settled lower` its own glyph, not
 // to bring the words back.
-const NUMERIC: Record<TrendVerdict, { word: string; cls: string; arr: string }> = {
-  improving: { word: '', cls: 'text-emerald-400', arr: '' },
-  holding: { word: '', cls: 'text-white/70', arr: '' },
-  sliding: { word: '', cls: 'text-white/70', arr: '' },
-  // Not verdicts — these two say "there is no reading", which no arrow can express. Words stay.
-  needs_data: { word: 'needs data', cls: 'text-white/60', arr: '' },
-};
+// `NUMERIC` (the bike dot's wordless verdict map) was deleted with the bike dot, 2026-09-04.
 
 // PRECISE VERDICT WORDS (2026-07-22, Michael — "all the words for every scenario has to be precise").
 // The trend engine's raw verdict is a NET early→recent direction; on its own it can't tell a metric
@@ -199,7 +193,7 @@ function asOf(ageDays: number | null | undefined): string | null {
 
 // Bike row — Power leads, Efficiency alongside (disagreement surfaced, never collapsed). The
 // efficiency basis carries the zone-band source (coggan_ftp = estimated; personal = from test).
-function BikeFitnessRow({ fitness, showAxis, mode, anchor, fallbackFtp = null }: { fitness: BikeFitness; showAxis?: boolean; mode: FitnessMode; anchor?: FitnessAnchor; fallbackFtp?: number | null }) {
+function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness: BikeFitness; mode: FitnessMode; anchor?: FitnessAnchor; fallbackFtp?: number | null }) {
   // ⛔ THE FTP ON RECORD, SERVER-FIRST WITH A CLIENT FALLBACK (2026-08-01).
   //
   // `anchor.value` is the authority — but `fitnessAnchors` is assembled by compute-snapshot and only
@@ -280,7 +274,12 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor, fallbackFtp = null }:
   // "rides we can read from", never as their total ride count, which we do not have here.
   const rideCount = Math.max(fitness.power.sampleCount ?? 0, fitness.efficiency.sampleCount ?? 0);
   const ftpNow = anchor?.value != null && Number.isFinite(anchor.value) ? Math.round(anchor.value) : fallbackFtp;
-  const range = (fitness as any).range as { positionPct: number; confident: boolean } | null | undefined;
+  // ⛔ FTP OVER TIME, NOT A DOT (2026-09-04, docs/SPEC-ftp-trend-line-2026-09-04.md). The dot placed
+  // best-20-min power in its own 12-week min/max under a label that read "167 W threshold" — marker and
+  // number disagreed, and "position in your own range" had no field source. TrainingPeaks' FTP view is a
+  // threshold-history line (track previous thresholds; WKO5 sFTP history), the same shape as the
+  // efficiency and drift charts. `ftpHistory` is every stored FTP reading in the window, from the server.
+  const ftpHistory = (Array.isArray(fitness.ftpHistory) ? fitness.ftpHistory : []).filter((p) => p?.date && Number.isFinite(p.value));
   const anchored = mode === 'anchored';
   // SLICE 1: a dot only when ANCHORED — bike is anchored only once the athlete ACCEPTS its FTP estimate
   // (basis flips to 'personal'). On est(FTP) it's TREND-ONLY: the arrow + "no baseline set · accept your
@@ -290,8 +289,10 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor, fallbackFtp = null }:
   // test, taken from 20 minutes the athlete already rode hard rather than asking them to test.
   // 2026-09-04: the estimate is the power-duration fit (TrainerRoad / intervals.icu), not 95% of a best 20.
   const ftpMethod = src === 'est (FTP)' ? ' FTP is estimated from your rides: your best power at each length from 2 to 20 minutes, fitted to a curve. It changes only when you accept a new number.' : '';
-  // The dot and the "accept your FTP" tag belong to a REAL read; a withheld or absent one gets neither.
-  const showDot = anchored && range != null && assertsLead && leadIsPower;
+  // The FTP line and the "accept your FTP" tag belong to a REAL read; a withheld or absent one gets neither.
+  const anchoredPower = anchored && assertsLead && leadIsPower;
+  // ⚠️ NO LINE THROUGH ONE DOT: fewer than two readings prints the number alone.
+  const showFtpLine = anchoredPower && ftpHistory.length >= 2;
   const trendOnly = !anchored && assertsLead && leadIsPower;
   return (
     <Row label="bike">
@@ -324,23 +325,41 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor, fallbackFtp = null }:
         // The reason line below says why there is no threshold read, the FTP on record prints under it,
         // and the rides card carries efficiency factor. Nothing here asserts a heart rate.
         null
-      ) : showDot ? (
+      ) : anchoredPower ? (
         // The headline names the NUMBER, not the metric's category: "212 W threshold" is what a rider
         // wants off a glance, and it is `anchor.value` — the same FTP the verdict was computed against
         // (D-358), never a second client-side resolve.
-        <FitnessDotBlock label={ftpNow != null ? `${ftpNow} W threshold` : 'power'} range={range!} verdict={lead.verdict} pctChange={lead.pctChange} wordMap={NUMERIC} showAxis={showAxis} explain={leadIsPower
-          // ⛔ THE ⓘ DEFINES THE METRIC AND STOPS (2026-08-01, Michael: "anything specific to where the
-          // user is needs to go to more; ⓘ simply shows what the metric is"). Both strings used to end
-          // with "the dot is where it sits versus your baseline; the arrow is the direction" — that is a
-          // legend for THIS athlete's position, not a definition of the measure. Moved to "more".
-          // ⚠️ THE FTP METHOD LINE IS CONDITIONAL, and it has to be. "Estimated from your hard rides"
-          // is false for an athlete who tested and entered their own FTP — appending it
-          // unconditionally would tell a confirmed rider their number was guessed. Only when the
-          // basis IS the estimate (`src === 'est (FTP)'`, from `efficiency.basis === 'coggan_ftp'`).
-          // It passes the ⓘ test (D-357): it describes HOW THE METRIC IS MADE, true for anyone,
-          // not where this athlete sits.
-          ? `Power = your best 20-minute power on similar terrain, shown against your FTP.${ftpMethod}`
-          : `Efficiency = how much power you hold per heartbeat on steady rides. Rising means the same work at a lower heart rate — getting fitter.${ftpMethod}`} />
+        <>
+          <span className="basis-full flex items-baseline justify-between gap-2">
+            <span className="text-white/55 text-[13px]">{ftpNow != null ? `${ftpNow} W threshold` : 'power'}</span>
+          </span>
+          {/* FTP over time — one dot per stored reading, the same fitted trendline (WKO5 least squares) and
+              "start → end" caption the efficiency and drift charts use. TrainingPeaks threshold history. */}
+          {showFtpLine && (
+            <TrendSparkline
+              series={ftpHistory.map((p) => ({ date: p.date, value: p.value, recent: true }))}
+              color={getDisciplineColor('bike')}
+              dotNoun="FTP reading"
+              fmtVal={(v) => String(Math.round(v))}
+              unit=" W"
+              minSpanFraction={0.15}
+              trendline
+              trendWord="FTP"
+              buildingLabel={(w) => `${w} of 12 weeks`}
+            />
+          )}
+          {/* ⛔ THE ⓘ DEFINES THE METRIC AND STOPS (2026-08-01, Michael: "anything specific to where the
+              user is needs to go to more; ⓘ simply shows what the metric is").
+              ⚠️ THE FTP METHOD LINE IS CONDITIONAL, and it has to be. "Estimated from your hard rides"
+              is false for an athlete who tested and entered their own FTP — appending it
+              unconditionally would tell a confirmed rider their number was guessed. Only when the
+              basis IS the estimate (`src === 'est (FTP)'`, from `efficiency.basis === 'coggan_ftp'`).
+              It passes the ⓘ test (D-357): it describes HOW THE METRIC IS MADE, true for anyone,
+              not where this athlete sits. */}
+          <p className="basis-full text-[12px] text-white/45 leading-snug mt-1 max-w-[min(100%,340px)]">
+            {`FTP = the highest power you can hold for about an hour.${ftpMethod}`}
+          </p>
+        </>
       ) : (
         <Signal label={ftpNow != null ? `${ftpNow} W threshold` : 'Power'} sig={lead} />
       )}
@@ -368,7 +387,7 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor, fallbackFtp = null }:
           "lose the heart rate sentence, keep it strict to the book"). It described a read the card no
           longer makes. The ride count it carried is not lost — the rides card states its own. */}
       {/* The receipt: window · rides · recency. The provenance lines below it print open (one tap). */}
-      {(tail || src || asOf(lead.newestAgeDays) || (showDot && anchor?.label)) && (
+      {(tail || src || asOf(lead.newestAgeDays) || (anchoredPower && anchor?.label)) && (
         <span className="basis-full flex items-baseline justify-between gap-2 text-white/55 text-[12px]">
           <span>{tail}</span>
         </span>
@@ -381,9 +400,7 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor, fallbackFtp = null }:
           of provenance stacked under a one-line verdict buried the verdict. */}
       {(
         <span className="basis-full flex flex-col gap-0.5 mt-0.5 text-[12px] text-white/45">
-          {/* WHERE YOU SIT — the dot/arrow legend, which is about this athlete rather than about the
-              metric, so it lives here rather than in the ⓘ. Only when there IS a dot to explain. */}
-          {showDot && <span>The dot is where this number sits in your last 12 weeks.</span>}
+          {/* "The dot is where this number sits in your last 12 weeks" is gone with the dot (2026-09-04). */}
           {/* ⛔ THE NUMBER THE READ WAS COMPUTED AGAINST, not one resolved here. It rides on the anchor
               (`FitnessAnchor.value`) so the FTP shown and the FTP behind the verdict are the same
               number by construction. Resolving it client-side would give one that is *probably* the
@@ -403,7 +420,7 @@ function BikeFitnessRow({ fitness, showAxis, mode, anchor, fallbackFtp = null }:
               ⚠️ The provenance it carried — the per-ride power band is `bike_fitness_v1.band_source`,
               computed at analysis time from whatever FTP resolved then, and is not verified equal to
               the FTP on record — is still true and still an open question, not a copy fix. */}
-          {showDot && anchor?.label && <span>{anchor.label}</span>}
+          {anchoredPower && anchor?.label && <span>{anchor.label}</span>}
         </span>
       )}
       {/* THE LONG VIEW — 12-week power sparkline (the cyclist's e1RM/efficiency analog, 2026-07-23). Only when
@@ -1307,7 +1324,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
             // bike plate looks exactly as before for an athlete with no rides.
             if (card.discipline === 'bike' && bikeHasSubstance) return (
               <>
-                <BikeFitnessRow fitness={bikeFitness!} showAxis={showAxis} mode={fitnessMode.bike ?? 'trend_only'} anchor={fitnessAnchors.bike} fallbackFtp={fallbackFtp} />
+                <BikeFitnessRow fitness={bikeFitness!} mode={fitnessMode.bike ?? 'trend_only'} anchor={fitnessAnchors.bike} fallbackFtp={fallbackFtp} />
                 {/* ⛔ NO CONDITIONS FOOTER ON THE BIKE (Michael 2026-09-03: "kill the hills and heat, kill
                     any run crossover"). "Hills and heat can have an impact. Trust your RPE" is written for
                     a runner reading pace; a ride is read on power, which heat and gradient do not inflate. */}
@@ -1429,7 +1446,8 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         // pre-run cases (bike was that first consumer; swim only when there is no bike).
         // ⚠️ FROM `active` ONLY, and resting cards keep `false` exactly as before — a dimmed card
         // never carried the axis, and that does not change here.
-        const firstAxisDisc = active.find((c) => c.discipline === 'bike' || c.discipline === 'swim')?.discipline;
+        // 2026-09-04: the bike dot is gone (FTP line instead), so swim is the only axis consumer left.
+        const firstAxisDisc = active.find((c) => c.discipline === 'swim')?.discipline;
         // ⛔ ONE PLATE, HAIRLINE DIVIDERS — the same `divide-y` construction the LOAD section already
         // uses in StateTab. Glass depth on the OUTSIDE, grid on the inside. Neutral, because this
         // plate is now multi-sport: the sport colour lives on each row's icon.

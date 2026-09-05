@@ -928,14 +928,12 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // re-derive it. 'none' keeps power as the shape the dot/summary are built from, exactly as before.
   const bikeLeadIsPower = bikeFitness.lead !== 'efficiency';
   const bikeLead = bikeLeadIsPower ? bikeFitness.power : bikeFitness.efficiency;
-  // State v3 DOT — the lead metric's position in the 12wk range, built from whichever signal led above
-  // (one variable now, so the dot's series and the summary's verdict can never come from different
-  // metrics). Power is higher-is-better (more watts = fitter); HR-at-power efficiency is lower-is-better
-  // (less HR for the same power = fitter).
-  const bikeBandSeries = bikeLeadIsPower
-    ? binRides.map((r) => ({ date: r.date, value: Number(r.w20) })).filter((p) => Number.isFinite(p.value) && p.value > 0)
-    : hrPts;
-  bikeFitness.range = positionInRange(bikeBandSeries, { higherIsBetter: bikeLeadIsPower });
+  // ⛔ THE BIKE DOT IS GONE (2026-09-04, docs/SPEC-ftp-trend-line-2026-09-04.md). `bikeFitness.range`
+  // placed the lead metric (best 20-min power) in its own 12-week min/max under a label that read
+  // "167 W threshold" — marker and number disagreed, and "position in your own 12-week range" had no
+  // field source (STATE-SOURCES: OURS). The bike row now draws FTP over time (`bikeFitness.ftpHistory`,
+  // attached by compute-snapshot from `fitness_baselines`) — TrainingPeaks' threshold history. The
+  // run-decoupling and strength ranges below still call `positionInRange`; only the bike stopped.
   const bike: PerfSummary | null = bikeLead.verdict !== 'needs_data'
     ? { verdict: bikeLead.verdict, pctChange: bikeLead.pctChange, sampleCount: bikeLead.sampleCount, newestAgeDays: bikeLead.newestAgeDays, windowDays: bikeLead.windowDays }
     : null;

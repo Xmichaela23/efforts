@@ -1549,6 +1549,37 @@ serve(async (req: Request) => {
           console.log("[compute-snapshot] endurance spine failed (non-fatal):", e?.message || e);
         }
 
+        /**
+         * ⛔ THE BIKE'S FTP OVER TIME — READ ONCE, USED TWICE (2026-09-04, docs/SPEC-ftp-trend-line-2026-09-04.md).
+         * `fitness_baselines` supersedes rather than overwrites, so bike FTP accumulates a dated trail by
+         * construction. This read used to live inside the named-session loop below, gated on a block
+         * AND a linked hard ride — so a rider without a plan never had it. It now runs for every athlete
+         * and feeds both the hard-ride card's reference series and the bike row's own FTP line
+         * (`display.bikeFitness.ftpHistory`, attached post-assembly like `loadByDiscipline`).
+         * FIELD — TrainingPeaks threshold history / WKO5 sFTP chart: FTP plotted as it changes.
+         * ⚠️ THE RUN HAS NO EQUIVALENT AND GETS NO ROW. Its threshold pace is a single value in
+         * `user_baselines.learned_fitness`, overwritten on every re-learn; the previous number is gone.
+         * Storing it as a superseding baseline is the right fix and is deliberately NOT smuggled in
+         * here — it changes what `learn-fitness-profile` writes, which reaches every surface reading a pace.
+         */
+        let bikeFtpHistory: Array<{ date: string; value: number; status: string }> = [];
+        try {
+          const { data: base } = await supabase
+            .from("fitness_baselines").select("value,source_date,created_at,status")
+            .eq("user_id", userId).eq("discipline", "bike").eq("metric", "ftp")
+            .order("source_date", { ascending: true });
+          bikeFtpHistory = (Array.isArray(base) ? base : [])
+            .map((b: any) => ({
+              date: String(b?.source_date || b?.created_at || "").slice(0, 10),
+              value: Number(b?.value),
+              status: String(b?.status || "provisional"),
+            }))
+            .filter((b) => b.date.length === 10 && Number.isFinite(b.value) && b.value > 0)
+            .sort((a, b) => a.date.localeCompare(b.date));
+        } catch (e: any) {
+          console.log("[compute-snapshot] ftp baseline series failed (non-fatal):", e?.message || e);
+        }
+
         let namedSessions: NamedSessionSeries[] = [];
         try {
           // Only worth asking when the block gave us a week map — without it there is no axis.
@@ -1628,36 +1659,12 @@ serve(async (req: Request) => {
               points.sort((a, b) => a.week - b.week || a.date.localeCompare(b.date));
               if (points.length === 0) continue;
 
-              /**
-               * ⛔ THE REFERENCE NUMBER, AND ONLY WHERE THE APP KEPT ONE. `fitness_baselines`
-               * supersedes rather than overwrites, so bike FTP accumulates a dated trail by
-               * construction — six readings over six weeks on this athlete, 176 → 153 → 168.
-               * ⚠️ THE RUN HAS NO EQUIVALENT AND GETS NO ROW. Its threshold pace is a single value in
-               * `user_baselines.learned_fitness`, overwritten on every re-learn; the previous number
-               * is gone. The card says so rather than drawing a line from one point. Storing it as a
-               * superseding baseline is the right fix and is deliberately NOT smuggled in here — it
-               * changes what `learn-fitness-profile` writes, which reaches every surface reading a pace.
-               */
+              // The reference number, and only where the app kept one — the bike's FTP trail, read once
+              // above. ⚠️ TWO POINTS IS NOT A LINE. One reading is the current number, which the card
+              // already has elsewhere; the row earns its place only once it can show movement.
               let reference: ReferenceSeries | null = null;
-              if (fam.sport === 'ride') {
-                try {
-                  const { data: base } = await supabase
-                    .from("fitness_baselines").select("value,source_date,created_at,status")
-                    .eq("user_id", userId).eq("discipline", "bike").eq("metric", "ftp")
-                    .order("source_date", { ascending: true });
-                  const pts = (Array.isArray(base) ? base : [])
-                    .map((b: any) => ({
-                      date: String(b?.source_date || b?.created_at || "").slice(0, 10),
-                      value: Number(b?.value),
-                      status: String(b?.status || "provisional"),
-                    }))
-                    .filter((b) => b.date.length === 10 && Number.isFinite(b.value) && b.value > 0);
-                  // ⚠️ TWO POINTS IS NOT A LINE. One reading is the current number, which the card
-                  // already has elsewhere; the row earns its place only once it can show movement.
-                  if (pts.length >= 2) reference = { metric: 'ftp', unit: 'W', points: pts };
-                } catch (e: any) {
-                  console.log("[compute-snapshot] ftp baseline series failed (non-fatal):", e?.message || e);
-                }
+              if (fam.sport === 'ride' && bikeFtpHistory.length >= 2) {
+                reference = { metric: 'ftp', unit: 'W', points: bikeFtpHistory };
               }
               namedSessions.push({ family: fam.family.replace('family:', ''), sport: fam.sport, label, points, reference });
             }
@@ -2023,6 +2030,14 @@ serve(async (req: Request) => {
             lbd[k] = { week: Number.isFinite(wk) && wk > 0 ? Math.round(wk) : null, typical: workloadByDiscTypical[k] ?? null, weeks };
           }
           stateTrendsV1.display.loadByDiscipline = lbd;
+          // The bike row's FTP line: every reading inside the same 12-week window every other State
+          // chart draws (TrainingPeaks' 90-day default, `STATE_TREND_WINDOWS.cadenceDays`), so the
+          // "FTP over N weeks" caption and the efficiency/drift captions measure one span. The client
+          // draws a line at ≥ 2 readings and the number alone below that (no line through one dot).
+          if (stateTrendsV1.display.bikeFitness) {
+            const windowStart = isoMinus(STATE_TREND_WINDOWS.cadenceDays);
+            stateTrendsV1.display.bikeFitness.ftpHistory = bikeFtpHistory.filter((p) => p.date >= windowStart && p.date <= asOf);
+          }
         }
         // Carry the descent cause on the payload (JSONB, no schema change) so the coach's composer receives
         // it as a candidate rather than inferring it (contract §3a/§4).
