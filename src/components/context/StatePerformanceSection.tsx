@@ -347,7 +347,7 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
               trendWord="FTP"
               buildingLabel={(w) => `${w} of 12 weeks`}
               label="FTP" headline={`${ftpNow ?? '—'} W`} qualifier={(() => { const d = String(anchor?.label ?? '').split(' · ').pop(); return d && /\w/.test(d) && d !== anchor?.label ? `estimated ${d}` : undefined; })()}
-              provenance={tail || null}
+              provenance={tail ? tail.replace(/^last \d+ weeks · /, '') : null}
               keyLine={`dots: each FTP estimate · dashed: the trend${src === 'est (FTP)' ? ' · moves only when you accept a number' : ''}`}
             />
           )}

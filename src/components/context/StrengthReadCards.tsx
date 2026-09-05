@@ -238,7 +238,7 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
           Friel's guidance is to compare like with like. Ledger: docs/STATE-SOURCES.md. */}
       {pts.some((p) => typeof p.tempF === 'number' && p.tempF >= 72) && (
         <div className="text-[12px] text-white/55 mt-1 leading-snug">
-          Heat raises heart rate at the same {isRide ? 'power' : 'pace'}, so efficiency reads lower and drift reads higher on hot days.
+          Hot days read lower on efficiency and higher on drift: heat raises heart rate at the same {isRide ? 'power' : 'pace'}.
         </div>
       )}
     </div>

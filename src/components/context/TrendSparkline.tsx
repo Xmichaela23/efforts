@@ -65,7 +65,7 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
       : null;
   }
   const runColor = color ?? getDisciplineColor('run');
-  const W = 300, H = 48, PAD_Y = 6, PAD_X = 2;
+  const W = 300, H = 44, PAD_Y = 6, PAD_X = 2;
   const vals = pts.map((p) => p.value);
   const minV = Math.min(...vals), maxV = Math.max(...vals);
   const rawRange = maxV - minV;
@@ -88,7 +88,7 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
   const fit = trendline ? fitTrend(pts) : null;
   const rangeLabel = unit ? `${fmtVal(minV)}–${fmtVal(maxV)}${unit}` : null;
   return (
-    <span className={`basis-full flex flex-col gap-1 ${divider ? 'mt-3 pt-3 border-t border-white/10' : 'mt-1.5'}`}>
+    <span className={`basis-full flex flex-col gap-0.5 ${divider ? 'mt-2 pt-2 border-t border-white/10' : 'mt-1'}`}>
       {label ? (
         <span className="flex items-end justify-between gap-2">
           <span className="flex flex-col gap-0.5 min-w-0">
@@ -122,14 +122,16 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
         </span>
       )}
       {(title || label) ? (
-        building && <span className="text-[12px] text-white/55">{buildingLabel(spanWeeks)}</span>
+        (building || provenance) && (
+          <span className="text-[12px] text-white/55">{[building ? buildingLabel(spanWeeks) : null, provenance].filter(Boolean).join(' · ')}</span>
+        )
       ) : (
         <span className="text-[10px] text-white/45 flex items-center justify-between">
           <span>{building ? buildingLabel(spanWeeks) : `last ${spanWeeks} weeks`}</span>
           {rangeLabel ? <span className="tabular-nums text-white/30">{rangeLabel}</span> : <span />}
         </span>
       )}
-      {provenance && <span className="text-[12px] text-white/65">{provenance}</span>}
+      {provenance && !(title || label) && <span className="text-[12px] text-white/65">{provenance}</span>}
       {keyLine && <span className="text-[12px] text-white/60 leading-snug">{keyLine}</span>}
       {caption && <span className="text-[10px] text-white/40">{caption}</span>}
     </span>
