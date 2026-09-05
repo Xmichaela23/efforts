@@ -7,11 +7,12 @@
 // no dead buttons that pretend to work; honest labels for what lands where. Consent-first throughout.
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 import { resolveStrengthCapacity, canonicalizeLiftKey } from '@shared/state-trend/capacity-resolver';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { resolveCurrentRunThresholdPace, resolveCurrentRunEasyPace } from '@/lib/resolve-current-run-pace';
+import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
 
 // The numbers the block is priced from, read through the SAME resolvers Training Baselines and the plan
 // builder use (Michael, 2026-09-05: "add the current e1RM, FTP, running threshold pace, easy pace").
@@ -56,6 +57,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   const ftp = baselines ? resolveCurrentFtp({ learned_fitness: lf, performance_numbers: pn } as any) : null;
   const thr = baselines ? resolveCurrentRunThresholdPace({ learned_fitness: lf, performance_numbers: pn } as any) : null;
   const easy = baselines ? resolveCurrentRunEasyPace({ learned_fitness: lf, performance_numbers: pn } as any) : null;
+  const lthr = baselines ? resolveCurrentLthr({ learned_fitness: lf, performance_numbers: pn, configured_hr_zones: baselines.configured_hr_zones ?? null } as any) : null;
   const withSource = (num: string | null, src: string | null | undefined) => num ? `${num}${sourceWord(src) ? ` · ${sourceWord(src)}` : ''}` : null;
   // ⛔ EDIT IN PLACE (Michael, 2026-09-05: "lost the edit option — the whole point"). Tap a number, type, save.
   // Writes go through AppContext.saveUserBaselines — the SAME save Training Baselines uses — with the same
@@ -113,6 +115,13 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         const secPerMi = metric ? sec * 1.609344 : sec;
         const str = `${Math.floor(secPerMi / 60)}:${String(Math.round(secPerMi % 60)).padStart(2, '0')}`;
         await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), threshold_pace_min_per_mi: str, threshold_pace_source: 'manual' } });
+      } else if (id === 'lthr') {
+        const v = Math.round(Number(t)); if (!(v > 0)) return;
+        // The zones object Baselines writes (manual_run_lthr + the sport-agnostic threshold_heart_rate), same column.
+        const uid = getStoredUserId();
+        const zones = { ...((baselines.configured_hr_zones && typeof baselines.configured_hr_zones === 'object') ? baselines.configured_hr_zones : {}), source: 'manual', custom_zones: true, updated_at: new Date().toISOString(), manual_run_lthr: v, threshold_heart_rate: v };
+        if (uid) { const { error } = await supabase.from('user_baselines').update({ configured_hr_zones: zones }).eq('user_id', uid); if (error) throw error; }
+        await saveUserBaselines({ ...baselines, configured_hr_zones: zones, performanceNumbers: { ...(pn ?? {}), lthr_source: 'manual' } });
       } else {
         const key = canonicalizeLiftKey(id); const v = Math.round(Number(t)); if (!key || !(v > 0)) return;
         await saveUserBaselines({ ...baselines, locked_baselines: { ...(baselines.locked_baselines ?? {}), [key]: v } });
@@ -221,10 +230,11 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         <div className="space-y-1.5">
           <Row id="ftp" name="FTP" value={withSource(ftp?.value != null ? `${Math.round(ftp.value)} W` : null, ftp?.source)} hint="W" />
           <Row id="threshold" name="Threshold pace" value={withSource(fmtPace(thr?.sec_per_mi, metric), thr?.source)} hint={metric ? 'm:ss/km' : 'm:ss/mi'} />
-          <Row id="easy" name="Easy pace" value={withSource(fmtPace(easy?.sec_per_mi, metric), easy?.source)} editable={false} />
+          <Row id="lthr" name="Threshold heart rate" value={withSource(lthr?.bpm != null ? `${Math.round(lthr.bpm)} bpm` : null, lthr?.source)} hint="bpm" />
+          <Row id="easy" name="Easy pace" value={fmtPace(easy?.sec_per_mi, metric) ? `${fmtPace(easy?.sec_per_mi, metric)} · from threshold` : null} editable={false} />
         </div>
         <p className="text-[11px] text-white/35 mt-2 leading-snug">
-          Tap FTP or threshold pace to set your own. Easy pace follows threshold. Rebuild above to apply.
+          Tap a number to set your own. Easy days run on threshold heart rate; easy pace is threshold pace × 1.19. Rebuild above to apply.
         </p>
         {saveNote && <p className="text-[12px] text-white/60 mt-1.5">{saveNote}</p>}
       </section>
