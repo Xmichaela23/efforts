@@ -131,7 +131,6 @@ export function EnduranceReadCards(
  * empty this card, which is the whole reason the spine exists beside the overlay.
  */
 // ⓘ copy, Michael 2026-09-02 (voice-checked): what the two run numbers mean, in plain words.
-const EF_EXPLAIN = 'Pace divided by heart rate. Higher means faster at the same heart rate.'; // 2026-09-03: Michael cut the paragraph
 const DECOUPLING_EXPLAIN = `Second-half heart rate against the first, same pace. The book's line is 5%.`; // 2026-09-03: Michael cut the paragraph
 
 
@@ -194,55 +193,19 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
         <span className="text-[11px] text-white/60 tabular-nums">{pts.length} logged</span>
       </div>
 
-      {latest.efficiency != null && (
-        <>
-          {/**
-            * ⛔ THE FIELD'S NAME, NOT OURS (2026-08-29, Michael: *"does anyone know what speed per
-            * beat means?"* — no, nobody, it was ours). TrainingPeaks calls this Efficiency Factor
-            * and defines it exactly as we compute it: graded pace ÷ average heart rate for a run,
-            * normalized power ÷ average heart rate for a ride. A runner who tracks this knows the
-            * name; nobody knows "speed per beat".
-            */}
-          {/* ⛔ NO SINGLE-SESSION NUMBER AT THE TOP (2026-09-04, Michael: "remove it"). TrainingPeaks prints a
-              workout's EF on that workout, never as a fitness-screen headline; the dashboard is the chart. The
-              trend line's caption ("1.650 → 1.498 over 12 weeks") is the read. */}
-          {(() => {
-            const f = fitTrend(eff);
-            return f ? (
-              <div className="flex items-baseline gap-1.5 mt-1">
-                <span className="readout-num text-[26px] leading-none">{fmtEff(f.end, isRide)}</span>
-                <span className="text-[12px] text-white/60">efficiency factor · {f.weeks}-week trend</span>
-              </div>
-            ) : (
-              <div className="text-[12px] text-white/60 mt-1">efficiency factor</div>
-            );
-          })()}
-          <div className="text-[11px] text-white/55 mt-0.5">
-            {isRide ? 'watts per heartbeat' : 'pace per heartbeat'} · higher is better
-          </div>
-          <p className="mt-1 text-[12px] text-white/45 leading-snug max-w-[min(100%,340px)]">
-            {isRide ? 'Power divided by heart rate. Higher means more power at the same heart rate.' : EF_EXPLAIN}
-          </p>
-          {/**
-            * ⛔⛔ "last time 1.720" IS DELETED, AND THE SOURCE SAYS WHY. TrainingPeaks' instruction is
-            * to compare SIMILAR sessions over several weeks — a rising line means the aerobic base is
-            * improving — and explicitly not to read one session against the one before it, because a
-            * single hot or hilly day moves the number more than fitness does. The card put that exact
-            * comparison in the athlete's eye and it was the first thing he read.
-            * ⚠️ THE TREND IS ALREADY ON THIS CARD: the line below, with its own date range.
-            */}
-        </>
-      )}
       {/* which session the headline IS — directly under the number it names, not under the drift line (2026-09-04) */}
-      {leftOut > 0 && (
-        <div className="text-[11px] text-white/55 mt-1">{leftOut} {leftOut === 1 ? 'ride' : 'rides'} under 10 min in the aerobic band, not in the trend</div>
-      )}
-      {eff.length >= 2 && <DatedChart points={eff} color={color} dotNoun={isRide ? 'ride' : 'run'} fmtVal={(v) => fmtEff(v, isRide)} trendWord="efficiency" />}
+      {eff.length >= 2 && (() => {
+        const f = fitTrend(eff);
+        const noun = isRide ? 'ride' : 'run';
+        const leftOutNote = leftOut > 0 ? ` · ${leftOut} ${leftOut === 1 ? noun : noun + 's'} under 10 min left out` : '';
+        return (
+          <DatedChart points={eff} color={color} dotNoun={noun} fmtVal={(v) => fmtEff(v, isRide)} trendWord="efficiency"
+            title={`Efficiency${f ? ` · ${fmtEff(f.end, isRide)}` : ''} · higher is better`}
+            keyLine={`dots: one ${noun}, ${isRide ? 'power' : 'pace'} ÷ heart rate · dashed: the trend${leftOutNote}`} />
+        );
+      })()}
       {/* The chart's own key, the same shape as the drift chart's (Michael, 2026-09-04: "efficiency needs to know if
           higher is better"). Dashed = the fitted trend. */}
-      {eff.length >= 2 && (
-        <div className="text-[11px] text-white/55 mt-1">efficiency · {isRide ? 'power' : 'pace'} to heart rate · higher is better · dashed: the trend · each dot one {isRide ? 'ride' : 'run'}</div>
-      )}
 
       {/* ⛔ THE "one session doesn't tell you much" CAUTION MOVED TO ONCE PER SPORT (Round 3 pass 2).
           It was printed under EVERY spine card (easy / long / quality / rides), which is the "said
@@ -262,14 +225,13 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
           show nothing — a number for a non-steady effort is not the same number. */}
       {/* the drift trend — the number the field trends (Pa:Hr / Pw:Hr), as a line and the last-4-weeks average, no verdict */}
       {driftPts.length >= 2 && (
-        <DatedChart points={driftPts} color={color} dotNoun={isRide ? 'steady ride' : 'run'} fmtVal={fmtDrift} unit="%" trendWord="drift" />
+        <DatedChart points={driftPts} color={color} dotNoun={isRide ? 'steady ride' : 'run'} fmtVal={fmtDrift} unit="%" trendWord="drift" divider
+          title={`Drift · lower is better · line ${DRIFT_LIMITS.hybridPct}%`}
+          keyLine={`dots: one steady ${isRide ? 'ride' : 'run'}, first half vs second · dashed: the trend`} />
       )}
       {/* ⛔ NO SINGLE-SESSION DRIFT NUMBER ON STATE (2026-09-04, Michael: "you're using the last run to give a drift
           reading"). This is the trend screen; one run's drift lives on that run. TrainingPeaks' dashboard shows the
           trend as a chart with no headline, which is what stays here. */}
-      {driftPts.length >= 2 && (
-        <div className="text-[11px] text-white/55 mt-1">drift · {driftWhat} · lower is better · line {DRIFT_LIMITS.hybridPct}% · each dot one {isRide ? 'steady ride' : 'run'}</div>
-      )}
       {/* HEAT (2026-09-04, Michael: "summer has an impact — put a note"). A fixed line, not generated: a fact with a
           source, the same every time. Shown when any session in the window was 72°F or hotter — Garmin's own
           heat cut-off (its fitness estimate is corrected above 72°F / 22°C); TrainingPeaks applies no correction and
@@ -376,9 +338,9 @@ function SessionChart({ points, color, valueOf }: {
  * exactly as before.
  */
 // The chart is one colour now (2026-09-04); `recent` is carried only because the series type asks for it.
-function DatedChart({ points, color, dotNoun = 'session', fmtVal, unit, trendWord }: { points: Array<{ date: string; value: number }>; color: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string; trendWord?: string }) {
+function DatedChart({ points, color, dotNoun = 'session', fmtVal, unit, trendWord, title, keyLine, divider }: { points: Array<{ date: string; value: number }>; color: string; dotNoun?: string; title?: string; keyLine?: string; divider?: boolean; fmtVal?: (v: number) => string; unit?: string; trendWord?: string }) {
   const series = points.map((p) => ({ date: p.date, value: p.value, recent: true }));
-  return <TrendSparkline series={series} color={color} dotNoun={dotNoun} {...(fmtVal ? { fmtVal } : {})} {...(unit ? { unit } : {})} trendline={!!trendWord} trendWord={trendWord} />;
+  return <TrendSparkline series={series} color={color} dotNoun={dotNoun} {...(fmtVal ? { fmtVal } : {})} {...(unit ? { unit } : {})} trendline={!!trendWord} trendWord={trendWord} title={title} keyLine={keyLine} divider={divider} />;
 }
 
 export default EnduranceReadCards;

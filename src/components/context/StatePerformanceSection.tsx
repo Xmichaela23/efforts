@@ -332,10 +332,7 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
           {/* Each chart on this card carries a title and a one-line key (Michael, 2026-09-04: "I don't know
               what each line is"). Solid = the readings, dashed = the fitted trend, right-hand number = low to
               high in the window. The receipts under the chart belong to the FTP estimate. */}
-          <span className="basis-full text-white/80 text-[13px] mt-1">{ftpNow != null ? `FTP · ${ftpNow} W` : 'FTP'}</span>
-          {showFtpLine && (
-            <span className="basis-full text-[11px] text-white/45 leading-snug">dots: each FTP estimate, one per change · dashed: the trend through them · right: low to high</span>
-          )}
+          {!showFtpLine && <span className="basis-full text-white/80 text-[13px] mt-1">{ftpNow != null ? `FTP · ${ftpNow} W` : 'FTP'}</span>}
           {/* FTP over time — one dot per stored reading, the same fitted trendline (WKO5 least squares) and
               "start → end" caption the efficiency and drift charts use. TrainingPeaks threshold history. */}
           {showFtpLine && (
@@ -349,6 +346,9 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
               trendline
               trendWord="FTP"
               buildingLabel={(w) => `${w} of 12 weeks`}
+              title={`FTP · ${ftpNow ?? '—'} W${(() => { const d = String(anchor?.label ?? '').split(' · ').pop(); return d && /\w/.test(d) && d !== anchor?.label ? ` · estimated ${d}` : ''; })()}`}
+              provenance={tail || null}
+              keyLine={`dots: each FTP estimate · dashed: the trend${src === 'est (FTP)' ? ' · moves only when you accept a number' : ''}`}
             />
           )}
           {/* ⛔ THE ⓘ DEFINES THE METRIC AND STOPS (2026-08-01, Michael: "anything specific to where the
@@ -359,7 +359,7 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
               basis IS the estimate (`src === 'est (FTP)'`, from `efficiency.basis === 'coggan_ftp'`).
               It passes the ⓘ test (D-357): it describes HOW THE METRIC IS MADE, true for anyone,
               not where this athlete sits. */}
-          {src === 'est (FTP)' && (
+          {src === 'est (FTP)' && !showFtpLine && (
             <span className="basis-full text-[12px] text-white/45 leading-snug">Estimated from your rides. It moves only when you accept a new number.</span>
           )}
         </>
@@ -390,7 +390,7 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
           "lose the heart rate sentence, keep it strict to the book"). It described a read the card no
           longer makes. The ride count it carried is not lost — the rides card states its own. */}
       {/* The receipt: window · rides · recency. The provenance lines below it print open (one tap). */}
-      {(tail || src || asOf(lead.newestAgeDays) || (anchoredPower && anchor?.label)) && (
+      {!showFtpLine && (tail || src || asOf(lead.newestAgeDays) || (anchoredPower && anchor?.label)) && (
         <span className="basis-full flex items-baseline justify-between gap-2 text-white/55 text-[12px]">
           <span>{tail}</span>
         </span>
@@ -423,7 +423,7 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
               ⚠️ The provenance it carried — the per-ride power band is `bike_fitness_v1.band_source`,
               computed at analysis time from whatever FTP resolved then, and is not verified equal to
               the FTP on record — is still true and still an open question, not a copy fix. */}
-          {anchoredPower && anchor?.label && <span>{anchor.label}</span>}
+          {anchoredPower && !showFtpLine && anchor?.label && <span>{anchor.label}</span>}
         </span>
       )}
       {/* THE LONG VIEW — 12-week power sparkline (the cyclist's e1RM/efficiency analog, 2026-07-23). Only when
@@ -436,8 +436,6 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
         <>
           {/* Titled (Michael, 2026-09-04): with the FTP line above it, an untitled second power chart read as
               a second FTP. This is TrainingPeaks' Peak Power (20 min) chart — display only; nothing reads it. */}
-          <span className="basis-full text-white/80 text-[13px] mt-3 pt-2 border-t border-white/10">Best 20-minute power</span>
-          <span className="basis-full text-[11px] text-white/45 leading-snug">dots: one ride each, its best 20 minutes · right: low to high · does not set FTP</span>
           <TrendSparkline
             series={fitness.power.series}
             color={getDisciplineColor('bike')}
@@ -445,6 +443,10 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
             fmtVal={(v) => String(Math.round(v))}
             unit=" W"
             minSpanFraction={0.15}
+            divider
+            title="Best 20-minute power"
+            buildingLabel={(w) => `${w} of 12 weeks`}
+            keyLine="dots: one ride's best 20 minutes · does not set FTP"
           />
         </>
       )}

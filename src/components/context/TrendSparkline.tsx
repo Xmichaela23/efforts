@@ -37,11 +37,17 @@ import { getDisciplineColor } from '@/lib/context-utils';
  * "1.24–1.90" means nothing to a reader — the shape is the message. Strength passes a lb unit and
  * keeps its range, where the numbers are self-explanatory.
  */
-export default function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, caption, buildingLabel = (w: number) => `building · ${w} of 12 weeks`, trendline = false, trendWord }: {
+export default function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, caption, title, keyLine, provenance, divider = false, buildingLabel = (w: number) => `building · ${w} of 12 weeks`, trendline = false, trendWord }: {
   series?: Array<{ date: string; value: number; recent: boolean; tempF?: number | null }>;
   color?: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string; minSpanFraction?: number;
   buildingLabel?: (spanWeeks: number) => string;
   caption?: string | null;
+  /** ONE TEMPLATE for every chart on State (2026-09-04): title row (title left, low–high right) · chart ·
+   *  "over N weeks: start → end" · coverage only while building · provenance · key line. */
+  title?: string;
+  keyLine?: string;
+  provenance?: string | null;
+  divider?: boolean;
   /** Draw a least-squares line through the dots and say where it starts and ends (WKO5's chart trendline). */
   trendline?: boolean;
   /** The noun for the caption, e.g. 'efficiency' / 'drift'. */
@@ -75,8 +81,15 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
   // adds a fitted trendline. Least squares on (date, value); the caption prints the line's start and end
   // values — "8.1% → 5.2%" — nothing about the last session, no improving/sliding word.
   const fit = trendline ? fitTrend(pts) : null;
+  const rangeLabel = unit ? `${fmtVal(minV)}–${fmtVal(maxV)}${unit}` : null;
   return (
-    <span className="basis-full flex flex-col gap-1 mt-1.5">
+    <span className={`basis-full flex flex-col gap-1 ${divider ? 'mt-3 pt-3 border-t border-white/10' : 'mt-1.5'}`}>
+      {title && (
+        <span className="flex items-baseline justify-between gap-2">
+          <span className="text-[13px] text-white/80">{title}</span>
+          {rangeLabel && <span className="text-[10px] tabular-nums text-white/35">{rangeLabel}</span>}
+        </span>
+      )}
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="block" aria-hidden="true">
         <polyline points={poly} fill="none" stroke={runColor} strokeOpacity={0.9} strokeWidth={1.75} vectorEffect="non-scaling-stroke" />
         {/* one dot per session (2026-09-04, Michael): TrainingPeaks and intervals.icu plot each workout as a point
@@ -89,13 +102,19 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
       </svg>
       {fit && (
         <span className="text-[11px] text-white/70">
-          {trendWord ? `${trendWord} ` : ''}over {spanWeeks} {spanWeeks === 1 ? 'week' : 'weeks'}: <span className="tabular-nums">{fmtVal(fit.start)}{unit}</span> → <span className="tabular-nums">{fmtVal(fit.end)}{unit}</span>
+          {trendWord && !title ? `${trendWord} ` : ''}over {spanWeeks} {spanWeeks === 1 ? 'week' : 'weeks'}: <span className="tabular-nums">{fmtVal(fit.start)}{unit}</span> → <span className="tabular-nums">{fmtVal(fit.end)}{unit}</span>
         </span>
       )}
-      <span className="text-[10px] text-white/45 flex items-center justify-between">
-        <span>{building ? buildingLabel(spanWeeks) : `last ${spanWeeks} weeks`}</span>
-        {unit ? <span className="tabular-nums text-white/30">{fmtVal(minV)}–{fmtVal(maxV)}{unit}</span> : <span />}
-      </span>
+      {title ? (
+        building && <span className="text-[10px] text-white/45">{buildingLabel(spanWeeks)}</span>
+      ) : (
+        <span className="text-[10px] text-white/45 flex items-center justify-between">
+          <span>{building ? buildingLabel(spanWeeks) : `last ${spanWeeks} weeks`}</span>
+          {rangeLabel ? <span className="tabular-nums text-white/30">{rangeLabel}</span> : <span />}
+        </span>
+      )}
+      {provenance && <span className="text-[11px] text-white/55">{provenance}</span>}
+      {keyLine && <span className="text-[11px] text-white/45 leading-snug">{keyLine}</span>}
       {caption && <span className="text-[10px] text-white/40">{caption}</span>}
     </span>
   );
