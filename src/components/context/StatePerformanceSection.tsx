@@ -1448,7 +1448,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                     value — the label was bigger than the thing it labelled. */}
                 <span className="flex items-center gap-2 shrink-0 w-[92px] pt-[3px]">
                   {Icon && <Icon size={15} strokeWidth={2.25} style={{ color: getDisciplineColor(card.discipline) }} className="shrink-0" />}
-                  <span className="text-[10.5px] font-semibold tracking-[0.14em] uppercase text-white/55">{card.discipline}</span>
+                  <span className="text-[11.5px] font-semibold tracking-[0.14em] uppercase text-white/70">{card.discipline}</span>
                 </span>
                 {/* ⛔ ONE GRID FOR THE WHOLE SPORT, NOT A GRID PER ROW — the columns only line up if
                     every row's cells are children of the SAME grid. Names left, numbers right: two
@@ -1462,13 +1462,13 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                 <span className="flex-1 min-w-0 grid grid-cols-[1fr_auto] items-baseline gap-x-3 gap-y-[6px]">
                   {rows.map((r, i) => (
                     <React.Fragment key={`${r.name}-${i}`}>
-                      <span className="text-[12px] text-white/55 leading-tight min-w-0">{r.name}</span>
+                      <span className="text-[14px] text-white/70 leading-tight min-w-0">{r.name}</span>
                       <span className="flex flex-col items-end text-right">
-                        <span className="text-[15px] text-white/90 leading-tight tabular-nums">
+                        <span className="text-[18px] text-white/95 leading-tight tabular-nums">
                           {r.arrow && <span className={`${r.arrowCls ?? 'text-white/70'} mr-1`}>{r.arrow}</span>}
                           {r.value}
                         </span>
-                        {r.note && <span className="text-[11px] text-white/40 leading-tight tabular-nums whitespace-nowrap">{r.note}</span>}
+                        {r.note && <span className="text-[12px] text-white/55 leading-tight tabular-nums whitespace-nowrap">{r.note}</span>}
                       </span>
                     </React.Fragment>
                   ))}
