@@ -430,14 +430,19 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
           it. Only the efficiency picture was duplicated by the rides card, and the bike row never
           drew one: its charts are power and load. */}
       {!building && leadIsPower && (
-        <TrendSparkline
-          series={fitness.power.series}
-          color={getDisciplineColor('bike')}
-          dotNoun="ride"
-          fmtVal={(v) => String(Math.round(v))}
-          unit=" W"
-          minSpanFraction={0.15}
-        />
+        <>
+          {/* Titled (Michael, 2026-09-04): with the FTP line above it, an untitled second power chart read as
+              a second FTP. This is TrainingPeaks' Peak Power (20 min) chart — display only; nothing reads it. */}
+          <span className="basis-full text-[12px] text-white/70">Best 20 minutes power over time</span>
+          <TrendSparkline
+            series={fitness.power.series}
+            color={getDisciplineColor('bike')}
+            dotNoun="ride"
+            fmtVal={(v) => String(Math.round(v))}
+            unit=" W"
+            minSpanFraction={0.15}
+          />
+        </>
       )}
       {/* ⛔ THE CTL/"fitness" CHART IS REMOVED (2026-09-01). Its axis read "10–23 fitness" — the same
           Banister/Coggan load model whose words we removed, drawn as a graph an athlete cannot read,
