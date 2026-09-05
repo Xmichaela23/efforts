@@ -127,7 +127,7 @@ function elevGainM(r: any): number | null {
  * fell 139 → 129, so heart-rate-alone is −7.2% and power-to-heart-rate is +7.4%. Both true; the card now
  * names which one it is printing.
  */
-function driftReadForPoint(hrs: any, wa: any, factDrift: number | null | undefined, powerDecouplingPct?: number | null): { driftPct: number | null; driftBasis: 'gap' | 'raw' | 'power' | 'hr' | null; driftWholeSession: boolean; fadeWithheld: boolean } {
+function driftReadForPoint(hrs: any, wa: any, factDrift: number | null | undefined, powerDecouplingPct?: number | null, gradedInterval = false): { driftPct: number | null; driftBasis: 'gap' | 'raw' | 'power' | 'hr' | null; driftWholeSession: boolean; fadeWithheld: boolean } {
   // "whole session" = an interval session (more than two planned steps). ⛔ NOT the analyser's mixed-effort
   // flag (2026-09-04, Michael: "why only 2 runs?"). That flag is a pace-variance stamp the snapshot itself
   // files as "a confidence hedge — NOT a filter" (decoupling_mixed_effort, below), yet passing it in here
@@ -143,8 +143,13 @@ function driftReadForPoint(hrs: any, wa: any, factDrift: number | null | undefin
   // itself, and without it the interval run's 18.6% headlined the drift chart. Michael: "it didn't fall
   // apart — it was intervals, programmed, part of the plan." Both signals decide: planned steps, or the
   // measured variance.
-  const mixed = hrs?.decouplingMixedEffort === true;
-  const steady = !(Number.isFinite(steps) && steps > 2) && !mixed;
+  // ⛔ D-372 item 3, RESTORED (2026-09-04, Michael: "this has been discussed"): the analyser's mixed-effort stamp
+  // (pace varied) is a confidence hedge, NOT a filter — it marked 19 of 22 easy runs "whole-session" and the drift
+  // line was drawn through the 3 left. It was put back as a filter at 15:29 (a0ca339a) after the Aug 28 screenshot
+  // and the run drift line went blank again. A run is whole-session only when it WAS an interval session:
+  // >2 planned steps, or the grader's verdict (`run_facts.workout_type === 'interval'`: plan tag → detected
+  // type → Friel Z3) — which is what labels the unlinked Aug 28 run interval without the pace-variance stamp.
+  const steady = !(Number.isFinite(steps) && steps > 2) && !gradedInterval;
   const dec = typeof hrs?.decouplingPct === 'number' && Number.isFinite(hrs.decouplingPct) ? hrs.decouplingPct : null;
   const pdec = typeof powerDecouplingPct === 'number' && Number.isFinite(powerDecouplingPct) ? powerDecouplingPct : null;
   const v1 = typeof wa?.hr_drift_v1?.pct === 'number' && Number.isFinite(wa.hr_drift_v1.pct) ? wa.hr_drift_v1.pct : null;
@@ -1530,7 +1535,7 @@ serve(async (req: Request) => {
               // decoupling when the analyser computed it, else `hr_drift_v1` (heart rate second half vs first,
               // by time, after the warm-up — `_shared/hr-drift-halves.ts`). Never withheld; an interval day is
               // labelled whole-session on the card instead of hidden. `f.drift` is the last resort.
-              ...driftReadForPoint(hrs, r?.workout_analysis, f.drift, powerDec),
+              ...driftReadForPoint(hrs, r?.workout_analysis, f.drift, powerDec, sport === "run" && runTypeByDate.get(date) === "interval"),
               keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
               // conditions, shown never corrected: the day's temperature and the climb
               tempF: (() => { const t = Number(r?.weather_data?.temperature); return Number.isFinite(t) ? Math.round(t) : null; })(),

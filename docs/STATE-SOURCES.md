@@ -15,6 +15,7 @@ stated and it is a decision Michael can reverse.
 | Efficiency factor, ride = normalized power ÷ avg HR | `compute-facts` | FIELD — TrainingPeaks EF |
 | Efficiency factor, run = grade-adjusted pace ÷ avg HR | `compute-facts` | FIELD — TrainingPeaks EF on NGP |
 | Grade-adjusted pace | `_shared/gap.ts` | FIELD — TrainingPeaks NGP |
+| Which sessions are on the drift line: steady only — a run is OFF the line only if it was an interval session (>2 planned steps, or the grader's `interval` verdict). The analyser's mixed-effort stamp is a hedge, never a filter | `compute-snapshot driftReadForPoint` | FIELD — Friel: Pa:Hr applies to steady aerobic efforts; TrainingPeaks prints it per workout with no verdict. D-372 item 3 (restored 2026-09-04 after a0ca339a re-added the stamp as a filter and blanked the run line) |
 | Drift per session = first half vs second half, warm-up skipped, 5% line | `analyze-running-workout/lib/heart-rate/efficiency.ts`, `ride-physiology.ts` | FIELD — Friel; TrainingPeaks Pa:Hr / Pw:Hr; the 5% line is Friel and Viada p107 (a plan rule — reports and flags only, never a filter: D-372) |
 | Drift is a trend, one dot per session | `StrengthReadCards.tsx`, `TrendSparkline.tsx` | FIELD — TrainingPeaks dashboard trend; intervals.icu per-activity points |
 | 12-week trend window | `TrendSparkline.tsx` | FIELD — TrainingPeaks 90-day default |
