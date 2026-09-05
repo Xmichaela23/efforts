@@ -7,7 +7,8 @@
 // no dead buttons that pretend to work; honest labels for what lands where. Consent-first throughout.
 
 import { useEffect, useState } from 'react';
-import { Pencil } from 'lucide-react';
+import { Pencil, Dumbbell, Activity, Bike } from 'lucide-react';
+import { getDisciplineColor } from '@/lib/context-utils';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 import { resolveStrengthCapacity, canonicalizeLiftKey } from '@shared/state-trend/capacity-resolver';
@@ -23,6 +24,16 @@ const sourceWord = (src: string | null | undefined): string => {
   if (v === 'locked' || v === 'typed' || v === 'manual' || v.startsWith('manual')) return 'your number';
   if (v === 'accepted') return 'accepted';
   return 'auto';
+};
+const SportHeading = ({ sport, label }: { sport: 'strength' | 'run' | 'bike'; label: string }) => {
+  const Icon = sport === 'strength' ? Dumbbell : sport === 'run' ? Activity : Bike;
+  const color = getDisciplineColor(sport);
+  return (
+    <div className="flex items-center gap-2 mb-2">
+      <Icon size={14} strokeWidth={2.25} style={{ color }} aria-hidden="true" />
+      <span className="text-[12px] uppercase tracking-[0.14em]" style={{ color }}>{label}</span>
+    </div>
+  );
 };
 const fmtPace = (secPerMi: number | null | undefined, metric: boolean): string | null => {
   if (secPerMi == null || !Number.isFinite(secPerMi) || secPerMi <= 0) return null;
@@ -134,7 +145,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       console.warn('[StateAdjustLens] save failed:', e);
     } finally { setEditing(null); setDraft(''); }
   };
-  const Row = ({ id, name, value, editable = true, hint }: { id: string; name: string; value: string | null; editable?: boolean; hint?: string }) => (
+  const Row = ({ id, name, value, editable = true, hint, sport }: { id: string; name: string; value: string | null; editable?: boolean; hint?: string; sport: 'strength' | 'run' | 'bike' }) => (
     <div className="flex items-center justify-between py-1 gap-3">
       <span className="text-[14px] text-white/85">{name}</span>
       {editing === id ? (
@@ -146,9 +157,10 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         </span>
       ) : editable ? (
         <button type="button" onClick={() => { setEditing(id); setDraft(''); setSaveNote(null); }} aria-label={`edit ${name}`}
-          className="inline-flex items-center gap-1.5 pl-2.5 pr-2 py-1 rounded-lg bg-white/[0.06] border border-white/15 text-[14px] text-white/90 tabular-nums outline-none focus:outline-none active:bg-white/[0.1]">
+          style={{ borderColor: `${getDisciplineColor(sport)}55`, background: `${getDisciplineColor(sport)}14` }}
+          className="inline-flex items-center gap-1.5 pl-2.5 pr-2 py-1 rounded-lg border text-[14px] text-white/90 tabular-nums outline-none focus:outline-none active:brightness-125">
           {value ?? <span className="text-white/45">tap to add</span>}
-          <Pencil size={12} strokeWidth={2} className="text-white/50 shrink-0" aria-hidden="true" />
+          <Pencil size={12} strokeWidth={2} style={{ color: getDisciplineColor(sport) }} className="shrink-0 opacity-80" aria-hidden="true" />
         </button>
       ) : (
         <span className="text-[14px] text-white/90 tabular-nums">{value ?? <span className="text-white/35">no number yet</span>}</span>
@@ -212,13 +224,13 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
 
       {/* STRENGTH — the deepest steer (swap / add / adjust weight already built; re-homing here next) */}
       <section className="mb-5">
-        <div className="text-[12px] uppercase tracking-wider text-white/60 mb-2">Strength</div>
+        <SportHeading sport="strength" label="Strength" />
         {perLift.length === 0 ? (
           <p className="text-[13px] text-white/40 leading-snug">Logged lifts show up here.</p>
         ) : (
           <div className="space-y-1.5">
             {perLift.map((lt) => (
-              <Row key={lt.canonical_name} id={lt.canonical_name} name={lt.display_name ?? lt.canonical_name} value={liftNumber(lt.canonical_name)} hint={metric ? 'kg' : 'lb'} />
+              <Row key={lt.canonical_name} id={lt.canonical_name} name={lt.display_name ?? lt.canonical_name} value={liftNumber(lt.canonical_name)} hint={metric ? 'kg' : 'lb'} sport="strength" />
             ))}
           </div>
         )}
@@ -229,12 +241,17 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
 
       {/* ENDURANCE — the numbers the run and ride sessions are priced from, and the re-price. */}
       <section>
-        <div className="text-[12px] uppercase tracking-wider text-white/60 mb-2">Run · Bike</div>
+        <SportHeading sport="run" label="Run" />
         <div className="space-y-1.5">
-          <Row id="ftp" name="FTP" value={withSource(ftp?.value != null ? `${Math.round(ftp.value)} W` : null, ftp?.source)} hint="W" />
-          <Row id="threshold" name="Threshold pace" value={withSource(fmtPace(thr?.sec_per_mi, metric), thr?.source)} hint={metric ? 'm:ss/km' : 'm:ss/mi'} />
-          <Row id="lthr" name="Threshold heart rate" value={withSource(lthr?.bpm != null ? `${Math.round(lthr.bpm)} bpm` : null, lthr?.source)} hint="bpm" />
-          <Row id="easy" name="Easy pace" value={fmtPace(easy?.sec_per_mi, metric) ? `${fmtPace(easy?.sec_per_mi, metric)} · from threshold` : null} editable={false} />
+          <Row id="threshold" name="Threshold pace" value={withSource(fmtPace(thr?.sec_per_mi, metric), thr?.source)} hint={metric ? 'm:ss/km' : 'm:ss/mi'} sport="run" />
+          <Row id="lthr" name="Threshold heart rate" value={withSource(lthr?.bpm != null ? `${Math.round(lthr.bpm)} bpm` : null, lthr?.source)} hint="bpm" sport="run" />
+          <Row id="easy" name="Easy pace" value={fmtPace(easy?.sec_per_mi, metric) ? `${fmtPace(easy?.sec_per_mi, metric)} · from threshold` : null} editable={false} sport="run" />
+        </div>
+        <div className="mt-4">
+          <SportHeading sport="bike" label="Bike" />
+          <div className="space-y-1.5">
+            <Row id="ftp" name="FTP" value={withSource(ftp?.value != null ? `${Math.round(ftp.value)} W` : null, ftp?.source)} hint="W" sport="bike" />
+          </div>
         </div>
         <p className="text-[13px] text-white/60 mt-2 leading-snug">
           Tap a number to set your own. Easy days run on threshold heart rate; easy pace is threshold pace × 1.19. Rebuild above to apply.
