@@ -139,7 +139,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       {editing === id ? (
         <span className="flex items-center gap-2">
           <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void commit(id); if (e.key === 'Escape') { setEditing(null); setDraft(''); } }}
-            inputMode={id === 'threshold' ? 'numeric' : 'decimal'} placeholder={hint} className="w-24 bg-white/[0.06] border border-white/20 rounded-md px-2 py-1 text-[14px] text-white/90 text-right tabular-nums outline-none" />
+            inputMode={id === 'threshold' ? 'numeric' : 'decimal'} placeholder={hint} className="w-24 bg-white/[0.06] border border-white/20 rounded-md px-2 py-1 text-[16px] text-white/90 text-right tabular-nums outline-none" />
           <button type="button" onClick={() => void commit(id)} className="text-[12px] text-white/80 px-2 py-1 rounded-md border border-white/15">save</button>
           <button type="button" onClick={() => { setEditing(null); setDraft(''); }} className="text-[12px] text-white/45 px-1 py-1">cancel</button>
         </span>
@@ -167,7 +167,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
     })();
   };
   return (
-    <div className="px-0.5">
+    <div className="px-0.5 overflow-x-hidden">
       <p className="text-[13px] text-white/55 mb-4 leading-snug">
         Everything here changes your training from today forward. Nothing applies on its own.
       </p>
