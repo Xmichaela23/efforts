@@ -1306,3 +1306,22 @@ on hand, the same shape as the run easy/hard split — no new measurement asked 
 **Open, before building:** distinguishing "fresh" from "tired" needs the lift's preceding-24–48h
 endurance load, which the load engine has. Define the window off the book, not invented. Judge against
 a new athlete, never Michael's numbers.
+
+---
+
+## ME lift loses its warm-up ramp while awaiting a test (follow-up)
+
+**Not fixed. Found 2026-09-04 on the reference athlete's Sep 4 "Lower body: Push".**
+
+A max-effort (ME) lift gets its warm-up ramp built by `compose.ts` (`slotTakesRamp` → `rampFor`),
+tagged warm-up, zero volume — verified on the Sep 7 bench: 45×5, 75×5, 100×3, 120×2, then 135.
+
+But when the lift's `load_basis` is `awaiting_test` (no 1RM established yet, early in a plan), the
+weight prescribes as "By feel" and the ramp is NOT built — the Sep 4 Back Squat (ME) had an empty
+`set_plan`. So the warm-up drops out exactly when a lifter has no tested max, which is the first
+weeks of the plan and the moment a ramp matters most.
+
+Viada's 1RM test protocol is itself a ramp (Module 3 / p215: 75% of predicted max climbing to the
+effort), so an ME test day should carry a percentage-of-bodyweight or last-known-weight ramp even
+before a tested number exists — not "by feel" with nothing to warm up on. Define the fallback ramp
+off the book; judge against a new athlete with no test on file, never Michael's numbers.
