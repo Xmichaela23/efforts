@@ -239,22 +239,16 @@ Deno.serve(async (req: Request) => {
      *     refuse any more: the composer already writes that lift's test as "By feel" (three open steps)
      *     and the block re-prices from the logged test. So the missing-lift refusal below fires ONLY
      *     when the athlete asked to skip the test — you cannot price a block off numbers you don't have.
-     *   - true → "Use current": every lift prices off the number on file (typed, or learned from logged
-     *     sets) and there is no test week. All four numbers are required for that; if one is missing the
-     *     test week is built instead and the reason is logged.
+     *   - true → "Use current": every lift WITH a number on file (typed, or learned from logged sets)
+     *     prices off it and week one is a normal week; a lift with NO number is tested in week one in a
+     *     session of its own (Michael, 2026-09-04: "price the lifts that have numbers, make only the
+     *     missing lift a week-one test row"). With no numbers at all the composer builds the full test
+     *     week, so nothing is ever refused for a missing lift any more.
      * The 65 lb floor still applies to every lift that HAS a number.
      */
     const skipRequested = (body as Record<string, unknown>).skip_test_week === true;
     const missing = missingBarbellLifts(maxes);
-    if (missing.length > 0 && skipRequested) {
-      const list = missing.map((l) => LIFT_LABEL[l]);
-      const named = list.length === 1 ? list[0] : `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
-      console.error(`[strength-plan] refused: missing ${named}`);
-      return json({
-        success: false,
-        error: `Missing ${named}. To use your current numbers instead of testing in week one, every lift needs one — or keep the week-one test.`,
-      }, 409);
-    }
+    if (missing.length > 0) console.log(`[strength-plan] no number on file for ${missing.map((l) => LIFT_LABEL[l]).join(', ')} — tested in week one`);
 
     // ⛔ THE 65 LB ENTRY MINIMUM, per lift (2026-08-13). Mirrors the gate in
     // `create-goal-and-materialize-plan` because this function is also invoked directly — same
@@ -682,9 +676,12 @@ Deno.serve(async (req: Request) => {
           const w = workingNumberFromFile(lift, v, Number.isFinite(typed) && Math.round(typed) === Math.round(v) ? 'typed' : 'learned');
           if (w) out[lift] = w;
         }
-        if (Object.keys(out).length < TESTED_LIFTS.length) {
-          console.warn(`[standing-plan] use-current asked but only ${Object.keys(out).length}/${TESTED_LIFTS.length} numbers on file — building the test week instead.`);
+        if (Object.keys(out).length === 0) {
+          console.warn('[standing-plan] use-current asked with no numbers on file — building the test week instead.');
           return null;
+        }
+        if (Object.keys(out).length < TESTED_LIFTS.length) {
+          console.log(`[standing-plan] use-current with ${Object.keys(out).length}/${TESTED_LIFTS.length} numbers on file — the rest are tested in week one (partial test).`);
         }
         return out;
       })();

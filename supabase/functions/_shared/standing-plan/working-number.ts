@@ -348,9 +348,16 @@ export const TEST_READ_ABSTAINS =
  *                    may demand it back verbatim, and a second fuzzy matcher is a second authority
  *                    on what a lift is called.
  *
- * ⛔ THE `amrap` FLAG IS THE SIGNAL. `testDaySession` stamps it on exactly one set per lift — the
- * last pretest step, taken for max reps. Inferring "the heaviest set" instead would promote an
- * ordinary warm-up into a measurement.
+ * ⛔ THE HEAVIEST COMPLETED SET IS THE TEST SET (Michael, 2026-09-04). The `amrap` flag used to be
+ * the only signal, and it cost him a block: on his Sep 1 "Test: Lower" the deadlift top set carried
+ * the flag and priced, the squat top set (105 x 6, completed) did not and was dropped — every squat
+ * after it read "By feel". The flag is stamped by the composer's ramp, but the logger's rows do not
+ * always carry it back. In a week-one session the athlete worked up to a top set; the heaviest
+ * completed set for the lift IS that set. The flag is honoured as a tie-break only.
+ *
+ * ⛔ THE DEFAULT NAMES ARE THE FALLBACK. A block whose config carries no `test_lift_names` reads its
+ * lifts by `TESTED_LIFT_NAME` (Back Squat, Deadlift, Bench Press, Overhead Press) rather than
+ * reading nothing.
  *
  * ⛔ AND IT MUST BE PROVABLY THE TEST WEEK. A row with no `week_number` cannot be shown to be week
  * one, and twelve weeks of prescription off an unprovable set is the failure this codebase keeps
@@ -361,12 +368,13 @@ export function readTestWeek(
   liftForName: Partial<Record<TestedLift, string>>,
 ): TestWeekReading {
   const wanted = new Map<string, TestedLift>();
-  for (const lift of TESTED_LIFTS) {
-    const name = liftForName[lift];
-    if (typeof name === 'string' && name.trim() !== '') wanted.set(name.trim().toLowerCase(), lift);
-  }
+  const nameFor = (lift: TestedLift): string => {
+    const name = liftForName?.[lift];
+    return typeof name === 'string' && name.trim() !== '' ? name.trim() : TESTED_LIFT_NAME[lift];
+  };
+  for (const lift of TESTED_LIFTS) wanted.set(nameFor(lift).toLowerCase(), lift);
 
-  const best = new Map<TestedLift, { weight: number; reps: number }>();
+  const best = new Map<TestedLift, { weight: number; reps: number; amrap: boolean }>();
   for (const row of rows ?? []) {
     // ⛔ PROVABLY WEEK ONE, or it is not the test.
     if (Number(row?.week_number) !== TEST_WEEK_INDEX) continue;
@@ -376,16 +384,23 @@ export function readTestWeek(
       if (!lift) continue;
       const sets = Array.isArray(ex?.sets) ? ex.sets : [];
       for (const set of sets as Record<string, unknown>[]) {
-        if (set?.amrap !== true) continue;
         // ⚠️ COMPLETED ONLY. An untouched set carries whatever the prefill left in it, and reading
         // that as a measurement prescribes a block off a number nobody lifted.
         if (set?.completed !== true) continue;
+        // ⚠️ A SET THE ROW ITSELF CALLS A WARM-UP IS NOT THE TEST — the composer's ramp flags its
+        // warm-up steps; a flagged warm-up heavier than the top set is a logging slip, not a max.
+        if (set?.warmup === true) continue;
         const weight = Number(set?.weight);
         const reps = Number(set?.reps);
         if (!Number.isFinite(weight) || weight <= 0) continue;
         if (!Number.isInteger(reps) || reps < 1) continue;
-        // ⚠️ THE LAST ATTEMPT WINS. An athlete who retook the test meant the second answer.
-        best.set(lift, { weight, reps });
+        const amrap = set?.amrap === true;
+        const prior = best.get(lift);
+        // ⚠️ HEAVIEST COMPLETED SET WINS; at equal weight the flagged set, then the later set (an
+        // athlete who retook the test meant the second answer).
+        if (!prior || weight > prior.weight || (weight === prior.weight && (amrap || !prior.amrap))) {
+          best.set(lift, { weight, reps, amrap });
+        }
       }
     }
   }
@@ -393,10 +408,6 @@ export function readTestWeek(
   const working: Partial<Record<TestedLift, WorkingNumber>> = {};
   const missing: { lift: TestedLift; reason: string }[] = [];
   for (const lift of TESTED_LIFTS) {
-    if (!wanted.has(String(liftForName[lift] ?? '').trim().toLowerCase())) {
-      missing.push({ lift, reason: 'this block never prescribed a movement for it' });
-      continue;
-    }
     const measured = best.get(lift);
     if (!measured) {
       missing.push({ lift, reason: 'no completed test set in week one' });

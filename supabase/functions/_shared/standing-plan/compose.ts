@@ -556,10 +556,11 @@ export type ComposeArgs = {
    */
   swimEasySessions?: number | null;
   /**
-   * ⛔ SKIP WEEK ONE'S TEST — offered ONLY when logged history already carries a trustworthy max
-   * (Michael, 2026-08-23). ⚠️ Never a bare athlete preference: the caller must have derived
-   * `workingNumbers` from evidence (`evidenceWorkingNumbers`) before setting this, and a block with
-   * this true and no working numbers would prescribe nothing at all. Default is the test.
+   * ⛔ SKIP WEEK ONE'S TEST — "Use current" on the wizard's "Know your numbers?" step (D-467,
+   * 2026-09-04): the caller hands over `workingNumbers` from the numbers on file and week one is a
+   * normal week. A lift with NO working number is tested in week one in a session of its own
+   * (`partialTests`); a skip with no working numbers at all falls back to the full test week.
+   * (History: 2026-08-23 this was offered only on logged evidence; 2026-08-30 it was removed.)
    */
   skipTestWeek?: boolean;
   /**
@@ -1927,9 +1928,17 @@ function exerciseForSlot(
  * ⛔ THE TEST WEEK (Michael, 2026-08-23). Week one's ME days run the p215 pretest as guided
  * sessions — upper on day 1, lower on day 2 — and the stored 1RM only aims the warm-ups.
  */
-function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[]): PlanSession | null {
-  const lifts = TEST_DAY_LIFTS[day.day];
-  if (!lifts) return null;
+function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], only?: TestedLift[]): PlanSession | null {
+  /**
+   * ⛔ THE PARTIAL TEST (Michael, 2026-09-04): "Use current" with a lift missing prices the lifts that
+   * have numbers and tests ONLY the missing lift — its own session on its test day, beside the priced
+   * one. `only` names those lifts; absent, this is the full test day of a full test week.
+   */
+  const dayLifts = TEST_DAY_LIFTS[day.day];
+  if (!dayLifts) return null;
+  const lifts = only ? dayLifts.filter((l) => only.includes(l)) : dayLifts;
+  if (lifts.length === 0) return null;
+  const partial = only != null && lifts.length < dayLifts.length;
   // ⛔ THE TEST TESTS THE MOVEMENT THE BLOCK WILL PRESCRIBE — see `testWeekLiftNames`.
   const names = testWeekLiftNames(args.competitionLifts);
   /**
@@ -1984,7 +1993,16 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[]):
     });
   }
   if (exercises.length === 0) return null;
-  if (!notes.some((n) => n.text.includes('first week is the test'))) {
+  if (only) {
+    const which = lifts.map((l) => names[l]).join(' and ');
+    if (!notes.some((n) => n.text.includes('tested in week one; the other lifts'))) {
+      notes.push({
+        kind: 'source',
+        text: `${which} ${lifts.length === 1 ? 'is' : 'are'} tested in week one; the other lifts price off the numbers on file, and the block reads this test the moment it is logged.`,
+        cite: 'Viada p215',
+      });
+    }
+  } else if (!notes.some((n) => n.text.includes('first week is the test'))) {
     notes.push({
       kind: 'source',
       text: 'The first week is the test. Two guided sessions set the numbers the rest of the block '
@@ -1996,7 +2014,7 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[]):
   return {
     day: dayNameFor(args, day.day),
     type: 'strength',
-    name: day.day === 1 ? 'Test: Upper' : 'Test: Lower',
+    name: partial ? `Test: ${lifts.map((l) => names[l]).join(' + ')}` : (day.day === 1 ? 'Test: Upper' : 'Test: Lower'),
     description: 'Work up in three steps. The last set is max clean reps and it is what the block reads.',
     duration: 45,
     strength_exercises: exercises,
@@ -2369,6 +2387,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   const skipping = args.skipTestWeek === true
     && Object.keys(args.workingNumbers ?? {}).length > 0;
   const testWeek = isTestWeek(args.week) && !skipping;
+  // ⛔ A SKIP WITH SOME NUMBERS MISSING (2026-09-04): those lifts are tested in week one, each in its own
+  // session on its test day; everything else prices off the numbers on file. Never a full test week.
+  const partialTests: TestedLift[] = skipping ? TESTED_LIFTS.filter((l) => !args.workingNumbers?.[l]) : [];
   const anchors = resolveEnduranceAnchors(args.baselines);
 
   /**
@@ -2918,6 +2939,20 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
          * being handed a shorter day with no reason, or the same lift printed twice.
          * ⚠️ ONE SENTENCE PER DAY, not per slot; a bodyweight-only pull day can drop more than one.
          */
+        // ⛔ THE PARTIAL TEST — week one only. The missing lift's priced row (which would read
+        // `awaiting_test`) leaves this session and comes back as a test session of its own on the same
+        // day, so the logger's test arm and the restate's week-one read see exactly what a test week
+        // would have given them for that lift, and nothing else changes.
+        let partialTest: PlanSession | null = null;
+        const partialHere = isTestWeek(args.week) ? (TEST_DAY_LIFTS[day.day] ?? []).filter((l) => partialTests.includes(l)) : [];
+        if (partialHere.length > 0) {
+          const liftNames = testWeekLiftNames(args.competitionLifts);
+          const testNames = new Set(partialHere.map((l) => liftNames[l]));
+          for (let i = exercises.length - 1; i >= 0; i--) if (testNames.has(exercises[i].name)) exercises.splice(i, 1);
+          for (let i = dosed.length - 1; i >= 0; i--) if (testNames.has(dosed[i].movement)) dosed.splice(i, 1);
+          for (let i = meRows.length - 1; i >= 0; i--) if (meRows[i].week === args.week && testNames.has(meRows[i].movement)) meRows.splice(i, 1);
+          partialTest = testDaySession(day, args, notes, partialHere);
+        }
         if (droppedHere > 0) {
           notes.push({
             kind: 'warning',
@@ -2966,6 +3001,21 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           ...(day.lowerRole === 'me' ? { heavyLower: true } : {}),
           sets: dosed,
         });
+        if (partialTest) {
+          sessions.push(partialTest);
+          dosing.push({
+            label: partialTest.name,
+            day: day.day,
+            isTest: true,
+            region: day.day === 2 ? ('lower' as const) : ('upper' as const),
+            ...(day.day === 2 ? { heavyLower: true } : {}),
+            sets: (partialTest.strength_exercises ?? []).map((e) => ({
+              movement: e.name,
+              intent: 'ME' as const,
+              sets: e.sets ?? 1,
+            })),
+          });
+        }
       }
     }
 

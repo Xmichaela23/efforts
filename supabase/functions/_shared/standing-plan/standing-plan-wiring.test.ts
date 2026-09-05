@@ -205,7 +205,9 @@ Deno.test('an unproven set is not evidence — and every abstention says why', (
     // ⚠️ An untouched set carries whatever the prefill left in it.
     { label: 'not completed', rows: [testRow(TEST_WEEK_INDEX, NAMES.bench, { weight: 185, reps: 5, amrap: true })] },
     // ⚠️ The amrap flag is the signal; an ordinary top set is not a measurement.
-    { label: 'not the amrap set', rows: [testRow(TEST_WEEK_INDEX, NAMES.bench, { weight: 185, reps: 5, completed: true })] },
+    // ⛔ 'not the amrap set' LEFT THIS LIST 2026-09-04: the heaviest completed set is the test set, flag
+    // or no flag (Michael's Sep 1 squat — see test-week-read.test.ts). A flagged WARM-UP is still not.
+    { label: 'only a flagged warm-up', rows: [{ week_number: TEST_WEEK_INDEX, strength_exercises: [{ name: NAMES.bench, sets: [{ weight: 185, reps: 5, warmup: true, completed: true }] }] }] },
     { label: 'a name nothing prescribed', rows: [testRow(TEST_WEEK_INDEX, 'Machine Chest Press', { weight: 185, reps: 5, amrap: true, completed: true })] },
   ];
   for (const c of cases) {

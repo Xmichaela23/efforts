@@ -1806,19 +1806,24 @@ comments ("week one is the test week, for everyone, every block"). Spec: `docs/S
 1. `wizard-steps.ts` — a `numbers` step on every route, immediately before `confirm` (`KnowYourNumbersStep.tsx`,
    rendered by `NonRaceBuilder`). One row per discipline the plan contains. A number on file → **Use current** /
    **Retest in week one** (Use is the default). Nothing on file → an inline field or **Test in week one**. Skippable.
-2. Typed numbers go to `user_baselines.performance_numbers` through `saveUserBaselines` — Training Baselines' own
-   path, same keys (`squat`, `bench`, `deadlift`, `overheadPress1RM`, `pullupMaxReps` 0-valid per Q-102, `ftp`,
-   `threshold_pace_min_per_mi` per-mile "m:ss", `swimPace100`). Untouched fields are never written; a number on
-   file is never overwritten from this screen.
+2. Nothing is typed on this screen (Michael, 2026-09-04, same night: "Typing numbers lives in Training Baselines,
+   not the wizard"). A row with nothing on file is tested in week one, full stop. The first cut carried inline
+   fields that wrote through `saveUserBaselines`; they were removed before the second push and the screen writes
+   nothing.
 3. Strength · Use current → `training_prefs.skip_test_week: true` (the wizard's own, previously unsent
    `skipTestWeek` slot). `generate-strength-plan` now honours it: working numbers come from the resolved four on
    file (`readBarbellMaxesResolved`: locked > trusted learned > typed) via `workingNumberFromFile` (working = 1RM ×
    0.96, Viada p215, same shape as a test read, `cite` names the source), `skipTestWeek: true`, week one is a
    normal week. Retest / absent → the test week, unchanged.
-4. The missing-lift refusal (`generate-strength-plan` and its mirror in `create-goal-and-materialize-plan`) now fires
-   ONLY when the athlete asked to skip the test. With the test week on, a lift with no number is a "By feel" test row
-   (`compose.ts` already did this) and the block re-prices from the logged test. The 65 lb floor still applies to
-   every lift that has a number. Before this, an athlete with empty baselines could not build Get Stronger at all.
+4. A missing lift never refuses a build any more (both `generate-strength-plan` and its mirror in
+   `create-goal-and-materialize-plan` only log). Under the test week it is a "By feel" test row (`compose.ts` already
+   did this). Under Use current (Michael, later the same night: "price the lifts that have numbers, make only the
+   missing lift a week-one test row — don't fall back to a full test week") the missing lift becomes its own
+   week-one test session on its test day (`Test: Deadlift`, tags `standing_plan test_week 1rm_test`, the p215 ramp
+   or "By feel"), beside the day's priced session; `rematerialize-standing-block` seeds the on-file lifts from the
+   stored `config.working_numbers` so the week-one read of one lift does not drop the others. Use current is offered
+   from one lift on file. The 65 lb floor still applies to every lift that has a number. Before this, an athlete
+   with empty baselines could not build Standard Focus at all.
 5. FTP / run threshold · Retest → after the plan is built (`useArcSetupComplete` `onBuilt`), the book's test session
    is scheduled into week one through `addPlannedWorkout`, the same rows Training Baselines schedules; the bodies
    moved to `src/lib/baseline-tests.ts` and Baselines reads them from there. Placement inside week one is OURS
@@ -1830,3 +1835,24 @@ comments ("week one is the test week, for everyone, every block"). Spec: `docs/S
 
 **Back-annotation:** the 2026-08-30 comment block in `generate-strength-plan/index.ts` is history; its text is kept
 above the new branch with a pointer here. No D-entry ever recorded the 08-30 ruling.
+
+## D-468 — The week-one test set is the heaviest completed set, flag or no flag (2026-09-04)
+
+**Bug (Michael's own Sep 1 "Test: Lower"):** `readTestWeek` accepted only sets carrying `amrap: true`. The deadlift
+top set (170 × 3) carried the flag and priced; the squat top set (105 × 6, completed) did not, was dropped, and every
+squat after it read "By feel" (`config.working_numbers` held bench, deadlift, overhead press and no squat). The flag is
+stamped by the composer's ramp; the logger's rows do not always carry it back.
+
+**Rule (Michael):** in a week-one session tagged `1rm_test`, the heaviest completed set for each tested lift IS the
+test set — price from it regardless of the flag. Implemented in `working-number.ts readTestWeek`: heaviest completed
+set wins; at equal weight the flagged set, then the later set; a set the row itself flags `warmup: true` is never the
+test; uncompleted sets never count. A block with no `test_lift_names` falls back to the default names
+(`TESTED_LIFT_NAME`). His plan does carry the four names, so that was not the cause. Tests: `test-week-read.test.ts`.
+
+**Deployed:** `rematerialize-standing-block` v99 (03:33 UTC). The restate runs under the athlete's session only
+(`requireUser`), so the apply for his plan is his tap: the Plans admin page's restate card, or any strength save from
+the logger, which fires it. Expected after apply: squat working number 119 (105 × 6 → predicted 124, × 0.96), Sep 11
+and later squat rows priced off it.
+
+**Pre-existing, untouched:** `standing-plan-wiring.test.ts` "96% of the average" fails on the untouched tree too —
+its expected Epley uses 1/30 where the code uses 0.0333 (203.5 vs 203.4852).

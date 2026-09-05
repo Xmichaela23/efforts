@@ -2541,17 +2541,12 @@ Deno.serve(async (req: Request) => {
             // asked to use the numbers on file instead of the week-one test (`skip_test_week: true`).
             // With the test week on, a missing number is a "By feel" test row, not a refusal — the
             // same rule `generate-strength-plan` applies; keep the two together.
+            // ⛔ 2026-09-04, later the same night: a missing lift is NEVER a refusal. Under "Use current" it
+            // becomes a week-one test session of its own while the others price off file; under the
+            // test week it is a "By feel" test row. `generate-strength-plan` composes both; this gate
+            // only logs.
             const gsMissing = missingBarbellLifts(gsMaxes).map((l) => LIFT_LABEL[l]);
-            if (gsMissing.length > 0 && gsTp.skip_test_week === true) {
-              const list = gsMissing.length === 1
-                ? gsMissing[0]
-                : `${gsMissing.slice(0, -1).join(', ')} and ${gsMissing[gsMissing.length - 1]}`;
-              throw new AppError(
-                'missing_strength_baseline',
-                `To use your current numbers instead of testing in week one we need your ${list} number${gsMissing.length > 1 ? 's' : ''} — or keep the week-one test.`,
-                409,
-              );
-            }
+            if (gsMissing.length > 0) console.log(`[create-goal] no number on file for ${gsMissing.join(', ')} — tested in week one`);
             // ⛔ THE 85 LB ENTRY MINIMUM, per lift (2026-08-13) — same shared reader, same reason
             // as the missing-lift gate above: every session's weight comes off these numbers, and
             // under 85 the program writes weights a 45 lb bar cannot be. See

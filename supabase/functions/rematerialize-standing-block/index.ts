@@ -118,6 +118,24 @@ Deno.serve(async (req: Request) => {
 
     const reading = readTestWeek(joined, sp.test_lift_names);
     /**
+     * ⛔ THE NUMBERS ON FILE STAY (D-467, 2026-09-04). A block built on "Use current" carries its working
+     * numbers in `config.working_numbers` (cite names the file source). A partial test — one lift missing,
+     * tested in week one — reads that ONE lift here; the other lifts have no test set to read and must
+     * not fall out of the block. Seed them from the stored numbers; a logged test always wins.
+     */
+    try {
+      const stored = (sp.working_numbers ?? null) as Record<string, Record<string, unknown>> | null;
+      if (stored && typeof stored === 'object') {
+        for (const [lift, w] of Object.entries(stored)) {
+          if ((reading.working as Record<string, unknown>)[lift]) continue;
+          const cite = String(w?.cite ?? '');
+          if (!/performance_numbers|strength_1rms/.test(cite)) continue; // only numbers that came from the file
+          (reading.working as Record<string, unknown>)[lift] = w;
+          reading.missing = reading.missing.filter((m) => m.lift !== lift);
+        }
+      }
+    } catch (e) { console.warn('[restate] stored working numbers not read:', (e as Error)?.message ?? String(e)); }
+    /**
      * ⛔ A LOCKED 1RM OVERRIDES THE TEST (Michael 2026-09-02: "user should be able to override — I don't
      * know why they would, but they should"). `user_baselines.locked_baselines[lift]` is the athlete's
      * asserted number with auto off (D-459). When one is set it IS the working number for that lift,

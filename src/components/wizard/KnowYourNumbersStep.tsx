@@ -2,9 +2,10 @@
  * "KNOW YOUR NUMBERS?" — the last wizard screen before the commit (SPEC-baseline-entry-2026-09-04).
  *
  * One row per discipline the plan will contain. A row with a number on file offers
- * [Use current] / [Retest in week one]; a row with nothing on file offers an inline field and
- * "Test in week one" (there is nothing current to use). Every field is optional, Continue is never
- * gated, and skipping changes nothing — the defaults (use what is on file, test what is not) apply.
+ * [Use current] / [Retest in week one]; a row with nothing on file is tested in week one, full stop —
+ * there is nothing current to use and NOTHING IS TYPED HERE (Michael, 2026-09-04: typing numbers
+ * lives in Training Baselines, not the wizard). Continue is never gated; skipping changes nothing —
+ * the defaults (use what is on file, test what is not) apply.
  *
  * WHAT EACH ANSWER DOES — the engine is not changed by this screen, it is only told:
  *   strength · Use current → `training_prefs.skip_test_week: true`; `generate-strength-plan` prices the
@@ -15,12 +16,9 @@
  *              `resolveCurrentFtp` / `resolveCurrentRunThresholdPace`. Retest → the book's test session
  *              (p212 / p210) is scheduled into week one after the plan is built, the same planned row
  *              Training Baselines schedules (`src/lib/baseline-tests.ts`).
- *   swim · number on file or typed; no test is scheduled (the app has no swim test session).
+ *   swim · number on file is used; no test is scheduled (the app has no swim test session).
  *
- * WRITES go through `saveUserBaselines`, the path Training Baselines uses — the wizard never writes
- * `user_baselines` itself. A typed number lands in `performance_numbers` under the same key Baselines
- * uses; a number the athlete did not touch is not written. Never overwrites a typed number with an
- * estimate: the "on file" line is read-only, the field only appears where nothing is on file.
+ * NO WRITES. This screen reads Baselines and records a choice; it never writes `user_baselines`.
  *
  * SOURCES for the words on screen: the 1RM keys and pull-up rep count are Baselines' own
  * (`STRENGTH_LIFT_FIELDS`, Q-102 `0` valid); FTP wording from `resolveCurrentFtp` (learned = from your
@@ -34,8 +32,6 @@ import { resolveCurrentRunThresholdPace } from '@/lib/resolve-current-run-pace';
 
 export type NumbersChoiceKey = 'strength' | 'ftp' | 'run';
 export type NumbersChoice = Partial<Record<NumbersChoiceKey, 'use' | 'test'>>;
-/** Inline entries as typed (strings), keyed by the `performance_numbers` key Baselines writes. */
-export type NumbersTyped = Partial<Record<'squat' | 'bench' | 'deadlift' | 'overheadPress1RM' | 'pullupMaxReps' | 'ftp' | 'threshold_pace_min_per_mi' | 'swimPace100', string>>;
 
 export type BaselinesRowLike = {
   performance_numbers?: Record<string, unknown> | null;
@@ -85,17 +81,6 @@ export function formatSecPerMi(sec: number, metric: boolean): string {
   return `${m}:${String(r).padStart(2, '0')}${metric ? '/km' : '/mi'}`;
 }
 
-/** "8:15" typed in the display unit → the per-mile "m:ss" string Baselines stores. */
-export function paceEntryToPerMile(raw: string, metric: boolean): string | null {
-  const m = raw.trim().match(/^(\d{1,2}):(\d{2})$/);
-  if (!m) return null;
-  let sec = Number(m[1]) * 60 + Number(m[2]);
-  if (!(sec > 0)) return null;
-  if (metric) sec = sec * 1.609344;
-  const mm = Math.floor(sec / 60), ss = Math.round(sec - mm * 60);
-  return `${mm}:${String(ss).padStart(2, '0')}`;
-}
-
 export type NumbersInclude = { strength: boolean; run: boolean; bike: boolean; swim: boolean };
 
 /** Hoisted out of the step so React keeps the same element between renders — an inline component would
@@ -119,34 +104,18 @@ function Toggle({ k, value, canUse, onSet, useLabel = 'Use current', testLabel =
   );
 }
 
-function Field({ k, value, placeholder, suffix, onType, ariaLabel }: {
-  k: keyof NumbersTyped; value: string; placeholder: string; suffix: string; onType: (k: keyof NumbersTyped, v: string) => void; ariaLabel: string;
-}) {
-  return (
-    <label className="inline-flex items-center gap-1.5">
-      <input inputMode="decimal" aria-label={ariaLabel} value={value} onChange={(e) => onType(k, e.target.value)} placeholder={placeholder}
-        className="w-20 rounded-lg bg-white/[0.07] border border-white/15 text-white text-[15px] px-2.5 py-1.5" style={{ fontSize: '16px' }} />
-      <span className="text-xs text-white/50">{suffix}</span>
-    </label>
-  );
-}
-
 export function KnowYourNumbersStep({
-  step, totalSteps, row, include, choice, typed, onChoice, onTyped, onBack, onContinue, saving,
+  step, totalSteps, row, include, choice, onChoice, onBack, onContinue,
 }: {
   step: number; totalSteps: number;
   row: BaselinesRowLike;
   include: NumbersInclude;
   choice: NumbersChoice;
-  typed: NumbersTyped;
   onChoice: (next: NumbersChoice) => void;
-  onTyped: (next: NumbersTyped) => void;
   onBack: () => void;
   onContinue: () => void;
-  saving?: boolean;
 }) {
   const metric = String(row?.units ?? '').toLowerCase() === 'metric';
-  const weightUnit = metric ? 'kg' : 'lb';
   const pn = (row?.performance_numbers ?? {}) as Record<string, unknown>;
 
   // strength — all four barbell lifts are needed to price a block off file; pull-ups ride along (Q-102)
@@ -159,7 +128,9 @@ export function KnowYourNumbersStep({
   const thr = resolveCurrentRunThresholdPace(row as never);
   const swimOnFile = typeof pn.swimPace100 === 'string' && pn.swimPace100.trim() !== '' ? String(pn.swimPace100) : null;
 
-  const strengthChoice: 'use' | 'test' = choice.strength ?? (strengthComplete ? 'use' : 'test');
+  // Use current is offered from ONE lift on file (2026-09-04): the lifts with numbers price, the rest are
+  // tested in week one in their own session. Nothing on file at all → the test week.
+  const strengthChoice: 'use' | 'test' = choice.strength ?? (strengthAny ? 'use' : 'test');
   const ftpChoice: 'use' | 'test' = choice.ftp ?? (ftp.value != null ? 'use' : 'test');
   const runChoice: 'use' | 'test' = choice.run ?? (thr.sec_per_mi != null ? 'use' : 'test');
 
@@ -172,10 +143,9 @@ export function KnowYourNumbersStep({
     if (include.run && choice.run == null) seeded.run = runChoice;
     if (Object.keys(seeded).length > 0) onChoice({ ...seeded, ...choice });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [strengthComplete, ftp.value, thr.sec_per_mi]);
+  }, [strengthAny, ftp.value, thr.sec_per_mi]);
 
   const set = (k: NumbersChoiceKey, v: 'use' | 'test') => onChoice({ ...choice, [k]: v });
-  const type = (k: keyof NumbersTyped, v: string) => onTyped({ ...typed, [k]: v });
 
   const rowShell = (title: string, body: React.ReactNode, right: React.ReactNode) => (
     <div className="rounded-xl border border-white/12 bg-white/[0.03] p-4 flex flex-col gap-3">
@@ -190,10 +160,9 @@ export function KnowYourNumbersStep({
   );
 
   return (
-    <StepLayout step={step} totalSteps={totalSteps} title="Know your numbers?" onBack={onBack} onContinue={onContinue} canContinue={!saving} saving={saving}
-      continueLabel="Continue">
+    <StepLayout step={step} totalSteps={totalSteps} title="Know your numbers?" onBack={onBack} onContinue={onContinue} canContinue continueLabel="Continue">
       <p className="text-white/70 text-sm mb-4">
-        Optional. Type what you know, keep what is on file, or test in week one. Nothing here is required.
+        Optional. Keep what is on file or test in week one. Numbers are typed in Training Baselines, not here.
       </p>
       <div className="flex flex-col gap-3">
         {include.strength && rowShell(
@@ -203,31 +172,20 @@ export function KnowYourNumbersStep({
               <>
                 {lifts.filter((l) => l.onFile).map((l) => `${l.f.label} ${l.onFile!.value}${l.f.reps ? ' reps' : ''}`).join(' · ')}
                 {' '}<span className="text-white/40">· {lifts.some((l) => l.onFile?.source === 'learned') ? 'from your logged sets' : 'typed in Baselines'}</span>
-                {!strengthComplete && <div className="text-white/50 mt-1">Use current needs all four barbell lifts on file — type the missing ones or test in week one.</div>}
                 {strengthChoice === 'use' && strengthComplete && <div className="text-white/50 mt-1">The block prices off these; no test week.</div>}
+                {strengthChoice === 'use' && !strengthComplete && <div className="text-white/50 mt-1">The block prices off these; {barbell.filter((l) => !l.onFile).map((l) => l.f.label).join(' and ')} {barbell.filter((l) => !l.onFile).length === 1 ? 'is' : 'are'} tested in week one.</div>}
                 {strengthChoice === 'test' && <div className="text-white/50 mt-1">Week one is the test week (p215). The number on file stays until the test replaces it.</div>}
               </>
             )
-            : 'Nothing on file. Type a one-rep max for any lift you know; the rest are tested in week one.',
-          <Toggle k="strength" value={strengthChoice} canUse={strengthComplete} onSet={set} />,
+            : 'Nothing on file. Every lift is tested in week one (p215). Numbers can be typed in Training Baselines.',
+          <Toggle k="strength" value={strengthChoice} canUse={strengthAny} onSet={set} />,
         )}
-        {include.strength && (strengthChoice === 'test' || !strengthComplete) && (
-          <div className="flex flex-wrap gap-3 px-1">
-            {lifts.filter((l) => !l.onFile).map((l) => (
-              <label key={l.f.key} className="inline-flex items-center gap-1.5">
-                <span className="text-white/70 text-[13px] w-16">{l.f.label}</span>
-                <Field k={l.f.key} value={typed[l.f.key] ?? ''} placeholder="" suffix={l.f.reps ? 'reps' : weightUnit} onType={type} ariaLabel={l.f.label} />
-              </label>
-            ))}
-          </div>
-        )}
-
         {include.bike && rowShell(
           'FTP',
           ftp.value != null
             ? <>{Math.round(ftp.value)} W <span className="text-white/40">· {ftp.source === 'manual' ? 'typed in Baselines' : ftp.source === 'learned' ? 'estimated from your rides' : 'estimated, low confidence'}</span>
                 {ftpChoice === 'test' && <div className="text-white/50 mt-1">The 20-minute FTP test (p212) is scheduled into week one.</div>}</>
-            : <>Nothing on file. <Field k="ftp" value={typed.ftp ?? ''} placeholder="" suffix="W" onType={type} ariaLabel="FTP" /> or test in week one (p212).</>,
+            : <>Nothing on file. The 20-minute FTP test (p212) is scheduled into week one.</>,
           <Toggle k="ftp" value={ftpChoice} canUse={ftp.value != null} onSet={set} />,
         )}
 
@@ -236,7 +194,7 @@ export function KnowYourNumbersStep({
           thr.sec_per_mi != null
             ? <>{formatSecPerMi(thr.sec_per_mi, metric)} <span className="text-white/40">· {thr.source === 'manual' || thr.source === 'manual-chosen' ? 'typed in Baselines' : 'from your runs'}</span>
                 {runChoice === 'test' && <div className="text-white/50 mt-1">The threshold time trial (p210) is scheduled into week one.</div>}</>
-            : <>Nothing on file. <Field k="threshold_pace_min_per_mi" value={typed.threshold_pace_min_per_mi ?? ''} placeholder="8:15" suffix={metric ? '/km' : '/mi'} onType={type} ariaLabel="Run threshold pace" /> or test in week one (p210).</>,
+            : <>Nothing on file. The threshold time trial (p210) is scheduled into week one.</>,
           <Toggle k="run" value={runChoice} canUse={thr.sec_per_mi != null} onSet={set} />,
         )}
 
@@ -244,7 +202,7 @@ export function KnowYourNumbersStep({
           'Swim pace (per 100)',
           swimOnFile
             ? <>{swimOnFile} <span className="text-white/40">· on file</span></>
-            : <>Nothing on file. <Field k="swimPace100" value={typed.swimPace100 ?? ''} placeholder="1:45" suffix="/100" onType={type} ariaLabel="Swim pace per 100" /> — there is no swim test to schedule.</>,
+            : <>Nothing on file — there is no swim test to schedule; the number is typed in Training Baselines.</>,
           null,
         )}
       </div>
