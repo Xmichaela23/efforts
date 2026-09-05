@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
-import { resolveStrengthCapacity } from '@shared/state-trend/capacity-resolver';
+import { resolveStrengthCapacity, canonicalizeLiftKey } from '@shared/state-trend/capacity-resolver';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { resolveCurrentRunThresholdPace, resolveCurrentRunEasyPace } from '@/lib/resolve-current-run-pace';
 
@@ -36,7 +36,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   // touched). It used to fire only as a side effect of saving Baselines after a lift lock changed.
   const [rebuilding, setRebuilding] = useState(false);
   const [rebuildNote, setRebuildNote] = useState<string | null>(null);
-  const { loadUserBaselines } = useAppContext();
+  const { loadUserBaselines, saveUserBaselines } = useAppContext();
   const [baselines, setBaselines] = useState<any | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -57,24 +57,58 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   const thr = baselines ? resolveCurrentRunThresholdPace({ learned_fitness: lf, performance_numbers: pn } as any) : null;
   const easy = baselines ? resolveCurrentRunEasyPace({ learned_fitness: lf, performance_numbers: pn } as any) : null;
   const withSource = (num: string | null, src: string | null | undefined) => num ? `${num}${sourceWord(src) ? ` · ${sourceWord(src)}` : ''}` : null;
-  const [repricing, setRepricing] = useState(false);
-  const [repriceNote, setRepriceNote] = useState<string | null>(null);
-  // Endurance re-price = the six-week checkpoint's own accept path (endurance-checkpoint `reprice`), which
-  // rewrites the unstarted endurance rows through materialize-plan from the current FTP and paces.
-  const repriceEndurance = () => {
-    void (async () => {
-      setRepricing(true); setRepriceNote(null);
-      try {
-        const { data: rs, error } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } });
-        if (error) throw error;
-        const n = Number((rs as any)?.rows_repriced ?? 0);
-        setRepriceNote(n > 0 ? `${n} endurance session${n === 1 ? '' : 's'} re-priced from your current numbers.` : 'Nothing to re-price.');
-      } catch (e) {
-        setRepriceNote('Could not re-price. Try again.');
-        console.warn('[StateAdjustLens] endurance re-price failed:', e);
-      } finally { setRepricing(false); }
-    })();
+  // ⛔ EDIT IN PLACE (Michael, 2026-09-05: "lost the edit option — the whole point"). Tap a number, type, save.
+  // Writes go through AppContext.saveUserBaselines — the SAME save Training Baselines uses — with the same
+  // fields: a lift becomes `locked_baselines[key]` (your number, auto off); FTP becomes `performanceNumbers.ftp`
+  // + `ftp_source: 'manual'`; threshold pace becomes `threshold_pace_min_per_mi` ("m:ss", per mile) +
+  // `threshold_pace_source: 'manual'`. Easy pace is threshold × 1.19 (the resolver's one rule) and is not edited.
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const [saveNote, setSaveNote] = useState<string | null>(null);
+  const reload = () => loadUserBaselines?.().then((b: any) => { if (b) setBaselines(b); }).catch(() => {});
+  const parsePace = (t: string): number | null => { const m = t.trim().match(/^(\d{1,2}):(\d{2})$/); if (!m) return null; const sec = Number(m[1]) * 60 + Number(m[2]); return sec > 0 ? sec : null; };
+  const commit = async (id: string) => {
+    if (!baselines) return;
+    const t = draft.trim();
+    try {
+      if (id === 'ftp') {
+        const v = Math.round(Number(t)); if (!(v > 0)) return;
+        await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), ftp: v, ftp_source: 'manual' } });
+      } else if (id === 'threshold') {
+        const sec = parsePace(t); if (sec == null) return;
+        const secPerMi = metric ? sec * 1.609344 : sec;
+        const str = `${Math.floor(secPerMi / 60)}:${String(Math.round(secPerMi % 60)).padStart(2, '0')}`;
+        await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), threshold_pace_min_per_mi: str, threshold_pace_source: 'manual' } });
+      } else {
+        const key = canonicalizeLiftKey(id); const v = Math.round(Number(t)); if (!key || !(v > 0)) return;
+        await saveUserBaselines({ ...baselines, locked_baselines: { ...(baselines.locked_baselines ?? {}), [key]: v } });
+      }
+      setSaveNote('Saved. Tap "Rebuild upcoming sessions" to apply it to the block.');
+      await reload();
+    } catch (e) {
+      setSaveNote('Could not save. Try again.');
+      console.warn('[StateAdjustLens] save failed:', e);
+    } finally { setEditing(null); setDraft(''); }
   };
+  const Row = ({ id, name, value, editable = true, hint }: { id: string; name: string; value: string | null; editable?: boolean; hint?: string }) => (
+    <div className="flex items-center justify-between py-1 gap-3">
+      <span className="text-[14px] text-white/85">{name}</span>
+      {editing === id ? (
+        <span className="flex items-center gap-2">
+          <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void commit(id); if (e.key === 'Escape') { setEditing(null); setDraft(''); } }}
+            inputMode={id === 'threshold' ? 'numeric' : 'decimal'} placeholder={hint} className="w-24 bg-white/[0.06] border border-white/20 rounded-md px-2 py-1 text-[14px] text-white/90 text-right tabular-nums outline-none" />
+          <button type="button" onClick={() => void commit(id)} className="text-[12px] text-white/80 px-2 py-1 rounded-md border border-white/15">save</button>
+          <button type="button" onClick={() => { setEditing(null); setDraft(''); }} className="text-[12px] text-white/45 px-1 py-1">cancel</button>
+        </span>
+      ) : editable ? (
+        <button type="button" onClick={() => { setEditing(id); setDraft(''); setSaveNote(null); }} className="text-[14px] text-white/90 tabular-nums underline decoration-white/25 underline-offset-4 outline-none focus:outline-none">
+          {value ?? <span className="text-white/35 no-underline">tap to add</span>}
+        </button>
+      ) : (
+        <span className="text-[14px] text-white/90 tabular-nums">{value ?? <span className="text-white/35">no number yet</span>}</span>
+      )}
+    </div>
+  );
   const rebuild = () => {
     void (async () => {
       setRebuilding(true);
@@ -119,15 +153,12 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         ) : (
           <div className="space-y-1.5">
             {perLift.map((lt) => (
-              <div key={lt.canonical_name} className="flex items-center justify-between py-1">
-                <span className="text-[14px] text-white/85">{lt.display_name ?? lt.canonical_name}</span>
-                <span className="text-[14px] text-white/90 tabular-nums">{liftNumber(lt.canonical_name) ?? <span className="text-white/35">no number yet</span>}</span>
-              </div>
+              <Row key={lt.canonical_name} id={lt.canonical_name} name={lt.display_name ?? lt.canonical_name} value={liftNumber(lt.canonical_name)} hint={metric ? 'kg' : 'lb'} />
             ))}
           </div>
         )}
         <p className="text-[11px] text-white/35 mt-2.5 leading-snug">
-          Swap, add, and weight changes live in the logger for now.
+          Tap a number to set your own. Swaps and added movements live in the logger.
         </p>
       </section>
 
@@ -135,29 +166,14 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       <section>
         <div className="text-[12px] uppercase tracking-wider text-white/45 mb-2">Run · Bike</div>
         <div className="space-y-1.5">
-          {([
-            ['FTP', withSource(ftp?.value != null ? `${Math.round(ftp.value)} W` : null, ftp?.source)],
-            ['Threshold pace', withSource(fmtPace(thr?.sec_per_mi, metric), thr?.source)],
-            ['Easy pace', withSource(fmtPace(easy?.sec_per_mi, metric), easy?.source)],
-          ] as Array<[string, string | null]>).map(([name, val]) => (
-            <div key={name} className="flex items-center justify-between py-1">
-              <span className="text-[14px] text-white/85">{name}</span>
-              <span className="text-[14px] text-white/90 tabular-nums">{val ?? <span className="text-white/35">no number yet</span>}</span>
-            </div>
-          ))}
+          <Row id="ftp" name="FTP" value={withSource(ftp?.value != null ? `${Math.round(ftp.value)} W` : null, ftp?.source)} hint="W" />
+          <Row id="threshold" name="Threshold pace" value={withSource(fmtPace(thr?.sec_per_mi, metric), thr?.source)} hint={metric ? 'm:ss/km' : 'm:ss/mi'} />
+          <Row id="easy" name="Easy pace" value={withSource(fmtPace(easy?.sec_per_mi, metric), easy?.source)} editable={false} />
         </div>
-        <button
-          type="button"
-          disabled={repricing}
-          onClick={repriceEndurance}
-          className="mt-3 text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 hover:bg-white/[0.08] disabled:opacity-50"
-        >
-          {repricing ? 'Re-pricing…' : 'Re-price upcoming endurance sessions'}
-        </button>
         <p className="text-[11px] text-white/35 mt-2 leading-snug">
-          Rewrites the run and ride sessions you have not started from the numbers above. Done sessions are not touched.
+          Tap FTP or threshold pace to set your own. Easy pace follows threshold. Rebuild above to apply.
         </p>
-        {repriceNote && <p className="text-[12px] text-white/60 mt-1.5">{repriceNote}</p>}
+        {saveNote && <p className="text-[12px] text-white/60 mt-1.5">{saveNote}</p>}
       </section>
     </div>
   );
