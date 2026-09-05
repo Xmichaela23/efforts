@@ -12,7 +12,7 @@ import { getDisciplineColor } from '@/lib/context-utils';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 import { resolveStrengthCapacity, canonicalizeLiftKey } from '@shared/state-trend/capacity-resolver';
-import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
+import { resolveCurrentFtp, pendingFtpProposal, acceptEstimatedFtp } from '@/lib/resolve-current-ftp';
 import { resolveCurrentRunThresholdPace, resolveCurrentRunEasyPace } from '@/lib/resolve-current-run-pace';
 import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
@@ -71,6 +71,28 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   const ftp = baselines ? resolveCurrentFtp({ learned_fitness: lf, performance_numbers: pn } as any) : null;
   const thr = baselines ? resolveCurrentRunThresholdPace({ learned_fitness: lf, performance_numbers: pn } as any) : null;
   const easy = baselines ? resolveCurrentRunEasyPace({ learned_fitness: lf, performance_numbers: pn } as any) : null;
+  // The FTP the rides measured, waiting on acceptance (TrainerRoad's proposed-then-accepted). Same write as
+  // Training Baselines' "use it": accept into learned_fitness, then re-price the unstarted endurance rows.
+  const proposal = baselines ? pendingFtpProposal({ learned_fitness: lf, performance_numbers: pn } as any) : null;
+  const [accepting, setAccepting] = useState(false);
+  const acceptFtp = () => {
+    void (async () => {
+      const uid = getStoredUserId(); if (!uid) return;
+      setAccepting(true); setSaveNote(null);
+      try {
+        const { data: row } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', uid).maybeSingle();
+        const raw = row?.learned_fitness; const cur = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        const next = acceptEstimatedFtp(cur as any, 'baselines'); if (!next) return;
+        const { error } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', uid);
+        if (error) throw error;
+        let note = `${Math.round(Number((next.ride_ftp_accepted as any).value))} W in use.`;
+        try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const n = Number((rp as any)?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} re-priced.`; } catch { /* the accept stands; rebuild covers it */ }
+        setSaveNote(note);
+        await reload();
+      } catch (e) { setSaveNote('Could not accept. Try again.'); console.warn('[StateAdjustLens] accept FTP failed:', e); }
+      finally { setAccepting(false); }
+    })();
+  };
   const lthr = baselines ? resolveCurrentLthr({ learned_fitness: lf, performance_numbers: pn, configured_hr_zones: baselines.configured_hr_zones ?? null } as any) : null;
   const withSource = (num: string | null, src: string | null | undefined) => num ? `${num}${sourceWord(src) ? ` · ${sourceWord(src)}` : ''}` : null;
   // ⛔ EDIT IN PLACE (Michael, 2026-09-05: "lost the edit option — the whole point"). Tap a number, type, save.
@@ -320,6 +342,12 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
           <SportHeading sport="bike" label="Bike" />
           <div className="space-y-1.5">
             <Row id="ftp" name="FTP" value={withSource(ftp?.value != null ? `${Math.round(ftp.value)} W` : null, ftp?.source)} hint="W" sport="bike" />
+            {proposal && (
+              <div className="flex items-center justify-between py-1 gap-3">
+                <span className="text-[13px] text-white/70">Your rides measure {Math.round(proposal.measured)} W</span>
+                <button type="button" disabled={accepting} onClick={acceptFtp} style={{ borderColor: `${getDisciplineColor('bike')}88`, color: getDisciplineColor('bike') }} className="text-[13px] px-3 py-1 rounded-lg border bg-white/[0.04] disabled:opacity-50">{accepting ? 'Applying…' : `use ${Math.round(proposal.measured)} W`}</button>
+              </div>
+            )}
           </div>
         </div>
         <p className="text-[13px] text-white/60 mt-2 leading-snug">
