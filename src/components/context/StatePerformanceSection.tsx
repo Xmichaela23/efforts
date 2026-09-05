@@ -329,9 +329,13 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
         // wants off a glance, and it is `anchor.value` — the same FTP the verdict was computed against
         // (D-358), never a second client-side resolve.
         <>
-          <span className="basis-full flex items-baseline justify-between gap-2">
-            <span className="text-white/55 text-[13px]">{ftpNow != null ? `${ftpNow} W threshold` : 'power'}</span>
-          </span>
+          {/* Each chart on this card carries a title and a one-line key (Michael, 2026-09-04: "I don't know
+              what each line is"). Solid = the readings, dashed = the fitted trend, right-hand number = low to
+              high in the window. The receipts under the chart belong to the FTP estimate. */}
+          <span className="basis-full text-white/80 text-[13px] mt-1">{ftpNow != null ? `FTP · ${ftpNow} W` : 'FTP'}</span>
+          {showFtpLine && (
+            <span className="basis-full text-[11px] text-white/45 leading-snug">dots: each FTP estimate, one per change · dashed: the trend through them · right: low to high</span>
+          )}
           {/* FTP over time — one dot per stored reading, the same fitted trendline (WKO5 least squares) and
               "start → end" caption the efficiency and drift charts use. TrainingPeaks threshold history. */}
           {showFtpLine && (
@@ -355,11 +359,9 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
               basis IS the estimate (`src === 'est (FTP)'`, from `efficiency.basis === 'coggan_ftp'`).
               It passes the ⓘ test (D-357): it describes HOW THE METRIC IS MADE, true for anyone,
               not where this athlete sits. */}
-          {/* Two labels, one per line on this card (Michael, 2026-09-04: "lose the copy, label what each line is"). */}
-          <ul className="basis-full text-[12px] text-white/45 leading-snug mt-1 max-w-[min(100%,340px)] list-disc pl-4">
-            <li>FTP line: your estimated FTP, one dot each time the estimate changed.{src === 'est (FTP)' ? ' It moves only when you accept a new number.' : ''}</li>
-            <li>Best 20 minutes: your best 20-minute power on each ride. It does not set FTP.</li>
-          </ul>
+          {src === 'est (FTP)' && (
+            <span className="basis-full text-[12px] text-white/45 leading-snug">Estimated from your rides. It moves only when you accept a new number.</span>
+          )}
         </>
       ) : (
         <Signal label={ftpNow != null ? `${ftpNow} W threshold` : 'Power'} sig={lead} />
@@ -434,7 +436,8 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
         <>
           {/* Titled (Michael, 2026-09-04): with the FTP line above it, an untitled second power chart read as
               a second FTP. This is TrainingPeaks' Peak Power (20 min) chart — display only; nothing reads it. */}
-          <span className="basis-full text-[12px] text-white/70">Best 20 minutes power over time</span>
+          <span className="basis-full text-white/80 text-[13px] mt-3 pt-2 border-t border-white/10">Best 20-minute power</span>
+          <span className="basis-full text-[11px] text-white/45 leading-snug">dots: one ride each, its best 20 minutes · right: low to high · does not set FTP</span>
           <TrendSparkline
             series={fitness.power.series}
             color={getDisciplineColor('bike')}
