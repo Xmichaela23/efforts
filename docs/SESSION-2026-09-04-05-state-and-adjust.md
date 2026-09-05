@@ -1,6 +1,6 @@
 # SESSION 2026-09-04 → 05 — State is sourced, Adjust owns the week, numbers are proposed then accepted
 
-**Read this first for the UI pass.** Main at the commit named at the bottom; everything here is pushed,
+**Read this first for the UI pass.** Main at 71393e6b; everything here is pushed,
 the server functions deployed, the iOS project synced (Xcode build is Michael's).
 
 ## The rules that now hold (and where they are written)
