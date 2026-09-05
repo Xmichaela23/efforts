@@ -1348,7 +1348,6 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                 {/* 2026-09-03 (Michael): the reads first (efficiency, drift — how you responded), the workload chart
                     (how much, how hard) below them. */}
                 <EnduranceReadCards asOf={asOf ?? null} sessions={enduranceSessions} spine={enduranceSpine} sport="run" />
-                <LoadWeeksCard sport="run" load={(stateDisplay as any)?.loadByDiscipline?.run ?? null} />
               </>
             );
             // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
