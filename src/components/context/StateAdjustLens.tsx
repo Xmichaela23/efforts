@@ -7,6 +7,7 @@
 // no dead buttons that pretend to work; honest labels for what lands where. Consent-first throughout.
 
 import { useEffect, useState } from 'react';
+import { Pencil } from 'lucide-react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 import { resolveStrengthCapacity, canonicalizeLiftKey } from '@shared/state-trend/capacity-resolver';
@@ -144,8 +145,10 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
           <button type="button" onClick={() => { setEditing(null); setDraft(''); }} className="text-[12px] text-white/45 px-1 py-1">cancel</button>
         </span>
       ) : editable ? (
-        <button type="button" onClick={() => { setEditing(id); setDraft(''); setSaveNote(null); }} className="text-[14px] text-white/90 tabular-nums underline decoration-white/25 underline-offset-4 outline-none focus:outline-none">
-          {value ?? <span className="text-white/35 no-underline">tap to add</span>}
+        <button type="button" onClick={() => { setEditing(id); setDraft(''); setSaveNote(null); }} aria-label={`edit ${name}`}
+          className="inline-flex items-center gap-1.5 pl-2.5 pr-2 py-1 rounded-lg bg-white/[0.06] border border-white/15 text-[14px] text-white/90 tabular-nums outline-none focus:outline-none active:bg-white/[0.1]">
+          {value ?? <span className="text-white/45">tap to add</span>}
+          <Pencil size={12} strokeWidth={2} className="text-white/50 shrink-0" aria-hidden="true" />
         </button>
       ) : (
         <span className="text-[14px] text-white/90 tabular-nums">{value ?? <span className="text-white/35">no number yet</span>}</span>
