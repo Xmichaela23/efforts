@@ -1278,3 +1278,31 @@ prescribed weight in a twelve-week block derives from that first test.
 one with none, and both tests underread — but the failure is structural and it lands hardest on a
 first-time lifter, who has no way to know the number was wrong. Judge the fix against a new athlete
 with an empty profile, never against Michael's numbers ([[feedback_user_agnostic_design]]).
+
+---
+
+## Paired 1RM test — fresh legs and tired legs (Viada, Module 3 "Assessments — 1 Rep Max")
+
+**Not built. Polish, not a fix.** Source: the 1RM assessment module (`Module_3_-_Assessments_1_Rep_Max.docx`),
+Viada in his own words:
+
+> "We'll establish them twice during the week, typically. Once we'll do a test right after a low
+> intensity steady state, a long day, so we get an idea of what the athlete's output is like when
+> there is lingering aerobic fatigue, and then we do it fresh."
+
+**What it is.** The same estimated max, read twice a week — once on tired legs (right after an easy
+long endurance day), once fresh. The PAIR is the signal, not either number: when the tired and fresh
+numbers converge, or fresh stops climbing while tired holds, the athlete is accumulating fatigue.
+It is a fatigue tracker built from the strength number this app already computes (e1RM), against the
+endurance load it already computes — a cross-domain read, the kind of thing State exists for.
+
+Viada also names the **broad jump** as a zero-injury-risk proxy for the same fatigue read ("a very
+simple, effective one rep max output assessment that can be done with zero injury risk").
+
+**Why it fits here.** The e1RM is already computed per session; the app already knows which sessions
+followed a long easy endurance day. A "fresh vs post-endurance max" split is two pools of the numbers
+on hand, the same shape as the run easy/hard split — no new measurement asked of the athlete.
+
+**Open, before building:** distinguishing "fresh" from "tired" needs the lift's preceding-24–48h
+endurance load, which the load engine has. Define the window off the book, not invented. Judge against
+a new athlete, never Michael's numbers.
