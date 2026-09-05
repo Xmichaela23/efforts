@@ -39,7 +39,7 @@ import LoadWeeksCard from '@/components/context/LoadWeeksCard';
 // ⛔ COLLAPSE TO ONE LINE PER SPORT (Round 3, 2026-09-01) — each sport shows a change-leading summary
 // and expands on tap. The summary wording is a set of pure functions so the confidence rule is pinned.
 import { fmtDayShort, latestPoint, strengthGlanceRows, type SportRow , fitTrend} from '@/lib/sport-summary';
-import { getStoredUserId } from '@/lib/supabase';
+import { supabase, getStoredUserId } from '@/lib/supabase';
 import TrendSparkline from '@/components/context/TrendSparkline';
 import { liftStatusLine } from '@/lib/strength-calibration-copy';
 import { Activity, Bike, Waves, Dumbbell, type LucideIcon } from 'lucide-react';
@@ -1040,6 +1040,39 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [bikeAnchorValue, loadUserBaselines]);
+
+  // ⛔ ATHLETE-SET ROW ORDER (2026-09-05, Michael: "can we make it so the user can move these by their own
+  // priority?"). Precedent: Garmin Connect's reorderable cards, TrainingPeaks' reorderable dashboard charts.
+  // Saved to `user_baselines.ui_prefs.state_row_order` (migration 20260905060000, applied by hand like every
+  // other) and mirrored on the device so it holds before the column exists. Absent = the goal-led default order.
+  const ROW_ORDER_KEY = 'efforts:state_row_order';
+  const [rowOrder, setRowOrder] = React.useState<string[] | null>(() => {
+    try { const v = JSON.parse(localStorage.getItem(ROW_ORDER_KEY) || 'null'); return Array.isArray(v) ? v : null; } catch { return null; }
+  });
+  const uiPrefsRef = React.useRef<Record<string, unknown>>({});
+  const [reordering, setReordering] = React.useState(false);
+  React.useEffect(() => {
+    let cancelled = false;
+    void loadUserBaselines?.().then((b: any) => {
+      if (cancelled || !b) return;
+      const prefs = (b.ui_prefs && typeof b.ui_prefs === 'object') ? (b.ui_prefs as Record<string, unknown>) : {};
+      uiPrefsRef.current = prefs;
+      const o = (prefs as any).state_row_order;
+      if (Array.isArray(o) && o.length > 0) { setRowOrder(o); try { localStorage.setItem(ROW_ORDER_KEY, JSON.stringify(o)); } catch { /* device copy only */ } }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [loadUserBaselines]);
+  const saveRowOrder = React.useCallback((next: string[]) => {
+    setRowOrder(next);
+    try { localStorage.setItem(ROW_ORDER_KEY, JSON.stringify(next)); } catch { /* device copy only */ }
+    const uid = getStoredUserId();
+    if (!uid) return;
+    const prefs = { ...uiPrefsRef.current, state_row_order: next };
+    uiPrefsRef.current = prefs;
+    void supabase.from('user_baselines').update({ ui_prefs: prefs }).eq('user_id', uid).then(({ error }) => {
+      if (error) console.warn('[State] row order kept on this device only (ui_prefs not on the account yet):', error.message);
+    });
+  }, []);
   // ⛔ SLICE b — ONE READ, and it must sit ABOVE the early return or the hook order changes between
   // renders. It self-silences on any plan that is not a strength block (`not_a_strength_block`), so
   // calling it unconditionally costs one function invoke and buys a stable hook list.
@@ -1304,18 +1337,33 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
     (Array.isArray(enduranceSessions) && enduranceSessions.some((s: { sport?: string }) => s?.sport === 'run'))
     || (Array.isArray(enduranceSpine) && enduranceSpine.some((s: { sport?: string }) => s?.sport === 'run'));
   const sortedCards = [...cards].filter((c) => c.discipline !== 'run' || hasRunContent).sort((a, b) => {
+    if (rowOrder) {
+      const ia = rowOrder.indexOf(a.discipline), ib = rowOrder.indexOf(b.discipline);
+      const ra = ia < 0 ? 99 : ia, rb = ib < 0 ? 99 : ib;
+      if (ra !== rb) return ra - rb;
+    }
     const band = bandOf(a.discipline) - bandOf(b.discipline);
     if (band !== 0) return band;
     const byCadence = (cadenceCounts?.[b.discipline] ?? 0) - (cadenceCounts?.[a.discipline] ?? 0);
     if (byCadence !== 0) return byCadence;
     return (TIEBREAK[a.discipline] ?? 5) - (TIEBREAK[b.discipline] ?? 5);
   });
+  const moveRow = (d: string, dir: -1 | 1) => {
+    const order = sortedCards.map((c) => c.discipline);
+    const i = order.indexOf(d); const j = i + dir;
+    if (i < 0 || j < 0 || j >= order.length) return;
+    [order[i], order[j]] = [order[j], order[i]];
+    saveRowOrder(order);
+  };
 
   return (
     <div className="py-3">
       {/* ⛔ THE SIX-WEEK CHECKPOINT (D-462 follow-up) sits above the sport plates: it is plan-level
           (threshold pace, FTP, threshold HR), not one sport's. Renders only when the server says it is due. */}
       <EnduranceCheckpointSheet enabled={hasActivePlan === true} />
+      <div className="px-3 flex justify-end">
+        <button type="button" onClick={() => setReordering((v) => !v)} className="text-[11px] tracking-wider uppercase text-white/45 py-1 outline-none focus:outline-none">{reordering ? 'done' : 'reorder'}</button>
+      </div>
       {/* Section clock label: PERFORMANCE is the SLOW clock. Per-row windows (8wk, steady runs,
           over 6wk, as-of dates) are receipts that inherit this and add specifics. */}
       {/* ⛔ THE "Fitness / trends over recent weeks" HEADING IS REMOVED (2026-09-01, cosmetic) — it
@@ -1394,7 +1442,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
           const rows = summaryRows(card.discipline);
           return (
             <div key={card.discipline}>
-              <button type="button" onClick={() => toggleSport(card.discipline)} className="w-full flex items-start gap-3 px-3 py-3 text-left outline-none focus:outline-none" aria-expanded={open} aria-label={`${card.discipline} details`}>
+              <button type="button" onClick={() => { if (!reordering) toggleSport(card.discipline); }} className="w-full flex items-start gap-3 px-3 py-3 text-left outline-none focus:outline-none" aria-expanded={open} aria-label={`${card.discipline} details`}>
                 {/* The discipline label is the ROW's name, so it steps DOWN (rule 3): the numbers on
                     the right are the payload and carry the larger size. It was 13.5px against a 12px
                     value — the label was bigger than the thing it labelled. */}
@@ -1429,7 +1477,14 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                     white/45, near-invisible, and the only signal these rows open at all. */}
                 {/* a clear cue that the row opens (Michael 2026-09-03): a proper chevron that turns when open */}
                 {/* down = opens in place (iOS/Material accordion); a right chevron would promise another screen */}
-                <span className={`text-white/80 text-[16px] leading-none shrink-0 self-center transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true">⌄</span>
+                {reordering ? (
+                  <span className="flex flex-col shrink-0 self-center gap-1">
+                    <span role="button" aria-label={`move ${card.discipline} up`} onClick={(e) => { e.stopPropagation(); moveRow(card.discipline, -1); }} className="px-2 py-0.5 text-white/85 text-[14px] leading-none">▲</span>
+                    <span role="button" aria-label={`move ${card.discipline} down`} onClick={(e) => { e.stopPropagation(); moveRow(card.discipline, 1); }} className="px-2 py-0.5 text-white/85 text-[14px] leading-none">▼</span>
+                  </span>
+                ) : (
+                  <span className={`text-white/80 text-[16px] leading-none shrink-0 self-center transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true">⌄</span>
+                )}
               </button>
               {open && <div className="px-3 pb-2">{inner}</div>}
             </div>
