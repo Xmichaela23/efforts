@@ -48,7 +48,7 @@ states laid over TrainingPeaks' numbers, and Garmin has no efficiency factor to 
 
 | What you see | How it's calculated | Source |
 |---|---|---|
-| **Bench Press 160 · e1RM** (and each lift) | Estimated one-rep max from your most recent logged set: weight × 36 ÷ (37 − reps). | Brzycki formula |
+| **Bench Press 160 · e1RM** (and each lift) | Estimated one-rep max from your most recent logged set, rounded to 5 lb: Epley and Brzycki run on the set's weight and reps and the two are averaged. | Viada, Module 3 / p215 — his own instruction: "use two or three [formulas]… to give you a range," averaged. |
 | **No arrow on lifts** | Deliberate. | Strong and Hevy show no direction on a lift |
 
 ### RUN
