@@ -62,6 +62,40 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   // fields: a lift becomes `locked_baselines[key]` (your number, auto off); FTP becomes `performanceNumbers.ftp`
   // + `ftp_source: 'manual'`; threshold pace becomes `threshold_pace_min_per_mi` ("m:ss", per mile) +
   // `threshold_pace_source: 'manual'`. Easy pace is threshold × 1.19 (the resolver's one rule) and is not edited.
+  // ⛔ DELOAD — the book's TAPER/DELOAD column (p274), deployed by the athlete, never scheduled (p120 rejects
+  // overreach-to-deload). Read the plan's current week + deload weeks from the rebuild's dry run; toggling
+  // next week calls the same rebuild with `taper_weeks` and applies.
+  const [deload, setDeload] = useState<{ currentWeek: number; weeks: number; taperWeeks: number[] } | null>(null);
+  const [deloadBusy, setDeloadBusy] = useState(false);
+  const [deloadNote, setDeloadNote] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void supabase.functions.invoke('rematerialize-standing-block', { body: { apply: false } }).then(({ data }) => {
+      const d = data as any;
+      if (cancelled || !d?.success || typeof d.current_week !== 'number') return;
+      setDeload({ currentWeek: d.current_week, weeks: Number(d.weeks) || 12, taperWeeks: Array.isArray(d.taper_weeks) ? d.taper_weeks.map(Number) : [] });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  const nextWeek = deload ? deload.currentWeek + 1 : null;
+  const nextIsDeload = !!(deload && nextWeek != null && deload.taperWeeks.includes(nextWeek));
+  const toggleDeload = () => {
+    if (!deload || nextWeek == null || nextWeek > deload.weeks) return;
+    const next = nextIsDeload ? deload.taperWeeks.filter((w) => w !== nextWeek) : [...deload.taperWeeks, nextWeek];
+    void (async () => {
+      setDeloadBusy(true); setDeloadNote(null);
+      try {
+        const { data: rs, error } = await supabase.functions.invoke('rematerialize-standing-block', { body: { apply: true, taper_weeks: next } });
+        if (error) throw error;
+        const d = rs as any;
+        setDeload({ ...deload, taperWeeks: Array.isArray(d?.taper_weeks) ? d.taper_weeks.map(Number) : next });
+        setDeloadNote(nextIsDeload ? `Week ${nextWeek} is back to the standard week.` : `Week ${nextWeek} is a deload week. Sessions rebuilt.`);
+      } catch (e) {
+        setDeloadNote('Could not change it. Try again.');
+        console.warn('[StateAdjustLens] deload toggle failed:', e);
+      } finally { setDeloadBusy(false); }
+    })();
+  };
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [saveNote, setSaveNote] = useState<string | null>(null);
@@ -144,6 +178,25 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         </p>
         {rebuildNote && <p className="text-[12px] text-white/60 mt-1.5">{rebuildNote}</p>}
       </section>
+
+      {deload && nextWeek != null && nextWeek <= deload.weeks && (
+        <section className="mb-5">
+          <div className="text-[12px] uppercase tracking-wider text-white/45 mb-2">Deload</div>
+          <button
+            type="button"
+            disabled={deloadBusy}
+            onClick={toggleDeload}
+            className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 hover:bg-white/[0.08] disabled:opacity-50"
+          >
+            {deloadBusy ? 'Rebuilding…' : nextIsDeload ? `Week ${nextWeek}: deload on · make it standard` : `Make week ${nextWeek} a deload week`}
+          </button>
+          <p className="text-[11px] text-white/35 mt-2 leading-snug">
+            The book's deload week: max-effort sets become skill and speed sets, the extra lower-body sets come out, and the endurance sessions drop a level. Use it when a race is near or you need a break.
+          </p>
+          {deload.taperWeeks.length > 0 && <p className="text-[11px] text-white/45 mt-1">Deload weeks: {deload.taperWeeks.join(', ')}</p>}
+          {deloadNote && <p className="text-[12px] text-white/60 mt-1.5">{deloadNote}</p>}
+        </section>
+      )}
 
       {/* STRENGTH — the deepest steer (swap / add / adjust weight already built; re-homing here next) */}
       <section className="mb-5">

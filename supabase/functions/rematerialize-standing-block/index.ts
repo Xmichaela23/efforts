@@ -210,10 +210,19 @@ Deno.serve(async (req: Request) => {
       : null;
     const blockDial = Array.isArray(sp.dial) ? sp.dial as string[] : null;
 
+    // ⛔ THE DELOAD WEEK IS A TOOL THE ATHLETE DEPLOYS (2026-09-05, Michael: "build the deload week and put it
+    // here"). The book rejects overreach-to-deload (p120) and offers the TAPER/DELOAD column of p274 as something
+    // you switch to — a race near, a break needed — not a week the plan schedules. `taper_weeks` in the body sets
+    // it (weeks not yet started only); absent, the plan's stored choice stands. Week one (the test week) never.
+    const requestedTaper = Array.isArray(p?.taper_weeks) ? (p.taper_weeks as unknown[]).map(Number) : null;
+    const storedTaper = Array.isArray(sp.taper_weeks) ? (sp.taper_weeks as unknown[]).map(Number) : [];
+    const taperWeeks = (requestedTaper ?? storedTaper)
+      .filter((n) => Number.isInteger(n) && n > TEST_WEEK_INDEX && n <= weeks && n >= currentWeek)
+      .sort((x, y) => x - y);
     const composeBase = {
       frame: sp.frame,
       weeks,
-      taperWeeks: [] as number[],
+      taperWeeks,
       competitionLifts: sp.competition_lifts ?? {},
       workingNumbers: reading.working,
       seed1RMs: sp.seed_one_rep_maxes ?? {},
@@ -365,7 +374,7 @@ Deno.serve(async (req: Request) => {
 
     if (!willWrite) {
       return json({
-        success: true, applied: false, current_week: currentWeek,
+        success: true, applied: false, current_week: currentWeek, taper_weeks: taperWeeks, weeks,
         working_numbers: workingNamed, missing: reading.missing,
         changes: restated.changes, unmatched: restated.unmatched,
         // ⛔ WHAT THE HEAVY SETS HAVE EARNED, AND OFF WHAT. A surface offering the athlete this diff
@@ -399,6 +408,7 @@ Deno.serve(async (req: Request) => {
           ...config,
           standing_plan: {
             ...sp,
+            taper_weeks: taperWeeks,
             working_numbers: reading.working,
             test_read: true,
             // ⛔ WHAT THE PATTERNS HAVE EARNED, STORED BESIDE THE NUMBERS (A2). The next restate reads
@@ -513,7 +523,7 @@ Deno.serve(async (req: Request) => {
       + `me_unread=${ladder.unread}`,
     );
 
-    return json({
+    return json({ taper_weeks: taperWeeks, weeks,
       success: true, applied: true, rows_written: written,
       current_week: currentWeek,
       working_numbers: workingNamed, missing: reading.missing,
