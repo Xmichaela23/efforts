@@ -34,6 +34,9 @@ stated and it is a decision Michael can reverse.
 
 | Which session a run was (easy / long / interval) | `compute-facts classifyRunIntent` | The plan's own tag on the planned session, stamped onto the workout (`workout_metadata.plan_tags`) so it survives a plan rebuild; no plan word → grouped as easy, no inference. Michael, 2026-09-02/04. |
 
+| Easy/hard row pace | `compute-snapshot`, `state-trend/run.ts` | FIELD — grade-adjusted pace (TrainingPeaks NGP) when the run has elevation; raw recorded pace otherwise (TrainingPeaks' own fallback), flagged "flat pace, no elevation". |
+| Which runs are graded interval vs easy | `compute-facts classifyRunIntent` reads `workout_analysis.classified_type` | FIELD — the analyser's auto-detection from interval structure + name (Garmin/Strava/TrainingPeaks all auto-detect); heart rate ≥90% LTHR is the secondary rung when no plan/detection. |
+
 ## FTP
 
 | Number | Where | Source |

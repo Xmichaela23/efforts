@@ -71,6 +71,7 @@ import { resolveRunEasyHrBand, isEasyHr, runEasyPaceEligible } from "../_shared/
 // ---------------------------------------------------------------------------
 
 interface WorkoutRow {
+  workout_analysis?: Record<string, any> | null;
   id: string;
   user_id: string;
   type: string;
@@ -1051,8 +1052,13 @@ function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null, threshold
   //    (≥ 90% LTHR) is a hard session, zones 1–2 are easy. This replaces the 2026-09-02 "no plan word → easy"
   //    default, which filed unlinked hard runs (Aug 28: 16 × 0.1 mi at 144 bpm on a 152 LTHR) as easy and
   //    dragged the easy row to 12:44/mi. No name-matching on the athlete's own titles.
-  const detected = String((w.computed as any)?.analysis?.heart_rate?.workout_type ?? '').toLowerCase();
-  if (detected === 'intervals' || detected === 'hill_repeats') return 'interval';
+  // 2026-09-04: read the LIVE detector — `workout_analysis.classified_type`, the one the analyser writes on
+  // every run (intervals / hill_repeats / tempo / steady_state / easy) from interval structure + name.
+  // It was reading `computed.analysis.heart_rate.workout_type`, an older sibling path never written, so
+  // the interval rung never fired and only the heart-rate test below did any work. Same auto-detection
+  // every commercial app runs (Garmin / Strava / TrainingPeaks find repeated efforts); we already compute it.
+  const detected = String((w as any)?.workout_analysis?.classified_type ?? (w.computed as any)?.analysis?.heart_rate?.workout_type ?? '').toLowerCase();
+  if (detected === 'intervals' || detected === 'hill_repeats' || detected === 'tempo' || detected === 'threshold' || detected === 'vo2' || detected === 'speed') return 'interval';
   // the resolved average (the same number the facts row prints); the column is null on some imports
   const avgHr = toNum(avgHrBpm) ?? toNum(w.avg_heart_rate);
   if (avgHr != null && thresholdHrBpm != null && thresholdHrBpm > 0) {
@@ -1511,7 +1517,7 @@ serve(async (req: Request) => {
         "id, user_id, type, date, timestamp, duration, moving_time, elapsed_time, distance, " +
         "avg_heart_rate, max_heart_rate, avg_pace, avg_power, max_power, normalized_power, " +
         "avg_cadence, elevation_gain, strength_exercises, mobility_exercises, " +
-        "workout_metadata, computed, planned_id, workout_status, workload_actual, sensor_data, gps_track, start_position_lat, start_position_long, weather_data",
+        "workout_metadata, computed, workout_analysis, planned_id, workout_status, workload_actual, sensor_data, gps_track, start_position_lat, start_position_long, weather_data",
       )
       .eq("id", workout_id)
       .maybeSingle();

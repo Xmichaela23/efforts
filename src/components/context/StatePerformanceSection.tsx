@@ -1067,7 +1067,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         if (grp.recentPaceSecPerKm != null) {
           // 2026-09-04: the warm-up stand-in (easy rows read off the warm-ups of hard runs) was OURS and is gone —
           // an easy row is easy runs, a hard row is hard runs, recorded pace and heart rate, nothing borrowed.
-          return { name: label, value: formatPace(grp.recentPaceSecPerKm, useImperial), note: grp.recentHrAvg != null ? `${grp.recentHrAvg} bpm` : undefined };
+          return { name: label, value: formatPace(grp.recentPaceSecPerKm, useImperial), note: [grp.recentHrAvg != null ? `${grp.recentHrAvg} bpm` : '', grp.paceIsGraded === false ? 'flat pace, no elevation' : ''].filter(Boolean).join(' · ') || undefined };
         }
         return { name: label, value: `${grp.runs} run${grp.runs === 1 ? '' : 's'}` };
       };

@@ -146,7 +146,7 @@ export function efficiencyIndexToSeries(
  *  reconstructed number. */
 export function recentGroupPaceHr(
   rows: ReadonlyArray<Record<string, unknown>> | null | undefined,
-): { recentPaceSecPerKm: number | null; recentHrAvg: number | null } {
+): { recentPaceSecPerKm: number | null; recentHrAvg: number | null; paceIsGraded: boolean } {
   const last5 = (Array.isArray(rows) ? rows : []).slice(-5);
   const median = (get: (r: Record<string, unknown>) => unknown): number => {
     const xs = last5.map((r) => Number(get(r) || 0)).filter((n) => n > 0).sort((a, b) => a - b);
@@ -156,7 +156,9 @@ export function recentGroupPaceHr(
   };
   const pace = median((r) => r.pace_s_per_km);
   const hr = median((r) => r.hr);
-  return { recentPaceSecPerKm: pace > 0 ? Math.round(pace) : null, recentHrAvg: hr > 0 ? Math.round(hr) : null };
+  // pace_is_graded false when ANY of the last-five carried a raw (ungraded) pace — the row then flags it.
+  const anyRaw = last5.some((r) => (r as any).pace_is_graded === false);
+  return { recentPaceSecPerKm: pace > 0 ? Math.round(pace) : null, recentHrAvg: hr > 0 ? Math.round(hr) : null, paceIsGraded: !anyRaw };
 }
 
 
@@ -358,7 +360,8 @@ export interface RunFitness {
     pctChange: number | null;
     sampleCount: number;
     newestAgeDays: number | null;
-    recentPaceSecPerKm?: number | null;    // the "what": recent steady-run RAW pace (what the watch showed) — default display
+    recentPaceSecPerKm?: number | null;    // the "what": recent steady-run pace (grade-adjusted when available) — default display
+    paceIsGraded?: boolean;                // false when the recent pace was raw (a run with no elevation)
     recentGapPaceSecPerKm?: number | null; // grade-adjusted twin for the GAP toggle; null when any recent run lacks GAP
     recentHrAvg?: number | null;           // …at this heart rate — pace-at-HR in units the runner feels
     /**

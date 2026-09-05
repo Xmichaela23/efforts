@@ -1014,16 +1014,25 @@ serve(async (req: Request) => {
           // Details show); the summary's own pass (`gap_pace_s_per_mi`) only when the analyser has not run.
           const gapPaceSecPerMi = Number(r.computed?.overall?.avg_gap_s_per_mi ?? r.computed?.overall?.gap_pace_s_per_mi);
           const gapPaceSecPerKm = Number.isFinite(gapPaceSecPerMi) && gapPaceSecPerMi > 0 ? gapPaceSecPerMi * MI_PER_KM : null;
+          // ⛔ NO ELEVATION → RAW PACE, DON'T DROP THE RUN (2026-09-04, Michael). A treadmill run or a device with
+          // no elevation stream has no grade-adjusted pace; the easy/hard rows used to require GAP, so those runs
+          // vanished and the row went blank with nothing saying why. TrainingPeaks falls back to raw pace when
+          // NGP can't be computed. So: GAP when present, raw recorded pace otherwise, and `pace_is_graded` says which.
+          const rawPaceSecPerMi = Number(r.computed?.overall?.avg_pace_s_per_mi);
+          const rawPaceSecPerKm = Number.isFinite(rawPaceSecPerMi) && rawPaceSecPerMi > 0 ? rawPaceSecPerMi * MI_PER_KM : null;
+          const rowPaceSecPerKm = gapPaceSecPerKm ?? rawPaceSecPerKm;
+          const paceIsGraded = gapPaceSecPerKm != null;
           const gapEfficiencyIndex = computeEfficiencyIndex(gapPaceSecPerKm, runHrByDate.get(r.date) ?? null);
           // The efficiency-trend row: GRADE-ADJUSTED pace ÷ HR, with the day's temperature carried so the
           // regression can fit the heat term and the chart can caption the conditions.
           {
             const hrForTrend = runHrByDate.get(r.date) ?? null;
             const tF = Number((r as any)?.weather_data?.temperature);
-            if (gapPaceSecPerKm != null && gapPaceSecPerKm > 0 && Number(hrForTrend) > 0) {
+            if (rowPaceSecPerKm != null && rowPaceSecPerKm > 0 && Number(hrForTrend) > 0) {
               runEffHistory.push({
                 date: r.date,
-                pace_s_per_km: gapPaceSecPerKm,
+                pace_s_per_km: rowPaceSecPerKm,
+                pace_is_graded: paceIsGraded,
                 hr: Number(hrForTrend),
                 temp_f: Number.isFinite(tF) ? tF : null,
                 /**
