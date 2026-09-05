@@ -794,7 +794,6 @@ export default function StateTab({
           below, so the screen carried TWO "this week" reads with thirteen weeks of charts wedged
           between them. Hoisted here so the load plate holds one clock: what the last seven days
           were, in every unit the app has for them. */}
-      <div className="px-1 mb-1 text-[12px] text-white/50 lowercase">load · rolling last 7 days vs your typical week</div>
 
       {/* READOUT PLATES (2026-08-15) — State wears the workout Details tab's card language
           (`readoutPlateStyle`, shared from src/lib/readout-plate.ts). The law from the logger
