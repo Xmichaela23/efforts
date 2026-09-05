@@ -300,8 +300,15 @@ export function restateFromTest(args: {
        * The row is still rewritten — `touched` — so the number reaches the calendar.
        */
       const repsKey = (v: unknown) => (Array.isArray(v) ? v.map((n) => Number(n)).join(',') : '');
+      // ⛔ THE WORKING STEPS' OWN REP COUNTS COUNT AS A CHANGE (2026-09-04). The opening reps of the heavy
+      // set live on `set_plan`, not only on `last_reps`; a clamp that moved 6 → 5 left `last_reps` alone and
+      // this diff called the row unchanged, so the corrected step never reached the stored row.
+      const stepsKey = (v: unknown) => (Array.isArray(v)
+        ? (v as Array<Record<string, unknown>>).filter((st) => st?.warmup !== true).map((st) => `${st?.weight ?? ''}x${st?.reps ?? ''}`).join(',')
+        : '');
       const repsMove = repsKey((fresh as Record<string, unknown>).last_reps)
-        !== repsKey((ex as Record<string, unknown>).last_reps);
+        !== repsKey((ex as Record<string, unknown>).last_reps)
+        || stepsKey((fresh as Record<string, unknown>).set_plan) !== stepsKey((ex as Record<string, unknown>).set_plan);
       if (!weightMoves && !setsMove && !repsMove) {
         if (Object.keys(shape).length === 0) return ex;
         touched = true;

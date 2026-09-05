@@ -1876,3 +1876,11 @@ p218's 1–5 band.
 
 Tests: `me-ladder-by-feel.test.ts`. Deployed: `rematerialize-standing-block` v100 (03:57 UTC). The apply is the
 athlete's tap (see D-468). Expected after apply: squat rows "105 × 1-5" with the top step inside the band.
+
+> **Addendum, same night (v101).** Rule 1 alone did not reach his plan: the restate RE-COMPOSES the block with the
+> numbers the test read, so the week-one squat row came back priced, matched the Sep 4 by-feel set, and the ladder
+> read it as a rung again (config `me_sets.history`: week 1 Friday, "earned"). Two more seams: `earnedMeSets` takes
+> `byFeelWeek` (the restate passes week 1 whenever the block ran a test week) and skips that week's rows outright;
+> and `restate.ts` now counts a change in the working steps' rep counts (`set_plan`) as a change — before, a clamp
+> that moved 6 → 5 left `last_reps` alone and the diff called the row unchanged, which is why the 04:08 apply wrote
+> the config and zero rows. Evidence read from the plan (config `updated_at` 04:08:49, rows `updated_at` 03:43:51).

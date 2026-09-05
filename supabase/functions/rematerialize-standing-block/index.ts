@@ -309,6 +309,8 @@ Deno.serve(async (req: Request) => {
       // ⛔ HISTORY AND THE LIVE WEEK ARE EVIDENCE; THE FUTURE IS NOT. The same boundary the restater
       // draws for writing, drawn here for reading.
       throughWeek: currentWeek,
+      // ⛔ A TEST-WEEK BLOCK TRAINED WEEK ONE BY FEEL; the probe re-prices it, the ladder must not read it.
+      byFeelWeek: sp.test_skipped === true ? null : TEST_WEEK_INDEX,
     });
 
     /**

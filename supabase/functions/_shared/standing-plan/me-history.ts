@@ -329,6 +329,14 @@ export function earnedMeSets(args: {
    * default, which assumes the pair of 2.5s nearly everyone has. Nothing in the app writes this yet.
    */
   smallestPlatePairLb?: number | null;
+  /**
+   * ⛔ THE WEEK THE ATHLETE TRAINED BY FEEL (Michael's squat, 2026-09-04, second cause). A block that ran
+   * the test week composed its week-one ME rows unpriced, and the athlete lifted by feel. The restate
+   * RE-COMPOSES the block with the numbers the test read, so the same week-one row now comes back priced,
+   * matches the by-feel set, and the set becomes a rung. The `weight == null` guard below cannot see
+   * that; the caller says which week was by feel. `null` when the block priced week one (Use current).
+   */
+  byFeelWeek?: number | null;
 }): MeLadderReading {
   const band = ME_SETS_BAND;
   const repBand = meRepBand();
@@ -346,6 +354,7 @@ export function earnedMeSets(args: {
        * (`readTestWeek`) is where those sets are measured.
        */
       if (row.weight == null) continue;
+      if (args.byFeelWeek != null && row.week === args.byFeelWeek) continue;
       index.set(`${row.week}|${row.day}|${row.movement.toLowerCase()}`, row);
     }
   }

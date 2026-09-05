@@ -37,6 +37,18 @@ Deno.test('a set logged against a by-feel (unpriced) ME row earns nothing and se
   assertEquals(reading.sets.press_lower, undefined, 'a by-feel set earned a set');
 });
 
+Deno.test('the restate re-prices week one — the by-feel week is still not a rung (byFeelWeek)', () => {
+  // the block as the restate re-composes it: week one PRICED off the numbers the test read
+  const composed = composeBlock({ ...BASE, workingNumbers: { squat: SQUAT }, weeks: 3, taperWeeks: [] } as never);
+  const wk1 = composed.flatMap((w: any) => w.meRows ?? []).find((r: any) => r.pattern === 'press_lower' && r.week === 1);
+  assert(wk1 && wk1.weight != null, 'the fixture week-one squat row did not re-price');
+  const logged = [{ week_number: 1, date: dateOn(wk1.day), strength_exercises: [{ name: wk1.movement, sets: [{ weight: 105, reps: 6, completed: true }] }] }];
+  const withGuard = earnedMeSets({ composed: composed as never, logged, throughWeek: 2, byFeelWeek: 1 });
+  assertEquals(withGuard.lastReps.press_lower, undefined, 'the by-feel week became a rung on recompose');
+  const without = earnedMeSets({ composed: composed as never, logged, throughWeek: 2, byFeelWeek: null });
+  assertEquals(without.lastReps.press_lower, [6], 'a block that PRICED week one (Use current) still reads it');
+});
+
 Deno.test('the ME set opens inside the band even when the last logged reps were above it', () => {
   const wk = composeWeek({ ...BASE, workingNumbers: { squat: SQUAT }, meLastRepsByPattern: { press_lower: [6] }, week: 4, column: 'standard' } as never);
   const squat = wk.sessions.flatMap((s: any) => s.strength_exercises ?? []).find((e: any) => e.name === 'Back Squat');
