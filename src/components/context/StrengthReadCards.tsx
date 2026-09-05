@@ -257,6 +257,11 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
         <div className="text-[11px] text-white/55 mt-1">{leftOut} {leftOut === 1 ? 'ride' : 'rides'} under 10 min in the aerobic band, not in the trend</div>
       )}
       {eff.length >= 2 && <DatedChart points={eff} color={color} dotNoun={isRide ? 'ride' : 'run'} fmtVal={(v) => fmtEff(v, isRide)} trendWord="efficiency" />}
+      {/* The chart's own key, the same shape as the drift chart's (Michael, 2026-09-04: "efficiency needs to know if
+          higher is better"). Dashed = the fitted trend. */}
+      {eff.length >= 2 && (
+        <div className="text-[11px] text-white/55 mt-1">efficiency · {isRide ? 'power' : 'pace'} to heart rate · higher is better · dashed: the trend · each dot one {isRide ? 'ride' : 'run'}</div>
+      )}
 
       {/* ⛔ THE "one session doesn't tell you much" CAUTION MOVED TO ONCE PER SPORT (Round 3 pass 2).
           It was printed under EVERY spine card (easy / long / quality / rides), which is the "said
