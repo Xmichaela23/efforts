@@ -1353,3 +1353,21 @@ athlete's core need. Could be an in-app guided test that writes an easy-HR / Zon
 Also noted (not a to-do): he does NOT test VO2max ("not truly practical"), and uses it only "to track
 readiness compared to your peaks" — the same read-current-against-your-own-peak idea behind the FTP
 history line.
+
+---
+
+## Home-gym pass on the standing plan's picks (Michael, 2026-09-04)
+
+**Not built.** Two edits to the movement picker, both inside the book's own substitution rules (p275:
+variety and substitution encouraged; primaries may stand in; the ME slot may be an asymmetrical movement):
+
+1. **One lunge-family movement per session.** A lower day was picking Bulgarian split squat, walking lunge
+   and reverse lunge on the same day (the braced asymmetrical, the braced superset and the focused quad all
+   landing on one family). Second and third slots take a goblet squat, step-up or single-leg RDL instead.
+   Keep the hip thrust: deadlift + hip thrust are the two highest-glute-activation movements in the research.
+2. **Fewer machine picks for a rack-bar-dumbbell gym.** Chest-supported row, Tate press, rear-delt machine
+   are all swappable for what a rack, a bar and dumbbells do; the engine already handles the swap, the
+   default picks need the home-gym route preferred when the equipment list says so.
+
+Michael expects the hybrid-coach course material to refine the pick list; hold the pass until that lands
+unless he says otherwise.
