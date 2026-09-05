@@ -9,6 +9,7 @@ import { parseLocalDate } from '@/lib/dateUtils';
 import MapEffort from './MapEffort';
 import SorenessScale from './SorenessScale';
 import { readinessSorenessPatch } from '@/utils/workoutMetadata';
+import { pendingFtpProposal, acceptEstimatedFtp } from '@/lib/resolve-current-ftp';
 import {
   Select,
   SelectContent,
@@ -110,6 +111,47 @@ export default function PostWorkoutFeedback({
   const [saving, setSaving] = useState(false);
   const [gear, setGear] = useState<GearItem[]>([]);
   const [workoutData, setWorkoutData] = useState<any>(null); // Distance, GPS track, etc.
+  // ⛔ A NEW FTP SHOWS UP HERE, THE MOMENT THE RIDE THAT MADE IT LANDS (Michael, 2026-09-05: "if someone improves
+  // on FTP that should be in the pop-up after the workout for acceptance"). TrainerRoad and Garmin both surface
+  // a detected FTP as a card with accept. The learner is run first so the number is fresh at this moment; the
+  // accept is the same write Training Baselines and the Adjust tab do (acceptEstimatedFtp → learned_fitness,
+  // then the unstarted endurance rows re-price). Nothing is applied on its own.
+  const [ftpProposal, setFtpProposal] = useState<{ measured: number; applied: number } | null>(null);
+  const [ftpAccepting, setFtpAccepting] = useState(false);
+  const [ftpNote, setFtpNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (workoutType !== 'ride') return;
+    let cancelled = false;
+    void (async () => {
+      const uid = getStoredUserId(); if (!uid) return;
+      try { await supabase.functions.invoke('learn-fitness-profile', { body: { user_id: uid } }); } catch { /* proposal reads whatever is on file */ }
+      const { data: row } = await supabase.from('user_baselines').select('learned_fitness, performance_numbers').eq('user_id', uid).maybeSingle();
+      if (cancelled || !row) return;
+      const lf = typeof row.learned_fitness === 'string' ? JSON.parse(row.learned_fitness) : row.learned_fitness;
+      const pn = typeof row.performance_numbers === 'string' ? JSON.parse(row.performance_numbers) : row.performance_numbers;
+      const prop = pendingFtpProposal({ learned_fitness: lf, performance_numbers: pn } as any);
+      setFtpProposal(prop ? { measured: Math.round(prop.measured), applied: Math.round(prop.applied) } : null);
+    })();
+    return () => { cancelled = true; };
+  }, [workoutId, workoutType]);
+  const acceptFtp = () => {
+    void (async () => {
+      const uid = getStoredUserId(); if (!uid) return;
+      setFtpAccepting(true);
+      try {
+        const { data: row } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', uid).maybeSingle();
+        const raw = row?.learned_fitness; const cur = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        const next = acceptEstimatedFtp(cur as any, 'baselines'); if (!next) return;
+        const { error } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', uid);
+        if (error) throw error;
+        const w = Math.round(Number((next.ride_ftp_accepted as any).value));
+        let note = `${w} W in use.`;
+        try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const n = Number((rp as any)?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} re-priced.`; } catch { /* the accept stands */ }
+        setFtpNote(note); setFtpProposal(null);
+      } catch (e) { setFtpNote('Could not apply. Try again from Adjust.'); console.warn('[PostWorkoutFeedback] FTP accept failed:', e); }
+      finally { setFtpAccepting(false); }
+    })();
+  };
   
   // Form state - pre-select default gear if no existing gear_id
   const [selectedGearId, setSelectedGearId] = useState<string | null>(existingGearId || null);
@@ -568,6 +610,24 @@ export default function PostWorkoutFeedback({
             height={280}
             useMiles={useImperial}
           />
+        </div>
+      )}
+
+      {(ftpProposal || ftpNote) && (
+        <div className="rounded-xl border px-3 py-2.5 mb-1" style={{ borderColor: `${SPORT_COLORS.ride}66`, background: `${SPORT_COLORS.ride}12` }}>
+          {ftpProposal ? (
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[15px] text-white/95">Your rides now measure {ftpProposal.measured} W</div>
+                <div className="text-[12px] text-white/60">{ftpProposal.measured > ftpProposal.applied ? 'Up' : 'Down'} from {ftpProposal.applied} W. Nothing changes until you take it.</div>
+              </div>
+              <button type="button" disabled={ftpAccepting} onClick={acceptFtp} className="shrink-0 text-[13px] px-3 py-1.5 rounded-lg border bg-white/[0.04] disabled:opacity-50" style={{ borderColor: `${SPORT_COLORS.ride}99`, color: SPORT_COLORS.ride }}>
+                {ftpAccepting ? 'Applying…' : `use ${ftpProposal.measured} W`}
+              </button>
+            </div>
+          ) : (
+            <div className="text-[13px] text-white/80">{ftpNote}</div>
+          )}
         </div>
       )}
 
