@@ -200,7 +200,7 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
         const leftOutNote = leftOut > 0 ? ` · ${leftOut} ${leftOut === 1 ? noun : noun + 's'} under 10 min left out` : '';
         return (
           <DatedChart points={eff} color={color} dotNoun={noun} fmtVal={(v) => fmtEff(v, isRide)} trendWord="efficiency"
-            title={`Efficiency${f ? ` · ${fmtEff(f.end, isRide)}` : ''} · higher is better`}
+            label="Efficiency" headline={f ? fmtEff(f.end, isRide) : undefined} qualifier="higher is better"
             keyLine={`dots: one ${noun}, ${isRide ? 'power' : 'pace'} ÷ heart rate · dashed: the trend${leftOutNote}`} />
         );
       })()}
@@ -226,7 +226,7 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
       {/* the drift trend — the number the field trends (Pa:Hr / Pw:Hr), as a line and the last-4-weeks average, no verdict */}
       {driftPts.length >= 2 && (
         <DatedChart points={driftPts} color={color} dotNoun={isRide ? 'steady ride' : 'run'} fmtVal={fmtDrift} unit="%" trendWord="drift" divider
-          title="Drift · lower is better"
+          label="Drift" qualifier="lower is better"
           keyLine={`dots: one steady ${isRide ? 'ride' : 'run'}, first half vs second · dashed: the trend · line: ${DRIFT_LIMITS.hybridPct}%`} />
       )}
       {/* ⛔ NO SINGLE-SESSION DRIFT NUMBER ON STATE (2026-09-04, Michael: "you're using the last run to give a drift
@@ -338,9 +338,9 @@ function SessionChart({ points, color, valueOf }: {
  * exactly as before.
  */
 // The chart is one colour now (2026-09-04); `recent` is carried only because the series type asks for it.
-function DatedChart({ points, color, dotNoun = 'session', fmtVal, unit, trendWord, title, keyLine, divider }: { points: Array<{ date: string; value: number }>; color: string; dotNoun?: string; title?: string; keyLine?: string; divider?: boolean; fmtVal?: (v: number) => string; unit?: string; trendWord?: string }) {
+function DatedChart({ points, color, dotNoun = 'session', fmtVal, unit, trendWord, title, label, headline, qualifier, keyLine, divider }: { points: Array<{ date: string; value: number }>; color: string; dotNoun?: string; title?: string; label?: string; headline?: string; qualifier?: string; keyLine?: string; divider?: boolean; fmtVal?: (v: number) => string; unit?: string; trendWord?: string }) {
   const series = points.map((p) => ({ date: p.date, value: p.value, recent: true }));
-  return <TrendSparkline series={series} color={color} dotNoun={dotNoun} {...(fmtVal ? { fmtVal } : {})} {...(unit ? { unit } : {})} trendline={!!trendWord} trendWord={trendWord} title={title} keyLine={keyLine} divider={divider} />;
+  return <TrendSparkline series={series} color={color} dotNoun={dotNoun} {...(fmtVal ? { fmtVal } : {})} {...(unit ? { unit } : {})} trendline={!!trendWord} trendWord={trendWord} title={title} label={label} headline={headline} qualifier={qualifier} keyLine={keyLine} divider={divider} />;
 }
 
 export default EnduranceReadCards;

@@ -346,7 +346,7 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
               trendline
               trendWord="FTP"
               buildingLabel={(w) => `${w} of 12 weeks`}
-              title={`FTP · ${ftpNow ?? '—'} W${(() => { const d = String(anchor?.label ?? '').split(' · ').pop(); return d && /\w/.test(d) && d !== anchor?.label ? ` · estimated ${d}` : ''; })()}`}
+              label="FTP" headline={`${ftpNow ?? '—'} W`} qualifier={(() => { const d = String(anchor?.label ?? '').split(' · ').pop(); return d && /\w/.test(d) && d !== anchor?.label ? `estimated ${d}` : undefined; })()}
               provenance={tail || null}
               keyLine={`dots: each FTP estimate · dashed: the trend${src === 'est (FTP)' ? ' · moves only when you accept a number' : ''}`}
             />
@@ -444,7 +444,7 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
             unit=" W"
             minSpanFraction={0.15}
             divider
-            title="Best 20-minute power"
+            label="Best 20-minute power"
             buildingLabel={(w) => `${w} of 12 weeks`}
             keyLine="dots: one ride's best 20 minutes · does not set FTP"
           />

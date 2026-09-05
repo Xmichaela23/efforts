@@ -37,7 +37,7 @@ import { getDisciplineColor } from '@/lib/context-utils';
  * "1.24–1.90" means nothing to a reader — the shape is the message. Strength passes a lb unit and
  * keeps its range, where the numbers are self-explanatory.
  */
-export default function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, caption, title, keyLine, provenance, divider = false, buildingLabel = (w: number) => `building · ${w} of 12 weeks`, trendline = false, trendWord }: {
+export default function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, caption, title, label, headline, qualifier, keyLine, provenance, divider = false, buildingLabel = (w: number) => `building · ${w} of 12 weeks`, trendline = false, trendWord }: {
   series?: Array<{ date: string; value: number; recent: boolean; tempF?: number | null }>;
   color?: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string; minSpanFraction?: number;
   buildingLabel?: (spanWeeks: number) => string;
@@ -45,6 +45,11 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
   /** ONE TEMPLATE for every chart on State (2026-09-04): title row (title left, low–high right) · chart ·
    *  "over N weeks: start → end" · coverage only while building · provenance · key line. */
   title?: string;
+  /** Lead hierarchy (2026-09-04): small label · one BIG number · small qualifier. `headline` defaults to the
+   *  fitted end (with a trendline) or the last point. */
+  label?: string;
+  headline?: string;
+  qualifier?: string;
   keyLine?: string;
   provenance?: string | null;
   divider?: boolean;
@@ -84,7 +89,18 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
   const rangeLabel = unit ? `${fmtVal(minV)}–${fmtVal(maxV)}${unit}` : null;
   return (
     <span className={`basis-full flex flex-col gap-1 ${divider ? 'mt-3 pt-3 border-t border-white/10' : 'mt-1.5'}`}>
-      {title && (
+      {label ? (
+        <span className="flex items-end justify-between gap-2">
+          <span className="flex flex-col gap-0.5 min-w-0">
+            <span className="text-[11px] uppercase tracking-wider text-white/55">{label}</span>
+            <span className="flex items-baseline gap-2 min-w-0">
+              <span className="readout-num text-[24px] leading-none text-white/95 tabular-nums">{headline ?? `${fmtVal(fit ? fit.end : last.value)}${unit}`}</span>
+              {qualifier && <span className="text-[12px] text-white/60 truncate">{qualifier}</span>}
+            </span>
+          </span>
+          {rangeLabel && <span className="text-[12px] tabular-nums text-white/50 whitespace-nowrap shrink-0">{rangeLabel}</span>}
+        </span>
+      ) : title && (
         <span className="flex items-baseline justify-between gap-2">
           <span className="text-[15px] text-white/90">{title}</span>
           {rangeLabel && <span className="text-[12px] tabular-nums text-white/50 whitespace-nowrap shrink-0">{rangeLabel}</span>}
@@ -102,10 +118,10 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
       </svg>
       {fit && (
         <span className="text-[13px] text-white/85">
-          {trendWord && !title ? `${trendWord} ` : ''}over {spanWeeks} {spanWeeks === 1 ? 'week' : 'weeks'}: <span className="tabular-nums">{fmtVal(fit.start)}{unit}</span> → <span className="tabular-nums">{fmtVal(fit.end)}{unit}</span>
+          {trendWord && !title && !label ? `${trendWord} ` : ''}over {spanWeeks} {spanWeeks === 1 ? 'week' : 'weeks'}: <span className="tabular-nums">{fmtVal(fit.start)}{unit}</span> → <span className="tabular-nums">{fmtVal(fit.end)}{unit}</span>
         </span>
       )}
-      {title ? (
+      {(title || label) ? (
         building && <span className="text-[12px] text-white/55">{buildingLabel(spanWeeks)}</span>
       ) : (
         <span className="text-[10px] text-white/45 flex items-center justify-between">
