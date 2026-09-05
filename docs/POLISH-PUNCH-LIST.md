@@ -1325,3 +1325,5 @@ Viada's 1RM test protocol is itself a ramp (Module 3 / p215: 75% of predicted ma
 effort), so an ME test day should carry a percentage-of-bodyweight or last-known-weight ramp even
 before a tested number exists — not "by feel" with nothing to warm up on. Define the fallback ramp
 off the book; judge against a new athlete with no test on file, never Michael's numbers.
+
+**Note added 2026-09-04:** the test WAS done, so `awaiting_test` is stale on that lift — likely a by-product of materialising a plan on top of already-completed tests (the ramp builds off the test result, and the link between the completed test and the new plan's ME slot didn't carry). So this may be one bug (stale load_basis after a plan-on-plan rebuild) rather than a missing-ramp design gap. Check the materialise/rematerialise path's handling of a prior completed test before building the fallback ramp.
