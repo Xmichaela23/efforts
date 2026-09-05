@@ -16,6 +16,26 @@ This feature is the entry point: an optional screen to type known numbers into b
 builds. Enter → the plan prices immediately. Skip → week-one tests establish them through the loop that
 already exists (exercise_log → learn-fitness-profile → strength_1rms; endurance six-week checkpoint).
 
+## Where it goes and what it looks like (Michael, 2026-09-04)
+ONE page, a wizard step placed AFTER strength (step 9) and BEFORE the start-date / confirm step (step
+10). It must precede the confirm because the choice changes what the plan CONTAINS — "retest" adds
+test sessions and leaves those rows unpriced — so the schedule shown on the final screen already
+reflects every toggle. Asking after the schedule is shown would force a rebuild.
+
+The page shows one row per discipline the athlete HAS a number for, each row: the current number, and
+a **[Use] / [Retest]** toggle. Disciplines with no number on file do not appear here (they were an
+inline enter-or-test earlier, or simply open with tests). Example:
+
+    Run threshold   8:15/mi        [ Use ] [ Retest ]
+    FTP             167 W          [ Use ] [ Retest ]
+    Strength        Squat 125 · Bench 160 · Deadlift 185 · OHP 105   [ Use ] [ Retest ]
+
+- **Use** → the plan prices that discipline off the number on file. Default selection.
+- **Retest** → the plan opens with week-one tests for that discipline; its priced rows wait on the
+  test (`awaiting_test`, used on purpose). The number on file is NOT deleted — it is replaced when the
+  retest is logged. A returning athlete who has gotten stronger picks Retest; one confident in the
+  number picks Use.
+
 ## What to build — IN THE WIZARD, not a separate screen
 The ask lives in `ArcSetupWizard` (Michael, 2026-09-04). The wizard already loads
 `user_baselines.performance_numbers` and `learned_fitness` at mount (`ArcSetupWizard.tsx:73` select),
