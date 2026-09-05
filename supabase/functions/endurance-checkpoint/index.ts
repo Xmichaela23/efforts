@@ -23,6 +23,7 @@ import {
 } from '../_shared/standing-plan/endurance-checkpoint.ts';
 import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolveCurrentFtp, pendingFtpProposal, acceptEstimatedFtp } from '../../../src/lib/resolve-current-ftp.ts';
+import { pendingRunThresholdProposal, acceptLearnedRunThreshold } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 
 const corsHeaders = {
@@ -187,6 +188,19 @@ Deno.serve(async (req: Request) => {
           }
         } catch (e) { console.warn('[checkpoint] FTP accept failed:', (e as Error)?.message ?? String(e)); }
       }
+      // Run threshold: the same accept, the same door (2026-09-05).
+      try {
+        const { data: fresh2 } = await supabase.from('user_baselines').select('learned_fitness, performance_numbers').eq('user_id', userId).maybeSingle();
+        const lf2 = (fresh2?.learned_fitness && typeof fresh2.learned_fitness === 'object') ? fresh2.learned_fitness as Record<string, unknown> : null;
+        const pn2 = (fresh2?.performance_numbers && typeof fresh2.performance_numbers === 'object') ? fresh2.performance_numbers as Record<string, unknown> : null;
+        if (pendingRunThresholdProposal({ learned_fitness: lf2, performance_numbers: pn2 } as any)) {
+          const nextT = acceptLearnedRunThreshold(lf2, 'checkpoint');
+          if (nextT) {
+            const { error: tErr } = await supabase.from('user_baselines').update({ learned_fitness: nextT, updated_at: new Date().toISOString() }).eq('user_id', userId);
+            if (tErr) console.warn(`[checkpoint] run threshold not accepted: ${tErr.message}`);
+          }
+        }
+      } catch (e) { console.warn('[checkpoint] run threshold accept failed:', (e as Error)?.message ?? String(e)); }
       for (const r of pending) {
         try {
           const { error } = await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(r.id) } });

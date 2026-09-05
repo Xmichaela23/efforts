@@ -71,6 +71,8 @@ type LearnedFitnessLike = {
   run_easy_pace_sec_per_km?: LearnedMetricLike;
   /** sec per KM — the MEASURED lactate-threshold pace (~1hr race pace). */
   run_threshold_pace_sec_per_km?: LearnedMetricLike;
+  /** The threshold pace the athlete ACCEPTED (proposed-then-accepted, the FTP pattern; 2026-09-05). Holds until the next accept. */
+  run_threshold_pace_accepted?: LearnedMetricLike;
 } | null | undefined;
 
 type PerformanceNumbersLike = {
@@ -275,6 +277,18 @@ export function resolveCurrentRunThresholdPace(baselines: RunBaselinesLike): Res
     ? learnedRaw.as_of
     : null;
   const learnedTrusted = learnedConf === 'medium' || learnedConf === 'high';
+  // ⛔ PROPOSED, THEN ACCEPTED (2026-09-05, Michael: "let's propose"). The learned threshold no longer moves the
+  // plan on its own: the value in use is the one accepted (seeded by the learner from the first trusted learned
+  // value, then held), and a newer trusted learned value is a PROPOSAL the athlete takes on Adjust, the post-run
+  // popup or the six-week checkpoint. Same door as FTP (resolve-current-ftp.ts); TrainerRoad's pattern.
+  const acceptedRaw = baselines.learned_fitness?.run_threshold_pace_accepted;
+  const acceptedSecPerKm = asPositiveFinite(acceptedRaw?.value);
+  const useSecPerKm = acceptedSecPerKm ?? learnedSecPerKm;
+  const useSecPerMi = secPerKmToMi(useSecPerKm);
+  const useTrusted = acceptedSecPerKm != null ? true : learnedTrusted;
+  const useConf = acceptedSecPerKm != null ? (confOf(acceptedRaw) ?? learnedConf) : learnedConf;
+  const useSamples = acceptedSecPerKm != null ? (asPositiveFinite(acceptedRaw?.sample_count) ?? learnedSamples) : learnedSamples;
+  const useAsOf = acceptedSecPerKm != null && typeof acceptedRaw?.as_of === 'string' && acceptedRaw.as_of.length >= 10 ? acceptedRaw.as_of : learnedAsOf;
 
   const pn = baselines.performance_numbers;
   // A typed/asserted value — try each unit spelling, convert to sec/MILE once. min_per_mi only if a STRING
@@ -333,8 +347,8 @@ export function resolveCurrentRunThresholdPace(baselines: RunBaselinesLike): Res
   const manualEligible = chosen !== 'learned';
 
   // 1. learned, trusted — MEASURED from their own runs.
-  if (learnedSecPerMi != null && learnedTrusted) {
-    return mk(learnedSecPerMi, 'learned', false, { confidence: learnedConf, sample_count: learnedSamples, as_of: learnedAsOf, kmNative: learnedSecPerKm });
+  if (useSecPerMi != null && useTrusted) {
+    return mk(useSecPerMi, 'learned', false, { confidence: useConf, sample_count: useSamples, as_of: useAsOf, kmNative: useSecPerKm });
   }
   // 2. manual / typed (an assertion).
   //
@@ -366,8 +380,8 @@ export function resolveCurrentRunThresholdPace(baselines: RunBaselinesLike): Res
   // evidence read, never a threshold by itself.
 
   // 5. learned-low (any confidence, still measured).
-  if (learnedSecPerMi != null) {
-    return mk(learnedSecPerMi, 'learned-low', false, { confidence: learnedConf, sample_count: learnedSamples, as_of: learnedAsOf, kmNative: learnedSecPerKm });
+  if (useSecPerMi != null) {
+    return mk(useSecPerMi, 'learned-low', false, { confidence: useConf, sample_count: useSamples, as_of: useAsOf, kmNative: useSecPerKm });
   }
   // 6. null — we do not know. SAY SO.
   return NULL_TP;
@@ -435,4 +449,37 @@ export function describeThresholdBasis(resolved: ResolvedThresholdPace | null | 
         showNumber: false,
       };
   }
+}
+
+/** The threshold pace the runs measured, waiting on acceptance. null when nothing is pending. sec/KM native. */
+export type RunThresholdProposal = { measuredSecPerKm: number; appliedSecPerKm: number; confidence: string };
+export function pendingRunThresholdProposal(baselines: RunBaselinesLike): RunThresholdProposal | null {
+  if (!baselines) return null;
+  const learnedRaw = baselines.learned_fitness?.run_threshold_pace_sec_per_km;
+  const measured = asPositiveFinite(learnedRaw?.value);
+  const conf = confOf(learnedRaw);
+  if (measured == null || !(conf === 'medium' || conf === 'high')) return null;
+  const applied = asPositiveFinite(baselines.learned_fitness?.run_threshold_pace_accepted?.value);
+  if (applied == null) return null;
+  const pn = baselines.performance_numbers;
+  if (pn?.threshold_pace_source === 'manual') return null;
+  if (Math.round(measured) === Math.round(applied)) return null;
+  return { measuredSecPerKm: measured, appliedSecPerKm: applied, confidence: String(conf) };
+}
+
+/** Accept the learned threshold pace: the same shape as `acceptEstimatedFtp`. Returns the next learned_fitness, or null. */
+export function acceptLearnedRunThreshold(
+  learned: Record<string, unknown> | null | undefined,
+  via: 'checkpoint' | 'baselines' | 'seed',
+  now: Date = new Date(),
+): Record<string, unknown> | null {
+  if (!learned || typeof learned !== 'object') return null;
+  const est = (learned as { run_threshold_pace_sec_per_km?: LearnedMetricLike }).run_threshold_pace_sec_per_km;
+  const value = asPositiveFinite(est?.value);
+  const conf = confOf(est);
+  if (value == null || !(conf === 'medium' || conf === 'high')) return null;
+  return {
+    ...learned,
+    run_threshold_pace_accepted: { ...(est as object), value, accepted_at: now.toISOString(), accepted_from: value, accepted_via: via },
+  };
 }

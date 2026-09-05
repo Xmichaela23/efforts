@@ -10,6 +10,7 @@ import MapEffort from './MapEffort';
 import SorenessScale from './SorenessScale';
 import { readinessSorenessPatch } from '@/utils/workoutMetadata';
 import { pendingFtpProposal, acceptEstimatedFtp } from '@/lib/resolve-current-ftp';
+import { pendingRunThresholdProposal, acceptLearnedRunThreshold } from '@/lib/resolve-current-run-pace';
 import {
   Select,
   SelectContent,
@@ -117,10 +118,12 @@ export default function PostWorkoutFeedback({
   // accept is the same write Training Baselines and the Adjust tab do (acceptEstimatedFtp → learned_fitness,
   // then the unstarted endurance rows re-price). Nothing is applied on its own.
   const [ftpProposal, setFtpProposal] = useState<{ measured: number; applied: number } | null>(null);
+  const [thrProposal, setThrProposal] = useState<{ measuredSecPerMi: number; appliedSecPerMi: number } | null>(null);
+  const fmtMi = (secPerMi: number) => `${Math.floor(secPerMi / 60)}:${String(Math.round(secPerMi % 60)).padStart(2, '0')}/mi`;
   const [ftpAccepting, setFtpAccepting] = useState(false);
   const [ftpNote, setFtpNote] = useState<string | null>(null);
   useEffect(() => {
-    if (workoutType !== 'ride') return;
+    if (workoutType !== 'ride' && workoutType !== 'run') return;
     let cancelled = false;
     void (async () => {
       const uid = getStoredUserId(); if (!uid) return;
@@ -129,11 +132,33 @@ export default function PostWorkoutFeedback({
       if (cancelled || !row) return;
       const lf = typeof row.learned_fitness === 'string' ? JSON.parse(row.learned_fitness) : row.learned_fitness;
       const pn = typeof row.performance_numbers === 'string' ? JSON.parse(row.performance_numbers) : row.performance_numbers;
-      const prop = pendingFtpProposal({ learned_fitness: lf, performance_numbers: pn } as any);
-      setFtpProposal(prop ? { measured: Math.round(prop.measured), applied: Math.round(prop.applied) } : null);
+      if (workoutType === 'ride') {
+        const prop = pendingFtpProposal({ learned_fitness: lf, performance_numbers: pn } as any);
+        setFtpProposal(prop ? { measured: Math.round(prop.measured), applied: Math.round(prop.applied) } : null);
+      } else {
+        const prop = pendingRunThresholdProposal({ learned_fitness: lf, performance_numbers: pn } as any);
+        setThrProposal(prop ? { measuredSecPerMi: prop.measuredSecPerKm * 1.609344, appliedSecPerMi: prop.appliedSecPerKm * 1.609344 } : null);
+      }
     })();
     return () => { cancelled = true; };
   }, [workoutId, workoutType]);
+  const acceptThr = () => {
+    void (async () => {
+      const uid = getStoredUserId(); if (!uid) return;
+      setFtpAccepting(true);
+      try {
+        const { data: row } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', uid).maybeSingle();
+        const raw = row?.learned_fitness; const cur = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        const next = acceptLearnedRunThreshold(cur as any, 'baselines'); if (!next) return;
+        const { error } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', uid);
+        if (error) throw error;
+        let note = `${fmtMi(Number((next.run_threshold_pace_accepted as any).value) * 1.609344)} in use.`;
+        try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const n = Number((rp as any)?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} re-priced.`; } catch { /* the accept stands */ }
+        setFtpNote(note); setThrProposal(null);
+      } catch (e) { setFtpNote('Could not apply. Try again from Adjust.'); console.warn('[PostWorkoutFeedback] threshold accept failed:', e); }
+      finally { setFtpAccepting(false); }
+    })();
+  };
   const acceptFtp = () => {
     void (async () => {
       const uid = getStoredUserId(); if (!uid) return;
@@ -613,9 +638,19 @@ export default function PostWorkoutFeedback({
         </div>
       )}
 
-      {(ftpProposal || ftpNote) && (
-        <div className="rounded-xl border px-3 py-2.5 mb-1" style={{ borderColor: `${SPORT_COLORS.ride}66`, background: `${SPORT_COLORS.ride}12` }}>
-          {ftpProposal ? (
+      {(ftpProposal || thrProposal || ftpNote) && (
+        <div className="rounded-xl border px-3 py-2.5 mb-1" style={{ borderColor: `${workoutType === 'run' ? SPORT_COLORS.run : SPORT_COLORS.ride}66`, background: `${workoutType === 'run' ? SPORT_COLORS.run : SPORT_COLORS.ride}12` }}>
+          {thrProposal ? (
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[15px] text-white/95">Your runs now measure {fmtMi(thrProposal.measuredSecPerMi)} at threshold</div>
+                <div className="text-[12px] text-white/60">{thrProposal.measuredSecPerMi < thrProposal.appliedSecPerMi ? 'Faster' : 'Slower'} than the {fmtMi(thrProposal.appliedSecPerMi)} in use. Nothing changes until you take it.</div>
+              </div>
+              <button type="button" disabled={ftpAccepting} onClick={acceptThr} className="shrink-0 text-[13px] px-3 py-1.5 rounded-lg border bg-white/[0.04] disabled:opacity-50" style={{ borderColor: `${SPORT_COLORS.run}99`, color: SPORT_COLORS.run }}>
+                {ftpAccepting ? 'Applying…' : `use ${fmtMi(thrProposal.measuredSecPerMi)}`}
+              </button>
+            </div>
+          ) : ftpProposal ? (
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-[15px] text-white/95">Your rides now measure {ftpProposal.measured} W</div>

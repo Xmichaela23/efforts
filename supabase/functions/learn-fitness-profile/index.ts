@@ -523,6 +523,19 @@ Deno.serve(async (req) => {
         console.log(`  FTP accepted seeded from estimate: ${seedFrom.value}W (${seedFrom.confidence})`);
       }
     }
+    // ⛔ RUN THRESHOLD PACE: PROPOSED, THEN ACCEPTED — the FTP pattern applied to the run (2026-09-05). Keep the
+    // accepted value; seed it from the first trusted learned value; never overwrite it here. The accept lives on
+    // Adjust, the post-run popup and the six-week checkpoint (`acceptLearnedRunThreshold`).
+    const priorThrAccepted = existing?.run_threshold_pace_accepted as Record<string, unknown> | undefined;
+    if (priorThrAccepted && Number(priorThrAccepted.value) > 0) {
+      mergedLearned.run_threshold_pace_accepted = priorThrAccepted;
+    } else {
+      const seedThr = mergedLearned.run_threshold_pace_sec_per_km as LearnedMetric | undefined;
+      if (seedThr && Number(seedThr.value) > 0 && (seedThr.confidence === 'medium' || seedThr.confidence === 'high')) {
+        mergedLearned.run_threshold_pace_accepted = { ...seedThr, accepted_at: new Date().toISOString(), accepted_from: seedThr.value, accepted_via: 'seed' };
+        console.log(`  run threshold accepted seeded from learned: ${seedThr.value} s/km (${seedThr.confidence})`);
+      }
+    }
 
     const existingIdentity = parseJsonb((existingBaselines as any)?.athlete_identity);
     const userConfirmed = existingIdentity?.confirmed_by_user === true;

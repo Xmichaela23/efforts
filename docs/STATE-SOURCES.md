@@ -49,6 +49,7 @@ stated and it is a decision Michael can reverse.
 | Rate limit ± 5% per learn | — | **DELETED 2026-09-04 evening** (was OURS) — `rateLimitFtp` is gone |
 | ⚠️ intervals.icu's eFTP model | `bike-ftp-estimator.ts fitCriticalPower` | UNVERIFIED — intervals.icu and TrainerRoad pages are blocked from the build container; the 2-parameter CP fit on 2–20 min and 0.97 × CP are cited to Hill / Jones / Vanhatalo and Morgan 2019, not to intervals.icu's page. Q-298 |
 | 5-minute all-out FTP test | `baseline-tests.ts ftp5MinTestRow` | FIELD — Viada, course Module 3: the 5-minute test is more repeatable (no pacing strategy). The module's ~80%-of-5-min extrapolation is NOT a second FTP formula here: the effort lands as the 5-min point on the power-duration curve and the one FTP rule (the CP fit) reads it. |
+| Run threshold pace: proposed, then accepted | `resolve-current-run-pace.ts` (accepted tier, `pendingRunThresholdProposal`, `acceptLearnedRunThreshold`); the learner seeds/keeps `run_threshold_pace_accepted`; accept on Adjust, the post-run popup, the checkpoint | FIELD — the same proposed-then-accepted door as FTP (TrainerRoad; Garmin's detected-threshold prompt). A learned value never re-prices the plan on its own. 2026-09-05. |
 | Proposed, then accepted; auto is the default | resolver, checkpoint, Baselines | FIELD — TrainerRoad (validated on 22,000 athletes; default auto with accept) |
 | Fallback when both reads abstain: 95% × best 20-min | learner STEP 4 | FIELD — Coggan 20-min test |
 

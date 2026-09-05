@@ -13,7 +13,7 @@ import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 import { resolveStrengthCapacity, canonicalizeLiftKey } from '@shared/state-trend/capacity-resolver';
 import { resolveCurrentFtp, pendingFtpProposal, acceptEstimatedFtp } from '@/lib/resolve-current-ftp';
-import { resolveCurrentRunThresholdPace, resolveCurrentRunEasyPace } from '@/lib/resolve-current-run-pace';
+import { resolveCurrentRunThresholdPace, resolveCurrentRunEasyPace, pendingRunThresholdProposal, acceptLearnedRunThreshold } from '@/lib/resolve-current-run-pace';
 import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { runThresholdTestRow, ftpTestRow, ftp5MinTestRow, addDaysISO } from '@/lib/baseline-tests';
@@ -91,6 +91,26 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         await reload();
       } catch (e) { setSaveNote('Could not accept. Try again.'); console.warn('[StateAdjustLens] accept FTP failed:', e); }
       finally { setAccepting(false); }
+    })();
+  };
+  const thrProposal = baselines ? pendingRunThresholdProposal({ learned_fitness: lf, performance_numbers: pn } as any) : null;
+  const [acceptingThr, setAcceptingThr] = useState(false);
+  const acceptThr = () => {
+    void (async () => {
+      const uid = getStoredUserId(); if (!uid) return;
+      setAcceptingThr(true); setSaveNote(null);
+      try {
+        const { data: row } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', uid).maybeSingle();
+        const raw = row?.learned_fitness; const cur = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        const next = acceptLearnedRunThreshold(cur as any, 'baselines'); if (!next) return;
+        const { error } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', uid);
+        if (error) throw error;
+        let note = `${fmtPace(Number((next.run_threshold_pace_accepted as any).value) * 1.609344, metric)} in use.`;
+        try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const n = Number((rp as any)?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} re-priced.`; } catch { /* the accept stands */ }
+        setSaveNote(note);
+        await reload();
+      } catch (e) { setSaveNote('Could not accept. Try again.'); console.warn('[StateAdjustLens] accept threshold failed:', e); }
+      finally { setAcceptingThr(false); }
     })();
   };
   const lthr = baselines ? resolveCurrentLthr({ learned_fitness: lf, performance_numbers: pn, configured_hr_zones: baselines.configured_hr_zones ?? null } as any) : null;
@@ -335,6 +355,12 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         <SportHeading sport="run" label="Run" />
         <div className="space-y-1.5">
           <Row id="threshold" name="Threshold pace" value={withSource(fmtPace(thr?.sec_per_mi, metric), thr?.source)} hint={metric ? 'm:ss/km' : 'm:ss/mi'} sport="run" />
+          {thrProposal && (
+            <div className="flex items-center justify-between py-1 gap-3">
+              <span className="text-[13px] text-white/70">Your runs measure {fmtPace(thrProposal.measuredSecPerKm * 1.609344, metric)}</span>
+              <button type="button" disabled={acceptingThr} onClick={acceptThr} style={{ borderColor: `${getDisciplineColor('run')}88`, color: getDisciplineColor('run') }} className="text-[13px] px-3 py-1 rounded-lg border bg-white/[0.04] disabled:opacity-50">{acceptingThr ? 'Applying…' : `use ${fmtPace(thrProposal.measuredSecPerKm * 1.609344, metric)}`}</button>
+            </div>
+          )}
           <Row id="lthr" name="Threshold heart rate" value={withSource(lthr?.bpm != null ? `${Math.round(lthr.bpm)} bpm` : null, lthr?.source)} hint="bpm" sport="run" />
           <Row id="easy" name="Easy pace" value={fmtPace(easy?.sec_per_mi, metric) ? `${fmtPace(easy?.sec_per_mi, metric)} · from threshold` : null} editable={false} sport="run" />
         </div>
