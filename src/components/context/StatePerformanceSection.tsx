@@ -288,7 +288,6 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
   // hard efforts and 20–120 min rides. Coggan's field protocol — the same arithmetic as a 20-minute
   // test, taken from 20 minutes the athlete already rode hard rather than asking them to test.
   // 2026-09-04: the estimate is the power-duration fit (TrainerRoad / intervals.icu), not 95% of a best 20.
-  const ftpMethod = src === 'est (FTP)' ? ' FTP is estimated from your rides: your best power at each length from 2 to 20 minutes, fitted to a curve. It changes only when you accept a new number.' : '';
   // The FTP line and the "accept your FTP" tag belong to a REAL read; a withheld or absent one gets neither.
   const anchoredPower = anchored && assertsLead && leadIsPower;
   // ⚠️ NO LINE THROUGH ONE DOT: fewer than two readings prints the number alone.
@@ -356,9 +355,11 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
               basis IS the estimate (`src === 'est (FTP)'`, from `efficiency.basis === 'coggan_ftp'`).
               It passes the ⓘ test (D-357): it describes HOW THE METRIC IS MADE, true for anyone,
               not where this athlete sits. */}
-          <p className="basis-full text-[12px] text-white/45 leading-snug mt-1 max-w-[min(100%,340px)]">
-            {`FTP = the highest power you can hold for about an hour.${ftpMethod}`}
-          </p>
+          {/* Two labels, one per line on this card (Michael, 2026-09-04: "lose the copy, label what each line is"). */}
+          <ul className="basis-full text-[12px] text-white/45 leading-snug mt-1 max-w-[min(100%,340px)] list-disc pl-4">
+            <li>FTP line: your estimated FTP, one dot each time the estimate changed.{src === 'est (FTP)' ? ' It moves only when you accept a new number.' : ''}</li>
+            <li>Best 20 minutes: your best 20-minute power on each ride. It does not set FTP.</li>
+          </ul>
         </>
       ) : (
         <Signal label={ftpNow != null ? `${ftpNow} W threshold` : 'Power'} sig={lead} />
