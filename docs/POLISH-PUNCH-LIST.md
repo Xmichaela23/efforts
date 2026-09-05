@@ -1342,7 +1342,7 @@ off the book; judge against a new athlete with no test on file, never Michael's 
 
 **Not built. Polish / feature material.** Source: the aerobic-assessments module.
 
-### 1. Five-minute FTP test — a second, more repeatable FTP protocol
+### 1. [x] DONE 2026-09-05 — Five-minute FTP test (schedulable from Adjust → Retest; `ftp5MinTestRow`; feeds the power-duration fit, no second FTP formula)
 Viada: the 5-minute all-out test is "considered more repeatable because there's no strategy to it… you
 go out as hard as you can and simply hang on until 5 minutes are up," and **"roughly 80 percent of…
 the average number over that five minutes becomes"** your FTP. So **FTP ≈ 0.80 × 5-min average power.**
@@ -1379,3 +1379,15 @@ variety and substitution encouraged; primaries may stand in; the ME slot may be 
 
 Michael expects the hybrid-coach course material to refine the pick list; hold the pass until that lands
 unless he says otherwise.
+
+---
+
+## Baselines becomes the profile page; Adjust owns the plan's numbers (agreed 2026-09-05, not built)
+
+Adjust now shows and edits every number the block prices from (four lifts, FTP, threshold pace, threshold
+heart rate), with proposals and accept, retest, deload and rebuild. Training Baselines duplicates the
+numbers. Split by purpose:
+- **Adjust**: the plan's numbers and the week's controls. Add the auto / my-number switch to its pills
+  (today an edit implies "my number" and cannot flip back to auto from Adjust).
+- **Baselines → profile**: heart-rate zones, max and resting heart rate, equipment, units, swim numbers.
+  Stops showing the lifts, FTP and threshold. The Focus screen's link reads as a profile page.
