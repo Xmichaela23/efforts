@@ -1,13 +1,13 @@
 // State-as-hub lens switcher (D-316). Three lenses on State: Status (look) / Adjust (what) /
 // Schedule (when). Styled to match the app's existing segmented tabs (Planned/Performance/Details on
 // the workout detail) — border-bottom row, active = white + underline, inactive = gray.
-import { Gauge, SlidersHorizontal, CalendarRange } from 'lucide-react';
+import { ScanLine, SlidersHorizontal, CalendarRange } from 'lucide-react';
 
 export type StateLens = 'status' | 'adjust' | 'schedule';
 
-const TABS: Array<{ key: StateLens; label: string; Icon: typeof Gauge }> = [
-  // Gauge, not Activity: the pulse glyph is the app's RUN mark (Michael, 2026-09-04).
-  { key: 'status', label: 'Status', Icon: Gauge },
+const TABS: Array<{ key: StateLens; label: string; Icon: typeof ScanLine }> = [
+  // ScanLine: not Activity (the app's RUN mark), not Gauge (the Focus screen's plan-builder glyph). Michael, 2026-09-04.
+  { key: 'status', label: 'Status', Icon: ScanLine },
   { key: 'adjust', label: 'Adjust', Icon: SlidersHorizontal },
   { key: 'schedule', label: 'Schedule', Icon: CalendarRange },
 ];
