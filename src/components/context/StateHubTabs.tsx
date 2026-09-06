@@ -3,7 +3,8 @@
 // the workout detail) — border-bottom row, active = white + underline, inactive = gray.
 import { ScanLine, SlidersHorizontal, CalendarRange } from 'lucide-react';
 
-export type StateLens = 'status' | 'adjust' | 'schedule';
+import type { StateLens } from '@/lib/state-lens';
+export type { StateLens };
 
 const TABS: Array<{ key: StateLens; label: string; Icon: typeof ScanLine }> = [
   // ScanLine: not Activity (the app's RUN mark), not Gauge (the Focus screen's plan-builder glyph). Michael, 2026-09-04.

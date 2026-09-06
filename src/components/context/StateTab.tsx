@@ -23,6 +23,7 @@ import type { ArcReadiness } from '@/lib/arc-types';
 import { shouldShowNudge } from '@/lib/nudge-policy';
 import StatePerformanceSection from '@/components/context/StatePerformanceSection';
 import StateHubTabs, { type StateLens } from '@/components/context/StateHubTabs';
+import { takePendingStateLens } from '@/lib/state-lens';
 import StateAdjustLens from '@/components/context/StateAdjustLens';
 import { readoutPlateStyle } from '@/lib/readout-plate';
 import { useSwimBaselineNudge } from '@/hooks/useSwimBaselineNudge';
@@ -66,7 +67,7 @@ export default function StateTab({
   const { liftTrends } = useExerciseLog(8);
   const [narrativeOpen, setNarrativeOpen] = useState(false);
   const [expandedSignal, setExpandedSignal] = useState<string | null>(null); // D-232 BODY-row provenance tap
-  const [stateLens, setStateLens] = useState<StateLens>('status'); // State-as-hub: Status / Adjust / Schedule (D-316)
+  const [stateLens, setStateLens] = useState<StateLens>(() => takePendingStateLens() ?? 'status'); // State-as-hub: Status / Adjust / Schedule (D-316)
   // Strength per-lift detail is COLLAPSED by default (Michael 2026-07-16) — the e1RM dot is the read;
   // the per-lift "from your logged sets" list is drill-down, folded until tapped.
   const [resolvedGoalId, setResolvedGoalId] = useState<string | null>(null);

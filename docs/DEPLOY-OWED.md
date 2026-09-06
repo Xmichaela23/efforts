@@ -1,5 +1,24 @@
 # Deploy-Owed / Post-Deploy Verification
 
+> ## 2026-09-06 (later) — PROFILE LOOKS AND WORKS LIKE ADJUST (docs/WORKORDER-profile-continuity-2026-09-06.md). **DEPLOYED, THROWAWAY-VERIFIED, NOT DEVICE-VERIFIED.**
+>
+> **What changed:** one shared number row (`src/components/ui/number-row.tsx`, word logic in `src/lib/number-word.ts`)
+> used by Adjust and Profile; the sport strip (`src/components/ui/sport-strip.tsx`) as Profile's filter and Adjust's jump
+> bar; Profile on Adjust's forge plate with its section headers (You · then Numbers / Zones / Equipment per sport; swim
+> adds Settings); every row saves at once (no Save button); removed: the big number + typed field + separate auto / my-number
+> switch, the "Performance Numbers" heading, the grey input boxes, "Don't know your numbers?", the retest scheduling
+> (each sport ends with "Retest or rebuild on Adjust", which opens State on the Adjust lens).
+> **Behaviour note:** a lift typed on Profile is the number on file AND your number (a lock), the same as typing on
+> Adjust; auto removes the lock and the number on file stays for a new block.
+> **THROWAWAY:** numbers typed → same value and word on both screens · set on Adjust → Profile agrees · back to auto on
+> Profile → Adjust agrees · photo upload 10/10 · both accounts deleted, zero rows and objects left.
+> **LINT:** `consistent-button-shape` on the touched files 4 → 0; no new `only-export-components` or `exhaustive-deps`;
+> `tsc` clean on the touched files (pre-existing errors elsewhere unchanged).
+> **EDGE FUNCTIONS:** none. **CLIENT:** Netlify from main; `npm run ios` run. Xcode build is Michael's.
+>
+> **Not device-verified:** the 16px inline input not zooming on iOS; the strip's active colour on the phone; the
+> "Retest or rebuild on Adjust" jump landing on the Adjust lens; the photo picker.
+
 > ## 2026-09-06 — PROFILE SCREEN (Training Baselines folded in) + ADJUST FIXES. **DEPLOYED, THROWAWAY-VERIFIED, NOT DEVICE-VERIFIED.**
 >
 > **PUSHED:** `origin/main == 08c130f5` (Profile) on top of `11c04ab2` (Adjust: four lifts always listed, the word beside a

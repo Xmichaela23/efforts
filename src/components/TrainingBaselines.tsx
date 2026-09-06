@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, RefreshCw, Calendar, Info, Loader2 } from 'lucide-react';
+import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, RefreshCw, Calendar, Info, Loader2, User, Hash, Gauge, Wrench, Settings2 } from 'lucide-react';
+import { NumberRow } from '@/components/ui/number-row';
+import { numberWord } from '@/lib/number-word';
+import SportStrip, { type StripSport } from '@/components/ui/sport-strip';
+import { GalaxyButton } from '@/components/ui/galaxy-button';
+import { readoutPlateStyle } from '@/lib/readout-plate';
+import { setPendingStateLens } from '@/lib/state-lens';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAppContext } from '@/contexts/AppContext';
 import StravaPreview from '@/components/StravaPreview';
 import GarminPreview from '@/components/GarminPreview';
 import { Button } from './ui/button';
-import { SPORT_COLORS } from '@/lib/context-utils';
+import { SPORT_COLORS, getDisciplineColor } from '@/lib/context-utils';
 import { deriveSwimPaceBands, parsePaceToSeconds } from '@/lib/swimPaceZones';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { refreshGroupRideRouteSnapshotsForUser } from '@/lib/refresh-group-ride-route-snapshots';
@@ -15,7 +21,7 @@ import { fetchArcContext } from '@/lib/fetch-arc-context';
 import { fiveKNudgeDismissKey, type ArcFiveKLearnedDivergence } from '@/lib/arc-types';
 import { resolveCurrentFtp, pendingFtpProposal, acceptEstimatedFtp } from '@/lib/resolve-current-ftp';
 import { frielRunZones } from '@/lib/friel-zones';
-import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace, describeThresholdBasis } from '@/lib/resolve-current-run-pace';
+import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace, describeThresholdBasis, pendingRunThresholdProposal, acceptLearnedRunThreshold } from '@/lib/resolve-current-run-pace';
 import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
 import { ageEstimateMaxHr, resolveCurrentMaxHr } from '@/lib/resolve-current-max-hr';
 import { resolveStrengthCapacity } from '@shared/state-trend/capacity-resolver';
@@ -834,28 +840,41 @@ const getPowerZones = (ftp: number): { name: string; range: string; color: strin
   ];
 };
 
-const handleSave = async () => {
+/**
+ * Every row saves at once (2026-09-06): `persist` is the old Save button's routine, parameterised on the
+ * data to write and on the manual heart-rate overrides, so a row's commit and an auto switch run the
+ * same follow-through (endurance re-price on a watched number, restate on a lock change).
+ */
+const persist = async (next: BaselineData, hr?: { runMax?: number | null; runLthr?: number | null; rideMax?: number | null; rideLthr?: number | null; resting?: number | null }) => {
+  const m = {
+    runMax: hr && hr.runMax !== undefined ? hr.runMax : manualRunMaxHR,
+    runLthr: hr && hr.runLthr !== undefined ? hr.runLthr : manualRunLTHR,
+    rideMax: hr && hr.rideMax !== undefined ? hr.rideMax : manualRideMaxHR,
+    rideLthr: hr && hr.rideLthr !== undefined ? hr.rideLthr : manualRideLTHR,
+  };
+  const restingOverride = hr && hr.resting !== undefined ? hr.resting : customRestingHR;
   try {
     setSaving(true);
     setSaveMessage('');
     // D-200: stamp when the swim threshold CHANGES so the State re-test nudge can measure "weeks since update".
-    let dataToSave: any = data;
+    let dataToSave: any = next;
     try {
       const prevSwim = JSON.parse(originalData || '{}')?.performanceNumbers?.swimPace100;
-      const curSwim = (data as any)?.performanceNumbers?.swimPace100;
+      const curSwim = (next as any)?.performanceNumbers?.swimPace100;
       if (curSwim && curSwim !== prevSwim) {
-        dataToSave = { ...data, performanceNumbers: { ...(data as any).performanceNumbers, swimPace100_updated_at: new Date().toISOString() } };
+        dataToSave = { ...next, performanceNumbers: { ...(next as any).performanceNumbers, swimPace100_updated_at: new Date().toISOString() } };
         setData(dataToSave);
       }
     } catch { void 0; }
     await saveUserBaselines(dataToSave as any);
 
     // Persist manual HR zone overrides to configured_hr_zones
-    const hasManualOverrides = manualRunMaxHR || manualRunLTHR || manualRideMaxHR || manualRideLTHR;
-    if (hasManualOverrides) {
+    const hasManualOverrides = !!(m.runMax || m.runLthr || m.rideMax || m.rideLthr);
+    const hrChanged = JSON.stringify({ manualRunMaxHR: m.runMax, manualRunLTHR: m.runLthr, manualRideMaxHR: m.rideMax, manualRideLTHR: m.rideLthr }) !== initialManualHR || (hr && hr.resting !== undefined);
+    if (hasManualOverrides || hrChanged) {
       const userId = getStoredUserId();
       if (userId) {
-        const restingHR = customRestingHR || garminRestingHR || 60;
+        const restingHR = restingOverride || garminRestingHR || 60;
 
         /**
          * ⛔ THROUGH THE RESOLVERS, OR THE SCREEN AND THE ENGINE PART COMPANY (2026-08-20).
@@ -874,15 +893,15 @@ const handleSave = async () => {
          */
         const baselinesForHr = {
           learned_fitness: learnedFitness,
-          performance_numbers: data.performanceNumbers,
-          configured_hr_zones: { manual_run_lthr: manualRunLTHR, manual_ride_lthr: manualRideLTHR },
+          performance_numbers: next.performanceNumbers,
+          configured_hr_zones: { manual_run_lthr: m.runLthr, manual_ride_lthr: m.rideLthr },
         } as never;
-        const effectiveRunLTHR = manualRunLTHR || resolveCurrentLthr(baselinesForHr, { sport: 'run' }).bpm || null;
-        const effectiveRunMax = manualRunMaxHR || resolveCurrentMaxHr(
+        const effectiveRunLTHR = m.runLthr || resolveCurrentLthr(baselinesForHr, { sport: 'run' }).bpm || null;
+        const effectiveRunMax = m.runMax || resolveCurrentMaxHr(
           { learned_fitness: learnedFitness } as never, { sport: 'run', allowAgeEstimate: false },
         ).bpm || null;
-        const effectiveRideLTHR = manualRideLTHR || resolveCurrentLthr(baselinesForHr, { sport: 'ride' }).bpm || null;
-        const effectiveRideMax = manualRideMaxHR || resolveCurrentMaxHr(
+        const effectiveRideLTHR = m.rideLthr || resolveCurrentLthr(baselinesForHr, { sport: 'ride' }).bpm || null;
+        const effectiveRideMax = m.rideMax || resolveCurrentMaxHr(
           { learned_fitness: learnedFitness } as never, { sport: 'ride', allowAgeEstimate: false },
         ).bpm || null;
 
@@ -916,13 +935,13 @@ const handleSave = async () => {
         const zones = zonesFor(primaryLTHR, primaryMax);
 
         const configuredZones: Record<string, any> = {
-          source: 'manual',
-          custom_zones: true,
+          source: hasManualOverrides ? 'manual' : 'learned',
+          custom_zones: hasManualOverrides,
           updated_at: new Date().toISOString(),
-          manual_run_max_hr: manualRunMaxHR,
-          manual_run_lthr: manualRunLTHR,
-          manual_ride_max_hr: manualRideMaxHR,
-          manual_ride_lthr: manualRideLTHR,
+          manual_run_max_hr: m.runMax,
+          manual_run_lthr: m.runLthr,
+          manual_ride_max_hr: m.rideMax,
+          manual_ride_lthr: m.rideLthr,
           /**
            * ⛔ ONLY WRITTEN WHEN IT IS UNAMBIGUOUS (2026-08-20). These two were
            * `runLTHR || rideLTHR` and `runMax || rideMax` — one number claiming to speak for two
@@ -957,7 +976,7 @@ const handleSave = async () => {
     }
 
     setOriginalData(JSON.stringify(dataToSave)); // match the SAVED copy (incl. swimPace100_updated_at) so the button greys out post-save
-    setInitialManualHR(JSON.stringify({ manualRunMaxHR, manualRunLTHR, manualRideMaxHR, manualRideLTHR }));
+    setInitialManualHR(JSON.stringify({ manualRunMaxHR: m.runMax, manualRunLTHR: m.runLthr, manualRideMaxHR: m.rideMax, manualRideLTHR: m.rideLthr }));
     // ⛔ A SAVED NUMBER RE-PRICES THE PLAN (Michael 2026-09-02). If a pace anchor, FTP, the 5K or a manual
     // threshold HR changed, every unstarted run/ride row is re-priced through the checkpoint function's
     // re-price mode — the same per-row rebuild the six-week checkpoint uses. Strength rows are untouched:
@@ -967,7 +986,7 @@ const handleSave = async () => {
       const prevPn = (JSON.parse(originalData || '{}')?.performanceNumbers ?? {}) as Record<string, unknown>;
       const nextPn = ((dataToSave as any)?.performanceNumbers ?? {}) as Record<string, unknown>;
       const WATCH = ['threshold_pace_min_per_mi', 'threshold_pace_source', 'ftp', 'ftp_source', 'fiveK', 'fiveK_source', 'threshold_heart_rate', 'lthr_source'];
-      const changed = WATCH.some((k) => String(prevPn[k] ?? '') !== String(nextPn[k] ?? '')) || !!(manualRunLTHR || manualRideLTHR);
+      const changed = WATCH.some((k) => String(prevPn[k] ?? '') !== String(nextPn[k] ?? '')) || !!(m.runLthr || m.rideLthr);
       if (changed) {
         const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } });
         if (rp?.success && rp?.repriced) {
@@ -987,9 +1006,9 @@ const handleSave = async () => {
         if (rs?.success) repriceNote += ' · weights updated';
       }
     } catch (e) { console.warn('[TrainingBaselines] restate after lock change failed:', e); }
-    setSaveMessage(`Saved!${repriceNote}`);
+    setSaveMessage(`Saved.${repriceNote}`);
     setLastUpdated(new Date().toISOString());
-    setTimeout(() => setSaveMessage(''), 2000);
+    setTimeout(() => setSaveMessage(''), 4000);
   } catch (error) {
     setSaveMessage('Error saving. Please try again.');
   } finally {
@@ -1155,6 +1174,256 @@ const disconnectGarmin = () => {
 };
 
   // Discipline options with colors
+const metric = data.units === 'metric';
+const [lastSavedSport, setLastSavedSport] = useState<string | null>(null);
+const [infoOpen, setInfoOpen] = useState<Set<string>>(new Set());
+const toggleInfo = (id: string) => setInfoOpen((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+const fmtBirthday = (iso: string) => { const d = new Date(iso + 'T12:00:00'); return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
+const STRIP_TO_DISCIPLINE: Record<StripSport, string> = { run: 'running', bike: 'cycling', swim: 'swimming', strength: 'strength' };
+const DISCIPLINE_TO_STRIP: Record<string, StripSport> = { running: 'run', cycling: 'bike', swimming: 'swim', strength: 'strength' };
+const stripSport: StripSport | null = activeSport ? (DISCIPLINE_TO_STRIP[activeSport] ?? null) : null;
+const activeColour = activeSport ? getDisciplineColor(stripSport ?? '') : 'rgba(255,255,255,0.7)';
+/** A row's commit: update the screen, then run the old Save routine on the result. */
+const commitData = async (updater: (d: BaselineData) => BaselineData, hr?: Parameters<typeof persist>[1]) => {
+  const next = updater(data);
+  setData(next);
+  setLastSavedSport(activeSport ?? 'you');
+  await persist(next, hr);
+};
+const goToAdjust = () => { setPendingStateLens('adjust'); window.dispatchEvent(new CustomEvent('open:state')); };
+const SectionHead = ({ id, Icon, label, colour, info }: { id: string; Icon: React.ComponentType<any>; label: string; colour: string; info?: string }) => {
+  const open = info ? infoOpen.has(id) : false;
+  return (
+    <>
+      <div className="flex items-center gap-2 mb-2">
+        <Icon size={15} strokeWidth={2.25} style={{ color: colour }} className="shrink-0" aria-hidden="true" />
+        <span className="text-[11.5px] font-semibold tracking-[0.14em] uppercase" style={{ color: colour }}>{label}</span>
+        {info && <button type="button" onClick={() => toggleInfo(id)} aria-label={`About ${label.toLowerCase()}`} aria-expanded={open} className="bg-transparent border-none p-0 cursor-pointer text-white/45 text-[12px] leading-none">ⓘ</button>}
+      </div>
+      {open && info && <p className="mb-2 text-[12px] text-white/65 leading-snug">{info}</p>}
+    </>
+  );
+};
+const parsePaceText = (t: string): number | null => { const m = t.trim().match(/^(\d{1,2}):(\d{2})$/); if (!m) return null; const sec = Number(m[1]) * 60 + Number(m[2]); return sec > 0 ? sec : null; };
+const paceToText = (secPerMi: number | null | undefined): string | null => { if (secPerMi == null || !Number.isFinite(secPerMi) || secPerMi <= 0) return null; const v = metric ? secPerMi / 1.609344 : secPerMi; return `${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, '0')}/${metric ? 'km' : 'mi'}`; };
+const pnAny = (data.performanceNumbers || {}) as any;
+const baselinesLike = { learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers, configured_hr_zones: { manual_run_lthr: manualRunLTHR, manual_ride_lthr: manualRideLTHR } } as any;
+/** The sport's sections — Numbers · Zones · Equipment (swim: Numbers · Settings · Zones · Equipment). */
+const sportSections = (): Array<{ id: string; label: string; Icon: React.ComponentType<any>; info?: string; body: React.ReactNode }> => {
+  const ageEstimates = getAgeBasedHREstimates(data.birthday, data.gender);
+  const restingInfo = getRestingHR(customRestingHR, garminRestingHR);
+  const hrRows = (sport: 'run' | 'ride') => {
+    const isRun = sport === 'run';
+    const manualMax = isRun ? manualRunMaxHR : manualRideMaxHR;
+    const manualLthr = isRun ? manualRunLTHR : manualRideLTHR;
+    const learnedMax = (isRun ? learnedFitness?.run_max_hr_observed?.value : learnedFitness?.ride_max_hr_observed?.value) || null;
+    const lthr = resolveCurrentLthr(baselinesLike, { sport });
+    const effMax = manualMax || learnedMax || (ageEstimates ? ageEstimates.maxHR : null);
+    const effLthr = lthr.bpm ?? (effMax ? Math.round(effMax * 0.88) : (ageEstimates ? ageEstimates.thresholdHR : null));
+    const lthrMine = isRun ? pnAny.lthr_source === 'manual' : manualLthr != null;
+    const lthrNote = lthrMine ? 'your number' : lthr.bpm != null ? (String(lthr.source ?? '').includes('estimate') || String(lthr.source ?? '').includes('max') ? 'estimated from max heart rate' : `from ${isRun ? 'runs' : 'rides'}`) : effMax ? 'estimated from max heart rate' : ageEstimates ? 'age estimate' : null;
+    const maxNote = manualMax ? 'your number' : learnedMax ? `observed in ${isRun ? 'runs' : 'rides'}` : ageEstimates ? 'age estimate' : null;
+    const rows: React.ReactNode[] = [];
+    rows.push(
+      <NumberRow key="lthr" id={`${sport}-lthr`} name="Threshold heart rate" hint="bpm" inputMode="numeric" sport={isRun ? 'run' : 'bike'} value={effLthr != null ? `${Math.round(effLthr)} bpm · ${numberWord(lthr.source, lthrMine)}` : null} note={lthrNote} mine={lthrMine}
+        onSave={(t) => { const v = parseInt(t); if (!(v > 0)) return; if (isRun) { setManualRunLTHR(v); void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, lthr_source: 'manual' } }), { runLthr: v }); } else { setManualRideLTHR(v); void commitData((d) => d, { rideLthr: v }); } }}
+        onAuto={() => { if (isRun) { setManualRunLTHR(null); void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, lthr_source: 'learned' } }), { runLthr: null }); } else { setManualRideLTHR(null); void commitData((d) => d, { rideLthr: null }); } }} />,
+    );
+    rows.push(
+      <NumberRow key="max" id={`${sport}-max`} name="Max heart rate" hint="bpm" inputMode="numeric" sport={isRun ? 'run' : 'bike'} value={effMax ? `${Math.round(effMax)} bpm · ${manualMax ? 'your number' : 'auto'}` : null} note={maxNote} mine={!!manualMax}
+        onSave={(t) => { const v = parseInt(t); if (!(v > 0)) return; if (isRun) { setManualRunMaxHR(v); void commitData((d) => d, { runMax: v }); } else { setManualRideMaxHR(v); void commitData((d) => d, { rideMax: v }); } }}
+        onAuto={() => { if (isRun) { setManualRunMaxHR(null); void commitData((d) => d, { runMax: null }); } else { setManualRideMaxHR(null); void commitData((d) => d, { rideMax: null }); } }} />,
+    );
+    rows.push(
+      <NumberRow key="rest" id={`${sport}-rest`} name="Resting heart rate" hint="bpm" inputMode="numeric" sport={isRun ? 'run' : 'bike'} value={restingInfo.value ? `${restingInfo.value} bpm · ${customRestingHR ? 'your number' : 'auto'}` : null} note={customRestingHR ? 'your number' : restingInfo.value ? 'from your watch' : null} mine={!!customRestingHR}
+        onSave={(t) => { const v = parseInt(t); if (!(v > 30)) return; setCustomRestingHR(v); void commitData((d) => d, { resting: v }); }}
+        onAuto={() => { setCustomRestingHR(null); void commitData((d) => d, { resting: null }); }} />,
+    );
+    const zones = getHRZones(effLthr, effMax, restingInfo.value);
+    const model = getZoneModel(effLthr, effMax, restingInfo.value);
+    const table = zones && zones.length > 0 ? (
+      <div className="mt-1 space-y-0.5">
+        {zones.map((z) => (
+          <div key={z.name} className="flex items-baseline justify-between text-[12px] px-1">
+            <span className="text-white/60">{z.name} {z.label}</span>
+            <span className="tabular-nums text-white/75">{z.min}–{z.max} bpm</span>
+          </div>
+        ))}
+        <p className="text-[12px] text-white/50 px-1 mt-1">{model}</p>
+      </div>
+    ) : <p className="text-[12px] text-white/50">Heart-rate zones appear once there is a threshold or a max heart rate: type one, or add your birthday for an age estimate.</p>;
+    return { rows, table };
+  };
+  const equipmentChips = (discipline: 'swimming' | 'strength', options: string[]) => (
+    <div className="flex flex-wrap gap-2">
+      {options.map((option) => {
+        const on = ((data.equipment as any)[discipline] || []).includes(option);
+        return <GalaxyButton key={option} shape="chip" variant={on ? 'primary' : 'secondary'} onClick={() => { toggleEquipment(discipline, option); void persistEquipmentSoon(); }}>{option}</GalaxyButton>;
+      })}
+    </div>
+  );
+
+  if (activeSport === 'running') {
+    const thr = resolveCurrentRunThresholdPace(baselinesLike);
+    const easy = resolveCurrentRunEasyPace(baselinesLike);
+    const thrMine = pnAny.threshold_pace_source === 'manual';
+    const thrSamples = Number(learnedFitness?.run_threshold_pace_sec_per_km?.sample_count);
+    const thrAccepted = learnedFitness?.run_threshold_pace_accepted?.value != null;
+    const thrNote = thrMine ? 'your number' : thr.source === 'learned' ? (thrAccepted ? 'accepted from runs' : `from runs${Number.isFinite(thrSamples) && thrSamples > 0 ? `, ${thrSamples} runs` : ''}`) : thr.sec_per_mi != null ? 'typed, until your runs measure' : null;
+    const thrProposal = pendingRunThresholdProposal(baselinesLike);
+    const fiveKMine = pnAny.fiveK_source !== 'learned';
+    const implied = arcFiveKNudge?.implied_5k_label ?? null;
+    const hr = hrRows('run');
+    return [
+      { id: 'run-numbers', label: 'Numbers', Icon: Hash, info: 'Threshold pace is the fastest pace you could hold for about an hour; hard sessions are set from it. Easy pace is what your last five easy runs measured, or threshold pace × 1.19 until there are five. Typing a number makes it your number; auto uses what your runs measure.', body: (
+        <div className="space-y-1.5">
+          <NumberRow id="threshold" name="Threshold pace" hint={metric ? 'm:ss/km' : 'm:ss/mi'} inputMode="numeric" sport="run" value={thr.sec_per_mi != null ? `${paceToText(thr.sec_per_mi)} · ${numberWord(thr.source, thrMine)}` : null} note={thrNote} mine={thrMine}
+            onSave={(t) => { const sec = parsePaceText(t); if (sec == null) return; const secPerMi = metric ? sec * 1.609344 : sec; const str = `${Math.floor(secPerMi / 60)}:${String(Math.round(secPerMi % 60)).padStart(2, '0')}`; void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, threshold_pace_min_per_mi: str, threshold_pace_source: 'manual' } as any })); }}
+            onAuto={() => void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, threshold_pace_source: 'learned' } as any }))} />
+          {thrProposal && (
+            <div className="flex items-center justify-between py-1 gap-3">
+              <span className="text-[13px] text-white/70">Your runs measure {paceToText(thrProposal.measuredSecPerKm * 1.609344)}</span>
+              <button type="button" disabled={thrAccepting} onClick={() => void acceptThr()} style={{ borderColor: `${getDisciplineColor('run')}88`, color: getDisciplineColor('run') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{thrAccepting ? 'Applying…' : `use ${paceToText(thrProposal.measuredSecPerKm * 1.609344)}`}</button>
+            </div>
+          )}
+          <NumberRow id="easy" name="Easy pace" editable={false} sport="run" value={paceToText(easy.sec_per_mi)} note={easy.sec_per_mi != null ? (easy.source === 'learned' ? 'from your last five easy runs' : 'threshold pace × 1.19, until five easy runs are logged') : 'follows threshold pace'} />
+          <NumberRow id="fiveK" name="5K time" hint="mm:ss" inputMode="numeric" sport="run" value={pnAny.fiveK ? `${pnAny.fiveK} · ${fiveKMine ? 'your number' : 'auto'}` : (!fiveKMine && implied ? `${implied} · auto` : null)} note={fiveKMine ? (implied && arcFiveKNudge?.should_prompt ? `your number. Your runs suggest about ${implied}.` : (pnAny.fiveK ? 'your number' : null)) : 'from runs'} mine={fiveKMine && !!pnAny.fiveK} seed={pnAny.fiveK || ''}
+            onSave={(t) => { if (!/^\d{1,2}:\d{2}$/.test(t.trim())) return; void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, fiveK: t.trim(), fiveK_source: 'manual' } as any })); }}
+            onAuto={() => void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, fiveK_source: 'learned' } as any }))} />
+          {hr.rows[0]}
+        </div>
+      ) },
+      { id: 'run-zones', label: 'Zones', Icon: Gauge, info: 'Five heart-rate zones from your threshold heart rate (Friel). With no threshold, from max and resting heart rate (Karvonen). Max heart rate is what your runs have shown, or an age estimate until then.', body: (
+        <div className="space-y-1.5">
+          {hr.rows[1]}
+          {hr.rows[2]}
+          {hr.table}
+        </div>
+      ) },
+    ];
+  }
+  if (activeSport === 'cycling') {
+    const ftp = resolveCurrentFtp(baselinesLike);
+    const ftpMine = pnAny.ftp_source === 'manual';
+    const proposal = pendingFtpProposal(baselinesLike);
+    const ftpAccepted = learnedFitness?.ride_ftp_accepted?.value != null;
+    const ftpNote = ftpMine ? 'your number' : ftp.source === 'learned' ? (ftpAccepted ? 'accepted from your rides' : 'from your rides') : ftp.value != null ? 'typed, until your rides measure' : null;
+    const hr = hrRows('ride');
+    const powerZones = ftp.value ? getPowerZones(Number(ftp.value)) : [];
+    return [
+      { id: 'bike-numbers', label: 'Numbers', Icon: Hash, info: 'FTP is the most power you could hold for about an hour. It sets your power zones and the targets on rides. Typing a number makes it your number; auto uses what your rides measure.', body: (
+        <div className="space-y-1.5">
+          <NumberRow id="ftp" name="FTP" hint="W" inputMode="numeric" sport="bike" value={ftp.value != null ? `${Math.round(Number(ftp.value))} W · ${numberWord(ftp.source, ftpMine)}` : null} note={ftpNote} mine={ftpMine}
+            onSave={(t) => { const v = Math.round(Number(t)); if (!(v > 0)) return; void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, ftp: v, ftp_source: 'manual' } as any })); }}
+            onAuto={() => void commitData((d) => { const pn: any = { ...d.performanceNumbers }; delete pn.ftp_source; return { ...d, performanceNumbers: pn }; })} />
+          {proposal && (
+            <div className="flex items-center justify-between py-1 gap-3">
+              <span className="text-[13px] text-white/70">Your rides measure {Math.round(proposal.measured)} W</span>
+              <button type="button" disabled={ftpAccepting} onClick={() => void acceptMeasuredFtp()} style={{ borderColor: `${getDisciplineColor('bike')}88`, color: getDisciplineColor('bike') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{ftpAccepting ? 'Applying…' : `use ${Math.round(proposal.measured)} W`}</button>
+            </div>
+          )}
+          {ftpAcceptNote && <p className="text-[12px] text-white/60">{ftpAcceptNote}</p>}
+          {hr.rows[0]}
+        </div>
+      ) },
+      { id: 'bike-zones', label: 'Zones', Icon: Gauge, info: 'Power zones from FTP (Coggan). Heart-rate zones from your threshold heart rate on the bike (Friel); with no threshold, from max and resting heart rate.', body: (
+        <div className="space-y-1.5">
+          {powerZones.length > 0 && (
+            <div className="space-y-0.5 mb-2">
+              {powerZones.map((z) => (
+                <div key={z.name} className="flex items-baseline justify-between text-[12px] px-1">
+                  <span className="text-white/60">{z.name}</span>
+                  <span className="tabular-nums text-white/75">{z.range}</span>
+                </div>
+              ))}
+              <p className="text-[12px] text-white/50 px-1 mt-1">power zones from FTP</p>
+            </div>
+          )}
+          {hr.rows[1]}
+          {hr.rows[2]}
+          {hr.table}
+        </div>
+      ) },
+    ];
+  }
+  if (activeSport === 'swimming') {
+    const swim100 = pnAny.swimPace100 as string | undefined;
+    const bands = deriveSwimPaceBands(parsePaceToSeconds(swim100) ?? 0);
+    return [
+      { id: 'swim-numbers', label: 'Numbers', Icon: Hash, info: 'Your hard, steady 100 pace: the effort you could hold for a strong continuous swim. Sets your swim pace zones.', body: (
+        <div className="space-y-1.5">
+          <NumberRow id="swim100" name="Threshold 100 pace" hint="m:ss" inputMode="numeric" sport="swim" value={swim100 ? `${swim100}/100 · your number` : null} note={swim100 ? 'your number' : null} seed={swim100 || ''}
+            onSave={(t) => { if (!/^\d{1,2}:\d{2}$/.test(t.trim())) return; void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, swimPace100: t.trim() } as any })); }} />
+        </div>
+      ) },
+      { id: 'swim-settings', label: 'Settings', Icon: Settings2, info: 'To find your threshold 100 pace: warm up, swim an all-out 400, rest, then an all-out 200. Threshold 100 pace = (400 time − 200 time) ÷ 2. No test handy: use your best steady pace for a continuous 20–30 minute swim.', body: (
+        <p className="text-[13px] text-white/60 leading-snug">Swim sessions are easy or technique work outside the plan's slots. The pace zones below come from the 100 pace above.</p>
+      ) },
+      { id: 'swim-zones', label: 'Zones', Icon: Gauge, body: bands.length > 0 ? (
+        <div className="space-y-0.5">
+          {bands.map((b) => (
+            <div key={b.label} className="flex items-baseline justify-between text-[12px] px-1">
+              <span className="text-white/60">{b.label}</span>
+              <span className="tabular-nums text-white/75">{b.range}</span>
+            </div>
+          ))}
+          <p className="text-[12px] text-white/50 px-1 mt-1">per 100, from your threshold 100 pace</p>
+        </div>
+      ) : <p className="text-[12px] text-white/50">Pace zones appear once a threshold 100 pace is typed.</p> },
+      { id: 'swim-equipment', label: 'Equipment', Icon: Wrench, body: equipmentChips('swimming', swimmingEquipmentOptions) },
+    ];
+  }
+  if (activeSport === 'strength') {
+    const liftRows = STRENGTH_LIFT_FIELDS.map((lift) => {
+      const r = resolveStrengthCapacity({ key: lift.key, typed: data.performanceNumbers as any, learnedStrength1rms: learnedFitness?.strength_1rms ?? null, locked: data.locked_baselines ?? null, asOf: new Date().toISOString().slice(0, 10) });
+      const locked = data.locked_baselines?.[lift.key] != null;
+      const learnedEntry = lift.learnedKey ? learnedFitness?.strength_1rms?.[lift.learnedKey] : null;
+      const sets = Number(learnedEntry?.sample_count);
+      const unit = lift.reps ? 'reps' : (metric ? 'kg' : 'lb');
+      const note = locked ? 'your number' : r.source === 'learned' ? `from your lifts${Number.isFinite(sets) && sets > 0 ? `, ${sets} sets` : ''}` : r.source === 'typed' ? (lift.reps ? 'typed' : 'typed, until your lifts measure') : null;
+      const sug = r.suggestion && r.suggestion.divergencePct > 0 ? ` Your lifts suggest ${Math.round(r.suggestion.computed)}.` : '';
+      return (
+        <NumberRow key={lift.key} id={lift.key} name={lift.label} hint={unit} inputMode="numeric" sport="strength" value={r.value != null ? `${Math.round(r.value)} ${unit} · ${numberWord(r.source, locked)}` : null} note={note ? note + sug : null} mine={locked}
+          onSave={(t) => { const n = lift.reps ? Math.max(0, parseInt(t) || 0) : Math.round(Number(t)); if (!(lift.reps ? Number.isFinite(n) : n > 0)) return; void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, [lift.key]: n } as any, locked_baselines: lift.reps ? (d.locked_baselines ?? null) : { ...(d.locked_baselines ?? {}), [lift.key]: n } })); }}
+          onAuto={lift.reps ? undefined : () => void commitData((d) => { const next = { ...(d.locked_baselines ?? {}) } as Record<string, number>; delete next[lift.key]; return { ...d, locked_baselines: Object.keys(next).length ? next : null }; })} />
+      );
+    });
+    return [
+      { id: 'strength-numbers', label: 'Numbers', Icon: Hash, info: 'The four lifts the block prices from, and pull-ups as reps. Typing a number makes it your number and locks it; auto uses what your lifts measure, three logged sets and up. A number typed here is also the number on file for a new block.', body: <div className="space-y-1.5">{liftRows}</div> },
+      { id: 'strength-equipment', label: 'Equipment', Icon: Wrench, info: 'A commercial gym has everything. A home gym lists what you have; the plan picks movements from it.', body: (
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-2">
+            <GalaxyButton shape="chip" variant={hasCommercialGym ? 'primary' : 'secondary'} onClick={() => void commitData((d) => ({ ...d, equipment: { ...d.equipment, strength: ['Commercial gym'] } }))}>Commercial gym</GalaxyButton>
+            <GalaxyButton shape="chip" variant={!hasCommercialGym ? 'primary' : 'secondary'} onClick={() => { if (hasCommercialGym) void commitData((d) => ({ ...d, equipment: { ...d.equipment, strength: [] } })); }}>Home gym</GalaxyButton>
+          </div>
+          {!hasCommercialGym && equipmentChips('strength', homeGymEquipmentOptions)}
+        </div>
+      ) },
+    ];
+  }
+  return [];
+};
+/** Equipment chips toggle local state first (`toggleEquipment`); the save runs on the next tick with the result. */
+const equipPersistRef = useRef<number | null>(null);
+const persistEquipmentSoon = () => { if (equipPersistRef.current) window.clearTimeout(equipPersistRef.current); equipPersistRef.current = window.setTimeout(() => { setDataAndPersist(); }, 0); };
+const latestData = useRef(data); latestData.current = data;
+const setDataAndPersist = () => { setLastSavedSport(activeSport ?? 'you'); void persist(latestData.current); };
+const [thrAccepting, setThrAccepting] = useState(false);
+const acceptThr = async () => {
+  const uid = getStoredUserId(); if (!uid || thrAccepting) return;
+  setThrAccepting(true);
+  try {
+    const { data: row } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', uid).maybeSingle();
+    const raw = row?.learned_fitness; const cur = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    const next = acceptLearnedRunThreshold(cur as any, 'baselines'); if (!next) return;
+    const { error } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', uid);
+    if (error) throw error;
+    setLearnedFitness(next);
+    if (pnAny.threshold_pace_source === 'manual') await commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, threshold_pace_source: 'learned' } as any }));
+    else { try { await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); } catch { /* the accept stands */ } }
+  } catch (e) { console.warn('[Profile] accept threshold failed:', e); }
+  finally { setThrAccepting(false); }
+};
 const disciplineOptions = [
     { id: 'running', name: 'Run', icon: Activity, color: SPORT_COLORS.run },
     { id: 'cycling', name: 'Cycle', icon: Bike, color: SPORT_COLORS.cycling },
@@ -1329,7 +1598,7 @@ return (
     
     {/* Description */}
     <div className="text-center mb-6">
-      <p className="text-white/50 text-sm">Your details, and the numbers your training is priced from</p>
+      <p className="text-white/50 text-sm">Your details, and the numbers your training is priced from. Every change saves at once.</p>
       {lastUpdated && (
         <p className="text-xs text-white/40 mt-2">
           Last updated: {new Date(lastUpdated).toLocaleDateString()}
@@ -1369,1415 +1638,66 @@ return (
               </div> */}
 
               {activeTab === 'baselines' ? (
-                <div className="space-y-5">
-                  {/* Basic Information */}
-                  <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
-                    <h2 className="text-sm font-semibold text-white/90 mb-3 tracking-wide">You</h2>
-
-                    {/* Identity (2026-09-06): photo, name, email, location. Email is the sign-in address, read-only. No sex field. */}
-                    <div className="flex items-start gap-3 mb-3">
-                      <label className="relative shrink-0 cursor-pointer" title="Change photo">
-                        {data.profile?.photo_url ? (
-                          <img src={data.profile.photo_url} alt="" className="h-16 w-16 rounded-full object-cover border border-white/20" />
-                        ) : (
-                          <div className="h-16 w-16 rounded-full bg-white/[0.08] border border-white/20 flex items-center justify-center text-[11px] text-white/50">{photoBusy ? '…' : 'photo'}</div>
-                        )}
-                        <input type="file" accept="image/*" className="hidden" disabled={photoBusy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadPhoto(f); e.target.value = ''; }} />
-                      </label>
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <input
-                          type="text"
-                          value={data.profile?.name || ''}
-                          onChange={(e) => setData(prev => ({ ...prev, profile: { ...(prev.profile ?? {}), name: e.target.value } }))}
-                          placeholder="Name"
-                          autoComplete="name"
-                          className="w-full h-8 px-2 text-xs bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
-                          style={{ fontFamily: 'Inter, sans-serif' }}
-                        />
-                        <input
-                          type="text"
-                          value={data.profile?.location || ''}
-                          onChange={(e) => setData(prev => ({ ...prev, profile: { ...(prev.profile ?? {}), location: e.target.value } }))}
-                          placeholder="Location"
-                          autoComplete="address-level2"
-                          className="w-full h-8 px-2 text-xs bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
-                          style={{ fontFamily: 'Inter, sans-serif' }}
-                        />
-                        <p className="text-xs text-white/50 truncate">{authEmail || ''}</p>
-                        {photoNote && <p className="text-xs text-white/60">{photoNote}</p>}
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-3">
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-white/60 whitespace-nowrap">Birthday</label>
-                        <input
-                          type="date"
-                          value={data.birthday || ''}
-                          onChange={(e) => setData(prev => ({ ...prev, birthday: e.target.value }))}
-                          className="h-8 px-2 text-xs bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
-                          style={{ fontFamily: 'Inter, sans-serif' }}
-                        />
-                        {calculateAge(data.birthday) != null && <span className="text-xs text-white/60">{calculateAge(data.birthday)} yrs</span>}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-white/60">Units</label>
-                        <select
-                          value={data.units || 'imperial'}
-                          onChange={(e) => setData(prev => ({ ...prev, units: e.target.value as any }))}
-                          className="h-8 px-2 text-xs bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 focus:outline-none focus:border-white/40"
-                          style={{ fontFamily: 'Inter, sans-serif' }}
-                        >
-                          <option value="imperial" className="bg-[#1a1a1a]">lbs</option>
-                          <option value="metric" className="bg-[#1a1a1a]">kg</option>
-                        </select>
-                        </div>
-                      {/*
-                        Lifting experience — stage 5 §8a. Sits in Basic Information, not the Strength
-                        sport panel, because that panel only renders once the athlete taps the sport
-                        tile and this has to be settable before a first block. Lifting is in every
-                        plan, so it is never sport-gated.
-                      */}
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-white/60 whitespace-nowrap">Lifting experience</label>
-                        <select
-                          value={data.performanceNumbers?.liftingExperience || ''}
-                          onChange={(e) => setData(prev => ({
-                            ...prev,
-                            performanceNumbers: {
-                              ...prev.performanceNumbers,
-                              liftingExperience: (e.target.value || undefined) as any
-                            }
-                          }))}
-                          className="h-8 px-2 text-xs bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 focus:outline-none focus:border-white/40"
-                          style={{ fontFamily: 'Inter, sans-serif' }}
-                        >
-                          <option value="" className="bg-[#1a1a1a]">-</option>
-                          <option value="new" className="bg-[#1a1a1a]">new to lifting (under a year)</option>
-                          <option value="couple_years" className="bg-[#1a1a1a]">a couple of years</option>
-                          <option value="many_years" className="bg-[#1a1a1a]">many years</option>
-                        </select>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-white/60">Ht</label>
-                        <input
-                          type="number"
-                          value={data.height || ''}
-                          onChange={(e) => setData(prev => ({ ...prev, height: parseInt(e.target.value) || undefined }))}
-                          placeholder="70"
-                          className="w-12 h-8 px-2 text-xs bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
-                          style={{ fontFamily: 'Inter, sans-serif' }}
-                        />
-                        <span className="text-xs text-white/60">{data.units === 'metric' ? 'cm' : 'in'}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-white/60">Wt</label>
-                        <input
-                          type="number"
-                          value={data.weight || ''}
-                          onChange={(e) => setData(prev => ({ ...prev, weight: parseInt(e.target.value) || undefined }))}
-                          placeholder="160"
-                          className="w-14 h-8 px-2 text-xs bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
-                          style={{ fontFamily: 'Inter, sans-serif' }}
-                        />
-                        <span className="text-xs text-white/60">{data.units === 'metric' ? 'kg' : 'lb'}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Disciplines */}
-                  <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
-                    <div className="mb-3">
-                      <h2 className="text-sm font-semibold text-white/90 tracking-wide">Your Sports</h2>
-                      <p className="text-xs text-white/50 mt-0.5">Tap to add performance baselines</p>
-                    </div>
-                    
-                    <div className="grid grid-cols-4 gap-2">
-                      {disciplineOptions.map((discipline) => {
-                        const Icon = discipline.icon;
-                        const isActive = activeSport === discipline.id;
-                        const hasBaseline = hasBaselineEntered(discipline.id);
-                        return (
-                          <button
-                            key={discipline.id}
-                            onClick={() => toggleDiscipline(discipline.id)}
-                            className={`relative flex items-center justify-center gap-1.5 py-2.5 rounded-xl border text-center transition-all duration-300 backdrop-blur-lg ${
-                              isActive
-                                ? 'border-transparent'
-                                : hasBaseline
-                                  ? 'border-white/20 bg-white/[0.06] hover:bg-white/[0.10]'
-                                  : 'border-white/15 bg-white/[0.04] hover:border-white/25 hover:bg-white/[0.08]'
-                            }`}
-                            style={{ 
-                              fontFamily: 'Inter, sans-serif',
-                              ...(isActive ? {
-                                backgroundColor: `${discipline.color}20`,
-                                borderColor: discipline.color,
-                                borderWidth: '1.5px',
-                                boxShadow: `0 0 20px ${discipline.color}30, inset 0 0 20px ${discipline.color}10`
-                              } : {})
-                            }}
-                          >
-                            {/* Q-070: sport-chip ✓ removed entirely (feature dropped — more trouble than worth). */}
-                            <Icon 
-                              className="h-4 w-4 transition-colors duration-300" 
-                              style={{ color: isActive || hasBaseline ? discipline.color : 'rgba(255,255,255,0.5)' }}
-                            />
-                            <span 
-                              className="text-xs font-medium transition-colors duration-300"
-                              style={{ color: isActive ? discipline.color : hasBaseline ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.5)' }}
-                            >
-                              {discipline.name}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Per-discipline performance numbers */}
-                  {activeSport && (
-                    <div 
-                      className="p-4 rounded-2xl backdrop-blur-xl border transition-all duration-300"
-                      style={{
-                        backgroundColor: `${getActiveSportColor()}08`,
-                        borderColor: `${getActiveSportColor()}30`,
-                        boxShadow: `0 4px 30px ${getActiveSportColor()}10`
-                      }}
-                    >
-                      <h2 
-                        className="text-sm font-semibold mb-4 tracking-wide"
-                        style={{ color: getActiveSportColor() }}
-                      >
-                        Performance Numbers
-                      </h2>
-
-                      {/* Running */}
-                      {activeSport === 'running' && (() => {
-                        const easyLearned = learnedFitness?.run_easy_pace_sec_per_km;
-                        /**
-                         * ⛔ THE THRESHOLD CARD READS THE RESOLVER NOW, NOT THE RAW LEARNED METRIC
-                         * (2026-08-19). It used to render `learned_fitness.run_threshold_pace_sec_per_km`
-                         * directly and only when that value existed, which broke in three ways at once:
-                         *
-                         *   · it showed a number the ENGINE might not be using (the same lie the easy-pace
-                         *     card above was fixed for — a number on screen that is not the number in use);
-                         *   · when the learner abstained the whole card VANISHED, so an athlete with a
-                         *     threshold pace derived from their easy runs saw nothing at all and never
-                         *     learned a derivation was standing in;
-                         *   · and "not enough data" was expressed as SILENCE, which is not the same as
-                         *     saying it. Michael only found the original bug because he went looking.
-                         */
-                        const resolvedThr = resolveCurrentRunThresholdPace({
-                          learned_fitness: learnedFitness,
-                          performance_numbers: data.performanceNumbers,
-                          effort_paces: data.effort_paces,
-                        } as any);
-                        const thrBasis = describeThresholdBasis(resolvedThr);
-                        const thrLearned = learnedFitness?.run_threshold_pace_sec_per_km;
-                        const hasEasyLearned = easyLearned?.value != null && Number.isFinite(Number(easyLearned.value)) && Number(easyLearned.value) > 0;
-                        const hasThrLearned = thrLearned?.value != null && Number.isFinite(Number(thrLearned.value)) && Number(thrLearned.value) > 0;
-                        const nudge = arcFiveKNudge;
-                        const nudgeKey = nudge ? fiveKNudgeDismissKey(nudge) : '';
-                        const showFiveKNudge = !!nudge?.should_prompt && nudgeKey && !dismissedFiveKMap[nudgeKey];
-                        return (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <Activity className="h-4 w-4" style={{ color: SPORT_COLORS.run }} />
-                            <h3 className="text-sm font-medium text-white/90">Running</h3>
-                          </div>
-                          {/* ⛔ A GRID, NOT `flex-wrap` (2026-08-20). Four blocks of different widths in
-                              a wrapping flex row left ragged columns and dead space — "a little jammed".
-                              Each fact gets one cell and they line up. */}
-                          {/* ⛔ STACKED, EQUAL WEIGHT (Michael 2026-09-02): three numbers, three identical rows. */}
-                          <div className="flex flex-col gap-4 mt-2">
-                            {/**
-                              * ⛔ ONE EASY-PACE BLOCK (2026-08-20). There were TWO — a display card showing
-                              * the resolved value, and a separate "Easy pace (manual)" input with the
-                              * picker under it. Same fact, twice, in one card, with a conditional so the
-                              * display half vanished when nothing was learned and the manual half retitled
-                              * itself "— in use" to compensate. It read as jammed because it was.
-                              *
-                              * Now: the resolved value and its receipt on top, the number you can type
-                              * under it, and the picker only when there are genuinely two to choose
-                              * between. Both values stay visible and the one IN USE is named (Law 3) —
-                              * which is what the two-block version was protecting and is preserved here.
-                              */}
-                            {/**
-                              * ⛔ EASY IS NOT A NUMBER YOU SET (Michael 2026-09-02, D-462). Easy days are a heart-rate
-                              * zone off threshold HR (the Heart Rate Zones card below); the pace shown here is a
-                              * REFERENCE band derived from threshold pace (resolveCurrentRunEasyPace is now threshold
-                              * × 1.19, nothing else). The typed easy pace field and the auto / my number switch that
-                              * sat here are gone — `easyPace` / `easy_pace_source` are no longer read by anything.
-                              */}
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-sm text-white/75 font-medium">Easy days</label>
-                              {(() => {
-                                const resolvedEasy = resolveCurrentRunEasyPace({
-                                  learned_fitness: learnedFitness,
-                                  performance_numbers: data.performanceNumbers,
-                                } as never);
-                                return (
-                                  <div className="rounded-xl border px-3 py-2" style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.15)' }}>
-                                    <div className="text-[13px] text-white/85">Run by heart rate — zone 2, conversational.</div>
-                                    <div className="text-[11px] text-white/55 leading-snug mt-0.5">
-                                      {resolvedEasy.sec_per_mi != null
-                                        ? `Reference pace about ${formatPaceSecPerMi(resolvedEasy.sec_per_mi)}, from your threshold pace. Hot days read high — go by conversation.`
-                                        : 'A reference pace appears once a threshold pace is on file.'}
-                                    </div>
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-sm text-white/75 font-medium">
-                                Threshold pace{' '}
-                                <button type="button" onClick={() => setThresholdInfoOpen((o) => !o)} aria-label="What is threshold pace?" className="text-white/45 text-[11px] bg-transparent border-none p-0 cursor-pointer">{thresholdInfoOpen ? '▾' : 'ⓘ'}</button>
-                              </label>
-                              {thresholdInfoOpen && (
-                                <p className="text-[12px] text-white/55 leading-snug max-w-[min(100%,340px)]">The fastest pace you could hold for about an hour. Hard sessions are set from it.</p>
-                              )}
-                              {/**
-                                * ⛔ SAME ROW AS EASY PACE AND STRENGTH (Michael 2026-09-02: "add my number to
-                                * threshold"). The resolver already honoured a typed `threshold_pace_min_per_mi`
-                                * and a `threshold_pace_source` choice; only the input and the switch were missing.
-                                * The threshold-test offer keeps its place under the row.
-                                */}
-                              {(() => {
-                                const mine = (data.performanceNumbers as any)?.threshold_pace_source === 'manual';
-                                const typed = (data.performanceNumbers as any)?.threshold_pace_min_per_mi || '';
-                                const measuredLines = thrBasis.state === 'measured'
-                                  ? [learnedBasisLine(thrLearned, 'run'), learnedAsOfLine(thrLearned)].filter(Boolean).join(' ')
-                                  : '';
-                                const status = mine
-                                  ? 'your number. Your runs don\'t change it.'
-                                  : thrBasis.state === 'stated'
-                                    ? 'auto. Your typed number, until your runs measure one.'
-                                    : `auto. ${thrBasis.label}${thrBasis.note ? ` ${thrBasis.note}` : ''}${measuredLines ? ` ${measuredLines}` : ''}`;
-                                const setMine = () => setData(prev => {
-                                  const pn: any = { ...prev.performanceNumbers, threshold_pace_source: 'manual' };
-                                  if (!pn.threshold_pace_min_per_mi && resolvedThr.sec_per_mi) pn.threshold_pace_min_per_mi = formatPaceSecPerMi(resolvedThr.sec_per_mi).replace('/mi', '');
-                                  return { ...prev, performanceNumbers: pn };
-                                });
-                                const setAuto = () => setData(prev => ({
-                                  ...prev,
-                                  performanceNumbers: { ...prev.performanceNumbers, threshold_pace_source: 'learned' },
-                                }));
-                                return (
-                                  <div
-                                    className="rounded-xl border px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1"
-                                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: mine ? `${SPORT_COLORS.run}55` : 'rgba(255,255,255,0.15)' }}
-                                  >
-                                    <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
-                                      <span className="text-lg font-semibold tabular-nums text-white">
-                                        {thrBasis.showNumber ? formatPaceSecPerMi(resolvedThr.sec_per_mi) : '—'}
-                                      </span>
-                                    </div>
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      aria-label="Threshold pace, my number, minutes per mile"
-                                      value={typed}
-                                      onChange={(e) => setData(prev => ({
-                                        ...prev,
-                                        performanceNumbers: { ...prev.performanceNumbers, threshold_pace_min_per_mi: e.target.value },
-                                      }))}
-                                      placeholder={hasThrLearned ? formatPace(thrLearned.value) : '9:30'}
-                                      className="w-[4.5rem] h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40 text-center shrink-0"
-                                      style={{ fontFamily: 'Inter, sans-serif' }}
-                                    />
-                                    <AutoMinePill mine={mine} onAuto={setAuto} onMine={setMine} color={SPORT_COLORS.run} label="Threshold pace" />
-                                    <div className="basis-full text-[11px] text-white/55 leading-snug">{status}</div>
-                                    <div className="basis-full">
-                                      {thrBasis.state !== 'measured' && thrBasis.state !== 'stated' && (
-                                        <div className="mt-2 pt-2 border-t border-white/[0.06]">
-                                          {scheduledRunTest ? (
-                                            <div className="flex items-center justify-between gap-2">
-                                              <span className="text-[11px] text-white/55">
-                                                Threshold test on {new Date(scheduledRunTest.date + 'T12:00:00').toLocaleDateString()}
-                                              </span>
-                                              <button
-                                                type="button"
-                                                onClick={() => void deleteRunTest()}
-                                                className="text-[12px] text-white/60 hover:text-white/70 underline underline-offset-2"
-                                              >
-                                                Remove
-                                              </button>
-                                            </div>
-                                          ) : showRunTestDatePicker ? (
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                              <input
-                                                type="date"
-                                                value={runTestDate}
-                                                min={new Date().toISOString().split('T')[0]}
-                                                onChange={(e) => setRunTestDate(e.target.value)}
-                                                className="h-8 px-2 text-[11px] bg-white/[0.06] border border-white/15 rounded-lg text-white"
-                                              />
-                                              <button
-                                                type="button"
-                                                onClick={() => void scheduleRunTest()}
-                                                className="h-8 px-3 text-[11px] font-medium rounded-lg text-white"
-                                                style={{ backgroundColor: `${SPORT_COLORS.run}26`, border: `1px solid ${SPORT_COLORS.run}80` }}
-                                              >
-                                                Schedule
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => setShowRunTestDatePicker(false)}
-                                                className="h-8 px-2 text-[11px] text-white/45 hover:text-white/70"
-                                              >
-                                                Cancel
-                                              </button>
-                                            </div>
-                                          ) : (
-                                            <button
-                                              type="button"
-                                              onClick={() => setShowRunTestDatePicker(true)}
-                                              className="text-[11px] font-medium px-2.5 py-1.5 rounded-lg text-white/80 hover:text-white bg-white/[0.05] border border-white/15 text-left"
-                                            >
-                                              Schedule a threshold test
-                                              <span className="block text-[11px] text-white/55 mt-0.5">12 min — measures it properly</span>
-                                            </button>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                            {/* ⛔ THE 5K SITS LAST, AND THAT IS THE INFORMATION ORDER (2026-08-20).
-                                Three cells in a two-column grid left an orphan row and a tall empty
-                                space beneath a small input. Pairing the two TALL cards puts them side
-                                by side and drops the 5K underneath — which is also the right reading
-                                order: the paces you train by first, the seed they came from last. */}
-                            {/**
-                              * ⛔ THRESHOLD HEART RATE, THE SECOND OF THE TWO NUMBERS A RUNNER NEEDS (Michael 2026-09-02,
-                              * from his own screen: the LTHR box was buried in the Heart Rate Zones card as "est. from max",
-                              * a formula shown as if it were his, with zones built on it). Same row as threshold pace:
-                              * the number in use, one input, auto / my number, the zones printed underneath from it.
-                              * Storage unchanged: `configured_hr_zones.manual_run_lthr` (typed) + `performance_numbers.lthr_source`
-                              * (choice) — what `resolveCurrentLthr` already reads. An estimate never shows as the number in use.
-                              */}
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-sm text-white/75 font-medium">
-                                Threshold heart rate{' '}
-                                <button type="button" onClick={() => setLthrInfoOpen((o) => !o)} aria-label="What is threshold heart rate?" className="text-white/45 text-[11px] bg-transparent border-none p-0 cursor-pointer">{lthrInfoOpen ? '▾' : 'ⓘ'}</button>
-                              </label>
-                              {lthrInfoOpen && (
-                                <p className="text-[12px] text-white/55 leading-snug max-w-[min(100%,340px)]">The heart rate you can hold for about an hour. Easy days are a zone below it; hard days sit near it.</p>
-                              )}
-                              {(() => {
-                                const resolved = resolveCurrentLthr({
-                                  learned_fitness: learnedFitness,
-                                  performance_numbers: data.performanceNumbers,
-                                  configured_hr_zones: { manual_run_lthr: manualRunLTHR },
-                                } as never, { sport: 'run' });
-                                const mine = (data.performanceNumbers as any)?.lthr_source === 'manual';
-                                const learnedRaw = learnedFitness?.run_threshold_hr;
-                                const learnedMeasured = learnedRaw && learnedRaw.is_estimate !== true && Number(learnedRaw.value) > 0 ? Number(learnedRaw.value) : null;
-                                const status = mine
-                                  ? 'your number. Your runs don\'t change it.'
-                                  : learnedMeasured != null && resolved.bpm != null
-                                    ? `auto. Measured from your hard runs${learnedRaw?.sample_count ? ` (${learnedRaw.sample_count} runs)` : ''}.`
-                                    : manualRunLTHR != null
-                                      ? 'auto. Your typed number, until your runs measure one.'
-                                      : 'auto. Nothing measured yet — easy running can\'t measure it. Enter it, or run hard once.';
-                                const setMine = () => {
-                                  if (manualRunLTHR == null && resolved.bpm != null) setManualRunLTHR(Math.round(resolved.bpm));
-                                  setData((prev) => ({ ...prev, performanceNumbers: { ...prev.performanceNumbers, lthr_source: 'manual' } }));
-                                };
-                                const setAuto = () => setData((prev) => ({ ...prev, performanceNumbers: { ...prev.performanceNumbers, lthr_source: 'learned' } }));
-                                const zones = resolved.bpm != null ? frielRunZones(Math.round(resolved.bpm)) : [];
-                                return (
-                                  <>
-                                    <div
-                                      className="rounded-xl border px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1"
-                                      style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: mine ? `${SPORT_COLORS.run}55` : 'rgba(255,255,255,0.15)' }}
-                                    >
-                                      <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
-                                        <span className="text-lg font-semibold tabular-nums text-white">{resolved.bpm != null ? Math.round(resolved.bpm) : '—'}</span>
-                                        <span className="text-[11px] text-white/50">bpm</span>
-                                      </div>
-                                      <input
-                                        type="number"
-                                        inputMode="numeric"
-                                        aria-label="Threshold heart rate, my number, bpm"
-                                        value={manualRunLTHR ?? ''}
-                                        onChange={(e) => {
-                                          const v = parseInt(e.target.value);
-                                          setManualRunLTHR(Number.isFinite(v) && v > 0 ? v : null);
-                                          setData((prev) => ({ ...prev, performanceNumbers: { ...prev.performanceNumbers, lthr_source: Number.isFinite(v) && v > 0 ? 'manual' : (prev.performanceNumbers as any)?.lthr_source } }));
-                                        }}
-                                        placeholder={learnedMeasured != null ? String(Math.round(learnedMeasured)) : '165'}
-                                        className="w-[4.5rem] h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40 text-center shrink-0"
-                                        style={{ fontFamily: 'Inter, sans-serif' }}
-                                      />
-                                      <AutoMinePill mine={mine} onAuto={setAuto} onMine={setMine} color={SPORT_COLORS.run} label="Threshold heart rate" />
-                                      <div className="basis-full text-[11px] text-white/55 leading-snug">{status}</div>
-                                    </div>
-                                    {zones.length > 0 && (
-                                      <div className="mt-1 space-y-0.5">
-                                        {zones.map((z) => (
-                                          <div key={z.name} className="flex items-baseline justify-between text-[12px] px-1">
-                                            <span className="text-white/60">{z.name} {z.label}</span>
-                                            <span className="tabular-nums text-white/75">{z.min}–{z.max} bpm</span>
-                                          </div>
-                                        ))}
-                                        <div className="text-[11px] text-white/40 px-1">zones from your threshold heart rate (Friel)</div>
-                                      </div>
-                                    )}
-                                  </>
-                                );
-                              })()}
-                            </div>
-                            <div className="flex flex-col gap-1.5">
-                              <label className="text-sm text-white/75 font-medium">5K Time</label>
-                              {/**
-                                * ⛔ SAME ROW (Michael 2026-09-02: "add my number to 5K time"). There is no learned
-                                * 5K in the resolver; the training-side number is the Arc's implied 5K (the nudge
-                                * that used to sit here as Yes / No). `auto` = take what your runs suggest and keep
-                                * taking it; `my number` = the race clock you typed. `fiveK_source` records the
-                                * choice; `fiveK` stays the value every downstream pace derives from.
-                                */}
-                              {(() => {
-                                const implied = nudge?.implied_5k_label ?? null;
-                                const mine = (data.performanceNumbers as any)?.fiveK_source !== 'learned';
-                                const typed = data.performanceNumbers?.fiveK || '';
-                                const shown = !mine && implied ? implied : (typed || null);
-                                const status = mine
-                                  ? `your number. Your runs don\'t change it.${implied && nudge?.should_prompt ? ` Your runs suggest ~${implied}.` : ''}`
-                                  : implied
-                                    ? `auto. From your runs (~${implied}).`
-                                    : 'auto. Your runs haven\'t suggested one yet.';
-                                const setMine = () => setData(prev => ({
-                                  ...prev,
-                                  performanceNumbers: { ...prev.performanceNumbers, fiveK_source: 'manual' },
-                                }));
-                                const setAuto = () => setData(prev => {
-                                  const pn: any = { ...prev.performanceNumbers, fiveK_source: 'learned' };
-                                  if (implied) pn.fiveK = implied; // the number every derived pace reads follows the choice
-                                  return { ...prev, performanceNumbers: pn };
-                                });
-                                return (
-                                  <div
-                                    className="rounded-xl border px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1"
-                                    style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: mine ? `${SPORT_COLORS.run}55` : 'rgba(255,255,255,0.15)' }}
-                                  >
-                                    <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
-                                      <span className="text-lg font-semibold tabular-nums text-white">{shown ?? '—'}</span>
-                                    </div>
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      aria-label="5K time, my number"
-                                      value={typed}
-                                      onChange={(e) => setData(prev => ({
-                                        ...prev,
-                                        performanceNumbers: { ...prev.performanceNumbers, fiveK: e.target.value, fiveK_source: 'manual' },
-                                      }))}
-                                      placeholder={implied ?? '25:00'}
-                                      className="w-[4.5rem] h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40 text-center shrink-0"
-                                      style={{ fontFamily: 'Inter, sans-serif' }}
-                                    />
-                                    <AutoMinePill mine={mine} onAuto={setAuto} onMine={setMine} color={SPORT_COLORS.run} label="5K time" />
-                                    <div className="basis-full text-[11px] text-white/55 leading-snug">{status}</div>
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          </div>
-                        </div>
-                        );
-                      })()}
-
-                      {/* Cycling */}
-                      {activeSport === 'cycling' && (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <Bike className="h-4 w-4" style={{ color: SPORT_COLORS.cycling }} />
-                            <h3 className="text-sm font-medium text-white/90">Cycling</h3>
-                          </div>
-                          <div className="space-y-3">
-                            <label className="text-sm text-white/75 font-medium">
-                              FTP{' '}
-                              <button type="button" onClick={() => setFtpInfoOpen((o) => !o)} aria-label="What is FTP?" className="text-white/45 text-[11px] bg-transparent border-none p-0 cursor-pointer">{ftpInfoOpen ? '▾' : 'ⓘ'}</button>
-                            </label>
-                            {ftpInfoOpen && (
-                              <p className="text-[12px] text-white/55 leading-snug max-w-[min(100%,340px)]">The most power you could hold for about an hour. Hard rides and your power zones are set from it.</p>
-                            )}
-                            {/**
-                              * ⛔ THE SAME ROW AS RUN AND STRENGTH (Michael 2026-09-02, "go"). FTP had this switch
-                              * first (Q-240: typing is choosing; `ftp_source: 'manual'` = my number, absent/'learned'
-                              * = auto) — only the clothes change. The resolver (`resolveCurrentFtp`) is untouched and
-                              * still what the zones below and the plan targets read.
-                              */}
-                            {(() => {
-                              const manualFtp = data.performanceNumbers?.ftp;
-                              const learnedFtp = learnedFitness?.ride_ftp_estimated?.value;
-                              const resolved = resolveCurrentFtp({ learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers } as any);
-                              const proposal = pendingFtpProposal({ learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers } as any);
-                              const mine = (data.performanceNumbers as any)?.ftp_source === 'manual';
-                              const status = mine
-                                ? 'your number. Your rides don\'t change it.'
-                                : learnedFtp
-                                  ? 'auto. From your rides — your power curve and your heart rate at threshold.'
-                                  : manualFtp
-                                    ? 'auto. Your typed number, until your rides measure one.'
-                                    : 'auto. Nothing on file yet.';
-                              const setMine = () => setData(prev => {
-                                const pn: any = { ...prev.performanceNumbers, ftp_source: 'manual' };
-                                if (!(pn.ftp > 0) && resolved.value) pn.ftp = Math.round(Number(resolved.value));
-                                return { ...prev, performanceNumbers: pn };
-                              });
-                              const setAuto = () => setData(prev => {
-                                const pn: any = { ...prev.performanceNumbers };
-                                delete pn.ftp_source;
-                                return { ...prev, performanceNumbers: pn };
-                              });
-                              return (
-                                <div
-                                  className="rounded-xl border px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1"
-                                  style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: mine ? `${SPORT_COLORS.cycling}55` : 'rgba(255,255,255,0.15)' }}
-                                >
-                                  <div className="flex-1 min-w-0 flex items-baseline gap-1.5 flex-wrap">
-                                    <span className="text-lg font-semibold tabular-nums text-white">{resolved.value != null ? Math.round(Number(resolved.value)) : '—'}</span>
-                                    <span className="text-[11px] text-white/50">watts</span>
-                                    {proposal && !mine && (
-                                      <>
-                                        <span className="text-[11px] text-white/50">· measured {Math.round(proposal.measured)}</span>
-                                        <button
-                                          type="button"
-                                          onClick={acceptMeasuredFtp}
-                                          disabled={ftpAccepting}
-                                          aria-label={`Use the measured FTP, ${Math.round(proposal.measured)} watts`}
-                                          // eslint-disable-next-line efforts/consistent-button-shape -- same pill as AutoMinePill beside it
-                                          className="text-[11px] px-2.5 h-7 leading-7 rounded-full border bg-transparent cursor-pointer disabled:opacity-50 shrink-0"
-                                          style={{ borderColor: `${SPORT_COLORS.cycling}88`, color: SPORT_COLORS.cycling }}
-                                        >
-                                          {ftpAccepting ? 'working…' : 'use it'}
-                                        </button>
-                                      </>
-                                    )}
-                                  </div>
-                                  <input
-                                    id="ftp-input"
-                                    ref={ftpInputRef}
-                                    type="number"
-                                    inputMode="numeric"
-                                    aria-label="FTP, my number, watts"
-                                    value={manualFtp ?? ''}
-                                    onChange={(e) => setData(prev => {
-                                      const typed = parseInt(e.target.value);
-                                      const next: any = { ...prev.performanceNumbers };
-                                      if (Number.isFinite(typed) && typed > 0) {
-                                        next.ftp = typed;
-                                        next.ftp_source = 'manual'; // typing is choosing (Q-240)
-                                      } else {
-                                        delete next.ftp;
-                                        if (next.ftp_source === 'manual') delete next.ftp_source;
-                                      }
-                                      return { ...prev, performanceNumbers: next };
-                                    })}
-                                    placeholder={resolved.value ? String(Math.round(Number(resolved.value))) : '250'}
-                                    className="w-[4.5rem] h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40 text-center shrink-0"
-                                    style={{ fontFamily: 'Inter, sans-serif' }}
-                                  />
-                                  <AutoMinePill mine={mine} onAuto={setAuto} onMine={setMine} color={SPORT_COLORS.cycling} label="FTP" />
-                                  <div className="basis-full text-[11px] text-white/55 leading-snug">{status} Sets your power zones and the targets in your plan.{ftpAcceptNote ? ` ${ftpAcceptNote}` : ''}</div>
-                                </div>
-                              );
-                            })()}
-
-                            {/* Power Zones from the RESOLVED FTP (learned-first) — the same source the app uses, so the
-                                zones on Baselines match the analyzer/coach instead of being manual-first (FTP fracture #2). */}
-                            {resolveCurrentFtp({ learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers } as any).value && (
-                              <div className="space-y-1.5">
-                                <div className="text-xs text-white/50 font-medium">Power Zones</div>
-                                <div className="space-y-1">
-                                  {getPowerZones(resolveCurrentFtp({ learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers } as any).value).map((zone) => (
-                                    <div 
-                                      key={zone.name}
-                                      className="flex items-center justify-between px-2 py-1 rounded text-xs"
-                                      style={{ backgroundColor: `${zone.color}15` }}
-                                    >
-                                      <div className="flex items-center gap-2">
-                                        <div 
-                                          className="w-2 h-2 rounded-full"
-                                          style={{ backgroundColor: zone.color }}
-                                        />
-                                        <span className="text-white/70">{zone.name}</span>
-                                      </div>
-                                      <span className="text-white/50 font-mono">{zone.range}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* FTP Test Scheduling */}
-                            <div className="pt-2 border-t border-white/10">
-                              {scheduledFtpTest && !showFtpDatePicker ? (
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-xs text-emerald-400">
-                                    FTP Test: {new Date(scheduledFtpTest.date + 'T12:00:00').toLocaleDateString()}
-                                  </span>
-                                  <button
-                                    onClick={rescheduleFtpTest}
-                                    className="text-xs px-2 py-1 rounded bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
-                                  >
-                                    Reschedule
-                                  </button>
-                                  <button
-                                    onClick={deleteFtpTest}
-                                    className="text-xs px-2 py-1 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              ) : !showFtpDatePicker ? (
-                                <button 
-                                  onClick={() => setShowFtpDatePicker(true)}
-                                  className="text-xs px-3 py-1.5 rounded-xl inline-flex items-center gap-1.5 bg-white/10 text-white/80 border border-white/20 hover:bg-white/20 transition-colors"
-                                >
-                                  <Calendar className="h-3.5 w-3.5" />
-                                  Schedule FTP Test
-                                </button>
-                              ) : (
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="date"
-                                    value={ftpTestDate}
-                                    onChange={(e) => setFtpTestDate(e.target.value)}
-                                    min={new Date().toISOString().split('T')[0]}
-                                    className="text-xs px-2 py-1.5 rounded bg-white/10 border border-white/20 text-white"
-                                  />
-                                  <button
-                                    onClick={async () => {
-                                      if (scheduledFtpTest) {
-                                        await deleteFtpTest();
-                                      }
-                                      await scheduleFtpTest();
-                                    }}
-                                    className="text-xs px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium"
-                                  >
-                                    {scheduledFtpTest ? 'Update' : 'Add'}
-                                  </button>
-                                  <button
-                                    onClick={() => setShowFtpDatePicker(false)}
-                                    className="text-xs px-2 py-1.5 text-white/50 hover:text-white"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Swimming */}
-                      {activeSport === 'swimming' && (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <Waves className="h-4 w-4" style={{ color: SPORT_COLORS.swim }} />
-                            <h3 className="text-sm font-medium text-white/90">Swimming</h3>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <label className="text-xs text-white/60">Threshold 100 Pace</label>
-                            <button
-                              type="button"
-                              onClick={() => setShowSwimTest((v) => !v)}
-                              aria-label="How to find your threshold pace"
-                              className="text-white/40 hover:text-white/70 transition-colors"
-                            >
-                              <Info className="h-3.5 w-3.5" />
-                            </button>
-                                      <input
-                                        type="text"
-                                        value={data.performanceNumbers?.swimPace100 || ''}
-                                        onChange={(e) => setData(prev => ({
-                                          ...prev,
-                                          performanceNumbers: {
-                                            ...prev.performanceNumbers,
-                                            swimPace100: e.target.value
-                                          }
-                                        }))}
-                              placeholder="1:45"
-                              className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
-                              style={{ fontFamily: 'Inter, sans-serif' }}
-                                      />
-                            <span className="text-xs text-white/60">mm:ss</span>
-                                    </div>
-                          {/* D-199 C1: seed microcopy — plain, science-accurate threshold framing (~20-30 min
-                              sustainable; longer than the old "hard 400" cue which biased fast). No "CSS"/Z-names. */}
-                          <p className="text-[12px] text-white/60 -mt-1 leading-snug">Your hard, steady 100 pace — the effort you could hold for a strong continuous swim of about 20–30 minutes, not a sprint and not your easy cruise. Your easy / moderate / hard zones are all built from this one number.</p>
-                          {/* D-199: (i) test protocol — how to FIND the threshold (the benchmark). Tappable (iOS:
-                              no hover). The 400/200 CSS test, the formula, a worked example, plus a no-test fallback. */}
-                          {showSwimTest && (
-                            <div className="px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/10 -mt-0.5 space-y-1.5">
-                              <p className="text-[11px] text-white/70 font-medium">How to find your threshold pace</p>
-                              <p className="text-[12px] text-white/70 leading-snug">Best way is a quick test. Warm up, then swim an all-out <span className="text-white/70">400</span>, rest fully, then an all-out <span className="text-white/70">200</span> — each as fast as you can hold the whole way.</p>
-                              <p className="text-[12px] text-white/70 leading-snug">Threshold 100 pace = (400 time − 200 time) ÷ 2.<br />Example: 400 in 6:40 and 200 in 3:00 → (400s − 180s) ÷ 2 = <span className="text-white/70">1:50 / 100</span>.</p>
-                              <p className="text-[12px] text-white/60 leading-snug">No test handy? Enter your best steady pace for a continuous 20–30 minute swim, and update it after you test.</p>
-                            </div>
+                <div className="space-y-4">
+                  {/* ── YOU: one plate, Adjust's construction (2026-09-06) ── */}
+                  <div className="galaxy-card readout-texture readout-texture--forge rounded-2xl divide-y divide-white/[0.10]" style={readoutPlateStyle(undefined, { galaxy: true })}>
+                    <div className="px-3 py-3">
+                      <SectionHead id="you" Icon={User} label="You" colour="rgba(255,255,255,0.7)" />
+                      <div className="flex items-start gap-3 mb-1">
+                        <label className="relative shrink-0 cursor-pointer" title="Change photo">
+                          {data.profile?.photo_url ? (
+                            <img src={data.profile.photo_url} alt="" className="h-16 w-16 rounded-full object-cover border border-white/20" />
+                          ) : (
+                            <div className="h-16 w-16 rounded-full bg-white/[0.08] border border-white/20 flex items-center justify-center text-[11px] text-white/50">{photoBusy ? '…' : 'photo'}</div>
                           )}
-                          <div className="space-y-2">
-                            <label className="text-xs text-white/60">Equipment</label>
-                            <div className="grid grid-cols-2 gap-2">
-                              {swimmingEquipmentOptions.map((option) => {
-                                const isSelected = (data.equipment.swimming || []).includes(option);
-                                const hint = swimmingEquipmentHints[option];
-                                return (
-                                  <button
-                                    key={option}
-                                    onClick={() => toggleEquipment('swimming', option)}
-                                    title={hint}
-                                    className={`flex items-center gap-2 px-3 py-2 text-xs rounded-lg border transition-all duration-300 ${
-                                      isSelected
-                                        ? 'text-white'
-                                        : 'border-white/15 bg-white/[0.04] text-white/60 hover:border-white/25 hover:bg-white/[0.08]'
-                                    }`}
-                                    style={{
-                                      fontFamily: 'Inter, sans-serif',
-                                      ...(isSelected ? { borderColor: `${SPORT_COLORS.swim}80`, backgroundColor: `${SPORT_COLORS.swim}15` } : {}),
-                                    }}
-                                  >
-                                    <span
-                                      className="w-3.5 h-3.5 rounded flex items-center justify-center border shrink-0"
-                                      style={{
-                                        borderColor: isSelected ? SPORT_COLORS.swim : 'rgba(255,255,255,0.25)',
-                                        backgroundColor: isSelected ? SPORT_COLORS.swim : 'transparent',
-                                      }}
-                                    >
-                                      {isSelected && <span className="text-[8px] text-black font-bold">✓</span>}
-                                    </span>
-                                    {option}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                                    </div>
-                          {/* D-199 Layer C1: swim Pace Zones derived from the entered 100 pace (the internal
-                              CSS anchor). PLAIN labels only — no "CSS"/Z-names (Decision A; the 2026-05-22
-                              anti-regression rule holds). All 5 bands show their pace targets (a reference,
-                              like the run HR-zone card); empty until a 100 pace is entered. The swim PROGRAM
-                              only prescribing easy/moderate (no hard/threshold/speed) is a separate item, Q-071. */}
-                          {(() => {
-                            const bands = deriveSwimPaceBands(parsePaceToSeconds(data.performanceNumbers?.swimPace100) ?? 0);
-                            return (
-                              <div className="px-3 py-2.5 rounded-lg bg-white/[0.03] border border-white/[0.06] mt-1">
-                                <div className="flex items-center justify-between">
-                                  <div className="text-xs text-white/60">Pace Zones</div>
-                                  {bands.length > 0 && (
-                                    <div className="text-[11px] text-white/55">Threshold pace · {data.performanceNumbers?.swimPace100}/100yd</div>
-                                  )}
-                                </div>
-                                {bands.length === 0 ? (
-                                  <div className="text-xs text-white/40 mt-1">Enter your 100 pace above to see your swim pace zones.</div>
-                                ) : (
-                                  <div className="mt-2 rounded-lg overflow-hidden border border-white/10">
-                                    {bands.map((b) => (
-                                      <div
-                                        key={b.label}
-                                        className={`flex items-center justify-between px-3 py-1.5 border-b border-white/[0.05] last:border-b-0 ${b.anchor ? 'bg-white/[0.06]' : ''}`}
-                                      >
-                                        <span className={`text-xs ${b.anchor ? 'font-semibold text-white/90' : 'font-medium text-white/80'}`}>
-                                          {b.label}
-                                        </span>
-                                        <span className="text-xs font-mono text-white/60">{b.range} /100yd</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
-                                  </div>
-                                )}
-
-                      {/* Strength */}
-                      {activeSport === 'strength' && (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <Dumbbell className="h-4 w-4" style={{ color: SPORT_COLORS.strength }} />
-                            <h3 className="text-sm font-medium text-white/90">Strength</h3>
-                            <span className="text-xs text-white/50">1RM ({data.units === 'metric' ? 'kg' : 'lbs'})</span>
-                          </div>
-                          
-                          
-                          {/**
-                            * ⛔ AUTO / LOCKED — the Garmin switch (Michael's ruling 2026-09-02, PLAN-strength-numbers).
-                            *
-                            * Each lift is either AUTO (default: the trusted number from your logged sets, the typed
-                            * number only until logs exist) or LOCKED (you set it; learning never moves it until you
-                            * switch back). The number shown big is the one the app USES — the same resolver the
-                            * coach, the State card and a new plan's weights read (`capacity-resolver.ts`, locked >
-                            * trusted-learned > typed). What the input edits FOLLOWS the switch: in auto it edits the
-                            * typed seed, in locked it edits the locked value. Tapping "locked" seeds the lock with the
-                            * number in use; tapping "auto" removes the lock and keeps the typed seed.
-                            * ⚠️ `locked_baselines` is saved with the rest of the row on Save (AppContext.saveUserBaselines).
-                            */}
-                          <div className="space-y-2">
-                            {STRENGTH_LIFT_FIELDS.map((lift) => {
-                              const typedRaw = (data.performanceNumbers as any)?.[lift.key];
-                              const lockedMap = (data.locked_baselines ?? {}) as Record<string, number>;
-                              const lockedRaw = lockedMap[lift.key];
-                              const isLocked = lockedRaw != null || !!lockDrafts[lift.key];
-                              const resolved = resolveStrengthCapacity({
-                                key: lift.key,
-                                typed: data.performanceNumbers as any,
-                                learnedStrength1rms: learnedFitness?.strength_1rms ?? null,
-                                locked: data.locked_baselines ?? null,
-                                asOf: new Date().toISOString().slice(0, 10),
-                              });
-                              const learnedEntry = lift.learnedKey ? learnedFitness?.strength_1rms?.[lift.learnedKey] : null;
-                              const learnedVal = Number(learnedEntry?.value);
-                              const learnedSets = Number(learnedEntry?.sample_count);
-                              const unit = lift.reps ? 'reps' : (data.units === 'metric' ? 'kg' : 'lb');
-                              const status = isLocked
-                                ? 'your number. Your lifts don\'t change it.'
-                                : resolved.source === 'learned'
-                                  ? `auto. From your lifts${Number.isFinite(learnedSets) && learnedSets > 0 ? ` (${learnedSets} sets)` : ''}.`
-                                  : resolved.source === 'typed'
-                                    ? (lift.reps
-                                      ? 'auto. Your typed number.'
-                                      : 'auto. Your typed number, until three logged sets pass the trust gate.')
-                                    : 'auto. Nothing on file yet.';
-                              const sug = resolved.suggestion;
-                              const suggestion = sug && sug.divergencePct > 0
-                                ? `Your lifts suggest ${Math.round(sug.computed)}.`
-                                : null;
-                              const inputValue = isLocked
-                                ? (lockedRaw ?? '')
-                                : (lift.reps ? (typedRaw ?? '') : (typedRaw || ''));
-                              const placeholder = isLocked
-                                ? (resolved.value != null ? String(resolved.value) : lift.placeholder)
-                                : (Number.isFinite(learnedVal) && learnedVal > 0 ? String(Math.round(learnedVal)) : lift.placeholder);
-                              const setLocked = () => {
-                                const seed = resolved.value;
-                                setLockDrafts((d) => ({ ...d, [lift.key]: true }));
-                                if (seed != null) {
-                                  setData((prev) => ({ ...prev, locked_baselines: { ...(prev.locked_baselines ?? {}), [lift.key]: seed } }));
-                                }
-                              };
-                              const setAuto = () => {
-                                setLockDrafts((d) => { const n = { ...d }; delete n[lift.key]; return n; });
-                                setData((prev) => {
-                                  const next = { ...(prev.locked_baselines ?? {}) } as Record<string, number>;
-                                  delete next[lift.key];
-                                  return { ...prev, locked_baselines: Object.keys(next).length ? next : null };
-                                });
-                              };
-                              const onInput = (raw: string) => {
-                                const n = raw === '' ? NaN : Math.max(0, parseInt(raw) || 0);
-                                const valid = lift.reps ? Number.isFinite(n) : Number.isFinite(n) && n > 0;
-                                if (isLocked) {
-                                  setData((prev) => {
-                                    const next = { ...(prev.locked_baselines ?? {}) } as Record<string, number>;
-                                    if (valid) next[lift.key] = n; else delete next[lift.key];
-                                    return { ...prev, locked_baselines: Object.keys(next).length ? next : null };
-                                  });
-                                } else {
-                                  setData((prev) => ({
-                                    ...prev,
-                                    performanceNumbers: { ...prev.performanceNumbers, [lift.key]: valid ? n : undefined },
-                                  }));
-                                }
-                              };
-                              return (
-                                <div
-                                  key={lift.key}
-                                  className="rounded-xl border px-3 py-2 flex flex-wrap items-center gap-x-3 gap-y-1"
-                                  style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: isLocked ? `${SPORT_COLORS.strength}55` : 'rgba(255,255,255,0.15)' }}
-                                >
-                                  <div className="w-14 shrink-0 text-xs text-white/70">{lift.label}</div>
-                                  <div className="flex-1 min-w-0 flex items-baseline gap-1.5">
-                                    <span className="text-lg font-semibold tabular-nums text-white">{resolved.value != null ? resolved.value : '—'}</span>
-                                    <span className="text-[11px] text-white/50">{unit}</span>
-                                  </div>
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    inputMode="numeric"
-                                    aria-label={`${lift.label} ${isLocked ? 'my number' : 'typed number'}`}
-                                    value={inputValue}
-                                    onChange={(e) => onInput(e.target.value)}
-                                    placeholder={placeholder}
-                                    className="w-16 h-8 px-2 text-sm bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40 shrink-0"
-                                    style={{ fontFamily: 'Inter, sans-serif' }}
-                                  />
-                                  <AutoMinePill mine={isLocked} onAuto={setAuto} onMine={setLocked} color={SPORT_COLORS.strength} label={lift.label} />
-                                  {/* the receipt gets the whole width — squeezed beside the input it wrapped one word per line */}
-                                  <div className="basis-full text-[11px] text-white/55 leading-snug pl-[4.25rem]">{status}{suggestion ? ` ${suggestion}` : ''}</div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                          {/* Baseline Test Note — below the numbers (Michael, 2026-09-02) */}
-                          <div 
-                            className="p-3 rounded-xl backdrop-blur-lg border"
-                            style={{ 
-                              backgroundColor: `${SPORT_COLORS.strength}10`,
-                              borderColor: `${SPORT_COLORS.strength}30`
-                            }}
-                          >
-                            <p className="text-xs text-white/90 mb-2">
-                              Don't know your numbers? Or want to retest?
-                            </p>
-                            <p className="text-xs text-white/70 mb-2">
-                              Log a{' '}
-                              <button
-                                onClick={() => onOpenBaselineTest?.('Baseline Test: Lower Body')}
-                                className="underline font-medium hover:opacity-80"
-                                style={{ color: SPORT_COLORS.strength }}
-                              >
-                                Lower
-                              </button>
-                              ,{' '}
-                              <button
-                                onClick={() => onOpenBaselineTest?.('Baseline Test: Upper Body')}
-                                className="underline font-medium hover:opacity-80"
-                                style={{ color: SPORT_COLORS.strength }}
-                              >
-                                Upper
-                              </button>
-                              {' '}or{' '}
-                              <button
-                                onClick={() => onOpenBaselineTest?.('Baseline Test: Full Body')}
-                                className="underline font-medium hover:opacity-80"
-                                style={{ color: SPORT_COLORS.strength }}
-                              >
-                                Full Body
-                              </button>
-                              {' '}baseline test. One all-out AMRAP set per lift after guided warmups — we'll help you find your working weight and estimate your 1RM from it; the number firms up over the first few weeks. Same test the Get Strong block ends with, so entry and retest match.
-                            </p>
-                            <p className="text-xs text-white/60 italic">
-                              Tip: Retest every 8-12 weeks to track progress.
-                            </p>
-                          </div>
-                          <div className="space-y-4 mt-4 pt-4 border-t border-white/10">
-                            <h4 className="text-sm font-medium text-white/80">Equipment Access</h4>
-                            
-                            {/* Commercial vs Home gym toggle */}
-                            <div className="flex gap-3">
-                              <button
-                                onClick={() => {
-                                  // Set to commercial gym, clear individual equipment
-                                  setData(prev => ({
-                                    ...prev,
-                                    equipment: { ...prev.equipment, strength: ['Commercial gym'] }
-                                  }));
-                                }}
-                                className={`flex items-center gap-2.5 px-4 py-2.5 text-sm rounded-xl border-2 transition-all duration-300 ${
-                                  hasCommercialGym
-                                    ? 'text-white'
-                                    : 'border-white/15 bg-white/[0.04] text-white/60 hover:border-white/25 hover:bg-white/[0.08]'
-                                }`}
-                                style={{ 
-                                  fontFamily: 'Inter, sans-serif',
-                                  ...(hasCommercialGym ? {
-                                    borderColor: SPORT_COLORS.strength,
-                                    backgroundColor: `${SPORT_COLORS.strength}15`
-                                  } : {})
-                                }}
-                              >
-                                <span 
-                                  className="w-4 h-4 rounded-full border-2 flex items-center justify-center"
-                                  style={{ 
-                                    borderColor: hasCommercialGym ? SPORT_COLORS.strength : 'rgba(255,255,255,0.3)',
-                                    backgroundColor: hasCommercialGym ? SPORT_COLORS.strength : 'transparent'
-                                  }}
-                                >
-                                  {hasCommercialGym && <span className="text-[10px] text-black font-bold">✓</span>}
-                                </span>
-                                Commercial gym
-                              </button>
-                              <button
-                                onClick={() => {
-                                  // Switch to home gym - only clear if coming FROM commercial gym
-                                  if (hasCommercialGym) {
-                                    setData(prev => ({
-                                      ...prev,
-                                      equipment: { ...prev.equipment, strength: [] }
-                                    }));
-                                  }
-                                  // If already home gym, do nothing - keep existing equipment
-                                }}
-                                className={`flex items-center gap-2.5 px-4 py-2.5 text-sm rounded-xl border-2 transition-all duration-300 ${
-                                  !hasCommercialGym
-                                    ? 'text-white'
-                                    : 'border-white/15 bg-white/[0.04] text-white/60 hover:border-white/25 hover:bg-white/[0.08]'
-                                }`}
-                                style={{ 
-                                  fontFamily: 'Inter, sans-serif',
-                                  ...(!hasCommercialGym ? {
-                                    borderColor: SPORT_COLORS.strength,
-                                    backgroundColor: `${SPORT_COLORS.strength}15`
-                                  } : {})
-                                }}
-                              >
-                                <span 
-                                  className="w-4 h-4 rounded-full border-2 flex items-center justify-center"
-                                  style={{ 
-                                    borderColor: !hasCommercialGym ? SPORT_COLORS.strength : 'rgba(255,255,255,0.3)',
-                                    backgroundColor: !hasCommercialGym ? SPORT_COLORS.strength : 'transparent'
-                                  }}
-                                >
-                                  {!hasCommercialGym && <span className="text-[10px] text-black font-bold">✓</span>}
-                                </span>
-                                Home gym
-                              </button>
-                            </div>
-
-                            {/* Home gym equipment details - only show if not commercial */}
-                            {!hasCommercialGym && (
-                              <div className="space-y-3">
-                                <p className="text-xs text-white/50 font-medium">Select your equipment:</p>
-                                <div className="grid grid-cols-2 gap-2">
-                                  {homeGymEquipmentOptions.map((option) => {
-                                    const isSelected = (data.equipment.strength || []).includes(option);
-                                    return (
-                                      <button
-                                        key={option}
-                                        onClick={() => toggleEquipment('strength', option)}
-                                        className={`flex items-center gap-2 px-3 py-2 text-xs rounded-lg border transition-all duration-300 ${
-                                          isSelected
-                                            ? 'text-white'
-                                            : 'border-white/15 bg-white/[0.04] text-white/60 hover:border-white/25 hover:bg-white/[0.08]'
-                                        }`}
-                                        style={{ 
-                                          fontFamily: 'Inter, sans-serif',
-                                          ...(isSelected ? {
-                                            borderColor: `${SPORT_COLORS.strength}80`,
-                                            backgroundColor: `${SPORT_COLORS.strength}15`
-                                          } : {})
-                                        }}
-                                      >
-                                        <span 
-                                          className="w-3.5 h-3.5 rounded flex items-center justify-center border"
-                                          style={{ 
-                                            borderColor: isSelected ? SPORT_COLORS.strength : 'rgba(255,255,255,0.25)',
-                                            backgroundColor: isSelected ? SPORT_COLORS.strength : 'transparent'
-                                          }}
-                                        >
-                                          {isSelected && <span className="text-[8px] text-black font-bold">✓</span>}
-                                        </span>
-                                        {option}
-                        </button>
-                                    );
-                                  })}
-                    </div>
-                  </div>
-                            )}
-                </div>
-                                    </div>
-                                  )}
-                                    </div>
-                                  )}
-
-                  {/* Heart Rate Zones — D-199 Layer A: per-active-sport. This card was GLOBAL (run + cycle
-                      rows on EVERY tab), bleeding run/cycle HR zones + a per-mile run threshold pace onto
-                      swim and strength (which don't use HR zones) and showing cycle on the run tab. Now it
-                      renders ONLY on the run/cycle tabs and ONLY for the active sport (active-sport gate on
-                      each push below). Swim has no valid HR anchor (run HR ≠ swim HR by ~10–15 bpm); swim
-                      zones derive from CSS (Layer C). Strength uses e1RM/RIR, not HR zones. */}
-                  {/* Run's threshold heart rate + zones live on the run tab now (2026-09-02); this card is the bike's. */}
-                  {activeSport === 'cycling' && (
-                  <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08] mt-5">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h2 className="text-sm font-semibold text-white/90 tracking-wide">Heart Rate Zones</h2>
-                        <p className="text-xs text-white/50 mt-0.5">Two inputs, five zones</p>
+                          <input type="file" accept="image/*" className="hidden" disabled={photoBusy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadPhoto(f); e.target.value = ''; }} />
+                        </label>
+                        <div className="flex-1 min-w-0">
+                          <NumberRow id="name" name="Name" inputType="text" value={data.profile?.name || null} seed={data.profile?.name || ''} onSave={(t) => commitData((d) => ({ ...d, profile: { ...(d.profile ?? {}), name: t } }))} />
+                          <NumberRow id="location" name="Location" inputType="text" value={data.profile?.location || null} seed={data.profile?.location || ''} onSave={(t) => commitData((d) => ({ ...d, profile: { ...(d.profile ?? {}), location: t } }))} />
+                          <NumberRow id="email" name="Email" editable={false} value={authEmail || null} />
+                          {photoNote && <p className="text-[12px] text-white/60 mt-1">{photoNote}</p>}
+                        </div>
                       </div>
-                      <button
-                        onClick={refreshLearnedProfile}
-                        disabled={learningProfile}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-xl bg-white/[0.08] border border-white/20 text-white/70 hover:bg-white/[0.12] hover:text-white transition-all disabled:opacity-50"
-                        type="button"
-                      >
-                        {learningProfile ? (
-                          <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
-                        ) : (
-                          <RefreshCw className="h-3 w-3" aria-hidden />
-                        )}
-                        {learningProfile ? 'Analyzing...' : 'Refresh'}
-                      </button>
-                    </div>
-
-                    {(() => {
-                      const ageEstimates = getAgeBasedHREstimates(data.birthday, data.gender);
-                      const restingInfo = getRestingHR(customRestingHR, garminRestingHR);
-
-                      const sportSections: { key: string; label: string; icon: React.ReactNode; color: string;
-                        learnedMaxHR: number | null; learnedLTHR: number | null; learnedThresholdPace: any;
-                        manualMaxHR: number | null; setManualMaxHR: (v: number | null) => void;
-                        manualLTHR: number | null; setManualLTHR: (v: number | null) => void;
-                      }[] = [];
-
-                      if ((activeSport as string) === 'running') { // unreachable while the card is bike-only; kept for the bike branch's shape
-                        sportSections.push({
-                          key: 'run', label: 'Running',
-                          icon: <Activity className="h-4 w-4" style={{ color: SPORT_COLORS.run }} />,
-                          color: SPORT_COLORS.run,
-                          learnedMaxHR: learnedFitness?.run_max_hr_observed?.value || null,
-                          // ⛔ RESOLVED, NOT RAW (2026-08-20) — see `effectiveRunLTHR` above. A raw read
-                          // shows the learner's `88%/90% of observed max (estimated)` fallback and calls
-                          // it "learned"; the resolver refuses it, and so must the card.
-                          learnedLTHR: resolveCurrentLthr(
-                            { learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers } as never,
-                            { sport: 'run' },
-                          ).bpm,
-                          learnedThresholdPace: learnedFitness?.run_threshold_pace_sec_per_km || null,
-                          manualMaxHR: manualRunMaxHR, setManualMaxHR: setManualRunMaxHR,
-                          manualLTHR: manualRunLTHR, setManualLTHR: setManualRunLTHR,
-                        });
-                      }
-                      if (activeSport === 'cycling') {
-                        sportSections.push({
-                          key: 'ride', label: 'Cycling',
-                          icon: <Bike className="h-4 w-4" style={{ color: SPORT_COLORS.cycling }} />,
-                          color: SPORT_COLORS.cycling,
-                          learnedMaxHR: learnedFitness?.ride_max_hr_observed?.value || null,
-                          learnedLTHR: resolveCurrentLthr(
-                            { learned_fitness: learnedFitness, performance_numbers: data.performanceNumbers } as never,
-                            { sport: 'ride' },
-                          ).bpm,
-                          learnedThresholdPace: null,
-                          manualMaxHR: manualRideMaxHR, setManualMaxHR: setManualRideMaxHR,
-                          manualLTHR: manualRideLTHR, setManualLTHR: setManualRideLTHR,
-                        });
-                      }
-
-                      if (sportSections.length === 0 && !ageEstimates) {
-                        return (
-                          <div className="text-center py-6">
-                            <p className="text-sm text-white/60 mb-2">Add your birthday or select a sport above to see HR zones</p>
-                            <p className="text-xs text-white/40">Or import workouts and we'll detect your values automatically.</p>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div className="space-y-5">
-                          {/* Per-sport: anchor inputs + zone table */}
-                          {sportSections.map((sport) => {
-                            const effectiveMaxHR = sport.manualMaxHR || sport.learnedMaxHR || (ageEstimates ? ageEstimates.maxHR : null);
-                            /**
-                             * ⛔ THE ESTIMATE TIER ANCHORS ON THE ATHLETE'S OWN MAX, NOT ON THEIR AGE
-                             * (2026-08-20). It fell straight to `ageEstimates.thresholdHR`, which is
-                             * `Tanaka(age) x 0.88` — a formula on top of a formula. `effectiveMaxHR`
-                             * above is a MEASURED peak when one exists (20 rides, high confidence, on
-                             * the account this was found on), so estimating from it is one inference
-                             * instead of two. Age stays underneath for an athlete with no history.
-                             *
-                             * ⚠️ THE POINT WAS NEVER "NO ESTIMATES." The defect was an estimate stored
-                             * as a LEARNED value at `sample_count: 0` and consumed by plans, workload
-                             * and zone bins as a measurement. The engine refuses it now. This card is
-                             * an EDITOR — it has to seed the two inputs with something, and it labels
-                             * what it used ("age est." / "observed"), so a number here is a prompt to
-                             * enter one, not a claim to have measured it.
-                             */
-                            const estimatedLTHR = effectiveMaxHR
-                              ? Math.round(effectiveMaxHR * 0.88)
-                              : (ageEstimates ? ageEstimates.thresholdHR : null);
-                            const effectiveLTHR = sport.manualLTHR || sport.learnedLTHR || estimatedLTHR;
-                            const zones = getHRZones(effectiveLTHR, effectiveMaxHR, restingInfo.value);
-                            const model = getZoneModel(effectiveLTHR, effectiveMaxHR, restingInfo.value);
-
-                            const maxSource = sport.manualMaxHR ? 'manual' : sport.learnedMaxHR ? 'observed' : ageEstimates ? 'age est.' : '';
-                            // ⚠️ "learned" HERE MEANS MEASURED, and it now only says so when that is true.
-                            // The value is resolved (gated), so a formula-derived anchor no longer reaches
-                            // this line at all — it falls to the age estimate, which is labelled as one.
-                            // "learned" means MEASURED and now only says so when it is true — the
-                            // value is resolved, so a formula-derived anchor never reaches that branch.
-                            const lthrSource = sport.manualLTHR
-                              ? 'manual'
-                              : sport.learnedLTHR
-                                ? 'learned'
-                                : effectiveMaxHR
-                                  ? 'est. from max'
-                                  : (ageEstimates ? 'age est.' : '');
-
+                      <NumberRow id="birthday" name="Birthday" inputType="date" value={data.birthday ? `${fmtBirthday(data.birthday)}${calculateAge(data.birthday) != null ? ` · ${calculateAge(data.birthday)} yrs` : ''}` : null} seed={data.birthday || ''} onSave={(t) => { if (/^\d{4}-\d{2}-\d{2}$/.test(t)) void commitData((d) => ({ ...d, birthday: t })); }} />
+                      <NumberRow id="units" name="Units" value={null} right={(
+                        <span className="inline-flex shrink-0 rounded-xl border border-white/15 overflow-hidden" role="group" aria-label="Units">
+                          {(['imperial', 'metric'] as const).map((u, i) => {
+                            const on = (data.units || 'imperial') === u;
                             return (
-                              <div key={sport.key} className="space-y-3">
-                                <div className="flex items-center gap-2">
-                                  {sport.icon}
-                                  <span className="text-xs font-medium text-white/80">{sport.label}</span>
-                                  {model && <span className="text-[10px] text-white/30 ml-auto">{model}</span>}
-                                </div>
-
-                                {/* Two anchor inputs */}
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div className="px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
-                                    <div className="text-xs text-white/50 mb-1">Max HR</div>
-                                    <div className="flex items-center gap-1.5">
-                                      <input
-                                        type="number"
-                                        // ⛔ THE INPUT SHOWS WHAT THE ZONES ARE BUILT FROM. It carried its
-                                        // own copy of the tier chain; `effectiveMaxHR` is the same
-                                        // expression today, but two copies of one number in one component
-                                        // is how the LTHR box below ended up disagreeing with its zones.
-                                        value={effectiveMaxHR ?? ''}
-                                        onChange={(e) => {
-                                          const val = parseInt(e.target.value);
-                                          if (val >= 120 && val <= 230) {
-                                            sport.setManualMaxHR(val);
-                                            setData(prev => ({ ...prev }));
-                                          } else if (e.target.value === '') {
-                                            sport.setManualMaxHR(null);
-                                            setData(prev => ({ ...prev }));
-                                          }
-                                        }}
-                                        className="w-14 text-sm font-medium text-white bg-transparent border-b border-white/20 focus:border-white/50 outline-none text-center"
-                                        min={120} max={230}
-                                      />
-                                      <span className="text-xs text-white/50">bpm</span>
-                                    </div>
-                                    <div className="text-[10px] text-white/30 mt-1">{maxSource}</div>
-                                  </div>
-                                  <div className="px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
-                                    <div className="text-xs text-white/50 mb-1">LTHR</div>
-                                    <div className="flex items-center gap-1.5">
-                                      <input
-                                        type="number"
-                                        /**
-                                         * ⛔ THIS BOX DISAGREED WITH ITS OWN ZONES (found on screen,
-                                         * 2026-08-20). It kept the OLD chain — ending in the age
-                                         * estimate — while `effectiveLTHR` above moved to estimating
-                                         * from the athlete's MEASURED max. Live result: the box read
-                                         * 148 (Tanaka(57) x 0.88) under a label that said "est. from
-                                         * max", which would have been 154. One number, two chains, one
-                                         * component. Reads the single computed value now.
-                                         */
-                                        value={effectiveLTHR ?? ''}
-                                        onChange={(e) => {
-                                          const val = parseInt(e.target.value);
-                                          if (val >= 100 && val <= 210) {
-                                            sport.setManualLTHR(val);
-                                            setData(prev => ({ ...prev }));
-                                          } else if (e.target.value === '') {
-                                            sport.setManualLTHR(null);
-                                            setData(prev => ({ ...prev }));
-                                          }
-                                        }}
-                                        className="w-14 text-sm font-medium text-white bg-transparent border-b border-white/20 focus:border-white/50 outline-none text-center"
-                                        min={100} max={210}
-                                      />
-                                      <span className="text-xs text-white/50">bpm</span>
-                                    </div>
-                                    <div className="text-[10px] text-white/30 mt-1">{lthrSource}</div>
-                                  </div>
-                                </div>
-
-                                {/* Threshold Pace (running only, if available) */}
-                                {sport.learnedThresholdPace && (
-                                  <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10">
-                                    <div>
-                                      <div className="text-xs text-white/50">Threshold Pace</div>
-                                      <div className="text-sm font-medium text-white">{formatPace(sport.learnedThresholdPace.value)}</div>
-                                    </div>
-                                    <div className="text-xs text-white/40">
-                                      {getConfidenceDots(sport.learnedThresholdPace.confidence)}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Derived 5-zone table */}
-                                {zones ? (
-                                  <div className="rounded-lg overflow-hidden border border-white/10">
-                                    {zones.map((zone) => (
-                                      <div
-                                        key={zone.name}
-                                        className="flex items-center justify-between px-3 py-1.5 border-b border-white/[0.05] last:border-b-0"
-                                        style={{ backgroundColor: `${zone.color}08` }}
-                                      >
-                                        <div className="flex items-center gap-2">
-                                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: zone.color }} />
-                                          <span className="text-xs font-medium text-white/80">{zone.name}</span>
-                                          <span className="text-xs text-white/40">{zone.label}</span>
-                                        </div>
-                                        <span className="text-xs font-mono text-white/60">
-                                          {zone.min}–{zone.max ?? '∞'} bpm
-                                        </span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <div className="text-xs text-white/40 text-center py-2">
-                                    Enter Max HR or LTHR to see zones
-                                  </div>
-                                )}
-                              </div>
+                              <button key={u} type="button" aria-pressed={on} onClick={() => { if (!on) void commitData((d) => ({ ...d, units: u })); }}
+                                className={`px-3 py-1 text-[13px] ${i === 1 ? 'border-l border-white/15' : ''} ${on ? 'text-white bg-white/[0.12]' : 'text-white/50 bg-white/[0.03]'}`}>
+                                {u === 'imperial' ? 'lb · mi' : 'kg · km'}
+                              </button>
                             );
                           })}
-
-                          {/* Resting HR — optional, de-emphasized */}
-                          <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06]">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-white/40">Resting HR</span>
-                              <input
-                                type="number"
-                                value={restingInfo.value ?? ''}
-                                onChange={(e) => {
-                                  const val = parseInt(e.target.value);
-                                  if (val >= 35 && val <= 100) {
-                                    setCustomRestingHR(val);
-                                    setData(prev => ({ ...prev, performanceNumbers: { ...prev.performanceNumbers, restingHeartRate: val } }));
-                                  } else if (e.target.value === '') {
-                                    setCustomRestingHR(null);
-                                    const { restingHeartRate, ...rest } = data.performanceNumbers as any;
-                                    setData(prev => ({ ...prev, performanceNumbers: rest }));
-                                  }
-                                }}
-                                placeholder="optional"
-                                className="w-16 text-xs text-white/60 bg-transparent border-b border-white/10 focus:border-white/30 outline-none text-center"
-                                min={35} max={100}
-                              />
-                              <span className="text-xs text-white/30">bpm</span>
-                            </div>
-                            {restingInfo.value && (
-                              <span className="text-[10px] text-white/30">
-                                {restingInfo.source === 'manual' ? 'manual' : restingInfo.source === 'garmin' ? 'garmin' : ''}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Status footer */}
-                          {learnedFitness && learnedFitness.learning_status !== 'insufficient_data' && (
-                            <div className="pt-3 border-t border-white/10 flex items-center justify-between">
-                              <div className="text-xs text-white/40">
-                                {learnedFitness.learning_status === 'confident' ? 'Profile confident' : 'Still learning'}
-                                {' \u2022 '}{learnedFitness.workouts_analyzed} workouts analyzed
-                              </div>
-                              {learnedFitness.last_updated && (
-                                <div className="text-xs text-white/30">
-                                  {new Date(learnedFitness.last_updated).toLocaleDateString()}
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {(!learnedFitness || learnedFitness.learning_status === 'insufficient_data') && (
-                            <div className="pt-3 border-t border-white/10 text-center">
-                              <button
-                                onClick={refreshLearnedProfile}
-                                disabled={learningProfile}
-                                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-medium rounded-xl bg-teal-500/20 border border-teal-500/50 text-teal-400 hover:bg-teal-500/30 transition-all disabled:opacity-50"
-                                type="button"
-                              >
-                                {learningProfile ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-                                {learningProfile ? 'Analyzing...' : 'Analyze My Workouts'}
-                              </button>
-                              <p className="text-xs text-white/50 mt-3">
-                                Auto-detect Max HR and LTHR from your training data
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
+                        </span>
+                      )} />
+                      <NumberRow id="height" name="Height" hint={metric ? 'cm' : 'in'} value={data.height ? `${data.height} ${metric ? 'cm' : 'in'}` : null} seed={data.height ? String(data.height) : ''} inputMode="numeric"
+                        onSave={(t) => { const v = parseInt(t); if (Number.isFinite(v) && v > 0) void commitData((d) => ({ ...d, height: v })); }} />
+                      <NumberRow id="weight" name="Weight" hint={metric ? 'kg' : 'lb'} value={data.weight ? `${data.weight} ${metric ? 'kg' : 'lb'}` : null} seed={data.weight ? String(data.weight) : ''} inputMode="numeric"
+                        onSave={(t) => { const v = parseInt(t); if (Number.isFinite(v) && v > 0) void commitData((d) => ({ ...d, weight: v })); }} />
+                      {saveMessage && lastSavedSport === 'you' && <p className="text-[13px] text-white/75 mt-1.5">{saveMessage}</p>}
+                    </div>
                   </div>
+
+                  {/* ── The sport strip: the app's segmented control, filtering the plate below to one sport ── */}
+                  <SportStrip value={stripSport} onChange={(sp) => setActiveSport(STRIP_TO_DISCIPLINE[sp])} />
+
+                  {/* ── ONE plate for the chosen sport, wearing Adjust's plate ── */}
+                  {activeSport && (
+                    <div className="galaxy-card readout-texture readout-texture--forge rounded-2xl divide-y divide-white/[0.10]" style={readoutPlateStyle(undefined, { galaxy: true })}>
+                      {sportSections().map((sec) => (
+                        <div key={sec.id} className="px-3 py-3">
+                          <SectionHead id={sec.id} Icon={sec.Icon} label={sec.label} colour={activeColour} info={sec.info} />
+                          {sec.body}
+                        </div>
+                      ))}
+                      <div className="px-3 py-3">
+                        {saveMessage && lastSavedSport === activeSport && <p className="text-[13px] text-white/75 mb-1.5">{saveMessage}</p>}
+                        <button type="button" onClick={goToAdjust} className="bg-transparent border-none p-0 text-[13px] text-white/60 outline-none focus:outline-none active:brightness-125">Retest or rebuild on Adjust</button>
+                      </div>
+                    </div>
                   )}
                 </div>
               ) : (
@@ -2901,24 +1821,6 @@ return (
                 </div>
               )}
 
-              {/* Save Button */}
-              <div className="pt-8 pb-8">
-                {saveMessage && (
-                  <div className={`text-center mb-4 text-sm ${
-                    saveMessage.includes('Error') ? 'text-red-400' : 'text-cyan-400'
-                  }`}>
-                    {saveMessage}
-                  </div>
-                )}
-                <button
-                  onClick={handleSave}
-                  disabled={!hasChanges || saving}
-                    className="w-full py-3 px-4 rounded-xl bg-white/[0.12] border border-white/50 text-white hover:bg-white/[0.15] hover:border-white/60 transition-all duration-300 font-medium disabled:bg-white/[0.05] disabled:border-white/20 disabled:text-white/40 disabled:hover:bg-white/[0.05] disabled:hover:border-white/20 disabled:cursor-default"
-                    style={{ fontFamily: 'Inter, sans-serif' }}
-                >
-                    {saving ? 'Saving...' : 'Save Baselines'}
-                </button>
-            </div>
           </>
         )}
   </div>

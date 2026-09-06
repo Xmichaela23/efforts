@@ -7,7 +7,10 @@
 // no dead buttons that pretend to work; honest labels for what lands where. Consent-first throughout.
 
 import React, { useEffect, useState } from 'react';
-import { Pencil, Dumbbell, Activity, Bike, Layers, Feather } from 'lucide-react';
+import { Dumbbell, Activity, Bike, Layers, Feather } from 'lucide-react';
+import { NumberRow } from '@/components/ui/number-row';
+import { numberWord, pillClass } from '@/lib/number-word';
+import SportStrip, { type StripSport } from '@/components/ui/sport-strip';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { readoutPlateStyle } from '@/lib/readout-plate';
 import { supabase, getStoredUserId } from '@/lib/supabase';
@@ -25,20 +28,7 @@ import { runThresholdTestRow, ftpTestRow, ftp5MinTestRow, addDaysISO } from '@/l
 // While the server re-prices row by row (30 rows on a full block), the screen says so — leaving mid-way is not
 // guaranteed to finish (Michael, 2026-09-05).
 const REPRICE_WAIT = 'Updating your upcoming sessions…';
-/**
- * The word beside a number agrees with its auto / my-number switch: "your number" when the athlete
- * set it (a lift lock, ftp_source / threshold_pace_source / lthr_source 'manual'), "accepted" when a
- * proposal was taken, otherwise "auto". The resolver's source string is NOT the switch: it says
- * 'typed' / 'manual' for a typed number that auto fell back to, and the pill read "your number" beside
- * a switch that read auto (throwaway check, 2026-09-05).
- */
-const sourceWord = (src: string | null | undefined, isMine: boolean): string => {
-  if (isMine) return 'your number';
-  const v = String(src ?? '').toLowerCase();
-  if (!v || v === 'none') return '';
-  if (v === 'accepted') return 'accepted';
-  return 'auto';
-};
+const sourceWord = numberWord;
 // The heading carries LOAD's ⓘ (LoadBar.tsx): one line stays under the sport, the rest opens here.
 const fmtPace = (secPerMi: number | null | undefined, metric: boolean): string | null => {
   if (secPerMi == null || !Number.isFinite(secPerMi) || secPerMi <= 0) return null;
@@ -52,6 +42,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   // 2026-09-03 (Michael: "maybe it should be here"): the one control that already works — rewrite the
   // unstarted sessions of the block from the plan (same lifts, weights, days; completed sessions never
   // touched). It used to fire only as a side effect of saving Baselines after a lift lock changed.
+  const [jumpTo, setJumpTo] = useState<StripSport | null>(null);
   const [rebuilding, setRebuilding] = useState(false);
   const [rebuildNote, setRebuildNote] = useState<string | null>(null);
   const { loadUserBaselines, saveUserBaselines } = useAppContext();
@@ -279,17 +270,15 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
     })();
   };
   const fmtDay = (iso: string) => new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  const [editing, setEditing] = useState<string | null>(null);
-  const [draft, setDraft] = useState('');
   const [saveNote, setSaveNote] = useState<string | null>(null);
   // Which sport's section shows the note — the one whose number was just saved.
   const [lastSaved, setLastSaved] = useState<'strength' | 'run' | 'bike' | null>(null);
   const sportOf = (id: string): 'strength' | 'run' | 'bike' => id === 'ftp' ? 'bike' : id === 'threshold' || id === 'lthr' ? 'run' : 'strength';
   const reload = () => loadUserBaselines?.().then((b: any) => { if (b) setBaselines(b); }).catch(() => {});
   const parsePace = (t: string): number | null => { const m = t.trim().match(/^(\d{1,2}):(\d{2})$/); if (!m) return null; const sec = Number(m[1]) * 60 + Number(m[2]); return sec > 0 ? sec : null; };
-  const commit = async (id: string) => {
+  const commit = async (id: string, text: string) => {
     if (!baselines) return;
-    const t = draft.trim();
+    const t = text.trim();
     setLastSaved(sportOf(id));
     try {
       if (id === 'ftp') {
@@ -316,7 +305,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
     } catch (e) {
       setSaveNote('Could not save. Try again.');
       console.warn('[StateAdjustLens] save failed:', e);
-    } finally { setEditing(null); setDraft(''); }
+    }
   };
   // The same follow-through Training Baselines runs after its Save: an endurance number re-prices the unstarted
   // run/ride rows (`endurance-checkpoint`), a lift lock restates the block (`rematerialize-standing-block`).
@@ -387,38 +376,10 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       await reload();
     } catch (e) { setSaveNote('Could not switch. Try again.'); console.warn('[StateAdjustLens] auto failed:', e); }
   };
-  const pill = 'text-[13px] px-3 py-1.5 rounded-xl border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50';
+  const pill = pillClass;
   const Row = ({ id, name, value, editable = true, hint, sport, note }: { id: string; name: string; value: string | null; editable?: boolean; hint?: string; sport: 'strength' | 'run' | 'bike'; note?: string }) => (
-    <div className="py-1">
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-[14px] text-white/85 min-w-0 leading-tight">{name}</span>
-      {editing === id ? (
-        <span className="flex items-center gap-2">
-          <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void commit(id); if (e.key === 'Escape') { setEditing(null); setDraft(''); } }}
-            inputMode={id === 'threshold' ? 'numeric' : 'decimal'} placeholder={hint} className="w-24 bg-white/[0.06] border border-white/20 rounded-md px-2 py-1 text-[16px] text-white/90 text-right tabular-nums outline-none" />
-          <button type="button" onClick={() => void commit(id)} className="text-[12px] text-white/80 px-2 py-1 rounded-xl border border-white/15">save</button>
-          <button type="button" onClick={() => { setEditing(null); setDraft(''); }} className="text-[12px] text-white/45 px-1 py-1">cancel</button>
-        </span>
-      ) : editable ? (
-        <span className="inline-flex shrink-0 whitespace-nowrap rounded-xl border overflow-hidden" style={{ borderColor: `${getDisciplineColor(sport)}55`, background: `${getDisciplineColor(sport)}14` }}>
-          <button type="button" onClick={() => { setEditing(id); setDraft(''); setSaveNote(null); }} aria-label={`edit ${name}`}
-            className="inline-flex items-center gap-1.5 pl-2.5 pr-2 py-1 bg-transparent border-none text-[14px] text-white/90 tabular-nums outline-none focus:outline-none active:brightness-125">
-            {value ?? <span className="text-white/45">tap to add</span>}
-            <Pencil size={12} strokeWidth={2} style={{ color: getDisciplineColor(sport) }} className="shrink-0 opacity-80" aria-hidden="true" />
-          </button>
-          {mine(id) && (
-            <button type="button" onClick={() => void setAuto(id)} aria-label={`${name}: back to auto`}
-              className="px-2 py-1 border-l text-[12px] text-white/70 bg-white/[0.04] outline-none focus:outline-none active:brightness-125" style={{ borderColor: `${getDisciplineColor(sport)}55` }}>
-              auto
-            </button>
-          )}
-        </span>
-      ) : (
-        <span className="text-[14px] text-white/90 tabular-nums shrink-0 text-right">{value ?? <span className="text-white/35">no number yet</span>}</span>
-      )}
-    </div>
-      {note && <p className="text-[12px] text-white/50 mt-1 leading-snug">{note}</p>}
-    </div>
+    <NumberRow id={id} name={name} value={value} editable={editable} hint={hint} sport={sport} note={note} mine={mine(id)}
+      inputMode={id === 'threshold' ? 'numeric' : 'decimal'} onEditStart={() => setSaveNote(null)} onSave={(t) => commit(id, t)} onAuto={() => setAuto(id)} />
   );
   const rebuild = () => {
     void (async () => {
@@ -549,6 +510,13 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       {/* ⛔ ONE PLATE, HAIRLINE DIVIDERS, the State construction — but plain glass, not the galaxy
           texture, so Adjust reads as its own zone (Michael, 2026-09-05). Left column: icon + label,
           the same 92px the State rows use, so the two screens line up when you flip between them. */}
+      {/* The sport strip as a JUMP bar (2026-09-06): tap Run and the screen scrolls to the Run section. Nothing
+          hidden, nothing filtered; the block and deload sections stay above it and the reorder still works. */}
+      <SportStrip value={jumpTo} sports={['run', 'bike', 'strength']} className="mb-3" onChange={(sp) => {
+        setJumpTo(sp);
+        const el = document.getElementById(`adjust-section-${sp}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }} />
       <div className="galaxy-card readout-texture readout-texture--forge rounded-2xl divide-y divide-white/[0.10]" style={readoutPlateStyle(undefined, { galaxy: true })}>
         {ordered.map((sec, i) => {
           const color = sec.sport ? getDisciplineColor(sec.sport) : 'rgba(255,255,255,0.7)';
@@ -557,7 +525,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
           // left"). The State plate's side column works for name + number rows; these rows carry pills
           // and buttons and need the whole width on a phone.
           return (
-            <div key={sec.id} className="px-3 py-3">
+            <div key={sec.id} id={sec.sport ? `adjust-section-${sec.sport}` : undefined} className="px-3 py-3 scroll-mt-24">
               <div className="flex items-center gap-2 mb-2">
                 <sec.Icon size={15} strokeWidth={2.25} style={{ color }} className="shrink-0" aria-hidden="true" />
                 <span className="text-[11.5px] font-semibold tracking-[0.14em] uppercase" style={{ color }}>{sec.label}</span>

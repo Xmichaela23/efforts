@@ -1076,6 +1076,28 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowImportPage(false);
   };
 
+  // Profile's "Retest or rebuild on Adjust" (2026-09-06): open State; the lens is pre-set via setPendingStateLens.
+  useEffect(() => {
+    const h = () => {
+      setSelectedWorkout(null);
+      setShowStrengthLogger(false);
+      setShowPilatesYogaLogger(false);
+      setShowBuilder(false);
+      setShowGear(false);
+      setShowImportPage(false);
+      setShowAllPlans(false);
+      setShowStrengthPlans(false);
+      setShowAthleticRecord(false);
+      setShowTrainingBaselines(false);
+      setShowContext(true);
+      if (location.pathname === '/profile' || location.pathname === '/profile/athletic-record') {
+        try { navigate('/', { replace: true }); } catch (e) { console.warn('[AppLayout] navigate from profile failed:', e); }
+      }
+    };
+    window.addEventListener('open:state', h);
+    return () => window.removeEventListener('open:state', h);
+  }, [location.pathname, navigate]);
+
   const handleOpenContext = (workoutId?: string) => {
     if (workoutId) {
       setContextFocusWorkoutId(workoutId);
