@@ -230,6 +230,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       console.warn('[StateAdjustLens] save failed:', e);
     } finally { setEditing(null); setDraft(''); }
   };
+  const pill = 'text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50';
   const Row = ({ id, name, value, editable = true, hint, sport }: { id: string; name: string; value: string | null; editable?: boolean; hint?: string; sport: 'strength' | 'run' | 'bike' }) => (
     <div className="flex items-center justify-between py-1 gap-3">
       <span className="text-[14px] text-white/85">{name}</span>
@@ -307,32 +308,20 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         </section>
       )}
 
-      <section className="mb-5">
-        <div className="text-[12px] uppercase tracking-wider text-white/60 mb-2">Retest</div>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => openLiftTest('Lower')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80">Lower lifts</button>
-          <button type="button" onClick={() => openLiftTest('Upper')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80">Upper lifts</button>
-          {scheduled.run ? (
-            <button type="button" disabled={testBusy === 'run'} onClick={() => removeTest('run')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50">Run threshold · {fmtDay(scheduled.run.date)} · remove</button>
-          ) : (
-            <button type="button" disabled={testBusy === 'run'} onClick={() => scheduleTest('run')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50">Run threshold</button>
-          )}
-          {scheduled.ftp ? (
-            <button type="button" disabled={testBusy === 'ftp'} onClick={() => removeTest('ftp')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50">FTP · {fmtDay(scheduled.ftp.date)} · remove</button>
-          ) : (
-            <button type="button" disabled={testBusy === 'ftp'} onClick={() => scheduleTest('ftp')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50">FTP · 20 min</button>
-          )}
-          {scheduled.ftp5 ? (
-            <button type="button" disabled={testBusy === 'ftp5'} onClick={() => removeTest('ftp5')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50">FTP · 5 min · {fmtDay(scheduled.ftp5.date)} · remove</button>
-          ) : (
-            <button type="button" disabled={testBusy === 'ftp5'} onClick={() => scheduleTest('ftp5')} className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50">FTP · 5 min</button>
-          )}
-        </div>
-        <p className="text-[13px] text-white/60 mt-2 leading-snug">
-          Lifts open the test session in the logger now. Run threshold and FTP tests go on the calendar three and two days out. The 5-minute test is all-out with no pacing, so it repeats well; the 20-minute one is the classic. A logged test re-prices the block.
-        </p>
-      </section>
-
+      {/* ⛔ TESTS SIT UNDER THEIR SPORT (Michael, 2026-09-05: "tests should sit under their sport"). One retest row
+          per discipline, in the same row shape as its numbers. What each one does, traced 2026-09-05:
+          - Lifts: opens the logger's "Baseline Test: Lower/Upper" session now (AppLayout `baselines:openTest`).
+            "Save as baseline" → `save-baseline-test` writes performance_numbers. NOTE: `rematerialize-standing-block`
+            prices from locked_baselines > the week-one test read > config.working_numbers and never reads
+            performance_numbers, so a mid-block test from here does not re-price the block on its own. Copy says
+            only what is true; the seam is filed in docs/WORKORDER-adjust-tests-2026-09-05.md.
+          - Run: a calendar row tagged run_test, three days out. auto-attach-planned links the run landed on that
+            day (same sport, same date), compute-workout-analysis reads the 8–13 min lap, writes the learned
+            threshold (88% of trial speed, p210) at high confidence; the learner keeps a trial over its own read.
+            The accepted value is held, so the trial shows as a proposal here and in the post-run popup.
+          - Bike: a calendar row tagged ftp_test (+ ftp_test_5min), two days out. No link needed: the learner
+            fits the power-duration curve (2–20 min) over the last 90 days. Medium confidence needs a 20-minute
+            point, so the 5-minute test only moves the number alongside a ride with a 20-minute effort on file. */}
       {/* STRENGTH — the deepest steer (swap / add / adjust weight already built; re-homing here next) */}
       <section className="mb-5">
         <SportHeading sport="strength" label="Strength" />
@@ -345,13 +334,20 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
             ))}
           </div>
         )}
-        <p className="text-[13px] text-white/60 mt-2.5 leading-snug">
-          Tap a number to set your own. Swaps and added movements live in the logger.
+        <div className="flex items-center justify-between py-1 gap-3 mt-1.5">
+          <span className="text-[14px] text-white/85">Retest</span>
+          <span className="flex flex-wrap gap-2 justify-end">
+            <button type="button" onClick={() => openLiftTest('Lower')} className={pill}>Lower lifts</button>
+            <button type="button" onClick={() => openLiftTest('Upper')} className={pill}>Upper lifts</button>
+          </span>
+        </div>
+        <p className="text-[13px] text-white/60 mt-2 leading-snug">
+          Tap a number to set your own. A retest opens the test session in the logger now: warm-up ramp, then one all-out set per lift. Swaps and added movements live in the logger.
         </p>
       </section>
 
-      {/* ENDURANCE — the numbers the run and ride sessions are priced from, and the re-price. */}
-      <section>
+      {/* RUN — the numbers the run sessions are priced from, the re-price, and the threshold test. */}
+      <section className="mb-5">
         <SportHeading sport="run" label="Run" />
         <div className="space-y-1.5">
           <Row id="threshold" name="Threshold pace" value={withSource(fmtPace(thr?.sec_per_mi, metric), thr?.source)} hint={metric ? 'm:ss/km' : 'm:ss/mi'} sport="run" />
@@ -363,21 +359,51 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
           )}
           <Row id="lthr" name="Threshold heart rate" value={withSource(lthr?.bpm != null ? `${Math.round(lthr.bpm)} bpm` : null, lthr?.source)} hint="bpm" sport="run" />
           <Row id="easy" name="Easy pace" value={fmtPace(easy?.sec_per_mi, metric) ? `${fmtPace(easy?.sec_per_mi, metric)} · from threshold` : null} editable={false} sport="run" />
-        </div>
-        <div className="mt-4">
-          <SportHeading sport="bike" label="Bike" />
-          <div className="space-y-1.5">
-            <Row id="ftp" name="FTP" value={withSource(ftp?.value != null ? `${Math.round(ftp.value)} W` : null, ftp?.source)} hint="W" sport="bike" />
-            {proposal && (
-              <div className="flex items-center justify-between py-1 gap-3">
-                <span className="text-[13px] text-white/70">Your rides measure {Math.round(proposal.measured)} W</span>
-                <button type="button" disabled={accepting} onClick={acceptFtp} style={{ borderColor: `${getDisciplineColor('bike')}88`, color: getDisciplineColor('bike') }} className="text-[13px] px-3 py-1 rounded-lg border bg-white/[0.04] disabled:opacity-50">{accepting ? 'Applying…' : `use ${Math.round(proposal.measured)} W`}</button>
-              </div>
-            )}
+          <div className="flex items-center justify-between py-1 gap-3">
+            <span className="text-[14px] text-white/85">Retest</span>
+            <span className="flex flex-wrap gap-2 justify-end">
+              {scheduled.run ? (
+                <button type="button" disabled={testBusy === 'run'} onClick={() => removeTest('run')} className={pill}>Threshold · {fmtDay(scheduled.run.date)} · remove</button>
+              ) : (
+                <button type="button" disabled={testBusy === 'run'} onClick={() => scheduleTest('run')} className={pill}>Threshold</button>
+              )}
+            </span>
           </div>
         </div>
         <p className="text-[13px] text-white/60 mt-2 leading-snug">
-          Tap a number to set your own. Easy days run on threshold heart rate; easy pace is threshold pace × 1.19. Rebuild above to apply.
+          Tap a number to set your own. Easy days run on threshold heart rate; easy pace is threshold pace × 1.19. The threshold test goes on the calendar three days out; a run logged on that day is read as the test, and the result shows here and after the run as a number to accept.
+        </p>
+      </section>
+
+      {/* BIKE — FTP, its proposal, and the two FTP tests. */}
+      <section>
+        <SportHeading sport="bike" label="Bike" />
+        <div className="space-y-1.5">
+          <Row id="ftp" name="FTP" value={withSource(ftp?.value != null ? `${Math.round(ftp.value)} W` : null, ftp?.source)} hint="W" sport="bike" />
+          {proposal && (
+            <div className="flex items-center justify-between py-1 gap-3">
+              <span className="text-[13px] text-white/70">Your rides measure {Math.round(proposal.measured)} W</span>
+              <button type="button" disabled={accepting} onClick={acceptFtp} style={{ borderColor: `${getDisciplineColor('bike')}88`, color: getDisciplineColor('bike') }} className="text-[13px] px-3 py-1 rounded-lg border bg-white/[0.04] disabled:opacity-50">{accepting ? 'Applying…' : `use ${Math.round(proposal.measured)} W`}</button>
+            </div>
+          )}
+          <div className="flex items-center justify-between py-1 gap-3">
+            <span className="text-[14px] text-white/85">Retest</span>
+            <span className="flex flex-wrap gap-2 justify-end">
+              {scheduled.ftp ? (
+                <button type="button" disabled={testBusy === 'ftp'} onClick={() => removeTest('ftp')} className={pill}>20 min · {fmtDay(scheduled.ftp.date)} · remove</button>
+              ) : (
+                <button type="button" disabled={testBusy === 'ftp'} onClick={() => scheduleTest('ftp')} className={pill}>20 min</button>
+              )}
+              {scheduled.ftp5 ? (
+                <button type="button" disabled={testBusy === 'ftp5'} onClick={() => removeTest('ftp5')} className={pill}>5 min · {fmtDay(scheduled.ftp5.date)} · remove</button>
+              ) : (
+                <button type="button" disabled={testBusy === 'ftp5'} onClick={() => scheduleTest('ftp5')} className={pill}>5 min</button>
+              )}
+            </span>
+          </div>
+        </div>
+        <p className="text-[13px] text-white/60 mt-2 leading-snug">
+          Tap a number to set your own. The FTP tests go on the calendar two days out. The 20-minute test is the classic. The 5-minute test is all-out with no pacing, so it repeats well; it prices alongside a ride with a 20-minute effort in the last 90 days. The result shows here and after the ride as a number to accept. Rebuild above to apply a number you typed.
         </p>
         {saveNote && <p className="text-[13px] text-white/75 mt-1.5">{saveNote}</p>}
       </section>
