@@ -50,3 +50,10 @@ Michael: "It's the easiest way to train the user, and it's clean: every bordered
   it. One line at the top of a plate says "Tap a value to change it" and nothing else repeats it.
 - The lint `efforts/consistent-button-shape` keeps button corners honest; this rule is enforced by
   review until a lint exists for bordered `span`/`div` labels.
+- **Three taps, two glyphs.** No glyph: it happens in place (edit, toggle, apply). Down chevron: it opens
+  under your thumb (a row expands, a sheet rises). Right chevron: you leave the screen (the Goals row
+  "Plan: Standard Focus · Week 1 ›" is the model; iOS Settings rows are the precedent). A card that
+  navigates gets the right chevron too.
+- **A segmented strip shares one border.** Status / Adjust / Schedule, Run / Ride / Strength / Swim:
+  one border around the group, the chosen segment marked by underline and colour, never bordered on
+  its own.

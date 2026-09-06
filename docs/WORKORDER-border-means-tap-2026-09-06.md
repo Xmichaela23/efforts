@@ -35,3 +35,10 @@ Lint: no new `consistent-button-shape` findings. `npx tsc --noEmit` clean. Walk 
 lenses), Profile (all four sports), the logger, the wizard, a plan builder screen: no bordered label
 left, every bordered pill does something on tap. Push, wait for Netlify, `npm run ios`. Report pushed /
 web / iOS synced, and what was not device-checked.
+
+## 5. Chevrons (same pass)
+
+Right chevron on every bordered control that leaves the screen: "Retest or rebuild on Adjust ›" on
+Profile, the two build cards on Goals ("Build a training plan", "Build a race plan"), any pill that
+navigates. Nothing that edits or opens in place gets one. Down chevrons on State rows stay. Use
+lucide `ChevronRight`, `h-4 w-4 text-white/40`, the way the Goals plan row already draws it.
