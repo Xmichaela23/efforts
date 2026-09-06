@@ -1463,13 +1463,15 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                   {rows.map((r, i) => (
                     <React.Fragment key={`${r.name}-${i}`}>
                       <span className="text-[14px] text-white/85 leading-tight min-w-0">{r.name}</span>
-                      <span className="flex flex-col items-end text-right">
-                        <span className="text-[15px] text-white/90 leading-tight tabular-nums">
-                          {r.arrow && <span className={`${r.arrowCls ?? 'text-white/70'} mr-1`}>{r.arrow}</span>}
-                          {r.value}
-                        </span>
-                        {r.note && <span className="text-[12.5px] text-white/65 leading-tight tabular-nums whitespace-nowrap">{r.note}</span>}
+                      <span className="text-[15px] text-white/90 leading-tight tabular-nums text-right">
+                        {r.arrow && <span className={`${r.arrowCls ?? 'text-white/70'} mr-1`}>{r.arrow}</span>}
+                        {r.value}
                       </span>
+                      {/* ⛔ THE NOTE GETS ITS OWN ROW ACROSS BOTH COLUMNS (2026-09-06). It sat under the value
+                          inside the value cell, so a wide note ("12-week trend · from 1.637") squeezed the name
+                          column until the name wrapped, and the name's second line ran into the note. On its own
+                          row nothing shares its width. */}
+                      {r.note && <span className="col-span-2 -mt-[4px] text-right text-[12.5px] text-white/65 leading-tight tabular-nums">{r.note}</span>}
                     </React.Fragment>
                   ))}
                 </span>
