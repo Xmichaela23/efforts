@@ -78,6 +78,7 @@ const FORM_ZONE_CLS: Record<string, string> = {
 // TrainingPeaks draws on its dashboard) as the primary visual. Per-day detail lives in the calendar.
 
 export default function LoadBar({ load, compact }: LoadBarProps) {
+  const [showKey, setShowKey] = React.useState(false);
   // ⛔ THE LOAD READ IS TRAININGPEAKS' PMC, WHOLE (2026-09-04, Michael: "each metric has to have an absolute
   // reference point", never a hodgepodge). Fitness · Fatigue · Form, and Friel's Form zone word beside form.
   // WHAT THIS REPLACED: the reconciled load word ("balanced" — the app's own reconciler, D-260) and the
@@ -128,7 +129,10 @@ export default function LoadBar({ load, compact }: LoadBarProps) {
     <div className="px-3 py-3">
       {/* Fitness · Fatigue · Form — TrainingPeaks' three numbers on one line, the Form zone word beside form. */}
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase">LOAD</span>
+        <span className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase">
+          LOAD{' '}
+          <button type="button" onClick={() => setShowKey((o) => !o)} aria-label="What do fitness, fatigue and form mean?" aria-expanded={showKey} className="bg-transparent border-none p-0 cursor-pointer text-white/45 normal-case tracking-normal font-normal text-[12px] align-baseline">ⓘ</button>
+        </span>
         {ff && fmt1(ff.fitness) != null ? (
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[11px] text-white/45 leading-none [&>span]:whitespace-nowrap">
             <span>fitness <span className="readout-num text-[13px] text-white/85">{fmt1(ff.fitness)}</span><Delta v={delta(ff.fitness, wk?.fitness)} /></span>
@@ -144,9 +148,10 @@ export default function LoadBar({ load, compact }: LoadBarProps) {
           <span className="text-[11px] text-white/40 leading-none">no sessions logged yet</span>
         )}
       </div>
-      {ff && fmt1(ff.fitness) != null && (
-        <div className="mt-1.5 text-[11px] text-white/50 leading-snug">
-          fitness: the last 6 weeks · fatigue: the last week · form = fitness − fatigue, above zero fresh, below zero carrying load · small numbers: this week's change
+      {showKey && (
+        <div className="mt-1.5 text-[12px] text-white/60 leading-snug max-w-[min(100%,360px)]">
+          Fitness is your training over the last six weeks, fatigue over the last week, form is fitness minus fatigue. The small numbers are this week's change.
+          Form words: above +25 transitional (fitness fading) · +5 to +25 fresh (race shape) · −10 to +5 grey zone (not building, not sharp) · −30 to −10 optimal (building) · below −30 high risk.
         </div>
       )}
 
