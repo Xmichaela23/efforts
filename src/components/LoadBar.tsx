@@ -127,10 +127,10 @@ export default function LoadBar({ load, compact }: LoadBarProps) {
   return (
     <div className="px-3 py-3">
       {/* Fitness · Fatigue · Form — TrainingPeaks' three numbers on one line, the Form zone word beside form. */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <span className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase">LOAD</span>
         {ff && fmt1(ff.fitness) != null ? (
-          <div className="flex items-center gap-2 text-[11px] text-white/45 leading-none">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[11px] text-white/45 leading-none [&>span]:whitespace-nowrap">
             <span>fitness <span className="readout-num text-[13px] text-white/85">{fmt1(ff.fitness)}</span><Delta v={delta(ff.fitness, wk?.fitness)} /></span>
             <Dot />
             <span>fatigue <span className="readout-num text-[13px] text-white/85">{fmt1(ff.fatigue)}</span><Delta v={delta(ff.fatigue, wk?.fatigue)} /></span>
@@ -144,9 +144,9 @@ export default function LoadBar({ load, compact }: LoadBarProps) {
           <span className="text-[11px] text-white/40 leading-none">no sessions logged yet</span>
         )}
       </div>
-      {!compact && ff && fmt1(ff.fitness) != null && (
-        <div className="mt-1 text-[11px] text-white/50 leading-snug">
-          fitness: the last 6 weeks of training · fatigue: the last week · form = fitness − fatigue, above zero fresh, below zero carrying load · small numbers: the change this week
+      {ff && fmt1(ff.fitness) != null && (
+        <div className="mt-1.5 text-[11px] text-white/50 leading-snug">
+          fitness: the last 6 weeks · fatigue: the last week · form = fitness − fatigue, above zero fresh, below zero carrying load · small numbers: this week's change
         </div>
       )}
 
