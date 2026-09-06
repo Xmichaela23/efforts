@@ -37,11 +37,9 @@ function OutcomeChip({ l }: { l: Lift }) {
   else if (l.outcome === 'updated') text = `updated to ${l.e1rm ?? ''}${suffix}`;
   else if (l.outcome === 'kept') text = `kept ${l.stored ?? ''}`;
   const kept = l.outcome === 'kept';
-  const cls = kept
-    ? 'text-white/55 border-white/20'
-    : 'text-emerald-300/90 border-emerald-400/40';
+  const cls = kept ? 'text-white/55' : 'text-emerald-300/90';
   return (
-    <span className={`text-[10px] rounded-full border px-2 py-0.5 tabular-nums whitespace-nowrap ${cls}`}>
+    <span className={`text-[10px] tabular-nums whitespace-nowrap ${cls}`}>
       {text}
     </span>
   );

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { MobileHeader } from './MobileHeader';
 import { 
@@ -1229,9 +1228,7 @@ const Connections: React.FC = () => {
               <Heart className="h-5 w-5 text-red-400" />
               <span>Apple Health</span>
               {healthKitAuthorized && (
-                <Badge variant="outline" className="ml-2 border-green-500/50 text-green-400">
-                  Connected
-                </Badge>
+                <span className="ml-2 text-xs font-semibold text-green-400">Connected</span>
               )}
             </CardTitle>
             <CardDescription className="text-white/60">

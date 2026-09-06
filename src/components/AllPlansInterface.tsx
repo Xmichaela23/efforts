@@ -1552,22 +1552,22 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const getCompletionBadge = (workout: any) => {
     if (!workout.completed) {
       return (
-        <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+        <span className="text-xs font-medium text-gray-600">
           Planned
         </span>
       );
     }
     
     const ratingColors = {
-      1: 'bg-red-100 text-red-800 border-red-200',
-      2: 'bg-orange-100 text-orange-800 border-orange-200', 
-      3: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      4: 'bg-green-100 text-green-800 border-green-200',
-      5: 'bg-emerald-100 text-emerald-800 border-emerald-200'
+      1: 'text-red-800',
+      2: 'text-orange-800',
+      3: 'text-yellow-800',
+      4: 'text-green-800',
+      5: 'text-emerald-800'
     };
     
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${ratingColors[workout.rating as keyof typeof ratingColors] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+      <span className={`text-xs font-medium ${ratingColors[workout.rating as keyof typeof ratingColors] || 'text-gray-600'}`}>
         ✓ {workout.rating}/5
       </span>
     );

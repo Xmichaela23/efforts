@@ -1,7 +1,8 @@
 /**
  * NumberRow — the one way a number is drawn and edited, on Adjust and on Profile (2026-09-06).
  *
- * Name left, pill right: `125 lb · auto ✎`. Tap the pill → inline input (16px, no zoom), save / cancel.
+ * Name left, pill right: `125 lb · auto`. Tap the pill → inline input (16px, no zoom), save / cancel. No pencil:
+ * the bordered pill is the affordance (docs/DESIGN-button-shape.md, "A border means you can tap it").
  * The word beside the number follows the switch: `auto`, `your number` (the athlete set it), `accepted`
  * (a proposal was taken) — see `numberWord`. When the athlete's own number is in use the pill grows an
  * `auto` segment that switches back. Read-only rows render the value with no pill. One optional note
@@ -10,7 +11,6 @@
  * (docs/DESIGN-button-shape.md).
  */
 import React, { useState } from 'react';
-import { Pencil } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/context-utils';
 
 export type NumberRowSport = 'strength' | 'run' | 'bike' | 'swim';
@@ -65,9 +65,8 @@ export function NumberRow({ id, name, value, editable = true, hint, sport, note,
         ) : editable ? (
           <span className="inline-flex shrink-0 max-w-[62%] rounded-xl border overflow-hidden" style={{ borderColor: `${colour}55`, background: `${colour}14` }}>
             <button type="button" onClick={() => { setEditing(true); setDraft(seed ?? ''); onEditStart?.(); }} aria-label={`edit ${name}`}
-              className="inline-flex items-center gap-1.5 pl-2.5 pr-2 py-1 bg-transparent border-none text-[14px] text-white/90 tabular-nums outline-none focus:outline-none active:brightness-125 min-w-0">
+              className="inline-flex items-center px-2.5 py-1 bg-transparent border-none text-[14px] text-white/90 tabular-nums outline-none focus:outline-none active:brightness-125 min-w-0">
               <span className="truncate">{value ?? <span className="text-white/45">tap to add</span>}</span>
-              <Pencil size={12} strokeWidth={2} style={{ color: colour }} className="shrink-0 opacity-80" aria-hidden="true" />
             </button>
             {mine && onAuto && (
               <button type="button" onClick={() => void onAuto()} aria-label={`${name}: back to auto`}

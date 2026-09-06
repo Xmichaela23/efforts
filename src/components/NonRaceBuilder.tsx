@@ -5895,7 +5895,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                                   <span className="text-white/85 text-sm">{CATEGORY_LABEL[category]}</span>
                                   <span className="text-white/50 text-xs">pull-up progression</span>
                                 </div>
-                                <div className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.03] border border-white/8 text-white/60">
+                                <div className="w-full py-2 text-sm text-white/60">
                                   Chins — set by the progression while it is on
                                 </div>
                               </div>

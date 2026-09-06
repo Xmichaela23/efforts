@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, RefreshCw, Calendar, Info, Loader2, User, Gauge, Wrench, Settings2 } from 'lucide-react';
+import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, RefreshCw, Calendar, Info, Loader2, User, Gauge, Wrench, Settings2, ChevronRight } from 'lucide-react';
 import { NumberRow } from '@/components/ui/number-row';
-import { numberWord } from '@/lib/number-word';
+import { numberWord, pillClass } from '@/lib/number-word';
 import SportStrip, { type StripSport } from '@/components/ui/sport-strip';
 import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { readoutPlateStyle } from '@/lib/readout-plate';
@@ -1662,6 +1662,7 @@ return (
                   <div className="galaxy-card readout-texture readout-texture--forge rounded-2xl divide-y divide-white/[0.10]" style={readoutPlateStyle(undefined, { galaxy: true })}>
                     <div className="px-3 py-3">
                       <SectionHead id="you" Icon={User} label="You" colour="rgba(255,255,255,0.7)" />
+                      <p className="mb-2 text-[13px] text-white/60 leading-snug">Tap a value to change it.</p>
                       <div className="flex items-start gap-3 mb-1">
                         <label className="relative shrink-0 cursor-pointer" title="Change photo">
                           {data.profile?.photo_url ? (
@@ -1714,7 +1715,7 @@ return (
                       ))}
                       <div className="px-3 py-3">
                         {saveMessage && lastSavedSport === activeSport && <p className="text-[13px] text-white/75 mb-1.5">{saveMessage}</p>}
-                        <button type="button" onClick={goToAdjust} className="bg-transparent border-none p-0 text-[13px] text-white/60 outline-none focus:outline-none active:brightness-125">Retest or rebuild on Adjust</button>
+                        <button type="button" onClick={goToAdjust} className={`${pillClass} inline-flex items-center gap-1 outline-none focus:outline-none active:brightness-125`}>Retest or rebuild on Adjust<ChevronRight className="h-4 w-4 text-white/40" aria-hidden="true" /></button>
                       </div>
                     </div>
                   )}

@@ -7,7 +7,7 @@
 // no dead buttons that pretend to work; honest labels for what lands where. Consent-first throughout.
 
 import React, { useEffect, useState } from 'react';
-import { Dumbbell, Activity, Bike, Layers, Feather } from 'lucide-react';
+import { Dumbbell, Activity, Bike, Layers, Feather, ChevronRight } from 'lucide-react';
 import { NumberRow } from '@/components/ui/number-row';
 import { numberWord, pillClass } from '@/lib/number-word';
 import SportStrip, { type StripSport } from '@/components/ui/sport-strip';
@@ -426,11 +426,11 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         <div className="flex items-center justify-between py-1 gap-3 mt-1.5">
           <span className="text-[14px] text-white/85">Retest</span>
           <span className="flex flex-wrap gap-2 justify-end">
-            <button type="button" disabled={retestBusy != null} onClick={() => openLiftTest('Lower')} className={pill}>{retestBusy === 'Lower' ? 'Opening…' : 'Lower lifts'}</button>
-            <button type="button" disabled={retestBusy != null} onClick={() => openLiftTest('Upper')} className={pill}>{retestBusy === 'Upper' ? 'Opening…' : 'Upper lifts'}</button>
+            <button type="button" disabled={retestBusy != null} onClick={() => openLiftTest('Lower')} className={`${pill} inline-flex items-center gap-1`}>{retestBusy === 'Lower' ? 'Opening…' : 'Lower lifts'}<ChevronRight className="h-4 w-4 text-white/40" aria-hidden="true" /></button>
+            <button type="button" disabled={retestBusy != null} onClick={() => openLiftTest('Upper')} className={`${pill} inline-flex items-center gap-1`}>{retestBusy === 'Upper' ? 'Opening…' : 'Upper lifts'}<ChevronRight className="h-4 w-4 text-white/40" aria-hidden="true" /></button>
           </span>
         </div>
-        <p className="text-[13px] text-white/60 mt-2 leading-snug">Tap a number to set your own. A retest opens today, in the logger.</p>
+        <p className="text-[13px] text-white/60 mt-2 leading-snug">A retest opens today, in the logger.</p>
         {saveNote && lastSaved === 'strength' && <p className="text-[13px] text-white/75 mt-1.5">{saveNote}</p>}
       </>
     ) },
@@ -463,7 +463,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
             </span>
           </div>
         </div>
-        <p className="text-[13px] text-white/60 mt-2 leading-snug">Tap a number to set your own. The threshold test goes on the calendar three days out.</p>
+        <p className="text-[13px] text-white/60 mt-2 leading-snug">The threshold test goes on the calendar three days out.</p>
         {saveNote && lastSaved === 'run' && <p className="text-[13px] text-white/75 mt-1.5">{saveNote}</p>}
       </>
     ) },
@@ -493,13 +493,15 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
             </span>
           </div>
         </div>
-        <p className="text-[13px] text-white/60 mt-2 leading-snug">Tap a number to set your own. The FTP tests go on the calendar two days out.</p>
+        <p className="text-[13px] text-white/60 mt-2 leading-snug">The FTP tests go on the calendar two days out.</p>
         {saveNote && lastSaved === 'bike' && <p className="text-[13px] text-white/75 mt-1.5">{saveNote}</p>}
       </>
     ) },
   ];
   const eff = effectiveOrder();
   const ordered = [...sections].sort((x, y) => eff.indexOf(x.id) - eff.indexOf(y.id));
+  // One line says it, once, at the top of the first sport section (docs/DESIGN-button-shape.md, 2026-09-06).
+  const firstSportId = ordered.find((s) => s.sport)?.id;
 
   return (
     <div className="px-0.5 overflow-x-hidden">
@@ -540,6 +542,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
                 )}
               </div>
               {open && sec.info && <p className="mb-2 text-[12px] text-white/65 leading-snug">{sec.info}</p>}
+              {sec.id === firstSportId && <p className="mb-2 text-[13px] text-white/60 leading-snug">Tap a value to change it.</p>}
               {sec.body}
             </div>
           );

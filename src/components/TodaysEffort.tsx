@@ -1815,7 +1815,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             ? formatPlannedSwimDistanceChip(workout as any)
                             : null;
                           return swimChip ? (
-                            <span className="rounded-md border border-blue-400/35 bg-blue-500/18 px-2 py-0.5 text-[11px] text-blue-200/95">
+                            <span className="text-[11px] text-blue-200/95">
                               {swimChip}
                             </span>
                           ) : null;

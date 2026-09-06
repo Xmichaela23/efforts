@@ -623,11 +623,11 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
               <span className="text-xs text-white font-light">{minutes}:00</span>
             ) : null}
             {(typeof yards === 'number') ? (
-              <span className="px-2 py-0.5 text-xs rounded-lg bg-blue-500/20 backdrop-blur-sm border border-blue-400/30 text-blue-300">{yards} yd</span>
+              <span className="text-xs text-blue-300">{yards} yd</span>
             ) : null}
             {(workout as any)?.workload_planned ? (
               <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-lg bg-white/[0.05] backdrop-blur-sm border border-white/15 text-gray-300"
+                className="inline-flex items-center gap-1 text-xs text-gray-300"
                 title="Planned workload: hours times intensity, one hour at threshold is 100"
               >
                 <span className="text-white/45 font-normal">Workload</span>
@@ -637,14 +637,14 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           </span>
         </div>
         {swimEquipment && (
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
             {swimEquipment.required.map((eq) => (
-              <span key={eq} className="px-2 py-0.5 text-[11px] rounded-md bg-blue-500/15 border border-blue-400/25 text-blue-200/80">
+              <span key={eq} className="text-[11px] text-blue-200/80">
                 bring: {eq}
               </span>
             ))}
             {swimEquipment.optional.map((eq) => (
-              <span key={eq} className="px-2 py-0.5 text-[11px] rounded-md bg-white/[0.05] border border-white/10 text-white/45">
+              <span key={eq} className="text-[11px] text-white/45">
                 optional: {eq}
               </span>
             ))}

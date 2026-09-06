@@ -20,10 +20,8 @@ type Status = { label: string; tone: 'connected' | 'action' | 'pending' | 'muted
 const Chip: React.FC<{ s: Status }> = ({ s }) => {
   // 'muted' is a plain text pointer (e.g. Manual → planned screen), not a pill.
   if (s.tone === 'muted') return <span className="shrink-0 text-[11px] text-white/40">{s.label}</span>;
-  const cls = s.tone === 'connected'
-    ? 'text-emerald-300 border-emerald-400/30 bg-emerald-400/10'
-    : 'text-sky-300 border-sky-400/30 bg-sky-400/10';
-  return <span className={`shrink-0 text-[11px] px-2 py-0.5 rounded-full border ${cls}`}>{s.label}</span>;
+  const cls = s.tone === 'connected' ? 'text-emerald-300' : 'text-sky-300';
+  return <span className={`shrink-0 text-[11px] ${cls}`}>{s.label}</span>;
 };
 
 const Row: React.FC<{ name: string; gives: string; status?: Status }> = ({ name, gives, status }) => (

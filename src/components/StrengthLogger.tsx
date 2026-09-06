@@ -5132,7 +5132,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 no structured week_type flag is plumbed to the logger. */}
             {/deload/i.test(String(scheduledWorkout?.name || '')) && (
               <span
-                className="shrink-0 mt-1 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-strength/15 border border-strength/40 text-strength/90"
+                className="shrink-0 mt-1 text-[11px] font-semibold uppercase tracking-wide text-strength/90"
                 title="This is a deload week — lighter loads are intentional recovery, not a regression."
               >
                 Deload
@@ -6571,7 +6571,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 the moment it's hit (Michael 2026-08-11). */}
                             {isAmrapPR && (
                               <div className="pb-2 flex items-center gap-2" role="status" aria-label={`Personal record — estimated 1RM ${amrapE1rm} pounds`}>
-                                <span className="text-[12px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-strength border-strength text-[#2A1206]">PR</span>
+                                <span className="text-[12px] font-bold uppercase tracking-wider text-strength">PR</span>
                                 <span className="text-[12px] font-medium text-strength/90">new best — est. 1RM {amrapE1rm} lb</span>
                               </div>
                             )}

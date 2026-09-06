@@ -2434,10 +2434,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                 opacity: color && !live ? 0.4 : 1,
               }}
             />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className={`text-base font-medium ${live ? 'text-white/90' : 'text-white/40'}`}>{label}</div>
               <div className={`mt-1 text-sm leading-relaxed ${live ? 'text-white/60' : 'text-white/30'}`}>{blurb}</div>
             </div>
+            <ChevronRight className="h-4 w-4 shrink-0 self-center text-white/40" aria-hidden="true" />
           </button>
           ))}
           {/* ⛔ "Build" IS NO LONGER A CARD (Michael, 2026-08-13: a new user kept tapping it instead
