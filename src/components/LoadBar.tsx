@@ -148,10 +148,21 @@ export default function LoadBar({ load, compact }: LoadBarProps) {
           <span className="text-[11px] text-white/40 leading-none">no sessions logged yet</span>
         )}
       </div>
-      {showKey && (
-        <div className="mt-1.5 text-[12px] text-white/60 leading-snug max-w-[min(100%,360px)]">
-          Fitness is your training over the last six weeks, fatigue over the last week, form is fitness minus fatigue. The small numbers are this week's change.
-          Form words: above +25 transitional (fitness fading) · +5 to +25 fresh (race shape) · −10 to +5 grey zone (not building, not sharp) · −30 to −10 optimal (building) · below −30 high risk.
+      {showKey && ff && (
+        <div className="mt-1.5 text-[12px] text-white/65 leading-snug max-w-[min(100%,360px)]">
+          <p>Every session earns workload points. Fitness averages them over the last six weeks, fatigue over the last week. The small numbers are this week's change.</p>
+          <p className="mt-1">Form is one subtraction: fitness − fatigue{fmt1(ff.fitness) != null && fmt1(ff.fatigue) != null ? ` = ${fmt1(ff.fitness)} − ${fmt1(ff.fatigue)} = ${(ff.form ?? 0) > 0 ? '+' : ''}${fmt1(ff.form)}` : ''}. The word beside it comes from this table:</p>
+          <table className="mt-1 text-[12px] tabular-nums">
+            <tbody>
+              {([['above +25', 'transitional', 'fitness fading'], ['+5 to +25', 'fresh', 'race shape'], ['−10 to +5', 'grey zone', 'not building, not sharp'], ['−30 to −10', 'optimal', 'building'], ['below −30', 'high risk', '']] as Array<[string, string, string]>).map(([range, word, meaning]) => (
+                <tr key={word} className={zone === word ? 'text-white/95' : 'text-white/55'}>
+                  <td className="pr-3 py-0.5 whitespace-nowrap">{range}</td>
+                  <td className="pr-3 py-0.5 whitespace-nowrap">{zone === word ? '▸ ' : ''}{word}</td>
+                  <td className="py-0.5">{meaning}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
