@@ -817,9 +817,10 @@ const getHRZones = (lthr: number | null, maxHR: number | null, restingHR: number
 };
 
 const getZoneModel = (lthr: number | null, maxHR: number | null, restingHR: number | null): string => {
-  if (lthr && lthr > 100) return 'Friel %LTHR';
-  if (maxHR && maxHR > 100 && restingHR && restingHR > 30) return 'Karvonen %HRR';
-  if (maxHR && maxHR > 100) return 'needs Resting HR';
+  // Citations live in the ledger, not on screen (docs/STATE-SOURCES.md: Friel %LTHR, Karvonen %HRR).
+  if (lthr && lthr > 100) return 'from your threshold heart rate';
+  if (maxHR && maxHR > 100 && restingHR && restingHR > 30) return 'from your max and resting heart rate';
+  if (maxHR && maxHR > 100) return 'needs resting heart rate';
   return '';
 };
 
@@ -1306,7 +1307,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
           {hr.rows[0]}
         </div>
       ) },
-      { id: 'run-zones', label: 'Zones', Icon: Gauge, info: 'Five heart-rate zones from your threshold heart rate (Friel). With no threshold, from max and resting heart rate (Karvonen). Max heart rate is what your runs have shown, or an age estimate until then.', body: (
+      { id: 'run-zones', label: 'Zones', Icon: Gauge, info: 'Five heart-rate zones from your threshold heart rate. With no threshold, from max and resting heart rate (Karvonen). Max heart rate is what your runs have shown, or an age estimate until then.', body: (
         <div className="space-y-1.5">
           {hr.rows[1]}
           {hr.rows[2]}
@@ -1339,7 +1340,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
           {hr.rows[0]}
         </div>
       ) },
-      { id: 'bike-zones', label: 'Zones', Icon: Gauge, info: 'Power zones from FTP (Coggan). Heart-rate zones from your threshold heart rate on the bike (Friel); with no threshold, from max and resting heart rate.', body: (
+      { id: 'bike-zones', label: 'Zones', Icon: Gauge, info: 'Power zones from FTP. Heart-rate zones from your threshold heart rate on the bike; with no threshold, from max and resting heart rate.', body: (
         <div className="space-y-1.5">
           {powerZones.length > 0 && (
             <div className="space-y-0.5 mb-2">
