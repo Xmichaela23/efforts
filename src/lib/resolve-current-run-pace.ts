@@ -175,6 +175,24 @@ export function resolveCurrentRunEasyPace(baselines: RunBaselinesLike): Resolved
    * ⛔ Q-174 (the easy-pace choice) is SUPERSEDED by this ruling; the field is ignored here.
    */
   if (!baselines) return NULL_RESULT;
+  /**
+   * ⛔ MEASURED FIRST (Michael, 2026-09-05: "from runs, with a note that heat and hills can factor").
+   * Easy still prescribes nothing — the heart-rate range does — so this is a READOUT, and the truest
+   * readout is the athlete's own last five easy runs (`learned_fitness.run_easy_pace_sec_per_km`, the
+   * learner's median of the five most recent; `high` = five on file). Threshold × 1.19 is the fallback
+   * for an athlete with fewer than five easy runs, which is Daniels' fast edge (easy = 1.21–1.30 ×
+   * threshold) and Friel's zone-2 top (1.14×) — a table, not a person. No typed tier, no accept step:
+   * a reference number is not a prescription and gets no ceremony.
+   */
+  const learned = baselines.learned_fitness?.run_easy_pace_sec_per_km;
+  const learnedMi = confOf(learned) === 'high' ? secPerKmToMi(asPositiveFinite(learned?.value)) : null;
+  if (learnedMi != null) {
+    return {
+      sec_per_mi: learnedMi, source: 'learned', confidence: 'high',
+      sample_count: asPositiveFinite(learned?.sample_count) ?? null, as_of: typeof learned?.as_of === 'string' ? learned.as_of : null,
+      is_estimate: false,
+    };
+  }
   const thr = resolveCurrentRunThresholdPace(baselines);
   const derived = pacesFromThresholdSecPerMi(thr.sec_per_mi);
   if (!derived) return NULL_RESULT;

@@ -132,7 +132,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   // Writes go through AppContext.saveUserBaselines — the SAME save Training Baselines uses — with the same
   // fields: a lift becomes `locked_baselines[key]` (your number, auto off); FTP becomes `performanceNumbers.ftp`
   // + `ftp_source: 'manual'`; threshold pace becomes `threshold_pace_min_per_mi` ("m:ss", per mile) +
-  // `threshold_pace_source: 'manual'`. Easy pace is threshold × 1.19 (the resolver's one rule) and is not edited.
+  // `threshold_pace_source: 'manual'`. Easy pace is a readout (last five easy runs, else threshold × 1.19) and is not edited.
   // ⛔ DELOAD — the book's TAPER/DELOAD column (p274), deployed by the athlete, never scheduled (p120 rejects
   // overreach-to-deload). Read the plan's current week + deload weeks from the rebuild's dry run; toggling
   // next week calls the same rebuild with `taper_weeks` and applies.
@@ -337,8 +337,8 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
     } catch (e) { setSaveNote('Could not switch. Try again.'); console.warn('[StateAdjustLens] auto failed:', e); }
   };
   const pill = 'text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50';
-  const Row = ({ id, name, value, editable = true, hint, sport }: { id: string; name: string; value: string | null; editable?: boolean; hint?: string; sport: 'strength' | 'run' | 'bike' }) => (
-    <div className="flex items-center justify-between py-1 gap-3">
+  const Row = ({ id, name, value, editable = true, hint, sport, note }: { id: string; name: string; value: string | null; editable?: boolean; hint?: string; sport: 'strength' | 'run' | 'bike'; note?: string }) => (
+    <div className="flex items-center justify-between py-1 gap-3 flex-wrap">
       <span className="text-[14px] text-white/85">{name}</span>
       {editing === id ? (
         <span className="flex items-center gap-2">
@@ -364,6 +364,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       ) : (
         <span className="text-[14px] text-white/90 tabular-nums">{value ?? <span className="text-white/35">no number yet</span>}</span>
       )}
+      {note && <p className="basis-full text-[12px] text-white/50 -mt-0.5 mb-0.5">{note}</p>}
     </div>
   );
   const rebuild = () => {
@@ -445,7 +446,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       </section>
 
       <section className="mb-5">
-        <SportHeading sport="run" label="Run" info="Easy days run on threshold heart rate; easy pace is threshold pace × 1.19. The threshold test goes on the calendar three days out; a run logged within a day of it is read as the test, and the result shows here and after the run as a number to accept. Typing a number makes it your number; auto uses what your runs measure." />
+        <SportHeading sport="run" label="Run" info="Easy days run on a heart-rate range off threshold heart rate; the easy pace shown is what your last five easy runs measured, or threshold pace × 1.19 until there are five. The threshold test goes on the calendar three days out; a run logged within a day of it is read as the test, and the result shows here and after the run as a number to accept. Typing a number makes it your number; auto uses what your runs measure." />
         <div className="space-y-1.5">
           <Row id="threshold" name="Threshold pace" value={withSource(fmtPace(thr?.sec_per_mi, metric), thr?.source)} hint={metric ? 'm:ss/km' : 'm:ss/mi'} sport="run" />
           {thrProposal && (
@@ -455,7 +456,9 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
             </div>
           )}
           <Row id="lthr" name="Threshold heart rate" value={withSource(lthr?.bpm != null ? `${Math.round(lthr.bpm)} bpm` : null, lthr?.source)} hint="bpm" sport="run" />
-          <Row id="easy" name="Easy pace" value={fmtPace(easy?.sec_per_mi, metric) ? `${fmtPace(easy?.sec_per_mi, metric)} · from threshold` : null} editable={false} sport="run" />
+          <Row id="easy" name="Easy pace" editable={false} sport="run"
+            value={fmtPace(easy?.sec_per_mi, metric) ? `${fmtPace(easy?.sec_per_mi, metric)} · ${easy?.source === 'learned' ? 'from runs' : 'from threshold'}` : null}
+            note={easy?.source === 'learned' ? 'Your last five easy runs. Heat and hills move it.' : 'Worked out from threshold until five easy runs are on file.'} />
           <div className="flex items-center justify-between py-1 gap-3">
             <span className="text-[14px] text-white/85">Retest</span>
             <span className="flex flex-wrap gap-2 justify-end">

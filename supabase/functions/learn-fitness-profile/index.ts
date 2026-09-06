@@ -864,15 +864,20 @@ export function analyzeRuns(runs: WorkoutRecord[], allRunCurves: WorkoutRecord[]
     });
 
     if (easyPaceRuns.length >= 3) {
-      const sortedPaces = easyPaceRuns.map(r => r.avg_pace).sort((a, b) => a - b);
-      const medianPace = sortedPaces[Math.floor(sortedPaces.length / 2)];
-      
+      // ⛔ THE FIVE MOST RECENT, not every easy run in the window (2026-09-05). This is the number the
+      // Adjust row shows as "from runs" and the easy steps print as the reference pace, and it has to be
+      // the same "last five easy runs" the State row reads. `runs` arrives newest first. Heat and hills
+      // move it by design — the row says so — and a 90-day median would hide a whole summer.
+      const recentEasy = easyPaceRuns.slice(0, 5);
+      const sortedPaces = recentEasy.map(r => r.avg_pace).sort((a, b) => a - b);
+      const mid = sortedPaces.length / 2;
+      const medianPace = sortedPaces.length % 2 ? sortedPaces[(sortedPaces.length - 1) / 2] : (sortedPaces[mid - 1] + sortedPaces[mid]) / 2;
       easy_pace = {
         value: Math.round(medianPace),
-        confidence: easyPaceRuns.length >= 5 ? 'high' : 'medium',
-        source: `pace at easy HR (${easyPaceRuns.length} runs; ${runEasyBand.basis})`,
-        sample_count: easyPaceRuns.length,
-        as_of: newestDate(easyPaceRuns),  // Q-173: heat can silence this learner for a whole summer
+        confidence: recentEasy.length >= 5 ? 'high' : 'medium',
+        source: `median of the last ${recentEasy.length} easy runs (${runEasyBand.basis})`,
+        sample_count: recentEasy.length,
+        as_of: newestDate(recentEasy),  // Q-173: heat can silence this learner for a whole summer
       };
     }
   }
