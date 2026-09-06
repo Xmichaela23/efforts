@@ -7,7 +7,7 @@
 // no dead buttons that pretend to work; honest labels for what lands where. Consent-first throughout.
 
 import React, { useEffect, useState } from 'react';
-import { Pencil, Dumbbell, Activity, Bike } from 'lucide-react';
+import { Pencil, Dumbbell, Activity, Bike, Layers, Feather } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
@@ -32,23 +32,6 @@ const sourceWord = (src: string | null | undefined): string => {
   return 'auto';
 };
 // The heading carries LOAD's ⓘ (LoadBar.tsx): one line stays under the sport, the rest opens here.
-const SportHeading = ({ sport, label, info }: { sport: 'strength' | 'run' | 'bike'; label: string; info?: string }) => {
-  const Icon = sport === 'strength' ? Dumbbell : sport === 'run' ? Activity : Bike;
-  const color = getDisciplineColor(sport);
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="mb-2">
-      <div className="flex items-center gap-2">
-        <Icon size={14} strokeWidth={2.25} style={{ color }} aria-hidden="true" />
-        <span className="text-[12px] uppercase tracking-[0.14em]" style={{ color }}>{label}</span>
-        {info && (
-          <button type="button" onClick={() => setOpen((o) => !o)} aria-label={`About ${label.toLowerCase()} on this screen`} aria-expanded={open} className="bg-transparent border-none p-0 cursor-pointer text-white/45 normal-case tracking-normal font-normal text-[12px] align-baseline">ⓘ</button>
-        )}
-      </div>
-      {open && info && <p className="mt-1.5 text-[12px] text-white/65 leading-snug max-w-[min(100%,360px)]">{info}</p>}
-    </div>
-  );
-};
 const fmtPace = (secPerMi: number | null | undefined, metric: boolean): string | null => {
   if (secPerMi == null || !Number.isFinite(secPerMi) || secPerMi <= 0) return null;
   const s = metric ? secPerMi / 1.609344 : secPerMi;
@@ -65,6 +48,41 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   const [rebuildNote, setRebuildNote] = useState<string | null>(null);
   const { loadUserBaselines, saveUserBaselines } = useAppContext();
   const [baselines, setBaselines] = useState<any | null>(null);
+  /**
+   * ⛔ THE SECTIONS ARE THE ATHLETE'S TO ORDER (Michael, 2026-09-05: "a similar movable container for user
+   * priority"), the same mechanism as the State rows: device copy in localStorage, account copy in
+   * `user_baselines.ui_prefs.adjust_section_order`. The plate is deliberately NOT the State plate's
+   * galaxy texture — plain glass — so the two screens read as different zones.
+   */
+  const SECTION_ORDER_KEY = 'efforts:adjust_section_order';
+  const DEFAULT_SECTIONS = ['block', 'deload', 'strength', 'run', 'bike'];
+  const [sectionOrder, setSectionOrder] = useState<string[]>(() => {
+    try { const v = JSON.parse(localStorage.getItem(SECTION_ORDER_KEY) || 'null'); return Array.isArray(v) && v.length ? v : DEFAULT_SECTIONS; } catch { return DEFAULT_SECTIONS; }
+  });
+  const [reordering, setReordering] = useState(false);
+  const [infoOpen, setInfoOpen] = useState<Set<string>>(new Set());
+  const toggleInfo = (id: string) => setInfoOpen((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  useEffect(() => {
+    const o = baselines?.ui_prefs?.adjust_section_order;
+    if (Array.isArray(o) && o.length > 0) { setSectionOrder(o); try { localStorage.setItem(SECTION_ORDER_KEY, JSON.stringify(o)); } catch { /* device copy only */ } }
+  }, [baselines]);
+  const saveSectionOrder = (next: string[]) => {
+    setSectionOrder(next);
+    try { localStorage.setItem(SECTION_ORDER_KEY, JSON.stringify(next)); } catch { /* device copy only */ }
+    const uid = getStoredUserId();
+    if (!uid) return;
+    const prefs = { ...((baselines?.ui_prefs && typeof baselines.ui_prefs === 'object') ? baselines.ui_prefs : {}), adjust_section_order: next };
+    void supabase.from('user_baselines').update({ ui_prefs: prefs }).eq('user_id', uid).then(({ error }) => {
+      if (error) console.warn('[Adjust] section order kept on this device only:', error.message);
+    });
+  };
+  const moveSection = (id: string, dir: -1 | 1) => {
+    const order = [...DEFAULT_SECTIONS].sort((x, y) => { const ix = sectionOrder.indexOf(x), iy = sectionOrder.indexOf(y); return (ix < 0 ? 99 : ix) - (iy < 0 ? 99 : iy); });
+    const i = order.indexOf(id); const j = i + dir;
+    if (i < 0 || j < 0 || j >= order.length) return;
+    [order[i], order[j]] = [order[j], order[i]];
+    saveSectionOrder(order);
+  };
   useEffect(() => {
     let cancelled = false;
     void loadUserBaselines?.().then((b: any) => { if (!cancelled && b) setBaselines(b); }).catch(() => {});
@@ -382,50 +400,29 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       } finally { setRebuilding(false); }
     })();
   };
-  return (
-    <div className="px-0.5 overflow-x-hidden">
-      <p className="text-[14px] text-white/70 mb-4 leading-snug">
-        Everything here changes your training from today forward. Nothing applies on its own.
-      </p>
+  const STRENGTH_INFO = "A retest goes on today's calendar as a test session and opens in the logger: warm-up ramp, then one all-out set per lift. When it is saved, the sessions you have not started re-price from it. Typing a number makes it your number and locks it; auto uses what your lifts measure. Swaps and added movements live in the logger.";
+  const RUN_INFO = "Easy days run on a heart-rate range off threshold heart rate; the easy pace shown is what your last five easy runs measured, or threshold pace × 1.19 until there are five. The threshold test goes on the calendar three days out; a run logged within a day of it is read as the test, and the result shows here and after the run as a number to accept. Typing a number makes it your number; auto uses what your runs measure.";
+  const BIKE_INFO = "The FTP tests go on the calendar two days out; a ride logged within a day of the test is read as the test. The 20-minute test is the classic. The 5-minute test is all-out with no pacing, so it repeats well; it prices alongside a ride with a 20-minute effort in the last 90 days. The result shows here and after the ride as a number to accept. Typing a number makes it your number; auto uses what your rides measure.";
 
-      <section className="mb-5">
-        <div className="text-[12px] uppercase tracking-wider text-white/60 mb-2">The block</div>
-        <button
-          type="button"
-          disabled={rebuilding}
-          onClick={rebuild}
-          className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 hover:bg-white/[0.08] disabled:opacity-50"
-        >
-          {rebuilding ? 'Rebuilding…' : 'Rebuild upcoming sessions'}
-        </button>
-        <p className="text-[13px] text-white/60 mt-2 leading-snug">
-          Rewrites the sessions you have not started from the plan: lifts and weights, runs and rides. Same days. Done sessions are not touched.
-        </p>
+  type Section = { id: string; label: string; sport?: 'strength' | 'run' | 'bike'; Icon: React.ComponentType<any>; info?: string; body: React.ReactNode };
+  const sections: Section[] = [
+    { id: 'block', label: 'The block', Icon: Layers, body: (
+      <>
+        <button type="button" disabled={rebuilding} onClick={rebuild} className={pill}>{rebuilding ? 'Rebuilding…' : 'Rebuild upcoming sessions'}</button>
+        <p className="text-[13px] text-white/60 mt-2 leading-snug">Rewrites the sessions you have not started from the plan: lifts and weights, runs and rides. Same days. Done sessions are not touched.</p>
         {rebuildNote && <p className="text-[13px] text-white/75 mt-1.5">{rebuildNote}</p>}
-      </section>
-
-      {deload && nextWeek != null && nextWeek <= deload.weeks && (
-        <section className="mb-5">
-          <div className="text-[12px] uppercase tracking-wider text-white/60 mb-2">Deload</div>
-          <button
-            type="button"
-            disabled={deloadBusy}
-            onClick={toggleDeload}
-            className="text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 hover:bg-white/[0.08] disabled:opacity-50"
-          >
-            {deloadBusy ? 'Rebuilding…' : nextIsDeload ? `Week ${nextWeek}: deload on · make it standard` : `Make week ${nextWeek} a deload week`}
-          </button>
-          <p className="text-[13px] text-white/60 mt-2 leading-snug">
-            Max-effort sets become skill and speed sets, the extra lower-body sets come out, and the endurance sessions drop a level. Switch to it two weeks out from a race or a meet. It is not a scheduled light week: the standard week is built to be run indefinitely.
-          </p>
-          {deload.taperWeeks.length > 0 && <p className="text-[11px] text-white/45 mt-1">Deload weeks: {deload.taperWeeks.join(', ')}</p>}
-          {deloadNote && <p className="text-[13px] text-white/75 mt-1.5">{deloadNote}</p>}
-        </section>
-      )}
-
-      {/* ⛔ TESTS SIT UNDER THEIR SPORT (Michael, 2026-09-05), one line of copy each, the rest behind the ⓘ. */}
-      <section className="mb-5">
-        <SportHeading sport="strength" label="Strength" info="A retest goes on today's calendar as a test session and opens in the logger: warm-up ramp, then one all-out set per lift. When it is saved, the sessions you have not started re-price from it. Typing a number makes it your number and locks it; auto uses what your lifts measure. Swaps and added movements live in the logger." />
+      </>
+    ) },
+    ...(deload && nextWeek != null && nextWeek <= deload.weeks ? [{ id: 'deload', label: 'Deload', Icon: Feather, body: (
+      <>
+        <button type="button" disabled={deloadBusy} onClick={toggleDeload} className={pill}>{deloadBusy ? 'Rebuilding…' : nextIsDeload ? `Week ${nextWeek}: deload on · make it standard` : `Make week ${nextWeek} a deload week`}</button>
+        <p className="text-[13px] text-white/60 mt-2 leading-snug">Max-effort sets become skill and speed sets, the extra lower-body sets come out, and the endurance sessions drop a level. Switch to it two weeks out from a race or a meet. It is not a scheduled light week: the standard week is built to be run indefinitely.</p>
+        {deload.taperWeeks.length > 0 && <p className="text-[11px] text-white/45 mt-1">Deload weeks: {deload.taperWeeks.join(', ')}</p>}
+        {deloadNote && <p className="text-[13px] text-white/75 mt-1.5">{deloadNote}</p>}
+      </>
+    ) }] : []),
+    { id: 'strength', label: 'Strength', sport: 'strength', Icon: Dumbbell, info: STRENGTH_INFO, body: (
+      <>
         {perLift.length === 0 ? (
           <p className="text-[13px] text-white/40 leading-snug">Logged lifts show up here.</p>
         ) : (
@@ -444,10 +441,10 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         </div>
         <p className="text-[13px] text-white/60 mt-2 leading-snug">Tap a number to set your own. A retest opens today, in the logger.</p>
         {saveNote && lastSaved === 'strength' && <p className="text-[13px] text-white/75 mt-1.5">{saveNote}</p>}
-      </section>
-
-      <section className="mb-5">
-        <SportHeading sport="run" label="Run" info="Easy days run on a heart-rate range off threshold heart rate; the easy pace shown is what your last five easy runs measured, or threshold pace × 1.19 until there are five. The threshold test goes on the calendar three days out; a run logged within a day of it is read as the test, and the result shows here and after the run as a number to accept. Typing a number makes it your number; auto uses what your runs measure." />
+      </>
+    ) },
+    { id: 'run', label: 'Run', sport: 'run', Icon: Activity, info: RUN_INFO, body: (
+      <>
         <div className="space-y-1.5">
           <Row id="threshold" name="Threshold pace" value={withSource(fmtPace(thr?.sec_per_mi, metric), thr?.source)} hint={metric ? 'm:ss/km' : 'm:ss/mi'} sport="run" />
           {thrProposal && (
@@ -477,10 +474,10 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         </div>
         <p className="text-[13px] text-white/60 mt-2 leading-snug">Tap a number to set your own. The threshold test goes on the calendar three days out.</p>
         {saveNote && lastSaved === 'run' && <p className="text-[13px] text-white/75 mt-1.5">{saveNote}</p>}
-      </section>
-
-      <section>
-        <SportHeading sport="bike" label="Bike" info="The FTP tests go on the calendar two days out; a ride logged within a day of the test is read as the test. The 20-minute test is the classic. The 5-minute test is all-out with no pacing, so it repeats well; it prices alongside a ride with a 20-minute effort in the last 90 days. The result shows here and after the ride as a number to accept. Typing a number makes it your number; auto uses what your rides measure." />
+      </>
+    ) },
+    { id: 'bike', label: 'Bike', sport: 'bike', Icon: Bike, info: BIKE_INFO, body: (
+      <>
         <div className="space-y-1.5">
           <Row id="ftp" name="FTP" value={withSource(ftp?.value != null ? `${Math.round(ftp.value)} W` : null, ftp?.source)} hint="W" sport="bike" />
           {proposal && (
@@ -507,7 +504,49 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         </div>
         <p className="text-[13px] text-white/60 mt-2 leading-snug">Tap a number to set your own. The FTP tests go on the calendar two days out.</p>
         {saveNote && lastSaved === 'bike' && <p className="text-[13px] text-white/75 mt-1.5">{saveNote}</p>}
-      </section>
+      </>
+    ) },
+  ];
+  const ordered = [...sections].sort((x, y) => { const ix = sectionOrder.indexOf(x.id), iy = sectionOrder.indexOf(y.id); return (ix < 0 ? 99 : ix) - (iy < 0 ? 99 : iy); });
+
+  return (
+    <div className="px-0.5 overflow-x-hidden">
+      <div className="flex items-baseline justify-between gap-3 mb-3">
+        <p className="text-[14px] text-white/70 leading-snug">Everything here changes your training from today forward. Nothing applies on its own.</p>
+        <button type="button" onClick={() => setReordering((v) => !v)} className="shrink-0 text-[11px] tracking-wider uppercase text-white/45 py-1 outline-none focus:outline-none">{reordering ? 'done' : 'reorder'}</button>
+      </div>
+      {/* ⛔ ONE PLATE, HAIRLINE DIVIDERS, the State construction — but plain glass, not the galaxy
+          texture, so Adjust reads as its own zone (Michael, 2026-09-05). Left column: icon + label,
+          the same 92px the State rows use, so the two screens line up when you flip between them. */}
+      <div className="rounded-2xl divide-y divide-white/[0.10] border border-white/[0.09] bg-white/[0.035]">
+        {ordered.map((sec, i) => {
+          const color = sec.sport ? getDisciplineColor(sec.sport) : 'rgba(255,255,255,0.7)';
+          const open = sec.info ? infoOpen.has(sec.id) : false;
+          return (
+            <div key={sec.id} className="flex items-start gap-3 px-3 py-3">
+              <span className="flex flex-col gap-1 shrink-0 w-[92px] pt-[3px]">
+                <span className="flex items-center gap-2">
+                  <sec.Icon size={15} strokeWidth={2.25} style={{ color }} className="shrink-0" aria-hidden="true" />
+                  <span className="text-[11.5px] font-semibold tracking-[0.14em] uppercase" style={{ color }}>{sec.label}</span>
+                </span>
+                {sec.info && (
+                  <button type="button" onClick={() => toggleInfo(sec.id)} aria-label={`About ${sec.label.toLowerCase()} on this screen`} aria-expanded={open} className="self-start bg-transparent border-none p-0 cursor-pointer text-white/45 text-[12px] leading-none">ⓘ</button>
+                )}
+              </span>
+              <div className="flex-1 min-w-0">
+                {open && sec.info && <p className="mb-2 text-[12px] text-white/65 leading-snug">{sec.info}</p>}
+                {sec.body}
+              </div>
+              {reordering && (
+                <span className="flex flex-col items-center shrink-0 -mr-1">
+                  <span role="button" aria-label={`move ${sec.label.toLowerCase()} up`} onClick={() => moveSection(sec.id, -1)} className={`px-2 py-0.5 text-[14px] leading-none ${i === 0 ? 'text-white/25' : 'text-white/85'}`}>▲</span>
+                  <span role="button" aria-label={`move ${sec.label.toLowerCase()} down`} onClick={() => moveSection(sec.id, 1)} className={`px-2 py-0.5 text-[14px] leading-none ${i === ordered.length - 1 ? 'text-white/25' : 'text-white/85'}`}>▼</span>
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
