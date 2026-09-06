@@ -172,8 +172,8 @@ export function KnowYourNumbersStep({
               <>
                 {lifts.filter((l) => l.onFile).map((l) => `${l.f.label} ${l.onFile!.value}${l.f.reps ? ' reps' : ''}`).join(' · ')}
                 {' '}<span className="text-white/40">· {lifts.some((l) => l.onFile?.source === 'learned') ? 'from your logged sets' : 'typed in Baselines'}</span>
-                {strengthChoice === 'use' && strengthComplete && <div className="text-white/50 mt-1">The block prices off these; no test week.</div>}
-                {strengthChoice === 'use' && !strengthComplete && <div className="text-white/50 mt-1">The block prices off these; {barbell.filter((l) => !l.onFile).map((l) => l.f.label).join(' and ')} {barbell.filter((l) => !l.onFile).length === 1 ? 'is' : 'are'} tested in week one.</div>}
+                {strengthChoice === 'use' && strengthComplete && <div className="text-white/50 mt-1">The block uses these; no test week.</div>}
+                {strengthChoice === 'use' && !strengthComplete && <div className="text-white/50 mt-1">The block uses these; {barbell.filter((l) => !l.onFile).map((l) => l.f.label).join(' and ')} {barbell.filter((l) => !l.onFile).length === 1 ? 'is' : 'are'} tested in week one.</div>}
                 {strengthChoice === 'test' && <div className="text-white/50 mt-1">Week one is the test week (p215). The number on file stays until the test replaces it.</div>}
               </>
             )

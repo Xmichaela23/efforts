@@ -326,7 +326,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
           const job = (st as any)?.job;
           if (job?.finished_at) {
             if (pollRef.current) window.clearInterval(pollRef.current); pollRef.current = null;
-            setSaveNote(`${prefix} ${Number(job.done ?? 0)} upcoming session${Number(job.done) === 1 ? '' : 's'} re-priced.`);
+            setSaveNote(`${prefix} ${Number(job.done ?? 0)} upcoming session${Number(job.done) === 1 ? '' : 's'} updated.`);
           } else if (Date.now() - startedAt > 180_000) {
             if (pollRef.current) window.clearInterval(pollRef.current); pollRef.current = null;
           }
@@ -335,7 +335,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       return `${prefix} Updating ${total} upcoming session${total === 1 ? '' : 's'} in the background. You can leave; it finishes on its own.`;
     }
     const n = Number(d?.rows_repriced ?? 0);
-    return n > 0 ? `${prefix} ${n} upcoming session${n === 1 ? '' : 's'} re-priced.` : prefix;
+    return n > 0 ? `${prefix} ${n} upcoming session${n === 1 ? '' : 's'} updated.` : prefix;
   };
   const repriceAfter = async (kind: 'endurance' | 'strength'): Promise<string> => {
     setSaveNote(REPRICE_WAIT);
@@ -395,9 +395,9 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       } finally { setRebuilding(false); }
     })();
   };
-  const STRENGTH_INFO = "A retest goes on today's calendar as a test session and opens in the logger: warm-up ramp, then one all-out set per lift. When it is saved, the sessions you have not started re-price from it. Typing a number makes it your number and locks it; auto uses what your lifts measure. Swaps and added movements live in the logger.";
+  const STRENGTH_INFO = "A retest goes on today's calendar as a test session and opens in the logger: warm-up ramp, then one all-out set per lift. When it is saved, the sessions you have not started take the new number. Typing a number makes it your number and locks it; auto uses what your lifts measure. Swaps and added movements live in the logger.";
   const RUN_INFO = "Easy days run on a heart-rate range off threshold heart rate; the easy pace shown is what your last five easy runs measured, or threshold pace × 1.19 until there are five. The threshold test goes on the calendar three days out; a run logged within a day of it is read as the test, and the result shows here and after the run as a number to accept. Typing a number makes it your number; auto uses what your runs measure.";
-  const BIKE_INFO = "The FTP tests go on the calendar two days out; a ride logged within a day of the test is read as the test. The 20-minute test is the classic. The 5-minute test is all-out with no pacing, so it repeats well; it prices alongside a ride with a 20-minute effort in the last 90 days. The result shows here and after the ride as a number to accept. Typing a number makes it your number; auto uses what your rides measure.";
+  const BIKE_INFO = "The FTP tests go on the calendar two days out; a ride logged within a day of the test is read as the test. The 20-minute test is the classic. The 5-minute test is all-out with no pacing, so it repeats well; it counts together with a ride that had a 20-minute effort in the last 90 days. The result shows here and after the ride as a number to accept. Typing a number makes it your number; auto uses what your rides measure.";
 
   type Section = { id: string; label: string; sport?: 'strength' | 'run' | 'bike'; Icon: React.ComponentType<any>; info?: string; body: React.ReactNode };
   const sections: Section[] = [

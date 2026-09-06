@@ -1396,7 +1396,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
       );
     });
     return [
-      { id: 'strength-numbers', label: 'Numbers', Icon: Hash, info: 'The four lifts the block prices from, and pull-ups as reps. Typing a number makes it your number and locks it; auto uses what your lifts measure, three logged sets and up. A number typed here is also the number on file for a new block.', body: <div className="space-y-1.5">{liftRows}</div> },
+      { id: 'strength-numbers', label: 'Numbers', Icon: Hash, info: 'The four lifts the block works from, and pull-ups as reps. Typing a number makes it your number and locks it; auto uses what your lifts measure, three logged sets and up. A number typed here is also the number on file for a new block.', body: <div className="space-y-1.5">{liftRows}</div> },
       { id: 'strength-equipment', label: 'Equipment', Icon: Wrench, info: 'A commercial gym has everything. A home gym lists what you have; the plan picks movements from it.', body: (
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
