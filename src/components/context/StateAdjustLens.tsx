@@ -15,6 +15,7 @@ import { resolveStrengthCapacity, canonicalizeLiftKey } from '@shared/state-tren
 import { resolveCurrentFtp, pendingFtpProposal, acceptEstimatedFtp } from '@/lib/resolve-current-ftp';
 import { resolveCurrentRunThresholdPace, resolveCurrentRunEasyPace, pendingRunThresholdProposal, acceptLearnedRunThreshold } from '@/lib/resolve-current-run-pace';
 import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
+import { frielZones } from '@shared/endurance/hr-zones';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { runThresholdTestRow, ftpTestRow, ftp5MinTestRow, addDaysISO } from '@/lib/baseline-tests';
 
@@ -458,7 +459,11 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
           <Row id="lthr" name="Threshold heart rate" value={withSource(lthr?.bpm != null ? `${Math.round(lthr.bpm)} bpm` : null, lthr?.source)} hint="bpm" sport="run" />
           <Row id="easy" name="Easy pace" editable={false} sport="run"
             value={fmtPace(easy?.sec_per_mi, metric) ? `${fmtPace(easy?.sec_per_mi, metric)} · ${easy?.source === 'learned' ? 'from runs' : 'from threshold'}` : null}
-            note={easy?.source === 'learned' ? 'Your last five easy runs. Heat and hills move it.' : 'Worked out from threshold until five easy runs are on file.'} />
+            note={easy?.source === 'learned'
+              ? (lthr?.bpm != null
+                ? `Your pace at ${frielZones(lthr.bpm)[1].min}–${frielZones(lthr.bpm)[1].max} bpm, your zone 2, over the last five easy runs. Heat and hills move it.`
+                : 'Your last five easy runs. Heat and hills move it.')
+              : 'Worked out from threshold until five easy runs are on file.'} />
           <div className="flex items-center justify-between py-1 gap-3">
             <span className="text-[14px] text-white/85">Retest</span>
             <span className="flex flex-wrap gap-2 justify-end">
