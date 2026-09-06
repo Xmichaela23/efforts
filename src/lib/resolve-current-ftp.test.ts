@@ -214,9 +214,12 @@ Deno.test('pending — no accepted value on file → nothing pending (the estima
   }), null);
 });
 
-Deno.test('pending — "my number" sees no proposal; "my number" with an empty field still does', () => {
+Deno.test('pending — "my number" sees the proposal against the typed number (taking it switches to auto); an empty "my number" falls through', () => {
   const lf = { ride_ftp_estimated: { value: 171, confidence: 'high' }, ride_ftp_accepted: accepted(167) };
-  assertEquals(pendingFtpProposal({ learned_fitness: lf, performance_numbers: { ftp: 181, ftp_source: 'manual' } }), null);
+  // 2026-09-05 (Michael): the proposal must show even when the number is set to "my number" — measured 171 against the 181 in use.
+  assertEquals(pendingFtpProposal({ learned_fitness: lf, performance_numbers: { ftp: 181, ftp_source: 'manual' } }), { measured: 171, applied: 181, confidence: 'high' });
+  // Typed number equal to the measurement: nothing to propose.
+  assertEquals(pendingFtpProposal({ learned_fitness: lf, performance_numbers: { ftp: 171, ftp_source: 'manual' } }), null);
   // Preference with nothing behind it falls through to auto (resolver rule) — so the proposal shows.
   assertEquals(pendingFtpProposal({ learned_fitness: lf, performance_numbers: { ftp_source: 'manual' } }), { measured: 171, applied: 167, confidence: 'high' });
   // "auto" with a typed number on file: the typed number is dormant, the proposal shows.

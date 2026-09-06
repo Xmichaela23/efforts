@@ -93,6 +93,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         const next = acceptEstimatedFtp(cur as any, 'baselines'); if (!next) return;
         const { error } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', uid);
         if (error) throw error;
+        if (pn?.ftp_source === 'manual') { const cleared: any = { ...(pn ?? {}) }; delete cleared.ftp_source; await saveUserBaselines({ ...baselines, performanceNumbers: cleared }); }
         let note = `${Math.round(Number((next.ride_ftp_accepted as any).value))} W in use.`;
         try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const n = Number((rp as any)?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} re-priced.`; } catch { /* the accept stands; rebuild covers it */ }
         setSaveNote(note);
@@ -113,6 +114,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         const next = acceptLearnedRunThreshold(cur as any, 'baselines'); if (!next) return;
         const { error } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', uid);
         if (error) throw error;
+        if (pn?.threshold_pace_source === 'manual') await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), threshold_pace_source: 'learned' } });
         let note = `${fmtPace(Number((next.run_threshold_pace_accepted as any).value) * 1.609344, metric)} in use.`;
         try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const n = Number((rp as any)?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} re-priced.`; } catch { /* the accept stands */ }
         setSaveNote(note);

@@ -181,10 +181,10 @@ export function pendingFtpProposal(baselines: BaselinesLike): FtpProposal | null
   const estimatedRaw = baselines.learned_fitness?.ride_ftp_estimated;
   const measured = asPositiveFinite(estimatedRaw?.value);
   if (measured == null || !isConfident(estimatedRaw?.confidence)) return null;
-  const applied = asPositiveFinite(baselines.learned_fitness?.ride_ftp_accepted?.value);
+  // Against the number IN USE — accepted, or the athlete's typed one (2026-09-05, Michael: the proposal must show
+  // even when the number is set to "your number"; taking it is what switches back to auto). Same rule for the run.
+  const applied = resolveCurrentFtp(baselines).value ?? asPositiveFinite(baselines.learned_fitness?.ride_ftp_accepted?.value);
   if (applied == null) return null;
-  const preference = String(baselines.performance_numbers?.ftp_source ?? '').toLowerCase();
-  if (preference === 'manual' && asPositiveFinite(baselines.performance_numbers?.ftp)) return null;
   if (Math.round(measured) === Math.round(applied)) return null;
   return { measured, applied, confidence: String(estimatedRaw?.confidence ?? '').toLowerCase() };
 }

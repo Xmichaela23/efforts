@@ -185,6 +185,11 @@ Deno.serve(async (req: Request) => {
             const { error: accErr } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', userId);
             if (accErr) console.warn(`[checkpoint] FTP not accepted: ${accErr.message}`);
             else ftpAccepted = Number((next.ride_ftp_accepted as { value: number }).value);
+            if (!accErr) {
+              const { data: pnRow } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', userId).maybeSingle();
+              const pnCur = (pnRow?.performance_numbers && typeof pnRow.performance_numbers === 'object') ? { ...(pnRow.performance_numbers as Record<string, unknown>) } : null;
+              if (pnCur && pnCur.ftp_source === 'manual') { delete pnCur.ftp_source; await supabase.from('user_baselines').update({ performance_numbers: pnCur }).eq('user_id', userId); }
+            }
           }
         } catch (e) { console.warn('[checkpoint] FTP accept failed:', (e as Error)?.message ?? String(e)); }
       }
@@ -198,6 +203,9 @@ Deno.serve(async (req: Request) => {
           if (nextT) {
             const { error: tErr } = await supabase.from('user_baselines').update({ learned_fitness: nextT, updated_at: new Date().toISOString() }).eq('user_id', userId);
             if (tErr) console.warn(`[checkpoint] run threshold not accepted: ${tErr.message}`);
+            if (!tErr && pn2 && (pn2 as any).threshold_pace_source === 'manual') {
+              await supabase.from('user_baselines').update({ performance_numbers: { ...pn2, threshold_pace_source: 'learned' } }).eq('user_id', userId);
+            }
           }
         }
       } catch (e) { console.warn('[checkpoint] run threshold accept failed:', (e as Error)?.message ?? String(e)); }

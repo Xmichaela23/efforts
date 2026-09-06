@@ -459,10 +459,9 @@ export function pendingRunThresholdProposal(baselines: RunBaselinesLike): RunThr
   const measured = asPositiveFinite(learnedRaw?.value);
   const conf = confOf(learnedRaw);
   if (measured == null || !(conf === 'medium' || conf === 'high')) return null;
-  const applied = asPositiveFinite(baselines.learned_fitness?.run_threshold_pace_accepted?.value);
+  // Against the pace IN USE — accepted, or the athlete's typed one; taking the proposal switches back to auto.
+  const applied = resolveCurrentRunThresholdPace(baselines).sec_per_km ?? asPositiveFinite(baselines.learned_fitness?.run_threshold_pace_accepted?.value);
   if (applied == null) return null;
-  const pn = baselines.performance_numbers;
-  if (pn?.threshold_pace_source === 'manual') return null;
   if (Math.round(measured) === Math.round(applied)) return null;
   return { measuredSecPerKm: measured, appliedSecPerKm: applied, confidence: String(conf) };
 }

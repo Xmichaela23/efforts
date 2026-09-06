@@ -154,6 +154,12 @@ export default function PostWorkoutFeedback({
         if (error) throw error;
         let note = `${fmtMi(Number((next.run_threshold_pace_accepted as any).value) * 1.609344)} in use.`;
         try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const n = Number((rp as any)?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} re-priced.`; } catch { /* the accept stands */ }
+        {
+          // Taking the number is choosing auto: clear a manual choice through the same column Baselines writes.
+          const { data: pnRow } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', uid).maybeSingle();
+          const pnCur: any = typeof pnRow?.performance_numbers === 'string' ? JSON.parse(pnRow.performance_numbers) : (pnRow?.performance_numbers ?? {});
+          if (pnCur && (pnCur.threshold_pace_source === 'manual')) { const cleared: any = { ...pnCur }; cleared.threshold_pace_source = 'learned'; await supabase.from('user_baselines').update({ performance_numbers: cleared }).eq('user_id', uid); }
+        }
         setFtpNote(note); setThrProposal(null);
       } catch (e) { setFtpNote('Could not apply. Try again from Adjust.'); console.warn('[PostWorkoutFeedback] threshold accept failed:', e); }
       finally { setFtpAccepting(false); }
@@ -172,6 +178,12 @@ export default function PostWorkoutFeedback({
         const w = Math.round(Number((next.ride_ftp_accepted as any).value));
         let note = `${w} W in use.`;
         try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const n = Number((rp as any)?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} re-priced.`; } catch { /* the accept stands */ }
+        {
+          // Taking the number is choosing auto: clear a manual choice through the same column Baselines writes.
+          const { data: pnRow } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', uid).maybeSingle();
+          const pnCur: any = typeof pnRow?.performance_numbers === 'string' ? JSON.parse(pnRow.performance_numbers) : (pnRow?.performance_numbers ?? {});
+          if (pnCur && (pnCur.ftp_source === 'manual')) { const cleared: any = { ...pnCur }; delete cleared.ftp_source; await supabase.from('user_baselines').update({ performance_numbers: cleared }).eq('user_id', uid); }
+        }
         setFtpNote(note); setFtpProposal(null);
       } catch (e) { setFtpNote('Could not apply. Try again from Adjust.'); console.warn('[PostWorkoutFeedback] FTP accept failed:', e); }
       finally { setFtpAccepting(false); }
