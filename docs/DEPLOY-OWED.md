@@ -1,5 +1,23 @@
 # Deploy-Owed / Post-Deploy Verification
 
+> ## 2026-09-06 — PROFILE SCREEN (Training Baselines folded in) + ADJUST FIXES. **DEPLOYED, THROWAWAY-VERIFIED, NOT DEVICE-VERIFIED.**
+>
+> **PUSHED:** `origin/main == 08c130f5` (Profile) on top of `11c04ab2` (Adjust: four lifts always listed, the word beside a
+> number follows its switch, threshold on auto falls back to the typed pace).
+> **SCHEMA:** `user_baselines.profile jsonb` + the public `avatars` bucket with owner-only write policies — Michael ran
+> `supabase/migrations/20260906090000_user_baselines_profile_and_avatars.sql` in the SQL editor; confirmed live by a
+> throwaway account writing name/location/photo_url as the user, uploading to its own folder, refused in another user's
+> folder, public URL serving the image, another user unable to read the row (10/10, rows and objects deleted after).
+> **EDGE FUNCTIONS DEPLOYED (11c04ab2):** the 33 importers of `resolve-current-run-pace` — `coach` **563** ·
+> `create-goal-and-materialize-plan` **402** · `generate-strength-plan` **232** · `rematerialize-standing-block` **109** ·
+> `endurance-checkpoint` **14**, all 2026-09-06 07:01 UTC. Nothing server-side changed for the Profile fold.
+> **CLIENT:** Netlify from main; iOS project synced (`npm run ios`), Xcode build is Michael's.
+>
+> **What to look for:** menu → Profile opens the screen at `/profile` (Training Baselines is off the menu; `/baselines`
+> redirects). "You" section on top: photo (tap to change), name, location, sign-in email (read-only), birthday with age,
+> units, height, weight. No sex field. Everything below is the old Baselines content unchanged. Adjust → Strength lists
+> Squat, Deadlift, Bench press, Overhead press with nothing logged; a typed lift reads "auto" beside an auto switch.
+
 > ## ⚠️ 2026-09-03 (evening) — YOUR WEEK READS THE BUILT PLAN; TWO EFFECT NOTES. **DEPLOYED, NOT DEVICE-VERIFIED.**
 >
 > **PUSHED:** `origin/main == c7c21af2` (also on `state-screen-round-1`).

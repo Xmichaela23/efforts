@@ -1382,7 +1382,7 @@ unless he says otherwise.
 
 ---
 
-## Baselines becomes the profile page; Adjust owns the plan's numbers (agreed 2026-09-05, not built)
+## Baselines becomes the profile page; Adjust owns the plan's numbers (agreed 2026-09-05; BUILT 2026-09-06 as one Profile screen at /profile — it keeps the numbers as well, both screens read the same record; the auto / my-number switch is on every Adjust pill)
 
 Adjust now shows and edits every number the block prices from (four lifts, FTP, threshold pace, threshold
 heart rate), with proposals and accept, retest, deload and rebuild. Training Baselines duplicates the
