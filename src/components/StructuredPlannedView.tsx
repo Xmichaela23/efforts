@@ -231,6 +231,8 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         const unitsAll = (String((workout as any)?.units||'').toLowerCase()==='metric') ? 'metric' : 'imperial';
         lines.push(...formatStrengthExerciseLines(v3.map((st:any)=>st.strength), unitsAll));
       }
+      // The talk-test reminder prints once per session, on the first heart-rate step; the rest carry the range.
+      let talkTestSaid = false;
       v3.forEach((st:any)=>{
         const secs = typeof st?.seconds==='number' ? st.seconds : undefined;
         if (typeof secs==='number' && secs>0) totalSecsFromSteps += Math.max(1, Math.round(secs));
@@ -333,10 +335,28 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         if (!derived && typeof distM==='number' && distM>0) pieces.push(fmtDist(distM));
         else if (typeof secs==='number' && secs>0) pieces.push(fmtDur(secs));
         else if (typeof distM==='number' && distM>0) pieces.push(fmtDist(distM));
-        if (pTxt) pieces.push(`@ ${pTxt}`);
+        /**
+         * ⛔ HEART RATE FIRST ON AN EASY STEP (Michael, 2026-09-05: "good to bang in people's heads —
+         * you can hold a conversation is the most important"). Warm-ups, recoveries, cool-downs and
+         * easy work carry `prescription: 'heart_rate'` + `hr_range` from the materializer, and that
+         * range is what the watch gets; the pace is a reference. This list printed the reference
+         * alone, so the athlete read a pace target on a step that has none.
+         * ⛔ THE WORDS ARE THE BOOK'S TALK TEST (p211): VT1 is the last pace at which a full sentence
+         * can be recited aloud without taking a breath. Michael: "whatever Viada says about VT1".
+         */
+        const hrr = (st as any)?.prescription === 'heart_rate' && (st as any)?.hr_range
+          && typeof (st as any).hr_range.lower === 'number' && typeof (st as any).hr_range.upper === 'number'
+          ? (st as any).hr_range as { lower: number; upper: number } : null;
+        if (hrr) {
+          const talk = talkTestSaid ? '' : ', easy enough to say a full sentence without stopping for breath';
+          talkTestSaid = true;
+          pieces.push(`@ HR ${Math.round(hrr.lower)}–${Math.round(hrr.upper)}${talk}`);
+          if (pTxt) pieces.push(`· ref pace ${pTxt}`);
+        }
+        else if (pTxt) pieces.push(`@ ${pTxt}`);
         else if (powRange) pieces.push(`@ ${powRange}`);
         else if (pow) pieces.push(`@ ${pow}`);
-        if (!pTxt && !powRange && !pow && typeof st?.label==='string' && st.label.trim()) {
+        if (!hrr && !pTxt && !powRange && !pow && typeof st?.label==='string' && st.label.trim()) {
           pieces.push(st.label);
         }
         const ln = pieces.join(' ') + equip;
