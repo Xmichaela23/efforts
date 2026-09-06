@@ -28,6 +28,7 @@ import {
   earnedMeSets,
   pretestSession,
   readTestWeek,
+  restateEndurance,
   restateFromTest,
   TEST_DAY_LIFTS,
   testDayCutoff,
@@ -37,6 +38,7 @@ import {
   TEST_WEEK_INDEX,
   weekLedgersFor,
 } from '../_shared/standing-plan/index.ts';
+import { calculateDurationWorkload, getDefaultIntensityForType, getStepsIntensity } from '../_shared/workload.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -144,7 +146,8 @@ Deno.serve(async (req: Request) => {
       .from('planned_workouts')
       // ⛔ COMPLETION TRAVELS WITH THE ROW NOW — the cut is per session, not per week, so
       // `restateFromTest` has to be able to tell a done session from a future one.
-      .select('id, week_number, date, strength_exercises, workout_status, completed_workout_id, tags')
+      // ⛔ AND THE ENDURANCE COLUMNS, because the runs and rides are restated too (2026-09-05).
+      .select('id, week_number, date, type, name, description, duration, steps_preset, strength_exercises, workout_status, completed_workout_id, tags')
       .eq('training_plan_id', plan.id)
       .eq('user_id', userId);
 
@@ -433,11 +436,19 @@ Deno.serve(async (req: Request) => {
       testDayCutoff: testCutoff,
     });
 
+    /**
+     * ⛔ THE RUNS AND RIDES TAKE TODAY'S SHAPE TOO (2026-09-05). Until now only the lift rows were
+     * restated; a library correction or a deload column never reached an existing calendar. Same
+     * laws: unstarted sessions only, the diff comes back on the dry run, applying is the tap.
+     */
+    const endurance = restateEndurance({ composed, planned: plannedRows ?? [], afterWeek: TEST_WEEK_INDEX });
+
     if (!willWrite) {
       return json({
         success: true, applied: false, current_week: currentWeek, taper_weeks: taperWeeks, weeks,
         working_numbers: workingNamed, missing: reading.missing,
         changes: restated.changes, unmatched: restated.unmatched,
+        endurance_changes: endurance.changes, endurance_unmatched: endurance.unmatched,
         // ⛔ WHAT THE HEAVY SETS HAVE EARNED, AND OFF WHAT. A surface offering the athlete this diff
         // has to be able to say why a second set appeared, or it is a number they never agreed to.
         me_sets: { by_pattern: ladder.sets, history: ladder.history, unread: ladder.unread },
@@ -457,6 +468,25 @@ Deno.serve(async (req: Request) => {
         .eq('id', u.id)
         .eq('user_id', userId);
       if (!error) written += 1;
+    }
+
+    // ⛔ THE ENDURANCE ROWS: tokens, minutes, words and tags off the composer; `computed` is re-expanded
+    // by the whole-plan refresh below (materialize-plan reads each row's own tokens), and the planned
+    // load is re-estimated the way activate-plan estimated it at build (D-238: duration x intensity^2).
+    let enduranceWritten = 0;
+    for (const u of endurance.rows) {
+      const intensity = getStepsIntensity(u.steps_preset, u.type) || getDefaultIntensityForType(u.type) || 0.70;
+      const load = u.duration > 0 ? Math.round(calculateDurationWorkload(u.duration, intensity)) : 0;
+      const { error } = await supabase
+        .from('planned_workouts')
+        .update({
+          name: u.name, description: u.description, rendered_description: u.description,
+          duration: u.duration, steps_preset: u.steps_preset.length ? u.steps_preset : null, tags: u.tags,
+          workload_planned: load > 0 ? load : null,
+        })
+        .eq('id', u.id)
+        .eq('user_id', userId);
+      if (!error) enduranceWritten += 1;
     }
 
     // ⛔ THE WORKING NUMBERS ARE STORED UNDER THE BLOCK'S OWN KEY, never `config.training_max`
@@ -564,7 +594,7 @@ Deno.serve(async (req: Request) => {
     // ⚠️ LOUD BUT NOT FATAL: get-week re-materializes a MISSING computed on its own, but a STALE one
     // is never re-checked — which is exactly why this call cannot be skipped silently.
     let computedRefreshed = false;
-    if (written > 0) {
+    if (written > 0 || enduranceWritten > 0) {
       try {
         const { error: matErr } = await supabase.functions.invoke('materialize-plan', {
           body: { training_plan_id: plan.id },
@@ -579,16 +609,18 @@ Deno.serve(async (req: Request) => {
     console.log(
       `[standing-restate] plan=${plan.id} week=${currentWeek} lifts=${found.join(',')} `
       + `rows=${written}/${restated.rows.length} changes=${restated.changes.length} `
+      + `endurance_rows=${enduranceWritten}/${endurance.rows.length} endurance_changes=${endurance.changes.length} `
       + `unmatched=${restated.unmatched.length} `
       + `me_sets=${JSON.stringify(ladder.sets)} me_bar=${JSON.stringify(ladder.bar)} `
       + `me_unread=${ladder.unread}`,
     );
 
     return json({ taper_weeks: taperWeeks, weeks,
-      success: true, applied: true, rows_written: written,
+      success: true, applied: true, rows_written: written, endurance_rows_written: enduranceWritten,
       current_week: currentWeek,
       working_numbers: workingNamed, missing: reading.missing,
       changes: restated.changes, unmatched: restated.unmatched,
+      endurance_changes: endurance.changes, endurance_unmatched: endurance.unmatched,
       me_sets: { by_pattern: ladder.sets, history: ladder.history, unread: ladder.unread },
       me_bar: { by_pattern: ladder.bar, state: ladder.barState, last_reps: ladder.lastReps },
       config_written: !cfgErr,

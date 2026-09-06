@@ -370,3 +370,125 @@ export function restateFromTest(args: {
 
   return { rows, changes, unmatched };
 }
+
+// ============================================================================
+// RESTATING THE ENDURANCE ROWS — the runs and rides take the shape the composer gives them today.
+//
+// ⛔ WHY (2026-09-05). `restateFromTest` rewrites the LIFT rows only. The run and ride rows kept the
+// tokens they were built with, so a session-library correction (the run MLSS level-2 round taking the
+// page's third step) never reached a calendar that already existed, and the deload column's "the
+// endurance sessions drop a level" was copy the write never honoured. The rebuild now restates both.
+//
+// ⛔ THE SAME TWO LAWS. Only sessions the athlete has not done; the diff is returned before it is
+// applied. Matched on week + weekday + type, in date order when a day carries two of one sport.
+//
+// ⚠️ A SCHEDULED TEST IS NOT THE COMPOSER'S ROW. Retests the athlete put on the calendar (run test,
+// FTP test) are inserted rows the composer does not know about; they are skipped by tag, never
+// matched, never rewritten.
+// ============================================================================
+
+const ENDURANCE_TYPES = new Set(['run', 'ride', 'swim']);
+const TEST_ROW_TAGS = new Set(['assessment', 'run_test', 'ftp_test', 'ftp_test_5min', '1rm_test', 'retest']);
+
+export type EndurancePlannedRowish = PlannedRowish & {
+  type?: string | null;
+  name?: string | null;
+  description?: string | null;
+  duration?: number | null;
+  steps_preset?: unknown;
+  tags?: unknown;
+};
+
+export type RestatedEnduranceRow = {
+  id: string;
+  week: number;
+  day: string;
+  type: string;
+  name: string;
+  description: string;
+  duration: number;
+  steps_preset: string[];
+  tags: string[];
+};
+
+export type EnduranceChange = {
+  week: number;
+  day: string;
+  type: string;
+  name: string;
+  from_minutes: number | null;
+  to_minutes: number;
+  /** The tokens differ — the session's shape, not only its length. */
+  shape_moved: boolean;
+};
+
+export type EnduranceRestatement = {
+  rows: RestatedEnduranceRow[];
+  changes: EnduranceChange[];
+  unmatched: { week: number; day: string; reason: string }[];
+};
+
+const tokensOf = (v: unknown): string[] => (Array.isArray(v) ? v.map((t) => String(t)) : []);
+
+export function restateEndurance(args: {
+  composed: ComposedWeek[];
+  planned: EndurancePlannedRowish[] | null | undefined;
+  afterWeek: number;
+}): EnduranceRestatement {
+  const bySlot = new Map<string, Array<ComposedWeek['sessions'][number]>>();
+  for (const wk of args.composed) {
+    for (const s of wk.sessions) {
+      if (!ENDURANCE_TYPES.has(String(s.type))) continue;
+      const key = `${wk.week}|${s.day}|${s.type}`;
+      bySlot.set(key, [...(bySlot.get(key) ?? []), s]);
+    }
+  }
+
+  const plannedBySlot = new Map<string, EndurancePlannedRowish[]>();
+  for (const row of args.planned ?? []) {
+    const week = Number(row?.week_number);
+    if (!Number.isFinite(week) || week < args.afterWeek) continue;
+    const type = String(row?.type ?? '');
+    if (!ENDURANCE_TYPES.has(type) || !row?.id) continue;
+    if (tokensOf(row?.tags).some((t) => TEST_ROW_TAGS.has(t))) continue;
+    const day = weekdayOf(row?.date);
+    if (!day) continue;
+    const key = `${week}|${day}|${type}`;
+    plannedBySlot.set(key, [...(plannedBySlot.get(key) ?? []), row]);
+  }
+
+  const rows: RestatedEnduranceRow[] = [];
+  const changes: EnduranceChange[] = [];
+  const unmatched: { week: number; day: string; reason: string }[] = [];
+
+  for (const [key, wanted] of bySlot) {
+    const [w, day] = key.split('|');
+    const week = Number(w);
+    if (week < args.afterWeek) continue;
+    const have = [...(plannedBySlot.get(key) ?? [])].sort((a, b) => String(a.date ?? '').localeCompare(String(b.date ?? '')) || String(a.id).localeCompare(String(b.id)));
+    if (have.length === 0) { unmatched.push({ week, day, reason: 'no materialized row for this day' }); continue; }
+    if (have.length !== wanted.length) { unmatched.push({ week, day, reason: `composer has ${wanted.length} session(s), calendar has ${have.length}` }); continue; }
+    wanted.forEach((fresh, i) => {
+      const row = have[i];
+      if (isDone(row)) return;
+      const nextTokens = tokensOf(fresh.steps_preset);
+      const curTokens = tokensOf(row.steps_preset);
+      const toMin = Math.round(Number(fresh.duration) || 0);
+      const fromMin = Number.isFinite(Number(row.duration)) && Number(row.duration) > 0 ? Math.round(Number(row.duration)) : null;
+      const shapeMoved = nextTokens.join(' ') !== curTokens.join(' ');
+      const nameMoved = String(fresh.name ?? '') !== String(row.name ?? '');
+      const descMoved = String(fresh.description ?? '') !== String(row.description ?? '');
+      if (!shapeMoved && !nameMoved && !descMoved && fromMin === toMin) return;
+      rows.push({
+        id: String(row.id), week, day, type: String(fresh.type),
+        name: String(fresh.name ?? ''), description: String(fresh.description ?? ''),
+        duration: toMin, steps_preset: nextTokens, tags: tokensOf(fresh.tags),
+      });
+      if (shapeMoved || fromMin !== toMin) {
+        changes.push({ week, day, type: String(fresh.type), name: String(fresh.name ?? ''), from_minutes: fromMin, to_minutes: toMin, shape_moved: shapeMoved });
+      }
+    });
+  }
+
+  return { rows, changes, unmatched };
+}

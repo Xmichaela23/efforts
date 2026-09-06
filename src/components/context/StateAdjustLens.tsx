@@ -397,7 +397,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
           {rebuilding ? 'Rebuilding…' : 'Rebuild upcoming sessions'}
         </button>
         <p className="text-[13px] text-white/60 mt-2 leading-snug">
-          Rewrites the sessions you have not started from the plan. Same lifts, weights and days. Done sessions are not touched.
+          Rewrites the sessions you have not started from the plan: lifts and weights, runs and rides. Same days. Done sessions are not touched.
         </p>
         {rebuildNote && <p className="text-[13px] text-white/75 mt-1.5">{rebuildNote}</p>}
       </section>
