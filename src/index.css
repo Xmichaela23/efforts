@@ -45,7 +45,7 @@
     /* Deterministic layout variables (universal for PWA + browser) */
     --header-h: 64px; /* matches h-16 */
     --tabbar-h: 56px; /* matches h-14 */
-    --tabbar-extra: 18px; /* iOS swipe-up gesture safe zone */
+    --tabbar-extra: 30px; /* iOS swipe-up gesture safe zone; 18 → 30 on 2026-09-06 (Michael: the tabs sit low, hard to hit) */
     /* Make Today readable while letting calendar fill remaining space */
     --todays-h: clamp(10rem, 20vh, 14rem);
     --cal-cell-h: 100px; /* compact height for ghosted timeline - emphasis on Today */
