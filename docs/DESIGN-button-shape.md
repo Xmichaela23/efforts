@@ -38,3 +38,15 @@ import { GalaxyButton } from '@/components/ui/galaxy-button';
 ## Adding a button
 
 Reach for `<GalaxyButton>` first. If it can't express what you need, extend the component (a new variant/size), not the call site — that's what keeps every screen in one language.
+
+## A border means you can tap it (2026-09-06)
+
+Michael: "It's the easiest way to train the user, and it's clean: every bordered pill does something."
+
+- **A bordered pill is a control.** Tap it and something happens: it edits, toggles, opens, or submits.
+- **A label never has a border.** Tags, badges, units, counts, statuses ("yards", "estimated", "grey zone",
+  a set count) are plain text, tinted if they carry a sport or a state, no border, no pill.
+- **Editable values need no pencil.** The pill is the affordance; a read-only value is plain text beside
+  it. One line at the top of a plate says "Tap a value to change it" and nothing else repeats it.
+- The lint `efforts/consistent-button-shape` keeps button corners honest; this rule is enforced by
+  review until a lint exists for bordered `span`/`div` labels.
