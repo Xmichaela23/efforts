@@ -1605,7 +1605,7 @@ return (
     
     {/* Description */}
     <div className="text-center mb-6">
-      <p className="text-white/50 text-sm">Your details and your training numbers. Changes save as you make them.</p>
+      <p className="text-white/50 text-sm">Your details and your training numbers.</p>
       {lastUpdated && (
         <p className="text-xs text-white/40 mt-2">
           Last updated: {new Date(lastUpdated).toLocaleDateString()}
