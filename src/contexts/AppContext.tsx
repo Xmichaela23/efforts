@@ -124,6 +124,8 @@ interface BaselineData {
   effort_paces?: Record<string, any> | null;
   /** AUTO/LOCKED switch (2026-09-02): per-lift values the athlete locked. Key present = locked; absent = auto. */
   locked_baselines?: Record<string, number> | null;
+  /** Profile screen identity fields (2026-09-06): name, location, photo_url. Email is the auth user's. */
+  profile?: { name?: string; location?: string; photo_url?: string } | null;
 }
 
 interface AppContextType {
@@ -388,6 +390,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Only written when the caller carried it (loaded rows always do) — a caller without the field
         // must not wipe a lock it never saw.
         ...(data.locked_baselines !== undefined ? { locked_baselines: data.locked_baselines } : {}),
+        // Same rule as the lock map: only written when the caller carried it.
+        ...(data.profile !== undefined ? { profile: data.profile ?? {} } : {}),
       };
       const { data: existingData } = await supabase.from('user_baselines').select('id').eq('user_id', userId).single();
       if (existingData) {
@@ -506,6 +510,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         effort_paces: data.effort_paces || null,
         // The lock map rides with the row so the Baselines screen can edit it and the resolver can read it.
         locked_baselines: data.locked_baselines || null,
+        profile: data.profile || {},
       };
     } catch (error) {
       console.error('Error in loadUserBaselines:', error);

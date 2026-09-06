@@ -728,6 +728,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     }
   }, [location.pathname]);
 
+  // Deep link: /profile opens the Profile screen (Training Baselines folded into it, 2026-09-06)
+  useEffect(() => {
+    if (location.pathname === '/profile') {
+      setSelectedWorkout(null);
+      setShowContext(false);
+      setShowStrengthLogger(false);
+      setShowPilatesYogaLogger(false);
+      setShowBuilder(false);
+      setShowGear(false);
+      setShowImportPage(false);
+      setShowAllPlans(false);
+      setShowStrengthPlans(false);
+      setShowAthleticRecord(false);
+      setShowGoals(false);
+      setShowTrainingBaselines(true);
+    }
+  }, [location.pathname]);
+
   // Deep link: /profile/athletic-record opens My Record (match menu + shareable URL)
   useEffect(() => {
     if (location.pathname === '/profile/athletic-record') {
@@ -917,11 +935,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowStrengthPlans(false);
     setShowAthleticRecord(false);
     setShowTrainingBaselines(true);
-    if (location.pathname === '/profile/athletic-record') {
+    if (location.pathname !== '/profile') {
       try {
-        navigate('/', { replace: true });
+        navigate('/profile', { replace: true });
       } catch (e) {
-        console.warn('[AppLayout] navigate away from /profile/athletic-record failed:', e);
+        console.warn('[AppLayout] navigate to /profile failed:', e);
       }
     }
   };
@@ -959,7 +977,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowAllPlans(false);
     setShowStrengthPlans(false);
     setShowGear(true);
-    if (location.pathname === '/profile/athletic-record') {
+    if ((location.pathname === '/profile/athletic-record' || location.pathname === '/profile')) {
       try {
         navigate('/', { replace: true });
       } catch (e) {
@@ -986,7 +1004,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowAllPlans(false);
     setShowStrengthPlans(false);
     setShowImportPage(true);
-    if (location.pathname === '/profile/athletic-record') {
+    if ((location.pathname === '/profile/athletic-record' || location.pathname === '/profile')) {
       try {
         navigate('/', { replace: true });
       } catch (e) {
@@ -1092,7 +1110,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setWorkoutBeingEdited(null);
     setActiveTab('summary');
 
-    if (location.pathname === '/goals' || location.pathname === '/profile/athletic-record') {
+    if (location.pathname === '/goals' || (location.pathname === '/profile/athletic-record' || location.pathname === '/profile')) {
       try {
         navigate('/', { replace: true });
       } catch (e) {
@@ -1499,7 +1517,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         }
         onBack={handleHeaderBack}
         onLogout={onLogout}
-        onTrainingBaselinesClick={handleTrainingBaselinesClick}
+        onProfileClick={handleTrainingBaselinesClick}
         onAthleticRecordClick={handleAthleticRecordClick}
         onConnectionsClick={handleConnectionsClick}
         onGearClick={handleGearClick}

@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AppProvider } from "@/contexts/AppContext";
 import Index from "./pages/Index";
@@ -15,14 +15,8 @@ import Connections from "./components/Connections";
 import PlansAdminImport from "./pages/PlansAdminImport";
 import OnboardingProfilePage from "./pages/OnboardingProfilePage";
 import ArcSetupPage from "./pages/ArcSetupPage";
-import TrainingBaselines from "./components/TrainingBaselines";
 
 const queryClient = new QueryClient();
-
-const BaselinesPage = () => {
-  const navigate = useNavigate();
-  return <TrainingBaselines onClose={() => navigate('/')} />;
-};
 
 const App = () => (
 <ThemeProvider defaultTheme="light">
@@ -35,6 +29,7 @@ const App = () => (
 <Routes>
 <Route path="/" element={<Index />} />
 <Route path="/goals" element={<Index />} />
+<Route path="/profile" element={<Index />} />
 <Route path="/profile/athletic-record" element={<Index />} />
 <Route path="/privacy" element={<Privacy />} />
 <Route path="/strava/callback" element={<StravaCallback />} /> {/* ✅ UNCOMMENTED */}
@@ -43,7 +38,7 @@ const App = () => (
 <Route path="/onboarding/profile" element={<OnboardingProfilePage />} />
 <Route path="/plans/admin" element={<PlansAdminImport />} />
 <Route path="/arc-setup" element={<ArcSetupPage />} />
-<Route path="/baselines" element={<BaselinesPage />} />
+<Route path="/baselines" element={<Navigate to="/profile" replace />} />
 <Route path="*" element={<NotFound />} />
 </Routes>
 </BrowserRouter>

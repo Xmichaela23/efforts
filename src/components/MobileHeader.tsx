@@ -21,7 +21,7 @@ interface MobileHeaderProps {
   /** Logout handler */
   onLogout?: () => void;
   /** Custom menu item handlers */
-  onTrainingBaselinesClick?: () => void;
+  onProfileClick?: () => void;
   onAthleticRecordClick?: () => void;
   onConnectionsClick?: () => void;
   onGearClick?: () => void;
@@ -35,7 +35,7 @@ export function MobileHeader({
   menuItems,
   wordmarkSize = 26,
   onLogout,
-  onTrainingBaselinesClick,
+  onProfileClick,
   onAthleticRecordClick,
   onConnectionsClick,
   onGearClick,
@@ -63,17 +63,13 @@ export function MobileHeader({
   // Default menu items
   const defaultMenuItems = (
     <>
-      <DropdownMenuItem onClick={onTrainingBaselinesClick || (() => navigate('/baselines'))}>
-        <Activity className="mr-2 h-4 w-4" />
-        Training Baselines
-      </DropdownMenuItem>
       <DropdownMenuItem
         onClick={onAthleticRecordClick || (() => navigate('/profile/athletic-record'))}
       >
         <Trophy className="mr-2 h-4 w-4" />
         Athletic Record
       </DropdownMenuItem>
-      <DropdownMenuItem>
+      <DropdownMenuItem onClick={onProfileClick || (() => navigate('/profile'))}>
         <User className="mr-2 h-4 w-4" />
         Profile
       </DropdownMenuItem>

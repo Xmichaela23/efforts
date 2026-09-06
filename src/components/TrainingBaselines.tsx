@@ -27,6 +27,8 @@ onOpenBaselineTest?: (testName: string) => void;
 
 interface BaselineData {
   // Personal details
+/** Profile screen identity fields (2026-09-06): name, location, photo_url. Email is the auth user's. */
+profile?: { name?: string; location?: string; photo_url?: string } | null;
 birthday?: string;
 height?: number;
 weight?: number;
@@ -111,6 +113,36 @@ function AutoMinePill({ mine, onAuto, onMine, color, label }: { mine: boolean; o
 
 export default function TrainingBaselines({ onClose, onOpenBaselineTest }: TrainingBaselinesProps) {
 const { saveUserBaselines, loadUserBaselines } = useAppContext();
+/** Profile identity (2026-09-06): the sign-in email is shown, never stored; the photo is uploaded to the
+ *  `avatars` bucket at `<user_id>/photo.jpg` (resized to 512px on the phone), its public URL saved to
+ *  `profile.photo_url` at once so leaving without Save does not orphan the file. */
+const [authEmail, setAuthEmail] = useState<string>('');
+const [photoBusy, setPhotoBusy] = useState(false);
+const [photoNote, setPhotoNote] = useState<string | null>(null);
+useEffect(() => {
+  let cancelled = false;
+  void supabase.auth.getUser().then(({ data: u }) => { if (!cancelled) setAuthEmail(u?.user?.email ?? ''); }).catch(() => {});
+  return () => { cancelled = true; };
+}, []);
+const uploadPhoto = async (file: File) => {
+  const uid = getStoredUserId(); if (!uid) return;
+  setPhotoBusy(true); setPhotoNote(null);
+  try {
+    const blob = await resizeImageToJpeg(file, 512);
+    const path = `${uid}/photo.jpg`;
+    const { error: upErr } = await supabase.storage.from('avatars').upload(path, blob, { upsert: true, contentType: 'image/jpeg', cacheControl: '3600' });
+    if (upErr) throw upErr;
+    const { data: pub } = supabase.storage.from('avatars').getPublicUrl(path);
+    const photo_url = `${pub.publicUrl}?v=${Date.now()}`;
+    const nextProfile = { ...(data.profile ?? {}), photo_url };
+    const { error: dbErr } = await supabase.from('user_baselines').update({ profile: nextProfile, updated_at: new Date().toISOString() }).eq('user_id', uid);
+    if (dbErr) throw dbErr;
+    setData(prev => ({ ...prev, profile: { ...(prev.profile ?? {}), photo_url } }));
+  } catch (e) {
+    console.warn('[Profile] photo upload failed:', e);
+    setPhotoNote('Could not save the photo. Try again.');
+  } finally { setPhotoBusy(false); }
+};
 // A lift switched to "locked" before a number exists — the input is in lock mode, nothing saved yet.
 const [lockDrafts, setLockDrafts] = useState<Record<string, boolean>>({});
 const [thresholdInfoOpen, setThresholdInfoOpen] = useState(false);
@@ -689,6 +721,20 @@ const getConfidenceDots = (confidence: string | undefined): string => {
 };
 
 // Calculate age from birthday
+/** Square-crop and resize an image on the phone before upload; JPEG at 0.85. */
+async function resizeImageToJpeg(file: File, size: number): Promise<Blob> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => { const i = new Image(); i.onload = () => resolve(i); i.onerror = () => reject(new Error('image decode failed')); i.src = url; });
+    const side = Math.min(img.naturalWidth, img.naturalHeight);
+    const sx = Math.round((img.naturalWidth - side) / 2), sy = Math.round((img.naturalHeight - side) / 2);
+    const canvas = document.createElement('canvas'); canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d'); if (!ctx) throw new Error('no canvas');
+    ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+    return await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('encode failed'))), 'image/jpeg', 0.85));
+  } finally { URL.revokeObjectURL(url); }
+}
+
 const calculateAge = (birthday: string | undefined): number | null => {
   if (!birthday) return null;
   const birthDate = new Date(birthday);
@@ -1279,11 +1325,11 @@ const DisciplineIcon = ({ discipline }: { discipline: string }) => {
 return (
   <div className="max-w-2xl mx-auto px-4 pb-6">
     {/* Page title */}
-    <h2 className="text-2xl font-bold text-white pb-2">Training Baselines</h2>
+    <h2 className="text-2xl font-bold text-white pb-2">Profile</h2>
     
     {/* Description */}
     <div className="text-center mb-6">
-      <p className="text-white/50 text-sm">Your performance data for personalized training plans</p>
+      <p className="text-white/50 text-sm">Your details, and the numbers your training is priced from</p>
       {lastUpdated && (
         <p className="text-xs text-white/40 mt-2">
           Last updated: {new Date(lastUpdated).toLocaleDateString()}
@@ -1326,7 +1372,41 @@ return (
                 <div className="space-y-5">
                   {/* Basic Information */}
                   <div className="p-4 rounded-2xl bg-white/[0.04] backdrop-blur-xl border border-white/[0.08]">
-                    <h2 className="text-sm font-semibold text-white/90 mb-3 tracking-wide">Basic Information</h2>
+                    <h2 className="text-sm font-semibold text-white/90 mb-3 tracking-wide">You</h2>
+
+                    {/* Identity (2026-09-06): photo, name, email, location. Email is the sign-in address, read-only. No sex field. */}
+                    <div className="flex items-start gap-3 mb-3">
+                      <label className="relative shrink-0 cursor-pointer" title="Change photo">
+                        {data.profile?.photo_url ? (
+                          <img src={data.profile.photo_url} alt="" className="h-16 w-16 rounded-full object-cover border border-white/20" />
+                        ) : (
+                          <div className="h-16 w-16 rounded-full bg-white/[0.08] border border-white/20 flex items-center justify-center text-[11px] text-white/50">{photoBusy ? '…' : 'photo'}</div>
+                        )}
+                        <input type="file" accept="image/*" className="hidden" disabled={photoBusy} onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadPhoto(f); e.target.value = ''; }} />
+                      </label>
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <input
+                          type="text"
+                          value={data.profile?.name || ''}
+                          onChange={(e) => setData(prev => ({ ...prev, profile: { ...(prev.profile ?? {}), name: e.target.value } }))}
+                          placeholder="Name"
+                          autoComplete="name"
+                          className="w-full h-8 px-2 text-xs bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
+                          style={{ fontFamily: 'Inter, sans-serif' }}
+                        />
+                        <input
+                          type="text"
+                          value={data.profile?.location || ''}
+                          onChange={(e) => setData(prev => ({ ...prev, profile: { ...(prev.profile ?? {}), location: e.target.value } }))}
+                          placeholder="Location"
+                          autoComplete="address-level2"
+                          className="w-full h-8 px-2 text-xs bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
+                          style={{ fontFamily: 'Inter, sans-serif' }}
+                        />
+                        <p className="text-xs text-white/50 truncate">{authEmail || ''}</p>
+                        {photoNote && <p className="text-xs text-white/60">{photoNote}</p>}
+                      </div>
+                    </div>
                     
                     <div className="flex flex-wrap gap-3">
                       <div className="flex items-center gap-2">
@@ -1338,20 +1418,7 @@ return (
                           className="h-8 px-2 text-xs bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 placeholder:text-white/40 focus:outline-none focus:border-white/40"
                           style={{ fontFamily: 'Inter, sans-serif' }}
                         />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-white/60">Gender</label>
-                        <select
-                          value={data.gender || ''}
-                          onChange={(e) => setData(prev => ({ ...prev, gender: e.target.value as any }))}
-                          className="h-8 px-2 text-xs bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded text-white/90 focus:outline-none focus:border-white/40"
-                          style={{ fontFamily: 'Inter, sans-serif' }}
-                        >
-                          <option value="" className="bg-[#1a1a1a]">-</option>
-                          <option value="male" className="bg-[#1a1a1a]">M</option>
-                          <option value="female" className="bg-[#1a1a1a]">F</option>
-                          <option value="prefer_not_to_say" className="bg-[#1a1a1a]">-</option>
-                        </select>
+                        {calculateAge(data.birthday) != null && <span className="text-xs text-white/60">{calculateAge(data.birthday)} yrs</span>}
                       </div>
                       <div className="flex items-center gap-2">
                         <label className="text-xs text-white/60">Units</label>
