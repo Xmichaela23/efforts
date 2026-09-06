@@ -162,7 +162,7 @@ export function KnowYourNumbersStep({
   return (
     <StepLayout step={step} totalSteps={totalSteps} title="Know your numbers?" onBack={onBack} onContinue={onContinue} canContinue continueLabel="Continue">
       <p className="text-white/70 text-sm mb-4">
-        Optional. Keep what is on file or test in week one. Numbers are typed in Training Baselines, not here.
+        Optional. Keep what is on file or test in week one. Numbers are typed on Profile, not here.
       </p>
       <div className="flex flex-col gap-3">
         {include.strength && rowShell(
@@ -177,7 +177,7 @@ export function KnowYourNumbersStep({
                 {strengthChoice === 'test' && <div className="text-white/50 mt-1">Week one is the test week (p215). The number on file stays until the test replaces it.</div>}
               </>
             )
-            : 'Nothing on file. Every lift is tested in week one (p215). Numbers can be typed in Training Baselines.',
+            : 'Nothing on file. Every lift is tested in week one (p215). Numbers can be typed on Profile.',
           <Toggle k="strength" value={strengthChoice} canUse={strengthAny} onSet={set} />,
         )}
         {include.bike && rowShell(
@@ -202,7 +202,7 @@ export function KnowYourNumbersStep({
           'Swim pace (per 100)',
           swimOnFile
             ? <>{swimOnFile} <span className="text-white/40">· on file</span></>
-            : <>Nothing on file — there is no swim test to schedule; the number is typed in Training Baselines.</>,
+            : <>Nothing on file — there is no swim test to schedule; the number is typed on Profile.</>,
           null,
         )}
       </div>
