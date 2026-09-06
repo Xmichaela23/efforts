@@ -20,6 +20,9 @@ import { runThresholdTestRow, ftpTestRow, ftp5MinTestRow, addDaysISO } from '@/l
 
 // The numbers the block is priced from, read through the SAME resolvers Training Baselines and the plan
 // builder use (Michael, 2026-09-05: "add the current e1RM, FTP, running threshold pace, easy pace").
+// While the server re-prices row by row (30 rows on a full block), the screen says so — leaving mid-way is not
+// guaranteed to finish (Michael, 2026-09-05).
+const REPRICE_WAIT = 'Updating your upcoming sessions. This can take up to a minute; keep this screen open.';
 const sourceWord = (src: string | null | undefined): string => {
   const v = String(src ?? '').toLowerCase();
   if (!v || v === 'none') return '';
@@ -86,7 +89,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   const acceptFtp = () => {
     void (async () => {
       const uid = getStoredUserId(); if (!uid) return;
-      setAccepting(true); setSaveNote(null); setLastSaved('bike');
+      setAccepting(true); setSaveNote(REPRICE_WAIT); setLastSaved('bike');
       try {
         const { data: row } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', uid).maybeSingle();
         const raw = row?.learned_fitness; const cur = typeof raw === 'string' ? JSON.parse(raw) : raw;
@@ -107,7 +110,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   const acceptThr = () => {
     void (async () => {
       const uid = getStoredUserId(); if (!uid) return;
-      setAcceptingThr(true); setSaveNote(null); setLastSaved('run');
+      setAcceptingThr(true); setSaveNote(REPRICE_WAIT); setLastSaved('run');
       try {
         const { data: row } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', uid).maybeSingle();
         const raw = row?.learned_fitness; const cur = typeof raw === 'string' ? JSON.parse(raw) : raw;
@@ -267,6 +270,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   // The same follow-through Training Baselines runs after its Save: an endurance number re-prices the unstarted
   // run/ride rows (`endurance-checkpoint`), a lift lock restates the block (`rematerialize-standing-block`).
   const repriceAfter = async (kind: 'endurance' | 'strength'): Promise<string> => {
+    setSaveNote(REPRICE_WAIT);
     try {
       if (kind === 'endurance') {
         const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } });
