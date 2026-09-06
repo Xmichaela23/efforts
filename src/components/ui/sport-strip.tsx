@@ -11,8 +11,9 @@ export type StripSport = 'run' | 'bike' | 'swim' | 'strength';
 const SEGMENTS: Array<{ key: StripSport; label: string; Icon: typeof Activity }> = [
   { key: 'run', label: 'Run', Icon: Activity },
   { key: 'bike', label: 'Ride', Icon: Bike },
-  { key: 'swim', label: 'Swim', Icon: Waves },
   { key: 'strength', label: 'Strength', Icon: Dumbbell },
+  // Swim last (Michael, 2026-09-06). Swim is minimal in this app; it does not lead the strip.
+  { key: 'swim', label: 'Swim', Icon: Waves },
 ];
 
 export default function SportStrip({ value, onChange, sports, className = '' }: {
