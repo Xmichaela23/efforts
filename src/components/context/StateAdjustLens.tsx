@@ -461,8 +461,8 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
             value={fmtPace(easy?.sec_per_mi, metric) ? `${fmtPace(easy?.sec_per_mi, metric)} · ${easy?.source === 'learned' ? 'from runs' : 'from threshold'}` : null}
             note={easy?.source === 'learned'
               ? (lthr?.bpm != null
-                ? `Your pace at ${frielZones(lthr.bpm)[1].min}–${frielZones(lthr.bpm)[1].max} bpm, your zone 2, over the last five easy runs. Heat and hills move it.`
-                : 'Your last five easy runs. Heat and hills move it.')
+                ? `Your pace at ${frielZones(lthr.bpm)[1].min}–${frielZones(lthr.bpm)[1].max} bpm, your zone 2, over your last five easy runs. Heat and hills slow this pace at the same heart rate.`
+                : 'Your last five easy runs. Heat and hills slow this pace at the same heart rate.')
               : 'Worked out from threshold until five easy runs are on file.'} />
           <div className="flex items-center justify-between py-1 gap-3">
             <span className="text-[14px] text-white/85">Retest</span>
