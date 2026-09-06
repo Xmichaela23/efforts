@@ -69,6 +69,15 @@ Deno.serve(async (req: Request) => {
     // with no checkpoint gate and nothing recorded. The Baselines screen calls this after a save that
     // changed a pace, FTP or threshold HR. Strength rows are untouched: a block's weights come from
     // its week-1 test, not from Baselines.
+    // ⛔ THE RE-PRICE IS A BACKGROUND JOB (2026-09-05, Michael: "let's make it right"). The rows are re-priced
+    // one call each; on a full block that is 30 calls and up to a minute. The client used to hold the request
+    // open and tell the athlete to keep the screen open. Now the server records the job on the plan
+    // (`config.reprice_job`), replies at once, and keeps working after the reply (EdgeRuntime.waitUntil —
+    // the same mechanism strava-webhook uses). The screen polls `reprice_status` for the count. If the
+    // runtime has no waitUntil, it falls back to running in the request as before.
+    if (p?.reprice_status === true) {
+      return json({ success: true, job: (config as Record<string, unknown>)?.reprice_job ?? null });
+    }
     if (p?.reprice === true) {
       const { data: rows } = await supabase
         .from('planned_workouts')
@@ -77,14 +86,31 @@ Deno.serve(async (req: Request) => {
         .eq('user_id', userId)
         .order('date');
       const pending = (rows ?? []).filter((r: any) => isRepriceable(r, today));
-      let repriced = 0;
-      for (const r of pending) {
-        try {
-          const { error } = await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(r.id) } });
-          if (!error) repriced += 1;
-        } catch (e) { console.warn(`[reprice] row ${r.id} not re-priced:`, (e as Error)?.message ?? String(e)); }
+      const job = { started_at: new Date().toISOString(), total: pending.length, done: 0, finished_at: null as string | null };
+      const writeJob = async (j: typeof job) => {
+        const { data: cur } = await supabase.from('plans').select('config').eq('id', plan.id).eq('user_id', userId).maybeSingle();
+        await supabase.from('plans').update({ config: { ...((cur?.config as Record<string, unknown>) ?? config), reprice_job: j } }).eq('id', plan.id).eq('user_id', userId);
+      };
+      await writeJob(job);
+      const run = async () => {
+        let repriced = 0;
+        for (const r of pending) {
+          try {
+            const { error } = await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(r.id) } });
+            if (!error) repriced += 1;
+          } catch (e) { console.warn(`[reprice] row ${r.id} not re-priced:`, (e as Error)?.message ?? String(e)); }
+          if (repriced % 5 === 0) await writeJob({ ...job, done: repriced });
+        }
+        await writeJob({ ...job, done: repriced, finished_at: new Date().toISOString() });
+        console.log(`[reprice] plan=${plan.id} repriced=${repriced}/${pending.length}`);
+        return repriced;
+      };
+      const waitUntil = (globalThis as any).EdgeRuntime?.waitUntil as ((p: Promise<unknown>) => void) | undefined;
+      if (typeof waitUntil === 'function' && pending.length > 0) {
+        waitUntil(run());
+        return json({ success: true, queued: true, rows_pending: pending.length });
       }
-      console.log(`[reprice] plan=${plan.id} repriced=${repriced}/${pending.length}`);
+      const repriced = await run();
       return json({ success: true, repriced: true, rows_repriced: repriced, rows_pending: pending.length });
     }
 
