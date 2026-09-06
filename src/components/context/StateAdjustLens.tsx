@@ -533,27 +533,26 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         {ordered.map((sec, i) => {
           const color = sec.sport ? getDisciplineColor(sec.sport) : 'rgba(255,255,255,0.7)';
           const open = sec.info ? infoOpen.has(sec.id) : false;
+          // Label on its own line, body full width (Michael, 2026-09-05: "a lot of dead space on the
+          // left"). The State plate's side column works for name + number rows; these rows carry pills
+          // and buttons and need the whole width on a phone.
           return (
-            <div key={sec.id} className="flex items-start gap-3 px-3 py-3">
-              <span className="flex flex-col gap-1 shrink-0 w-[92px] pt-[3px]">
-                <span className="flex items-center gap-2">
-                  <sec.Icon size={15} strokeWidth={2.25} style={{ color }} className="shrink-0" aria-hidden="true" />
-                  <span className="text-[11.5px] font-semibold tracking-[0.14em] uppercase" style={{ color }}>{sec.label}</span>
-                </span>
+            <div key={sec.id} className="px-3 py-3">
+              <div className="flex items-center gap-2 mb-2">
+                <sec.Icon size={15} strokeWidth={2.25} style={{ color }} className="shrink-0" aria-hidden="true" />
+                <span className="text-[11.5px] font-semibold tracking-[0.14em] uppercase" style={{ color }}>{sec.label}</span>
                 {sec.info && (
-                  <button type="button" onClick={() => toggleInfo(sec.id)} aria-label={`About ${sec.label.toLowerCase()} on this screen`} aria-expanded={open} className="self-start bg-transparent border-none p-0 cursor-pointer text-white/45 text-[12px] leading-none">ⓘ</button>
+                  <button type="button" onClick={() => toggleInfo(sec.id)} aria-label={`About ${sec.label.toLowerCase()} on this screen`} aria-expanded={open} className="bg-transparent border-none p-0 cursor-pointer text-white/45 text-[12px] leading-none">ⓘ</button>
                 )}
-              </span>
-              <div className="flex-1 min-w-0">
-                {open && sec.info && <p className="mb-2 text-[12px] text-white/65 leading-snug">{sec.info}</p>}
-                {sec.body}
+                {reordering && (
+                  <span className="ml-auto flex items-center shrink-0 -mr-1">
+                    <span role="button" aria-label={`move ${sec.label.toLowerCase()} up`} onClick={() => moveSection(sec.id, -1)} className={`px-2 py-0.5 text-[14px] leading-none ${i === 0 ? 'text-white/25' : 'text-white/85'}`}>▲</span>
+                    <span role="button" aria-label={`move ${sec.label.toLowerCase()} down`} onClick={() => moveSection(sec.id, 1)} className={`px-2 py-0.5 text-[14px] leading-none ${i === ordered.length - 1 ? 'text-white/25' : 'text-white/85'}`}>▼</span>
+                  </span>
+                )}
               </div>
-              {reordering && (
-                <span className="flex flex-col items-center shrink-0 -mr-1">
-                  <span role="button" aria-label={`move ${sec.label.toLowerCase()} up`} onClick={() => moveSection(sec.id, -1)} className={`px-2 py-0.5 text-[14px] leading-none ${i === 0 ? 'text-white/25' : 'text-white/85'}`}>▲</span>
-                  <span role="button" aria-label={`move ${sec.label.toLowerCase()} down`} onClick={() => moveSection(sec.id, 1)} className={`px-2 py-0.5 text-[14px] leading-none ${i === ordered.length - 1 ? 'text-white/25' : 'text-white/85'}`}>▼</span>
-                </span>
-              )}
+              {open && sec.info && <p className="mb-2 text-[12px] text-white/65 leading-snug">{sec.info}</p>}
+              {sec.body}
             </div>
           );
         })}
