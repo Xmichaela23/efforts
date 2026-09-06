@@ -10,7 +10,7 @@ export interface LoadBarData {
    * fitness = 42-day exponential average of daily workload (CTL), fatigue = 7-day (ATL), form = yesterday's
    * fitness − yesterday's fatigue (TSB). Server-computed (`_shared/fitness-fatigue.ts`) over the whole history.
    */
-  fitness_fatigue?: { fitness: number | null; fatigue: number | null; form: number | null } | null;
+  fitness_fatigue?: { fitness: number | null; fatigue: number | null; form: number | null; week_ago?: { fitness: number | null; fatigue: number | null; form: number | null } | null } | null;
   /** Kept on the payload for the coach; NOT rendered here since 2026-09-04 (ACWR is Gabbett's — neither Garmin nor TrainingPeaks). */
   acwr?: number | null;
   acwr_provisional?: boolean;
@@ -85,6 +85,13 @@ export default function LoadBar({ load, compact }: LoadBarProps) {
   const ff = load.fitness_fatigue ?? null;
   const zone = formZone(ff?.form);
   const fmt1 = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? null : Math.round(v));
+  // The week's change beside each number (intervals.icu's tile). Printed as a signed number, never an arrow.
+  const delta = (now: number | null | undefined, then: number | null | undefined) => {
+    if (now == null || then == null || !Number.isFinite(now) || !Number.isFinite(then)) return null;
+    const d = Math.round(now - then); return d === 0 ? '±0' : d > 0 ? `+${d}` : `${d}`;
+  };
+  const wk = ff?.week_ago ?? null;
+  const Delta = ({ v }: { v: string | null }) => v ? <span className="ml-0.5 text-[10.5px] text-white/45 tabular-nums">{v}</span> : null;
 
   // Weekly COMPOSITION — aggregate the 7-day load by discipline (from by_type; fall back to the
   // day's dominant_type). This is the primary load visual; the per-day rhythm lives in the calendar.
@@ -124,9 +131,9 @@ export default function LoadBar({ load, compact }: LoadBarProps) {
         <span className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase">LOAD</span>
         {ff && fmt1(ff.fitness) != null ? (
           <div className="flex items-center gap-2 text-[11px] text-white/45 leading-none">
-            <span>fitness <span className="readout-num text-[13px] text-white/85">{fmt1(ff.fitness)}</span></span>
+            <span>fitness <span className="readout-num text-[13px] text-white/85">{fmt1(ff.fitness)}</span><Delta v={delta(ff.fitness, wk?.fitness)} /></span>
             <Dot />
-            <span>fatigue <span className="readout-num text-[13px] text-white/85">{fmt1(ff.fatigue)}</span></span>
+            <span>fatigue <span className="readout-num text-[13px] text-white/85">{fmt1(ff.fatigue)}</span><Delta v={delta(ff.fatigue, wk?.fatigue)} /></span>
             <Dot />
             <span>
               form <span className="readout-num text-[13px] text-white/85">{(ff.form ?? 0) > 0 ? '+' : ''}{fmt1(ff.form)}</span>
@@ -137,6 +144,11 @@ export default function LoadBar({ load, compact }: LoadBarProps) {
           <span className="text-[11px] text-white/40 leading-none">no sessions logged yet</span>
         )}
       </div>
+      {!compact && ff && fmt1(ff.fitness) != null && (
+        <div className="mt-1 text-[11px] text-white/50 leading-snug">
+          fitness: the last 6 weeks of training · fatigue: the last week · form = fitness − fatigue, above zero fresh, below zero carrying load · small numbers: the change this week
+        </div>
+      )}
 
       {/* Composition strip — the primary load visual (full surface only). */}
       {!compact && comp.length > 0 && total > 0 && (
