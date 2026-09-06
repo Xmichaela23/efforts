@@ -50,9 +50,11 @@ export const usePlannedWorkouts = (options?: UsePlannedWorkoutsOptions) => {
       const plannedItems = items.filter((it: any) => !!it?.planned);
       const transformedWorkouts: PlannedWorkout[] = plannedItems.map(toPlannedWorkout);
       setPlannedWorkouts(transformedWorkouts);
+      return transformedWorkouts; // react-query requires a defined value; the state above is what consumers read
     } catch (err) {
       console.error('Error fetching planned workouts:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch planned workouts');
+      return [] as PlannedWorkout[];
     } finally {
       setLoading(false);
     }
