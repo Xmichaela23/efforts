@@ -658,7 +658,7 @@ export default function PostWorkoutFeedback({
                 <div className="text-[15px] text-white/95">Your runs now measure {fmtMi(thrProposal.measuredSecPerMi)} at threshold</div>
                 <div className="text-[12px] text-white/60">{thrProposal.measuredSecPerMi < thrProposal.appliedSecPerMi ? 'Faster' : 'Slower'} than the {fmtMi(thrProposal.appliedSecPerMi)} in use. Nothing changes until you take it.</div>
               </div>
-              <button type="button" disabled={ftpAccepting} onClick={acceptThr} className="shrink-0 text-[13px] px-3 py-1.5 rounded-lg border bg-white/[0.04] disabled:opacity-50" style={{ borderColor: `${SPORT_COLORS.run}99`, color: SPORT_COLORS.run }}>
+              <button type="button" disabled={ftpAccepting} onClick={acceptThr} className="shrink-0 text-[13px] px-3 py-1.5 rounded-xl border bg-white/[0.04] disabled:opacity-50" style={{ borderColor: `${SPORT_COLORS.run}99`, color: SPORT_COLORS.run }}>
                 {ftpAccepting ? 'Applying…' : `use ${fmtMi(thrProposal.measuredSecPerMi)}`}
               </button>
             </div>
@@ -668,7 +668,7 @@ export default function PostWorkoutFeedback({
                 <div className="text-[15px] text-white/95">Your rides now measure {ftpProposal.measured} W</div>
                 <div className="text-[12px] text-white/60">{ftpProposal.measured > ftpProposal.applied ? 'Up' : 'Down'} from {ftpProposal.applied} W. Nothing changes until you take it.</div>
               </div>
-              <button type="button" disabled={ftpAccepting} onClick={acceptFtp} className="shrink-0 text-[13px] px-3 py-1.5 rounded-lg border bg-white/[0.04] disabled:opacity-50" style={{ borderColor: `${SPORT_COLORS.ride}99`, color: SPORT_COLORS.ride }}>
+              <button type="button" disabled={ftpAccepting} onClick={acceptFtp} className="shrink-0 text-[13px] px-3 py-1.5 rounded-xl border bg-white/[0.04] disabled:opacity-50" style={{ borderColor: `${SPORT_COLORS.ride}99`, color: SPORT_COLORS.ride }}>
                 {ftpAccepting ? 'Applying…' : `use ${ftpProposal.measured} W`}
               </button>
             </div>

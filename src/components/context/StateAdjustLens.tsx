@@ -363,7 +363,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       await reload();
     } catch (e) { setSaveNote('Could not switch. Try again.'); console.warn('[StateAdjustLens] auto failed:', e); }
   };
-  const pill = 'text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50';
+  const pill = 'text-[13px] px-3 py-1.5 rounded-xl border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50';
   const Row = ({ id, name, value, editable = true, hint, sport, note }: { id: string; name: string; value: string | null; editable?: boolean; hint?: string; sport: 'strength' | 'run' | 'bike'; note?: string }) => (
     <div className="py-1">
     <div className="flex items-center justify-between gap-3">
@@ -372,11 +372,11 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         <span className="flex items-center gap-2">
           <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void commit(id); if (e.key === 'Escape') { setEditing(null); setDraft(''); } }}
             inputMode={id === 'threshold' ? 'numeric' : 'decimal'} placeholder={hint} className="w-24 bg-white/[0.06] border border-white/20 rounded-md px-2 py-1 text-[16px] text-white/90 text-right tabular-nums outline-none" />
-          <button type="button" onClick={() => void commit(id)} className="text-[12px] text-white/80 px-2 py-1 rounded-md border border-white/15">save</button>
+          <button type="button" onClick={() => void commit(id)} className="text-[12px] text-white/80 px-2 py-1 rounded-xl border border-white/15">save</button>
           <button type="button" onClick={() => { setEditing(null); setDraft(''); }} className="text-[12px] text-white/45 px-1 py-1">cancel</button>
         </span>
       ) : editable ? (
-        <span className="inline-flex shrink-0 whitespace-nowrap rounded-lg border overflow-hidden" style={{ borderColor: `${getDisciplineColor(sport)}55`, background: `${getDisciplineColor(sport)}14` }}>
+        <span className="inline-flex shrink-0 whitespace-nowrap rounded-xl border overflow-hidden" style={{ borderColor: `${getDisciplineColor(sport)}55`, background: `${getDisciplineColor(sport)}14` }}>
           <button type="button" onClick={() => { setEditing(id); setDraft(''); setSaveNote(null); }} aria-label={`edit ${name}`}
             className="inline-flex items-center gap-1.5 pl-2.5 pr-2 py-1 bg-transparent border-none text-[14px] text-white/90 tabular-nums outline-none focus:outline-none active:brightness-125">
             {value ?? <span className="text-white/45">tap to add</span>}
@@ -460,7 +460,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
           {thrProposal && (
             <div className="flex items-center justify-between py-1 gap-3">
               <span className="text-[13px] text-white/70">Your runs measure {fmtPace(thrProposal.measuredSecPerKm * 1.609344, metric)}</span>
-              <button type="button" disabled={acceptingThr} onClick={acceptThr} style={{ borderColor: `${getDisciplineColor('run')}88`, color: getDisciplineColor('run') }} className="text-[13px] px-3 py-1 rounded-lg border bg-white/[0.04] disabled:opacity-50">{acceptingThr ? 'Applying…' : `use ${fmtPace(thrProposal.measuredSecPerKm * 1.609344, metric)}`}</button>
+              <button type="button" disabled={acceptingThr} onClick={acceptThr} style={{ borderColor: `${getDisciplineColor('run')}88`, color: getDisciplineColor('run') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{acceptingThr ? 'Applying…' : `use ${fmtPace(thrProposal.measuredSecPerKm * 1.609344, metric)}`}</button>
             </div>
           )}
           <Row id="lthr" name="Threshold heart rate" value={withSource(lthr?.bpm != null ? `${Math.round(lthr.bpm)} bpm` : null, lthr?.source)} hint="bpm" sport="run" />
@@ -493,7 +493,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
           {proposal && (
             <div className="flex items-center justify-between py-1 gap-3">
               <span className="text-[13px] text-white/70">Your rides measure {Math.round(proposal.measured)} W</span>
-              <button type="button" disabled={accepting} onClick={acceptFtp} style={{ borderColor: `${getDisciplineColor('bike')}88`, color: getDisciplineColor('bike') }} className="text-[13px] px-3 py-1 rounded-lg border bg-white/[0.04] disabled:opacity-50">{accepting ? 'Applying…' : `use ${Math.round(proposal.measured)} W`}</button>
+              <button type="button" disabled={accepting} onClick={acceptFtp} style={{ borderColor: `${getDisciplineColor('bike')}88`, color: getDisciplineColor('bike') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{accepting ? 'Applying…' : `use ${Math.round(proposal.measured)} W`}</button>
             </div>
           )}
           <div className="flex items-center justify-between py-1 gap-3">
