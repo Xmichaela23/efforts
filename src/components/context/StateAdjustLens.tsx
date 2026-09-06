@@ -6,7 +6,7 @@
 // endurance ease/push next) get re-homed here in the next pass. Nothing here changes your plan yet —
 // no dead buttons that pretend to work; honest labels for what lands where. Consent-first throughout.
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pencil, Dumbbell, Activity, Bike } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { supabase, getStoredUserId } from '@/lib/supabase';
@@ -22,7 +22,7 @@ import { runThresholdTestRow, ftpTestRow, ftp5MinTestRow, addDaysISO } from '@/l
 // builder use (Michael, 2026-09-05: "add the current e1RM, FTP, running threshold pace, easy pace").
 // While the server re-prices row by row (30 rows on a full block), the screen says so — leaving mid-way is not
 // guaranteed to finish (Michael, 2026-09-05).
-const REPRICE_WAIT = 'Updating your upcoming sessions. This can take up to a minute; keep this screen open.';
+const REPRICE_WAIT = 'Updating your upcoming sessions…';
 const sourceWord = (src: string | null | undefined): string => {
   const v = String(src ?? '').toLowerCase();
   if (!v || v === 'none') return '';
@@ -98,7 +98,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         if (error) throw error;
         if (pn?.ftp_source === 'manual') { const cleared: any = { ...(pn ?? {}) }; delete cleared.ftp_source; await saveUserBaselines({ ...baselines, performanceNumbers: cleared }); }
         let note = `${Math.round(Number((next.ride_ftp_accepted as any).value))} W in use.`;
-        try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const n = Number((rp as any)?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} re-priced.`; } catch { /* the accept stands; rebuild covers it */ }
+        try { note = await repriceEndurance(note); } catch { /* the accept stands */ }
         setSaveNote(note);
         await reload();
       } catch (e) { setSaveNote('Could not accept. Try again.'); console.warn('[StateAdjustLens] accept FTP failed:', e); }
@@ -119,7 +119,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         if (error) throw error;
         if (pn?.threshold_pace_source === 'manual') await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), threshold_pace_source: 'learned' } });
         let note = `${fmtPace(Number((next.run_threshold_pace_accepted as any).value) * 1.609344, metric)} in use.`;
-        try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const n = Number((rp as any)?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} re-priced.`; } catch { /* the accept stands */ }
+        try { note = await repriceEndurance(note); } catch { /* the accept stands */ }
         setSaveNote(note);
         await reload();
       } catch (e) { setSaveNote('Could not accept. Try again.'); console.warn('[StateAdjustLens] accept threshold failed:', e); }
@@ -269,14 +269,38 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   };
   // The same follow-through Training Baselines runs after its Save: an endurance number re-prices the unstarted
   // run/ride rows (`endurance-checkpoint`), a lift lock restates the block (`rematerialize-standing-block`).
+  // The endurance re-price is a background job on the server (endurance-checkpoint `reprice` → `reprice_job` on the
+  // plan). Queue it, tell the athlete they can leave, and poll for the count while this screen is open.
+  const pollRef = React.useRef<number | null>(null);
+  React.useEffect(() => () => { if (pollRef.current) window.clearInterval(pollRef.current); }, []);
+  const repriceEndurance = async (prefix: string): Promise<string> => {
+    const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } });
+    const d = rp as any;
+    if (d?.queued) {
+      const total = Number(d.rows_pending ?? 0);
+      if (pollRef.current) window.clearInterval(pollRef.current);
+      const startedAt = Date.now();
+      pollRef.current = window.setInterval(async () => {
+        try {
+          const { data: st } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice_status: true } });
+          const job = (st as any)?.job;
+          if (job?.finished_at) {
+            if (pollRef.current) window.clearInterval(pollRef.current); pollRef.current = null;
+            setSaveNote(`${prefix} ${Number(job.done ?? 0)} upcoming session${Number(job.done) === 1 ? '' : 's'} re-priced.`);
+          } else if (Date.now() - startedAt > 180_000) {
+            if (pollRef.current) window.clearInterval(pollRef.current); pollRef.current = null;
+          }
+        } catch { /* keep polling */ }
+      }, 3000);
+      return `${prefix} Updating ${total} upcoming session${total === 1 ? '' : 's'} in the background. You can leave; it finishes on its own.`;
+    }
+    const n = Number(d?.rows_repriced ?? 0);
+    return n > 0 ? `${prefix} ${n} upcoming session${n === 1 ? '' : 's'} re-priced.` : prefix;
+  };
   const repriceAfter = async (kind: 'endurance' | 'strength'): Promise<string> => {
     setSaveNote(REPRICE_WAIT);
     try {
-      if (kind === 'endurance') {
-        const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } });
-        const n = Number((rp as any)?.rows_repriced ?? 0);
-        return n > 0 ? `Saved. ${n} upcoming session${n === 1 ? '' : 's'} re-priced.` : 'Saved.';
-      }
+      if (kind === 'endurance') return await repriceEndurance('Saved.');
       const { data: rs } = await supabase.functions.invoke('rematerialize-standing-block', { body: { apply: true } });
       return (rs as any)?.success ? 'Saved. Upcoming weights updated.' : 'Saved.';
     } catch { return 'Saved. Rebuild above to apply it.'; }

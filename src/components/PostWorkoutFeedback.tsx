@@ -153,7 +153,7 @@ export default function PostWorkoutFeedback({
         const { error } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', uid);
         if (error) throw error;
         let note = `${fmtMi(Number((next.run_threshold_pace_accepted as any).value) * 1.609344)} in use.`;
-        try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const n = Number((rp as any)?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} re-priced.`; } catch { /* the accept stands */ }
+        try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const d = rp as any; if (d?.queued) { const t = Number(d.rows_pending ?? 0); note += ` Updating ${t} upcoming session${t === 1 ? '' : 's'} in the background; you can close this.`; } else { const n = Number(d?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} re-priced.`; } } catch { /* the accept stands */ }
         {
           // Taking the number is choosing auto: clear a manual choice through the same column Baselines writes.
           const { data: pnRow } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', uid).maybeSingle();
@@ -177,7 +177,7 @@ export default function PostWorkoutFeedback({
         if (error) throw error;
         const w = Math.round(Number((next.ride_ftp_accepted as any).value));
         let note = `${w} W in use.`;
-        try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const n = Number((rp as any)?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} re-priced.`; } catch { /* the accept stands */ }
+        try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const d = rp as any; if (d?.queued) { const t = Number(d.rows_pending ?? 0); note += ` Updating ${t} upcoming session${t === 1 ? '' : 's'} in the background; you can close this.`; } else { const n = Number(d?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} re-priced.`; } } catch { /* the accept stands */ }
         {
           // Taking the number is choosing auto: clear a manual choice through the same column Baselines writes.
           const { data: pnRow } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', uid).maybeSingle();
