@@ -421,14 +421,21 @@ const [garminAccessToken, setGarminAccessToken] = useState<string | null>(null);
     };
   }, []);
 
-  // Auto-open leftmost sport with data, or Run as default
+  // Open on the sport the athlete last had open (Michael, 2026-09-06: it kept opening on Strength, the
+  // only sport ticked on his account). Fallback: the first ticked sport in strip order, then Run.
+  const LAST_SPORT_KEY = 'efforts:profile_last_sport';
 useEffect(() => {
     if (!loading && activeSport === null) {
-      const sportOrder = ['running', 'cycling', 'swimming', 'strength'];
+      const sportOrder = ['running', 'cycling', 'strength', 'swimming'];
+      let last: string | null = null;
+      try { last = localStorage.getItem(LAST_SPORT_KEY); } catch { /* device copy only */ }
       const firstWithData = sportOrder.find(s => data.disciplines.includes(s));
-      setActiveSport(firstWithData || 'running');
+      setActiveSport((last && sportOrder.includes(last) ? last : null) || firstWithData || 'running');
     }
   }, [loading, data.disciplines]);
+useEffect(() => {
+    if (activeSport) { try { localStorage.setItem(LAST_SPORT_KEY, activeSport); } catch { /* device copy only */ } }
+  }, [activeSport]);
 
   // Check for existing Strava token
 useEffect(() => {
@@ -1427,8 +1434,8 @@ const acceptThr = async () => {
 const disciplineOptions = [
     { id: 'running', name: 'Run', icon: Activity, color: SPORT_COLORS.run },
     { id: 'cycling', name: 'Cycle', icon: Bike, color: SPORT_COLORS.cycling },
-    { id: 'swimming', name: 'Swim', icon: Waves, color: SPORT_COLORS.swim },
-    { id: 'strength', name: 'Strength', icon: Dumbbell, color: SPORT_COLORS.strength }
+    { id: 'strength', name: 'Strength', icon: Dumbbell, color: SPORT_COLORS.strength },
+    { id: 'swimming', name: 'Swim', icon: Waves, color: SPORT_COLORS.swim }
   ];
   
   // Get active sport color

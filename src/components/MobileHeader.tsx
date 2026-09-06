@@ -63,15 +63,15 @@ export function MobileHeader({
   // Default menu items
   const defaultMenuItems = (
     <>
+      <DropdownMenuItem onClick={onProfileClick || (() => navigate('/profile'))}>
+        <User className="mr-2 h-4 w-4" />
+        Profile
+      </DropdownMenuItem>
       <DropdownMenuItem
         onClick={onAthleticRecordClick || (() => navigate('/profile/athletic-record'))}
       >
         <Trophy className="mr-2 h-4 w-4" />
         Athletic Record
-      </DropdownMenuItem>
-      <DropdownMenuItem onClick={onProfileClick || (() => navigate('/profile'))}>
-        <User className="mr-2 h-4 w-4" />
-        Profile
       </DropdownMenuItem>
       <DropdownMenuItem onClick={onConnectionsClick || (() => navigate('/connections'))}>
         <Link className="mr-2 h-4 w-4" />
