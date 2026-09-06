@@ -585,10 +585,12 @@ function describeSession(session: EnduranceSession, raceTempo: boolean): string 
     parts.push('Run at race pace, with the recovery periods a quarter longer than usual.');
   }
   if (session.family === 'run_mlss') {
-    // ⚠️ THE TOKEN SAYS 5K PACE; THE SESSION IS MLSS. Zone 4 tops out at vVO2 and a 5K sits close to
-    // it, which is why the existing vocabulary can carry this at all — but the two are not the same
-    // thing and the card should not imply they are.
-    parts.push('Held at the hardest pace you could hold for about an hour of racing, not 5K pace.');
+    // ⛔ THE PAGE'S OWN WORDS (p231, 2026-09-05, Michael: "whatever the book says"). The session is
+    // time in zone 4 with fatigue spread evenly; the work may be run on hills with the pace adjusted
+    // to hold the effort. The old line ("the hardest pace you could hold for about an hour") described
+    // threshold pace, and these rounds run at 125% and 115% of it — it was written for a 5K-pace token
+    // this session no longer uses.
+    parts.push('Time above threshold with the fatigue spread evenly across the rounds. Hills are fine if the pace is adjusted to hold the effort.');
   }
   /**
    * ⛔ THE PRESCRIPTION LINE (Michael, 2026-09-02, rulings 1 and 2). Easy sessions are a heart-rate
@@ -600,9 +602,10 @@ function describeSession(session: EnduranceSession, raceTempo: boolean): string 
     parts.push('Heart-rate zone; the pace shown is a reference.');
   } else if (session.family === 'run_near_threshold') {
     parts.push('Effort 5–6 of 10.');
-  } else if (session.family === 'run_mlss') {
-    parts.push('Effort 8–10 of 10.');
   }
+  // ⛔ NO EFFORT NUMBER ON THE MLSS ROW. The page gives none for these sessions; "8–10 of 10" was OURS
+  // (2026-09-02) and came off on 2026-09-05 ("whatever the book says"). The near-threshold 5–6 is the
+  // same ruling and stands until it is looked at.
   return parts.join(' ');
 }
 
