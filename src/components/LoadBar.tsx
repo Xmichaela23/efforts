@@ -10,7 +10,7 @@ export interface LoadBarData {
    * fitness = 42-day exponential average of daily workload (CTL), fatigue = 7-day (ATL), form = yesterday's
    * fitness − yesterday's fatigue (TSB). Server-computed (`_shared/fitness-fatigue.ts`) over the whole history.
    */
-  fitness_fatigue?: { fitness: number | null; fatigue: number | null; form: number | null; week_ago?: { fitness: number | null; fatigue: number | null; form: number | null } | null } | null;
+  fitness_fatigue?: { fitness: number | null; fatigue: number | null; form: number | null; fitness_prior?: number | null; fatigue_prior?: number | null; week_ago?: { fitness: number | null; fatigue: number | null; form: number | null } | null } | null;
   /** Kept on the payload for the coach; NOT rendered here since 2026-09-04 (ACWR is Gabbett's — neither Garmin nor TrainingPeaks). */
   acwr?: number | null;
   acwr_provisional?: boolean;
@@ -151,7 +151,7 @@ export default function LoadBar({ load, compact }: LoadBarProps) {
       {showKey && ff && (
         <div className="mt-1.5 text-[12px] text-white/65 leading-snug max-w-[min(100%,360px)]">
           <p>Every session earns workload points. Fitness averages them over the last six weeks, fatigue over the last week. The small numbers are this week's change.</p>
-          <p className="mt-1">Form is one subtraction: fitness − fatigue{fmt1(ff.fitness) != null && fmt1(ff.fatigue) != null ? ` = ${fmt1(ff.fitness)} − ${fmt1(ff.fatigue)} = ${(ff.form ?? 0) > 0 ? '+' : ''}${fmt1(ff.form)}` : ''}. The word beside it comes from this table:</p>
+          <p className="mt-1">Form is one subtraction, fitness − fatigue, taken as you start the day{fmt1(ff.fitness_prior) != null && fmt1(ff.fatigue_prior) != null ? `: ${fmt1(ff.fitness_prior)} − ${fmt1(ff.fatigue_prior)} = ${(ff.form ?? 0) > 0 ? '+' : ''}${fmt1(ff.form)}` : ''}. The word beside it comes from this table:</p>
           <table className="mt-1 text-[12px] tabular-nums">
             <tbody>
               {([['above +25', 'transitional', 'fitness fading'], ['+5 to +25', 'fresh', 'race shape'], ['−10 to +5', 'grey zone', 'not building, not sharp'], ['−30 to −10', 'optimal', 'building'], ['below −30', 'high risk', '']] as Array<[string, string, string]>).map(([range, word, meaning]) => (

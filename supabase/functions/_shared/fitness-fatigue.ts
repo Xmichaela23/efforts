@@ -32,6 +32,9 @@ export interface FitnessFatigue {
   fitness: number | null;
   /** ATL — 7-day EWMA of daily load, as of asOf. */
   fatigue: number | null;
+  /** The values form was subtracted from: fitness and fatigue entering asOf (end of the previous day). */
+  fitness_prior?: number | null;
+  fatigue_prior?: number | null;
   /** TSB — fitness − fatigue ENTERING asOf (freshness). Positive = fresh, negative = fatigued. */
   form: number | null;
   provenance: {
@@ -112,6 +115,8 @@ export function computeFitnessFatigue(
     fitness: r1(ctl),
     fatigue: r1(atl),
     form: r1(ctlPrior - atlPrior),             // freshness entering asOf (TSB, prior-day convention)
+    fitness_prior: r1(ctlPrior),
+    fatigue_prior: r1(atlPrior),
     provenance: prov(daysBetween(earliest, asOf) + 1),
   };
 }
