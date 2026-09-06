@@ -1164,6 +1164,35 @@ body.wizard-active { --tabbar-h: 0px; }
   filter: blur(0.16px) saturate(1.10) contrast(1.02);
 }
 
+/* FORGE — the Adjust plate (2026-09-05, Michael: "cool texture and lighting like these but different").
+   Same nebula ground, stars and grain as every galaxy card, but lit from the LEFT edge instead of
+   the top, washed in the app's own violet and magenta (never a sport hue — this plate holds every
+   sport's controls), and textured with fine scanlines plus wide columns instead of the dot-and-
+   diamond data grid. It reads as the panel you turn the knobs on, not the instrument you read. */
+.readout-texture--forge.galaxy-card::before {
+  background-color: #0a0714;
+  background-image:
+    radial-gradient(120% 90% at -12% 50%, rgba(var(--card-accent-rgb, 236,233,227), var(--card-accent-a, 0.22)), transparent 62%),
+    radial-gradient(70% 62% at 102% 100%, rgba(138,104,230,0.22), transparent 62%),
+    radial-gradient(56% 48% at 92% 0%, rgba(232,78,156,0.12), transparent 60%),
+    radial-gradient(48% 40% at 30% 110%, rgba(56,112,206,0.12), transparent 62%),
+    radial-gradient(1.2px 1.2px at calc(18% + var(--card-star-x, 0%)) 22%, rgba(255,255,255,0.65), transparent),
+    radial-gradient(1px 1px at calc(78% - var(--card-star-x, 0%)) 58%, rgba(255,240,210,0.5), transparent),
+    radial-gradient(1px 1px at calc(60% + var(--card-star-x, 0%)) 34%, rgba(210,225,255,0.55), transparent),
+    radial-gradient(1px 1px at calc(33% - var(--card-star-x, 0%)) 74%, rgba(255,255,255,0.45), transparent),
+    radial-gradient(1.4px 1.4px at calc(88% - var(--card-star-x, 0%)) 46%, rgba(255,245,220,0.5), transparent),
+    radial-gradient(ellipse at 20% 50%, #0e0a22 0%, #080616 58%, #030209 100%);
+}
+.readout-texture--forge::after {
+  background-image:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.075) 0px, rgba(255,255,255,0.075) 1px, transparent 1px, transparent 4px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.040) 0px, rgba(255,255,255,0.040) 1px, transparent 1px, transparent 28px);
+  background-size: 4px 4px, 28px 28px;
+  background-blend-mode: soft-light, soft-light;
+  opacity: 0.9;
+  filter: blur(0.12px) saturate(1.05);
+}
+
 /* READOUT typography (2026-08-15, Michael: "need to feel readout more") — the two text treatments
    that make the Details tab read as an instrument, as utilities that inherit the plate's own accent
    (`--card-accent-rgb`, set by readoutPlateStyle). On a sport plate labels tint toward the sport and

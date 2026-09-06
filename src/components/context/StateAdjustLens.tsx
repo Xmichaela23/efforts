@@ -9,6 +9,7 @@
 import React, { useEffect, useState } from 'react';
 import { Pencil, Dumbbell, Activity, Bike, Layers, Feather } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/context-utils';
+import { readoutPlateStyle } from '@/lib/readout-plate';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 import { resolveStrengthCapacity, canonicalizeLiftKey } from '@shared/state-trend/capacity-resolver';
@@ -51,8 +52,8 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   /**
    * ⛔ THE SECTIONS ARE THE ATHLETE'S TO ORDER (Michael, 2026-09-05: "a similar movable container for user
    * priority"), the same mechanism as the State rows: device copy in localStorage, account copy in
-   * `user_baselines.ui_prefs.adjust_section_order`. The plate is deliberately NOT the State plate's
-   * galaxy texture — plain glass — so the two screens read as different zones.
+   * `user_baselines.ui_prefs.adjust_section_order`. The plate wears the FORGE variant of the galaxy
+   * texture (index.css): side-lit, violet, scanlines — same family as State, different room.
    */
   const SECTION_ORDER_KEY = 'efforts:adjust_section_order';
   const DEFAULT_SECTIONS = ['block', 'deload', 'strength', 'run', 'bike'];
@@ -76,8 +77,15 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       if (error) console.warn('[Adjust] section order kept on this device only:', error.message);
     });
   };
+  // A section missing from the saved order (the deload row is only there when a block is live) keeps
+  // its default place instead of dropping to the bottom.
+  const effectiveOrder = (): string[] => {
+    const known = sectionOrder.filter((id) => DEFAULT_SECTIONS.includes(id));
+    for (const id of DEFAULT_SECTIONS) if (!known.includes(id)) known.splice(DEFAULT_SECTIONS.indexOf(id), 0, id);
+    return known;
+  };
   const moveSection = (id: string, dir: -1 | 1) => {
-    const order = [...DEFAULT_SECTIONS].sort((x, y) => { const ix = sectionOrder.indexOf(x), iy = sectionOrder.indexOf(y); return (ix < 0 ? 99 : ix) - (iy < 0 ? 99 : iy); });
+    const order = effectiveOrder();
     const i = order.indexOf(id); const j = i + dir;
     if (i < 0 || j < 0 || j >= order.length) return;
     [order[i], order[j]] = [order[j], order[i]];
@@ -357,8 +365,9 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   };
   const pill = 'text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50';
   const Row = ({ id, name, value, editable = true, hint, sport, note }: { id: string; name: string; value: string | null; editable?: boolean; hint?: string; sport: 'strength' | 'run' | 'bike'; note?: string }) => (
-    <div className="flex items-center justify-between py-1 gap-3 flex-wrap">
-      <span className="text-[14px] text-white/85">{name}</span>
+    <div className="py-1">
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-[14px] text-white/85 min-w-0 leading-tight">{name}</span>
       {editing === id ? (
         <span className="flex items-center gap-2">
           <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void commit(id); if (e.key === 'Escape') { setEditing(null); setDraft(''); } }}
@@ -367,7 +376,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
           <button type="button" onClick={() => { setEditing(null); setDraft(''); }} className="text-[12px] text-white/45 px-1 py-1">cancel</button>
         </span>
       ) : editable ? (
-        <span className="inline-flex rounded-lg border overflow-hidden" style={{ borderColor: `${getDisciplineColor(sport)}55`, background: `${getDisciplineColor(sport)}14` }}>
+        <span className="inline-flex shrink-0 whitespace-nowrap rounded-lg border overflow-hidden" style={{ borderColor: `${getDisciplineColor(sport)}55`, background: `${getDisciplineColor(sport)}14` }}>
           <button type="button" onClick={() => { setEditing(id); setDraft(''); setSaveNote(null); }} aria-label={`edit ${name}`}
             className="inline-flex items-center gap-1.5 pl-2.5 pr-2 py-1 bg-transparent border-none text-[14px] text-white/90 tabular-nums outline-none focus:outline-none active:brightness-125">
             {value ?? <span className="text-white/45">tap to add</span>}
@@ -381,9 +390,10 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
           )}
         </span>
       ) : (
-        <span className="text-[14px] text-white/90 tabular-nums">{value ?? <span className="text-white/35">no number yet</span>}</span>
+        <span className="text-[14px] text-white/90 tabular-nums shrink-0 text-right">{value ?? <span className="text-white/35">no number yet</span>}</span>
       )}
-      {note && <p className="basis-full text-[12px] text-white/50 -mt-0.5 mb-0.5">{note}</p>}
+    </div>
+      {note && <p className="text-[12px] text-white/50 mt-1 leading-snug">{note}</p>}
     </div>
   );
   const rebuild = () => {
@@ -507,7 +517,8 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       </>
     ) },
   ];
-  const ordered = [...sections].sort((x, y) => { const ix = sectionOrder.indexOf(x.id), iy = sectionOrder.indexOf(y.id); return (ix < 0 ? 99 : ix) - (iy < 0 ? 99 : iy); });
+  const eff = effectiveOrder();
+  const ordered = [...sections].sort((x, y) => eff.indexOf(x.id) - eff.indexOf(y.id));
 
   return (
     <div className="px-0.5 overflow-x-hidden">
@@ -518,7 +529,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       {/* ⛔ ONE PLATE, HAIRLINE DIVIDERS, the State construction — but plain glass, not the galaxy
           texture, so Adjust reads as its own zone (Michael, 2026-09-05). Left column: icon + label,
           the same 92px the State rows use, so the two screens line up when you flip between them. */}
-      <div className="rounded-2xl divide-y divide-white/[0.10] border border-white/[0.09] bg-white/[0.035]">
+      <div className="galaxy-card readout-texture readout-texture--forge rounded-2xl divide-y divide-white/[0.10]" style={readoutPlateStyle(undefined, { galaxy: true })}>
         {ordered.map((sec, i) => {
           const color = sec.sport ? getDisciplineColor(sec.sport) : 'rgba(255,255,255,0.7)';
           const open = sec.info ? infoOpen.has(sec.id) : false;
