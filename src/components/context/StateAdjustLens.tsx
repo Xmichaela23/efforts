@@ -504,7 +504,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   return (
     <div className="px-0.5 overflow-x-hidden">
       <div className="flex items-baseline justify-between gap-3 mb-3">
-        <p className="text-[14px] text-white/70 leading-snug">Everything here changes your training from today forward. Nothing applies on its own.</p>
+        <p className="text-[14px] text-white/70 leading-snug">Changes here go into the sessions you have not done yet. Nothing changes until you tap.</p>
         <button type="button" onClick={() => setReordering((v) => !v)} className="shrink-0 text-[11px] tracking-wider uppercase text-white/45 py-1 outline-none focus:outline-none">{reordering ? 'done' : 'reorder'}</button>
       </div>
       {/* ⛔ ONE PLATE, HAIRLINE DIVIDERS, the State construction — but plain glass, not the galaxy
