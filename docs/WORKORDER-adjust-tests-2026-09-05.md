@@ -1,5 +1,14 @@
 # WORKORDER — Adjust tab retests: what each one does, and the throwaway-account verification
-**Written 2026-09-05 (chat trace; commit pending). For a terminal session with the service key.**
+**Written 2026-09-05 (chat trace). For a terminal session with the service key.**
+
+> **UPDATE, same day — the fork is TAKEN and built (D-470, commit on main).** The lift retest is now a calendar row
+> (`schedule_retest`), the restate reads the latest tagged test per lift at any week, test runs/rides attach by tag
+> within a day, and the auto/my-number segment is on every "your number" pill on Adjust. §"The trace" below describes
+> the state BEFORE that build; the seams it names are closed. **Deploy first** (list in D-470), then run the accounts
+> below with the EXPECTED results updated: lift account — after `schedule_retest` + a logged retest workout linked to
+> the row + `rematerialize-standing-block apply:true`, the upcoming squat rows MUST re-price (the old "assert
+> UNCHANGED" is inverted). Add: run account — the test run landed on D+1 now attaches (was: no attach); D+2 does not.
+> Add: a "manual" account that taps auto on Adjust (`threshold_pace_source: 'learned'`) and then sees the proposal.
 
 ## What was changed on the screen (built, not pushed)
 `src/components/context/StateAdjustLens.tsx`: the standalone RETEST section is gone. Each sport now has a

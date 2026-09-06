@@ -322,6 +322,15 @@ export type LoggedWorkoutRowish = {
   strength_exercises?: unknown;
   week_number?: number | null;
   workout_date?: string | null;
+  /** The planned row's date — orders tests when the athlete retested later in the block. */
+  date?: string | null;
+  /**
+   * ⛔ A MID-BLOCK RETEST (Michael, 2026-09-05: "the rebuild reads the latest tested session per lift,
+   * any week"). True when the planned row the workout was logged against carries the `1rm_test` tag —
+   * the same tag week one's test sessions carry. A row so marked is a test whatever its week; a row
+   * without it is a test only if it is provably week one.
+   */
+  is_test?: boolean;
 };
 
 export type TestWeekReading = {
@@ -374,10 +383,11 @@ export function readTestWeek(
   };
   for (const lift of TESTED_LIFTS) wanted.set(nameFor(lift).toLowerCase(), lift);
 
-  const best = new Map<TestedLift, { weight: number; reps: number; amrap: boolean }>();
+  const best = new Map<TestedLift, { weight: number; reps: number; amrap: boolean; date: string }>();
   for (const row of rows ?? []) {
-    // ⛔ PROVABLY WEEK ONE, or it is not the test.
-    if (Number(row?.week_number) !== TEST_WEEK_INDEX) continue;
+    // ⛔ PROVABLY WEEK ONE, OR A ROW TAGGED AS A TEST — or it is not the test.
+    if (Number(row?.week_number) !== TEST_WEEK_INDEX && row?.is_test !== true) continue;
+    const rowDate = String(row?.date ?? row?.workout_date ?? '').slice(0, 10);
     const exercises = Array.isArray(row?.strength_exercises) ? row.strength_exercises : [];
     for (const ex of exercises as Record<string, unknown>[]) {
       const lift = wanted.get(String(ex?.name ?? '').trim().toLowerCase());
@@ -396,10 +406,13 @@ export function readTestWeek(
         if (!Number.isInteger(reps) || reps < 1) continue;
         const amrap = set?.amrap === true;
         const prior = best.get(lift);
-        // ⚠️ HEAVIEST COMPLETED SET WINS; at equal weight the flagged set, then the later set (an
-        // athlete who retook the test meant the second answer).
-        if (!prior || weight > prior.weight || (weight === prior.weight && (amrap || !prior.amrap))) {
-          best.set(lift, { weight, reps, amrap });
+        // ⛔ THE LATEST TEST WINS (2026-09-05): a retest dated after the session on record replaces it
+        // outright — an athlete who retested meant the new answer, heavier or not. Within one date,
+        // ⚠️ HEAVIEST COMPLETED SET WINS; at equal weight the flagged set, then the later set.
+        const newer = !!prior && rowDate > prior.date;
+        const older = !!prior && rowDate < prior.date;
+        if (!prior || newer || (!older && (weight > prior.weight || (weight === prior.weight && (amrap || !prior.amrap))))) {
+          best.set(lift, { weight, reps, amrap, date: rowDate });
         }
       }
     }
@@ -410,7 +423,7 @@ export function readTestWeek(
   for (const lift of TESTED_LIFTS) {
     const measured = best.get(lift);
     if (!measured) {
-      missing.push({ lift, reason: 'no completed test set in week one' });
+      missing.push({ lift, reason: 'no completed test set in week one or a later retest' });
       continue;
     }
     const wn = workingNumberFromTest(lift, measured);

@@ -410,11 +410,12 @@ Deno.serve(async (req) => {
 
     // Fetch planned candidates of same sport on the exact YYYY-MM-DD only (timezone-agnostic)
     const day = String(w.date || '').slice(0,10);
+    const PLANNED_COLS = 'id,user_id,type,date,name,computed,intervals,duration,total_duration_seconds,workout_status,completed_workout_id,pool_length_m,pool_unit,pool_label,environment,strength_exercises,mobility_exercises,tags';
     const { data: plannedList } = await supabase
       .from('planned_workouts')
       // `duration` + `total_duration_seconds` are the unstructured session's ONLY statement of length —
       // without them selected, sumPlanned's fallback has nothing to read.
-      .select('id,user_id,type,date,name,computed,intervals,duration,total_duration_seconds,workout_status,completed_workout_id,pool_length_m,pool_unit,pool_label,environment,strength_exercises,mobility_exercises')
+      .select(PLANNED_COLS)
       .eq('user_id', w.user_id)
       .eq('type', finalSport)
       .eq('date', day)
@@ -428,6 +429,41 @@ Deno.serve(async (req) => {
       .in('workout_status', ['planned','in_progress','completed','sent_to_garmin']);
 
     let candidates = Array.isArray(plannedList) ? plannedList : [];
+    /**
+     * ⛔ A SCHEDULED TEST IS ATTACHED BY ITS TAG WITHIN A DAY, NOT BY THE EXACT DATE (Michael, 2026-09-05).
+     * The run threshold test and the FTP tests go on the calendar two or three days out; the athlete who runs
+     * it the evening before, or the morning after, still ran the test — and only an attached run reaches
+     * `compute-workout-analysis`'s `run_test` read. Rows tagged `run_test` / `ftp_test`, not yet completed, dated
+     * yesterday, today or tomorrow, join the candidates; the duration and ambiguity gates below still apply.
+     * Strength is untouched (its branch matches by date + type only).
+     */
+    const TEST_TAGS = ['run_test', 'ftp_test'];
+    const isTestRow = (p: any): boolean => (Array.isArray(p?.tags) ? p.tags : []).some((t: any) => TEST_TAGS.includes(String(t).toLowerCase()));
+    if (finalSport === 'run' || finalSport === 'ride') {
+      try {
+        const shift = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+        const { data: testRows } = await supabase
+          .from('planned_workouts')
+          .select(PLANNED_COLS)
+          .eq('user_id', w.user_id)
+          .eq('type', finalSport)
+          .gte('date', shift(day, -1))
+          .lte('date', shift(day, 1))
+          .in('workout_status', ['planned', 'in_progress', 'sent_to_garmin'])
+          .overlaps('tags', TEST_TAGS);
+        const seen = new Set(candidates.map((p: any) => String(p.id)));
+        for (const r of (testRows ?? [])) {
+          if (!seen.has(String((r as any).id))) { candidates.push(r); seen.add(String((r as any).id)); }
+        }
+      } catch (e) { console.warn('[auto-attach-planned] test-row lookup failed:', String(e)); }
+    }
+    const dateOk = (p: any): boolean => {
+      const pdate = String(p?.date || '').slice(0, 10);
+      if (pdate === day) return true;
+      if (!isTestRow(p)) return false;
+      const ms = Math.abs(new Date(`${pdate}T12:00:00Z`).getTime() - new Date(`${day}T12:00:00Z`).getTime());
+      return ms <= 24 * 3600 * 1000;
+    };
     console.log('[auto-attach-planned] Found candidates:', candidates.length, 'for sport:', finalSport, 'day:', day);
     if (!candidates.length) {
       console.log('[auto-attach-planned] No candidates found for sport:', finalSport, 'day:', day);
@@ -438,7 +474,7 @@ Deno.serve(async (req) => {
     candidates = candidates.filter((p: any) => {
       const pdate = String((p as any).date || '').slice(0,10);
       const plannedTypeNormalized = sportSubtype((p as any).type).sport;
-      const matches = pdate === day && plannedTypeNormalized === finalSport;
+      const matches = dateOk(p) && plannedTypeNormalized === finalSport;
       if (!matches) {
         console.log('[auto-attach-planned] Candidate filtered out:', p.id, 'planned type:', (p as any).type, 'normalized:', plannedTypeNormalized, 'expected:', finalSport);
       }
@@ -635,7 +671,7 @@ Deno.serve(async (req) => {
       const pdate = String((p as any).date || '').slice(0,10);
       const plannedTypeNormalized = sportSubtype((p as any).type).sport;
       console.log('[auto-attach-planned] Checking candidate:', p.id, 'date:', pdate, 'type:', (p as any).type, 'normalized:', plannedTypeNormalized, 'expected:', finalSport);
-      if (pdate !== day || plannedTypeNormalized !== finalSport) {
+      if (!dateOk(p) || plannedTypeNormalized !== finalSport) {
         console.log('[auto-attach-planned] Skipping candidate - date or type mismatch');
         continue;
       }

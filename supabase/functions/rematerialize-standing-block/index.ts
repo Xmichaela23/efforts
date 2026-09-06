@@ -26,9 +26,12 @@ import { resolvePlanWeekIndex } from '../_shared/plan-week.ts';
 import {
   composeBlock,
   earnedMeSets,
+  pretestSession,
   readTestWeek,
   restateFromTest,
+  TEST_DAY_LIFTS,
   testDayCutoff,
+  testWeekLiftNames,
   // ⚠️ ONE ANSWER TO "which weekday is this date" — the same helper the restatement matches rows on.
   STANDING_PLAN_PROTOCOL_ID,
   TEST_WEEK_INDEX,
@@ -84,22 +87,75 @@ Deno.serve(async (req: Request) => {
     const today = asOf ?? new Date().toISOString().slice(0, 10);
     const currentWeek = resolvePlanWeekIndex(config, today, weeks) ?? 1;
 
+    /**
+     * ⛔ THE MID-BLOCK RETEST IS A CALENDAR ROW (Michael, 2026-09-05: "lift retest = calendar row today, tagged
+     * like the week-one test, linked to the plan; the rebuild reads the latest tested session per lift, any
+     * week"). Adjust → Strength → Retest asks for `schedule_retest: 'lower' | 'upper'`. The row is composed
+     * the way week one's test is (p215's three steps, aimed by the number the block currently prices from),
+     * dated today, tagged `standing_plan 1rm_test retest`, linked to this plan. The logger renders it through
+     * its standing-plan test arm (the tag), the save links the workout to the row, the restate that every
+     * strength save fires reads it (`readTestWeek`, `is_test`), and the unstarted weeks re-price. The same
+     * path the week-one test takes, entered from week N.
+     */
+    const retestGroup = p?.schedule_retest === 'lower' ? 2 : p?.schedule_retest === 'upper' ? 1 : null;
+    if (retestGroup != null) {
+      const lifts = TEST_DAY_LIFTS[retestGroup] ?? [];
+      const names = testWeekLiftNames(sp.competition_lifts ?? {});
+      const stored = (sp.working_numbers ?? null) as Record<string, Record<string, unknown>> | null;
+      const seeds = (sp.seed_one_rep_maxes ?? {}) as Record<string, unknown>;
+      const exercises: Record<string, unknown>[] = [];
+      for (const lift of lifts) {
+        // Aim the ramp by what the block prices from now (the last test's predicted 1RM), else the build seed.
+        const predicted = Number(stored?.[lift]?.predicted1RM);
+        const seed = Number.isFinite(predicted) && predicted > 0 ? predicted : Number(seeds?.[lift]);
+        const steps = Number.isFinite(seed) && seed > 0 ? pretestSession(lift, seed, 5) : null;
+        if (!steps) {
+          exercises.push({ name: names[lift], reps: '6, 5, max', weight: 'By feel', load_prescribed: false, slot_intent: 'ME',
+            notes: 'No max on file to aim the warm-ups — work up until the last set is genuinely hard.' });
+          continue;
+        }
+        exercises.push({
+          name: names[lift], sets: steps.length, reps: steps.map((st) => st.reps).join(', '), weight: steps[steps.length - 1].weight,
+          load_prescribed: true, slot_intent: 'ME',
+          notes: 'Retest — the last set is taken for max clean reps, and it re-prices the rest of the block.',
+          set_plan: steps.map((st) => ({ weight: st.weight, reps: st.reps === 'max' ? 1 : st.reps, amrap: st.reps === 'max' })),
+        });
+      }
+      if (exercises.length === 0) return json({ success: false, reason: 'no_lifts_for_retest' }, 400);
+      const dow = ((new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7) + 1; // Monday=1 … Sunday=7, as activate-plan
+      const row = {
+        user_id: userId, training_plan_id: plan.id, template_id: String(plan.id),
+        week_number: currentWeek, day_number: dow, date: today, type: 'strength',
+        name: retestGroup === 2 ? 'Retest: Lower' : 'Retest: Upper',
+        description: 'Work up in three steps. The last set is max clean reps and it re-prices the rest of the block.',
+        duration: 45, workout_status: 'planned', source: 'training_plan',
+        strength_exercises: exercises, computed: null,
+        units: (config?.units === 'metric' ? 'metric' : 'imperial'),
+        tags: ['standing_plan', '1rm_test', 'retest'],
+      };
+      const { data: inserted, error: insErr } = await supabase.from('planned_workouts').insert(row).select('*').single();
+      if (insErr || !inserted) return json({ success: false, reason: 'retest_insert_failed', details: insErr?.message ?? null }, 500);
+      console.log(`[standing-restate] retest scheduled plan=${plan.id} week=${currentWeek} row=${inserted.id} lifts=${lifts.join(',')}`);
+      return json({ success: true, scheduled: true, planned: inserted, current_week: currentWeek });
+    }
+
     // ── WHAT THE TEST WEEK ACTUALLY RECORDED ─────────────────────────────────
     const { data: plannedRows } = await supabase
       .from('planned_workouts')
       // ⛔ COMPLETION TRAVELS WITH THE ROW NOW — the cut is per session, not per week, so
       // `restateFromTest` has to be able to tell a done session from a future one.
-      .select('id, week_number, date, strength_exercises, workout_status, completed_workout_id')
+      .select('id, week_number, date, strength_exercises, workout_status, completed_workout_id, tags')
       .eq('training_plan_id', plan.id)
       .eq('user_id', userId);
 
     // ⛔ THE PLANNED ROW CARRIES THE WEEK **AND THE DATE**. The date was added 2026-08-24 for the ME
     // ladder: `earnedMeSets` matches on week + WEEKDAY + movement, the same three keys the restater
     // uses, and a logged workout carries neither the plan week nor the plan's weekday of its own.
-    const weekById = new Map<string, { week: number; date: string | null }>();
+    const weekById = new Map<string, { week: number; date: string | null; isTest: boolean; isRetest: boolean }>();
     for (const r of plannedRows ?? []) {
       if (r?.id && typeof r.week_number === 'number') {
-        weekById.set(String(r.id), { week: r.week_number, date: typeof r.date === 'string' ? r.date : null });
+        const tags = (Array.isArray(r.tags) ? r.tags : []).map((t: unknown) => String(t).toLowerCase());
+        weekById.set(String(r.id), { week: r.week_number, date: typeof r.date === 'string' ? r.date : null, isTest: tags.includes('1rm_test'), isRetest: tags.includes('retest') });
       }
     }
     const { data: doneRows } = await supabase
@@ -113,6 +169,9 @@ Deno.serve(async (req: Request) => {
     const joined = (doneRows ?? []).map((w: Record<string, unknown>) => ({
       week_number: weekById.get(String(w?.planned_id))?.week ?? null,
       date: weekById.get(String(w?.planned_id))?.date ?? null,
+      // ⛔ A ROW TAGGED `1rm_test` IS A TEST WHATEVER ITS WEEK (the mid-block retest, 2026-09-05).
+      is_test: weekById.get(String(w?.planned_id))?.isTest === true,
+      is_retest: weekById.get(String(w?.planned_id))?.isRetest === true,
       strength_exercises: w?.strength_exercises ?? null,
     }));
 
@@ -314,7 +373,9 @@ Deno.serve(async (req: Request) => {
     const probe = composeBlock(composeBase);
     const ladder = earnedMeSets({
       composed: probe,
-      logged: joined,
+      // ⛔ A RETEST IS MEASURED, NOT EARNED (D-469's rule, applied to the mid-block retest): its all-out set
+      // re-prices the block through `readTestWeek` and must not also read as a rung on that weekday.
+      logged: joined.filter((r) => r.is_retest !== true),
       // ⛔ HISTORY AND THE LIVE WEEK ARE EVIDENCE; THE FUTURE IS NOT. The same boundary the restater
       // draws for writing, drawn here for reading.
       throughWeek: currentWeek,

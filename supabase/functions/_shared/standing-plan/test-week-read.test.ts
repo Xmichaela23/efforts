@@ -52,3 +52,23 @@ Deno.test('a row that is not provably week one is not the test', () => {
   const r = readTestWeek([{ week_number: 2, strength_exercises: [{ name: 'Back Squat', sets: [{ weight: 200, reps: 1, completed: true }] }] }], {});
   assert(!r.working.squat);
 });
+
+Deno.test('a later retest row replaces the week-one read for that lift, heavier or not; the other lifts keep week one', () => {
+  const names = { squat: 'Back Squat', deadlift: 'Deadlift', bench: 'Bench Press', overheadPress: 'Overhead Press' };
+  const r = readTestWeek([
+    { week_number: 1, date: '2026-09-01', strength_exercises: [
+      { name: 'Back Squat', sets: [{ weight: 105, reps: 6, completed: true }] },
+      { name: 'Deadlift', sets: [{ weight: 170, reps: 3, completed: true, amrap: true }] },
+    ] },
+    // week 4, tagged 1rm_test (is_test), lighter than week one: the retest is the answer
+    { week_number: 4, date: '2026-09-22', is_test: true, strength_exercises: [
+      { name: 'Back Squat', sets: [{ weight: 45, reps: 5, completed: true }, { weight: 95, reps: 8, completed: true, amrap: true }] },
+    ] },
+    // week 4, NOT tagged: an ordinary session is never a test
+    { week_number: 4, date: '2026-09-23', strength_exercises: [
+      { name: 'Deadlift', sets: [{ weight: 225, reps: 1, completed: true }] },
+    ] },
+  ], names);
+  assertEquals(r.working.squat?.measured, { weight: 95, reps: 8 });
+  assertEquals(r.working.deadlift?.measured, { weight: 170, reps: 3 });
+});

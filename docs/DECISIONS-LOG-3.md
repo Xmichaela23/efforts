@@ -1884,3 +1884,31 @@ athlete's tap (see D-468). Expected after apply: squat rows "105 × 1-5" with th
 > and `restate.ts` now counts a change in the working steps' rep counts (`set_plan`) as a change — before, a clamp
 > that moved 6 → 5 left `last_reps` alone and the diff called the row unchanged, which is why the 04:08 apply wrote
 > the config and zero rows. Evidence read from the plan (config `updated_at` 04:08:49, rows `updated_at` 03:43:51).
+
+## D-470 — The lift retest is a calendar row; the rebuild reads the latest tested session per lift, any week (2026-09-05)
+
+**Ruling (Michael, 2026-09-05):** "lift retest = calendar row today, tagged like the week-one test, linked to the plan;
+the rebuild reads the latest tested session per lift, any week. Attach a test run to its row by tag within a day, not
+the exact date." Trace that led here: `docs/WORKORDER-adjust-tests-2026-09-05.md` (the Adjust lift test wrote
+`performance_numbers`, which the restate never reads, so "a logged test re-prices the block" was false for lifts).
+
+**Built**
+1. `rematerialize-standing-block` takes `schedule_retest: 'lower' | 'upper'`: inserts today's `Retest: Lower/Upper`
+   row (p215's three steps aimed by the block's current predicted 1RM, else the build seed; tags
+   `standing_plan 1rm_test retest`; `training_plan_id`, `week_number` = current week) and returns it. Adjust opens it
+   in the logger (`open:strengthLogger`); the save links the workout to the row and fires the restate as every
+   strength save does.
+2. `readTestWeek` (`working-number.ts`): a row is a test if it is provably week one OR its planned row carries
+   `1rm_test` (`is_test`). Per lift, the LATEST dated test row wins outright, heavier or not; inside one date the
+   heaviest completed set (D-468). `test-week-read.test.ts` covers it (5/5).
+3. The restate keeps `retest` rows out of the ME ladder (D-469's rule: a test set is measured, not earned).
+4. `auto-attach-planned`: for runs and rides, planned rows tagged `run_test` / `ftp_test`, not completed, dated
+   yesterday–tomorrow, join the candidates; the duration ratio and ambiguity gates still apply. Strength unchanged.
+5. Adjust: every "your number" pill carries an `auto` segment — `threshold_pace_source → 'learned'`, `ftp_source`
+   removed, `lthr_source → 'learned'`, the lift lock removed — through `saveUserBaselines`, then the same follow-through
+   Baselines runs (`endurance-checkpoint` reprice / `rematerialize-standing-block` apply). One line of copy per sport,
+   the rest behind LOAD's ⓘ.
+
+**Not deployed from this chat.** Functions to deploy: `rematerialize-standing-block`, `auto-attach-planned`, and every
+function importing `_shared/standing-plan` (generate-strength-plan, create-goal-and-materialize-plan, compute-snapshot at
+least — compute the closure). Throwaway-account verification: the work order, five accounts.

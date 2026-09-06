@@ -27,13 +27,21 @@ const sourceWord = (src: string | null | undefined): string => {
   if (v === 'accepted') return 'accepted';
   return 'auto';
 };
-const SportHeading = ({ sport, label }: { sport: 'strength' | 'run' | 'bike'; label: string }) => {
+// The heading carries LOAD's ⓘ (LoadBar.tsx): one line stays under the sport, the rest opens here.
+const SportHeading = ({ sport, label, info }: { sport: 'strength' | 'run' | 'bike'; label: string; info?: string }) => {
   const Icon = sport === 'strength' ? Dumbbell : sport === 'run' ? Activity : Bike;
   const color = getDisciplineColor(sport);
+  const [open, setOpen] = useState(false);
   return (
-    <div className="flex items-center gap-2 mb-2">
-      <Icon size={14} strokeWidth={2.25} style={{ color }} aria-hidden="true" />
-      <span className="text-[12px] uppercase tracking-[0.14em]" style={{ color }}>{label}</span>
+    <div className="mb-2">
+      <div className="flex items-center gap-2">
+        <Icon size={14} strokeWidth={2.25} style={{ color }} aria-hidden="true" />
+        <span className="text-[12px] uppercase tracking-[0.14em]" style={{ color }}>{label}</span>
+        {info && (
+          <button type="button" onClick={() => setOpen((o) => !o)} aria-label={`About ${label.toLowerCase()} on this screen`} aria-expanded={open} className="bg-transparent border-none p-0 cursor-pointer text-white/45 normal-case tracking-normal font-normal text-[12px] align-baseline">ⓘ</button>
+        )}
+      </div>
+      {open && info && <p className="mt-1.5 text-[12px] text-white/65 leading-snug max-w-[min(100%,360px)]">{info}</p>}
     </div>
   );
 };
@@ -78,7 +86,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   const acceptFtp = () => {
     void (async () => {
       const uid = getStoredUserId(); if (!uid) return;
-      setAccepting(true); setSaveNote(null);
+      setAccepting(true); setSaveNote(null); setLastSaved('bike');
       try {
         const { data: row } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', uid).maybeSingle();
         const raw = row?.learned_fitness; const cur = typeof raw === 'string' ? JSON.parse(raw) : raw;
@@ -98,7 +106,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   const acceptThr = () => {
     void (async () => {
       const uid = getStoredUserId(); if (!uid) return;
-      setAcceptingThr(true); setSaveNote(null);
+      setAcceptingThr(true); setSaveNote(null); setLastSaved('run');
       try {
         const { data: row } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', uid).maybeSingle();
         const raw = row?.learned_fitness; const cur = typeof raw === 'string' ? JSON.parse(raw) : raw;
@@ -191,18 +199,42 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       finally { setTestBusy(null); }
     })();
   };
-  const openLiftTest = (which: 'Lower' | 'Upper' | 'Full Body') => {
-    window.dispatchEvent(new CustomEvent('baselines:openTest', { detail: { testName: `Baseline Test: ${which}` } }));
+  // ⛔ THE LIFT RETEST IS A CALENDAR ROW (Michael, 2026-09-05): `rematerialize-standing-block` writes today's
+  // "Retest: Lower / Upper" row — tagged like week one's test, linked to the plan, p215's ramp aimed by the
+  // number the block prices from — and the logger opens on it. The save links the workout to the row; the restate
+  // every strength save fires reads the latest tested session per lift (`readTestWeek`, any week) and re-prices
+  // the unstarted weeks. Without a standing plan the Baselines launcher session is the fallback (off-plan; it
+  // writes the number on file and nothing else).
+  const [retestBusy, setRetestBusy] = useState<string | null>(null);
+  const openLiftTest = (which: 'Lower' | 'Upper') => {
+    void (async () => {
+      setRetestBusy(which);
+      try {
+        const { data, error } = await supabase.functions.invoke('rematerialize-standing-block', { body: { schedule_retest: which.toLowerCase() } });
+        const d = data as any;
+        if (!error && d?.success && d?.planned) {
+          window.dispatchEvent(new CustomEvent('open:strengthLogger', { detail: { planned: d.planned } }));
+          window.dispatchEvent(new CustomEvent('week:invalidate'));
+          return;
+        }
+      } catch (e) { console.warn('[StateAdjustLens] retest row failed:', e); }
+      finally { setRetestBusy(null); }
+      window.dispatchEvent(new CustomEvent('baselines:openTest', { detail: { testName: `Baseline Test: ${which}` } }));
+    })();
   };
   const fmtDay = (iso: string) => new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [saveNote, setSaveNote] = useState<string | null>(null);
+  // Which sport's section shows the note — the one whose number was just saved.
+  const [lastSaved, setLastSaved] = useState<'strength' | 'run' | 'bike' | null>(null);
+  const sportOf = (id: string): 'strength' | 'run' | 'bike' => id === 'ftp' ? 'bike' : id === 'threshold' || id === 'lthr' ? 'run' : 'strength';
   const reload = () => loadUserBaselines?.().then((b: any) => { if (b) setBaselines(b); }).catch(() => {});
   const parsePace = (t: string): number | null => { const m = t.trim().match(/^(\d{1,2}):(\d{2})$/); if (!m) return null; const sec = Number(m[1]) * 60 + Number(m[2]); return sec > 0 ? sec : null; };
   const commit = async (id: string) => {
     if (!baselines) return;
     const t = draft.trim();
+    setLastSaved(sportOf(id));
     try {
       if (id === 'ftp') {
         const v = Math.round(Number(t)); if (!(v > 0)) return;
@@ -223,12 +255,56 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         const key = canonicalizeLiftKey(id); const v = Math.round(Number(t)); if (!key || !(v > 0)) return;
         await saveUserBaselines({ ...baselines, locked_baselines: { ...(baselines.locked_baselines ?? {}), [key]: v } });
       }
-      setSaveNote('Saved. Tap "Rebuild upcoming sessions" to apply it to the block.');
+      setSaveNote(await repriceAfter(id === 'ftp' || id === 'threshold' || id === 'lthr' ? 'endurance' : 'strength'));
       await reload();
     } catch (e) {
       setSaveNote('Could not save. Try again.');
       console.warn('[StateAdjustLens] save failed:', e);
     } finally { setEditing(null); setDraft(''); }
+  };
+  // The same follow-through Training Baselines runs after its Save: an endurance number re-prices the unstarted
+  // run/ride rows (`endurance-checkpoint`), a lift lock restates the block (`rematerialize-standing-block`).
+  const repriceAfter = async (kind: 'endurance' | 'strength'): Promise<string> => {
+    try {
+      if (kind === 'endurance') {
+        const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } });
+        const n = Number((rp as any)?.rows_repriced ?? 0);
+        return n > 0 ? `Saved. ${n} upcoming session${n === 1 ? '' : 's'} re-priced.` : 'Saved.';
+      }
+      const { data: rs } = await supabase.functions.invoke('rematerialize-standing-block', { body: { apply: true } });
+      return (rs as any)?.success ? 'Saved. Upcoming weights updated.' : 'Saved.';
+    } catch { return 'Saved. Rebuild above to apply it.'; }
+  };
+  // ⛔ AUTO / MY NUMBER, ON THE PILL (Michael, 2026-09-05). "auto" clears the manual choice through the SAME save
+  // Baselines uses — threshold_pace_source → 'learned', ftp_source removed, lthr_source → 'learned', the lift lock
+  // removed — and the pill shows the measured number. Typing a number is choosing "my number" (Q-240), as before.
+  const mine = (id: string): boolean => {
+    if (!baselines) return false;
+    if (id === 'threshold') return pn?.threshold_pace_source === 'manual';
+    if (id === 'ftp') return pn?.ftp_source === 'manual';
+    if (id === 'lthr') return pn?.lthr_source === 'manual';
+    const key = canonicalizeLiftKey(id);
+    return !!key && Number(baselines.locked_baselines?.[key]) > 0;
+  };
+  const setAuto = async (id: string) => {
+    if (!baselines) return;
+    setSaveNote(null); setLastSaved(sportOf(id));
+    try {
+      if (id === 'threshold') {
+        await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), threshold_pace_source: 'learned' } });
+      } else if (id === 'ftp') {
+        const next: any = { ...(pn ?? {}) }; delete next.ftp_source;
+        await saveUserBaselines({ ...baselines, performanceNumbers: next });
+      } else if (id === 'lthr') {
+        await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), lthr_source: 'learned' } });
+      } else {
+        const key = canonicalizeLiftKey(id); if (!key) return;
+        const next = { ...(baselines.locked_baselines ?? {}) } as Record<string, number>; delete next[key];
+        await saveUserBaselines({ ...baselines, locked_baselines: Object.keys(next).length ? next : null });
+      }
+      setSaveNote((await repriceAfter(id === 'ftp' || id === 'threshold' || id === 'lthr' ? 'endurance' : 'strength')).replace('Saved.', 'Auto.'));
+      await reload();
+    } catch (e) { setSaveNote('Could not switch. Try again.'); console.warn('[StateAdjustLens] auto failed:', e); }
   };
   const pill = 'text-[13px] px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.05] text-white/80 disabled:opacity-50';
   const Row = ({ id, name, value, editable = true, hint, sport }: { id: string; name: string; value: string | null; editable?: boolean; hint?: string; sport: 'strength' | 'run' | 'bike' }) => (
@@ -242,12 +318,19 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
           <button type="button" onClick={() => { setEditing(null); setDraft(''); }} className="text-[12px] text-white/45 px-1 py-1">cancel</button>
         </span>
       ) : editable ? (
-        <button type="button" onClick={() => { setEditing(id); setDraft(''); setSaveNote(null); }} aria-label={`edit ${name}`}
-          style={{ borderColor: `${getDisciplineColor(sport)}55`, background: `${getDisciplineColor(sport)}14` }}
-          className="inline-flex items-center gap-1.5 pl-2.5 pr-2 py-1 rounded-lg border text-[14px] text-white/90 tabular-nums outline-none focus:outline-none active:brightness-125">
-          {value ?? <span className="text-white/45">tap to add</span>}
-          <Pencil size={12} strokeWidth={2} style={{ color: getDisciplineColor(sport) }} className="shrink-0 opacity-80" aria-hidden="true" />
-        </button>
+        <span className="inline-flex rounded-lg border overflow-hidden" style={{ borderColor: `${getDisciplineColor(sport)}55`, background: `${getDisciplineColor(sport)}14` }}>
+          <button type="button" onClick={() => { setEditing(id); setDraft(''); setSaveNote(null); }} aria-label={`edit ${name}`}
+            className="inline-flex items-center gap-1.5 pl-2.5 pr-2 py-1 bg-transparent border-none text-[14px] text-white/90 tabular-nums outline-none focus:outline-none active:brightness-125">
+            {value ?? <span className="text-white/45">tap to add</span>}
+            <Pencil size={12} strokeWidth={2} style={{ color: getDisciplineColor(sport) }} className="shrink-0 opacity-80" aria-hidden="true" />
+          </button>
+          {mine(id) && (
+            <button type="button" onClick={() => void setAuto(id)} aria-label={`${name}: back to auto`}
+              className="px-2 py-1 border-l text-[12px] text-white/70 bg-white/[0.04] outline-none focus:outline-none active:brightness-125" style={{ borderColor: `${getDisciplineColor(sport)}55` }}>
+              auto
+            </button>
+          )}
+        </span>
       ) : (
         <span className="text-[14px] text-white/90 tabular-nums">{value ?? <span className="text-white/35">no number yet</span>}</span>
       )}
@@ -308,23 +391,9 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         </section>
       )}
 
-      {/* ⛔ TESTS SIT UNDER THEIR SPORT (Michael, 2026-09-05: "tests should sit under their sport"). One retest row
-          per discipline, in the same row shape as its numbers. What each one does, traced 2026-09-05:
-          - Lifts: opens the logger's "Baseline Test: Lower/Upper" session now (AppLayout `baselines:openTest`).
-            "Save as baseline" → `save-baseline-test` writes performance_numbers. NOTE: `rematerialize-standing-block`
-            prices from locked_baselines > the week-one test read > config.working_numbers and never reads
-            performance_numbers, so a mid-block test from here does not re-price the block on its own. Copy says
-            only what is true; the seam is filed in docs/WORKORDER-adjust-tests-2026-09-05.md.
-          - Run: a calendar row tagged run_test, three days out. auto-attach-planned links the run landed on that
-            day (same sport, same date), compute-workout-analysis reads the 8–13 min lap, writes the learned
-            threshold (88% of trial speed, p210) at high confidence; the learner keeps a trial over its own read.
-            The accepted value is held, so the trial shows as a proposal here and in the post-run popup.
-          - Bike: a calendar row tagged ftp_test (+ ftp_test_5min), two days out. No link needed: the learner
-            fits the power-duration curve (2–20 min) over the last 90 days. Medium confidence needs a 20-minute
-            point, so the 5-minute test only moves the number alongside a ride with a 20-minute effort on file. */}
-      {/* STRENGTH — the deepest steer (swap / add / adjust weight already built; re-homing here next) */}
+      {/* ⛔ TESTS SIT UNDER THEIR SPORT (Michael, 2026-09-05), one line of copy each, the rest behind the ⓘ. */}
       <section className="mb-5">
-        <SportHeading sport="strength" label="Strength" />
+        <SportHeading sport="strength" label="Strength" info="A retest goes on today's calendar as a test session and opens in the logger: warm-up ramp, then one all-out set per lift. When it is saved, the sessions you have not started re-price from it. Typing a number makes it your number and locks it; auto uses what your lifts measure. Swaps and added movements live in the logger." />
         {perLift.length === 0 ? (
           <p className="text-[13px] text-white/40 leading-snug">Logged lifts show up here.</p>
         ) : (
@@ -337,18 +406,16 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         <div className="flex items-center justify-between py-1 gap-3 mt-1.5">
           <span className="text-[14px] text-white/85">Retest</span>
           <span className="flex flex-wrap gap-2 justify-end">
-            <button type="button" onClick={() => openLiftTest('Lower')} className={pill}>Lower lifts</button>
-            <button type="button" onClick={() => openLiftTest('Upper')} className={pill}>Upper lifts</button>
+            <button type="button" disabled={retestBusy != null} onClick={() => openLiftTest('Lower')} className={pill}>{retestBusy === 'Lower' ? 'Opening…' : 'Lower lifts'}</button>
+            <button type="button" disabled={retestBusy != null} onClick={() => openLiftTest('Upper')} className={pill}>{retestBusy === 'Upper' ? 'Opening…' : 'Upper lifts'}</button>
           </span>
         </div>
-        <p className="text-[13px] text-white/60 mt-2 leading-snug">
-          Tap a number to set your own. A retest opens the test session in the logger now: warm-up ramp, then one all-out set per lift. Swaps and added movements live in the logger.
-        </p>
+        <p className="text-[13px] text-white/60 mt-2 leading-snug">Tap a number to set your own. A retest opens today, in the logger.</p>
+        {saveNote && lastSaved === 'strength' && <p className="text-[13px] text-white/75 mt-1.5">{saveNote}</p>}
       </section>
 
-      {/* RUN — the numbers the run sessions are priced from, the re-price, and the threshold test. */}
       <section className="mb-5">
-        <SportHeading sport="run" label="Run" />
+        <SportHeading sport="run" label="Run" info="Easy days run on threshold heart rate; easy pace is threshold pace × 1.19. The threshold test goes on the calendar three days out; a run logged within a day of it is read as the test, and the result shows here and after the run as a number to accept. Typing a number makes it your number; auto uses what your runs measure." />
         <div className="space-y-1.5">
           <Row id="threshold" name="Threshold pace" value={withSource(fmtPace(thr?.sec_per_mi, metric), thr?.source)} hint={metric ? 'm:ss/km' : 'm:ss/mi'} sport="run" />
           {thrProposal && (
@@ -370,14 +437,12 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
             </span>
           </div>
         </div>
-        <p className="text-[13px] text-white/60 mt-2 leading-snug">
-          Tap a number to set your own. Easy days run on threshold heart rate; easy pace is threshold pace × 1.19. The threshold test goes on the calendar three days out; a run logged on that day is read as the test, and the result shows here and after the run as a number to accept.
-        </p>
+        <p className="text-[13px] text-white/60 mt-2 leading-snug">Tap a number to set your own. The threshold test goes on the calendar three days out.</p>
+        {saveNote && lastSaved === 'run' && <p className="text-[13px] text-white/75 mt-1.5">{saveNote}</p>}
       </section>
 
-      {/* BIKE — FTP, its proposal, and the two FTP tests. */}
       <section>
-        <SportHeading sport="bike" label="Bike" />
+        <SportHeading sport="bike" label="Bike" info="The FTP tests go on the calendar two days out; a ride logged within a day of the test is read as the test. The 20-minute test is the classic. The 5-minute test is all-out with no pacing, so it repeats well; it prices alongside a ride with a 20-minute effort in the last 90 days. The result shows here and after the ride as a number to accept. Typing a number makes it your number; auto uses what your rides measure." />
         <div className="space-y-1.5">
           <Row id="ftp" name="FTP" value={withSource(ftp?.value != null ? `${Math.round(ftp.value)} W` : null, ftp?.source)} hint="W" sport="bike" />
           {proposal && (
@@ -402,10 +467,8 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
             </span>
           </div>
         </div>
-        <p className="text-[13px] text-white/60 mt-2 leading-snug">
-          Tap a number to set your own. The FTP tests go on the calendar two days out. The 20-minute test is the classic. The 5-minute test is all-out with no pacing, so it repeats well; it prices alongside a ride with a 20-minute effort in the last 90 days. The result shows here and after the ride as a number to accept. Rebuild above to apply a number you typed.
-        </p>
-        {saveNote && <p className="text-[13px] text-white/75 mt-1.5">{saveNote}</p>}
+        <p className="text-[13px] text-white/60 mt-2 leading-snug">Tap a number to set your own. The FTP tests go on the calendar two days out.</p>
+        {saveNote && lastSaved === 'bike' && <p className="text-[13px] text-white/75 mt-1.5">{saveNote}</p>}
       </section>
     </div>
   );
