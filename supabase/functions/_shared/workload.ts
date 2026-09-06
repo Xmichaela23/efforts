@@ -717,7 +717,7 @@ export type WorkloadMethod =
   | 'pace_intensity'         // measured: rTSS (threshold pace vs NGP) or sTSS (CSS vs pace)
   | 'hr_intensity'           // measured: Friel's HR zones of LTHR → TSS per hour
   | 'steps_preset'           // structured prescription
-  | 'volume_based'           // strength (sets × reps × load)
+  | 'rpe_estimate'           // strength: minutes ÷ 60 × session rating × 10 (Friel's TSS estimate); was 'volume_based' (tonnage) until 2026-09-04
   | 'duration_intensity'     // duration × inferred intensity
   | 'srpe_estimated'         // ESTIMATED (field-standard, r≈0.68–0.74): no HR/power/pace but a logged RPE
   | 'duration_default'       // ESTIMATED (lowest trust): duration × a DEFAULT intensity, no effort signal AND no RPE (W1)
@@ -760,7 +760,7 @@ export function classifyWorkloadMethod(args: {
   const t = (args.type || '').toLowerCase();
   const isCardio = t === 'run' || t === 'ride' || t === 'bike' || t === 'swim';
 
-  if (t === 'strength') return { method: 'volume_based', estimated: false };
+  if (t === 'strength') return { method: 'rpe_estimate', estimated: true };
   // Cardio: the label is the rung the one rule fired, never a second reading of the inputs. A second
   // classifier here labelled a run scored off pace as "hr_intensity" (found 2026-09-04).
   if (isCardio && args.cardioMethod) {
