@@ -362,7 +362,14 @@ export function resolveCurrentRunThresholdPace(baselines: RunBaselinesLike): Res
   // ── Tier 0 (Q-174): the athlete's explicit choice outranks everything. ──
   const chosen = pn?.threshold_pace_source;
   if (chosen === 'manual' && manual != null) return mk(manual, 'manual-chosen', false);
-  const manualEligible = chosen !== 'learned';
+  /**
+   * 'learned' (auto) no longer skips the typed pace. It used to (Q-174: "a declined typed number
+   * cannot resurface"), so an athlete who tapped auto on Adjust or Baselines with no measured runs on
+   * file was left with NO threshold on either screen and in the plan (throwaway check, 2026-09-05).
+   * Auto now means what it means for FTP (`resolveCurrentFtp`): the measured number when there is one,
+   * the typed number until then. Source 'manual' (not 'manual-chosen') so the screens can still tell a
+   * fallback from a choice.
+   */
 
   // 1. learned, trusted — MEASURED from their own runs.
   if (useSecPerMi != null && useTrusted) {
@@ -375,7 +382,7 @@ export function resolveCurrentRunThresholdPace(baselines: RunBaselinesLike): Res
   // exists to kill — and an assertion outranks an inference everywhere else in this file. When a
   // typed value disagrees with the training data the app SAYS SO (the 5K retest flag,
   // `_shared/arc-context.ts`); it does not edit the athlete behind their back.
-  if (manual != null && manualEligible) return mk(manual, 'manual', false);
+  if (manual != null) return mk(manual, 'manual', false);
 
   // 3. effort_paces (wizard/VDOT off the typed 5K) — an INFERENCE, and therefore BOUNDED.
   //

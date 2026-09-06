@@ -25,10 +25,17 @@ import { runThresholdTestRow, ftpTestRow, ftp5MinTestRow, addDaysISO } from '@/l
 // While the server re-prices row by row (30 rows on a full block), the screen says so — leaving mid-way is not
 // guaranteed to finish (Michael, 2026-09-05).
 const REPRICE_WAIT = 'Updating your upcoming sessions…';
-const sourceWord = (src: string | null | undefined): string => {
+/**
+ * The word beside a number agrees with its auto / my-number switch: "your number" when the athlete
+ * set it (a lift lock, ftp_source / threshold_pace_source / lthr_source 'manual'), "accepted" when a
+ * proposal was taken, otherwise "auto". The resolver's source string is NOT the switch: it says
+ * 'typed' / 'manual' for a typed number that auto fell back to, and the pill read "your number" beside
+ * a switch that read auto (throwaway check, 2026-09-05).
+ */
+const sourceWord = (src: string | null | undefined, isMine: boolean): string => {
+  if (isMine) return 'your number';
   const v = String(src ?? '').toLowerCase();
   if (!v || v === 'none') return '';
-  if (v === 'locked' || v === 'typed' || v === 'manual' || v.startsWith('manual')) return 'your number';
   if (v === 'accepted') return 'accepted';
   return 'auto';
 };
@@ -99,11 +106,28 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   const pn = baselines ? (baselines.performanceNumbers ?? baselines.performance_numbers ?? null) : null;
   const lf = baselines?.learned_fitness ?? null;
   const metric = baselines?.units === 'metric';
+  /**
+   * The four lifts the block prices from are always listed, whether or not a set has been logged:
+   * a fresh account with numbers typed on the profile page saw "Logged lifts show up here." and no
+   * rows, while the profile page showed all four (throwaway check, 2026-09-05). Logged lifts beyond
+   * the four (the State screen's list, `perLift`) follow them; the same lift is not listed twice.
+   */
+  const liftRows: Lift[] = (() => {
+    const four: Lift[] = [
+      { canonical_name: 'squat', display_name: 'Squat' },
+      { canonical_name: 'deadlift', display_name: 'Deadlift' },
+      { canonical_name: 'bench', display_name: 'Bench press' },
+      { canonical_name: 'overheadPress1RM', display_name: 'Overhead press' },
+    ];
+    const seen = new Set(four.map((l) => canonicalizeLiftKey(l.canonical_name)));
+    const extra = perLift.filter((l) => { const k = canonicalizeLiftKey(l.canonical_name); if (!k || seen.has(k)) return false; seen.add(k); return true; });
+    return [...four, ...extra];
+  })();
   const liftNumber = (canonical: string): string | null => {
     if (!baselines) return null;
     const r = resolveStrengthCapacity({ key: canonical, typed: pn, learnedStrength1rms: lf?.strength_1rms ?? null, locked: baselines.locked_baselines ?? null, asOf: new Date().toISOString().slice(0, 10) });
     if (r.value == null) return null;
-    const w = sourceWord(r.source);
+    const w = sourceWord(r.source, mine(canonical));
     return `${Math.round(r.value)} ${metric ? 'kg' : 'lb'}${w ? ` · ${w}` : ''}`;
   };
   const ftp = baselines ? resolveCurrentFtp({ learned_fitness: lf, performance_numbers: pn } as any) : null;
@@ -154,7 +178,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
     })();
   };
   const lthr = baselines ? resolveCurrentLthr({ learned_fitness: lf, performance_numbers: pn, configured_hr_zones: baselines.configured_hr_zones ?? null } as any) : null;
-  const withSource = (num: string | null, src: string | null | undefined) => num ? `${num}${sourceWord(src) ? ` · ${sourceWord(src)}` : ''}` : null;
+  const withSource = (id: string, num: string | null, src: string | null | undefined) => { const w = sourceWord(src, mine(id)); return num ? `${num}${w ? ` · ${w}` : ''}` : null; };
   // ⛔ EDIT IN PLACE (Michael, 2026-09-05: "lost the edit option — the whole point"). Tap a number, type, save.
   // Writes go through AppContext.saveUserBaselines — the SAME save Training Baselines uses — with the same
   // fields: a lift becomes `locked_baselines[key]` (your number, auto off); FTP becomes `performanceNumbers.ftp`
@@ -433,15 +457,11 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
     ) }] : []),
     { id: 'strength', label: 'Strength', sport: 'strength', Icon: Dumbbell, info: STRENGTH_INFO, body: (
       <>
-        {perLift.length === 0 ? (
-          <p className="text-[13px] text-white/40 leading-snug">Logged lifts show up here.</p>
-        ) : (
-          <div className="space-y-1.5">
-            {perLift.map((lt) => (
-              <Row key={lt.canonical_name} id={lt.canonical_name} name={lt.display_name ?? lt.canonical_name} value={liftNumber(lt.canonical_name)} hint={metric ? 'kg' : 'lb'} sport="strength" />
-            ))}
-          </div>
-        )}
+        <div className="space-y-1.5">
+          {liftRows.map((lt) => (
+            <Row key={lt.canonical_name} id={lt.canonical_name} name={lt.display_name ?? lt.canonical_name} value={liftNumber(lt.canonical_name)} hint={metric ? 'kg' : 'lb'} sport="strength" />
+          ))}
+        </div>
         <div className="flex items-center justify-between py-1 gap-3 mt-1.5">
           <span className="text-[14px] text-white/85">Retest</span>
           <span className="flex flex-wrap gap-2 justify-end">
@@ -456,14 +476,14 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
     { id: 'run', label: 'Run', sport: 'run', Icon: Activity, info: RUN_INFO, body: (
       <>
         <div className="space-y-1.5">
-          <Row id="threshold" name="Threshold pace" value={withSource(fmtPace(thr?.sec_per_mi, metric), thr?.source)} hint={metric ? 'm:ss/km' : 'm:ss/mi'} sport="run" />
+          <Row id="threshold" name="Threshold pace" value={withSource('threshold', fmtPace(thr?.sec_per_mi, metric), thr?.source)} hint={metric ? 'm:ss/km' : 'm:ss/mi'} sport="run" />
           {thrProposal && (
             <div className="flex items-center justify-between py-1 gap-3">
               <span className="text-[13px] text-white/70">Your runs measure {fmtPace(thrProposal.measuredSecPerKm * 1.609344, metric)}</span>
               <button type="button" disabled={acceptingThr} onClick={acceptThr} style={{ borderColor: `${getDisciplineColor('run')}88`, color: getDisciplineColor('run') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{acceptingThr ? 'Applying…' : `use ${fmtPace(thrProposal.measuredSecPerKm * 1.609344, metric)}`}</button>
             </div>
           )}
-          <Row id="lthr" name="Threshold heart rate" value={withSource(lthr?.bpm != null ? `${Math.round(lthr.bpm)} bpm` : null, lthr?.source)} hint="bpm" sport="run" />
+          <Row id="lthr" name="Threshold heart rate" value={withSource('lthr', lthr?.bpm != null ? `${Math.round(lthr.bpm)} bpm` : null, lthr?.source)} hint="bpm" sport="run" />
           <Row id="easy" name="Easy pace" editable={false} sport="run"
             value={fmtPace(easy?.sec_per_mi, metric) ? `${fmtPace(easy?.sec_per_mi, metric)} · ${easy?.source === 'learned' ? 'from runs' : 'from threshold'}` : null}
             note={easy?.source === 'learned'
@@ -489,7 +509,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
     { id: 'bike', label: 'Bike', sport: 'bike', Icon: Bike, info: BIKE_INFO, body: (
       <>
         <div className="space-y-1.5">
-          <Row id="ftp" name="FTP" value={withSource(ftp?.value != null ? `${Math.round(ftp.value)} W` : null, ftp?.source)} hint="W" sport="bike" />
+          <Row id="ftp" name="FTP" value={withSource('ftp', ftp?.value != null ? `${Math.round(ftp.value)} W` : null, ftp?.source)} hint="W" sport="bike" />
           {proposal && (
             <div className="flex items-center justify-between py-1 gap-3">
               <span className="text-[13px] text-white/70">Your rides measure {Math.round(proposal.measured)} W</span>

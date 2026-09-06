@@ -75,9 +75,16 @@ Deno.test('choice=manual outranks even a high-confidence learned pace', () => {
   assertEquals(r.source, 'manual-chosen');
 });
 
-Deno.test('choice=learned SKIPS the manual tier (a declined typed number cannot resurface)', () => {
+Deno.test('choice=learned with nothing measured falls back to the typed pace, as FTP does (2026-09-05)', () => {
   const r = resolveCurrentRunThresholdPace({ performance_numbers: { threshold_pace_sec_per_mi: 620, threshold_pace_source: 'learned', fiveK_pace: 585 } });
-  assertEquals(r.sec_per_mi, null); // manual skipped, no 5K tier → nothing, honestly
+  assertEquals(r.sec_per_mi, 620);
+  assertEquals(r.source, 'manual'); // a fallback, not a choice — 'manual-chosen' is reserved for choice=manual
+});
+
+Deno.test('choice=learned with a trusted measured pace uses the measured pace over the typed one', () => {
+  const r = resolveCurrentRunThresholdPace({ ...learned(372, 'high'), performance_numbers: { threshold_pace_sec_per_mi: 620, threshold_pace_source: 'learned' } });
+  assertEquals(r.sec_per_mi, 599);
+  assertEquals(r.source, 'learned');
 });
 
 // ═══ LAW 2 — WE DO NOT INVENT ════════════════════════════════════════════════
