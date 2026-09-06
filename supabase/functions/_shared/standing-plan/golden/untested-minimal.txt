@@ -75,7 +75,7 @@ WEEK 02  column=standard
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
-  [Monday] run      Hard Run — 35 min
+  [Monday] run      Hard Run — 38 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ By feel       | awaiting_test
@@ -107,7 +107,7 @@ WEEK 02  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
-  [Saturday] run      Long Run — 53 min
+  [Saturday] run      Long Run — 50 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
@@ -237,7 +237,7 @@ WEEK 05  column=standard
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
-  [Monday] run      Hard Run — 35 min
+  [Monday] run      Hard Run — 38 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ By feel       | awaiting_test
@@ -269,7 +269,7 @@ WEEK 05  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
-  [Saturday] run      Long Run — 47 min
+  [Saturday] run      Long Run — 44 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
@@ -399,7 +399,7 @@ WEEK 08  column=standard
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
-  [Monday] run      Hard Run — 35 min
+  [Monday] run      Hard Run — 38 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ By feel       | awaiting_test
@@ -431,7 +431,7 @@ WEEK 08  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
-  [Saturday] run      Long Run — 44 min
+  [Saturday] run      Long Run — 41 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
@@ -561,7 +561,7 @@ WEEK 11  column=standard
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
-  [Monday] run      Hard Run — 35 min
+  [Monday] run      Hard Run — 38 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ By feel       | awaiting_test
@@ -593,7 +593,7 @@ WEEK 11  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
-  [Saturday] run      Long Run — 45 min
+  [Saturday] run      Long Run — 42 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)

@@ -35,3 +35,7 @@ the server functions deployed, the iOS project synced (Xcode build is Michael's)
 ## Specs written this session
 `SPEC-baseline-entry-2026-09-04.md` (built), `SPEC-ftp-trend-line-2026-09-04.md` (built),
 `SPEC-ftp-estimator-2026-09-04.md`, `SPEC-ftp-accept-2026-09-04.md`, `SPEC-state-nothing-invented-2026-09-04.md`.
+
+## Run MLSS level-2 round matches p232 (2026-09-05)
+
+Michael's Monday Hard Run showed 45 s @ 125% / 53 s @ 115% / 1:30 easy per round. The page says 45 s @ 125% / 45 s @ 115% / 30 s @ 100% / 1:30 @ VT1. The float is now fixed at 45 s and the 30 s at threshold is emitted as a third step (counted as work). Hard Run goes 42 → 45 min in the golden plans; the long run gives back 2–3 min under the weekly run budget. Goldens and docs/INVENTORY.md regenerated. Functions to deploy: coach, compute-snapshot, endurance-checkpoint, generate-strength-plan, rematerialize-standing-block. Michael's row updates on his next rebuild.

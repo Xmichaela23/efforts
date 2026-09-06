@@ -393,6 +393,16 @@ export type Archetype = {
     insideRep?: boolean;
   };
   /**
+   * A THIRD prescribed segment after the float, where the page writes one — MLSS level 2's
+   * "45s @ 125% / 45s @ 115% / 30s @ 100%" (p232). Emitted after the float, before the recovery,
+   * and counted as work when at or above the family's floor. Absent on every other shape.
+   */
+  hold?: {
+    band: Range;
+    intensity: Intensity;
+    label: string;
+  };
+  /**
    * ⛔ HOW MANY REPS THE SHAPE USES — the shortest and longest count across his own options for it.
    *
    * ⚠️ PRESENT MEANS REP-DRIVEN; ABSENT MEANS DOSE-DRIVEN, and the split is not cosmetic. Where a
@@ -627,7 +637,14 @@ export const FAMILIES: Record<FamilyId, {
         repBand: { lo: 45, hi: 45 },
         repsBand: { lo: 6, hi: 12 },
         work: pct(1.25),
-        float: { band: { lo: 45, hi: 60 }, intensity: pct(1.15), label: 'Near-threshold float' },
+        /**
+         * ⛔ THE PAGE'S ROUND, STEP FOR STEP (2026-09-05, Michael: "the code has to be 100%"). p232, level 2:
+         * "2 sets of 4 rounds of: 45s @ 125% / 45s @ 115% / 30s @ 100% / 1:30 @ VT1". The float is 45 s, not a
+         * 45–60 s range the page never gives (a built plan sampled 53 s from it), and the 30 s at threshold is
+         * the third step, which was missing.
+         */
+        float: { band: { lo: 45, hi: 45 }, intensity: pct(1.15), label: 'Near-threshold float' },
+        hold: { band: { lo: 30, hi: 30 }, intensity: pct(1.00), label: 'At threshold' },
         recovery: { kind: 'stated', band: { lo: 90, hi: 90 }, intensity: vt1 },
         set: { repeatsPerSet: { lo: 3, hi: 4 }, restBand: { lo: 120, hi: 120 }, intensity: easy },
         cite: 'Viada pp231-232 — 2-minute recovery walk/jog between sets',

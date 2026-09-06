@@ -73,7 +73,7 @@ WEEK 02  column=standard
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
-  [Monday] run      Hard Run — 42 min
+  [Monday] run      Hard Run — 45 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 190           | 90% · plan 45wx5 105wx5 145wx3 170wx2 190x
@@ -106,7 +106,7 @@ WEEK 02  column=standard
       HYP    Goblet Squat                   3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5 · per_side
       -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
-  [Saturday] run      Long Run — 82 min
+  [Saturday] run      Long Run — 79 min
   NOTES
       [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -235,7 +235,7 @@ WEEK 05  column=standard
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
-  [Monday] run      Hard Run — 42 min
+  [Monday] run      Hard Run — 45 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 195           | 90% · plan 45wx5 105wx5 145wx3 175wx2 195x
@@ -268,7 +268,7 @@ WEEK 05  column=standard
       HYP    Goblet Squat                   3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5 · per_side
       -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
-  [Saturday] run      Long Run — 79 min
+  [Saturday] run      Long Run — 76 min
   NOTES
       [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -396,7 +396,7 @@ WEEK 08  column=standard
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
-  [Monday] run      Hard Run — 42 min
+  [Monday] run      Hard Run — 45 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 200           | 90% · plan 45wx5 110wx5 150wx3 180wx2 200x
@@ -429,7 +429,7 @@ WEEK 08  column=standard
       HYP    Goblet Squat                   3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5 · per_side
       -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
-  [Saturday] run      Long Run — 92 min
+  [Saturday] run      Long Run — 90 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
@@ -555,7 +555,7 @@ WEEK 11  column=standard
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
-  [Monday] run      Hard Run — 42 min
+  [Monday] run      Hard Run — 45 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Deadlift                       1x1-5        @ 200           | 90% · plan 45wx5 110wx5 150wx3 180wx2 200x
@@ -588,7 +588,7 @@ WEEK 11  column=standard
       HYP    Goblet Squat                   3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5 · per_side
       -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
-  [Saturday] run      Long Run — 91 min
+  [Saturday] run      Long Run — 88 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)

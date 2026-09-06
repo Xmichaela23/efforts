@@ -82,3 +82,4 @@ The week-execution bars (a count). Add rows when touched.
 |---|---|---|
 | Working number from a number on file = 1RM × 0.96 | `working-number.ts workingNumberFromFile` | FIELD — Viada p215, the same fraction the test read uses |
 | Week-one retest placement: run test on day 3, FTP test on day 5 of the block | `src/lib/baseline-tests.ts RETEST_OFFSET_DAYS` | **OURS** — the book says only "no hard training 48 hours prior" (p210, p212); the day inside week one is this app's choice |
+| Run MLSS level-2 round: 45 s @ 125% / 45 s @ 115% / 30 s @ 100% / 1:30 @ VT1; 2 sets of 4; 2 min between sets | `endurance-library/source-rules.ts long_surge_float` (`hold` step) + `generate.ts mkRepeat` | FIELD — Viada p232, step for step. Before 2026-09-05 the float was sampled from a 45–60 s range the page does not give and the 30 s at threshold was missing (both were OURS, now removed) |

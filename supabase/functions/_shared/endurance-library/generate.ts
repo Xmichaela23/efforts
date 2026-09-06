@@ -384,9 +384,12 @@ function buildIntervals(ctx: BuildContext): Block[] {
     ? a.float.intensity.kind === 'pct_threshold' && a.float.intensity.lo >= workFloor
     : false;
   const floatInside = a.float?.insideRep === true;
+  // The page's third segment (p232 MLSS level 2: 30 s at threshold after the float). Same accounting as the float.
+  const holdSeconds = a.hold ? Math.round(lerp(a.hold.band, levelT(ctx.level))) : 0;
+  const holdCountsAsWork = a.hold ? a.hold.intensity.kind === 'pct_threshold' && a.hold.intensity.lo >= workFloor : false;
 
   // How much work one repeat contributes. An `insideRep` segment is already inside `repSeconds`.
-  const workPerRep = repSeconds + (a.float && !floatInside && floatCountsAsWork ? floatSeconds : 0);
+  const workPerRep = repSeconds + (a.float && !floatInside && floatCountsAsWork ? floatSeconds : 0) + (a.hold && holdCountsAsWork ? holdSeconds : 0);
   const reps = repCount(a, ctx, workPerRep);
 
   const workLabel = a.float && !floatInside ? 'Surge' : 'Work';
@@ -407,6 +410,9 @@ function buildIntervals(ctx: BuildContext): Block[] {
     steps.push(step('work', workLabel, repSeconds > 0 ? repSeconds : null, workAt(i, n), sport, anchor));
     if (a.float && !floatInside) {
       steps.push(step(floatCountsAsWork ? 'work' : 'float', a.float.label, floatSeconds, a.float.intensity, sport, anchor));
+    }
+    if (a.hold) {
+      steps.push(step(holdCountsAsWork ? 'work' : 'float', a.hold.label, holdSeconds, a.hold.intensity, sport, anchor));
     }
     return steps;
   };
