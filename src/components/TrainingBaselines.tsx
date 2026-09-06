@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, RefreshCw, Calendar, Info, Loader2, User, Hash, Gauge, Wrench, Settings2 } from 'lucide-react';
+import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, RefreshCw, Calendar, Info, Loader2, User, Gauge, Wrench, Settings2 } from 'lucide-react';
 import { NumberRow } from '@/components/ui/number-row';
 import { numberWord } from '@/lib/number-word';
 import SportStrip, { type StripSport } from '@/components/ui/sport-strip';
@@ -1265,7 +1265,13 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
     <div className="flex flex-wrap gap-2">
       {options.map((option) => {
         const on = ((data.equipment as any)[discipline] || []).includes(option);
-        return <GalaxyButton key={option} shape="chip" variant={on ? 'primary' : 'secondary'} onClick={() => { toggleEquipment(discipline, option); void persistEquipmentSoon(); }}>{option}</GalaxyButton>;
+        const colour = getDisciplineColor(discipline === 'strength' ? 'strength' : 'swim');
+        return (
+          <GalaxyButton key={option} shape="chip" variant={on ? 'primary' : 'secondary'} aria-pressed={on}
+            className={on ? 'text-white' : 'text-white/55'}
+            style={on ? { borderColor: `${colour}88`, background: `${colour}22` } : undefined}
+            onClick={() => { toggleEquipment(discipline, option); void persistEquipmentSoon(); }}>{option}</GalaxyButton>
+        );
       })}
     </div>
   );
@@ -1282,7 +1288,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
     const implied = arcFiveKNudge?.implied_5k_label ?? null;
     const hr = hrRows('run');
     return [
-      { id: 'run-numbers', label: 'Numbers', Icon: Hash, info: 'Threshold pace is the fastest pace you could hold for about an hour; hard sessions are set from it. Easy pace is what your last five easy runs measured, or threshold pace × 1.19 until there are five. Typing a number makes it your number; auto uses what your runs measure.', body: (
+      { id: 'run-numbers', label: 'Paces', Icon: Activity, info: 'Threshold pace is the fastest pace you could hold for about an hour; hard sessions are set from it. Easy pace is what your last five easy runs measured, or threshold pace × 1.19 until there are five. Typing a number makes it your number; auto uses what your runs measure.', body: (
         <div className="space-y-1.5">
           <NumberRow id="threshold" name="Threshold pace" hint={metric ? 'm:ss/km' : 'm:ss/mi'} inputMode="numeric" sport="run" value={thr.sec_per_mi != null ? `${paceToText(thr.sec_per_mi)} · ${numberWord(thr.source, thrMine)}` : null} note={thrNote} mine={thrMine}
             onSave={(t) => { const sec = parsePaceText(t); if (sec == null) return; const secPerMi = metric ? sec * 1.609344 : sec; const str = `${Math.floor(secPerMi / 60)}:${String(Math.round(secPerMi % 60)).padStart(2, '0')}`; void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, threshold_pace_min_per_mi: str, threshold_pace_source: 'manual' } as any })); }}
@@ -1318,7 +1324,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
     const hr = hrRows('ride');
     const powerZones = ftp.value ? getPowerZones(Number(ftp.value)) : [];
     return [
-      { id: 'bike-numbers', label: 'Numbers', Icon: Hash, info: 'FTP is the most power you could hold for about an hour. It sets your power zones and the targets on rides. Typing a number makes it your number; auto uses what your rides measure.', body: (
+      { id: 'bike-numbers', label: 'FTP', Icon: Bike, info: 'FTP is the most power you could hold for about an hour. It sets your power zones and the targets on rides. Typing a number makes it your number; auto uses what your rides measure.', body: (
         <div className="space-y-1.5">
           <NumberRow id="ftp" name="FTP" hint="W" inputMode="numeric" sport="bike" value={ftp.value != null ? `${Math.round(Number(ftp.value))} W · ${numberWord(ftp.source, ftpMine)}` : null} note={ftpNote} mine={ftpMine}
             onSave={(t) => { const v = Math.round(Number(t)); if (!(v > 0)) return; void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, ftp: v, ftp_source: 'manual' } as any })); }}
@@ -1357,7 +1363,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
     const swim100 = pnAny.swimPace100 as string | undefined;
     const bands = deriveSwimPaceBands(parsePaceToSeconds(swim100) ?? 0);
     return [
-      { id: 'swim-numbers', label: 'Numbers', Icon: Hash, info: 'Your hard, steady 100 pace: the effort you could hold for a strong continuous swim. Sets your swim pace zones.', body: (
+      { id: 'swim-numbers', label: 'Pace', Icon: Waves, info: 'Your hard, steady 100 pace: the effort you could hold for a strong continuous swim. Sets your swim pace zones.', body: (
         <div className="space-y-1.5">
           <NumberRow id="swim100" name="Threshold 100 pace" hint="m:ss" inputMode="numeric" sport="swim" value={swim100 ? `${swim100}/100 · your number` : null} note={swim100 ? 'your number' : null} seed={swim100 || ''}
             onSave={(t) => { if (!/^\d{1,2}:\d{2}$/.test(t.trim())) return; void commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, swimPace100: t.trim() } as any })); }} />
@@ -1396,12 +1402,18 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
       );
     });
     return [
-      { id: 'strength-numbers', label: 'Numbers', Icon: Hash, info: 'The four lifts the block works from, and pull-ups as reps. Typing a number makes it your number and locks it; auto uses what your lifts measure, three logged sets and up. A number typed here is also the number on file for a new block.', body: <div className="space-y-1.5">{liftRows}</div> },
+      { id: 'strength-numbers', label: 'Lifts · 1RM', Icon: Dumbbell, info: 'The four lifts the block works from, and pull-ups as reps. Typing a number makes it your number and locks it; auto uses what your lifts measure, three logged sets and up. A number typed here is also the number on file for a new block.', body: <div className="space-y-1.5">{liftRows}</div> },
       { id: 'strength-equipment', label: 'Equipment', Icon: Wrench, info: 'A commercial gym has everything. A home gym lists what you have; the plan picks movements from it.', body: (
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
-            <GalaxyButton shape="chip" variant={hasCommercialGym ? 'primary' : 'secondary'} onClick={() => void commitData((d) => ({ ...d, equipment: { ...d.equipment, strength: ['Commercial gym'] } }))}>Commercial gym</GalaxyButton>
-            <GalaxyButton shape="chip" variant={!hasCommercialGym ? 'primary' : 'secondary'} onClick={() => { if (hasCommercialGym) void commitData((d) => ({ ...d, equipment: { ...d.equipment, strength: [] } })); }}>Home gym</GalaxyButton>
+            <GalaxyButton shape="chip" variant={hasCommercialGym ? 'primary' : 'secondary'} aria-pressed={hasCommercialGym}
+              className={hasCommercialGym ? 'text-white' : 'text-white/55'}
+              style={hasCommercialGym ? { borderColor: `${getDisciplineColor('strength')}88`, background: `${getDisciplineColor('strength')}22` } : undefined}
+              onClick={() => void commitData((d) => ({ ...d, equipment: { ...d.equipment, strength: ['Commercial gym'] } }))}>Commercial gym</GalaxyButton>
+            <GalaxyButton shape="chip" variant={!hasCommercialGym ? 'primary' : 'secondary'} aria-pressed={!hasCommercialGym}
+              className={!hasCommercialGym ? 'text-white' : 'text-white/55'}
+              style={!hasCommercialGym ? { borderColor: `${getDisciplineColor('strength')}88`, background: `${getDisciplineColor('strength')}22` } : undefined}
+              onClick={() => { if (hasCommercialGym) void commitData((d) => ({ ...d, equipment: { ...d.equipment, strength: [] } })); }}>Home gym</GalaxyButton>
           </div>
           {!hasCommercialGym && equipmentChips('strength', homeGymEquipmentOptions)}
         </div>
