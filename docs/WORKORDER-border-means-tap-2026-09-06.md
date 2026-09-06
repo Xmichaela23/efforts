@@ -42,3 +42,7 @@ Right chevron on every bordered control that leaves the screen: "Retest or rebui
 Profile, the two build cards on Goals ("Build a training plan", "Build a race plan"), any pill that
 navigates. Nothing that edits or opens in place gets one. Down chevrons on State rows stay. Use
 lucide `ChevronRight`, `h-4 w-4 text-white/40`, the way the Goals plan row already draws it.
+
+## 6. One label on Profile (same pass)
+
+The zone table's source line reads "Friel %LTHR" / "Karvonen %HRR". Citations live in the ledger, not on screen. Make it "from your threshold heart rate" / "from your max and resting heart rate" / "needs resting heart rate" (src/components/TrainingBaselines.tsx `getZoneModel`).

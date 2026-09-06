@@ -3,6 +3,7 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 
 import { frielZones, karvonenZones } from './hr-zones.ts';
+import { frielRunZones } from '../../../../src/lib/friel-zones.ts';
 import { paceZonesFromVdot } from './pace-zones.ts';
 import { longRunMilesForWeek as sharedLongRun, longRunFloorMiles as sharedFloor, longRunPeakTarget } from './volume.ts';
 import { PHASE_ZONE_DIST as SHARED_DIST } from './distribution.ts';
@@ -16,18 +17,15 @@ import {
 } from '../../generate-combined-plan/science.ts';
 
 // ── PARITY 1 — HR zones (vs the client getFrielZones/getKarvonenZones formula + your confirmed golden) ──
-Deno.test('PARITY: HR zones — Friel %LTHR golden (LTHR 158 → Z2 142 / Z3 150 / Z4 166) + formula sweep', () => {
+Deno.test('PARITY: HR zones — ONE Friel table (D-286): the server zones ARE frielRunZones (LTHR 158 → Z2 141 / Z3 149 / Z4 165)', () => {
   const z = frielZones(158);
-  assertEquals(z[1].max, 142); // Z2
-  assertEquals(z[2].max, 150); // Z3
-  assertEquals(z[3].max, 166); // Z4
-  for (const lthr of [140, 150, 158, 165, 172, 185]) {
+  assertEquals(z[1].max, 141); // Z2 top = easy ceiling = round(0.89 × LTHR)
+  assertEquals(z[2].max, 149); // Z3
+  assertEquals(z[3].max, 165); // Z4
+  for (const lthr of [140, 150, 152, 158, 165, 172, 185]) {
     const zz = frielZones(lthr);
-    assertEquals(zz[0].max, Math.round(lthr * 0.85));
-    assertEquals(zz[1].max, Math.round(lthr * 0.90));
-    assertEquals(zz[2].max, Math.round(lthr * 0.95));
-    assertEquals(zz[3].max, Math.round(lthr * 1.05));
-    assertEquals(zz[4].max, null);
+    const one = frielRunZones(lthr);
+    for (let i = 0; i < 5; i++) { assertEquals(zz[i].min, one[i].min); assertEquals(zz[i].max, one[i].max); }
   }
   const k = karvonenZones(180, 50); // hrr 130
   assertEquals(k[3].max, Math.round(50 + 130 * 0.90)); // Z4

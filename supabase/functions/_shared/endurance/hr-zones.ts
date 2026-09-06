@@ -4,6 +4,8 @@
 // keeps the two in lockstep (a true single-home unify is deferred — client and edge are separate
 // build contexts). Friel %LTHR (Garmin / TrainingPeaks) + Karvonen %HRR. See SPEC-shared-endurance-model.md.
 
+import { frielRunZones } from '../../../../src/lib/friel-zones.ts';
+
 export interface HRZone {
   name: string;
   label: string;
@@ -11,15 +13,16 @@ export interface HRZone {
   max: number | null;
 }
 
-/** Friel 5-zone model from LTHR (used by Garmin, TrainingPeaks). */
+/**
+ * Friel 5-zone model from LTHR (used by Garmin, TrainingPeaks).
+ *
+ * ⛔ ONE TABLE (2026-09-06). This was a second copy that topped Z2 at round(0.90 × LTHR) while the model
+ * the athlete reads on Profile, the learner's easy ceiling and the run grader all use `frielRunZones`
+ * (src/lib/friel-zones.ts, D-286: Z2 top = round(0.89 × LTHR)). At LTHR 152 the calendar's easy steps
+ * said 129–137 and Profile said 129–135. The copy is gone; this delegates, the same way easy-hr.ts does.
+ */
 export function frielZones(lthr: number): HRZone[] {
-  return [
-    { name: 'Z1', label: 'Recovery',  min: 0,                        max: Math.round(lthr * 0.85) },
-    { name: 'Z2', label: 'Aerobic',   min: Math.round(lthr * 0.85),  max: Math.round(lthr * 0.90) },
-    { name: 'Z3', label: 'Tempo',     min: Math.round(lthr * 0.90),  max: Math.round(lthr * 0.95) },
-    { name: 'Z4', label: 'Threshold', min: Math.round(lthr * 0.95),  max: Math.round(lthr * 1.05) },
-    { name: 'Z5', label: 'VO2max',    min: Math.round(lthr * 1.05),  max: null },
-  ];
+  return frielRunZones(lthr).map((z) => ({ name: z.name, label: z.label, min: z.min, max: z.max }));
 }
 
 /** Karvonen %HRR model (uses Max HR + Resting HR). */
