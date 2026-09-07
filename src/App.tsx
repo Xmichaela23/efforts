@@ -42,7 +42,7 @@ const App = () => (
 <Route path="/reset-password" element={<ResetPassword />} /> {/* opened from the reset email; no session needed */}
 <Route path="/strava/callback" element={<StravaCallback />} /> {/* ✅ UNCOMMENTED */}
 <Route path="/auth/garmin/callback" element={<GarminCallback />} />
-<Route path="/connections" element={<Connections />} />
+<Route path="/connections" element={<Index />} /> {/* inside the app shell; see AppLayout showConnections */}
 <Route path="/onboarding/profile" element={<OnboardingProfilePage />} />
 <Route path="/plans/admin" element={<PlansAdminImport />} />
 <Route path="/arc-setup" element={<ArcSetupPage />} />

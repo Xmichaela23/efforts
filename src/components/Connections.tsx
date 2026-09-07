@@ -43,7 +43,7 @@ interface ConnectionStatus {
   providerUserId?: string;
 }
 
-const Connections: React.FC = () => {
+const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const [connections, setConnections] = useState<ConnectionStatus[]>([
     {
       provider: 'garmin',
@@ -979,10 +979,9 @@ const Connections: React.FC = () => {
     navigate('/privacy');
   };
 
-  return (
-    <div className="mobile-app-container">
-      <MobileHeader />
-      <main className="mobile-main-content overflow-y-auto overflow-x-hidden" style={{ paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + 1rem)' }}>
+  // Inside the app shell (AppLayout `showConnections`) the shell draws the header and the tab bar;
+  // this renders only the content. The standalone page below is kept for the callback routes.
+  const content = (
         <div className="max-w-4xl mx-auto px-6 pb-6 min-h-0">
           <h2 className="text-2xl font-bold text-white mb-2">Connections</h2>
           <p className="text-white/50 text-sm mb-6">
@@ -1490,6 +1489,14 @@ const Connections: React.FC = () => {
         </p>
       </div>
         </div>
+  );
+  if (embedded) return <div className="max-w-full">{content}</div>;
+
+  return (
+    <div className="mobile-app-container">
+      <MobileHeader />
+      <main className="mobile-main-content overflow-y-auto overflow-x-hidden" style={{ paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + var(--tabbar-extra, 0px))' }}>
+        {content}
       </main>
       
       {/* Bottom Navigation Tab Bar - extra padding for iOS swipe gesture safe zone */}

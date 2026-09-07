@@ -23,6 +23,7 @@ import FitFileImporter from './FitFileImporter';
 import TrainingBaselines from './TrainingBaselines';
 import AccountPage from './AccountPage';
 import SupportContent from '@/components/SupportContent';
+import Connections from '@/components/Connections';
 import AthleticRecordPage from './AthleticRecordPage';
 import { parseLocalDate } from '@/lib/dateUtils';
 import Gear from './Gear';
@@ -205,6 +206,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [showTrainingBaselines, setShowTrainingBaselines] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
+  const [showConnections, setShowConnections] = useState(false);
   const [showAthleticRecord, setShowAthleticRecord] = useState(false);
   const [showGear, setShowGear] = useState(false);
   const [showContext, setShowContext] = useState(false);
@@ -776,6 +778,30 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const handleAccountClick = () => {
     try { navigate('/account', { replace: true }); } catch { setShowAccount(true); }
   };
+
+  // Deep link: /connections opens Connections inside the app, so it carries the real tab bar
+  // (it drew its own, older one when it was a standalone route — Michael, 2026-09-07: "wrong nav bar").
+  useEffect(() => {
+    if (location.pathname === '/connections') {
+      setSelectedWorkout(null);
+      setShowContext(false);
+      setShowStrengthLogger(false);
+      setShowPilatesYogaLogger(false);
+      setShowBuilder(false);
+      setShowGear(false);
+      setShowImportPage(false);
+      setShowAllPlans(false);
+      setShowStrengthPlans(false);
+      setShowTrainingBaselines(false);
+      setShowAthleticRecord(false);
+      setShowGoals(false);
+      setShowAccount(false);
+      setShowSupport(false);
+      setShowConnections(true);
+    } else {
+      setShowConnections(false);
+    }
+  }, [location.pathname]);
 
   // Deep link: /help opens Support inside the app, so it carries the tab bar like every other screen.
   // The public copy at /support is its own route and needs no session (Strava and Garmin link to it).
@@ -1718,6 +1744,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 onClose={handleCloseContext}
                 onSelectWorkout={handleEditEffort}
               />
+            </div>
+          ) : showConnections ? (
+            <div className="pt-4 h-full overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + var(--tabbar-extra, 0px))' }}>
+              <Connections embedded />
             </div>
           ) : showSupport ? (
             <div className="pt-4 h-full overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + var(--tabbar-extra, 0px))' }}>
