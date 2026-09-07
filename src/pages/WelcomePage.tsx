@@ -298,18 +298,19 @@ export default function WelcomePage() {
   );
 
   /** A connect row: mark on the left, name and one line, Connected or a chevron on the right. */
+  /** A bordered pill, the height of the Strava button, so the two read as a pair. */
   const connectRow = (key: string, mark: React.ReactNode, title: string, line: string, on: boolean, onTap: () => void) => (
     <button key={key} type="button" onClick={() => { if (!on) onTap(); }} aria-pressed={on}
-      className="w-full text-left flex items-center gap-3 px-3 py-3 bg-transparent border-none">
-      <span className="shrink-0 w-8 flex justify-center">{mark}</span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-[15px] text-white">{title}</span>
-        <span className="block text-[12px] text-white/55 leading-snug">{line}</span>
+      className={`w-full text-left flex items-center gap-3 px-4 h-11 rounded-xl border ${on ? 'border-white/40 bg-white/[0.10]' : 'border-white/25 bg-white/[0.08]'}`}>
+      <span className="shrink-0 flex items-center">{mark}</span>
+      <span className="min-w-0 flex-1 flex items-baseline gap-2">
+        <span className="text-[15px] text-white">{title}</span>
+        <span className="hidden sm:inline text-[12px] text-white/50 truncate">{line}</span>
       </span>
       {on ? (
         <span className="flex items-center gap-1 text-[13px] text-white/75"><Check className="h-4 w-4" /> Connected</span>
       ) : (
-        <span className="text-white/45 text-lg leading-none">›</span>
+        <span className="text-white/60 text-lg leading-none">›</span>
       )}
     </button>
   );
@@ -345,24 +346,22 @@ export default function WelcomePage() {
                 <SectionHead Icon={User} label="You" colour="rgba(255,255,255,0.7)" />
                 <NumberRow id="name" name="Name" inputType="text" value={name} seed={name ?? ''} onSave={(t) => setName(t.trim() || null)} />
                 <NumberRow id="birthday" name="Birthday" inputType="date" value={birthday ? `${fmtBirthday(birthday)}${calculateAge(birthday) != null ? ` · ${calculateAge(birthday)} yrs` : ''}` : null} seed={birthday ?? ''} onSave={(t) => { if (/^\d{4}-\d{2}-\d{2}$/.test(t)) setBirthday(t); }} />
+                <NumberRow id="units" name="Units" value={null} right={segmented<'imperial' | 'metric'>([{ v: 'imperial', label: 'lb · mi' }, { v: 'metric', label: 'kg · km' }], units, setUnits)} />
                 <NumberRow id="height" name="Height" hint={metric ? 'cm' : 'in'} inputMode="numeric" value={height ? `${height} ${metric ? 'cm' : 'in'}` : null} seed={height ? String(height) : ''} onSave={(t) => { const v = parseInt(t); if (Number.isFinite(v) && v > 0) setHeight(v); }} />
                 <NumberRow id="weight" name="Weight" hint={metric ? 'kg' : 'lb'} inputMode="numeric" value={weight ? `${weight} ${metric ? 'kg' : 'lb'}` : null} seed={weight ? String(weight) : ''} onSave={(t) => { const v = parseInt(t); if (Number.isFinite(v) && v > 0) setWeight(v); }} />
-                <NumberRow id="units" name="Units" value={null} right={segmented<'imperial' | 'metric'>([{ v: 'imperial', label: 'lb · mi' }, { v: 'metric', label: 'kg · km' }], units, setUnits)} />
                 <p className="mt-2 text-[12px] text-white/45">Tap a value to change it.</p>
               </div>
 
               <div className="px-3 py-3">
                 <SectionHead Icon={Link2} label="Bring in your workouts" colour="rgba(255,255,255,0.7)" />
                 <p className="m-0 mb-1 text-[12px] text-white/55 leading-snug">Your last 90 days come in, so the plan starts from your own sessions. Also on Connections, any time.</p>
-                <div className="-mx-3 divide-y divide-white/[0.08]">
+                <div className="mt-2 space-y-2">
                   {stravaOn
                     ? connectRow('strava', <span className="text-[#FC4C02] font-bold text-[11px] tracking-wide">STRAVA</span>, 'Strava', 'Activities arrive as you finish them.', true, () => {})
                     : (
-                      <div className="px-3 py-3">
-                        <button type="button" onClick={() => void startStrava()} className="inline-block hover:opacity-90 transition-opacity bg-transparent border-none p-0">
-                          <img src="/icons/strava-connect.svg" alt="Connect with Strava" className="h-11" />
-                        </button>
-                      </div>
+                      <button type="button" onClick={() => void startStrava()} className="block hover:opacity-90 transition-opacity bg-transparent border-none p-0">
+                        <img src="/icons/strava-connect.svg" alt="Connect with Strava" className="h-11" />
+                      </button>
                     )}
                   {connectRow('garmin', <Watch className="h-5 w-5" style={{ color: '#00A0DE' }} />, 'Garmin Connect', 'Rides and runs arrive as you finish them.', garminOn, () => void startGarmin())}
                   {isNativeIOS && healthKit && connectRow('health', <Heart className="h-5 w-5" style={{ color: '#FF2D55' }} />, 'Apple Health', 'Workouts from your watch and phone.', healthOn, () => void startAppleHealth())}
