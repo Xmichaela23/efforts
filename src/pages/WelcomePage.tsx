@@ -382,12 +382,12 @@ export default function WelcomePage() {
         )}
 
         {step === 3 && (
-          <StepLayout step={3} totalSteps={TOTAL} title="Your numbers" subtitle="From your watch, typed, or measured in week one. Nothing is guessed." onBack={() => go(2)} onContinue={() => void finish()} canContinue continueLabel="Next" saving={saving}>
+          <StepLayout step={3} totalSteps={TOTAL} title="Your numbers" subtitle="Nothing is guessed." onBack={() => go(2)} onContinue={() => void finish()} canContinue continueLabel="Next" saving={saving}>
             <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
               <div className="px-3 py-3">
-                <SectionHead Icon={Link2} label="From your watch" colour="rgba(255,255,255,0.7)" />
-                <p className="m-0 mb-2 text-[12px] text-white/55 leading-snug">
-                  One tap brings in your last 90 days and fills what it can: easy pace, threshold pace, FTP if you ride with power, and your training load. Garmin's arrive over the next few minutes.
+                <SectionHead Icon={Link2} label="Connect" colour="rgba(255,255,255,0.85)" />
+                <p className="m-0 mb-2 text-[13px] text-white/75 leading-snug">
+                  Brings in your last 90 days. Paces, FTP and training load come from them.
                 </p>
                 <div className="space-y-2">
                   {connectRow('strava', <StravaMark />, 'Strava', 'Activities arrive as you finish them.', stravaOn, () => void startStrava())}
@@ -398,7 +398,7 @@ export default function WelcomePage() {
               </div>
 
               <div className="px-3 py-3">
-                <SectionHead Icon={Dumbbell} label="Your numbers" colour="rgba(255,255,255,0.7)" />
+                <SectionHead Icon={Dumbbell} label="On file" colour="rgba(255,255,255,0.85)" />
                 {thr.sec_per_mi != null && (
                   <NumberRow id="threshold" name="Threshold pace" hint={metric ? 'm:ss/km' : 'm:ss/mi'} inputMode="numeric" sport="run"
                     value={`${paceToText(metric ? thr.sec_per_mi / 1.609344 : thr.sec_per_mi)}/${metric ? 'km' : 'mi'} · ${numberWord(thr.source, thrMine)}`}
@@ -414,12 +414,12 @@ export default function WelcomePage() {
                     value={`${swim100}/100 · your number`} seed={swim100}
                     onSave={(t) => { if (!/^\d{1,2}:\d{2}$/.test(t.trim())) return; setPn((p) => ({ ...p, swimPace100: t.trim() })); }} />
                 )}
-                <p className="m-0 mt-2 text-[13px] text-white/70">
+                <p className="m-0 mt-1 text-[14px] text-white/85">
                   {thr.sec_per_mi == null && ftp.value == null && !swim100
-                    ? 'Nothing on file yet. Your paces, your FTP and your lifts are measured in week one.'
-                    : 'Anything your watch did not give, your lifts included, is measured in week one.'}
+                    ? 'Nothing yet. Paces, FTP and lifts are measured in week one.'
+                    : 'The rest, lifts included, is measured in week one.'}
                 </p>
-                <p className="mt-2 text-[12px] text-white/45">Tap a value to change it.</p>
+                {(thr.sec_per_mi != null || ftp.value != null || swim100) && <p className=\"mt-2 text-[12px] text-white/45\">Tap a value to change it.</p>}
               </div>
 
             </div>
