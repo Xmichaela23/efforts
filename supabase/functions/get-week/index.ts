@@ -923,6 +923,11 @@ Deno.serve(async (req)=>{
         // computed: same shape as DB row for UI compatibility (MobileSummary, etc.)
         computed: w?.computed ?? null,
         workout_analysis: w?.workout_analysis ?? null,
+        // Selected above and dropped here until 2026-09-07, so the Home row and the week chip could
+        // never show a failed analysis. The client reads these three (src/lib/analysis-state.ts).
+        analysis_status: w?.analysis_status ?? null,
+        analysis_error: w?.analysis_error ?? null,
+        analysis_updated_at: w?.analysis_updated_at ?? null,
         name: w?.name ?? null,
         timestamp: w?.timestamp ?? null,
         // Workload data from database (single source of truth)
