@@ -405,7 +405,6 @@ export default function WelcomePage() {
           <StepLayout step={3} totalSteps={TOTAL} title="Your numbers" subtitle="Runners: threshold pace, 5K pace, easy heart-rate range. Riders: FTP." onBack={() => go(2)} onContinue={() => void finish()} canContinue continueLabel="Next" saving={saving}>
             <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
               <div className="px-3 py-2.5">
-                <SectionHead Icon={Link2} label="Import" colour="rgba(255,255,255,0.85)" />
                 <p className="m-0 mb-2 text-[13px] text-white/80 leading-snug">Import your last 90 days and we estimate them.</p>
                 <div className="space-y-1.5">
                   {connectRow('strava', <StravaMark />, 'Strava', '', stravaOn, () => void startStrava())}
@@ -416,17 +415,15 @@ export default function WelcomePage() {
               </div>
 
               <div className="px-3 py-2.5">
-                <SectionHead Icon={User} label="Your numbers" colour="rgba(255,255,255,0.85)" />
-                <p className="m-0 mb-1 text-[13px] text-white/80 leading-snug">If you know them, add them. Or test with our tests.</p>
+                <p className="m-0 mb-1 text-[13px] text-white/80 leading-snug">Know them? Add them. Or test with our tests.</p>
                 <NumberRow id="threshold" name="Threshold pace" hint={metric ? 'm:ss/km' : 'm:ss/mi'} inputMode="numeric" sport="run"
                   value={thr.sec_per_mi != null ? `${paceToText(metric ? thr.sec_per_mi / 1.609344 : thr.sec_per_mi)}/${metric ? 'km' : 'mi'} · ${numberWord(thr.source, thrMine)}` : null}
                   onSave={(t) => { const sec = parsePaceText(t); if (sec == null) return; const secPerMi = metric ? sec * 1.609344 : sec; setPn((p) => ({ ...p, threshold_pace_min_per_mi: paceToText(secPerMi), threshold_pace_source: 'manual' })); }} />
                 <NumberRow id="fiveK" name="5K time" hint="mm:ss" inputMode="numeric" sport="run"
                   value={fiveK ? `${fiveK} · ${pn.fiveK_source === 'manual' ? 'your number' : 'auto'}` : null} seed={fiveK || ''}
                   onSave={(t) => { if (!/^\d{1,2}:\d{2}$/.test(t.trim())) return; setPn((p) => ({ ...p, fiveK: t.trim(), fiveK_source: 'manual' })); }} />
-                <NumberRow id="easyhr" name="Easy heart rate" hint="threshold bpm" inputMode="numeric" sport="run"
+                <NumberRow id="easyhr" name="Easy heart rate" hint="threshold bpm" inputMode="numeric" sport="run" note={easyLo == null ? null : null}
                   value={easyLo != null && easyHi != null ? `${easyLo}–${easyHi} bpm · ${manualRunLthr ? 'your number' : 'auto'}` : null} seed={lthr ? String(Math.round(lthr)) : ''}
-                  note={easyLo == null ? 'Type your threshold heart rate; the range comes from it.' : null}
                   onSave={(t) => { const v = parseInt(t); if (Number.isFinite(v) && v > 80 && v < 230) setManualRunLthr(v); }} />
                 <NumberRow id="ftp" name="FTP" hint="W" inputMode="numeric" sport="bike"
                   value={ftp.value != null ? `${Math.round(Number(ftp.value))} W · ${numberWord(ftp.source, ftpMine)}` : null}
