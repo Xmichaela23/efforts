@@ -733,7 +733,7 @@ export default function PostWorkoutFeedback({
             ))}
             <button
               onClick={() => setSelectedPool(null)}
-              className="flex-1 py-2.5 text-sm font-light rounded-lg border-2 backdrop-blur-md transition-all duration-300 bg-white/[0.04] border-white/10 text-white/50 hover:text-white/70"
+              className="flex-1 py-2.5 text-sm font-light rounded-xl border-2 backdrop-blur-md transition-all duration-300 bg-white/[0.04] border-white/10 text-white/50 hover:text-white/70"
             >
               Skip
             </button>
