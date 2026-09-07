@@ -419,7 +419,7 @@ export default function WelcomePage() {
                     ? 'Nothing yet. Paces, FTP and lifts are measured in week one.'
                     : 'The rest, lifts included, is measured in week one.'}
                 </p>
-                {(thr.sec_per_mi != null || ftp.value != null || swim100) && <p className=\"mt-2 text-[12px] text-white/45\">Tap a value to change it.</p>}
+                {(thr.sec_per_mi != null || ftp.value != null || swim100) && <p className="mt-2 text-[12px] text-white/45">Tap a value to change it.</p>}
               </div>
 
             </div>
