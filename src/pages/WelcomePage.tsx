@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
-import { Bike, Check, Dumbbell, Footprints, Heart, Link2, User, Waves, Watch, Wrench } from 'lucide-react';
+import { Activity, Bike, Check, Dumbbell, Heart, Link2, User, Waves, Watch, Wrench } from 'lucide-react';
 import { MobileHeader } from '@/components/MobileHeader';
 import { StepLayout } from '@/components/wizard/StepLayout';
 import { GalaxyButton } from '@/components/ui/galaxy-button';
@@ -41,7 +41,7 @@ const TOTAL = 3;
 
 // ⛔ The four canonical discipline ids (src/lib/discipline.ts `normalizeDiscipline`).
 const SPORTS: Array<{ id: Discipline; label: string; Icon: React.ComponentType<any>; colourKey: string }> = [
-  { id: 'run', label: 'Run', Icon: Footprints, colourKey: 'run' },
+  { id: 'run', label: 'Run', Icon: Activity, colourKey: 'run' },
   { id: 'ride', label: 'Ride', Icon: Bike, colourKey: 'bike' },
   { id: 'strength', label: 'Lift', Icon: Dumbbell, colourKey: 'strength' },
   { id: 'swim', label: 'Swim', Icon: Waves, colourKey: 'swim' },
@@ -397,7 +397,7 @@ export default function WelcomePage() {
           <StepLayout step={2} totalSteps={TOTAL} title="Your sports and gear" onBack={() => go(1)} onContinue={() => void finishSports()} canContinue={canLeaveSports} continueLabel="Next" saving={saving} blockedReason={blocked}>
             <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
               <div className="px-3 py-3">
-                <SectionHead Icon={Footprints} label="Sports you do" colour="rgba(255,255,255,0.7)" />
+                <SectionHead Icon={Activity} label="Sports you do" colour="rgba(255,255,255,0.7)" />
                 <div className="grid grid-cols-2 gap-2">{SPORTS.map(sportCard)}</div>
               </div>
 
