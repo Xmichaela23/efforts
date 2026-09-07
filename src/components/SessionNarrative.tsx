@@ -466,7 +466,6 @@ export default function SessionNarrative({
       {sd?.race_readiness && isRaceReadinessShape(sd.race_readiness) && (
         <RaceReadinessBlock rr={sd.race_readiness} />
       )}
-      {!hideNextUp && nextSession && <NextUp session={nextSession} />}
       {!hasNarrative && hasStructuredForRender && (
         <>
           {technicalInsightsForRender.length > 0 && (
@@ -495,6 +494,8 @@ export default function SessionNarrative({
           )}
         </>
       )}
+      {/* NEXT sits last (Michael, 2026-09-07: it was in the middle of the ride's details). */}
+      {!hideNextUp && nextSession && <NextUp session={nextSession} />}
     </div>
   );
 }
