@@ -25,7 +25,6 @@ import { enrichSamplesWithGAP } from '../_shared/gap.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 import {
   collapseCourseSegmentsToZones,
-  generateRaceDebrief,
   parseWorkoutWeatherDataBlob,
   resolveRaceDebriefWeather,
   type CourseStrategyZoneLine,
@@ -2880,12 +2879,9 @@ Deno.serve(async (req) => {
       .eq('id', workout_id)
       .maybeSingle();
     const prevWa = existingAnalysisRow?.workout_analysis as Record<string, unknown> | null | undefined;
-    const preservedRaceDebrief =
-      typeof prevWa?.race_debrief_text === 'string' && prevWa.race_debrief_text.trim()
-        ? prevWa.race_debrief_text.trim()
-        : null;
-
-    let raceDebriefNew: string | null = null;
+    // race_debrief_text: the model-written debrief paragraph is gone (no-AI work order, 2026-09-07). The
+    // column is written null on every analysis so a paragraph a model wrote earlier does not survive a
+    // recompute; the debrief screen shows the per-mile facts and the deterministic adherence digest.
     // Hoisted out of the inner try so the persist step below can snapshot it
     // into workout_analysis.course_strategy_zones (defense-in-depth read path).
     let courseStrategyZonesUsed: CourseStrategyZoneLine[] | null = null;
@@ -3031,48 +3027,15 @@ Deno.serve(async (req) => {
           deviceAvgTempC,
         });
 
-        if (splits.length >= 8 && elapsedSec > 120) {
-          // When the workout is a matched goal race, ground the debrief in the
-          // event name (e.g. "Ojai Valley Marathon") rather than the activity
-          // title (often "Morning Run") so the LLM and copy stay race-aware.
-          const debriefRaceName = goalRaceCompletionMatch.matched && goalRaceCompletionMatch.eventName
-            ? String(goalRaceCompletionMatch.eventName)
-            : String(wAny.name ?? 'Race');
-          // If goalRaceCompletion didn't find a projection, try training_prefs.race_result.projected_seconds directly.
-          let debriefProjectedSec = goalRaceCompletionMatch.fitnessProjectionSeconds ?? null;
-          if (debriefProjectedSec == null && goalRaceCompletionMatch.goalId) {
-            try {
-              const { data: gtp } = await supabase
-                .from('goals')
-                .select('training_prefs')
-                .eq('id', goalRaceCompletionMatch.goalId)
-                .maybeSingle();
-              const snap = Number((gtp as any)?.training_prefs?.race_result?.projected_seconds);
-              if (Number.isFinite(snap) && snap > 0) debriefProjectedSec = Math.round(snap);
-            } catch { /* non-fatal */ }
-          }
-
-          const debrief = await generateRaceDebrief({
-            workoutName: debriefRaceName,
-            elapsedSeconds: elapsedSec,
-            movingSeconds: movingSec,
-            goalSeconds: goalRaceCompletionMatch.goalTimeSeconds ?? null,
-            projectedSeconds: debriefProjectedSec,
-            avgHR: avgHr > 0 ? avgHr : 0,
-            maxHR: maxHr > 0 ? maxHr : 0,
-            intensityFactor: ifVal,
-            weather,
-            splits,
-            courseStrategyZones,
-          });
-          if (debrief) raceDebriefNew = debrief;
-        }
+        // elapsedSec / movingSec / ifVal / weather / splits above fed the deleted model debrief only;
+        // courseStrategyZonesUsed (set above) still reaches the persisted snapshot.
+        void elapsedSec; void movingSec; void weather;
       } catch (e) {
         console.warn('[analyze-running-workout] race debrief skipped:', e);
       }
     }
 
-    const race_debrief_text = raceDebriefNew ?? preservedRaceDebrief;
+    const race_debrief_text: string | null = null;
 
     // Variance gate (_varGate) is hoisted above generateAISummaryV1 so it can
     // gate the LLM input shape. The same values feed glance below.

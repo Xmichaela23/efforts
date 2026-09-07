@@ -74,35 +74,30 @@ export function fmtFinishClock(totalSec: number): string {
   return `${mi}:${String(s).padStart(2, '0')}`;
 }
 
-export type LlmDisplayGroup = {
+/** One pacing group as course-strategy-build produces it and course_segments stores it. */
+export type DisplayGroup = {
   display_group_id: number;
   segment_orders: number[];
   display_label: string;
   effort_zone: string;
   target_pace_slow_sec_per_mi: number;
   target_pace_fast_sec_per_mi: number;
-  target_hr_low: number;
-  target_hr_high: number;
+  /** Null when the athlete has neither configured zones nor a max heart rate. */
+  target_hr_low: number | null;
+  target_hr_high: number | null;
   coaching_cue: string;
 };
 
-export type ParsedLlm = { display_groups: LlmDisplayGroup[] };
-
-export function stripJsonFences(text: string): string {
-  let t = text.trim();
-  if (t.startsWith('```')) {
-    t = t.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
-  }
-  return t.trim();
-}
+export type ParsedStrategy = { display_groups: DisplayGroup[] };
 
 const EFFORT = new Set(['conservative', 'cruise', 'caution', 'push']);
 
-export function validateLlmResponse(
+/** Self-check on the built groups: full segment coverage, ordered bounds, lengths. */
+export function validateDisplayGroups(
   parsed: unknown,
   segmentCount: number,
   maxHr: number | null,
-): { ok: true; data: ParsedLlm } | { ok: false; error: string } {
+): { ok: true; data: ParsedStrategy } | { ok: false; error: string } {
   if (!parsed || typeof parsed !== 'object') return { ok: false, error: 'not an object' };
   const dg = (parsed as Record<string, unknown>).display_groups;
   if (!Array.isArray(dg) || dg.length === 0) return { ok: false, error: 'missing display_groups' };
@@ -128,17 +123,19 @@ export function validateLlmResponse(
     if (!Number.isFinite(ps) || !Number.isFinite(pf) || ps < pf) {
       return { ok: false, error: 'pace bounds invalid (slow must be >= fast sec/mi)' };
     }
-    const hrl = Number(o.target_hr_low);
-    const hrh = Number(o.target_hr_high);
-    if (!Number.isFinite(hrl) || !Number.isFinite(hrh) || hrl > hrh) return { ok: false, error: 'HR bounds invalid' };
-    if (maxHr != null && hrh > maxHr + 5) return { ok: false, error: 'HR high above max_hr' };
+    if (o.target_hr_low != null || o.target_hr_high != null) {
+      const hrl = Number(o.target_hr_low);
+      const hrh = Number(o.target_hr_high);
+      if (!Number.isFinite(hrl) || !Number.isFinite(hrh) || hrl > hrh) return { ok: false, error: 'HR bounds invalid' };
+      if (maxHr != null && hrh > maxHr + 5) return { ok: false, error: 'HR high above max_hr' };
+    }
     const cue = String(o.coaching_cue || '');
     if (cue.length > 80) return { ok: false, error: 'cue too long' };
     const lab = String(o.display_label || '');
     if (lab.length > 40) return { ok: false, error: 'label too long' };
   }
   if (seen.size !== segmentCount) return { ok: false, error: 'segment coverage mismatch' };
-  return { ok: true, data: parsed as ParsedLlm };
+  return { ok: true, data: parsed as ParsedStrategy };
 }
 
 function dominantTerrain(geoms: GeometrySegment[], orders: number[]): 'climb' | 'descent' | 'flat' | 'rolling' {
@@ -168,7 +165,7 @@ function templateLabel(startMi: number, endMi: number, terrain: string): string 
 
 export function materializeSegmentRows(
   geometry: GeometrySegment[],
-  groups: LlmDisplayGroup[],
+  groups: DisplayGroup[],
 ): Record<string, unknown>[] {
   return geometry.map((geo) => {
     const g = groups.find((gr) => gr.segment_orders.includes(geo.segment_order));
@@ -196,129 +193,11 @@ export function materializeSegmentRows(
       effort_zone: g.effort_zone,
       target_pace_slow_sec_per_mi: g.target_pace_slow_sec_per_mi,
       target_pace_fast_sec_per_mi: g.target_pace_fast_sec_per_mi,
-      target_hr_low: Math.round(g.target_hr_low),
-      target_hr_high: Math.round(g.target_hr_high),
+      target_hr_low: g.target_hr_low == null ? null : Math.round(g.target_hr_low),
+      target_hr_high: g.target_hr_high == null ? null : Math.round(g.target_hr_high),
       coaching_cue: isFirst ? String(g.coaching_cue || '').slice(0, 80) : null,
     };
   });
-}
-
-export function geometryToPromptSegments(geoms: GeometrySegment[]): Record<string, unknown>[] {
-  return geoms.map((g) => ({
-    segment_order: g.segment_order,
-    start_mi: Math.round((g.start_distance_m / MI_M) * 100) / 100,
-    end_mi: Math.round((g.end_distance_m / MI_M) * 100) / 100,
-    elevation_change_ft: Math.round(g.elevation_change_m * FT_PER_M),
-    avg_grade_pct: Math.round(g.avg_grade_pct * 10) / 10,
-    terrain_type: g.terrain_type,
-  }));
-}
-
-/**
- * LLM cues sometimes say "flat" for a whole group while GPX-derived segments include a bump.
- * Nudge copy when geometry shows meaningful rise (still ≤80 chars for validation).
- */
-function cueImpliesFlatTerrain(cue: string): boolean {
-  const c = cue.trim();
-  if (!c) return false;
-  if (
-    /\bflat (terrain|finish|stretch|miles|section|ground|kilometers?|km)\b|\bfinal\s+flat\b|\bon (the )?flat\b|\bonly flat\b|\bthe flat\b/i.test(c)
-  ) {
-    return true;
-  }
-  return /\bflat\b/i.test(c);
-}
-
-export function alignCoachingCuesWithGeometry(groups: LlmDisplayGroup[], geometry: GeometrySegment[]): void {
-  for (const dg of groups) {
-    const subs = geometry.filter((g) => dg.segment_orders.includes(g.segment_order));
-    if (subs.length === 0) continue;
-    let cue = String(dg.coaching_cue || '').trim();
-    if (!cue || !cueImpliesFlatTerrain(cue)) continue;
-    const climbLabeled = subs.some((s) => s.terrain_type === 'climb');
-    const chunkRise = subs.some((s) => s.elevation_change_m >= 3);
-    const totalRiseM = subs.reduce((a, s) => a + Math.max(0, s.elevation_change_m), 0);
-    if (!climbLabeled && !chunkRise && totalRiseM < 6) continue;
-    const suffix = ' Small rise—stay smooth.';
-    if (cue.length + suffix.length <= 80) {
-      dg.coaching_cue = (cue + suffix).slice(0, 80);
-      continue;
-    }
-    dg.coaching_cue = cue
-      .replace(/\bfinal flat stretch\b/gi, 'final stretch')
-      .replace(/\bflat terrain\b/gi, 'rolling terrain')
-      .replace(/\bflat finish\b/gi, 'strong finish')
-      .replace(/\bflat stretch\b/gi, 'late miles')
-      .replace(/\bflat miles\b/gi, 'these miles')
-      .replace(/\bflat section\b/gi, 'this section')
-      .replace(/\bflat ground\b/gi, 'rolling ground')
-      .replace(/\bon flat\b/gi, 'over small rises')
-      .replace(/\bthe flat\b/gi, 'this part')
-      .replace(/\bfinal flat\b/gi, 'late miles')
-      .slice(0, 80);
-  }
-}
-
-/** sec/mi added to both pace bounds per 1% average grade (net rise / run × 100). */
-const CLIMB_PACE_NUDGE_SEC_PER_GRADE_PT = 2;
-const CLIMB_PACE_GRADE_CAP_PCT = 5;
-const CLIMB_PACE_FLOOR_TOLERANCE_SEC = 3;
-const CLIMB_PACE_MIN_RUN_M = 50;
-
-function median(xs: number[]): number | null {
-  if (xs.length === 0) return null;
-  const s = [...xs].sort((a, b) => a - b);
-  const i = Math.floor(s.length / 2);
-  return s.length % 2 ? s[i]! : (s[i - 1]! + s[i]!) / 2;
-}
-
-function groupGeometrySubset(geometry: GeometrySegment[], orders: number[]): GeometrySegment[] {
-  return geometry.filter((g) => orders.includes(g.segment_order));
-}
-
-function climbGroupNetRunAndGrade(subs: GeometrySegment[]): { netElevM: number; runM: number; avgGradePct: number } {
-  let runM = 0;
-  let netElevM = 0;
-  for (const s of subs) {
-    runM += Math.max(0, s.end_distance_m - s.start_distance_m);
-    netElevM += s.elevation_change_m;
-  }
-  const avgGradePct = runM >= CLIMB_PACE_MIN_RUN_M ? (netElevM / runM) * 100 : 0;
-  return { netElevM, runM, avgGradePct };
-}
-
-/**
- * Post-LLM deterministic floor: net-climbing groups get both pace bounds increased (slower)
- * by N sec/mi per % grade (capped), unless the band is already at least that much slower
- * than the median mid-pace of flat/net-down groups (goal implied average if none).
- */
-export function applyClimbPaceFloorToDisplayGroups(
-  groups: LlmDisplayGroup[],
-  geometry: GeometrySegment[],
-  impliedAvgSecPerMi: number,
-): void {
-  const entries = groups.map((g) => {
-    const subs = groupGeometrySubset(geometry, g.segment_orders);
-    const { netElevM, runM, avgGradePct } = climbGroupNetRunAndGrade(subs);
-    const slow = g.target_pace_slow_sec_per_mi;
-    const fast = g.target_pace_fast_sec_per_mi;
-    const mid = (slow + fast) / 2;
-    return { g, netElevM, runM, avgGradePct, mid, slow, fast };
-  });
-
-  const flatPeerMids = entries.filter((e) => e.netElevM <= 0).map((e) => e.mid);
-  const peerMid = median(flatPeerMids) ?? impliedAvgSecPerMi;
-
-  for (const e of entries) {
-    if (e.netElevM <= 0) continue;
-    if (e.runM < CLIMB_PACE_MIN_RUN_M) continue;
-    const gradeEff = Math.min(Math.max(0, e.avgGradePct), CLIMB_PACE_GRADE_CAP_PCT);
-    const nudge = Math.round(CLIMB_PACE_NUDGE_SEC_PER_GRADE_PT * gradeEff);
-    if (nudge <= 0) continue;
-    if (e.mid >= peerMid + nudge - CLIMB_PACE_FLOOR_TOLERANCE_SEC) continue;
-    e.g.target_pace_slow_sec_per_mi = e.slow + nudge;
-    e.g.target_pace_fast_sec_per_mi = e.fast + nudge;
-  }
 }
 
 export function impliedAvgPaceSecPerMi(goalTimeSec: number, distanceMi: number): number {

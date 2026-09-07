@@ -75,6 +75,9 @@ export default function Privacy({ onBack }: PrivacyProps) {
                   <li className="text-white">• To allow you to track and manage your training</li>
                   <li className="text-white">• We do not sell or share your data with third parties</li>
                 </ul>
+                <p className="text-white">
+                  Efforts does not use AI. Every number and every sentence in the app is computed from your data by fixed rules.
+                </p>
               </div>
 
               <div className="space-y-3">

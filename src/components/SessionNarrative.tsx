@@ -147,14 +147,14 @@ export function NextUp({ session }: { session: NextSession }) {
   );
 }
 
-function isLlmRaceReadinessShape(
+function isRaceReadinessShape(
   rr: NonNullable<SessionNarrativeProps['sessionDetail']>['race_readiness'],
 ): rr is NonNullable<SessionNarrativeProps['sessionDetail']>['race_readiness'] {
   return !!rr && typeof (rr as { verdict?: string }).verdict === 'string';
 }
 
 function RaceReadinessBlock({ rr }: { rr: NonNullable<SessionNarrativeProps['sessionDetail']>['race_readiness'] }) {
-  if (!isLlmRaceReadinessShape(rr) || !String(rr.headline || '').trim()) return null;
+  if (!isRaceReadinessShape(rr) || !String(rr.headline || '').trim()) return null;
   return (
     <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.06] px-3 py-3 space-y-3">
       <div>
@@ -463,7 +463,7 @@ export default function SessionNarrative({
           })}
         </div>
       )}
-      {sd?.race_readiness && isLlmRaceReadinessShape(sd.race_readiness) && (
+      {sd?.race_readiness && isRaceReadinessShape(sd.race_readiness) && (
         <RaceReadinessBlock rr={sd.race_readiness} />
       )}
       {!hideNextUp && nextSession && <NextUp session={nextSession} />}

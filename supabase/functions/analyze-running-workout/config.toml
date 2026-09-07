@@ -3,6 +3,3 @@ command = ""
 
 [deploy]
 import_map = ""
-
-[env]
-OPENAI_API_KEY = ""

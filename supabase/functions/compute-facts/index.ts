@@ -1014,7 +1014,7 @@ function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null, threshold
    * `state-trend/run.ts` reads this word to compare long runs to other long runs.
    *
    * ⛔ NAME-DERIVED, NEVER DURATION-DERIVED, and the app already had this pattern: `isLongRunLike`
-   * (`session-detail/race-readiness-llm.ts`) reads the planned name for the same fact. A minutes
+   * (`session-detail/race-readiness.ts`) reads the planned name for the same fact. A minutes
    * threshold is precisely what item 2 deleted; re-adding one as a grouping key smuggles it back.
    * ⚠️ SO IT IS FORWARD-ONLY. Rows written before today say `easy` on long runs and will group as
    * easy until re-computed. That is a thinner long-run pool at first, never a wrong one.

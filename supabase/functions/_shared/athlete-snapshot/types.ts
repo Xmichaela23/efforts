@@ -2,7 +2,7 @@
 // ATHLETE SNAPSHOT — The single source of truth
 // =============================================================================
 // Every screen reads from this. Nothing computes its own view of reality.
-// Sections 1-4 are deterministic. Section 5 (coaching) is the only LLM layer.
+// Every section is deterministic. The model-written section 5 (coaching) was removed 2026-09-07.
 // =============================================================================
 
 // ---------------------------------------------------------------------------
@@ -211,18 +211,6 @@ export type BodyResponse = {
 };
 
 // ---------------------------------------------------------------------------
-// 5. Coaching (LLM writes this — the only non-deterministic section)
-// ---------------------------------------------------------------------------
-
-export type Coaching = {
-  headline: string;                  // "High load — protect recovery"
-  narrative: string;                 // 2-3 sentences, specific, no jargon
-  next_session_guidance: string | null;
-  // e.g. "Tomorrow's intervals are your key session. Given today's elevated load,
-  //        extend your warmup and use the first two reps to settle in."
-};
-
-// ---------------------------------------------------------------------------
 // The Snapshot
 // ---------------------------------------------------------------------------
 
@@ -238,7 +226,6 @@ export type AthleteSnapshot = {
   plan_position: PlanPosition;
   daily_ledger: LedgerDay[];
   body_response: BodyResponse;
-  coaching: Coaching;
 
   // Upcoming sessions with full prescription detail
   upcoming: Array<{

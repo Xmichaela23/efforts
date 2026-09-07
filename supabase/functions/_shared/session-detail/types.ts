@@ -50,7 +50,7 @@ export type StrengthMatchQuality =
   | 'followed' | 'dialed_back' | 'pushed_hard' | 'modified' | 'skipped' | 'unplanned';
 
 /** LLM output for Performance race-readiness block (strict JSON contract). */
-export type SessionRaceReadinessLlmV1 = {
+export type SessionRaceReadinessV1 = {
   headline: string;
   verdict: string;
   tactical_instruction: string;
@@ -586,7 +586,7 @@ export type SessionDetailV1 = {
    * Populated only when gated (run, plan id + race_date, window, long-run-like, ≥10 mi or ≥90 min).
    * Null if LLM unavailable or call fails.
    */
-  race_readiness?: SessionRaceReadinessLlmV1 | null;
+  race_readiness?: SessionRaceReadinessV1 | null;
 
   /** Plan-aware load readiness at workout date (null if no session_load / unavailable). */
   readiness?: SessionDetailReadinessV1 | null;

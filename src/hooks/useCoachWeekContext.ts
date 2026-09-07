@@ -616,7 +616,7 @@ export function useCoachWeekContext(date?: string) {
           user_id: userId,
           date: focusDate,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          // `skip_cache: true` bypasses `coach_cache` and forces a full recompute (incl. Anthropic narrative). Use only for explicit user refresh. Automatic mounts use `false` so the edge function can return cached JSON without LLM.
+          // `skip_cache: true` bypasses `coach_cache` and forces a full recompute. Use only for explicit user refresh. Automatic mounts use `false` so the edge function can return cached JSON without LLM.
           skip_cache: force,
         },
       });

@@ -19,7 +19,7 @@ import {
   fetchBlockIdentityForWorkout,
   type BlockIdentity,
 } from '../_shared/plan-context.ts';
-import { trySessionRaceReadinessLlm } from '../_shared/session-detail/race-readiness-llm.ts';
+import { buildSessionRaceReadiness } from '../_shared/session-detail/race-readiness.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
 // ⛔ THE ONE completed-set/exercise hydration shape (2026-08-11). Both normalizers below used to
 // rebuild each set by hand — `{reps, weight, rir, completed, prefilled}` — dropping `resistance_level`
@@ -42,7 +42,6 @@ import {
 } from '../_shared/strength/all-out-set.ts';
 import { buildReadiness } from '../_shared/readiness.ts';
 import type { ReadinessSnapshotV1 } from '../_shared/readiness-types.ts';
-import { generateRaceNarrative } from '../_shared/race-narrative.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
 import { buildForwardContext } from '../_shared/session-detail/forward-context.ts';
 import { FORWARD_CONTEXT_COPY_VERSION } from '../_shared/session-detail/types.ts';
@@ -60,7 +59,7 @@ type DetailOptions = {
   version?: string; // response schema version; default v1
 };
 
-/** workout = map/readouts only; session_detail = Performance contract + LLM; full = both (omit scope for backward compat). */
+/** workout = map/readouts only; session_detail = Performance contract; full = both (omit scope for backward compat). */
 type WorkoutDetailScope = 'workout' | 'session_detail' | 'full';
 
 const SNAPSHOT_LATENCY_WARN_MS = 200;
@@ -108,7 +107,7 @@ function msFromTimestampField(v: unknown): number | null {
 }
 
 /**
- * Persisted session_detail_v1 is stale → run full snapshot + LLM pipeline.
+ * Persisted session_detail_v1 is stale → run the full snapshot pipeline.
  * `session_detail_updated_at` is set by merge_session_detail_v1_into_workout_analysis (JSONB on workouts).
  */
 function isSessionDetailStale(workoutRow: { updated_at?: string | null; planned_id?: string | null }, analysis: Record<string, unknown>): boolean {
@@ -326,14 +325,14 @@ function buildDetailCoreForSession(row: any): { detail: any; processingComplete:
   return { detail, processingComplete };
 }
 
-/** Keep session_detail under edge time limits: omit race_readiness if LLM + DB gate runs long. */
-const RACE_READINESS_BUDGET_MS = 42_000;
+/** Keep session_detail under edge time limits: omit race_readiness if its DB gate (longest prior run) runs long. */
+const RACE_READINESS_BUDGET_MS = 8_000;
 
 function raceReadinessWithBudget<T>(p: Promise<T | null>): Promise<T | null> {
   return new Promise((resolve) => {
     const t = setTimeout(() => {
       console.warn(
-        `[workout-detail] race_readiness_llm exceeded ${RACE_READINESS_BUDGET_MS}ms — omitting block`,
+        `[workout-detail] race_readiness exceeded ${RACE_READINESS_BUDGET_MS}ms — omitting block`,
       );
       resolve(null);
     }, RACE_READINESS_BUDGET_MS);
@@ -342,7 +341,7 @@ function raceReadinessWithBudget<T>(p: Promise<T | null>): Promise<T | null> {
       resolve(v);
     }).catch((e) => {
       clearTimeout(t);
-      console.warn('[workout-detail] race_readiness_llm rejected:', e instanceof Error ? e.message : e);
+      console.warn('[workout-detail] race_readiness rejected:', e instanceof Error ? e.message : e);
       resolve(null);
     });
   });
@@ -1135,8 +1134,10 @@ async function runSessionDetailPipelineAndPersist(
 
     if (sessionDetailV1 && planCtxForSession) {
       try {
-        const rrLlm = await raceReadinessWithBudget(
-          trySessionRaceReadinessLlm({
+        // Deterministic race-readiness block (fixed sentences off the session's facts) for the block-peak
+        // long run on a race plan. No model: the sentences are templates in race-readiness.ts.
+        const rr = await raceReadinessWithBudget(
+          buildSessionRaceReadiness({
             sessionDetail: sessionDetailV1,
             workoutAnalysis: wa,
             planContext: planCtxForSession,
@@ -1145,125 +1146,19 @@ async function runSessionDetailPipelineAndPersist(
             userId,
           }),
         );
-        if (rrLlm) sessionDetailV1.race_readiness = rrLlm;
+        if (rr) sessionDetailV1.race_readiness = rr;
       } catch (rrErr: unknown) {
         console.warn(
-          '[race_readiness_llm] skipped:',
+          '[race_readiness] skipped:',
           rrErr instanceof Error ? rrErr.message : rrErr,
         );
       }
     }
 
-    // Goal race: generate LLM debrief narrative from actual per-mile data.
-    // SPORT GUARD (2026-05-14): this block synthesizes run-style mile splits +
-    // pace-per-mile from the workout's distance series and was gated ONLY on
-    // is_goal_race — never on sport. A cycling goal race (e.g. a 70.3 bike leg,
-    // is_goal_race=true via cyclingGoalRaceMatch) fell through to the series
-    // fallback at the next block and rendered "Mile 9 at 2:51/mi" on a ride.
-    // mile-by-mile pace is a running construct; cyclists get power/NP context
-    // elsewhere. Restrict to run only. See docs/MAINTENANCE-DEBT.md
-    // "Cross-sport analysis-key bleed".
-    const isRunSession = ['run', 'running'].includes(String((row as any)?.type || '').toLowerCase());
-    if (sessionDetailV1) sessionDetailV1._rn_gate = `is_goal_race=${wa?.is_goal_race} type=${(row as any)?.type} isRun=${isRunSession}`;
-    if (sessionDetailV1 && wa?.is_goal_race === true && isRunSession) {
-      try {
-        const raceData = wa?.race ?? {};
-        // Primary source: pre-computed mile splits from analyze-running-workout
-        let mileSplits: any[] = wa?.detailed_analysis?.mile_by_mile_terrain?.splits ?? [];
-
-        // Fallback: build mile splits from computed.analysis.series (columnar arrays written by
-        // compute-workout-analysis). This fires when analyze-running-workout couldn't read sensor
-        // data (e.g. after a recompute) and left mile_by_mile_terrain empty.
-        if (mileSplits.length < 10) {
-          const computedRaw = (row as any)?.computed;
-          const computed = typeof computedRaw === 'string' ? (() => { try { return JSON.parse(computedRaw); } catch { return null; } })() : computedRaw;
-          const series = computed?.analysis?.series;
-          if (series && Array.isArray(series.distance_m) && series.distance_m.length >= 20) {
-            const distM: number[] = series.distance_m;
-            const timeS: number[] = series.time_s ?? [];
-            const hrBpm: (number | null)[] = series.hr_bpm ?? [];
-            const elevM: (number | null)[] = series.elevation_m ?? [];
-            const n = distM.length;
-            const totalMi = (distM[n - 1] ?? 0) / 1609.34;
-            const miles = Math.floor(totalMi);
-
-            const interp = (arr: number[], targetD: number): number => {
-              for (let i = 1; i < n; i++) {
-                if (distM[i] >= targetD) {
-                  const d0 = distM[i - 1], d1 = distM[i];
-                  const f = d1 === d0 ? 0 : (targetD - d0) / (d1 - d0);
-                  return arr[i - 1] + f * (arr[i] - arr[i - 1]);
-                }
-              }
-              return arr[n - 1];
-            };
-
-            const fallbackSplits: any[] = [];
-            for (let m = 1; m <= miles; m++) {
-              const dStart = (m - 1) * 1609.34, dEnd = m * 1609.34;
-              if (timeS.length < n) continue;
-              const t0m = interp(timeS as number[], dStart);
-              const t1m = interp(timeS as number[], dEnd);
-              if (!(t1m > t0m)) continue;
-              const pace_s_per_mi = t1m - t0m;
-
-              let hrSum = 0, hrCnt = 0;
-              let firstElev: number | null = null, lastElev: number | null = null;
-              for (let i = 0; i < n; i++) {
-                if (distM[i] < dStart || distM[i] > dEnd) continue;
-                const hr = hrBpm[i];
-                if (typeof hr === 'number' && hr > 40 && hr < 250) { hrSum += hr; hrCnt++; }
-                const el = elevM[i];
-                if (typeof el === 'number' && Number.isFinite(el)) {
-                  if (firstElev === null) firstElev = el;
-                  lastElev = el;
-                }
-              }
-              const avg_hr_bpm = hrCnt > 0 ? Math.round(hrSum / hrCnt) : null;
-              const elevGain = firstElev != null && lastElev != null ? Math.max(0, lastElev - firstElev) : null;
-              const gradePercent = firstElev != null && lastElev != null ? ((lastElev - firstElev) / 1609.34) * 100 : null;
-              fallbackSplits.push({ mile: m, pace_s_per_mi, avg_hr_bpm, elevation_gain_m: elevGain, grade_percent: gradePercent, start_elevation_m: firstElev, end_elevation_m: lastElev });
-            }
-            if (fallbackSplits.length >= 10) {
-              mileSplits = fallbackSplits;
-              console.log('[race-narrative] using computed.analysis.series fallback splits:', fallbackSplits.length);
-            }
-          }
-        }
-
-        const wd = (() => {
-          const raw = (row as any)?.weather_data;
-          if (!raw) return null;
-          if (typeof raw === 'string') { try { return JSON.parse(raw); } catch { return null; } }
-          return raw;
-        })();
-
-        const actualSec = Number(raceData?.actual_seconds);
-        if (sessionDetailV1) sessionDetailV1._rn_data = `splits=${mileSplits?.length} actualSec=${actualSec} isFinite=${Number.isFinite(actualSec)} gt3600=${actualSec > 3600}`;
-        if (Array.isArray(mileSplits) && mileSplits.length >= 10 && Number.isFinite(actualSec) && actualSec > 3600) {
-          const raceNarrative = await generateRaceNarrative({
-            actualSeconds: actualSec,
-            goalTimeSeconds: raceData?.goal_time_seconds != null ? Number(raceData.goal_time_seconds) : null,
-            fitnessProjectionSeconds: raceData?.fitness_projection_seconds != null ? Number(raceData.fitness_projection_seconds) : null,
-            eventName: raceData?.event_name ?? null,
-            splits: mileSplits,
-            weatherStartF: wd?.temperature_start_f ?? wd?.temperature ?? null,
-            weatherEndF: wd?.temperature_end_f ?? null,
-            weatherPeakF: wd?.temperature_peak_f ?? null,
-            weatherHumidity: wd?.humidity ?? null,
-            weatherWindMph: wd?.windSpeed ?? wd?.wind_speed ?? null,
-          });
-          if (raceNarrative) {
-            sessionDetailV1.narrative_text = raceNarrative;
-            console.log('[race-narrative] narrative set, length:', sessionDetailV1.narrative_text.length);
-          }
-        } else {
-          console.log('[race-narrative] skipped — insufficient data (splits:', mileSplits?.length, 'actualSec:', actualSec, ')');
-        }
-      } catch (rnErr: unknown) {
-        console.warn('[race-narrative] skipped:', rnErr instanceof Error ? rnErr.message : rnErr);
-      }
-    }
+    // The goal-race narrative (a model writing prose off the mile splits) was deleted with the no-AI
+    // work order (2026-09-07). The debrief screen keeps the per-mile facts and the deterministic marathon
+    // adherence digest from analyze-running-workout; `narrative_text` stays whatever the deterministic
+    // session builder set.
 
     // Forward context: "What this means for future races".
     // Wires Arc into the post-race debrief so it can speak to what comes next,

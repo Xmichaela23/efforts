@@ -67,7 +67,6 @@ const today = new Date().toISOString().slice(0, 10);
 const importWorkout = () => ({ name: 'B1 matrix import', type: 'run', date: today, duration: 1800, distance: 5000, moving_time: 1800, elapsed_time: 1800, timestamp: new Date().toISOString(), metrics: { avg_heart_rate: 140, max_heart_rate: 160 } });
 // body per function; `t` = the account whose entity ids go in the body (B for a/c/d, A for b)
 const BODIES = {
-  'arc-setup-chat': () => ({ messages: [{ role: 'user', content: 'Quick check, one line back please.' }], fresh_setup: true }),
   'backfill-facts': () => ({ limit: 1 }),
   'backfill-routes': () => ({ dry_run: true }),
   'compute-snapshot': () => ({}),

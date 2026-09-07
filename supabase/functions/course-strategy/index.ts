@@ -1,12 +1,13 @@
 /**
- * course-strategy — rebuild geometry, call LLM, persist strategy on course_segments.
+ * course-strategy — rebuild geometry, build the pacing plan by arithmetic, persist it on course_segments.
  * POST JSON: { course_id: string }
- * Paces to current-fitness projection when available (client or server-computed race_readiness);
- * plan/goal time is context only. Falls back to plan goal if no projection can be computed.
+ *
+ * Deterministic since 2026-09-07 (no-AI work order): the model that used to write the display groups is
+ * gone; `_shared/course-strategy-build.ts` groups the geometry and prices each group off the anchor finish
+ * time and the Minetti grade cost. Paces to the current-fitness projection when available; plan/goal time
+ * is the fallback anchor.
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
-import { callLLM } from '../_shared/llm.ts';
-import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import {
   normalizeElevationProfile,
   smoothElevation,
@@ -15,20 +16,13 @@ import {
 } from '../_shared/course-segmentation.ts';
 import {
   hashAthleteSnapshot,
-  stripJsonFences,
-  validateLlmResponse,
+  validateDisplayGroups,
   materializeSegmentRows,
-  geometryToPromptSegments,
-  alignCoachingCuesWithGeometry,
-  applyClimbPaceFloorToDisplayGroups,
   parsePaceToSecPerMi,
-  fmtPaceClock,
-  fmtFinishClock,
-  impliedAvgPaceSecPerMi,
   goalDistanceMi,
   type SnapshotForHash,
-  type LlmDisplayGroup,
 } from '../_shared/course-strategy-helpers.ts';
+import { buildCourseStrategyGroups, type StrategyLeg } from '../_shared/course-strategy-build.ts';
 import { resolveGoalTargetTimeSeconds } from '../_shared/resolve-goal-target-time.ts';
 import {
   resolvePaceAnchorForCourse,
@@ -50,12 +44,6 @@ async function getUser(supabase: ReturnType<typeof createClient>, authHeader: st
   const { data: { user }, error } = await supabase.auth.getUser(jwt);
   if (error || !user) return { user: null, err: 'Invalid authentication' };
   return { user, err: null };
-}
-
-async function promptHash(s: string): Promise<string> {
-  const buf = new TextEncoder().encode(s);
-  const digest = await crypto.subtle.digest('SHA-256', buf);
-  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
 }
 
 /** First lat,lng from Google-encoded polyline (precision 5). */
@@ -81,70 +69,6 @@ function decodePolylineFirstPoint(encoded: string): [number, number] | null {
     else lng += delta;
   }
   return [lat / factor, lng / factor];
-}
-
-function extractDrift(wa: Record<string, unknown> | null): number | null {
-  if (!wa) return null;
-  const ga = wa.granular_analysis as Record<string, unknown> | undefined;
-  const hra = ga?.heart_rate_analysis as Record<string, unknown> | undefined;
-  const d1 = hra?.hr_drift_bpm;
-  const hs = wa.heart_rate_summary as Record<string, unknown> | undefined;
-  const d2 = hs?.drift_bpm;
-  const v = Number(d1 ?? d2);
-  return Number.isFinite(v) ? v : null;
-}
-
-type StrategyLeg = 'swim' | 'bike' | 'run' | 'full';
-
-function buildPrompt(params: {
-  roleIntro: string;
-  segments: Record<string, unknown>[];
-  easy: string;
-  threshold: string;
-  zones: string;
-  maxHr: string;
-  longRun: string;
-  goalTime: string;
-  impliedAvg: string;
-  pacingContextLines: string;
-  legExtraInstructions: string;
-}): string {
-  return `${params.roleIntro}
-
-Course segments (geometry):
-${JSON.stringify(params.segments)}
-
-Athlete profile:
-- Easy pace: ${params.easy}/mi
-- Threshold pace: ${params.threshold}/mi
-- HR zones: ${params.zones}
-- Max HR: ${params.maxHr}
-- Recent long run: ${params.longRun}
-- Race pacing target (anchor all pace bands to this finish time and implied average pace): ${params.goalTime} (${params.impliedAvg}/mi average)
-${params.pacingContextLines}
-${params.legExtraInstructions}
-
-Instructions:
-1. Group adjacent segments of similar terrain into display groups. For a full marathon, target about 7 groups (roughly 6–9); scale down for shorter races. Do not merge distinct terrain episodes—if geometry separates a steep descent from different rolling flats, keep separate display groups rather than one mega-segment.
-2. For each display group, assign:
-   - display_group_id (1-indexed)
-   - segment_orders: array of segment_order values in this group
-   - display_label: max 40 chars
-   - effort_zone: "conservative" | "cruise" | "caution" | "push"
-   - target_pace_slow_sec_per_mi: slower bound (higher number)
-   - target_pace_fast_sec_per_mi: faster bound (lower number)
-   - target_hr_low, target_hr_high
-   - coaching_cue: max 80 chars, imperative, reference terrain
-
-3. Ground every coaching_cue in the segment list: if ANY segment in that display group has terrain_type "climb" or clearly positive elevation_change_ft, you must not describe the whole group as only "flat" or "flat terrain"—mention the rise (even briefly, e.g. "short climb to the line").
-4. Net downhill groups can still have a small finishing bump; check the last segments in the group before calling the finish "flat".
-5. Pacing vs terrain: if a display group includes any climb terrain or meaningful net elevation gain in the segment list, set pace bounds at least as conservative as an equivalent flat section (usually a few sec/mi slower on the slow bound, not faster splits "because push")—runners slow on uphills; HR may sit at the upper end of the band. Descent-heavy groups may allow slightly quicker bounds where appropriate.
-6. Effort zones: long gentle net-downhill sections are often "cruise" (easy rhythm). Use "caution" for steep descents, technical drops, and for late-race segments (mile ~18+) that are flat or rolling after many miles of sustained descent—leg fatigue dominates even when grade looks easy, so prefer "caution" over "cruise" for those late flats/rollers unless segments clearly show easy fresh terrain.
-
-Rules: target_pace_slow_sec_per_mi >= target_pace_fast_sec_per_mi. HR realistic vs max. Across all display groups, distance-weighted pace must imply a finish time within ~3 minutes of the race pacing target (same as ${params.goalTime}); do not pace implicitly to a faster aspirational plan time if a slower fitness-based target was given in context.
-
-Return ONLY valid JSON, no markdown:
-{"display_groups":[{"display_group_id":1,"segment_orders":[1,2],"display_label":"Mi 0–2 · start","effort_zone":"conservative","target_pace_slow_sec_per_mi":680,"target_pace_fast_sec_per_mi":640,"target_hr_low":130,"target_hr_high":145,"coaching_cue":"Start easy on early climbs"}]}`;
 }
 
 Deno.serve(async (req) => {
@@ -340,40 +264,21 @@ Deno.serve(async (req) => {
 
   const goalTimeSec = anchor.seconds;
 
-  let pacingContextLines = '';
-  if (anchor.kind === 'completed_actual') {
-    pacingContextLines =
-      `- Pace anchor: official race result ${fmtFinishClock(anchor.seconds)} — this is a post-race retrospective strategy. Zones reflect actual race-day fitness.\n` +
-      (planGoalSec != null ? `- Athlete's stated goal was ${fmtFinishClock(planGoalSec)} (for context only).\n` : '');
-  } else if (
-    (anchor.kind === 'coach_readiness' && planGoalSec != null && planGoalSec !== anchor.seconds) ||
-    (anchor.kind === 'fitness_floors_stated_goal' && planGoalSec != null)
-  ) {
-    pacingContextLines =
-      `- Pace anchor (current-fitness finish projection): ${fmtFinishClock(anchor.seconds)} — segment bands must aggregate to this finish time, not the plan time.\n` +
-      `- Stated plan / goal target (aspirational): ${fmtFinishClock(planGoalSec)}.\n`;
-  } else if (anchor.kind === 'arc_projection') {
-    pacingContextLines =
-      `- Pace anchor: Arc fitness projection ${fmtFinishClock(anchor.seconds)} (VDOT from learned threshold pace — authoritative).\n` +
-      (planGoalSec != null && planGoalSec !== anchor.seconds ? `- Athlete goal target: ${fmtFinishClock(planGoalSec)} (aspirational, for context only).\n` : '');
-  } else if (anchor.kind === 'coach_readiness') {
-    pacingContextLines = `- Pace anchor: current-fitness finish projection ${fmtFinishClock(anchor.seconds)}.\n`;
-  } else if (anchor.kind === 'plan_target') {
-    pacingContextLines =
-      `- Pace anchor: stated plan / goal race target ${fmtFinishClock(anchor.seconds)} (no coach fitness projection for this goal in cache).\n`;
-  } else {
-    pacingContextLines =
-      `- Pace anchor: baseline fitness projection ${fmtFinishClock(anchor.seconds)} (no coach cache match and no plan target in goal/plan config).\n`;
-  }
-
   const courseLeg: StrategyLeg = (() => {
     const l = String((course as { leg?: string }).leg || 'full').toLowerCase();
     if (l === 'swim' || l === 'bike' || l === 'run' || l === 'full') return l;
     return 'full';
   })();
   const proj = (goal as Record<string, unknown>).projection as Record<string, unknown> | null;
+  // Leg splits apply to TRIATHLON goals only. A single-sport race course is inferred as leg 'run' or
+  // 'bike' by course-upload, and the old code then priced it at 29% / 50% of the finish — a 4:27
+  // marathon came out as a 1:17 "run leg" (found on the 2026-09-07 throwaway run; the model used to
+  // paper over it).
+  const isTriGoal = /tri/.test(String(goal.sport || '').toLowerCase());
   let legTargetSec = goalTimeSec;
-  if (courseLeg === 'swim' && proj && typeof proj.swim_min === 'number') {
+  if (!isTriGoal) {
+    // single-sport race: the whole finish is this leg
+  } else if (courseLeg === 'swim' && proj && typeof proj.swim_min === 'number') {
     legTargetSec = Math.round(Number(proj.swim_min) * 60);
   } else if (courseLeg === 'bike' && proj && typeof proj.bike_min === 'number') {
     legTargetSec = Math.round(Number(proj.bike_min) * 60);
@@ -385,26 +290,6 @@ Deno.serve(async (req) => {
     legTargetSec = Math.max(1200, Math.round(goalTimeSec * 0.5));
   } else if (courseLeg === 'run') {
     legTargetSec = Math.max(900, Math.round(goalTimeSec * 0.29));
-  }
-  if (courseLeg !== 'full') {
-    pacingContextLines +=
-      `- Leg strategy: **${courseLeg}** — split time ~${fmtFinishClock(legTargetSec)} from projection (full-race clock ${fmtFinishClock(goalTimeSec)}).\n`;
-  }
-  if (course.goal_id) {
-    const { data: legSiblings } = await supabase
-      .from('race_courses')
-      .select('id, name, leg, strategy_updated_at')
-      .eq('user_id', user.id)
-      .eq('goal_id', String(course.goal_id));
-    const sibSummary = (legSiblings || [])
-      .map((r) => {
-        const o = r as { leg?: string; name?: string };
-        return `${String(o.leg || '?')}:${String(o.name || '')}`;
-      })
-      .join(' | ');
-    if (sibSummary) {
-      pacingContextLines += `- Other course legs for this goal: ${sibSummary}.\n`;
-    }
   }
 
   const rawProfile = normalizeElevationProfile(course.elevation_profile);
@@ -443,9 +328,6 @@ Deno.serve(async (req) => {
     .maybeSingle();
   const cz = baseline?.configured_hr_zones as Record<string, unknown> | null;
   const zonesArr = (cz?.zones as Array<{ min?: number; max?: number | null }>) || [];
-  const zStr = zonesArr.length
-    ? zonesArr.map((z, i) => `Z${i + 1} ${z.min ?? '?'}-${z.max ?? 'open'}`).join(', ')
-    : 'not configured';
 
   const hrZonesForHash: Record<string, string> = {};
   zonesArr.forEach((z, i) => {
@@ -454,27 +336,22 @@ Deno.serve(async (req) => {
 
   const { data: recentRuns } = await supabase
     .from('workouts')
-    .select('distance, avg_heart_rate, workout_analysis, date')
+    .select('distance, avg_heart_rate, date')
     .eq('user_id', user.id)
     .eq('type', 'run')
     .eq('workout_status', 'completed')
     .order('date', { ascending: false })
     .limit(20);
 
+  // Longest recent run's average HR feeds the staleness hash only (course-detail computes the same hash).
   let longMi = 0;
   let longHr: number | null = null;
-  let drift: number | null = null;
   for (const w of recentRuns || []) {
     const km = Number(w.distance) || 0;
     const mi = km * 0.621371;
     if (mi >= 10 && mi > longMi) {
       longMi = mi;
       longHr = w.avg_heart_rate != null ? Number(w.avg_heart_rate) : null;
-      let wa: Record<string, unknown> | null = null;
-      try {
-        wa = typeof w.workout_analysis === 'string' ? JSON.parse(w.workout_analysis) : (w.workout_analysis as Record<string, unknown>) || null;
-      } catch { /* ignore */ }
-      drift = extractDrift(wa);
     }
   }
 
@@ -494,11 +371,11 @@ Deno.serve(async (req) => {
     ? mFromRow / 1609.344
     : (goalDistanceMi(String(goal.distance || '')) || 26.2);
 
-  const timeBaseForTerrain = courseLeg === 'full' ? goalTimeSec : legTargetSec;
+  const timeBaseForTerrain = courseLeg === 'full' || !isTriGoal ? goalTimeSec : legTargetSec;
 
   // Adjust goal time for course terrain (bike/run; skip swim OWS grade heuristics here).
-  let terrainGoalTimeSec = courseLeg === 'swim' ? legTargetSec : timeBaseForTerrain;
-  if (courseLeg !== 'swim' && distMi > 0 && smoothed.length >= 2) {
+  let terrainGoalTimeSec = isTriGoal && courseLeg === 'swim' ? legTargetSec : timeBaseForTerrain;
+  if (!(isTriGoal && courseLeg === 'swim') && distMi > 0 && smoothed.length >= 2) {
     const flatPace = timeBaseForTerrain / distMi;
     let accSec = 0;
     for (let i = 1; i < smoothed.length; i++) {
@@ -511,130 +388,33 @@ Deno.serve(async (req) => {
       accSec += (flatPace + gradeAdj) * (segDistM / 1609.344);
     }
     const rounded = Math.round(accSec);
-    if (Math.abs(rounded - timeBaseForTerrain) > 15) {
-      terrainGoalTimeSec = rounded;
-      pacingContextLines += `- Terrain-adjusted **leg** target: ${fmtFinishClock(terrainGoalTimeSec)} (from flat leg split ${fmtFinishClock(timeBaseForTerrain)} using course profile).\n`;
-    }
+    if (Math.abs(rounded - timeBaseForTerrain) > 15) terrainGoalTimeSec = rounded;
   }
 
-  const implied = impliedAvgPaceSecPerMi(terrainGoalTimeSec, distMi);
-
-  // FTP via the resolver (learned-first) so the bike leg strategy uses the SAME FTP as the screens/coach —
-  // was manual-only `pn.ftp` (CAPABILITY-MAP straggler). arc carries learned_fitness.
-  const ftpW = resolveCurrentFtp({ learned_fitness: (arc as any).learned_fitness, performance_numbers: pn as any }).value
-    ?? (Number(pn.ftp_watts ?? pn.ftpWatts) || null);
-  let roleIntro = 'You are a running coach building a race-day pacing strategy.';
-  let legExtraInstructions = '';
-  if (courseLeg === 'bike') {
-    roleIntro =
-      'You are a triathlon / time-trial bike pacing coach. Use the same JSON output schema; pace sec/mi fields represent **sustainable road effort** along the course (pair with %FTP in cues when the athlete has FTP).';
-    legExtraInstructions =
-      (ftpW ? `- Estimated FTP: ~${Math.round(ftpW)}W.\n` : '') +
-      '- Use elevation in segments; note fueling on long or late climbs.\n';
-  } else if (courseLeg === 'swim') {
-    roleIntro =
-      'You are an open-water swim coach. Use the same JSON output schema; map pace bands to **steady OWS effort** and sighting — segments may be short; reference buoys, turns, and conditions in cues.';
-    legExtraInstructions = '- Emphasize sighting, navigation, and even pacing; avoid run-specific mile markers in cues.\n';
-  } else if (courseLeg === 'run' && ['triathlon', 'tri'].includes(String(goal.sport || '').toLowerCase())) {
-    legExtraInstructions =
-      '- **Triathlon run leg** off the bike: expect elevated HR for a given pace; start conservative.\n';
-  }
-
-  const prompt = buildPrompt({
-    roleIntro,
-    segments: geometryToPromptSegments(geometry),
-    easy: easySec != null ? fmtPaceClock(easySec) : 'unknown',
-    threshold: threshSec != null ? fmtPaceClock(threshSec) : 'unknown',
-    zones: zStr,
-    maxHr: maxHr != null ? String(maxHr) : 'unknown',
-    longRun: longMi > 0
-      ? `${Math.round(longMi * 10) / 10}mi at ${longHr ?? '?'} bpm, ${drift != null ? `${drift} bpm drift` : 'drift n/a'}`
-      : 'no recent long run in data',
-    goalTime: fmtFinishClock(terrainGoalTimeSec),
-    impliedAvg: fmtPaceClock(implied),
-    pacingContextLines: pacingContextLines.trimEnd(),
-    legExtraInstructions: legExtraInstructions.trimEnd(),
+  // The pacing plan: arithmetic on geometry + anchor time (see course-strategy-build.ts).
+  const groups = buildCourseStrategyGroups({
+    geometry,
+    distanceMi: distMi,
+    legTargetSec: terrainGoalTimeSec,
+    leg: courseLeg,
+    hrZones: zonesArr,
+    maxHr,
   });
-
-  const ph = await promptHash(prompt);
-
-  async function runLlm(extraErr?: string): Promise<{ text: string | null }> {
-    const userBlock = extraErr ? `${prompt}\n\nFix your previous JSON. Error: ${extraErr}` : prompt;
-    const text = await callLLM({
-      system: 'You output only valid JSON for race pacing. No markdown.',
-      user: userBlock,
-      maxTokens: 8192,
-      temperature: 0.2,
-      model: 'sonnet',
-    });
-    return { text };
-  }
-
-  let llmText = (await runLlm()).text;
-  let parsed: unknown = null;
-  let lastErr = '';
-  for (let attempt = 0; attempt < 2; attempt++) {
-    if (!llmText) {
-      lastErr = 'empty LLM response';
-      if (attempt === 0) {
-        const r = await runLlm('empty response');
-        llmText = r.text;
-        continue;
-      }
-      break;
-    }
-    try {
-      parsed = JSON.parse(stripJsonFences(llmText));
-    } catch (e) {
-      lastErr = 'JSON parse failed';
-      if (attempt === 0) {
-        const r = await runLlm(lastErr);
-        llmText = r.text;
-        continue;
-      }
-      break;
-    }
-    const v = validateLlmResponse(parsed, geometry.length, maxHr);
-    if (!v.ok) {
-      lastErr = v.error;
-      if (attempt === 0) {
-        const r = await runLlm(v.error);
-        llmText = r.text;
-        continue;
-      }
-      await supabase.from('course_strategy_debug').insert({
-        course_id: courseId,
-        raw_llm_response: llmText.slice(0, 120_000),
-        prompt_hash: ph,
-        success: false,
-        error_message: v.error,
-      });
-      return new Response(JSON.stringify({ error: 'Strategy validation failed', detail: v.error }), {
-        status: 422,
-        headers: { ...cors, 'Content-Type': 'application/json' },
-      });
-    }
-    parsed = v.data;
-    break;
-  }
-
-  if (!parsed || typeof parsed !== 'object' || !('display_groups' in (parsed as object))) {
+  const built = JSON.stringify({ display_groups: groups });
+  const v = validateDisplayGroups({ display_groups: groups }, geometry.length, maxHr);
+  if (!v.ok) {
     await supabase.from('course_strategy_debug').insert({
       course_id: courseId,
-      raw_llm_response: String(llmText || '').slice(0, 120_000),
-      prompt_hash: ph,
+      raw_llm_response: built.slice(0, 120_000),
+      prompt_hash: null,
       success: false,
-      error_message: lastErr,
+      error_message: v.error,
     });
-    return new Response(JSON.stringify({ error: 'Strategy generation failed', detail: lastErr }), {
+    return new Response(JSON.stringify({ error: 'Strategy validation failed', detail: v.error }), {
       status: 422,
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
   }
-
-  const groups = (parsed as { display_groups: LlmDisplayGroup[] }).display_groups;
-  alignCoachingCuesWithGeometry(groups, geometry);
-  applyClimbPaceFloorToDisplayGroups(groups, geometry, implied);
   let rows: Record<string, unknown>[];
   try {
     rows = materializeSegmentRows(geometry, groups);
@@ -642,8 +422,8 @@ Deno.serve(async (req) => {
     const msg = e instanceof Error ? e.message : String(e);
     await supabase.from('course_strategy_debug').insert({
       course_id: courseId,
-      raw_llm_response: String(llmText || '').slice(0, 120_000),
-      prompt_hash: ph,
+      raw_llm_response: built.slice(0, 120_000),
+      prompt_hash: null,
       success: false,
       error_message: msg,
     });
@@ -708,15 +488,7 @@ Deno.serve(async (req) => {
     console.warn('[course-strategy] weather attach failed (non-fatal):', wErr instanceof Error ? wErr.message : wErr);
   }
 
-  await supabase.from('course_strategy_debug').insert({
-    course_id: courseId,
-    raw_llm_response: String(llmText || '').slice(0, 120_000),
-    prompt_hash: ph,
-    success: true,
-    error_message: null,
-  });
-
-  return new Response(JSON.stringify({ ok: true, course_id: courseId, display_groups: groups.length }), {
+  return new Response(JSON.stringify({ ok: true, course_id: courseId, display_groups: groups.length, anchor, leg: courseLeg, leg_target_sec: terrainGoalTimeSec, distance_mi: Math.round(distMi * 100) / 100 }), {
     headers: { ...cors, 'Content-Type': 'application/json' },
   });
   } catch (e) {

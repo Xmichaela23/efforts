@@ -817,51 +817,17 @@ function DayPicker({
 
 // ─── Step components ──────────────────────────────────────────────────────────
 
-type RaceInputPhase = 'input' | 'extracting' | 'confirm';
-
 function Step1Races({
   state, setState, onNext, wizardStep, wizardTotalSteps,
 }: { state: WizardState; setState: WizardSetState; onNext: () => void; wizardStep: number; wizardTotalSteps: number }) {
-  const [phase, setPhase] = useState<RaceInputPhase>(
-    // If races were already extracted (e.g. back-navigation), start at confirm
-    state.races.some(r => r.name.trim() && r.targetDate) ? 'confirm' : 'input',
-  );
-  const [inputText, setInputText] = useState('');
-  const [extractError, setExtractError] = useState<string | null>(null);
-
-  const extract = async () => {
-    const t = inputText.trim();
-    if (!t) return;
-    setExtractError(null);
-    setPhase('extracting');
-    try {
-      const { data, error } = await supabase.functions.invoke('extract-races', {
-        body: { text: t },
-      });
-      if (error || !data) throw new Error((error as { message?: string } | null)?.message || 'Extraction failed');
-      const races = (data as { races?: unknown[] }).races;
-      if (!Array.isArray(races) || races.length === 0) {
-        setExtractError("Couldn't find those races — try being more specific, or add them manually below.");
-        setPhase('input');
-        return;
-      }
-      const mapped: WizardRace[] = races.map((r) => {
-        const ro = r as { name?: string; distance?: string; date?: string; priority?: string };
-        return {
-          id: crypto.randomUUID(),
-          name: ro.name || 'Race',
-          distance: normalizeDistance(ro.distance || '70.3'),
-          targetDate: ro.date || '',
-          priority: ro.priority === 'B' ? 'B' : ro.priority === 'C' ? 'C' : 'A',
-        };
-      });
-      setState({ ...state, races: mapped });
-      setPhase('confirm');
-    } catch (e) {
-      setExtractError(e instanceof Error ? e.message : 'Extraction failed');
-      setPhase('input');
+  // Race name, distance and date are typed. The web lookup that used to fill them in (a model reading a
+  // race page) was deleted with the no-AI work order (2026-09-07).
+  useEffect(() => {
+    if (state.races.length === 0) {
+      setState({ ...state, races: [{ id: crypto.randomUUID(), name: '', distance: '70.3', targetDate: '', priority: 'A' }] });
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const updateRace = (id: string, patch: Partial<WizardRace>) => {
     setState({ ...state, races: state.races.map(r => r.id === id ? { ...r, ...patch } : r) });
@@ -896,52 +862,11 @@ function Step1Races({
 
   const canContinue = state.races.some(r => r.name.trim() && r.targetDate);
 
-  // ── Input phase ────────────────────────────────────────────────────────────
-  if (phase === 'input' || phase === 'extracting') {
-    return (
-      <StepLayout
-        step={wizardStep} totalSteps={wizardTotalSteps}
-        title="What does your season look like?"
-        subtitle="Describe your race or races — we'll look up the dates and details."
-        onContinue={extract}
-        canContinue={inputText.trim().length > 0 && phase === 'input'}
-        continueLabel="Find my races"
-        saving={phase === 'extracting'}
-      >
-        <textarea
-          value={inputText}
-          onChange={e => setInputText(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void extract(); }}
-          placeholder="e.g. Ironman Santa Cruz, Chicago Marathon"
-          rows={4}
-          disabled={phase === 'extracting'}
-          className="w-full rounded-xl bg-white/[0.07] border border-white/15 text-white placeholder:text-white/30 text-[15px] px-3.5 py-3.5 focus:outline-none focus:border-teal-500/50 resize-none leading-relaxed disabled:opacity-50"
-        />
-        {phase === 'extracting' && (
-          <div className="flex items-center gap-2 text-sm text-white/45">
-            <Loader2 className="h-4 w-4 animate-spin" /> Looking up your races…
-          </div>
-        )}
-        {extractError && (
-          <p className="text-sm text-red-300/80">{extractError}</p>
-        )}
-        <button
-          type="button"
-          onClick={() => { setState({ ...state, races: [{ id: crypto.randomUUID(), name: '', distance: '70.3', targetDate: '', priority: 'A' }] }); setPhase('confirm'); }}
-          className="text-sm text-white/35 hover:text-white/55 underline underline-offset-2"
-        >
-          Add manually instead
-        </button>
-      </StepLayout>
-    );
-  }
-
-  // ── Confirm phase ──────────────────────────────────────────────────────────
   return (
     <StepLayout
       step={wizardStep} totalSteps={wizardTotalSteps}
-      title="Do these look right?"
-      subtitle="Adjust anything before continuing."
+      title="What does your season look like?"
+      subtitle="Race name, distance and date. Up to three races."
       onContinue={onNext}
       canContinue={canContinue}
     >
@@ -1032,13 +957,6 @@ function Step1Races({
         </button>
       )}
 
-      <button
-        type="button"
-        onClick={() => setPhase('input')}
-        className="text-sm text-white/35 hover:text-white/55 underline underline-offset-2"
-      >
-        ← Search again
-      </button>
     </StepLayout>
   );
 }
@@ -1060,98 +978,6 @@ function StepPriorRace({
 }) {
   const primary = state.races.find((r) => r.priority === 'A') ?? state.races[0];
   const primaryDist = primary?.distance?.trim() || '70.3';
-
-  const priorDateLookupRunRef = useRef(0);
-  const [priorDateLookupUi, setPriorDateLookupUi] = useState<'idle' | 'loading' | 'error'>('idle');
-  const [priorDateLookupHint, setPriorDateLookupHint] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!state.priorRaceHasEntry) {
-      setPriorDateLookupUi('idle');
-      setPriorDateLookupHint(null);
-      return;
-    }
-
-    const name = state.priorRaceName.trim();
-    const yr = parseWizardPriorRaceYear(state.priorRaceYear);
-    const dist = state.priorRaceDistance.trim();
-    const dateStr = state.priorRaceDate.trim();
-
-    if (dateStr) {
-      setPriorDateLookupUi('idle');
-      setPriorDateLookupHint(null);
-      return;
-    }
-
-    if (name.length < 3 || yr == null || !dist) {
-      setPriorDateLookupUi('idle');
-      setPriorDateLookupHint(null);
-      return;
-    }
-
-    const runId = ++priorDateLookupRunRef.current;
-    const timer = window.setTimeout(() => {
-      if (runId !== priorDateLookupRunRef.current) return;
-      void (async () => {
-        if (runId !== priorDateLookupRunRef.current) return;
-        setPriorDateLookupUi('loading');
-        setPriorDateLookupHint(null);
-        try {
-          const text = `${name} — ${dist} — The athlete already finished this event in calendar year ${yr}. Find that year's official race date only (YYYY-MM-DD), not a future edition.`;
-          const { data, error } = await supabase.functions.invoke('extract-races', {
-            body: { text, prior_finish: true },
-          });
-          if (runId !== priorDateLookupRunRef.current) return;
-          if (error) throw new Error((error as { message?: string }).message || 'Lookup failed');
-          const races = (data as { races?: unknown[] })?.races;
-          if (!Array.isArray(races) || races.length === 0) {
-            setPriorDateLookupUi('error');
-            setPriorDateLookupHint("Couldn't find that race date — choose it on the calendar.");
-            return;
-          }
-          const firstWithDate = races.find((r) => {
-            const ro = r as { date?: string };
-            return typeof ro.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ro.date);
-          }) as { date?: string; name?: string } | undefined;
-          const found = firstWithDate?.date;
-          if (!found) {
-            setPriorDateLookupUi('error');
-            setPriorDateLookupHint("Couldn't find that race date — choose it on the calendar.");
-            return;
-          }
-          if (Number(found.slice(0, 4)) !== yr) {
-            setPriorDateLookupUi('error');
-            setPriorDateLookupHint("Lookup didn't match that year — set the date manually.");
-            return;
-          }
-          const official = typeof firstWithDate.name === 'string' ? firstWithDate.name.trim() : '';
-          setState((prev) => ({
-            ...prev,
-            priorRaceDate: found,
-            ...(official.length > name.length ? { priorRaceName: official } : {}),
-          }));
-          setPriorDateLookupUi('idle');
-          setPriorDateLookupHint(null);
-        } catch {
-          if (runId !== priorDateLookupRunRef.current) return;
-          setPriorDateLookupUi('error');
-          setPriorDateLookupHint("Couldn't look up the date — enter it manually.");
-        }
-      })();
-    }, 650);
-
-    return () => {
-      priorDateLookupRunRef.current += 1;
-      window.clearTimeout(timer);
-    };
-  }, [
-    state.priorRaceHasEntry,
-    state.priorRaceName,
-    state.priorRaceYear,
-    state.priorRaceDistance,
-    state.priorRaceDate,
-    setState,
-  ]);
 
   const chooseSkip = () => {
     setState({
@@ -1261,21 +1087,11 @@ function StepPriorRace({
               className="w-full rounded-lg bg-white/[0.07] border border-white/15 text-white placeholder:text-white/30 text-[14px] px-3 py-2.5 focus:outline-none focus:border-teal-500/50"
             />
             <p className="text-[11px] text-white/35 mt-1">
-              If you enter a year, it must match the calendar year of the race date. With name and year filled in,
-              we look up the date for you (same service as &quot;Find my races&quot; on the season step).
+              If you enter a year, it must match the calendar year of the race date.
             </p>
           </div>
           <div>
             <p className="text-[11px] text-white/40 mb-1.5">Race date</p>
-            {priorDateLookupUi === 'loading' && (
-              <div className="flex items-center gap-2 text-[11px] text-white/45 mb-1.5">
-                <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
-                Looking up race date…
-              </div>
-            )}
-            {priorDateLookupUi === 'error' && priorDateLookupHint && (
-              <p className="text-[11px] text-amber-200/85 mb-1.5">{priorDateLookupHint}</p>
-            )}
             <input
               type="date"
               value={state.priorRaceDate}

@@ -3964,7 +3964,7 @@ Deno.serve(async (req: Request) => {
            * have the server silently drop them on the floor — inputs with no pipe behind them.
            *
            * Both have real readers already: `plan-context.ts:58` reads `course_profile` and
-           * `race-readiness-llm` gates ALL race-terrain talk on its presence;
+           * `session-detail/race-readiness` gates ALL race-terrain talk on its presence;
            * `resolveGoalTargetTimeSeconds` reads `target_time` for the coach, course-strategy and
            * the finish projection.
            *

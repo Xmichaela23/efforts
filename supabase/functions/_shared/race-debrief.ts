@@ -1,95 +1,15 @@
 /**
- * LLM race debrief — additive path for goal race sessions.
- * Sits alongside marathon-race-narrative.ts deterministic digest.
- * Callers merge result into workouts.workout_analysis.race_debrief_text.
+ * Race-debrief helpers — deterministic only.
+ *
+ * Course-strategy zone collapse, race-day weather resolution and the suspect-stop mile finder, shared by
+ * analyze-running-workout, cycling-goal-race-completion and the marathon adherence digest. The model-written
+ * debrief paragraph that used to live here (`generateRaceDebrief`) was deleted with the no-AI work order
+ * (2026-09-07); `workout_analysis.race_debrief_text` is now written null.
  *
  * Weather: persisted canonical row is `workouts.weather_data` (get-weather / analysis). Client UI uses the
  * same field names via `src/lib/sessionWeather.ts`. Here, `resolveRaceDebriefWeather` adds `race_courses`
- * snapshot + `avg_temperature` device fallback for the LLM fact block only.
+ * snapshot + `avg_temperature` device fallback.
  */
-
-import { callLLM } from './llm.ts';
-
-/** Removes common LLM echoes of coach-only instructions before the athlete sees debrief prose. */
-export function stripRaceDebriefMetaArtifacts(text: string): string {
-  let s = String(text || '');
-  s = s.replace(/\s*[—–-]\s*one clause,?\s*move on\s*[—–-]?\s*/gi, ' ');
-  s = s.replace(/\s*[,;]\s*one clause,?\s*move on\b\.?/gi, '. ');
-  s = s.replace(/\bone clause,?\s*move on\b/gi, '');
-  s = s.replace(/\bstage direction[s]?\b[^\n.]*/gi, '');
-  return s.replace(/\s{2,}/g, ' ').replace(/\s+([,.])/g, '$1').trim();
-}
-
-const RACE_DEBRIEF_SYSTEM_PROMPT = `You are a running coach debriefing an athlete after a race.
-
-The athlete already has pace, HR, and splits on screen. Do not recite the split table or dwell on numbers they can read themselves. Your job is interpretation: what the pattern means, and what drove the result.
-
-NARRATIVE STRUCTURE — follow this order exactly:
-1) First sentence: name the race and state actual finish time. If a PROJECTED FINISH TIME is provided, also state the gap to that projection — that gap is the only performance delta that matters. If PROJECTED FINISH TIME is "not available", do NOT mention a missing projection or a missing course model; simply state the actual finish and move directly to interpretation. NEVER write phrases like "no course model projection exists" or "no plan gap to close" — the course model and zones may still be present even when the time projection is null.
-2) Second sentence: the single most important pacing or execution fact the data supports, stated plainly (not a list of mile splits).
-3) Remaining sentences (about three): explain what drove the result using terrain, heart rate, weather, and (when present) the pre-race COURSE STRATEGY ZONES. Name specific miles only when they explain a mechanism—not because a mile was slow or an outlier.
-
-OUTLIER MILES:
-- If a mile is clearly slower than surrounding running pace and grade does not explain it, you may mention a likely brief aid stop or similar in plain language (e.g. "Mile 18 looks like a short stop"). Keep that aside to a short phrase; do not make it the paragraph thesis. Never quote or paraphrase internal coaching instructions.
-
-ANTI-LEAK (critical):
-- The athlete reads only athlete-facing prose. Forbidden in output: meta lines like "one clause", "move on", "keep it brief", "do not dwell", bullet labels from this prompt, or any stage direction meant for you. Write as if emailing the athlete directly.
-
-TARGET FRAMING:
-- The only time benchmark for "how you did vs the plan" is PROJECTED FINISH TIME (a single number derived from the course model). Ignore any other stored target times even if they appeared elsewhere in tooling. If PROJECTED FINISH TIME is unavailable, the debrief is purely about execution quality — say nothing about missing projections; analyze the run on its own terms using zones, terrain, HR, and weather.
-
-VOCABULARY — DO NOT INVENT MISSING DATA:
-- "PROJECTED FINISH TIME" is a TIME, not a model. When it is unavailable, the COURSE STRATEGY ZONES (and the rest of the data) are usually still present. Do not claim the course model, course profile, or strategy is missing. Never write "no course model exists for X" or similar.
-
-TERRAIN:
-- Grade is per mile: positive = uphill, negative = downhill. Pace loss on real climb with appropriate HR is terrain. Pace loss on easy grade with rising HR in heat points to thermoregulation competing with locomotion—say that plainly, once.
-
-WEATHER:
-- Use the supplied temps and humidity. Rough guide: about +1 bpm cardiac load per ~1.8°F rise in ambient temperature during a long effort; high humidity tightens that. Sunny late race adds demand on top of pace.
-- The fact block includes WEATHER MERGE (authoritative): follow it. If start/finish temp or humidity appears as a number in WEATHER, you MUST use it—never write that weather is missing, unknown, or unavailable for this session.
-
-HEART RATE — DO NOT ROMANTICIZE DRIFT:
-- Late-race HR climbing is normal physiology, not a story about toughness. After roughly three hours of sustained running, HR rises even at constant perceived effort: that is natural cardiovascular drift.
-- When you describe HR in the second half, decompose it into the causes the data supports—do not collapse them into one heroic arc:
-  (1) Time on feet / natural drift in hour four and beyond.
-  (2) Heat load: use the supplied start vs finish temp (and humidity, conditions) to attribute part of the rise; temperature rise adds cardiac cost independent of pace.
-  (3) Terrain: rising HR on positive grade or hard climbing segments is terrain cost; align with grade column and any caution/climb sections implied by the splits.
-- Do not frame late-race HR as the athlete "pushing," "not folding," "holding what the legs wanted," or "cardiovascular system working hard" unless pace actually increased relative to what the grade would predict (i.e. real acceleration, not drift-plus-heat-plus-hills).
-- Forbidden motivational HR clichés include: "didn't fold," "pushing through," "what's interesting is," "working hard to hold," "legs wanted to give."
-
-VOICE:
-- Direct, human, like a coach talking to one person. No report tone.
-- No idioms, no slogans, no "real talk," no filler praise, no motivational clichés.
-- Never paste wording from CONTEXT lines such as "POSSIBLE NON-RUNNING SLOW MILES"; translate into natural speech only.
-
-OUTPUT FORMAT — follow exactly:
-Write four labeled sections. Each section label is on its own line in brackets, followed by 1–3 sentences of plain prose. No bullets, no sub-headers inside sections. A blank line between sections.
-
-[EXECUTION]
-{First sentence: race name + actual finish + projection gap if available. Second sentence: the single most important pacing or execution fact.}
-
-[CONDITIONS]
-{Weather and terrain impact. Decompose late-race HR into causes: heat load, drift, terrain — as the data supports. 1–3 sentences.}
-
-[FINISH]
-{What happened in the final miles: pace trend, HR trend, what it means physiologically. 1–2 sentences.}
-
-[TAKEAWAY]
-{One concrete line about what to carry forward. Do not assume the athlete will race this specific course again — frame advice as a general principle or "on a course like this." Anchor to what the data or course strategy zones showed. Do not invent generic advice if the zones already defined targets for those miles.}
-
-CLOSE — STRATEGY-ANCHORED, NOT GENERIC:
-- End with one concrete line about what to adjust next time on THIS course. The line MUST be anchored to what the course strategy actually prescribed. Do not invent generic pacing advice ("start 15–20 seconds slower in miles 1–3") if a prescribed zone for those miles already exists in COURSE STRATEGY ZONES.
-- Decision tree for the closing line when COURSE STRATEGY ZONES are provided:
-  (a) If actual HR/pace in the relevant miles fell INSIDE the prescribed zone's HR band → the strategy itself is what to revisit ("the Conservative zone you executed at HR 130–138 was the right call; consider extending it through mile 5 next time before opening up").
-  (b) If actual HR/pace EXCEEDED the prescribed zone's HR band → name the deviation and the zone by name ("your prescribed Conservative band was 125–135 bpm in miles 1–3; you ran 136–137 — that's the dial-back next time").
-  (c) If actual was BELOW the prescribed band → say so plainly ("you ran the Cruise miles under the prescribed band — there's room to push that section harder next time").
-- Never recommend a numeric pace or HR adjustment for a segment without first checking it against the prescribed zone for that segment. If the strategy already called for what you're about to recommend, recognize the strategy was right and the execution matched — don't repeat the same instruction back to the athlete as if it's new.
-
-COURSE ZONES (from pre-race strategy) — USE THEM, DON'T IGNORE THEM:
-- Segments may be listed with effort zones: Conservative, Cruise, Caution, Push (from course strategy generation). Refer to them by zone name ("the Conservative miles", "the Push section through 19–22") when discussing execution.
-- When actual HR and pace align with what that zone implied, that is execution matching the plan — not drift or toughness. Say it that way: "you executed the Caution zone at the prescribed HR band."
-- When HR or stress exceeds what the zone and HR band suggested for a segment, that is where to explain why (heat, terrain, pace, or stop time) AND where to anchor the closing advice.
-- Do not collapse the strategy into raw grade analysis. Zones, mile ranges, and HR bands are all signal; reference them.`;
 
 export type RawCourseSegmentRow = {
   segment_order: number;
@@ -293,98 +213,7 @@ export function resolveRaceDebriefWeather(args: {
   };
 }
 
-export interface RaceDebriefInputs {
-  workoutName: string;
-  elapsedSeconds: number;
-  movingSeconds: number;
-  goalSeconds: number | null;
-  projectedSeconds: number | null;
-  avgHR: number;
-  maxHR: number;
-  intensityFactor: number | null;
-  weather: RaceDebriefWeatherResolved;
-  splits: Array<{
-    mile: number;
-    paceSeconds: number;
-    avgHR: number;
-    grade: number;
-  }>;
-  /** From race_courses.course_segments (collapsed by display group). */
-  courseStrategyZones?: CourseStrategyZoneLine[] | null;
-}
-
-function fmtClock(s: number): string {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = Math.round(s % 60);
-  return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-}
-
-function fmtPace(secPerMi: number): string {
-  const m = Math.floor(secPerMi / 60);
-  const s = Math.round(secPerMi % 60);
-  return `${m}:${String(s).padStart(2, '0')}/mi`;
-}
-
-function signedDiffSeconds(diff: number): string {
-  const sign = diff >= 0 ? '+' : '-';
-  return `${sign}${fmtClock(Math.abs(diff))}`;
-}
-
-function estimateHeatHRBpm(startF: number | null, finishF: number | null): string {
-  if (startF == null || finishF == null) return 'unknown';
-  if (!Number.isFinite(startF) || !Number.isFinite(finishF)) return 'unknown';
-  return `~${Math.round((finishF - startF) / 1.8)} bpm`;
-}
-
-function buildFactString(i: RaceDebriefInputs): string {
-  const aidLoss = i.elapsedSeconds - i.movingSeconds;
-  const vsProjected = i.projectedSeconds !== null
-    ? i.elapsedSeconds - i.projectedSeconds
-    : null;
-
-  const tempRise = (i.weather.startTempF != null && i.weather.finishTempF != null)
-    ? i.weather.finishTempF - i.weather.startTempF
-    : null;
-
-  // Optional hint only — do not let the model treat this as the main story (prompt limits that).
-  const suspectStopHint = formatSuspectStopMiles(i.splits);
-
-  return `
-CONTEXT FOR THE COACH (not for quoting verbatim to the athlete):
-The athlete sees splits on their device. Interpret patterns; do not reproduce the full table in prose.
-
-RACE: ${i.workoutName}
-ACTUAL FINISH (elapsed): ${fmtClock(i.elapsedSeconds)}
-PROJECTED FINISH TIME (single number from course model — only "vs plan" benchmark): ${i.projectedSeconds != null ? fmtClock(i.projectedSeconds) : 'not available — analyze execution on its own terms; do NOT say the course model is missing'}
-GAP VS PROJECTION: ${vsProjected !== null ? signedDiffSeconds(vsProjected) : 'N/A'}
-MOVING TIME: ${fmtClock(i.movingSeconds)} (use for drift: natural HR rise is expected after ~3h sustained effort)
-TIME OFF COURSE (elapsed minus moving — aid, stops): ${aidLoss > 30 ? fmtClock(aidLoss) : 'negligible'}
-SESSION AVG HR / MAX HR: ${i.avgHR} / ${i.maxHR} bpm
-INTENSITY FACTOR (if available): ${i.intensityFactor ?? 'N/A'}
-
-${i.weather.provenance}
-
-WEATHER:
-Conditions: ${i.weather.conditions ?? 'unknown'}
-Start temp: ${i.weather.startTempF ?? 'unknown'}°F
-Finish temp: ${i.weather.finishTempF ?? 'unknown'}°F
-Temp rise during race: ${tempRise !== null ? `${tempRise >= 0 ? '+' : ''}${tempRise}°F` : 'unknown'}
-Estimated heat-related HR contribution from temp rise: ${estimateHeatHRBpm(i.weather.startTempF, i.weather.finishTempF)}
-Humidity: ${i.weather.humidityPct != null ? `${i.weather.humidityPct}%` : 'unknown'}
-
-COURSE STRATEGY ZONES (pre-race — effort band + mile range; compare to actual HR/pace in those miles):
-${formatCourseStrategyZonesBlock(i.courseStrategyZones ?? null)}
-
-PER-MILE DATA (reference as needed; do not read aloud row by row):
-${i.splits.map((s) =>
-  `Mile ${s.mile}: ${fmtPace(s.paceSeconds)} | ${s.avgHR} bpm | ${s.grade > 0 ? '+' : ''}${s.grade}%`,
-).join('\n')}
-${suspectStopHint ? `\nSUSPECT NON-RUNNING SLOW SEGMENTS (for your judgment only — summarize naturally if relevant; never echo this label): ${suspectStopHint}` : ''}
-`.trim();
-}
-
-/** Per-mile pace (sec/mi) + grade (%). Used by debrief + marathon deterministic digest. */
+/** Per-mile pace (sec/mi) + grade (%). Used by the marathon deterministic digest. */
 export type SuspectStopSplitInput = {
   mile: number;
   paceSeconds: number;
@@ -428,31 +257,4 @@ export function collectSuspectStopMiles(splits: SuspectStopSplitInput[]): number
   }
 
   return [...flagged].sort((a, b) => a - b).slice(0, 8);
-}
-
-function formatSuspectStopMiles(splits: RaceDebriefInputs['splits']): string | null {
-  const miles = collectSuspectStopMiles(
-    splits.map((s) => ({ mile: s.mile, paceSeconds: s.paceSeconds, grade: s.grade })),
-  );
-  return miles.length ? miles.map((m) => `mile ${m}`).join(', ') : null;
-}
-
-export async function generateRaceDebrief(
-  inputs: RaceDebriefInputs,
-): Promise<string | null> {
-  try {
-    const facts = buildFactString(inputs);
-    const narrativeRaw = await callLLM({
-      system: RACE_DEBRIEF_SYSTEM_PROMPT,
-      user: facts,
-      maxTokens: 900,
-      temperature: 0.2,
-      model: 'sonnet',
-    });
-    const narrative = narrativeRaw ? stripRaceDebriefMetaArtifacts(narrativeRaw.trim()) : null;
-    return narrative;
-  } catch (err) {
-    console.error('[race-debrief] LLM call failed:', err);
-    return null;
-  }
 }

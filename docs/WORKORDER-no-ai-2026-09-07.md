@@ -51,3 +51,23 @@ takes typed entry. Home refreshes for a Standard Focus user with readiness lines
 version bumped so old caches are ignored. Deploy every touched function, push, `npm run ios`. Report:
 functions deleted, functions changed and versions, secrets removed, what the course screen does now, what
 was not device-checked.
+
+## Built (2026-09-07)
+
+- Deleted: `arc-setup-chat`, `extract-races` (local and on the project), `_shared/llm.ts`, `_shared/llm-arc-setup.ts`,
+  `_shared/arc-setup-prompt.ts`, `_shared/arc-setup-schedule-rules.ts`, `_shared/race-narrative.ts`,
+  `_shared/athlete-snapshot/coaching.ts`, `_shared/session-detail/race-readiness-llm.ts` (renamed `race-readiness.ts`, templates only).
+- Three model paths the inventory missed came out too: the coach's legacy week-narrative fallback (a direct
+  Anthropic fetch), the goal-race narrative in `workout-detail`, and the race debrief in `analyze-running-workout`
+  (`race_debrief_text` is now written null).
+- `course-strategy` is arithmetic (`_shared/course-strategy-build.ts`): like-terrain groups, even effort via the
+  Minetti grade cost, ±2.5% band, HR band by distance, fixed cues, fuel note. Ledger rows in STATE-SOURCES.md.
+  Found and fixed on the throwaway: a single-sport race course inferred as leg `run` was priced at 29% of the
+  finish (a 4:27 marathon became a 1:17 "run leg"); leg splits now apply to triathlon goals only.
+- Coach payload 203 / client min 203; `athlete_snapshot.coaching` gone. Secrets `ANTHROPIC_API_KEY`,
+  `OPENAI_API_KEY` unset. Privacy page carries the no-AI sentence. Wizard race step and prior-race date are typed.
+- Throwaway script: `scripts/_burner-no-ai-2026-09-07.mjs` (22 checks green, 2026-09-07).
+- Not this work order, seen on the way: `course-detail` flags a freshly built strategy `strategy_stale=true`
+  (its snapshot hash resolves threshold pace differently from `course-strategy`); the readiness block's
+  projection line reads the target from plan context, so a target typed after the build shows "No goal finish
+  time on file".

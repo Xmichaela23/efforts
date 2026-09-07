@@ -1,10 +1,12 @@
 /**
- * LLM race readiness for session_detail_v1 — only for 28-day block peak runs (≥12 mi, longest in window).
- * Uses shared callLLM (model from env / llm.ts). On failure returns null.
+ * Race readiness for session_detail_v1 — only for 28-day block peak runs (≥12 mi, longest in window).
+ *
+ * Deterministic: every sentence is a fixed template filled from the session's fact packet
+ * (`buildSessionRaceReadinessFacts`). The model that used to write this block was deleted with the
+ * no-AI work order (2026-09-07); what was its fallback is now the only path. Copy obeys docs/COPY-VOICE.md.
  */
-import { callLLM } from '../llm.ts';
 import type { PlanContext } from '../plan-context.ts';
-import type { SessionDetailV1, SessionRaceReadinessLlmV1 } from './types.ts';
+import type { SessionDetailV1, SessionRaceReadinessV1 } from './types.ts';
 
 const MI = 1609.34;
 
@@ -67,7 +69,7 @@ async function fetchLongestPriorRunDistanceMiles(
       .order('date', { ascending: false })
       .limit(20);
     if (error) {
-      console.warn('[race_readiness_llm] prior_long_runs query error (fail open):', error.message);
+      console.warn('[race_readiness] prior_long_runs query error (fail open):', error.message);
       return 0;
     }
     let maxMiles = 0;
@@ -80,7 +82,7 @@ async function fetchLongestPriorRunDistanceMiles(
     }
     return maxMiles;
   } catch (e) {
-    console.warn('[race_readiness_llm] prior_long_runs exception (fail open):', e);
+    console.warn('[race_readiness] prior_long_runs exception (fail open):', e);
     return 0;
   }
 }
@@ -170,7 +172,7 @@ function elevationProfileLabel(
 
 /**
  * Race distance in miles for finish-time math when the plan goal names a standard event.
- * Null when unknown (ultra, custom, or unlabeled) — LLM must not invent 26.2.
+ * Null when unknown (ultra, custom, or unlabeled) — the copy must not assume 26.2.
  */
 function inferTargetRaceDistanceMiles(goalLabel: string | null | undefined): number | null {
   const s = String(goalLabel || '').toLowerCase();
@@ -242,7 +244,7 @@ export function raceReadinessGateSkipReason(params: {
   return null;
 }
 
-export function gateSessionRaceReadinessLlm(params: {
+export function gateSessionRaceReadiness(params: {
   sessionNormType: string;
   workoutTypeKey: string;
   planId: string | null;
@@ -479,146 +481,95 @@ export function buildSessionRaceReadinessFacts(params: {
   return out;
 }
 
-function extractJsonObject(text: string): string | null {
-  const t = String(text || '').trim();
-  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const body = fence ? fence[1].trim() : t;
-  const start = body.indexOf('{');
-  const end = body.lastIndexOf('}');
-  if (start < 0 || end <= start) return null;
-  return body.slice(start, end + 1);
-}
-
-/** Remove accidental snake_case key references like "(conditions_heat_flag)" from model copy. */
-function stripSnakeCaseKeyParens(s: string): string {
-  const t = String(s || '').replace(/\s*\([a-z][a-z0-9]*(?:_[a-z][a-z0-9]*)+\)/gi, ' ');
-  return t.replace(/\s{2,}/g, ' ').trim();
-}
-
-/** tactical_instruction must anchor to today's data with a digit (pace, bpm, mile, °F, s/mi). */
-function tacticalInstructionHasConcreteNumber(s: string): boolean {
-  return /\d/.test(String(s || ''));
-}
-
-function parseRaceReadinessLlmResponse(text: string | null | undefined): SessionRaceReadinessLlmV1 | null {
-  if (!text) return null;
-  const jsonStr = extractJsonObject(text);
-  if (!jsonStr) return null;
-  try {
-    const o = JSON.parse(jsonStr) as Record<string, unknown>;
-    const headline = stripSnakeCaseKeyParens(String(o.headline || '').trim());
-    const verdict = stripSnakeCaseKeyParens(String(o.verdict || '').trim());
-    const tactical_instruction = stripSnakeCaseKeyParens(String(o.tactical_instruction || '').trim());
-    const projection = stripSnakeCaseKeyParens(String(o.projection || '').trim());
-    const taper_guidance = stripSnakeCaseKeyParens(String(o.taper_guidance || '').trim());
-    const flagRaw = o.flag;
-    const flag =
-      flagRaw === null || flagRaw === undefined || String(flagRaw).toLowerCase() === 'null'
-        ? null
-        : stripSnakeCaseKeyParens(String(flagRaw).trim()) || null;
-    if (!headline || !verdict || !tactical_instruction || !projection || !taper_guidance) return null;
-    if (!tacticalInstructionHasConcreteNumber(tactical_instruction)) return null;
-    return { headline, verdict, tactical_instruction, flag, projection, taper_guidance };
-  } catch {
-    return null;
-  }
-}
-
-/** When the LLM is unavailable or returns invalid JSON, still surface a structured block from FACTS-only copy. */
 export function raceReadinessDeterministicFallback(
   facts: Record<string, unknown>,
   planCtx?: PlanContext | null,
-): SessionRaceReadinessLlmV1 | null {
+): SessionRaceReadinessV1 | null {
   const d = facts.days_to_race;
   const days = typeof d === 'number' && d > 0 ? d : null;
   if (days == null) return null;
   const raceLabel =
     typeof facts.race_name === 'string' && String(facts.race_name).trim()
       ? String(facts.race_name).trim()
-      : 'your race';
+      : 'the race';
   const dist = facts.distance_miles;
+  const distN = typeof dist === 'number' && dist > 0 ? dist : null;
   const heat = facts.conditions_heat_flag === true;
   const heatNote = typeof facts.conditions_heat_note === 'string' ? facts.conditions_heat_note.trim() : '';
-  const drift = typeof facts.hr_drift_bpm === 'number' ? facts.hr_drift_bpm : null;
-  const typ = typeof facts.typical_hr_drift_bpm === 'number' ? facts.typical_hr_drift_bpm : null;
+  const drift = typeof facts.hr_drift_bpm === 'number' ? Math.round(facts.hr_drift_bpm) : null;
+  const typ = typeof facts.typical_hr_drift_bpm === 'number' ? Math.round(facts.typical_hr_drift_bpm) : null;
   const driftWhy =
     typeof facts.hr_drift_explanation === 'string' ? String(facts.hr_drift_explanation).trim() : '';
   const avgHrF = typeof facts.avg_hr === 'number' ? Math.round(facts.avg_hr) : null;
-  const split = facts.pacing_split_seconds_per_mile;
+  const splitRaw = facts.pacing_split_seconds_per_mile;
+  const split = typeof splitRaw === 'number' && Math.abs(splitRaw) >= 5 ? Math.round(splitRaw) : null;
   const elev = typeof facts.elevation_gain_ft === 'number' ? Math.round(facts.elevation_gain_ft) : null;
   const ep = typeof facts.elevation_profile === 'string' ? String(facts.elevation_profile) : null;
-  const coachBits: string[] = [];
-  if (drift != null && typ != null) {
-    coachBits.push(
-      `Drift +${Math.round(drift)} bpm vs your typical +${Math.round(typ)} bpm is a solid aerobic read`,
-    );
-    if (driftWhy === 'terrain_driven') {
-      coachBits.push('late climbing factored into that picture — the pipeline already terrain-adjusted the HR story');
-    }
-  }
-  if (avgHrF != null) coachBits.push(`${avgHrF} bpm average`);
-  if (typeof split === 'number' && Math.abs(split) >= 5) {
-    coachBits.push(
-      split > 0
-        ? `you slowed about +${Math.round(split)}s/mi in the second half`
-        : `you picked it up ~${Math.round(Math.abs(split))}s/mi in the second half`,
-    );
-  }
-  if (elev != null && ep) coachBits.push(`${ep} terrain (~${elev} ft gain)`);
-  if (heat && heatNote) coachBits.push(heatNote);
-  else if (heat) coachBits.push('it was warm enough to tax the back half');
-  const verdict =
-    (coachBits.length ? coachBits.join(' — ') + '. ' : '') +
-    `You're on track with ${days} days until ${raceLabel}.`;
-
-  const fastestMile = typeof facts.fastest_mile === 'number' ? facts.fastest_mile : null;
+  const fastestMile = typeof facts.fastest_mile === 'number' ? Math.round(facts.fastest_mile) : null;
   const fastestMilePace =
     typeof facts.fastest_mile_pace === 'string' ? String(facts.fastest_mile_pace).trim() : '';
   const avgPaceStr = typeof facts.avg_pace === 'string' ? String(facts.avg_pace).trim() : '';
-  const distN = typeof dist === 'number' && dist > 0 ? dist : null;
+
+  // ── verdict: the observed facts, one sentence each, no reader-directed language ──
+  const lines: string[] = [];
+  if (drift != null && typ != null) {
+    lines.push(`Heart-rate drift +${drift} bpm against a typical +${typ} bpm.`);
+    if (driftWhy === 'terrain_driven') lines.push('Late climbing accounts for part of that rise.');
+  } else if (drift != null) {
+    lines.push(`Heart-rate drift +${drift} bpm.`);
+  }
+  if (avgHrF != null) lines.push(`Average heart rate ${avgHrF} bpm.`);
+  if (split != null) {
+    lines.push(
+      split > 0
+        ? `Second-half pace ${split} s/mi slower than the first.`
+        : `Second-half pace ${Math.abs(split)} s/mi faster than the first.`,
+    );
+  }
+  if (elev != null && ep) lines.push(`${ep.charAt(0).toUpperCase()}${ep.slice(1)} terrain, about ${elev} ft of gain.`);
+  if (heat && heatNote) lines.push(heatNote.endsWith('.') ? heatNote : `${heatNote}.`);
+  else if (heat) lines.push('Warm conditions add heart-rate cost in the back half.');
+  lines.push(`${days} days remain before ${raceLabel}.`);
+  const verdict = lines.join(' ');
+
+  // ── tactical line: one race-day consequence tied to a number from this session ──
   const earlyMilesLabel =
     distN != null && distN < 12 ? 'the first 2–3 miles' : distN != null && distN < 16 ? 'the first 3–4 miles' : 'the first 5 miles';
-
-  let tactical_instruction = '';
+  let tactical_instruction: string;
   if (fastestMile != null && fastestMilePace) {
     tactical_instruction =
-      `Your fastest mile today was mile ${Math.round(fastestMile)} at ${fastestMilePace} — stay slower than that effort through ${earlyMilesLabel} at ${raceLabel} so you don't repeat today's fade.`;
+      `Fastest mile today: mile ${fastestMile} at ${fastestMilePace}. ${earlyMilesLabel.charAt(0).toUpperCase()}${earlyMilesLabel.slice(1)} at ${raceLabel} run faster than that pace set up the same second-half slowdown.`;
   } else if (avgPaceStr) {
-    const thirdLabel =
-      distN != null && distN >= 18 ? 'roughly the first third of the race' : earlyMilesLabel;
-    tactical_instruction = `You averaged ${avgPaceStr} today — use that as an early ceiling for ${thirdLabel} at ${raceLabel} if you want the same aerobic control you showed here.`;
-  } else if (avgHrF != null && drift != null && typ != null) {
-    tactical_instruction = `You held ~${avgHrF} bpm average with +${Math.round(drift)} bpm drift vs your typical +${Math.round(typ)} — cap early effort at a similar HR at ${raceLabel} through ${earlyMilesLabel}, then reassess.`;
-  } else if (drift != null && typ != null) {
-    tactical_instruction = `You held +${Math.round(drift)} bpm drift versus your usual +${Math.round(typ)} — keep the first third of ${raceLabel} controlled; lungs and legs should feel easier if the morning is cooler.`;
-    if (heat && heatNote) {
-      tactical_instruction += ` ${heatNote}`;
-    } else if (heat) {
-      tactical_instruction += ' Heat added cost today; at a cooler gun you can afford the same HR at slightly truer pace early.';
-    }
+    tactical_instruction =
+      `Average pace today ${avgPaceStr}. ${earlyMilesLabel.charAt(0).toUpperCase()}${earlyMilesLabel.slice(1)} at ${raceLabel} held at that pace or slower hold heart-rate drift in today's range.`;
   } else if (avgHrF != null) {
-    tactical_instruction = `You averaged ${avgHrF} bpm today — treat that as your early-race HR anchor through ${earlyMilesLabel} at ${raceLabel}, then let pace follow if breathing stays easy.`;
+    tactical_instruction =
+      `Average heart rate today ${avgHrF} bpm. ${earlyMilesLabel.charAt(0).toUpperCase()}${earlyMilesLabel.slice(1)} at ${raceLabel} at a similar heart rate leave the same margin for the back half.`;
   } else {
-    tactical_instruction = `With ${days} days to ${raceLabel}, run the first 2–3 miles ~15–20 s/mi slower than race goal pace feels, then build only if everything feels easy.`;
+    tactical_instruction =
+      `${days} days to ${raceLabel}. The first 2–3 miles run 15–20 s/mi slower than goal pace leave margin for the back half.`;
   }
-  if (typeof split === 'number' && Math.abs(split) >= 5) {
-    tactical_instruction += ` You faded +${Math.round(split)}s/mi second half today — don't chase early pace that sets up the same pattern.`;
+  if (split != null && split > 0) {
+    tactical_instruction += ` Early pace above today's average repeats the ${split} s/mi second-half slowdown.`;
   }
+
+  // ── taper line ──
   const planTaper = planCtx?.has_taper_phase === true;
   const nextN = typeof facts.next_session_name === 'string' ? facts.next_session_name : '';
   const nextP = typeof facts.next_session_prescription === 'string' ? facts.next_session_prescription : '';
   let taper_guidance = planTaper
-    ? 'Your plan already structures taper — do not add extra volume. Protect sleep, normal fueling, and any short race-pace touches only if legs feel fresh.'
-    : 'Keep recovery between hard days honest; avoid stacking fatigue this close to the race.';
+    ? 'The plan already reduces volume from here. Volume added in the last two weeks arrives as fatigue on race day; short race-pace touches hold the pace familiar without adding load.'
+    : 'Hard days stacked without recovery this close to the race arrive as fatigue on race day.';
   if (planTaper && (nextN || nextP)) {
-    taper_guidance += ` Next on plan: ${nextN}${nextP ? ` — ${nextP.slice(0, 120)}` : ''}. Optional sessions are fine to skip if you feel flat.`;
+    taper_guidance += ` Next on the plan: ${nextN}${nextP ? ` — ${nextP.slice(0, 120)}` : ''}.`;
   }
+
   const headline =
     drift != null && typ != null && drift < typ
-      ? `${days} days out — drift beat your typical in tough conditions`
-      : typeof dist === 'number'
-        ? `${days} days out — ${dist} mi long run checked off`
-        : `${days} days out — long work toward ${raceLabel}`;
+      ? `${days} days out — heart-rate drift below typical`
+      : distN != null
+        ? `${days} days out — ${distN} mi long run logged`
+        : `${days} days out — long run toward ${raceLabel} logged`;
   return {
     headline,
     verdict,
@@ -626,129 +577,36 @@ export function raceReadinessDeterministicFallback(
     flag: null,
     projection:
       typeof facts.target_race_goal_finish_clock === 'string'
-        ? `Goal finish on file: ${facts.target_race_goal_finish_clock}. Treat today as workload confirmation, not a race predictor.`
-        : 'No goal finish time on file — set a target in the plan or pace off recent long-run effort.',
+        ? `Goal finish on file: ${facts.target_race_goal_finish_clock}. A single long run confirms the workload; it does not predict the finish.`
+        : 'No goal finish time on file. Race pace comes off recent long-run effort until a target is set in the plan.',
     taper_guidance,
   };
 }
 
-export async function generateSessionRaceReadinessLlm(
-  facts: Record<string, unknown>,
-): Promise<SessionRaceReadinessLlmV1 | null> {
-  const systemPrompt = `You are an experienced endurance coach. Your job is to produce one JSON object whose string values sound like you are speaking directly to the athlete after studying their long run.
-
-CRITICAL — OUTPUT HYGIENE: Never put fact field names, JSON keys, snake_case identifiers, or technical labels in any string you write. Do not write things like "(conditions_heat_flag)" or "pacing_split_seconds_per_mile". Reason from the numeric values and plain-language ideas only. Say "it peaked near 80°F", not the key name.
-
-Use only numbers and relationships that appear in DATA. Do not invent stats, dates, or race details. If something is missing, omit that thread instead of guessing.
-
-Today's elevation describes this workout's terrain load (use for fitness / drift / pace reads). Never treat it as the race course unless the plan course profile is in DATA (see user instructions).
-
-If DATA includes target_race_distance_miles, finish-time estimates must agree with per-mile pace × that distance (see user instructions).
-
-tactical_instruction must include numbers that appear in today's DATA only — never copy placeholder or example numbers from the instructions (see user instructions).
-
-Output: valid JSON only. No markdown fences, no preamble, no commentary outside the JSON.`;
-
-  const dtr = facts.days_to_race;
-  const rname = facts.race_name;
-  const daysPart = typeof dtr === 'number' ? String(dtr) : 'unknown';
-  const racePart =
-    typeof rname === 'string' && String(rname).trim() ? String(rname).trim() : 'the race';
-
-  const userPrompt = `You are an experienced endurance coach. An athlete just finished a long run about ${daysPart} days before ${racePart}. Write a race readiness assessment that reads like a smart coach who actually looked at the numbers — not a system summarizing a form.
-
-DATA (for your eyes only — do not echo key names in your answer):
-${JSON.stringify(facts, null, 2)}
-
-HOW TO REASON:
-
-Heart rate: Compare average HR, drift, and typical drift if both exist. If drift is lower than their typical, say plainly that it is a fitness / execution signal. If it was hot (use the temperature values or any described ramp from start to peak), strip the heat tax: late-run HR in rising heat is expected, not automatic loss of fitness. What does the HR story say about aerobic capacity right now?
-
-HR DRIFT CONTEXT (pipeline — use when interpreting "controlled drift"): hr_drift_bpm is the primary aerobic signal: when pace_normalized_drift_bpm is present, hr_drift_bpm matches it (HR change after accounting for intentional pace shift across the run). Otherwise hr_drift_bpm is terrain-adjusted HR drift from this activity's GPS (early vs late grade). hr_drift_bpm_terrain_adjusted is the analyzer's late-minus-early HR after that terrain adjustment (when present). terrain_contribution_bpm is how much raw HR change was attributed to hillier late terrain before that step. hr_drift_explanation classifies the story: "terrain_driven" means late hills largely explain the HR pattern; "cardiac_drift" is aerobic decoupling after pace/terrain accounting; "pace_driven" means HR tracked a deliberate pace change; "mixed" is several factors. When you say their drift was controlled or their aerobic system held steady, ground it in hr_drift_explanation and these fields — not only the magnitude.
-
-Pace: If they slowed (positive split in the data), say so with the actual magnitude. Was it explainable by heat, rolling or hilly terrain, or discipline — vs unexplained collapse? What should they take away for race execution?
-
-Conditions: If the temperature at the end or peak is much higher than at the start, heat was back-loaded and the hardest miles were the hottest — that reframes late fade. When DATA also suggests late climbing (e.g. rolling/hilly elevation_profile, meaningful elevation_gain_ft, hr_drift_explanation "terrain_driven", or positive terrain_contribution_bpm), treat final miles as carrying both heat and grade stress together — not heat alone. Cooler race morning usually means easier early hours — connect that to ${racePart}.
-
-Race day: Tie the threads together for ${racePart} specifically. What does today predict? What should they do the same or differently?
-
-PROJECTION / FINISH TIME SANITY: If DATA includes target_race_distance_miles (e.g. 26.2 for a marathon), any finish-time range you give must match your stated average pace per mile within ~5 minutes — compute: total minutes ≈ (pace minutes per mile) × (race miles). Example: ~10:45/mi for 26.2 mi is about 4h 42m, not 2h 45m. If target_race_distance_miles is null, do not assume 26.2; give pace guidance or a wide honest range and avoid precise finish clocks unless target_race_goal_finish_clock is on file.
-
-Today's route vs ${racePart} (both matter, different roles): Today's elevation gain and terrain profile in DATA reflect the terrain load that shaped this session's drift and pace — reference them when reasoning about fitness and execution under real hills. Do not imply they describe ${racePart}'s course unless DATA includes a plan course profile (course_profile). Without course_profile, keep race-day terrain out of verdict and tactical copy too — not only projection.
-
-COURSE PROFILE RULE (applies especially to "projection"): Only reference race course elevation, net gain/loss, or profile (rolling, hilly, net downhill, etc.) as ${racePart}'s course if DATA includes course_profile from the plan config. If course_profile is absent or empty, do not compare the race to today's route in projection: base "projection" on temperature delta between today's conditions and likely race morning, plus today's HR, pace, and drift. Never use today's elevation_gain_ft or elevation_profile as a stand-in for race terrain (e.g. do not say "similarly rolling (545 ft gain)" for the marathon unless that figure is explicitly race data inside course_profile).
-
-Taper: If their plan already includes taper structure, do not tell them to "cut volume" generically. Say what to protect (sleep, fuel, short sharp work if any) and what optional pieces to skip if tired. Name the actual next session if the data includes it.
-
-BLOCK PEAK (when DATA includes is_block_peak_run true): This run is the longest effort in the past 28 days — it is the definitive fitness checkpoint for this training block. Write the tactical instruction as the authoritative race-day number. It will be surfaced as the primary signal on the athlete's race overview screen and should reflect peak readiness, not a routine session read.
-
-TACTICAL_INSTRUCTION (mandatory): One race-day line tied to this session's DATA only. Use whatever anchors exist in DATA: fastest_mile + fastest_mile_pace, avg_pace, hr_drift_bpm vs typical_hr_drift_bpm, avg_hr, pacing_split_seconds_per_mile, temps, distance_miles — combine them so the athlete gets a concrete guardrail (pace ceiling, HR ceiling, or early-mile discipline vs a split they actually ran). Vary the wording run to run; do not reuse canned phrases from week to week if the numbers change.
-
-Shape (illustrative — substitute values ONLY from DATA, never from this prompt): "Your fastest mile was mile [N] at [pace from DATA] — don't run faster than [X] in the early miles at ${racePart}." OR "You averaged [avg_pace] / [avg_hr] bpm — use that as an early cap at ${racePart}." If fastest_mile is missing, use avg_pace or HR; if those are missing, use drift vs typical + duration.
-
-Bad (reject): generic intent with no digits from DATA, or any numbers that are not in DATA for this workout.
-
-OUTPUT RULES:
-- Second person ("you", "your").
-- Cite real numbers from DATA (+7 bpm, 15 mi, 37 s/mi, °F, etc.) — never cite field names.
-- No filler ("great job", "keep it up", "as you prepare").
-- If there is no honest concern, "flag" must be null.
-- "tactical_instruction" must satisfy TACTICAL_INSTRUCTION above: digits must reflect this session's DATA, not example numbers from the prompt.
-- "projection" must include brief reasoning, not only a time — and must follow COURSE PROFILE RULE above (no today's-elevation-as-race-proxy). Pace × target_race_distance_miles must match any finish clock you state (±~5 min).
-
-Respond with this exact JSON shape — string values only where shown, flag may be null:
-{
-  "headline": "specific, include at least one concrete number or comparison",
-  "verdict": "3-4 sentences: coach reasoning tying HR + pace + conditions to race day",
-  "tactical_instruction": "one sentence; every number must appear in DATA for this workout — see TACTICAL_INSTRUCTION",
-  "flag": "one real concern if the data supports it, otherwise null",
-  "projection": "finish or pace estimate with brief reasoning; race terrain only if course_profile in DATA — else temp + HR/pace only",
-  "taper_guidance": "2-3 sentences specific to the next ~two weeks — not generic advice"
-}`;
-
-  const raw = await callLLM({
-    system: systemPrompt,
-    user: userPrompt,
-    maxTokens: 1100,
-    temperature: 0.28,
-    model: 'sonnet',
-  });
-  if (raw == null || raw === '') {
-    console.warn('[race_readiness_llm] callLLM returned empty — check ANTHROPIC_API_KEY / credits / model');
-  }
-  const parsed = parseRaceReadinessLlmResponse(raw);
-  if (!parsed && raw) {
-    console.warn(
-      '[race_readiness_llm] empty or invalid LLM response (parse failed or tactical_instruction missing concrete number)',
-    );
-  }
-  return parsed;
-}
-
-export async function trySessionRaceReadinessLlm(params: {
+export async function buildSessionRaceReadiness(params: {
   sessionDetail: SessionDetailV1;
   workoutAnalysis: Record<string, unknown> | null;
   planContext: PlanContext;
   row: Record<string, unknown>;
   supabase?: any;
   userId?: string | null;
-}): Promise<SessionRaceReadinessLlmV1 | null> {
+}): Promise<SessionRaceReadinessV1 | null> {
   try {
-    return await trySessionRaceReadinessLlmImpl(params);
+    return await buildSessionRaceReadinessImpl(params);
   } catch (e) {
-    console.warn('[race_readiness_llm] unexpected error (suppress):', e instanceof Error ? e.message : e);
+    console.warn('[race_readiness] unexpected error (suppress):', e instanceof Error ? e.message : e);
     return null;
   }
 }
 
-async function trySessionRaceReadinessLlmImpl(params: {
+async function buildSessionRaceReadinessImpl(params: {
   sessionDetail: SessionDetailV1;
   workoutAnalysis: Record<string, unknown> | null;
   planContext: PlanContext;
   row: Record<string, unknown>;
   supabase?: any;
   userId?: string | null;
-}): Promise<SessionRaceReadinessLlmV1 | null> {
+}): Promise<SessionRaceReadinessV1 | null> {
   const sd = params.sessionDetail;
   const wa = params.workoutAnalysis;
   const pc = params.planContext;
@@ -780,12 +638,12 @@ async function trySessionRaceReadinessLlmImpl(params: {
   };
   const skip = raceReadinessGateSkipReason(gateParams);
   if (skip) {
-    console.warn('[race_readiness_llm] gate_skip:', skip);
+    console.warn('[race_readiness] gate_skip:', skip);
     return null;
   }
 
   if (distMi == null || distMi < 12) {
-    console.warn('[race_readiness_llm] gate_skip: below_12mi_block_peak_threshold', { distMi });
+    console.warn('[race_readiness] gate_skip: below_12mi_block_peak_threshold', { distMi });
     return null;
   }
 
@@ -800,12 +658,12 @@ async function trySessionRaceReadinessLlmImpl(params: {
       wid,
     );
   } else {
-    console.warn('[race_readiness_llm] prior_long_runs skipped (no supabase/userId/row id) — fail open longestPrior=0');
+    console.warn('[race_readiness] prior_long_runs skipped (no supabase/userId/row id) — fail open longestPrior=0');
   }
 
   const isBlockPeak = distMi >= 12 && distMi >= longestPrior;
   if (!isBlockPeak) {
-    console.warn('[race_readiness_llm] gate_skip: not_block_peak', {
+    console.warn('[race_readiness] gate_skip: not_block_peak', {
       current: distMi,
       longest_prior: longestPrior,
     });
@@ -816,12 +674,6 @@ async function trySessionRaceReadinessLlmImpl(params: {
     ...params,
     blockPeakMeta: { longest_prior_distance_miles: longestPrior },
   });
-  const llm = await generateSessionRaceReadinessLlm(packet);
-  if (llm) return llm;
-  const fb = raceReadinessDeterministicFallback(packet, pc);
-  if (fb) {
-    console.warn('[race_readiness_llm] using deterministic fallback (LLM empty or parse failed)');
-  }
-  return fb;
+  return raceReadinessDeterministicFallback(packet, pc);
 }
 

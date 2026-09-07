@@ -130,7 +130,6 @@ const LEDGER: Record<string, Reason> = {
   'run easy pace::src/components/TrainingBaselines.tsx': 'receipt',
   'run easy pace::src/lib/run-pace-calibration.ts': 'presence-gate',
   'run easy pace::supabase/functions/generate-combined-plan/index.ts': 'reconciler-input',
-  'run easy pace::supabase/functions/_shared/arc-setup-prompt.ts': 'prompt-text',
   'run easy pace::supabase/functions/_shared/block-adaptation/index.ts': 'comparator',
   'run easy pace::supabase/functions/adapt-plan/index.ts': 'comparator',
   // Remaining raw read is the SERVER PACE GATE (`:3630` `learnedPaceUsable`) — a presence test
@@ -143,7 +142,6 @@ const LEDGER: Record<string, Reason> = {
   'run threshold pace::supabase/functions/compute-workout-analysis/index.ts': 'writer',
   'run threshold pace::src/components/TrainingBaselines.tsx': 'receipt',
   'run threshold pace::src/lib/run-pace-calibration.ts': 'presence-gate',
-  'run threshold pace::supabase/functions/_shared/arc-setup-prompt.ts': 'prompt-text',
   // Updates the learned threshold after a race (reads the prior to diff, writes the next).
   'run threshold pace::supabase/functions/_shared/race-feedback.ts': 'writer',
   // Remaining raw read is the SERVER PACE GATE (`:3630` `learnedPaceUsable`) — a presence test
@@ -154,7 +152,6 @@ const LEDGER: Record<string, Reason> = {
   // ── ftp ──────────────────────────────────────────────────────────────────
   'ftp::supabase/functions/learn-fitness-profile/index.ts': 'writer',
   'ftp::src/components/TrainingBaselines.tsx': 'receipt',
-  'ftp::supabase/functions/_shared/arc-setup-prompt.ts': 'prompt-text',
   'ftp::supabase/functions/_shared/block-adaptation/index.ts': 'comparator',
   'ftp::supabase/functions/adapt-plan/index.ts': 'comparator',
   // compute-snapshot's bike anchor (`deriveBike`) was routed 2026-09-04 through `appliedLearnedFtp`
@@ -178,7 +175,6 @@ const LEDGER: Record<string, Reason> = {
   'swim css::src/components/AthleticRecordPage.tsx': 'unreviewed',
   'swim css::src/components/CompletedTab.tsx': 'unreviewed',
   'swim css::src/hooks/useWorkoutData.ts': 'unreviewed',
-  'swim css::supabase/functions/_shared/arc-setup-prompt.ts': 'prompt-text',
   'swim css::supabase/functions/_shared/planning-context.ts': 'unreviewed',
   'swim css::supabase/functions/_shared/race-projections.ts': 'unreviewed',
   'swim css::supabase/functions/workout-detail/index.ts': 'unreviewed',

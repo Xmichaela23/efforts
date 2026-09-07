@@ -1346,8 +1346,8 @@ function assemblePayload(
          * ⛔ THE TERRAIN CLAIM, AND IT IS STAMPED AS A CLAIM (2026-08-04).
          *
          * `goals.course_profile` already has a reader with an honesty rule built in:
-         * `race-readiness-llm` refuses to mention race terrain at all unless this field is present,
-         * and explicitly forbids using today's route as a stand-in for race day. Writing an
+         * `session-detail/race-readiness` reads it for the race-terrain facts and never uses today's
+         * route as a stand-in for race day. Writing an
          * athlete-typed number here turns that rule on — so the number had better be labelled for
          * what it is.
          *
@@ -4357,9 +4357,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           collects that this builder never had. Everything else that form asks (name, priority,
           strength protocol + frequency) is either answered elsewhere in this flow or defaulted.
 
-          ⛔ NO RACE PICKER HERE YET. The date is typed. `extract-races` exists and works
-          (web search, official name, A/B priority) and wiring it is the next slice — it changes what
-          this card LOOKS like, not what it produces, so the payload below is already final.
+          The race name and date are typed here, as everywhere else in the app (the web lookup that
+          used to fill them was deleted with the no-AI work order, 2026-09-07).
 
           ⛔ AND NO "just finish vs get faster" QUESTION. That answer picks the generator
           (`create-goal…:3411`), and the faster branch is gated on a real pace benchmark — an athlete
