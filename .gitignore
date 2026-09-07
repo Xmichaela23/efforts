@@ -47,3 +47,5 @@ test-outputs/
 # strength composer whose behaviour the deno suites actually pin.
 scripts/plan-test-output/
 .b1-matrix/
+.burner-*
+.burner-*/
