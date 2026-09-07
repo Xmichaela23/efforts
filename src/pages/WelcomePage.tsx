@@ -346,7 +346,7 @@ export default function WelcomePage() {
   /** A bordered pill, the height of the Strava button, so the two read as a pair. */
   const connectRow = (key: string, mark: React.ReactNode, title: string, line: string, on: boolean, onTap: () => void) => (
     <button key={key} type="button" onClick={() => { if (!on) onTap(); }} aria-pressed={on}
-      className={`w-full text-left flex items-center gap-3 px-4 h-11 rounded-xl border ${on ? 'border-white/40 bg-white/[0.10]' : 'border-white/25 bg-white/[0.08]'}`}>
+      className={`w-full text-left flex items-center gap-3 px-4 h-10 rounded-xl border ${on ? 'border-white/40 bg-white/[0.10]' : 'border-white/25 bg-white/[0.08]'}`}>
       <span className="shrink-0 flex items-center">{mark}</span>
       <span className="min-w-0 flex-1 flex items-baseline gap-2">
         <span className="text-[15px] text-white">{title}</span>
@@ -402,20 +402,12 @@ export default function WelcomePage() {
         )}
 
         {step === 3 && (
-          <StepLayout step={3} totalSteps={TOTAL} title="Your numbers" onBack={() => go(2)} onContinue={() => void finish()} canContinue continueLabel="Next" saving={saving}>
+          <StepLayout step={3} totalSteps={TOTAL} title="Your numbers" subtitle="Runners: threshold pace, 5K pace, easy heart-rate range. Riders: FTP." onBack={() => go(2)} onContinue={() => void finish()} canContinue continueLabel="Next" saving={saving}>
             <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
-              <div className="px-3 py-3">
-                <SectionHead Icon={Dumbbell} label="Plans need" colour="rgba(255,255,255,0.85)" />
-                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[14px]">
-                  <span className="text-white/60">Runners</span><span className="text-white/90">threshold pace · 5K pace · easy heart-rate range</span>
-                  <span className="text-white/60">Riders</span><span className="text-white/90">FTP</span>
-                </div>
-              </div>
-
-              <div className="px-3 py-3">
+              <div className="px-3 py-2.5">
                 <SectionHead Icon={Link2} label="Import" colour="rgba(255,255,255,0.85)" />
-                <p className="m-0 mb-2 text-[14px] text-white/85 leading-snug">Import your last 90 days from Strava or Garmin and we estimate them.</p>
-                <div className="space-y-2">
+                <p className="m-0 mb-2 text-[13px] text-white/80 leading-snug">Import your last 90 days and we estimate them.</p>
+                <div className="space-y-1.5">
                   {connectRow('strava', <StravaMark />, 'Strava', '', stravaOn, () => void startStrava())}
                   {connectRow('garmin', <Watch className="h-5 w-5" style={{ color: '#00A0DE' }} />, 'Garmin Connect', '', garminOn, () => void startGarmin())}
                   {isNativeIOS && healthKit && connectRow('health', <Heart className="h-5 w-5" style={{ color: '#FF2D55' }} />, 'Apple Health', '', healthOn, () => void startAppleHealth())}
@@ -423,9 +415,9 @@ export default function WelcomePage() {
                 {connectNote && <p className="m-0 mt-2 text-[12px] text-white/60">{connectNote}</p>}
               </div>
 
-              <div className="px-3 py-3">
+              <div className="px-3 py-2.5">
                 <SectionHead Icon={User} label="Your numbers" colour="rgba(255,255,255,0.85)" />
-                <p className="m-0 mb-1 text-[14px] text-white/85 leading-snug">If you know them, add them. You can always test with our tests.</p>
+                <p className="m-0 mb-1 text-[13px] text-white/80 leading-snug">If you know them, add them. Or test with our tests.</p>
                 <NumberRow id="threshold" name="Threshold pace" hint={metric ? 'm:ss/km' : 'm:ss/mi'} inputMode="numeric" sport="run"
                   value={thr.sec_per_mi != null ? `${paceToText(metric ? thr.sec_per_mi / 1.609344 : thr.sec_per_mi)}/${metric ? 'km' : 'mi'} · ${numberWord(thr.source, thrMine)}` : null}
                   onSave={(t) => { const sec = parsePaceText(t); if (sec == null) return; const secPerMi = metric ? sec * 1.609344 : sec; setPn((p) => ({ ...p, threshold_pace_min_per_mi: paceToText(secPerMi), threshold_pace_source: 'manual' })); }} />
@@ -439,7 +431,6 @@ export default function WelcomePage() {
                 <NumberRow id="ftp" name="FTP" hint="W" inputMode="numeric" sport="bike"
                   value={ftp.value != null ? `${Math.round(Number(ftp.value))} W · ${numberWord(ftp.source, ftpMine)}` : null}
                   onSave={(t) => { const v = Math.round(Number(t)); if (!(v > 0)) return; setPn((p) => ({ ...p, ftp: v, ftp_source: 'manual' })); }} />
-                <p className="mt-2 text-[12px] text-white/45">Tap a value to add or change it.</p>
               </div>
             </div>
           </StepLayout>
