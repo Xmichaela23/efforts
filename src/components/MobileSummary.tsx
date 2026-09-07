@@ -369,6 +369,26 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       })()}
 
 
+      {/* D-167: pool-swim narrative RE-ENABLED. The swim analyzer now emits clean plain prose with the
+          authoritative pace (verified on real data — no markdown title, 2:00/100yd, 50 m pool), so swims
+          get INSIGHTS like run/ride and fill the dead space below the card. SessionNarrative also hosts
+          the recompute control, so the separate D-164 pool-swim recompute button is removed (Q-064). */}
+      <SessionNarrative
+        sessionDetail={sd}
+        hasSessionDetail={hasSessionDetail}
+        noPlannedCompare={noPlannedCompare}
+        planLinkNote={!planned ? 'No plan session linked.' : null}
+        recomputing={recomputing}
+        recomputeError={recomputeError}
+        onRecompute={recomputeAnalysis}
+        // The read comes first, the interval table is the evidence under it; Next stays at the very bottom
+        // (Michael, 2026-09-07: "put this above intervals" · "leave next at the bottom").
+        hideNextUp
+        // This workout's discipline colours the Performance tab's readout labels — the same
+        // SPORT_COLORS the Details tab's plate uses, so the two tabs of one workout agree.
+        accentRgb={getDisciplineColorRgb(normalizeDiscipline(type) || String(type || ''))}
+      />
+
       {/* Execution score card is rendered in UnifiedWorkoutView strip to avoid duplication */}
       {/* Goal race: no segments table — summary times + debrief only */}
       {!sd?.race?.is_goal_race && (
@@ -390,25 +410,8 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
           })() : null}
         />
       )}
-      {/* Pool / Lengths / fins moved INTO the unified swim card (D-166, PoolSwimOverall). */}
-
-      {/* D-167: pool-swim narrative RE-ENABLED. The swim analyzer now emits clean plain prose with the
-          authoritative pace (verified on real data — no markdown title, 2:00/100yd, 50 m pool), so swims
-          get INSIGHTS like run/ride and fill the dead space below the card. SessionNarrative also hosts
-          the recompute control, so the separate D-164 pool-swim recompute button is removed (Q-064). */}
-      <SessionNarrative
-        sessionDetail={sd}
-        hasSessionDetail={hasSessionDetail}
-        noPlannedCompare={noPlannedCompare}
-        planLinkNote={!planned ? 'No plan session linked.' : null}
-        recomputing={recomputing}
-        recomputeError={recomputeError}
-        onRecompute={recomputeAnalysis}
-        // This workout's discipline colours the Performance tab's readout labels — the same
-        // SPORT_COLORS the Details tab's plate uses, so the two tabs of one workout agree.
-        accentRgb={getDisciplineColorRgb(normalizeDiscipline(type) || String(type || ''))}
-      />
-
+      {/* NEXT sits last, after the interval table (Michael, 2026-09-07). */}
+      {(sd as any)?.next_session && <NextUp session={(sd as any).next_session} />}
       {/* Swim "richer data — join the iOS beta" CTA REMOVED (2026-07-19, Michael) — a promo pitch on the
           swim screen; not wanted. The swim read is facts-only; we don't upsell on it. Component left in
           the tree (unrendered) for the cleanup sweep. */}

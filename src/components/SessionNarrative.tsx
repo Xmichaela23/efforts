@@ -433,7 +433,7 @@ export default function SessionNarrative({
           prints a ride in. Anything unlisted keeps its place after these. */}
       {(() => {
         const ORDER: Record<string, number> = {
-          'INTENSITY': 1, 'PACING': 2, 'TERRAIN': 3, 'CONDITIONS': 3,
+          'GRADE-ADJUSTED PACE': 1, 'INTENSITY': 1, 'PACING': 2, 'TERRAIN': 3, 'CONDITIONS': 3,
           'POWER ADHERENCE': 4, 'INTERVAL EXECUTION': 5, 'PLAN CONTEXT': 6,
           'HEART RATE': 7, 'CARDIAC DRIFT': 8, 'EFFICIENCY': 9,
         };
