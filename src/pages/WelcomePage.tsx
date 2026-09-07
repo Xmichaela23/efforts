@@ -294,12 +294,12 @@ export default function WelcomePage() {
 
   // ── pieces ───────────────────────────────────────────────────────────────────────────────
   const chips = (options: string[], on: Set<string>, toggle: (v: string) => void, colour: string) => (
-    <div className="mt-2 flex flex-wrap gap-2">
+    <div className="mt-2 flex flex-wrap gap-1.5">
       {options.map((o) => {
         const active = on.has(o);
         return (
           <GalaxyButton key={o} shape="chip" variant={active ? 'primary' : 'secondary'} aria-pressed={active}
-            className={active ? 'text-white' : 'text-white/55'}
+            className={`!px-2.5 !py-1 !text-[12px] ${active ? 'text-white' : 'text-white/55'}`}
             style={active ? { borderColor: `${colour}88`, background: `${colour}22` } : undefined}
             onClick={() => toggle(o)}>{o}</GalaxyButton>
         );
@@ -362,22 +362,20 @@ export default function WelcomePage() {
         )}
 
         {step === 2 && (
-          <StepLayout step={2} totalSteps={TOTAL} title="Your gym" subtitle="The plan will cater lifts to the equipment you have." onBack={() => go(1)} onContinue={() => void finishSports()} canContinue={canLeaveSports} continueLabel="Next" saving={saving} blockedReason={blocked}>
+          <StepLayout step={2} totalSteps={TOTAL} title="Your gym" subtitle="The plan caters lifts to the equipment you have." onBack={() => go(1)} onContinue={() => void finishSports()} canContinue={canLeaveSports} continueLabel="Next" saving={saving} blockedReason={blocked}>
             <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
               <div className="px-3 py-3">
                 <SectionHead Icon={Wrench} label="Where you lift" colour={getDisciplineColor('strength')} />
                 <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => setGym('commercial')} aria-pressed={gym === 'commercial'} className={card(gym === 'commercial')}>
-                    <span className="block text-base">Commercial gym</span>
-                    <span className="block text-sm mt-0.5 text-white/55">Has everything.</span>
+                  <button type="button" onClick={() => setGym('commercial')} aria-pressed={gym === 'commercial'} className={`${card(gym === 'commercial')} !p-3`}>
+                    <span className="block text-[15px]">Commercial gym</span>
                   </button>
-                  <button type="button" onClick={() => setGym('home')} aria-pressed={gym === 'home'} className={card(gym === 'home')}>
-                    <span className="block text-base">Home gym</span>
-                    <span className="block text-sm mt-0.5 text-white/55">Tap what you own.</span>
+                  <button type="button" onClick={() => setGym('home')} aria-pressed={gym === 'home'} className={`${card(gym === 'home')} !p-3`}>
+                    <span className="block text-[15px]">Home gym</span>
                   </button>
                 </div>
                 {gym === 'home' && chips(HOME_GYM_EQUIPMENT_OPTIONS, gear, toggleGear, getDisciplineColor('strength'))}
-                {gym === 'commercial' && <p className="m-0 mt-2 text-[12px] text-white/55">A commercial gym has everything the plan asks for.</p>}
+                {gym === 'commercial' && <p className="m-0 mt-2 text-[12px] text-white/55">Has everything the plan asks for.</p>}
                 {gym == null && <p className="m-0 mt-2 text-[12px] text-white/55">Anything else, swim gear included, lives on Profile.</p>}
               </div>
             </div>
