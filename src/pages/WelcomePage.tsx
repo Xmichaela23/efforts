@@ -74,6 +74,12 @@ const StravaMark = () => (
   </svg>
 );
 
+/** The Train screen's card (NonRaceBuilder `optBtn`). */
+const card = (active: boolean) =>
+  `w-full text-left p-4 rounded-xl border text-white transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40 ${
+    active ? 'border-[rgb(var(--wiz-accent-rgb,236,233,227))] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)]' : 'border-white/12 bg-white/[0.03]'
+  }`;
+
 const plateClass = 'galaxy-card readout-texture readout-texture--forge rounded-2xl divide-y divide-white/[0.10]';
 
 export default function WelcomePage() {
@@ -308,7 +314,7 @@ export default function WelcomePage() {
         const on = value === o.v;
         return (
           <button key={o.v} type="button" aria-pressed={on} onClick={() => onPick(o.v)}
-            className={`px-3 py-1 text-[13px] ${i > 0 ? 'border-l border-white/15' : ''} ${on ? 'text-white bg-white/[0.12]' : 'text-white/50 bg-white/[0.03]'}`}>
+            className={`px-3 py-1 text-[13px] focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40 ${i > 0 ? 'border-l border-white/15' : ''} ${on ? 'text-white bg-white/[0.12]' : 'text-white/50 bg-white/[0.03]'}`}>
             {o.label}
           </button>
         );
@@ -360,13 +366,17 @@ export default function WelcomePage() {
             <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
               <div className="px-3 py-3">
                 <SectionHead Icon={Wrench} label="Where you lift" colour={getDisciplineColor('strength')} />
-                {segmented<'commercial' | 'home'>([{ v: 'commercial', label: 'Commercial gym' }, { v: 'home', label: 'Home gym' }], gym, setGym)}
-                {gym === 'home' && (
-                  <>
-                    <p className="m-0 mt-2 text-[12px] text-white/55">Tap what you own.</p>
-                    {chips(HOME_GYM_EQUIPMENT_OPTIONS, gear, toggleGear, getDisciplineColor('strength'))}
-                  </>
-                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setGym('commercial')} aria-pressed={gym === 'commercial'} className={card(gym === 'commercial')}>
+                    <span className="block text-base">Commercial gym</span>
+                    <span className="block text-sm mt-0.5 text-white/55">Has everything.</span>
+                  </button>
+                  <button type="button" onClick={() => setGym('home')} aria-pressed={gym === 'home'} className={card(gym === 'home')}>
+                    <span className="block text-base">Home gym</span>
+                    <span className="block text-sm mt-0.5 text-white/55">Tap what you own.</span>
+                  </button>
+                </div>
+                {gym === 'home' && chips(HOME_GYM_EQUIPMENT_OPTIONS, gear, toggleGear, getDisciplineColor('strength'))}
                 {gym === 'commercial' && <p className="m-0 mt-2 text-[12px] text-white/55">A commercial gym has everything the plan asks for.</p>}
                 {gym == null && <p className="m-0 mt-2 text-[12px] text-white/55">Anything else, swim gear included, lives on Profile.</p>}
               </div>
