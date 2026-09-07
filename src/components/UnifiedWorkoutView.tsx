@@ -1064,7 +1064,17 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   const { data, error } = await supabase.functions.invoke('share-strength-to-strava', {
                     body: { workoutId: wid },
                   });
-                  const payload = (data ?? {}) as { url?: string | null; error?: string };
+                  let payload = (data ?? {}) as { url?: string | null; error?: string };
+                  // A non-2xx answer arrives as `error` with an empty `data`; the server's reason is in
+                  // the response body on the error's context (2026-09-07: every failure read as the
+                  // generic line, so nobody could tell a dead token from a missing scope).
+                  if (error && !payload?.error) {
+                    try {
+                      const ctx = (error as { context?: Response }).context;
+                      const body = ctx ? await ctx.clone().json().catch(() => null) : null;
+                      if (body && typeof body.error === 'string') payload = { ...payload, error: body.error };
+                    } catch { /* keep the generic line */ }
+                  }
                   if (error || payload?.error) {
                     setShareError(payload?.error || 'Could not post to Strava.');
                   } else if (payload?.url) {
