@@ -412,27 +412,7 @@ export default function SessionNarrative({
         * — the coach and the week read from it, and `narrativeText` still resolves. This is a RENDER
         * decision on the session screen only.
         */}
-      {!hasNarrative && hasSummaryBullets && (
-        <div>
-          <span className="readout-label text-xs font-medium uppercase tracking-wide">
-            {summaryTitle}
-          </span>
-          <div className="mt-1 space-y-1.5">
-            {(() => {
-              const seen = new Set<string>();
-              const out = summaryBullets.filter((b) => {
-                const k = b.trim();
-                if (seen.has(k)) return false;
-                seen.add(k);
-                return true;
-              });
-              return out.slice(0, 4).map((b: string, i: number) => (
-                <p key={i} className="text-sm text-gray-300 leading-relaxed">{String(b)}</p>
-              ));
-            })()}
-          </div>
-        </div>
-      )}
+      {/* The INSIGHTS bullets are gone too (Michael, 2026-09-07: "kill insights"): the one line left, "HR 131 bpm", is already in the table above. */}
       {/* Macro trends live on the State screen now (single source of truth). The per-session
           discipline context is `discipline_trend` (read from the cached spine, never a competing
           verdict). The old raw-pace/pace-at-HR TrendSparkline was DELETED 2026-07-11 (Q-157) — no
