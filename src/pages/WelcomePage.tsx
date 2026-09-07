@@ -80,9 +80,6 @@ const card = (active: boolean) =>
     active ? 'border-[rgb(var(--wiz-accent-rgb,236,233,227))] bg-[rgba(var(--wiz-accent-rgb,236,233,227),0.10)]' : 'border-white/12 bg-white/[0.03]'
   }`;
 
-/** What the strength plan is built on (the Standard Focus card's requirement, NonRaceBuilder). */
-const NEEDED_GEAR = ['Barbell + plates', 'Squat rack / Power cage', 'Bench (flat/adjustable)'];
-
 const plateClass = 'galaxy-card readout-texture readout-texture--forge rounded-2xl divide-y divide-white/[0.10]';
 
 export default function WelcomePage() {
@@ -296,16 +293,15 @@ export default function WelcomePage() {
   };
 
   // ── pieces ───────────────────────────────────────────────────────────────────────────────
-  const chips = (options: string[], on: Set<string>, toggle: (v: string) => void, colour: string, needed: string[] = []) => (
+  const chips = (options: string[], on: Set<string>, toggle: (v: string) => void, colour: string) => (
     <div className="mt-2 flex flex-wrap gap-1.5">
       {options.map((o) => {
         const active = on.has(o);
-        const need = needed.includes(o);
         return (
           <GalaxyButton key={o} shape="chip" variant={active ? 'primary' : 'secondary'} aria-pressed={active}
             className={`!px-2.5 !py-1 !text-[12px] ${active ? 'text-white' : 'text-white/55'}`}
-            style={active ? { borderColor: `${colour}88`, background: `${colour}22` } : need ? { borderColor: `${colour}55` } : undefined}
-            onClick={() => toggle(o)}>{o}{need && !active ? <span className="ml-1 text-[10px] text-white/45">needed</span> : null}</GalaxyButton>
+            style={active ? { borderColor: `${colour}88`, background: `${colour}22` } : undefined}
+            onClick={() => toggle(o)}>{o}</GalaxyButton>
         );
       })}
     </div>
@@ -366,7 +362,7 @@ export default function WelcomePage() {
         )}
 
         {step === 2 && (
-          <StepLayout step={2} totalSteps={TOTAL} title="Your gym" subtitle="The plan caters lifts to the equipment you have." onBack={() => go(1)} onContinue={() => void finishSports()} canContinue={canLeaveSports} continueLabel="Next" saving={saving} blockedReason={blocked}>
+          <StepLayout step={2} totalSteps={TOTAL} title="Your gym" subtitle="Each plan says what it needs when you pick it." onBack={() => go(1)} onContinue={() => void finishSports()} canContinue={canLeaveSports} continueLabel="Next" saving={saving} blockedReason={blocked}>
             <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
               <div className="px-3 py-3">
                 <SectionHead Icon={Wrench} label="Where you lift" colour={getDisciplineColor('strength')} />
@@ -378,18 +374,7 @@ export default function WelcomePage() {
                     <span className="block text-[15px]">Home gym</span>
                   </button>
                 </div>
-                {gym === 'home' && (
-                  <>
-                    <p className="m-0 mt-2 text-[12px] text-white/55">The plan is built on a barbell and plates, a rack and a bench.</p>
-                    {chips(HOME_GYM_EQUIPMENT_OPTIONS, gear, toggleGear, getDisciplineColor('strength'), NEEDED_GEAR)}
-                    {NEEDED_GEAR.some((g) => !gear.has(g)) && gear.size > 0 && (
-                      <p className="m-0 mt-2 text-[12px] text-white/55">
-                        Without {NEEDED_GEAR.filter((g) => !gear.has(g)).map((g) => g.split(' (')[0].split(' /')[0].toLowerCase()).join(', ')}, the plan substitutes the lifts that need it.
-                      </p>
-                    )}
-                  </>
-                )}
-                {gym === 'commercial' && <p className="m-0 mt-2 text-[12px] text-white/55">Has everything the plan is built on.</p>}
+                {gym === 'home' && chips(HOME_GYM_EQUIPMENT_OPTIONS, gear, toggleGear, getDisciplineColor('strength'))}
                 {gym == null && <p className="m-0 mt-2 text-[12px] text-white/55">Anything else, swim gear included, lives on Profile.</p>}
               </div>
             </div>
