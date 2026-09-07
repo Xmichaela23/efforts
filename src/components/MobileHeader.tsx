@@ -46,12 +46,9 @@ export function MobileHeader({
   const navigate = useNavigate();
   const { isAdmin, loading: adminLoading } = useAppAdmin();
 
-  const openHelpEmail = () => {
-    const q = new URLSearchParams({
-      subject: 'Efforts — Help request',
-    });
-    window.location.href = `mailto:support@efforts.work?${q.toString()}`;
-  };
+  // Opens the support page rather than an empty email. The page answers the common questions and
+  // carries the address for anything it does not. It is also the support site given to Strava and Garmin.
+  const openHelpEmail = () => navigate('/support');
 
   const handleLogout = async () => {
     if (onLogout) {

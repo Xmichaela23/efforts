@@ -9,6 +9,7 @@ import { AppProvider } from "@/contexts/AppContext";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Privacy from "./pages/Privacy";
+import Support from "./pages/Support";
 import StravaCallback from "./components/StravaCallback"; // ✅ UNCOMMENTED
 import GarminCallback from "./components/GarminCallback";
 import Connections from "./components/Connections";
@@ -34,6 +35,7 @@ const App = () => (
 <Route path="/profile/athletic-record" element={<Index />} />
 <Route path="/account" element={<Index />} />
 <Route path="/privacy" element={<Privacy />} />
+<Route path="/support" element={<Support />} />
 <Route path="/reset-password" element={<ResetPassword />} /> {/* opened from the reset email; no session needed */}
 <Route path="/strava/callback" element={<StravaCallback />} /> {/* ✅ UNCOMMENTED */}
 <Route path="/auth/garmin/callback" element={<GarminCallback />} />
