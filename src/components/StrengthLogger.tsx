@@ -78,7 +78,7 @@ import { isBandAssistedMovement } from '@/lib/band-assistance';
 import { canWritePullupCapacity } from '@/lib/pullup-progression';
 // Rest-timer lengths + the plyo test, extracted so both are testable and the main-lift question is
 // asked of the shared classifier rather than a private regex.
-import { calculateRestTime, isPlyometricMovement as isPlyometric, restBucketForIntent, restCueForBucket, REST_MINUTES_ARE_OURS } from '@/lib/strength-rest-timer';
+import { calculateRestTime, isPlyometricMovement as isPlyometric, restBucketForIntent, restCueForBucket, WARMUP_REST_SEC, REST_MINUTES_ARE_OURS } from '@/lib/strength-rest-timer';
 import { PLYO_FAMILIES, PLYO_FAMILY_IDS, type PlyoFamily } from '@shared/standing-plan/plyo';
 
 // ⛔ THE PLYO ROW IS A DRILL, NOT A SET (WORKORDER-plyo-screen-2026-09-02, p227). No weight, no rep
@@ -4282,9 +4282,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       if (set.duration_seconds !== undefined) return;          // no rest after a duration hold
       if (setIndex >= ex.sets.length - 1) return;              // no rest after the last set
       const restKey = `${exerciseId}-${setIndex}`;
-      const calculatedRest = (typeof set.reps === 'number' && set.reps > 0)
-        ? calculateRestTime(ex.name, set.reps, slotIntentOf(ex))
-        : 90;
+      const calculatedRest = set.setType === 'warmup'
+        ? WARMUP_REST_SEC
+        : (typeof set.reps === 'number' && set.reps > 0)
+          ? calculateRestTime(ex.name, set.reps, slotIntentOf(ex))
+          : 90;
       setRestDismissed((prev) => { if (!prev.has(restKey)) return prev; const n = new Set(prev); n.delete(restKey); return n; });
       setTimers((prev) => {
         if (prev[restKey]?.running) return prev;                // already running — don't restart
@@ -5100,9 +5102,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               {restBucket && (
                 <div className="pt-1.5">
                   <p className="text-[12px] leading-snug text-[#FFE6D5]/85">{restCueForBucket(restBucket)}</p>
-                  {/* ⛔ WHOSE NUMBER IT IS, ON THE SCREEN THAT SHOWS IT. He gives the rule and no
-                      minutes; the clock above is our stand-in and does not get to look like his. */}
-                  <p className="pt-1 text-[11px] leading-snug text-[#FFE6D5]/50">{REST_MINUTES_ARE_OURS}</p>
+                  {/* Whose minutes these are is recorded in strength-rest-timer.ts (REST_MINUTES_ARE_OURS)
+                      and docs/STATE-SOURCES.md, not on the screen (Michael, 2026-09-07: "LLM slop"). */}
                 </div>
               )}
             </div>

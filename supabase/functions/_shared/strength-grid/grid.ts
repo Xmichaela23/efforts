@@ -391,8 +391,10 @@ export function resolveSlot(req: SlotRequest): ResolvedSlot {
   // rest timer can print the cue alone beside its clock (2026-08-27); a note reader wants both.
   notes.push(
     req.intent === 'HYP'
-      ? { kind: 'source', text: `${REST_BETWEEN_SETS_RULE_HYP.cue} ${REST_BETWEEN_SETS_RULE_HYP.provenance}`, cite: 'Viada p84' }
-      : { kind: 'source', text: `${REST_BETWEEN_SETS_RULE.cue} ${REST_BETWEEN_SETS_RULE.provenance}`, cite: 'Viada p78' },
+      // The instruction only (2026-09-07). The provenance sentence is for whoever maintains the
+      // number and read as talk about "the source" on an athlete's screen; the cite carries the page.
+      ? { kind: 'source', text: REST_BETWEEN_SETS_RULE_HYP.cue, cite: 'Viada p84' }
+      : { kind: 'source', text: REST_BETWEEN_SETS_RULE.cue, cite: 'Viada p78' },
   );
   if (prescription.kind === 'barbell' && prescription.setsBand.lo !== prescription.setsBand.hi) {
     notes.push({

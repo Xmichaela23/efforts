@@ -57,6 +57,10 @@ export const isPlyometricMovement = (exerciseName: string): boolean => {
  * plyometrics stay 150s, and every accessory band is untouched.
  */
 export const HEAVY_MAIN_REST_SEC = 180;
+// OURS — a warm-up set is not the work, so it does not take the work's rest (Michael, 2026-09-07:
+// three minutes after the empty bar). Strong and Hevy run their warm-up sets on a short timer.
+// docs/STATE-SOURCES.md has the row.
+export const WARMUP_REST_SEC = 60;
 
 /**
  * ⛔⛔ WHAT THE SLOT IS, NOT JUST WHAT THE MOVEMENT IS (2026-08-27).

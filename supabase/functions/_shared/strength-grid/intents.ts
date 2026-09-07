@@ -207,7 +207,7 @@ export const REST_BETWEEN_SETS_RULE = {
    * ⚠️ ONE OWNER. The timer imports this; it does not carry its own wording (2026-08-27).
    */
   cue: 'Rest until you are nearly recovered, but not so long that you cool down. Take the next set '
-    + 'when you know you can finish it without getting crushed.',
+    + 'when you know you can finish it.',
   /** ⛔ WHY ANY CLOCK BESIDE IT IS OURS. */
   provenance: 'A strength session should not accumulate fatigue. The source gives this as a rule '
     + 'and no number of minutes.',
@@ -218,9 +218,7 @@ export const REST_BETWEEN_SETS_RULE = {
  * caller can stamp the strength rule on a hypertrophy slot by accident.
  */
 export const REST_BETWEEN_SETS_RULE_HYP = {
-  cue: 'Muscle-building work is the exception: the point where capacity drops off is part of the '
-    + 'stimulus rather than the end of the session, so it does not need the same near-full recovery '
-    + 'between sets.',
+  cue: 'Shorter rest on purpose. Carrying some fatigue into the next set is part of this work.',
   provenance: 'The source gives this as a rule and no number of minutes.',
 } as const;
 
