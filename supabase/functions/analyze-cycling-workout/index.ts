@@ -1,3 +1,4 @@
+import { halvesSteady, notSteadyLine } from '../_shared/ride-halves-steady.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { hrDriftHalvesPct, warmupSkipSeconds } from '../_shared/hr-drift-halves.ts';
 import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
@@ -240,6 +241,8 @@ export function generateCyclingAdherenceSummary(opts: {
   factPacket: { facts?: { normalized_power_w?: number | null; intensity_factor?: number | null; classified_type?: string | null } | null } | null | undefined;
   /** Computed from `hrAnalysis.hr_drift_bpm / hrAnalysis.early_avg_hr * 100`; null when HR unavailable. */
   hrDriftPct: number | null;
+  /** Two-halves pedalling power; the drift reading is withheld when they differ by more than 10%. */
+  powerHalves?: { first_w?: number | null; second_w?: number | null } | null;
 }): CyclingAdherenceSummary | null {
   const intervals = Array.isArray(opts.intervalBreakdown) ? opts.intervalBreakdown : [];
   const workIntervals = intervals.filter((i) => i?.interval_type === 'work');
@@ -279,7 +282,11 @@ export function generateCyclingAdherenceSummary(opts: {
 
   // HR drift interpretation. Cycling stores drift_bpm + early/late HR; convert to %
   // for the interpretation thresholds (which mirror running's drift bands).
-  if (typeof opts.hrDriftPct === 'number' && Number.isFinite(opts.hrDriftPct)) {
+  const halvesOk = halvesSteady(opts.powerHalves?.first_w, opts.powerHalves?.second_w);
+  if (halvesOk === false) {
+    // ⛔ WITHHELD WITH THE REASON (2026-09-07): drift answers "did heart rate hold at a constant effort".
+    technical_insights.push({ label: 'Cardiac drift', value: notSteadyLine(Number(opts.powerHalves!.first_w), Number(opts.powerHalves!.second_w)) });
+  } else if (typeof opts.hrDriftPct === 'number' && Number.isFinite(opts.hrDriftPct)) {
     const drift = opts.hrDriftPct;
     if (Math.abs(drift) < 3) {
       technical_insights.push({
@@ -2006,6 +2013,7 @@ Deno.serve(async (req) => {
       intervalBreakdown,
       factPacket: cyclingFactPacketV1,
       hrDriftPct: cyclingHrDriftPct,
+      powerHalves: (cyclingFactPacketV1 as any)?.derived?.power_halves ?? null,
     });
     console.log('📝 [ADHERENCE SUMMARY] verdict:', adherenceSummary?.verdict ?? '(null)', 'technical_insights:', adherenceSummary?.technical_insights?.length ?? 0, 'plan_impact:', !!adherenceSummary?.plan_impact);
 

@@ -2,6 +2,7 @@
 // SESSION_DETAIL_V1 — Build from snapshot slice + workout_analysis
 // =============================================================================
 
+import { halvesSteady, notSteadyLine } from '../ride-halves-steady.ts';
 import type { SessionDetailV1, SegmentVerdictV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
 import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
 import type { VerdictDirection } from '../core-verdict.ts';
@@ -1763,14 +1764,21 @@ export function buildAnalysisDetailRows(
       const ct = String((factPacket?.facts as any)?.classified_type || '').toLowerCase();
       const isAerobicRide = /endurance|recovery|long|aerobic|base|z2|easy/.test(ct);
       const dec = Number((comp?.analysis?.efficiency as any)?.aerobic_decoupling_pct);
-      if (isAerobicRide && Number.isFinite(dec)) {
+      const ph = (factPacket as any)?.derived?.power_halves;
+      const steady = halvesSteady(ph?.first_w, ph?.second_w);
+      if (isAerobicRide && steady === false) {
+        // ⛔ WITHHELD WITH THE REASON (2026-09-07). The ratio moved because the effort moved.
+        rows.push({ label: 'Heart rate', value: notSteadyLine(Number(ph.first_w), Number(ph.second_w)) });
+      } else if (isAerobicRide && Number.isFinite(dec)) {
         const d = Math.round(dec * 10) / 10;
         // ⛔ NAMED FOR WHAT IT MEASURES (2026-09-03, WORKORDER-bike-state-audit §2). This number is POWER
         // AGAINST HEART RATE — the first-half power-to-heart-rate ratio against the second — and a positive
         // value means that ratio fell. "Moderate drift over the ride" read as heart rate climbing; on the Sep 3
         // ride heart rate FELL (139 → 129) and power fell faster (155 → 136 W), so the ratio still fell 7.4%.
         // The sentence now says which ratio moved and which way; the bare number stays as the receipt.
-        const desc = d < 5 ? 'Power to heart rate held steady'
+        // Sign-aware (2026-09-07): a large NEGATIVE number is not "held steady" — the ratio rose.
+        const desc = d <= -5 ? 'Power to heart rate rose over the ride'
+          : d < 5 ? 'Power to heart rate held steady'
           : d <= 10 ? 'Power to heart rate fell over the ride'
           : 'Power to heart rate fell hard over the ride';
         rows.push({ label: 'Heart rate', value: `${desc} (${d}%)` });
