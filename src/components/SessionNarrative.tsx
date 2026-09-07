@@ -425,54 +425,45 @@ export default function SessionNarrative({
         (sd as any).segment_verdicts.map((sv: any, i: number) => (
           <RouteDoorway key={i} verdict={sv} />
         ))}
-      {hasAnalysisDetails && (
-        <div className="space-y-1.5">
-          {analysisRows.slice(0, 8).map((r, i) => {
-            // "CONDITIONS" in old-format blocks contains elevation/course profile — label as TERRAIN.
-            // True weather (temp, humidity) is a separate row or part of CONDITIONS when no terrain exists.
-            const rawLabel = String(r.label ?? '');
-            const value = String(r.value ?? '');
-            const isTerrainData = rawLabel.toUpperCase() === 'CONDITIONS' && /\bft\b|gain|descent|downhill|uphill|elevation|grade|climb/i.test(value);
-            const label = isTerrainData ? 'TERRAIN' : rawLabel;
-            return (
-              <div key={i}>
-                <span className="readout-label text-xs font-medium uppercase tracking-wide">{label}</span>
-                <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{value}</p>
+      {/* ⛔ ONE LIST, IN THE ORDER AN ATHLETE READS (Michael, 2026-09-07). The server sends two lists — the
+          session rows (heart rate, efficiency, pacing, terrain) and the adherence insights (power adherence,
+          interval execution, drift, intensity, plan context). They used to print in two blocks, so the two
+          heart-rate readings sat four rows apart and the ride's effort came near the bottom. Merged here and
+          ordered: what I did · did I hit the plan · what it says about my engine. Same order TrainingPeaks
+          prints a ride in. Anything unlisted keeps its place after these. */}
+      {(() => {
+        const ORDER: Record<string, number> = {
+          'INTENSITY': 1, 'PACING': 2, 'TERRAIN': 3, 'CONDITIONS': 3,
+          'POWER ADHERENCE': 4, 'INTERVAL EXECUTION': 5, 'PLAN CONTEXT': 6,
+          'HEART RATE': 7, 'CARDIAC DRIFT': 8, 'EFFICIENCY': 9,
+        };
+        const rows: Array<{ label: string; value: string }> = [];
+        const push = (rawLabel: unknown, rawValue: unknown) => {
+          const value = String(rawValue ?? '');
+          let label = String(rawLabel ?? '');
+          if (label.toUpperCase() === 'CONDITIONS' && /\bft\b|gain|descent|downhill|uphill|elevation|grade|climb/i.test(value)) label = 'TERRAIN';
+          if (label && value) rows.push({ label, value });
+        };
+        if (hasAnalysisDetails) analysisRows.slice(0, 8).forEach((r) => push(r.label, r.value));
+        if (!hasNarrative && hasStructuredForRender) {
+          technicalInsightsForRender.forEach((t) => push(t.label, t.value));
+          if (hasPlanImpactForRender) push(planImpactLabel, planImpactText);
+        }
+        const rank = (l: string) => ORDER[l.toUpperCase()] ?? 50;
+        const ordered = rows.map((r, i) => ({ r, i })).sort((a, b) => rank(a.r.label) - rank(b.r.label) || a.i - b.i).map((x) => x.r);
+        return ordered.length > 0 ? (
+          <div className="space-y-2">
+            {ordered.map((r, i) => (
+              <div key={`${r.label}-${i}`}>
+                <span className="readout-label text-xs font-medium uppercase tracking-wide">{r.label}</span>
+                <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{r.value}</p>
               </div>
-            );
-          })}
-        </div>
-      )}
+            ))}
+          </div>
+        ) : null;
+      })()}
       {sd?.race_readiness && isRaceReadinessShape(sd.race_readiness) && (
         <RaceReadinessBlock rr={sd.race_readiness} />
-      )}
-      {!hasNarrative && hasStructuredForRender && (
-        <>
-          {technicalInsightsForRender.length > 0 && (
-            <div className="space-y-2">
-              {technicalInsightsForRender.map((t, i: number) => {
-                const rawLabel = String(t.label ?? '');
-                const value = String(t.value ?? '');
-                const isTerrainData = rawLabel.toUpperCase() === 'CONDITIONS' && /\bft\b|gain|descent|downhill|uphill|elevation|grade|climb/i.test(value);
-                const label = isTerrainData ? 'TERRAIN' : rawLabel;
-                return (
-                <div key={i}>
-                  <span className="readout-label text-xs font-medium uppercase tracking-wide">{label}</span>
-                  <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{value}</p>
-                </div>
-                );
-              })}
-            </div>
-          )}
-          {hasPlanImpactForRender && (
-            <div>
-              <span className="readout-label text-xs font-medium uppercase tracking-wide">
-                {planImpactLabel}
-              </span>
-              <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{planImpactText}</p>
-            </div>
-          )}
-        </>
       )}
       {/* NEXT sits last (Michael, 2026-09-07: it was in the middle of the ride's details). */}
       {!hideNextUp && nextSession && <NextUp session={nextSession} />}
