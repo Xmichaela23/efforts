@@ -1,3 +1,5 @@
+import { useAppContext } from '@/contexts/AppContext';
+import { shareSession, shareSessionText } from '@/lib/share-session-text';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -192,6 +194,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const [updatedWorkoutData, setUpdatedWorkoutData] = useState<any | null>(null);
   // Sharing a strength session out to Strava — see the button below for why it is manual only.
   const [sharing, setSharing] = useState(false);
+  const { useImperial: shareUseImperial } = useAppContext();
+  const [shareNote, setShareNote] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
   // The receipt from a previous share, when the row carries one, so the button can say so on reopen.
   const priorShareId = String((workout as Record<string, unknown> | null)?.strava_shared_activity_id ?? '');
@@ -1089,6 +1093,30 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               className="px-3 py-1 rounded-xl bg-white/[0.06] border border-white/20 text-white/80 font-light text-xs hover:bg-white/[0.10] hover:text-white transition-all duration-300 disabled:opacity-50"
             >
               {sharing ? 'Posting…' : sharedUrl ? 'Posted to Strava' : 'Share to Strava'}
+            </button>
+          </div>
+        )}
+        {/* Share with a friend (2026-09-07): the session as text through the phone's share sheet, with
+            the site at the bottom. Any completed session, runs and rides included. No picture. */}
+        {isCompleted && (
+          <div className="flex items-center justify-end mt-2">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const w = workout as Record<string, unknown> | null;
+                  const text = shareSessionText(w, Boolean(shareUseImperial));
+                  const how = await shareSession(text, String(w?.name || 'Session'));
+                  setShareNote(how === 'copied' ? 'Copied. Paste it anywhere.' : null);
+                  if (how === 'copied') setTimeout(() => setShareNote(null), 2500);
+                } catch {
+                  setShareNote('Could not open the share sheet.');
+                  setTimeout(() => setShareNote(null), 2500);
+                }
+              }}
+              className="px-3 py-1 rounded-xl bg-white/[0.06] border border-white/20 text-white/80 font-light text-xs hover:bg-white/[0.10]"
+            >
+              {shareNote ?? 'Share'}
             </button>
           </div>
         )}
