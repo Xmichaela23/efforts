@@ -153,7 +153,10 @@ export async function fetchCyclingPRs(
   try {
     const { data: rows } = await supabase
       .from('workouts')
-      .select('id, date, computed')
+      // ⛔ ONLY THE POWER CURVE (2026-09-07). This pulled the whole `computed` blob for up to 500 rides —
+      // 43 MB on Michael's 95 rides — to read one small key, and the ride analyser died on Supabase's
+      // compute limit (WORKER_RESOURCE_LIMIT) on every ride from 2026-09-01. PostgREST selects the key.
+      .select('id, date, power_curve:computed->power_curve')
       .eq('user_id', params.userId)
       .in('type', ['ride', 'cycling', 'bike'])
       .eq('workout_status', 'completed')
@@ -163,7 +166,7 @@ export async function fetchCyclingPRs(
 
     const all: Array<{ id: string; date: string; powerCurve: Record<string, number> }> = [];
     for (const r of (Array.isArray(rows) ? rows : [])) {
-      const pc = (r as any)?.computed?.power_curve;
+      const pc = (r as any)?.power_curve ?? (r as any)?.computed?.power_curve;   // alias from the narrow select; the test fixtures still carry `computed`
       if (!pc || typeof pc !== 'object') continue;
       const pcEntries: Record<string, number> = {};
       for (const dur of PR_DURATIONS) {
@@ -264,7 +267,10 @@ export async function fetchCyclingVsSimilar(
     // candidate. The run-side `getSimilarWorkoutComparisons` does the same.
     const { data: rows } = await supabase
       .from('workouts')
-      .select('id, date, computed, avg_heart_rate, workout_analysis')
+      // ⛔ NOT THE WHOLE `computed` BLOB (2026-09-07). The loop reads workout_analysis (facts, performance,
+      // heart-rate summaries) and `computed.overall`; `computed.analysis` — 40 MB across Michael's 95 rides —
+      // was fetched for 120 rides and never read, and the ride analyser died on the compute limit.
+      .select('id, date, avg_heart_rate, workout_analysis, overall:computed->overall')
       .eq('user_id', params.userId)
       .in('type', ['ride', 'cycling', 'bike'])
       .eq('workout_status', 'completed')
@@ -287,8 +293,10 @@ export async function fetchCyclingVsSimilar(
     // the filter can drop the off-IF rows; the 3-hit fallback then decides
     // whether the filter takes effect.
     const allMatches: Match[] = [];
-    for (const r of (Array.isArray(rows) ? rows : [])) {
-      const wa = (r as any)?.workout_analysis;
+    for (const r0 of (Array.isArray(rows) ? rows : [])) {
+      // The helpers below read `row.computed.overall`; rebuild that one key from the narrow select.
+      const r: any = (r0 as any)?.computed ? r0 : { ...(r0 as any), computed: { overall: (r0 as any)?.overall ?? null } };
+      const wa = r?.workout_analysis;
       if (!wa || typeof wa !== 'object') continue;
       const facts = wa?.fact_packet_v1?.facts;
       if (!facts) continue;

@@ -77,3 +77,21 @@ paying user**, alongside the existing B1 items.
 function service-key-only and give the client a thin authenticated wrapper. ⛔ Check the other
 functions that take a `user_id` in the body before fixing this one in isolation — the pattern is
 likely not unique to `compute-snapshot`.
+
+## Incident 2026-09-07 — the ride analyser died on every ride (WORKER_RESOURCE_LIMIT), CLOSED the same night
+
+**Found:** Michael tapped "Recompute analysis" on a ride and nothing changed. Direct calls returned HTTP 546
+`WORKER_RESOURCE_LIMIT` after ~12 s on every ride, even an 18-minute one; the run analyser was fine. Rides had
+been silently sticking in `analysis_status = 'analyzing'` since 2026-09-01 (three rows). Not tonight's code: a
+build from before the evening's commits failed the same way.
+
+**Cause:** `_shared/cycling-v1/cross-workout-queries.ts` — `fetchCyclingPRs` selected `computed` for up to 500
+rides to read one small key (`power_curve`), and `fetchCyclingVsSimilar` selected `computed` for 120 rides and
+never read it. `computed.analysis` is ~40 MB across 95 rides. The history grew until parsing it crossed the
+edge worker's budget.
+
+**Fix:** narrow selects (`power_curve:computed->power_curve`; `overall:computed->overall` + `workout_analysis`).
+Payload 43 MB → 0.8 MB. Both Saturday rides analyse in 8–9 s.
+
+**What it proved:** B4/B7 — no alarm and no "failed" word on screen — the analyser was dead for six days and
+the only sign was a stuck status nobody reads. The plumbing work order starts with those two.
