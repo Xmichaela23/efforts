@@ -690,7 +690,7 @@ export default function PostWorkoutFeedback({
             <button
               key={option.value}
               onClick={() => setSelectedFeeling(option.value === selectedFeeling ? null : option.value)}
-              className={`flex-1 py-2.5 px-2 text-xs font-light rounded-lg border-2 backdrop-blur-md transition-all duration-300 ${
+              className={`flex-1 py-2.5 px-2 text-xs font-light rounded-xl border-2 backdrop-blur-md transition-all duration-300 ${
                 selectedFeeling === option.value
                   ? 'bg-white/[0.15] border-white/40 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.1)_inset]'
                   : 'bg-white/[0.08] border-white/20 text-white/70 hover:bg-white/[0.12] hover:text-white/90 hover:border-white/30'
@@ -718,7 +718,7 @@ export default function PostWorkoutFeedback({
               <button
                 key={p.value}
                 onClick={() => setSelectedPool(p.value === selectedPool ? null : p.value)}
-                className={`flex-1 py-2.5 text-sm font-light rounded-lg border-2 backdrop-blur-md transition-all duration-300 ${
+                className={`flex-1 py-2.5 text-sm font-light rounded-xl border-2 backdrop-blur-md transition-all duration-300 ${
                   selectedPool === p.value
                     ? 'bg-white/[0.15] border-white/40 text-white'
                     : 'bg-white/[0.08] border-white/20 text-white/70 hover:bg-white/[0.12] hover:text-white/90 hover:border-white/30'
@@ -761,7 +761,7 @@ export default function PostWorkoutFeedback({
                     if (next.has(eq)) next.delete(eq); else next.add(eq);
                     return next;
                   })}
-                  className={`px-3 py-2 text-sm font-light rounded-lg border-2 backdrop-blur-md transition-all duration-300 ${
+                  className={`px-3 py-2 text-sm font-light rounded-xl border-2 backdrop-blur-md transition-all duration-300 ${
                     active
                       ? 'bg-white/[0.15] border-white/40 text-white'
                       : 'bg-white/[0.08] border-white/20 text-white/70 hover:bg-white/[0.12] hover:text-white/90 hover:border-white/30'
