@@ -32,6 +32,7 @@ const App = () => (
 <Route path="/goals" element={<Index />} />
 <Route path="/profile" element={<Index />} />
 <Route path="/profile/athletic-record" element={<Index />} />
+<Route path="/account" element={<Index />} />
 <Route path="/privacy" element={<Privacy />} />
 <Route path="/reset-password" element={<ResetPassword />} /> {/* opened from the reset email; no session needed */}
 <Route path="/strava/callback" element={<StravaCallback />} /> {/* ✅ UNCOMMENTED */}

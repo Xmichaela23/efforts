@@ -21,6 +21,7 @@ import UnifiedWorkoutView from './UnifiedWorkoutView';
 import ScreenErrorBoundary from './ScreenErrorBoundary';
 import FitFileImporter from './FitFileImporter';
 import TrainingBaselines from './TrainingBaselines';
+import AccountPage from './AccountPage';
 import AthleticRecordPage from './AthleticRecordPage';
 import { parseLocalDate } from '@/lib/dateUtils';
 import Gear from './Gear';
@@ -199,6 +200,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [showStrengthPlans, setShowStrengthPlans] = useState(false);
   const [showImportPage, setShowImportPage] = useState(false);
   const [showTrainingBaselines, setShowTrainingBaselines] = useState(false);
+  const [showAccount, setShowAccount] = useState(false);
   const [showAthleticRecord, setShowAthleticRecord] = useState(false);
   const [showGear, setShowGear] = useState(false);
   const [showContext, setShowContext] = useState(false);
@@ -745,6 +747,31 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       setShowTrainingBaselines(true);
     }
   }, [location.pathname]);
+
+  // Deep link: /account opens the Account screen (2026-09-06); any other path closes it.
+  useEffect(() => {
+    if (location.pathname === '/account') {
+      setSelectedWorkout(null);
+      setShowContext(false);
+      setShowStrengthLogger(false);
+      setShowPilatesYogaLogger(false);
+      setShowBuilder(false);
+      setShowGear(false);
+      setShowImportPage(false);
+      setShowAllPlans(false);
+      setShowStrengthPlans(false);
+      setShowTrainingBaselines(false);
+      setShowAthleticRecord(false);
+      setShowGoals(false);
+      setShowAccount(true);
+    } else {
+      setShowAccount(false);
+    }
+  }, [location.pathname]);
+
+  const handleAccountClick = () => {
+    try { navigate('/account', { replace: true }); } catch { setShowAccount(true); }
+  };
 
   // Deep link: /profile/athletic-record opens My Record (match menu + shareable URL)
   useEffect(() => {
@@ -1540,6 +1567,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         onBack={handleHeaderBack}
         onLogout={onLogout}
         onProfileClick={handleTrainingBaselinesClick}
+        onAccountClick={handleAccountClick}
         onAthleticRecordClick={handleAthleticRecordClick}
         onConnectionsClick={handleConnectionsClick}
         onGearClick={handleGearClick}
@@ -1662,6 +1690,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 onClose={handleCloseContext}
                 onSelectWorkout={handleEditEffort}
               />
+            </div>
+          ) : showAccount ? (
+            <div className="pt-4 h-full overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + var(--tabbar-extra))' }}>
+              <AccountPage onSignOut={onLogout} />
             </div>
           ) : showAthleticRecord ? (
             <div className="pt-4 h-full overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + 1rem)' }}>

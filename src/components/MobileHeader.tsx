@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { User, Upload, Download, Settings, Activity, Link, Package, HelpCircle, Trophy } from 'lucide-react';
+import { User, Upload, Download, Settings, Activity, Link, Package, HelpCircle, Trophy, KeyRound } from 'lucide-react';
 import { EffortsWordmark } from './EffortsButton';
 import { useAppAdmin } from '@/hooks/useAppAdmin';
 import { supabase } from '@/lib/supabase';
@@ -22,6 +22,7 @@ interface MobileHeaderProps {
   onLogout?: () => void;
   /** Custom menu item handlers */
   onProfileClick?: () => void;
+  onAccountClick?: () => void;
   onAthleticRecordClick?: () => void;
   onConnectionsClick?: () => void;
   onGearClick?: () => void;
@@ -36,6 +37,7 @@ export function MobileHeader({
   wordmarkSize = 26,
   onLogout,
   onProfileClick,
+  onAccountClick,
   onAthleticRecordClick,
   onConnectionsClick,
   onGearClick,
@@ -67,6 +69,10 @@ export function MobileHeader({
         <User className="mr-2 h-4 w-4" />
         Profile
       </DropdownMenuItem>
+      <DropdownMenuItem onClick={onAccountClick || (() => navigate('/account'))}>
+        <KeyRound className="mr-2 h-4 w-4" />
+        Account
+      </DropdownMenuItem>
       <DropdownMenuItem
         onClick={onAthleticRecordClick || (() => navigate('/profile/athletic-record'))}
       >
@@ -92,9 +98,6 @@ export function MobileHeader({
       <DropdownMenuItem onClick={openHelpEmail}>
         <HelpCircle className="mr-2 h-4 w-4" />
         Help & Support
-      </DropdownMenuItem>
-      <DropdownMenuItem onClick={handleLogout}>
-        Sign Out
       </DropdownMenuItem>
       {!adminLoading && isAdmin && (
         <DropdownMenuItem onClick={() => navigate('/plans/admin')}>

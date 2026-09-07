@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, RefreshCw, Calendar, Info, Loader2, User, Gauge, Wrench, Settings2, ChevronRight, KeyRound } from 'lucide-react';
-import { AccountPlate } from '@/components/AccountPlate';
+import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, RefreshCw, Calendar, Info, Loader2, User, Gauge, Wrench, Settings2, ChevronRight } from 'lucide-react';
 import { NumberRow } from '@/components/ui/number-row';
 import { numberWord, pillClass } from '@/lib/number-word';
 import SportStrip, { type StripSport } from '@/components/ui/sport-strip';
@@ -1713,17 +1712,6 @@ return (
                         onSave={(t) => { const v = parseInt(t); if (Number.isFinite(v) && v > 0) void commitData((d) => ({ ...d, weight: v })); }} />
                       {saveMessage && lastSavedSport === 'you' && <p className="text-[13px] text-white/75 mt-1.5">{saveMessage}</p>}
                     </div>
-                  </div>
-
-                  {/* ── ACCOUNT: sign-in address, password, sign out, delete (2026-09-06) ── */}
-                  <div className="galaxy-card readout-texture readout-texture--forge rounded-2xl divide-y divide-white/[0.10]" style={readoutPlateStyle(undefined, { galaxy: true })}>
-                    <AccountPlate
-                      header={<SectionHead id="account" Icon={KeyRound} label="Account" colour="rgba(255,255,255,0.7)" />}
-                      email={authEmail}
-                      pendingEmail={pendingEmail}
-                      onPendingEmail={setPendingEmail}
-                      onSignOut={signOut}
-                    />
                   </div>
 
                   {/* ── The sport strip: the app's segmented control, filtering the plate below to one sport ── */}
