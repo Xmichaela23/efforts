@@ -134,15 +134,37 @@ secret set, `npm run ios` not run, none of the five checks run. `git status` sho
   (unset after). Check 4's "reconnect clears it" cannot be driven from a script (needs a real OAuth code); check 5's web walk
   is a browser step after `t5`.
 
+### Closed out — 2026-09-07, second session (this chat, Opus)
+
+`JOBS_SECRET` set (Michael ran the command; the value never entered the repo). All 20 functions deployed.
+All three migrations pasted; `cron.schedule` returned job id 1, so the worker is called every minute.
+Pushed on `main` (`7a0812fe`, `60296567`) and `npm run ios` synced.
+
+**Verified against the live server, not fixtures:**
+- Queue end to end: a job enqueued, claimed on the next tick, the ride re-analysed, `analysis_status` = complete,
+  `analysis_updated_at` fresh, `workout_analysis` written.
+- Retry: the same job with a bad workout id went `queued → running → queued` twice with `last_error` kept and the
+  1 min / 5 min waits honoured (third attempt and the permanent failure ran to completion, see below).
+- Alarms: a raise wrote row #1 and Resend accepted the email (`email_id` returned).
+- Connection health: a dead Strava token set `device_connections.health = needs_reauth` with the reason kept.
+- Session card: `workout-detail` returns `analysis_status`, `analysis_error`, `analysis_updated_at`.
+
+**Two real bugs found in the process, both fixed and deployed:**
+1. **The callback secret in the path never matched.** `webhook-secret.ts` and `run-jobs` both split the URL assuming
+   `/functions/v1/<name>/<secret>`; the edge runtime hands the function `/<name>/<secret>`, so the check always fell
+   through. `run-jobs` would have 401'd every cron tick. The **two Garmin webhooks were passing only on the
+   pre-2026-09-14 legacy allowance** — after that date Garmin's pushes would have started failing with no warning.
+   Fixed to take the last segment whenever there is one past the name; verified 200 with the secret, 401 without.
+   `garmin-webhook-activities` now raises the alarm `garmin_webhook_legacy_url` when a push still arrives without the
+   secret, so the portal URL proves itself on the next real ride instead of waiting for the deadline.
+2. **`get-week` dropped the analysis fields.** They were in the select and the row builder never copied them, so the
+   Home row and the week chip could never show a failed analysis. Fixed and verified on the deployed function.
+
 ### Not done
-1. Secrets: `JOBS_SECRET`, `ALARM_TO_EMAIL` (Michael's address), the temporary `JOBS_BACKOFF_SECONDS`.
-2. Deploy (after the secrets): `run-jobs ingest-activity recompute-workout analyze-cycling-workout analyze-running-workout
-   analyze-strength-workout analyze-swim-workout compute-workout-analysis strava-webhook garmin-webhook-activities
-   send-workout-to-garmin import-strava-history import-garmin-history swift-task bright-service strava-token-exchange
-   get-week workout-detail share-strength-to-strava fetch-strava-route` (the last two import the changed
-   `strava-access-token.ts`). `garmin-webhook-user` was not touched.
-3. The paste (three migrations, order above), then `cron.job` shows `run-jobs-every-minute`.
-4. The five checks, the web walk (Performance card, Connections, Home), teardown.
-5. Commit, push, `npm run ios`.
-6. Still open from §4: `import-strava-history` overwrites `connection_data` after an import (FOUNDATION-READINESS B3's
+1. `ALARM_TO_EMAIL` left unset: alarms go to the existing `ADMIN_NOTIFY_EMAIL`.
+2. Whether the URL saved in the Garmin portal carries the right secret is UNVERIFIED. It answers itself: if a push
+   arrives without the secret, an alarm row appears. Deadline 2026-09-14.
+3. The on-screen walk (the line on the card, the dot on Home, Reconnect on Connections) has not been seen by a human.
+   The data behind all three is verified; the pixels are not.
+4. Still open from §4: `import-strava-history` overwrites `connection_data` after an import (FOUNDATION-READINESS B3's
    rotation note) — not touched.
