@@ -1546,7 +1546,9 @@ export function formatCyclingEfficiencyRow(
   // and the other headlined it. `dec` is still required above as an eligibility signal (a ride without
   // it is not a readable aerobic effort), it is simply no longer PRINTED here. See the Heart rate row.
   void dec;
-  return { label: 'EFFICIENCY', value: `Watts per heartbeat ${ef}` };
+  // Say what the number is and which way is good (Michael, 2026-09-07: "this makes sense to someone?").
+  // Efficiency factor = normalized power ÷ average heart rate (Friel / TrainingPeaks EF); the field's own term.
+  return { label: 'EFFICIENCY', value: `Efficiency factor ${ef.toFixed(2)}: power per heartbeat (normalized power ÷ average heart rate). Higher on the same kind of ride over time means fitter.` };
 }
 
 /**

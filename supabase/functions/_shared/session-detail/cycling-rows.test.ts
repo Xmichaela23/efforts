@@ -21,12 +21,12 @@ import { formatCyclingClimbingRow, formatCyclingEfficiencyRow } from './build.ts
 Deno.test('efficiency: both values finite → "Watts per heartbeat {ef}", drift NOT printed here', () => {
   assertEquals(
     formatCyclingEfficiencyRow({ efficiency_factor: 1.62, aerobic_decoupling_pct: 4.3 }),
-    { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.62' },
+    { label: 'EFFICIENCY', value: 'Efficiency factor 1.62: power per heartbeat (normalized power ÷ average heart rate). Higher on the same kind of ride over time means fitter.' },
   );
   // 0% decoupling is finite → still renders (Number(null) trap: 0 is a value, absent is not)
   assertEquals(
     formatCyclingEfficiencyRow({ efficiency_factor: 1.7, aerobic_decoupling_pct: 0 }),
-    { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.7' },
+    { label: 'EFFICIENCY', value: 'Efficiency factor 1.70: power per heartbeat (normalized power ÷ average heart rate). Higher on the same kind of ride over time means fitter.' },
   );
 });
 
