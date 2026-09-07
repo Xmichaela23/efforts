@@ -109,7 +109,12 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       });
 
       if (res.error) {
-        throw new Error(res.error.message);
+        // Say what actually came back (2026-09-07). "Edge Function returned a non-2xx status code" hid a
+        // 546 compute-limit death for six days. supabase-js keeps the Response on `error.context`.
+        const ctx = (res.error as { context?: Response }).context;
+        let detail = '';
+        try { detail = ctx ? (await ctx.text()).slice(0, 160) : ''; } catch { /* no body */ }
+        throw new Error(`Recompute failed${ctx?.status ? ` (HTTP ${ctx.status})` : ''}${detail ? `: ${detail}` : `: ${res.error.message}`}`);
       }
 
       const result = res.data as {
