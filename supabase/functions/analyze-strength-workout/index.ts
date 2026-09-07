@@ -1694,10 +1694,9 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
 // receipt — which is DETERMINISTIC prose (`_shared/strength/substitution-note.ts`), computed from the
 // movement-pattern table and checkable by hand. That is the model for anything this screen ever says.
 //
-// ⛔ THIS IS NOT A BAN ON LLMs IN THE APP. Michael, same message: *"we may keep it in race builder so
-// dont get rid of all of it."* `_shared/llm.ts` stays, and so does every caller of it — the coach,
-// the race-readiness line, `course-strategy`, `arc-setup-chat`, `extract-races`. What died is the
-// output-LLM on the STRENGTH SESSION SCREEN specifically.
+// At the time (2026-08-02) this was NOT a ban on models in the app — the race builder kept its callers.
+// SUPERSEDED 2026-09-07 (docs/WORKORDER-no-ai-2026-09-07.md): every model call is gone, `_shared/llm.ts`
+// is deleted, and the app computes every sentence by fixed rules.
 //
 // ⚠️ `insights` IS NOW ALWAYS EMPTY, and the fields fed from it go null by their own existing
 // guards — `session_state_v1.narrative.text` (null, source 'none'), `summary.bullets` ([]), and

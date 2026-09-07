@@ -1647,7 +1647,7 @@ Deno.serve(async (req) => {
     // =========================================================================
     // Baselines + 28d personal norms (to avoid generic thresholds)
     // Baselines come from ArcContext — a single source of athlete truth shared with
-    // generate-training-context, arc-setup-chat, and create-goal-and-materialize-plan.
+    // generate-training-context and create-goal-and-materialize-plan.
     // =========================================================================
     const userUnits = String(arc.units || 'imperial').toLowerCase();
     const isImperial = userUnits !== 'metric';
