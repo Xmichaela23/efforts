@@ -109,6 +109,20 @@ async function handleActivityCreated(activityId: number, ownerId: number) {
       return;
     }
 
+    // A lift the athlete posted FROM Efforts (share-strength-to-strava) comes straight back through
+    // this door as a new activity. It is already on the calendar; importing it doubles the session
+    // (Michael, 2026-09-07: "strava sent it back"). The outbound id is kept on the workout row.
+    const { data: ours } = await supabase
+      .from('workouts')
+      .select('id')
+      .eq('user_id', userConnection.user_id)
+      .eq('strava_shared_activity_id', String(activityId))
+      .limit(1);
+    if (ours && ours.length > 0) {
+      console.log(JSON.stringify({ event: 'strava_activity_skipped_own_share', activityId, workout_id: ours[0].id }));
+      return;
+    }
+
     const userId = userConnection.user_id;
 
     // Check user's source preference

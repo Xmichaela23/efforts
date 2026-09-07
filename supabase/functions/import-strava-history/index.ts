@@ -668,6 +668,13 @@ Deno.serve(async (req) => {
       .not('strava_activity_id', 'is', null);
 
     const existing = new Set<number>((existingRes.data || []).map((w: any) => w.strava_activity_id));
+    // Activities Efforts itself posted to Strava (share-strength-to-strava) are not imports.
+    const { data: sharedRows } = await supabase
+      .from('workouts')
+      .select('strava_shared_activity_id')
+      .eq('user_id', userId)
+      .not('strava_shared_activity_id', 'is', null);
+    const ourShares = new Set<number>((sharedRows || []).map((w: any) => Number(w.strava_shared_activity_id)).filter((n: number) => Number.isFinite(n)));
 
     // Q-066: port the LIVE webhook's source-preference gate (strava-webhook/index.ts:175-204) so historical
     // import respects the SAME Garmin/Strava preference the live path does. Without it, a dual-connect user
@@ -750,6 +757,7 @@ Deno.serve(async (req) => {
       if (!activities.length) break;
 
       for (const a of activities) {
+        if (ourShares.has(Number(a.id))) { skipped++; continue; } // posted from Efforts; not an import
         // Narrow to the user's LOCAL calendar day(s) — the padded UTC window above over-fetches
         // by a day each side on purpose; this is the precise selection (Q-154). Same
         // `start_date_local`-first derivation the stored row uses at the mapping below.
