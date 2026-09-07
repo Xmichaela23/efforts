@@ -15,10 +15,11 @@
 //       (connection_data.garmin_permissions). The activities webhook checks it before fetching details:
 //       no ACTIVITY_EXPORT → the activity is skipped.
 //
-// Auth: verify_jwt=false (Garmin sends no JWT). The URL carries `?k=<GARMIN_WEBHOOK_SECRET>`; without it
-// the reply is 401 (strict: this endpoint never had a bare URL). Always reply 200 fast, then do the work
+// Auth: verify_jwt=false (Garmin sends no JWT). The URL carries the secret as its last path segment
+// (`/garmin-webhook-user/<GARMIN_WEBHOOK_SECRET>`; `?k=` also works). The bare URL is accepted until
+// LEGACY_URL_ACCEPTED_UNTIL, then 401. Always reply 200 fast, then do the work
 // after the reply (EdgeRuntime.waitUntil, the same shape as strava-webhook / endurance-checkpoint).
-import { checkWebhookSecret } from '../_shared/webhook-secret.ts';
+import { checkWebhookSecret, LEGACY_URL_ACCEPTED_UNTIL } from '../_shared/webhook-secret.ts';
 import { logConnectionEvent, serviceClient } from '../_shared/provider-deregister.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
@@ -27,7 +28,7 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
 
-  const auth = checkWebhookSecret(req, null);
+  const auth = checkWebhookSecret(req, LEGACY_URL_ACCEPTED_UNTIL);
   if (!auth.ok) {
     console.warn(JSON.stringify({ event: 'garmin_webhook_user_refused', mode: auth.mode }));
     return new Response('Unauthorized', { status: 401 });

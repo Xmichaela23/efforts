@@ -5,7 +5,8 @@
 // webhooks require `?k=<GARMIN_WEBHOOK_SECRET>` on the URL. The activities webhook was registered in the
 // Garmin portal without a secret, so it accepts the bare URL until LEGACY_URL_ACCEPTED_UNTIL (7 days from
 // the switch, logged as mode 'legacy'); after that date the bare URL is a 401 with no redeploy needed.
-// The user webhook is new and never had a bare URL, so it passes `legacyUntil: null` and is strict from day one.
+// The user webhook also accepts the bare URL until the cutoff (2026-09-07: the portal dropped the query
+// secret on first save, so a strict endpoint would have refused Garmin's real notices during the switch).
 
 /** The bare (secret-less) activities URL is accepted until this instant, then refused. */
 export const LEGACY_URL_ACCEPTED_UNTIL = '2026-09-14T02:00:00Z';
@@ -31,8 +32,16 @@ function timingSafeEqual(a: string, b: string): boolean {
 export function checkWebhookSecret(req: Request, legacyUntil: string | null): SecretCheck {
   const expected = Deno.env.get('GARMIN_WEBHOOK_SECRET') || '';
   if (!expected) return { ok: false, mode: 'unset' };
-  const given = new URL(req.url).searchParams.get('k') || '';
-  if (given && timingSafeEqual(given, expected)) return { ok: true, mode: 'secret' };
+  // ⛔ THE SECRET RIDES IN THE PATH, NOT ONLY THE QUERY (2026-09-07). The Garmin portal saved the
+  // registered URLs with the `?k=` stripped, so a query-only secret never reaches us. Supabase routes any
+  // sub-path to the function, so `/functions/v1/<name>/<secret>` works and the portal keeps it.
+  const url = new URL(req.url);
+  const fromQuery = url.searchParams.get('k') || '';
+  const segs = url.pathname.split('/').filter(Boolean);
+  const fromPath = segs.length > 3 ? segs[segs.length - 1] : '';   // functions / v1 / <name> / <secret>
+  for (const given of [fromQuery, fromPath]) {
+    if (given && timingSafeEqual(given, expected)) return { ok: true, mode: 'secret' };
+  }
   if (legacyUntil && Date.now() < Date.parse(legacyUntil)) return { ok: true, mode: 'legacy' };
   return { ok: false, mode: 'none' };
 }
