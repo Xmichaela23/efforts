@@ -46,9 +46,12 @@ const GarminCallback: React.FC = () => {
           // This is direct navigation - redirect to home with code
           // Store the code for the main app to pick up
           sessionStorage.setItem('garmin_auth_code', code);
-          
-          // Redirect to main app
-          try { (window as any).appNavigate?.('/'); } catch { window.location.assign('/'); }
+
+          // Back to the sign-up intake if it started this (same-tab, no pop-up), else Home.
+          let intake = false;
+          try { intake = localStorage.getItem('efforts:intake_step') !== null; } catch { /* no device copy */ }
+          const dest = intake ? '/welcome' : '/';
+          try { (window as any).appNavigate?.(dest); } catch { window.location.assign(dest); }
         }
 
       } catch (error) {

@@ -124,6 +124,18 @@ function AutoMinePill({ mine, onAuto, onMine, color, label }: { mine: boolean; o
  * ⛔ These strings are matched EXACTLY by `substituteExerciseForEquipment` (materialize-plan) and by
  * substring in `_shared/strength-equipment-tier.ts`; see the comment above the Profile picker.
  */
+/** Swim gear chips. ONE list, shared by Profile and the sign-up intake (2026-09-07). */
+export const SWIM_EQUIPMENT_OPTIONS: string[] = [
+    "Pool access",
+    "Open water access",
+    "Paddles",
+    "Pull buoy",
+    "Ankle band",
+    "Kickboard",
+    "Fins",
+    "Snorkel"
+  ];
+
 export const HOME_GYM_EQUIPMENT_OPTIONS: string[] = [
     "Barbell + plates",
     "Dumbbells",
@@ -1531,16 +1543,7 @@ const disciplineOptions = [
   // adjacent to Pull buoy in the list so the pairing is visually obvious;
   // server-side: when athlete is beginner AND owns ankle band, pull-focused
   // sessions emit `optional:ankle_band` tag.
-  const swimmingEquipmentOptions = [
-    "Pool access",
-    "Open water access",
-    "Paddles",
-    "Pull buoy",
-    "Ankle band",
-    "Kickboard",
-    "Fins",
-    "Snorkel"
-  ];
+  const swimmingEquipmentOptions = SWIM_EQUIPMENT_OPTIONS;
 
   // D-070: athlete-facing "what this unlocks" copy for each swim equipment chip.
   // Surfaced via the chip's title attribute (hover tooltip). Keep ≤ one line each —

@@ -38,23 +38,25 @@ not redesign that. What was missing was the way in.
 
 The flow now (pushed):
 1. Create account (RegisterForm) → `/welcome`.
-2. `/welcome` = src/pages/WelcomePage.tsx, three screens, Next at the bottom, progress in localStorage
-   `efforts:intake_step`, finishing stamps `user_baselines.ui_prefs.intake_done`:
-   About you (name, miles/km) · Bring in your workouts (Apple Health on iOS, Strava, Garmin, Not now; Strava round-trips
-   through /strava/callback and returns to screen 3; Garmin pops up, exchanges via bright-service, asks for 90 days) ·
-   Your sports and gear (sports; Commercial gym or the shared HOME_GYM_EQUIPMENT_OPTIONS list). Every field is the same
-   field Profile edits, saved through saveUserBaselines.
+2. `/welcome` = src/pages/WelcomePage.tsx, TWO screens (Michael: "these can be one card"), Next at the bottom, progress
+   in localStorage `efforts:intake_step`, finishing stamps `user_baselines.ui_prefs.intake_done`:
+   About you (name · miles/km · bring in your workouts: official Strava button, Garmin card, Apple Health card on iOS;
+   Next skips them) · Your sports and gear (sport cards with icons and sport colour; Commercial gym or the shared
+   HOME_GYM_EQUIPMENT_OPTIONS chips; SWIM_EQUIPMENT_OPTIONS chips when Swim is on). Strava AND Garmin open in the same
+   tab, no pop-up (Michael: "the pop up block is annoying"); both callbacks return to /welcome while the intake is in
+   progress (GarminCallback stores `garmin_auth_code`, the page trades it via bright-service and asks for 90 days).
+   Cards drawn like the Train screen's focus cards. Every field is the same field Profile edits, via saveUserBaselines.
 3. Home. Own workouts on the calendar if connected. When the account has no plan: "No plan yet." + "Build a plan around
    this ›" → the Focus screen, where they pick a plan. Nothing opens by itself.
 4. First-run cards (FirstRunCard) on Home, State, strength logger; seen on device + ui_prefs.seen_first_run.
 Also: Strava connect from Connections imports 90 days by itself; Garmin connect asks for 90 days and Connections has
 "Import Last 90 Days"; import-garmin-history asks in 30-day windows (409 = already requested); the Standard Focus card no
 longer claims tested lifts are required; post-import goes to /profile; loadUserBaselines returns ui_prefs.
-Verified on the local dev server with the demo account (throwaway), driven by script: all three intake screens render,
+The THREE-screen version was verified on the local dev server with the demo account (throwaway), driven by script: the screens render,
 Next saves through saveUserBaselines (units, disciplines, equipment.strength, ui_prefs.intake_done all landed), the last
 Next lands on Home, the Home first-run card shows, tapping it removes it, and it stays gone after a reload (device +
 ui_prefs.seen_first_run). NOT walked: the Strava and Garmin doors (need a real OAuth), Apple Health (iOS only), a truly
-brand-new account (RegisterForm → /welcome; the register form was not driven). Discipline ids written by the intake are
+brand-new account (RegisterForm → /welcome; the register form was not driven). The two-screen rewrite that followed builds clean but was NOT re-walked: the browser pane's session ended and this chat does not type passwords. Discipline ids written by the intake are
 the canonical run/ride/swim/strength; Profile still writes running/cycling/swimming and readers normalise both.
 
 ## Still on the list
