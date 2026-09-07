@@ -1,16 +1,15 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
-import { Activity, Bike, Check, Dumbbell, Heart, Link2, User, Waves, Watch, Wrench } from 'lucide-react';
+import { Check, Dumbbell, Heart, Link2, User, Watch, Wrench } from 'lucide-react';
 import { MobileHeader } from '@/components/MobileHeader';
 import { StepLayout } from '@/components/wizard/StepLayout';
 import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { NumberRow } from '@/components/ui/number-row';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
-import { HOME_GYM_EQUIPMENT_OPTIONS, SWIM_EQUIPMENT_OPTIONS } from '@/components/TrainingBaselines';
+import { HOME_GYM_EQUIPMENT_OPTIONS } from '@/components/TrainingBaselines';
 import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
-import { normalizeDiscipline, type Discipline } from '@/lib/discipline';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { readoutPlateStyle } from '@/lib/readout-plate';
 import { numberWord } from '@/lib/number-word';
@@ -22,11 +21,11 @@ import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
  * Home. Nobody is dropped into a plan: the plan is picked from the Focus screen when they want it.
  *
  *   1  About you              the Profile plate's own rows (name, birthday, height, weight, units)
- *   2  Your sports and gear   sport cards lit like the tab bar · where they lift and what they own ·
- *                             swim gear
+ *   2  Your gym               commercial, or what they own. No sport question: the wizard asks which
+ *                             sport goes in each row of the week, and the history says what they do.
  *   3  Your numbers           Connect Strava / Garmin once at the top (fills what it can from 90
- *                             days); one tap-to-change row per sport picked (threshold pace, FTP,
- *                             pace per 100). An empty row is measured in week one; lifts always are.
+ *                             days); a tap-to-change row for each number that EXISTS (threshold pace,
+ *                             FTP, pace per 100), one line for everything else: measured in week one.
  *                             The only thing they HAVE to do on this screen is nothing.
  *
  * One plate per screen, the same forge plate Profile and Adjust use, so the first thing a new athlete
@@ -38,14 +37,6 @@ import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 const STEP_KEY = 'efforts:intake_step';
 type Step = 1 | 2 | 3;
 const TOTAL = 3;
-
-// ⛔ The four canonical discipline ids (src/lib/discipline.ts `normalizeDiscipline`).
-const SPORTS: Array<{ id: Discipline; label: string; Icon: React.ComponentType<any>; colourKey: string }> = [
-  { id: 'run', label: 'Run', Icon: Activity, colourKey: 'run' },
-  { id: 'ride', label: 'Ride', Icon: Bike, colourKey: 'bike' },
-  { id: 'strength', label: 'Lift', Icon: Dumbbell, colourKey: 'strength' },
-  { id: 'swim', label: 'Swim', Icon: Waves, colourKey: 'swim' },
-];
 
 const readStep = (): Step => {
   try { const v = Number(localStorage.getItem(STEP_KEY)); return v === 2 || v === 3 ? v : 1; } catch { return 1; }
@@ -111,11 +102,8 @@ export default function WelcomePage() {
   const [pn, setPn] = useState<Record<string, any>>({});
 
   // Screen 2
-  // Strength is not a choice: every plan in the app carries it. The other three are.
-  const [sports, setSports] = useState<Set<string>>(new Set(['strength']));
   const [gym, setGym] = useState<'commercial' | 'home' | null>(null);
   const [gear, setGear] = useState<Set<string>>(new Set());
-  const [swimGear, setSwimGear] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!getStoredUserId()) navigate('/', { replace: true });
@@ -131,12 +119,9 @@ export default function WelcomePage() {
       if (b.height) setHeight(Number(b.height));
       if (b.weight) setWeight(Number(b.weight));
       if (b.units === 'metric' || b.units === 'imperial') setUnits(b.units);
-      if (Array.isArray(b.disciplines) && b.disciplines.length) setSports(new Set(['strength', ...(b.disciplines.map(normalizeDiscipline).filter(Boolean) as string[])]));
       const st: string[] = Array.isArray(b.equipment?.strength) ? b.equipment.strength : [];
       if (st.includes('Commercial gym')) setGym('commercial');
       else if (st.length) { setGym('home'); setGear(new Set(st)); }
-      const sw: string[] = Array.isArray(b.equipment?.swimming) ? b.equipment.swimming : [];
-      if (sw.length) setSwimGear(new Set(sw));
       setLearned(b.learned_fitness ?? null);
       setPn({ ...(b.performanceNumbers ?? {}) });
     }).catch(() => {});
@@ -262,19 +247,15 @@ export default function WelcomePage() {
   // ── Screen 2 ─────────────────────────────────────────────────────────────────────────────
   const toggleIn = (set: React.Dispatch<React.SetStateAction<Set<string>>>) => (v: string) =>
     set((prev) => { const n = new Set(prev); if (n.has(v)) n.delete(v); else n.add(v); return n; });
-  const toggleSport = (id: string) => { if (id !== 'strength') toggleIn(setSports)(id); };
   const toggleGear = toggleIn(setGear);
-  const toggleSwimGear = toggleIn(setSwimGear);
 
-  const liftAnswered = !sports.has('strength') || gym === 'commercial' || (gym === 'home' && gear.size > 0);
-  const canLeaveSports = liftAnswered;
+  const canLeaveSports = gym === 'commercial' || (gym === 'home' && gear.size > 0);
   const blocked = 'Commercial gym, or what you own.';
 
-  const sportsPatch = (b: any) => {
-    const strength = !sports.has('strength') ? [] : gym === 'commercial' ? ['Commercial gym'] : Array.from(gear);
-    const swimming = sports.has('swim') ? Array.from(swimGear) : [];
-    return { ...b, disciplines: Array.from(sports), equipment: { ...(b.equipment ?? {}), strength, swimming } };
-  };
+  const sportsPatch = (b: any) => ({
+    ...b,
+    equipment: { ...(b.equipment ?? {}), strength: gym === 'commercial' ? ['Commercial gym'] : Array.from(gear) },
+  });
 
   const finishSports = async () => {
     if (!canLeaveSports) return;
@@ -353,28 +334,6 @@ export default function WelcomePage() {
     </button>
   );
 
-  /** A sport card lit from the top like the tab bar: lamp and border take the sport's colour. */
-  const sportCard = ({ id, label, Icon, colourKey }: (typeof SPORTS)[number]) => {
-    const fixed = id === 'strength';
-    const active = fixed || sports.has(id);
-    const colour = getDisciplineColor(colourKey);
-    return (
-      <button key={id} type="button" onClick={() => toggleSport(id)} aria-pressed={active} aria-disabled={fixed}
-        className="relative flex flex-col items-center justify-center gap-1.5 py-5 rounded-xl border-2 transition-colors"
-        style={active
-          ? { borderColor: `${colour}cc`, background: `linear-gradient(180deg, ${colour}33 0%, rgba(255,255,255,0.05) 60%)`, color: '#fff' }
-          : { borderColor: 'rgba(255,255,255,0.22)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.72)' }}>
-        <span aria-hidden="true" style={{
-          position: 'absolute', top: 6, left: '50%', transform: 'translateX(-50%)', width: 10, height: 2, borderRadius: 999,
-          background: colour, opacity: active ? 1 : 0, boxShadow: `0 0 10px ${colour}aa, 0 0 18px ${colour}66`, transition: 'opacity 200ms ease',
-        }} />
-        <Icon className="h-6 w-6" style={{ color: colour, opacity: active ? 1 : 0.7 }} />
-        <span className="text-[14px] tracking-wide">{label}</span>
-        {fixed && <span className="text-[11px] text-white/50 -mt-1">always</span>}
-      </button>
-    );
-  };
-
   return (
     <div className="mobile-app-container">
       <MobileHeader />
@@ -397,33 +356,20 @@ export default function WelcomePage() {
         )}
 
         {step === 2 && (
-          <StepLayout step={2} totalSteps={TOTAL} title="Your sports and gear" onBack={() => go(1)} onContinue={() => void finishSports()} canContinue={canLeaveSports} continueLabel="Next" saving={saving} blockedReason={blocked}>
+          <StepLayout step={2} totalSteps={TOTAL} title="Your gym" subtitle="So the plan only asks for lifts you can do." onBack={() => go(1)} onContinue={() => void finishSports()} canContinue={canLeaveSports} continueLabel="Next" saving={saving} blockedReason={blocked}>
             <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
               <div className="px-3 py-3">
-                <SectionHead Icon={Activity} label="Sports you do" colour="rgba(255,255,255,0.7)" />
-                <div className="grid grid-cols-2 gap-2">{SPORTS.map(sportCard)}</div>
+                <SectionHead Icon={Wrench} label="Where you lift" colour={getDisciplineColor('strength')} />
+                {segmented<'commercial' | 'home'>([{ v: 'commercial', label: 'Commercial gym' }, { v: 'home', label: 'Home gym' }], gym, setGym)}
+                {gym === 'home' && (
+                  <>
+                    <p className="m-0 mt-2 text-[12px] text-white/55">Tap what you own.</p>
+                    {chips(HOME_GYM_EQUIPMENT_OPTIONS, gear, toggleGear, getDisciplineColor('strength'))}
+                  </>
+                )}
+                {gym === 'commercial' && <p className="m-0 mt-2 text-[12px] text-white/55">A commercial gym has everything the plan asks for.</p>}
+                {gym == null && <p className="m-0 mt-2 text-[12px] text-white/55">Anything else, swim gear included, lives on Profile.</p>}
               </div>
-
-              {sports.has('strength') && (
-                <div className="px-3 py-3">
-                  <SectionHead Icon={Wrench} label="Where you lift" colour={getDisciplineColor('strength')} />
-                  {segmented<'commercial' | 'home'>([{ v: 'commercial', label: 'Commercial gym' }, { v: 'home', label: 'Home gym' }], gym, setGym)}
-                  {gym === 'home' && (
-                    <>
-                      <p className="m-0 mt-2 text-[12px] text-white/55">Tap what you own.</p>
-                      {chips(HOME_GYM_EQUIPMENT_OPTIONS, gear, toggleGear, getDisciplineColor('strength'))}
-                    </>
-                  )}
-                  {gym === 'commercial' && <p className="m-0 mt-2 text-[12px] text-white/55">A commercial gym has everything the plan asks for.</p>}
-                </div>
-              )}
-
-              {sports.has('swim') && (
-                <div className="px-3 py-3">
-                  <SectionHead Icon={Wrench} label="Swim gear" colour={getDisciplineColor('swim')} />
-                  {chips(SWIM_EQUIPMENT_OPTIONS, swimGear, toggleSwimGear, getDisciplineColor('swim'))}
-                </div>
-              )}
             </div>
           </StepLayout>
         )}
@@ -446,32 +392,33 @@ export default function WelcomePage() {
 
               <div className="px-3 py-3">
                 <SectionHead Icon={Dumbbell} label="Your numbers" colour="rgba(255,255,255,0.7)" />
-                {sports.has('run') && (
+                {thr.sec_per_mi != null && (
                   <NumberRow id="threshold" name="Threshold pace" hint={metric ? 'm:ss/km' : 'm:ss/mi'} inputMode="numeric" sport="run"
-                    value={thr.sec_per_mi != null ? `${paceToText(metric ? thr.sec_per_mi / 1.609344 : thr.sec_per_mi)}/${metric ? 'km' : 'mi'} · ${numberWord(thr.source, thrMine)}` : null}
-                    note={thr.sec_per_mi != null ? null : 'Measured in week one unless you add it.'}
+                    value={`${paceToText(metric ? thr.sec_per_mi / 1.609344 : thr.sec_per_mi)}/${metric ? 'km' : 'mi'} · ${numberWord(thr.source, thrMine)}`}
                     onSave={(t) => { const sec = parsePaceText(t); if (sec == null) return; const secPerMi = metric ? sec * 1.609344 : sec; setPn((p) => ({ ...p, threshold_pace_min_per_mi: paceToText(secPerMi), threshold_pace_source: 'manual' })); }} />
                 )}
-                {sports.has('ride') && (
+                {ftp.value != null && (
                   <NumberRow id="ftp" name="FTP" hint="W" inputMode="numeric" sport="bike"
-                    value={ftp.value != null ? `${Math.round(Number(ftp.value))} W · ${numberWord(ftp.source, ftpMine)}` : null}
-                    note={ftp.value != null ? null : 'Measured in week one unless you add it.'}
+                    value={`${Math.round(Number(ftp.value))} W · ${numberWord(ftp.source, ftpMine)}`}
                     onSave={(t) => { const v = Math.round(Number(t)); if (!(v > 0)) return; setPn((p) => ({ ...p, ftp: v, ftp_source: 'manual' })); }} />
                 )}
-                {sports.has('swim') && (
+                {swim100 && (
                   <NumberRow id="swim100" name="Pace per 100" hint="m:ss" inputMode="numeric" sport="swim"
-                    value={swim100 ? `${swim100}/100 · your number` : null}
-                    note={swim100 ? null : 'Measured in week one unless you add it.'} seed={swim100 || ''}
+                    value={`${swim100}/100 · your number`} seed={swim100}
                     onSave={(t) => { if (!/^\d{1,2}:\d{2}$/.test(t.trim())) return; setPn((p) => ({ ...p, swimPace100: t.trim() })); }} />
                 )}
-                {sports.has('strength') && (
-                  <p className="m-0 mt-2 text-[13px] text-white/70">Your lifts are measured in week one.</p>
-                )}
+                <p className="m-0 mt-2 text-[13px] text-white/70">
+                  {thr.sec_per_mi == null && ftp.value == null && !swim100
+                    ? 'Nothing on file yet. Your paces, your FTP and your lifts are measured in week one.'
+                    : 'Anything your watch did not give, your lifts included, is measured in week one.'}
+                </p>
                 <p className="mt-2 text-[12px] text-white/45">Tap a value to change it.</p>
               </div>
+
             </div>
           </StepLayout>
         )}
+
       </main>
     </div>
   );
