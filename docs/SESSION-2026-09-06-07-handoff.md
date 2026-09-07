@@ -38,14 +38,17 @@ not redesign that. What was missing was the way in.
 
 The flow now (pushed):
 1. Create account (RegisterForm) → `/welcome`.
-2. `/welcome` = src/pages/WelcomePage.tsx, TWO screens (Michael: "these can be one card"), Next at the bottom, progress
-   in localStorage `efforts:intake_step`, finishing stamps `user_baselines.ui_prefs.intake_done`:
-   About you (name · miles/km · bring in your workouts: official Strava button, Garmin card, Apple Health card on iOS;
-   Next skips them) · Your sports and gear (sport cards with icons and sport colour; Commercial gym or the shared
-   HOME_GYM_EQUIPMENT_OPTIONS chips; SWIM_EQUIPMENT_OPTIONS chips when Swim is on). Strava AND Garmin open in the same
-   tab, no pop-up (Michael: "the pop up block is annoying"); both callbacks return to /welcome while the intake is in
-   progress (GarminCallback stores `garmin_auth_code`, the page trades it via bright-service and asks for 90 days).
-   Cards drawn like the Train screen's focus cards. Every field is the same field Profile edits, via saveUserBaselines.
+2. `/welcome` = src/pages/WelcomePage.tsx, THREE screens (Michael's final order, 2026-09-07: "sports first, numbers
+   second, connecting offered as the way to answer the numbers question"), Next at the bottom, progress in localStorage
+   `efforts:intake_step`, finishing stamps `user_baselines.ui_prefs.intake_done`:
+   About you (Profile's own rows: name, birthday+age, units, height, weight) · Your sports and gear (sport cards lit in
+   their colour; Commercial/Home gym + HOME_GYM_EQUIPMENT_OPTIONS chips; SWIM_EQUIPMENT_OPTIONS when Swim) · Your numbers
+   (Strava / Garmin / Apple Health pills at the top, one tap fills what it can from 90 days; then one tap-to-change row
+   per sport picked: threshold pace, FTP, pace per 100, read through resolveCurrentRunThresholdPace / resolveCurrentFtp
+   so a learned number shows with its source word; an empty row says "Measured in week one unless you add it"; Lift is
+   one line "Your lifts are measured in week one"). Strava and Garmin open in the SAME tab; both callbacks return to
+   /welcome screen 3 while the intake is in progress. Every field is the same field Profile edits, via saveUserBaselines.
+   Drawn as the forge plate (readoutPlateStyle galaxy) with Profile's SectionHead and NumberRow.
 3. Home. Own workouts on the calendar if connected. When the account has no plan: "No plan yet." + "Build a plan around
    this ›" → the Focus screen, where they pick a plan. Nothing opens by itself.
 4. First-run cards (FirstRunCard) on Home, State, strength logger; seen on device + ui_prefs.seen_first_run.

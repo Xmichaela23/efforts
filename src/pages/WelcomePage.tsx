@@ -13,16 +13,21 @@ import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/
 import { normalizeDiscipline, type Discipline } from '@/lib/discipline';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { readoutPlateStyle } from '@/lib/readout-plate';
+import { numberWord } from '@/lib/number-word';
+import { resolveCurrentRunThresholdPace } from '@/lib/resolve-current-run-pace';
+import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 
 /**
  * The sign-up intake (2026-09-07). Two screens after the account, Next at the bottom of each, then
  * Home. Nobody is dropped into a plan: the plan is picked from the Focus screen when they want it.
  *
  *   1  About you              the Profile plate's own rows (name, birthday, height, weight, units)
- *                             and the connect rows (Strava, Garmin, Apple Health on iOS). Next skips
- *                             the connections.
  *   2  Your sports and gear   sport cards lit like the tab bar · where they lift and what they own ·
  *                             swim gear
+ *   3  Your numbers           Connect Strava / Garmin once at the top (fills what it can from 90
+ *                             days); one tap-to-change row per sport picked (threshold pace, FTP,
+ *                             pace per 100). An empty row is measured in week one; lifts always are.
+ *                             The only thing they HAVE to do on this screen is nothing.
  *
  * One plate per screen, the same forge plate Profile and Adjust use, so the first thing a new athlete
  * touches is the thing they will keep touching. Every field written here is the same field Profile
@@ -31,8 +36,8 @@ import { readoutPlateStyle } from '@/lib/readout-plate';
  */
 
 const STEP_KEY = 'efforts:intake_step';
-type Step = 1 | 2;
-const TOTAL = 2;
+type Step = 1 | 2 | 3;
+const TOTAL = 3;
 
 // ⛔ The four canonical discipline ids (src/lib/discipline.ts `normalizeDiscipline`).
 const SPORTS: Array<{ id: Discipline; label: string; Icon: React.ComponentType<any>; colourKey: string }> = [
@@ -43,8 +48,10 @@ const SPORTS: Array<{ id: Discipline; label: string; Icon: React.ComponentType<a
 ];
 
 const readStep = (): Step => {
-  try { return Number(localStorage.getItem(STEP_KEY)) === 2 ? 2 : 1; } catch { return 1; }
+  try { const v = Number(localStorage.getItem(STEP_KEY)); return v === 2 || v === 3 ? v : 1; } catch { return 1; }
 };
+const parsePaceText = (t: string): number | null => { const m = t.trim().match(/^(\d{1,2}):(\d{2})$/); if (!m) return null; const sec = Number(m[1]) * 60 + Number(m[2]); return sec > 0 ? sec : null; };
+const paceToText = (sec: number): string => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
 const writeStep = (s: Step) => { try { localStorage.setItem(STEP_KEY, String(s)); } catch { /* device copy only */ } };
 
 const calculateAge = (birthday: string | undefined): number | null => {
@@ -99,6 +106,10 @@ export default function WelcomePage() {
   const [healthOn, setHealthOn] = useState(false);
   const [connectNote, setConnectNote] = useState<string | null>(null);
 
+  // Screen 3: what the account holds (learned from history) plus what they type here.
+  const [learned, setLearned] = useState<any>(null);
+  const [pn, setPn] = useState<Record<string, any>>({});
+
   // Screen 2
   const [sports, setSports] = useState<Set<string>>(new Set());
   const [gym, setGym] = useState<'commercial' | 'home' | null>(null);
@@ -125,6 +136,8 @@ export default function WelcomePage() {
       else if (st.length) { setGym('home'); setGear(new Set(st)); }
       const sw: string[] = Array.isArray(b.equipment?.swimming) ? b.equipment.swimming : [];
       if (sw.length) setSwimGear(new Set(sw));
+      setLearned(b.learned_fitness ?? null);
+      setPn({ ...(b.performanceNumbers ?? {}) });
     }).catch(() => {});
     return () => { cancelled = true; };
   }, [loadUserBaselines]);
@@ -166,10 +179,10 @@ export default function WelcomePage() {
     try { await persist(aboutYouPatch); go(2); } finally { setSaving(false); }
   };
 
-  /** Save what is answered before leaving the tab for Strava or Garmin. */
+  /** Save what is answered before leaving the tab for Strava or Garmin; come back to Your numbers. */
   const saveBeforeLeaving = async () => {
-    try { await persist(aboutYouPatch); } catch { /* keep going */ }
-    writeStep(1);
+    try { await persist(sportsPatch); } catch { /* keep going */ }
+    writeStep(3);
   };
 
   const startStrava = async () => {
@@ -253,16 +266,33 @@ export default function WelcomePage() {
   const toggleSwimGear = toggleIn(setSwimGear);
 
   const liftAnswered = !sports.has('strength') || gym === 'commercial' || (gym === 'home' && gear.size > 0);
-  const canFinish = sports.size > 0 && liftAnswered;
+  const canLeaveSports = sports.size > 0 && liftAnswered;
   const blocked = sports.size === 0 ? 'Tap the sports you do.' : 'Commercial gym, or what you own.';
 
+  const sportsPatch = (b: any) => {
+    const strength = !sports.has('strength') ? [] : gym === 'commercial' ? ['Commercial gym'] : Array.from(gear);
+    const swimming = sports.has('swim') ? Array.from(swimGear) : [];
+    return { ...b, disciplines: Array.from(sports), equipment: { ...(b.equipment ?? {}), strength, swimming } };
+  };
+
+  const finishSports = async () => {
+    if (!canLeaveSports) return;
+    setSaving(true);
+    try { await persist(sportsPatch); go(3); } finally { setSaving(false); }
+  };
+
+  // ── Screen 3 ─────────────────────────────────────────────────────────────────────────────
+  const baselinesLike = { learned_fitness: learned, performance_numbers: pn };
+  const thr = resolveCurrentRunThresholdPace(baselinesLike as any);
+  const thrMine = pn.threshold_pace_source === 'manual';
+  const ftp = resolveCurrentFtp(baselinesLike as any);
+  const ftpMine = pn.ftp_source === 'manual';
+  const swim100 = typeof pn.swimPace100 === 'string' ? pn.swimPace100 : null;
+
   const finish = async () => {
-    if (!canFinish) return;
     setSaving(true);
     try {
-      const strength = !sports.has('strength') ? [] : gym === 'commercial' ? ['Commercial gym'] : Array.from(gear);
-      const swimming = sports.has('swim') ? Array.from(swimGear) : [];
-      await persist((b) => ({ ...b, disciplines: Array.from(sports), equipment: { ...(b.equipment ?? {}), strength, swimming } }));
+      await persist((b) => ({ ...b, performanceNumbers: { ...(b.performanceNumbers ?? {}), ...pn } }));
       const uid = getStoredUserId();
       if (uid) {
         const { data } = await supabase.from('user_baselines').select('ui_prefs').eq('user_id', uid).maybeSingle();
@@ -347,7 +377,7 @@ export default function WelcomePage() {
       <MobileHeader />
       <main className="mobile-main-content">
         {step === 1 && (
-          <StepLayout step={1} totalSteps={TOTAL} title="About you" onContinue={() => void finishAboutYou()} canContinue continueLabel="Next" saving={saving}>
+          <StepLayout step={1} totalSteps={TOTAL} title="About you" onContinue={() => void finishAboutYou()} canContinue continueLabel="Next" saving={saving} hideProgress={false}>
             <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
               <div className="px-3 py-3">
                 <SectionHead Icon={User} label="You" colour="rgba(255,255,255,0.7)" />
@@ -359,22 +389,12 @@ export default function WelcomePage() {
                 <p className="mt-2 text-[12px] text-white/45">Tap a value to change it.</p>
               </div>
 
-              <div className="px-3 py-3">
-                <SectionHead Icon={Link2} label="Bring in your workouts" colour="rgba(255,255,255,0.7)" />
-                <p className="m-0 mb-1 text-[12px] text-white/55 leading-snug">Your last 90 days come in, so the plan starts from your own sessions. Also on Connections, any time.</p>
-                <div className="mt-2 space-y-2">
-                  {connectRow('strava', <StravaMark />, 'Strava', 'Activities arrive as you finish them.', stravaOn, () => void startStrava())}
-                  {connectRow('garmin', <Watch className="h-5 w-5" style={{ color: '#00A0DE' }} />, 'Garmin Connect', 'Rides and runs arrive as you finish them.', garminOn, () => void startGarmin())}
-                  {isNativeIOS && healthKit && connectRow('health', <Heart className="h-5 w-5" style={{ color: '#FF2D55' }} />, 'Apple Health', 'Workouts from your watch and phone.', healthOn, () => void startAppleHealth())}
-                </div>
-                {connectNote && <p className="m-0 mt-2 text-[12px] text-white/60">{connectNote}</p>}
-              </div>
             </div>
           </StepLayout>
         )}
 
         {step === 2 && (
-          <StepLayout step={2} totalSteps={TOTAL} title="Your sports and gear" onBack={() => go(1)} onContinue={() => void finish()} canContinue={canFinish} continueLabel="Next" saving={saving} blockedReason={blocked}>
+          <StepLayout step={2} totalSteps={TOTAL} title="Your sports and gear" onBack={() => go(1)} onContinue={() => void finishSports()} canContinue={canLeaveSports} continueLabel="Next" saving={saving} blockedReason={blocked}>
             <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
               <div className="px-3 py-3">
                 <SectionHead Icon={Footprints} label="Sports you do" colour="rgba(255,255,255,0.7)" />
@@ -401,6 +421,51 @@ export default function WelcomePage() {
                   {chips(SWIM_EQUIPMENT_OPTIONS, swimGear, toggleSwimGear, getDisciplineColor('swim'))}
                 </div>
               )}
+            </div>
+          </StepLayout>
+        )}
+
+        {step === 3 && (
+          <StepLayout step={3} totalSteps={TOTAL} title="Your numbers" subtitle="From your watch, typed, or measured in week one. Nothing is guessed." onBack={() => go(2)} onContinue={() => void finish()} canContinue continueLabel="Next" saving={saving}>
+            <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
+              <div className="px-3 py-3">
+                <SectionHead Icon={Link2} label="From your watch" colour="rgba(255,255,255,0.7)" />
+                <p className="m-0 mb-2 text-[12px] text-white/55 leading-snug">
+                  One tap brings in your last 90 days and fills what it can: easy pace, threshold pace, FTP if you ride with power, and your training load. Garmin's arrive over the next few minutes.
+                </p>
+                <div className="space-y-2">
+                  {connectRow('strava', <StravaMark />, 'Strava', 'Activities arrive as you finish them.', stravaOn, () => void startStrava())}
+                  {connectRow('garmin', <Watch className="h-5 w-5" style={{ color: '#00A0DE' }} />, 'Garmin Connect', 'Rides and runs arrive as you finish them.', garminOn, () => void startGarmin())}
+                  {isNativeIOS && healthKit && connectRow('health', <Heart className="h-5 w-5" style={{ color: '#FF2D55' }} />, 'Apple Health', 'Workouts from your watch and phone.', healthOn, () => void startAppleHealth())}
+                </div>
+                {connectNote && <p className="m-0 mt-2 text-[12px] text-white/60">{connectNote}</p>}
+              </div>
+
+              <div className="px-3 py-3">
+                <SectionHead Icon={Dumbbell} label="Your numbers" colour="rgba(255,255,255,0.7)" />
+                {sports.has('run') && (
+                  <NumberRow id="threshold" name="Threshold pace" hint={metric ? 'm:ss/km' : 'm:ss/mi'} inputMode="numeric" sport="run"
+                    value={thr.sec_per_mi != null ? `${paceToText(metric ? thr.sec_per_mi / 1.609344 : thr.sec_per_mi)}/${metric ? 'km' : 'mi'} · ${numberWord(thr.source, thrMine)}` : null}
+                    note={thr.sec_per_mi != null ? null : 'Measured in week one unless you add it.'}
+                    onSave={(t) => { const sec = parsePaceText(t); if (sec == null) return; const secPerMi = metric ? sec * 1.609344 : sec; setPn((p) => ({ ...p, threshold_pace_min_per_mi: paceToText(secPerMi), threshold_pace_source: 'manual' })); }} />
+                )}
+                {sports.has('ride') && (
+                  <NumberRow id="ftp" name="FTP" hint="W" inputMode="numeric" sport="bike"
+                    value={ftp.value != null ? `${Math.round(Number(ftp.value))} W · ${numberWord(ftp.source, ftpMine)}` : null}
+                    note={ftp.value != null ? null : 'Measured in week one unless you add it.'}
+                    onSave={(t) => { const v = Math.round(Number(t)); if (!(v > 0)) return; setPn((p) => ({ ...p, ftp: v, ftp_source: 'manual' })); }} />
+                )}
+                {sports.has('swim') && (
+                  <NumberRow id="swim100" name="Pace per 100" hint="m:ss" inputMode="numeric" sport="swim"
+                    value={swim100 ? `${swim100}/100 · your number` : null}
+                    note={swim100 ? null : 'Measured in week one unless you add it.'} seed={swim100 || ''}
+                    onSave={(t) => { if (!/^\d{1,2}:\d{2}$/.test(t.trim())) return; setPn((p) => ({ ...p, swimPace100: t.trim() })); }} />
+                )}
+                {sports.has('strength') && (
+                  <p className="m-0 mt-2 text-[13px] text-white/70">Your lifts are measured in week one.</p>
+                )}
+                <p className="mt-2 text-[12px] text-white/45">Tap a value to change it.</p>
+              </div>
             </div>
           </StepLayout>
         )}
