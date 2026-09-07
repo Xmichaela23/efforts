@@ -4,7 +4,7 @@ import { useAppContext } from '@/contexts/AppContext';
 // ⛔ ONE VOCABULARY (stage 4). See `src/lib/discipline.ts`.
 import { normalizeDiscipline } from '@/lib/discipline';
 import { getDisciplineColorRgb } from '@/lib/context-utils';
-import { supabase } from '../lib/supabase';
+import { supabase, ensureFreshSession } from '../lib/supabase';
 import StrengthPerformanceSummary from './StrengthPerformanceSummary';
 import SessionNarrative, { NextUp } from './SessionNarrative';
 import { StrengthTestResult } from './StrengthTestResult';
@@ -96,17 +96,11 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       setRecomputing(true);
       setRecomputeError(null);
 
-      let { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+      // ⛔ A STALE TOKEN IS A 401 ON THE SERVER (2026-09-07). Tokens live 60 minutes and the phone build does
+      // not auto-refresh; `ensureFreshSession` (src/lib/supabase.ts) refreshes when expired or nearly so.
+      await ensureFreshSession();
+      const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
       if (sessionErr) console.warn('[MobileSummary] recompute getSession:', sessionErr);
-      // ⛔ A STALE TOKEN IS A 401 ON THE SERVER (2026-09-07: "Recompute failed (HTTP 401) unauthorized" on the
-      // phone while a fresh session succeeded). On iOS the WebView's refresh timer stalls in the background,
-      // so an hour-old token can still be the one on file. Refresh when it is expired or about to be.
-      const expiresAt = Number(session?.expires_at ?? 0);
-      if (session && expiresAt > 0 && expiresAt - Math.floor(Date.now() / 1000) < 60) {
-        const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
-        if (refreshErr) console.warn('[MobileSummary] recompute refreshSession:', refreshErr);
-        if (refreshed?.session) session = refreshed.session;
-      }
       const accessToken = session?.access_token;
       if (!accessToken) {
         throw new Error('Not signed in');

@@ -28,7 +28,7 @@ import Gear from './Gear';
 import PostWorkoutFeedback from './PostWorkoutFeedback';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import PullToRefresh from './PullToRefresh';
-import { supabase, getStoredUserId } from '@/lib/supabase';
+import { supabase, getStoredUserId, ensureFreshSession } from '@/lib/supabase';
 import { MobileHeader } from './MobileHeader';
 import { App as CapacitorApp } from '@capacitor/app';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -154,6 +154,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       try {
         listenerHandle = await CapacitorApp.addListener('appStateChange', ({ isActive }) => {
           if (!isActive) return;
+          // The sign-in token lives 60 minutes and the phone does not auto-refresh; refresh on every resume.
+          void ensureFreshSession();
           if (localStorage.getItem('strength_logger_open') !== '1') return;
           if (!hasUncompletedStrengthSession()) return;
           // Restore the workout identity BEFORE reopening so the draft-restore guard matches.
