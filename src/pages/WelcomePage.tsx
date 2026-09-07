@@ -362,7 +362,7 @@ export default function WelcomePage() {
         )}
 
         {step === 2 && (
-          <StepLayout step={2} totalSteps={TOTAL} title="Your gym" subtitle="Each plan says what it needs when you pick it." onBack={() => go(1)} onContinue={() => void finishSports()} canContinue={canLeaveSports} continueLabel="Next" saving={saving} blockedReason={blocked}>
+          <StepLayout step={2} totalSteps={TOTAL} title="Your gym" subtitle="Plans list the equipment they require before you build one." onBack={() => go(1)} onContinue={() => void finishSports()} canContinue={canLeaveSports} continueLabel="Next" saving={saving} blockedReason={blocked}>
             <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
               <div className="px-3 py-3">
                 <SectionHead Icon={Wrench} label="Where you lift" colour={getDisciplineColor('strength')} />
