@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { User, Upload, Download, Settings, Activity, Link, Package, HelpCircle, Trophy, KeyRound } from 'lucide-react';
+import { User, Download, Settings, Activity, Link, Package, HelpCircle, Trophy, KeyRound } from 'lucide-react';
 import { EffortsWordmark } from './EffortsButton';
 import { useAppAdmin } from '@/hooks/useAppAdmin';
 import { supabase } from '@/lib/supabase';
@@ -63,6 +63,8 @@ export function MobileHeader({
   };
 
   // Default menu items
+  // Order (docs/WORKORDER-menu-and-export-2026-09-07.md §1): you and your login, then what you plug in,
+  // then your data, then help. Export is not here — "Download your data" lives on the Account screen.
   const defaultMenuItems = (
     <>
       <DropdownMenuItem onClick={onProfileClick || (() => navigate('/profile'))}>
@@ -73,12 +75,6 @@ export function MobileHeader({
         <KeyRound className="mr-2 h-4 w-4" />
         Account
       </DropdownMenuItem>
-      <DropdownMenuItem
-        onClick={onAthleticRecordClick || (() => navigate('/profile/athletic-record'))}
-      >
-        <Trophy className="mr-2 h-4 w-4" />
-        Athletic Record
-      </DropdownMenuItem>
       <DropdownMenuItem onClick={onConnectionsClick || (() => navigate('/connections'))}>
         <Link className="mr-2 h-4 w-4" />
         Connections
@@ -87,13 +83,15 @@ export function MobileHeader({
         <Package className="mr-2 h-4 w-4" />
         Gear
       </DropdownMenuItem>
+      <DropdownMenuItem
+        onClick={onAthleticRecordClick || (() => navigate('/profile/athletic-record'))}
+      >
+        <Trophy className="mr-2 h-4 w-4" />
+        Athletic Record
+      </DropdownMenuItem>
       <DropdownMenuItem onClick={onImportClick}>
         <Download className="mr-2 h-4 w-4" />
         Import
-      </DropdownMenuItem>
-      <DropdownMenuItem>
-        <Upload className="mr-2 h-4 w-4" />
-        Export Data
       </DropdownMenuItem>
       <DropdownMenuItem onClick={openHelpEmail}>
         <HelpCircle className="mr-2 h-4 w-4" />

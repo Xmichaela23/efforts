@@ -1,14 +1,18 @@
 /**
  * AccountPlate — the ACCOUNT plate on Profile (docs/WORKORDER-account-2026-09-06.md §3).
  *
- * Rows: Email (plain text, shown once on the screen) · Change password · Change email · Sign out ·
- * Delete account. Each "Change" row is a bordered pill with a down chevron: the sheet rises under the
+ * Rows: Email (plain text, shown once on the screen) · Change password · Change email · Download your
+ * data · Sign out · Delete account. Each "Change" row is a bordered pill with a down chevron: the sheet rises under the
  * thumb, the screen is not left (docs/DESIGN-button-shape.md, "Three taps, two glyphs"). Sign out is a
  * plain bordered pill; Delete account is the danger variant.
  *
  * Password and email changes go straight to Supabase Auth (`updateUser`); no current-password field,
  * a signed-in session is what Supabase needs. Delete calls the `delete-account` edge function with the
  * user's own JWT, then signs out locally and leaves a one-time line for the sign-in screen.
+ *
+ * Download your data (docs/WORKORDER-menu-and-export-2026-09-07.md §2): the sheet builds one zip through
+ * the `export-data` edge function, then "Save file" hands it to the share sheet on iOS or downloads it on
+ * the web (src/lib/export-data.ts). The link is good for one hour.
  */
 import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
@@ -17,6 +21,7 @@ import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { NumberRow } from '@/components/ui/number-row';
 import { pillClass } from '@/lib/number-word';
 import { supabase, invokeFunction } from '@/lib/supabase';
+import { buildExport, saveExport, type ExportBuild } from '@/lib/export-data';
 
 /** Ours — the reset page uses the same floor; Supabase's project default is 6. */
 export const PASSWORD_MIN = 8;
@@ -26,7 +31,7 @@ export const ACCOUNT_DELETED_KEY = 'efforts:account-deleted';
 const fieldClass =
   'mt-1 w-full rounded-xl border border-white/15 bg-zinc-900/70 px-3 py-2 text-[16px] text-white placeholder:text-zinc-500 focus:border-white/35 focus:outline-none';
 
-type SheetKind = 'password' | 'email' | 'delete' | null;
+type SheetKind = 'password' | 'email' | 'export' | 'delete' | null;
 
 type Props = {
   header: React.ReactNode;
@@ -45,8 +50,9 @@ export function AccountPlate({ header, email, pendingEmail, onPendingEmail, onSi
   const [confirmText, setConfirmText] = useState('');
   const [busy, setBusy] = useState(false);
   const [line, setLine] = useState<string | null>(null);
+  const [exportBuild, setExportBuild] = useState<ExportBuild | null>(null);
 
-  const open = (k: SheetKind) => { setPw1(''); setPw2(''); setNewEmail(''); setConfirmText(''); setLine(null); setSheet(k); };
+  const open = (k: SheetKind) => { setPw1(''); setPw2(''); setNewEmail(''); setConfirmText(''); setLine(null); setExportBuild(null); setSheet(k); };
   const close = () => { if (!busy) setSheet(null); };
 
   const pwProblem = pw1.length < PASSWORD_MIN ? `At least ${PASSWORD_MIN} characters.` : pw1 !== pw2 ? 'The two entries differ.' : null;
@@ -84,6 +90,21 @@ export function AccountPlate({ header, email, pendingEmail, onPendingEmail, onSi
     setSheet(null);
   };
 
+  const buildTheFile = async () => {
+    setBusy(true); setLine(null);
+    try { setExportBuild(await buildExport()); }
+    catch (e) { setLine(e instanceof Error ? e.message : 'The file did not build.'); }
+    finally { setBusy(false); }
+  };
+
+  const saveTheFile = async () => {
+    if (!exportBuild) return;
+    setBusy(true); setLine(null);
+    try { await saveExport(exportBuild); }
+    catch (e) { setLine(e instanceof Error ? e.message : 'The file did not save.'); }
+    finally { setBusy(false); }
+  };
+
   const sheetClass = 'bg-zinc-950 border-white/10 text-white px-5 pb-8 pt-5';
 
   return (
@@ -101,6 +122,12 @@ export function AccountPlate({ header, email, pendingEmail, onPendingEmail, onSi
         <span className="text-[14px] text-white/85">Sign-in address</span>
         <button type="button" onClick={() => open('email')} className={`${pillClass} inline-flex items-center gap-1 outline-none focus:outline-none active:brightness-125`}>
           Change email<ChevronDown className="h-4 w-4 text-white/40" aria-hidden="true" />
+        </button>
+      </div>
+      <div className="py-1 flex items-center justify-between gap-3">
+        <span className="text-[14px] text-white/85">Your data</span>
+        <button type="button" onClick={() => open('export')} className={`${pillClass} inline-flex items-center gap-1 outline-none focus:outline-none active:brightness-125`}>
+          Download your data<ChevronDown className="h-4 w-4 text-white/40" aria-hidden="true" />
         </button>
       </div>
       <div className="pt-3 flex items-center gap-2">
@@ -138,6 +165,26 @@ export function AccountPlate({ header, email, pendingEmail, onPendingEmail, onSi
             {line && <p className="text-[13px] text-white/75">{line}</p>}
             <GalaxyButton type="submit" variant="primary" size="lg" fullWidth disabled={busy}>{busy ? 'Sending…' : 'Send confirmation'}</GalaxyButton>
           </form>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={sheet === 'export'} onOpenChange={(o) => { if (!o) close(); }}>
+        <SheetContent side="bottom" className={sheetClass}>
+          <SheetHeader><SheetTitle className="text-left text-white">Download your data</SheetTitle></SheetHeader>
+          <SheetDescription className="mt-3 text-left text-[14px] text-white/80 leading-snug">
+            One zip: your workouts, every logged set, your plans and your numbers. Ready in a moment.
+          </SheetDescription>
+          <div className="mt-4 space-y-3">
+            {line && <p className="text-[13px] text-white/75">{line}</p>}
+            {exportBuild ? (
+              <>
+                <GalaxyButton type="button" variant="primary" size="lg" fullWidth disabled={busy} onClick={() => void saveTheFile()}>{busy ? 'Saving…' : 'Save file'}</GalaxyButton>
+                <p className="text-[13px] text-white/60">The link is good for one hour.</p>
+              </>
+            ) : (
+              <GalaxyButton type="button" variant="primary" size="lg" fullWidth disabled={busy} onClick={() => void buildTheFile()}>{busy ? 'Building…' : 'Build the file'}</GalaxyButton>
+            )}
+          </div>
         </SheetContent>
       </Sheet>
 
