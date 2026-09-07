@@ -15,6 +15,7 @@ import Connections from "./components/Connections";
 import PlansAdminImport from "./pages/PlansAdminImport";
 import OnboardingProfilePage from "./pages/OnboardingProfilePage";
 import ArcSetupPage from "./pages/ArcSetupPage";
+import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
 <Route path="/profile" element={<Index />} />
 <Route path="/profile/athletic-record" element={<Index />} />
 <Route path="/privacy" element={<Privacy />} />
+<Route path="/reset-password" element={<ResetPassword />} /> {/* opened from the reset email; no session needed */}
 <Route path="/strava/callback" element={<StravaCallback />} /> {/* ✅ UNCOMMENTED */}
 <Route path="/auth/garmin/callback" element={<GarminCallback />} />
 <Route path="/connections" element={<Connections />} />

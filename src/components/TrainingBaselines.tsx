@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, RefreshCw, Calendar, Info, Loader2, User, Gauge, Wrench, Settings2, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch, RefreshCw, Calendar, Info, Loader2, User, Gauge, Wrench, Settings2, ChevronRight, KeyRound } from 'lucide-react';
+import { AccountPlate } from '@/components/AccountPlate';
 import { NumberRow } from '@/components/ui/number-row';
 import { numberWord, pillClass } from '@/lib/number-word';
 import SportStrip, { type StripSport } from '@/components/ui/sport-strip';
@@ -13,7 +14,7 @@ import GarminPreview from '@/components/GarminPreview';
 import { Button } from './ui/button';
 import { SPORT_COLORS, getDisciplineColor } from '@/lib/context-utils';
 import { deriveSwimPaceBands, parsePaceToSeconds } from '@/lib/swimPaceZones';
-import { supabase, getStoredUserId } from '@/lib/supabase';
+import { supabase, getStoredUserId, getStoredAuthUser } from '@/lib/supabase';
 import { refreshGroupRideRouteSnapshotsForUser } from '@/lib/refresh-group-ride-route-snapshots';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { runThresholdTestRow, ftpTestRow } from '@/lib/baseline-tests';
@@ -28,6 +29,8 @@ import { resolveStrengthCapacity } from '@shared/state-trend/capacity-resolver';
 
 interface TrainingBaselinesProps {
 onClose: () => void;
+/** Same action as the menu's Sign Out (AuthWrapper.handleLogout), reached from the Account plate. */
+onSignOut?: () => void | Promise<void>;
 onOpenBaselineTest?: (testName: string) => void;
 }
 
@@ -117,19 +120,30 @@ function AutoMinePill({ mine, onAuto, onMine, color, label }: { mine: boolean; o
   );
 }
 
-export default function TrainingBaselines({ onClose, onOpenBaselineTest }: TrainingBaselinesProps) {
+export default function TrainingBaselines({ onClose, onOpenBaselineTest, onSignOut }: TrainingBaselinesProps) {
 const { saveUserBaselines, loadUserBaselines } = useAppContext();
 /** Profile identity (2026-09-06): the sign-in email is shown, never stored; the photo is uploaded to the
  *  `avatars` bucket at `<user_id>/photo.jpg` (resized to 512px on the phone), its public URL saved to
  *  `profile.photo_url` at once so leaving without Save does not orphan the file. */
-const [authEmail, setAuthEmail] = useState<string>('');
+const [authEmail, setAuthEmail] = useState<string>(() => getStoredAuthUser()?.email ?? '');
+/** A new sign-in address waiting on its confirmation link (Supabase keeps it as `user.new_email`). */
+const [pendingEmail, setPendingEmail] = useState<string | null>(null);
 const [photoBusy, setPhotoBusy] = useState(false);
 const [photoNote, setPhotoNote] = useState<string | null>(null);
 useEffect(() => {
   let cancelled = false;
-  void supabase.auth.getUser().then(({ data: u }) => { if (!cancelled) setAuthEmail(u?.user?.email ?? ''); }).catch(() => {});
+  void supabase.auth.getUser().then(({ data: u }) => {
+    if (cancelled) return;
+    if (u?.user?.email) setAuthEmail(u.user.email);
+    const ne = (u?.user as { new_email?: string | null } | undefined)?.new_email ?? null;
+    setPendingEmail(ne && ne !== u?.user?.email ? ne : null);
+  }).catch(() => {});
   return () => { cancelled = true; };
 }, []);
+const signOut = async () => {
+  if (onSignOut) { await onSignOut(); return; }
+  await supabase.auth.signOut();
+};
 const uploadPhoto = async (file: File) => {
   const uid = getStoredUserId(); if (!uid) return;
   setPhotoBusy(true); setPhotoNote(null);
@@ -1676,7 +1690,6 @@ return (
                         <div className="flex-1 min-w-0">
                           <NumberRow id="name" name="Name" inputType="text" value={data.profile?.name || null} seed={data.profile?.name || ''} onSave={(t) => commitData((d) => ({ ...d, profile: { ...(d.profile ?? {}), name: t } }))} />
                           <NumberRow id="location" name="Location" inputType="text" value={data.profile?.location || null} seed={data.profile?.location || ''} onSave={(t) => commitData((d) => ({ ...d, profile: { ...(d.profile ?? {}), location: t } }))} />
-                          <NumberRow id="email" name="Email" editable={false} value={authEmail || null} />
                           {photoNote && <p className="text-[12px] text-white/60 mt-1">{photoNote}</p>}
                         </div>
                       </div>
@@ -1700,6 +1713,17 @@ return (
                         onSave={(t) => { const v = parseInt(t); if (Number.isFinite(v) && v > 0) void commitData((d) => ({ ...d, weight: v })); }} />
                       {saveMessage && lastSavedSport === 'you' && <p className="text-[13px] text-white/75 mt-1.5">{saveMessage}</p>}
                     </div>
+                  </div>
+
+                  {/* ── ACCOUNT: sign-in address, password, sign out, delete (2026-09-06) ── */}
+                  <div className="galaxy-card readout-texture readout-texture--forge rounded-2xl divide-y divide-white/[0.10]" style={readoutPlateStyle(undefined, { galaxy: true })}>
+                    <AccountPlate
+                      header={<SectionHead id="account" Icon={KeyRound} label="Account" colour="rgba(255,255,255,0.7)" />}
+                      email={authEmail}
+                      pendingEmail={pendingEmail}
+                      onPendingEmail={setPendingEmail}
+                      onSignOut={signOut}
+                    />
                   </div>
 
                   {/* ── The sport strip: the app's segmented control, filtering the plate below to one sport ── */}

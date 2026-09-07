@@ -1,9 +1,24 @@
 import React, { useState } from 'react';
+import { ACCOUNT_DELETED_KEY } from '@/components/AccountPlate';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { EffortsWordmark } from '@/components/EffortsButton';
+
+/** Where the reset email lands (docs/WORKORDER-account-2026-09-06.md §1); must be in Supabase's Redirect URLs. */
+export const RESET_PASSWORD_URL = 'https://efforts.work/reset-password';
+
+/** One-time line left by the Account plate after a delete. */
+function takeDeletedLine(): string | null {
+  try {
+    if (sessionStorage.getItem(ACCOUNT_DELETED_KEY) !== '1') return null;
+    sessionStorage.removeItem(ACCOUNT_DELETED_KEY);
+    return 'Your account is deleted.';
+  } catch {
+    return null;
+  }
+}
 
 /** All discipline keys used by EffortsWordmark layers — full spectrum glow on auth. */
 const AUTH_DISCIPLINES = ['run', 'strength', 'ride', 'pilates', 'swim'] as const;
@@ -20,6 +35,24 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  /** 'signin' | 'forgot' (one email field) | 'sent' (the neutral line, whatever the server said). */
+  const [mode, setMode] = useState<'signin' | 'forgot' | 'sent'>('signin');
+  const [notice] = useState<string | null>(() => takeDeletedLine());
+
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      // Never confirm or deny that an address exists: the result is not shown, the same line is.
+      await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: RESET_PASSWORD_URL });
+    } catch (err) {
+      console.error('Reset request error:', err);
+    } finally {
+      setLoading(false);
+      setMode('sent');
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,9 +87,47 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
             activeDisciplines={[...AUTH_DISCIPLINES]}
           />
         </div>
-        <p className="mt-5 text-sm text-zinc-400">Sign in to your account</p>
+        <p className="mt-5 text-sm text-zinc-400">{mode === 'signin' ? 'Sign in to your account' : 'Reset your password'}</p>
+        {notice && <p className="mt-3 text-sm text-zinc-300">{notice}</p>}
       </div>
 
+      {mode === 'sent' ? (
+        <div className="space-y-6 text-center">
+          <p className="text-sm text-zinc-300">If that address has an account, a reset link is on its way.</p>
+          <button type="button" onClick={() => setMode('signin')} className="text-sm font-semibold text-amber-400 hover:text-amber-300 hover:underline">
+            Back to sign in
+          </button>
+        </div>
+      ) : mode === 'forgot' ? (
+        <form onSubmit={handleForgot} className="space-y-4">
+          <div>
+            <Label htmlFor="reset-email" className="text-zinc-400">
+              Email
+            </Label>
+            <Input
+              id="reset-email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter your email"
+              required
+              className={authInputClass}
+            />
+          </div>
+          <Button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-xl border-0 bg-gradient-to-r from-amber-500 to-yellow-400 font-semibold text-black shadow-[0_0_24px_-4px_rgba(251,191,36,0.45)] hover:from-amber-400 hover:to-yellow-300"
+          >
+            {loading ? 'Sending...' : 'Send reset link'}
+          </Button>
+          <div className="text-center">
+            <button type="button" onClick={() => setMode('signin')} className="text-sm font-semibold text-amber-400 hover:text-amber-300 hover:underline">
+              Back to sign in
+            </button>
+          </div>
+        </form>
+      ) : (
       <form onSubmit={handleLogin} className="space-y-4">
         {error && (
           <div className="rounded-xl border border-red-500/30 bg-red-950/40 p-3">
@@ -92,6 +163,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
             required
             className={authInputClass}
           />
+          <div className="mt-2 text-right">
+            <button type="button" onClick={() => { setError(''); setMode('forgot'); }} className="text-sm text-zinc-400 hover:text-zinc-200 hover:underline">
+              Forgot password?
+            </button>
+          </div>
         </div>
 
         <Button
@@ -102,7 +178,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
           {loading ? 'Signing in...' : 'Sign In'}
         </Button>
       </form>
+      )}
 
+      {mode === 'signin' && (
       <div className="text-center">
         <p className="text-sm text-zinc-500">
           Don&apos;t have an account?{' '}
@@ -115,6 +193,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
           </button>
         </p>
       </div>
+      )}
     </div>
   );
 };

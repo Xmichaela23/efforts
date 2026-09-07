@@ -114,7 +114,12 @@ const AuthWrapper: React.FC = () => {
 
     bootstrap();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // Password recovery (2026-09-06): the client is built with detectSessionInUrl=false, so the
+      // recovery token never reaches this listener in-app; /reset-password (its own route, outside
+      // AuthWrapper) reads the token from the URL itself and sets the session there. If the event
+      // ever does arrive here, it must not gate the app or churn the session.
+      if (event === 'PASSWORD_RECOVERY') return;
       const next = session?.user ?? null;
       // Q-072 — resume churn killer: when the auth event re-fires for the SAME already-approved
       // user (iOS fires SIGNED_IN / INITIAL_SESSION on every foreground), do NOTHING. The old code

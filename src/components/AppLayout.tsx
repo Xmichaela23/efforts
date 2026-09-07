@@ -1672,6 +1672,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               <TrainingBaselines
                 onClose={handleBackToDashboard}
                 onOpenBaselineTest={openBaselineTest}
+                onSignOut={onLogout}
               />
             </div>
           ) : showGear ? (
