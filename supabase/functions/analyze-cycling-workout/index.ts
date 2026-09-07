@@ -277,13 +277,16 @@ export function generateCyclingAdherenceSummary(opts: {
   // range". A work interval is on target when its average power sits inside the prescribed range, or within
   // ±15% of the range's midpoint when there is no range. The time share falls back only when no power exists.
   const hits = workIntervals.filter((i: any) => {
-    const avg = Number(i?.executed?.avg_power_w ?? i?.executed?.avg_power ?? i?.avg_power);
-    const lo = Number(i?.planned?.power_range?.lower), hi = Number(i?.planned?.power_range?.upper);
+    // Rows come from generateIntervalBreakdown (actual_power_w, planned_power_range_*, planned_power_w) or,
+    // from older callers, the stored interval shape (executed / planned). Read both.
+    if (typeof i?.power_adherence_percent === 'number') return i.power_adherence_percent >= 85;
+    const avg = Number(i?.actual_power_w ?? i?.executed?.avg_power_w ?? i?.executed?.avg_power ?? i?.avg_power);
+    const lo = Number(i?.planned_power_range_lower ?? i?.planned?.power_range?.lower), hi = Number(i?.planned_power_range_upper ?? i?.planned?.power_range?.upper);
     if (Number.isFinite(avg) && avg > 0 && Number.isFinite(lo) && Number.isFinite(hi) && hi > 0) {
       const mid = (lo + hi) / 2;
       return (avg >= lo && avg <= hi) || (avg >= mid * 0.85 && avg <= mid * 1.15);
     }
-    const target = Number(i?.planned?.power_watts ?? i?.planned?.power ?? i?.target_power);
+    const target = Number(i?.planned_power_w ?? i?.planned?.power_watts ?? i?.planned?.power ?? i?.target_power);
     if (Number.isFinite(avg) && avg > 0 && Number.isFinite(target) && target > 0) {
       return avg >= target * 0.85 && avg <= target * 1.15;
     }
