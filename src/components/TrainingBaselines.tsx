@@ -119,6 +119,32 @@ function AutoMinePill({ mine, onAuto, onMine, color, label }: { mine: boolean; o
   );
 }
 
+/**
+ * Home-gym equipment chips. ONE list, shared by Profile and the sign-up intake (2026-09-07).
+ * ⛔ These strings are matched EXACTLY by `substituteExerciseForEquipment` (materialize-plan) and by
+ * substring in `_shared/strength-equipment-tier.ts`; see the comment above the Profile picker.
+ */
+export const HOME_GYM_EQUIPMENT_OPTIONS: string[] = [
+    "Barbell + plates",
+    "Dumbbells",
+    "Squat rack / Power cage",
+    "Bench (flat/adjustable)",
+    "Incline bench",
+    "Pull-up bar",
+    "Kettlebells",
+    "Cable machine",
+    "Resistance bands",
+    // ⛔ ADDED 2026-09-02 (WORKORDER-plyo-screen §3): gates the ladder drills in the plyo family; matched
+    // by exact string in the logger's plyo Swap options.
+    "Agility ladder",
+    "Ab wheel",
+    // ⛔ ADDED 2026-08-26 — see the ruling above. ⚠️ Both strings are matched by SUBSTRING in
+    // `athleteEquipmentToKeys` ("trx"/"suspension", "stability ball"); renaming either silently
+    // removes the capability from every athlete who ticked it.
+    "TRX / suspension trainer",
+    "Stability ball"
+  ];
+
 export default function TrainingBaselines({ onClose, onOpenBaselineTest, onSignOut }: TrainingBaselinesProps) {
 const { saveUserBaselines, loadUserBaselines } = useAppContext();
 /** Profile identity (2026-09-06): the sign-in email is shown, never stored; the photo is uploaded to the
@@ -1577,26 +1603,7 @@ const disciplineOptions = [
    * ⚠️ "Incline bench" stays a SEPARATE chip from "Bench (flat/adjustable)": that label is an OR, so
    * it cannot be read as incline capability. An athlete with an adjustable bench ticks both.
    */
-  const homeGymEquipmentOptions = [
-    "Barbell + plates",
-    "Dumbbells",
-    "Squat rack / Power cage",
-    "Bench (flat/adjustable)",
-    "Incline bench",
-    "Pull-up bar",
-    "Kettlebells",
-    "Cable machine",
-    "Resistance bands",
-    // ⛔ ADDED 2026-09-02 (WORKORDER-plyo-screen §3): gates the ladder drills in the plyo family; matched
-    // by exact string in the logger's plyo Swap options.
-    "Agility ladder",
-    "Ab wheel",
-    // ⛔ ADDED 2026-08-26 — see the ruling above. ⚠️ Both strings are matched by SUBSTRING in
-    // `athleteEquipmentToKeys` ("trx"/"suspension", "stability ball"); renaming either silently
-    // removes the capability from every athlete who ticked it.
-    "TRX / suspension trainer",
-    "Stability ball"
-  ];
+  const homeGymEquipmentOptions = HOME_GYM_EQUIPMENT_OPTIONS;
 
   
   // Helper to check if user has commercial gym access

@@ -87,9 +87,11 @@ const StravaCallback: React.FC = () => {
           setMessage('Connected to Strava. History can be imported from Connections.');
         }
 
-        // Redirect back to main app
+        // Back to the intake if it sent us here, else Home.
+        let intake = false;
+        try { intake = localStorage.getItem('efforts:intake_step') !== null; } catch { /* no device copy */ }
         setTimeout(() => {
-          navigate('/');
+          navigate(intake ? '/welcome' : '/');
         }, 1500);
 
       } catch (error) {

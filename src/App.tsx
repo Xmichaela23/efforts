@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Privacy from "./pages/Privacy";
 import Support from "./pages/Support";
+import WelcomePage from "./pages/WelcomePage";
 import StravaCallback from "./components/StravaCallback"; // ✅ UNCOMMENTED
 import GarminCallback from "./components/GarminCallback";
 import Connections from "./components/Connections";
@@ -37,6 +38,7 @@ const App = () => (
 <Route path="/privacy" element={<Privacy />} />
 <Route path="/support" element={<Support />} /> {/* public: no session needed, the address given to Strava and Garmin */}
 <Route path="/help" element={<Index />} />
+<Route path="/welcome" element={<WelcomePage />} /> {/* sign-up intake: about you · bring in your workouts · sports and gear */}
 <Route path="/reset-password" element={<ResetPassword />} /> {/* opened from the reset email; no session needed */}
 <Route path="/strava/callback" element={<StravaCallback />} /> {/* ✅ UNCOMMENTED */}
 <Route path="/auth/garmin/callback" element={<GarminCallback />} />

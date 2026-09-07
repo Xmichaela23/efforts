@@ -50,10 +50,11 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onSwitchToLogin 
       if (error) {
         setError(error.message);
       } else {
-        // Sign-up returns a session straight away (email confirmation is off), and AuthWrapper's auth
-        // listener picks it up. Land the new athlete in the plan builder, not on an empty Home: the
-        // Goals screen reads `openBuilder` from the navigation state and opens the wizard (2026-09-07).
-        navigate('/goals', { replace: true, state: { openBuilder: 'train' } });
+        // Sign-up returns a session straight away (email confirmation is off) and AuthWrapper's auth
+        // listener picks it up. The new athlete goes to the intake (about you · bring in your workouts ·
+        // sports and gear), then Home. Never straight into a plan (Michael, 2026-09-07).
+        try { localStorage.setItem('efforts:intake_step', '1'); } catch { /* device copy only */ }
+        navigate('/welcome', { replace: true });
         onSuccess();
       }
     } catch (error) {

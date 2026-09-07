@@ -1692,23 +1692,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           <div className="px-2 pt-3">
             <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
               <p className="m-0 text-white/90 text-base">No plan yet.</p>
-              <p className="m-0 mt-1 text-white/55 text-sm">
-                Build one around the riding and running you already do, or connect a watch first so the numbers come from your own sessions.
-              </p>
-              <div className="mt-3 flex flex-col gap-2">
+              <div className="mt-3">
                 <button
                   type="button"
-                  onClick={() => navigate('/goals', { state: { openBuilder: 'train' } })}
+                  onClick={() => navigate('/goals')}
                   className="w-full text-left rounded-xl border border-white/25 bg-white/[0.08] px-4 py-3 text-white/90 text-sm"
                 >
-                  Build a plan ›
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate('/connections')}
-                  className="w-full text-left rounded-xl border border-white/25 bg-white/[0.08] px-4 py-3 text-white/90 text-sm"
-                >
-                  Connect Garmin or Strava ›
+                  Build a plan around this ›
                 </button>
               </div>
             </div>
