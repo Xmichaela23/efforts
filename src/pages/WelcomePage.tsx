@@ -69,6 +69,13 @@ const SectionHead = ({ Icon, label, colour }: { Icon: React.ComponentType<any>; 
   </div>
 );
 
+/** Strava's mark, drawn inline (Simple Icons path) so the row matches the others. */
+const StravaMark = () => (
+  <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+    <path fill="#FC4C02" d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169" />
+  </svg>
+);
+
 const plateClass = 'galaxy-card readout-texture readout-texture--forge rounded-2xl divide-y divide-white/[0.10]';
 
 export default function WelcomePage() {
@@ -356,13 +363,7 @@ export default function WelcomePage() {
                 <SectionHead Icon={Link2} label="Bring in your workouts" colour="rgba(255,255,255,0.7)" />
                 <p className="m-0 mb-1 text-[12px] text-white/55 leading-snug">Your last 90 days come in, so the plan starts from your own sessions. Also on Connections, any time.</p>
                 <div className="mt-2 space-y-2">
-                  {stravaOn
-                    ? connectRow('strava', <span className="text-[#FC4C02] font-bold text-[11px] tracking-wide">STRAVA</span>, 'Strava', 'Activities arrive as you finish them.', true, () => {})
-                    : (
-                      <button type="button" onClick={() => void startStrava()} className="block hover:opacity-90 transition-opacity bg-transparent border-none p-0">
-                        <img src="/icons/strava-connect.svg" alt="Connect with Strava" className="h-11" />
-                      </button>
-                    )}
+                  {connectRow('strava', <StravaMark />, 'Strava', 'Activities arrive as you finish them.', stravaOn, () => void startStrava())}
                   {connectRow('garmin', <Watch className="h-5 w-5" style={{ color: '#00A0DE' }} />, 'Garmin Connect', 'Rides and runs arrive as you finish them.', garminOn, () => void startGarmin())}
                   {isNativeIOS && healthKit && connectRow('health', <Heart className="h-5 w-5" style={{ color: '#FF2D55' }} />, 'Apple Health', 'Workouts from your watch and phone.', healthOn, () => void startAppleHealth())}
                 </div>
