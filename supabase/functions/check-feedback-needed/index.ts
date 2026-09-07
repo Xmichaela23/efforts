@@ -49,7 +49,10 @@ Deno.serve(async (req) => {
       .in('type', ['run', 'ride', 'swim'])
       .is('rpe', null)
       .is('feedback_dismissed_at', null) // Server checks dismissals from database
-      .gte('date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]) // Last 7 days
+      // OURS — only a session from today or yesterday gets the question (was 7 days). A history pull
+      // creates rows for old dates and the 7-day window asked about each of them (Michael, 2026-09-07,
+      // a ride from two days earlier surfaced after a Strava reconnect). docs/STATE-SOURCES.md.
+      .gte('date', new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString().split('T')[0])
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(1);
