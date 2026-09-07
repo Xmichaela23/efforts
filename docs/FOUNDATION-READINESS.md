@@ -95,3 +95,19 @@ Payload 43 MB → 0.8 MB. Both Saturday rides analyse in 8–9 s.
 
 **What it proved:** B4/B7 — no alarm and no "failed" word on screen — the analyser was dead for six days and
 the only sign was a stuck status nobody reads. The plumbing work order starts with those two.
+
+## Incident 2026-09-07 — cross-user reads through the app's own key, CLOSED the same night
+
+**Found:** a throwaway login (the demo account) could read another athlete's rows through the anon key on
+plans, exercise_log, goals, workout_facts, athlete_snapshot, and every athlete's planned week through the
+`planned_workouts_resolved` view. RLS was on almost everywhere; several tables carried permissive policies
+and the view ran with its owner's rights, which steps around RLS.
+
+**Fix:** three migrations, pasted by Michael: owner-only policies on plans + exercise_log; then the same four
+owner rules on EVERY public table with a `user_id` (rerunnable); then `security_invoker = true` on every view
+with a `user_id`. Sweep after: 42 tables/views, zero cross-user reads signed in, zero reads with the public
+key alone, every own row still visible.
+
+**Lesson:** B1 covered the server functions; the client's direct reads were assumed covered by RLS and were
+not fully. The sweep script pattern (sign in as a throwaway, count another user's rows on every table the
+REST spec exposes) is the check to rerun whenever a table or view is added.
