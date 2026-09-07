@@ -1699,7 +1699,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   onClick={() => navigate('/goals')}
                   className="w-full text-left rounded-xl border border-white/25 bg-white/[0.08] px-4 py-3 text-white/90 text-sm"
                 >
-                  Build a plan around this ›
+                  Build a training or race plan ›
                 </button>
               </div>
             </div>
