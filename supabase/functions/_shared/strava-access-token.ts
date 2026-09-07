@@ -1,4 +1,5 @@
 import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2';
+import { recordProviderResult } from './connection-health.ts';
 
 export type StravaTokenResult =
   | { ok: true; accessToken: string }
@@ -38,6 +39,7 @@ export async function ensureStravaAccessToken(
   if (!stale) return { ok: true, accessToken };
 
   if (!refreshToken) {
+    await recordProviderResult(supabase, { provider: 'strava', userId, status: 401, error: 'token expired and no refresh token stored' });
     return { ok: false, error: 'Strava token expired — reconnect Strava.' };
   }
 
@@ -60,6 +62,8 @@ export async function ensureStravaAccessToken(
   if (!tr.ok) {
     const txt = await tr.text().catch(() => '');
     console.warn('[strava-access-token] refresh failed', tr.status, txt.slice(0, 200));
+    // Connection health (§4): Strava answers 400 invalid_grant for a revoked refresh token — a dead grant reads as 401.
+    await recordProviderResult(supabase, { provider: 'strava', userId, status: tr.status === 400 ? 401 : tr.status, error: `oauth/token refresh → ${tr.status}` });
     return { ok: false, error: 'Could not refresh Strava token — reconnect Strava.' };
   }
 

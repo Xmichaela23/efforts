@@ -14,6 +14,17 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — 2026-09-07 (the plumbing: queue, alarm, "failed" on screen, connection health — DEPLOYED, migrations NOT pasted)
+
+- [ ] **Paste three migrations in order in the SQL editor:** `20260907070000_jobs_alarms_analysis_stamp.sql`, `20260907080000_connection_health.sql`,
+      `20260907090000_run_jobs_cron.sql` (replace `<JOBS_SECRET>` with the value in the plumbing report; the same value is the
+      `JOBS_SECRET` function secret). Then `SELECT jobname, active FROM cron.job;` shows `run-jobs-every-minute`.
+- [ ] **Then the terminal runs** `JOBS_SECRET_FILE=… node scripts/_plumbing-verify-2026-09-07.mjs all` (t1–t5) and `teardown`.
+      Until the paste: ingest falls back to the old direct call, alarms still email (no rate limit), health writes log and skip.
+- [ ] **Look for on a device:** a completed session whose analysis failed carries a small amber dot on Home and on the week chip;
+      its Performance tab says "Analysis failed at …: …." with a bordered "Try again"; Connections shows "Reconnect ›" on a dead
+      Garmin/Strava sign-in and Home says "Garmin needs reconnecting ›" under Today.
+
 ## ⏳ AWAITING MICHAEL — 2026-09-04 evening (D-466, on branch `claude/chat-archival-behavior-ee4r3z`, NOT on main, NOT deployed)
 
 - [ ] **Merge the branch to main** (fast-forward from `291b3147`), then deploy the 33 functions listed in the

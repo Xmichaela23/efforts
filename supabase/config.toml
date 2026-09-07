@@ -12,3 +12,7 @@ verify_jwt = false
 
 [functions.garmin-webhook-user]
 verify_jwt = false
+
+# run-jobs is called by pg_cron with no JWT; the secret in the URL path (JOBS_SECRET) is the door.
+[functions.run-jobs]
+verify_jwt = false

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { withAlarm } from '../_shared/alarm.ts';
 import { hrDriftHalvesPct, warmupSkipSeconds } from '../_shared/hr-drift-halves.ts';
 import { extractSensorData } from '../../lib/analysis/sensor-data/extractor.ts';
 import { generateIntervalBreakdown } from './lib/intervals/interval-breakdown.ts';
@@ -77,7 +78,9 @@ import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 // OUTPUT: { success: boolean, analysis: PrescribedRangeAdherence }
 // =============================================================================
 
-Deno.serve(async (req) => {
+// The alarm wrapper (docs/WORKORDER-plumbing-2026-09-07.md §2): a throw or a 5xx here is reported
+// (one email per kind per 15 minutes, every one in public.alarms) and then returned unchanged.
+Deno.serve(withAlarm('analyze-running-workout', async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -3309,7 +3312,7 @@ Deno.serve(async (req) => {
       }
     });
   }
-});
+}));
 
 /**
  * REMOVED: Types and granular pace adherence (moved to lib/adherence/granular-pace.ts)

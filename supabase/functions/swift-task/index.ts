@@ -14,6 +14,9 @@ declare const Deno: any;
 // - Requires a valid `token` (Garmin OAuth access token) provided by the client
 // - This function simply forwards the request and returns the upstream response
 
+import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { recordProviderResult } from '../_shared/connection-health.ts';
+
 const GARMIN_CONNECT_BASE = 'https://connectapi.garmin.com';
 const GARMIN_APIS_BASE = 'https://apis.garmin.com';
 
@@ -88,6 +91,22 @@ Deno.serve(async (req: Request) => {
         'Accept': 'application/json, text/plain, */*',
       },
     });
+
+    // Connection health (docs/WORKORDER-plumbing-2026-09-07.md §4): the proxy carries the athlete's JWT
+    // (verify_jwt on), so the upstream answer lands on their Garmin row. Never blocks the reply.
+    (async () => {
+      try {
+        const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+        if (!jwt) return;
+        const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+        const { data } = await supabase.auth.getUser(jwt);
+        const userId = data?.user?.id;
+        if (!userId) return;
+        await recordProviderResult(supabase, { provider: 'garmin', userId, status: upstream.status, error: upstream.ok ? null : `${path.split('?')[0]} → ${upstream.status}` });
+      } catch (e) {
+        console.warn('[swift-task] health write skipped:', (e as Error)?.message ?? e);
+      }
+    })();
 
     // Pass-through status and body
     const contentType = upstream.headers.get('Content-Type') || 'application/json';

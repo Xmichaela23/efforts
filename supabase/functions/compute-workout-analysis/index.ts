@@ -1,6 +1,7 @@
 // Supabase Edge Function: compute-workout-analysis
 // @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { withAlarm } from '../_shared/alarm.ts';
 import { buildRunPaceCurve, type RunPaceCurve } from '../../../src/lib/run-critical-speed.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { normalizeSamples } from '../../lib/analysis/sensor-data/extractor.ts';
@@ -912,7 +913,9 @@ async function extractAssessmentBaseline(
   }
 }
 
-Deno.serve(async (req) => {
+// The alarm wrapper (docs/WORKORDER-plumbing-2026-09-07.md §2): a throw or a 5xx here is reported
+// (one email per kind per 15 minutes, every one in public.alarms) and then returned unchanged.
+Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
   // CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
@@ -2188,4 +2191,4 @@ Deno.serve(async (req) => {
     }
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
   }
-});
+}));

@@ -6,12 +6,39 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { invalidateUserTrainingCache } from '../_shared/invalidate-user-training-cache.ts';
 import { metabolicCostPerMeter } from '../_shared/gap.ts'; // ONE canonical Minetti cost — no inline copy
+import { enqueueJob } from '../_shared/jobs.ts';
 const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY'));
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
+/**
+ * ⛔ FOLLOW-UPS GO THROUGH THE QUEUE (2026-09-07, docs/WORKORDER-plumbing-2026-09-07.md §1). A row in
+ * public.jobs; run-jobs (pg_cron, every minute) calls the target with the service key, retries at
+ * 1 / 5 / 25 minutes, then marks it failed and raises the alarm. Before this the call was a
+ * fire-and-forget fetch whose only failure sign was `.catch(console.error)`.
+ *
+ * ⚠️ FALLBACK: if the insert fails (the jobs migration not yet pasted, or the table unreachable) the
+ * old direct call runs so an activity is never left unprocessed by the plumbing itself.
+ */
+async function enqueueOrCall(kind, payload, ids) {
+  const q = await enqueueJob(supabase, { kind, payload, user_id: ids?.user_id ?? null, workout_id: ids?.workout_id ?? null });
+  if (q.ok) {
+    console.log(JSON.stringify({ event: 'job_enqueued', kind, id: q.id, workout_id: ids?.workout_id ?? null }));
+    return { queued: true, id: q.id };
+  }
+  console.error(`[ingest-activity] enqueue ${kind} failed (${q.error}) — calling directly`);
+  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/${kind}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key },
+    body: JSON.stringify(payload),
+  }).then((r) => { if (!r.ok) console.error(`[ingest-activity] ${kind} direct call non-OK:`, r.status); })
+    .catch((e) => console.error(`[ingest-activity] ${kind} direct call failed:`, e));
+  return { queued: false, id: null };
+}
+
 function toIsoDate(dateLike) {
   try {
     if (!dateLike) return null;
@@ -1294,12 +1321,7 @@ async function mergeSameSwimIfExists(supabase: any, userId: string, row: any) {
     // single ordered orchestrator instead — it re-runs the full chain in dependency order.
     // See docs/AUDIT-fanout-ordering-2026-07-17.md.
     try {
-      const svcKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-      await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/recompute-workout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${svcKey}`, 'apikey': svcKey },
-        body: JSON.stringify({ workout_id: match.id, user_id: userId, include_summary: true }),
-      });
+      await enqueueOrCall('recompute-workout', { workout_id: match.id, user_id: userId, include_summary: true }, { user_id: userId, workout_id: match.id });
     } catch (_e) { /* recompute non-fatal */ }
   }
   return { id: match.id, keptSource: u.source || match.source, mergedFields: Object.keys(u) };
@@ -1494,21 +1516,15 @@ Deno.serve(async (req)=>{
         //    auto-attach → summary → analysis → workload/adaptation → facts(skip_snapshot) → analyze →
         //    snapshot(fresh watermark) → cache-invalidate. Service-role door requires the exact
         //    SERVICE_ROLE_KEY + an explicit user_id (NOT the anon fallback).
-        const svcKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-        const orchestrateUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/recompute-workout`;
-        fetch(orchestrateUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${svcKey}`,
-            'apikey': svcKey
-          },
-          body: JSON.stringify({ workout_id: wid, user_id: row.user_id, include_summary: true })
-        }).catch(err => console.error('[ingest-activity] recompute-workout orchestrator failed:', err));
+        //
+        //    2026-09-07: QUEUED, not fired (§1 of the plumbing work order). recompute-workout owns
+        //    auto-attach as its step 0, so no separate auto-attach-planned job is queued — the
+        //    `fnUrl` above was never called and stays as it was. adapt-plan is queued right after.
+        await enqueueOrCall('recompute-workout', { workout_id: wid, user_id: row.user_id, include_summary: true }, { user_id: row.user_id, workout_id: wid });
       }
     } catch  {}
 
-    // Plan auto-adapt (progression, deload signals, strength fingerprint relayout, materialize) — fire-and-forget.
+    // Plan auto-adapt (progression, deload signals, strength fingerprint relayout, materialize) — queued (was fire-and-forget).
     // Idempotent by design: a normal activity ingest does not mutate plan JSON, so the run-shape
     // fingerprint is unchanged → relayout is a no-op unless the template/week was edited elsewhere.
     // Telemetry: adapt-plan logs JSON lines tag=adapt_plan_auto and returns relayout_* fields on action=auto.
@@ -1517,23 +1533,8 @@ Deno.serve(async (req)=>{
     try {
       const off = Deno.env.get('ADAPT_PLAN_AUTO_ON_INGEST');
       if (off !== '0' && off !== 'false') {
-        const adaptUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/adapt-plan`;
-        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-        fetch(adaptUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${key}`,
-            apikey: key,
-          },
-          body: JSON.stringify({ user_id: userId, action: 'auto' }),
-        })
-          .then((r) => {
-            if (!r.ok) {
-              console.error('[ingest-activity] adapt-plan auto non-OK:', r.status, r.statusText);
-            }
-          })
-          .catch((e) => console.error('[ingest-activity] adapt-plan auto failed:', e));
+        // 2026-09-07: queued behind the recompute job (§1); run-jobs runs them in order.
+        await enqueueOrCall('adapt-plan', { user_id: userId, action: 'auto' }, { user_id: userId, workout_id: null });
       }
     } catch (e) {
       console.error('[ingest-activity] adapt-plan auto trigger error:', e);

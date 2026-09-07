@@ -15,6 +15,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import { invalidateUserTrainingCache } from '../_shared/invalidate-user-training-cache.ts';
+import { withAlarm } from '../_shared/alarm.ts';
 import {
   mondayOf,
   resolveAnalyzeEdgeFn,
@@ -40,7 +41,7 @@ async function markStatus(client: any, workout_id: string, patch: Record<string,
   }
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withAlarm('recompute-workout', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -87,6 +88,12 @@ Deno.serve(async (req) => {
   const analyzeFn = resolveAnalyzeEdgeFn(workout.type as string | null);
   const workoutDate = String((workout as any).date || '').slice(0, 10);
   const steps: RecomputeStep[] = [];
+  // Every failed step, in order, as '<step>: <reason>'. The first one becomes the response's `error`.
+  const failures: string[] = [];
+  const fail = (step: RecomputeStep, reason: unknown) => {
+    const msg = (reason as { message?: string })?.message ?? String(reason ?? 'failed');
+    failures.push(`${step}: ${msg}`.slice(0, 500));
+  };
 
   // D-078: user-triggered recompute forces fresh ai_summary; the automatic (service/ingest) path
   // PRESERVES existing narrative on a transient LLM null — the original ingest-activity behaviour.
@@ -103,9 +110,10 @@ Deno.serve(async (req) => {
   if (includeSummary) {
     const r = await invokeWithRetry(serviceClient, 'compute-workout-summary', { workout_id });
     if (r?.error) {
+      fail('summary', r.error);
       await markStatus(serviceClient, workout_id, { summary_status: 'failed' });
       console.warn('[recompute-workout] compute-workout-summary failed — halting chain:', r.error.message);
-      return json({ ok: false, stale: true, steps, code: 'summary_failed', error: r.error.message });
+      return json({ ok: false, stale: true, steps, code: 'summary_failed', error: failures[0], failed_step: 'summary', failures }, 500);
     }
     steps.push('summary');
   }
@@ -113,20 +121,20 @@ Deno.serve(async (req) => {
   // ── 2. compute-workout-analysis — writes computed.analysis. Degradable → CONTINUE on fail.
   {
     const r = await invokeWithRetry(serviceClient, 'compute-workout-analysis', { workout_id });
-    if (r?.error) console.warn('[recompute-workout] compute-workout-analysis failed (continuing degraded):', r.error.message);
+    if (r?.error) { fail('analysis', r.error); console.warn('[recompute-workout] compute-workout-analysis failed (continuing degraded):', r.error.message); }
     else steps.push('analysis');
   }
 
   // ── 3a. calculate-workload — ACWR substrate; must precede snapshot. Continue on fail.
   {
     const r = await invokeWithRetry(serviceClient, 'calculate-workload', { workout_id });
-    if (r?.error) console.warn('[recompute-workout] calculate-workload failed (non-fatal):', r.error.message);
+    if (r?.error) { fail('workload', r.error); console.warn('[recompute-workout] calculate-workload failed (non-fatal):', r.error.message); }
     else steps.push('workload');
   }
   // ── 3b. compute-adaptation-metrics — reads computed (must follow analysis; F5). No retry, continue.
   {
     const r = await serviceClient.functions.invoke('compute-adaptation-metrics', { body: { workout_id } });
-    if (r?.error) console.warn('[recompute-workout] compute-adaptation-metrics failed (non-fatal):', r.error.message);
+    if (r?.error) { fail('adaptation', r.error); console.warn('[recompute-workout] compute-adaptation-metrics failed (non-fatal):', r.error.message); }
     else steps.push('adaptation');
   }
 
@@ -135,9 +143,10 @@ Deno.serve(async (req) => {
   {
     const r = await invokeWithRetry(serviceClient, 'compute-facts', { workout_id, skip_snapshot: true });
     if (r?.error) {
+      fail('facts', r.error);
       await markStatus(serviceClient, workout_id, { metrics_status: 'failed' });
       console.warn('[recompute-workout] compute-facts failed — halting downstream:', r.error.message);
-      return json({ ok: true, stale: true, steps, code: 'facts_failed' });
+      return json({ ok: false, stale: true, steps, code: 'facts_failed', error: failures[0], failed_step: failures[0].split(':')[0], failures }, 500);
     }
     steps.push('facts');
   }
@@ -148,7 +157,7 @@ Deno.serve(async (req) => {
       workout_id,
       force_regenerate_ai_summary: forceRegenerate,
     });
-    if (r?.error) console.warn(`[recompute-workout] ${analyzeFn} failed (continuing):`, r.error.message);
+    if (r?.error) { fail('analyze', r.error); console.warn(`[recompute-workout] ${analyzeFn} failed (continuing):`, r.error.message); }
     else steps.push('analyze');
   }
 
@@ -169,12 +178,17 @@ Deno.serve(async (req) => {
     await invalidateUserTrainingCache(serviceClient, workout.user_id, 'recompute-workout');
     steps.push('snapshot');
   } catch (e) {
+    fail('snapshot', e);
     console.warn('[recompute-workout] snapshot/cache refresh failed (non-fatal):', (e as Error)?.message ?? e);
   }
 
-  console.log('[recompute-workout] steps completed:', steps);
+  console.log('[recompute-workout] steps completed:', steps, failures.length ? `failed: ${failures.join(' | ')}` : '');
+  if (failures.length) {
+    // Degraded output has been written where it could be; the caller (queue or tap) still hears the miss.
+    return json({ ok: false, stale: true, steps, code: 'step_failed', error: failures[0], failed_step: failures[0].split(':')[0], failures }, 500);
+  }
   return json({ ok: true, stale: false, steps });
-});
+}));
 
 function json(
   body: {
@@ -183,6 +197,8 @@ function json(
     stale?: boolean;
     error?: string;
     code?: string;
+    failed_step?: string;
+    failures?: string[];
   },
   status = 200,
 ) {

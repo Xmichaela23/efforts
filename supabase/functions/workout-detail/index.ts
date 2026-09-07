@@ -1387,6 +1387,10 @@ function normalizeBasic(w: any) {
     workload_actual: w?.workload_actual ?? null,
     workload_planned: w?.workload_planned ?? null,
     intensity_factor: w?.intensity_factor ?? null,
+    // Analysis state — the Performance card says "failed" / "did not finish" off these (plumbing §3).
+    analysis_status: w?.analysis_status ?? null,
+    analysis_error: w?.analysis_error ?? null,
+    analysis_updated_at: w?.analysis_updated_at ?? null,
   };
 }
 
@@ -1427,6 +1431,7 @@ Deno.serve(async (req) => {
     // Select minimal set plus optional blobs (shared column list)
     const baseSel = [
       'id','user_id','date','type','workout_status','planned_id','name','metrics','computed','workout_analysis',
+      'analysis_status','analysis_error','analysis_updated_at', // "failed" on screen (plumbing work order §3)
       'avg_heart_rate','max_heart_rate','avg_power','max_power','avg_cadence','max_cadence',
       'avg_speed','max_speed','max_pace','distance','duration','elapsed_time','moving_time','calories','steps','elevation_gain','elevation_loss',
       'start_position_lat','start_position_long','timestamp',
@@ -1460,7 +1465,12 @@ Deno.serve(async (req) => {
       const selectSd = baseSel + ',swim_data,number_of_active_lengths,pool_length,weather_data';
       let qSd = supabase.from('workouts').select(selectSd).eq('id', id) as any;
       qSd = qSd.eq('user_id', userId);
-      const { data: rowSd, error: errSd } = await qSd.maybeSingle();
+      let sdRes = await qSd.maybeSingle();
+      // analysis_updated_at arrives with migration 20260907070000; before the paste PostgREST answers 42703 — retry without it.
+      if (sdRes?.error?.code === '42703') {
+        sdRes = await (supabase.from('workouts').select(selectSd.replace(',analysis_updated_at', '')).eq('id', id) as any).eq('user_id', userId).maybeSingle();
+      }
+      const { data: rowSd, error: errSd } = sdRes;
       if (errSd) throw errSd;
       if (!rowSd) {
         return new Response(JSON.stringify({ error: 'not_found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -1522,7 +1532,14 @@ Deno.serve(async (req) => {
 
     let query = supabase.from('workouts').select(select).eq('id', id) as any;
     if (userId) query = query.eq('user_id', userId);
-    const { data: row, error } = await query.maybeSingle();
+    let rowRes = await query.maybeSingle();
+    // analysis_updated_at arrives with migration 20260907070000; before the paste PostgREST answers 42703 — retry without it.
+    if (rowRes?.error?.code === '42703') {
+      let q2 = supabase.from('workouts').select(select.replace(',analysis_updated_at', '')).eq('id', id) as any;
+      if (userId) q2 = q2.eq('user_id', userId);
+      rowRes = await q2.maybeSingle();
+    }
+    const { data: row, error } = rowRes;
     if (error) throw error;
     if (!row) {
       return new Response(JSON.stringify({ error: 'not_found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

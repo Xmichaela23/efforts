@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, getStoredUserId } from '@/lib/supabase';
+import { analysisNeedsAttention, analysisFailureLine } from '@/lib/analysis-state';
 import { computeDayTimings } from '@/lib/pairing-timing';
 import { useStrengthOrderingPreference } from '@/lib/use-strength-ordering-preference';
 import { useWeather } from '@/hooks/useWeather';
@@ -145,6 +146,41 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 }) => {
   const navigate = useNavigate();
   const { useImperial, workouts, loading, loadUserBaselines, detailedPlans } = useAppContext();
+
+  /**
+   * Connection health (docs/WORKORDER-plumbing-2026-09-07.md §4): the providers whose stored token
+   * the server has marked needs_reauth. One line under Today while it is so; tapping it leaves for
+   * Connections. RLS limits both tables to the athlete's own rows; a missing `health` column (the
+   * migration not yet pasted) answers 400 and reads as nothing to say.
+   */
+  const [reauthProviders, setReauthProviders] = useState<string[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [uc, dc] = await Promise.all([
+          supabase.from('user_connections').select('provider,health').eq('health', 'needs_reauth'),
+          supabase.from('device_connections').select('provider,health').eq('health', 'needs_reauth'),
+        ]);
+        const rows = [...(uc.data || []), ...(dc.data || [])] as Array<{ provider?: string }>;
+        const names = Array.from(new Set(rows.map((r) => String(r?.provider || '').toLowerCase()).filter(Boolean)));
+        if (!cancelled) setReauthProviders(names);
+      } catch {
+        if (!cancelled) setReauthProviders([]);
+      }
+    };
+    load();
+    const onVisible = () => { if (document.visibilityState === 'visible') load(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { cancelled = true; document.removeEventListener('visibilitychange', onVisible); };
+  }, []);
+  const reauthLine = (() => {
+    if (!reauthProviders.length) return null;
+    const label = (p: string) => (p === 'garmin' ? 'Garmin' : p === 'strava' ? 'Strava' : p);
+    const names = reauthProviders.map(label);
+    const who = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+    return `${who} ${names.length === 1 ? 'needs' : 'need'} reconnecting ›`;
+  })();
   const [homeArc, setHomeArc] = useState<ArcContextPayload | null>(null);
   const [homeArcReady, setHomeArcReady] = useState(false);
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
@@ -1584,6 +1620,25 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </div>
         </div>
 
+        {reauthLine ? (
+          <div className="flex-shrink-0 px-2 pt-2">
+            <button
+              type="button"
+              onClick={() => navigate('/connections')}
+              className="m-0 w-full cursor-pointer border-none bg-transparent p-0 text-left"
+              style={{
+                fontSize: '0.72rem',
+                fontWeight: 400,
+                letterSpacing: '0.02em',
+                color: 'rgba(255, 205, 130, 0.9)',
+              }}
+              aria-label="A connection needs reconnecting — open Connections"
+            >
+              {reauthLine}
+            </button>
+          </div>
+        ) : null}
+
         {homeArcReady && arcLineText ? (
           <div className="flex-shrink-0 px-2 pt-2 pb-1">
             {arcNeedsGoals ? (
@@ -1847,6 +1902,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           >
                             ✓
                           </span>
+                        )}
+                        {/* "Failed" on screen (plumbing §3): a small dot; the card says why when opened. */}
+                        {isCompleted && analysisNeedsAttention(workout as never) && (
+                          <span
+                            aria-label={analysisFailureLine(workout as never) || 'Analysis failed'}
+                            title={analysisFailureLine(workout as never) || 'Analysis failed'}
+                            className="inline-block w-1.5 h-1.5 rounded-full ml-2 align-middle bg-amber-300/85"
+                          />
                         )}
                         {isCompleted && isUnmatchedAgainstPlan(
                           workout as never,

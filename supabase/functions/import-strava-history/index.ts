@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { recordProviderResult } from '../_shared/connection-health.ts';
 import { runPostImportAthletePipeline } from '../_shared/post-import-athlete-pipeline.ts';
 import { localDayOf, localDayInRange, paddedEpochBounds } from './date-window.ts';
 
@@ -726,6 +727,8 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Connection health (§4): the list call's answer, after the one refresh attempt above.
+      await recordProviderResult(supabase, { provider: 'strava', userId, status: res.status, error: res.ok ? null : `athlete/activities → ${res.status}` });
       if (!res.ok) {
         const txt = await res.text();
         throw new Error(`Strava API error ${res.status}: ${txt}`);

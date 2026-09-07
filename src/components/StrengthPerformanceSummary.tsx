@@ -29,6 +29,8 @@ interface StrengthPerformanceSummaryProps {
   onRecompute?: () => Promise<void>;
   recomputing?: boolean;
   recomputeError?: string | null;
+  /** The stored failure line ("Analysis failed at …" / "Analysis did not finish.") — plumbing §3. */
+  analysisFailure?: string | null;
 }
 
 const extractExercisesFromComputed = (workout: any) => {
@@ -99,7 +101,7 @@ const extractExercisesFromComputed = (workout: any) => {
   }
 };
 
-export default function StrengthPerformanceSummary({ planned, completed, type, sessionDetail, onRecompute, recomputing, recomputeError }: StrengthPerformanceSummaryProps) {
+export default function StrengthPerformanceSummary({ planned, completed, type, sessionDetail, onRecompute, recomputing, recomputeError, analysisFailure }: StrengthPerformanceSummaryProps) {
   // ⛔ SLICE b — the calibration read, unconditional so the hook list is stable. It self-silences on
   // any plan that is not a strength block, and the notice renders nothing when no event is standing.
   const calibration = useStrengthCalibration(true);
@@ -517,8 +519,16 @@ export default function StrengthPerformanceSummary({ planned, completed, type, s
           </GalaxyButton>
         </div>
       )}
-      {recomputeError && (
-        <p className="text-xs text-rose-400 mb-2">{recomputeError}</p>
+      {/* "Failed" on screen (plumbing §3): the tap's own error outranks the stored line while fresh. */}
+      {(recomputeError || analysisFailure) && (
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <p className="text-xs text-rose-300/90 m-0">{recomputeError || analysisFailure}</p>
+          {onRecompute && (
+            <GalaxyButton variant="secondary" size="sm" onClick={onRecompute} disabled={recomputing} className="shrink-0 text-xs" title="Run the analysis again">
+              {recomputing ? 'Trying…' : 'Try again'}
+            </GalaxyButton>
+          )}
+        </div>
       )}
       {/* ── THE ALL-OUT SET (2026-07-30) ─────────────────────────────────────────────────────────
           ⛔ THE REP RECORD LEADS. the previous program: *"If your squat goes from 225x6 to 225x9, you've

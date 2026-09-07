@@ -49,3 +49,6 @@ scripts/plan-test-output/
 .b1-matrix/
 .burner-*
 .burner-*/
+
+# plumbing verification state (scripts/_plumbing-verify-2026-09-07.mjs)
+.plumbing-verify-*

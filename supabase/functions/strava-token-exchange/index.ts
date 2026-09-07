@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { healthyOnConnect } from '../_shared/connection-health.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -86,6 +87,8 @@ Deno.serve(async (req) => {
         },
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
+        // A fresh connect clears needs_reauth (docs/WORKORDER-plumbing-2026-09-07.md §4).
+        ...healthyOnConnect(),
       }, { onConflict: 'user_id,provider' });
 
     if (error) {

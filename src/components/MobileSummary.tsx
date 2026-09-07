@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { analysisFailureLine, describeRecomputeError, type AnalysisRow } from '@/lib/analysis-state';
 import { Loader2 } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 // ⛔ ONE VOCABULARY (stage 4). See `src/lib/discipline.ts`.
@@ -83,6 +84,10 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
 
   const type = String(sd?.type || (planned as any)?.type || (completed as any)?.type || '').toLowerCase();
 
+  // "Failed" on screen (docs/WORKORDER-plumbing-2026-09-07.md §3): the stored analysis_status /
+  // analysis_error / analysis_updated_at on the completed row become one plain line, with "Try again".
+  const analysisFailure = analysisFailureLine(completed as AnalysisRow | null);
+
   useEffect(() => {
     setRecomputeError(null);
     setRecomputing(false);
@@ -116,8 +121,9 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         // 546 compute-limit death for six days. supabase-js keeps the Response on `error.context`.
         const ctx = (res.error as { context?: Response }).context;
         let detail = '';
-        try { detail = ctx ? (await ctx.text()).slice(0, 160) : ''; } catch { /* no body */ }
-        throw new Error(`Recompute failed${ctx?.status ? ` (HTTP ${ctx.status})` : ''}${detail ? `: ${detail}` : `: ${res.error.message}`}`);
+        try { detail = ctx ? (await ctx.text()).slice(0, 2000) : ''; } catch { /* no body */ }
+        // recompute-workout answers 500 with { error: '<step>: <reason>' } (plumbing §1) — same words as the card.
+        throw new Error(describeRecomputeError(detail, res.error.message));
       }
 
       const result = res.data as {
@@ -139,7 +145,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
           console.warn('[MobileSummary] recompute partial success, steps:', result.steps);
         }
       } else {
-        throw new Error(result.error ?? 'Recompute failed');
+        throw new Error(describeRecomputeError(JSON.stringify(result), result.error ?? 'Recompute failed'));
       }
     } catch (e: unknown) {
       setRecomputeError(typeof e === 'string' ? e : (e as Error)?.message || String(e));
@@ -237,6 +243,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
           onRecompute={recomputeAnalysis}
           recomputing={recomputing}
           recomputeError={recomputeError}
+          analysisFailure={analysisFailure}
         />
         {/* NEXT moved to the bottom of the strength Performance tab (below the compare table) — the
             up-next session is context to glance at after reviewing the work, not above it. */}
@@ -380,6 +387,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         planLinkNote={!planned ? 'No plan session linked.' : null}
         recomputing={recomputing}
         recomputeError={recomputeError}
+        analysisFailure={analysisFailure}
         onRecompute={recomputeAnalysis}
         // The read comes first, the interval table is the evidence under it; Next stays at the very bottom
         // (Michael, 2026-09-07: "put this above intervals" · "leave next at the bottom").

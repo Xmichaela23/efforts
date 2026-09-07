@@ -1,4 +1,5 @@
 import { halvesSteady, notSteadyLine } from '../_shared/ride-halves-steady.ts';
+import { withAlarm } from '../_shared/alarm.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { hrDriftHalvesPct, warmupSkipSeconds } from '../_shared/hr-drift-halves.ts';
 import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
@@ -1315,7 +1316,9 @@ async function inferPlanIdForDate(
 }
 
 // Main handler
-Deno.serve(async (req) => {
+// The alarm wrapper (docs/WORKORDER-plumbing-2026-09-07.md §2): a throw or a 5xx here is reported
+// (one email per kind per 15 minutes, every one in public.alarms) and then returned unchanged.
+Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 204,
@@ -2913,4 +2916,4 @@ Deno.serve(async (req) => {
       headers: { 'Content-Type': 'application/json', ...corsHeaders() }
     });
   }
-});
+}));

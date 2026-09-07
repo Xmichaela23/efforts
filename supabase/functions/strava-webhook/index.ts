@@ -2,6 +2,8 @@
 /// <reference lib="deno.ns" />
 // @ts-ignore Deno Edge Functions resolve jsr imports at runtime
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { raise as raiseAlarm } from '../_shared/alarm.ts';
+import { recordProviderResult } from '../_shared/connection-health.ts';
 import { runPostImportAthletePipeline } from '../_shared/post-import-athlete-pipeline.ts';
 
 // Strava webhook verification and processing
@@ -51,6 +53,8 @@ Deno.serve(async (req) => {
       return new Response('OK', { status: 200 });
     } catch (error) {
       console.error('❌ Error processing Strava webhook:', error);
+      // The alarm (docs/WORKORDER-plumbing-2026-09-07.md §2): a 5xx here means Strava's notice was dropped.
+      await raiseAlarm('strava-webhook', `HTTP 500: ${String((error as Error)?.message ?? error).slice(0, 120)}`, { function: 'strava-webhook', error: String((error as Error)?.message ?? error) });
       return new Response('Internal server error', { status: 500 });
     }
   }
@@ -140,6 +144,8 @@ async function handleActivityCreated(activityId: number, ownerId: number) {
         status = retry.status;
       }
     }
+    // Connection health (§4): a 401 that survived the refresh means the athlete must reconnect.
+    await recordProviderResult(supabase, { provider: 'strava', userId, status, error: status === 200 ? null : `activities/${activityId} → ${status}` });
     if (!activityData) {
       console.log(`⚠️ Could not fetch activity ${activityId} from Strava (status ${status})`);
       return;
@@ -262,6 +268,7 @@ async function handleActivityUpdated(activityId: number, ownerId: number, update
         status = retry.status;
       }
     }
+    await recordProviderResult(supabase, { provider: 'strava', userId, status, error: status === 200 ? null : `activities/${activityId} → ${status}` });
     if (!activityData) {
       console.log(`⚠️ Could not fetch updated activity ${activityId} from Strava (status ${status})`);
       return;
@@ -413,6 +420,8 @@ async function refreshStravaAccessToken(userId: string): Promise<string | null> 
     });
     if (!tokenResp.ok) {
       console.warn('⚠️ Strava token refresh failed:', tokenResp.status);
+      // Strava answers 400 invalid_grant for a revoked refresh token — that is a dead grant, so it reads as 401.
+      await recordProviderResult(supabase, { provider: 'strava', userId, status: tokenResp.status === 400 ? 401 : tokenResp.status, error: `oauth/token refresh → ${tokenResp.status}` });
       return null;
     }
     const tokenJson = await tokenResp.json();

@@ -38,7 +38,9 @@ export function checkWebhookSecret(req: Request, legacyUntil: string | null): Se
   const url = new URL(req.url);
   const fromQuery = url.searchParams.get('k') || '';
   const segs = url.pathname.split('/').filter(Boolean);
-  const fromPath = segs.length > 3 ? segs[segs.length - 1] : '';   // functions / v1 / <name> / <secret>
+  // The edge runtime hands the function `/<name>/<secret>` (2 segments), not the public
+  // `/functions/v1/<name>/<secret>` (4). Take the last segment whenever there is one past the name.
+  const fromPath = segs.length > 1 ? segs[segs.length - 1] : '';
   for (const given of [fromQuery, fromPath]) {
     if (given && timingSafeEqual(given, expected)) return { ok: true, mode: 'secret' };
   }

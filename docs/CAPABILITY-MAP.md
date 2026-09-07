@@ -161,7 +161,11 @@ Law 2 says measured ≠ inferred. These are inferred and presented as measured.
 
 | capability | entry point | status | note |
 |---|---|---|---|
-| Garmin/Strava ingest → the ordered orchestrator | `ingest-activity/index.ts:1499` → `recompute-workout` | BUILT | ingest delegates the whole chain to `recompute-workout` (2026-07-17) | ⟨A31⟩
+| Garmin/Strava ingest → the ordered orchestrator | `ingest-activity/index.ts enqueueOrCall` → `jobs` row → `run-jobs` → `recompute-workout` | BUILT | 2026-09-07: ingest ENQUEUES `recompute-workout` + `adapt-plan` (`public.jobs`); `run-jobs` (pg_cron, every minute) runs them with 1/5/25-min retries; the direct call is only the fallback when the insert fails | ⟨A31⟩
+| Job queue (retries, dead-letter, worker) | `_shared/jobs.ts`, `run-jobs/index.ts`, migrations `20260907070000` + `20260907090000` | BUILT 2026-09-07 | `claim_jobs(n)` FOR UPDATE SKIP LOCKED; 3 attempts then `failed` + alarm; a failed recompute writes `analysis_status='failed'` on the workout | docs/WORKORDER-plumbing-2026-09-07.md §1 |
+| Alarm (email + table) | `_shared/alarm.ts raise / withAlarm`, `public.alarms` | BUILT 2026-09-07 | one Resend email per kind per 15 min (`ALARM_TO_EMAIL`), every alarm in the table; wraps the analysers, `recompute-workout`, the two webhooks, `run-jobs` | §2 |
+| Connection health (needs_reauth on screen) | `_shared/connection-health.ts`, migration `20260907080000`, `Connections.tsx` "Reconnect ›", `TodaysEffort.tsx` line under Today | BUILT 2026-09-07 | 401/403 from a provider → `needs_reauth`; reconnect resets to `ok` | §4 |
+| "Failed" on the workout card + Home dot | `src/lib/analysis-state.ts`, `SessionNarrative.tsx` / `StrengthPerformanceSummary.tsx` "Try again", `TodaysEffort.tsx` + `WorkoutCalendar.tsx` dot | BUILT 2026-09-07 | reads `analysis_status` / `analysis_error` / `analysis_updated_at` from `get-week` + `workout-detail`; analyzing > 10 min = "did not finish" | §3 |
 | Phone-recorded workout ingest | `ingest-phone-workout/index.ts:297` | BUILT | routes through `recompute-workout` (the ordered orchestrator) since 2026-07-17 — reaches `compute-facts` and the spine | ⟨A31⟩
 | FIT-file import | `save-imported-workout/index.ts:206` | BUILT | routes through `recompute-workout` since 2026-07-17 — reaches `compute-facts` and the spine | ⟨A31⟩
 | Garmin swim length/lap reconstruction | `swim-activity-details/index.ts:315` | PARTIAL | Garmin-only (hard 400 otherwise) |

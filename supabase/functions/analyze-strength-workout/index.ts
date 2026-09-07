@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { withAlarm } from '../_shared/alarm.ts';
 import { isBandAssistedMovement } from '../../../src/lib/band-assistance.ts';
 import { energyLevel, sorenessLevel, sleepQuality, overallReadinessLabel } from '../_shared/readiness-scale.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
@@ -1717,7 +1718,9 @@ function corsHeaders(): Record<string, string> {
 }
 
 // Main edge function handler
-Deno.serve(async (req) => {
+// The alarm wrapper (docs/WORKORDER-plumbing-2026-09-07.md §2): a throw or a 5xx here is reported
+// (one email per kind per 15 minutes, every one in public.alarms) and then returned unchanged.
+Deno.serve(withAlarm('analyze-strength-workout', async (req) => {
   // Handle CORS preflight requests FIRST - before any other logic
   // This MUST be outside try-catch to ensure it always works
   if (req.method === 'OPTIONS') {
@@ -2172,4 +2175,4 @@ Deno.serve(async (req) => {
       }
     });
   }
-});
+}));

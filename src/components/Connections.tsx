@@ -28,10 +28,14 @@ import { supabase } from '../lib/supabase';
 import { Capacitor } from '@capacitor/core';
 import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
 import SwimSourceMatrix from './SwimSourceMatrix';
+import { GalaxyButton } from '@/components/ui/galaxy-button';
 
 interface ConnectionStatus {
   provider: string;
   connected: boolean;
+  /** Server-written (docs/WORKORDER-plumbing-2026-09-07.md §4): needs_reauth shows "Reconnect ›" instead of Connected. */
+  health?: 'ok' | 'needs_reauth' | 'error';
+  lastError?: string | null;
   lastSync?: string;
   webhookActive?: boolean;
   syncStatus: 'idle' | 'syncing' | 'error' | 'success';
@@ -400,6 +404,8 @@ const Connections: React.FC = () => {
           return {
             ...conn,
             connected: !!existing,
+            health: (existing?.health === 'needs_reauth' || existing?.health === 'error') ? existing.health : 'ok',
+            lastError: existing?.last_error ?? null,
             lastSync: existing?.last_sync || existing?.connection_data?.last_sync,
             // null/undefined = sync on; only explicit false means “off” in DB (legacy / old toggle)
             webhookActive: existing?.webhook_active !== false,
@@ -990,7 +996,27 @@ const Connections: React.FC = () => {
             <CardContent>
               {connection.connected ? (
                 <div className="space-y-4">
-                  {/* Connected Status Indicator */}
+                  {/* Connected Status Indicator — or, when the server marked the stored token dead
+                      (health = needs_reauth, plumbing §4), "Reconnect ›": a bordered pill that leaves
+                      the screen into the provider's sign-in. The chevron marks the exit. */}
+                  {connection.health === 'needs_reauth' ? (
+                    <div className="p-3 rounded-md bg-white/[0.08] backdrop-blur-lg border border-amber-300/30">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm text-amber-200/90">
+                          {getProviderName(connection.provider)} stopped accepting the saved sign-in.
+                        </span>
+                        <GalaxyButton
+                          shape="chip"
+                          variant="primary"
+                          onClick={() => (connection.provider === 'garmin' ? connectGarmin() : connectStrava())}
+                          className="shrink-0"
+                          aria-label={`Reconnect ${getProviderName(connection.provider)}`}
+                        >
+                          Reconnect ›
+                        </GalaxyButton>
+                      </div>
+                    </div>
+                  ) : (
                   <div className="p-3 rounded-md bg-white/[0.08] backdrop-blur-lg border border-white/25">
                     <div className="flex items-center space-x-2">
                       <div className={`w-2 h-2 rounded-full ${
@@ -1005,6 +1031,7 @@ const Connections: React.FC = () => {
                       </span>
                     </div>
                   </div>
+                  )}
 
                   {/* Last Sync - only show for Strava */}
                   {connection.provider === 'strava' && (

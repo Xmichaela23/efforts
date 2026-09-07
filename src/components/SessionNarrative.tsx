@@ -113,6 +113,8 @@ interface SessionNarrativeProps {
   planLinkNote: string | null;
   recomputing: boolean;
   recomputeError: string | null;
+  /** The stored failure line ("Analysis failed at …" / "Analysis did not finish.") — plumbing §3. */
+  analysisFailure?: string | null;
   onRecompute: () => void;
   recomputeDisabled?: boolean;
   /** When true, the NEXT/up-next block is NOT rendered inline — the caller renders <NextUp> elsewhere
@@ -196,11 +198,30 @@ export default function SessionNarrative({
   planLinkNote,
   recomputing,
   recomputeError,
+  analysisFailure,
   onRecompute,
   recomputeDisabled,
   hideNextUp,
   accentRgb,
 }: SessionNarrativeProps) {
+  // "Failed" on screen (docs/WORKORDER-plumbing-2026-09-07.md §3). The tap's own error outranks the
+  // stored line while it is fresh; "Try again" is the existing recompute tap. Plain words, no codes.
+  const failureText = recomputeError || analysisFailure || null;
+  const failureBlock = failureText ? (
+    <div className="flex items-center justify-between gap-3 mb-1">
+      <p className="text-sm text-red-300/90 m-0">{failureText}</p>
+      <GalaxyButton
+        variant="secondary"
+        size="sm"
+        onClick={onRecompute}
+        disabled={recomputing || recomputeDisabled}
+        className="shrink-0 text-xs"
+        title="Run the analysis again"
+      >
+        {recomputing ? 'Trying…' : 'Try again'}
+      </GalaxyButton>
+    </div>
+  ) : null;
   const summaryTitle = sd?.summary?.title || 'Insights';
   const summaryBullets = Array.isArray(sd?.summary?.bullets) ? sd!.summary!.bullets! : [];
   const narrativeText = (typeof sd?.narrative_text === 'string' && sd.narrative_text.trim()) || '';
@@ -277,9 +298,7 @@ export default function SessionNarrative({
             {recomputing ? 'Recomputing…' : 'Recompute analysis'}
           </GalaxyButton>
         </div>
-        {recomputeError && (
-          <p className="text-sm text-red-400 mb-1">{recomputeError}</p>
-        )}
+        {failureBlock}
         <p className="text-sm text-gray-500 italic">
           {hasSessionDetail
             ? 'No insights available for this workout yet. Recompute analysis to refresh.'
@@ -311,7 +330,7 @@ export default function SessionNarrative({
           it doesn't interfere with layout"). It used to own a full-width row of its own between the
           adherence chips and the first real content, which pushed everything down and read as a section
           heading. It is a maintenance control, not content: it belongs at the edge, sharing a line. */}
-      {recomputeError && <div className="text-xs text-red-300 mb-1">{recomputeError}</div>}
+      {failureBlock}
       {(() => {
         // Stat line above INSIGHTS: distance · duration · temperature.
         // distance/duration from session_detail_v1.completed_totals; temperature

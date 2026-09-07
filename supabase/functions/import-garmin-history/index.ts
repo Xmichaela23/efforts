@@ -5,6 +5,26 @@
 // Body: { token: string, days?: number, garminUserId?: string }
 
 const GARMIN_APIS_BASE = 'https://apis.garmin.com';
+import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { recordProviderResult } from '../_shared/connection-health.ts';
+
+/**
+ * Connection health (docs/WORKORDER-plumbing-2026-09-07.md §4). The body carries the token, not the
+ * athlete, so the athlete is read off the caller's JWT; with no verifiable user the write is skipped.
+ */
+async function reportGarminHealth(req: Request, status: number, error: string | null): Promise<void> {
+  try {
+    const jwt = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+    if (!jwt) return;
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const { data } = await supabase.auth.getUser(jwt);
+    const userId = data?.user?.id;
+    if (!userId) return;
+    await recordProviderResult(supabase, { provider: 'garmin', userId, status, error });
+  } catch (e) {
+    console.warn('[import-garmin-history] health write skipped:', (e as Error)?.message ?? e);
+  }
+}
 
 function cors() {
   return {
@@ -138,6 +158,11 @@ Deno.serve(async (req) => {
 
     const successful = results.filter(r => r.ok).length;
     const failed = results.filter(r => !r.ok).length;
+    // Health: a 401/403 on any window means the token is dead; otherwise the last window's answer.
+    const reauth = results.find(r => r.status === 401 || r.status === 403);
+    const last = results[results.length - 1];
+    if (reauth) await reportGarminHealth(req, reauth.status, `backfill/activities → ${reauth.status}`);
+    else if (last) await reportGarminHealth(req, last.status, last.ok ? null : `backfill/activities → ${last.status}`);
 
     return new Response(JSON.stringify({
       ok: true,

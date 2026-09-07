@@ -1,6 +1,7 @@
 // Edge function: send-workout-to-garmin
 // Exports a planned workout to Garmin Connect
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { recordProviderResult } from '../_shared/connection-health.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts'
 import { getStepEquipmentDetail } from '../_shared/swim/swim-step-equipment.ts'
@@ -152,6 +153,8 @@ serve(async (req) => {
     } catch {}
 
     let sendResult = await sendToGarmin(garminPayload, accessToken)
+    // Connection health (§4): the push's answer, on the athlete's Garmin row (401/403 → needs_reauth).
+    if (typeof sendResult.status === 'number') await recordProviderResult(supabase, { provider: 'garmin', userId, status: sendResult.status, error: sendResult.success ? null : sendResult.error ?? null })
     if (!sendResult.success) {
       // If validation guard triggered in convertWorkoutToGarmin
       if (String(sendResult.error||'').includes('RUN_EXPORT_MISSING_TARGETS')) {
@@ -287,7 +290,11 @@ async function refreshGarminToken(client: ReturnType<typeof createClient>, userI
         refresh_token: refreshToken
       })
     })
-    if (!res.ok) return null
+    if (!res.ok) {
+      // Connection health (§4): Garmin answers 400 invalid_grant for a revoked refresh token — a dead grant reads as 401.
+      await recordProviderResult(client, { provider: 'garmin', userId, status: res.status === 400 ? 401 : res.status, error: `oauth/token refresh → ${res.status}` })
+      return null
+    }
     const json = await res.json()
     const access_token = json?.access_token
     const new_refresh = json?.refresh_token || refreshToken
@@ -1349,7 +1356,7 @@ function estimateWorkoutSeconds(
   return Math.round(total);
 }
 
-async function sendToGarmin(workout: GarminWorkout, accessToken: string): Promise<{ success: boolean; workoutId?: string; error?: string }> {
+async function sendToGarmin(workout: GarminWorkout, accessToken: string): Promise<{ success: boolean; workoutId?: string; error?: string; status?: number }> {
   try {
     const url = 'https://apis.garmin.com/workoutportal/workout/v2'
     const { ok, status, text, response } = await postJsonWithRetry(
@@ -1361,9 +1368,9 @@ async function sendToGarmin(workout: GarminWorkout, accessToken: string): Promis
       },
       { attempts: 5, baseMs: 500, maxMs: 8000 }
     )
-    if (!ok) return { success: false, error: `Garmin API ${status}: ${text}` }
+    if (!ok) return { success: false, error: `Garmin API ${status}: ${text}`, status }
     const json = await (response as Response).json()
-    return { success: true, workoutId: json?.workoutId ?? json?.id }
+    return { success: true, workoutId: json?.workoutId ?? json?.id, status }
   } catch (e: any) {
     return { success: false, error: e?.message ?? String(e) }
   }

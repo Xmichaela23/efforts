@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { withAlarm } from '../_shared/alarm.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 import { resolvePoolLength } from '../_shared/swim/resolve-pool-length.ts';
 import { swimPacePer100Seconds } from '../_shared/swim/swim-pace.ts';
@@ -90,7 +91,9 @@ function parsePhaseFromTags(tags: string[]): { phase: string | null, week: strin
   return { phase, week, totalWeeks };
 }
 
-Deno.serve(async (req) => {
+// The alarm wrapper (docs/WORKORDER-plumbing-2026-09-07.md §2): a throw or a 5xx here is reported
+// (one email per kind per 15 minutes, every one in public.alarms) and then returned unchanged.
+Deno.serve(withAlarm('analyze-swim-workout', async (req) => {
   // Handle CORS preflight requests FIRST
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -549,5 +552,5 @@ Deno.serve(async (req) => {
       }
     });
   }
-});
+}));
 

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { analysisNeedsAttention, analysisFailureLine } from '@/lib/analysis-state';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
@@ -1358,6 +1359,14 @@ export default function WorkoutCalendar({
                             {content}
                             {renderDisciplineIcon(true)}
                             {renderCompletedCheckmark()}
+                            {/* "Failed" on screen (plumbing §3): a small dot on the week chip; the card says why. */}
+                            {analysisNeedsAttention(evt?._src) && (
+                              <span
+                                aria-label={analysisFailureLine(evt?._src) || 'Analysis failed'}
+                                title={analysisFailureLine(evt?._src) || 'Analysis failed'}
+                                className="inline-block w-1.5 h-1.5 rounded-full ml-1 align-middle bg-amber-300/85"
+                              />
+                            )}
                             {/* ⛔ THE MISS, VISIBLE IN THE WEEK. Opens the activity, where the
                                 "Didn't match your planned … — link it?" button lives. */}
                             {unmatchedIds.has(String(workoutId || '')) && (

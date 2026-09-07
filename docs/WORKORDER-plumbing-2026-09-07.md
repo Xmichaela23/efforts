@@ -82,3 +82,67 @@ Tear the throwaway down. Deno tests: claim/backoff arithmetic, the rate limit, t
 types clean. Deploy every touched function, push, `npm run ios`. FOUNDATION-READINESS: S3, B3, B4, B7 closed
 with the date. Report: migrations to paste (in order), dashboard steps (extensions, secrets), functions
 deployed, the alarm email's arrival, what was not device-checked.
+
+---
+
+## Status — 2026-09-07, terminal stopped on Michael's word before deploy
+
+Everything below is ON DISK ONLY: nothing committed, nothing pushed, nothing deployed, no migration pasted, no
+secret set, `npm run ios` not run, none of the five checks run. `git status` shows the full set.
+
+### Finished (written and checked, not deployed)
+- **Migrations, paste in this order:** `supabase/migrations/20260907070000_jobs_alarms_analysis_stamp.sql`
+  (jobs + `claim_jobs(n)` + alarms + `workouts.analysis_updated_at` with its trigger), `20260907080000_connection_health.sql`
+  (`health` / `last_error` / `last_ok_at` on both connection tables), `20260907090000_run_jobs_cron.sql` (pg_cron + pg_net +
+  Vault secret `jobs_secret` + the every-minute schedule; `<JOBS_SECRET>` is a placeholder that must equal the
+  `JOBS_SECRET` function secret — neither exists yet; generate one value, set it with `supabase secrets set JOBS_SECRET=…`,
+  and substitute it into the paste). The CLI's login cannot run SQL from this terminal, so the paste stays with Michael.
+- **§1 queue:** `_shared/jobs.ts` (backoff 1/5/25 min, 3 attempts, `enqueueJob`, 5 tests), `run-jobs/index.ts` (path secret,
+  claims 5, sequential, 40 s budget, 90 s per job, kind allowlist, final failure → `failed` + alarm + `analysis_status='failed'`
+  on a recompute job), `supabase/config.toml` `[functions.run-jobs] verify_jwt = false`. `ingest-activity` enqueues
+  `recompute-workout` then `adapt-plan` through `enqueueOrCall` (falls back to the old direct call if the insert fails, so
+  deploying before the paste is safe). No separate `auto-attach-planned` job: `recompute-workout` runs auto-attach as its
+  step 0, and the `fnUrl` at the old fire-and-forget site was never called (code trace, not the work order's list).
+  `recompute-workout` keeps every failed step as `<step>: <reason>` and answers 500 with the first one (summary / facts still
+  halt; the rest continue degraded); the athlete's tap reads the same words.
+- **§2 alarm:** `_shared/alarm.ts` — `raise()` (row in `alarms` + Resend email, one per kind per 15 min, `ALARM_TO_EMAIL` →
+  `ADMIN_NOTIFY_EMAIL` → michael@efforts.work), `withAlarm()` wraps the four analysers, `compute-workout-analysis`,
+  `recompute-workout`; `strava-webhook` and `garmin-webhook-activities` call `raise()` on their 500; `run-jobs` on final
+  failure. 5 tests. Subject `efforts: <kind> — <summary>`; body: who, workout, step, error, logs link.
+- **§3 failed on screen:** `get-week` + `workout-detail` return `analysis_status` / `analysis_error` / `analysis_updated_at`
+  (both retry without the new column while the migration is unpasted — PostgREST 42703). `src/lib/analysis-state.ts`
+  (6 tests): "Analysis failed at <step>: <reason>." / "Analysis did not finish." (analyzing or pending older than 10 min, or
+  unstamped). `SessionNarrative.tsx` + `StrengthPerformanceSummary.tsx`: the line + bordered "Try again" (the existing
+  recompute tap, synchronous — §1's rule; §5 check 5 says "the tap enqueues", that reading was NOT built). `MobileSummary.tsx`
+  turns a 500 from the tap into the same words. Amber dot after the ✓ on the Home row (`TodaysEffort.tsx`) and on the week
+  chip (`WorkoutCalendar.tsx`).
+- **§4 connection health:** `_shared/connection-health.ts` (4 tests). Writers: `strava-webhook` (fetch + refresh),
+  `garmin-webhook-activities` (activityDetails fetch), `send-workout-to-garmin` (push + refresh), `import-strava-history`
+  (list), `import-garmin-history` + `swift-task` (athlete from the caller's JWT), `_shared/strava-access-token.ts` (refresh).
+  A Strava/Garmin 400 `invalid_grant` on refresh reads as 401. Reset to `ok` on connect in `bright-service` and
+  `strava-token-exchange`. `Connections.tsx`: "Reconnect ›" chip (GalaxyButton) instead of "Connected" on `needs_reauth`,
+  tapping starts the provider flow. `TodaysEffort.tsx`: "Garmin needs reconnecting ›" under Today, tap → /connections.
+- **Checks that ran:** deno tests 20/20 (jobs, alarm, connection-health, analysis-state); `tsc` no new errors in `src/`;
+  eslint on the touched components 257 findings before and after (none new); `deno check` on every touched function: no
+  error on a touched line (the pre-existing ones remain); `npm run build` exit 0 — but a `git stash`/`pop` ran during that
+  build, so run it again before trusting it.
+- **Docs:** FOUNDATION-READINESS rows S3, B3, B4, B7 marked CLOSED 2026-09-07 — that describes the code on disk, not
+  production; STATE-SOURCES has four OURS rows (backoff, 15-min window, 10-min stall, worker budget); CAPABILITY-MAP rows;
+  POLISH-PUNCH-LIST "AWAITING MICHAEL 2026-09-07" block.
+- `scripts/_plumbing-verify-2026-09-07.mjs` — the five checks as `setup | t1 | t2 | t3 | t4 | t5 | check5 | teardown | all`,
+  syntax-checked, NEVER RUN. Needs `JOBS_SECRET_FILE` and, for t1/t3, the `JOBS_BACKOFF_SECONDS=2,2,2` function secret
+  (unset after). Check 4's "reconnect clears it" cannot be driven from a script (needs a real OAuth code); check 5's web walk
+  is a browser step after `t5`.
+
+### Not done
+1. Secrets: `JOBS_SECRET`, `ALARM_TO_EMAIL` (Michael's address), the temporary `JOBS_BACKOFF_SECONDS`.
+2. Deploy (after the secrets): `run-jobs ingest-activity recompute-workout analyze-cycling-workout analyze-running-workout
+   analyze-strength-workout analyze-swim-workout compute-workout-analysis strava-webhook garmin-webhook-activities
+   send-workout-to-garmin import-strava-history import-garmin-history swift-task bright-service strava-token-exchange
+   get-week workout-detail share-strength-to-strava fetch-strava-route` (the last two import the changed
+   `strava-access-token.ts`). `garmin-webhook-user` was not touched.
+3. The paste (three migrations, order above), then `cron.job` shows `run-jobs-every-minute`.
+4. The five checks, the web walk (Performance card, Connections, Home), teardown.
+5. Commit, push, `npm run ios`.
+6. Still open from §4: `import-strava-history` overwrites `connection_data` after an import (FOUNDATION-READINESS B3's
+   rotation note) — not touched.

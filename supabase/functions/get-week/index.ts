@@ -436,11 +436,19 @@ Deno.serve(async (req)=>{
       'workout_metadata',
       'workout_analysis',
       'name',
-      'timestamp'
+      'timestamp',
+      // "failed" on screen (docs/WORKORDER-plumbing-2026-09-07.md §3): the Home rows read these.
+      'analysis_status',
+      'analysis_error',
+      'analysis_updated_at'
     ].join(',');
-    const { data: wkRaw, error: wkErr } = await supabase.from('workouts').select(workoutSel).eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', {
-      ascending: true
-    });
+    // analysis_updated_at arrives with migration 20260907070000; until it is pasted PostgREST answers
+    // 42703 (undefined column) and the week must still load — retry without it.
+    let wkRes = await supabase.from('workouts').select(workoutSel).eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', { ascending: true });
+    if (wkRes.error?.code === '42703') {
+      wkRes = await supabase.from('workouts').select(workoutSel.replace(',analysis_updated_at', '')).eq('user_id', userId).gte('date', fromISO).lte('date', toISO).order('date', { ascending: true });
+    }
+    const { data: wkRaw, error: wkErr } = wkRes;
     const errors = [];
     if (wkErr) errors.push({
       where: 'workouts',

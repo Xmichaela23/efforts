@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { raise as raiseAlarm } from '../_shared/alarm.ts';
+import { recordProviderResult } from '../_shared/connection-health.ts';
 import { checkWebhookSecret, LEGACY_URL_ACCEPTED_UNTIL } from '../_shared/webhook-secret.ts';
 
 /**
@@ -29,6 +31,15 @@ Deno.serve(async (req)=>{
     return new Response('Unauthorized', { status: 401 });
   }
   console.log(JSON.stringify({ event: 'garmin_webhook_auth', mode: auth.mode }));
+  // A push that got in WITHOUT the secret means the address saved in the Garmin portal is not the one
+  // this server expects. It still works until LEGACY_URL_ACCEPTED_UNTIL and is a 401 after it, so record
+  // it now while there is time to change the portal. alarm.ts sends at most one email per kind per 15 min.
+  if (auth.mode === 'legacy') {
+    raiseAlarm('garmin_webhook_legacy_url', 'A Garmin push arrived without the callback secret', {
+      accepted_until: LEGACY_URL_ACCEPTED_UNTIL,
+      fix: 'Re-save the activities callback URL in the Garmin portal with the current secret as its last path segment.',
+    }).catch(() => {});
+  }
   try {
     // Parse the incoming webhook payload
     const payload = await req.json();
@@ -50,6 +61,8 @@ Deno.serve(async (req)=>{
     return response;
   } catch (error) {
     console.error('Error processing webhook:', error);
+    // The alarm (docs/WORKORDER-plumbing-2026-09-07.md §2): a 5xx here means Garmin's notice was dropped.
+    await raiseAlarm('garmin-webhook-activities', `HTTP 500: ${String(error?.message ?? error).slice(0, 120)}`, { function: 'garmin-webhook-activities', error: String(error?.message ?? error) });
     return new Response('Internal server error', {
       status: 500
     });
@@ -88,6 +101,10 @@ async function fetchActivityDetails(summaryId, userId) {
         'Content-Type': 'application/json'
       }
     });
+    // Connection health (§4): the stored token's answer, on the athlete's Garmin row.
+    if (connection?.user_id) {
+      await recordProviderResult(supabase, { provider: 'garmin', userId: connection.user_id, status: response.status, error: response.ok ? null : `activityDetails → ${response.status} ${response.statusText}` });
+    }
     if (!response.ok) {
       console.error(`Garmin API error: ${response.status} ${response.statusText}`);
       return null;
