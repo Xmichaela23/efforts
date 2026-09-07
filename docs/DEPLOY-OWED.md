@@ -1,14 +1,13 @@
 # Deploy-Owed / Post-Deploy Verification
 
-> ## 2026-09-06 (night) — ACCOUNT: forgot password, /reset-password, change password / email, sign out, delete account (docs/WORKORDER-account-2026-09-06.md). **PUSHED, WEB LIVE, FUNCTION DEPLOYED, MIGRATION OWED, NOT DEVICE-VERIFIED.**
+> ## 2026-09-06 (night) — ACCOUNT: forgot password, /reset-password, change password / email, sign out, delete account (docs/WORKORDER-account-2026-09-06.md). **PUSHED, WEB LIVE, FUNCTION DEPLOYED, MIGRATION APPLIED, THROWAWAY-VERIFIED, NOT DEVICE-VERIFIED.**
 >
 > **PUSHED:** `origin/main == aec5122f`. **WEB:** Netlify built it (GitHub status "Deployment has completed"); the served bundle
 > carries the new copy and the reset page was walked in Chrome against the real site (below).
 > **EDGE FUNCTION DEPLOYED:** `delete-account` **v1**, 2026-09-07 01:09 UTC (its bundle carried the working-tree
 > `_shared/require-user.ts`, which has an uncommitted additive helper from the B1 work order; `requireUser` itself is unchanged).
-> **SCHEMA — OWED TO MICHAEL:** `supabase/migrations/20260906120000_delete_user_data.sql` (the `delete_user_data(uid)` sweep,
-> service role only). Until it is pasted into the SQL editor, Delete account returns "Could not find the function
-> public.delete_user_data" and the auth user is left in place (the function aborts before `auth.admin.deleteUser`).
+> **SCHEMA:** `supabase/migrations/20260906120000_delete_user_data.sql` (the `delete_user_data(uid)` sweep, service role only)
+> — Michael ran it in the SQL editor 2026-09-07; confirmed live by the delete below, not by a success message.
 > **DASHBOARD — OWED TO MICHAEL:** Authentication → URL Configuration: Site URL `https://efforts.work`, Redirect URLs add
 > `https://efforts.work/reset-password`. Before real users: Authentication → SMTP Settings → Resend (the project's
 > `RESEND_API_KEY` already exists as a function secret); the built-in mailer is rate-limited to a few emails an hour.
@@ -20,10 +19,9 @@
 > renders, "Password set. Open efforts and sign in.", browser holds no session, the new password signs in; a full load with
 > the expired hash shows "This link has expired. Request a new one from the sign-in screen." · Sign-in "Forgot password?"
 > swaps to one email field and shows the neutral line for an address that has no account.
-> (4) delete: **NOT VERIFIED** — blocked on the migration. The throwaway account `78bd9bbc-…` is left in place with a
-> baselines row and an avatar object so the check can run the moment the SQL is in:
-> `node scripts/_burner-account-2026-09-06.mjs delete && node scripts/_burner-account-2026-09-06.mjs check`
-> (getUserById → none; every `user_id` table 0 rows, table list read from PostgREST at run time; avatars folder empty).
+> (4) delete, after the SQL was in: `delete-account` → 200 `{ deleted: true }`; `auth.admin.getUserById` → 404; all
+> **41** public tables with a `user_id` column (list read from PostgREST at run time, not hand-picked) → 0 rows for the
+> uid; `avatars/<uid>/` empty. Nothing left to tear down.
 > **LINT:** no `consistent-button-shape` findings in the new files; `tsc` error count unchanged (326 pre-existing, none in
 > the touched files). **iOS:** `npm run ios` run; Xcode build is Michael's.
 >
