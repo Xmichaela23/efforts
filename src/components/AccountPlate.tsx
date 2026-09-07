@@ -15,7 +15,7 @@
  * the web (src/lib/export-data.ts). The link is good for one hour.
  */
 import React, { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Eye, EyeOff } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { NumberRow } from '@/components/ui/number-row';
@@ -52,6 +52,7 @@ export function AccountPlate({ header, email, pendingEmail, onPendingEmail, onSi
   const [line, setLine] = useState<string | null>(null);
   const [exportBuild, setExportBuild] = useState<ExportBuild | null>(null);
 
+  const [showPw, setShowPw] = useState(false);
   const open = (k: SheetKind) => { setPw1(''); setPw2(''); setNewEmail(''); setConfirmText(''); setLine(null); setExportBuild(null); setSheet(k); };
   const close = () => { if (!busy) setSheet(null); };
 
@@ -63,7 +64,11 @@ export function AccountPlate({ header, email, pendingEmail, onPendingEmail, onSi
     const { error } = await supabase.auth.updateUser({ password: pw1 });
     setBusy(false);
     setLine(error ? error.message : 'Password changed.');
-    if (!error) { setPw1(''); setPw2(''); }
+    if (!error) {
+      setPw1(''); setPw2('');
+      // Say it, then close (Michael, 2026-09-07: "once set this should close").
+      window.setTimeout(() => { setSheet(null); setLine(null); }, 900);
+    }
   };
 
   const changeEmail = async () => {
@@ -143,10 +148,16 @@ export function AccountPlate({ header, email, pendingEmail, onPendingEmail, onSi
           <SheetDescription className="sr-only">Set a new password for this account.</SheetDescription>
           <form className="mt-4 space-y-3" onSubmit={(e) => { e.preventDefault(); void changePassword(); }}>
             <label className="block text-[13px] text-white/60">New password
-              <input type="password" autoComplete="new-password" value={pw1} onChange={(e) => setPw1(e.target.value)} className={fieldClass} placeholder={`${PASSWORD_MIN}+ characters`} />
+              <div className="relative">
+                <input type={showPw ? 'text' : 'password'} autoComplete="new-password" value={pw1} onChange={(e) => setPw1(e.target.value)} className={`${fieldClass} pr-11`} placeholder={`${PASSWORD_MIN}+ characters`} />
+                <button type="button" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? 'Hide password' : 'Show password'} aria-pressed={showPw}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 bg-transparent border-none p-1 text-white/55">
+                  {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </label>
             <label className="block text-[13px] text-white/60">Again
-              <input type="password" autoComplete="new-password" value={pw2} onChange={(e) => setPw2(e.target.value)} className={fieldClass} />
+              <input type={showPw ? 'text' : 'password'} autoComplete="new-password" value={pw2} onChange={(e) => setPw2(e.target.value)} className={fieldClass} />
             </label>
             {line && <p className="text-[13px] text-white/75">{line}</p>}
             <GalaxyButton type="submit" variant="primary" size="lg" fullWidth disabled={busy}>{busy ? 'Setting…' : 'Set password'}</GalaxyButton>
