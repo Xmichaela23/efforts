@@ -5,7 +5,7 @@
  * completed workout that doesn't yet have a workout_facts row.
  *
  * Input:  { user_id?: string, limit?: number, force?: boolean }
- *   - user_id: optional, backfill only this user
+ *   - user_id: honoured only for the service key (internal / scripts); a signed-in caller is scoped to their own JWT
  *   - limit:   optional, max workouts to process (default 500)
  *   - force:   if true, recompute even if workout_facts row exists
  *
@@ -14,6 +14,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireUserOrService, AuthError } from "../_shared/require-user.ts";
 
 serve(async (req: Request) => {
   const corsHeaders = {
@@ -27,7 +28,20 @@ serve(async (req: Request) => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const userId: string | undefined = body.user_id;
+    // B1: identity comes from the verified JWT; the service key (internal fan-out / scripts) may name a user in the body. Body user_id is otherwise ignored.
+    // A service call MUST name one user — the old "no user_id = every athlete" sweep is gone (B13).
+    let userId: string;
+    try {
+      ({ userId } = await requireUserOrService(req, body.user_id));
+    } catch (e) {
+      if (e instanceof AuthError) {
+        return new Response(JSON.stringify({ error: "unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw e;
+    }
     const limit: number = Math.min(body.limit ?? 500, 2000);
     const force: boolean = body.force === true;
 
@@ -43,9 +57,7 @@ serve(async (req: Request) => {
       .order("date", { ascending: false })
       .limit(limit);
 
-    if (userId) {
-      query = query.eq("user_id", userId);
-    }
+    query = query.eq("user_id", userId);
 
     if (!force) {
       // Left-anti-join: only workouts without a workout_facts row.

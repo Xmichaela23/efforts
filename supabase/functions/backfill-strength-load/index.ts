@@ -33,7 +33,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { resolveUser } from '../_shared/require-user.ts';
+import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import { calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
 import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts';
 import { resolveAthleteTimezone } from '../_shared/athlete-timezone.ts';
@@ -72,12 +72,16 @@ serve(async (req) => {
     // the only thing that may name someone else. A human JWT is scoped to its own `sub` and the body
     // `user_id` is IGNORED — otherwise this becomes "rewrite any athlete's training history" behind
     // a public key, which is the exact hole B1 closed.
-    const { userId: jwtUserId, isService } = await resolveUser(req);
-    const userId = isService ? String(body?.user_id ?? '').trim() : jwtUserId!;
-    if (!userId) {
-      return new Response(JSON.stringify({ success: false, error: 'user_id required for a service-role call' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    let userId: string;
+    try {
+      ({ userId } = await requireUserOrService(req, body?.user_id));
+    } catch (e) {
+      if (e instanceof AuthError) {
+        return new Response(JSON.stringify({ success: false, error: 'unauthorized' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      throw e;
     }
     const dryRun: boolean = body?.dry_run !== false; // ⛔ DRY BY DEFAULT — this rewrites history.
     const batchSize: number = Number(body?.batch_size) || 25;

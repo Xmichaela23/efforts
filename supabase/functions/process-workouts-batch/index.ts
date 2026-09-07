@@ -2,6 +2,7 @@
 // Accepts either an explicit list of workout IDs or auto-discovers
 // completed workouts that haven't been analyzed yet.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,20 +24,39 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceKey);
 
     const payload = await req.json().catch(() => ({}));
+    // B1: identity comes from the verified JWT; the service key (internal fan-out / scripts) may name a user in the body. Body user_id is otherwise ignored.
+    let userId: string;
+    try {
+      ({ userId } = await requireUserOrService(req, payload?.user_id));
+    } catch (e) {
+      if (e instanceof AuthError) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      throw e;
+    }
 
-    // Accept an explicit list, or auto-discover workouts missing analysis
-    // for the requesting user (requires user_id in payload).
+    // Accept an explicit list (scoped to the resolved user — anyone else's ids are dropped, not processed),
+    // or auto-discover this user's workouts missing analysis.
     let workoutIds: string[] = [];
 
     if (Array.isArray(payload.workout_ids) && payload.workout_ids.length > 0) {
-      workoutIds = payload.workout_ids.map(String);
-    } else if (payload.user_id) {
+      const { data, error } = await supabase
+        .from('workouts')
+        .select('id')
+        .eq('user_id', userId)
+        .in('id', payload.workout_ids.map(String));
+      if (error) throw error;
+      workoutIds = (data ?? []).map((r: any) => r.id);
+    } else {
       // Auto mode: find completed workouts that lack computed analysis
       const limit = Number(payload.limit) || 25;
       const { data, error } = await supabase
         .from('workouts')
         .select('id')
-        .eq('user_id', payload.user_id)
+        .eq('user_id', userId)
         .eq('workout_status', 'completed')
         .is('computed', null)
         .order('date', { ascending: false })
@@ -44,11 +64,6 @@ Deno.serve(async (req) => {
 
       if (error) throw error;
       workoutIds = (data ?? []).map((r: any) => r.id);
-    } else {
-      return new Response(
-        JSON.stringify({ error: 'Provide workout_ids (array) or user_id to auto-discover unprocessed workouts.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
 
     if (workoutIds.length === 0) {

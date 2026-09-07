@@ -10,6 +10,7 @@
 // Old runs show correct on their next recompute; new runs immediately.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireUserOrService, AuthError } from "../_shared/require-user.ts";
 import { resolveRouteCluster } from "../_shared/route-intelligence.ts";
 
 const ROUTE_TYPES = ["run", "running", "walk", "ride", "bike", "cycling", "virtualride"];
@@ -30,8 +31,15 @@ async function clusterSummary(supabase: any, user_id: string) {
 
 serve(async (req) => {
   try {
-    const { user_id, dry_run = true, offset = 0, batch = DEFAULT_BATCH } = await req.json().catch(() => ({}));
-    if (!user_id) return json({ error: "user_id required" }, 400);
+    const { user_id: bodyUserId, dry_run = true, offset = 0, batch = DEFAULT_BATCH } = await req.json().catch(() => ({}));
+    // B1: identity comes from the verified JWT; the service key (internal fan-out / scripts) may name a user in the body. Body user_id is otherwise ignored.
+    let user_id: string;
+    try {
+      ({ userId: user_id } = await requireUserOrService(req, bodyUserId));
+    } catch (e) {
+      if (e instanceof AuthError) return json({ error: "unauthorized" }, 401);
+      throw e;
+    }
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     // Total route workouts (lean — head count, no payload).

@@ -7,12 +7,13 @@
  * Safe to re-run: only touches rows with workload_planned IS NULL.
  *
  * Input (POST JSON): { user_id?: string, dry_run?: boolean }
- *   - user_id: optional override (defaults to the calling user)
+ *   - user_id: honoured only for the service key (CLI/admin); a signed-in caller is always their own JWT user
  *   - dry_run: if true, compute but don't write (returns what would change)
  *
  * Output: { updated, skipped, dry_run }
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import {
   getStepsIntensity,
   calculateDurationWorkload,
@@ -48,28 +49,19 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    const authH = req.headers.get('Authorization') || '';
-    const token = authH.startsWith('Bearer ') ? authH.slice(7) : null;
     const body = await req.json().catch(() => ({}));
-
-    // Allow service-role calls (CLI/admin) with explicit user_id in body
-    const isServiceRole = token === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    // B1: identity comes from the verified JWT; the service key (internal fan-out / scripts) may name a user in the body. Body user_id is otherwise ignored.
+    // (Before: a signed-in caller's body user_id OVERRODE their JWT — that was the hole here.)
     let userId: string;
-    if (isServiceRole) {
-      if (!body?.user_id) {
-        return new Response(JSON.stringify({ error: 'user_id required for service-role calls' }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      userId = body.user_id;
-    } else {
-      const { data: userData } = await supabase.auth.getUser(token || undefined);
-      if (!userData?.user?.id) {
+    try {
+      ({ userId } = await requireUserOrService(req, body?.user_id));
+    } catch (e) {
+      if (e instanceof AuthError) {
         return new Response(JSON.stringify({ error: 'unauthorized' }), {
           status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      userId = body?.user_id || userData.user.id;
+      throw e;
     }
     const dryRun: boolean = body?.dry_run === true;
 

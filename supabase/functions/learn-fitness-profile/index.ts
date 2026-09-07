@@ -24,6 +24,7 @@
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import {
   fitRunCriticalSpeed,
   paceCurveToEfforts,
@@ -206,13 +207,18 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const { user_id } = payload;
-
-    if (!user_id) {
-      return new Response(JSON.stringify({ error: 'user_id is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    // B1: identity comes from the verified JWT; the service key (internal fan-out / scripts) may name a user in the body. Body user_id is otherwise ignored.
+    let user_id: string;
+    try {
+      ({ userId: user_id } = await requireUserOrService(req, payload?.user_id));
+    } catch (e) {
+      if (e instanceof AuthError) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      throw e;
     }
 
     // Initialize Supabase client with service role key

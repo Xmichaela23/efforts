@@ -29,6 +29,7 @@
 // the training caches (`coach_cache`, `block_adaptation_cache`) for the deleted plan(s).
 
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { requireUserOrService, AuthError } from '../_shared/require-user.ts'
 import {
   LIVE_PLAN_STATUSES,
   plansLinkedToGoal,
@@ -43,30 +44,6 @@ const corsHeaders = {
 } as Record<string, string>
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-/** `sub` from a user access JWT, or null if not an authenticated caller token. */
-function authenticatedSubFromBearer(req: Request): string | null {
-  const authHeader = req.headers.get('Authorization') ?? ''
-  const m = authHeader.match(/^Bearer\s+(.+)$/i)
-  const token = m?.[1]?.trim()
-  if (!token) return null
-  const parts = token.split('.')
-  if (parts.length !== 3) return null
-  try {
-    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-    const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4))
-    const json = JSON.parse(atob(b64 + pad)) as { role?: string; sub?: string; aud?: string | string[] }
-    const role = typeof json?.role === 'string' ? json.role : ''
-    const audRaw = json.aud
-    const aud = Array.isArray(audRaw) ? audRaw[0] : typeof audRaw === 'string' ? audRaw : ''
-    const sub = typeof json?.sub === 'string' ? json.sub.trim() : ''
-    const isAuthed = role === 'authenticated' || aud === 'authenticated'
-    if (isAuthed && UUID_RE.test(sub)) return sub
-  } catch {
-    /* invalid JWT */
-  }
-  return null
-}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -196,11 +173,14 @@ Deno.serve(async (req) => {
       return json({ error: 'goal_id required' }, 400)
     }
 
-    const userId = authenticatedSubFromBearer(req)
-    if (!userId) return json({ error: 'invalid_auth: sign in required' }, 401)
-    const fromBody = typeof body.user_id === 'string' ? body.user_id.trim() : ''
-    if (fromBody && fromBody !== userId) {
-      return json({ error: 'user_id_mismatch' }, 400)
+    // B1: identity comes from the verified JWT; the service key (internal fan-out / scripts) may name a user in the body. Body user_id is otherwise ignored.
+    // (Before: the JWT payload was decoded WITHOUT signature verification — a forged token passed.)
+    let userId: string
+    try {
+      ({ userId } = await requireUserOrService(req, typeof body.user_id === 'string' ? body.user_id : null))
+    } catch (e) {
+      if (e instanceof AuthError) return json({ error: 'invalid_auth: sign in required' }, 401)
+      throw e
     }
     const authHeader = req.headers.get('Authorization') ?? ''
 

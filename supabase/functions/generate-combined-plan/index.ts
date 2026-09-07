@@ -22,6 +22,7 @@
 // hard/easy, proper brick placement, and multi-event taper protocols.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import type { CombinedPlanRequest, GoalInput, AthleteState, AthleteMemory } from './types.ts';
 import { buildPhaseTimeline, applyLoadingPattern, blockForWeek, loadingPatternForIntent } from './phase-structure.ts';
 import { buildWeek, buildAssessmentWeekSessions } from './week-builder.ts';
@@ -76,7 +77,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body: CombinedPlanRequest = await req.json();
-    const { user_id, goals, athlete_state, athlete_memory, start_date, generation_trade_offs, arc } = body;
+    const { user_id: bodyUserId, goals, athlete_state, athlete_memory, start_date, generation_trade_offs, arc } = body;
     const preview = body.preview === true;
     // D-048 — copy into a local array so we can safely merge phase-structure
     // trade-offs without mutating the caller's input array.
@@ -89,7 +90,14 @@ Deno.serve(async (req: Request) => {
     });
 
     // ── Input validation ────────────────────────────────────────────────────
-    if (!user_id)                         return json({ error: 'user_id required' }, 400);
+    // B1: identity comes from the verified JWT; the service key (internal fan-out / scripts) may name a user in the body. Body user_id is otherwise ignored.
+    let user_id: string;
+    try {
+      ({ userId: user_id } = await requireUserOrService(req, bodyUserId));
+    } catch (e) {
+      if (e instanceof AuthError) return json({ error: 'unauthorized' }, 401);
+      throw e;
+    }
     if (!Array.isArray(goals) || goals.length < 1) return json({ error: 'At least one goal required' }, 400);
     if (!athlete_state?.current_ctl)      return json({ error: 'athlete_state.current_ctl required' }, 400);
     if (!athlete_state?.weekly_hours_available) return json({ error: 'weekly_hours_available required' }, 400);

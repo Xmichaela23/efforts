@@ -16,6 +16,7 @@
  *        POST {}               → detect + freeze new cores.
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import { detectCores, groupStats, type DetectRun } from '../_shared/core-detect.ts';
 import { parseGpsPoints } from '../_shared/gps-points.ts';
 
@@ -25,7 +26,6 @@ const corsHeaders: Record<string, string> = {
 };
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 // Tuned to real data (2026-07-06): watch-on jitter spans ~140m; this user's distinct trailheads are
@@ -75,19 +75,14 @@ Deno.serve(async (req) => {
     minCoreDistanceM: numOpt(body?.min_core_distance_m) ?? 600,
   };
 
-  // Auth: resolve the caller from their JWT and operate on their own data. Plus an admin/backfill
-  // path — a service-role bearer may target an explicit user_id (pre-launch, solo; the service key
-  // is a secret only the owner holds).
-  const authHeader = req.headers.get('Authorization') ?? '';
-  const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data: { user } } = await authClient.auth.getUser();
-  let userId: string | null = user?.id ?? null;
-  if (!userId && typeof body?.user_id === 'string' && authHeader === `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`) {
-    userId = body.user_id;
+  // B1: identity comes from the verified JWT; the service key (internal fan-out / scripts) may name a user in the body. Body user_id is otherwise ignored.
+  let userId: string;
+  try {
+    ({ userId } = await requireUserOrService(req, typeof body?.user_id === 'string' ? body.user_id : null));
+  } catch (e) {
+    if (e instanceof AuthError) return json({ ok: false, error: 'unauthorized' }, 401);
+    throw e;
   }
-  if (!userId) return json({ ok: false, error: 'unauthorized' }, 401);
 
   const svc = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 

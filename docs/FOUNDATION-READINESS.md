@@ -26,7 +26,7 @@
 
 | # | Item | Sev | Evidence | Status |
 |---|---|---|---|---|
-| B1 | **Cross-user data exposure (IDOR).** ~47 functions take `user_id` from the request body under the service-role key; ~24 also `verify_jwt=false` (publicly reachable). Anyone can POST any `user_id` and read that user's whole arc, or delete their connections. The CORRECT pattern already exists (`save-location` derives id from the verified JWT) — used in only ~26 of ~90 fns. | **BLOCKER** | `get-arc-context/index.ts:26-41`, `disconnect-connection/index.ts:26-35` (bad); `save-location/index.ts:11-34` (good) | **NEW — file (security)** |
+| B1 | **Cross-user data exposure (IDOR).** ~47 functions took `user_id` from the request body under the service-role key. **CLOSED 2026-09-06** — every user-scoped function now derives the acting user from the verified JWT via `_shared/require-user.ts` (`requireUser` / `requireUserOrService`); a body `user_id` is honoured only when the bearer is byte-equal to the project's service-role key (internal fan-out from the webhooks, other functions, backfill scripts). Converted in the 2026-09-06 work order (docs/WORKORDER-b1-user-id-2026-09-06.md): arc-setup-chat, backfill-facts, backfill-routes, compute-snapshot, generate-combined-plan, learn-fitness-profile, planning-context, process-workouts-batch, recompute-athlete-memory, adapt-plan, backfill-planned-workload, backfill-strength-load, coach, compute-core-verdict, delete-goal, detect-cores, match-cores, readiness, recompute-workout, save-imported-workout (20; the 14 already on `requireUser` unchanged; `strava-webhook` + `garmin-webhook-activities` stay `verify_jwt=false` and reach the chain with the service key). Verified by the two-account matrix `scripts/b1-matrix-2026-09-06.mjs` on the deployed functions: A's token + B's id → A's own data or 404, B's rows untouched across 41 tables; anon key + B's id → 401 on all 20; service key + B's id → B's data; guard fixtures in `_shared/require-user.test.ts` (client / service / anon / forged, 10 green). | ~~BLOCKER~~ **CLOSED** | `_shared/require-user.ts` | **[WORKORDER-b1-user-id-2026-09-06]** |
 | B4 | **No error sink.** Zero Sentry/structured logging; 455 `console.error` into ephemeral edge logs; no error table in 97 migrations. If a user's compute breaks you never know — this turns every other bug into a *silent* bug. Reuse the `notify-admin-signup` Resend wiring for a `notify-admin-error`. | **BLOCKER** | no error table; `notify-admin-signup` exists, no error analog | **NEW — file** (only "considered", DECISIONS-LOG:2120) |
 | B2 | **Hardcoded anon key + project URL in client** (7 files). Public-by-design so not a secret leak, but defeats key rotation and makes B1 trivially scriptable. Move to `import.meta.env`. | Serious | `src/lib/supabase.ts:5-6`, `GarminPreview.tsx`, `Connections.tsx`, `TrainingBaselines.tsx:769` | partly **[SCREEN-CONNECTIVITY hygiene flags]**; **file** |
 | B3 | **Sync dies silently; no connection-health state.** No `status`/`needs_reauth`/`last_error` column on `user_connections`/`device_connections`. A dead token looks healthy; cardio sync just stops. Plus a rotation bug: `import-strava-history` overwrites `connection_data` with stats, dropping the rotated refresh_token → next server refresh breaks permanently. | Serious | `strava-refresh/index.ts:58-64`; `import-strava-history/index.ts:880-891` | **NEW — file** |
@@ -38,12 +38,12 @@
 | B10 | **`weekly_workload` table has `user_id` but no RLS.** Latent cross-user read if ever queried with the anon client (server-only today). The one gap in an otherwise consistent RLS picture. | Cleanup (latent) | migration `20250115000002` (no `ENABLE ROW LEVEL SECURITY`) | **NEW — file** |
 | B11 | **Migrations dir ≠ prod schema of record.** 6 naming schemes, two files share a prefix (undefined order), some "apply by hand not `db push`", `route_progress_metrics` has no migration at all. `run-migration/` is an empty stub. | Cleanup | `supabase/migrations/`; `route_progress_metrics` (no migration) | **NEW — file** |
 | B12 | **`readiness_checkins` dual-write can diverge**; backfill reconciliation is gap-only (`ON CONFLICT DO NOTHING`) so it never corrects a diverged row. | Cleanup | `StrengthLogger.tsx:3278` (fail-soft table write) | partly **[D-140–143]** |
-| B13 | **`backfill-facts` unguarded** — no auth, no dry-run, `user_id` optional → runs across ALL users on service-role. (4 of 6 backfills are properly gated.) | Cleanup | `backfill-facts` | **NEW — file** |
+| B13 | **`backfill-facts` unguarded** — no auth, no dry-run, `user_id` optional → runs across ALL users on service-role. (4 of 6 backfills are properly gated.) | Cleanup — auth + per-user scope closed with B1 (2026-09-06: service key must name one user, the all-users sweep is gone); still no dry-run | `backfill-facts` | **NEW — file** |
 
 ---
 
 ## The two blockers, restated plainly
-**Before a second paying account:** (1) **stop trusting body-supplied `user_id`** — derive it from the verified login on every user-scoped function (B1), and (2) **add an error sink + admin alert** so a broken compute is visible (B4). Everything else in SERIOUS is a focused sprint; CLEANUP won't bite a small early cohort.
+**Before a second paying account:** (1) ~~stop trusting body-supplied `user_id`~~ **B1 CLOSED 2026-09-06** (see the B1 row), and (2) **add an error sink + admin alert** so a broken compute is visible (B4). Everything else in SERIOUS is a focused sprint; CLEANUP won't bite a small early cohort.
 
 ## What's genuinely good (don't touch)
 The pure-math `_shared/` core (ACWR, workload, reconcile, week-optimizer) is well-tested and correct. RLS on user tables is broadly consistent (`auth.uid()=user_id`) — B1 is an *edge-function* trust-boundary problem, not a table-policy one. The compute algorithms are bounded and indexed. The target pattern (run+contract) is right.
@@ -56,6 +56,8 @@ The pure-math `_shared/` core (ACWR, workload, reconcile, week-optimizer) is wel
 ---
 
 ## B1-class — `compute-snapshot` accepts any `user_id` with the public anon key (found 2026-09-01)
+
+**CLOSED 2026-09-06 with B1** — `compute-snapshot` now runs `requireUserOrService`; anon key + any `user_id` → 401 (matrix cell d), a signed-in caller gets their own snapshot whatever id they send (cell a).
 
 **Found while recomputing Michael's own snapshot on his instruction.** The installed CLI has no
 `functions invoke`, so the function was called over HTTPS with the app's **public anon key** (the one

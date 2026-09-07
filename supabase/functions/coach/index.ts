@@ -6,6 +6,7 @@
 // - No AI here; AI language should be layered on top of these facts.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import type {
   CoachWeekContextRequestV1,
   CoachWeekContextResponseV1,
@@ -994,12 +995,18 @@ Deno.serve(async (req) => {
   try {
     const payload = (await req.json().catch(() => ({}))) as Partial<CoachWeekContextRequestV1>;
     const skipCache = Boolean(payload?.skip_cache);
-    const userId = String(payload?.user_id || '');
-    if (!userId) {
-      return new Response(JSON.stringify({ error: 'user_id is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // B1: identity comes from the verified JWT; the service key (internal fan-out / scripts) may name a user in the body. Body user_id is otherwise ignored.
+    let userId: string;
+    try {
+      ({ userId } = await requireUserOrService(req, payload?.user_id));
+    } catch (e) {
+      if (e instanceof AuthError) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      throw e;
     }
     const userTz = payload?.timezone ? String(payload.timezone) : null;
     const asOfDate = String(payload?.date || (() => {

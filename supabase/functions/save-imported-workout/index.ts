@@ -3,6 +3,7 @@
 // Accepts raw import shape from FitFileImporter, maps to DB schema, inserts, returns saved workout.
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import { zone3FloorBpm } from '../../../src/lib/friel-zones.ts';
 
 const corsHeaders = {
@@ -112,29 +113,25 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing authorization' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    const body = await req.json().catch(() => ({}));
+    // B1: identity comes from the verified JWT; the service key (internal fan-out / scripts) may name a user in the body. Body user_id is otherwise ignored.
+    let userId: string;
+    try {
+      ({ userId } = await requireUserOrService(req, typeof body?.user_id === 'string' ? body.user_id : null));
+    } catch (e) {
+      if (e instanceof AuthError) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      throw e;
     }
-
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const { data: { user }, error: userErr } = await supabase.auth.getUser();
-    if (userErr || !user?.id) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    const body = await req.json();
+    // Writes go through the service client; every row is stamped with the resolved user.
+    const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
     const workout = body?.workout;
     if (!workout || !workout.date) {
       return new Response(JSON.stringify({ error: 'workout required with date' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const toSave = mapImportToDb(workout, user.id);
+    const toSave = mapImportToDb(workout, userId);
 
     const { data, error } = await supabase
       .from('workouts')
@@ -156,7 +153,7 @@ Deno.serve(async (req) => {
         const { data: existing } = await svcClient
           .from('user_baselines')
           .select('configured_hr_zones')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .maybeSingle();
         const currentSource = existing?.configured_hr_zones?.source;
         // Only overwrite if no zones yet or current source is also fit_file (not strava)
@@ -188,10 +185,10 @@ Deno.serve(async (req) => {
           await svcClient
             .from('user_baselines')
             .upsert(
-              { user_id: user.id, configured_hr_zones: configuredZones },
+              { user_id: userId, configured_hr_zones: configuredZones },
               { onConflict: 'user_id' }
             );
-          console.log(`[FIT ZONES] Stored HR config for user ${user.id}: LTHR=${fitLthr}, maxHR=${fitMaxHr}`);
+          console.log(`[FIT ZONES] Stored HR config for user ${userId}: LTHR=${fitLthr}, maxHR=${fitMaxHr}`);
         }
       }
     } catch (e) {

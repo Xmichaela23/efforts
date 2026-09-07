@@ -46,3 +46,4 @@ test-outputs/
 # APPLICATION — and they are output of `generate-combined-plan`, a different subsystem from the
 # strength composer whose behaviour the deno suites actually pin.
 scripts/plan-test-output/
+.b1-matrix/

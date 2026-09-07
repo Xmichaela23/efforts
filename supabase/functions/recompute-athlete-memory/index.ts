@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 
 import { formatLocalDate, parseLocalDate } from '../_shared/parse-local-date.ts';
 
@@ -213,12 +214,18 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = (await req.json()) as RecomputeRequest;
-    const userId = body?.user_id;
-    if (!userId) {
-      return new Response(JSON.stringify({ success: false, error: 'user_id required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // B1: identity comes from the verified JWT; the service key (internal fan-out / scripts) may name a user in the body. Body user_id is otherwise ignored.
+    let userId: string;
+    try {
+      ({ userId } = await requireUserOrService(req, body?.user_id));
+    } catch (e) {
+      if (e instanceof AuthError) {
+        return new Response(JSON.stringify({ success: false, error: 'unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      throw e;
     }
 
     const periodWeeks = Number.isFinite(body?.period_weeks) ? Math.max(1, Math.floor(body.period_weeks!)) : DEFAULT_PERIOD_WEEKS;

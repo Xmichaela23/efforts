@@ -21,7 +21,7 @@
 // =============================================================================
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { resolveUser } from '../_shared/require-user.ts';
+import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import type { Phase, PhaseStructure } from '../generate-run-plan/types.ts';
 import {
   buildStrengthSessionsForPlanWeek,
@@ -145,13 +145,17 @@ Deno.serve(async (req) => {
     // VERIFIED JWT — body user_id is ignored. The internal service caller (ingest action=auto, service key)
     // supplies it in the body. auto_batch above is cron-secret-guarded and returned before this point.
     // `user_id` below is the effective acting user, so every downstream branch is correctly scoped.
-    const { userId: jwtUserId, isService } = await resolveUser(req);
-    const user_id = isService ? bodyUserId : jwtUserId;
-    if (!user_id) {
-      return new Response(JSON.stringify({ error: 'user_id is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    let user_id: string;
+    try {
+      ({ userId: user_id } = await requireUserOrService(req, bodyUserId));
+    } catch (e) {
+      if (e instanceof AuthError) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      throw e;
     }
 
     // =========================================================================

@@ -9,40 +9,12 @@ import {
   mondayOf,
   resolveAnalyzeEdgeFn,
   timingSafeEqual,
-  decideAuthDoor,
   invokeWithRetry,
 } from './orchestrator-lib.ts';
 
 const SVC = 'service-role-key-xxxxxxxxxxxxxxxxxxxxxxxxxxxx';
 
-// ── AUTH DOOR (rider 1): two doors, and the service one is ONLY a door ─────────────────────────
-Deno.test('auth: exact service key + explicit user_id → SERVICE door', () => {
-  const d = decideAuthDoor({ token: SVC, serviceKey: SVC, bodyUserId: 'user-123' });
-  assertEquals(d, { kind: 'service', ownerUserId: 'user-123' });
-});
-
-Deno.test('auth: exact service key but NO user_id → REJECT (a service call must name the user)', () => {
-  const d = decideAuthDoor({ token: SVC, serviceKey: SVC, bodyUserId: null });
-  assertEquals(d.kind, 'reject');
-});
-
-Deno.test('auth: a WRONG key → falls to the user-JWT gate, never bypasses (service is only the door)', () => {
-  const d = decideAuthDoor({ token: 'wrong-key', serviceKey: SVC, bodyUserId: 'user-123' });
-  assertEquals(d.kind, 'user'); // NOT service, even with a user_id present
-});
-
-Deno.test('auth: a normal user JWT → user gate (unchanged external path)', () => {
-  const d = decideAuthDoor({ token: 'eyJhbGciOi.userjwt.sig', serviceKey: SVC, bodyUserId: null });
-  assertEquals(d.kind, 'user');
-});
-
-Deno.test('auth: empty token → REJECT', () => {
-  assertEquals(decideAuthDoor({ token: '', serviceKey: SVC, bodyUserId: 'user-123' }).kind, 'reject');
-});
-
-Deno.test('auth: a token that merely PREFIXES the service key is not the service key', () => {
-  assertEquals(decideAuthDoor({ token: SVC.slice(0, -1), serviceKey: SVC, bodyUserId: 'u' }).kind, 'user');
-});
+// ── AUTH DOOR: moved to _shared/require-user.test.ts (requireUserOrService) on 2026-09-06 ──────────
 
 // ── timingSafeEqual: underpins the service door ────────────────────────────────────────────────
 Deno.test('timingSafeEqual: equal → true; differing → false; length mismatch → false', () => {

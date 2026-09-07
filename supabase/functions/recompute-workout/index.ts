@@ -13,11 +13,11 @@
  *   Anything else → 401. Downstream invokes use the service role.
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import { invalidateUserTrainingCache } from '../_shared/invalidate-user-training-cache.ts';
 import {
   mondayOf,
   resolveAnalyzeEdgeFn,
-  decideAuthDoor,
   invokeWithRetry,
 } from './orchestrator-lib.ts';
 
@@ -30,7 +30,6 @@ const corsHeaders: Record<string, string> = {
 };
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 async function markStatus(client: any, workout_id: string, patch: Record<string, unknown>): Promise<void> {
@@ -49,12 +48,6 @@ Deno.serve(async (req) => {
     return json({ ok: false, code: 'method_not_allowed', error: 'POST only', steps: [] as RecomputeStep[] }, 405);
   }
 
-  const authH = req.headers.get('Authorization') || '';
-  const token = authH.startsWith('Bearer ') ? authH.slice(7).trim() : '';
-  if (!token) {
-    return json({ ok: false, code: 'unauthorized', error: 'Missing token', steps: [] }, 401);
-  }
-
   // Parse the body BEFORE auth — the trusted-service door needs the explicit user_id from it.
   let body: any = {};
   try {
@@ -69,25 +62,14 @@ Deno.serve(async (req) => {
   const includeSummary = body?.include_summary !== false; // default true (idempotent re-normalize)
   const bodyUserId = body?.user_id ? String(body.user_id) : null;
 
-  // ── AUTH: two doors (decision is pure + fixtured in orchestrator-lib.test.ts) ─────────────
-  const decision = decideAuthDoor({ token, serviceKey: SUPABASE_SERVICE_ROLE_KEY, bodyUserId });
+  // ── AUTH: the shared B1 guard. Door A = verified user JWT (body user_id ignored); Door B = service key + body user_id.
   let ownerUserId: string;
-  const isService = decision.kind === 'service';
-  if (decision.kind === 'reject') {
-    return json({ ok: false, code: decision.code, error: decision.error, steps: [] }, 401);
-  } else if (decision.kind === 'service') {
-    // Door B — trusted service caller named the user explicitly (verified IS the service role).
-    ownerUserId = decision.ownerUserId;
-  } else {
-    // Door A — user JWT gate. BYTE-IDENTICAL to the prior external gate.
-    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-    });
-    const { data: { user }, error: authErr } = await userClient.auth.getUser();
-    if (authErr || !user) {
-      return json({ ok: false, code: 'unauthorized', error: 'Invalid token', steps: [] }, 401);
-    }
-    ownerUserId = user.id;
+  let isService: boolean;
+  try {
+    ({ userId: ownerUserId, internal: isService } = await requireUserOrService(req, bodyUserId));
+  } catch (e) {
+    if (e instanceof AuthError) return json({ ok: false, code: 'unauthorized', error: e.message, steps: [] }, 401);
+    throw e;
   }
 
   const serviceClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);

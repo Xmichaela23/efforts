@@ -25,32 +25,7 @@ export function timingSafeEqual(a: string, b: string): boolean {
   return mismatch === 0;
 }
 
-export type AuthDecision =
-  | { kind: 'service'; ownerUserId: string }
-  | { kind: 'user' }
-  | { kind: 'reject'; code: string; error: string };
-
-/**
- * The auth door decision — TWO doors, and the service one is ONLY a door, never a bypass.
- *  - exact service key (constant-time) + explicit user_id  → trusted service door.
- *  - exact service key + no user_id                        → REJECT (a service call must name the user).
- *  - anything else (incl. a user JWT)                      → fall to the user-JWT gate (getUser + ownership),
- *                                                            which the caller runs UNCHANGED.
- * Never returns 'user' for the service key, and never returns 'service' for a non-service token.
- */
-export function decideAuthDoor(params: {
-  token: string;
-  serviceKey: string;
-  bodyUserId: string | null;
-}): AuthDecision {
-  const { token, serviceKey, bodyUserId } = params;
-  if (!token) return { kind: 'reject', code: 'unauthorized', error: 'Missing token' };
-  if (timingSafeEqual(token, serviceKey)) {
-    if (!bodyUserId) return { kind: 'reject', code: 'unauthorized', error: 'service call requires user_id' };
-    return { kind: 'service', ownerUserId: bodyUserId };
-  }
-  return { kind: 'user' };
-}
+// The auth door moved to `_shared/require-user.ts` (requireUserOrService) on 2026-09-06 — B1 work order.
 
 /** Bounded retry: invoke, then up to `retries` more attempts on error. Transient-shaped failures only. */
 export async function invokeWithRetry(client: any, fn: string, body: any, retries = 1): Promise<any> {

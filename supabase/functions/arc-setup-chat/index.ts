@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import { arcContextForFreshSetup, getArcContext } from '../_shared/arc-context.ts';
 import { buildArcSetupSystemPrompt } from '../_shared/arc-setup-prompt.ts';
 import type { ConversationMessage } from '../_shared/llm.ts';
@@ -51,12 +52,18 @@ Deno.serve(async (req) => {
       /** QA: omit saved schedule / snapshots from context; no draft lock-in */
       fresh_setup?: boolean;
     };
-    const userId = body.user_id;
-    if (!userId || typeof userId !== 'string') {
-      return new Response(JSON.stringify({ error: 'user_id is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // B1: identity comes from the verified JWT; the service key (internal fan-out / scripts) may name a user in the body. Body user_id is otherwise ignored.
+    let userId: string;
+    try {
+      ({ userId } = await requireUserOrService(req, body.user_id));
+    } catch (e) {
+      if (e instanceof AuthError) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      throw e;
     }
     const raw = body.focus_date;
     const focusDateISO =

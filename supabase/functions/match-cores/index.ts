@@ -9,6 +9,7 @@
  * Auth: user JWT; service-role bearer may target an explicit user_id (pre-launch backfill).
  */
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import { computeCoreEffort, type EffortPoint } from '../_shared/core-effort.ts';
 import { parseGpsPoints, parseHrByTime } from '../_shared/gps-points.ts';
 import { type LatLng } from '../_shared/core-match.ts';
@@ -18,7 +19,6 @@ const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const CAP = 800; // points/run kept for effort accuracy (finer than detection's 400)
@@ -61,14 +61,14 @@ Deno.serve(async (req) => {
     bufferM: numOpt(body?.buffer_m) ?? 50,
   };
 
-  const authHeader = req.headers.get('Authorization') ?? '';
-  const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { global: { headers: { Authorization: authHeader } } });
-  const { data: { user } } = await authClient.auth.getUser();
-  let userId: string | null = user?.id ?? null;
-  if (!userId && typeof body?.user_id === 'string' && authHeader === `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`) {
-    userId = body.user_id;
+  // B1: identity comes from the verified JWT; the service key (internal fan-out / scripts) may name a user in the body. Body user_id is otherwise ignored.
+  let userId: string;
+  try {
+    ({ userId } = await requireUserOrService(req, typeof body?.user_id === 'string' ? body.user_id : null));
+  } catch (e) {
+    if (e instanceof AuthError) return json({ ok: false, error: 'unauthorized' }, 401);
+    throw e;
   }
-  if (!userId) return json({ ok: false, error: 'unauthorized' }, 401);
 
   const svc = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
