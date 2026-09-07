@@ -1766,10 +1766,8 @@ export function buildAnalysisDetailRows(
       const dec = Number((comp?.analysis?.efficiency as any)?.aerobic_decoupling_pct);
       const ph = (factPacket as any)?.derived?.power_halves;
       const steady = halvesSteady(ph?.first_w, ph?.second_w);
-      if (isAerobicRide && steady === false) {
-        // ⛔ WITHHELD WITH THE REASON (2026-09-07). The ratio moved because the effort moved.
-        rows.push({ label: 'Heart rate', value: notSteadyLine(Number(ph.first_w), Number(ph.second_w)) });
-      } else if (isAerobicRide && Number.isFinite(dec)) {
+      const halvesNote = steady === false ? ` ${notSteadyLine(Number(ph.first_w), Number(ph.second_w))}` : '';
+      if (isAerobicRide && Number.isFinite(dec)) {
         const d = Math.round(dec * 10) / 10;
         // ⛔ NAMED FOR WHAT IT MEASURES (2026-09-03, WORKORDER-bike-state-audit §2). This number is POWER
         // AGAINST HEART RATE — the first-half power-to-heart-rate ratio against the second — and a positive
@@ -1781,7 +1779,7 @@ export function buildAnalysisDetailRows(
           : d < 5 ? 'Power to heart rate held steady'
           : d <= 10 ? 'Power to heart rate fell over the ride'
           : 'Power to heart rate fell hard over the ride';
-        rows.push({ label: 'Heart rate', value: `${desc} (${d}%)` });
+        rows.push({ label: 'Heart rate', value: `${desc} (${d}%).${halvesNote}` });
       }
     }
   } catch { /* */ }

@@ -16,7 +16,7 @@ export function halvesSteady(firstW: unknown, secondW: unknown): boolean | null 
   return Math.abs(s - f) / f <= HALVES_STEADY_MAX_DIFF;
 }
 
-/** The sentence that replaces a withheld reading. */
+/** The note beside a reading taken on a ride whose halves were not ridden at the same power. */
 export function notSteadyLine(firstW: number, secondW: number): string {
-  return `Not read: the ride was not steady (${Math.round(firstW)} W → ${Math.round(secondW)} W between halves).`;
+  return `The ride was not steady (${Math.round(firstW)} W → ${Math.round(secondW)} W between halves), so read this loosely.`;
 }

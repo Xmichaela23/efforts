@@ -282,16 +282,16 @@ export function generateCyclingAdherenceSummary(opts: {
 
   // HR drift interpretation. Cycling stores drift_bpm + early/late HR; convert to %
   // for the interpretation thresholds (which mirror running's drift bands).
+  // The drift is always READ (Michael, 2026-09-07: "cardiac drift should be read"). When the two halves were
+  // not ridden at the same power, the number is still shown and the note beside it says why it may mislead.
   const halvesOk = halvesSteady(opts.powerHalves?.first_w, opts.powerHalves?.second_w);
-  if (halvesOk === false) {
-    // ⛔ WITHHELD WITH THE REASON (2026-09-07): drift answers "did heart rate hold at a constant effort".
-    technical_insights.push({ label: 'Cardiac drift', value: notSteadyLine(Number(opts.powerHalves!.first_w), Number(opts.powerHalves!.second_w)) });
-  } else if (typeof opts.hrDriftPct === 'number' && Number.isFinite(opts.hrDriftPct)) {
+  const halvesNote = halvesOk === false ? ` ${notSteadyLine(Number(opts.powerHalves!.first_w), Number(opts.powerHalves!.second_w))}` : '';
+  if (typeof opts.hrDriftPct === 'number' && Number.isFinite(opts.hrDriftPct)) {
     const drift = opts.hrDriftPct;
     if (Math.abs(drift) < 3) {
       technical_insights.push({
         label: 'Cardiac drift',
-        value: `Heart rate stable (${drift > 0 ? '+' : ''}${drift.toFixed(1)}% drift). Aerobic system held steady throughout the ride.`,
+        value: halvesNote ? `Heart rate ${drift > 0 ? '+' : ''}${drift.toFixed(1)}% drift.${halvesNote}` : `Heart rate stable (${drift > 0 ? '+' : ''}${drift.toFixed(1)}% drift). Aerobic system held steady throughout the ride.`,
       });
     } else if (drift >= 3 && drift < 8) {
       technical_insights.push({
