@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Activity, Bike, Plus, Waves } from 'lucide-react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { SPORT_COLORS } from '@/lib/context-utils';
+import EffortScale from '@/components/ui/effort-scale';
 import { Button } from './ui/button';
 import { useToast } from './ui/use-toast';
 import { useAppContext } from '@/contexts/AppContext';
@@ -77,21 +78,6 @@ const FEELING_OPTIONS = [
   { value: 'exhausted', label: 'Exhausted', description: 'Really pushed it' },
 ];
 
-// ⛔ THE TALK TEST, NOT ADJECTIVES (Michael 2026-09-02). "Moderate" told nobody anything; "full
-// sentences" does. 3 = conversational is the easy-day anchor: an easy run logged at 3 with a high
-// heart rate reads as heat, not effort. Standard 1–10 session-RPE anchoring.
-const RPE_DESCRIPTIONS: Record<number, string> = {
-  1: 'Could sing',
-  2: 'Could sing',
-  3: 'Conversational — full sentences',
-  4: 'Short sentences',
-  5: 'A few words',
-  6: 'A few words',
-  7: 'One word',
-  8: 'One word',
-  9: 'Almost max',
-  10: 'Max',
-};
 
 export default function PostWorkoutFeedback({
   workoutId,
@@ -678,42 +664,8 @@ export default function PostWorkoutFeedback({
         </div>
       )}
 
-      {/* RPE Selection - Optional */}
-      <div>
-        <label className="text-sm font-light text-white/70 mb-2 block">
-          How Hard? (RPE) <span className="text-xs text-white/40 font-light">(optional)</span>
-          {selectedRpe && (
-            <span className="ml-2 text-white/50 font-light">
-              — {RPE_DESCRIPTIONS[selectedRpe]}
-            </span>
-          )}
-        </label>
-        <div className="flex gap-1">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rpe) => (
-            <button
-              key={rpe}
-              onClick={() => setSelectedRpe(rpe === selectedRpe ? null : rpe)}
-              className={`flex-1 py-2.5 text-sm font-light rounded-lg border-2 backdrop-blur-md transition-all duration-300 ${
-                selectedRpe === rpe
-                  ? 'bg-white/[0.15] border-white/40 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.1)_inset]'
-                  : 'bg-white/[0.08] border-white/20 text-white/70 hover:bg-white/[0.12] hover:text-white/90 hover:border-white/30'
-              }`}
-              style={{
-                backgroundColor: selectedRpe === rpe ? `rgba(${getRgbFromColor(sportColor)}, 0.2)` : undefined,
-                borderColor: selectedRpe === rpe ? `rgba(${getRgbFromColor(sportColor)}, 0.5)` : undefined,
-              }}
-            >
-              {rpe}
-            </button>
-          ))}
-        </div>
-        <div className="flex justify-between mt-1 text-xs text-white/40 font-light">
-          <span>1–2 could sing</span>
-          <span>3 conversational</span>
-          <span>5–6 a few words</span>
-          <span>10 max</span>
-        </div>
-      </div>
+      {/* The one effort scale (src/components/ui/effort-scale.tsx); talk-test words for endurance. */}
+      <EffortScale sport={isSwim ? 'swim' : workoutType === 'run' ? 'run' : 'bike'} value={selectedRpe} onChange={setSelectedRpe} />
 
       {/* Muscle soreness (D-234/D-235) — optional, no default, all disciplines */}
       <div>

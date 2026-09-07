@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { GalaxyButton } from '@/components/ui/galaxy-button';
+import EffortScale, { effortWords } from '@/components/ui/effort-scale';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -1085,13 +1086,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   // Helper: get RPE label
-  const getRPELabel = (rpe: number): string => {
-    if (rpe <= 3) return 'Light';
-    if (rpe <= 5) return 'Moderate';
-    if (rpe <= 7) return 'Hard';
-    if (rpe <= 9) return 'Very Hard';
-    return 'Maximal';
-  };
+  const getRPELabel = (rpe: number): string => effortWords('strength', rpe);
 
   // Helper: detect if this is a baseline test workout
   const isBaselineTestWorkout = (workout: any): boolean => {
@@ -7098,14 +7093,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 }} rows={4} className="mt-1 w-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 rounded-lg p-2 text-sm text-white/90 placeholder:text-white/70 focus:outline-none focus:border-white/35 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" placeholder="" style={{ fontFamily: 'Inter, sans-serif' }} />
               </div>
               <div>
-                <label className="text-sm text-white/70">RPE (1–10)</label>
-                <input type="number" min={1} max={10} inputMode="numeric" autoComplete="off" value={notesRpe} onChange={(e)=>{
-                  const newRpe = e.target.value?Math.max(1, Math.min(10, parseInt(e.target.value)||0)): '';
+                {/* The one effort scale (src/components/ui/effort-scale.tsx), same row as the finish sheet. */}
+                <EffortScale sport="strength" label="Effort" value={notesRpe === '' ? null : Number(notesRpe)} onChange={(v) => {
+                  const newRpe = v == null ? '' : v;
                   setNotesRpe(newRpe);
                   if (isInitialized && exercises.length > 0) {
                     saveSessionProgress(exercises, attachedAddons, notesText, newRpe);
                   }
-                }} className="mt-1 w-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 rounded-lg p-2 text-sm text-center text-white/90 placeholder:text-white/70 focus:outline-none focus:border-white/35 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]" placeholder="—" style={{ fontFamily: 'Inter, sans-serif' }} />
+                }} />
               </div>
             </div>
             <div className="mt-4 sticky bottom-0 bg-white/[0.08] backdrop-blur-md border-2 border-white/20 pt-3 rounded-lg shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
@@ -7452,34 +7447,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   Workout Complete!
                 </h2>
                 
-                <p className="text-white/70 mb-8 text-center">
-                  How hard was that session?
-                </p>
                 
-                {/* RPE slider */}
+                {/* The one effort scale (src/components/ui/effort-scale.tsx); reps-left words for lifting. */}
                 <div className="mb-6">
-                  <div className="flex justify-between mb-2">
-                    <span className="text-sm text-white/72">Easy</span>
-                    <span className="text-sm text-white/72">Maximal</span>
-                  </div>
-                  
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={sessionRPE}
-                    onChange={(e) => setSessionRPE(Number(e.target.value))}
-                    className="w-full h-2 bg-white/[0.15] rounded-lg appearance-none cursor-pointer"
-                  />
-                  
-                  <div className="text-center mt-3">
-                    <div className="text-4xl font-bold text-white/90">{sessionRPE}</div>
-                    <div className="text-sm text-white/70 mt-1">
-                      {getRPELabel(sessionRPE)}
-                    </div>
-                  </div>
+                  <EffortScale sport="strength" value={sessionRPE} onChange={(v) => setSessionRPE(v ?? 5)} label="How hard was that session?" optional={false} />
                 </div>
-                
                 <div className="flex gap-3">
                   <GalaxyButton
                     variant="secondary"
