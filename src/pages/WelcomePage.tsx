@@ -450,18 +450,18 @@ export default function WelcomePage() {
 
               <div className="px-3 py-2.5">
                 <p className="m-0 mb-1 text-[13px] text-white/80 leading-snug">Know them? Add them. Or test with our tests.</p>
-                <NumberRow id="threshold" name="Threshold pace" hint={metric ? 'm:ss/km' : 'm:ss/mi'} inputMode="numeric" sport="run"
-                  value={thr.sec_per_mi != null ? `${paceToText(metric ? thr.sec_per_mi / 1.609344 : thr.sec_per_mi)}/${metric ? 'km' : 'mi'} · ${numberWord(thr.source, thrMine)}` : null}
-                  saveOnBlur onSave={(t) => { const sec = parsePaceText(t); if (sec == null) return; const secPerMi = metric ? sec * 1.609344 : sec; const str = paceToText(secPerMi); setPn((p) => ({ ...p, threshold_pace_min_per_mi: str, threshold_pace_source: 'manual' })); void persist((b) => ({ ...b, performanceNumbers: { ...(b.performanceNumbers ?? {}), threshold_pace_min_per_mi: str, threshold_pace_source: 'manual' } })); }} />
                 <NumberRow id="fiveK" name="5K time" hint="mm:ss" inputMode="numeric" sport="run"
                   value={fiveK ? `${fiveK} · ${pn.fiveK_source === 'manual' ? 'your number' : 'auto'}` : null} seed={fiveK || ''}
                   saveOnBlur onSave={(t) => { if (!/^\d{1,2}:\d{2}$/.test(t.trim())) return; const v = t.trim(); setPn((p) => ({ ...p, fiveK: v, fiveK_source: 'manual' })); void persist((b) => ({ ...b, performanceNumbers: { ...(b.performanceNumbers ?? {}), fiveK: v, fiveK_source: 'manual' } })); }} />
-                <NumberRow id="easyhr" name="Easy heart rate" hint="threshold bpm" inputMode="numeric" sport="run" note={easyLo == null ? null : null}
-                  value={easyLo != null && easyHi != null ? `${easyLo}–${easyHi} bpm · ${manualRunLthr ? 'your number' : 'auto'}` : null} seed={lthr ? String(Math.round(lthr)) : ''}
-                  saveOnBlur onSave={(t) => { const v = parseInt(t); if (!(Number.isFinite(v) && v > 80 && v < 230)) return; setManualRunLthr(v); const uid = getStoredUserId(); if (!uid) return; void supabase.from('user_baselines').select('configured_hr_zones').eq('user_id', uid).maybeSingle().then(({ data }) => { const cfg: any = typeof data?.configured_hr_zones === 'string' ? JSON.parse(data.configured_hr_zones) : (data?.configured_hr_zones ?? {}); return supabase.from('user_baselines').update({ configured_hr_zones: { ...cfg, manual_run_lthr: v } }).eq('user_id', uid); }); }} />
                 <NumberRow id="ftp" name="FTP" hint="W" inputMode="numeric" sport="bike"
                   value={ftp.value != null ? `${Math.round(Number(ftp.value))} W · ${numberWord(ftp.source, ftpMine)}` : null}
                   saveOnBlur onSave={(t) => { const v = Math.round(Number(t)); if (!(v > 0)) return; setPn((p) => ({ ...p, ftp: v, ftp_source: 'manual' })); void persist((b) => ({ ...b, performanceNumbers: { ...(b.performanceNumbers ?? {}), ftp: v, ftp_source: 'manual' } })); }} />
+                <NumberRow id="threshold" name="Threshold pace" hint={metric ? 'm:ss/km' : 'm:ss/mi'} inputMode="numeric" sport="run"
+                  value={thr.sec_per_mi != null ? `${paceToText(metric ? thr.sec_per_mi / 1.609344 : thr.sec_per_mi)}/${metric ? 'km' : 'mi'} · ${numberWord(thr.source, thrMine)}` : null}
+                  saveOnBlur onSave={(t) => { const sec = parsePaceText(t); if (sec == null) return; const secPerMi = metric ? sec * 1.609344 : sec; const str = paceToText(secPerMi); setPn((p) => ({ ...p, threshold_pace_min_per_mi: str, threshold_pace_source: 'manual' })); void persist((b) => ({ ...b, performanceNumbers: { ...(b.performanceNumbers ?? {}), threshold_pace_min_per_mi: str, threshold_pace_source: 'manual' } })); }} />
+                <NumberRow id="lthr" name="Threshold heart rate" hint="bpm" inputMode="numeric" sport="run" note={easyLo == null ? null : null}
+                  value={lthr ? `${Math.round(lthr)} bpm · easy ${easyLo}–${easyHi}` : null} seed={lthr ? String(Math.round(lthr)) : ''}
+                  saveOnBlur onSave={(t) => { const v = parseInt(t); if (!(Number.isFinite(v) && v > 80 && v < 230)) return; setManualRunLthr(v); const uid = getStoredUserId(); if (!uid) return; void supabase.from('user_baselines').select('configured_hr_zones').eq('user_id', uid).maybeSingle().then(({ data }) => { const cfg: any = typeof data?.configured_hr_zones === 'string' ? JSON.parse(data.configured_hr_zones) : (data?.configured_hr_zones ?? {}); return supabase.from('user_baselines').update({ configured_hr_zones: { ...cfg, manual_run_lthr: v } }).eq('user_id', uid); }); }} />
               </div>
             </div>
           </StepLayout>
