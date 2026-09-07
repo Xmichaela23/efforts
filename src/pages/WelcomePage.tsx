@@ -15,6 +15,8 @@ import { readoutPlateStyle } from '@/lib/readout-plate';
 import { numberWord } from '@/lib/number-word';
 import { resolveCurrentRunThresholdPace } from '@/lib/resolve-current-run-pace';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
+import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
+import { Z2_FLOOR_PCT_LTHR, EASY_CEILING_PCT_LTHR } from '@/lib/friel-zones';
 
 /**
  * The sign-up intake (2026-09-07). Two screens after the account, Next at the bottom of each, then
@@ -106,6 +108,7 @@ export default function WelcomePage() {
   // Screen 3: what the account holds (learned from history) plus what they type here.
   const [learned, setLearned] = useState<any>(null);
   const [pn, setPn] = useState<Record<string, any>>({});
+  const [manualRunLthr, setManualRunLthr] = useState<number | null>(null);
 
   // Screen 2
   const [gym, setGym] = useState<'commercial' | 'home' | null>(null);
@@ -131,6 +134,16 @@ export default function WelcomePage() {
       setLearned(b.learned_fitness ?? null);
       setPn({ ...(b.performanceNumbers ?? {}) });
     }).catch(() => {});
+    // Threshold heart rate lives on its own column; loadUserBaselines does not return it.
+    const uid = getStoredUserId();
+    if (uid) {
+      void supabase.from('user_baselines').select('configured_hr_zones').eq('user_id', uid).maybeSingle().then(({ data }) => {
+        if (cancelled) return;
+        const cfg: any = typeof data?.configured_hr_zones === 'string' ? JSON.parse(data.configured_hr_zones) : (data?.configured_hr_zones ?? {});
+        const v = Number(cfg?.manual_run_lthr);
+        if (Number.isFinite(v) && v > 0) setManualRunLthr(v);
+      });
+    }
     return () => { cancelled = true; };
   }, [loadUserBaselines]);
 
@@ -270,12 +283,15 @@ export default function WelcomePage() {
   };
 
   // ── Screen 3 ─────────────────────────────────────────────────────────────────────────────
-  const baselinesLike = { learned_fitness: learned, performance_numbers: pn };
+  const baselinesLike = { learned_fitness: learned, performance_numbers: pn, configured_hr_zones: { manual_run_lthr: manualRunLthr } };
   const thr = resolveCurrentRunThresholdPace(baselinesLike as any);
+  const lthr = manualRunLthr ?? resolveCurrentLthr(baselinesLike as any, { sport: 'run' }).bpm;
+  const easyLo = lthr ? Math.round(lthr * Z2_FLOOR_PCT_LTHR) : null;
+  const easyHi = lthr ? Math.round(lthr * EASY_CEILING_PCT_LTHR) : null;
+  const fiveK = typeof pn.fiveK === 'string' ? pn.fiveK : null;
   const thrMine = pn.threshold_pace_source === 'manual';
   const ftp = resolveCurrentFtp(baselinesLike as any);
   const ftpMine = pn.ftp_source === 'manual';
-  const swim100 = typeof pn.swimPace100 === 'string' ? pn.swimPace100 : null;
 
   const finish = async () => {
     setSaving(true);
@@ -283,9 +299,13 @@ export default function WelcomePage() {
       await persist((b) => ({ ...b, performanceNumbers: { ...(b.performanceNumbers ?? {}), ...pn } }));
       const uid = getStoredUserId();
       if (uid) {
-        const { data } = await supabase.from('user_baselines').select('ui_prefs').eq('user_id', uid).maybeSingle();
+        const { data } = await supabase.from('user_baselines').select('ui_prefs, configured_hr_zones').eq('user_id', uid).maybeSingle();
         const prefs = (data?.ui_prefs && typeof data.ui_prefs === 'object') ? (data.ui_prefs as Record<string, unknown>) : {};
-        await supabase.from('user_baselines').update({ ui_prefs: { ...prefs, intake_done: true } }).eq('user_id', uid);
+        const cfg: any = typeof data?.configured_hr_zones === 'string' ? JSON.parse(data.configured_hr_zones) : (data?.configured_hr_zones ?? {});
+        const patch: Record<string, unknown> = { ui_prefs: { ...prefs, intake_done: true } };
+        // The resolvers honour manual_run_lthr directly; Profile rewrites its cached bins on its next save.
+        if (manualRunLthr) patch.configured_hr_zones = { ...cfg, manual_run_lthr: manualRunLthr };
+        await supabase.from('user_baselines').update(patch).eq('user_id', uid);
       }
       try { localStorage.removeItem(STEP_KEY); } catch { /* device copy only */ }
       navigate('/', { replace: true });
@@ -382,50 +402,48 @@ export default function WelcomePage() {
         )}
 
         {step === 3 && (
-          <StepLayout step={3} totalSteps={TOTAL} title="Your numbers" subtitle="Nothing is guessed." onBack={() => go(2)} onContinue={() => void finish()} canContinue continueLabel="Next" saving={saving}>
+          <StepLayout step={3} totalSteps={TOTAL} title="Your numbers" onBack={() => go(2)} onContinue={() => void finish()} canContinue continueLabel="Next" saving={saving}>
             <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
               <div className="px-3 py-3">
-                <SectionHead Icon={Link2} label="Connect" colour="rgba(255,255,255,0.85)" />
-                <p className="m-0 mb-2 text-[13px] text-white/75 leading-snug">
-                  Brings in your last 90 days. Paces, FTP and training load come from them.
-                </p>
+                <SectionHead Icon={Dumbbell} label="Plans need" colour="rgba(255,255,255,0.85)" />
+                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[14px]">
+                  <span className="text-white/60">Runners</span><span className="text-white/90">threshold pace · 5K pace · easy heart-rate range</span>
+                  <span className="text-white/60">Riders</span><span className="text-white/90">FTP</span>
+                </div>
+              </div>
+
+              <div className="px-3 py-3">
+                <SectionHead Icon={Link2} label="Import" colour="rgba(255,255,255,0.85)" />
+                <p className="m-0 mb-2 text-[14px] text-white/85 leading-snug">Import your last 90 days from Strava or Garmin and we estimate them.</p>
                 <div className="space-y-2">
-                  {connectRow('strava', <StravaMark />, 'Strava', 'Activities arrive as you finish them.', stravaOn, () => void startStrava())}
-                  {connectRow('garmin', <Watch className="h-5 w-5" style={{ color: '#00A0DE' }} />, 'Garmin Connect', 'Rides and runs arrive as you finish them.', garminOn, () => void startGarmin())}
-                  {isNativeIOS && healthKit && connectRow('health', <Heart className="h-5 w-5" style={{ color: '#FF2D55' }} />, 'Apple Health', 'Workouts from your watch and phone.', healthOn, () => void startAppleHealth())}
+                  {connectRow('strava', <StravaMark />, 'Strava', '', stravaOn, () => void startStrava())}
+                  {connectRow('garmin', <Watch className="h-5 w-5" style={{ color: '#00A0DE' }} />, 'Garmin Connect', '', garminOn, () => void startGarmin())}
+                  {isNativeIOS && healthKit && connectRow('health', <Heart className="h-5 w-5" style={{ color: '#FF2D55' }} />, 'Apple Health', '', healthOn, () => void startAppleHealth())}
                 </div>
                 {connectNote && <p className="m-0 mt-2 text-[12px] text-white/60">{connectNote}</p>}
               </div>
 
               <div className="px-3 py-3">
-                <SectionHead Icon={Dumbbell} label="On file" colour="rgba(255,255,255,0.85)" />
-                {thr.sec_per_mi != null && (
-                  <NumberRow id="threshold" name="Threshold pace" hint={metric ? 'm:ss/km' : 'm:ss/mi'} inputMode="numeric" sport="run"
-                    value={`${paceToText(metric ? thr.sec_per_mi / 1.609344 : thr.sec_per_mi)}/${metric ? 'km' : 'mi'} · ${numberWord(thr.source, thrMine)}`}
-                    onSave={(t) => { const sec = parsePaceText(t); if (sec == null) return; const secPerMi = metric ? sec * 1.609344 : sec; setPn((p) => ({ ...p, threshold_pace_min_per_mi: paceToText(secPerMi), threshold_pace_source: 'manual' })); }} />
-                )}
-                {ftp.value != null && (
-                  <NumberRow id="ftp" name="FTP" hint="W" inputMode="numeric" sport="bike"
-                    value={`${Math.round(Number(ftp.value))} W · ${numberWord(ftp.source, ftpMine)}`}
-                    onSave={(t) => { const v = Math.round(Number(t)); if (!(v > 0)) return; setPn((p) => ({ ...p, ftp: v, ftp_source: 'manual' })); }} />
-                )}
-                {swim100 && (
-                  <NumberRow id="swim100" name="Pace per 100" hint="m:ss" inputMode="numeric" sport="swim"
-                    value={`${swim100}/100 · your number`} seed={swim100}
-                    onSave={(t) => { if (!/^\d{1,2}:\d{2}$/.test(t.trim())) return; setPn((p) => ({ ...p, swimPace100: t.trim() })); }} />
-                )}
-                <p className="m-0 mt-1 text-[14px] text-white/85">
-                  {thr.sec_per_mi == null && ftp.value == null && !swim100
-                    ? 'Nothing yet. Paces, FTP and lifts are measured in week one.'
-                    : 'The rest, lifts included, is measured in week one.'}
-                </p>
-                {(thr.sec_per_mi != null || ftp.value != null || swim100) && <p className="mt-2 text-[12px] text-white/45">Tap a value to change it.</p>}
+                <SectionHead Icon={User} label="Your numbers" colour="rgba(255,255,255,0.85)" />
+                <p className="m-0 mb-1 text-[14px] text-white/85 leading-snug">If you know them, add them. You can always test with our tests.</p>
+                <NumberRow id="threshold" name="Threshold pace" hint={metric ? 'm:ss/km' : 'm:ss/mi'} inputMode="numeric" sport="run"
+                  value={thr.sec_per_mi != null ? `${paceToText(metric ? thr.sec_per_mi / 1.609344 : thr.sec_per_mi)}/${metric ? 'km' : 'mi'} · ${numberWord(thr.source, thrMine)}` : null}
+                  onSave={(t) => { const sec = parsePaceText(t); if (sec == null) return; const secPerMi = metric ? sec * 1.609344 : sec; setPn((p) => ({ ...p, threshold_pace_min_per_mi: paceToText(secPerMi), threshold_pace_source: 'manual' })); }} />
+                <NumberRow id="fiveK" name="5K time" hint="mm:ss" inputMode="numeric" sport="run"
+                  value={fiveK ? `${fiveK} · ${pn.fiveK_source === 'manual' ? 'your number' : 'auto'}` : null} seed={fiveK || ''}
+                  onSave={(t) => { if (!/^\d{1,2}:\d{2}$/.test(t.trim())) return; setPn((p) => ({ ...p, fiveK: t.trim(), fiveK_source: 'manual' })); }} />
+                <NumberRow id="easyhr" name="Easy heart rate" hint="threshold bpm" inputMode="numeric" sport="run"
+                  value={easyLo != null && easyHi != null ? `${easyLo}–${easyHi} bpm · ${manualRunLthr ? 'your number' : 'auto'}` : null} seed={lthr ? String(Math.round(lthr)) : ''}
+                  note={easyLo == null ? 'Type your threshold heart rate; the range comes from it.' : null}
+                  onSave={(t) => { const v = parseInt(t); if (Number.isFinite(v) && v > 80 && v < 230) setManualRunLthr(v); }} />
+                <NumberRow id="ftp" name="FTP" hint="W" inputMode="numeric" sport="bike"
+                  value={ftp.value != null ? `${Math.round(Number(ftp.value))} W · ${numberWord(ftp.source, ftpMine)}` : null}
+                  onSave={(t) => { const v = Math.round(Number(t)); if (!(v > 0)) return; setPn((p) => ({ ...p, ftp: v, ftp_source: 'manual' })); }} />
+                <p className="mt-2 text-[12px] text-white/45">Tap a value to add or change it.</p>
               </div>
-
             </div>
           </StepLayout>
         )}
-
       </main>
     </div>
   );
