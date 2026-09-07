@@ -112,11 +112,50 @@ export function getStoredAuthUser(): { id: string; email?: string; [k: string]: 
  * exactly which stage failed.  The body is serialized with a WeakSet-based
  * replacer so a stray cyclic ref never hard-crashes the request.
  */
+/**
+ * ⛔ KEEP THE SIGN-IN TOKEN FRESH (2026-09-07). A token on this project lives 60 minutes and
+ * `autoRefreshToken` is off (the WKWebView XHR bug above). Since the B1 pass every user-scoped function
+ * verifies the token, so an hour-old phone session got "Recompute failed (HTTP 401) unauthorized".
+ * Called before every function call and on app resume: if the stored token is expired or within five
+ * minutes of it, refresh with the stored refresh token. gotrue-js v2 refreshes over fetch; if that path
+ * throws in the WebView, fall back to a plain fetch and write the session back where gotrue keeps it.
+ */
+const STORAGE_KEY = `sb-${supabaseUrl.split('//')[1].split('.')[0]}-auth-token`;
+export async function ensureFreshSession(): Promise<void> {
+  let stored: { access_token?: string; refresh_token?: string; expires_at?: number } | null = null;
+  try { stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch { stored = null; }
+  if (!stored?.access_token || !stored?.refresh_token) return;
+  const expiresAt = Number(stored.expires_at ?? 0);
+  if (expiresAt > 0 && expiresAt - Math.floor(Date.now() / 1000) >= 300) return;
+  try {
+    const { data, error } = await supabase.auth.refreshSession({ refresh_token: stored.refresh_token });
+    if (!error && data?.session) return;
+    if (error) console.warn('[auth] refreshSession:', error.message);
+  } catch (e) {
+    console.warn('[auth] refreshSession threw, using plain fetch:', (e as Error)?.message ?? e);
+  }
+  try {
+    const res = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: supabaseKey },
+      body: JSON.stringify({ refresh_token: stored.refresh_token }),
+    });
+    if (!res.ok) { console.warn('[auth] manual refresh failed:', res.status); return; }
+    const next = await res.json() as { access_token: string; refresh_token: string; expires_in: number; expires_at?: number };
+    const session = { ...stored, ...next, expires_at: next.expires_at ?? Math.floor(Date.now() / 1000) + Number(next.expires_in || 3600) };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    try { await supabase.auth.setSession({ access_token: next.access_token, refresh_token: next.refresh_token }); } catch { /* storage already holds it */ }
+  } catch (e) {
+    console.warn('[auth] manual refresh threw:', (e as Error)?.message ?? e);
+  }
+}
+
 export async function invokeFunction<T = unknown>(
   fnName: string,
   body: Record<string, unknown>,
 ): Promise<{ data: T | null; error: { message: string; code?: string } | null }> {
   // ── 1. Auth ──────────────────────────────────────────────────────────────
+  await ensureFreshSession();
   // Read the token directly from localStorage — avoids supabase.auth.getSession()
   // which can trigger an XHR-based token refresh that fails in WKWebView on iOS
   // ("XMLHttpRequest.onreadystatechange getter can only be called on instances

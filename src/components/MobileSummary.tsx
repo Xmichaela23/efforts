@@ -96,8 +96,17 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       setRecomputing(true);
       setRecomputeError(null);
 
-      const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+      let { data: { session }, error: sessionErr } = await supabase.auth.getSession();
       if (sessionErr) console.warn('[MobileSummary] recompute getSession:', sessionErr);
+      // ⛔ A STALE TOKEN IS A 401 ON THE SERVER (2026-09-07: "Recompute failed (HTTP 401) unauthorized" on the
+      // phone while a fresh session succeeded). On iOS the WebView's refresh timer stalls in the background,
+      // so an hour-old token can still be the one on file. Refresh when it is expired or about to be.
+      const expiresAt = Number(session?.expires_at ?? 0);
+      if (session && expiresAt > 0 && expiresAt - Math.floor(Date.now() / 1000) < 60) {
+        const { data: refreshed, error: refreshErr } = await supabase.auth.refreshSession();
+        if (refreshErr) console.warn('[MobileSummary] recompute refreshSession:', refreshErr);
+        if (refreshed?.session) session = refreshed.session;
+      }
       const accessToken = session?.access_token;
       if (!accessToken) {
         throw new Error('Not signed in');
