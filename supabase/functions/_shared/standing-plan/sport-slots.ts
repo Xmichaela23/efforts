@@ -18,7 +18,7 @@
 import { FAMILIES } from '../endurance-library/index.ts';
 import type { FamilyId, Level } from '../endurance-library/index.ts';
 import { clampRideLevel } from './frames.ts';
-import type { EnduranceSlot, FrameDay } from './frames.ts';
+import type { EnduranceSlot, FrameDay, FrameId } from './frames.ts';
 
 export type SportMix = {
   /** Runs a week the athlete asked for. */
@@ -136,6 +136,23 @@ export type AssignedSlot = {
  *
  * ⚠️ **THE TABLE IS OURS.** p275 permits the modality swap and says the long ride may stand in for the
  * long run; it gives no family-to-family mapping, and neither does anything else in the corpus.
+ *
+ * ⛔⛔ REACHED FROM `all_rounder` ONLY (WORKORDER-train-menu-reshape-2026-09-07). p275 is the All
+ * Rounder's own page, so its permission is that frame's: a run row on p274 may be ridden, and the
+ * long run may be the long ride. **`strength_5k` is p246, a run week, and a rider's home under the
+ * Train menu is Ride + Strength (p279) — not this frame with its runs converted.** The conversion
+ * was measured collapsing both of p246's quality slots onto one ride family
+ * (DESIGN-standard-focus-all-rounder §2), which is the week this table must never build again.
+ *
+ * ⛔ WHERE THE FENCE IS: `fenceMixToFrame` / `fenceEnduranceDaysToFrame` below, applied by
+ * `generate-strength-plan` on the way in — the one live path that builds a NEW block. The wizard
+ * itself never offers a ride on that frame any more (`allowedSlotSports`), so the fence is what
+ * catches a stale draft or an older client. `assignSports` and `composeWeek` stay frame-agnostic
+ * on purpose: the mechanics below (the level clamp, his hard-pair order, the bike sentence) are
+ * shared machinery the All Rounder still uses, and their unit tests exercise them on p246's rows
+ * because those rows are the simplest all-run fixture. ⚠️ A block ALREADY BUILT on `strength_5k`
+ * with a ride answer keeps it — `rematerialize-standing-block` rebuilds from the stored mix, and
+ * rewriting a stored week is not this order's business.
  */
 export const RIDE_EQUIVALENT: Partial<Record<FamilyId, { family: FamilyId; archetype: string }>> = {
   /**
@@ -230,6 +247,44 @@ export function hardOnBikeNote(hardRides: number, hardRuns: number): string | nu
     : (hardRides === 1 ? 'The hard session is on the bike' : 'The hard sessions are on the bike');
   return `${subject}. Riding hard does not land on the legs the way running does, so the intensity `
     + 'costs the lifting less.';
+}
+
+/**
+ * ⛔ WHICH FRAMES MAY RIDE A RUN ROW — see the note on `RIDE_EQUIVALENT`. p275's permission belongs
+ * to the All Rounder; p246 is a run week. A third frame that prescribes its own rides natively
+ * (p279) adds itself here only if its page permits the swap on its run rows.
+ */
+export const RIDE_SUBSTITUTION_FRAMES: ReadonlySet<FrameId> = new Set<FrameId>(['all_rounder']);
+
+export function frameAllowsRideSubstitution(frame: FrameId): boolean {
+  return RIDE_SUBSTITUTION_FRAMES.has(frame);
+}
+
+/**
+ * ⛔ THE MIX A FRAME IS ALLOWED TO BUILD FROM. Identity — the same object back — on a frame that
+ * permits the swap, so the All Rounder's path is byte-identical. On any other frame every ride ask
+ * comes off: the ratio's `rides` is zero and a per-slot `'ride'` answer becomes `'run'` (an explicit
+ * run, so his hard-pair order sees two answered runs and moves nothing). `'none'`, the variant
+ * picks and the minutes are untouched — a declined hard slot still converts to the frame's easy
+ * session, and a pick that named a ride shape is dropped by `applyVariantPicks` because the run
+ * family does not offer it.
+ */
+export function fenceMixToFrame<T extends SportMix>(frame: FrameId, mix: T): T {
+  if (frameAllowsRideSubstitution(frame)) return mix;
+  const slots = mix.slots
+    ? Object.fromEntries(Object.entries(mix.slots).map(([k, v]) => [k, v === 'ride' ? 'run' : v]))
+    : mix.slots;
+  return { ...mix, rides: 0, slots } as T;
+}
+
+/** The same fence for the athlete's stated days per sport — a ride-day count on p246 adds filler rides. */
+export function fenceEnduranceDaysToFrame<T extends { run?: number | null; ride?: number | null } | null | undefined>(
+  frame: FrameId,
+  days: T,
+): T {
+  if (frameAllowsRideSubstitution(frame) || days == null) return days;
+  if (days.ride == null || days.ride === 0) return days;
+  return { ...days, ride: 0 } as T;
 }
 
 export const RIDE_EQUIVALENCE_IS_OURS =

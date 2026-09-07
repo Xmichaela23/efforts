@@ -291,10 +291,12 @@ export type Frame = {
    * `get_stronger` displays as "Strong Focus" — and the comment there records what happens when the
    * two are conflated: the athlete picked one name and was handed a plan called another.
    *
-   * ⚠️ ABSENT MEANS THE FRAME HAS NO ATHLETE-FACING NAME YET, and `strength_5k` is deliberately left
-   * that way. Michael has ruled it becomes **5K + Strength** inside a Run Focus grouping, and that
-   * grouping does not exist — naming it here before the screen that houses it would put a third name
-   * on a plan that already has two. **That is a separate change; do not fill it in as tidiness.**
+   * ⛔ `strength_5k` IS **Run + Strength** (WORKORDER-train-menu-reshape-2026-09-07). It sat without a
+   * name until the Run Focus grouping that houses it existed on the Train screen; that grouping
+   * exists now (Standard Focus / Run Focus / Ride Focus), and the frame is what every wizard step
+   * title and the built plan's own name read — `programmeName` prefers this field. The goal label
+   * in `non-race-goal-seeds.ts` carries the same words for the readers that only have a goal id.
+   * ⚠️ A plan built before this keeps the name it stored.
    */
   displayName?: string;
   cite: string;
@@ -828,6 +830,7 @@ export const FRAMES: Record<FrameId, Frame> = {
   strength_5k: {
     id: 'strength_5k',
     sourceName: 'Strength + 5K',
+    displayName: 'Run + Strength',
     cite: 'Viada pp246-247',
     liftingDays: 4,
     columns: { standard: STRENGTH_5K_STANDARD, taper: STRENGTH_5K_TAPER },

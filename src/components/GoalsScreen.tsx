@@ -2342,13 +2342,15 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                 )}
               </div>
             )}
-            {/* ⛔ "Strength Focus" APPEARS TWICE ON THIS SCREEN AND IT IS NOT A DUPLICATE. Michael,
+            {/* ⛔ THE SAME NAME APPEARS TWICE ON THIS SCREEN AND IT IS NOT A DUPLICATE. Michael,
                 2026-08-05: *"why does strength focus have the current plan? if its meant to it
                 should be clear thats what it is, but might be redundnt."* The card below is his
-                RUNNING BLOCK (Anchor, week 2 of 12); the identically-named card behind Train is the
-                door to START one. Same name, two different things, and nothing said which was
-                which. Labelled rather than renamed — the block genuinely IS a Strength Focus, so
-                renaming either one would make the app call the same thing two names. */}
+                RUNNING BLOCK (week N of 12); the identically-named card behind Train is the door to
+                START one. Same name, two different things, and nothing said which was which.
+                Labelled rather than renamed. ⛔ BOTH LABELS ARE THE CARD THE ATHLETE TAPPED
+                (2026-09-07): the block's stored name is the frame's own (`Run + Strength` or
+                `Standard Focus`, via `programmeName`), and the Train card carries the same words.
+                "Strength Focus" no longer exists on the screen. */}
             {activeGoals.length > 0 && (
               <div className="flex items-center gap-3 pb-3">
                 <span className="text-xs font-medium text-white/30 uppercase tracking-wider">Current</span>

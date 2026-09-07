@@ -50,6 +50,8 @@ import {
   demonstratedRunVolume,
   demonstratedWeeklyMinutes,
   assignSports,
+  fenceEnduranceDaysToFrame,
+  fenceMixToFrame,
   FRAMES,
   isLongSlot,
   resolveFrame,
@@ -453,7 +455,7 @@ Deno.serve(async (req: Request) => {
        * running lost the long ride — the only session that carries real hours — and got two short
        * hard rides. Hoisted so there is one owner.
        */
-      const enduranceDaysBySport = (() => {
+      const enduranceDaysBySport = fenceEnduranceDaysToFrame(frameId, (() => {
         const raw = (body as Record<string, unknown>).endurance_days;
         if (!raw || typeof raw !== 'object') return undefined;
         const pick = (k: string) => {
@@ -463,9 +465,16 @@ Deno.serve(async (req: Request) => {
         const run = pick('run');
         const ride = pick('ride');
         return run == null && ride == null ? undefined : { run, ride };
-      })();
+      })());
 
-      const mixForFrame = {
+      /**
+       * ⛔⛔ THE MIX IS FENCED TO THE FRAME (WORKORDER-train-menu-reshape-2026-09-07). p246 is a run
+       * week and every endurance slot on `strength_5k` is a run; the ride conversion table is the
+       * All Rounder's (p275). See `fenceMixToFrame` — identity on `all_rounder`, so that path is
+       * byte-identical; on `strength_5k` the rides come off before the long slot's sport is
+       * derived below, so the preview, the pins and the built week all read one fenced mix.
+       */
+      const mixForFrame = fenceMixToFrame(frameId, {
         /**
          * ⛔⛔ A STATED DAY COUNT BEATS THE RATIO DEFAULT (2026-08-30). The `?? DEFAULT` chain stays
          * exactly as it was for every athlete who has NOT answered — the 2026-08-23 rule that the
@@ -524,7 +533,7 @@ Deno.serve(async (req: Request) => {
           }
           return Object.keys(out).length > 0 ? out : null;
         })(),
-      };
+      });
       const longSlotSport = (() => {
         const a = assignSports(FRAMES[frameId].columns.standard, mixForFrame);
         const long = Object.entries(a.byKey).find(([k]) => {

@@ -18,8 +18,9 @@ export type StepRouterState = {
   goal: string | null | undefined;
   entry: string | null | undefined;
   /**
-   * ⛔ WHICH FOCUS — Standard or Run. It decides the FRAME, and it decides whether the tier screen
-   * is in the flow at all. Absent is `run`, which is every build that predates the Standard card.
+   * ⛔ WHICH FOCUS — Standard or Run. It decides the FRAME, and with it which screens the flow
+   * carries (`skipsSportScope`, `fixedSportScope`). Absent is `run`, which is every build that
+   * predates the Standard card.
    */
   focus?: 'standard' | 'run';
   posture: Partial<Record<string, string | null | undefined>>;
@@ -33,13 +34,14 @@ export type StepKey =
   // off it; renaming it is a bigger diff than it is worth for a screen whose job did not change (it
   // is still "the first card, and the one Back closes the builder from").
   | 'goal'
-  // ⛔ THE TRAIN DRILL-DOWN — Run / Ride / Strength / Athletic. Only reachable from the Train entry
-  // card, and only Strength opens anything today. It sits between `goal` and the picked goal's own
-  // flow, so the Strength path is: entry → train → tier → posture → … → confirm.
+  // ⛔ THE TRAIN DRILL-DOWN — Standard Focus / Run Focus / Ride Focus. Only reachable from the Train
+  // entry card; Standard and Run open the same builder on different frames, Ride is dimmed. It sits
+  // between `goal` and the picked goal's own flow, so the Run Focus path is:
+  // entry → train → posture → endurance → … → confirm.
+  // ⛔ THE `tier` STEP IS GONE (WORKORDER-train-menu-reshape-2026-09-07). Strong was a no-op
+  // pass-through into `get_stronger` and Heavy was dark; the programme Strong named is the Run
+  // Focus card now. Do not reintroduce a tier — no hypertrophy position exists for this audience.
   | 'train'
-  // ⛔ THE STRENGTH TIER — Strong / Heavy / Definition (SPEC §A). Only on the Strength path, and only
-  // Strong is live: it is today's block, so the step is a pass-through that sends nothing new.
-  | 'tier'
   // ⛔ THE RACE ITSELF — distance, date, level. Its own card, immediately after the goal, because
   // every screen after it is shaped by the answers: the date owns the block length (so the `length`
   // step drops out), and the level picks the volume table the plan is built from.
@@ -215,6 +217,37 @@ export function skipsSportScope(state: StepRouterState): boolean {
  */
 export const STANDARD_FOCUS_POSTURE = { run: 'maintain', bike: 'maintain' } as const;
 
+/**
+ * ⛔⛔ RUN + STRENGTH HOLDS RUNNING ONLY (WORKORDER-train-menu-reshape-2026-09-07 §3). p246 is a run
+ * week — every endurance slot on `strength_5k` is a run family — and under the Train menu a rider's
+ * home is Ride + Strength (p279), not this frame with its runs converted through a table that is
+ * ours. So the sport-scope cards ("Run only / Ride only / Run + ride") come off this frame too: two
+ * of the three answers would build a week the plan no longer offers.
+ *
+ * ⚠️ THE POSTURE STEP ITSELF STAYS on this frame, unlike Standard Focus — it still carries the
+ * lifting-days line and the easy-swims add-on, which have no other home. What it stops doing is
+ * asking which sports. `fixedSportScope` is the one predicate both the flow and the write read.
+ * ⚠️ BIKE IS `out`, NOT `maintain`: that is what keeps the ride chips, the ride-hours box, the
+ * ride experience question and the FTP number question off the later screens, and what sends
+ * `endurance_sport: 'run'` to the builder. Swim is not named — its own toggle owns it.
+ */
+export const RUN_STRENGTH_POSTURE = { run: 'maintain', bike: 'out' } as const;
+
+/**
+ * ⛔ THE SPORT SCOPE A FRAME ANSWERS FOR THE ATHLETE, or `null` where the screen still asks.
+ * Standard Focus: both held (p274 prescribes both). Run + Strength: running held, riding out
+ * (p246 prescribes runs). Every other goal: the cards are asked.
+ * ⚠️ KEYED ON THE FRAME THE FOCUS PICKS, not on the entry card — a `get_stronger` goal reached from
+ * anywhere builds on `strength_5k` unless the focus says `standard`, and the frame is what decides
+ * which sports its rows can hold.
+ */
+export function fixedSportScope(
+  state: StepRouterState,
+): typeof STANDARD_FOCUS_POSTURE | typeof RUN_STRENGTH_POSTURE | null {
+  if (state.goal !== 'get_stronger') return null;
+  return (state.focus ?? 'run') === 'standard' ? STANDARD_FOCUS_POSTURE : RUN_STRENGTH_POSTURE;
+}
+
 export function getSteps(state: StepRouterState): StepKey[] {
   // ⛔ STRENGTH FOCUS SKIPS "What can you sustain?". That step converts a Light/Moderate/Committed
   // tier into `weekly_hours_available` — and on this path nothing reads it. The lifting is three days,
@@ -280,29 +313,19 @@ export function getSteps(state: StepRouterState): StepKey[] {
   // The drill-down only exists on the Train branch, and it stays in the array after a discipline is
   // picked so Back walks entry ← train ← flow instead of jumping to the door.
   const door: StepKey[] = state.entry === 'train' ? ['goal', 'train'] : ['goal'];
-  // The tier sits between the discipline and the block's own questions — it is WHICH strength block,
-  // so it has to be answered before anything shaped by it. Only on the Train→Strength path; a goal
-  // reached another way (standalone route, a stored goal) keeps the old flow.
   /**
-   * ⛔⛔ THE TIER SCREEN IS THE 5K PATH'S QUESTION, NOT EVERY STRENGTH PATH'S (fixed 2026-08-30).
+   * ⛔ NO TIER SCREEN ON ANY PATH (WORKORDER-train-menu-reshape-2026-09-07). It sat here between the
+   * discipline and the block's own questions — Strong / Heavy — and Standard Focus once shipped
+   * landing on it (*"it just takes you to strong focus or the unbuilt build"*, 2026-08-30). Strong
+   * was a pass-through and Heavy was dark, so the screen asked nothing the engine could hear; the
+   * programme Strong named is the Run Focus card now.
    *
-   * ⛔ WHAT SHIPPED AND WHAT MICHAEL SAW. Standard Focus seeds the same goal as Strength Focus, so
-   * `isStrengthFocus` was true for it, so its tap landed on the Strong / Heavy card — *"it just
-   * takes you to strong focus or the unbuilt build."* The card was right, the payload was right, and
-   * the athlete could not reach the frame at all.
-   *
-   * ⛔ AND THE TIER GENUINELY DOES NOT APPLY. Strong maps to Strength + 5K (p246) and Heavy to
-   * Hypertrophy + 5K (p244) — **both are 5K programmes.** There is no Strong/Heavy split of the All
-   * Rounder anywhere in the book, so the screen would be asking a question with no answer for it.
-   * Standard Focus goes straight to the posture card, then the endurance week with its five rows.
-   *
-   * ⚠️ NOTHING IS MISSING FOR IT. Every step after the tier is shared, and the endurance screen is
-   * already frame-driven — the flow is complete without a Standard-only screen.
+   * ⛔ THE POSTURE CARD IS THE FIRST SCREEN AFTER THE TRAIN PICK on the Run Focus path, and Standard
+   * Focus skips it (`skipsSportScope`). On Run Focus it no longer asks which sports either
+   * (`fixedSportScope`); it keeps the lifting line and the easy-swims toggle.
    */
-  const asksTier = isStrengthFocus && state.entry === 'train' && (state.focus ?? 'run') !== 'standard';
   const head: StepKey[] = isStrengthFocus
-    ? [...door, ...(asksTier ? ['tier' as StepKey] : []),
-        ...(skipsSportScope(state) ? [] : ['posture' as StepKey])]
+    ? [...door, ...(skipsSportScope(state) ? [] : ['posture' as StepKey])]
     : [...door, 'posture', 'commitment', 'length'];
   return [...head, ...scheduleSteps(state, isStrengthFocus, isRaceGoal), 'numbers', 'confirm'];
 }

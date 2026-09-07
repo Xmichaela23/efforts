@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, AlertTriangle, Bike, Waves, Check, Dumbbell, Info, Footprints, Shuffle, Weight, Flag, Plus, Gauge, ChevronDown } from 'lucide-react';
+import { Activity, AlertTriangle, Bike, Waves, Check, Dumbbell, Info, Footprints, Shuffle, Flag, Plus, Gauge, ChevronDown } from 'lucide-react';
 import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { StepLayout } from '@/components/wizard/StepLayout';
 import { KnowYourNumbersStep, type NumbersChoice } from '@/components/wizard/KnowYourNumbersStep';
@@ -324,23 +324,28 @@ const ENTRY_COPY: Record<EntryCardId, { label: string; blurb: string; Icon: Reac
 const ENTRY_LIVE: Record<EntryCardId, boolean> = { train: true, race: true, build: false };
 
 /**
- * ⛔ THE TRAIN DRILL-DOWN — the four ongoing-focus disciplines. Strength is the only one built.
+ * ⛔ THE TRAIN DRILL-DOWN — three cards (WORKORDER-train-menu-reshape-2026-09-07):
  *
- * "Athletic", never "Multi" (Michael, 2026-08-05): *"Multi" reads as triathlon-only, which is the
- * read we are avoiding.* The card name alone does not signal multi-discipline, so the SUBTITLE
- * carries it — never render one of these without its blurb.
+ *     Standard Focus   the All Rounder, pp274-275 — live
+ *     Run Focus        Run + Strength, pp246-247 — live (today's Strength + 5K programme, re-homed)
+ *     Ride Focus       Ride + Strength, p279 + p280 — dimmed until it ships
  *
- * ⛔ Run / Ride / Athletic are DIMMED AND NON-TAPPABLE, and they must NOT be wired to the
- * `build_endurance` / `build_speed` / `starting_over` seeds. Those ids still exist in
- * `non-race-goal-seeds.ts` and still work for goals already built on them — pointing a card at one
- * would open exactly the unfinished flow the July rule exists to keep shut.
+ * ⛔ THE STRENGTH FOCUS AND ATHLETIC FOCUS CARDS ARE GONE, AND SO IS THE STRONG / HEAVY TIER SCREEN
+ * (2026-09-07). Strength Focus fronted the same programme Run Focus fronts now, under a second
+ * name; Strong was a no-op routing into it and Heavy was dark. No hypertrophy tier, no "Muscle"
+ * position anywhere — ruled out for the audience.
+ *
+ * ⛔ Ride Focus is DIMMED AND NON-TAPPABLE, and it must NOT be wired to the `build_endurance` /
+ * `build_speed` / `starting_over` seeds. Those ids still exist in `non-race-goal-seeds.ts` and still
+ * work for goals already built on them — pointing a card at one would open exactly the unfinished
+ * flow the July rule exists to keep shut.
+ * ⚠️ NEVER RENDER ONE OF THESE WITHOUT ITS BLURB — the card name alone does not say what the block
+ * holds around the lifting.
  */
-type TrainCardId = 'standard' | 'run' | 'ride' | 'strength' | 'athletic';
-// ⛔ STRENGTH LEADS (Michael, 2026-08-24) — it is the one card that is actually buildable today,
-// so it goes first rather than sitting third under two dimmed ones.
+type TrainCardId = 'standard' | 'run' | 'ride';
 // ⛔ STANDARD FOCUS LEADS (Michael, 2026-08-30). It is the year-round programme — the one an athlete
 // SITS in — so it goes above the singular sports rather than beside them (DESIGN §1).
-const TRAIN_ORDER: TrainCardId[] = ['standard', 'strength', 'run', 'ride', 'athletic'];
+const TRAIN_ORDER: TrainCardId[] = ['standard', 'run', 'ride'];
 type CardIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
 /**
  * ⛔ THEY ARE "<DISCIPLINE> FOCUS", NOT THE BARE DISCIPLINE (Michael, 2026-08-05). "Run" is a thing
@@ -356,8 +361,8 @@ const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string; Icon: Card
     label: 'Standard Focus',
     // ⛔ HIS CLAIMS, ALL OF THEM ON p274-275: an "all-year" programme, for an athlete interested in
     // multiple sports, that pivots to a race programme about a month out. Nothing here is ours.
-    // ⚠️ VIADA IS NOT NAMED. The Strength Focus card below already names him and twice on one screen
-    // reads as two different programmes borrowing the same authority.
+    // ⚠️ VIADA IS NOT NAMED ON ANY CARD. The old Strength Focus card named him, and two programmes
+    // on one screen borrowing the same authority read as two different things.
     // ⚠️ THE TWO SPORTS ARE NAMED (Michael, off the live screen, 2026-08-30). "Both endurance
     // sports" read as ambiguous and he asked whether it covered swimming — it does not, and no
     // frame prescribes one.
@@ -365,31 +370,38 @@ const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string; Icon: Card
     Icon: Shuffle,
     color: getDisciplineColor('strength'),
   },
-  run: { label: 'Run Focus', blurb: 'Base, VO2 max, distance', Icon: Footprints, color: getDisciplineColor('run') },
-  ride: { label: 'Ride Focus', blurb: 'FTP and endurance', Icon: Bike, color: getDisciplineColor('ride') },
-  strength: {
-    label: 'Strength Focus',
-    // 2026-08-24: the card now fronts the Standing Plan (Viada), not the previous program — the previous program line
-    // described a block this flow no longer builds. Same rule as before: who it's for, no number.
-    // The gate (65, barbell-maxes.ts) still refuses true beginners with its own copy.
-    blurb: 'Barbell compounds, heavy and fast, with run, ride or both held around them — based on Alex Viada\'s method.',
-    Icon: Dumbbell,
-    color: getDisciplineColor('strength'),
+  run: {
+    label: 'Run Focus',
+    // ⛔ THE ONE PROGRAMME BEHIND THIS CARD TODAY IS RUN + STRENGTH (pp246-247): a run week with the
+    // lifting cut around it. Who it's for, no number, no protocol name — the gate (barbell-maxes.ts)
+    // still refuses true beginners with its own copy. The requirement line under it is the same one
+    // Standard Focus shows (`STANDARD_FOCUS_REQUIREMENT`): the block needs the same kit and tests.
+    blurb: 'Your running, with the lifting cut around it.',
+    Icon: Footprints,
+    color: getDisciplineColor('run'),
   },
-  athletic: { label: 'Athletic Focus', blurb: 'Several disciplines, balanced', Icon: Shuffle, color: getDisciplineColor('mobility') },
+  ride: {
+    label: 'Ride Focus',
+    // ⚠️ DIMMED UNTIL RIDE + STRENGTH (p279, notes p280) SHIPS. Same sentence shape as Run Focus so
+    // the two read as the pair they are.
+    blurb: 'Your riding, with the lifting cut around it.',
+    Icon: Bike,
+    color: getDisciplineColor('ride'),
+  },
 };
-/** The goal each Train card seeds. `null` = not built; the card is dimmed and does not navigate. */
 /**
  * The goal each Train card seeds. `null` = not built; the card is dimmed and does not navigate.
  *
- * ⚠️ TWO CARDS, ONE GOAL, AND THAT IS THE DESIGN. Standard Focus and Strength Focus are the same
- * flow and the same builder — what differs is WHICH VIADA PROGRAMME the week is cut from, which is
- * the frame, and the frame is chosen by `focus` rather than by a second goal id. A second goal would
+ * ⚠️ TWO CARDS, ONE GOAL, AND THAT IS THE DESIGN. Standard Focus and Run Focus are the same flow
+ * and the same builder — what differs is WHICH VIADA PROGRAMME the week is cut from, which is the
+ * frame, and the frame is chosen by `focus` rather than by a second goal id. A second goal would
  * mean a second seed, a second length floor and a second everything downstream, for one dial.
  * ⛔ SO THE CARD, NOT THE GOAL, IS WHAT THE SCREEN HIGHLIGHTS — see `state.focus`.
+ * ⛔ Run Focus opens on frame `strength_5k` — `state.focus` is `'run'`, which `frameOf` already
+ * treats as the default.
  */
 const TRAIN_GOAL: Record<TrainCardId, NonRaceGoalId | null> = {
-  standard: 'get_stronger', run: null, ride: null, strength: 'get_stronger', athletic: null,
+  standard: 'get_stronger', run: 'get_stronger', ride: null,
 };
 
 /** ⚠️ SMALL COUNTS ARE WORDS, not digits — the register every other sentence on these screens uses. */
@@ -405,7 +417,7 @@ const FOCUS_FRAME: Record<'standard' | 'run', FrameId> = {
  * ⛔ THE FRAME THIS BUILD IS DESCRIBING. One derivation, read by the payload assembler AND by the
  * component, because the screen and the payload disagreeing about how many endurance rows there are
  * is the whole class of defect the per-slot answer exists to prevent.
- * ⚠️ ABSENT IS `strength_5k`, so the Strength Focus path is untouched.
+ * ⚠️ ABSENT IS `strength_5k` — every build that predates the Standard card, and the Run Focus card.
  */
 const frameOf = (st: { focus?: 'standard' | 'run' }): FrameId => FOCUS_FRAME[st.focus ?? 'run'];
 
@@ -417,11 +429,11 @@ const frameOf = (st: { focus?: 'standard' | 'run' }): FrameId => FOCUS_FRAME[st.
  * for a Standard Focus build — the wizard telling the athlete they picked something else, on the
  * step right after they picked it.
  *
- * ⚠️ THE FRAME OWNS THE NAME WHEN IT HAS ONE (`Frame.displayName`), and `strength_5k` deliberately
- * has none — so it falls through to the goal label and every existing screen reads exactly as it
- * does today. That is the same id-versus-display split `non-race-goal-seeds.ts` records, and its
- * comment records what happens when the two are conflated: the athlete picked one name and was
- * handed a plan called another.
+ * ⚠️ THE FRAME OWNS THE NAME (`Frame.displayName`) — both frames carry one since 2026-09-07
+ * (`Standard Focus`, `Run + Strength`), so the goal label is the fallback for a goal with no frame.
+ * That is the same id-versus-display split `non-race-goal-seeds.ts` records, and its comment records
+ * what happens when the two are conflated: the athlete picked one name and was handed a plan called
+ * another.
  */
 const programmeName = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' }): string =>
   FRAMES[frameOf(st)]?.displayName ?? (st.goal ? GOAL_LABELS[st.goal] : 'Goal');
@@ -429,10 +441,11 @@ const programmeName = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | '
 /**
  * ⛔⛔ WHAT THE BLOCK ACTUALLY REQUIRES, AT THE DOOR (Michael, 2026-08-30).
  *
- * ⛔ THE 2026-07-25 RULE IS BACK, AND SHORTER. A precondition paragraph used to sit under the
+ * ⛔ THE 2026-07-25 RULE IS BACK, AND SHORTER. A precondition paragraph used to sit under the old
  * Strength Focus card and was cut for height, with a note saying the requirement had gone UNSAID and
  * that finding out on step three is worse than knowing before you start. This is one line instead of
- * five.
+ * five. ⛔ IT RENDERS UNDER BOTH LIVE CARDS (2026-09-07): Standard Focus and Run Focus build from the
+ * same tested lifts and the same kit.
  *
  * ⛔ EVERY CLAUSE IS ENFORCED OR PRESCRIBED, NOT ASPIRATIONAL:
  *   · the four numbers — `missingBarbellLifts` / `liftsBelowEntryMinimum` refuse entry without them.
@@ -449,33 +462,10 @@ const STANDARD_FOCUS_REQUIREMENT =
   'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in '
   + 'week one.';
 
-/**
- * ⛔ THE THREE STRENGTH TIERS (SPEC §A). One the previous program spine, three intents — the tier moves accessory
- * VOLUME and CHARACTER (plus a focus area for Definition). The main-lift engine (training max,
- * percentages, deload, the "+" set) is identical in all three.
- *
- * ⛔ STRONG IS TODAY'S PLAN, NOT A NEW ONE. Michael, 2026-08-05: *"strong is our current strength
- * focus plan."* So picking it changes NOTHING about what gets built — it routes into the existing
- * `get_stronger` flow untouched, and sends no new field. Heavy and Definition are dark until the
- * assistance rework lands (`SPEC-assistance-fix.md` §0–§7), because the accessory selection they
- * differ ON is the thing being fixed. Offering them now would ship three names for one block.
- *
- * ⚠️ NOTHING HERE REACHES THE PAYLOAD YET, DELIBERATELY. The spec's resolved call is that the tier
- * travels as its own `strength_tier` field — but that key is ALREADY TAKEN on the plan config by the
- * EQUIPMENT tier (`generate-strength-plan/index.ts`, `strength_tier: 'barbell'`). Two meanings, one
- * key, and the readers would not know which they had. Pick the name when the field is actually
- * needed (when Heavy or Definition ships), not now while Strong is a no-op.
- */
-/** ⛔ DEFINITION IS GONE, RULED 2026-08-24 (Michael): its job is the focus chips ("shape where you
- *  choose" is literally the picker), and there is no page behind it — Strong maps to Strength+5K
- *  (p246), Heavy to Hypertrophy+5K (p244, the book's own recommended first program), Definition to
- *  nothing. This screen's earlier comment already called it: three names for one block. */
-type StrengthTierId = 'strong' | 'heavy';
-const TIER_ORDER: StrengthTierId[] = ['strong', 'heavy'];
-const TIER_COPY: Record<StrengthTierId, { label: string; blurb: string; Icon: CardIcon; live: boolean }> = {
-  strong: { label: 'Strong', blurb: 'Stronger, not bigger.', Icon: Dumbbell, live: true },
-  heavy: { label: 'Heavy', blurb: 'Build muscle.', Icon: Weight, live: false },
-};
+// ⛔ THE STRONG / HEAVY TIER SCREEN IS GONE (WORKORDER-train-menu-reshape-2026-09-07). Strong was a
+// no-op routing into `get_stronger`; Heavy was dark; nothing in the payload read the tier. The
+// programme Strong named is the Run Focus card now (`Run + Strength`, pp246-247). No hypertrophy
+// tier comes back in its place — ruled out for the audience.
 
 // ⛔ TIER_ENTRY_NOTE and RUNNER_MILEAGE_CHART MOVED to `standing-plan-week-copy.ts` (2026-08-24
 // evening, Michael) — they render beside the miles input on the endurance-week screen now, the
@@ -992,11 +982,6 @@ export type NonRaceState = {
    * card existed. It never changes what that path builds.
    */
   focus?: 'standard' | 'run';
-  /**
-   * Which strength tier was picked (SPEC §A). Only `strong` is selectable today and it is a no-op —
-   * see `TIER_COPY`. Held in state so the card reads as chosen and Back returns to it.
-   */
-  strengthTier: StrengthTierId | null;
   /** Easy-swim add-on count (Michael, 2026-08-24): 0 = none, 1–2 = easy/technique swims appended
    *  outside the four endurance slots. Cap 2 — past that the athlete wants a tri plan. */
   swimEasySessions?: 0 | 1 | 2;
@@ -1236,7 +1221,7 @@ export type NonRaceState = {
 // file's header for why: the Standard Focus card shipped landing on the wrong screen while every
 // test on the path passed. ⚠️ Re-exported so every `StepKey` reference here is unchanged.
 export type { StepKey } from '@/lib/wizard-steps';
-import { getSteps, skipsSportScope, STANDARD_FOCUS_POSTURE, type StepKey } from '@/lib/wizard-steps';
+import { getSteps, skipsSportScope, fixedSportScope, type StepKey } from '@/lib/wizard-steps';
 
 
 // The goal seeded the posture; the user may have edited it. Re-derive goal_type/sport/strength_protocol
@@ -1316,7 +1301,7 @@ function assemblePayload(
   /**
    * ⛔⛔ THE FRAME THIS WIZARD IS DESCRIBING. Every slot question on the endurance step reads it —
    * how many rows there are, what each one is for, which day it lands on, and what the chips size.
-   * ⚠️ ABSENT IS `strength_5k`, so the Strength Focus path is untouched.
+   * ⚠️ ABSENT IS `strength_5k` — the Run Focus path, and every build that predates the focus.
    */
   const wizardFrame: FrameId = frameOf(state);
   const derivedCounts = (() => {
@@ -2069,7 +2054,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // `equipmentTier` reads the arc, which may not have loaded on the first render, and the race
     // screen reads no posture.
     entry: initialEntry ?? null,
-    strengthTier: null,
     goal: initialEntry === 'race' ? 'marathon' : null,
     discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
     // ⛔ NO PREFILLED DAYS (2026-07-29). These seeded 'sunday' / 'thursday' so the week drew on
@@ -2216,15 +2200,21 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * is written by its own step. Only the two the frame prescribes are claimed.
    * ⚠️ IT RUNS ON THE FRAME, NOT ON A STEP, because the flow no longer HAS the step to hang it off —
    * and the payload can be assembled from any later screen.
+   *
+   * ⛔ AND IT WRITES RUN + STRENGTH'S ANSWER TOO (WORKORDER-train-menu-reshape-2026-09-07 §3):
+   * `run: maintain, bike: out` — p246 is a run week, so the scope cards are not asked on that frame
+   * either (`fixedSportScope`), and bike `out` is what keeps every ride control off the later
+   * screens and sends `endurance_sport: 'run'`. One effect, one predicate, two frames.
    */
   React.useEffect(() => {
-    if (!skipsSportScope(state)) return;
+    const fixed = fixedSportScope(state);
+    if (!fixed) return;
     const need = (['run', 'bike'] as const)
-      .filter((d) => state.posture[d] !== STANDARD_FOCUS_POSTURE[d]);
+      .filter((d) => state.posture[d] !== fixed[d]);
     if (need.length === 0) return;
     setState((st) => ({
       ...st,
-      posture: { ...st.posture, run: STANDARD_FOCUS_POSTURE.run, bike: STANDARD_FOCUS_POSTURE.bike },
+      posture: { ...st.posture, run: fixed.run, bike: fixed.bike },
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.goal, state.focus, state.posture.run, state.posture.bike]);
@@ -3549,10 +3539,19 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * renders Ride chips; with one sport allowed every slot is auto-assigned to it — the choice
    * screen only exists for the mixed athlete. Swim is never a slot sport (add-on ruling).
    */
-  const allowedSlotSports: SlotSport[] = [
-    ...((state.posture.run ?? 'out') === 'maintain' ? (['run'] as const) : []),
-    ...((state.posture.bike ?? 'out') === 'maintain' ? (['ride'] as const) : []),
-  ];
+  /**
+   * ⛔⛔ ON `strength_5k` EVERY SLOT IS A RUN (WORKORDER-train-menu-reshape-2026-09-07 §3). p246 is a
+   * run week; the run-to-ride table is ours and the All Rounder's (p275). The posture effect above
+   * already writes bike `out` on this frame, so this reads `['run']` from the posture alone — the
+   * literal is the belt to that brace, for a draft saved while the scope cards still offered
+   * "Ride only" on this frame. The single-sport pre-fill then answers all four rows.
+   */
+  const allowedSlotSports: SlotSport[] = wizardFrame === 'strength_5k'
+    ? ['run']
+    : [
+      ...((state.posture.run ?? 'out') === 'maintain' ? (['run'] as const) : []),
+      ...((state.posture.bike ?? 'out') === 'maintain' ? (['ride'] as const) : []),
+    ];
   /**
    * ⛔ THE TIER LINE (item 8, 2026-08-24): when logged history unlocks the +1-2 easy-run tier, the
    * volume step SAYS so — a fact, not a question. Same functions the server's gate runs, fed the
@@ -4247,11 +4246,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               const { Icon, color } = TRAIN_COPY[t];
               const live = goal != null;
               /**
-               * ⛔ THE CARD IS THE SELECTION, NOT THE GOAL (2026-08-30). Standard Focus and Strength
+               * ⛔ THE CARD IS THE SELECTION, NOT THE GOAL (2026-08-30). Standard Focus and Run
                * Focus seed the same goal, so highlighting on the goal would light BOTH cards the
                * moment either was tapped. `state.focus` is what tells them apart.
                */
-              const focusOfCard = t === 'standard' ? 'standard' : t === 'strength' ? 'run' : null;
+              const focusOfCard = t === 'standard' ? 'standard' : t === 'run' ? 'run' : null;
               const chosen = live && state.goal === goal
                 && (focusOfCard == null || (state.focus ?? 'run') === focusOfCard);
               return (
@@ -4278,8 +4277,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                         {TRAIN_COPY[t].blurb}
                       </span>
                       {/* ⛔ WHAT IT REQUIRES, AT THE DOOR — see `STANDARD_FOCUS_REQUIREMENT`. One
-                          line, on the one card whose block refuses at the gate without it. */}
-                      {t === 'standard' ? (
+                          line, under each card whose block refuses at the gate without it. */}
+                      {t === 'standard' || t === 'run' ? (
                         <span className="block text-xs mt-1.5 leading-relaxed text-white/45">
                           {STANDARD_FOCUS_REQUIREMENT}
                         </span>
@@ -4287,62 +4286,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       {/* ⛔ THE PRECONDITION PARAGRAPH IS GONE (Michael, 2026-08-05: *"lose this"*).
                           It listed what the block needs — barbell, rack, bench, four maxes on file —
                           and it made one card three times the height of its three neighbours, which
-                          is what a picker screen cannot afford.
-
-                          ⚠️ IT WAS THERE FOR A REASON AND THAT REASON HAS NOT GONE AWAY: the
-                          2026-07-25 rule was to state a block's requirements AT THE DOOR, because
-                          finding out on step three that you need four 1RMs on file is worse than
-                          knowing before you start. The requirement is now UNSAID on this path. The
-                          natural home is the tier screen (the next tap, still before any work) —
-                          not built, deliberately not guessed at. */}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </StepLayout>
-      )}
-
-      {/* ── THE STRENGTH TIER ────────────────────────────────────────────────────────────────────
-          Strong / Heavy / Definition (SPEC §A). Strong is the block that exists today, so picking it
-          is a pass-through — nothing new goes to the engine. Heavy and Definition are dark until the
-          assistance rework lands, because the accessory selection they differ ON is exactly what is
-          being fixed; shipping them now would be three names for one block. */}
-      {currentStep === 'tier' && (
-        <StepLayout
-          step={stepNo('tier')} totalSteps={steps.length} title={eyeTitle('Strength')}
-          subtitle="Hold your endurance while you focus on strength goals."
-          onBack={back} onContinue={next} canContinue={state.strengthTier != null}
-          hideContinue hideProgress
-        >
-          <div className="space-y-2">
-            {/* ⛔ THE HONESTY NOTE + MILEAGE CHECK LEFT THIS SCREEN (Michael, 2026-08-24 evening).
-                They are about the running VOLUME, which is typed on the endurance-week screen — so
-                they render there, beside the miles box (`EnduranceWeekCard`), not at the tier door
-                where there is nothing to apply them to. Copy now lives in
-                `standing-plan-week-copy.ts` (`VOLUME_HONESTY_LINES`, `RUNNER_MILEAGE_CHART`). */}
-            {TIER_ORDER.map((t) => {
-              const { label, blurb, Icon, live } = TIER_COPY[t];
-              return (
-                <button
-                  key={t} type="button"
-                  className={optBtn(state.strengthTier === t, !live)}
-                  disabled={!live}
-                  onClick={() => { if (!live) return; setState((s) => ({ ...s, strengthTier: t })); next(); }}
-                >
-                  <span className="flex items-start gap-3.5">
-                    {/* All three are strength blocks, so all three carry the strength colour — what
-                        differs between them is the work around the lifts, not the discipline. */}
-                    <Icon
-                      className="h-6 w-6 shrink-0 mt-0.5"
-                      style={{ color: getDisciplineColor('strength'), opacity: live ? 1 : 0.4 }}
-                    />
-                    <span className="min-w-0 block">
-                      <span className="block text-base">{label}</span>
-                      <span className={`block text-sm mt-1 leading-relaxed ${live ? 'text-white/70' : 'text-white/40'}`}>
-                        {blurb}
-                      </span>
+                          is what a picker screen cannot afford. The one-line requirement above is
+                          what replaced it (2026-08-30), and it sits under both live cards. */}
                     </span>
                   </span>
                 </button>
@@ -4791,7 +4736,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             {/* ⛔ "Who are you this block?" CUT (Michael, 2026-08-24 evening) — the four cards ARE
                 the question, and the heading's line of height is what kept the swim card below the
                 fold. The cards still pre-shape the slot screen exactly as before. */}
-            {([
+            {/* ⛔ THE FRAME ANSWERS THE SPORT SCOPE ON RUN + STRENGTH (2026-09-07 §3) — see
+                `fixedSportScope`. p246 prescribes runs in every endurance slot, so the three cards
+                would offer two answers the plan no longer builds. One line states what the block
+                holds instead; the count is read off the frame, not typed. Riding an athlete does on
+                top is outside the plan, and the line says so without an imperative. */}
+            {fixedSportScope(state) != null ? (
+              <p className="text-white/60 text-sm leading-relaxed">
+                {`The endurance in this block is running: ${COUNT_WORD[slotKeysFor(wizardFrame).length] ?? slotKeysFor(wizardFrame).length} sessions a week, set by the programme. Riding sits outside the plan.`}
+              </p>
+            ) : ([
               // ⛔ THE EFFECT LINE UNDER EACH CARD (Michael, 2026-08-24): what the choice does to
               // the lifting, his anchors, flat. "smaller toll" is his approved phrasing — riding
               // is not zero-cost, it just doesn't pound the legs.

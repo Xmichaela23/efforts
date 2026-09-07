@@ -41,18 +41,14 @@ export const GOAL_LABELS: Record<NonRaceGoalId, string> = {
   // duration copy. So the athlete picked "Strength Focus" and was handed a plan called
   // "Get stronger". Fixed here rather than by adding a second special case.
   //
-  // ⛔ "STRENGTH FOCUS" → "STRONG FOCUS" (Michael, 2026-08-05). STRENGTH is the DISCIPLINE and it
-  // keeps that name on the Train card, beside Run Focus / Ride Focus / Athletic Focus. STRONG is the
-  // BLOCK — the tier picked one screen later (D-383), and the block is what this label names. Three
-  // names for one thing in four taps ("Strength Focus" card → "Strength" tier screen → pick "Strong"
-  // → "Strength Focus · 12 weeks") is what this closes.
-  //
-  // ⚠️ AND IT IS A CONSTANT ONLY WHILE STRONG IS THE ONLY LIVE TIER. Heavy and Definition are the
-  // same `get_stronger` goal with a different tier, so the day either ships this must READ THE TIER
-  // ("Heavy Focus", "Definition Focus") rather than stay hardcoded. The tier does not reach the
-  // payload yet (D-383 — `strength_tier` is taken by the EQUIPMENT tier), which is the only reason a
-  // constant is honest today. Wire the tier, then derive this.
-  get_stronger: 'Strong Focus',
+  // ⛔ "STRONG FOCUS" → "RUN + STRENGTH" (WORKORDER-train-menu-reshape-2026-09-07). The programme
+  // lives under the Run Focus card now and the Strong / Heavy tier screen is gone, so the block is
+  // named for what it is: a run week (pp246-247) with the lifting cut around it. The frame's own
+  // `displayName` (`frames.ts`) carries the same words and is what the wizard prefers; this label
+  // is for every reader that only has the goal id. Keep the two identical.
+  // ⚠️ THE ID STAYS `get_stronger` — routing, specs and every stored goal key off it. Standard
+  // Focus seeds the same id and takes its name from its own frame.
+  get_stronger: 'Run + Strength',
   build_muscle: 'Build muscle + train',
   maintain: 'Maintain',
   starting_over: 'Starting over',

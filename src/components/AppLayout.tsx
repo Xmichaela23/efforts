@@ -1953,7 +1953,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   <span aria-hidden="true" style={lampStyle(goalsActive)} />
                   {/* ⛔ "Goals" → "Focus", with the eye (2026-08-05). The screen behind this tab is
                       the front door — Train / Race / Build — and "focus" is the word it uses
-                      throughout ("Choose your focus", Run Focus, Strength Focus). A tab labelled
+                      throughout ("Choose your focus", Standard Focus, Run Focus). A tab labelled
                       Goals opening a screen that never says "goal" is one name too many. The
                       internal `showGoals` state keeps its name; only what the athlete reads changed. */}
                   <span aria-hidden="true" className={sigilClass('eye-mark', goalsActive)} />

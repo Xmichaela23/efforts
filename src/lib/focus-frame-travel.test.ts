@@ -1,7 +1,7 @@
 /**
  * ⛔⛔ THE FOCUS HAS TO SURVIVE EVERY HOP, and this file is the guard (2026-08-30).
  *
- * Standard Focus builds the All Rounder (p274-275); Strength Focus builds Strength + 5K (p246-247).
+ * Standard Focus builds the All Rounder (p274-275); Run Focus builds Run + Strength (p246-247).
  * The athlete's answer travels: the Train card → `NonRaceState.focus` → the wizard payload →
  * `create-goal`'s forward → `generate-strength-plan`'s body read → `resolveFrame`.
  *

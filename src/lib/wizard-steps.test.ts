@@ -2,7 +2,7 @@
  * ⛔⛔ WHERE A TAP LANDS, ASSERTED BY RUNNING THE ROUTER (2026-08-30).
  *
  * ⛔ THIS FILE EXISTS BECAUSE A GREEN SUITE MISSED A SHIPPED DEFECT. Standard Focus went live and its
- * card landed on the Strength Focus tier screen — the Strong / Heavy card — so the athlete could not
+ * card landed on the old Strong / Heavy tier screen — so the athlete could not
  * reach the new programme at all. Four tests on that path were passing at the time. They asserted
  * that the focus reached the PAYLOAD, and the payload was correct; nothing asserted the ROUTE.
  *
@@ -11,7 +11,10 @@
  * this file possible — see `wizard-steps.ts`.
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { getSteps, skipsSportScope, STANDARD_FOCUS_POSTURE, type StepRouterState } from './wizard-steps.ts';
+import {
+  fixedSportScope, getSteps, RUN_STRENGTH_POSTURE, skipsSportScope, STANDARD_FOCUS_POSTURE,
+  type StepRouterState,
+} from './wizard-steps.ts';
 
 const strengthPath = (focus?: 'standard' | 'run'): StepRouterState => ({
   goal: 'get_stronger',
@@ -41,7 +44,8 @@ Deno.test('⛔⛔ STANDARD FOCUS DOES NOT LAND ON THE 5K PATH\'S TIER SCREEN', (
    */
   assertEquals(landsOn(strengthPath('standard')), 'endurance',
     'Standard Focus lands somewhere other than the endurance week');
-  assert(!getSteps(strengthPath('standard')).includes('tier'),
+  // ⛔ THE TIER SCREEN NO LONGER EXISTS ON ANY PATH (2026-09-07) — see the Run Focus test below.
+  assert(!(getSteps(strengthPath('standard')) as string[]).includes('tier'),
     'the tier screen is back in the Standard Focus flow');
 });
 
@@ -85,17 +89,44 @@ Deno.test('⛔⛔ AND THE SKIPPED PATH STILL HOLDS BOTH SPORTS — the Continue 
     'swim is claimed by the skipped path — it is parked, and off by default');
 });
 
-Deno.test('⛔ AND THE 5K PATH IS UNCHANGED — tier first, exactly as it ships', () => {
+Deno.test('⛔⛔ RUN FOCUS OPENS ON THE POSTURE CARD — the Strong / Heavy tier screen is gone', () => {
   /**
-   * ⚠️ BOTH SHAPES. An athlete who picks Strength Focus carries `focus: 'run'`; every build that
-   * predates the Standard card carries no focus at all. Neither may move.
+   * ⛔ WORKORDER-train-menu-reshape-2026-09-07. Strong was a no-op routing into `get_stronger` and
+   * Heavy was dark, so the screen asked nothing the engine could hear. The Run Focus card opens the
+   * same wizard on `strength_5k`, one screen shorter.
+   * ⚠️ BOTH SHAPES. An athlete who picks Run Focus carries `focus: 'run'`; every build that predates
+   * the Standard card carries no focus at all. Both take the same route.
    */
   for (const st of [strengthPath('run'), strengthPath(undefined)]) {
-    assertEquals(landsOn(st), 'tier', 'the Strength Focus path no longer opens the tier screen');
+    assertEquals(landsOn(st), 'posture', 'the Run Focus path does not open on the posture card');
     assertEquals(getSteps(st), [
-      'goal', 'train', 'tier', 'posture', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm',
+      'goal', 'train', 'posture', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm',
     ]);
+    assert(!(getSteps(st) as string[]).includes('tier'), 'the tier screen is back');
   }
+});
+
+Deno.test('⛔⛔ RUN + STRENGTH HOLDS RUNNING ONLY — the scope cards are answered by the frame', () => {
+  /**
+   * ⛔ §3 of the same order: p246 is a run week, every endurance slot is a run family, and a rider's
+   * home under the Train menu is Ride + Strength. So the posture card on this frame keeps its
+   * lifting line and swim toggle but stops asking which sports; the answer is written for the
+   * athlete, the same mechanism Standard Focus uses.
+   * ⚠️ BIKE IS `out` — that is what keeps the ride chips, the ride-hours box and the FTP question
+   * off the later screens, and sends `endurance_sport: 'run'` to the builder.
+   */
+  assertEquals(RUN_STRENGTH_POSTURE.run, 'maintain');
+  assertEquals(RUN_STRENGTH_POSTURE.bike, 'out');
+  assert(!('swim' in RUN_STRENGTH_POSTURE), 'swim is claimed — its own toggle owns it');
+  for (const st of [strengthPath('run'), strengthPath(undefined)]) {
+    assertEquals(fixedSportScope(st), RUN_STRENGTH_POSTURE);
+    // ⚠️ THE STEP STAYS — it is the cards that go, not the screen.
+    assert(getSteps(st).includes('posture'), 'the posture card left the Run Focus flow');
+  }
+  assertEquals(fixedSportScope(strengthPath('standard')), STANDARD_FOCUS_POSTURE);
+  // ⛔ AND A NON-STRENGTH GOAL IS STILL ASKED.
+  assertEquals(fixedSportScope({ ...strengthPath('run'), goal: 'build_endurance' }), null);
+  assertEquals(fixedSportScope({ ...strengthPath('run'), goal: 'marathon' }), null);
 });
 
 Deno.test('⛔ THE FLOW IS COMPLETE WITHOUT A STANDARD-ONLY SCREEN', () => {
@@ -107,21 +138,23 @@ Deno.test('⛔ THE FLOW IS COMPLETE WITHOUT A STANDARD-ONLY SCREEN', () => {
   const standard = getSteps(strengthPath('standard'));
   const run = getSteps(strengthPath('run'));
   /**
-   * ⚠️ TWO SCREENS APART NOW, NOT ONE — rebased 2026-08-30 with the sport-scope ruling. The rule is
-   * the same and is what matters: **Standard Focus is the 5K flow MINUS screens, never PLUS one.**
+   * ⚠️ REBASED 2026-08-30 with the sport-scope ruling and again 2026-09-07 with the tier gone. The
+   * rule is the same and is what matters: **Standard Focus is the 5K flow MINUS screens, never PLUS one.**
    * Both omissions are questions p274 has no answer for. If a Standard build ever needs a question
    * the 5K build does not, this assertion is what fails and this is where it goes.
    */
-  assertEquals(standard, run.filter((k) => k !== 'tier' && k !== 'posture'),
-    'the two flows differ by more than the tier and sport-scope screens');
+  // ⚠️ ONE SCREEN APART SINCE 2026-09-07 — the tier screen is gone from both.
+  assertEquals(standard, run.filter((k) => k !== 'posture'),
+    'the two flows differ by more than the sport-scope screen');
   for (const required of ['endurance', 'schedule', 'numbers', 'confirm'] as const) {
     assert(standard.includes(required), `Standard Focus never asks for ${required}`);
   }
 });
 
-Deno.test('⚠️ A GOAL REACHED OUTSIDE THE TRAIN DRILL-DOWN NEVER SEES THE TIER', () => {
-  // ⛔ PRE-EXISTING RULE, PINNED HERE BECAUSE THE FIX SITS ON THE SAME LINE. The tier is gated on
-  // `entry === 'train'`, and a stored goal or a standalone route keeps the older flow.
-  assert(!getSteps({ ...strengthPath('run'), entry: 'build' }).includes('tier'));
-  assert(!getSteps({ ...strengthPath('standard'), entry: 'build' }).includes('tier'));
+Deno.test('⚠️ A GOAL REACHED OUTSIDE THE TRAIN DRILL-DOWN TAKES THE SAME ROUTE, MINUS THE DOOR', () => {
+  // ⛔ A stored goal or a standalone route has no `train` screen and nothing else differs.
+  assertEquals(getSteps({ ...strengthPath('run'), entry: 'build' }),
+    getSteps(strengthPath('run')).filter((k) => k !== 'train'));
+  assertEquals(getSteps({ ...strengthPath('standard'), entry: 'build' }),
+    getSteps(strengthPath('standard')).filter((k) => k !== 'train'));
 });

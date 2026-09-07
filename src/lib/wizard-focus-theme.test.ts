@@ -76,9 +76,10 @@ Deno.test('⛔ AND ONLY THE STEPS HE NAMED CHANGED', () => {
                            'Per-discipline focus', 'How long is this block?']) {
     assert(WIZARD.includes(`title="${untouched}"`), `"${untouched}" was renamed without a ruling`);
   }
-  // ⚠️ AND THE THREE THAT ALREADY CARRIED THE MARK STILL DO — this change added to the theme rather
-  // than reshuffling it.
-  for (const kept of ['Choose your focus', 'Train', 'Strength']) {
+  // ⚠️ AND THE TWO THAT ALREADY CARRIED THE MARK STILL DO — this change added to the theme rather
+  // than reshuffling it. ⛔ "Strength" was the Strong / Heavy tier screen's title, and that screen is
+  // gone (WORKORDER-train-menu-reshape-2026-09-07); the mark went with it, not off it.
+  for (const kept of ['Choose your focus', 'Train']) {
     assert(WIZARD.includes(`title={eyeTitle('${kept}')}`), `"${kept}" lost the mark it already had`);
   }
 });
