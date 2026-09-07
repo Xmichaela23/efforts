@@ -608,6 +608,9 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
     completedmanually: false,
     source: 'strava',
     is_strava_imported: true,
+    // A row created by a history pull never asks for post-workout feedback (Michael, 2026-09-07:
+    // "no pop ups when importing"). The popup honours this column as a dismissal.
+    feedback_dismissed_at: new Date().toISOString(),
     strava_activity_id: a.id,
 
     // GPS data for Mapbox rendering
