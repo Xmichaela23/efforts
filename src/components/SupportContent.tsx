@@ -51,14 +51,22 @@ export default function SupportContent() {
                   • Nothing is sent to any artificial intelligence or machine learning service. Every number
                   in the app is measured from your own activities or worked out with a published formula.
                 </li>
-                <li className="text-white">
-                  • Account, then Download your data, gives you everything we hold about you as a file.
-                </li>
-                <li className="text-white">
-                  • Account, then Delete account, removes all of it. We tell Strava and Garmin to stop at the
-                  same time. This cannot be undone.
-                </li>
               </ul>
+            </div>
+
+            <div className="space-y-3">
+              <h2 className="text-xl font-semibold text-white">Downloading and deleting your data</h2>
+              <p className="text-white">
+                Open the menu, then Account. Download your data gives you everything we hold about you as a
+                file you can keep.
+              </p>
+              <p className="text-white">
+                Delete account, on the same screen, removes all of it: your account, your workouts, your plans,
+                and everything we read from a connected service. We tell Strava and Garmin to stop at the same
+                time. It takes effect immediately and cannot be undone. If you would rather we did it for you,
+                write to <a href="mailto:support@efforts.work" className="underline">support@efforts.work</a>{' '}
+                from the address on your account.
+              </p>
             </div>
 
             <div className="space-y-3">
