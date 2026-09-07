@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
-import { Check, Dumbbell, Heart, Link2, User, Watch } from 'lucide-react';
+import { Check, Dumbbell, Heart, Link2, User, Watch, Wrench } from 'lucide-react';
 import { MobileHeader } from '@/components/MobileHeader';
 import { StepLayout } from '@/components/wizard/StepLayout';
 import { GalaxyButton } from '@/components/ui/galaxy-button';
@@ -20,11 +20,10 @@ import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
  * The sign-up intake (2026-09-07). Two screens after the account, Next at the bottom of each, then
  * Home. Nobody is dropped into a plan: the plan is picked from the Focus screen when they want it.
  *
- *   1  About you              the Profile plate's own rows (name, birthday, units, height, weight)
- *                             and one more: Gym, commercial or home, the chips unfolding under it.
- *                             No sport question: the wizard asks which sport goes in each row of
- *                             the week, and the history says what they do.
- *   2  Your numbers           Connect Strava / Garmin once at the top (fills what it can from 90
+ *   1  About you              the Profile plate's own rows (name, birthday, height, weight, units)
+ *   2  Your gym               commercial, or what they own. No sport question: the wizard asks which
+ *                             sport goes in each row of the week, and the history says what they do.
+ *   3  Your numbers           Connect Strava / Garmin once at the top (fills what it can from 90
  *                             days); a tap-to-change row for each number that EXISTS (threshold pace,
  *                             FTP, pace per 100), one line for everything else: measured in week one.
  *                             The only thing they HAVE to do on this screen is nothing.
@@ -36,11 +35,11 @@ import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
  */
 
 const STEP_KEY = 'efforts:intake_step';
-type Step = 1 | 2;
-const TOTAL = 2;
+type Step = 1 | 2 | 3;
+const TOTAL = 3;
 
 const readStep = (): Step => {
-  try { return Number(localStorage.getItem(STEP_KEY)) >= 2 ? 2 : 1; } catch { return 1; }
+  try { const v = Number(localStorage.getItem(STEP_KEY)); return v === 2 || v === 3 ? v : 1; } catch { return 1; }
 };
 const parsePaceText = (t: string): number | null => { const m = t.trim().match(/^(\d{1,2}):(\d{2})$/); if (!m) return null; const sec = Number(m[1]) * 60 + Number(m[2]); return sec > 0 ? sec : null; };
 const paceToText = (sec: number): string => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
@@ -153,7 +152,6 @@ export default function WelcomePage() {
 
   const aboutYouPatch = (b: any) => ({
     ...b,
-    equipment: { ...(b.equipment ?? {}), strength: gym === 'commercial' ? ['Commercial gym'] : gym === 'home' ? Array.from(gear) : (b.equipment?.strength ?? []) },
     units,
     ...(birthday ? { birthday } : {}),
     ...(height ? { height } : {}),
@@ -169,8 +167,8 @@ export default function WelcomePage() {
 
   /** Save what is answered before leaving the tab for Strava or Garmin; come back to Your numbers. */
   const saveBeforeLeaving = async () => {
-    try { await persist(aboutYouPatch); } catch { /* keep going */ }
-    writeStep(2);
+    try { await persist(sportsPatch); } catch { /* keep going */ }
+    writeStep(3);
   };
 
   const startStrava = async () => {
@@ -251,9 +249,21 @@ export default function WelcomePage() {
     set((prev) => { const n = new Set(prev); if (n.has(v)) n.delete(v); else n.add(v); return n; });
   const toggleGear = toggleIn(setGear);
 
-  const gymAnswered = gym === 'commercial' || (gym === 'home' && gear.size > 0);
+  const canLeaveSports = gym === 'commercial' || (gym === 'home' && gear.size > 0);
+  const blocked = 'Commercial gym, or what you own.';
 
-  // ── Screen 2 ─────────────────────────────────────────────────────────────────────────────
+  const sportsPatch = (b: any) => ({
+    ...b,
+    equipment: { ...(b.equipment ?? {}), strength: gym === 'commercial' ? ['Commercial gym'] : Array.from(gear) },
+  });
+
+  const finishSports = async () => {
+    if (!canLeaveSports) return;
+    setSaving(true);
+    try { await persist(sportsPatch); go(3); } finally { setSaving(false); }
+  };
+
+  // ── Screen 3 ─────────────────────────────────────────────────────────────────────────────
   const baselinesLike = { learned_fitness: learned, performance_numbers: pn };
   const thr = resolveCurrentRunThresholdPace(baselinesLike as any);
   const thrMine = pn.threshold_pace_source === 'manual';
@@ -298,7 +308,7 @@ export default function WelcomePage() {
         const on = value === o.v;
         return (
           <button key={o.v} type="button" aria-pressed={on} onClick={() => onPick(o.v)}
-            className={`px-3 py-1 text-[13px] focus:outline-none focus-visible:ring-1 focus-visible:ring-white/40 ${i > 0 ? 'border-l border-white/15' : ''} ${on ? 'text-white bg-white/[0.12]' : 'text-white/50 bg-white/[0.03]'}`}>
+            className={`px-3 py-1 text-[13px] ${i > 0 ? 'border-l border-white/15' : ''} ${on ? 'text-white bg-white/[0.12]' : 'text-white/50 bg-white/[0.03]'}`}>
             {o.label}
           </button>
         );
@@ -329,7 +339,7 @@ export default function WelcomePage() {
       <MobileHeader />
       <main className="mobile-main-content">
         {step === 1 && (
-          <StepLayout step={1} totalSteps={TOTAL} title="About you" onContinue={() => void finishAboutYou()} canContinue={gymAnswered} continueLabel="Next" saving={saving} blockedReason={gym === 'home' ? 'Tap what you own.' : 'Commercial gym or home gym.'}>
+          <StepLayout step={1} totalSteps={TOTAL} title="About you" onContinue={() => void finishAboutYou()} canContinue continueLabel="Next" saving={saving} hideProgress={false}>
             <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
               <div className="px-3 py-3">
                 <SectionHead Icon={User} label="You" colour="rgba(255,255,255,0.7)" />
@@ -338,8 +348,6 @@ export default function WelcomePage() {
                 <NumberRow id="units" name="Units" value={null} right={segmented<'imperial' | 'metric'>([{ v: 'imperial', label: 'lb · mi' }, { v: 'metric', label: 'kg · km' }], units, setUnits)} />
                 <NumberRow id="height" name="Height" hint={metric ? 'cm' : 'in'} inputMode="numeric" value={height ? `${height} ${metric ? 'cm' : 'in'}` : null} seed={height ? String(height) : ''} onSave={(t) => { const v = parseInt(t); if (Number.isFinite(v) && v > 0) setHeight(v); }} />
                 <NumberRow id="weight" name="Weight" hint={metric ? 'kg' : 'lb'} inputMode="numeric" value={weight ? `${weight} ${metric ? 'kg' : 'lb'}` : null} seed={weight ? String(weight) : ''} onSave={(t) => { const v = parseInt(t); if (Number.isFinite(v) && v > 0) setWeight(v); }} />
-                <NumberRow id="gym" name="Gym" value={null} right={segmented<'commercial' | 'home'>([{ v: 'commercial', label: 'Commercial' }, { v: 'home', label: 'Home' }], gym, setGym)} />
-                {gym === 'home' && chips(HOME_GYM_EQUIPMENT_OPTIONS, gear, toggleGear, getDisciplineColor('strength'))}
                 <p className="mt-2 text-[12px] text-white/45">Tap a value to change it.</p>
               </div>
 
@@ -348,7 +356,26 @@ export default function WelcomePage() {
         )}
 
         {step === 2 && (
-          <StepLayout step={2} totalSteps={TOTAL} title="Your numbers" subtitle="From your watch, typed, or measured in week one. Nothing is guessed." onBack={() => go(1)} onContinue={() => void finish()} canContinue continueLabel="Next" saving={saving}>
+          <StepLayout step={2} totalSteps={TOTAL} title="Your gym" subtitle="So the plan only asks for lifts you can do." onBack={() => go(1)} onContinue={() => void finishSports()} canContinue={canLeaveSports} continueLabel="Next" saving={saving} blockedReason={blocked}>
+            <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
+              <div className="px-3 py-3">
+                <SectionHead Icon={Wrench} label="Where you lift" colour={getDisciplineColor('strength')} />
+                {segmented<'commercial' | 'home'>([{ v: 'commercial', label: 'Commercial gym' }, { v: 'home', label: 'Home gym' }], gym, setGym)}
+                {gym === 'home' && (
+                  <>
+                    <p className="m-0 mt-2 text-[12px] text-white/55">Tap what you own.</p>
+                    {chips(HOME_GYM_EQUIPMENT_OPTIONS, gear, toggleGear, getDisciplineColor('strength'))}
+                  </>
+                )}
+                {gym === 'commercial' && <p className="m-0 mt-2 text-[12px] text-white/55">A commercial gym has everything the plan asks for.</p>}
+                {gym == null && <p className="m-0 mt-2 text-[12px] text-white/55">Anything else, swim gear included, lives on Profile.</p>}
+              </div>
+            </div>
+          </StepLayout>
+        )}
+
+        {step === 3 && (
+          <StepLayout step={3} totalSteps={TOTAL} title="Your numbers" subtitle="From your watch, typed, or measured in week one. Nothing is guessed." onBack={() => go(2)} onContinue={() => void finish()} canContinue continueLabel="Next" saving={saving}>
             <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
               <div className="px-3 py-3">
                 <SectionHead Icon={Link2} label="From your watch" colour="rgba(255,255,255,0.7)" />
