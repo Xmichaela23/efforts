@@ -3,12 +3,14 @@
 // actions (password, sign-in address, sign out, delete) live here, the way Strava and Garmin keep an
 // Account page apart from the profile. The plate itself is unchanged (src/components/AccountPlate.tsx).
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { KeyRound } from 'lucide-react';
 import { AccountPlate } from '@/components/AccountPlate';
 import { readoutPlateStyle } from '@/lib/readout-plate';
 import { supabase, getStoredAuthUser } from '@/lib/supabase';
 
 export default function AccountPage({ onSignOut }: { onSignOut?: () => void | Promise<void> }) {
+  const navigate = useNavigate();
   const [authEmail, setAuthEmail] = useState<string>(() => getStoredAuthUser()?.email ?? '');
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   useEffect(() => {
@@ -22,8 +24,9 @@ export default function AccountPage({ onSignOut }: { onSignOut?: () => void | Pr
     return () => { cancelled = true; };
   }, []);
   const signOut = async () => {
-    if (onSignOut) { await onSignOut(); return; }
-    await supabase.auth.signOut();
+    if (onSignOut) await onSignOut(); else await supabase.auth.signOut();
+    // The sign-in screen should not sit on /account, or the next sign-in lands here.
+    try { navigate('/', { replace: true }); } catch { /* fine */ }
   };
   return (
     <div className="max-w-2xl mx-auto px-4 pb-6">

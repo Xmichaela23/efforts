@@ -1149,6 +1149,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowImportPage(false);
     setShowTrainingBaselines(false); // NEW: Reset training baselines
     setShowAthleticRecord(false);
+    setShowAccount(false);
     setShowGear(false); // Reset gear view
     setShowContext(false);
     setShowGoals(false);
@@ -1159,7 +1160,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setWorkoutBeingEdited(null);
     setActiveTab('summary');
 
-    if (location.pathname === '/goals' || (location.pathname === '/profile/athletic-record' || location.pathname === '/profile')) {
+    if (location.pathname === '/goals' || location.pathname === '/account' || (location.pathname === '/profile/athletic-record' || location.pathname === '/profile')) {
       try {
         navigate('/', { replace: true });
       } catch (e) {
@@ -1848,7 +1849,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 <Button
                   onClick={() => {
                     // Close any open views and navigate to home
-                    if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showGear || showContext) {
+                    if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showAccount || showGear || showContext) {
                       handleBackToDashboard();
                     }
                     setShowGoals(false);
@@ -1864,7 +1865,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 <Button
                   onClick={() => {
                     // Close any open views and navigate to context
-                    if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord) {
+                    if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showAccount) {
                       handleBackToDashboard();
                     }
                     setShowGoals(false);
@@ -1880,7 +1881,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 </Button>
                 <Button
                   onClick={() => {
-                    if (selectedWorkout || showStrengthLogger || showAllPlans || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showGear || showContext) {
+                    if (selectedWorkout || showStrengthLogger || showAllPlans || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showAccount || showGear || showContext) {
                       handleBackToDashboard();
                     }
                     setShowGoals(true);

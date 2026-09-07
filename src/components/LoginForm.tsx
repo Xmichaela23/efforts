@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import React, { useState } from 'react';
 import { ACCOUNT_DELETED_KEY } from '@/components/AccountPlate';
 import { supabase } from '@/lib/supabase';
@@ -31,6 +32,7 @@ interface LoginFormProps {
 }
 
 const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -67,8 +69,10 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
 
       if (error) {
         setError(error.message);
+      } else {
+        // Land on Home, not on whatever screen the last person signed out from (2026-09-07).
+        try { navigate('/', { replace: true }); } catch { /* AuthWrapper still swaps to the app */ }
       }
-      // AuthWrapper will handle the redirect via onAuthStateChange
     } catch (error) {
       setError('An unexpected error occurred');
       console.error('Login error:', error);
