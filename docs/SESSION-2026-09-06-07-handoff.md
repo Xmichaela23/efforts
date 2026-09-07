@@ -50,7 +50,12 @@ The flow now (pushed):
 Also: Strava connect from Connections imports 90 days by itself; Garmin connect asks for 90 days and Connections has
 "Import Last 90 Days"; import-garmin-history asks in 30-day windows (409 = already requested); the Standard Focus card no
 longer claims tested lifts are required; post-import goes to /profile; loadUserBaselines returns ui_prefs.
-Verified on the local server with the demo account: see the note below for how far the walk got.
+Verified on the local dev server with the demo account (throwaway), driven by script: all three intake screens render,
+Next saves through saveUserBaselines (units, disciplines, equipment.strength, ui_prefs.intake_done all landed), the last
+Next lands on Home, the Home first-run card shows, tapping it removes it, and it stays gone after a reload (device +
+ui_prefs.seen_first_run). NOT walked: the Strava and Garmin doors (need a real OAuth), Apple Health (iOS only), a truly
+brand-new account (RegisterForm → /welcome; the register form was not driven). Discipline ids written by the intake are
+the canonical run/ride/swim/strength; Profile still writes running/cycling/swimming and readers normalise both.
 
 ## Still on the list
 1. New-user spec: both front doors (connect Garmin/Strava · use my phone), first-run cards, one per screen. Write spec, then build.

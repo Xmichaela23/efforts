@@ -1486,6 +1486,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           transform: 'translateZ(0)',
         }}
       />
+      {/* First-run card sits ABOVE the Today panel: inside it, it ate the panel's fixed height and
+          pushed the session rows under the fold (seen on the demo account, 2026-09-07). */}
+      {!noPlanYet ? (
+        <div className="flex-shrink-0 px-2 pt-2 pb-1" style={{ position: 'relative', zIndex: 1 }}>
+          <FirstRunCard id="home">Tap a session to open it.</FirstRunCard>
+        </div>
+      ) : null}
       {/* Scrollable container for Today panel */}
       <div 
         ref={scrollRef}
@@ -1642,12 +1649,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             >
               {reauthLine}
             </button>
-          </div>
-        ) : null}
-
-        {!noPlanYet ? (
-          <div className="flex-shrink-0 px-2 pt-2">
-            <FirstRunCard id="home">Tap a session to open it.</FirstRunCard>
           </div>
         ) : null}
 

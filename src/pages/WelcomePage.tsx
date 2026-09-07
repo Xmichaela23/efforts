@@ -7,6 +7,7 @@ import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 import { HOME_GYM_EQUIPMENT_OPTIONS } from '@/components/TrainingBaselines';
 import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
+import { normalizeDiscipline, type Discipline } from '@/lib/discipline';
 
 /**
  * The sign-up intake (2026-09-07). Three screens after the account, Next at the bottom of each, then
@@ -30,11 +31,13 @@ const STEP_KEY = 'efforts:intake_step';
 type Step = 1 | 2 | 3;
 const TOTAL = 3;
 
-const SPORTS: Array<{ id: string; label: string }> = [
-  { id: 'running', label: 'Run' },
-  { id: 'cycling', label: 'Ride' },
+// ⛔ The four canonical discipline ids (src/lib/discipline.ts `normalizeDiscipline`), the form every
+// reader gates on. Profile still writes the long forms; readers normalise either, this writes canon.
+const SPORTS: Array<{ id: Discipline; label: string }> = [
+  { id: 'run', label: 'Run' },
+  { id: 'ride', label: 'Ride' },
   { id: 'strength', label: 'Lift' },
-  { id: 'swimming', label: 'Swim' },
+  { id: 'swim', label: 'Swim' },
 ];
 
 const readStep = (): Step => {
@@ -82,7 +85,7 @@ export default function WelcomePage() {
       if (cancelled || !b) return;
       if (b.profile?.name) setName(String(b.profile.name));
       if (b.units === 'metric' || b.units === 'imperial') setUnits(b.units);
-      if (Array.isArray(b.disciplines) && b.disciplines.length) setSports(new Set(b.disciplines));
+      if (Array.isArray(b.disciplines) && b.disciplines.length) setSports(new Set(b.disciplines.map(normalizeDiscipline).filter(Boolean) as string[]));
       const st: string[] = Array.isArray(b.equipment?.strength) ? b.equipment.strength : [];
       if (st.includes('Commercial gym')) setGym('commercial');
       else if (st.length) { setGym('home'); setGear(new Set(st)); }
