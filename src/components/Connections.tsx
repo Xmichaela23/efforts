@@ -592,6 +592,24 @@ const Connections: React.FC = () => {
     }
   };
 
+  // Garmin history = a backfill request. Garmin accepts at most 30 days per request and sends the
+  // activities to our webhook afterwards, so this can only report that the request went in.
+  const requestGarminHistory = async (token: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('import-garmin-history', {
+        body: { token, days: 90 },
+      });
+      if (error) throw new Error(error.message || 'request failed');
+      const windows = Number(data?.windows ?? 0);
+      const ok = Number(data?.successful ?? 0);
+      setGarminMessage(ok > 0
+        ? `Garmin has your request for the last 90 days. Activities arrive over the next few minutes.`
+        : `Garmin did not accept the history request (${ok} of ${windows} windows). Try again in a minute.`);
+    } catch (e) {
+      setGarminMessage(`Could not ask Garmin for history: ${e instanceof Error ? e.message : 'unknown error'}`);
+    }
+  };
+
   const importHistoricalData = async (provider: string, startDate?: string, endDate?: string) => {
     try {
       setLoading(true);
@@ -642,7 +660,8 @@ const Connections: React.FC = () => {
         });
 
         setTimeout(() => {
-          navigate(imported > 0 ? '/onboarding/profile' : '/');
+          // The learned numbers live on Profile now (2026-09-06); the old /onboarding/profile page predates it.
+          navigate(imported > 0 ? '/profile' : '/');
         }, 1500);
       }
       
@@ -807,7 +826,10 @@ const Connections: React.FC = () => {
       setGarminAccessToken(tokenData.access_token);
       setGarminConnected(true);
       localStorage.setItem('garmin_access_token', tokenData.access_token);
-      setGarminMessage('Successfully connected to Garmin!');
+      setGarminMessage('Connected to Garmin. Asking for your last 90 days…');
+      // Ask Garmin for history straight away (2026-09-07). Garmin answers the request later, through
+      // the activities webhook, so the screen can only say it was asked. The button below asks again.
+      void requestGarminHistory(tokenData.access_token);
 
       // Clean up
       sessionStorage.removeItem('garmin_code_verifier');
@@ -1151,6 +1173,19 @@ const Connections: React.FC = () => {
                           }
                           return 'Import Last 30 Days';
                         })()}
+                      </Button>
+                    )}
+
+                    {connection.provider === 'garmin' && connection.connected && garminAccessToken && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { void requestGarminHistory(garminAccessToken); }}
+                        disabled={loading}
+                        className="rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 hover:bg-white/[0.12]"
+                      >
+                        <Zap className="h-4 w-4 mr-2" />
+                        Import Last 90 Days
                       </Button>
                     )}
 

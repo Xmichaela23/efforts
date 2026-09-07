@@ -30,6 +30,26 @@ Two bugs found while verifying, both fixed and deployed:
 Not verified: the three screens by a human eye (the data behind them is verified), and whether the Garmin portal URL
 carries the right secret (it answers itself, deadline 2026-09-14).
 
+## New-user path — wired 2026-09-07 (this chat)
+The wizard already existed (Focus → Build a training plan → NonRaceBuilder, steps from src/lib/wizard-steps.ts) and is
+untouched. What was broken for a stranger, now fixed, all pushed:
+- Sign-up lands in the wizard (RegisterForm → /goals with `openBuilder: 'train'`; GoalsScreen opens it and strips the state).
+  The "in development, you'll be notified" box on the register form is gone.
+- Home shows a first card when the account has no plan at all: "No plan yet." with two doors, Build a plan › and
+  Connect Garmin or Strava › (TodaysEffort `noPlanYet` = no week plan context and no plans on the account).
+- Strava connect pulls the last 90 days by itself (StravaCallback), then goes Home. The Connections import still exists.
+- Garmin connect asks for the last 90 days by itself, and Connections has "Import Last 90 Days" under Garmin.
+  import-garmin-history now asks in 30-day windows (Garmin's maximum), three requests for 90 days; a 409 = already
+  requested and counts as done. Deployed. NOT PROVEN on a real Garmin account yet.
+- The Standard Focus card no longer claims four tested lifts are required (that gate was removed 2026-09-04).
+- After a Strava import, Connections goes to /profile, not the pre-plate /onboarding/profile page.
+- First-run cards (src/components/FirstRunCard.tsx): one sentence, tap to dismiss, never again; seen = localStorage +
+  user_baselines.ui_prefs.seen_first_run. Placed on Home ("Tap a session to open it."), State ("Status, Adjust and
+  Schedule are three readings of the same week. Tap one."), the strength logger ("Tap Done on a set when you finish it.").
+  AppContext.loadUserBaselines now returns ui_prefs (it never did, so the account copy of every UI pref was dead).
+Unverified on a screen: all of the above sits behind sign-in and this chat does not type passwords. Build passes; the
+data paths were read in code. First person through it should be Michael on the web or TestFlight.
+
 ## Still on the list
 1. New-user spec: both front doors (connect Garmin/Strava · use my phone), first-run cards, one per screen. Write spec, then build.
 2. Strength popup polish: rating first on a lift, "estimated" until rated. Not gated.

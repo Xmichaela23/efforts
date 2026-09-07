@@ -49,12 +49,48 @@ const StravaCallback: React.FC = () => {
         }
 
         setStatus('success');
-        setMessage('Successfully connected to Strava!');
+        setMessage('Connected to Strava. Pulling your last 90 days…');
+
+        // Pull history without a second trip to Connections (2026-09-07): a new athlete's numbers come
+        // from these activities, and the old flow sent them Home with nothing imported. Same call the
+        // Connections button makes, 90 days instead of 30 so the run and ride learners have enough.
+        try {
+          const { data: conn } = await supabase
+            .from('device_connections')
+            .select('connection_data, access_token, refresh_token')
+            .eq('user_id', userId)
+            .filter('provider', 'eq', 'strava')
+            .single();
+          const accessToken = (conn?.connection_data?.access_token || conn?.access_token) as string | undefined;
+          const refreshToken = (conn?.connection_data?.refresh_token || conn?.refresh_token) as string | undefined;
+          if (accessToken) {
+            const endD = new Date();
+            const startD = new Date();
+            startD.setDate(startD.getDate() - 90);
+            const { data: result } = await supabase.functions.invoke('import-strava-history', {
+              body: {
+                userId,
+                accessToken,
+                refreshToken,
+                importType: 'historical',
+                startDate: startD.toISOString().split('T')[0],
+                endDate: endD.toISOString().split('T')[0],
+              },
+            });
+            const imported = Number(result?.imported ?? 0);
+            setMessage(imported > 0
+              ? `Connected to Strava. ${imported} activities imported.`
+              : 'Connected to Strava. No activities in the last 90 days.');
+          }
+        } catch (e) {
+          console.warn('[StravaCallback] history import skipped:', e);
+          setMessage('Connected to Strava. History can be imported from Connections.');
+        }
 
         // Redirect back to main app
         setTimeout(() => {
           navigate('/');
-        }, 2000);
+        }, 1500);
 
       } catch (error) {
         console.error('Error handling Strava callback:', error);

@@ -419,6 +419,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   // Hydrate follow-up UI from `/goals` navigation state, then strip it so refresh/back doesn’t re-apply.
   useEffect(() => {
     const st = location.state as {
+      /** Open the builder straight away (sign-up lands here, RegisterForm 2026-09-07). */
+      openBuilder?: 'train' | 'race' | 'build';
       fromArcSetup?: boolean;
       seasonPlanJustBuilt?: boolean;
       /** Absent or true = show the completion card. The intake passes false — see `complete()`. */
@@ -435,6 +437,13 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     const emptyState = !st || Object.keys(st).length === 0;
 
     if (!emptyState) {
+      if (st.openBuilder) {
+        // A new athlete arriving from sign-up: open the wizard at its first question and strip the
+        // state so back / refresh does not reopen it.
+        setShowBuilder(st.openBuilder);
+        navigate(location.pathname, { replace: true, state: {} });
+        return;
+      }
       let handedToSchedule = false;
       setShowBuilder(null); // builder completed (or arc-setup returned) → close the embedded view, show the result
       if (st.needPaceCalibration) setShowCalibration(true);

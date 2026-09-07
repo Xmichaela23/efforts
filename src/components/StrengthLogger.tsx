@@ -1,3 +1,4 @@
+import FirstRunCard from '@/components/FirstRunCard';
 import { BAR_TYPES } from '@/lib/bar-types';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
@@ -5031,6 +5032,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     >
       {/* Spacer for app header */}
       <div style={{ height: 'calc(var(--header-h, 64px) + env(safe-area-inset-top, 0px))' }} />
+      <div className="px-3 pt-2">
+        <FirstRunCard id="logger">Tap Done on a set when you finish it.</FirstRunCard>
+      </div>
       {/* Rest-timer OVERLAY (D-139 + overlay fix): pinned just below the app header via `sticky`, so it
           stays visible while you scroll the set list. Auto-armed on Done; Skip ENDS the rest. `sticky`
           (not `fixed`) so backdrop-blur ancestors don't break it. Renders nothing when no rest runs. */}

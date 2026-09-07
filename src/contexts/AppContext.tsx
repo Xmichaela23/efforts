@@ -511,6 +511,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // The lock map rides with the row so the Baselines screen can edit it and the resolver can read it.
         locked_baselines: data.locked_baselines || null,
         profile: data.profile || {},
+        // Per-athlete UI preferences (row order, section order, first-run cards seen). select('*')
+        // always fetched it and this return dropped it (2026-09-07), so the account copy never read back.
+        ui_prefs: data.ui_prefs || null,
       };
     } catch (error) {
       console.error('Error in loadUserBaselines:', error);

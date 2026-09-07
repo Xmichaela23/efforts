@@ -446,8 +446,8 @@ const programmeName = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | '
  * and their own figure when it fires, and a second copy here is one more place for it to go stale.
  */
 const STANDARD_FOCUS_REQUIREMENT =
-  'Needs a barbell and plates, a rack and a bench — and a tested squat, bench press, deadlift and '
-  + 'overhead press.';
+  'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in '
+  + 'week one.';
 
 /**
  * ⛔ THE THREE STRENGTH TIERS (SPEC §A). One the previous program spine, three intents — the tier moves accessory

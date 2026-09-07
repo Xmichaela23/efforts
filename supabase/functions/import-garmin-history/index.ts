@@ -139,20 +139,23 @@ Deno.serve(async (req) => {
     const now = new Date();
     const results = [];
 
-    // Process in 24-hour chunks
-    for (let i = 0; i < clampedDays; i++) {
-      const day = new Date(now);
-      day.setUTCDate(day.getUTCDate() - i);
-      
-      const startTime = startOfUtcDaySeconds(day);
-      const endTime = startTime + 86400; // +24 hours
-      
+    // Windows of 30 days, newest first (2026-09-07). Garmin's backfill accepts at most 30 days per
+    // request, so 90 days is three requests, not ninety one-day ones. A window that was already
+    // requested comes back 409 and counts as done: Garmin delivers each activity once, through the
+    // activities webhook, minutes later.
+    const WINDOW_DAYS = 30;
+    const endOfToday = startOfUtcDaySeconds(now) + 86400;
+    for (let offset = 0; offset < clampedDays; offset += WINDOW_DAYS) {
+      const span = Math.min(WINDOW_DAYS, clampedDays - offset);
+      const endTime = endOfToday - offset * 86400;
+      const startTime = endTime - span * 86400;
+
       const result = await triggerBackfillWindow(token, userId, startTime, endTime);
+      if (result.status === 409) { result.ok = true; result.response = 'already requested'; }
       results.push(result);
-      
-      // Add small delay between requests to avoid rate limiting
-      if (i < clampedDays - 1) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+
+      if (offset + WINDOW_DAYS < clampedDays) {
+        await new Promise(resolve => setTimeout(resolve, 250));
       }
     }
 

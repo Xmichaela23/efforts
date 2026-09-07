@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +17,7 @@ interface RegisterFormProps {
 }
 
 const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onSwitchToLogin }) => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -48,6 +50,10 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onSwitchToLogin 
       if (error) {
         setError(error.message);
       } else {
+        // Sign-up returns a session straight away (email confirmation is off), and AuthWrapper's auth
+        // listener picks it up. Land the new athlete in the plan builder, not on an empty Home: the
+        // Goals screen reads `openBuilder` from the navigation state and opens the wizard (2026-09-07).
+        navigate('/goals', { replace: true, state: { openBuilder: 'train' } });
         onSuccess();
       }
     } catch (error) {
@@ -69,12 +75,6 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onSwitchToLogin 
           />
         </div>
         <p className="mt-5 text-sm text-zinc-400">Create your account</p>
-        <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-950/25 p-3">
-          <p className="text-sm text-amber-100/90">
-            efforts is currently in development. By registering, you&apos;ll be notified when the app
-            becomes available.
-          </p>
-        </div>
       </div>
 
       <form onSubmit={handleRegister} className="space-y-4">

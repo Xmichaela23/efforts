@@ -1,3 +1,4 @@
+import FirstRunCard from '@/components/FirstRunCard';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, getStoredUserId } from '@/lib/supabase';
@@ -293,6 +294,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   // Unified lookup - use week range for training plan context, but filter items to active date
   const { items: allUnifiedItems = [], loading: unifiedLoading, trainingPlanContext } = useWeekUnified(fromISO, toISO);
+  // First card (2026-09-07): an athlete with no plan at all gets two doors in the empty space
+  // where a session would sit, instead of a 38%-opacity line that vanishes when one fetch fails.
+  // `detailedPlans` is every plan on the account (AppContext), `trainingPlanContext` the week's.
+  const noPlanYet = !loading && !unifiedLoading && !trainingPlanContext
+    && Object.keys(detailedPlans ?? {}).length === 0;
   
   // Filter to only items for the active date
   const unifiedItems = allUnifiedItems.filter((item: any) => {
@@ -1639,7 +1645,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </div>
         ) : null}
 
-        {homeArcReady && arcLineText ? (
+        {!noPlanYet ? (
+          <div className="flex-shrink-0 px-2 pt-2">
+            <FirstRunCard id="home">Tap a session to open it.</FirstRunCard>
+          </div>
+        ) : null}
+
+        {homeArcReady && arcLineText && !(arcNeedsGoals && noPlanYet) ? (
           <div className="flex-shrink-0 px-2 pt-2 pb-1">
             {arcNeedsGoals ? (
               <button
@@ -1676,7 +1688,32 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             Option C: slightly wider rail + Today blocks get a small bleed.
             Calendar/week strip spacing is untouched (handled in `WorkoutCalendar`). */}
         <div className="px-2 overflow-x-hidden" style={{ paddingBottom: hasExpandedWorkout ? 120 : 56 }}>
-        {displayWorkouts.length === 0 ? (
+        {displayWorkouts.length === 0 && noPlanYet ? (
+          <div className="px-2 pt-3">
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+              <p className="m-0 text-white/90 text-base">No plan yet.</p>
+              <p className="m-0 mt-1 text-white/55 text-sm">
+                Build one around the riding and running you already do, or connect a watch first so the numbers come from your own sessions.
+              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate('/goals', { state: { openBuilder: 'train' } })}
+                  className="w-full text-left rounded-xl border border-white/25 bg-white/[0.08] px-4 py-3 text-white/90 text-sm"
+                >
+                  Build a plan ›
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/connections')}
+                  className="w-full text-left rounded-xl border border-white/25 bg-white/[0.08] px-4 py-3 text-white/90 text-sm"
+                >
+                  Connect Garmin or Strava ›
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : displayWorkouts.length === 0 ? (
           // Empty state - show "Rest" if there's an active plan, otherwise "No effort"
           <div className="flex items-center justify-center h-full px-4">
             <p className="text-center text-lg font-medium italic" style={{ color: 'rgba(255, 255, 255, 0.25)' }}>
