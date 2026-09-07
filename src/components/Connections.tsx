@@ -966,9 +966,9 @@ const Connections: React.FC = () => {
   const getProviderDescription = (provider: string) => {
     switch (provider) {
       case 'strava':
-        return 'Connect your Strava account to automatically import your activities.';
+        return 'Connect Strava and new activities arrive on their own after each workout.';
       case 'garmin':
-        return 'Connect your Garmin account to automatically import your activities.';
+        return 'Connect Garmin and new activities arrive on their own after each workout.';
       default:
         return `Connect your ${provider} account to sync data.`;
     }
@@ -1052,13 +1052,14 @@ const Connections: React.FC = () => {
                         ✓ Connected to {getProviderName(connection.provider)}
                       </span>
                     </div>
+                    <p className="m-0 mt-1.5 text-[12px] text-white/60">New activities arrive on their own. The buttons below pull in past ones.</p>
                   </div>
                   )}
 
                   {/* Last Sync - only show for Strava */}
                   {connection.provider === 'strava' && (
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-white/60">Last Import:</span>
+                      <span className="text-white/60">Last pull of past activities:</span>
                       <span className="flex items-center space-x-1 text-white/80">
                         <Clock className="h-3 w-3" />
                         <span>
@@ -1171,7 +1172,7 @@ const Connections: React.FC = () => {
                             const end = new Date(stravaEndDate + 'T00:00:00');
                             return `Import ${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
                           }
-                          return 'Import Last 30 Days';
+                          return 'Pull in the last 30 days';
                         })()}
                       </Button>
                     )}
@@ -1185,7 +1186,7 @@ const Connections: React.FC = () => {
                         className="rounded-full bg-white/[0.08] backdrop-blur-lg border border-white/25 text-white/90 hover:bg-white/[0.12]"
                       >
                         <Zap className="h-4 w-4 mr-2" />
-                        Import Last 90 Days
+                        Ask Garmin for the last 90 days
                       </Button>
                     )}
 
