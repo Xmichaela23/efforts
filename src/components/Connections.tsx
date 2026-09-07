@@ -875,14 +875,13 @@ const Connections: React.FC = () => {
         throw new Error('Not authenticated');
       }
 
-      // Delete from user_connections
-      const { error } = await supabase
-        .from('user_connections')
-        .delete()
-        .eq('user_id', authUser.id)
-        .filter('provider', 'eq', 'garmin');
-
+      // Server-side disconnect: tells Garmin we are letting go of the user (their deregistration call),
+      // then deletes our Garmin rows in both connection tables. Identity comes from the JWT.
+      const { data: result, error } = await supabase.functions.invoke('disconnect-connection', {
+        body: { provider: 'garmin' }
+      });
       if (error) throw error;
+      if (result && result.success !== true) throw new Error(result.error || 'Disconnect did not complete');
 
       // Update UI state
       setGarminConnected(false);

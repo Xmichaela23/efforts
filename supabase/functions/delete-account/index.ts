@@ -5,6 +5,9 @@
 // from the body, so the only account this can delete is the caller's.
 //
 // Order:
+//   0. tell the providers we are letting go of the user (docs/WORKORDER-garmin-partner-readiness-2026-09-07.md §2):
+//      Garmin DELETE wellness-api/rest/user/registration, Strava POST oauth/deauthorize — with the stored
+//      tokens, before the sweep takes them. Logged; a failure there never blocks the delete.
 //   1. every object under avatars/<uid>/ in storage
 //   2. delete_user_data(uid) — a SECURITY DEFINER SQL function (migration 20260906120000) that sweeps
 //      every public table with a `user_id` column, discovered at run time from information_schema, so
@@ -14,6 +17,7 @@
 //   4. { deleted: true }; the uid and per-table counts go to the function log.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireUser } from '../_shared/require-user.ts';
+import { connectedProviders, deregisterGarmin, deauthorizeStrava } from '../_shared/provider-deregister.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -54,6 +58,11 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const providers = await connectedProviders(admin, userId);
+    const notified: Record<string, unknown> = {};
+    if (providers.includes('garmin')) notified.garmin = await deregisterGarmin(admin, userId);
+    if (providers.includes('strava')) notified.strava = await deauthorizeStrava(admin, userId);
+
     const avatars = await deleteAvatars(userId);
 
     const { data: counts, error: rpcErr } = await admin.rpc('delete_user_data', { uid: userId });
@@ -62,7 +71,7 @@ Deno.serve(async (req) => {
     const { error: authErr } = await admin.auth.admin.deleteUser(userId);
     if (authErr) throw new Error(`auth delete: ${authErr.message}`);
 
-    console.log(JSON.stringify({ event: 'account_deleted', user_id: userId, avatars, tables: counts }));
+    console.log(JSON.stringify({ event: 'account_deleted', user_id: userId, avatars, tables: counts, providers_notified: notified }));
     return json({ deleted: true });
   } catch (e) {
     console.error(JSON.stringify({ event: 'account_delete_failed', user_id: userId, error: `${e}` }));

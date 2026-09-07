@@ -9,3 +9,6 @@ verify_jwt = false
 
 [functions.garmin-webhook-activities]
 verify_jwt = false
+
+[functions.garmin-webhook-user]
+verify_jwt = false

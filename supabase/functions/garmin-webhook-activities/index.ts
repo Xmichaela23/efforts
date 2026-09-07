@@ -1,5 +1,19 @@
 // @ts-nocheck
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { checkWebhookSecret, LEGACY_URL_ACCEPTED_UNTIL } from '../_shared/webhook-secret.ts';
+
+/**
+ * Permission gate (docs/WORKORDER-garmin-partner-readiness-2026-09-07.md §1): garmin-webhook-user stores
+ * Garmin's userPermissionsChange list on connection_data.garmin_permissions. When a list is stored and
+ * ACTIVITY_EXPORT is not in it, the user has withdrawn activity access and we must not pull. No list stored
+ * (the user never narrowed anything) → allowed.
+ */
+function activityExportAllowed(connectionData) {
+  const perms = connectionData?.garmin_permissions;
+  if (!Array.isArray(perms)) return true;
+  return perms.map((p) => String(p).toUpperCase()).includes('ACTIVITY_EXPORT');
+}
+
 Deno.serve(async (req)=>{
   // Only handle POST requests
   if (req.method !== 'POST') {
@@ -7,6 +21,14 @@ Deno.serve(async (req)=>{
       status: 405
     });
   }
+  // Callback-URL secret (§3). The bare URL registered in the Garmin portal before the switch is accepted
+  // until LEGACY_URL_ACCEPTED_UNTIL and logged as 'legacy'; after that it is a 401.
+  const auth = checkWebhookSecret(req, LEGACY_URL_ACCEPTED_UNTIL);
+  if (!auth.ok) {
+    console.warn(JSON.stringify({ event: 'garmin_webhook_refused', mode: auth.mode }));
+    return new Response('Unauthorized', { status: 401 });
+  }
+  console.log(JSON.stringify({ event: 'garmin_webhook_auth', mode: auth.mode }));
   try {
     // Parse the incoming webhook payload
     const payload = await req.json();
@@ -189,7 +211,7 @@ async function processActivities(activities) {
   const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
   for (const activity of activities){
     try {
-      const { data: connections } = await supabase.from('user_connections').select('user_id').eq('provider', 'garmin').eq('connection_data->>user_id', activity.userId).limit(1);
+      const { data: connections } = await supabase.from('user_connections').select('user_id, connection_data').eq('provider', 'garmin').eq('connection_data->>user_id', activity.userId).limit(1);
       const connection = connections?.[0];
       if (!connection) {
         console.log(`No user found for Garmin userId: ${activity.userId}`);
@@ -197,6 +219,10 @@ async function processActivities(activities) {
       }
       if (!connection.user_id) {
         console.log(`Found connection but user_id is null for Garmin userId: ${activity.userId}`);
+        continue;
+      }
+      if (!activityExportAllowed(connection.connection_data)) {
+        console.log(JSON.stringify({ event: 'garmin_activity_skipped_no_permission', user_id: connection.user_id, summaryId: activity.summaryId }));
         continue;
       }
 
@@ -332,6 +358,10 @@ async function processActivityDetails(activityDetails) {
       }
       if (!connection.user_id) {
         console.log(`Found connection but user_id is null for Garmin userId: ${activity.userId}`);
+        continue;
+      }
+      if (!activityExportAllowed(connection.connection_data)) {
+        console.log(JSON.stringify({ event: 'garmin_activity_skipped_no_permission', user_id: connection.user_id, summaryId: activity.summaryId }));
         continue;
       }
 

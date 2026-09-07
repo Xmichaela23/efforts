@@ -1,5 +1,38 @@
 # Deploy-Owed / Post-Deploy Verification
 
+> ## 2026-09-07 — GARMIN PARTNER READINESS (docs/WORKORDER-garmin-partner-readiness-2026-09-07.md). **PUSHED, FUNCTIONS DEPLOYED, THROWAWAY-VERIFIED, MIGRATION OWED, PORTAL OWED.**
+>
+> **EDGE FUNCTIONS DEPLOYED** 2026-09-07 02:02 UTC, versions from `supabase functions list`: `garmin-webhook-user` **v1** (new) ·
+> `garmin-webhook-activities` **v114** · `disconnect-connection` **v24** · `delete-account` **v3**. Shared files they carry:
+> `_shared/webhook-secret.ts` (new, the two webhooks) and `_shared/provider-deregister.ts` (new, the other three). No other
+> function imports either. **SECRET SET:** `GARMIN_WEBHOOK_SECRET` (function secret, 64 hex chars; the value is in the Supabase
+> dashboard → Edge Functions → Secrets, and in the session's chat report). **CLIENT:** Netlify from main; `npm run ios` run.
+>
+> **OWED TO MICHAEL — SQL editor:** `supabase/migrations/20260907020000_connection_events.sql` (the `connection_events` table;
+> service role only). Until it is in, every writer logs the event to the function log and carries on — the throwaway saw the
+> `404` and nothing else failed. **OWED TO MICHAEL — Garmin developer portal:** register the two callback URLs (with `?k=<secret>`)
+> from the chat report: `garmin-webhook-activities` for activities + activity details, `garmin-webhook-user` for deregistrations +
+> user permission changes. The bare activities URL keeps working until **2026-09-14 02:00 UTC** (`LEGACY_URL_ACCEPTED_UNTIL`,
+> logged as `mode: legacy`), then 401 with no redeploy. `garmin-webhook-user` never had a bare URL and is strict from v1.
+>
+> **THROWAWAY (`scripts/_burner-garmin-2026-09-07.mjs`, one account, real deployed functions, deleted after):**
+> deregistration without the key 401 · wrong key 401 · with the key 200 → connection row gone, the Garmin-sourced workout and its
+> `workout_facts` + `workout_data` rows gone, `garmin_activities` gone, the non-Garmin workout and ITS facts row remain, the auth
+> user remains · `userPermissionsChange` 200 → `connection_data.garmin_permissions = ["HEALTH_EXPORT"]` stored, rest of
+> connection_data kept · activities webhook: key 200, bare 200 (legacy), wrong key 200 (legacy); user webhook bare 401 ·
+> `disconnect-connection garmin` as the user → 200, `user_connections` row gone, **the Garmin deregistration request was sent
+> and Garmin answered 400** for the fake token (`provider_attempted: true, provider_status: 400`), anon key + body userId → 401 ·
+> `delete-account` → 200, user 404, 0 rows.
+>
+> **NEEDS GARMIN'S SANDBOX (cannot be verified with a fake token):** a 204 from `DELETE wellness-api/rest/user/registration`
+> with a real token; Garmin's real deregistration / permission-change payloads arriving at the new URL; the activities webhook
+> skipping an activity after `ACTIVITY_EXPORT` is withdrawn (the gate is code-traced: `activityExportAllowed` in both the
+> summary and the details path). **Also new:** the client's Garmin disconnect now calls `disconnect-connection` instead of
+> deleting `user_connections` itself, so the Garmin call happens on every disconnect; Strava disconnect also tells Strava
+> (`POST oauth/deauthorize`) — not throwaway-tested (no Strava row on the throwaway). Removed: the stray
+> `supabase/functions/garmin-webhook-activities-working.ts`. Privacy page: a "Connected Services: Garmin and Strava" section —
+> **Michael reads it before the meeting** (`src/pages/Privacy.tsx`, live at `/privacy`).
+
 > ## 2026-09-06 (night) — ACCOUNT: forgot password, /reset-password, change password / email, sign out, delete account (docs/WORKORDER-account-2026-09-06.md). **PUSHED, WEB LIVE, FUNCTION DEPLOYED, MIGRATION APPLIED, THROWAWAY-VERIFIED, NOT DEVICE-VERIFIED.**
 >
 > **PUSHED:** `origin/main == aec5122f`. **WEB:** Netlify built it (GitHub status "Deployment has completed"); the served bundle

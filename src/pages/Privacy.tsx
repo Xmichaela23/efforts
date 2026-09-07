@@ -45,7 +45,26 @@ export default function Privacy({ onBack }: PrivacyProps) {
                 <ul className="space-y-2 ml-4">
                   <li className="text-white">• User account details (such as name and email address)</li>
                   <li className="text-white">• Workout, activity, and health-related data you choose to log</li>
-                  <li className="text-white">• Device data (when authorized)</li>
+                  <li className="text-white">• Activity data from services you connect (Garmin, Strava), described below</li>
+                </ul>
+              </div>
+
+              <div className="space-y-3">
+                <h2 className="text-xl font-semibold text-white">Connected Services: Garmin and Strava</h2>
+                <p className="text-white">
+                  When you connect a Garmin account, Garmin sends us your activities as you record them. From each activity we read
+                  the activity type, start time, duration, distance, calories, speed and pace, heart rate, cadence, power, elevation,
+                  starting location, device name, laps, and the per-second recording (heart rate, speed, position, elevation, temperature).
+                  We use it to show your training and to shape your plan. If you ask, we send a planned workout to your Garmin device.
+                </p>
+                <p className="text-white">
+                  When you connect a Strava account, Strava sends us the same kind of activity data, and we read it the same way.
+                </p>
+                <ul className="space-y-2 ml-4">
+                  <li className="text-white">• When you disconnect Garmin or Strava in Efforts, we tell that service to stop sending us your data and we remove our access to it.</li>
+                  <li className="text-white">• When you remove Efforts from your Garmin account, Garmin tells us, we stop reading your Garmin data, and we delete the activities and connection details we received from Garmin. Your Efforts account and everything you logged yourself stay.</li>
+                  <li className="text-white">• When you delete your Efforts account, we tell Garmin and Strava to stop, and all of your data, including everything received from them, is permanently deleted.</li>
+                  <li className="text-white">• We do not sell Garmin or Strava data, and we do not share it with anyone else.</li>
                 </ul>
               </div>
 
