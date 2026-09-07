@@ -48,7 +48,7 @@ export function MobileHeader({
 
   // Opens the support page rather than an empty email. The page answers the common questions and
   // carries the address for anything it does not. It is also the support site given to Strava and Garmin.
-  const openHelpEmail = () => navigate('/support');
+  const openHelpEmail = () => navigate('/help');
 
   const handleLogout = async () => {
     if (onLogout) {

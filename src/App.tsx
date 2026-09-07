@@ -35,7 +35,8 @@ const App = () => (
 <Route path="/profile/athletic-record" element={<Index />} />
 <Route path="/account" element={<Index />} />
 <Route path="/privacy" element={<Privacy />} />
-<Route path="/support" element={<Support />} />
+<Route path="/support" element={<Support />} /> {/* public: no session needed, the address given to Strava and Garmin */}
+<Route path="/help" element={<Index />} />
 <Route path="/reset-password" element={<ResetPassword />} /> {/* opened from the reset email; no session needed */}
 <Route path="/strava/callback" element={<StravaCallback />} /> {/* ✅ UNCOMMENTED */}
 <Route path="/auth/garmin/callback" element={<GarminCallback />} />
