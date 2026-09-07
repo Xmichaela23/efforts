@@ -271,7 +271,22 @@ export function generateCyclingAdherenceSummary(opts: {
 
   // Per-interval hit rate. Same hit-window [85, 115] as running (analyze-running-workout
   // uses the same threshold) and as compute-facts/buildRideFacts (intervals_hit logic).
-  const hits = workIntervals.filter((i) => {
+  // ⛔ JUDGE POWER, NOT TIME (2026-09-07). The stored interval's `executed.adherence_percentage` is the share
+  // of the PLANNED DURATION ridden (Michael's 87-min ride: 59% of a 165-min steady block), and this read it
+  // as a power ratio, so "0 of 1 on target" sat two lines under "100% of time within the prescribed power
+  // range". A work interval is on target when its average power sits inside the prescribed range, or within
+  // ±15% of the range's midpoint when there is no range. The time share falls back only when no power exists.
+  const hits = workIntervals.filter((i: any) => {
+    const avg = Number(i?.executed?.avg_power_w ?? i?.executed?.avg_power ?? i?.avg_power);
+    const lo = Number(i?.planned?.power_range?.lower), hi = Number(i?.planned?.power_range?.upper);
+    if (Number.isFinite(avg) && avg > 0 && Number.isFinite(lo) && Number.isFinite(hi) && hi > 0) {
+      const mid = (lo + hi) / 2;
+      return (avg >= lo && avg <= hi) || (avg >= mid * 0.85 && avg <= mid * 1.15);
+    }
+    const target = Number(i?.planned?.power_watts ?? i?.planned?.power ?? i?.target_power);
+    if (Number.isFinite(avg) && avg > 0 && Number.isFinite(target) && target > 0) {
+      return avg >= target * 0.85 && avg <= target * 1.15;
+    }
     const adh = i.adherence_percentage ?? i.adherence ?? 100;
     return adh >= 85 && adh <= 115;
   }).length;
