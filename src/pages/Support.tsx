@@ -14,15 +14,9 @@ interface SupportProps {
 export default function Support({ onBack }: SupportProps) {
   const navigate = useNavigate();
 
-  const handleBack = () => {
-    if (onBack) {
-      onBack();
-    } else if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate('/');
-    }
-  };
+  // Always the app, never browser history. Reached from a link in the Strava or Garmin listing there is
+  // no history to go back to, and stepping back landed the visitor on whatever they were reading before.
+  const handleBack = () => (onBack ? onBack() : navigate('/'));
 
   return (
     <div className="mobile-app-container">
