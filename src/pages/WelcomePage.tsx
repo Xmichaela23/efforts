@@ -164,13 +164,19 @@ export default function WelcomePage() {
 
   const go = (s: Step) => { writeStep(s); setStep(s); };
 
-  /** The same save Profile uses, over whatever is already on the row. */
-  const persist = useCallback(async (patch: (b: any) => any) => {
-    const current = (await loadUserBaselines?.()) ?? {
-      disciplines: [], performanceNumbers: {}, equipment: {}, units: 'imperial',
-      disciplineFitness: {}, benchmarks: {}, injuryHistory: '', injuryRegions: [], trainingBackground: '',
+  /** The same save Profile uses, over whatever is already on the row. Saves run one after another
+   *  (a row's blur-save and Next can fire in the same tick; the second must read the first's result). */
+  const queue = React.useRef<Promise<void>>(Promise.resolve());
+  const persist = useCallback((patch: (b: any) => any) => {
+    const run = async () => {
+      const current = (await loadUserBaselines?.()) ?? {
+        disciplines: [], performanceNumbers: {}, equipment: {}, units: 'imperial',
+        disciplineFitness: {}, benchmarks: {}, injuryHistory: '', injuryRegions: [], trainingBackground: '',
+      };
+      await saveUserBaselines?.(patch(current));
     };
-    await saveUserBaselines?.(patch(current));
+    queue.current = queue.current.then(run, run);
+    return queue.current;
   }, [loadUserBaselines, saveUserBaselines]);
 
   const aboutYouPatch = (b: any) => ({
@@ -373,11 +379,11 @@ export default function WelcomePage() {
             <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
               <div className="px-3 py-3">
                 <SectionHead Icon={User} label="You" colour="rgba(255,255,255,0.7)" />
-                <NumberRow id="name" name="Name" inputType="text" value={name} seed={name ?? ''} onSave={(t) => setName(t.trim() || null)} />
-                <NumberRow id="birthday" name="Birthday" inputType="date" value={birthday ? `${fmtBirthday(birthday)}${calculateAge(birthday) != null ? ` · ${calculateAge(birthday)} yrs` : ''}` : null} seed={birthday ?? ''} onSave={(t) => { if (/^\d{4}-\d{2}-\d{2}$/.test(t)) setBirthday(t); }} />
-                <NumberRow id="units" name="Units" value={null} right={segmented<'imperial' | 'metric'>([{ v: 'imperial', label: 'lb · mi' }, { v: 'metric', label: 'kg · km' }], units, setUnits)} />
-                <NumberRow id="height" name="Height" hint={metric ? 'cm' : 'in'} inputMode="numeric" value={height ? `${height} ${metric ? 'cm' : 'in'}` : null} seed={height ? String(height) : ''} onSave={(t) => { const v = parseInt(t); if (Number.isFinite(v) && v > 0) setHeight(v); }} />
-                <NumberRow id="weight" name="Weight" hint={metric ? 'kg' : 'lb'} inputMode="numeric" value={weight ? `${weight} ${metric ? 'kg' : 'lb'}` : null} seed={weight ? String(weight) : ''} onSave={(t) => { const v = parseInt(t); if (Number.isFinite(v) && v > 0) setWeight(v); }} />
+                <NumberRow id="name" name="Name" inputType="text" value={name} seed={name ?? ''} saveOnBlur onSave={(t) => { const v = t.trim() || null; setName(v); if (v) void persist((b) => ({ ...b, profile: { ...(b.profile ?? {}), name: v } })); }} />
+                <NumberRow id="birthday" name="Birthday" inputType="date" value={birthday ? `${fmtBirthday(birthday)}${calculateAge(birthday) != null ? ` · ${calculateAge(birthday)} yrs` : ''}` : null} seed={birthday ?? ''} saveOnBlur onSave={(t) => { if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return; setBirthday(t); void persist((b) => ({ ...b, birthday: t })); }} />
+                <NumberRow id="units" name="Units" value={null} right={segmented<'imperial' | 'metric'>([{ v: 'imperial', label: 'lb · mi' }, { v: 'metric', label: 'kg · km' }], units, (u) => { setUnits(u); void persist((b) => ({ ...b, units: u })); })} />
+                <NumberRow id="height" name="Height" hint={metric ? 'cm' : 'in'} inputMode="numeric" value={height ? `${height} ${metric ? 'cm' : 'in'}` : null} seed={height ? String(height) : ''} saveOnBlur onSave={(t) => { const v = parseInt(t); if (!(Number.isFinite(v) && v > 0)) return; setHeight(v); void persist((b) => ({ ...b, height: v })); }} />
+                <NumberRow id="weight" name="Weight" hint={metric ? 'kg' : 'lb'} inputMode="numeric" value={weight ? `${weight} ${metric ? 'kg' : 'lb'}` : null} seed={weight ? String(weight) : ''} saveOnBlur onSave={(t) => { const v = parseInt(t); if (!(Number.isFinite(v) && v > 0)) return; setWeight(v); void persist((b) => ({ ...b, weight: v })); }} />
                 <p className="mt-2 text-[12px] text-white/45">Tap a value to change it.</p>
               </div>
 
@@ -420,7 +426,7 @@ export default function WelcomePage() {
                   return (
                     <NumberRow key={lift.key} id={lift.key} name={lift.label} hint={unit} inputMode="numeric" sport="strength"
                       value={v != null ? `${Math.round(v)} ${unit} · your number` : null} seed={v != null ? String(Math.round(v)) : ''}
-                      onSave={(t) => { const n = Math.round(Number(t)); if (!(n > 0)) return; setPn((p) => ({ ...p, [lift.key]: n })); setLocked((l) => ({ ...l, [lift.key]: n })); }} />
+                      saveOnBlur onSave={(t) => { const n = Math.round(Number(t)); if (!(n > 0)) return; setPn((p) => ({ ...p, [lift.key]: n })); setLocked((l) => ({ ...l, [lift.key]: n })); void persist((b) => ({ ...b, performanceNumbers: { ...(b.performanceNumbers ?? {}), [lift.key]: n }, locked_baselines: { ...(b.locked_baselines ?? {}), [lift.key]: n } })); }} />
                   );
                 })}
                 <p className="m-0 mt-2 text-[12px] text-white/50">Anything left blank is measured in week one.</p>
@@ -446,16 +452,16 @@ export default function WelcomePage() {
                 <p className="m-0 mb-1 text-[13px] text-white/80 leading-snug">Know them? Add them. Or test with our tests.</p>
                 <NumberRow id="threshold" name="Threshold pace" hint={metric ? 'm:ss/km' : 'm:ss/mi'} inputMode="numeric" sport="run"
                   value={thr.sec_per_mi != null ? `${paceToText(metric ? thr.sec_per_mi / 1.609344 : thr.sec_per_mi)}/${metric ? 'km' : 'mi'} · ${numberWord(thr.source, thrMine)}` : null}
-                  onSave={(t) => { const sec = parsePaceText(t); if (sec == null) return; const secPerMi = metric ? sec * 1.609344 : sec; setPn((p) => ({ ...p, threshold_pace_min_per_mi: paceToText(secPerMi), threshold_pace_source: 'manual' })); }} />
+                  saveOnBlur onSave={(t) => { const sec = parsePaceText(t); if (sec == null) return; const secPerMi = metric ? sec * 1.609344 : sec; const str = paceToText(secPerMi); setPn((p) => ({ ...p, threshold_pace_min_per_mi: str, threshold_pace_source: 'manual' })); void persist((b) => ({ ...b, performanceNumbers: { ...(b.performanceNumbers ?? {}), threshold_pace_min_per_mi: str, threshold_pace_source: 'manual' } })); }} />
                 <NumberRow id="fiveK" name="5K time" hint="mm:ss" inputMode="numeric" sport="run"
                   value={fiveK ? `${fiveK} · ${pn.fiveK_source === 'manual' ? 'your number' : 'auto'}` : null} seed={fiveK || ''}
-                  onSave={(t) => { if (!/^\d{1,2}:\d{2}$/.test(t.trim())) return; setPn((p) => ({ ...p, fiveK: t.trim(), fiveK_source: 'manual' })); }} />
+                  saveOnBlur onSave={(t) => { if (!/^\d{1,2}:\d{2}$/.test(t.trim())) return; const v = t.trim(); setPn((p) => ({ ...p, fiveK: v, fiveK_source: 'manual' })); void persist((b) => ({ ...b, performanceNumbers: { ...(b.performanceNumbers ?? {}), fiveK: v, fiveK_source: 'manual' } })); }} />
                 <NumberRow id="easyhr" name="Easy heart rate" hint="threshold bpm" inputMode="numeric" sport="run" note={easyLo == null ? null : null}
                   value={easyLo != null && easyHi != null ? `${easyLo}–${easyHi} bpm · ${manualRunLthr ? 'your number' : 'auto'}` : null} seed={lthr ? String(Math.round(lthr)) : ''}
-                  onSave={(t) => { const v = parseInt(t); if (Number.isFinite(v) && v > 80 && v < 230) setManualRunLthr(v); }} />
+                  saveOnBlur onSave={(t) => { const v = parseInt(t); if (!(Number.isFinite(v) && v > 80 && v < 230)) return; setManualRunLthr(v); const uid = getStoredUserId(); if (!uid) return; void supabase.from('user_baselines').select('configured_hr_zones').eq('user_id', uid).maybeSingle().then(({ data }) => { const cfg: any = typeof data?.configured_hr_zones === 'string' ? JSON.parse(data.configured_hr_zones) : (data?.configured_hr_zones ?? {}); return supabase.from('user_baselines').update({ configured_hr_zones: { ...cfg, manual_run_lthr: v } }).eq('user_id', uid); }); }} />
                 <NumberRow id="ftp" name="FTP" hint="W" inputMode="numeric" sport="bike"
                   value={ftp.value != null ? `${Math.round(Number(ftp.value))} W · ${numberWord(ftp.source, ftpMine)}` : null}
-                  onSave={(t) => { const v = Math.round(Number(t)); if (!(v > 0)) return; setPn((p) => ({ ...p, ftp: v, ftp_source: 'manual' })); }} />
+                  saveOnBlur onSave={(t) => { const v = Math.round(Number(t)); if (!(v > 0)) return; setPn((p) => ({ ...p, ftp: v, ftp_source: 'manual' })); void persist((b) => ({ ...b, performanceNumbers: { ...(b.performanceNumbers ?? {}), ftp: v, ftp_source: 'manual' } })); }} />
               </div>
             </div>
           </StepLayout>

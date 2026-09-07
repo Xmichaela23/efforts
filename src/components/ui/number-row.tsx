@@ -40,9 +40,12 @@ export type NumberRowProps = {
   seed?: string;
   /** A custom control in place of the pill (e.g. a units toggle). */
   right?: React.ReactNode;
+  /** Save when the field loses focus (a typed value survives tapping Next). Off by default: Profile
+   *  keeps the explicit save so a stray tap cannot commit a half-typed number. */
+  saveOnBlur?: boolean;
 };
 
-export function NumberRow({ id, name, value, editable = true, hint, sport, note, mine = false, onSave, onAuto, onEditStart, inputMode, inputType = 'number', seed, right }: NumberRowProps) {
+export function NumberRow({ id, name, value, editable = true, hint, sport, note, mine = false, onSave, onAuto, onEditStart, inputMode, inputType = 'number', seed, right, saveOnBlur = false }: NumberRowProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const colour = colourOf(sport);
@@ -57,10 +60,11 @@ export function NumberRow({ id, name, value, editable = true, hint, sport, note,
           <span className="flex items-center gap-2 min-w-0">
             <input autoFocus value={draft} onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') void save(); if (e.key === 'Escape') close(); }}
+              onBlur={(e) => { if (!saveOnBlur) return; const to = e.relatedTarget as HTMLElement | null; if (to?.dataset?.rowControl) return; if (draft.trim()) void save(); else close(); }}
               type={inputType === 'date' ? 'date' : 'text'} inputMode={inputMode ?? (inputType === 'text' ? 'text' : 'decimal')} placeholder={hint}
               className={`${wide ? 'w-40' : 'w-24'} min-w-0 bg-white/[0.06] border border-white/20 rounded-md px-2 py-1 text-[16px] text-white/90 ${wide ? '' : 'text-right tabular-nums'} outline-none`} />
-            <button type="button" onClick={() => void save()} className="text-[12px] text-white/80 px-2 py-1 rounded-xl border border-white/15">save</button>
-            <button type="button" onClick={close} className="text-[12px] text-white/45 px-1 py-1">cancel</button>
+            <button type="button" data-row-control="1" onClick={() => void save()} className="text-[12px] text-white/80 px-2 py-1 rounded-xl border border-white/15">save</button>
+            <button type="button" data-row-control="1" onClick={close} className="text-[12px] text-white/45 px-1 py-1">cancel</button>
           </span>
         ) : editable ? (
           <span className="inline-flex shrink-0 max-w-[62%] rounded-xl border overflow-hidden" style={{ borderColor: `${colour}55`, background: `${colour}14` }}>
