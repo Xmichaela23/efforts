@@ -111,7 +111,8 @@ export default function WelcomePage() {
   const [pn, setPn] = useState<Record<string, any>>({});
 
   // Screen 2
-  const [sports, setSports] = useState<Set<string>>(new Set());
+  // Strength is not a choice: every plan in the app carries it. The other three are.
+  const [sports, setSports] = useState<Set<string>>(new Set(['strength']));
   const [gym, setGym] = useState<'commercial' | 'home' | null>(null);
   const [gear, setGear] = useState<Set<string>>(new Set());
   const [swimGear, setSwimGear] = useState<Set<string>>(new Set());
@@ -130,7 +131,7 @@ export default function WelcomePage() {
       if (b.height) setHeight(Number(b.height));
       if (b.weight) setWeight(Number(b.weight));
       if (b.units === 'metric' || b.units === 'imperial') setUnits(b.units);
-      if (Array.isArray(b.disciplines) && b.disciplines.length) setSports(new Set(b.disciplines.map(normalizeDiscipline).filter(Boolean) as string[]));
+      if (Array.isArray(b.disciplines) && b.disciplines.length) setSports(new Set(['strength', ...(b.disciplines.map(normalizeDiscipline).filter(Boolean) as string[])]));
       const st: string[] = Array.isArray(b.equipment?.strength) ? b.equipment.strength : [];
       if (st.includes('Commercial gym')) setGym('commercial');
       else if (st.length) { setGym('home'); setGear(new Set(st)); }
@@ -261,13 +262,13 @@ export default function WelcomePage() {
   // ── Screen 2 ─────────────────────────────────────────────────────────────────────────────
   const toggleIn = (set: React.Dispatch<React.SetStateAction<Set<string>>>) => (v: string) =>
     set((prev) => { const n = new Set(prev); if (n.has(v)) n.delete(v); else n.add(v); return n; });
-  const toggleSport = toggleIn(setSports);
+  const toggleSport = (id: string) => { if (id !== 'strength') toggleIn(setSports)(id); };
   const toggleGear = toggleIn(setGear);
   const toggleSwimGear = toggleIn(setSwimGear);
 
   const liftAnswered = !sports.has('strength') || gym === 'commercial' || (gym === 'home' && gear.size > 0);
-  const canLeaveSports = sports.size > 0 && liftAnswered;
-  const blocked = sports.size === 0 ? 'Tap the sports you do.' : 'Commercial gym, or what you own.';
+  const canLeaveSports = liftAnswered;
+  const blocked = 'Commercial gym, or what you own.';
 
   const sportsPatch = (b: any) => {
     const strength = !sports.has('strength') ? [] : gym === 'commercial' ? ['Commercial gym'] : Array.from(gear);
@@ -354,10 +355,11 @@ export default function WelcomePage() {
 
   /** A sport card lit from the top like the tab bar: lamp and border take the sport's colour. */
   const sportCard = ({ id, label, Icon, colourKey }: (typeof SPORTS)[number]) => {
-    const active = sports.has(id);
+    const fixed = id === 'strength';
+    const active = fixed || sports.has(id);
     const colour = getDisciplineColor(colourKey);
     return (
-      <button key={id} type="button" onClick={() => toggleSport(id)} aria-pressed={active}
+      <button key={id} type="button" onClick={() => toggleSport(id)} aria-pressed={active} aria-disabled={fixed}
         className="relative flex flex-col items-center justify-center gap-1.5 py-5 rounded-xl border-2 transition-colors"
         style={active
           ? { borderColor: `${colour}cc`, background: `linear-gradient(180deg, ${colour}33 0%, rgba(255,255,255,0.05) 60%)`, color: '#fff' }
@@ -368,6 +370,7 @@ export default function WelcomePage() {
         }} />
         <Icon className="h-6 w-6" style={{ color: colour, opacity: active ? 1 : 0.7 }} />
         <span className="text-[14px] tracking-wide">{label}</span>
+        {fixed && <span className="text-[11px] text-white/50 -mt-1">always</span>}
       </button>
     );
   };
