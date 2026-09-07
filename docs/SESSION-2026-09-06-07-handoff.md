@@ -13,8 +13,22 @@ Read this first in a fresh chat. Memory files under ~/.claude/projects/-Users-mi
 - Demo account demo@efforts.work (id 1a1f04d1-…), read-only copy of Michael; teardown `node scripts/delete-demo-account.mjs`. Michael changed its password himself.
 - Tab bar 12px higher; effort scale shared (talk test / reps left); menu order; sport strip swim last.
 
-## Running now
-- Plumbing terminal: docs/WORKORDER-plumbing-2026-09-07.md (queue, alarm, failed on screen, connection health). Expect 2–3 SQL pastes + dashboard steps in its report; check it against the code before Michael pastes.
+## Plumbing — DONE 2026-09-07 (second session, Opus)
+docs/WORKORDER-plumbing-2026-09-07.md is closed out; its status section has the detail.
+Job queue on pg_cron every minute, alarms with email, failed analysis on the card with Try again plus a dot on Home
+and the week, connection health with Reconnect. `JOBS_SECRET` set, three migrations pasted, 20 functions deployed,
+pushed, iOS synced. Verified against the live server with a throwaway account, not fixtures.
+
+Two bugs found while verifying, both fixed and deployed:
+- The callback secret in the URL path never matched (the edge runtime hands the function `/<name>/<secret>`, not
+  `/functions/v1/<name>/<secret>`). Both Garmin webhooks were passing only on the pre-2026-09-14 legacy allowance and
+  would have started refusing Garmin's pushes on that date. A push that still arrives without the secret now raises
+  the alarm `garmin_webhook_legacy_url`, so the portal URL proves itself on the next real ride.
+- `get-week` selected the analysis fields and dropped them when building each row, so the Home and week dot could
+  never appear.
+
+Not verified: the three screens by a human eye (the data behind them is verified), and whether the Garmin portal URL
+carries the right secret (it answers itself, deadline 2026-09-14).
 
 ## Still on the list
 1. New-user spec: both front doors (connect Garmin/Strava · use my phone), first-run cards, one per screen. Write spec, then build.
