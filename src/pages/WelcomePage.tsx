@@ -25,7 +25,9 @@ import { Z2_FLOOR_PCT_LTHR, EASY_CEILING_PCT_LTHR } from '@/lib/friel-zones';
  *   1  About you              the Profile plate's own rows (name, birthday, height, weight, units)
  *   2  Your gym               commercial, or what they own. No sport question: the wizard asks which
  *                             sport goes in each row of the week, and the history says what they do.
- *   3  Your numbers           Connect Strava / Garmin once at the top (fills what it can from 90
+ *   3  Your lifts             squat, bench, deadlift, press as tap-to-add rows (a typed number locks,
+ *                             as on Profile); the tests measure what is left blank in week one.
+ *   4  Your numbers           Connect Strava / Garmin once at the top (fills what it can from 90
  *                             days); a tap-to-change row for each number that EXISTS (threshold pace,
  *                             FTP, pace per 100), one line for everything else: measured in week one.
  *                             The only thing they HAVE to do on this screen is nothing.
@@ -37,11 +39,11 @@ import { Z2_FLOOR_PCT_LTHR, EASY_CEILING_PCT_LTHR } from '@/lib/friel-zones';
  */
 
 const STEP_KEY = 'efforts:intake_step';
-type Step = 1 | 2 | 3;
-const TOTAL = 3;
+type Step = 1 | 2 | 3 | 4;
+const TOTAL = 4;
 
 const readStep = (): Step => {
-  try { const v = Number(localStorage.getItem(STEP_KEY)); return v === 2 || v === 3 ? v : 1; } catch { return 1; }
+  try { const v = Number(localStorage.getItem(STEP_KEY)); return v === 2 || v === 3 || v === 4 ? v : 1; } catch { return 1; }
 };
 const parsePaceText = (t: string): number | null => { const m = t.trim().match(/^(\d{1,2}):(\d{2})$/); if (!m) return null; const sec = Number(m[1]) * 60 + Number(m[2]); return sec > 0 ? sec : null; };
 const paceToText = (sec: number): string => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
@@ -109,6 +111,7 @@ export default function WelcomePage() {
   const [learned, setLearned] = useState<any>(null);
   const [pn, setPn] = useState<Record<string, any>>({});
   const [manualRunLthr, setManualRunLthr] = useState<number | null>(null);
+  const [locked, setLocked] = useState<Record<string, number>>({});
 
   // Screen 2
   const [gym, setGym] = useState<'commercial' | 'home' | null>(null);
@@ -133,6 +136,7 @@ export default function WelcomePage() {
       else if (st.length) { setGym('home'); setGear(new Set(st)); }
       setLearned(b.learned_fitness ?? null);
       setPn({ ...(b.performanceNumbers ?? {}) });
+      if (b.locked_baselines && typeof b.locked_baselines === 'object') setLocked({ ...b.locked_baselines });
     }).catch(() => {});
     // Threshold heart rate lives on its own column; loadUserBaselines does not return it.
     const uid = getStoredUserId();
@@ -187,7 +191,7 @@ export default function WelcomePage() {
   /** Save what is answered before leaving the tab for Strava or Garmin; come back to Your numbers. */
   const saveBeforeLeaving = async () => {
     try { await persist(sportsPatch); } catch { /* keep going */ }
-    writeStep(3);
+    writeStep(4);
   };
 
   const startStrava = async () => {
@@ -296,7 +300,7 @@ export default function WelcomePage() {
   const finish = async () => {
     setSaving(true);
     try {
-      await persist((b) => ({ ...b, performanceNumbers: { ...(b.performanceNumbers ?? {}), ...pn } }));
+      await persist((b) => ({ ...b, performanceNumbers: { ...(b.performanceNumbers ?? {}), ...pn }, locked_baselines: Object.keys(locked).length ? { ...(b.locked_baselines ?? {}), ...locked } : (b.locked_baselines ?? null) }));
       const uid = getStoredUserId();
       if (uid) {
         const { data } = await supabase.from('user_baselines').select('ui_prefs, configured_hr_zones').eq('user_id', uid).maybeSingle();
@@ -402,7 +406,31 @@ export default function WelcomePage() {
         )}
 
         {step === 3 && (
-          <StepLayout step={3} totalSteps={TOTAL} title="Your numbers" subtitle="Runners: threshold pace, 5K pace, easy heart-rate range. Riders: FTP." onBack={() => go(2)} onContinue={() => void finish()} canContinue continueLabel="Next" saving={saving}>
+          <StepLayout step={3} totalSteps={TOTAL} title="Your lifts" subtitle="Plans work from your estimated one-rep max. We encourage our tests, but if you have recent numbers, add them here." onBack={() => go(2)} onContinue={() => go(4)} canContinue continueLabel="Next" saving={saving}>
+            <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
+              <div className="px-3 py-2.5">
+                {([
+                  { key: 'squat', label: 'Squat' },
+                  { key: 'bench', label: 'Bench' },
+                  { key: 'deadlift', label: 'Deadlift' },
+                  { key: 'overheadPress1RM', label: 'Overhead press' },
+                ] as const).map((lift) => {
+                  const unit = metric ? 'kg' : 'lb';
+                  const v = locked[lift.key] ?? (typeof pn[lift.key] === 'number' ? pn[lift.key] : null);
+                  return (
+                    <NumberRow key={lift.key} id={lift.key} name={lift.label} hint={unit} inputMode="numeric" sport="strength"
+                      value={v != null ? `${Math.round(v)} ${unit} · your number` : null} seed={v != null ? String(Math.round(v)) : ''}
+                      onSave={(t) => { const n = Math.round(Number(t)); if (!(n > 0)) return; setPn((p) => ({ ...p, [lift.key]: n })); setLocked((l) => ({ ...l, [lift.key]: n })); }} />
+                  );
+                })}
+                <p className="m-0 mt-2 text-[12px] text-white/50">Anything left blank is measured in week one.</p>
+              </div>
+            </div>
+          </StepLayout>
+        )}
+
+        {step === 4 && (
+          <StepLayout step={4} totalSteps={TOTAL} title="Your numbers" subtitle="Runners: threshold pace, 5K pace, easy heart-rate range. Riders: FTP." onBack={() => go(3)} onContinue={() => void finish()} canContinue continueLabel="Next" saving={saving}>
             <div className={plateClass} style={readoutPlateStyle(undefined, { galaxy: true })}>
               <div className="px-3 py-2.5">
                 <p className="m-0 mb-2 text-[13px] text-white/80 leading-snug">Import your last 90 days and we estimate them.</p>
