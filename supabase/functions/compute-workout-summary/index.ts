@@ -1005,7 +1005,21 @@ Deno.serve(async (req) => {
       if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch { return []; } }
       const arr = Array.isArray(raw) ? raw : (Array.isArray(raw?.laps) ? raw.laps : []);
       const out: Lap[] = [];
-      for (const L of arr) {
+      // Garmin laps carry ONLY a start time (`startTimeInSeconds`, epoch). A lap with no end was
+      // dropped below, so every Garmin lap vanished. Each lap ends where the next begins; the last
+      // one takes the median length of the others (or the activity's end when there is only one).
+      const starts = arr.map((L: any) => Number(L?.startTimeInSeconds ?? L?.start_ts ?? L?.start ?? L?.begin ?? 0));
+      const gaps = starts.slice(1).map((v: number, i: number) => v - starts[i]).filter((g: number) => g > 0).sort((a: number, b: number) => a - b);
+      const medianGap = gaps.length ? gaps[Math.floor(gaps.length / 2)] : 0;
+      for (let li = 0; li < arr.length; li++) {
+        const L = arr[li];
+        const hasEnd = Number(L?.endTimeInSeconds ?? L?.end_ts ?? L?.end ?? L?.finish ?? 0) > 0
+          || Number(L?.elapsed_time ?? L?.moving_time ?? L?.totalElapsedTimeInSeconds ?? L?.totalTimerTimeInSeconds ?? 0) > 0;
+        if (!hasEnd && starts[li] > 0) {
+          const next = starts[li + 1];
+          const derivedEnd = (Number.isFinite(next) && next > starts[li]) ? next : (medianGap > 0 ? starts[li] + medianGap : 0);
+          if (derivedEnd > 0) (L as any).endTimeInSeconds = derivedEnd;
+        }
         let start_ts = Number(L?.startTimeInSeconds ?? L?.start_ts ?? L?.start ?? L?.begin ?? 0);
         if (!start_ts && L?.start_date) {
           const parsed = Date.parse(L.start_date);
@@ -1215,8 +1229,13 @@ Deno.serve(async (req) => {
       return windowIdxFromT(rows, L.start_ts, L.end_ts);
     }
     function windowIdxFromT(rows:any[], start_ts:number, end_ts:number): [number, number] {
-      let sIdx = 0; while (sIdx + 1 < rows.length && (rows[sIdx].t ?? 0) < start_ts) sIdx++;
-      let eIdx = sIdx; while (eIdx + 1 < rows.length && (rows[eIdx].t ?? 0) < end_ts) eIdx++;
+      // Lap times on the clock (epoch, Garmin) are matched against the rows' clock (`ts`); lap times
+      // on the timer are matched against the timer (`t`). Comparing epoch laps to timer rows put
+      // every lap past the end of the run (2026-09-07).
+      const onClock = start_ts > 1e9 && Number(rows[0]?.ts) > 1e9;
+      const rt = (r: any) => (onClock ? (r?.ts ?? 0) : (r?.t ?? 0));
+      let sIdx = 0; while (sIdx + 1 < rows.length && rt(rows[sIdx]) < start_ts) sIdx++;
+      let eIdx = sIdx; while (eIdx + 1 < rows.length && rt(rows[eIdx]) < end_ts) eIdx++;
       // tighten to moving (prefer distance increase; fallback to speed)
       const floor = ALIGN.idle_speed_mps;
       while (sIdx < eIdx) {
