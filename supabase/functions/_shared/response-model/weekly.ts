@@ -710,7 +710,7 @@ function computeEmptyState(args: {
     return {
       // Michael's words (2026-09-08). "Focus" is what the tab is called; "goal" is the old name.
       headline: 'No focus yet.',
-      subtitle: 'Pick one and the week fills in.',
+      subtitle: 'Plans for riders and runners: get strong, get fast, or train for a race.',
       cta_label: 'Choose a focus ›',
       cta_action: 'create_goal',
     };
