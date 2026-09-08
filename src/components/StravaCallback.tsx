@@ -49,12 +49,15 @@ const StravaCallback: React.FC = () => {
         }
 
         setStatus('success');
-        setMessage('Connected to Strava. Pulling your last 90 days…');
+        setMessage('Connected to Strava.');
 
-        // Pull history without a second trip to Connections (2026-09-07): a new athlete's numbers come
-        // from these activities, and the old flow sent them Home with nothing imported. Same call the
-        // Connections button makes, 90 days instead of 30 so the run and ride learners have enough.
-        try {
+        // A connect is a connect. The ninety-day pull runs ONLY when the sign-up intake started this
+        // (its Strava pill says "Import your last 90 days"); a reconnect on an existing account pulls
+        // nothing (Michael, 2026-09-07). Connections keeps its own pull buttons.
+        let fromIntake = false;
+        try { fromIntake = localStorage.getItem('efforts:intake_step') !== null; } catch { /* no device copy */ }
+        if (fromIntake) try {
+          setMessage('Connected to Strava. Importing your last 90 days…');
           const { data: conn } = await supabase
             .from('device_connections')
             .select('connection_data, access_token, refresh_token')

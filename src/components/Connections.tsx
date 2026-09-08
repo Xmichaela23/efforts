@@ -826,10 +826,7 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
       setGarminAccessToken(tokenData.access_token);
       setGarminConnected(true);
       localStorage.setItem('garmin_access_token', tokenData.access_token);
-      setGarminMessage('Connected to Garmin. Asking for your last 90 days…');
-      // Ask Garmin for history straight away (2026-09-07). Garmin answers the request later, through
-      // the activities webhook, so the screen can only say it was asked. The button below asks again.
-      void requestGarminHistory(tokenData.access_token);
+      setGarminMessage('Connected to Garmin.');
 
       // Clean up
       sessionStorage.removeItem('garmin_code_verifier');
