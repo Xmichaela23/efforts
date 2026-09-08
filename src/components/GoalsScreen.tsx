@@ -2279,8 +2279,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         ) : activeGoals.length === 0 && activeUnlinkedPlans.length === 0 && inactiveGoals.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Target className="h-10 w-10 text-white/20 mb-4" />
-            <p className="text-white/50 text-base">No goals yet</p>
-            <p className="text-white/30 text-sm mt-1">Add one to get started</p>
+            <p className="text-white/50 text-base">No focus yet.</p>
+            <p className="text-white/30 text-sm mt-1">Pick one below.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -2396,7 +2396,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           {/* The other half of the "Current" label above — these three START something, they are not
               what is running. Without the pair, the door read as a second copy of the live block. */}
           <div className="flex items-center gap-3 pb-1">
-            <span className="text-xs font-medium text-white/30 uppercase tracking-wider">Start something new</span>
+            <span className="text-xs font-medium text-white/30 uppercase tracking-wider">Plans</span>
             <div className="h-px flex-1 bg-white/10" />
           </div>
           {/* ── THE FRONT DOOR (SPEC §B) — replaces "Add a goal" ────────────────────────────────────
@@ -2417,7 +2417,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             ⚠️ Sizes went UP a step across this screen (`p-5`, `text-base`, `text-sm`) — Michael read
             the first build on a phone and the labels were too small. */}
           {([
-          { id: 'train' as const, Icon: Gauge, label: 'Build a training plan', blurb: 'Run, ride, strength, or a mix — no race needed', live: true, color: getDisciplineColor('mobility') },
+          { id: 'train' as const, Icon: Gauge, label: 'Build a training plan', blurb: 'Run, ride, or both, with strength built in.', live: true, color: getDisciplineColor('mobility') },
           { id: 'race' as const, Icon: Flag, label: 'Build a race plan', blurb: 'Train for any race — built to the date', live: true, color: FOCUS_RACE_COLOR },
           ]).map(({ id, Icon, label, blurb, live, color }) => (
           <button
@@ -2449,13 +2449,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               thing you tap to create. Demoted to the Past-goals row treatment and renamed to what
               it is. Still NOT live (WORKORDER-build-your-own-strength, Stage 0 not started) — the
               row is inert; wire it to `setShowBuilder('build')` the day the flow lands. */}
-          <button
-            type="button"
-            disabled
-            className="w-full flex items-center justify-center rounded-xl py-2 text-xs text-white/35 cursor-default"
-          >
-            Build your own — the engine does the math
-          </button>
+          {/* The inert "Build your own" row is gone (Michael, 2026-09-08). Restore it the day the
+              build-your-own flow lands. */}
           {/* ⛔ "Plan a season" IS NOT A TOP-LEVEL BUTTON ANY MORE (Michael, 2026-08-05: *"plan a
             season should be in race"*). It now lives inside the Race flow, under the race fields,
             as the way out for an athlete racing more than once — see the `race` step in
