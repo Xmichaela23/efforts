@@ -62,6 +62,23 @@ ui_prefs.seen_first_run). NOT walked: the Strava and Garmin doors (need a real O
 brand-new account (RegisterForm → /welcome; the register form was not driven). The two-screen rewrite that followed builds clean but was NOT re-walked: the browser pane's session ended and this chat does not type passwords. Discipline ids written by the intake are
 the canonical run/ride/swim/strength; Profile still writes running/cycling/swimming and readers normalise both.
 
+## Found and fixed late 2026-09-07 (this chat)
+- **Garmin runs never split into intervals.** Two causes in compute-workout-summary: (1) ingest-activity stringified
+  Garmin laps into the jsonb column and the reader took a string as no laps; (2) Garmin laps carry only
+  `startTimeInSeconds`, so each lap was dropped for lacking an end, and their epoch times were compared to
+  timer-relative rows. Fixed: writer stores the list, reader parses text, lap ends derive from the next lap's start,
+  clock laps match clock rows. Sep 7 Hard Run: 0 intervals / 47% → 33 intervals, aligned, 83%.
+- **Strava pull doubled two Garmin rides.** import-strava-history's Garmin-first gate used `.maybeSingle()`, which
+  errors on two Garmin rows in one day (two rides on Sep 5) and let both Strava copies in. Fixed with `.limit(1)`.
+  The two copies were deleted on Michael's word.
+- A lift posted from Efforts to Strava came straight back through the webhook as a new workout. Webhook and pull
+  now skip activities whose id is on a row as `strava_shared_activity_id`. The column's migration (2026-09-03) had
+  never been pasted; it is in now.
+- Post-workout feedback popup: only a run or ride dated today or yesterday, and never a row a history pull created.
+- Rest timer: plain cues, provenance off the screen; a warm-up set rests 60 s (ours).
+- Share a session with a friend (share sheet, text + efforts.work); Delete moved into the session header.
+- Connections rendered inside the app shell (real tab bar); copy says what connected means and what the pull buttons do.
+
 ## Still on the list
 1. New-user spec: both front doors (connect Garmin/Strava · use my phone), first-run cards, one per screen. Write spec, then build.
 2. Strength popup polish: rating first on a lift, "estimated" until rated. Not gated.
