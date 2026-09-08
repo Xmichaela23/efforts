@@ -26,6 +26,7 @@ export default function StateHubTabs({
         const active = value === key;
         return (
           <button
+            data-first-run={key}
             key={key}
             type="button"
             onClick={() => onChange(key)}

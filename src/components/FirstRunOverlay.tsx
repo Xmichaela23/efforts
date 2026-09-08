@@ -8,20 +8,29 @@ import { supabase, getStoredUserId } from '@/lib/supabase';
  * label beside it, and a tap moves to the next. Four stops, then it is gone for good (device +
  * `ui_prefs.seen_first_run.overlay`, the same two places FirstRunCard uses). Words are Michael's.
  */
-const ID = 'overlay';
-const KEY = `efforts:seen:${ID}`;
+export type Stop = { target: string; text: string; pad?: number };
 
-type Stop = { target: string; text: string; pad?: number };
-const STOPS: Stop[] = [
+/** Home, once, while the account has no plan. */
+export const HOME_STOPS: Stop[] = [
   { target: 'button[aria-label="Menu"]', text: 'Menu: Profile, Connections, Account', pad: 8 },
   { target: '[data-first-run="calendar"]', text: 'This calendar will fill with upcoming and completed sessions you can tap for details.', pad: 4 },
   { target: '[data-first-run="state"]', text: 'State: how your training is going', pad: 6 },
   { target: '[data-first-run="focus"]', text: 'Focus: build your plan', pad: 6 },
 ];
 
+/** State, once, on the first visit. */
+export const STATE_STOPS: Stop[] = [
+  { target: '[data-first-run="status"]', text: 'Status: what training did to you this week and the weeks before.', pad: 6 },
+  { target: '[data-first-run="adjust"]', text: 'Adjust: change the numbers and the plan for sessions you have not done yet.', pad: 6 },
+  { target: '[data-first-run="schedule"]', text: 'Schedule: move sessions around your week.', pad: 6 },
+];
+
 type Box = { top: number; left: number; width: number; height: number };
 
-export default function FirstRunOverlay({ active }: { active: boolean }) {
+export default function FirstRunOverlay({ id = 'overlay', stops = HOME_STOPS, active }: { id?: string; stops?: Stop[]; active: boolean }) {
+  const ID = id;
+  const KEY = `efforts:seen:${ID}`;
+  const STOPS = stops;
   const [seen, setSeen] = useState<boolean>(() => {
     try { return localStorage.getItem(KEY) === '1'; } catch { return false; }
   });
@@ -40,7 +49,7 @@ export default function FirstRunOverlay({ active }: { active: boolean }) {
       if (seenMap[ID]) { setSeen(true); try { localStorage.setItem(KEY, '1'); } catch { /* device copy only */ } }
     });
     return () => { cancelled = true; };
-  }, [active, seen]);
+  }, [active, seen, ID, KEY]);
 
   // Measure the current stop's control; re-measure on resize and a moment after mount (layout settles).
   useLayoutEffect(() => {
@@ -56,7 +65,7 @@ export default function FirstRunOverlay({ active }: { active: boolean }) {
     const t = setTimeout(measure, 250);
     window.addEventListener('resize', measure);
     return () => { clearTimeout(t); window.removeEventListener('resize', measure); };
-  }, [step, seen, active]);
+  }, [step, seen, active, STOPS]);
 
   const finish = () => {
     setSeen(true);
