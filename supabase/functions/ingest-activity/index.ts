@@ -1073,12 +1073,13 @@ async function mapGarminToWorkout(activity, userId) {
         return activity.swim_data ? JSON.stringify(activity.swim_data) : null;
       }
     })(),
+    // The column is jsonb: store the list itself, not its text (2026-09-07). Stringified laps read as
+    // no laps in compute-workout-summary, and a structured run then never split into intervals.
     laps: (()=>{
-      try {
-        return computeInput?.laps ? JSON.stringify(computeInput.laps) : activity.laps ? JSON.stringify(activity.laps) : null;
-      } catch  {
-        return activity.laps ? JSON.stringify(activity.laps) : null;
-      }
+      const l = computeInput?.laps ?? activity.laps ?? null;
+      if (!l) return null;
+      if (typeof l === 'string') { try { return JSON.parse(l); } catch { return null; } }
+      return l;
     })(),
     // Server-computed summary for UI (intervals + overall)
     computed: ((): string | null => {

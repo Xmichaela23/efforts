@@ -999,6 +999,10 @@ Deno.serve(async (req) => {
     type Lap = { start_ts:number; end_ts:number; time_s:number; dist_m:number; start_idx?:number; end_idx?:number };
     function normalizeLaps(raw:any): Lap[] {
       if (!raw) return [];
+      // Garmin rows written before 2026-09-07 hold the laps as a JSON STRING inside the jsonb column
+      // (ingest-activity stringified them). A string read as "no laps" made every structured Garmin run
+      // look like one continuous effort, so the interval table never appeared (Michael's Sep 7 Hard Run).
+      if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch { return []; } }
       const arr = Array.isArray(raw) ? raw : (Array.isArray(raw?.laps) ? raw.laps : []);
       const out: Lap[] = [];
       for (const L of arr) {

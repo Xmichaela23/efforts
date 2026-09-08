@@ -785,10 +785,13 @@ Deno.serve(async (req) => {
               : (sp.includes('walk') || sp.includes('hike')) ? 'walk'
               : (sp.includes('weight') || sp.includes('strength')) ? 'strength'
               : 'run';
-            const { data: garminWorkout } = await supabase
+            // `.maybeSingle()` errors when there are TWO Garmin rows that day (two rides on 2026-09-05),
+            // which read as "no Garmin record" and let both Strava copies in. Any match is enough.
+            const { data: garminRows } = await supabase
               .from('workouts').select('id')
               .eq('user_id', userId).eq('date', activityDate).eq('type', mappedType)
-              .not('garmin_activity_id', 'is', null).maybeSingle();
+              .not('garmin_activity_id', 'is', null).limit(1);
+            const garminWorkout = garminRows && garminRows.length > 0 ? garminRows[0] : null;
             if (garminWorkout) {
               console.log(`⏭️ Q-066: skipping Strava activity ${a.id} — Garmin record exists for ${activityDate} ${mappedType}`);
               skipped++; skippedByPreference++; continue;
