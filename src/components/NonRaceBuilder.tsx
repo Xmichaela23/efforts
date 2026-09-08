@@ -441,7 +441,11 @@ const PROGRAM_COPY: Record<ProgramId, {
 }> = {
   run_strength: {
     label: 'Run + Strength',
-    blurb: 'Twelve weeks. Four lifting days, four runs.',
+    // p247 only: the lifts are the goal; running holds at the athlete's mileage; the long run tops
+    // out at 90 to 100 minutes. The 25 mi/wk tier threshold is OURS and stays off the card (Michael,
+    // 2026-09-07: the card carries the book's facts, not ours).
+    blurb: 'You get stronger. Your speed and mileage hold. Twelve weeks: four lifting days, four runs. '
+      + 'The long run stays under 100 minutes.',
     Icon: DISCIPLINE_ICONS.run, color: getDisciplineColor('run'),
     goal: 'get_stronger', focus: 'run',
   },
@@ -512,6 +516,16 @@ const programmeName = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | '
 const STANDARD_FOCUS_REQUIREMENT =
   'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in '
   + 'week one.';
+/**
+ * The Run + Strength card's door line (Michael, 2026-09-07). The running figures are p246's own
+ * session lengths added up: MLSS+ level 2, NT level 3, VT1 level 1, LSD level 2 come to 180 to 255
+ * minutes, and the long run is an hour at level 2. The lifting hours are OURS: the book gives no
+ * session times for the lifting days; four days of four slots at 60 to 75 minutes is the estimate.
+ */
+const RUN_STRENGTH_REQUIREMENT =
+  'Needs a barbell and plates, a rack and a bench. You should be comfortable running a full hour; '
+  + 'the week holds about three hours of running and seven to nine hours of training in all. '
+  + 'A lift you have not tested gets a test session in week one.';
 
 // ⛔ THE STRONG / HEAVY TIER SCREEN IS GONE (WORKORDER-train-menu-reshape-2026-09-07). Strong was a
 // no-op routing into `get_stronger`; Heavy was dark; nothing in the payload read the tier. The
@@ -4410,7 +4424,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                           carries; this block refuses at the gate without it. */}
                       {live ? (
                         <span className="block text-xs mt-1.5 leading-relaxed text-white/45">
-                          {STANDARD_FOCUS_REQUIREMENT}
+                          {p === 'run_strength' ? RUN_STRENGTH_REQUIREMENT : STANDARD_FOCUS_REQUIREMENT}
                         </span>
                       ) : null}
                     </span>
