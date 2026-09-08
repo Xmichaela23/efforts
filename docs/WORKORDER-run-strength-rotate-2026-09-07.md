@@ -125,3 +125,88 @@ something this order introduced. It is also why the chips stop at 90: at 90 the 
   one a test week, four lifting days, the plyo day, the easy run 30 minutes every week, the day-1
   hard run rotating through three shapes.
 
+---
+
+## 8. THE WEDNESDAY RUN — traced and fixed (2026-09-08)
+
+**Root cause, in one sentence:** the near-threshold session was emitted as a DISTANCE token, and
+turning its 240-second reps into miles needs a threshold pace this athlete does not have, so the work
+reps reached the row with neither a distance the engine believed nor a time at all — and the row's
+duration, which is the sum of its steps, came out as the warm-up plus the default rests plus the
+cool-down.
+
+### 8a. The arithmetic, exactly
+
+p246 day 3 is `run_near_threshold` level 3 pinned to `below_threshold`: **8 reps of 240 s at 90% of
+threshold, 75 s recovery between** (pp233-234), inside a 10-minute warm-up and an 8-minute cool-down.
+The composer sizes it at **59 minutes** and always did.
+
+| | before | after |
+|---|---|---|
+| token | `cruise_8x1mi_threshold` | `interval_8x240s_90pct_R75s` |
+| steps on the row | 16 (8 distance reps with no pace, 7 rests at the materializer's 60 s DEFAULT) | 17 (8 × 240 s, 7 × 75 s) |
+| row duration | **25 min** (600 + 7×60 + 480) | **59 min** (600 + 8×240 + 7×75 + 480 = 3525 s) |
+
+⛔ **THE `: 1` FALLBACK IS WHERE THE ONE MILE CAME FROM.** With no threshold pace the emitter wrote
+one mile per rep — and it did so for EVERY archetype in the family, so a 75-second rep and an
+810-second rep both arrived as `N x 1mi`. Seven prescriptions flattened into one.
+
+⚠️ **A NULL THRESHOLD IS THE DESIGNED STATE, NOT A DATA GAP.** Michael ruled 2026-09-02 that a
+threshold is *"either learned or entered"* with no 5K math, and that a hard run then ships with an
+effort target and no pace. That ruling is intact: the fix keeps the session's TIME, which survives a
+missing pace, and the pace is still absent until a test, a race or an entry.
+
+### 8b. The fix is the shape, not the row
+
+`session-vocabulary.ts`, `run_near_threshold`. It emits `interval_{n}x{s}s_{pct}pct_R{rest}s` — a
+shape that already existed for p235's long-run inserts, is already parsed by `expandRunToken`, and is
+already in both materializer caches. It carries the reps, the rep's own seconds, the source's
+percentage and the source's rest. **No parser, exporter or view needed a change.**
+
+⚠️ `cruise_` IS STILL PARSED and is no longer emitted. Rows built before this keep it; a rebuild or a
+restate re-materializes them. Fix-forward.
+
+### 8c. Why Wednesday does not rotate and Monday does
+
+**The frame pins it.** `frames.ts` day 3 carries `archetype: 'below_threshold'`; day 1 carries none,
+so `rotatedArchetype` walks `run_mlss`'s three shapes week to week. It is not a filter and nothing is
+being excluded: **all seven near-threshold variants exist at level 3** — `short_above`,
+`race_repeats`, `race_repeats_long`, `below_threshold`, `below_threshold_long`, `surge_embedded`,
+`surge_opener` — and the page names one.
+
+⚠️ **AND THE "5 TO 8" IS A REP COUNT, NOT A REP LENGTH.** `repsBand` is 5-8 (level 3 → 8) and
+`repBand` is 210-240 seconds, cited to pp233-234. The comment table at the top of
+`session-vocabulary.ts` reads *"p247 asks for 5-8 minute work intervals"*, which does not match the
+library's own numbers. **Recorded, not changed** — which of the two p247 actually says is a source
+question, and inventing an answer is what the corpus rule forbids.
+
+### 8d. Standard Focus IS touched, and here is the before and after
+
+p274's day 3 is also `run_near_threshold` — level 2, unpinned, so it rotates. Its rows carried the
+same fabricated mile. **The composed All Rounder block hash therefore changes, legitimately:**
+`ad54b512…5443` → `5ca20bb1…69e2`.
+
+| variant at level 2 | before | after |
+|---|---|---|
+| rotation default (`short_above`) | `cruise_16x1mi_threshold` | `interval_16x75s_105pct_R30s` |
+| `race_repeats` | `cruise_4x1mi_threshold` | `interval_4x390s_105pct_R240s` |
+| `race_repeats_long` | `cruise_2x1mi_threshold` | `interval_2x810s_95pct_R240s` |
+| `below_threshold` | `cruise_6x1mi_threshold` | `interval_6x225s_90pct_R75s` |
+| `below_threshold_long` | `cruise_5x1mi_threshold` | `interval_5x435s_88pct_R75s` |
+| `surge_embedded` | `cruise_8x1mi_threshold` | `interval_8x270s_95pct_R60s` |
+| `surge_opener` | `cruise_6x1mi_threshold` | `interval_6x280s_92pct_R60s` |
+
+⚠️ **NOTHING ELSE ABOUT THE ALL ROUNDER MOVED** — the hash difference is this row.
+
+### 8e. Verified
+
+- Robot account through the deployed chain: Wednesday reads **59 min**, 17 steps, 8 × 240 s work and
+  7 × 75 s recovery, every step time-based with no distance on any of them. Account deleted.
+- Monday checked the same way and is unchanged at 45 min: it emits `round_`, which was already
+  time-based. That is why day 1 never showed this defect.
+- Garmin: the export prefers `computed.steps` and a step with seconds and no distance is a `TIME`
+  step; a distance DERIVED from a time prescription is exported as TIME too (`distanceDerived`).
+- `near-threshold-is-time.test.ts` — every variant at both levels, the numbers matched against the
+  session's own, the row's arithmetic reaching the composer's duration, every frame's near-threshold
+  slot in both columns, the MLSS slot beside it, and the materializer's cache still matching.
+

@@ -380,13 +380,58 @@ export function translateEnduranceSession(
     }
 
     case 'run_near_threshold': {
-      const { reps, repSeconds } = repShape(session);
-      // ⚠️ `cruise_` IS DISTANCE-BASED, so the rep's length is converted at THIS athlete's own
-      // threshold pace — the pace stage 1 already resolved. One decimal, because the token's own
-      // regex accepts `[\d.]` and a 5-minute rep is not a round mile.
-      const paceSecPerMi = session.anchor.value ?? null;
-      const miles = paceSecPerMi ? Math.max(0.1, Math.round((repSeconds / paceSecPerMi) * 10) / 10) : 1;
-      work = [`cruise_${reps}x${miles}mi_threshold`];
+      /**
+       * ⛔⛔ THE PRESCRIPTION IS TIME, SO THE TOKEN IS TIME (2026-09-08). This emitted `cruise_` — a
+       * DISTANCE token — and it produced the worst row in the programme.
+       *
+       * ⛔ WHAT IT COST, MEASURED ON A BUILT PLAN. p246's day 3 is the hardest run of the week: 8
+       * reps of 4 minutes at 90% of threshold with 75 seconds between (pp233-234), which the
+       * composer sizes at **59 minutes**. Every materialized row read **25**.
+       *
+       * ⛔ AND 25 IS NOT A ROUNDING — IT IS THE WARM-UP, THE RESTS AND THE COOL-DOWN, WITH THE WORK
+       * COUNTED AS ZERO. Two failures in one line, both caused by naming a distance the source never
+       * gave:
+       *   1. `cruise_` needs a pace to turn 240 seconds into miles, and this athlete has none —
+       *      Michael ruled on 2026-09-02 that a threshold is *"either learned or entered"*, with no
+       *      5K math, so a null threshold is the DESIGNED state for a new athlete. The old line's
+       *      `: 1` fallback then invented **one mile per rep**, a number from nowhere.
+       *   2. The materializer expands a distance step with no pace into a step with no time, and the
+       *      row's duration is the sum of its steps. 10 min warm-up + 7 × 60 s of DEFAULT rest +
+       *      8 min cool-down = **25**. The source's own 75-second rest never travelled either,
+       *      because `cruise_` has no rest field in the shape this file emitted.
+       *
+       * ⛔ SO THE FIX IS THE SHAPE, NOT THE ROW. `interval_{n}x{s}s_{pct}pct_R{rest}s` already
+       * exists, is already parsed (`expandRunToken`), and is already in both materializer caches —
+       * it was built for p235's long-run inserts, which are seconds at a percentage for the same
+       * reason. It carries the reps, the rep's own SECONDS, the source's percentage and the source's
+       * rest, and it survives a missing pace: the athlete gets the right session with an effort
+       * target and no pace number, which is exactly the accepted consequence of the 2026-09-02
+       * ruling. **Time survives a missing pace; distance does not.**
+       *
+       * ⚠️ THE SAME RULE THE MLSS BRANCH BELOW ALREADY FOLLOWS — it emits `round_`, which is
+       * time-based, which is why day 1's rows have always carried their full length.
+       * ⚠️ THE `cruise_` PARSER STAYS in the materializer. Rows built before this keep it and still
+       * read; a rebuild or a restate re-materializes them onto the new shape. Fix-forward.
+       */
+      const { reps, repSeconds, restSeconds } = repShape(session);
+      /**
+       * ⛔ THE SOURCE'S OWN PERCENTAGE — the band's top, the same reading `compoundRoundToken` takes
+       * for every other percentage token in this file. Every archetype in this family states one
+       * (`pct_threshold`), so the fallback below is a guard rather than a path.
+       */
+      const workStep = session.blocks
+        .flatMap((b) => b.steps)
+        .find((st) => st.role === 'work' && st.seconds != null);
+      const at = workStep?.intensity;
+      const pct = at && at.kind === 'pct_threshold' && typeof at.hi === 'number'
+        ? Math.round(at.hi * 100)
+        : null;
+      work = pct != null
+        ? [`interval_${reps}x${repSeconds}s_${pct}pct` + (restSeconds > 0 ? `_R${restSeconds}s` : '')]
+        // ⚠️ AN INTENSITY THE GRAMMAR CANNOT NAME still travels as TIME, through the round shape,
+        // rather than falling back to a distance this file would have to invent.
+        : [`round_${reps}x_${repSeconds}s${at?.kind === 'race_pace' ? 'racepace' : 'vt1'}`
+          + (restSeconds > 0 ? `_R${restSeconds}s` : '')];
       break;
     }
 
@@ -619,7 +664,10 @@ export const EMITTED_TOKEN_SHAPES: { shape: RegExp; example: string }[] = [
   { shape: /^cooldown_run_\d+min_easy$/, example: 'cooldown_run_8min_easy' },
   { shape: /^run_easy_\d+min$/, example: 'run_easy_30min' },
   { shape: /^longrun_\d+min_easypace$/, example: 'longrun_90min_easypace' },
-  { shape: /^cruise_\d+x[\d.]+mi_threshold$/, example: 'cruise_4x1mi_threshold' },
+  // ⛔ `cruise_` IS NO LONGER EMITTED (2026-09-08) — `run_near_threshold` prescribes SECONDS and now
+  // says so; see that case for the 59-minute session that materialized as 25. The shape stays listed
+  // because the materializer still parses it for rows built before the change.
+
   { shape: /^interval_\d+x\d+m_5kpace_R\d+s$/, example: 'interval_6x800m_5kpace_R90s' },
   // ⛔ THE STRIDES ADD-ON (p109). The materializer has parsed this shape since before the Standing
   // Plan existed; it emits one untargeted work step per stride and a walk/jog between.

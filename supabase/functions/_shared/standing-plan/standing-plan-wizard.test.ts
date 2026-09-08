@@ -427,8 +427,15 @@ Deno.test('the frame\'s two hard slots are distinct families, and the screen\'s 
 Deno.test('the run option list carries a threshold label, because slot two IS a threshold run', () => {
   /**
    * ⛔ THE RUN ARM READ `RUN_GROUND_OPTIONS` — VO2 and speed only. The frame's second hard slot is
-   * `run_near_threshold`; the composer builds it as `cruise_..._threshold` and names it "Threshold
-   * Run". So whatever the athlete picked, the row described a session the week does not contain.
+   * `run_near_threshold`, so whatever the athlete picked, the row described a session the week does
+   * not contain.
+   *
+   * ⚠️ THE TOKEN THIS ONCE MATCHED IS GONE (2026-09-08). It asserted `/cruise_.*_threshold/` as a
+   * PROXY for "slot two is a threshold run", and that proxy retired when the family stopped emitting
+   * a distance token: p233's reps are prescribed in SECONDS and `cruise_` could only carry them as
+   * miles, which needs a pace the athlete may not have. The RULE is unchanged and is now asserted
+   * directly — the frame's own family tag — plus the property that made the change necessary, that
+   * the session's work reaches the athlete as time.
    */
   const titles = hardSlotOptions('run').map((o) => o.title);
   assert(titles.includes('Sustained threshold'), `no threshold label for a threshold slot: ${titles}`);
@@ -438,6 +445,15 @@ Deno.test('the run option list carries a threshold label, because slot two IS a 
     ...COMPOSE, week: 2, column: 'standard', sportMix: { runs: 4, rides: 0, swimDays: 0 },
   });
   const wed = wk.sessions.find((s) => s.day === 'Wednesday' && s.type === 'run')!;
-  assert(/cruise_.*_threshold/.test((wed.steps_preset ?? []).join(' ')),
-    'slot two is not a threshold run after all — re-check the default');
+  assert((wed.tags ?? []).includes('family:run_near_threshold'),
+    `slot two is not a threshold run after all — re-check the default: ${(wed.tags ?? []).join(', ')}`);
+  /**
+   * ⛔⛔ AND ITS WORK IS TIME, NOT DISTANCE — the fix of 2026-09-08 and the thing that keeps the
+   * row's duration honest. A distance rep with no pace expands to a step with no seconds, and the
+   * row's duration is the sum of its steps: p246's 59-minute session materialized as 25, which was
+   * its warm-up, its rests and its cool-down with the work counted as zero.
+   */
+  const work = (wed.steps_preset ?? []).join(' ');
+  assert(/interval_\d+x\d+s_\d+pct/.test(work), `slot two's work is not time-based: ${work}`);
+  assert(!/cruise_/.test(work), `slot two is back on the distance token: ${work}`);
 });
