@@ -82,6 +82,10 @@ Deno.test('⛔ AND ONLY THE STEPS HE NAMED CHANGED', () => {
   for (const kept of ['Choose your focus', 'Train']) {
     assert(WIZARD.includes(`title={eyeTitle('${kept}')}`), `"${kept}" lost the mark it already had`);
   }
+  // ⛔ AND THE PROGRAM LIST UNDER RUN FOCUS / RIDE FOCUS CARRIES IT TOO (Michael, 2026-09-07): the
+  // screen is titled by the grouping's discipline word, under the same eye as Train.
+  assert(WIZARD.includes("title={eyeTitle(state.trainCard === 'ride' ? 'Ride' : 'Run')}"),
+    'the program list lost the eye, or its title stopped being the discipline word');
 });
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════

@@ -377,7 +377,9 @@ const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string; Icon: Card
     // still refuses true beginners with its own copy. The requirement line under it is the same one
     // Standard Focus shows (`STANDARD_FOCUS_REQUIREMENT`): the block needs the same kit and tests.
     blurb: 'Your running, with the lifting cut around it.',
-    Icon: Footprints,
+    // ⛔ THE APP'S OWN RUN ICON (Michael, 2026-09-07) — the one `DISCIPLINE_ICONS` draws for run
+    // everywhere else, not a second glyph for the same discipline.
+    Icon: DISCIPLINE_ICONS.run,
     color: getDisciplineColor('run'),
   },
   ride: {
@@ -401,8 +403,57 @@ const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string; Icon: Card
  * treats as the default.
  */
 const TRAIN_GOAL: Record<TrainCardId, NonRaceGoalId | null> = {
-  standard: 'get_stronger', run: 'get_stronger', ride: null,
+  standard: 'get_stronger', run: null, ride: null,
 };
+/**
+ * ⛔ WHAT EACH TRAIN CARD OPENS (Michael, 2026-09-07). Standard Focus is one programme and opens the
+ * wizard directly. Run Focus and Ride Focus are GROUPINGS — each opens a program list screen
+ * (`currentStep === 'program'`) under the Train screen, and the programme card on that screen is
+ * what seeds the goal and opens the wizard. A grouping with nothing live yet still opens its list,
+ * with its cards dimmed, so the screen says what is coming rather than refusing the tap.
+ */
+const TRAIN_OPENS: Record<TrainCardId, 'wizard' | 'programs'> = {
+  standard: 'wizard', run: 'programs', ride: 'programs',
+};
+
+/**
+ * ⛔ THE PROGRAMMES UNDER EACH GROUPING — program ids, not tiers. The screen reuses the shape the
+ * Strong / Heavy tier screen had (removed 2026-09-07 in the reshape) because that shape was right:
+ * one card per programme, one live, the rest dimmed until they ship, no Continue.
+ *
+ *   Run Focus    Run + Strength (pp246-247) live · Long Run + Strength (p250) and the speed block
+ *                (p276) come later and are not drawn until they are buildable
+ *   Ride Focus   Ride + Strength (p279, notes p280) dimmed until it ships
+ *
+ * ⚠️ NO PROTOCOL NAMES, NO AUTHOR ON A CARD. The numbers on the blurbs are the frame's own counts
+ * (p246: four lifting days, four runs; twelve weeks is the block length this path builds).
+ */
+type ProgramId = 'run_strength' | 'ride_strength';
+const PROGRAMS_BY_CARD: Record<TrainCardId, ProgramId[]> = {
+  standard: [], run: ['run_strength'], ride: ['ride_strength'],
+};
+const PROGRAM_COPY: Record<ProgramId, {
+  label: string; blurb: string; Icon: CardIcon; color: string;
+  /** The goal the card seeds; `null` = not built, the card is dimmed and does not navigate. */
+  goal: NonRaceGoalId | null;
+  /** Which frame the wizard opens on — see `FOCUS_FRAME`. */
+  focus: 'standard' | 'run';
+}> = {
+  run_strength: {
+    label: 'Run + Strength',
+    blurb: 'Twelve weeks. Four lifting days, four runs.',
+    Icon: DISCIPLINE_ICONS.run, color: getDisciplineColor('run'),
+    goal: 'get_stronger', focus: 'run',
+  },
+  ride_strength: {
+    label: 'Ride + Strength',
+    blurb: 'Twelve weeks. Four lifting days, your riding.',
+    Icon: Bike, color: getDisciplineColor('ride'),
+    goal: null, focus: 'run',
+  },
+};
+/** The program screen's title, per grouping — the discipline word, under the eye like Train. */
+const PROGRAM_SCREEN_TITLE: Record<TrainCardId, string> = { standard: 'Standard', run: 'Run', ride: 'Ride' };
 
 /** ⚠️ SMALL COUNTS ARE WORDS, not digits — the register every other sentence on these screens uses. */
 const COUNT_WORD: Record<number, string> = { 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five' };
@@ -982,6 +1033,15 @@ export type NonRaceState = {
    * card existed. It never changes what that path builds.
    */
   focus?: 'standard' | 'run';
+  /**
+   * ⛔ WHICH TRAIN CARD WAS TAPPED (2026-09-07). Run Focus and Ride Focus open a program list before
+   * any goal is seeded, so the goal cannot say which grouping the athlete is in; this does. It is
+   * what `getSteps` reads to put the `program` screen in the flow, and what highlights the card on
+   * Back. `null` = no Train card tapped (a race, a build, a stored goal).
+   */
+  trainCard: TrainCardId | null;
+  /** Which programme card was tapped on the program screen, so it reads as chosen on Back. */
+  program: ProgramId | null;
   /** Easy-swim add-on count (Michael, 2026-08-24): 0 = none, 1–2 = easy/technique swims appended
    *  outside the four endurance slots. Cap 2 — past that the athlete wants a tri plan. */
   swimEasySessions?: 0 | 1 | 2;
@@ -2055,6 +2115,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // screen reads no posture.
     entry: initialEntry ?? null,
     goal: initialEntry === 'race' ? 'marathon' : null,
+    trainCard: null, program: null,
     discipline: undefined, posture: {}, strengthProtocol: undefined, commitment: 'light', targetWeeks: 12,
     // ⛔ NO PREFILLED DAYS (2026-07-29). These seeded 'sunday' / 'thursday' so the week drew on
     // arrival instead of an empty box. Michael: *"no prefill let them chose."* A long run is
@@ -4244,26 +4305,36 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             {TRAIN_ORDER.map((t) => {
               const goal = TRAIN_GOAL[t];
               const { Icon, color } = TRAIN_COPY[t];
-              const live = goal != null;
+              // ⛔ A CARD IS LIVE IF IT OPENS SOMETHING — the wizard, or a program list (`TRAIN_OPENS`).
+              const live = TRAIN_OPENS[t] === 'programs' || goal != null;
               /**
                * ⛔ THE CARD IS THE SELECTION, NOT THE GOAL (2026-08-30). Standard Focus and Run
                * Focus seed the same goal, so highlighting on the goal would light BOTH cards the
-               * moment either was tapped. `state.focus` is what tells them apart.
+               * moment either was tapped. `state.trainCard` is what tells them apart (2026-09-07);
+               * a draft from before that field existed falls back to the focus.
                */
-              const focusOfCard = t === 'standard' ? 'standard' : t === 'run' ? 'run' : null;
-              const chosen = live && state.goal === goal
-                && (focusOfCard == null || (state.focus ?? 'run') === focusOfCard);
+              const chosen = state.trainCard != null
+                ? state.trainCard === t
+                : (t === 'standard' && state.goal === 'get_stronger' && state.focus === 'standard');
               return (
                 <button
                   key={t} type="button"
                   className={optBtn(chosen, !live)}
                   disabled={!live}
                   onClick={() => {
+                    if (!live) return;
+                    if (TRAIN_OPENS[t] === 'programs') {
+                      // ⛔ NO GOAL YET. The programme card on the next screen seeds it; a goal left
+                      // over from an earlier tap is cleared so the list opens clean.
+                      setState((st) => ({ ...st, trainCard: t, program: null, goal: null }));
+                      next();
+                      return;
+                    }
                     if (!goal) return;
                     reseed(goal, undefined);
                     // ⛔ THE FOCUS TRAVELS FROM HERE — it picks the frame (`FOCUS_FRAME`) and it is
                     // what the payload carries. Set AFTER `reseed`, which does not touch it.
-                    if (focusOfCard) setState((st) => ({ ...st, focus: focusOfCard }));
+                    setState((st) => ({ ...st, focus: 'standard', trainCard: t, program: null }));
                     next();
                   }}
                 >
@@ -4278,7 +4349,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       </span>
                       {/* ⛔ WHAT IT REQUIRES, AT THE DOOR — see `STANDARD_FOCUS_REQUIREMENT`. One
                           line, under each card whose block refuses at the gate without it. */}
-                      {t === 'standard' || t === 'run' ? (
+                      {t === 'standard' ? (
                         <span className="block text-xs mt-1.5 leading-relaxed text-white/45">
                           {STANDARD_FOCUS_REQUIREMENT}
                         </span>
@@ -4288,6 +4359,60 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                           and it made one card three times the height of its three neighbours, which
                           is what a picker screen cannot afford. The one-line requirement above is
                           what replaced it (2026-08-30), and it sits under both live cards. */}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </StepLayout>
+      )}
+
+      {/* ── THE PROGRAM LIST ─────────────────────────────────────────────────────────────────────
+          Under Run Focus / Ride Focus (Michael, 2026-09-07): one card per programme, the live one
+          opens the wizard on its frame exactly as the Train card did before, the rest are dimmed
+          until they ship. Same shape as the Strong / Heavy screen this replaced, with program ids
+          in place of tiers. No Continue: tapping a card IS the answer. */}
+      {currentStep === 'program' && state.trainCard != null && (
+        <StepLayout
+          step={stepNo('program')} totalSteps={steps.length}
+          title={eyeTitle(state.trainCard === 'ride' ? 'Ride' : 'Run')}
+          subtitle="Pick a program."
+          onBack={back} onContinue={next} canContinue={state.program != null}
+          hideContinue hideProgress
+        >
+          <div className="space-y-2">
+            {PROGRAMS_BY_CARD[state.trainCard].map((p) => {
+              const { label, blurb, Icon, color, goal, focus } = PROGRAM_COPY[p];
+              const live = goal != null;
+              return (
+                <button
+                  key={p} type="button"
+                  className={optBtn(state.program === p, !live)}
+                  disabled={!live}
+                  onClick={() => {
+                    if (!goal) return;
+                    reseed(goal, undefined);
+                    // ⛔ THE FOCUS TRAVELS FROM HERE — it picks the frame (`FOCUS_FRAME`). Set AFTER
+                    // `reseed`, which does not touch it.
+                    setState((st) => ({ ...st, focus, program: p }));
+                    next();
+                  }}
+                >
+                  <span className="flex items-start gap-3.5">
+                    <Icon className="h-6 w-6 shrink-0 mt-0.5" style={{ color, opacity: live ? 1 : 0.4 }} />
+                    <span className="min-w-0 block">
+                      <span className="block text-base">{label}</span>
+                      <span className={`block text-sm mt-1 leading-relaxed ${live ? 'text-white/70' : 'text-white/40'}`}>
+                        {blurb}
+                      </span>
+                      {/* ⛔ WHAT IT REQUIRES, AT THE DOOR — the same line the Standard Focus card
+                          carries; this block refuses at the gate without it. */}
+                      {live ? (
+                        <span className="block text-xs mt-1.5 leading-relaxed text-white/45">
+                          {STANDARD_FOCUS_REQUIREMENT}
+                        </span>
+                      ) : null}
                     </span>
                   </span>
                 </button>

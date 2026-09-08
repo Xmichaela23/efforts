@@ -25,8 +25,12 @@ const GENERATE = read('../../supabase/functions/generate-strength-plan/index.ts'
 const RESOLVER = read('../../supabase/functions/_shared/standing-plan/frame-resolver.ts');
 
 Deno.test('⛔ HOP 1 — the card sets the focus and the payload carries it', () => {
-  assert(/setState\(\(st\) => \(\{ \.\.\.st, focus: focusOfCard \}\)\)/.test(WIZARD),
-    'the Train card no longer records which focus was picked');
+  // ⛔ TWO CARDS SET IT NOW (2026-09-07): the Standard Focus card on the Train screen, and the
+  // programme card on the Run Focus list (which carries its frame's focus in `PROGRAM_COPY`).
+  assert(/setState\(\(st\) => \(\{ \.\.\.st, focus: 'standard', trainCard: t, program: null \}\)\)/.test(WIZARD),
+    'the Standard Focus card no longer records its focus');
+  assert(/setState\(\(st\) => \(\{ \.\.\.st, focus, program: p \}\)\)/.test(WIZARD),
+    'the programme card no longer records its focus');
   assert(/\{ focus: 'standard' \}/.test(WIZARD),
     'the wizard payload no longer carries the focus');
   // ⚠️ AND THE 5K PATH SENDS NOTHING, so its payload is unchanged.

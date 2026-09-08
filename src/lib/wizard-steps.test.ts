@@ -16,10 +16,15 @@ import {
   type StepRouterState,
 } from './wizard-steps.ts';
 
+/**
+ * ⚠️ `trainCard` FOLLOWS THE FOCUS (2026-09-07): a Standard Focus tap records `standard`, a Run
+ * Focus tap records `run` and goes through the program list. A build with no focus at all is a
+ * draft from before the Standard card existed, and it has no Train card either.
+ */
 const strengthPath = (focus?: 'standard' | 'run'): StepRouterState => ({
   goal: 'get_stronger',
   entry: 'train',
-  ...(focus ? { focus } : {}),
+  ...(focus ? { focus, trainCard: focus } : {}),
   posture: { strength: 'develop', run: 'maintain', bike: 'maintain', swim: 'out' },
 });
 
@@ -89,21 +94,35 @@ Deno.test('⛔⛔ AND THE SKIPPED PATH STILL HOLDS BOTH SPORTS — the Continue 
     'swim is claimed by the skipped path — it is parked, and off by default');
 });
 
-Deno.test('⛔⛔ RUN FOCUS OPENS ON THE POSTURE CARD — the Strong / Heavy tier screen is gone', () => {
+Deno.test('⛔⛔ RUN FOCUS OPENS THE PROGRAM LIST, THEN THE POSTURE CARD — no tier screen anywhere', () => {
   /**
-   * ⛔ WORKORDER-train-menu-reshape-2026-09-07. Strong was a no-op routing into `get_stronger` and
-   * Heavy was dark, so the screen asked nothing the engine could hear. The Run Focus card opens the
-   * same wizard on `strength_5k`, one screen shorter.
-   * ⚠️ BOTH SHAPES. An athlete who picks Run Focus carries `focus: 'run'`; every build that predates
-   * the Standard card carries no focus at all. Both take the same route.
+   * ⛔ Michael, 2026-09-07: Run Focus is a grouping. Its tap opens a "Run" screen with one live
+   * card, Run + Strength, and THAT card seeds the goal and opens the wizard on `strength_5k`. The
+   * Strong / Heavy tier screen it replaces asked nothing the engine could hear.
    */
-  for (const st of [strengthPath('run'), strengthPath(undefined)]) {
-    assertEquals(landsOn(st), 'posture', 'the Run Focus path does not open on the posture card');
-    assertEquals(getSteps(st), [
-      'goal', 'train', 'posture', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm',
-    ]);
-    assert(!(getSteps(st) as string[]).includes('tier'), 'the tier screen is back');
-  }
+  const st = strengthPath('run');
+  assertEquals(landsOn(st), 'program', 'the Run Focus card does not open the program list');
+  assertEquals(getSteps(st), [
+    'goal', 'train', 'program', 'posture', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm',
+  ]);
+  assert(!(getSteps(st) as string[]).includes('tier'), 'the tier screen is back');
+  // ⛔ BEFORE THE PROGRAMME IS PICKED THERE IS NO GOAL, and the list is still the next screen.
+  const listing: StepRouterState = { goal: null, entry: 'train', trainCard: 'run', posture: {} };
+  assertEquals(landsOn(listing), 'program', 'the list is not reachable before a goal exists');
+});
+
+Deno.test('⛔ RIDE FOCUS OPENS ITS OWN LIST — one dimmed card, no goal, nothing beyond it yet', () => {
+  const st: StepRouterState = { goal: null, entry: 'train', trainCard: 'ride', posture: {} };
+  assertEquals(landsOn(st), 'program', 'the Ride Focus card does not open the program list');
+  assertEquals(getSteps(st).slice(0, 3), ['goal', 'train', 'program']);
+});
+
+Deno.test('⚠️ A DRAFT FROM BEFORE THE TRAIN CARD EXISTED TAKES THE OLD ROUTE — no program screen', () => {
+  // Every build that predates the Standard card carries no focus and no Train card; it opens on
+  // the posture card exactly as it did, so a saved draft does not land on a screen it never saw.
+  const st = strengthPath(undefined);
+  assertEquals(landsOn(st), 'posture');
+  assert(!(getSteps(st) as string[]).includes('program'));
 });
 
 Deno.test('⛔⛔ RUN + STRENGTH HOLDS RUNNING ONLY — the scope cards are answered by the frame', () => {
@@ -144,8 +163,10 @@ Deno.test('⛔ THE FLOW IS COMPLETE WITHOUT A STANDARD-ONLY SCREEN', () => {
    * the 5K build does not, this assertion is what fails and this is where it goes.
    */
   // ⚠️ ONE SCREEN APART SINCE 2026-09-07 — the tier screen is gone from both.
-  assertEquals(standard, run.filter((k) => k !== 'posture'),
-    'the two flows differ by more than the sport-scope screen');
+  // ⚠️ TWO SCREENS APART SINCE 2026-09-07 — the program list and the sport-scope card, and both
+  // are screens the Standard programme has no use for.
+  assertEquals(standard, run.filter((k) => k !== 'posture' && k !== 'program'),
+    'the two flows differ by more than the program and sport-scope screens');
   for (const required of ['endurance', 'schedule', 'numbers', 'confirm'] as const) {
     assert(standard.includes(required), `Standard Focus never asks for ${required}`);
   }
@@ -154,7 +175,7 @@ Deno.test('⛔ THE FLOW IS COMPLETE WITHOUT A STANDARD-ONLY SCREEN', () => {
 Deno.test('⚠️ A GOAL REACHED OUTSIDE THE TRAIN DRILL-DOWN TAKES THE SAME ROUTE, MINUS THE DOOR', () => {
   // ⛔ A stored goal or a standalone route has no `train` screen and nothing else differs.
   assertEquals(getSteps({ ...strengthPath('run'), entry: 'build' }),
-    getSteps(strengthPath('run')).filter((k) => k !== 'train'));
+    getSteps(strengthPath('run')).filter((k) => k !== 'train' && k !== 'program'));
   assertEquals(getSteps({ ...strengthPath('standard'), entry: 'build' }),
     getSteps(strengthPath('standard')).filter((k) => k !== 'train'));
 });

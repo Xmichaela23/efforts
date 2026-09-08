@@ -23,6 +23,12 @@ export type StepRouterState = {
    * predates the Standard card.
    */
   focus?: 'standard' | 'run';
+  /**
+   * ⛔ WHICH TRAIN CARD WAS TAPPED (2026-09-07) — `standard`, `run` or `ride`. Run and Ride are
+   * groupings that open a program list (`program`) before any goal exists; Standard opens the
+   * wizard directly. Absent or null = not reached through a Train card.
+   */
+  trainCard?: string | null;
   posture: Partial<Record<string, string | null | undefined>>;
 };
 
@@ -42,6 +48,10 @@ export type StepKey =
   // pass-through into `get_stronger` and Heavy was dark; the programme Strong named is the Run
   // Focus card now. Do not reintroduce a tier — no hypertrophy position exists for this audience.
   | 'train'
+  // ⛔ THE PROGRAM LIST (Michael, 2026-09-07) — under Run Focus / Ride Focus only. One card per
+  // programme; the live one seeds the goal and opens the wizard on its frame. It sits where the
+  // tier screen sat, with program ids in place of tiers, and Standard Focus never sees it.
+  | 'program'
   // ⛔ THE RACE ITSELF — distance, date, level. Its own card, immediately after the goal, because
   // every screen after it is shaped by the answers: the date owns the block length (so the `length`
   // step drops out), and the level picks the volume table the plan is built from.
@@ -314,15 +324,23 @@ export function getSteps(state: StepRouterState): StepKey[] {
   // picked so Back walks entry ← train ← flow instead of jumping to the door.
   const door: StepKey[] = state.entry === 'train' ? ['goal', 'train'] : ['goal'];
   /**
+   * ⛔ THE PROGRAM LIST FOLLOWS THE TRAIN CARD FOR A GROUPING (2026-09-07). Run Focus and Ride Focus
+   * open it; Standard Focus does not. It is in the array BEFORE any goal exists, because the
+   * athlete is on that screen with no goal yet and Back / Next have to walk it. On Ride Focus the
+   * flow ends there for now (its one card is dimmed), and the screen hides the count.
+   */
+  const asksProgram = state.entry === 'train' && (state.trainCard === 'run' || state.trainCard === 'ride');
+  if (asksProgram) door.push('program');
+  /**
    * ⛔ NO TIER SCREEN ON ANY PATH (WORKORDER-train-menu-reshape-2026-09-07). It sat here between the
    * discipline and the block's own questions — Strong / Heavy — and Standard Focus once shipped
    * landing on it (*"it just takes you to strong focus or the unbuilt build"*, 2026-08-30). Strong
    * was a pass-through and Heavy was dark, so the screen asked nothing the engine could hear; the
    * programme Strong named is the Run Focus card now.
    *
-   * ⛔ THE POSTURE CARD IS THE FIRST SCREEN AFTER THE TRAIN PICK on the Run Focus path, and Standard
-   * Focus skips it (`skipsSportScope`). On Run Focus it no longer asks which sports either
-   * (`fixedSportScope`); it keeps the lifting line and the easy-swims toggle.
+   * ⛔ THE POSTURE CARD IS THE FIRST SCREEN AFTER THE PROGRAM PICK on the Run Focus path, and
+   * Standard Focus skips it (`skipsSportScope`). On Run Focus it no longer asks which sports either
+   * (`fixedSportScope`); it keeps the lifting line. The easy-swims toggle came off it 2026-09-07.
    */
   const head: StepKey[] = isStrengthFocus
     ? [...door, ...(skipsSportScope(state) ? [] : ['posture' as StepKey])]
