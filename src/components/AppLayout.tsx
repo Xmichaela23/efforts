@@ -1836,7 +1836,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   />
 
                   {/* WorkoutCalendar - fills remaining space */}
-                  <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                  <div data-first-run="calendar" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                     <WorkoutCalendar
                       onAddEffort={() => handleAddEffort('run')}
                       onSelectType={handleSelectEffortType}
@@ -1923,7 +1923,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   <span aria-hidden="true" className={sigilClass('home', homeActive)} />
                   <span className={labelClass}>Home</span>
                 </Button>
-                <Button
+                <Button data-first-run="state"
                   onClick={() => {
                     // Close any open views and navigate to context
                     if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showAccount) {
@@ -1940,7 +1940,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   <span aria-hidden="true" className={sigilClass('context', contextActive)} />
                   <span className={labelClass}>State</span>
                 </Button>
-                <Button
+                <Button data-first-run="focus"
                   onClick={() => {
                     if (selectedWorkout || showStrengthLogger || showAllPlans || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showAccount || showGear || showContext) {
                       handleBackToDashboard();

@@ -1,4 +1,3 @@
-import FirstRunCard from '@/components/FirstRunCard';
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
@@ -746,9 +745,6 @@ export default function StateTab({
     <div className="pt-1 pb-4">
       {/* State-as-hub lens switcher (D-316): Status = the screen you know; Adjust/Schedule are new. */}
       <StateHubTabs value={stateLens} onChange={setStateLens} />
-      <div className="px-2 pt-2">
-        <FirstRunCard id="state">Status, Adjust and Schedule are three readings of the same week. Tap one.</FirstRunCard>
-      </div>
 
       {/* 2026-09-03 (Michael: "the compounds are the only ones that are prescribed"): the Adjust tab lists the
           coached lifts only — the ones the plan prescribes a number for — never the whole logged list. */}

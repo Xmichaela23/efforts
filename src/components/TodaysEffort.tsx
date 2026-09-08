@@ -1,3 +1,4 @@
+import FirstRunOverlay from '@/components/FirstRunOverlay';
 import FirstRunCard from '@/components/FirstRunCard';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -1493,6 +1494,23 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           <FirstRunCard id="home">Tap a session to open it.</FirstRunCard>
         </div>
       ) : null}
+      <FirstRunOverlay active={noPlanYet} />
+      {/* No plan yet: the one door, above the panel (2026-09-08). */}
+      {noPlanYet ? (
+          <div className="flex-shrink-0 px-2 pt-2 pb-1" style={{ position: 'relative', zIndex: 1 }}>
+            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+              <div>
+                <button
+                  type="button"
+                  onClick={() => navigate('/goals')}
+                  className="w-full text-left rounded-xl border border-white/25 bg-white/[0.08] px-4 py-3 text-white/90 text-sm"
+                >
+                  Build a training or race plan ›
+                </button>
+              </div>
+            </div>
+          </div>
+      ) : null}
       {/* Scrollable container for Today panel */}
       <div 
         ref={scrollRef}
@@ -1689,22 +1707,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             Option C: slightly wider rail + Today blocks get a small bleed.
             Calendar/week strip spacing is untouched (handled in `WorkoutCalendar`). */}
         <div className="px-2 overflow-x-hidden" style={{ paddingBottom: hasExpandedWorkout ? 120 : 56 }}>
-        {displayWorkouts.length === 0 && noPlanYet ? (
-          <div className="px-2 pt-3">
-            <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-              <p className="m-0 text-white/90 text-base">No plan yet.</p>
-              <div className="mt-3">
-                <button
-                  type="button"
-                  onClick={() => navigate('/goals')}
-                  className="w-full text-left rounded-xl border border-white/25 bg-white/[0.08] px-4 py-3 text-white/90 text-sm"
-                >
-                  Build a training or race plan ›
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : displayWorkouts.length === 0 ? (
+        {displayWorkouts.length === 0 ? (
           // Empty state - show "Rest" if there's an active plan, otherwise "No effort"
           <div className="flex items-center justify-center h-full px-4">
             <p className="text-center text-lg font-medium italic" style={{ color: 'rgba(255, 255, 255, 0.25)' }}>

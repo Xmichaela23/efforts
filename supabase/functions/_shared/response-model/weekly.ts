@@ -708,9 +708,10 @@ function computeEmptyState(args: {
 
   if (goals.length === 0) {
     return {
-      headline: 'No goal set — maintaining general fitness.',
-      subtitle: 'Mostly easy aerobic work + one harder day, plus your usual strength. Add a goal to direct training.',
-      cta_label: 'No current goals — Create new goal',
+      // Michael's words (2026-09-08). "Focus" is what the tab is called; "goal" is the old name.
+      headline: 'No focus yet.',
+      subtitle: 'Pick one and the week fills in.',
+      cta_label: 'Choose a focus ›',
       cta_action: 'create_goal',
     };
   }
