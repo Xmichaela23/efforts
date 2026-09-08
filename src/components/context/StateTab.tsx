@@ -678,11 +678,9 @@ export default function StateTab({
   // Arc-grounded empty-state copy authored by coach (response model). Falls back to a minimal
   // generic line only if the server payload is missing the field (e.g. older cache row).
   const serverEmptyState = wsv.empty_state ?? null;
-  const aimlessHeadline = serverEmptyState?.headline ?? 'No active plan — training stays general fitness.';
-  const aimlessSubtext =
-    serverEmptyState?.subtitle ??
-    'Mostly easy aerobic work, one harder day, and your usual strength. Without a goal to shape the week, back-to-back hard days add up faster than they help.';
-  const aimlessCtaLabel = serverEmptyState?.cta_label ?? 'Set a goal';
+  const aimlessHeadline = serverEmptyState?.headline ?? 'No focus yet.';
+  const aimlessSubtext = serverEmptyState?.subtitle ?? 'Pick one and the week fills in.';
+  const aimlessCtaLabel = serverEmptyState?.cta_label ?? 'Choose a focus ›';
   const aimlessCtaAction = serverEmptyState?.cta_action ?? 'create_goal';
   const aimlessCtaTarget = aimlessCtaAction === 'plan_season' ? '/goals' : '/goals';
 
