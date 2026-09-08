@@ -2037,6 +2037,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 );
               })}
             </div>
+            {/* Two-a-day spacing (p108, the hybrid two-a-day rule): a lift and an endurance session on
+                one date. Words are Michael's (2026-09-08). */}
+            {(() => {
+              const kinds = new Set(displayWorkouts.map((w: any) => String(w?.type || '').toLowerCase()));
+              const hasLift = kinds.has('strength');
+              const hasEndurance = ['run', 'ride', 'bike', 'cycling', 'swim', 'walk'].some((k) => kinds.has(k));
+              return hasLift && hasEndurance ? (
+                <p className="m-0 mt-2 px-1 text-[12px] text-white/55">Two sessions today. Six to eight hours apart.</p>
+              ) : null;
+            })()}
           </div>
         )}
         </div>

@@ -106,3 +106,4 @@ The week-execution bars (a count). Add rows when touched.
 | run-jobs stops claiming after 40 s; one job may take at most 90 s | `run-jobs/index.ts CLAIM_BUDGET_MS`, `JOB_TIMEOUT_MS` | **OURS** — keeps a tick inside the gateway limit; the next minute takes the rest |
 | Rest after a warm-up set = 60 s (the work's rest is 90–180 s by intent) | `src/lib/strength-rest-timer.ts WARMUP_REST_SEC`, `StrengthLogger.tsx autoStartRestForSet` | OURS — a warm-up is not the work; Strong/Hevy run warm-up sets on a short timer | 2026-09-07 |
 | Post-workout feedback asks only about a run or ride dated today or yesterday (36 h) | `check-feedback-needed/index.ts` | OURS — the 7-day window surfaced rows a history pull had just created for old dates | 2026-09-07 |
+| Two sessions on one date: "Six to eight hours apart" | `TodaysEffort.tsx` under the day's sessions | Viada p108 (6–8 h between two-a-days; the 4–6 h short-easy-morning case not shown) | 2026-09-08 |
