@@ -45,6 +45,8 @@ const WORD: Record<number, string> = {
 export function liftingCommitmentLine(frameId: keyof typeof FRAMES = 'strength_5k'): string | null {
   const n = liftingDaysForFrame(frameId);
   if (n <= 0) return null;
-  return `${WORD[n] ?? n} lifting days a week. Your endurance fits around them. `
-    + 'Riding has less impact on lift gains than running.';
+  // ⛔ The riding-vs-running clause came off 2026-09-07 (Michael): on Run + Strength there is no
+  // riding in the block, and on Standard Focus the ride days are the frame's, so the comparison
+  // informed no choice on either path.
+  return `${WORD[n] ?? n} lifting days a week. Your endurance fits around them.`;
 }

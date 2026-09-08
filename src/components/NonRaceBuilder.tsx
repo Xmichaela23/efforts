@@ -4743,7 +4743,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 top is outside the plan, and the line says so without an imperative. */}
             {fixedSportScope(state) != null ? (
               <p className="text-white/60 text-sm leading-relaxed">
-                {`The endurance in this block is running: ${COUNT_WORD[slotKeysFor(wizardFrame).length] ?? slotKeysFor(wizardFrame).length} sessions a week, set by the programme. Riding sits outside the plan.`}
+                {(() => {
+                  const total = slotKeysFor(wizardFrame).length;
+                  const hard = hardSlotKeysFor(wizardFrame).length;
+                  const easy = Math.max(0, total - hard - 1);
+                  const w = (n: number) => COUNT_WORD[n] ?? String(n);
+                  // p246: one long run (LSD) in the standard column; the rest of the non-hard runs are easy.
+                  return `${w(total).replace(/^./, (c) => c.toUpperCase())} runs a week, set by the program: ${w(hard)} hard, one long, ${w(easy)} easy. Riding you do on top sits outside the plan.`;
+                })()}
               </p>
             ) : ([
               // ⛔ THE EFFECT LINE UNDER EACH CARD (Michael, 2026-08-24): what the choice does to
@@ -4780,47 +4787,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 </button>
               );
             })}
-            {/* ⛔ SWIM IS AN ADD-ON, NEVER A SLOT (Michael, 2026-08-24): easy laps + technique only,
-                1 or 2 a week, off by default. Cap 2 — past that the athlete wants a tri plan. The
-                hard swim families are never prescribed by this plan (standing ruling). */}
-            <div className="rounded-xl border border-white/12 bg-white/[0.02] p-3">
-              <button
-                type="button"
-                onClick={() => setState((s) => ({
-                  ...s,
-                  posture: { ...s.posture, swim: (s.posture.swim ?? 'out') === 'maintain' ? 'out' : 'maintain' },
-                  swimEasySessions: (s.posture.swim ?? 'out') === 'maintain' ? 0 : 1,
-                }))}
-                className="w-full flex items-center justify-between"
-              >
-                <span className="flex items-center gap-2.5">
-                  <Waves className="h-4 w-4" style={{ color: getDisciplineColor('swim') }} />
-                  <span className={`font-medium ${(state.posture.swim ?? 'out') === 'maintain' ? 'text-white' : 'text-white/60'}`}>
-                    Add easy swims
-                  </span>
-                </span>
-                {(state.posture.swim ?? 'out') === 'maintain' && <Check className="h-4 w-4 text-white/70" />}
-              </button>
-              <p className="text-white/50 text-xs mt-1.5">
-                Technique and easy laps, for feel. Doesn't take a session spot, costs your lifting nothing.
-              </p>
-              {(state.posture.swim ?? 'out') === 'maintain' && (
-                <div className="flex gap-1.5 mt-2">
-                  {([1, 2] as const).map((n) => (
-                    <button
-                      key={n} type="button"
-                      onClick={() => setState((s) => ({ ...s, swimEasySessions: n }))}
-                      className={`px-3.5 py-1.5 rounded-lg text-sm border ${(state.swimEasySessions ?? 1) === n ? 'border-white/40 bg-white/[0.08] text-white' : 'border-white/12 text-white/55'}`}
-                    >{n} a week</button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* Easy-swim add-on removed from this step (Michael, 2026-09-07). State fields stay; off by default. */}
             {/* ⛔ THE COUNT IS THE FRAME'S. p246 prescribes two quality sessions and p274 three, and
                 this sentence stated "two" for both — the screen telling a Standard Focus athlete
                 their week has one fewer hard session than it does, one step before the screen that
                 shows all three. */}
-            <p className="text-white/50 text-xs">{`The week has ${COUNT_WORD[hardSlotKeysFor(wizardFrame).length] ?? String(hardSlotKeysFor(wizardFrame).length)} hard sessions. A sport that doesn't get one keeps its endurance base but not its speed.`}</p>
+            {fixedSportScope(state) == null && (
+              <p className="text-white/50 text-xs">{`The week has ${COUNT_WORD[hardSlotKeysFor(wizardFrame).length] ?? String(hardSlotKeysFor(wizardFrame).length)} hard sessions. A sport that doesn't get one keeps its endurance base but not its speed.`}</p>
+            )}
           </div>
         </StepLayout>
       )}

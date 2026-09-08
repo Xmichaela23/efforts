@@ -32,8 +32,8 @@ Deno.test('⛔ COPY-VOICE — a fact and its consequence, no imperative and no r
   for (const banned of ['should', 'try', 'make sure', 'need to', 'must', 'don\'t worry', 'just']) {
     assert(!line.toLowerCase().includes(banned), `the commitment line instructs or reassures: "${banned}"`);
   }
-  // Michael, 2026-08-25: the riding-vs-running fact rides on the end of the line.
-  assertEquals(line.endsWith('Riding has less impact on lift gains than running.'), true, 'the consequence clause is gone');
+  // Michael, 2026-09-07: the riding-vs-running clause is gone and stays gone.
+  assert(!line.includes('Riding'), 'the riding comparison is back on a line that has no riding in it');
   assert(line.includes('Your endurance fits around them.'), 'the endurance clause is gone');
 });
 
