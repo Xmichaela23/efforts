@@ -47,7 +47,7 @@ import {
 } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 // ⛔ THE LIBRARY OWNS WHICH SHAPES A FAMILY OFFERS AT A LEVEL — read, never restated. A second list
 // here is how a chip comes to quote a session the composer will not build.
-import { FAMILIES } from '../../supabase/functions/_shared/endurance-library/index.ts';
+import { archetypesFor, FAMILIES } from '../../supabase/functions/_shared/endurance-library/index.ts';
 import {
   ladderOf,
   slotMinuteOptions,
@@ -620,6 +620,16 @@ export function experienceChips(
   /** ⚠️ THIS FRAME'S OWN SHAPE PER ROW — never the `strength_5k` table. See `specFor`. */
   const archetypeOf = (key: SlotKey): string | undefined =>
     frameSlots(frame).find((x) => x.key === key)?.archetype;
+  /**
+   * ⛔⛔ THE SHAPES THE **FRAME** ROTATES THIS SLOT THROUGH, where it names them (2026-09-08) — see
+   * `EnduranceSlot.archetypes`. Without this the chip fell back to the family's whole list at that
+   * level and quoted **89 minutes** for a slot whose three sessions top out at 69: a number no week
+   * builds, which is what `experience-chips.test.ts` exists to catch and did.
+   * ⚠️ NOT A PIN. The slot has no single shape any more, so `spec.archetype` stays undefined and
+   * `longestFor` takes the max across exactly these three.
+   */
+  const rotationOf = (key: SlotKey): string[] | undefined =>
+    frameSlots(frame).find((x) => x.key === key)?.archetypes;
   /** One slot as the engine will build it, at one tier. Null when this slot is not that sport. */
   const specFor = (key: SlotKey, sport: SlotSport, tier: ExperienceTier): SlotSpec | null => {
     const sp = slots[key];
@@ -657,6 +667,10 @@ export function experienceChips(
        */
       archetype: opts.archetypes?.[key] ?? eq?.archetype ?? archetypeOf(key),
       sport: sp,
+      // ⚠️ CARRIED, NOT APPLIED — only `longestFor` reads it, and only when nothing is pinned.
+      ...(opts.archetypes?.[key] || eq?.archetype || archetypeOf(key)
+        ? {}
+        : { rotation: rotationOf(key) }),
     } as SlotSpec;
   };
   /** How long this slot's session can be at its own level — see `longestMin`. */
@@ -673,6 +687,20 @@ export function experienceChips(
      * ⛔ NOTHING PINNED, SO THE BLOCK ROTATES — and "up to" has to cover the longest week it will
      * serve, not the first one. `rotatedArchetype` walks the shapes offered at this level.
      */
+    /**
+     * ⛔ THE FRAME'S OWN LIST FIRST, where the programme names one — the block rotates exactly those
+     * and "up to" must describe them, not every shape the family offers at this level.
+     */
+    /**
+     * ⚠️ FILTERED TO THE **RESOLVED** LEVEL, exactly as the composer filters it
+     * (`frameRotatedArchetype`). The "newer" tier drops this slot's level, and the frame's three
+     * shapes are level-3 lines — unfiltered, every one of them measured zero and the chip quoted a
+     * shorter session than the week builds. When the list does not apply, the family's own rotation
+     * below is what the composer will use, so it is what the chip must measure.
+     */
+    const named = (spec.rotation ?? []).filter((id) =>
+      archetypesFor(spec.family as never, spec.level as never).some((a) => a.id === id));
+    if (named.length > 0) return named.reduce((best, id) => Math.max(best, top(id)), 0);
     const table = FAMILIES as Record<string, { archetypes: Array<{ id: string; levels?: number[] }> }>;
     const offered = table[spec.family]?.archetypes
       ?.filter((a) => !a.levels || a.levels.includes(spec.level as number)) ?? [];

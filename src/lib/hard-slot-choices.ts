@@ -199,7 +199,7 @@ export const HARD_SLOT_FACT_NOTE =
 // ⛔ THE OPTIONS ARE THE LIBRARY'S OWN ARCHETYPES — page-cited workouts, one list, no copy of it
 // here. The slot's family is p246's (frames.ts); a ride reads the family through RIDE_EQUIVALENT,
 // the same table the composer uses, so the card can never offer a workout the week cannot build.
-import { FAMILIES, type FamilyId } from '../../supabase/functions/_shared/endurance-library/index.ts';
+import { archetypesFor, FAMILIES, type FamilyId } from '../../supabase/functions/_shared/endurance-library/index.ts';
 import { RIDE_EQUIVALENT } from '../../supabase/functions/_shared/standing-plan/index.ts';
 import type { FrameId } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 import { frameSlots } from './standing-plan-week-copy';
@@ -248,14 +248,29 @@ export function slotFamilyFor(
   return sport === 'ride' ? (RIDE_EQUIVALENT[stated]?.family ?? stated) : stated;
 }
 
+/**
+ * ⛔⛔ FILTERED TO THE LEVEL THE SLOT IS BUILT AT (2026-09-08). This listed every shape the family
+ * owns, and `experience-tier-travel.test.ts` carried a tripwire saying so in as many words: *"no
+ * hard shape is level-gated, which is what makes the picker safe… if a gated archetype is ever
+ * added, `slotVariantOptions` has to learn about it before the option can ship."*
+ *
+ * ⛔ THE DAY IT FIRED. p234's three qualifying near-threshold sessions are LEVEL-3 lines
+ * (`levels: [3]`), and Standard Focus's day 3 is the same family at level 2 — so an unfiltered
+ * picker would have offered a session that row cannot build. Picking it threw inside
+ * `buildEnduranceSession` and took the whole week down with it.
+ * ⚠️ THE LIBRARY IS ASKED, never a `levels` test written out here — `archetypesFor` owns the answer,
+ * and the composer's own guard (`applyVariantPicks`) now asks it too. One question, one owner.
+ */
 export function slotVariantOptions(
   key: HardSlotKey,
   sport: 'run' | 'ride',
   frame: FrameId = 'strength_5k',
 ): SlotVariantOption[] {
-  const rules = FAMILIES[slotFamilyFor(key, sport, frame)];
-  if (!rules) return [];
-  return rules.archetypes.map((a) => ({ id: a.id, label: a.label }));
+  const family = slotFamilyFor(key, sport, frame);
+  if (!FAMILIES[family]) return [];
+  const row = frameSlots(frame).find((x) => x.key === key);
+  const level = (row?.level ?? 1) as never;
+  return archetypesFor(family as never, level).map((a) => ({ id: a.id, label: a.label }));
 }
 
 /**

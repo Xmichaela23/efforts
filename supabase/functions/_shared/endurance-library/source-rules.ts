@@ -755,6 +755,72 @@ export const FAMILIES: Record<FamilyId, {
         recovery: { kind: 'stated', band: { lo: 60, hi: 90 }, intensity: vt1 },
         cite: 'Viada pp233-234 — 1 to 1:30 at VT1 between',
       },
+      /**
+       * ⛔⛔⛔ p234'S OWN THREE LEVEL-3 LINES THAT SATISFY p247 — added verbatim, 2026-09-08.
+       *
+       * ⛔ WHY THEY EXIST AS THEIR OWN SHAPES. p247 asks for the Wednesday near-threshold session to
+       * carry **5- to 8-minute work intervals**, and that filter selects exactly three of p234's
+       * level-3 lines. The shapes already in this family model a SPAN and derive their rep count
+       * from the dose — right for a library, and wrong for a slot whose page names three specific
+       * sessions. These three carry DEGENERATE bands (`lo === hi`) so each builds the line it was
+       * transcribed from and nothing else.
+       *
+       * ⛔ THE FILTER'S OWN WORKING, so nobody re-derives it. p234 level 3 prints ten sessions:
+       *   · 10 × 1200m · 3 × 1600m + 6 × 400m · 1000m/800m/400m/200m — DISTANCE, and a distance
+       *     needs a threshold pace this athlete may not have (2026-09-02: threshold is learned or
+       *     entered, never derived from a 5K). Left out deliberately.
+       *   · 4 sets of 4 rounds of 1 min @ 105% — one-minute work. Fails the filter.
+       *   · 2 sets of 4 rounds of 20s @ 140% / 4:40 @ 92% — fails.
+       *   · 3 sets of 4 rounds of 2 min @ 95% … — fails.
+       *   · **8 rounds of 5 min @ 90% / 1:30 @ VT1** — PASSES.
+       *   · **6 rounds of 6 min @ 88% / 1 min @ VT1** — PASSES.
+       *   · **4 rounds of 8:30 @ 85% / 1 min @ VT1** — PASSES.
+       *   · Race-specific NT — p247 reserves race pace for within six weeks of a race, which is the
+       *     taper column's `NT (race tempo)`. Not the standard week.
+       *
+       * ⚠️ `levels: [3]` IS LOAD-BEARING. Standard Focus's day 3 is the same family at LEVEL 2, and
+       * its rotation walks whatever this family offers at that level — so these three must not be
+       * offered there, or that programme's week would change. Its composed block hash is the guard.
+       * ⚠️ THEY DO NOT REPLACE THE SPAN SHAPES. `below_threshold` and `below_threshold_long` still
+       * model the same method across all three levels for every other caller; what these add is the
+       * page's own three lines, nameable by a frame that has to pick exactly them.
+       */
+      {
+        id: 'sustained_5min_90',
+        shape: 'intervals',
+        label: 'Eight sustained five-minute repeats',
+        repBand: { lo: 300, hi: 300 },
+        repsBand: { lo: 8, hi: 8 },
+        repsByLevel: { 3: { lo: 8, hi: 8 } },
+        levels: [3],
+        work: pct(0.90),
+        recovery: { kind: 'stated', band: { lo: 90, hi: 90 }, intensity: vt1 },
+        cite: 'Viada pp233-234 — "8 rounds of: 5 min @ 90% / 1:30 @ VT1"',
+      },
+      {
+        id: 'sustained_6min_88',
+        shape: 'intervals',
+        label: 'Six sustained six-minute repeats',
+        repBand: { lo: 360, hi: 360 },
+        repsBand: { lo: 6, hi: 6 },
+        repsByLevel: { 3: { lo: 6, hi: 6 } },
+        levels: [3],
+        work: pct(0.88),
+        recovery: { kind: 'stated', band: { lo: 60, hi: 60 }, intensity: vt1 },
+        cite: 'Viada pp233-234 — "6 rounds of: 6 min @ 88% / 1 min @ VT1"',
+      },
+      {
+        id: 'sustained_8min30_85',
+        shape: 'intervals',
+        label: 'Four sustained eight-and-a-half-minute repeats',
+        repBand: { lo: 510, hi: 510 },
+        repsBand: { lo: 4, hi: 4 },
+        repsByLevel: { 3: { lo: 4, hi: 4 } },
+        levels: [3],
+        work: pct(0.85),
+        recovery: { kind: 'stated', band: { lo: 60, hi: 60 }, intensity: vt1 },
+        cite: 'Viada pp233-234 — "4 rounds of: 8:30 @ 85% / 1 min @ VT1"',
+      },
       {
         /** ⛔ THE LONGER, EASIER HALF of the same method — as the repeat lengthens the percentage
          *  steps down with it. Split so the two can no longer be combined. */

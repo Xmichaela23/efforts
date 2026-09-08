@@ -41,21 +41,34 @@ Deno.test('⛔ THE COUNT IS DERIVED FROM THE SLOTS, never assumed to be two', ()
 Deno.test('⛔ THE NUMBER ITSELF IS UNCHANGED — the rotation logic was proved correct, not touched', () => {
   const all = experienceChips({ hard1: 'run', hard2: 'run', easy: 'run', long: 'run' } as never, { baselines: {} as never });
   /**
-   * ⚠️ 66 → 59 ON 2026-08-31, AND THE CHIP IS STILL QUOTING A SESSION HE ACTUALLY GETS — which is the
-   * property this test exists for. The near-threshold session shortened because its repeat count is
-   * now the source's own for that level instead of one derived from the week's dose. **The chip
-   * follows the session it measures; that is the whole point of it.**
-   * ⚠️ THIS IS ATHLETE-FACING: the experienced chip now reads about seven minutes shorter. The newer
-   * tier's number is unchanged, which is asserted directly below.
+   * ⚠️ 66 → 59 ON 2026-08-31, then **59 → 69 ON 2026-09-08**, AND THE CHIP IS STILL QUOTING A SESSION
+   * HE ACTUALLY GETS — which is the property this test exists for, and it caught both moves.
+   *
+   * The first change shortened the near-threshold session: its repeat count became the source's own
+   * for that level instead of one derived from the week's dose. The second replaced the session
+   * outright. p246's Wednesday was pinned to a shape p234 prints at LEVEL 2, and p247 asks that slot
+   * for 5- to 8-minute work intervals; it now rotates the three level-3 lines that satisfy the ask,
+   * the longest of which is *"8 rounds of: 5 min @ 90% / 1:30 @ VT1"* — sixty-nine minutes with its
+   * warm-up and cool-down. **The chip follows the session it measures; that is the whole point.**
+   * ⚠️ THIS IS ATHLETE-FACING: the experienced chip reads ten minutes longer than it did yesterday.
+   * ⚠️ AND IT IS THE MAX ACROSS THE THREE, not one of them — the block rotates, so "up to" has to
+   * cover the longest week it serves.
    */
-  assertEquals(all.run!.experienced.longestMin, 59);
+  assertEquals(all.run!.experienced.longestMin, 69);
   /**
-   * ⚠️ 45 → 41 ON 2026-08-31, same cause as the line above: the source's own per-level repeat count
-   * replaced a dose-derived one. ⛔ AND THIS IS THE NUMBER THE ONE-HOUR KNIFE-EDGE TURNS ON — the
-   * newer tier's hard run was 45 minutes against a 60-minute ask, a gap of exactly half an easy run.
-   * See `volume-bounds.test.ts` for what four minutes does to that week.
+   * ⚠️ 45 → 41 ON 2026-08-31, then **41 → 46 ON 2026-09-08**. ⛔ AND THIS IS THE NUMBER THE ONE-HOUR
+   * KNIFE-EDGE TURNS ON — see `volume-bounds.test.ts` for what a few minutes does to that week.
+   *
+   * ⛔ THE SECOND MOVE IS THE ROTATION REACHING THE CHIP, and it is a CORRECTION rather than a
+   * change of session. p246's Wednesday used to be PINNED, so this tier measured the pinned shape at
+   * its own lowered level and got 41. The slot rotates now, and p234's three qualifying sessions are
+   * level-3 lines — so at the "newer" tier they do not apply at all, the composer falls back to the
+   * family's own rotation at the lowered level, and the longest week that serves is 46 minutes.
+   * ⚠️ 41 WAS THEREFORE ALREADY UNDER-CLAIMING for any week the engine rotated onto a longer shape.
+   * `experience-chips.test.ts` is the check that matters here: it builds the weeks and asserts the
+   * chip's number is one of them.
    */
-  assertEquals(all.run!.newer.longestMin, 41);
+  assertEquals(all.run!.newer.longestMin, 46);
 });
 
 Deno.test('⛔ THE REST OF THE HOURS ARE ACCOUNTED FOR, WITHOUT A SECOND NUMBER', () => {

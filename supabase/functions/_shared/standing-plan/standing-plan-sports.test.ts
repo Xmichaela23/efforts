@@ -932,8 +932,16 @@ Deno.test('the RUN slots are untouched by all of it — different families canno
   const a = assignSports(STANDARD, { runs: 3, rides: 1, slots: runs });
   assertEquals(a.byKey['1:0'].family, 'run_mlss');
   assertEquals(a.byKey['3:0'].family, 'run_near_threshold');
-  // ⚠️ Day 3's archetype is the FRAME's own (`below_threshold`); day 1's is left to the rotation.
-  assertEquals(arche(a, '3:0'), 'below_threshold');
+  /**
+   * ⚠️ NEITHER SLOT CARRIES AN ARCHETYPE OUT OF THE ASSIGNER (2026-09-08). Day 1 never did — the
+   * frame names no shape and the composer rotates it. Day 3 was pinned to `below_threshold` and is
+   * now a ROTATION of p234's three qualifying level-3 sessions (`EnduranceSlot.archetypes`), which
+   * the composer resolves by week; the assigner carries the frame's single `archetype` field and
+   * there is no longer one to carry.
+   * ⛔ THE RULE THIS TEST IS ABOUT IS UNCHANGED and is the line above: the two slots are different
+   * FAMILIES, so the de-collision cannot re-point either of them.
+   */
+  assertEquals(arche(a, '3:0'), undefined);
   assertEquals(arche(a, '1:0'), undefined);
 });
 

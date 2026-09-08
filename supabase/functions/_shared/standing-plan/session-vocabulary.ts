@@ -49,8 +49,22 @@ const minutes = (seconds: number) => Math.max(1, Math.round(seconds / 60));
  * |---|---|---|
  * | `run_vt1` | `run_easy_{n}min` | VT1 is at or below the talk-test ceiling; that is this app's easy pace |
  * | `run_lsd` | `longrun_{n}min_easypace` | the long day, primarily below VT1 |
- * | `run_near_threshold` | `cruise_{n}x{d}mi_threshold` | repeats at threshold — p247 asks for 5-8 minute work intervals |
+ * | `run_near_threshold` | `interval_{n}x{s}s_{pct}pct_R{r}s` | the page prescribes SECONDS at a percentage; see the note below |
  * | `run_mlss` | `interval_{n}x{d}m_5kpace_R{r}s` | MLSS is zone 4, VT2 to vVO2 — 5K-pace territory |
+ *
+ * ⛔⛔ THE "5 TO 8" IS A REP LENGTH, AND THIS LINE USED TO IMPLY IT WAS A REP COUNT — settled off
+ * the page 2026-09-08. p247 on the Wednesday session: *"I recommend NT workouts with **5- to
+ * 8-minute work intervals**."* That is the length of one work interval. p234's level-3 list holds
+ * exactly three sessions that satisfy it, and the frame names all three:
+ *
+ *     8 rounds of: 5 min @ 90% / 1:30 @ VT1
+ *     6 rounds of: 6 min @ 88% / 1 min @ VT1
+ *     4 rounds of: 8:30 @ 85% / 1 min @ VT1
+ *
+ * ⚠️ THE LIBRARY'S `repsBand` OF 5-8 IS A DIFFERENT NUMBER THAT HAPPENS TO READ THE SAME, and
+ * conflating the two is what put *"8 × 4 min @ 90%"* on this slot — eight repeats, which is the
+ * count, at four minutes, which is p234's LEVEL 2 length. That session is on no line of the page.
+ * See `frames.ts` day 3 for the rotation and `source-rules.ts` for the filter's own working.
  *
  * ⚠️ THE MLSS MAPPING IS THE ONE WORTH ARGUING WITH. Zone 4 tops out at vVO2 (Part B4) and a 5K is
  * run at roughly vVO2 for most athletes, so `5kpace` is the closest thing the existing vocabulary

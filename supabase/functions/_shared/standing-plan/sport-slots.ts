@@ -15,7 +15,7 @@
 // tax the lifts. A held sport keeps its LONG session and loses its hard one.
 // ============================================================================
 
-import { FAMILIES } from '../endurance-library/index.ts';
+import { archetypesFor, FAMILIES } from '../endurance-library/index.ts';
 import type { FamilyId, Level } from '../endurance-library/index.ts';
 import { clampRideLevel } from './frames.ts';
 import type { EnduranceSlot, FrameDay, FrameId } from './frames.ts';
@@ -468,8 +468,24 @@ function applyVariantPicks(
   for (const [k, want] of Object.entries(mix.archetypes ?? {})) {
     const assigned = byKey[k];
     if (!assigned || typeof want !== 'string' || !want) continue;
-    const fam = FAMILIES[assigned.family];
-    if (fam?.archetypes.some((a) => a.id === want)) {
+    /**
+     * ⛔⛔ VALIDATED AGAINST THE FAMILY **AND THE LEVEL** (2026-09-08). This asked only whether the
+     * family owns the id, and every archetype used to be offered at every level, so the gap never
+     * fired. It does now: p234's three qualifying near-threshold sessions are level-3 lines
+     * (`levels: [3]`), and a pick naming one of them on a level-2 slot made
+     * `buildEnduranceSession` THROW — *"archetype X is not offered for Y at level Z"* — which does
+     * not spoil one session, it fails the whole week.
+     *
+     * ⛔ A PICK THE LEVEL DOES NOT OFFER IS IGNORED, NOT FATAL. That is this field's own stated
+     * contract — *"a pick that is not one of the ASSIGNED family's own archetypes is ignored"* —
+     * and the level is part of what the family offers. A stored pick from a block built at another
+     * level, or a payload from a client that never filtered, now falls back to the engine's own
+     * rotation instead of taking the plan down.
+     * ⚠️ THE LIBRARY IS ASKED. `archetypesFor` owns which shapes a level offers; a `levels` test
+     * written out here would be a second copy of that answer.
+     */
+    const offered = archetypesFor(assigned.family as never, assigned.level as never);
+    if (offered.some((a) => a.id === want)) {
       byKey[k] = { ...assigned, archetype: want };
       picked.add(k);
     }

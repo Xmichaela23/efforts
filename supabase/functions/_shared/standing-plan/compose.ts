@@ -108,6 +108,46 @@ import { FAMILIES } from '../endurance-library/index.ts';
  * this alternates by week number, because that preference cannot be answered before they have done
  * both and the wizard does not ask it. ⚠️ An explicit pick still wins — see the call site.
  */
+/**
+ * ⛔⛔ THE FRAME'S OWN ROTATION — the shapes a SLOT names, walked by week (2026-09-08).
+ *
+ * ⛔ IT IS A DIFFERENT QUESTION FROM `rotatedArchetype` BELOW, and the difference is whose rule it
+ * is. That one asks *"what does this FAMILY offer at this level"* and is the same answer for every
+ * programme. This one asks *"which shapes did THIS PROGRAMME name for this slot"* — p247 asks the
+ * Run + Strength Wednesday for 5- to 8-minute work intervals, which selects three of p234's
+ * level-3 lines, and the All Rounder's day 3 is the same family under no such rule. See
+ * `EnduranceSlot.archetypes`.
+ *
+ * ⛔⛔ IT IS CALLED IN BOTH PLACES OR IT IS WORSE THAN USELESS — the bounds spec and the built
+ * session. The comment on `enduranceSpecs` records what happened the last time one of the two was
+ * left to a default: the floor described a session the athlete never got. Deterministic in the week
+ * number, so two calls give one answer.
+ * ⚠️ A SUBSTITUTED SLOT TAKES NONE OF IT. These are run sessions; a slot ridden instead resolves
+ * inside its own family, exactly as it did before this existed.
+ *
+ * ⛔⛔ AND IT IS FILTERED TO THE **RESOLVED** LEVEL, WHICH IS NOT ALWAYS THE FRAME'S — found by the
+ * hours sweep before it shipped. The low-volume tier drops this slot to level 1 for an athlete
+ * running very little (`levelForFamily`), and p234's three qualifying sessions are level-3 lines:
+ * asking the library for one of them at level 1 THROWS, and the whole week fails to build. The
+ * frame names shapes for the slot as the PAGE writes it; when the athlete's own level moves off
+ * that row, the list no longer applies and the ordinary rules take over.
+ * ⚠️ THE LIBRARY IS ASKED, never a literal — `archetypesFor` owns which shapes a level offers, and
+ * a second copy of that answer here is the D-457 disease with a new face.
+ */
+function frameRotatedArchetype(
+  slot: { archetypes?: string[] },
+  assigned: { substituted?: boolean; family: string },
+  level: number,
+  week: number,
+): string | undefined {
+  const list = slot.archetypes;
+  if (assigned.substituted || !Array.isArray(list) || list.length === 0) return undefined;
+  const offered = new Set(archetypesFor(assigned.family as never, level as never).map((a) => a.id));
+  const usable = list.filter((id) => offered.has(id));
+  if (usable.length === 0) return undefined;
+  return usable[(Math.max(1, week) - 1) % usable.length];
+}
+
 function rotatedArchetype(family: string, level: number, week: number): string | undefined {
   const rules = (FAMILIES as Record<string, { archetypes: Array<{ id: string; levels?: number[] }> }>)[family];
   if (!rules) return undefined;
@@ -117,6 +157,7 @@ function rotatedArchetype(family: string, level: number, week: number): string |
 }
 import { translateEnduranceSession } from './session-vocabulary.ts';
 import { enduranceLedgerFor, type EnduranceLedger } from './endurance-ledger.ts';
+import { archetypesFor } from '../endurance-library/index.ts';
 import type { EnduranceSession } from '../endurance-library/index.ts';
 import { weekConflicts, type WeekConflict } from './week-conflicts.ts';
 import {
@@ -2578,10 +2619,17 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
          * it here and at the build site gives the same answer — but it has to be CALLED in both,
          * not left to the library's default in one of them.
          */
+        /**
+         * ⛔ AND THE FRAME'S OWN ROTATION OUTRANKS BOTH (2026-09-08) — see `frameRotatedArchetype`.
+         * A slot whose programme names its shapes is measured on the shape THIS week builds, or the
+         * bounds would describe one of the three and the athlete would run another.
+         */
         out.push({
           family: a.family,
           level: levelForFamily(a.family, a.level),
-          archetype: a.archetype ?? rotatedArchetype(a.family, levelForFamily(a.family, a.level), args.week),
+          archetype: frameRotatedArchetype(slot, a, levelForFamily(a.family, a.level), args.week)
+            ?? a.archetype
+            ?? rotatedArchetype(a.family, levelForFamily(a.family, a.level), args.week),
           sport: a.sport,
         });
       });
@@ -3048,7 +3096,19 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
        * every ride slot, and p246's near-threshold slot names its own — and for the rest it makes the
        * measured session the built one, which is what the ladder always claimed to be.
        */
-      const slotArchetype = assigned.archetype
+      /**
+       * ⛔⛔ THE FRAME'S OWN ROTATION COMES FIRST, WHERE IT STATES ONE (2026-09-08) — see
+       * `EnduranceSlot.archetypes`. p247 names three sessions for this programme's Wednesday and
+       * p112 says to vary them week to week; the frame is where a programme-specific list belongs,
+       * because the same family serves another programme under no such rule.
+       * ⚠️ READ OFF THE **FRAME** SLOT, NOT THE ASSIGNED ONE. The assignment carries the sport and
+       * may have substituted a ride, whose shapes are its own family's — so a substituted slot
+       * falls through to the rules below exactly as it did before.
+       */
+      const slotArchetype = frameRotatedArchetype(
+        slot, assigned, levelForFamily(assigned.family, assigned.level), args.week,
+      )
+        ?? assigned.archetype
         ?? rotatedArchetype(assigned.family, levelForFamily(assigned.family, assigned.level), args.week);
       /**
        * ⛔ THE ATHLETE'S OWN LENGTH FOR THIS SESSION, WHERE A SCREEN ASKED — see `SportMix.minutes`.

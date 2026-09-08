@@ -194,6 +194,24 @@ export type EnduranceSlot = {
   level: Level;
   /** ⚠️ p247's own refinement of the slot, where it gives one. */
   archetype?: string;
+  /**
+   * ⛔⛔⛔ THE SHAPES THIS SLOT ROTATES THROUGH, WHERE THE PROGRAMME NAMES MORE THAN ONE (2026-09-08).
+   *
+   * ⛔ WHY IT IS ON THE FRAME AND NOT ON THE FAMILY. p247 asks Wednesday's near-threshold session for
+   * **5- to 8-minute work intervals**, and that filter picks exactly three of p234's level-3 lines.
+   * It is a statement about THIS PROGRAMME'S Wednesday, not about the near-threshold family — the
+   * All Rounder's day 3 is the same family at level 2 and is governed by nothing of the sort. A
+   * filter living on the family would change both weeks; living here it changes one.
+   *
+   * ⛔ AND THE ROTATION IS p112: hold the load and vary *"across slightly different set durations
+   * and intensities"* session to session. `composeWeek` walks this list by week, the same rule
+   * `rotatedArchetype` applies to a slot the frame leaves open — which is what day 1 does.
+   *
+   * ⚠️ IT REPLACES `archetype`, NEVER JOINS IT. A slot states one shape or a rotation, and carrying
+   * both would leave two answers to one question. ⚠️ A sport substitution drops it: these are run
+   * sessions and a slot ridden instead takes its own family's shapes.
+   */
+  archetypes?: string[];
   /** Taper only — *"NT (race tempo)"*: race pace with recoveries 25% longer (p247). */
   raceTempo?: boolean;
   /**
@@ -375,7 +393,17 @@ const STRENGTH_5K_STANDARD: FrameDay[] = [
     ],
     endurance: [],
   },
-  { day: 3, label: null, strength: [], endurance: [E('run_near_threshold', 3, 'NT (level 3)', { archetype: 'below_threshold' })], plyo: true },
+  /**
+   * ⛔⛔ WEDNESDAY ROTATES p234'S THREE QUALIFYING LEVEL-3 SESSIONS (2026-09-08) — see
+   * `EnduranceSlot.archetypes` for the ruling and `source-rules.ts` for the filter's own working.
+   *
+   * ⛔ IT WAS PINNED TO `below_threshold`, AND THAT PIN WAS WRONG ON THE PAGE. That shape's
+   * four-minute repeat is p234's LEVEL 2 line (*"6 rounds of: 4 min @ 90%"*); at level 3 the count
+   * climbed to eight and the length did not, producing *"8 × 4 min @ 90%"* — a session p234 does not
+   * print at any level. p247 asks this slot for 5- to 8-minute work intervals, and the three lines
+   * below are the level-3 sessions that satisfy it.
+   */
+  { day: 3, label: null, strength: [], endurance: [E('run_near_threshold', 3, 'NT (level 3)', { archetypes: ['sustained_5min_90', 'sustained_6min_88', 'sustained_8min30_85'] })], plyo: true },
   {
     day: 4,
     label: 'DE: Upper',

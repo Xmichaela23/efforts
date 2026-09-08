@@ -210,3 +210,78 @@ same fabricated mile. **The composed All Rounder block hash therefore changes, l
   session's own, the row's arithmetic reaching the composer's duration, every frame's near-threshold
   slot in both columns, the MLSS slot beside it, and the materializer's cache still matching.
 
+---
+
+## 9. WEDNESDAY'S SESSION ITSELF — the pin was wrong on the page (2026-09-08)
+
+§8 fixed the DIMENSION the work travels in. This fixes WHICH SESSION it is.
+
+### 9a. What was wrong
+
+The slot was pinned to `below_threshold`, whose four-minute repeat is p234's **level 2** line
+(*"6 rounds of: 4 min @ 90% / 1 min @ VT1"*). At level 3 the rep count climbed to eight and the
+length did not, so the slot built **8 × 4 min @ 90%** — a session p234 prints at no level.
+
+p247 asks this slot for **5- to 8-minute work intervals**. p234's level-3 list holds ten sessions
+and exactly three satisfy it:
+
+| session | token | length |
+|---|---|---|
+| 8 rounds of: 5 min @ 90% / 1:30 @ VT1 | `interval_8x300s_90pct_R90s` | 69 min |
+| 6 rounds of: 6 min @ 88% / 1 min @ VT1 | `interval_6x360s_88pct_R60s` | 59 min |
+| 4 rounds of: 8:30 @ 85% / 1 min @ VT1 | `interval_4x510s_85pct_R60s` | 55 min |
+
+The other seven are out, and each for a stated reason: three are DISTANCE sessions (1200 m, 1600 m,
+the 1000/800/400/200 ladder) which need a threshold pace this athlete may not have; three have
+work intervals of one minute, twenty seconds and two minutes and fail the filter; the
+race-specific set is what p247 reserves for within six weeks of a race, which is the taper column.
+
+⚠️ **THE 8 × 5 MIN SESSION IS 69 MINUTES, NOT INSIDE 55-65.** Forty minutes of work plus seven
+ninety-second recoveries plus the 10-minute warm-up and 8-minute cool-down. That is p234's own line
+and it is reported rather than trimmed.
+
+### 9b. How it is built
+
+- Three new archetypes in `source-rules.ts`, each with **degenerate bands** (`lo === hi`) so it
+  builds the line it was transcribed from and nothing else, each citing its own page line, all
+  `levels: [3]`.
+- `EnduranceSlot.archetypes` — a slot may name the shapes it rotates through. The frame states the
+  p247 filter because it is a fact about **this programme's Wednesday**; the All Rounder's day 3 is
+  the same family under no such rule.
+- `frameRotatedArchetype` in `compose.ts`, called at BOTH the bounds spec and the built session, as
+  that file's own note demands. It is filtered to the RESOLVED level: the low-volume tier drops this
+  slot to level 1, where these three do not exist, and an unfiltered list threw inside the library
+  and failed the whole week.
+
+### 9c. Three holes the change exposed, all closed
+
+1. **`applyVariantPicks` did not check the level.** An athlete pick naming a level-3 shape on a
+   level-2 slot threw and took the week down. It now asks `archetypesFor` and ignores a pick the
+   level does not offer, which is that field's own stated contract.
+2. **The workout picker did not filter by level.** `experience-tier-travel.test.ts` carried a
+   tripwire saying exactly this would happen; `slotVariantOptions` now asks the library.
+3. **The experience chip measured the family, not the block.** It quoted *"up to 89 min"* for a slot
+   whose three sessions top out at 69. `FrameSlot.archetypes` and `SlotSpec.rotation` carry the
+   frame's list to the screen so the chip measures the block's own sessions.
+
+### 9d. Numbers that moved on screen
+
+| | before | after |
+|---|---|---|
+| experienced chip, longest hard run | 59 min | **69 min** |
+| newer chip, longest hard run | 41 min | **46 min** |
+
+⚠️ The newer tier's move is a CORRECTION rather than a new session: at that tier the three do not
+apply, the composer falls back to the family's rotation at the lowered level, and 41 was
+under-claiming any week that rotated onto a longer shape.
+
+### 9e. Verified
+
+- **Standard Focus untouched, proven:** composed All Rounder block hash `5ca20bb1…69e2`, identical
+  before and after. Its day 3 is level 2 and the three new shapes are `levels: [3]`.
+- **Robot account, deployed chain, four consecutive weeks:** 59 · 55 · 69 · 59 — the three sessions
+  in rotation, coming round on the fourth. Every step time-based, no distance on any of them, the
+  10-minute warm-up and 8-minute cool-down on all three. Account deleted.
+- The comment table at the top of `session-vocabulary.ts` now states the page's answer: the 5-to-8
+  is a REP LENGTH, and the library's `repsBand` of 5-8 is a different number that reads the same.
+

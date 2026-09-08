@@ -62,6 +62,13 @@ export type FrameSlot = {
   family: string;
   level: number;
   archetype?: string;
+  /**
+   * ⛔ THE SHAPES THE FRAME ROTATES THIS SLOT THROUGH, where a programme names them (2026-09-08) —
+   * see `EnduranceSlot.archetypes`. It travels because the screen has to measure the BLOCK'S own
+   * sessions: without it the experience chip fell back to the family's whole level-3 list and quoted
+   * eighty-nine minutes for a slot whose three sessions top out at sixty-nine.
+   */
+  archetypes?: string[];
   label: string;
   options: { value: SlotSport; label: string }[];
 };
@@ -129,6 +136,8 @@ export function frameSlots(
         family: String(slot.family),
         level: Number(slot.level),
         ...(slot.archetype ? { archetype: slot.archetype } : {}),
+        // ⛔ AND THE FRAME'S ROTATION FOR THIS SLOT — see `FrameSlot.archetypes` for why it travels.
+        ...(slot.archetypes?.length ? { archetypes: [...slot.archetypes] } : {}),
         label: labelFor(role, n),
         options: optionsFor(role, String(slot.family)),
       });

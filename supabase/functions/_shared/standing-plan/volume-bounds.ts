@@ -34,6 +34,14 @@ export type SlotSpec = {
   level: Level;
   archetype?: string;
   sport: 'run' | 'ride' | 'swim';
+  /**
+   * ⛔ THE SHAPES THE FRAME ROTATES THIS SLOT THROUGH, where a programme names them — see
+   * `EnduranceSlot.archetypes`. Carried so a reader measuring *"the longest this slot gets"* covers
+   * exactly the block's own sessions rather than every shape the family offers at this level.
+   * ⚠️ NEVER A PIN. A slot with one shape sets `archetype`; this is only read where that is absent,
+   * and nothing here builds from it.
+   */
+  rotation?: string[];
 };
 
 /** What one slot delivers at the two ends of its own dial. */

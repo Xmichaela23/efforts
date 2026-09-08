@@ -145,16 +145,38 @@ Deno.test('⛔⛔ EVERY HARD ROW OFFERS ITS WORKOUT, AND THE LONG ROW STILL DOES
     'the wizard gates the workout picker by programme again');
 
   /**
-   * ⛔ NO HARD SHAPE IS LEVEL-GATED, which is what makes the picker safe. If a gated archetype is
-   * ever added to one of these families this fails, and `slotVariantOptions` — which ignores
-   * `levels` — has to learn about it before the option can ship.
+   * ⛔⛔ THE PICKER FILTERS BY LEVEL, AND THIS TRIPWIRE FIRED (2026-09-08). It used to assert that NO
+   * hard shape was level-gated, on the reasoning that `slotVariantOptions` ignored `levels` and was
+   * therefore only safe while nothing used them. p234's three qualifying near-threshold sessions
+   * are level-3 lines, so the day came; the picker learned about `levels` rather than the option
+   * being held back, which is what that note asked for.
+   *
+   * ⛔ WHY IT MATTERS: Standard Focus's day 3 is the same family at LEVEL 2. An unfiltered picker
+   * would offer it a session that row cannot build, and picking one threw inside the library and
+   * took the whole week down.
+   * ⚠️ ASSERTED AS A PROPERTY, not against a list of ids: every shape the picker offers a row is one
+   * the library offers at that row's own level.
    */
-  const { FAMILIES } = await import('../../supabase/functions/_shared/endurance-library/index.ts');
-  for (const fam of ['run_mlss', 'run_near_threshold', 'ride_anaerobic', 'ride_sweet_spot'] as const) {
-    for (const a of (FAMILIES as Record<string, { archetypes: { id: string; levels?: number[] }[] }>)[fam].archetypes) {
-      assert(!a.levels, `${fam}.${a.id} is level-gated and the picker does not filter by level`);
+  const { FAMILIES, archetypesFor } = await import('../../supabase/functions/_shared/endurance-library/index.ts');
+  const { frameSlots } = await import('./standing-plan-week-copy.ts');
+  const { slotVariantOptions } = await import('./hard-slot-choices.ts');
+  let gated = 0;
+  for (const frame of ['strength_5k', 'all_rounder'] as const) {
+    for (const row of frameSlots(frame).filter((r) => r.role === 'hard')) {
+      for (const sport of ['run', 'ride'] as const) {
+        for (const opt of slotVariantOptions(row.key as never, sport, frame)) {
+          const fam = (FAMILIES as Record<string, { archetypes: { id: string; levels?: number[] }[] }>);
+          const owner = Object.keys(fam).find((f) => fam[f].archetypes.some((a) => a.id === opt.id))!;
+          assert(
+            archetypesFor(owner as never, row.level as never).some((a) => a.id === opt.id),
+            `${frame}/${row.key} @L${row.level} offers ${opt.id}, which ${owner} does not build at that level`,
+          );
+        }
+      }
+      gated += 1;
     }
   }
+  assert(gated >= 5, `only ${gated} hard rows were exercised`);
 
   // ⛔ AND THE CHIP MEASURES THE PICKED SHAPE, on every row the FRAME has rather than a fixed pair.
   assert(/hardArchetypes=\{Object\.fromEntries\(hardSlotKeysFor\(wizardFrame\)/.test(WIZARD),

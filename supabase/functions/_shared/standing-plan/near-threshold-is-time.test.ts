@@ -1,9 +1,13 @@
 /**
  * ⛔⛔ THE NEAR-THRESHOLD RUN IS PRESCRIBED IN SECONDS AND MUST TRAVEL AS SECONDS (2026-09-08).
  *
- * ⛔ THE DEFECT THIS PINS, MEASURED ON A BUILT PLAN. p246's day 3 is the hardest run of the week —
- * 8 reps of 4 minutes at 90% of threshold, 75 seconds between (pp233-234) — and the composer sizes
- * it at **59 minutes**. Every materialized row read **25**, on every week of every block.
+ * ⛔ THE DEFECT THIS PINS, MEASURED ON A BUILT PLAN. p246's day 3 is the hardest run of the week and
+ * the composer sizes it at **59 minutes**. Every materialized row read **25**, on every week of
+ * every block.
+ * ⚠️ THE SESSION ITSELF ALSO CHANGED, on 2026-09-08 and for a separate reason — the slot was pinned
+ * to a shape p234 prints at LEVEL 2 and now rotates the three level-3 lines that satisfy p247. The
+ * two facts are independent: this file's rule is about the DIMENSION the work travels in, and it
+ * held for the old pin and holds for all three of the new sessions.
  *
  * ⛔ 25 WAS NOT A ROUNDING. The family emitted `cruise_{n}x{d}mi_threshold`, a DISTANCE token, and
  * turning 240 seconds into miles needs a threshold pace. Michael ruled on 2026-09-02 that a
@@ -25,6 +29,9 @@ import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.t
 import { buildEnduranceSession, resolveEnduranceAnchors } from '../endurance-library/index.ts';
 import { MATERIALIZER_RUN_PATTERNS, translateEnduranceSession } from './session-vocabulary.ts';
 import { FRAMES, type FrameId } from './frames.ts';
+import { archetypesFor } from '../endurance-library/index.ts';
+import { composeWeek } from './compose.ts';
+import { defaultCompetitionLifts } from './frame-resolver.ts';
 
 /** ⛔ NO THRESHOLD ON FILE — the designed state after 2026-09-02, and the one that produced the 25. */
 const NO_THRESHOLD = {
@@ -69,8 +76,11 @@ Deno.test('⛔⛔ EVERY NEAR-THRESHOLD VARIANT TRAVELS AS TIME, WITH ITS OWN REP
     'short_above', 'race_repeats', 'race_repeats_long', 'below_threshold',
     'below_threshold_long', 'surge_embedded', 'surge_opener',
   ];
+  // ⚠️ THE THREE p234 LINES ARE LEVEL 3 ONLY (`levels: [3]`), so they join the sweep at that level
+  // and are absent from level 2 — which is what keeps Standard Focus's day 3 unchanged.
+  const levelThreeOnly = ['sustained_5min_90', 'sustained_6min_88', 'sustained_8min30_85'];
   for (const level of [2, 3]) {
-    for (const archetype of [undefined, ...archetypes]) {
+    for (const archetype of [undefined, ...archetypes, ...(level === 3 ? levelThreeOnly : [])]) {
       const t = tokensFor('run_near_threshold', level, archetype);
       const work = t.steps_preset.find((x) => !/^(warmup|cooldown)_/.test(x))!;
       const label = `${archetype ?? 'rotation default'} @L${level}`;
@@ -119,8 +129,8 @@ Deno.test('⛔⛔ THE ROW\'S OWN ARITHMETIC REACHES THE COMPOSER\'S DURATION —
 Deno.test('⛔ AND EVERY FRAME\'S NEAR-THRESHOLD SLOT IS COVERED — both columns, both programmes', () => {
   /**
    * ⚠️ READ OFF THE FRAMES rather than listed here, so a column that gains a near-threshold slot is
-   * covered without anyone remembering to add it. p246 pins `below_threshold`; p274 leaves it to
-   * the rotation, and the taper carries its own levels.
+   * covered without anyone remembering to add it. The standard column of p246 rotates three shapes,
+   * its taper pins one, and p274 leaves its own to the family's rotation.
    */
   let checked = 0;
   for (const frame of ['strength_5k', 'all_rounder'] as FrameId[]) {
@@ -159,4 +169,67 @@ Deno.test('⛔ THE MATERIALIZER STILL RECOGNISES WHAT THIS FILE EMITS', () => {
         `nothing in the materializer parses ${tok}`);
     }
   }
+});
+
+Deno.test('⛔⛔ WEDNESDAY ROTATES p234\'S THREE QUALIFYING LEVEL-3 SESSIONS, AND NOTHING ELSE', () => {
+  /**
+   * ⛔ p247 asks this slot for **5- to 8-minute work intervals**; p234's level-3 list holds exactly
+   * three sessions that satisfy it, and p112 says to vary them week to week. The frame names all
+   * three (`EnduranceSlot.archetypes`) and the composer walks them.
+   * ⛔ THE PIN IT REPLACED WAS WRONG ON THE PAGE: `below_threshold`'s four-minute repeat is p234's
+   * LEVEL 2 line, and at level 3 the count climbed while the length did not, building "8 x 4 min
+   * @ 90%" — a session the page does not print at any level.
+   */
+  const slot = FRAMES.strength_5k.columns.standard
+    .flatMap((d) => (d.endurance ?? []) as { family: string; archetypes?: string[]; archetype?: string }[])
+    .find((x) => x.family === 'run_near_threshold')!;
+  assertEquals(slot.archetypes, ['sustained_5min_90', 'sustained_6min_88', 'sustained_8min30_85']);
+  assertEquals(slot.archetype, undefined, 'the slot carries a pin as well as a rotation');
+
+  /**
+   * ⛔ EACH ONE BUILDS ITS OWN PAGE LINE, on the 10-minute warm-up and 8-minute cool-down, in time.
+   * ⚠️ THE LENGTHS ARE THE PAGE'S ARITHMETIC, not a target: 8 x 5:00 is forty minutes of work and
+   * comes to sixty-nine minutes with its wrapper. That is what p234 prints.
+   */
+  const expected: Record<string, [string, number]> = {
+    sustained_5min_90: ['interval_8x300s_90pct_R90s', 69],
+    sustained_6min_88: ['interval_6x360s_88pct_R60s', 59],
+    sustained_8min30_85: ['interval_4x510s_85pct_R60s', 55],
+  };
+  for (const [id, [token, minutes]] of Object.entries(expected)) {
+    const t = tokensFor('run_near_threshold', 3, id);
+    assertEquals(t.steps_preset, ['warmup_run_10min_easy', token, 'cooldown_run_8min_easy'], id);
+    assertEquals(t.duration, minutes, `${id} is not ${minutes} minutes`);
+  }
+
+  // ⛔ AND THEY ARE NOT OFFERED AT LEVEL 2 — Standard Focus's day 3 is that level and must not move.
+  for (const id of Object.keys(expected)) {
+    assert(!archetypesFor('run_near_threshold' as never, 2 as never).some((a) => a.id === id),
+      `${id} is offered at level 2 — Standard Focus's Wednesday would change`);
+    assert(archetypesFor('run_near_threshold' as never, 3 as never).some((a) => a.id === id),
+      `${id} is not offered at level 3`);
+  }
+});
+
+Deno.test('⛔⛔ THE THREE COME ROUND IN ORDER, WEEK AFTER WEEK — p112', () => {
+  /**
+   * ⚠️ ASSERTED ON THE COMPOSED WEEK, not on the helper: the rotation has to survive the assigner
+   * and the spec builder, and the bounds and the built session must agree on which one it is.
+   */
+  const seen: string[] = [];
+  for (const week of [2, 3, 4, 5, 6, 7]) {
+    const w = composeWeek({
+      competitionLifts: defaultCompetitionLifts(), roundTo: 5, frame: 'strength_5k', week,
+      column: 'standard', equipment: ['Barbell + plates', 'Dumbbells', 'Flat bench'],
+      baselines: NO_THRESHOLD,
+      sportMix: { slots: { '1:0': 'run', '3:0': 'run', '4:0': 'run', '6:0': 'run' } },
+    } as never);
+    const wed = w.sessions.find((x) => x.day === 'Wednesday' && x.type === 'run')!;
+    const tok = (wed.steps_preset ?? []).find((x) => x.startsWith('interval_'))!;
+    seen.push(tok);
+    assert(wed.duration >= 55 && wed.duration <= 70, `week ${week}: ${wed.duration} min`);
+  }
+  // ⛔ THREE DISTINCT SESSIONS, AND THE FOURTH WEEK IS THE FIRST AGAIN.
+  assertEquals(new Set(seen.slice(0, 3)).size, 3, `the rotation repeats inside three weeks: ${seen.join(', ')}`);
+  assertEquals(seen.slice(0, 3), seen.slice(3), 'the rotation does not come round');
 });
