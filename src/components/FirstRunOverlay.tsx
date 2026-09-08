@@ -20,7 +20,7 @@ export const HOME_STOPS: Stop[] = [
 
 /** State, once, on the first visit. */
 export const STATE_STOPS: Stop[] = [
-  { target: '[data-first-run="status"]', text: 'Status: what training did to you this week and the weeks before.', pad: 6 },
+  { target: '[data-first-run="status"]', text: 'Status: how training is going based on this week and previous weeks.', pad: 6 },
   { target: '[data-first-run="adjust"]', text: 'Adjust: change the numbers and the plan for sessions you have not done yet.', pad: 6 },
   { target: '[data-first-run="schedule"]', text: 'Schedule: move sessions around your week.', pad: 6 },
 ];
