@@ -338,12 +338,22 @@ export function getSteps(state: StepRouterState): StepKey[] {
    * was a pass-through and Heavy was dark, so the screen asked nothing the engine could hear; the
    * programme Strong named is the Run Focus card now.
    *
-   * ⛔ THE POSTURE CARD IS THE FIRST SCREEN AFTER THE PROGRAM PICK on the Run Focus path, and
-   * Standard Focus skips it (`skipsSportScope`). On Run Focus it no longer asks which sports either
-   * (`fixedSportScope`); it keeps the lifting line. The easy-swims toggle came off it 2026-09-07.
+   * ⛔⛔ AND THE POSTURE CARD IS OUT OF BOTH STRENGTH PATHS (WORKORDER-run-strength-rotate,
+   * 2026-09-07 evening). Standard Focus lost it on 2026-08-30 (`skipsSportScope`); Run + Strength
+   * lost the last thing on it that same evening — the easy-swims toggle came off in 32bca15d and
+   * the sport cards were already answered by the frame (`fixedSportScope`), leaving one line of
+   * copy standing as a screen. **The lifting line it carried moved to the top of the endurance
+   * screen**, where the week it describes is drawn.
+   *
+   * ⚠️ THE PREDICATE IS `fixedSportScope`, NOT A SECOND FRAME LITERAL: a path whose sports the frame
+   * answers has nothing left for this card to ask. A goal reached outside the Train drill-down, and
+   * every non-strength goal, keeps it.
+   * ⚠️ THE POSTURE ITSELF IS STILL WRITTEN — by the effect that reads `fixedSportScope`, which runs
+   * on the frame rather than on the step. A value nobody was asked for still has to reach the
+   * payload, and dropping the screen must not drop the write.
    */
   const head: StepKey[] = isStrengthFocus
-    ? [...door, ...(skipsSportScope(state) ? [] : ['posture' as StepKey])]
+    ? [...door, ...(fixedSportScope(state) != null ? [] : ['posture' as StepKey])]
     : [...door, 'posture', 'commitment', 'length'];
   return [...head, ...scheduleSteps(state, isStrengthFocus, isRaceGoal), 'numbers', 'confirm'];
 }

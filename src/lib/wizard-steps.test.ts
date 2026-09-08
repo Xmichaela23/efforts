@@ -67,10 +67,14 @@ Deno.test('⛔⛔⛔ STANDARD FOCUS NEVER ASKS WHICH SPORTS — two of the three
   assert(!getSteps(strengthPath('standard')).includes('posture'),
     'the sport-scope card is back in the Standard Focus flow');
 
-  // ⛔ AND EVERY OTHER FLOW KEEPS IT — the 5K path, a focus-less build, and a non-strength goal.
+  /**
+   * ⚠️ AND RUN + STRENGTH LOST IT TOO, 2026-09-07 evening — for its own reason, and by a different
+   * predicate. `skipsSportScope` is still Standard-only and still false here; what takes the screen
+   * out of BOTH flows is `fixedSportScope`, which answers "the frame answers the sports" for each.
+   * See the Run + Strength test below.
+   */
   for (const st of [strengthPath('run'), strengthPath(undefined)]) {
-    assert(!skipsSportScope(st));
-    assert(getSteps(st).includes('posture'), 'the 5K path lost its sport-scope card');
+    assert(!skipsSportScope(st), 'skipsSportScope widened past Standard Focus');
   }
   const endurance = { ...strengthPath('standard'), goal: 'build_endurance' };
   assert(!skipsSportScope(endurance), 'a non-strength goal was caught by the Standard Focus skip');
@@ -94,17 +98,26 @@ Deno.test('⛔⛔ AND THE SKIPPED PATH STILL HOLDS BOTH SPORTS — the Continue 
     'swim is claimed by the skipped path — it is parked, and off by default');
 });
 
-Deno.test('⛔⛔ RUN FOCUS OPENS THE PROGRAM LIST, THEN THE POSTURE CARD — no tier screen anywhere', () => {
+Deno.test('⛔⛔ RUN FOCUS OPENS THE PROGRAM LIST, THEN THE ENDURANCE SCREEN — seven screens', () => {
   /**
    * ⛔ Michael, 2026-09-07: Run Focus is a grouping. Its tap opens a "Run" screen with one live
    * card, Run + Strength, and THAT card seeds the goal and opens the wizard on `strength_5k`. The
    * Strong / Heavy tier screen it replaces asked nothing the engine could hear.
+   *
+   * ⛔⛔ AND THE POSTURE CARD CAME OUT THE SAME EVENING (WORKORDER-run-strength-rotate §1). Its swim
+   * toggle went in 32bca15d and its sport cards were already answered by the frame, leaving one
+   * line of copy standing as a screen; the lifting line it carried moved to the top of the
+   * endurance screen. **Seven screens, and this list is the assertion that keeps it seven.**
+   * ⚠️ THE ACCESSORY STEP STAYS. Moving it behind Adjust on the built week is a separate ruling and
+   * is explicitly out of that order's scope.
    */
   const st = strengthPath('run');
   assertEquals(landsOn(st), 'program', 'the Run Focus card does not open the program list');
   assertEquals(getSteps(st), [
-    'goal', 'train', 'program', 'posture', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm',
+    'goal', 'train', 'program', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm',
   ]);
+  assert(!(getSteps(st) as string[]).includes('posture'),
+    'the posture card is back in the Run + Strength flow');
   assert(!(getSteps(st) as string[]).includes('tier'), 'the tier screen is back');
   // ⛔ BEFORE THE PROGRAMME IS PICKED THERE IS NO GOAL, and the list is still the next screen.
   const listing: StepRouterState = { goal: null, entry: 'train', trainCard: 'run', posture: {} };
@@ -117,30 +130,41 @@ Deno.test('⛔ RIDE FOCUS OPENS ITS OWN LIST — one dimmed card, no goal, nothi
   assertEquals(getSteps(st).slice(0, 3), ['goal', 'train', 'program']);
 });
 
-Deno.test('⚠️ A DRAFT FROM BEFORE THE TRAIN CARD EXISTED TAKES THE OLD ROUTE — no program screen', () => {
-  // Every build that predates the Standard card carries no focus and no Train card; it opens on
-  // the posture card exactly as it did, so a saved draft does not land on a screen it never saw.
+Deno.test('⚠️ A DRAFT FROM BEFORE THE TRAIN CARD EXISTED SEES NO PROGRAM SCREEN', () => {
+  /**
+   * Every build that predates the Standard card carries no focus and no Train card, so it never
+   * meets the program list — that screen belongs to a grouping it was not reached through.
+   * ⚠️ IT DOES GET THE NEW ENDURANCE SCREEN, and that is right rather than a leak: the screen is
+   * keyed on the FRAME, and a focus-less build is `strength_5k`. The programme it is building is
+   * Run + Strength whichever door it came through.
+   */
   const st = strengthPath(undefined);
-  assertEquals(landsOn(st), 'posture');
   assert(!(getSteps(st) as string[]).includes('program'));
+  assertEquals(getSteps(st), [
+    'goal', 'train', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm',
+  ]);
 });
 
 Deno.test('⛔⛔ RUN + STRENGTH HOLDS RUNNING ONLY — the scope cards are answered by the frame', () => {
   /**
-   * ⛔ §3 of the same order: p246 is a run week, every endurance slot is a run family, and a rider's
-   * home under the Train menu is Ride + Strength. So the posture card on this frame keeps its
-   * lifting line and swim toggle but stops asking which sports; the answer is written for the
+   * ⛔ §3 of the reshape order: p246 is a run week, every endurance slot is a run family, and a
+   * rider's home under the Train menu is Ride + Strength. So the sport question is answered for the
    * athlete, the same mechanism Standard Focus uses.
    * ⚠️ BIKE IS `out` — that is what keeps the ride chips, the ride-hours box and the FTP question
    * off the later screens, and sends `endurance_sport: 'run'` to the builder.
+   *
+   * ⛔⛔ AND THE POSTURE STEP IS GONE FROM BOTH PATHS (2026-09-07 evening). `fixedSportScope` is now
+   * what removes it: a path whose sports the frame answers has nothing left for that card to ask.
+   * **The write is not gone with the screen** — the effect that stores this posture reads the same
+   * predicate and runs on the frame, not on the step.
    */
   assertEquals(RUN_STRENGTH_POSTURE.run, 'maintain');
   assertEquals(RUN_STRENGTH_POSTURE.bike, 'out');
   assert(!('swim' in RUN_STRENGTH_POSTURE), 'swim is claimed — its own toggle owns it');
   for (const st of [strengthPath('run'), strengthPath(undefined)]) {
     assertEquals(fixedSportScope(st), RUN_STRENGTH_POSTURE);
-    // ⚠️ THE STEP STAYS — it is the cards that go, not the screen.
-    assert(getSteps(st).includes('posture'), 'the posture card left the Run Focus flow');
+    assert(!getSteps(st).includes('posture'),
+      'the posture card is back in the Run + Strength flow');
   }
   assertEquals(fixedSportScope(strengthPath('standard')), STANDARD_FOCUS_POSTURE);
   // ⛔ AND A NON-STRENGTH GOAL IS STILL ASKED.

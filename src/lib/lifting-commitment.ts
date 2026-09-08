@@ -50,3 +50,26 @@ export function liftingCommitmentLine(frameId: keyof typeof FRAMES = 'strength_5
   // informed no choice on either path.
   return `${WORD[n] ?? n} lifting days a week. Your endurance fits around them.`;
 }
+
+/**
+ * ⛔ THE SAME LINE WITH THE ENDURANCE NAMED (Michael, 2026-09-07 evening). It moved off the posture
+ * card — which came out of the flow with it — onto the top of the endurance screen, where the week
+ * it describes is drawn. On Run + Strength every endurance slot is a run, so the sentence can say
+ * what "your endurance" is instead of leaving the athlete to work it out from the rows below.
+ *
+ * ⛔⛔ BOTH COUNTS ARE THE FRAME'S OWN, COUNTED not typed: the lifting days off the column's barbell
+ * sessions, the runs off its endurance slots. A frame with a different shape says a different
+ * sentence without anyone editing this line.
+ * ⚠️ ONE SPORT ONLY. It returns null on a frame whose endurance is not all runs — p274 prescribes
+ * rides and this sentence would be false there, and a wrong sentence is worse than none.
+ */
+export function runWeekCommitmentLine(frameId: keyof typeof FRAMES = 'strength_5k'): string | null {
+  const frame = FRAMES[frameId];
+  if (!frame) return null;
+  const lifting = liftingDaysForFrame(frameId);
+  const slots = frame.columns.standard.flatMap((d) => d.endurance ?? []);
+  if (lifting <= 0 || slots.length === 0) return null;
+  if (!slots.every((s) => String(s.family).startsWith('run_'))) return null;
+  const runs = (WORD[slots.length] ?? String(slots.length)).toLowerCase();
+  return `${WORD[lifting] ?? lifting} lifting days a week. ${runs.replace(/^./, (c) => c.toUpperCase())} runs fit around them.`;
+}

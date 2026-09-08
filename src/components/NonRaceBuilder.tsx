@@ -8,6 +8,15 @@ import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { runThresholdTestRow, ftpTestRow, RETEST_OFFSET_DAYS, addDaysISO } from '@/lib/baseline-tests';
 // ⛔ THE ENDURANCE WEEK — one screen replacing `volume` + `hardday` on the strength path (2026-08-24).
 import EnduranceWeekCard from './EnduranceWeekCard';
+/**
+ * ⛔ THE RUN + STRENGTH ENDURANCE SCREEN (WORKORDER-run-strength-rotate-2026-09-07). Four run rows,
+ * one control. Its own card rather than a mode on `EnduranceWeekCard`, which is the Standard Focus
+ * screen and stays untouched through this order.
+ */
+import RunStrengthWeekCard from './RunStrengthWeekCard';
+import {
+  EASY_RUN_FIXED_MIN, longRunDefaultMinutes, longRunLengthOptions,
+} from '@/lib/run-strength-week';
 // ⛔ THE HARD SLOT'S SESSION CHOICES — one component, shared with anything that renders a slot.
 import HardSlotChoices from './HardSlotChoices';
 import {
@@ -475,6 +484,23 @@ const FOCUS_FRAME: Record<'standard' | 'run', FrameId> = {
  * ⚠️ ABSENT IS `strength_5k` — every build that predates the Standard card, and the Run Focus card.
  */
 const frameOf = (st: { focus?: 'standard' | 'run' }): FrameId => FOCUS_FRAME[st.focus ?? 'run'];
+
+/**
+ * ⛔⛔ THE ROTATE-ONLY RUN PATH — Run + Strength (Michael, 2026-09-07 evening,
+ * `WORKORDER-run-strength-rotate-2026-09-07.md`). On this programme the engine rotates the run
+ * workouts and the endurance screen leaves ONE thing open: how long the long run is. Hours, days a
+ * week, the running-experience chips and the two hard-workout pickers are not asked, so none of
+ * them reaches the payload — see `RunStrengthWeekCard`.
+ *
+ * ⛔ KEYED ON THE FRAME, NOT THE TRAIN CARD. The frame is what fixes the week (p246), so a build
+ * reached from a stored goal gets the same screen as one reached from the card. `all_rounder` is
+ * false here and keeps its own screen, its own per-session lengths and its own experience question:
+ * **Standard Focus is untouched by this order and its composed block is byte-identical.**
+ * ⚠️ ONE OWNER, READ IN BOTH SCOPES — the payload assembler and the component. Two copies of this
+ * test is how the screen and the payload come to disagree about what was asked.
+ */
+const rotateOnlyRunPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' }): boolean =>
+  st.goal === 'get_stronger' && frameOf(st) === 'strength_5k';
 
 /**
  * ⛔⛔ WHAT THE ATHLETE CALLS THE PROGRAMME THEY PICKED — ONE SOURCE (2026-08-30).
@@ -3768,6 +3794,54 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    */
   // ⚠️ ONLY A QUESTION THAT IS ON THE SCREEN MAY BLOCK CONTINUE — see `experienceAsked`. The
   // unanswered SENTENCE follows the same list, so it can never name a control the athlete cannot find.
+  /**
+   * ⛔⛔ THE TWO LENGTHS THE ROTATE-ONLY RUN PATH SENDS, SEEDED BEFORE THE SCREEN DRAWS (2026-09-07).
+   *
+   * ⛔ THE EASY RUN IS A CONSTANT, NOT A CONTROL — 30 minutes, p246's VT1 slot at level 1. It is
+   * WRITTEN into `slotMinutes` rather than left to the frame's own midpoint, because the row states
+   * "30 min" and a row that states a number the payload does not carry is the screen and the plan
+   * disagreeing in silence. ⚠️ Measured: 30 resolves inside that slot's own ladder and builds
+   * exactly 30, so the stated number is the built one.
+   *
+   * ⛔ THE LONG RUN OPENS ON THE RULED DEFAULT — 75 minutes. It is a seeded ANSWER, not a
+   * suggestion sitting in an empty control: the athlete may change it, and the screen's own gate is
+   * satisfied on arrival because the page has an answer for this row and the athlete is only
+   * overriding it. That is the opposite of the Standard Focus rule, where the length starts empty,
+   * and the difference is deliberate: there, no default is honest because the athlete is being
+   * asked; here the programme has a length and the chip is an override.
+   * ⚠️ IT ONLY EVER SEEDS A MISSING VALUE. An athlete who picked 90 and walked back does not have it
+   * reset to 75 on the next render.
+   */
+  const rotateOnlyRun = rotateOnlyRunPath(state);
+  const longRunOptions = useMemo(
+    () => (rotateOnlyRun
+      ? longRunLengthOptions(slotSportsNow, { baselines: baselinesRow, frame: wizardFrame })
+      : []),
+    [rotateOnlyRun, wizardFrame, slotSportsNow, baselinesRow],
+  );
+  React.useEffect(() => {
+    if (!rotateOnlyRun) return;
+    const seedLong = longRunDefaultMinutes(longRunOptions);
+    setState((st) => {
+      const now = st.slotMinutes ?? {};
+      const needEasy = Number(now.easy) !== EASY_RUN_FIXED_MIN;
+      const needLong = seedLong != null && !(Number(now.long) > 0);
+      if (!needEasy && !needLong) return st;
+      return {
+        ...st,
+        slotMinutes: {
+          ...now,
+          ...(needEasy ? { easy: EASY_RUN_FIXED_MIN } : {}),
+          ...(needLong ? { long: seedLong } : {}),
+        },
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rotateOnlyRun, longRunOptions.join(',')]);
+  /** ⛔ THE ONE GATE ON THAT SCREEN — a length the chips actually offer, so a stale value cannot pass. */
+  const longRunAnswered = !rotateOnlyRun
+    || (state.slotMinutes?.long != null && longRunOptions.includes(state.slotMinutes.long));
+
   const experienceUnanswered: SlotSport[] = experienceAsked
     .filter((sp) => state.enduranceExperience?.[sp] !== 'newer'
       && state.enduranceExperience?.[sp] !== 'experienced');
@@ -4853,90 +4927,22 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           ⛔ AND THE TITLE'S NAME COMES FROM `GOAL_LABELS`, IT IS NOT TYPED HERE. It used to be the
           literal "Strength Focus", which is the exact second-copy the label's own comment was written
           to stop — rename the block and this title silently keeps the old name. One source. */}
-      {currentStep === 'posture' && isStrengthFocus && (
-        <StepLayout
-          step={stepNo('posture')} totalSteps={steps.length} title={`${programmeName(state)} · ${STRENGTH_FOCUS_WEEKS} weeks`}
-          onBack={back} onContinue={next} canContinue={postureCanContinue}
-        >
-          <div className="space-y-3">
-            {/* ⛔ THE BRIEF PARAGRAPH IS GONE FROM THIS STEP (Michael, 2026-08-25: use the space
-                to get the cards on the phone). The title already says 12 weeks; the commitment
-                line below carries the rest. `strengthFocusBrief` still opens the PLAN. */}
-            {/* ⛔ WHAT IS OWED, BEFORE THE DAY PICKER (Michael, 2026-08-25). The lifting days are
-                what define this block and they were not named until step 7's week list — the last
-                screen before Build, three steps after the athlete committed to the shape.
-                ⛔ DERIVED FROM THE FRAME, NOT TYPED HERE — `liftingCommitmentLine` counts the days
-                the frame's own column carries barbell work, so a frame with a different count says
-                a different number without anyone editing this line. ⚠️ COPY-VOICE: the fact and its
-                consequence, no imperative and no reassurance. */}
-            {liftingCommitmentLine() && (
-              <p className="text-white/75 text-sm leading-relaxed">{liftingCommitmentLine()}</p>
-            )}
-            {/* ⛔ "Who are you this block?" CUT (Michael, 2026-08-24 evening) — the four cards ARE
-                the question, and the heading's line of height is what kept the swim card below the
-                fold. The cards still pre-shape the slot screen exactly as before. */}
-            {/* ⛔ THE FRAME ANSWERS THE SPORT SCOPE ON RUN + STRENGTH (2026-09-07 §3) — see
-                `fixedSportScope`. p246 prescribes runs in every endurance slot, so the three cards
-                would offer two answers the plan no longer builds. One line states what the block
-                holds instead; the count is read off the frame, not typed. Riding an athlete does on
-                top is outside the plan, and the line says so without an imperative. */}
-            {fixedSportScope(state) != null ? (
-              <p className="text-white/60 text-sm leading-relaxed">
-                {(() => {
-                  const total = slotKeysFor(wizardFrame).length;
-                  const hard = hardSlotKeysFor(wizardFrame).length;
-                  const easy = Math.max(0, total - hard - 1);
-                  const w = (n: number) => COUNT_WORD[n] ?? String(n);
-                  // p246: one long run (LSD) in the standard column; the rest of the non-hard runs are easy.
-                  return `${w(total).replace(/^./, (c) => c.toUpperCase())} runs a week, set by the program: ${w(hard)} hard, one long, ${w(easy)} easy. Riding you do on top sits outside the plan.`;
-                })()}
-              </p>
-            ) : ([
-              // ⛔ THE EFFECT LINE UNDER EACH CARD (Michael, 2026-08-24): what the choice does to
-              // the lifting, his anchors, flat. "smaller toll" is his approved phrasing — riding
-              // is not zero-cost, it just doesn't pound the legs.
-              { id: 'run_only', label: 'Run only', run: true, bike: false,
-                effect: 'Get stronger while holding your running base.' },
-              { id: 'ride_only', label: 'Ride only', run: false, bike: true,
-                effect: 'Get stronger while holding your riding base.' },
-              { id: 'run_ride', label: 'Run + ride', run: true, bike: true,
-                effect: 'Get stronger while holding your running and riding base.' },
-            ] as const).map((card) => {
-              const selected =
-                ((state.posture.run ?? 'out') === 'maintain') === card.run &&
-                ((state.posture.bike ?? 'out') === 'maintain') === card.bike;
-              return (
-                <button
-                  key={card.id} type="button"
-                  onClick={() => {
-                    setPosture('run', card.run ? 'maintain' : 'out');
-                    setPosture('bike', card.bike ? 'maintain' : 'out');
-                  }}
-                  className={`w-full rounded-xl border p-3 ${selected ? 'border-white/25 bg-white/[0.06]' : 'border-white/12 bg-white/[0.02]'}`}
-                >
-                  <span className="flex items-center justify-between">
-                    <span className="flex items-center gap-2.5">
-                      {card.run && <Footprints className="h-4 w-4" style={{ color: getDisciplineColor('run') }} />}
-                      {card.bike && <Bike className="h-4 w-4" style={{ color: getDisciplineColor('bike') }} />}
-                      <span className={`font-medium ${selected ? 'text-white' : 'text-white/60'}`}>{card.label}</span>
-                    </span>
-                    {selected && <Check className="h-4 w-4 text-white/70" />}
-                  </span>
-                  <span className="block text-left text-white/50 text-xs mt-1.5 leading-relaxed">{card.effect}</span>
-                </button>
-              );
-            })}
-            {/* Easy-swim add-on removed from this step (Michael, 2026-09-07). State fields stay; off by default. */}
-            {/* ⛔ THE COUNT IS THE FRAME'S. p246 prescribes two quality sessions and p274 three, and
-                this sentence stated "two" for both — the screen telling a Standard Focus athlete
-                their week has one fewer hard session than it does, one step before the screen that
-                shows all three. */}
-            {fixedSportScope(state) == null && (
-              <p className="text-white/50 text-xs">{`The week has ${COUNT_WORD[hardSlotKeysFor(wizardFrame).length] ?? String(hardSlotKeysFor(wizardFrame).length)} hard sessions. A sport that doesn't get one keeps its endurance base but not its speed.`}</p>
-            )}
-          </div>
-        </StepLayout>
-      )}
+      {/* ⛔⛔ THE STRENGTH PATH'S POSTURE CARD IS DELETED (WORKORDER-run-strength-rotate-2026-09-07),
+          AND THIS IS ITS TOMBSTONE so it is not rebuilt.
+
+          It asked "which endurance are you keeping" — Run only / Ride only / Run + ride, plus the
+          easy-swims add-on. Both programmes have since answered that question themselves: Standard
+          Focus on 2026-08-30 (p274 prescribes running AND riding, so two of the three answers were
+          weeks the frame refuses to build) and Run + Strength on 2026-09-07 (p246 is a run week).
+          The swim toggle came off in 32bca15d. What was left was one line of copy standing as a
+          screen, and `getSteps` no longer routes to it — see `fixedSportScope`.
+
+          ⛔ THE POSTURE IS STILL WRITTEN. The effect that writes it reads `fixedSportScope` and runs
+          on the FRAME, not on this step, so deleting the screen does not drop the value: a runner
+          whose baselines list only running still gets `run: maintain` into the payload.
+          ⛔ AND THE LIFTING LINE IS NOT LOST — it moved to the top of the endurance screen, where
+          the week it describes is drawn (`runWeekCommitmentLine`).
+          ⚠️ EVERY OTHER GOAL KEEPS ITS OWN posture screen, directly below, untouched. */}
 
       {currentStep === 'posture' && !isStrengthFocus && (
         <StepLayout
@@ -6057,7 +6063,34 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           eye icon"*). Focus is the section's theme word — the nav tab, the Focus screen heading and
           the Train screen's Strength/Run/Ride/Athletic Focus all carry it — and this step was the
           one place in the flow that named itself after the WEEK rather than after the theme. */}
-      {currentStep === 'endurance' && (
+      {/* ⛔⛔ RUN + STRENGTH HAS ITS OWN ENDURANCE SCREEN (WORKORDER-run-strength-rotate-2026-09-07).
+          Four run rows, one control: how long the long run is. The easy run is fixed, the two hard
+          runs rotate and state their length as a fact. Hours, days, the experience chips and the
+          hard-workout pickers are not asked, so `EnduranceWeekCard` — which carries all of them —
+          is not the screen for this path. See `RunStrengthWeekCard`.
+          ⚠️ CONTINUE IS GATED ON THE ONE CONTROL, and the seed effect answers it before the screen
+          renders, so the gate is a guard rather than a wall. */}
+      {currentStep === 'endurance' && rotateOnlyRunPath(state) && (
+        <StepLayout
+          step={stepNo('endurance')} totalSteps={steps.length} title={eyeTitle('Endurance focus')}
+          onBack={back} onContinue={next}
+          canContinue={longRunAnswered}
+          blockedReason={tintedReason(longRunAnswered ? undefined : 'The long run has no length yet.')}
+        >
+          <RunStrengthWeekCard
+            frame={wizardFrame}
+            slots={slotSportsNow}
+            baselines={baselinesRow}
+            slotMinutes={state.slotMinutes}
+            onSlotMinutes={(key, minutes) => setState((st) => ({
+              ...st,
+              slotMinutes: { ...(st.slotMinutes ?? {}), [key]: minutes },
+            }))}
+          />
+        </StepLayout>
+      )}
+
+      {currentStep === 'endurance' && !rotateOnlyRunPath(state) && (
         <StepLayout
           step={stepNo('endurance')} totalSteps={steps.length} title={eyeTitle('Endurance focus')}
           // ⚠️ NO SUBTITLE. Michael's header is the first thing on the card and it is verbatim; a
