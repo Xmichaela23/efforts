@@ -9,7 +9,7 @@
  * happy path would re-open every one of them.
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { getDisciplineSwaps, sessionSwapExtras, venueOf, VENUE_PREFIX } from './session-discipline-swap.ts';
+import { getDisciplineSwaps, sessionSwapExtras, intensityOf, venueOf, VENUE_PREFIX } from './session-discipline-swap.ts';
 
 const ALL = ['run', 'ride', 'swim'] as const;
 const base = { workout_status: 'planned', total_duration_seconds: 3600 };
@@ -45,28 +45,42 @@ Deno.test('a hard run still offers the ride (p138), and needs an FTP for it', ()
   assert(!kinds(getDisciplineSwaps(hardRun, ALL, [], null, null)).includes('discipline:ride'));
 });
 
-Deno.test('⛔ A RIDE ALWAYS OFFERS ITS MACHINES (p275)', () => {
+/**
+ * ⛔⛔ ONLY A MACHINE MICHAEL HAS NAMED SHIPS (2026-09-09: *"Labels: Trainer, Treadmill."*). p275
+ * blesses the rower, ski erg, air bike, elliptical and arc trainer, and the library still knows
+ * them — but a label is an athlete-facing line and every one of those waits for his yes. ⚠️ THE
+ * WITHHELD ONES ARE PINNED HERE so nobody "restores" them without the words arriving first.
+ */
+Deno.test('⛔ A RIDE OFFERS THE TRAINER, AND NO MACHINE HE HAS NOT NAMED', () => {
   const k = kinds(sessionSwapExtras(easyRide));
-  for (const v of ['trainer', 'rower', 'ski_erg', 'air_bike']) assert(k.includes(`venue:${v}`), `${v} missing from ${k.join(',')}`);
+  assert(k.includes('venue:trainer'), k.join(','));
+  for (const v of ['rower', 'ski_erg', 'air_bike']) {
+    assert(!k.includes(`venue:${v}`), `${v} shipped without a label from Michael`);
+  }
 });
 
-Deno.test('⛔ THE GROUND-IMPACT RULE GATES THE RUN MACHINES, and the treadmill is never gated', () => {
+/**
+ * ⛔ THE TREADMILL IS NEVER GATED — it still puts feet on the ground, which is what p275 asks for,
+ * and Michael's line for it says exactly that.
+ *
+ * ⚠️ THE GROUND-IMPACT GATE HAS NOTHING LEFT TO GATE while the treadmill is the only named run
+ * machine. The rule is p275's and stays built; it becomes live the moment a second run machine gets
+ * a name. Pinned by the withheld pair below, so removing the gate would still be a failure.
+ */
+Deno.test('⛔ THE TREADMILL IS OFFERED WHATEVER THE WEEK HOLDS; the unnamed run machines are not', () => {
   const otherRun = { ...base, type: 'run', name: 'Easy Run', tags: ['band:vt1_or_easier'] };
 
-  // One run in the week — only the treadmill, which still puts feet on the ground.
-  const alone = kinds(sessionSwapExtras(hardRun, null, [hardRun]));
-  assert(alone.includes('venue:treadmill'), alone.join(','));
-  assert(!alone.includes('venue:elliptical'), alone.join(','));
+  for (const week of [[hardRun], [hardRun, otherRun]]) {
+    const k = kinds(sessionSwapExtras(hardRun, null, week));
+    assert(k.includes('venue:treadmill'), k.join(','));
+    for (const v of ['elliptical', 'arc_trainer']) {
+      assert(!k.includes(`venue:${v}`), `${v} shipped without a label from Michael`);
+    }
+  }
 
-  // Two runs still outdoors — the machines open up.
-  const withCompany = kinds(sessionSwapExtras(hardRun, null, [hardRun, otherRun]));
-  assert(withCompany.includes('venue:elliptical'), withCompany.join(','));
-  assert(withCompany.includes('venue:arc_trainer'), withCompany.join(','));
-
-  // The other run already indoors does not count as ground.
+  // And a run already indoors still does not count as ground — the rule the gate will enforce.
   const indoors = { ...otherRun, tags: [...otherRun.tags, `${VENUE_PREFIX}treadmill`] };
-  const gated = kinds(sessionSwapExtras(hardRun, null, [hardRun, indoors]));
-  assert(!gated.includes('venue:elliptical'), gated.join(','));
+  assert(kinds(sessionSwapExtras(hardRun, null, [hardRun, indoors])).includes('venue:treadmill'));
 });
 
 Deno.test('⛔ THE MACHINE CHANGES NOTHING ABOUT THE SESSION — only a tag', () => {
@@ -107,6 +121,29 @@ Deno.test('a completed or skipped row offers nothing, long day and machines incl
 });
 
 /** ⛔ THE SPLIT ITSELF: `to` still means "the sport this becomes", so an easy run reports no `run`. */
+/**
+ * ⛔⛔ THE COMPOSER'S BANDS ARE READ, AND THIS WAS A LIVE BUG (2026-09-09, caught on a throwaway).
+ * `intensityOf` matched a hand-written tag list and a name regex, neither of which the standing
+ * plan writes — so an Anaerobic Ride (`band:above`) banded EASY and the sheet offered it "Run
+ * instead" under the easy-work line: the one direction p138 does not bless, sold with the wrong
+ * sentence. And the long run has no `long` tag at all — it is `family:run_lsd`, and used to band
+ * long only off the word "Long" in its name.
+ */
+Deno.test('⛔ `band:` AND `family:` DECIDE THE BAND — not a name and not a tag list', () => {
+  const composedHardRide = { ...base, type: 'ride', name: 'Anaerobic Ride', tags: ['standing_plan', 'family:ride_anaerobic', 'band:above'] };
+  assertEquals(intensityOf(composedHardRide), 'hard');
+  assertEquals(getDisciplineSwaps(composedHardRide, ALL, [], null, 250).map((o) => o.to), [], 'a hard ride offered a swap');
+
+  const composedLongRun = { ...base, type: 'run', name: 'Sunday Session', tags: ['standing_plan', 'family:run_lsd', 'band:vt1_or_easier'] };
+  assertEquals(intensityOf(composedLongRun), 'long', 'the long day banded off its NAME, not its family');
+
+  const composedEasyRide = { ...base, type: 'ride', name: 'Ride', tags: ['standing_plan', 'family:ride_endurance', 'band:vt1_or_easier'] };
+  assertEquals(intensityOf(composedEasyRide), 'easy');
+
+  // ⚠️ A row with no `band:` keeps the old ladder — a missing signal is not a verdict.
+  assertEquals(intensityOf({ ...base, type: 'run', name: 'Tempo Run', tags: [] }), 'hard');
+});
+
 Deno.test('⛔ THE EXTRAS STAY OUT OF `getDisciplineSwaps` — `to` never repeats the source sport', () => {
   const easyRun = { ...base, type: 'run', name: 'Easy Run', tags: ['band:vt1_or_easier'] };
   assertEquals(getDisciplineSwaps(easyRun, ALL, [], null, 250).map((o) => o.to).sort(), ['ride', 'swim']);

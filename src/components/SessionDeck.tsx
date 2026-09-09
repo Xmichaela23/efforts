@@ -7,6 +7,9 @@ import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
 import { extractSessionDetailV1FromWorkout } from '@/hooks/useWorkoutDetail';
 import AdherenceChips from './AdherenceChips';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
+// ⛔ THE MACHINE'S NAME IS MICHAEL'S WORD, from the one file that holds the swap sheet's words.
+import { VENUE_LABEL } from '@/lib/swap-copy';
+import { venueOf } from '@/lib/session-discipline-swap';
 import { formatSessionDuration } from './PlannedSessionHeader';
 import {
   liftLinesFor,
@@ -189,7 +192,8 @@ export const SessionCard: React.FC<{
   lines: string[];
   sport: string;
   onOpen?: () => void;
-}> = ({ title, meta, lines, sport, onOpen }) => {
+  venueLabel?: string | null;
+}> = ({ title, meta, lines, sport, venueLabel, onOpen }) => {
   const colour = getDisciplineColor(sport);
   const rgb = getDisciplineColorRgb(sport);
   return (
@@ -203,7 +207,16 @@ export const SessionCard: React.FC<{
     >
       {/* ⛔ THE TIME SITS ON THE NAME LINE, RIGHT — the same rule the deck card follows. */}
       <div className="flex items-baseline justify-between gap-3">
-        <div className="text-[20px] font-semibold leading-tight min-w-0" style={{ color: colour }}>{title}</div>
+        <div className="text-[20px] font-semibold leading-tight min-w-0" style={{ color: colour }}>
+          {title}
+          {/* ⛔ THE MACHINE, BESIDE THE NAME (work order 2026-09-09 §1). It is the same session
+              performed somewhere else, so it qualifies the name rather than replacing it. */}
+          {venueLabel ? (
+            <span className="text-[13px] font-light ml-2" style={{ color: 'rgba(255,255,255,0.55)' }}>
+              {venueLabel}
+            </span>
+          ) : null}
+        </div>
         {meta ? (
           <div className="text-[13px] tabular-nums flex-shrink-0" style={{ color: 'rgba(255,255,255,0.62)' }}>
             {meta}
@@ -406,6 +419,7 @@ const TodaySession: React.FC<{ session: TodayRow; useImperial: boolean; isPastDa
       meta={formatSessionDuration(session)}
       lines={enduranceLinesFor(session)}
       sport={sport}
+      venueLabel={VENUE_LABEL[venueOf(session as never) ?? ''] ?? null}
       onOpen={onOpen}
     />
   );

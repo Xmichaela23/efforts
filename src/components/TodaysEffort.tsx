@@ -25,8 +25,11 @@ import {
   matrixKindFor,
   intensityOf,
   disciplineOf,
+  sessionSwapExtras,
   type SwapOption,
 } from '@/lib/session-discipline-swap';
+// ⛔ EVERY WORD ON THE SWAP SHEET IS MICHAEL'S, AND LIVES IN ONE FILE.
+import { swapButtonLabel, swapLineFor } from '@/lib/swap-copy';
 import { formatSwimPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout, displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore } from '@/lib/context-utils';
@@ -728,7 +731,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           console.warn('[swap] materialize-plan failed for the hard ride:', e);
         }
       }
-      toast({ title: `Swapped to a ${option.to === 'ride' ? 'ride' : option.to}`, variant: 'default' });
+      toast({
+        title: option.kind === 'venue'
+          ? `Moved to the ${(swapButtonLabel(option) || 'machine').toLowerCase()}`
+          : option.kind === 'hike'
+            ? 'Swapped to a hike'
+            : `Swapped to a ${option.to === 'ride' ? 'ride' : option.to}`,
+        variant: 'default',
+      });
       setSelectedPlannedWorkout(null);
       setPlannedDrawerStep('detail');
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
@@ -2481,8 +2491,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                  * that has never contained a swim is not evidence they can swim. `unifiedItems` is
                  * the week the client already holds, so this costs no fetch.
                  */
+                /**
+                 * ⛔ ONE SHEET, TWO READERS (work order 2026-09-09). `getDisciplineSwaps` answers
+                 * "which SPORT can this become"; `sessionSwapExtras` answers "the same session on a
+                 * machine, or the long day as a hike" — neither of which is a sport change, and both
+                 * of which return `to === from`. They are separate so `to` keeps one meaning; the
+                 * athlete sees one list.
+                 */
                 const swapOptions: SwapOption[] = w
-                  ? getDisciplineSwaps(
+                  ? [...sessionSwapExtras(
+                      w,
+                      declaredPosture,
+                      // p275's ground-impact rule needs the WEEK, not the day.
+                      Array.isArray(allUnifiedItems) ? (allUnifiedItems as never) : [],
+                    ), ...getDisciplineSwaps(
                       w,
                       // ⛔ THE WEEK, NOT THE DAY (2026-08-08). `unifiedItems` is filtered to
                       // `activeDate`, so asking it which sports the athlete has answered with only
@@ -2504,7 +2526,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       declaredPosture,
                       // ⛔ Gates the HARD ride only — see `useResolvedFtp`. Easy swaps ignore it.
                       resolvedFtp,
-                    )
+                    )]
                   : [];
                 if (plannedDrawerStep === 'swap' && w) {
                   return (
@@ -2514,13 +2536,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       </div>
                       {swapOptions.map((opt) => (
                         <button
-                          key={opt.to}
+                          /* ⚠️ THE KEY IS THE KIND AND THE TARGET — a machine and a sport swap can
+                             both carry the same `to`, so `to` alone repeats. */
+                          key={`${opt.kind ?? 'discipline'}:${opt.venue ?? opt.to}`}
                           type="button"
                           disabled={swappingSession}
                           onClick={() => handleApplyDisciplineSwap(w, opt)}
                           className="w-full px-4 py-3 rounded-xl text-left text-white border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] transition-colors disabled:opacity-50"
                         >
-                          <div className="text-sm font-medium">{opt.label}</div>
+                          <div className="text-sm font-medium">{swapButtonLabel(opt)}</div>
+                          {/* ⛔ MICHAEL'S LINE, FROM `swap-copy` — one owner for every word here. */}
+                          {swapLineFor(opt) ? (
+                            <div className="text-[12px] text-white/55 mt-1">{swapLineFor(opt)}</div>
+                          ) : null}
                           {/* ⛔ WARN, NEVER GATE — the button above still works. */}
                           {opt.warnings.map((warn) => (
                             <div key={warn} className="text-[12px] text-amber-200/80 mt-1">{warn}</div>

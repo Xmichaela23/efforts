@@ -30,6 +30,7 @@
 import { plannedDurationSeconds } from './planned-session/duration';
 // ⛔ ONE VOCABULARY (stage 1). See `src/lib/discipline.ts` for why `ride`, and why unknown is null.
 import { normalizeDiscipline, postureKey, type Discipline as CanonicalDiscipline } from './discipline';
+import { OFFERED_VENUES } from './swap-copy';
 // ⛔ ONE POSTURE SANITISER, and it is the server's. `@shared/state-trend` is already imported by the
 // client (`useStateTrends`), so this reads the same three values the State screen groups by.
 import type { PerDisciplinePosture } from '@shared/state-trend';
@@ -244,9 +245,35 @@ export type IntensityBand = 'easy' | 'hard' | 'long';
 export function intensityOf(s: SwappableSession): IntensityBand {
   const tags = (s.tags ?? []).map((t) => String(t).toLowerCase());
   const name = String(s.name ?? '').toLowerCase();
+
+  /**
+   * ⛔⛔ THE COMPOSER'S OWN BANDS COME FIRST (2026-09-09), AND NOT READING THEM WAS A LIVE BUG.
+   *
+   * Every composed endurance row carries `band:` off `ENDURANCE_CLASS` — `above` / `near` / `below`
+   * / `vt1_or_easier` — and `family:`. This function read neither: it matched a hand-written tag
+   * list (`intervals`, `tempo`, `threshold`…) and a name regex, and the standing plan writes none of
+   * those words. **An Anaerobic Ride (`band:above`) therefore banded EASY**, and the swap sheet
+   * offered it "Run instead" under the easy-work line — the one swap p138 does not bless in that
+   * direction, sold with a sentence about easy work.
+   *
+   * ⚠️ THE LONG DAY IS ITS FAMILY, NOT ITS NAME. `family:run_lsd` is what the composer stamps on the
+   * long run; the row carries no `long` tag at all, so this used to band it long off the WORD "Long"
+   * in its name. One rename and the week's key session would have started offering easy swaps.
+   *
+   * ⚠️ THE OLD LADDER STAYS UNDERNEATH for every row that carries no `band:` — a marathon-generator
+   * row, a library plan, anything built before these tags existed. A missing signal is not a verdict.
+   */
+  const family = tags.find((t) => t.startsWith('family:'))?.slice('family:'.length);
+  if (family === 'run_lsd' || family === 'ride_long') return 'long';
+
   if (tags.includes('long_run') || tags.includes('long_ride') || tags.includes('long') || /\blong\b/.test(name)) {
     return 'long';
   }
+
+  const band = tags.find((t) => t.startsWith('band:'))?.slice('band:'.length);
+  if (band === 'above' || band === 'near' || band === 'below') return 'hard';
+  if (band === 'vt1_or_easier') return 'easy';
+
   const hard = ['intervals', 'tempo', 'threshold', 'hard_run', 'vo2', 'quality', 'race_day'];
   if (tags.some((t) => hard.includes(t)) || /interval|tempo|threshold|hill repeat/.test(name)) return 'hard';
   return 'easy';
@@ -641,14 +668,23 @@ export function sessionSwapExtras(
    * THIS one — moving it is what the athlete is about to do. ⚠️ A TREADMILL STILL COUNTS AS GROUND
    * IMPACT (work order §1), so it is offered whatever the rest of the week holds.
    */
+  /**
+   * ⛔ ONLY A MACHINE MICHAEL HAS NAMED IS OFFERED (`OFFERED_VENUES`). p275 blesses more of them and
+   * the constants above still list them, but a label is an athlete-facing line and every one of
+   * those waits for his yes. An unnamed machine is withheld, never given a name this file invented.
+   */
+  const named = (v: Venue) => (OFFERED_VENUES as readonly string[]).includes(v);
+
   if (!venueOf(session)) {
     if (from === 'ride') {
       for (const v of RIDE_VENUES) {
+        if (!named(v)) continue;
         options.push({ kind: 'venue', venue: v, copyKey: K.machine, to: from, label: K.machine, needsMaterialize: false, warnings: [], patch: venuePatch(session, v) });
       }
     } else if (from === 'run') {
       const onTheGround = weekSessions.filter((r) => disciplineOf(r.type) === 'run' && !venueOf(r)).length;
       for (const v of RUN_VENUES) {
+        if (!named(v)) continue;
         if (v !== 'treadmill' && onTheGround <= 1) continue;
         options.push({ kind: 'venue', venue: v, copyKey: v === 'treadmill' ? K.machine : K.machineGround, to: from, label: K.machine, needsMaterialize: false, warnings: [], patch: venuePatch(session, v) });
       }
