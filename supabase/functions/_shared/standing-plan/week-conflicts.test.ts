@@ -84,19 +84,17 @@ Deno.test('⛔ A CLEAN WEEK SAYS NOTHING — the frame untouched raises no confl
   assertEquals(week.conflicts, []);
 });
 
-Deno.test('a hard RIDE pinned onto the heavy leg day is named, and the hard RUN is silent', () => {
+Deno.test('a hard session on the heavy leg day is named — the ride gets an order, the run gets p77', () => {
   /**
-   * ⛔⛔ REWRITTEN 2026-09-09 (WORKORDER-kill-ours §A.3, §B.6) — AND THE SILENT HALF IS THE POINT.
-   *
-   * Three of this rule's four sentences carried claims with no page: *"riding hard costs the legs
-   * less than running hard does"* and, twice, *"come in under the weights the test priced."* They
-   * were deleted, and §B.6 gives replacement words for exactly ONE case — the same-day hard ride, in
-   * Michael's own sentence off p145 and p77. **The other three arms say nothing until he writes
-   * them**, because the standing rule is silence over an unsourced claim.
-   *
-   * ⚠️ SO THIS TEST PINS AN ABSENCE ON PURPOSE. If a sentence appears on the hard-run arm, someone
-   * has written athlete-facing copy without his yes — which is the failure this order exists to fix,
-   * not a test that got stale.
+   * ⛔⛔ BOTH ARMS ARE MICHAEL'S OWN SENTENCES (2026-09-09, kill-ours §A.3 and §B.6), and they are
+   * different because the athlete can do something different about them.
+   *   · A hard RIDE stacked on the heavy leg day: the order to run the day in (p145, p77) — lift
+   *     first, six to eight hours clear. The only case in this file with a fix that moves nothing.
+   *   · A hard RUN, or either sport a day apart: his general line off p77 — the day, the session that
+   *     came first, and what tired legs do to a lift.
+   * ⚠️ THE DELETED CLAIMS STAY DELETED, and that is asserted below rather than assumed: *"riding hard
+   * costs the legs less"*, *"come in under the weights the test priced"*, and the other two of §A.3's
+   * four have no page and may not return through either arm.
    */
   const ride = build({ runs: 3, rides: 2 }, 'Saturday', ['Tuesday', null]);
   const rideC = ride.week.conflicts.find((c) => c.rule === 'hard_with_heavy_legs');
@@ -104,39 +102,73 @@ Deno.test('a hard RIDE pinned onto the heavy leg day is named, and the hard RUN 
   assert(rideC!.days.includes('Tuesday'), rideC!.days.join(','));
   assertEquals(rideC!.text,
     'Tuesday: hard ride and heavy legs. Lifts in the first session, 6 to 8 hours before the ride.');
-  // ⛔ HIS WORDS, VERBATIM. The page numbers live here rather than on the screen (p145, p77).
-  assert(!/costs the legs less/.test(rideC!.text), 'the deleted ride claim came back');
 
   const run = build({ runs: 4, rides: 0 }, 'Saturday', ['Tuesday', null]);
   const runC = run.week.conflicts.find((c) => c.rule === 'hard_with_heavy_legs');
-  assertEquals(runC, undefined,
-    `the hard-run arm shipped a sentence Michael has not written: ${runC?.text}`);
+  assert(runC, 'a hard run on the heavy leg day raised nothing');
+  assertEquals(runC!.text,
+    'Tuesday: heavy legs after hard run. Tired legs cause you to lift slowly and establish improper '
+    + 'coordination patterns.');
+  // ⛔ THE ARTICLE IS DROPPED ON PURPOSE — his own lines name sessions bare ("Tuesday: hard ride and
+  // heavy legs", "Friday heavy legs, Saturday long run"). A "the" here would be a word he did not write.
+  assert(!/after the /.test(runC!.text), runC!.text);
+
   for (const c of [...run.week.conflicts, ...ride.week.conflicts]) {
+    assert(!/costs the legs less/.test(c.text), `deleted claim came back: ${c.text}`);
     assert(!/under the weights the test priced/.test(c.text), `deleted claim came back: ${c.text}`);
     assert(!/injury risk rather than a hard day/.test(c.text), `deleted claim came back: ${c.text}`);
     assert(!/tendon cost rather than a comfort one/.test(c.text), `deleted claim came back: ${c.text}`);
   }
 });
 
-Deno.test('⛔ THE LONG RUN AFTER HEAVY LEGS IS HIS SENTENCE, AND THE SAME-DAY CASE IS SILENT', () => {
+Deno.test('⛔ HEAVY LEGS AFTER A LONG SESSION TAKES THE SAME p77 SENTENCE', () => {
   /**
-   * ⛔ §B.6, APPROVED: *"Friday heavy legs, Saturday long run. The run is on legs that have not
-   * recovered."* p130 and p131 — the two sessions, their days, and what the legs are. Michael,
-   * 2026-09-09: *"don't take liberties that aren't ours."* p144's cut does not reach the next day,
-   * so nothing is claimed about a remedy.
-   * ⚠️ THE SAME-DAY ARM HAS NO APPROVED WORDS AND EMITS NOTHING.
+   * ⛔ THE SAME EVENT AS THE RULE ABOVE, ONE SYSTEM ALONG: a lift opening on legs a LONG session left
+   * behind rather than a hard one. `heavy_lower` is the only load in `COST` that needs `long_effort`
+   * clear, so the subject is always the barbell work and his lifting-after-endurance line fits it
+   * exactly. Its old sentence — *"a tendon cost rather than a comfort one"* — was `model.ts`'s own
+   * framing with no page and is gone.
    */
+  const { week } = build({ runs: 4, rides: 0 }, 'Saturday', [null, null], ['Saturday', 'Sunday', 'Friday']);
+  const c = week.conflicts.find((x) => x.rule === 'heavy_legs_after_long');
+  assert(c, 'heavy legs inside the long session\'s shadow raised nothing');
+  assert(/^\w+: heavy legs after (long run|long ride)\./.test(c!.text), c!.text);
+  assert(c!.text.endsWith('Tired legs cause you to lift slowly and establish improper coordination patterns.'),
+    c!.text);
+});
+
+Deno.test('⛔ THE LONG RUN AND HEAVY LEGS — a day apart and stacked are two different sentences', () => {
   /**
-   * ⚠️ THE FIXTURE HAS TO BLOCK THE WEEKEND. The rotation follows the long pin and the frame always
-   * puts ME Lower three days after the LSD, so an unblocked week cannot stack them a day apart — the
-   * only route is the athlete's own days off relocating the long session onto Wednesday.
+   * ⛔ BOTH ARE HIS (§B.6), and the split is by spacing because the facts differ.
+   *   · A DAY APART: *"Friday heavy legs, Saturday long run. The run is on legs that have not
+   *     recovered."* (p130, p131). p144's cut does not reach the next day, so no remedy is claimed.
+   *     Michael, 2026-09-09: *"don't take liberties that aren't ours."*
+   *   · STACKED ON ONE DAY: his endurance-after-lifting line — the run is the session that suffers.
+   *
+   * ⚠️ THE DAY-APART FIXTURE HAS TO BLOCK THE WEEKEND. The rotation follows the long pin and the
+   * frame always puts ME Lower three days after the LSD, so an unblocked week cannot stack them a day
+   * apart — the only route is the athlete's own days off relocating the long session onto Wednesday.
    */
-  const { week } = build({ runs: 4, rides: 0 }, 'Wednesday', [null, null], ['Saturday', 'Sunday']);
-  const c = week.conflicts.find((x) => x.rule === 'long_after_heavy_legs');
-  assert(c, 'the long run beside the heavy leg day raised nothing');
-  assert(/heavy legs, /.test(c!.text), c!.text);
-  assert(/The run is on legs that have not recovered\.$/.test(c!.text), c!.text);
-  assertEquals(c!.days.length, 2, c!.days.join(','));
+  const apart = build({ runs: 4, rides: 0 }, 'Wednesday', [null, null], ['Saturday', 'Sunday'])
+    .week.conflicts.find((x) => x.rule === 'long_after_heavy_legs');
+  assert(apart, 'the long run beside the heavy leg day raised nothing');
+  assertEquals(apart!.text, 'Tuesday heavy legs, Wednesday long run. The run is on legs that have not recovered.');
+  assertEquals(apart!.days.length, 2, apart!.days.join(','));
+
+  /**
+   * ⛔⛔ AND THE STACKED ARM IS ONLY EVER ABOUT THE LIFT. `long_run` needs `heavy_legs` clear and a
+   * hard RUN emits `heavy_legs` too, so on one day this rule can fire with a hard run in the way —
+   * and both of his sentences here say *"heavy legs"* in as many words. That day is named by
+   * `two_hard_one_day` instead; the guard is asserted so a future edit cannot quietly describe a
+   * session that did not happen.
+   */
+  const stacked = build({ runs: 4, rides: 0 }, 'Tuesday', ['Monday', null], ['Sunday'])
+    .week.conflicts.find((x) => x.rule === 'long_after_heavy_legs');
+  assert(stacked, 'the long run stacked on the heavy leg day raised nothing');
+  assertEquals(stacked!.text,
+    'Tuesday: long run after heavy leg training. Legs will be fatigued, session suffers.');
+  assert(stacked!.sessions.some((n) => /lower|test/i.test(n)),
+    `the stacked sentence blames heavy legs but no lift is in it: ${stacked!.sessions.join(', ')}`);
 });
 
 Deno.test('a hard session on the SPEED leg day is named, and the reason is bar speed', () => {
@@ -228,20 +260,20 @@ Deno.test('⛔ EVERY CONFLICT SENTENCE PASSES THE VOICE CHECK', () => {
   }
   assert(seen > 0, 'the sweep found no conflicts at all — the fixtures stopped stacking');
   /**
-   * ⛔ EVERY RULE THAT STILL SPEAKS IS REACHED, or this test is green about sentences it never read.
+   * ⛔ EVERY RULE IS REACHED, or this test is green about sentences it never read.
    *
-   * ⚠️ FIVE, NOT SIX, SINCE 2026-09-09. `heavy_legs_after_long` computes its clearance and emits
-   * NOTHING: its sentence claimed *"a tendon cost rather than a comfort one"*, which has no page, and
-   * §B.6 gives that case no replacement words. The id is deliberately still in `ConflictRule` — it is
-   * a rule waiting for a line, not a rule that was removed.
+   * ⚠️ BACK TO ALL SIX ON 2026-09-09. Between the morning and the afternoon of that day
+   * `heavy_legs_after_long` emitted nothing — its claim had no page and no replacement had been
+   * written yet — and this assertion recorded the gap. §B.6 now carries the line, so the rule speaks
+   * again and the exemption is deleted rather than left standing as a lie.
+   * ⚠️ `easy_run_with_heavy_legs` IS NOT IN THIS LIST. It needs a frame whose easy run can land on a
+   * lower day, which `strength_5k` does not have; it has its own test at the foot of this file.
    */
-  const SPEAKING = ['hard_with_heavy_legs', 'long_after_heavy_legs', 'hard_on_speed_leg_day',
-    'two_hard_one_day', 'no_rest_day'];
+  const SPEAKING = ['hard_with_heavy_legs', 'long_after_heavy_legs', 'heavy_legs_after_long',
+    'hard_on_speed_leg_day', 'two_hard_one_day', 'no_rest_day'];
   for (const r of SPEAKING) {
     assert(rules.has(r), `the sweep never reached ${r} — only: ${[...rules].join(', ')}`);
   }
-  assert(!rules.has('heavy_legs_after_long'),
-    'heavy_legs_after_long shipped a sentence Michael has not written');
 });
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════

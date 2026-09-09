@@ -247,6 +247,42 @@ function phraseFor(t: TypedSession): string {
   return t.s.name;
 }
 
+/**
+ * ⛔ THE SAME WORD WITHOUT ITS ARTICLE. Michael's templates read *"heavy legs after hard run"* and
+ * *"long run after heavy leg training"* — bare, exactly as his other two approved lines name their
+ * sessions (*"Tuesday: hard ride and heavy legs"*, *"Friday heavy legs, Saturday long run"*).
+ * ⚠️ ONE OWNER OF THE WORDS. It derives from `phraseFor` rather than restating the mapping, so a
+ * session that gets a new name gets it in every sentence at once.
+ */
+function bareFor(t: TypedSession): string {
+  const p = phraseFor(t);
+  return p.startsWith('the ') ? p.slice(4) : p;
+}
+
+/**
+ * ⛔ IS THE THING IN THE WAY AN ENDURANCE SESSION? His two templates are about a lift and a RUN or
+ * RIDE — *"Lifting after a hard or long run"*, *"Hard or long run after lifting"*. A heavy leg day
+ * blocked by ANOTHER heavy leg day is a real break with no approved sentence (it would read "heavy
+ * legs after heavy leg session"), so it stays silent rather than being forced into his words.
+ */
+const isEnduranceBlocker = (t: TypedSession): boolean =>
+  t.load === 'hard_cardio' || t.load === 'long_run' || t.load === 'long_ride';
+
+/**
+ * ⛔ HIS TWO SENTENCES, WORD FOR WORD (Michael, 2026-09-09, WORKORDER-kill-ours §B.6). The day and
+ * the session name are the athlete's own picks; nothing else in them is substitutable.
+ *
+ * ⚠️ WHICH ONE FIRES IS DECIDED BY **WHICH SESSION COMES SECOND**, which is the axis his own headings
+ * use: *"Lifting after a hard or long run"* against *"Hard or long run after lifting"*. `unmetNeeds`
+ * already answers that — the SUBJECT is the session whose clearance was not met, so the subject is
+ * always the one running on legs the blocker left behind.
+ */
+const liftingAfterEndurance = (day: Weekday, session: string): string =>
+  `${day}: heavy legs after ${session}. Tired legs cause you to lift slowly and establish improper `
+  + 'coordination patterns.';
+const enduranceAfterLifting = (day: Weekday, session: string): string =>
+  `${day}: ${session} after heavy leg training. Legs will be fatigued, session suffers.`;
+
 /** `on the same day as` / `the day before` — how far apart, in the words a week is read in. */
 function apartPhrase(a: Weekday, b: Weekday): 'same' | 'adjacent' | 'two' {
   const d = Math.abs(WEEKDAYS.indexOf(a) - WEEKDAYS.indexOf(b));
@@ -331,16 +367,19 @@ export function weekConflicts(args: {
 
     if (u.load === 'heavy_lower' && u.system === 'heavy_legs') {
       /**
-       * ⛔⛔ THREE OF THIS RULE'S FOUR SENTENCES ARE GONE AND ONE IS HIS (2026-09-09, kill-ours §A.3
-       * and §B.6). *"Riding hard costs the legs less than running hard does"* and *"come in under the
-       * weights the test priced"* are claims with no page — the second one twice — and the standing
-       * rule is that a claim without a page comes off rather than being softened.
+       * ⛔⛔ BOTH OF THIS RULE'S OLD SENTENCES ARE GONE AND BOTH REPLACEMENTS ARE HIS (2026-09-09,
+       * kill-ours §A.3 and §B.6). *"Riding hard costs the legs less than running hard does"* and
+       * *"come in under the weights the test priced"* are claims with no page; a claim without a page
+       * comes off rather than being softened.
        *
-       * ⛔ WHAT SHIPS IS THE SAME-DAY RIDE CASE, in Michael's own words off p145 and p77: the two
-       * sessions, the day, and the order to run them in. ⚠️ THE OTHER THREE ARMS ARE SILENT UNTIL HE
-       * WRITES THEM — the hard RUN on the heavy day, and either sport a day apart. Silence over an
-       * unsourced claim is the standing rule (`voiceViolation`'s own drop), and the athlete still has
-       * the calendar in front of them. **Do not fill these in from the deleted sentences.**
+       * ⛔ TWO ARMS, AND THE RIDE'S IS THE MORE SPECIFIC ONE. A hard ride stacked on the heavy leg day
+       * gets an ORDER to run the day in (p145, p77) — it is the one case where the athlete can fix the
+       * clash without moving anything. Everything else takes his general lifting-after-endurance line
+       * (p77): the day, the session that came first, and what tired legs do to a lift.
+       *
+       * ⚠️ A HEAVY LEG DAY BLOCKED BY ANOTHER HEAVY LEG DAY STAYS SILENT — see `isEnduranceBlocker`.
+       * His template names a run or a ride; "heavy legs after heavy leg session" is not a sentence he
+       * wrote, and the break is real but unworded.
        */
       if (apart === 'same' && blocker.s.type === 'ride') {
         push({
@@ -352,44 +391,74 @@ export function weekConflicts(args: {
           text: `${sDay}: hard ride and heavy legs. Lifts in the first session, 6 to 8 hours before `
             + 'the ride.',
         });
+      } else if (isEnduranceBlocker(blocker)) {
+        push({
+          kind: 'cost',
+          rule: 'hard_with_heavy_legs',
+          days,
+          sessions,
+          shortBy: u.shortBy,
+          text: liftingAfterEndurance(sDay, bareFor(blocker)),
+        });
       }
       continue;
     }
 
     if (u.load === 'long_run' && u.system === 'heavy_legs') {
       /**
-       * ⛔ *"carries injury risk rather than a hard day"* HAS NO PAGE AND IS DELETED (§A.3). p144 does
-       * not reach the next day and nothing else prices the risk, so the sentence states the fact and
-       * stops: the two sessions, their days, and what the legs are (p130, p131). Michael's words,
-       * 2026-09-09 — *"don't take liberties that aren't ours."*
-       * ⚠️ THE SAME-DAY ARM IS SILENT. He wrote the day-apart sentence; a long run stacked on the
-       * heavy day is a different claim and is not his yet.
-       * ⚠️ `bDay` LEADS BECAUSE THE HEAVY DAY COMES FIRST — subject is the long run, blocker is the
-       * lift, and his sentence reads in calendar order.
+       * ⛔ *"carries injury risk rather than a hard day"* HAS NO PAGE AND IS DELETED (§A.3). Both
+       * replacements are his, and they are different sentences because they are different days.
+       *   · A DAY APART — the two sessions, their days, and what the legs are (p130, p131). Michael,
+       *     2026-09-09: *"don't take liberties that aren't ours"* — p144's cut does not reach the
+       *     next day, so nothing is claimed about a remedy.
+       *   · THE SAME DAY — his general endurance-after-lifting line (p130, p131).
+       * ⚠️ `bDay` LEADS ON THE DAY-APART ARM because the heavy day comes first; subject is the long
+       * run, blocker is the lift, and his sentence reads in calendar order.
+       *
+       * ⛔⛔ AND THE BLOCKER HAS TO ACTUALLY BE THE LIFT. `long_run` needs `heavy_legs` clear, and a
+       * hard RUN emits `heavy_legs` too — so on one day this rule can fire with a hard run in the way,
+       * and both of his sentences here say *"heavy legs"* in as many words. That day is already named
+       * by `two_hard_one_day`; saying "after heavy leg training" about a session that was not one
+       * would be the plan describing a week that did not happen.
        */
-      if (apart !== 'same') {
-        push({
-          kind: 'cost',
-          rule: 'long_after_heavy_legs',
-          days,
-          sessions,
-          shortBy: u.shortBy,
-          text: `${bDay} heavy legs, ${sDay} long run. The run is on legs that have not recovered.`,
-        });
-      }
+      if (blocker.load !== 'heavy_lower') continue;
+      push({
+        kind: 'cost',
+        rule: 'long_after_heavy_legs',
+        days,
+        sessions,
+        shortBy: u.shortBy,
+        text: apart === 'same'
+          ? enduranceAfterLifting(sDay, bareFor(subject))
+          : `${bDay} heavy legs, ${sDay} long run. The run is on legs that have not recovered.`,
+      });
       continue;
     }
 
     /**
-     * ⛔⛔ HEAVY LEGS AFTER A LONG SESSION IS SILENT AS OF 2026-09-09 (§A.3), AND THE RULE ID STAYS.
+     * ⛔ HEAVY LEGS AFTER A LONG SESSION — *"a tendon cost rather than a comfort one"* was `model.ts`'s
+     * own framing with no page behind it and is deleted (§A.3). What ships is his lifting-after-
+     * endurance line (p77), the same sentence rule 1 uses, because it is the same event: a lift
+     * opening on legs a long session left behind.
      *
-     * Its sentence claimed *"a tendon cost rather than a comfort one"* — `model.ts`'s own framing,
-     * with no page behind it — and §B.6 gives this case no replacement words. The clearance is still
-     * computed, the id still exists, and nothing is emitted until Michael writes the line.
-     * ⚠️ DO NOT REVIVE THE OLD TEXT. It is quoted here only so a reader can see what was removed and
-     * why: the tendon claim is ours, not p130's.
+     * ⚠️ ONLY `heavy_lower` CAN REACH THIS SYSTEM — it is the one load in `COST` that needs
+     * `long_effort` clear — so the subject is always the lift and the blocker always the long session.
+     * The guard is stated rather than assumed, so a new row in that table cannot borrow a sentence
+     * written about a barbell.
      */
-    if (u.system === 'long_effort') continue;
+    if (u.system === 'long_effort') {
+      if (u.load === 'heavy_lower' && isEnduranceBlocker(blocker)) {
+        push({
+          kind: 'cost',
+          rule: 'heavy_legs_after_long',
+          days,
+          sessions,
+          shortBy: u.shortBy,
+          text: liftingAfterEndurance(sDay, bareFor(blocker)),
+        });
+      }
+      continue;
+    }
   }
 
   // ── 4: THE FRAME RULE (p246 §E1a). Days 2 and 5 print NO endurance; the speed day carries no

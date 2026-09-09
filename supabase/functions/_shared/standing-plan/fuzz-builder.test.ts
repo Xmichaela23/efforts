@@ -181,13 +181,6 @@ const tradeOffs = {
   hardOnLowerWithNote: 0,
   /** A keystone clearance the athlete broke, WITH a sentence naming the day and the shortfall. */
   keystoneBreakWithNote: 0,
-  /**
-   * ⛔ A keystone clearance the athlete broke that the block deliberately SAYS NOTHING about
-   * (2026-09-09, kill-ours §A.3/§B.6). Four shapes, listed exhaustively at the check site. Counted
-   * rather than ignored so the number is visible in the sweep's own log — if it moves, somebody
-   * changed which breaks are silent.
-   */
-  keystoneBreakSilentByRuling: 0,
 };
 
 // ── VIADA'S PLACEMENT LAWS, AS CHECKS (2026-08-26) ───────────────────────────────────────────────
@@ -388,23 +381,8 @@ function checkPlacementLaws(
         tradeOffs.hardOnLowerWithNote++;
         continue;
       }
-      /**
-       * ⛔⛔ A HARD **RUN** ON THE ME LOWER DAY IS SILENT BY RULING (2026-09-09, kill-ours §A.3).
-       *
-       * Its sentence claimed *"squats and deadlifts opening on legs that already ran hard come in
-       * under the weights the test priced"* — no page — and §B.6 approved words for the RIDE arm
-       * only. Michael writes the run sentence when he writes it; until then the block says nothing
-       * rather than saying something unsourced.
-       *
-       * ⚠️ NARROW ON PURPOSE: the ME lower day, and a RUN. A hard ride there still speaks (p145,
-       * p77), and any hard session on the DE lower day still speaks through
-       * `hard_on_speed_leg_day`, whose sentence was never in question.
-       */
-      const meWeekdays = lower.me.map(dayOf);
-      if (t.s.type === 'run' && meWeekdays.includes(t.s.day as Weekday)) {
-        tradeOffs.keystoneBreakSilentByRuling++;
-        continue;
-      }
+      // ⛔ THE 2026-09-09 RUN EXEMPTION IS DELETED. A hard run on the ME lower day was silent for one
+      // afternoon while its sentence had no page; §B.6 now carries the p77 line, so it is named again.
       fails.push(`week ${wk}: hard endurance on the lower-body day ${t.s.day} because the ATHLETE `
         + `put it there, and NOTHING SAYS SO — ${t.s.name} · notes=[${dayNotes()}]`);
       continue;
@@ -462,31 +440,20 @@ function checkPlacementLaws(
       || (blockerDay != null && c.days.includes(DAYS[blockerDay])));
     if (covered) { tradeOffs.keystoneBreakWithNote++; continue; }
     /**
-     * ⛔⛔ FOUR BREAKS ARE DELIBERATELY UNNAMED SINCE 2026-09-09, AND THE LIST IS EXHAUSTIVE
-     * (WORKORDER-kill-ours §A.3 and §B.6).
+     * ⛔⛔ THE EXEMPTION LIST THAT STOOD HERE FOR ONE AFTERNOON IS DELETED (2026-09-09).
      *
-     * Their sentences carried claims with no page — *"come in under the weights the test priced"*,
-     * *"carries injury risk rather than a hard day"*, *"a tendon cost rather than a comfort one"* —
-     * and §B.6 supplies replacement words for only ONE arm of the three rules: the same-day hard
-     * RIDE beside heavy legs, plus the long run the day AFTER heavy legs. Everything else waits for
-     * Michael to write it, because the standing rule is silence over an unsourced claim.
+     * Between the morning and the evening of that day four breaks emitted nothing — their claims had
+     * no page and §B.6 had not yet been written — and this block counted them instead of failing.
+     * **§B.6 now carries all four sentences, so every break is named again and the exemption would
+     * hide a real regression.** It is recorded here rather than deleted silently, because a list of
+     * "breaks we allow to be silent" is exactly the thing that quietly grows.
      *
-     * ⛔ SO THE HARNESS STILL FAILS ON A SILENT BREAK — it just knows which four are silent BY
-     * RULING and counts them instead. **Do not widen this list to make a new failure go away.** A
-     * break outside it is a break nobody decided to leave unnamed, which is the bug this criterion
-     * has always been for.
+     * ⚠️ ONE SHAPE IS STILL UNWORDED AND IS NOT EXEMPTED: a heavy leg day blocked by ANOTHER heavy
+     * leg day. His template names a run or a ride ("heavy legs after hard run"), and "heavy legs
+     * after heavy leg session" is not a sentence he wrote. It does not arise on any frame in the
+     * sweep — `strength_5k` has one lower day — so nothing needs to allow for it. **If it ever does,
+     * the honest move is to ask him for the line, not to add a case here.**
      */
-    const sameDay = subjectDay != null && blockerDay != null && subjectDay === blockerDay;
-    const blockerIsRide = blockerDay != null && view.typed.some((t) =>
-      t.load === 'hard_cardio' && t.s.type === 'ride' && t.s.day === DAYS[blockerDay]);
-    const silentByRuling =
-      // 1-2 · a hard session on the heavy leg day — only the SAME-DAY RIDE has words.
-      (u.load === 'heavy_lower' && u.system === 'heavy_legs' && !(sameDay && blockerIsRide))
-      // 3 · the long run STACKED on the heavy leg day. Only the day-apart case has words.
-      || (u.load === 'long_run' && u.system === 'heavy_legs' && sameDay)
-      // 4 · heavy legs after a long session, either spacing. `heavy_legs_after_long` emits nothing.
-      || u.system === 'long_effort';
-    if (silentByRuling) { tradeOffs.keystoneBreakSilentByRuling++; continue; }
     const athleteCaused = touchedLabels.has(u.unit) || touchedLabels.has(u.blockedBy);
     fails.push(`week ${wk}: KEYSTONE break the ${athleteCaused ? 'ATHLETE asked for and NOTHING NAMES' : 'ENGINE placed'}`
       + ` — ${u.unit} on ${where} needs ${u.system} clear; ${u.blockedBy} leaves it outstanding, `
@@ -772,12 +739,10 @@ function report(name: string, cases: Case[], check: (c: Case) => string[]): numb
   console.log(`  ${name}: ${cases.length} combinations, ${total} failures in `
     + `${byClass.size} class(es), ${tradeOffs.liftOnBlockedWithNote} stated lift-on-day-off trade-offs`);
   console.log(`    · stated trade-offs: hard-on-lower-with-note ${tradeOffs.hardOnLowerWithNote}, `
-    + `keystone-break-with-note ${tradeOffs.keystoneBreakWithNote}, `
-    + `keystone-break-silent-by-ruling ${tradeOffs.keystoneBreakSilentByRuling}`);
+    + `keystone-break-with-note ${tradeOffs.keystoneBreakWithNote}`);
   tradeOffs.liftOnBlockedWithNote = 0;
   tradeOffs.hardOnLowerWithNote = 0;
   tradeOffs.keystoneBreakWithNote = 0;
-  tradeOffs.keystoneBreakSilentByRuling = 0;
   for (const [k, v] of [...byClass.entries()].sort((a, b) => b[1].n - a[1].n)) {
     console.log(`    ✗ [${v.n}×] ${k}`);
     console.log(`        e.g. ${v.first}`);
