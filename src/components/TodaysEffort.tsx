@@ -26,10 +26,12 @@ import {
   intensityOf,
   disciplineOf,
   sessionSwapExtras,
+  isPlanTwin,
+  sameSwapOn,
   type SwapOption,
 } from '@/lib/session-discipline-swap';
 // ⛔ EVERY WORD ON THE SWAP SHEET IS MICHAEL'S, AND LIVES IN ONE FILE.
-import { swapButtonLabel, swapLineFor } from '@/lib/swap-copy';
+import { swapButtonLabel, swapLineFor, SWAP_SHEET_HEADER } from '@/lib/swap-copy';
 import { formatSwimPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout, displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore } from '@/lib/context-utils';
@@ -218,6 +220,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [skippingSession, setSkippingSession] = useState(false);
   const [plannedDrawerStep, setPlannedDrawerStep] = useState<'detail' | 'skip' | 'swap'>('detail');
   const [swappingSession, setSwappingSession] = useState(false);
+  /**
+   * ⛔ THE SWAP'S SCOPE (work order 2026-09-09 §6) — the same Just today / Rest of plan the lift
+   * swap offers. ⚠️ IT RESETS TO "just today" EVERY TIME THE SHEET OPENS: rewriting the rest of
+   * a plan is not a setting to inherit from the last session the athlete happened to change.
+   */
+  const [swapRestOfPlan, setSwapRestOfPlan] = useState(false);
   const declaredPosture = useDeclaredPosture();
   // ⛔ Gates the HARD-ride swap: no usable FTP, no watts, so it is not offered.
   const resolvedFtp = useResolvedFtp();
@@ -701,7 +709,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
    * ⚠️ NEVER BLOCKED. A swap with warnings is still applied — the warnings are shown beside the
    * button, not in place of it. That is the guardrail rule: warn, do not gate.
    */
-  const handleApplyDisciplineSwap = async (workout: any, option: SwapOption) => {
+  const handleApplyDisciplineSwap = async (workout: any, option: SwapOption, restOfPlan = false) => {
     const userId = getStoredUserId();
     if (!userId || !workout?.id) {
       toast({ title: 'Error', description: 'Please log in to change a session', variant: 'destructive' });
@@ -731,12 +739,68 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           console.warn('[swap] materialize-plan failed for the hard ride:', e);
         }
       }
+      /**
+       * ═══ REST OF PLAN ═════════════════════════════════════════════════════════════════════════
+       *
+       * ⛔ EVERY LATER REPEAT OF THIS SESSION, RE-ASKED ONE ROW AT A TIME. `sameSwapOn` builds each
+       * row its OWN patch — a machine patch carries that row's tag list, a hike patch that row's
+       * minutes — because copying this row's patch across would overwrite theirs with ours.
+       *
+       * ⚠️ TODAY IS ALREADY WRITTEN ABOVE AND IS NOT REVISITED (`gt` on the date). And a row that
+       * cannot take the swap is SKIPPED, not forced: `sameSwapOn` returns null for a session already
+       * logged, already indoors, or no longer the long day.
+       *
+       * ⚠️ THE FAILURE IS NON-FATAL. Today's swap has already succeeded by this point; if the later
+       * rows fail, the athlete is told what did happen rather than shown an error for a write that
+       * worked. Nothing is rolled back — a reverted swap the athlete asked for is the worse outcome.
+       */
+      let alsoWritten = 0;
+      if (restOfPlan) {
+        try {
+          const q = supabase
+            .from('planned_workouts')
+            .select('id,date,type,name,tags,workout_status,duration,total_duration_seconds,computed,training_plan_id')
+            .eq('user_id', userId)
+            .eq('workout_status', 'planned')
+            .gt('date', String(workout.date).slice(0, 10));
+          const planId = (workout as any)?.training_plan_id ?? null;
+          const { data: later } = await (planId ? q.eq('training_plan_id', planId) : q);
+          const rows = Array.isArray(later) ? later : [];
+          for (const row of rows) {
+            if (!isPlanTwin(workout as never, row as never)) continue;
+            const same = sameSwapOn(row as never, option, {
+              available: availableDisciplines(Array.isArray(allUnifiedItems) ? allUnifiedItems : []),
+              posture: declaredPosture,
+              ftp: resolvedFtp,
+              // The ground-impact gate wants that row's OWN week, which is not loaded. Absent means
+              // "not asked": the treadmill is offered, and nothing else is.
+              weekSessions: [],
+            });
+            if (!same) continue;
+            const { error: e2 } = await supabase
+              .from('planned_workouts').update(same.patch).eq('id', row.id).eq('user_id', userId);
+            if (e2) continue;
+            if (same.needsMaterialize) {
+              try {
+                await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(row.id) } });
+              } catch { /* the row is swapped either way; a re-open re-materialises it */ }
+            }
+            alsoWritten += 1;
+          }
+        } catch (e) {
+          console.warn('[swap] rest-of-plan write failed after today succeeded:', e);
+        }
+      }
+
+      const what = option.kind === 'venue'
+        ? `Moved to the ${(swapButtonLabel(option) || 'machine').toLowerCase()}`
+        : option.kind === 'hike'
+          ? 'Swapped to a hike'
+          : `Swapped to a ${option.to === 'ride' ? 'ride' : option.to}`;
       toast({
-        title: option.kind === 'venue'
-          ? `Moved to the ${(swapButtonLabel(option) || 'machine').toLowerCase()}`
-          : option.kind === 'hike'
-            ? 'Swapped to a hike'
-            : `Swapped to a ${option.to === 'ride' ? 'ride' : option.to}`,
+        // ⛔ SAY HOW MANY, NOT "rest of plan". The athlete asked for the rest of the plan; what they
+        // get is the sessions it actually held, and that number is the receipt.
+        title: alsoWritten > 0 ? `${what} — this and ${alsoWritten} later` : what,
         variant: 'default',
       });
       setSelectedPlannedWorkout(null);
@@ -2006,6 +2070,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   if (opts.length === 0) return null;
                   const openSwap = () => {
                     setSelectedPlannedWorkout(workout);
+                    setSwapRestOfPlan(false);
                     setPlannedDrawerStep('swap');
                   };
                   return (
@@ -2531,8 +2596,21 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 if (plannedDrawerStep === 'swap' && w) {
                   return (
                     <div className="flex flex-col gap-2 w-full">
-                      <div className="text-[13px] text-white/70 pb-1">
-                        Same day, same time. Pick the sport you want instead.
+                      {/* ⛔ MICHAEL'S HEADER (2026-09-09), from `swap-copy` with every other word here. */}
+                      <div className="text-[13px] text-white/70 pb-1">{SWAP_SHEET_HEADER}</div>
+                      {/* ⛔ THE SAME TWO CHOICES THE LIFT SWAP OFFERS (work order §6). Just today is the
+                          default — one row — and Rest of plan writes this session's later repeats too. */}
+                      <div className="flex items-center gap-2 pb-1">
+                        <button
+                          type="button"
+                          onClick={() => setSwapRestOfPlan(false)}
+                          className={`px-2.5 py-1 rounded-xl text-[12px] border transition-colors ${!swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/70 hover:text-white/80'}`}
+                        >Just today</button>
+                        <button
+                          type="button"
+                          onClick={() => setSwapRestOfPlan(true)}
+                          className={`px-2.5 py-1 rounded-xl text-[12px] border transition-colors ${swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/70 hover:text-white/80'}`}
+                        >Rest of plan</button>
                       </div>
                       {swapOptions.map((opt) => (
                         <button
@@ -2541,7 +2619,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           key={`${opt.kind ?? 'discipline'}:${opt.venue ?? opt.to}`}
                           type="button"
                           disabled={swappingSession}
-                          onClick={() => handleApplyDisciplineSwap(w, opt)}
+                          onClick={() => handleApplyDisciplineSwap(w, opt, swapRestOfPlan)}
                           className="w-full px-4 py-3 rounded-xl text-left text-white border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] transition-colors disabled:opacity-50"
                         >
                           <div className="text-sm font-medium">{swapButtonLabel(opt)}</div>
@@ -2595,7 +2673,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               {swapOptions.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => setPlannedDrawerStep('swap')}
+                  onClick={() => { setSwapRestOfPlan(false); setPlannedDrawerStep('swap'); }}
                   className="w-full px-4 py-3 rounded-xl font-medium tracking-wide text-white/85 border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] transition-colors flex items-center justify-center gap-2"
                 >
                   <ArrowLeftRight className="w-4 h-4" />

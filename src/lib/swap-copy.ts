@@ -3,7 +3,7 @@
  *
  * docs/WORKORDER-endurance-swaps-2026-09-09.md. ⛔ EVERY LINE HERE IS MICHAEL'S, GIVEN 2026-09-09,
  * and each carries the page it came from IN THE CODE. Nothing else may be added: a swap whose line
- * he has not written is not offered (see `OFFERED_VENUES`).
+ * he has not written is not offered.
  *
  * ⛔⛔ THE PAGE NUMBERS ARE NOT ON THE SCREEN. He wrote them beside the lines — "(p137)", "(p138)",
  * "(p275)" — and his own standing rule is that a citation lives in the ledger and never in the copy:
@@ -32,19 +32,9 @@ export const SWAP_MACHINE = 'Same session, indoors.';
 export const SWAP_MACHINE_TREADMILL = 'Same session, indoors. Ground impact still counts.';
 
 /**
- * ⛔⛔ ONLY TWO MACHINES SHIP (Michael, 2026-09-09: *"Labels: Trainer, Treadmill."*).
- *
- * The library knows p275's full set — rower, ski erg, air bike, elliptical, arc trainer — and none of
- * them has a line or a label from him. ⚠️ AN UNNAMED MACHINE IS NOT OFFERED rather than given a name
- * this file invented: every athlete-facing line waits for his yes, and a label is a line.
- *
- * ⚠️ AND THE GROUND-IMPACT GATE HAS NOTHING LEFT TO GATE while this list holds one run machine, since
- * the treadmill is never gated. The gate stays built and tested — it is p275's rule, and it becomes
- * live the moment a second run machine gets a name.
+ * The machine's name, beside the session's. ⛔ TWO MACHINES, AND THE OTHER FIVE ARE CUT (Michael,
+ * 2026-09-09) — p275's rower, ski erg, air bike, elliptical and arc trainer are not in the app.
  */
-export const OFFERED_VENUES = ['trainer', 'treadmill'] as const;
-
-/** The machine's name, beside the session's. Michael's words; there are only two. */
 export const VENUE_LABEL: Record<string, string> = {
   trainer: 'Trainer',
   treadmill: 'Treadmill',
@@ -69,6 +59,11 @@ export function swapLineFor(opt: { copyKey?: string; venue?: string }): string |
   if (opt.venue === 'treadmill') return SWAP_MACHINE_TREADMILL;
   return opt.copyKey ? SWAP_LINE[opt.copyKey] ?? null : null;
 }
+
+/** ⛔ THE SHEET'S HEADER (Michael, 2026-09-09). It replaced "Same day, same time. Pick the sport you
+ *  want instead." — which was wrong the moment a machine could be the only option, since a machine
+ *  is not a sport. */
+export const SWAP_SHEET_HEADER = 'Instead:';
 
 /** `Ride instead` / `Run instead` / `Trainer` / `Hike`. The button's own word. */
 export function swapButtonLabel(opt: { kind?: string; venue?: string; to: string }): string {

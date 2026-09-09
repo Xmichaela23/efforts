@@ -5,11 +5,13 @@
  *
  * ⚠️ THIS FILE PINS WHAT IS *NOT* OFFERED as hard as what is. Three of the four changes are a
  * narrowing — the long day opens up, but hard-ride-to-hard-run closes, swim closes on the long day,
- * and the run machines close behind p275's ground-impact rule. A later session reading only the
- * happy path would re-open every one of them.
+ * and five of p275's seven machines are cut. A later session reading only the happy path would
+ * re-open every one of them.
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { getDisciplineSwaps, sessionSwapExtras, intensityOf, venueOf, VENUE_PREFIX } from './session-discipline-swap.ts';
+import {
+  getDisciplineSwaps, sessionSwapExtras, intensityOf, venueOf, VENUE_PREFIX, isPlanTwin, sameSwapOn,
+} from './session-discipline-swap.ts';
 
 const ALL = ['run', 'ride', 'swim'] as const;
 const base = { workout_status: 'planned', total_duration_seconds: 3600 };
@@ -46,16 +48,16 @@ Deno.test('a hard run still offers the ride (p138), and needs an FTP for it', ()
 });
 
 /**
- * ⛔⛔ ONLY A MACHINE MICHAEL HAS NAMED SHIPS (2026-09-09: *"Labels: Trainer, Treadmill."*). p275
- * blesses the rower, ski erg, air bike, elliptical and arc trainer, and the library still knows
- * them — but a label is an athlete-facing line and every one of those waits for his yes. ⚠️ THE
- * WITHHELD ONES ARE PINNED HERE so nobody "restores" them without the words arriving first.
+ * ⛔⛔ ONE MACHINE PER SPORT (Michael, 2026-09-09: *"the five other machines are cut, not pending"*).
+ * p275 also blesses the rower, ski erg, air bike, elliptical and arc trainer; they are not in the
+ * app and nothing is held back waiting for a label. ⚠️ PINNED HERE so a later reading of p275 does
+ * not add them back as if they had only been missed.
  */
-Deno.test('⛔ A RIDE OFFERS THE TRAINER, AND NO MACHINE HE HAS NOT NAMED', () => {
+Deno.test('⛔ A RIDE OFFERS THE TRAINER, AND NO OTHER MACHINE', () => {
   const k = kinds(sessionSwapExtras(easyRide));
   assert(k.includes('venue:trainer'), k.join(','));
   for (const v of ['rower', 'ski_erg', 'air_bike']) {
-    assert(!k.includes(`venue:${v}`), `${v} shipped without a label from Michael`);
+    assert(!k.includes(`venue:${v}`), `${v} is cut, and shipped anyway`);
   }
 });
 
@@ -63,18 +65,19 @@ Deno.test('⛔ A RIDE OFFERS THE TRAINER, AND NO MACHINE HE HAS NOT NAMED', () =
  * ⛔ THE TREADMILL IS NEVER GATED — it still puts feet on the ground, which is what p275 asks for,
  * and Michael's line for it says exactly that.
  *
- * ⚠️ THE GROUND-IMPACT GATE HAS NOTHING LEFT TO GATE while the treadmill is the only named run
- * machine. The rule is p275's and stays built; it becomes live the moment a second run machine gets
- * a name. Pinned by the withheld pair below, so removing the gate would still be a failure.
+ * ⚠️ THE GROUND-IMPACT GATE HAS NOTHING LEFT TO GATE now that the treadmill is the only run machine
+ * in the app. The rule is p275's, not a consequence of that list, so it stays built; it becomes live
+ * the moment a second run machine ships. Pinned by the cut pair below, so removing the gate would
+ * still be a failure.
  */
-Deno.test('⛔ THE TREADMILL IS OFFERED WHATEVER THE WEEK HOLDS; the unnamed run machines are not', () => {
+Deno.test('⛔ THE TREADMILL IS OFFERED WHATEVER THE WEEK HOLDS; the cut run machines never are', () => {
   const otherRun = { ...base, type: 'run', name: 'Easy Run', tags: ['band:vt1_or_easier'] };
 
   for (const week of [[hardRun], [hardRun, otherRun]]) {
     const k = kinds(sessionSwapExtras(hardRun, null, week));
     assert(k.includes('venue:treadmill'), k.join(','));
     for (const v of ['elliptical', 'arc_trainer']) {
-      assert(!k.includes(`venue:${v}`), `${v} shipped without a label from Michael`);
+      assert(!k.includes(`venue:${v}`), `${v} is cut, and shipped anyway`);
     }
   }
 
@@ -147,4 +150,43 @@ Deno.test('⛔ `band:` AND `family:` DECIDE THE BAND — not a name and not a ta
 Deno.test('⛔ THE EXTRAS STAY OUT OF `getDisciplineSwaps` — `to` never repeats the source sport', () => {
   const easyRun = { ...base, type: 'run', name: 'Easy Run', tags: ['band:vt1_or_easier'] };
   assertEquals(getDisciplineSwaps(easyRun, ALL, [], null, 250).map((o) => o.to).sort(), ['ride', 'swim']);
+});
+
+/**
+ * ═══ REST OF PLAN (work order §6) ════════════════════════════════════════════════════════════════
+ *
+ * ⛔ THE LATER ROW GETS ITS OWN PATCH, NOT A COPY OF THIS ONE. Every patch the library builds is
+ * derived from the row it was built for, so the test that matters is that two rows with DIFFERENT
+ * tags produce different tag lists — the bug this design exists to prevent is one row's tags landing
+ * on another.
+ */
+Deno.test('⛔ THE SAME SESSION LATER IN THE PLAN IS ITS `family:`, NOT ITS NAME', () => {
+  const renamed = { ...hardRun, name: 'Thursday Session' };
+  assert(isPlanTwin(hardRun, renamed));
+  assert(!isPlanTwin(hardRun, longRun));          // a different family is a different session
+  assert(!isPlanTwin(hardRun, easyRide));         // and never across sports
+
+  // No family at all — a marathon-generator row — falls back to the sport, never wider.
+  const bare = { ...base, type: 'run', name: 'Easy Run', tags: [] as string[] };
+  assert(isPlanTwin(bare, { ...base, type: 'run', name: 'Something', tags: [] as string[] }));
+  assert(!isPlanTwin(bare, easyRide));
+});
+
+Deno.test('⛔ EACH ROW IS RE-ASKED, AND KEEPS ITS OWN TAGS', () => {
+  const laterRide = { ...easyRide, tags: [...easyRide.tags, 'week:4'] };
+  const chosen = sessionSwapExtras(easyRide).find((o) => o.venue === 'trainer')!;
+  const same = sameSwapOn(laterRide, chosen, { available: ALL })!;
+  assert(same, 'the later ride should still take the trainer');
+  const tags = same.patch.tags as string[];
+  assert(tags.includes('week:4'), tags.join(','));               // its own tags survived
+  assert(tags.includes(`${VENUE_PREFIX}trainer`), tags.join(','));
+  assert(!(chosen.patch.tags as string[]).includes('week:4'));   // and did not leak backwards
+});
+
+Deno.test('⛔ A ROW THAT CANNOT TAKE THE SWAP IS LEFT ALONE, NOT FORCED', () => {
+  const chosen = sessionSwapExtras(easyRide).find((o) => o.venue === 'trainer')!;
+  const logged = { ...easyRide, workout_status: 'completed' };
+  assertEquals(sameSwapOn(logged, chosen, { available: ALL }), null);
+  const alreadyIndoors = { ...easyRide, tags: [...easyRide.tags, `${VENUE_PREFIX}trainer`] };
+  assertEquals(sameSwapOn(alreadyIndoors, chosen, { available: ALL }), null);
 });

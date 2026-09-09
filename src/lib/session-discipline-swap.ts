@@ -30,7 +30,6 @@
 import { plannedDurationSeconds } from './planned-session/duration';
 // ⛔ ONE VOCABULARY (stage 1). See `src/lib/discipline.ts` for why `ride`, and why unknown is null.
 import { normalizeDiscipline, postureKey, type Discipline as CanonicalDiscipline } from './discipline';
-import { OFFERED_VENUES } from './swap-copy';
 // ⛔ ONE POSTURE SANITISER, and it is the server's. `@shared/state-trend` is already imported by the
 // client (`useStateTrends`), so this reads the same three values the State screen groups by.
 import type { PerDisciplinePosture } from '@shared/state-trend';
@@ -79,8 +78,18 @@ export type SwappableSession = {
 export type SwapKind = 'discipline' | 'hike' | 'venue';
 
 /** The machines p275 blesses, per sport. ⛔ THE LABELS ARE PENDING MICHAEL'S WORDS — see `venueKey`. */
-export const RIDE_VENUES = ['trainer', 'rower', 'ski_erg', 'air_bike'] as const;
-export const RUN_VENUES = ['treadmill', 'elliptical', 'arc_trainer'] as const;
+/**
+ * ⛔⛔ ONE MACHINE PER SPORT, AND THE OTHER FIVE ARE CUT (Michael, 2026-09-09: *"the five other
+ * machines are cut, not pending"*). p275 also blesses the rower, ski erg, air bike, elliptical and
+ * arc trainer; they are not in the app and nothing is held back waiting for a label.
+ *
+ * ⚠️ THE GROUND-IMPACT GATE BELOW OUTLIVES THEM ON PURPOSE. p275's rule — *"impact with the ground
+ * on at least one day"* a week — is the source's, not a consequence of this list, and the treadmill
+ * is exempt from it because it keeps feet on the ground. The gate costs one line and is the thing a
+ * second run machine would need on day one.
+ */
+export const RIDE_VENUES = ['trainer'] as const;
+export const RUN_VENUES = ['treadmill'] as const;
 export type Venue = (typeof RIDE_VENUES)[number] | (typeof RUN_VENUES)[number];
 
 /** One literal, shared with the readers that ask "was this indoors". */
@@ -668,23 +677,14 @@ export function sessionSwapExtras(
    * THIS one — moving it is what the athlete is about to do. ⚠️ A TREADMILL STILL COUNTS AS GROUND
    * IMPACT (work order §1), so it is offered whatever the rest of the week holds.
    */
-  /**
-   * ⛔ ONLY A MACHINE MICHAEL HAS NAMED IS OFFERED (`OFFERED_VENUES`). p275 blesses more of them and
-   * the constants above still list them, but a label is an athlete-facing line and every one of
-   * those waits for his yes. An unnamed machine is withheld, never given a name this file invented.
-   */
-  const named = (v: Venue) => (OFFERED_VENUES as readonly string[]).includes(v);
-
   if (!venueOf(session)) {
     if (from === 'ride') {
       for (const v of RIDE_VENUES) {
-        if (!named(v)) continue;
         options.push({ kind: 'venue', venue: v, copyKey: K.machine, to: from, label: K.machine, needsMaterialize: false, warnings: [], patch: venuePatch(session, v) });
       }
     } else if (from === 'run') {
       const onTheGround = weekSessions.filter((r) => disciplineOf(r.type) === 'run' && !venueOf(r)).length;
       for (const v of RUN_VENUES) {
-        if (!named(v)) continue;
         if (v !== 'treadmill' && onTheGround <= 1) continue;
         options.push({ kind: 'venue', venue: v, copyKey: v === 'treadmill' ? K.machine : K.machineGround, to: from, label: K.machine, needsMaterialize: false, warnings: [], patch: venuePatch(session, v) });
       }
@@ -731,6 +731,64 @@ function venuePatch(session: SwappableSession, venue: Venue): Record<string, unk
       `${VENUE_PREFIX}${venue}`,
     ])],
   };
+}
+
+/**
+ * ═══ REST OF PLAN ════════════════════════════════════════════════════════════════════════════════
+ *
+ * ⛔ THE SAME TWO CHOICES THE LIFT SWAP OFFERS (work order 2026-09-09 §6). "Just today" writes one
+ * row; "Rest of plan" writes this session's every later repeat.
+ *
+ * ⚠️ A PATCH IS NOT PORTABLE, WHICH IS THE WHOLE REASON THIS EXISTS. Every patch the library builds
+ * is derived from the row it was built for — the machine patch carries THAT row's whole tag list, the
+ * hike patch carries THAT row's minutes, the hard ride's name carries THAT row's length. Copying one
+ * row's patch onto another would overwrite the second row's tags with the first's. So a later row is
+ * re-asked from scratch and gets its own answer.
+ *
+ * ⛔ AND IT IS RE-ASKED, NOT ASSUMED. A later row that cannot take this swap — already logged,
+ * already indoors, a long day that is no longer long — returns null and is left alone. The athlete
+ * asked for the swap wherever it holds, not for it to be forced where it does not.
+ */
+export function isPlanTwin(session: SwappableSession, row: SwappableSession): boolean {
+  const fam = (t?: readonly string[] | null) =>
+    (t ?? []).find((x) => String(x).startsWith('family:')) ?? null;
+  const a = fam(session.tags);
+  /**
+   * ⚠️ `family:` FIRST, THE SPORT ONLY AS A FALLBACK. The composer stamps a family on every standing
+   * plan row and it is what "this session, every week" actually means. A row with no family — a
+   * marathon-generator row, a hand-added session — is matched on its sport instead, which is looser;
+   * it is the widest identity this library will assume, and it never crosses sports.
+   */
+  if (a) return fam(row.tags) === a;
+  const d = disciplineOf(session.type);
+  return !!d && disciplineOf(row.type) === d;
+}
+
+/** The same swap, re-derived against a LATER row. Null when it does not hold there. */
+export function sameSwapOn(
+  row: SwappableSession,
+  chosen: { kind?: SwapKind; venue?: Venue; to: Discipline },
+  ctx: {
+    available: ReadonlyArray<Discipline>;
+    posture?: PerDisciplinePosture | null;
+    ftp?: number | null;
+    /** That row's own week, for the ground-impact gate. Absent behaves as `sessionSwapExtras` does. */
+    weekSessions?: ReadonlyArray<SwappableSession>;
+  },
+): SwapOption | null {
+  const all = [
+    ...sessionSwapExtras(row, ctx.posture ?? null, ctx.weekSessions ?? []),
+    /**
+     * ⚠️ NO SAME-DAY LIST FOR A FUTURE ROW. That argument only produces WARNINGS, and a warning is a
+     * thing said on the sheet to the athlete looking at it — it cannot be said about a day that is
+     * not on screen. The swap itself is identical either way.
+     */
+    ...getDisciplineSwaps(row, ctx.available, [], ctx.posture ?? null, ctx.ftp ?? null),
+  ];
+  const want = { kind: chosen.kind ?? 'discipline', venue: chosen.venue ?? null, to: chosen.to };
+  return all.find((o) => (o.kind ?? 'discipline') === want.kind
+    && (o.venue ?? null) === want.venue
+    && o.to === want.to) ?? null;
 }
 
 /**

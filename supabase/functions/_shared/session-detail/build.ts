@@ -208,8 +208,9 @@ export type SessionDetailInput = {
   actualSession: ActualSession | null;
   match: SessionMatch | null;
   plannedSession: PlannedSession | null;
-  /** Raw planned_workouts row with strength_exercises (for strength weight deviation) */
-  plannedRowRaw?: { strength_exercises?: any[]; computed?: any } | null;
+  /** Raw planned_workouts row with strength_exercises (for strength weight deviation) and `tags`
+   *  (for `venue:` — the session the athlete moved indoors). */
+  plannedRowRaw?: { strength_exercises?: any[]; computed?: any; tags?: string[] | null } | null;
   /** Completed workout strength_exercises (for strength weight deviation) */
   completedStrengthExercises?: any[] | null;
   /**
@@ -839,6 +840,21 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     return { pct: null, basis: (basis === 'gap' || basis === 'raw') ? basis : null, assessment: null, confounded, whole_session: wholeSession };
   })();
 
+  /**
+   * ⛔ AN INDOOR SESSION HAS NO WEATHER AND NO HILLS (work order 2026-09-09 §1). The athlete moved
+   * this session onto a trainer or a treadmill; the `venue:` tag on the PLANNED row is the only thing
+   * that says so, and it is the athlete's own statement rather than an inference from the data.
+   *
+   * ⚠️ THE NUMBERS ARE NOT TOUCHED. Drift is still measured and still printed — what comes off is the
+   * two EXPLANATIONS that cannot be true indoors: "hills mixed in", and "the heat drove it". Reading
+   * a garage temperature off an outdoor forecast onto a trainer ride is the "score that lies" class:
+   * a real number attached to a session it did not happen to.
+   */
+  const indoorVenue = (() => {
+    const tags = (plannedRowRaw as any)?.tags;
+    return Array.isArray(tags) && tags.some((t: unknown) => String(t ?? '').startsWith('venue:'));
+  })();
+
   // ── Analysis detail rows ───────────────────────────────────────────────────
   // Goal races use structured technical_insights only — suppress fact-packet rows to avoid duplication
   const analysisDetailRows = isGoalRaceSession
@@ -857,6 +873,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         providerElevationGainM ?? null,
         weatherTempStartF ?? null,
         weatherTempEndF ?? null,
+        indoorVenue,
       );
 
   /**
@@ -1592,6 +1609,10 @@ export function buildAnalysisDetailRows(
    *  silent `catch` is right for missing DATA — and it hides a broken REFERENCE just as quietly. */
   weatherTempStartF: number | null = null,
   weatherTempEndF: number | null = null,
+  /** ⛔ THE ATHLETE MOVED THIS SESSION INDOORS (`venue:` on the planned row). Weather and terrain are
+   *  facts about a place the session did not happen in, so the heat and hills lines come off — the
+   *  drift number itself is unchanged. Defaults false: an unflagged session behaves exactly as before. */
+  indoors: boolean = false,
 ): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = [];
   if (!factPacket) return rows;
@@ -1974,10 +1995,13 @@ export function buildAnalysisDetailRows(
         const line = 5;
         const d = Math.round((pctAny - line) * 10) / 10;
         const room = pctAny <= 0 ? `heart rate fell · line ${line}%` : (d > 0 ? `${d.toFixed(1)} over the ${line}% line` : `line ${line}%`);
+        // ⛔ "hills mixed in" IS NOT SAID INDOORS. The `raw` basis means terrain was not adjusted
+        // for; on a trainer or a treadmill there was no terrain, so the suffix would be inventing a
+        // cause. The percentage stands as measured.
         const scope = decoupling?.whole_session
           ? ' — whole session, intervals included, so not a steady-run read'
           : (decoupling?.basis === 'hr' ? ' — heart rate alone, second half against first'
-            : (decoupling?.basis === 'raw' ? ' — hills mixed in' : ''));
+            : (decoupling?.basis === 'raw' && !indoors ? ' — hills mixed in' : ''));
         rows.push({ label: 'Heart rate', value: `Drift ${pctAny.toFixed(1)}% (${room})${scope}` });
       } else if (withheldForPaceSpread) {
         rows.push({
@@ -1995,7 +2019,9 @@ export function buildAnalysisDetailRows(
       const sign = signal > 0 ? '+' : '';
       let value = `Drifted ${sign}${absSig} bpm over the session`;
 
-      if (driftExplanation === 'terrain_driven') {
+      // ⛔ AND THE THIRD HILLS LINE. "Mostly terrain-driven" is the same claim as "hills mixed in"
+      // in longer words; indoors there were no grade changes to attribute it to.
+      if (driftExplanation === 'terrain_driven' && !indoors) {
         const terrainContrib = typeof derived?.terrain_contribution_bpm === 'number' ? derived.terrain_contribution_bpm : null;
         if (terrainContrib != null) {
           value += ` (mostly terrain-driven; ~${Math.round(Math.abs(terrainContrib))} bpm from grade changes)`;
@@ -2017,10 +2043,13 @@ export function buildAnalysisDetailRows(
         const typSign = driftTypical > 0 ? '+' : '';
         const delta = absSig - Math.abs(driftTypical);
         const wxD = factPacket?.facts?.weather;
-        const heatConfound = (typeof wxD?.temperature_f === 'number' && wxD.temperature_f > 75)
-          || (typeof wxD?.heat_stress_level === 'string' && wxD.heat_stress_level !== 'none' && wxD.heat_stress_level !== '');
-        const terrainConfound = driftExplanation === 'terrain_driven'
-          || (typeof derived?.terrain_contribution_bpm === 'number' && Math.abs(derived.terrain_contribution_bpm) >= 3);
+        // ⛔ NEITHER CONFOUND EXISTS INDOORS. The forecast belongs to an address, not to a garage,
+        // and a trainer has no gradient — so "the heat drove it" / "the terrain drove it" would
+        // explain the drift away with something that was not in the room.
+        const heatConfound = !indoors && ((typeof wxD?.temperature_f === 'number' && wxD.temperature_f > 75)
+          || (typeof wxD?.heat_stress_level === 'string' && wxD.heat_stress_level !== 'none' && wxD.heat_stress_level !== ''));
+        const terrainConfound = !indoors && (driftExplanation === 'terrain_driven'
+          || (typeof derived?.terrain_contribution_bpm === 'number' && Math.abs(derived.terrain_contribution_bpm) >= 3));
         const confoundWord = heatConfound && terrainConfound ? 'heat and terrain'
           : heatConfound ? 'the heat'
           : terrainConfound ? 'the terrain' : null;
@@ -2040,6 +2069,9 @@ export function buildAnalysisDetailRows(
 
   try {
     if (sport === 'swim') throw new Error('swim-skip-conditions'); // Layer 2: no land terrain/grade/elevation row for swims
+    // ⛔ AND NO CONDITIONS ROW INDOORS — it is the heat line and the hills line, both of which are
+    // about outside (work order 2026-09-09 §1: *"an indoor ride reports no heat and no hills"*).
+    if (indoors) throw new Error('indoor-skip-conditions');
     const facts = factPacket?.facts;
     const wx = facts?.weather;
     const terrainType = typeof facts?.terrain_type === 'string' && facts.terrain_type !== 'flat'
