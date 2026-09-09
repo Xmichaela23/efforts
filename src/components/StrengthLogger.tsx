@@ -5584,9 +5584,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         aria-label="How to do this exercise"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => setHowToFor(exercise.id)}
-                        className="pr-3 pl-1 text-white/70 hover:text-white"
+                        className="pr-3 pl-1 text-white/80 hover:text-white"
                       >
-                        <Info className="h-4 w-4" />
+                        <Info className="h-5 w-5" />
                       </button>
                     )}
                   </div>
@@ -7385,8 +7385,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               <SheetHeader>
                 <SheetTitle className="text-center">{ex ? (ex.execution_name || ex.name) : ''}</SheetTitle>
               </SheetHeader>
-              <div className="py-4 text-[15px] leading-relaxed text-gray-800">{ex?.how_to}</div>
-              <button onClick={() => setHowToFor(null)} className="w-full py-3 text-gray-700 hover:text-gray-900">Close</button>
+              <div className="py-4 text-[17px] leading-relaxed text-white/90">{ex?.how_to}</div>
+              <button onClick={() => setHowToFor(null)} className="w-full py-3 text-white/70 hover:text-white">Close</button>
             </SheetContent>
           </Sheet>
         );
