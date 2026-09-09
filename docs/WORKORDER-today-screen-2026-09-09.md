@@ -54,7 +54,7 @@ Data: today's rows from `get-week` (the rows `TodaysEffort.tsx` already loads). 
      - `family:ride_endurance`: `Easy, under 75 percent. Spend a few minutes of the ride paying attention to
        how you pedal (smooth circles, not stomping) and how you sit on the bike. Truly easy.` (p239, p275).
        APPROVED.
-     - `family:run_mlss` and `family:run_nt` (the Hard Run): `Stay near threshold as long as you can without
+     - `family:run_mlss` and `family:run_near_threshold` (the Hard Run): `Stay near threshold as long as you can without
        falling apart.` (p233, p110). APPROVED.
      - `family:run_lsd` (the Long Run): `Easy the whole way. Stopping for a bit is fine. Be able to speak long
        sentences easily the whole time.` (p235, p211). APPROVED.
@@ -67,6 +67,13 @@ Data: today's rows from `get-week` (the rows `TodaysEffort.tsx` already loads). 
    - **A workout not from the plan** (Garmin / Strava / typed): name and time only. No lines.
 3. **The week so far**: dropped from Today (2026-09-09). It lives on State.
 4. **Rest day / nothing planned**: nothing shown. No line.
+
+## 2b. Look
+
+- Sport colours reflected (Michael, 2026-09-09): each session on Today carries its sport's colour the way the
+  calendar and cards do (docs/REFERENCE-wizard-visual-language.md, memory project_efforts_visual_language:
+  sport dots as the light source, soft sport-colour bleed). Lift, ride, run each in their own colour; the
+  spacing line carries no colour.
 
 ## 3. Not on Today
 
