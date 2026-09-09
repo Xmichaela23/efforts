@@ -79,6 +79,33 @@ the canonical run/ride/swim/strength; Profile still writes running/cycling/swimm
 - Share a session with a friend (share sheet, text + efforts.work); Delete moved into the session header.
 - Connections rendered inside the app shell (real tab bar); copy says what connected means and what the pull buttons do.
 
+## 2026-09-08 (evening) — strength rows: how-to, swap list, braced hinge
+- **Setup out of the name.** "Back Extension (feet under a loaded bar)" overflowed the logger's box and still did not
+  say how to do it. Display names are plain again (`EXECUTION_NAME` in `_shared/strength-grid/grid.ts`); the how-to
+  travels on the row as `how_to` (`EXECUTION_HOW_TO` + `executionHowTo`, same kit gate as the name; a movement with no
+  machine version shows it on every kit). Stamped in compose (`rowHowTo`, floor rows, core pick), carried through
+  materialize, rebuild shape, and re-derived on a swap. Logger: (i) beside the name opens a sheet (white, 17 px).
+  Rows with a how-to: Back Extension (floor), Leg Curl (bench, dumbbell), Chest-Supported Row (incline, dumbbells),
+  Reverse Hyper / Weighted Reverse Hyper (bench), Calf Raise (bodyweight, both legs). All words Michael's.
+- **Braced hinge (p274 days 2 and 5).** The slot is marked hamstrings and the reverse hyper is tagged glutes, so the
+  muscle filter threw the book's first pick out of its own row and Back Extension filled it. `alsoAdmits` names the
+  reverse hyper family on both slots (the hip thrust rule). Measured: home kit → Weighted Reverse Hyper, bodyweight →
+  Reverse Hyper, commercial gym unchanged; the glute floor add-on gives way to a Nordic curl for hamstrings.
+- **Swap list is the slot's own.** A frame accessory row carries `swap_options` (the cell's `pickOptions`, whole,
+  incl. its own movement so a swap can be undone; the logger hides the current one). Replaces the previous program's
+  leg pool, which offered lunges, a front squat and core work on a hinge row. Swap now re-derives the display name.
+- **Rebuild replaces a movement when the cell's answer changed** (`restate.ts`): an unmatched by-feel row (marked, or
+  priced "By feel") and an unmatched fresh row in the same category+pattern are the same slot; the fresh row replaces
+  the old one. Never a delete, never a done session. Rebuild also carries `execution_name`/`how_to`/`swap_options`.
+- **Michael's own block** stored `slot_picks.braced_hinge = "back extension"` at build time, and the composer honours
+  the athlete's answer, so Rebuild keeps Back Extension for him. Path: Swap → Rest of plan → Weighted Reverse Hyper
+  (materialize writes the swapped name into the built session and re-derives its how-to; the swap list stays).
+  No screen changes a stored slot pick after the build — open item.
+- DE line: "move the bar fast" only on a barbell row (`displayFormat` total); dumbbell, band, bodyweight rows say
+  "move fast". Delete workout is the last thing on the completed-workout page.
+- Tests: 4 standing-plan failures and 1 strength-grid failure (`rest between sets is HIS rule`) pre-exist today's
+  changes; goldens regenerated and committed (57 rows braced hinge, 36 rows calf how-to marker).
+
 ## Still on the list
 1. New-user spec: both front doors (connect Garmin/Strava · use my phone), first-run cards, one per screen. Write spec, then build.
 2. Strength popup polish: rating first on a lift, "estimated" until rated. Not gated.
@@ -88,6 +115,8 @@ the canonical run/ride/swim/strength; Profile still writes running/cycling/swimm
 6. 278 deno-check errors in old files (race plan builder, run analyser, facts, combined-plan) — cleanup, largest file first.
 7. Dead AutoMinePill in TrainingBaselines.tsx; session_detail_v1 not persisted since 08-31 (speed only).
 8. course-detail strategy_stale hash mismatch; readiness projection ignores a target typed after build (marathon rebuild).
+9. A way to change a stored slot pick after the build (Adjust); today only Rest-of-plan swap or a new plan does it.
+10. Muscle tag for `back extension` is hamstrings and the braced hinge slot is marked hamstrings while the book's row is posterior chain led by the reverse hyper — admitted by name for now; revisit the slot muscle with the frame measured.
 
 ## Michael's standing rules for this work (short form)
 Plain words, no idioms, no "priced"; screenshots = optics; ask when two readings; never DB-write his data (throwaways only; his account read-only); every number sourced or ledgered OURS; one effort scale; border = tap; a chevron only when you leave the screen; Next at the bottom; no AI ever again.
