@@ -628,7 +628,7 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
       // ⚠️ THE BRACED SUPERSET — same region, opposite patterns, which is p275's own rule 2b for what
       // may be paired: *"similar muscle groups but dramatically different specific patterns and loads."*
       // ⚠️ p221 braced hinge lower — reverse hyper, GHD, machine back extension — is posterior chain.
-      S('HYP', 'accessory', 'braced', 'hinge_lower', '2 x HYP: braced hinge / braced lower push superset', { muscle: 'hamstrings' }),
+      S('HYP', 'accessory', 'braced', 'hinge_lower', '2 x HYP: braced hinge / braced lower push superset', { muscle: 'hamstrings', alsoAdmits: ['reverse hyperextension', 'reverse hyper', 'weighted reverse hyper'] }),
       // ⚠️ p221 braced push lower — hack squat, leg press, lever squat — is quadriceps.
       S('HYP', 'accessory', 'braced', 'press_lower', '2 x HYP: braced hinge / braced lower push superset', { muscle: 'quadriceps' }),
       // ⛔ p223 NAMES THE HIP THRUST FIRST IN THIS ROW — *"machine/Smith machine hip thrust ·
@@ -675,7 +675,7 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
     strength: [
       S('ME', 'competition', 'primary', 'press_lower', '1 x ME: secondary push'),
       // ⚠️ p221 braced hinge lower — reverse hyper, GHD, machine back extension — is posterior chain.
-      S('HYP', 'accessory', 'braced', 'hinge_lower', '2 x HYP: braced hinge / braced lower push superset', { muscle: 'hamstrings' }),
+      S('HYP', 'accessory', 'braced', 'hinge_lower', '2 x HYP: braced hinge / braced lower push superset', { muscle: 'hamstrings', alsoAdmits: ['reverse hyperextension', 'reverse hyper', 'weighted reverse hyper'] }),
       // ⚠️ p221 braced push lower — hack squat, leg press, lever squat — is quadriceps.
       S('HYP', 'accessory', 'braced', 'press_lower', '2 x HYP: braced hinge / braced lower push superset', { muscle: 'quadriceps' }),
       S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: focused quadriceps', { muscle: 'quadriceps' }),

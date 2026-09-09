@@ -179,6 +179,8 @@ export interface AlternativeOption {
    * machine, a bodyweight move). Same movement pattern either way (never a wrong-muscle offer).
    */
   tier: 'direct' | 'lighter';
+  /** What the athlete reads, when it differs from the stored name (a slot's own pick list). */
+  display?: string;
 }
 
 function equipmentOf(cfg: ExerciseConfig): AlternativeOption['equipment'] {

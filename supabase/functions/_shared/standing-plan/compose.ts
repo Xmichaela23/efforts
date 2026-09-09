@@ -45,6 +45,7 @@ import {
   musclesForChips,
   movementLabel,
   pickKeyForSlot,
+  pickOptions,
   VIADA_PICKS,
   type ViadaPickKey,
 } from './accessory-picks.ts';
@@ -255,6 +256,9 @@ export type StrengthExercise = {
   /** How to do the home version of a machine movement, in Michael's words (2026-09-08). Display only,
    *  behind an (i) beside the name. Absent when the athlete has the station or the name alone is enough. */
   how_to?: string;
+  /** The slot's own pick list, for the logger's Swap sheet (2026-09-08). Absent on rows that are not
+   *  a frame accessory cell. `name` is the catalogue spelling, `display` what the athlete reads. */
+  swap_options?: { name: string; display: string }[];
   set_plan?: PlannedSet[];
 };
 
@@ -1696,6 +1700,7 @@ function exerciseForSlot(
         ...(rowHowTo(movement, slot, args.equipment)
           ? { how_to: rowHowTo(movement, slot, args.equipment)! }
           : {}),
+        ...rowSwapOptions(slotKey, movement, slot, args.equipment),
         sets,
         reps,
         weight: 'By feel',
@@ -1932,6 +1937,7 @@ function exerciseForSlot(
       ...(rowHowTo(movement, slot, args.equipment)
         ? { how_to: rowHowTo(movement, slot, args.equipment)! }
         : {}),
+      ...rowSwapOptions(slotKey, movement, slot, args.equipment),
       sets,
       reps,
       weight,
@@ -2400,6 +2406,25 @@ function rowHowTo(
 ): string | null {
   if (slot.role === 'competition') return null;
   return executionHowTo(movement, equipment ?? null);
+}
+/**
+ * THE SLOT'S OWN OPTIONS, FOR THE SWAP SHEET (Michael, 2026-09-08: "clean up the swap list, it's wrong").
+ * The logger offered the previous program's leg pool for a p274 braced hinge row: hip thrusts, lunges,
+ * a front squat and core work. The right list is the cell's own picker list — the same `pickOptions`
+ * the builder shows — minus the movement the row already is.
+ */
+function rowSwapOptions(
+  slotKey: ViadaPickKey | null,
+  movement: string,
+  slot: StrengthSlot,
+  equipment: string[] | null | undefined,
+): { swap_options?: { name: string; display: string }[] } {
+  if (!slotKey) return {};
+  const self = canonicalize(movement);
+  const opts = pickOptions(slotKey, equipment ?? null, slot.muscle ?? null, slot.alsoAdmits ?? null)
+    .filter((o) => canonicalize(o.name) !== self)
+    .map((o) => ({ name: o.name, display: o.display }));
+  return opts.length > 0 ? { swap_options: opts } : {};
 }
 function testRegionOf(name: string): 'upper' | 'lower' | null {
   if (/^test:\s*upper$/i.test(name.trim())) return 'upper';

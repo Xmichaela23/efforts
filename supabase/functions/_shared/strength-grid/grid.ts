@@ -555,14 +555,14 @@ const EXECUTION_NAME: Record<string, string> = {
  * A movement belongs here only when its name alone misleads a home athlete about the execution.
  */
 const EXECUTION_HOW_TO: Record<string, string> = {
-  'back extension': 'Lie face down on a flat bench or the floor with your hips at the edge and your feet hooked under a loaded barbell. Hands behind your head or across your chest. Lower your torso toward the floor, then raise it until your body is a straight line from head to heels. Do not arch past straight.',
+  'back extension': 'Lie face down on the floor with your feet hooked under a loaded barbell. Hands behind your head or across your chest. Raise your chest and shoulders off the floor as far as you can, pause, then lower. Keep your feet down and your neck in line with your back.',
   'leg curl': 'Lie face down on a flat bench with your knees just past the end and a dumbbell held between your feet. Hold the bench with your hands. Curl your heels toward your glutes, pause, then lower the dumbbell slowly until your legs are straight.',
   'leg curls': 'Lie face down on a flat bench with your knees just past the end and a dumbbell held between your feet. Hold the bench with your hands. Curl your heels toward your glutes, pause, then lower the dumbbell slowly until your legs are straight.',
   'lying leg curl': 'Lie face down on a flat bench with your knees just past the end and a dumbbell held between your feet. Hold the bench with your hands. Curl your heels toward your glutes, pause, then lower the dumbbell slowly until your legs are straight.',
   'hamstring curl': 'Lie face down on a flat bench with your knees just past the end and a dumbbell held between your feet. Hold the bench with your hands. Curl your heels toward your glutes, pause, then lower the dumbbell slowly until your legs are straight.',
   'chest supported row': 'Set a bench to about 45 degrees and lie chest down on it with a dumbbell in each hand, arms hanging. Row both dumbbells to your ribs, squeezing your shoulder blades together, then lower until your arms are straight. Keep your chest on the bench.',
-  'reverse hyper': 'Lie face down on a flat bench with your hips at the edge and your legs hanging toward the floor. Hold the bench with your hands. Raise your legs until they are level with your torso, pause, then lower them slowly. For the weighted version hold a dumbbell between your feet.',
-  'weighted reverse hyper': 'Lie face down on a flat bench with your hips at the edge and your legs hanging toward the floor. Hold the bench with your hands. Raise your legs until they are level with your torso, pause, then lower them slowly. For the weighted version hold a dumbbell between your feet.',
+  'reverse hyper': 'Lie face down on a flat bench with your hips right at the edge. Hold the front legs or sides of the bench to brace your upper body. Keep your legs straight, toes turned slightly out, and use your glutes to lift your legs until they are in line with your torso. Lower with control.',
+  'weighted reverse hyper': 'Lie face down on a flat bench with your hips right at the edge. Hold the front legs or sides of the bench to brace your upper body. Squeeze a light dumbbell between your feet. Keep your legs straight, toes turned slightly out, and use your glutes to lift your legs until they are in line with your torso. Lower with control.',
 };
 
 /**

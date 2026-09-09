@@ -251,6 +251,8 @@ interface LoggedExercise {
   /** How to do the home version of a machine movement (2026-09-08). Shown behind the (i) beside
    *  the name; dropped with `execution_name` the moment the athlete types a different exercise. */
   how_to?: string;
+  /** The slot's own pick list for the Swap sheet, stamped by the server on frame accessory rows. */
+  swap_options?: { name: string; display: string }[];
   load_prescribed?: boolean;
   /** ⛔ A STARTING POINT FOR THE WEIGHT BOX — NOT A PRESCRIPTION (D-406). Rides only on assistance
    *  rows, always beside `load_prescribed: false`. The plan still says "by feel"; this is a number
@@ -2495,6 +2497,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               ? s.execution_name.trim()
               : undefined,
             how_to: typeof s?.how_to === 'string' && s.how_to.trim() ? s.how_to.trim() : undefined,
+            swap_options: Array.isArray(s?.swap_options) && s.swap_options.length > 0 ? s.swap_options : undefined,
             // ⛔ CARRIED, NOT APPLIED (D-406). This only makes the number available to the weight
             // box as a greyed starting point; it does not become the row's `weight`, and nothing
             // here treats it as a prescription. Guarded on a finite positive so an absent
@@ -5680,7 +5683,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   "its job is not to stop you moving; it is to make sure you know you moved."
               ─────────────────────────────────────────────────────────────────────────────────────── */}
               {swapFor === exercise.id && (() => {
-                const alts: AlternativeOption[] = plyoFamilyFor(exercise.name)
+                // 2026-09-08: a frame accessory row carries its slot's own pick list; that is the
+                // swap list, the same one the builder showed. Nothing else is offered for it.
+                const alts: AlternativeOption[] = (exercise.swap_options && exercise.swap_options.length > 0)
+                  ? exercise.swap_options.map((o) => ({ name: o.name, display: o.display, same_pattern: true as const, equipment: 'unknown' as const, tier: 'direct' as const }))
+                  : plyoFamilyFor(exercise.name)
                   ? plyoAlternatives(exercise.name, strengthEquipment)
                   : getInSlotAlternatives(
                   exercise.planned_name || exercise.name,
@@ -5828,7 +5835,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           size="sm"
                           onClick={() => applySwap(a.name)}
                           className="px-2.5 py-1.5 text-[12px]"
-                        >{a.name}</GalaxyButton>
+                        >{a.display ?? a.name}</GalaxyButton>
                       );
                       const direct = alts.filter((a) => a.tier === 'direct');
                       const lighter = alts.filter((a) => a.tier === 'lighter');

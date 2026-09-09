@@ -2699,6 +2699,9 @@ export function expandTokensForRow(
             how_to: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
               ? ((ex as any)?.how_to ?? undefined)
               : undefined),
+            swap_options: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
+              ? ((ex as any)?.swap_options ?? undefined)
+              : undefined),
             /**
              * ⛔ HOW THE WEIGHT WAS ARRIVED AT, OR WHY THERE ISN'T ONE — carried (2026-09-01). This
              * object is a WHITELIST and `load_basis` was never on it, so the composer's marker died
@@ -3095,6 +3098,9 @@ export function expandTokensForRow(
             // The how-to rides with the execution name and is dropped with it (2026-09-08).
             how_to: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
               ? ((ex as any)?.how_to ?? undefined)
+              : undefined),
+            swap_options: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
+              ? ((ex as any)?.swap_options ?? undefined)
               : undefined),
             /**
              * ⛔ HOW THE WEIGHT WAS ARRIVED AT, OR WHY THERE ISN'T ONE — carried (2026-09-01). This

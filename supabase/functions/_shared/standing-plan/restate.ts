@@ -265,6 +265,7 @@ export function restateFromTest(args: {
       // Written as an absence as well, so a name the composer stopped relabelling goes back to plain.
       if ((fr.execution_name ?? null) !== (er.execution_name ?? null)) shape.execution_name = fr.execution_name;
       if ((fr.how_to ?? null) !== (er.how_to ?? null)) shape.how_to = fr.how_to;
+      if (JSON.stringify(fr.swap_options ?? null) !== JSON.stringify(er.swap_options ?? null)) shape.swap_options = fr.swap_options;
       if (shapeOnly) {
         if (Object.keys(shape).length === 0) return ex;
         touched = true;
