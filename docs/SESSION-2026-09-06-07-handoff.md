@@ -141,6 +141,15 @@ the canonical run/ride/swim/strength; Profile still writes running/cycling/swimm
   book in prose. Give bare facts with page numbers, one per line, and let him write the sentence.
 
 ## Still on the list
+0. Rest timer to field norms (Michael, 2026-09-09: "they do feel messy"). Strong: one default, 2:00, for every
+   exercise, starts itself when a set is ticked, changeable per exercise, separate warm-up and working
+   durations, sound in settings. Hevy: a default in Settings, per-exercise override, off is an option, 5 s
+   to 5 min, plus/minus 15 s on the running timer. Ours today: 3:00 heavy / 2:00 speed / 1:30 muscle by set
+   kind, 1:00 warm-up, a timer object per set. To do: (a) a Default rest timer row in settings, athlete's
+   number, remembered; (b) per-exercise override on the logger; (c) plus/minus 15 s on the running timer;
+   (d) one clear start rule: the timer starts when the set is ticked, nothing else starts it; (e) the
+   per-kind minutes become the shipped default only until the athlete sets one. The p78 rule line stays as
+   the cue. Not built.
 1. New-user spec: both front doors (connect Garmin/Strava · use my phone), first-run cards, one per screen. Write spec, then build.
 2. Strength popup polish: rating first on a lift, "estimated" until rated. Not gated.
 3. Resend for sign-in emails (dashboard, SMTP) before real users; password rules (8 chars + breach check).
