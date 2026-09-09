@@ -1,4 +1,5 @@
 import FirstRunCard from '@/components/FirstRunCard';
+import FirstRunOverlay from '@/components/FirstRunOverlay';
 import { BAR_TYPES } from '@/lib/bar-types';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
@@ -564,6 +565,17 @@ const PlateMath: React.FC<{
 const slotIntentOf = (ex: unknown): string | null =>
   (ex as { slot_intent?: string } | null | undefined)?.slot_intent ?? null;
 
+/**
+ * THE FOUR KINDS OF SET, one line each, behind a tap on the word (Michael, 2026-09-08: "put the answer
+ * where the question comes up"). p218's table in his terms; the letters spelled out because he asked.
+ */
+const SET_TYPE_INFO: Record<'ME' | 'DE' | 'SKILL' | 'HYP', { name: string; text: string }> = {
+  ME: { name: 'Maximal effort', text: '1 to 5 reps at 90 to 100 percent. Rest until you know you can finish the next set. Stop before you grind.' },
+  DE: { name: 'Dynamic effort', text: 'Speed. 2 to 4 reps at 70 to 80 percent, every rep as fast as you can. Leave 3 or 4 in reserve.' },
+  SKILL: { name: 'Skill', text: 'Practice under load. 3 to 5 reps at 75 to 85 percent, down under control, up fast. Leave 3 or 4 in reserve.' },
+  HYP: { name: 'Hypertrophy', text: 'Muscle. 6 to 12 reps, no percentage, pick the weight that leaves 0 to 2 in reserve. Getting tired is the point.' },
+};
+
 export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSaved, targetDate }: StrengthLoggerProps) {
   const { workouts, addWorkout, updateWorkout, loadUserBaselines } = useAppContext();
 
@@ -574,6 +586,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [strengthEquipment, setStrengthEquipment] = useState<string[]>([]);
   const [swapFor, setSwapFor] = useState<string | null>(null); // exercise.id whose swap sheet is open
   const [howToFor, setHowToFor] = useState<string | null>(null); // exercise.id whose how-to sheet is open
+  const [setTypeFor, setSetTypeFor] = useState<'ME' | 'DE' | 'SKILL' | 'HYP' | null>(null); // the set-type sheet
   const [swapRestOfPlan, setSwapRestOfPlan] = useState(false); // when on, a swap persists to the plan (not just today)
 
   // Adapt-a-plan #1 — persist a swap for the rest of the plan on the EXISTING override table
@@ -5046,6 +5059,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       <div className="px-3 pt-2">
         <FirstRunCard id="logger">Tap Done on a set when you finish it.</FirstRunCard>
       </div>
+      <FirstRunOverlay
+        id="logger-word"
+        stops={[{ target: '[data-first-run="set-word"]', text: 'The word is the kind of set. Tap it.', pad: 6 }]}
+        active={exercises.some((e) => ['ME', 'DE', 'SKILL', 'HYP'].includes(String((e as any)?.slot_intent || '').toUpperCase()))}
+      />
       {/* Rest-timer OVERLAY (D-139 + overlay fix): pinned just below the app header via `sticky`, so it
           stays visible while you scroll the set list. Auto-armed on Done; Skip ENDS the rest. `sticky`
           (not `fixed`) so backdrop-blur ancestors don't break it. Renders nothing when no rest runs. */}
@@ -6142,15 +6160,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         * dimmer at `white/45` because it speaks for a whole group from outside the
                         * card; matching THAT would have put the rule below the observation under it.
                         */}
+                      {/* The word is the kind of set; tap it and one line explains it (2026-09-08). */}
                       {intentLine && (
-                        <div className="px-1.5 pt-0.5 pb-1 text-[12px] font-medium text-white/70 leading-snug">
+                        <button type="button" data-first-run="set-word" onClick={() => bookWord && setSetTypeFor(bookWord)}
+                          className="block w-full text-left px-1.5 pt-0.5 pb-1 text-[12px] font-medium text-white/70 leading-snug">
                           {intentLine}
-                        </div>
+                        </button>
                       )}
                       {cardCue && (
-                        <div className="px-1.5 pt-0.5 pb-2 text-[12px] font-medium text-white/70 leading-snug">
-                          {cardCue}
-                        </div>
+                        bookWord === 'ME'
+                          ? (
+                            <button type="button" data-first-run="set-word" onClick={() => setSetTypeFor('ME')}
+                              className="block w-full text-left px-1.5 pt-0.5 pb-2 text-[12px] font-medium text-white/70 leading-snug">
+                              {cardCue}
+                            </button>
+                          ) : (
+                            <div className="px-1.5 pt-0.5 pb-2 text-[12px] font-medium text-white/70 leading-snug">
+                              {cardCue}
+                            </div>
+                          )
                       )}
                       {/* The detected advance trigger — a fact about last session, dimmer than the
                           rule above it. Renders independently of the cues: an old-plan band row
@@ -7401,6 +7429,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       )}
 
       {/* RIR Prompt */}
+      <Sheet open={!!setTypeFor} onOpenChange={(o) => { if (!o) setSetTypeFor(null); }}>
+        <SheetContent side="bottom" className="h-auto max-h-[80vh]">
+          <SheetHeader>
+            <SheetTitle className="text-center">{setTypeFor ? `${setTypeFor} · ${SET_TYPE_INFO[setTypeFor].name}` : ''}</SheetTitle>
+          </SheetHeader>
+          <div className="py-4 text-[17px] leading-relaxed text-white/90">{setTypeFor ? SET_TYPE_INFO[setTypeFor].text : ''}</div>
+          <button onClick={() => setSetTypeFor(null)} className="w-full py-3 text-white/70 hover:text-white">Close</button>
+        </SheetContent>
+      </Sheet>
       {(() => {
         const ex = howToFor ? exercises.find((e) => e.id === howToFor) : null;
         return (
