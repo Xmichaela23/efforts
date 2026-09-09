@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, Check, CheckCircle, Repeat } from 'lucide-react';
+import { Plus, X, ChevronDown, ChevronUp, Search, Loader2, Check, CheckCircle, Repeat, Info } from 'lucide-react';
 import { repFloorFor, repsAreBlank } from '@/lib/logged-rep-entry';
 import { advanceNudgeFor } from '@/lib/advance-nudge';
 import { useAppContext } from '@/contexts/AppContext';
@@ -248,6 +248,9 @@ interface LoggedExercise {
    * edits the box, so their own words become the name and the swap logic is untouched.
    */
   execution_name?: string;
+  /** How to do the home version of a machine movement (2026-09-08). Shown behind the (i) beside
+   *  the name; dropped with `execution_name` the moment the athlete types a different exercise. */
+  how_to?: string;
   load_prescribed?: boolean;
   /** ⛔ A STARTING POINT FOR THE WEIGHT BOX — NOT A PRESCRIPTION (D-406). Rides only on assistance
    *  rows, always beside `load_prescribed: false`. The plan still says "by feel"; this is a number
@@ -567,6 +570,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // pick something the app never showed them).
   const [strengthEquipment, setStrengthEquipment] = useState<string[]>([]);
   const [swapFor, setSwapFor] = useState<string | null>(null); // exercise.id whose swap sheet is open
+  const [howToFor, setHowToFor] = useState<string | null>(null); // exercise.id whose how-to sheet is open
   const [swapRestOfPlan, setSwapRestOfPlan] = useState(false); // when on, a swap persists to the plan (not just today)
 
   // Adapt-a-plan #1 — persist a swap for the rest of the plan on the EXISTING override table
@@ -2490,6 +2494,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             execution_name: typeof s?.execution_name === 'string' && s.execution_name.trim()
               ? s.execution_name.trim()
               : undefined,
+            how_to: typeof s?.how_to === 'string' && s.how_to.trim() ? s.how_to.trim() : undefined,
             // ⛔ CARRIED, NOT APPLIED (D-406). This only makes the number available to the weight
             // box as a greyed starting point; it does not become the row's `weight`, and nothing
             // here treats it as a prescription. Guarded on a finite positive so an absent
@@ -5555,7 +5560,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       onChange={(e) => {
                         // ⛔ THEIR WORDS WIN. Dropping the display name here is what keeps the swap
                         // contract honest: from this keystroke on, `name` is the only name.
-                        setExercises((prev) => prev.map((ex) => ex.id === exercise.id ? { ...ex, execution_name: undefined } : ex));
+                        setExercises((prev) => prev.map((ex) => ex.id === exercise.id ? { ...ex, execution_name: undefined, how_to: undefined } : ex));
                         updateExerciseName(exercise.id, e.target.value);
                         setActiveDropdown(e.target.value.length > 0 ? exercise.id : null);
                       }}
@@ -5571,6 +5576,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       }}
                       style={{ fontSize: '16px', fontFamily: 'Inter, sans-serif' }}
                     />
+                    {/* The how-to for a home version of a machine movement (2026-09-08). Only rows the
+                        server stamped get it; it goes with the display name when the athlete types. */}
+                    {exercise.how_to && (
+                      <button
+                        type="button"
+                        aria-label="How to do this exercise"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => setHowToFor(exercise.id)}
+                        className="pr-3 pl-1 text-white/70 hover:text-white"
+                      >
+                        <Info className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                   {activeDropdown === exercise.id && exercise.name.length > 0 && (
                     <div className="absolute top-11 left-0 right-0 bg-white/[0.12] backdrop-blur-md border-2 border-white/25 rounded-xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 max-h-32 overflow-y-auto">
@@ -7359,6 +7377,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       )}
 
       {/* RIR Prompt */}
+      {(() => {
+        const ex = howToFor ? exercises.find((e) => e.id === howToFor) : null;
+        return (
+          <Sheet open={!!ex} onOpenChange={(o) => { if (!o) setHowToFor(null); }}>
+            <SheetContent side="bottom" className="h-auto max-h-[80vh]">
+              <SheetHeader>
+                <SheetTitle className="text-center">{ex ? (ex.execution_name || ex.name) : ''}</SheetTitle>
+              </SheetHeader>
+              <div className="py-4 text-[15px] leading-relaxed text-gray-800">{ex?.how_to}</div>
+              <button onClick={() => setHowToFor(null)} className="w-full py-3 text-gray-700 hover:text-gray-900">Close</button>
+            </SheetContent>
+          </Sheet>
+        );
+      })()}
       <Sheet open={showRIRPrompt} onOpenChange={setShowRIRPrompt}>
         <SheetContent side="bottom" className="h-auto max-h-[80vh]">
           <SheetHeader>

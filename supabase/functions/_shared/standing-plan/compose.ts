@@ -21,7 +21,7 @@ import {
   type EnduranceBaselines,
   type Level,
 } from '../endurance-library/index.ts';
-import { bandRouteName, executionName, isAsymmetrical, isBodyweightLoad, prescribe, resolveSlot,
+import { bandRouteName, executionHowTo, executionName, isAsymmetrical, isBodyweightLoad, prescribe, resolveSlot,
   type ViadaPattern } from '../strength-grid/index.ts';
 import { gearRoutesFor, ownsLoadingImplement } from '../../../../src/lib/strength-gear.ts';
 import {
@@ -252,6 +252,9 @@ export type StrengthExercise = {
    * sees the station's name, because that is what they will walk over to.
    */
   execution_name?: string;
+  /** How to do the home version of a machine movement, in Michael's words (2026-09-08). Display only,
+   *  behind an (i) beside the name. Absent when the athlete has the station or the name alone is enough. */
+  how_to?: string;
   set_plan?: PlannedSet[];
 };
 
@@ -1690,6 +1693,9 @@ function exerciseForSlot(
         ...(rowExecutionName(movement, slot, args.equipment)
           ? { execution_name: rowExecutionName(movement, slot, args.equipment)! }
           : {}),
+        ...(rowHowTo(movement, slot, args.equipment)
+          ? { how_to: rowHowTo(movement, slot, args.equipment)! }
+          : {}),
         sets,
         reps,
         weight: 'By feel',
@@ -1922,6 +1928,9 @@ function exerciseForSlot(
       name: rowDisplayName(movement, slot),
       ...(rowExecutionName(movement, slot, args.equipment)
         ? { execution_name: rowExecutionName(movement, slot, args.equipment)! }
+        : {}),
+      ...(rowHowTo(movement, slot, args.equipment)
+        ? { how_to: rowHowTo(movement, slot, args.equipment)! }
         : {}),
       sets,
       reps,
@@ -2378,6 +2387,19 @@ function rowExecutionName(
   if (slot.role === 'competition') return null;
   const exec = executionName(movement, equipment ?? null);
   return exec === movement ? null : exec;
+}
+/**
+ * THE HOW-TO FOR THIS ROW, or `null`. Same carve-out and same gate as `rowExecutionName` above: a
+ * competition lift is never annotated, and the text only travels when the free-weight route is the
+ * one the athlete's kit resolved to (2026-09-08).
+ */
+function rowHowTo(
+  movement: string,
+  slot: StrengthSlot,
+  equipment: string[] | null | undefined,
+): string | null {
+  if (slot.role === 'competition') return null;
+  return executionHowTo(movement, equipment ?? null);
 }
 function testRegionOf(name: string): 'upper' | 'lower' | null {
   if (/^test:\s*upper$/i.test(name.trim())) return 'upper';

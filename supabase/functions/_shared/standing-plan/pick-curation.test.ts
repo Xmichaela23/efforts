@@ -62,8 +62,10 @@ Deno.test('⛔ A ROW NAMES A STATION ONLY WHEN THE ATHLETE HAS ONE', () => {
    * rename is conditional on the kit, never a blanket relabel.
    */
   const home = labels('ham_iso', HOME).join(' | ') + labels('braced_pull', HOME).join(' | ');
-  assert(/lying, dumbbell between the feet/.test(home), 'the curl does not name its home execution');
-  assert(/incline bench, dumbbells/.test(home), 'the chest-supported row does not name its execution');
+  // 2026-09-08: the setup came out of the name (it overflowed the logger's box) and into the row's
+  // `how_to`; the picker shows the plain movement, the logger shows the how-to behind an (i).
+  assert(/Leg Curl/.test(home), 'the curl is not offered to the home athlete');
+  assert(!/\(/.test(home), 'a picker label still carries its setup in parentheses');
   assert(/Band Pull Down/.test(home), 'the pulldown does not say it is a band');
   assert(!/Lat Pulldown/.test(home), 'a cable station is still named to an athlete with no cable');
 

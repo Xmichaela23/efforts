@@ -476,6 +476,14 @@ export function executionName(name: string, equipment: string[] | null | undefin
  * A movement belongs here only when it already has a free-weight route in `ASSISTANCE_GEAR`. This
  * renames; it never widens what an athlete can reach.
  */
+/**
+ * 2026-09-08 (Michael, on the logger: "back extension is cut off and confusing, not sure how to do
+ * it"): the setup came OUT of the name and into `EXECUTION_HOW_TO` below. A name that carries its
+ * setup in parentheses overflows the box and still does not say how to do the movement. The name is
+ * the plain movement again; the how-to travels on the row as `how_to` and the logger shows it behind
+ * an (i) beside the name. Same gate as the name: only when the free-weight route is the one that
+ * resolved.
+ */
 const EXECUTION_NAME: Record<string, string> = {
   /**
    * ⛔⛔ "BACK EXTENSION" IS NOT AN INSTRUCTION — Michael, 2026-08-30: *which version, and what does
@@ -490,7 +498,7 @@ const EXECUTION_NAME: Record<string, string> = {
    */
   // ⚠️ PARENTHESES, NOT A DASH. The substitute mark appends " - for your gear", and two dashes in one
   // option read as a run-on: *"Back Extension - feet under a loaded bar - for your gear"*.
-  'back extension': 'Back Extension (feet under a loaded bar)',
+  'back extension': 'Back Extension',
   /**
    * ⛔ THE BENCH EXECUTION, NAMED AS ONE (2026-08-30). `reverse hyper` and `reverse hyperextension`
    * read as the same movement and were the same route; p221's is the MACHINE, and this is the home
@@ -500,10 +508,10 @@ const EXECUTION_NAME: Record<string, string> = {
    * never true for it and the bench name is the only one it ever shows. That is deliberate — it is
    * not an equipment fallback, it IS the movement.
    */
-  'reverse hyper': 'Bench Reverse Hyper',
+  'reverse hyper': 'Reverse Hyper',
   // ⚠️ THE LOADED ONE SAYS BENCH TOO — without it an athlete reads "Weighted Reverse Hyper" and
   // pictures the machine with plates on it.
-  'weighted reverse hyper': 'Weighted Bench Reverse Hyper',
+  'weighted reverse hyper': 'Weighted Reverse Hyper',
   // Seated, chest against the pad, arms sweeping back - on an incline bench with dumbbells.
   /**
    * ⚠️ "FLY", NOT "RAISE" (2026-09-01). Both name the movement; **fly is the word lifters search
@@ -525,11 +533,11 @@ const EXECUTION_NAME: Record<string, string> = {
    * differs — and the name never said which. ⚠️ Conditional: a gym member with the station sees the
    * plain name, because that is what they will walk over to.
    */
-  'chest supported row': 'Chest-Supported Row (incline bench, dumbbells)',
-  'leg curl': 'Leg Curl (lying, dumbbell between the feet)',
-  'leg curls': 'Leg Curl (lying, dumbbell between the feet)',
-  'lying leg curl': 'Leg Curl (lying, dumbbell between the feet)',
-  'hamstring curl': 'Leg Curl (lying, dumbbell between the feet)',
+  'chest supported row': 'Chest-Supported Row',
+  'leg curl': 'Leg Curl',
+  'leg curls': 'Leg Curl',
+  'lying leg curl': 'Leg Curl',
+  'hamstring curl': 'Leg Curl',
   /**
    * ONE ENTRY, AND THE OTHER CANDIDATES WERE CHECKED AND LEFT OUT.
    * `seated calf raise` names no equipment - a home athlete reads it and does it with a dumbbell
@@ -539,6 +547,38 @@ const EXECUTION_NAME: Record<string, string> = {
    * movement the athlete would do with free weights.
    */
 };
+
+/**
+ * HOW TO DO THE HOME VERSION, in Michael's approved words (2026-09-08). Four movements the book
+ * prescribes on a machine and the plan swaps to a bench and free weights when the athlete has no
+ * machine. Keyed like `EXECUTION_NAME`; shown to the athlete behind an (i) beside the row name.
+ * A movement belongs here only when its name alone misleads a home athlete about the execution.
+ */
+const EXECUTION_HOW_TO: Record<string, string> = {
+  'back extension': 'Lie face down on a flat bench or the floor with your hips at the edge and your feet hooked under a loaded barbell. Hands behind your head or across your chest. Lower your torso toward the floor, then raise it until your body is a straight line from head to heels. Do not arch past straight.',
+  'leg curl': 'Lie face down on a flat bench with your knees just past the end and a dumbbell held between your feet. Hold the bench with your hands. Curl your heels toward your glutes, pause, then lower the dumbbell slowly until your legs are straight.',
+  'leg curls': 'Lie face down on a flat bench with your knees just past the end and a dumbbell held between your feet. Hold the bench with your hands. Curl your heels toward your glutes, pause, then lower the dumbbell slowly until your legs are straight.',
+  'lying leg curl': 'Lie face down on a flat bench with your knees just past the end and a dumbbell held between your feet. Hold the bench with your hands. Curl your heels toward your glutes, pause, then lower the dumbbell slowly until your legs are straight.',
+  'hamstring curl': 'Lie face down on a flat bench with your knees just past the end and a dumbbell held between your feet. Hold the bench with your hands. Curl your heels toward your glutes, pause, then lower the dumbbell slowly until your legs are straight.',
+  'chest supported row': 'Set a bench to about 45 degrees and lie chest down on it with a dumbbell in each hand, arms hanging. Row both dumbbells to your ribs, squeezing your shoulder blades together, then lower until your arms are straight. Keep your chest on the bench.',
+  'reverse hyper': 'Lie face down on a flat bench with your hips at the edge and your legs hanging toward the floor. Hold the bench with your hands. Raise your legs until they are level with your torso, pause, then lower them slowly. For the weighted version hold a dumbbell between your feet.',
+  'weighted reverse hyper': 'Lie face down on a flat bench with your hips at the edge and your legs hanging toward the floor. Hold the bench with your hands. Raise your legs until they are level with your torso, pause, then lower them slowly. For the weighted version hold a dumbbell between your feet.',
+};
+
+/**
+ * The how-to for the home version of a movement, or `null` when the athlete has the station (or
+ * declared no equipment) and the plain name is what they will walk over to. Same gate as
+ * `executionName`, on purpose: the two describe the same execution.
+ */
+export function executionHowTo(name: string, equipment: string[] | null | undefined): string | null {
+  const declared = Array.isArray(equipment) && equipment.some((c) => String(c || '').trim());
+  if (!declared) return null;
+  const text = EXECUTION_HOW_TO[foldExerciseName(name)];
+  if (!text) return null;
+  const keys = athleteEquipmentToKeys(equipment as string[]);
+  const hasStation = gearRoutesFor(name).some((r) => r.includes('machine') && r.every((k) => keys.has(k)));
+  return hasStation ? null : text;
+}
 
 export function bandRouteName(name: string, equipment: string[] | null | undefined): string {
   const declared = Array.isArray(equipment) && equipment.some((c) => String(c || '').trim());

@@ -138,6 +138,7 @@ function printRow(e: StrengthExercise): string {
   if (e.target_rir != null) tail.push(`RIR ${e.target_rir}`);
   if (e.load_basis) tail.push(e.load_basis);
   if (e.execution_name) tail.push(`shown as "${e.execution_name}"`);
+  if (e.how_to) tail.push('how-to');
   if (Array.isArray(e.set_plan) && e.set_plan.length > 0) {
     tail.push(`plan ${e.set_plan.map((s) => `${s.weight}${s.warmup ? 'w' : ''}${s.amrap ? '+' : ''}x${s.reps ?? ''}`).join(' ')}`);
   }
