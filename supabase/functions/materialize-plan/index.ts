@@ -21,6 +21,7 @@ import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts
 // ⚠️ The SERVER canonicalizer — `exercise_log.canonical_name` is its output, so the lookup key and
 // the stored key are the same function's answer. The client mirror lacks the Q-197 plural rule.
 import { canonicalize as canonicalizeName } from '../_shared/canonicalize.ts';
+import { executionHowTo, executionName } from '../_shared/strength-grid/grid.ts';
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay, getMovementGroup, resolveSwapSeedWeight } from '../../../src/lib/exercise-config.ts';
 import { resolveProfile, getTargetRir, protocolUsesRir } from '../_shared/strength-profiles.ts';
 
@@ -2694,14 +2695,16 @@ export function expandTokensForRow(
              */
             execution_name: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
               ? ((ex as any)?.execution_name ?? undefined)
-              : undefined),
-            // The how-to rides with the execution name and is dropped with it (2026-09-08).
+              // A swapped or substituted row is re-labelled for the movement it became (2026-09-08).
+              : (executionName(name, userEquipment) !== name ? executionName(name, userEquipment) : undefined)),
+            // The how-to belongs to the movement the row became (2026-09-08): carried when the name is
+            // unchanged, re-derived for a swap or substitution, absent when the movement has none.
             how_to: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
-              ? ((ex as any)?.how_to ?? undefined)
-              : undefined),
-            swap_options: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
-              ? ((ex as any)?.swap_options ?? undefined)
-              : undefined),
+              ? ((ex as any)?.how_to ?? executionHowTo(name, userEquipment) ?? undefined)
+              : (executionHowTo(name, userEquipment) ?? undefined)),
+            // The swap list belongs to the SLOT, not the movement, so it survives a swap: that is how
+            // the athlete gets back to the original (Michael, 2026-09-08).
+            swap_options: (ex as any)?.swap_options ?? undefined,
             /**
              * ⛔ HOW THE WEIGHT WAS ARRIVED AT, OR WHY THERE ISN'T ONE — carried (2026-09-01). This
              * object is a WHITELIST and `load_basis` was never on it, so the composer's marker died
@@ -3094,14 +3097,16 @@ export function expandTokensForRow(
              */
             execution_name: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
               ? ((ex as any)?.execution_name ?? undefined)
-              : undefined),
-            // The how-to rides with the execution name and is dropped with it (2026-09-08).
+              // A swapped or substituted row is re-labelled for the movement it became (2026-09-08).
+              : (executionName(name, userEquipment) !== name ? executionName(name, userEquipment) : undefined)),
+            // The how-to belongs to the movement the row became (2026-09-08): carried when the name is
+            // unchanged, re-derived for a swap or substitution, absent when the movement has none.
             how_to: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
-              ? ((ex as any)?.how_to ?? undefined)
-              : undefined),
-            swap_options: (String(name).toLowerCase().trim() === String(originalName).toLowerCase().trim()
-              ? ((ex as any)?.swap_options ?? undefined)
-              : undefined),
+              ? ((ex as any)?.how_to ?? executionHowTo(name, userEquipment) ?? undefined)
+              : (executionHowTo(name, userEquipment) ?? undefined)),
+            // The swap list belongs to the SLOT, not the movement, so it survives a swap: that is how
+            // the athlete gets back to the original (Michael, 2026-09-08).
+            swap_options: (ex as any)?.swap_options ?? undefined,
             /**
              * ⛔ HOW THE WEIGHT WAS ARRIVED AT, OR WHY THERE ISN'T ONE — carried (2026-09-01). This
              * object is a WHITELIST and `load_basis` was never on it, so the composer's marker died
