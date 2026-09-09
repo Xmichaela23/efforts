@@ -113,6 +113,33 @@ the canonical run/ride/swim/strength; Profile still writes running/cycling/swimm
 - Tests: 4 standing-plan failures and 1 strength-grid failure (`rest between sets is HIS rule`) pre-exist today's
   changes; goldens regenerated and committed (57 rows braced hinge, 36 rows calf how-to marker).
 
+## 2026-09-09 — decided, not built: the Today screen
+- Bottom bar becomes **Home · State · +**. Home opens on **Today**, with **Week** (the current calendar) as a second
+  tab at the top, the way State has Status / Adjust / Schedule. The **+ is for plan building only**, it opens the
+  Focus screen (training card, race entry, current plan). Adding a workout by hand moves to the Week tab: tap a
+  day, add (TrainingPeaks / TrainerRoad pattern). Low priority. The first-run Focus spotlight moves to the +.
+- **Today** lays the day out from the book: the spacing line when there are two sessions, then each session with
+  its rows (the row's own numbers) and one cue per kind of set, then the week so far (load line, totals).
+- Approved lines (Michael's words; nothing of ours):
+  - Two sessions: `Two sessions today. Six to eight hours apart.` then `Closer than that:` /
+    `Lift first, make the ride easier.` / `Ride first, skip the skill work.` (on a day whose only speed row is DE:
+    `drop the speed work`). The line is built from the day's own data (ride length + class, lift region, set
+    count), never a list of rules.
+  - ME: `1 to 5 reps, stop short of failure. More than 5, log it.` (logger's current line, p219)
+  - DE: `As fast as possible on every rep. Bar slows, set is over.` (p218)
+  - HYP: `8 to 12 reps, 1 to 2 in reserve. Reps slow as the set goes.` (p86, p218) — SHIPPED on the card and logger
+    2026-09-09; the "top of the band → add weight" trigger was ours and is removed (cue and last-time note).
+  - SKILL: words still needed. Page: 3–5 reps at 75–85%, 3–4 in reserve, form and consistency before speed, no
+    fatigue, ample rest, first session of the day (p218, p219, p142).
+  - Endurance stop rule: heart rate up 5% at the same output, or output down 5% at the same heart rate (p107).
+  - Lifting cost line: counted work sets vs 14 (p86).
+- Also decided: a 3-week check-in on the calculated max (p245, ~1% every 3 weeks) — separate piece, not built.
+- The set word on a logger row is tappable (sheet with the letters spelled out + one line per kind) and gets a
+  one-time spotlight. SHIPPED 2026-09-09. The sheet's lines are mine and should be replaced with the approved ones
+  above when the Today screen is built.
+- Michael, on my copy, 2026-09-09: he hates detangling it; it contradicts itself. Next chat: never paraphrase the
+  book in prose. Give bare facts with page numbers, one per line, and let him write the sentence.
+
 ## Still on the list
 1. New-user spec: both front doors (connect Garmin/Strava · use my phone), first-run cards, one per screen. Write spec, then build.
 2. Strength popup polish: rating first on a lift, "estimated" until rated. Not gated.
