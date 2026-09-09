@@ -1120,26 +1120,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             </button>
           </div>
         )}
-        {/* Delete (2026-09-07): it sat `fixed bottom-3 right-3`, under the tab bar, where nobody could
-            see it (Michael: "there isn't a delete workout"). Now in the header with Share. */}
-        {isCompleted && onDelete && workout?.id && (
-          <div className="flex items-center justify-end mt-2">
-            <button
-              type="button"
-              onClick={() => {
-                try {
-                  if (!window.confirm('Delete this workout? This cannot be undone.')) return;
-                  onDelete?.(String((workout as Record<string, unknown>).id));
-                } catch (e) {
-                  console.warn('[UnifiedWorkoutView] delete workout confirmation/handler failed:', e);
-                }
-              }}
-              className="px-3 py-1 rounded-xl bg-transparent border border-red-400/40 text-red-300/85 font-light text-xs hover:bg-red-500/10"
-            >
-              Delete
-            </button>
-          </div>
-        )}
         {shareError && (
           <p className="text-xs text-red-400 text-right mt-1">{shareError}</p>
         )}
@@ -1704,6 +1684,26 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
         </div>
       </Tabs>
+      {/* Delete (2026-09-08, Michael: "Delete is too close to Share. Just put it at the bottom."). It sat in
+          the header under Share on 2026-09-07; now the last thing on the page, above the nav-bar spacer. */}
+      {isCompleted && onDelete && workout?.id && (
+        <div className="flex items-center justify-center mt-6 px-4">
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                if (!window.confirm('Delete this workout? This cannot be undone.')) return;
+                onDelete?.(String((workout as Record<string, unknown>).id));
+              } catch (e) {
+                console.warn('[UnifiedWorkoutView] delete workout confirmation/handler failed:', e);
+              }
+            }}
+            className="px-4 py-2 rounded-xl bg-transparent border border-red-400/40 text-red-300/85 font-light text-sm hover:bg-red-500/10"
+          >
+            Delete workout
+          </button>
+        </div>
+      )}
       {/* Spacer for nav bar */}
       <div style={{ height: 'calc(var(--tabbar-h, 56px) + env(safe-area-inset-bottom, 0px) + 16px)' }} />
       </div>

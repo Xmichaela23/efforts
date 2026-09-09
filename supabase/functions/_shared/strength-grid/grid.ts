@@ -562,6 +562,8 @@ const EXECUTION_HOW_TO: Record<string, string> = {
   'hamstring curl': 'Lie face down on a flat bench with your knees just past the end and a dumbbell held between your feet. Hold the bench with your hands. Curl your heels toward your glutes, pause, then lower the dumbbell slowly until your legs are straight.',
   'chest supported row': 'Set a bench to about 45 degrees and lie chest down on it with a dumbbell in each hand, arms hanging. Row both dumbbells to your ribs, squeezing your shoulder blades together, then lower until your arms are straight. Keep your chest on the bench.',
   'reverse hyper': 'Lie face down on a flat bench with your hips right at the edge. Hold the front legs or sides of the bench to brace your upper body. Keep your legs straight, toes turned slightly out, and use your glutes to lift your legs until they are in line with your torso. Lower with control.',
+  'calf raise': 'Stand with the balls of both feet on a step or a plate, heels hanging off. Rise onto your toes as high as you can, pause, then lower your heels below the step. Bodyweight, both legs at once.',
+  'calf raises': 'Stand with the balls of both feet on a step or a plate, heels hanging off. Rise onto your toes as high as you can, pause, then lower your heels below the step. Bodyweight, both legs at once.',
   'weighted reverse hyper': 'Lie face down on a flat bench with your hips right at the edge. Hold the front legs or sides of the bench to brace your upper body. Squeeze a light dumbbell between your feet. Keep your legs straight, toes turned slightly out, and use your glutes to lift your legs until they are in line with your torso. Lower with control.',
 };
 
@@ -571,10 +573,13 @@ const EXECUTION_HOW_TO: Record<string, string> = {
  * `executionName`, on purpose: the two describe the same execution.
  */
 export function executionHowTo(name: string, equipment: string[] | null | undefined): string | null {
-  const declared = Array.isArray(equipment) && equipment.some((c) => String(c || '').trim());
-  if (!declared) return null;
   const text = EXECUTION_HOW_TO[foldExerciseName(name)];
   if (!text) return null;
+  // A movement with no machine version (the calf raise, 2026-09-08) reads the same on every kit.
+  const hasMachineRoute = gearRoutesFor(name).some((r) => r.includes('machine'));
+  if (!hasMachineRoute) return text;
+  const declared = Array.isArray(equipment) && equipment.some((c) => String(c || '').trim());
+  if (!declared) return null;
   const keys = athleteEquipmentToKeys(equipment as string[]);
   const hasStation = gearRoutesFor(name).some((r) => r.includes('machine') && r.every((k) => keys.has(k)));
   return hasStation ? null : text;

@@ -48,7 +48,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Goblet Squat                   3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Saturday] run      Long Run — 92 min
   NOTES
       [source  ] The first week is the test. Two guided sessions set the numbers the rest of the block is built on, and the weights fill in as soon as those two are logged. Testing before a programme is the source's own advice.  (Viada p215, p247)
@@ -80,7 +80,7 @@ WEEK 02  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Tuesday] ride     Anaerobic Ride — 36 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
@@ -133,7 +133,7 @@ WEEK 03  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
@@ -186,7 +186,7 @@ WEEK 04  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
@@ -239,7 +239,7 @@ WEEK 05  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Tuesday] ride     Anaerobic Ride — 36 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
@@ -292,7 +292,7 @@ WEEK 06  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
@@ -345,7 +345,7 @@ WEEK 07  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
@@ -397,7 +397,7 @@ WEEK 08  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Tuesday] ride     Anaerobic Ride — 36 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
@@ -449,7 +449,7 @@ WEEK 09  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
@@ -501,7 +501,7 @@ WEEK 10  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
@@ -553,7 +553,7 @@ WEEK 11  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Tuesday] ride     Anaerobic Ride — 36 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo
@@ -605,7 +605,7 @@ WEEK 12  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
       tags: standing_plan, plyo

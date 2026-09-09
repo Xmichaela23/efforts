@@ -6061,7 +6061,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     if (!bookWord || bookWord === 'ME' || !exercise?.target_reps) return null;
                     const reps = String(exercise.target_reps).replace(/\+$/, '');
                     const rir = exercise?.target_rir != null ? ` · ${formatRirTarget(exercise.target_rir)} in reserve` : '';
-                    const speed = bookWord === 'DE' ? ' · move the bar fast' : '';
+                    // 2026-09-08 (Michael, on a dumbbell reverse lunge: "move the bar fast?"): the words
+                    // follow the load. A barbell row (displayFormat 'total') keeps the bar; a dumbbell,
+                    // kettlebell, band or bodyweight row says "move fast". Same rule as the plan card.
+                    const barLoaded = getExerciseConfig(exercise.name)?.displayFormat === 'total';
+                    const speed = bookWord === 'DE' ? (barLoaded ? ' · move the bar fast' : ' · move fast') : '';
                     return `${bookWord} · ${reps} reps${rir}${speed}`;
                   })();
                   const cardCue = cardCueRaw && bookWord === 'ME' ? `ME · ${cardCueRaw}` : cardCueRaw;

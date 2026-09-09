@@ -50,7 +50,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
       -      Nordic Hamstring Curl          3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: hamstrings had nothing else this week.
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Saturday] run      Long Run — 42 min
   NOTES
       [source  ] The first week is the test. Two guided sessions set the numbers the rest of the block is built on, and the weights fill in as soon as those two are logged. Testing before a programme is the source's own advice.  (Viada p215, p247)
@@ -107,7 +107,7 @@ WEEK 02  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Saturday] run      Long Run — 50 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -162,7 +162,7 @@ WEEK 03  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Saturday] run      Long Run — 44 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -217,7 +217,7 @@ WEEK 04  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Saturday] run      Long Run — 43 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -272,7 +272,7 @@ WEEK 05  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Saturday] run      Long Run — 44 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -327,7 +327,7 @@ WEEK 06  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Saturday] run      Long Run — 53 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -382,7 +382,7 @@ WEEK 07  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Saturday] run      Long Run — 38 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -437,7 +437,7 @@ WEEK 08  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Saturday] run      Long Run — 41 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -492,7 +492,7 @@ WEEK 09  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Saturday] run      Long Run — 58 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -547,7 +547,7 @@ WEEK 10  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Saturday] run      Long Run — 37 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -602,7 +602,7 @@ WEEK 11  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Saturday] run      Long Run — 42 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -657,7 +657,7 @@ WEEK 12  column=standard
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
       SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
-      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · note: Floor: calves had nothing else this week.
+      -      Calf Raise                     3x8-10       @ By feel       | RIR 1.5 · auto_regulated · how-to · note: Floor: calves had nothing else this week.
   [Saturday] run      Long Run — 52 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.

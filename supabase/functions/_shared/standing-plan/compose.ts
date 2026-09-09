@@ -3696,6 +3696,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         // gives it no load, so its by-feel is the SAME kind as a HYP slot's: an output of the rule,
         // not a number waiting on a test. See `load_basis`.
         load_basis: 'auto_regulated' as const,
+        ...(executionHowTo(add.movement, args.equipment ?? null) ? { how_to: executionHowTo(add.movement, args.equipment ?? null)! } : {}),
         /**
          * ⛔ THE RESERVE IS STAMPED HERE TOO, AND ITS ABSENCE WAS VISIBLE ON A DEVICE
          * (Michael's screenshots, 2026-08-27). One session showed dumbbell bench at
@@ -3853,6 +3854,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           load_prescribed: false,
           load_basis: 'auto_regulated' as const,
           ...(takesReps ? { target_rir: ACCESSORY_TARGET_RIR } : {}),
+          ...(executionHowTo(movement, args.equipment ?? null) ? { how_to: executionHowTo(movement, args.equipment ?? null)! } : {}),
           notes: 'Your core pick.',
         },
         ...existing.slice(at),
