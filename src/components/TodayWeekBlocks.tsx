@@ -87,9 +87,10 @@ const TodayWeekBlocks: React.FC<{
         weeklyStats={weeklyStats}
         items={weekRows}
         expanded={open}
-        /* ⚠️ NO CHEVRON WHERE THERE IS NOTHING TO OPEN. A control that reveals an empty space
-           teaches the athlete to stop tapping controls. */
-        onToggle={cards.length > 0 ? toggle : undefined}
+        onToggle={toggle}
+        /* The chevron's second reason to exist: the card knows about its own explanation, not about
+           what renders beneath it. It hides the control when neither is there. */
+        hasBars={cards.length > 0}
       />
 
       {cards.length > 0 && open ? (

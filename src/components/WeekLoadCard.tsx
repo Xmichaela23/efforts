@@ -1,27 +1,35 @@
 import React from 'react';
 import { ChevronDown } from 'lucide-react';
-import LoadBar from '@/components/LoadBar';
+import { LoadKey, type LoadBarData } from '@/components/LoadBar';
+import { formZone } from '@shared/fitness-fatigue';
 import { useAppContext } from '@/contexts/AppContext';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
-import { getDisciplineColorRgb } from '@/lib/context-utils';
-import { weekExecTotals } from '@/lib/week-exec-totals';
+import { getDisciplineColor } from '@/lib/context-utils';
 
 /**
  * ═══ THE LOAD CARD — fitness, fatigue, form, and what the week has covered ═══════════════════════
  *
- * ⛔ EXTRACTED FROM `WorkoutCalendar`, WHERE IT WAS INLINE, AND MOVED TO TODAY (Michael,
- * 2026-09-09). It sat at the bottom of the Week calendar; Today is the screen an athlete opens, and
- * this is the read they open it for. It renders in ONE place — under the day's sessions, above the
- * workload bars — and nowhere else.
+ * ⛔ MOVED OFF THE WEEK CALENDAR, WHERE IT WAS INLINE, AND REDRAWN (Michael, 2026-09-09: it "looks
+ * messy"). It renders in ONE place — Today, under the day's sessions — and nowhere else.
  *
- * ⚠️ THE CARD ITSELF IS UNCHANGED. Same `LoadBar` with the same four inputs, the same per-sport
- * readout treatment, the same `galaxy-card readout-texture` shell. What moved is where it hangs.
- * Nothing about the numbers, the wording or the styling was touched on the way over — a move and a
- * restyle in one change is how a regression hides.
+ * ⛔⛔ TWO ROWS IN PROFILE'S NUMBER-ROW IDIOM (`ui/number-row.tsx`): the number in white, the label
+ * grey beside it, nothing shouting. What it replaced was `LoadBar`'s compact head — the same three
+ * numbers, but wrapped mid-row with `·` separators between them and a second line of sport-COLOURED
+ * numbers underneath, so five colours and three type sizes competed in a block six lines tall.
  *
- * ⛔ AND THE Run / Ride / Lifted ROW CAME OFF TODAY IN THE SAME CHANGE. This card already carries
- * those three figures; two rows of the same numbers under one another is the divergence-by-accretion
- * this screen keeps having to unpick.
+ *   · Row 1 — fitness / fatigue / form, with this week's change small beside each.
+ *   · Row 2 — Run / Bike / Lifted, the value in white and a sport-colour DOT before the label. ⚠️ THE
+ *     COLOUR MOVES TO THE DOT AND OFF THE TEXT. A coloured number reads as a status; the sport is
+ *     which row this is, not how the week went, so it belongs in a mark rather than in the figure.
+ *
+ * ⛔ SAME NUMBERS, SAME SOURCES, NOTHING RECOMPUTED. Fitness / fatigue / form and their week-ago
+ * deltas come off the coach payload's `fitness_fatigue` exactly as `LoadBar` reads them; the
+ * distances are the server's `weeklyStats`; the lifted figure is the same `reps × weight` sum over
+ * the week's logged sets. This file changed how they are drawn and nothing about what they are.
+ *
+ * ⛔ ONE CHEVRON, ON THE HEADER LINE. It opens the explanation AND the workload bars beneath the
+ * card — the ⓘ is gone, so there are not two disclosures on one card doing different jobs. The
+ * caller owns the state and renders the bars; see `TodayWeekBlocks`.
  */
 
 type WeeklyStats = {
@@ -37,35 +45,88 @@ type WeekItem = {
   executed?: { strength_exercises?: Array<{ sets?: Array<{ weight?: unknown; reps?: unknown; completed?: unknown }> }> } | null;
 };
 
+const fmt1 = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? null : Math.round(v));
+
+/** This week's change, a signed number and never an arrow — the same rule `LoadBar` prints by. */
+const delta = (now: number | null | undefined, then: number | null | undefined): string | null => {
+  if (now == null || then == null || !Number.isFinite(now) || !Number.isFinite(then)) return null;
+  const d = Math.round(now - then);
+  return d === 0 ? '±0' : d > 0 ? `+${d}` : `${d}`;
+};
+
+/** TrainingPeaks' Form zones (Friel) — fresh and optimal read plain, high risk is flagged. */
+const FORM_ZONE_CLS: Record<string, string> = {
+  fresh: 'text-white/70', optimal: 'text-white/70', 'grey zone': 'text-white/45',
+  transitional: 'text-white/50', 'high risk': 'text-[#FF5A5F]',
+};
+
+/** One cell of row 1: the number in white, the label grey under it, the change small beside it. */
+const StatCell: React.FC<{ label: string; value: string | null; change?: string | null; after?: React.ReactNode }> = ({
+  label, value, change, after,
+}) => (
+  <div className="flex flex-col gap-0.5 min-w-0">
+    <span className="flex items-baseline gap-1 min-w-0">
+      <span className="text-[17px] font-light tabular-nums leading-none" style={{ color: 'rgba(255,255,255,0.92)' }}>
+        {value ?? '—'}
+      </span>
+      {change ? <span className="text-[10.5px] tabular-nums leading-none" style={{ color: 'rgba(255,255,255,0.42)' }}>{change}</span> : null}
+    </span>
+    <span className="flex items-baseline gap-1 text-[11px] leading-none truncate" style={{ color: 'rgba(255,255,255,0.45)' }}>
+      {label}
+      {after}
+    </span>
+  </div>
+);
+
+/** One cell of row 2: the value in white, a sport-colour dot before the grey label. */
+const SportCell: React.FC<{ label: string; value: string; sport: string }> = ({ label, value, sport }) => (
+  <div className="flex flex-col gap-0.5 min-w-0">
+    <span className="text-[15px] font-light tabular-nums leading-none" style={{ color: 'rgba(255,255,255,0.92)' }}>
+      {value}
+    </span>
+    <span className="flex items-center gap-1.5 text-[11px] leading-none truncate" style={{ color: 'rgba(255,255,255,0.45)' }}>
+      <span
+        aria-hidden="true"
+        className="inline-block rounded-full flex-shrink-0"
+        style={{ width: 6, height: 6, background: getDisciplineColor(sport) }}
+      />
+      {label}
+    </span>
+  </div>
+);
+
 const WeekLoadCard: React.FC<{
   /** `weeklyStats` from `useWeekUnified` — the server's per-sport distance for the week. */
   weeklyStats?: WeeklyStats | null;
   /** The week's unified items, for the logged strength volume. */
   items?: readonly unknown[];
-  /**
-   * The disclosure at the card's right edge. Present only when there is something to open —
-   * the caller owns both the state and what appears underneath.
-   */
+  /** The disclosure on the header line. The caller owns the state and what appears underneath. */
   expanded?: boolean;
   onToggle?: () => void;
+  /**
+   * Whether the caller has workload bars to reveal. The card knows about its own explanation and
+   * nothing about what renders beneath it, so the chevron's second reason to exist comes from here.
+   */
+  hasBars?: boolean;
   className?: string;
-}> = ({ weeklyStats, items = [], expanded, onToggle, className = '' }) => {
+}> = ({ weeklyStats, items = [], expanded, onToggle, hasBars = false, className = '' }) => {
   const { useImperial } = useAppContext();
   const coachCtx = useCoachWeekContext();
 
   const wsv = coachCtx.data?.weekly_state_v1;
-  const snap = (coachCtx.data as { athlete_snapshot?: { body_response?: { load_status?: unknown } } } | null | undefined)?.athlete_snapshot ?? null;
-  const loadStatus = (snap?.body_response?.load_status ?? null) as never;
+  const ff = ((wsv?.load as LoadBarData | undefined)?.fitness_fatigue) ?? null;
+  const wk = ff?.week_ago ?? null;
+  const zone = formZone(ff?.form);
 
-  const metrics: Array<{ label: string; value: string; type: string }> = [];
+  const metrics: Array<{ label: string; value: string; sport: string }> = [];
   const d = weeklyStats?.distances;
   if (d) {
     if ((d.run_meters ?? 0) > 0)
-      metrics.push({ label: 'Run:', value: useImperial ? `${(d.run_meters! / 1609.34).toFixed(1)} mi` : `${(d.run_meters! / 1000).toFixed(1)} km`, type: 'run' });
+      metrics.push({ label: 'Run', sport: 'run', value: useImperial ? `${(d.run_meters! / 1609.34).toFixed(1)} mi` : `${(d.run_meters! / 1000).toFixed(1)} km` });
     if ((d.cycling_meters ?? 0) > 0)
-      metrics.push({ label: 'Bike:', value: useImperial ? `${(d.cycling_meters! / 1609.34).toFixed(1)} mi` : `${(d.cycling_meters! / 1000).toFixed(1)} km`, type: 'bike' });
+      metrics.push({ label: 'Bike', sport: 'bike', value: useImperial ? `${(d.cycling_meters! / 1609.34).toFixed(1)} mi` : `${(d.cycling_meters! / 1000).toFixed(1)} km` });
     if ((d.swim_meters ?? 0) > 0)
-      metrics.push({ label: 'Swim:', value: useImperial ? `${Math.round(d.swim_meters! / 0.9144)} yd` : `${Math.round(d.swim_meters!)} m`, type: 'swim' });
+      metrics.push({ label: 'Swim', sport: 'swim', value: useImperial ? `${Math.round(d.swim_meters! / 0.9144)} yd` : `${Math.round(d.swim_meters!)} m` });
   }
 
   let totalVol = 0;
@@ -82,79 +143,62 @@ const WeekLoadCard: React.FC<{
     }
   }
   if (totalVol > 0)
-    metrics.push({ label: 'Strength:', value: `${totalVol.toLocaleString()} ${useImperial ? 'lb' : 'kg'}`, type: 'strength' });
+    metrics.push({ label: 'Lifted', sport: 'strength', value: `${totalVol.toLocaleString()} ${useImperial ? 'lb' : 'kg'}` });
 
-  if (!wsv && metrics.length === 0) return null;
+  const hasNumbers = ff != null && fmt1(ff.fitness) != null;
+  if (!hasNumbers && metrics.length === 0) return null;
 
   return (
-    // ⛔ ONE textured card holding LOAD *and* the week totals — the totals used to sit on bare black
-    // below a textured LoadBar, which is what kept reading as "no texture" (Michael 2026-08-15,
-    // third showing). The spectral grid wraps the whole data block.
-    // ⚠️ `pr-7` ONLY WHERE THE CHEVRON IS. `LoadBar`'s row is justify-between, so its status text
-    // ends at the card's right edge — exactly where the disclosure sits. The inset moves the text
-    // clear instead of letting the two stack on the same pixels, which is the defect the swap glyph
-    // hit on Today's card and had to be moved out of.
-    <div className={`galaxy-card readout-texture readout-texture--nova rounded-xl border border-white/[0.10] pb-3 space-y-2 relative ${onToggle ? 'pr-7' : ''} ${className}`}>
-      {/**
-        * ⛔ THE CHEVRON AT THE RIGHT EDGE (Michael, 2026-09-09) — it opens the workload bars beneath
-        * the card. ⚠️ It is a DISCLOSURE, not a link: the bars are the same week seen over five of
-        * them, so they belong under the read rather than beside it, and an athlete who does not want
-        * the history should not have to scroll past it.
-        *
-        * ⚠️ ABSOLUTELY POSITIONED so it cannot displace `LoadBar`'s own justify-between row, which
-        * puts the verdict word right-of-centre; a flex sibling would push that off its column.
-        */}
-      {onToggle ? (
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={expanded === true}
-          aria-label="Workload over five weeks"
-          className="absolute right-2 top-2 z-10 p-1 rounded-xl text-white/45 hover:text-white/85 hover:bg-white/[0.08] transition-colors"
-        >
-          <ChevronDown
-            className="h-4 w-4"
-            style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 180ms ease' }}
+    <div className={`galaxy-card readout-texture readout-texture--nova rounded-xl border border-white/[0.10] px-3 py-3 ${className}`}>
+      {/* ⛔ THE HEADER LINE: the word, then the chevron immediately right of it. No ⓘ — one control. */}
+      <div className="flex items-center gap-1.5">
+        <span className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase">LOAD</span>
+        {/* ⚠️ NO CHEVRON WHERE THERE IS NOTHING TO OPEN. A control that reveals an empty space
+            teaches the athlete to stop tapping controls. */}
+        {onToggle && (hasNumbers || hasBars) ? (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={expanded === true}
+            aria-label="What fitness, fatigue and form mean, and workload over five weeks"
+            className="p-0.5 rounded-xl text-white/40 hover:text-white/85 transition-colors"
+          >
+            <ChevronDown
+              className="h-3.5 w-3.5"
+              style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 180ms ease' }}
+            />
+          </button>
+        ) : null}
+      </div>
+
+      {hasNumbers ? (
+        <div className="mt-2.5 grid grid-cols-3 gap-x-3">
+          <StatCell label="fitness" value={String(fmt1(ff!.fitness))} change={delta(ff!.fitness, wk?.fitness)} />
+          <StatCell label="fatigue" value={String(fmt1(ff!.fatigue))} change={delta(ff!.fatigue, wk?.fatigue)} />
+          <StatCell
+            label="form"
+            value={`${(ff!.form ?? 0) > 0 ? '+' : ''}${fmt1(ff!.form)}`}
+            change={delta(ff!.form, wk?.form)}
+            /* ⚠️ FRIEL'S ZONE WORD STAYS, beside the label rather than beside the number — it is the
+               one thing on this card that says what the figure MEANS, and losing it in a redraw
+               would be a content change nobody asked for. */
+            after={zone ? <span className={FORM_ZONE_CLS[zone] ?? 'text-white/45'}>{zone}</span> : null}
           />
-        </button>
-      ) : null}
-      {wsv && (
-        // Same three inputs State passes (hasActivePlan · planned · done) — without them the
-        // programme-aware read fell back to the bare status word, so Home and State could
-        // print different load words for the same week (2026-09-03).
-        <LoadBar
-          load={wsv.load as never}
-          loadStatus={loadStatus}
-          weekIntent={wsv?.week?.intent}
-          hasActivePlan={(wsv as { plan?: { has_active_plan?: boolean } })?.plan?.has_active_plan === true}
-          plannedThisWeek={weekExecTotals(wsv as never).planned}
-          doneThisWeek={weekExecTotals(wsv as never).done}
-          compact
-        />
+        </div>
+      ) : (
+        <div className="mt-2 text-[11px]" style={{ color: 'rgba(255,255,255,0.40)' }}>no sessions logged yet</div>
       )}
+
       {metrics.length > 0 && (
-        // Second column starts at 58% so Bike/Swim line up with the verdict word above
-        // (Michael 2026-08-15: "move bike, not balanced"). LOAD's row is justify-between,
-        // so the verdict sits right-of-centre — a plain 50/50 grid put Bike left of it.
-        <div className="grid grid-cols-[60%_1fr] gap-x-4 gap-y-0.5 px-3">
-          {/* READOUT TREATMENT, PER SPORT (2026-08-15). Each metric sets its own accent, so
-              the label tints and the NUMBER glows in that sport's colour — the numbers were
-              flat white while only the labels carried colour, which read as a legend rather
-              than as instrument readouts. Same `readout-label`/`readout-num` pair State and
-              the workout Performance tab use, so the week totals here and the discipline
-              rows on State are one treatment. */}
-          {metrics.map((m, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-1.5 min-w-0"
-              style={{ ['--card-accent-rgb' as string]: getDisciplineColorRgb(m.type) } as React.CSSProperties}
-            >
-              <span className="readout-label font-light leading-tight" style={{ fontSize: '0.82rem' }}>{m.label}</span>
-              <span className="readout-num font-light leading-tight truncate" style={{ fontSize: '0.82rem' }}>{m.value}</span>
-            </div>
+        <div className="mt-3 grid grid-cols-3 gap-x-3">
+          {metrics.map((m) => (
+            <SportCell key={m.label} label={m.label} value={m.value} sport={m.sport} />
           ))}
         </div>
       )}
+
+      {/* ⛔ THE EXPLANATION OPENS WITH THE CHEVRON — one owner for the words, `LoadKey` in `LoadBar`. */}
+      {expanded && ff ? <LoadKey ff={ff} /> : null}
     </div>
   );
 };

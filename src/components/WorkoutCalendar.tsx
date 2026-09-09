@@ -19,8 +19,10 @@ import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
 import RescheduleValidationPopup from '@/components/RescheduleValidationPopup';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
-import LoadBar from '@/components/LoadBar';
-import { weekExecTotals } from '@/lib/week-exec-totals';
+// ⚠️ `LoadBar` IS NO LONGER IMPORTED HERE — the load card it fed left this screen for Today
+// (2026-09-09). See `WeekLoadCard`.
+// ⚠️ `weekExecTotals` went with `LoadBar` — it fed that card's planned/done inputs and nothing else
+// on this screen. It is still the shared reader State and Today's card use.
 import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 import { fetchWeekUnified } from '@/lib/fetchWeekUnified';
 import { formatPlannedSwimDistanceChip } from '@/utils/swimPlanTokens';

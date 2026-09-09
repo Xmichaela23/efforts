@@ -77,6 +77,35 @@ const FORM_ZONE_CLS: Record<string, string> = {
 // composition (which discipline carried the load — our differentiator, and the same "TSS by sport" split
 // TrainingPeaks draws on its dashboard) as the primary visual. Per-day detail lives in the calendar.
 
+/**
+ * ⛔ THE LOAD EXPLANATION, IN ONE PLACE (2026-09-09). Two surfaces open it — State, behind this
+ * bar's ⓘ, and Today's load card, behind its chevron. It is athlete-facing copy, and a second copy
+ * of these paragraphs is a second thing to keep true, so it is extracted rather than duplicated.
+ *
+ * ⚠️ THE WORDS ARE UNCHANGED. Only where they live moved.
+ */
+export function LoadKey({ ff }: { ff: NonNullable<LoadBarData['fitness_fatigue']> }) {
+  const fmt1 = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? null : Math.round(v));
+  const zone = formZone(ff?.form);
+  return (
+    <div className="mt-1.5 text-[12px] text-white/65 leading-snug max-w-[min(100%,360px)]">
+      <p>Every session earns workload points. Fitness averages them over the last six weeks, fatigue over the last week. The small numbers are this week's change.</p>
+      <p className="mt-1">Form is one subtraction, fitness − fatigue, taken as you start the day{fmt1(ff.fitness_prior) != null && fmt1(ff.fatigue_prior) != null ? `: ${fmt1(ff.fitness_prior)} − ${fmt1(ff.fatigue_prior)} = ${(ff.form ?? 0) > 0 ? '+' : ''}${fmt1(ff.form)}` : ''}. The word beside it comes from this table:</p>
+      <table className="mt-1 text-[12px] tabular-nums">
+        <tbody>
+          {([['above +25', 'transitional', 'fitness fading'], ['+5 to +25', 'fresh', 'race shape'], ['−10 to +5', 'grey zone', 'not building, not sharp'], ['−30 to −10', 'optimal', 'building'], ['below −30', 'high risk', '']] as Array<[string, string, string]>).map(([range, word, meaning]) => (
+            <tr key={word} className={zone === word ? 'text-white/95' : 'text-white/55'}>
+              <td className="pr-3 py-0.5 whitespace-nowrap">{range}</td>
+              <td className="pr-3 py-0.5 whitespace-nowrap">{zone === word ? '▸ ' : ''}{word}</td>
+              <td className="py-0.5">{meaning}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function LoadBar({ load, compact }: LoadBarProps) {
   const [showKey, setShowKey] = React.useState(false);
   // ⛔ THE LOAD READ IS TRAININGPEAKS' PMC, WHOLE (2026-09-04, Michael: "each metric has to have an absolute
@@ -148,23 +177,7 @@ export default function LoadBar({ load, compact }: LoadBarProps) {
           <span className="text-[11px] text-white/40 leading-none">no sessions logged yet</span>
         )}
       </div>
-      {showKey && ff && (
-        <div className="mt-1.5 text-[12px] text-white/65 leading-snug max-w-[min(100%,360px)]">
-          <p>Every session earns workload points. Fitness averages them over the last six weeks, fatigue over the last week. The small numbers are this week's change.</p>
-          <p className="mt-1">Form is one subtraction, fitness − fatigue, taken as you start the day{fmt1(ff.fitness_prior) != null && fmt1(ff.fatigue_prior) != null ? `: ${fmt1(ff.fitness_prior)} − ${fmt1(ff.fatigue_prior)} = ${(ff.form ?? 0) > 0 ? '+' : ''}${fmt1(ff.form)}` : ''}. The word beside it comes from this table:</p>
-          <table className="mt-1 text-[12px] tabular-nums">
-            <tbody>
-              {([['above +25', 'transitional', 'fitness fading'], ['+5 to +25', 'fresh', 'race shape'], ['−10 to +5', 'grey zone', 'not building, not sharp'], ['−30 to −10', 'optimal', 'building'], ['below −30', 'high risk', '']] as Array<[string, string, string]>).map(([range, word, meaning]) => (
-                <tr key={word} className={zone === word ? 'text-white/95' : 'text-white/55'}>
-                  <td className="pr-3 py-0.5 whitespace-nowrap">{range}</td>
-                  <td className="pr-3 py-0.5 whitespace-nowrap">{zone === word ? '▸ ' : ''}{word}</td>
-                  <td className="py-0.5">{meaning}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {showKey && ff && <LoadKey ff={ff} />}
 
       {/* Composition strip — the primary load visual (full surface only). */}
       {!compact && comp.length > 0 && total > 0 && (
