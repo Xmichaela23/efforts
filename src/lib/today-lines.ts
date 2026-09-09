@@ -253,18 +253,22 @@ const FAMILY_LINE: Record<string, string> = {
   ride_sweet_spot: 'As close to threshold as you can without going over.',
 };
 
-/** p107. Every endurance family carries it. */
-const STOP_RULE = 'Heart rate up 5 percent, or output down 5 percent: stop.';
-
 /**
- * The family line (when the book has one) then the stop rule. A session the athlete brought in
- * rather than one the plan built gets neither — the caller decides that; see `isFromPlan`.
+ * ⛔⛔ THE STOP RULE IS OFF TODAY (Michael, 2026-09-09, §2 as revised). It read
+ * *"Heart rate up 5 percent, or output down 5 percent: stop."* under every endurance session.
+ *
+ * ⚠️ THE CLAIM IS NOT WITHDRAWN AND THE PAGE HAS NOT MOVED — p107 still says it, and the ride/run
+ * card still reads drift against that same 5 percent line AFTER the session, with heat and hills
+ * beside it. What changed is where it belongs: it is a rule the athlete applies mid-session with a
+ * watch, and Today is read before the session starts. ⛔ DO NOT PUT IT BACK HERE without the ruling
+ * changing; the constant is deliberately gone rather than left unreferenced, because a dead string
+ * in this file is one a later session will wire back up.
+ *
+ * The family line, when the book has one, and nothing else. A session the athlete brought in rather
+ * than one the plan built gets nothing — the caller decides that; see `isFromPlan`.
  */
 export function enduranceLinesFor(session: TodayRow): string[] {
   const family = familyOf(session);
-  const out: string[] = [];
   const line = family ? FAMILY_LINE[family] : undefined;
-  if (line) out.push(line);
-  out.push(STOP_RULE);
-  return out;
+  return line ? [line] : [];
 }

@@ -152,10 +152,9 @@ Deno.test('the movement shows the execution the athlete’s kit reaches', () => 
 
 // ── the endurance session ───────────────────────────────────────────────────────────────────────
 
-Deno.test('each named family gets its line, then the stop rule', () => {
+Deno.test('each named family gets its line, and only that line', () => {
   assertEquals(enduranceLinesFor(ride('ride_anaerobic', 'above')), [
     'Go by feel. Stay above the floor. No ceiling. Each set harder than the last.',
-    'Heart rate up 5 percent, or output down 5 percent: stop.',
   ]);
   assertEquals(enduranceLinesFor(ride('ride_sweet_spot', 'below'))[0], 'As close to threshold as you can without going over.');
   assertEquals(enduranceLinesFor(run('run_vt1', 'vt1_or_easier'))[0], 'Easy. Talk test twice, at 5 minutes and at 20.');
@@ -171,9 +170,30 @@ Deno.test('⛔ THE HARD RUN IS BOTH FAMILY IDS — the composer stamps `run_near
   assertEquals(enduranceLinesFor(run('run_near_threshold', 'near'))[0], line);
 });
 
-Deno.test('⛔ A FAMILY THE BOOK HAS NO LINE FOR GETS THE STOP RULE AND NOTHING INVENTED', () => {
-  assertEquals(enduranceLinesFor(ride('ride_vo2', 'above')), ['Heart rate up 5 percent, or output down 5 percent: stop.']);
-  assertEquals(enduranceLinesFor(run('run_sprint_power', 'above')).length, 1);
+Deno.test('⛔ A FAMILY THE BOOK HAS NO LINE FOR GETS NOTHING, AND NOTHING IS INVENTED', () => {
+  assertEquals(enduranceLinesFor(ride('ride_vo2', 'above')), []);
+  assertEquals(enduranceLinesFor(run('run_sprint_power', 'above')), []);
+});
+
+/**
+ * ⛔ THE STOP RULE IS OFF TODAY (Michael, 2026-09-09, §2 as revised) — it is a mid-session rule the
+ * athlete applies with a watch, and the ride/run card reads drift against the same p107 line after
+ * the session. Pinned by its words, so wiring it back on is a test failure and not a quiet edit.
+ */
+Deno.test('⛔ NO STOP RULE ON ANY ENDURANCE SESSION', () => {
+  const everyLine = [
+    ...enduranceLinesFor(ride('ride_anaerobic', 'above')),
+    ...enduranceLinesFor(ride('ride_endurance', 'vt1_or_easier')),
+    ...enduranceLinesFor(ride('ride_sweet_spot', 'below')),
+    ...enduranceLinesFor(run('run_mlss', 'above')),
+    ...enduranceLinesFor(run('run_near_threshold', 'near')),
+    ...enduranceLinesFor(run('run_lsd', 'vt1_or_easier')),
+    ...enduranceLinesFor(run('run_vt1', 'vt1_or_easier')),
+  ].join(' ');
+  /* ⚠️ PIN THE SENTENCE, NOT A FRAGMENT OF IT. `/5 percent/` also matches the easy ride's
+     "under 75 percent", and `/stop\./` the long run's "Stopping for a bit is fine." */
+  assert(!everyLine.includes('Heart rate up 5 percent'), everyLine);
+  assert(!everyLine.includes('output down 5 percent'), everyLine);
 });
 
 Deno.test('⛔ NEVER THE WORD VT1 ON SCREEN', () => {

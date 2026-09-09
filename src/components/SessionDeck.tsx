@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getExerciseConfig } from '@/lib/exercise-config';
 import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
 import { displayDisciplineOf } from '@/lib/utils';
@@ -120,6 +120,20 @@ export const SessionDeck: React.FC<{
   const reduced = useMemo(prefersReducedMotion, []);
   const colour = getDisciplineColor(sport);
   const rgb = getDisciplineColorRgb(sport);
+  /**
+   * ⛔ THE CARD IS AS TALL AS ITS OWN CUE (Michael, 2026-09-09: the cards look bulky). The stack has
+   * to be absolutely positioned for the cards to sit on one another, which leaves the container with
+   * no height — so it takes the FRONT card's, measured.
+   * ⚠️ `useLayoutEffect`, so the browser never paints the unmeasured state.
+   */
+  const cardRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const [stackHeight, setStackHeight] = useState<number | undefined>(undefined);
+  useLayoutEffect(() => {
+    const el = cardRefs.current[idx];
+    if (!el) return;
+    const h = el.offsetHeight;
+    setStackHeight((prev) => (prev === h ? prev : h));
+  }, [idx, cards]);
 
   const go = useCallback((n: number) => {
     setIdx((prev) => Math.max(0, Math.min(cards.length - 1, n === prev ? prev : n)));
@@ -179,11 +193,8 @@ export const SessionDeck: React.FC<{
   return (
     <div
       data-deck="1"
-      className="relative select-none"
-      /* ⚠️ THE TOP MARGIN IS THE HEAD'S ROOM. The session name and `n of N` sit ABOVE the card at
-         `top: -4`, outside the deck's own box; without the margin they land on whatever the day
-         printed above — on a two-a-day, the spacing line. */
-      style={{ height: 236, margin: '20px 0 22px', perspective: 900, touchAction: 'pan-y', ['--c' as string]: colour }}
+      className="select-none"
+      style={{ margin: '18px 0 20px', perspective: 900, touchAction: 'pan-y', ['--c' as string]: colour }}
       onPointerDown={(e) => {
         setDragging(true);
         startX.current = e.clientX;
@@ -199,72 +210,98 @@ export const SessionDeck: React.FC<{
       onPointerUp={end}
       onPointerCancel={end}
     >
-      {/* Session name and `n of N`, above the deck. */}
+      {/* Session name and `n of N`, in flow above the stack. */}
       <div
-        className="absolute left-0 right-0 flex justify-between text-[13px] uppercase tracking-[0.06em] z-[5]"
-        style={{ top: -4, color: 'rgba(255,255,255,0.38)' }}
+        className="flex justify-between text-[11px] uppercase tracking-[0.06em] mb-1.5"
+        style={{ color: 'rgba(255,255,255,0.38)' }}
       >
         <span className="truncate pr-3">{title}</span>
         <span data-deck-pos="1" className="tabular-nums flex-shrink-0">{idx + 1} of {cards.length}</span>
       </div>
 
-      {cards.map((c, i) => (
-        <button
-          key={c.key}
-          type="button"
-          className="absolute text-left w-full"
-          style={{
-            ...glass(rgb),
-            inset: '22px 0 0 0',
-            padding: '18px 20px 16px',
-            transformStyle: 'preserve-3d',
-            transformOrigin: '50% 60%',
-            transition: dragging || reduced
-              ? 'none'
-              : 'transform 420ms cubic-bezier(.2,.8,.2,1), opacity 420ms ease, filter 420ms ease',
-            willChange: 'transform',
-            cursor: 'pointer',
-            ...styleFor(i),
-          }}
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            // ⛔ A DRAG IS NOT A TAP. Anything past a few pixels was the deck's gesture.
-            if (moved.current > 8) return;
-            onOpen?.();
-          }}
-        >
-          <div className="text-[22px] font-semibold leading-tight" style={{ letterSpacing: '-0.01em', color: 'rgba(255,255,255,0.95)' }}>
-            {c.name}
-          </div>
-          {c.meta ? (
-            <div className="absolute text-[13px] tabular-nums" style={{ right: 18, top: 16, color: 'rgba(255,255,255,0.38)' }}>
-              {c.meta}
+      {/**
+        * ⛔ THE STACK RESERVES EXACTLY THE FRONT CARD'S HEIGHT (Michael, 2026-09-09: the cards look
+        * bulky). The cards must be absolutely positioned to sit on top of one another, which takes
+        * them out of flow and leaves the container with no height of its own — the first cut gave it
+        * a fixed 236 px, so a one-line cue got the same box as a three-line one and the short cards
+        * were mostly empty.
+        *
+        * ⚠️ MEASURED IN A LAYOUT EFFECT, so the browser never paints the unmeasured state, and
+        * transitioned so a swipe between a short cue and a long one does not snap.
+        */}
+      <div
+        className="relative"
+        style={{
+          height: stackHeight ?? undefined,
+          transition: reduced ? 'none' : 'height 420ms cubic-bezier(.2,.8,.2,1)',
+        }}
+      >
+        {cards.map((c, i) => (
+          <button
+            key={c.key}
+            ref={(el) => { cardRefs.current[i] = el; }}
+            type="button"
+            className="absolute text-left w-full"
+            style={{
+              ...glass(rgb),
+              top: 0, left: 0, right: 0,
+              padding: '14px 16px',
+              transformStyle: 'preserve-3d',
+              transformOrigin: '50% 60%',
+              transition: dragging || reduced
+                ? 'none'
+                : 'transform 420ms cubic-bezier(.2,.8,.2,1), opacity 420ms ease, filter 420ms ease',
+              willChange: 'transform',
+              cursor: 'pointer',
+              ...styleFor(i),
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              // ⛔ A DRAG IS NOT A TAP. Anything past a few pixels was the deck's gesture.
+              if (moved.current > 8) return;
+              onOpen?.();
+            }}
+          >
+            {/* ⛔ THE WEIGHT SITS ON THE NAME LINE, RIGHT. It used to be absolutely positioned above
+                the name, which cost the card a whole line for four characters. */}
+            <div className="flex items-baseline justify-between gap-3">
+              <div className="text-[20px] font-semibold leading-tight min-w-0" style={{ letterSpacing: '-0.01em', color: 'rgba(255,255,255,0.95)' }}>
+                {c.name}
+              </div>
+              {c.meta ? (
+                <div className="text-[13px] tabular-nums flex-shrink-0" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                  {c.meta}
+                </div>
+              ) : null}
             </div>
-          ) : null}
-          {c.kind ? (
-            <div
-              className="flex items-center gap-2 text-[13px] uppercase tracking-[0.08em]"
-              style={{ color: colour, margin: '6px 0 12px' }}
-            >
-              <span
-                aria-hidden="true"
-                className="inline-block rounded-full flex-shrink-0"
-                style={{ width: 7, height: 7, background: colour, boxShadow: `0 0 10px ${colour}` }}
-              />
-              {c.kind}
-            </div>
-          ) : null}
-          {c.cue ? (
-            <div className="text-[16px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.92)', marginTop: c.kind ? 0 : 10 }}>
-              {c.cue}
-            </div>
-          ) : null}
-        </button>
-      ))}
+            {c.kind ? (
+              <div
+                className="flex items-center gap-2 text-[12px] uppercase tracking-[0.08em]"
+                style={{ color: colour, margin: '5px 0 8px' }}
+              >
+                <span
+                  aria-hidden="true"
+                  className="inline-block rounded-full flex-shrink-0"
+                  style={{ width: 7, height: 7, background: colour, boxShadow: `0 0 10px ${colour}` }}
+                />
+                {c.kind}
+              </div>
+            ) : null}
+            {c.cue ? (
+              <div
+                className="text-[15px]"
+                style={{ lineHeight: 1.35, color: 'rgba(255,255,255,0.92)', marginTop: c.kind ? 0 : 8 }}
+              >
+                {c.cue}
+              </div>
+            ) : null}
+          </button>
+        ))}
+      </div>
 
-      {/* Position dots, below the deck. */}
-      <div className="absolute left-0 right-0 flex gap-1.5 justify-center" style={{ bottom: -2 }}>
+      {/* Position dots, in flow below the stack. */}
+      <div className="flex gap-1.5 justify-center mt-2.5">
         {cards.map((c, i) => (
           <span
             key={c.key}
@@ -300,21 +337,26 @@ export const SessionCard: React.FC<{
   return (
     <button
       type="button"
-      className="relative w-full text-left"
-      style={{ ...glass(rgb), padding: '18px 20px 16px', margin: '0 0 22px', cursor: 'pointer' }}
+      className="w-full text-left"
+      /* ⚠️ SAME PADDING AND TYPE AS A DECK CARD, and no fixed height — the card is as tall as its
+         family line and stop rule, nothing more. */
+      style={{ ...glass(rgb), padding: '14px 16px', margin: '0 0 20px', cursor: 'pointer' }}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpen?.(); }}
     >
-      <div className="text-[22px] font-semibold leading-tight pr-16" style={{ color: colour }}>{title}</div>
-      {meta ? (
-        <div className="absolute text-[14px] tabular-nums" style={{ right: 18, top: 18, color: 'rgba(255,255,255,0.62)' }}>
-          {meta}
-        </div>
-      ) : null}
+      {/* ⛔ THE TIME SITS ON THE NAME LINE, RIGHT — the same rule the deck card follows. */}
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="text-[20px] font-semibold leading-tight min-w-0" style={{ color: colour }}>{title}</div>
+        {meta ? (
+          <div className="text-[13px] tabular-nums flex-shrink-0" style={{ color: 'rgba(255,255,255,0.62)' }}>
+            {meta}
+          </div>
+        ) : null}
+      </div>
       {lines.map((line, i) => (
         <div
           key={line}
-          className="text-[16px] leading-relaxed"
-          style={{ marginTop: i === 0 ? 10 : 8, color: i === 0 ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.62)' }}
+          className="text-[15px]"
+          style={{ lineHeight: 1.35, marginTop: i === 0 ? 8 : 6, color: i === 0 ? 'rgba(255,255,255,0.92)' : 'rgba(255,255,255,0.62)' }}
         >
           {line}
         </div>
