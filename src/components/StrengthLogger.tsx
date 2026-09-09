@@ -80,6 +80,7 @@ import { canWritePullupCapacity } from '@/lib/pullup-progression';
 // asked of the shared classifier rather than a private regex.
 import { calculateRestTime, isPlyometricMovement as isPlyometric, restBucketForIntent, restCueForBucket, WARMUP_REST_SEC, REST_MINUTES_ARE_OURS } from '@/lib/strength-rest-timer';
 import { PLYO_FAMILIES, PLYO_FAMILY_IDS, type PlyoFamily } from '@shared/standing-plan/plyo';
+import { executionHowTo, executionName } from '@shared/strength-grid/grid.ts';
 
 // ⛔ THE PLYO ROW IS A DRILL, NOT A SET (WORKORDER-plyo-screen-2026-09-02, p227). No weight, no rep
 // target, no reserve — "performed multiple times with ample rest", done "until the movement is
@@ -5808,6 +5809,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             ? {
                                 ...ex,
                                 name: altName,
+                                // 2026-09-08: the name box shows `execution_name || name`, and a swap that
+                                // left the old display name in place changed the row underneath while the
+                                // box went on saying the old movement. The display name and the how-to
+                                // belong to the movement, so they are re-derived for the new one.
+                                execution_name: (() => { const d = executionName(altName, strengthEquipment); return d !== altName ? d : undefined; })(),
+                                how_to: executionHowTo(altName, strengthEquipment) ?? undefined,
                                 // The prescription (target reps, target RIR, authored %) belongs to the
                                 // SLOT, not to the lift that was sitting in it, so it rides through the
                                 // swap untouched. The athlete's own entries do not: `rir` was their
