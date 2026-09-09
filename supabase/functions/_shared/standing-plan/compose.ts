@@ -2420,9 +2420,10 @@ function rowSwapOptions(
   equipment: string[] | null | undefined,
 ): { swap_options?: { name: string; display: string }[] } {
   if (!slotKey) return {};
-  const self = canonicalize(movement);
+  // The whole list, the row's own movement included: after a swap the athlete may want it back
+  // (Michael, 2026-09-08). The logger hides whichever one the row currently is.
+  void movement;
   const opts = pickOptions(slotKey, equipment ?? null, slot.muscle ?? null, slot.alsoAdmits ?? null)
-    .filter((o) => canonicalize(o.name) !== self)
     .map((o) => ({ name: o.name, display: o.display }));
   return opts.length > 0 ? { swap_options: opts } : {};
 }

@@ -5686,8 +5686,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               {swapFor === exercise.id && (() => {
                 // 2026-09-08: a frame accessory row carries its slot's own pick list; that is the
                 // swap list, the same one the builder showed. Nothing else is offered for it.
+                const isSelf = (n: string) => {
+                  const k = n.toLowerCase().trim();
+                  return k === String(exercise.name || '').toLowerCase().trim() || k === String(exercise.execution_name || '').toLowerCase().trim();
+                };
                 const alts: AlternativeOption[] = (exercise.swap_options && exercise.swap_options.length > 0)
-                  ? exercise.swap_options.map((o) => ({ name: o.name, display: o.display, same_pattern: true as const, equipment: 'unknown' as const, tier: 'direct' as const }))
+                  ? exercise.swap_options
+                    .filter((o) => !isSelf(o.name) && !isSelf(o.display))
+                    .map((o) => ({ name: o.name, display: o.display, same_pattern: true as const, equipment: 'unknown' as const, tier: 'direct' as const }))
                   : plyoFamilyFor(exercise.name)
                   ? plyoAlternatives(exercise.name, strengthEquipment)
                   : getInSlotAlternatives(
