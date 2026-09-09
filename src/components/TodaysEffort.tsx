@@ -903,7 +903,23 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     return items
       .map((it:any) => {
         const isCompleted = String(it?.status||'').toLowerCase()==='completed';
-        if (isCompleted) return it?.completed_workout ?? mapUnifiedItemToCompleted(it);
+        if (isCompleted) {
+          const row = it?.completed_workout ?? mapUnifiedItemToCompleted(it);
+          /**
+           * ⛔ THE PERFORMANCE PAYLOAD AND THE NAME RIDE ON THE ITEM, NOT INSIDE `completed_workout`
+           * (2026-09-09). `get-week` emits `workout_analysis` and `name` at the item's top level; the
+           * server's `completed_workout` block carries neither, and this branch prefers that block —
+           * so the completed card reached the screen with no `session_detail_v1` and the four
+           * Performance tiles had nothing to draw.
+           * ⚠️ THE BLOCK STILL WINS WHERE IT HAS A VALUE. This only fills what it does not carry, so
+           * a row whose analysis genuinely has not run still shows no tiles — the honest state.
+           */
+          return {
+            ...row,
+            workout_analysis: row?.workout_analysis ?? it?.workout_analysis ?? null,
+            name: row?.name ?? it?.name ?? null,
+          };
+        }
         return it?.planned_workout ?? null;
       })
       .filter(Boolean);
@@ -1828,19 +1844,25 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   </div>
                 );
                 /**
-                 * ⛔⛔ A PLANNED SESSION FROM THE PLAN IS A DECK OR A CARD NOW (work order §3d) — a
-                 * lift and the plyo day swipe one row at a time, a ride or run is one glass card.
-                 * `TodaySession` returns null for anything else, and the pill below is what
-                 * "anything else" gets: a COMPLETED session, which carries provider attribution and
-                 * its own metrics, and one the athlete brought in. Those were not part of §3d and
-                 * are deliberately untouched.
+                 * ⛔⛔ TODAY IS ONE CARD OBJECT AT THREE STATES. A planned lift or plyo day swipes as
+                 * a deck, a planned ride or run is one glass card, and a COMPLETED session is the
+                 * same card greyed (Michael, 2026-09-09). ⚠️ THE PILL ROW BELOW IS NOW ONLY FOR A
+                 * SKIPPED SESSION, which says why it was skipped and is not a reading of anything.
+                 *
+                 * ⛔ AND A DONE SESSION OPENS ON PERFORMANCE, not in the planned drawer.
+                 * `handleEditEffort` already routes a completed row there (`AppLayout`: *"Completed:
+                 * open on Performance tab"*), so this asks for the door that exists.
                  */
+                const isCompletedRow = (w: { workout_status?: unknown }) =>
+                  String(w?.workout_status ?? '').toLowerCase() === 'completed';
                 if (rendersAsSessionCard(workout as never)) {
                   return wrap(
                     <TodaySession
                       session={workout as never}
                       useImperial={useImperial}
-                      onOpen={() => setSelectedPlannedWorkout(workout)}
+                      onOpen={() => (isCompletedRow(workout)
+                        ? onEditEffort?.(workout)
+                        : setSelectedPlannedWorkout(workout))}
                     />,
                   );
                 }

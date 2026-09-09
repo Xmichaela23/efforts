@@ -2,7 +2,10 @@ import React from 'react';
 import CardDeck, { deckGlass, type DeckItem } from './CardDeck';
 import { getExerciseConfig } from '@/lib/exercise-config';
 import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
-import { displayDisciplineOf } from '@/lib/utils';
+import { displayDisciplineOf, normalizeDistanceKm } from '@/lib/utils';
+import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
+import { extractSessionDetailV1FromWorkout } from '@/hooks/useWorkoutDetail';
+import AdherenceChips from './AdherenceChips';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 import { formatSessionDuration } from './PlannedSessionHeader';
 import {
@@ -220,6 +223,127 @@ export const SessionCard: React.FC<{
   );
 };
 
+// ── the completed card ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * A session that is DONE. Same card object as a planned one, greyed: the sport colour at low alpha
+ * on the edge and the glow, the title dimmed. ⛔ NO CUE LINES — the cues tell an athlete how to do
+ * work that is still in front of them, and on a finished row they would be instructions for a set
+ * already over.
+ *
+ * ⚠️ THIS REPLACES THE OLD PILL ROW for completed and brought-in sessions (Michael, 2026-09-09), so
+ * Today is one object at three states — planned, done, and the deck — rather than two visual
+ * languages on one list.
+ *
+ * ⛔ LINE 2 IS THE PERFORMANCE TAB'S OWN FOUR TILES, `AdherenceChips`, rendered rather than
+ * reimplemented: Workload with the usual range, Execution, Duration of plan, and Drift against
+ * p107's 5 percent line. SAME NUMBERS, SAME SOURCE, NOTHING RECOMPUTED — they come off
+ * `workout_analysis.session_detail_v1`, the payload the Performance tab reads, which `get-week`
+ * already carries on the row. ⚠️ NO SECOND FETCH: `extractSessionDetailV1FromWorkout` reads what is
+ * in hand. A row whose analysis has not landed shows line 1 and no tiles, which is the honest state.
+ */
+const doneGlass = (rgb: string): React.CSSProperties => ({
+  borderRadius: 18,
+  background: 'linear-gradient(180deg, rgba(16,17,21,0.90), rgba(10,11,14,0.96))',
+  border: `1px solid rgba(${rgb},0.18)`,
+  boxShadow: `0 0 0 1px rgba(255,255,255,0.02) inset, 0 14px 40px rgba(0,0,0,0.5), 0 0 24px rgba(${rgb},0.06)`,
+});
+
+/** `5.0 mi · 48:00` for a run or ride; `3,725 lb · 3 lifts` for a lift session. */
+export function doneHeadline(workout: Record<string, unknown>, useImperial: boolean): string | null {
+  /**
+   * ⚠️ THE DURATION FALLS BACK TO THE PERFORMANCE PAYLOAD'S OWN `completed_totals.duration_s`.
+   * `get-week`'s `completed_workout` block does not always carry a moving time, and the number the
+   * tiles below already print is the same session's — reading it is not a second opinion.
+   */
+  const sdTotals = (extractSessionDetailV1FromWorkout(workout) as { completed_totals?: { duration_s?: unknown } } | null)?.completed_totals;
+  const parts: string[] = [];
+  if (String(workout?.type ?? '').toLowerCase() === 'strength') {
+    // ⛔ THE SAME `reps × weight` SUM the load card and `StrengthCompletedView` print, gated the same
+    // way: a 0 lb set contributes nothing.
+    const exercises = Array.isArray((workout as { executed?: { strength_exercises?: unknown } })?.executed?.strength_exercises)
+      ? ((workout as { executed: { strength_exercises: Array<{ sets?: Array<{ reps?: unknown; weight?: unknown; completed?: unknown }> }> } }).executed.strength_exercises)
+      : Array.isArray(workout?.strength_exercises)
+        ? (workout.strength_exercises as Array<{ sets?: Array<{ reps?: unknown; weight?: unknown; completed?: unknown }> }>)
+        : [];
+    let volume = 0;
+    for (const ex of exercises) {
+      for (const s of ex?.sets ?? []) {
+        if (s?.completed === false) continue;
+        const reps = Number(s?.reps) || 0;
+        const weight = Number(s?.weight) || 0;
+        if (reps > 0 && weight > 0) volume += reps * weight;
+      }
+    }
+    const lifts = exercises.filter((ex) => Array.isArray(ex?.sets) && ex.sets.length > 0).length;
+    if (volume > 0) parts.push(`${Math.round(useImperial ? volume : volume * 0.453592).toLocaleString()} ${useImperial ? 'lb' : 'kg'}`);
+    if (lifts > 0) parts.push(`${lifts} ${lifts === 1 ? 'lift' : 'lifts'}`);
+    return parts.length ? parts.join(' · ') : null;
+  }
+
+  const km = normalizeDistanceKm(workout as never);
+  if (km != null && Number.isFinite(km) && km > 0) {
+    parts.push(useImperial ? `${(km * 0.621371).toFixed(1)} mi` : `${km.toFixed(1)} km`);
+  }
+  const moving = resolveMovingSeconds(workout as never);
+  const secs = moving != null && Number.isFinite(moving) && moving > 0 ? moving : Number(sdTotals?.duration_s);
+  if (secs != null && Number.isFinite(secs) && secs > 0) {
+    const s = Math.round(secs);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const ss = s % 60;
+    parts.push(h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}` : `${m}:${String(ss).padStart(2, '0')}`);
+  }
+  return parts.length ? parts.join(' · ') : null;
+}
+
+export const CompletedSessionCard: React.FC<{
+  workout: Record<string, unknown>;
+  useImperial: boolean;
+  onOpen?: () => void;
+}> = ({ workout, useImperial, onOpen }) => {
+  const sport = displayDisciplineOf(workout as never);
+  const colour = getDisciplineColor(sport);
+  const rgb = getDisciplineColorRgb(sport);
+  const headline = doneHeadline(workout, useImperial);
+
+  const sd = extractSessionDetailV1FromWorkout(workout) as Parameters<typeof AdherenceChips>[0]['sessionDetail'];
+  /* ⚠️ THE SAME GATE THE PERFORMANCE TAB APPLIES. `noPlannedCompare` is what turns the tiles off for
+     a session with nothing to compare against; reading it here rather than inventing a rule keeps
+     the two surfaces showing the tiles on exactly the same rows. */
+  const noPlannedCompare = !(sd?.plan_context as { planned_id?: unknown } | undefined)?.planned_id;
+
+  return (
+    <button
+      type="button"
+      className="w-full text-left"
+      style={{ ...doneGlass(rgb), padding: '14px 16px', margin: '0 0 14px', cursor: 'pointer' }}
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpen?.(); }}
+    >
+      <div className="flex items-baseline justify-between gap-3">
+        {/* ⚠️ THE SPORT COLOUR AT LOW ALPHA — done, not gone. A flat grey title would lose which
+            sport this was, which is the one thing the row still has to say at a glance. */}
+        <div className="text-[20px] font-semibold leading-tight min-w-0 truncate" style={{ color: `${colour}8C` }}>
+          {deriveWorkoutTitle(workout as never)}
+        </div>
+        <span aria-label="Completed" className="text-[13px] flex-shrink-0" style={{ color: 'rgba(255,255,255,0.45)' }}>✓</span>
+      </div>
+
+      {headline ? (
+        <div className="text-[15px] tabular-nums" style={{ lineHeight: 1.35, marginTop: 6, color: 'rgba(255,255,255,0.62)' }}>
+          {headline}
+        </div>
+      ) : null}
+
+      {sd ? (
+        <div style={{ marginTop: 2, marginLeft: -8, marginRight: -8, opacity: 0.85 }}>
+          <AdherenceChips sessionDetail={sd} hasSessionDetail noPlannedCompare={noPlannedCompare} dense />
+        </div>
+      ) : null}
+    </button>
+  );
+};
+
 // ── the one entry point Today renders ───────────────────────────────────────────────────────────
 
 /**
@@ -232,7 +356,11 @@ export const SessionCard: React.FC<{
  */
 export function rendersAsSessionCard(session: TodayRow): boolean {
   const status = String((session as { workout_status?: unknown })?.workout_status ?? '').toLowerCase();
-  if (status === 'completed' || status === 'skipped') return false;
+  // ⛔ A DONE SESSION IS A CARD TOO NOW (Michael, 2026-09-09) — the greyed one, with its headline and
+  // the Performance tab's tiles. What is left for the old pill row is a SKIPPED session, which says
+  // why it was skipped and is not a reading of anything.
+  if (status === 'skipped') return false;
+  if (status === 'completed') return true;
   if (!isFromPlan(session)) return false;
   return isStrengthRow(session) || isEnduranceRow(session);
 }
@@ -246,7 +374,14 @@ const TodaySession: React.FC<{ session: TodayRow; useImperial: boolean; onOpen?:
   session, useImperial, onOpen,
 }) => {
   const status = String((session as { workout_status?: unknown })?.workout_status ?? '').toLowerCase();
-  if (status === 'completed' || status === 'skipped') return null;
+  if (status === 'skipped') return null;
+
+  // ⛔ DONE FIRST. A completed session — planned or brought in — is the greyed card; everything below
+  // is about work still ahead.
+  if (status === 'completed') {
+    return <CompletedSessionCard workout={session as Record<string, unknown>} useImperial={useImperial} onOpen={onOpen} />;
+  }
+
   if (!isFromPlan(session)) return null;
 
   const sport = displayDisciplineOf(session as never);

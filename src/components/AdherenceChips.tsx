@@ -55,6 +55,13 @@ interface AdherenceChipsProps {
   hasSessionDetail: boolean;
   noPlannedCompare: boolean;
   hideTopAdherence?: boolean;
+  /**
+   * ⛔ ADDITIVE, OPT-IN, AND THE PERFORMANCE TAB DOES NOT PASS IT (2026-09-09). Today's completed
+   * card is ~314 px wide inside its padding; these four chips were built for the full-width
+   * Performance tab and ran into one another there — "WORKLOADEXECUTION". Dense only shrinks the
+   * type and closes the gaps. ⚠️ NO NUMBER, LABEL OR SUBTITLE CHANGES.
+   */
+  dense?: boolean;
 }
 
 export default function AdherenceChips({
@@ -62,7 +69,21 @@ export default function AdherenceChips({
   hasSessionDetail,
   noPlannedCompare,
   hideTopAdherence,
+  dense = false,
 }: AdherenceChipsProps) {
+  const numCls = dense ? 'readout-num text-sm whitespace-nowrap' : 'readout-num text-lg whitespace-nowrap';
+  const labelCls = dense
+    ? 'readout-label text-[9px] uppercase text-center whitespace-nowrap'
+    : 'readout-label text-[11px] uppercase text-center whitespace-nowrap';
+  const subCls = dense
+    ? 'text-[9px] text-white/40 text-center leading-snug whitespace-nowrap'
+    : 'text-[10px] text-white/40 text-center leading-snug whitespace-nowrap';
+  const rowCls = dense
+    ? 'flex items-start justify-between w-full px-0 gap-1'
+    : 'flex items-start justify-between w-full px-3';
+  const outerCls = dense
+    ? 'flex items-center justify-center gap-2 text-center mb-1'
+    : 'flex items-center justify-center gap-6 text-center mb-3';
   try {
     if (!hasSessionDetail || !sd) return null;
     if (noPlannedCompare) return null;
@@ -166,9 +187,9 @@ export default function AdherenceChips({
         // 2026-09-03: same markup as chipText so the four readouts sit on one baseline (the percentage
         // chip used to be smaller and lower-case, which read as a different kind of thing).
         <div className="flex flex-col items-center px-1 min-w-0">
-          <div className="readout-num text-lg whitespace-nowrap">{pct}%</div>
-          <div className="readout-label text-[11px] uppercase text-center whitespace-nowrap">{label}</div>
-          <div className="text-[10px] text-white/40 text-center leading-snug whitespace-nowrap">{text}</div>
+          <div className={numCls}>{pct}%</div>
+          <div className={labelCls}>{label}</div>
+          <div className={subCls}>{text}</div>
         </div>
       );
     };
@@ -189,9 +210,9 @@ export default function AdherenceChips({
       if (!value) return null;
       return (
         <div className="flex flex-col items-center px-1 min-w-0">
-          <div className="readout-num text-lg whitespace-nowrap">{value}</div>
-          <div className="readout-label text-[11px] uppercase text-center whitespace-nowrap">{label}</div>
-          <div className="text-[10px] text-white/40 text-center leading-snug whitespace-nowrap">{text}</div>
+          <div className={numCls}>{value}</div>
+          <div className={labelCls}>{label}</div>
+          <div className={subCls}>{text}</div>
         </div>
       );
     };
@@ -307,8 +328,8 @@ export default function AdherenceChips({
       return (
         <div className="w-full pt-1 pb-2">
           {weekLabel && <div className="readout-label mb-2 text-center text-[11px] uppercase">{weekLabel}</div>}
-          <div className="flex items-center justify-center gap-6 text-center mb-3">
-            <div className="flex items-start justify-between w-full px-3">
+          <div className={outerCls}>
+            <div className={rowCls}>
               {chipText('Workload', loadValue, loadSubtitle)}
               {chip('Pace', paceAdherence, paceDeltaSec != null ? fmtDeltaPer100(paceDeltaSec) : '—')}
               {chipText('Duration', durationValue, 'of plan')}
@@ -323,8 +344,8 @@ export default function AdherenceChips({
       return (
         <div className="w-full pt-1 pb-2">
           {weekLabel && <div className="readout-label mb-2 text-center text-[11px] uppercase">{weekLabel}</div>}
-          <div className="flex items-center justify-center gap-6 text-center mb-3">
-            <div className="flex items-start justify-between w-full px-3">
+          <div className={outerCls}>
+            <div className={rowCls}>
               {chipText('Workload', loadValue, loadSubtitle)}
               {/* 2026-09-03: Execution and Drift on rides too (Michael: "drift really important on the
                   performance screens for running and riding"). Power / Easy reads live in Insights. */}
@@ -352,8 +373,8 @@ export default function AdherenceChips({
     return (
       <div className="w-full pt-1 pb-2">
         {weekLabel && <div className="readout-label mb-2 text-center text-[11px] uppercase">{weekLabel}</div>}
-        <div className="flex items-center justify-center gap-6 text-center mb-3">
-          <div className="flex items-start justify-between w-full px-3">
+        <div className={outerCls}>
+          <div className={rowCls}>
             {chipText('Workload', loadValue, loadSubtitle)}
             {executionScore != null && chip('Execution', executionScore, executionSubtitle)}
             {chipText('Duration', durationValue, 'of plan')}
