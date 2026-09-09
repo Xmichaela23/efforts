@@ -41,6 +41,7 @@ import { FRAMES } from './frames.ts';
 import { canonicalize } from '../canonicalize.ts';
 import { WEEKLY_SETS_SOLID, isRepPrescribable, musclesWorkedBy } from '../accessory-dosing/index.ts';
 import { allGridMovements } from '../strength-grid/index.ts';
+import { ATHLETE_ADDITIONS_ON } from './compose.ts';
 
 /** A commercial-gym athlete. ⚠️ Declared equipment is the case the grid gates on. */
 const EQUIPMENT = ['barbell', 'rack', 'bench', 'dumbbells', 'pullup_bar'];
@@ -288,6 +289,7 @@ Deno.test('the picks-are-placed-by-what-they-train apology goes quiet on the slo
 });
 
 Deno.test('the core pick reaches the week through the floor, and the row says whose it is', () => {
+  if (!ATHLETE_ADDITIONS_ON) return; // 2026-09-08: the plan adds nothing the page does not print (compose.ts)
   const picks = { ...defaultViadaPicks(EQUIPMENT, []), core: 'v up' };
   const rows = rowsOf(week({
     slotPicks: picks,
@@ -343,6 +345,7 @@ Deno.test('a named muscle takes four sets on its own slots — the top of his 3-
 });
 
 Deno.test('Glutes and Core are real chips — they reach no cell, so they arrive as rows', () => {
+  if (!ATHLETE_ADDITIONS_ON) return; // 2026-09-08: the plan adds nothing the page does not print (compose.ts)
   for (const chip of ['glutes', 'core'] as DialChip[]) {
     assertEquals(chipHasFrameSlot(chip), false, `${chip} unexpectedly has a frame slot`);
   }
@@ -362,6 +365,7 @@ Deno.test('Glutes and Core are real chips — they reach no cell, so they arrive
 });
 
 Deno.test('REGRESSION: the advanced running tier pulls the dial back without switching it off', () => {
+  if (!ATHLETE_ADDITIONS_ON) return; // 2026-09-08: the plan adds nothing the page does not print (compose.ts)
   /**
    * ⛔ THE BUG: the pull-back held added rows to p086's six-to-eight "recovers" line. This frame's
    * lifting days already carry eight to eleven counted sets, so no session could take a three-set
@@ -415,6 +419,7 @@ Deno.test('no session crosses the source\'s costly line, chips or not', () => {
 // ── the screen and the week agree ────────────────────────────────────────────────────────────────
 
 Deno.test('a named Dial movement is the one the week uses', () => {
+  if (!ATHLETE_ADDITIONS_ON) return; // 2026-09-08: the plan adds nothing the page does not print (compose.ts)
   /**
    * ⛔ THE SCREEN OFFERS ONE PICKER PER SLOTLESS CHIP AND THE ENGINE MUST HONOUR IT. There is no
    * day tag — see `DIAL_ROW_DAY_IS_THE_COMPOSERS` for why two projections of one were built
@@ -435,6 +440,7 @@ Deno.test('a named Dial movement is the one the week uses', () => {
 });
 
 Deno.test('the extra rows carry his accessory dose — 3 x 8-10, by feel', () => {
+  if (!ATHLETE_ADDITIONS_ON) return; // 2026-09-08: the plan adds nothing the page does not print (compose.ts)
   const picks = defaultViadaPicks(EQUIPMENT, ['glutes']);
   const owned = rowsOf(week({ slotPicks: picks, dial: ['glutes'] }))
     .filter((r) => r.notes === 'Your glute focus.');
@@ -453,6 +459,7 @@ Deno.test('the extra rows carry his accessory dose — 3 x 8-10, by feel', () =>
 });
 
 Deno.test('⛔ NO ADDED ROW LETS THE GENERIC CHART ANSWER FOR IT, AND A HOLD CARRIES NO RESERVE', () => {
+  if (!ATHLETE_ADDITIONS_ON) return; // 2026-09-08: the plan adds nothing the page does not print (compose.ts)
   // ⚠️ THE CLASS, NOT THE INSTANCE — every floor and Dial row in a real week, over the chips and
   // several equipment cases, because the screenshot caught one row and the defect is shared by all
   // of them.
@@ -590,6 +597,7 @@ Deno.test('⛔ NO ROW IN A BUILT WEEK PRINTS REPS ON A HOLD', () => {
 });
 
 Deno.test('⛔ THE CORE CHIP NEVER INTRODUCES A THIRD MOVEMENT', () => {
+  if (!ATHLETE_ADDITIONS_ON) return; // 2026-09-08: the plan adds nothing the page does not print (compose.ts)
   /**
    * ⛔ MICHAEL'S RULING, 2026-08-24. The screen had TWO core controls — the "Core movement" pick and
    * a Dial row picker — and the built week carried both answers. The chip must extend the pick, or

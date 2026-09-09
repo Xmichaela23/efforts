@@ -103,6 +103,13 @@ the canonical run/ride/swim/strength; Profile still writes running/cycling/swimm
   No screen changes a stored slot pick after the build — open item.
 - DE line: "move the bar fast" only on a barbell row (`displayFormat` total); dumbbell, band, bodyweight rows say
   "move fast". Delete workout is the last thing on the completed-workout page.
+- **The plan adds nothing the page does not print** (Michael, later that evening: "we can't have an ours — we have
+  no rules, only Alex does" · "forget my anything — he prescribes plenty"). `ATHLETE_ADDITIONS_ON = false` in
+  `compose.ts` switches off the per-muscle floor (the added Calf Raise / Nordic / Hanging Leg Raise rows) and the
+  core-pick placement (twice a week, a frequency the book never states). The builder no longer asks for core picks.
+  The dial was already off. Measured: the three test weeks lose only the added rows and their notes (137 lines, no
+  other change). 14 tests of the switched-off mechanism return early on the switch; two floor assertions gated.
+  Michael's existing rows stay until he removes them or a new plan is built (rebuild is name-matched).
 - Tests: 4 standing-plan failures and 1 strength-grid failure (`rest between sets is HIS rule`) pre-exist today's
   changes; goldens regenerated and committed (57 rows braced hinge, 36 rows calf how-to marker).
 
@@ -116,7 +123,7 @@ the canonical run/ride/swim/strength; Profile still writes running/cycling/swimm
 7. Dead AutoMinePill in TrainingBaselines.tsx; session_detail_v1 not persisted since 08-31 (speed only).
 8. course-detail strategy_stale hash mismatch; readiness projection ignores a target typed after build (marathon rebuild).
 9. A way to change a stored slot pick after the build (Adjust); today only Rest-of-plan swap or a new plan does it.
-10. Muscle tag for `back extension` is hamstrings and the braced hinge slot is marked hamstrings while the book's row is posterior chain led by the reverse hyper — admitted by name for now; revisit the slot muscle with the frame measured.
+10. (moot while the floor is off) Muscle tag for `back extension` is hamstrings and the braced hinge slot is marked hamstrings while the book's row is posterior chain led by the reverse hyper — admitted by name for now; revisit the slot muscle with the frame measured.
 
 ## Michael's standing rules for this work (short form)
 Plain words, no idioms, no "priced"; screenshots = optics; ask when two readings; never DB-write his data (throwaways only; his account read-only); every number sourced or ledgered OURS; one effort scale; border = tap; a chevron only when you leave the screen; Next at the bottom; no AI ever again.

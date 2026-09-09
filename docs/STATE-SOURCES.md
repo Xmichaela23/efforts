@@ -111,3 +111,4 @@ The week-execution bars (a count). Add rows when touched.
 | Exercise how-to lines (back extension, leg curl, chest-supported row, reverse hyper, calf raise) | `strength-grid/grid.ts EXECUTION_HOW_TO` | OURS — Michael's words, from Strong/Hevy exercise cards and field sources; not the book | 2026-09-08 |
 | DE cue "move the bar fast" on barbell rows, "move fast" on the rest | `StrengthLogger.tsx intentLine` | Viada p218 (DE = submaximal load, maximal speed); the wording split is OURS | 2026-09-08 |
 | Rebuild replaces an accessory movement whose cell answer changed; never deletes, never a done session | `standing-plan/restate.ts` | OURS — rebuild rule, 2026-09-08 | 2026-09-08 |
+| The plan adds no row the page does not print: muscle floor and core-pick placement OFF | `standing-plan/compose.ts ATHLETE_ADDITIONS_ON` | Michael 2026-09-08: no rules of ours, only the book's; anything more is added in the logger on the day | 2026-09-08 |

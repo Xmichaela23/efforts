@@ -5611,7 +5611,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     ) : null}
                   </div>
                 );
-              }))(picksForFrame(wizardFrame, strengthEquipment))}
+              }))(picksForFrame(wizardFrame, strengthEquipment).filter((k) => !String(k).startsWith('core')))}
               {/* ⛔ ONE LINE, UNDER THE FIELD IT IS ABOUT. What stood here named the source, the
                   missing core slot and "the four movement patterns" — sourcing talk and engine
                   vocabulary, under a dropdown.
@@ -5621,9 +5621,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   your weekly core work uses"* under four pickers, none of them core. **A note is not
                   a note when its subject is gone; it is a claim about a control the athlete cannot
                   find.** It reads the same list the pickers do, so the two cannot come apart. */}
-              {picksForFrame(wizardFrame, strengthEquipment).includes('core') ? (
-                <p className="text-white/45 text-[13px] leading-relaxed">{CORE_PICK_NOTE}</p>
-              ) : null}
+              {/* 2026-09-08: the plan places no core picks (the page prints none), so the pickers and this note are gone. */}
             </div>
 
             {/* ⛔ IT SAID "sets of 6-12" WHILE THE ROWS ON THIS SAME SCREEN SAID "3 x 8-10"

@@ -14,6 +14,7 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { composeWeek, PICKS_ARE_PLACED_BY_WHAT_THEY_TRAIN } from './compose.ts';
 import { buildStandingPlanRow } from './plan-row.ts';
+import { ATHLETE_ADDITIONS_ON } from './compose.ts';
 
 const BASE = {
   frame: 'strength_5k' as const,
@@ -28,6 +29,7 @@ const rows = (wk: ReturnType<typeof week>) =>
   wk.sessions.filter((s) => s.type === 'strength').flatMap((s) => s.strength_exercises ?? []);
 
 Deno.test('⛔ AN AB PICK REACHES THE WEEK, AND THE ROW STOPS SAYING NOBODY ASKED FOR CORE', () => {
+  if (!ATHLETE_ADDITIONS_ON) return; // 2026-09-08: the plan adds nothing the page does not print (compose.ts)
   // ⛔ THE DEVICE FINDING ITSELF, AS A FIXTURE.
   // ⚠️ IT USED TO PIN `e.name === 'plank'` HERE AND THAT WAS THE OTHER DEVICE DEFECT (2026-08-24):
   // the floor filled the core gap with a STATIC HOLD and the row printed "3 x 8-10" under it. The
@@ -68,6 +70,7 @@ Deno.test('a pick that fits a hypertrophy slot fills it, in the athlete\'s own s
 });
 
 Deno.test('⛔ A PICK IS NEVER PRESCRIBED TWICE IN ONE WEEK', () => {
+  if (!ATHLETE_ADDITIONS_ON) return; // 2026-09-08: the plan adds nothing the page does not print (compose.ts)
   // ⚠️ MUTATION-TESTED: dropping `picks.unplaced.delete` puts the same movement in every matching
   // slot, which is how a "preference" becomes the whole week.
   const wk = week(['Bulgarian Split Squat', 'Hanging Leg Raise']);
@@ -78,6 +81,7 @@ Deno.test('⛔ A PICK IS NEVER PRESCRIBED TWICE IN ONE WEEK', () => {
 });
 
 Deno.test('⛔ A PICK THAT COULD NOT BE HONOURED IS NAMED, NOT SWALLOWED', () => {
+  if (!ATHLETE_ADDITIONS_ON) return; // 2026-09-08: the plan adds nothing the page does not print (compose.ts)
   /**
    * ⛔ THE A1 RULING'S SECOND HALF. It is a `warning`, because `buildStandingPlanRow` turns every
    * warning into a `placement_compromises` entry — the channel the athlete already reads.

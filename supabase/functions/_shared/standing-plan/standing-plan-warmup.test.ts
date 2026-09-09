@@ -23,6 +23,7 @@ import {
   rampFor,
   slotTakesRamp,
 } from './warmup.ts';
+import { ATHLETE_ADDITIONS_ON } from './compose.ts';
 
 const BASE = {
   frame: 'strength_5k' as const,
@@ -137,6 +138,7 @@ Deno.test('⛔ THE COPY PASSES THE VOICE CHECK, and the ours-label says what is 
 });
 
 Deno.test('⛔⛔ RULE 4 — core lands AFTER the main work and BEFORE the isolation work (p142)', () => {
+  if (!ATHLETE_ADDITIONS_ON) return; // 2026-09-08: the plan adds nothing the page does not print (compose.ts)
   /**
    * ⛔ *"Many athletes are tempted to perform any core/bracing work last in a routine… This tends to
    * do the core a disservice - isolation work is rarely degraded by a tired core, and core work tends

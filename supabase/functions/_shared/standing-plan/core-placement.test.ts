@@ -26,6 +26,7 @@
 
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { composeWeek, type PlanSession, type StrengthExercise } from './compose.ts';
+import { ATHLETE_ADDITIONS_ON } from './compose.ts';
 
 const HOME_KIT = [
   'Barbell + plates', 'Dumbbells', 'Squat rack / Power cage', 'Bench (flat/adjustable)',
@@ -74,6 +75,7 @@ const isCoreRow = (e: StrengthExercise) => /v up|hanging leg raise|crunch|plank|
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
 Deno.test('⛔⛔ RULE 4 — the core row sits AFTER the main work and BEFORE every accessory row', () => {
+  if (!ATHLETE_ADDITIONS_ON) return; // 2026-09-08: the plan adds nothing the page does not print (compose.ts)
   const w = week(2, 'v up');
   const host = strengthSessions(w).find((s) => rowsOf(s).some(isCoreRow));
   assert(host, 'the chosen core movement was not placed on the week at all');
@@ -102,6 +104,7 @@ Deno.test('⛔⛔ RULE 4 — the core row sits AFTER the main work and BEFORE ev
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
 Deno.test('⛔ TWO core rows a week, and they carry the accessory dose', () => {
+  if (!ATHLETE_ADDITIONS_ON) return; // 2026-09-08: the plan adds nothing the page does not print (compose.ts)
   /**
    * ⚠️ AMENDED 2026-09-01 — Michael asked *"is one exercise a week enough?"* and it was not: one slot
    * is three sets, which is this app's FLOOR for any muscle rather than a dose. Two sessions of three
@@ -122,6 +125,7 @@ Deno.test('⛔ TWO core rows a week, and they carry the accessory dose', () => {
 // ════════════════════════════════════════════════════════════════════════════════════════════════
 
 Deno.test('⛔ NO PICK, NO CORE ROW — the frame is unchanged for an athlete who leaves it alone', () => {
+  if (!ATHLETE_ADDITIONS_ON) return; // 2026-09-08: the plan adds nothing the page does not print (compose.ts)
   const without = strengthSessions(week(2, null)).flatMap(rowsOf).map((e) => String(e.name));
   /**
    * ⛔ THE ASSERTION IS NOW "NO CORE AT ALL", not "no v-up" (2026-09-01). The floor's session-set cap

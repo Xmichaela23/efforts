@@ -27,6 +27,7 @@ import { gearRoutesFor, ownsLoadingImplement } from '../../../../src/lib/strengt
 import {
   HOLD_PRESCRIPTION,
   fillMuscleFloor,
+  type FloorResult,
   isRepPrescribable,
   ledgerFor,
   muscleFloorSets,
@@ -830,6 +831,18 @@ const ACCESSORY_TARGET_RIR = 1.5;
  * answer here is ours. One slot a week is the floor's own structural convention — see
  * `MUSCLE_FLOOR_IS_ONE_SLOT` — applied to a row the athlete asked for rather than to a gap.
  */
+/**
+ * ⛔⛔⛔ THE PLAN PRINTS THE PAGE AND NOTHING ELSE (Michael, 2026-09-08: "we can't have an ours — we
+ * have no rules, only Alex does" · "forget my anything — he prescribes plenty"). Two additions this
+ * composer used to make on its own authority are OFF:
+ *   1. the per-muscle floor (a three-set row for any muscle the week left at zero — it put a bodyweight
+ *      calf raise into a p274 week whose page prints no calf row);
+ *   2. the athlete's core picks, placed twice a week at a frequency the book never states.
+ * Anything the athlete wants beyond the page they add in the logger on the day. The dial was already
+ * off (`DIAL_CONTROL_VISIBLE`). The code stays behind this switch so the mechanism is not lost.
+ */
+export const ATHLETE_ADDITIONS_ON = false;
+
 const CORE_PICK_FREQUENCY_IS_OURS =
   'Your core choices are placed twice a week, on your two lightest lifting days and never on a test '
   + 'day, rotating through the movements you chose. The source gives core its own movements and says '
@@ -3601,7 +3614,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     .map((f) => picks.byFold.get(f) ?? f)
     .some((n) => musclesWorkedBy(n)?.primary === 'core');
 
-  const CORE_SLOTS_PER_WEEK = 2;
+  const CORE_SLOTS_PER_WEEK = ATHLETE_ADDITIONS_ON ? 2 : 0;
   /**
    * ⛔ ONE ANSWER IS ONE SLOT, AND THAT IS AN EXISTING LAW RATHER THAN A DOSE OPINION. *"A pick is
    * never prescribed twice in one week"* is pinned by `standing-plan-picks.test.ts` and exists
@@ -3620,7 +3633,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   );
   /** ⚠️ The first of the week's two, kept for the floor preference below. */
   const corePickRaw = coreWanted[0] ?? '';
-  const filled = fillMuscleFloor(dosing, {
+  const filled: FloorResult = !ATHLETE_ADDITIONS_ON
+    ? { sessions: dosing.map((d) => ({ ...d, sets: [...d.sets] })), added: [], unfilled: [], notes: [] }
+    : fillMuscleFloor(dosing, {
     equipment: args.equipment ?? null,
     prefer: [
       ...[...picks.unplaced].map((f) => picks.byFold.get(f) ?? f),

@@ -42,6 +42,7 @@ import {
   type ComposeArgs,
   type TestedLift,
 } from './index.ts';
+import { ATHLETE_ADDITIONS_ON } from './compose.ts';
 
 // ── a real athlete, and a second one that shares nothing with the first ────────────────────────
 
@@ -720,7 +721,10 @@ Deno.test('the ledger sees the strength sets, and no week breaks the ceiling or 
        * the channel that tells an athlete something they asked for could not be done. Nobody asked,
        * and nothing failed. Every other muscle still has to be filled or named.
        */
-      const silent = wk.ledger.belowFloor.filter((m) => m !== 'core' && !spoken.has(m));
+      // 2026-09-08: the plan adds nothing the page does not print (compose.ts ATHLETE_ADDITIONS_ON),
+      // so a muscle the page leaves at zero stays at zero and is not a warning. The ledger still
+      // reports it; nothing has to name it.
+      const silent = ATHLETE_ADDITIONS_ON ? wk.ledger.belowFloor.filter((m) => m !== 'core' && !spoken.has(m)) : [];
       assertEquals(silent, [], `${where}: muscles left below the floor with no warning naming them`);
     }
   }
@@ -774,8 +778,11 @@ Deno.test('a block runs test week first and holds its shape throughout', () => {
      * the filler reports it in `unfilled` rather than adding work nobody asked for. Every other
      * muscle must still be reached.
      */
-    assertEquals(wk.ledger.belowFloor.filter((m) => m !== 'core'), [],
-      `wk${wk.week} left a muscle below the floor`);
+    // 2026-09-08: the floor is off (compose.ts ATHLETE_ADDITIONS_ON); the page's own rows are the week.
+    if (ATHLETE_ADDITIONS_ON) {
+      assertEquals(wk.ledger.belowFloor.filter((m) => m !== 'core'), [],
+        `wk${wk.week} left a muscle below the floor`);
+    }
   }
 });
 
