@@ -90,6 +90,14 @@ Data: today's rows from `get-week` (the rows `TodaysEffort.tsx` already loads). 
   plan card renders them), under the family line. Lifts stay as rows + cues; the logger has the rest.
 - Tomorrow: the next day's sessions, name and time only, at the bottom. No cues, no lines.
 
+## 3c. Lifting session time (Michael, 2026-09-09)
+
+The 45 / 55 / 20 minutes the composer stamps on test, lifting and plyo sessions are fixed numbers with no
+page. Replace with an estimate from the session's own rows: for each row, sets × (time under the bar + the
+rest the timer would run for that kind of set), summed, shown as a range (low to high), e.g. `45–55 min`.
+Time under the bar per set is a field estimate and is marked as such in the code. The ride and run keep
+their built lengths. Shown wherever the shared header shows minutes (Today, the drawer, the planned screen).
+
 ## 4. Out of scope
 
 - WORKORDER-kill-ours and WORKORDER-de-row-by-feel (separate, may land first or after).
