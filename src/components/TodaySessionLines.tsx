@@ -1,6 +1,7 @@
 import React from 'react';
 import { getExerciseConfig } from '@/lib/exercise-config';
 import { sportColorFor } from './PlannedSessionHeader';
+import { displayDisciplineOf } from '@/lib/utils';
 import {
   spacingLineFor,
   liftLinesFor,
@@ -79,7 +80,9 @@ const TodaySessionLines: React.FC<{ session: TodayRow }> = ({ session }) => {
   if (status === 'completed' || status === 'skipped') return null;
   if (!isFromPlan(session)) return null;
 
-  const color = sportColorFor((session as { type?: unknown })?.type);
+  // ⛔ THE DISPLAY DISCIPLINE, so the plyo day's lines match its own colour rather than a lifting
+  // day's orange. Same seam the calendar and the header colour by; keyed on the tag, never the name.
+  const color = sportColorFor(displayDisciplineOf(session as never));
 
   if (isStrengthRow(session)) {
     const rows = liftLinesFor(session, barLoaded).filter((r) => r.movement);

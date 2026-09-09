@@ -28,7 +28,7 @@ import {
   type SwapOption,
 } from '@/lib/session-discipline-swap';
 import { formatSwimPace } from '@/utils/workoutFormatting';
-import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout } from '@/lib/utils';
+import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout, displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
@@ -1732,12 +1732,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.30rem' }}>
               {displayWorkouts.map((workout) => {
                 const workoutType = workout.type || workout.workout_type || '';
+                /**
+                 * ⛔ THE DISPLAY DISCIPLINE FEEDS THE COLOUR; THE WIRE TYPE STILL FEEDS THE
+                 * REASONING (2026-09-09). The plyo day is `type: 'strength'` and must not wear
+                 * strength's orange — the same seam the calendar draws its magenta chip from. Only
+                 * the pill, the glow and the title colour move; `isEnduranceType` below keeps
+                 * asking the real type, because that question is about what the session IS.
+                 */
+                const displayType = displayDisciplineOf(workout);
                 const isCompleted = workout.workout_status === 'completed';
                 const isSkipped = String(workout.workout_status || '').toLowerCase() === 'skipped';
                 const isPlannedRow = !isCompleted;
                 const glowState: 'idle' | 'week' | 'done' | 'active' = isCompleted ? 'done' : 'week';
-                const phosphorPill = getDisciplinePhosphorPill(workoutType, glowState);
-                const pillRgb = getDisciplineColorRgb(workoutType);
+                const phosphorPill = getDisciplinePhosphorPill(displayType, glowState);
+                const pillRgb = getDisciplineColorRgb(displayType);
                 const providerAttr = isCompleted ? getProviderAttribution(workout) : { source: null as any };
                 const showImportAttribution = isCompleted && !!providerAttr?.source;
                 const showEnduranceDetails = isCompleted && isEnduranceType(workoutType);
@@ -1919,7 +1927,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       <div
                         className="font-medium tracking-normal text-base"
                         style={{
-                          color: isCompleted ? 'rgba(255, 255, 255, 0.92)' : getDisciplinePhosphorCore(workoutType),
+                          color: isCompleted ? 'rgba(255, 255, 255, 0.92)' : getDisciplinePhosphorCore(displayType),
                           // Legibility: slight dark edge + faint discipline bloom
                           textShadow: isCompleted
                             ? `0 1px 1px rgba(0,0,0,0.65), 0 0 8px rgba(0,0,0,0.45)`

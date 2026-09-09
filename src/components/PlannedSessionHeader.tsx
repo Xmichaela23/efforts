@@ -7,6 +7,9 @@ import { plannedDurationMinutes } from '@/lib/planned-session/duration';
 // ⛔ A LIFTING SESSION IS PRICED OFF ITS ROWS, NOT OFF A CONSTANT (work order 2026-09-09 §3c).
 import { formatStrengthSessionMinutes } from '@/lib/strength-session-minutes';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
+// ⛔ ONE TAG-KEYED SEAM between the wire type and what an athlete sees — the plyo day's colour, and
+// the reader that says a session IS the plyo day. The calendar already colours by these.
+import { displayDisciplineOf, isPlyoSession } from '@/lib/utils';
 
 /**
  * ═══ ONE HEADER FOR A PLANNED SESSION. Three surfaces render it; none of them own it. ═══════════
@@ -56,7 +59,15 @@ export type PlannedSessionHeaderProps = {
  * so walks, mobility and pilates/yoga must keep their own colours instead of collapsing to grey.
  */
 export function sportColorFor(type: unknown): string {
-  const canonical = normalizeSessionType(typeof type === 'string' ? type : String(type ?? ''));
+  const raw = (typeof type === 'string' ? type : String(type ?? '')).trim().toLowerCase();
+  /**
+   * ⛔ `plyo` IS A DISPLAY DISCIPLINE, NOT A WIRE TYPE, so it is answered before the canonical
+   * normalizer — which correctly returns `null` for it, since the session is `type: 'strength'`
+   * everywhere that reasons about it. Callers pass `displayDisciplineOf(row)`, the tag-keyed seam
+   * the calendar already colours by; this is the other end of it.
+   */
+  if (raw === 'plyo') return SPORT_COLORS.plyo;
+  const canonical = normalizeSessionType(raw);
   if (!canonical) return '#64748b';                       // unknown stays grey — never a guess
   const key = canonical === 'ride' ? 'bike' : canonical;  // SPORT_COLORS keys the bike as `bike`
   return SPORT_COLORS[key as keyof typeof SPORT_COLORS] ?? '#64748b';
@@ -82,6 +93,17 @@ export function formatPlannedDuration(workout: unknown): string | null {
  */
 export function formatSessionDuration(workout: unknown): string | null {
   const w = (workout ?? {}) as Record<string, unknown>;
+  /**
+   * ⛔⛔ THE PLYO DAY SHOWS NO TIME AT ALL (Michael, 2026-09-09). Its rows carry no effort count to
+   * price — `compose.ts` puts the band's top in `reps` as *"the row's recorded-efforts capacity; the
+   * logger records, never targets"* — and the source gives the drill day no length either. With
+   * nothing on the row and nothing on the page, any figure here would be invented, so there is none.
+   *
+   * ⚠️ BY THE TAG, NEVER THE NAME. `isPlyoSession` is the shared reader; the session is
+   * `type: 'strength'` on the wire and its name is a display string.
+   */
+  if (isPlyoSession(w)) return null;
+
   const type = String(w.type ?? (w as { workout_type?: unknown }).workout_type ?? '');
   if (normalizeSessionType(type) === 'strength') {
     const estimated = formatStrengthSessionMinutes(w.strength_exercises);
@@ -99,8 +121,13 @@ const PlannedSessionHeader: React.FC<PlannedSessionHeaderProps> = ({
   className = '',
 }) => {
   const w = (workout ?? {}) as Record<string, unknown>;
-  const type = String(w.type ?? (w as { workout_type?: unknown }).workout_type ?? '');
-  const color = sportColorFor(type);
+  /**
+   * ⛔ THE DISPLAY DISCIPLINE, NOT THE WIRE TYPE — the same seam the calendar colours by
+   * (`displayDisciplineOf`, keyed on the `plyo` tag). The plyo day is `type: 'strength'` and must
+   * not wear strength's orange: it is a drill day, and a four-lift week reading as five lifting
+   * sessions is the confusion that colour exists to end.
+   */
+  const color = sportColorFor(displayDisciplineOf(w));
   const title = deriveWorkoutTitle(w as never);
   /**
    * ⛔⛔ A LIFT NOW SHOWS ITS MINUTES, THE SAME WAY A RIDE DOES (Michael, 2026-09-09, on Today).
