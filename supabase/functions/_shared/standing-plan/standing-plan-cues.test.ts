@@ -85,13 +85,16 @@ Deno.test('⛔⛔ EVERY LIFTING SESSION SAYS WHAT KIND OF DAY IT IS — and the 
        * ⚠️ THE SPEED DAY IS UNCHANGED. `SPEED_SET_END_CUE` is not a stop rule and has no per-card
        * counterpart now that the DE card cue is retired. Do not symmetry-fix it.
        */
-      assertEquals(s.description, isSpeedDay ? `${SPEED_SET_END_CUE} ${ACCESSORY_FATIGUE_CUE}` : ACCESSORY_FATIGUE_CUE,
-        `${s.name} carries the wrong session line`);
-      assertEquals(String(s.description).includes(SET_END_CUE), false,
-        `${s.name} still stamps the stop rule at session level — it belongs on the card`);
-      // ⛔ AND THE ACCESSORY LINE IS ON BOTH INTENTS. All four lifting days carry accessories, so the
-      // fatigue rule that inverts on them (p84) is said on every one of them.
-      assert(String(s.description).includes(ACCESSORY_FATIGUE_CUE), `${s.name} lost the accessory line`);
+      /**
+       * ⛔⛔ AND ON 2026-09-09 THE LIFTING DAY LOST **BOTH** ITS LINES (WORKORDER-kill-ours §B2). The
+       * same ruling one step further: everything the session line said is on a row underneath it —
+       * `ACCESSORY_FATIGUE_CUE`'s p84 content is the HYP row's *"Reps slow as the set goes"*, and
+       * `SPEED_SET_END_CUE`'s is the DE row's reps, reserve and speed word. A line read once at the
+       * top of a card whose every row repeats it is wallpaper.
+       * ⚠️ ASSERTED AS AN EMPTY STRING, NOT AS "does not contain". Empty is the order's own wording
+       * and it is checkable; "does not contain X" would pass on a line that grew something new.
+       */
+      assertEquals(s.description, '', `${s.name} grew a session line back`);
       if (isSpeedDay) speed += 1; else heavy += 1;
     }
   }
@@ -168,13 +171,25 @@ Deno.test('⛔⛔ THE CLAIM IS HIS, THE WORDS ARE OURS — and the rejected draf
 Deno.test('⛔ THE PLYO DAY AND THE TEST DAY KEEP THEIR OWN INSTRUCTIONS', () => {
   // ⚠️ THE CUE IS FOR PRESCRIBED BARBELL WORK. A plyometric drill's stop rule is p227's — quality,
   // not reps in reserve — and the test day's whole job is a set taken to a clean maximum.
+  /**
+   * ⛔⛔ THEIR INSTRUCTIONS ARE ON THE ROWS AND ONLY ON THE ROWS (2026-09-09, §B2). Both sessions used
+   * to repeat at the top what every row under them already said — p227's stop rule three times on a
+   * plyo card, the max-rep instruction twice on a test card — so the session line is empty on both.
+   * ⚠️ `PLYO_DOSE.stopRule` IS KEPT AS THE LEDGER for the row note that replaced it; it simply has no
+   * caller now.
+   */
   const plyo = week(2).sessions.find((s) => (s.tags ?? []).includes('plyo'));
   assert(plyo, 'the plyo day vanished');
-  assertEquals(plyo!.description, PLYO_DOSE.stopRule);
+  assertEquals(plyo!.description, '', 'the plyo day grew a session line back');
+  const drills = plyo!.strength_exercises ?? [];
+  assert(drills.length > 0 && drills.every((d) => /Tired or sloppy, stop\.$/.test(String(d.notes))),
+    'the drills lost the approved stop rule the session line was deleted in favour of');
   const test = week(1).sessions.filter((s) => (s.tags ?? []).includes('test_week'));
   assert(test.length > 0, 'week one has no test sessions');
   for (const s of test) {
-    assertEquals(/reps left/.test(s.description), false, `${s.name} took the reps-in-reserve cue`);
+    assertEquals(s.description, '', `${s.name} grew a session line back`);
+    assert((s.strength_exercises ?? []).every((e) => /It sets your numbers\.$/.test(String(e.notes))),
+      `${s.name} lost the approved row note the session line was deleted in favour of`);
   }
 });
 

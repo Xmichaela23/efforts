@@ -636,35 +636,40 @@ function describeSession(session: EnduranceSession, raceTempo: boolean): string 
   const parts: string[] = [];
   const safety = session.notes.find((n) => n.kind === 'safety');
   if (safety) parts.push(safety.text);
-  if (session.totals.isLowerBound) {
-    parts.push('At least this long — some recoveries carry no stated duration.');
-  }
+  /**
+   * ⛔ *"At least this long — some recoveries carry no stated duration."* IS DELETED (2026-09-09,
+   * WORKORDER-kill-ours §B2). It described the ENGINE's own uncertainty about a total, not the
+   * session, and an athlete cannot act on it. `totals.isLowerBound` is unchanged and still travels
+   * for any reader that needs it.
+   */
   if (raceTempo) {
-    // ⛔ p247, verbatim in substance: race pace with recoveries a quarter longer.
+    // ⛔ KEPT (§B2). p247, verbatim in substance: race pace with recoveries a quarter longer.
     parts.push('Run at race pace, with the recovery periods a quarter longer than usual.');
   }
   if (session.family === 'run_mlss') {
-    // ⛔ THE PAGE'S OWN WORDS (p231, 2026-09-05, Michael: "whatever the book says"). The session is
-    // time in zone 4 with fatigue spread evenly; the work may be run on hills with the pace adjusted
-    // to hold the effort. The old line ("the hardest pace you could hold for about an hour") described
-    // threshold pace, and these rounds run at 125% and 115% of it — it was written for a 5K-pace token
-    // this session no longer uses.
-    parts.push('Time above threshold with the fatigue spread evenly across the rounds. Hills are fine if the pace is adjusted to hold the effort.');
+    /**
+     * ⛔ REWRITTEN 2026-09-09 (§B2, APPROVED — Michael's words off p231). The line said the same
+     * thing in more of them: *"Time above threshold with the fatigue spread evenly across the
+     * rounds. Hills are fine if the pace is adjusted to hold the effort."* The zone name is on the
+     * row already; what the athlete does with it is the two clauses that are left.
+     */
+    parts.push('Fatigue spread evenly across the rounds. Hills are fine, adjust pace to hold the effort.');
   }
   /**
-   * ⛔ THE PRESCRIPTION LINE (Michael, 2026-09-02, rulings 1 and 2). Easy sessions are a heart-rate
-   * zone with the pace shown for reference; hard sessions carry an effort target beside the pace —
-   * threshold work 5–6 of 10, intervals 8–10, his numbers. The step-level fields are stamped by the
-   * materializer (`stampRunPrescription`); this is the sentence on the row.
+   * ⛔ THE PRESCRIPTION LINE (Michael, rulings 1 and 2 of 2026-09-02, rewritten 2026-09-09 §B2).
+   *
+   * ⛔ THE EASY AND LONG RUNS SAY WHAT TO STEER BY AND WHY THE PACE WILL NOT HOLD STILL (p235,
+   * APPROVED). *"Heart-rate zone; the pace shown is a reference"* named a mechanism; this names the
+   * instruction and the reason an athlete's pace moves under it.
+   * ⛔ AND THE NEAR-THRESHOLD RUN'S *"Effort 5–6 of 10."* IS DELETED (§B2). The step-level fields the
+   * materializer stamps (`stampRunPrescription`) carry the target; a second effort number on the row
+   * is the same claim twice, and the 5–6 was never on a page for this session.
    */
   if (session.family === 'run_vt1' || session.family === 'run_lsd') {
-    parts.push('Heart-rate zone; the pace shown is a reference.');
-  } else if (session.family === 'run_near_threshold') {
-    parts.push('Effort 5–6 of 10.');
+    parts.push('Go by heart rate. Pace varies with fatigue, hydration and weather.');
   }
-  // ⛔ NO EFFORT NUMBER ON THE MLSS ROW. The page gives none for these sessions; "8–10 of 10" was OURS
-  // (2026-09-02) and came off on 2026-09-05 ("whatever the book says"). The near-threshold 5–6 is the
-  // same ruling and stands until it is looked at.
+  // ⛔ NO EFFORT NUMBER ON ANY RUN ROW NOW. The MLSS one was OURS and came off 2026-09-05 ("whatever
+  // the book says"); the near-threshold 5–6 followed it on 2026-09-09.
   return parts.join(' ');
 }
 

@@ -1947,7 +1947,14 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], 
     day: dayNameFor(args, day.day),
     type: 'strength',
     name: partial ? `Test: ${lifts.map((l) => names[l]).join(' + ')}` : (day.day === 1 ? 'Test: Upper' : 'Test: Lower'),
-    description: 'Work up in three steps. The last set is max clean reps and it is what the block reads.',
+    /**
+     * ⛔ THE SESSION LINE IS DELETED (2026-09-09, WORKORDER-kill-ours §B2). It read *"Work up in three
+     * steps. The last set is max clean reps and it is what the block reads."* — the same instruction
+     * the ROWS now carry in Michael's own words (*"Last set as many reps as possible. It sets your
+     * numbers."*), said once at the top of the card and again on every lift under it.
+     * ⚠️ EMPTY, NOT REMOVED. `PlanSession.description` is required and every reader expects a string.
+     */
+    description: '',
     duration: 45,
     strength_exercises: exercises,
     /**
@@ -2023,7 +2030,9 @@ function plyoSession(day: FrameDay, args: ComposeArgs, rows: StrengthExercise[])
     day: dayNameFor(args, day.day),
     type: 'strength',
     name: 'Plyometrics',
-    description: PLYO_DOSE.stopRule,
+    // ⛔ 2026-09-09 (§B2): the stop rule is on every drill row already, in his approved words. Saying
+    // it a fourth time at the session level is the wallpaper this order exists to remove.
+    description: '',
     duration: 20,
     strength_exercises: rows,
     tags: ['standing_plan', 'plyo'],
@@ -2149,42 +2158,22 @@ export const ACCESSORY_FATIGUE_CUE =
   + 'a reason to stop. Still short of failure.';
 
 /**
- * ⛔ WHAT THIS LIFTING DAY SAYS ABOUT ITS SETS — read off the FRAME'S OWN DATA, never the day label.
+ * ⛔⛔ `sessionCueFor` IS DELETED (2026-09-09, WORKORDER-kill-ours §B2), AND ITS TWO CONSTANTS ARE NOT.
  *
- * ⚠️ THE COMPETITION SLOT IS THE DAY'S IDENTITY. Every lifting day in both columns carries exactly
- * one `role: 'competition'` slot and its intent is what the label announces (`ME: Upper` opens on an
- * ME competition slot, `DE: Lower` on a DE one) — but the day ALSO carries DE and HYP accessories,
- * so "does this day contain a DE slot" is not the question. The competition slot is.
+ * It joined `SPEED_SET_END_CUE` (speed days only) and `ACCESSORY_FATIGUE_CUE` (every lifting day)
+ * into the session `description`. Both are on the ROWS now — the HYP row says *"Reps slow as the set
+ * goes"*, the DE row says its reps, reserve and speed word — so the session line was the same
+ * instruction a second time, at the top of a card whose every row repeats it.
  *
- * ⛔ AND NOT `day.label`. That string is display text — `plain-intent.ts` maps it to `Heavy:` /
- * `Speed:` before an athlete reads it — and keying engine behaviour off a display string is how the
- * two get renamed apart. The intent is data; use the data.
+ * ⛔ WHY THE FUNCTION GOES AND THE CONSTANTS STAY. The function's whole job was picking between the
+ * two, and a picker with nothing to pick for is a dead branch. The constants carry the RECORD: their
+ * comments are the argument for why *"if the bar slows, the set is done"* and *"fatigue costs you
+ * what the day trains"* may not come back, and p84's hedge (*"may well be"*) may not be tightened.
+ * Same idiom as `strength-focus-copy.ts`'s `STANDING_DE_SET_CUE` — no caller, on purpose.
  *
- * ⚠️ FALLS BACK TO THE HEAVY LINE, which is the conservative direction: it is the stop rule, and a
- * day whose identity could not be read should not lose one.
+ * ⚠️ A LIFTING SESSION NOW CARRIES AN EMPTY DESCRIPTION. That is the order's own wording, and it is
+ * the honest state: everything the day has to say is on a row.
  */
-export function sessionCueFor(day: FrameDay): string {
-  const competition = day.strength.find((s) => s.role === 'competition');
-  /**
-   * ⛔⛔ THE HEAVY DAY'S SESSION LINE CARRIES NO STOP RULE — MOVED, NOT DROPPED (Michael, 2026-08-28).
-   *
-   * ⚠️ IT WAS SAID TWICE ON ONE SCREEN. `SET_END_CUE` at the top of the day and *"stop short of
-   * failure"* on every ME card are the same instruction, and he ruled that **the card owns it**: a
-   * stop rule is about the set in front of you, and that is where you are looking when you need it.
-   *
-   * ⛔ SO A HEAVY DAY NOW CARRIES ONLY {@link ACCESSORY_FATIGUE_CUE}, AND THAT IS DELIBERATE, NOT AN
-   * OVERSIGHT. `SET_END_CUE` is untouched as a constant — his own verbatim sentence, its comment
-   * still forbids rewording, and `strength-focus-copy.ts`'s `STANDING_ME_SET_CUE` is where the same
-   * instruction now reaches him. **It stopped being stamped here; it did not stop being said.**
-   *
-   * ⚠️ AND THE SPEED DAY IS UNCHANGED — DO NOT SYMMETRY-FIX THIS. `SPEED_SET_END_CUE` is not a stop
-   * rule; it states what the day trains. It has no per-card counterpart at all now that the DE card
-   * cue is retired (`strength-focus-copy.ts` `STANDING_DE_SET_CUE`), so removing it would leave the
-   * speed day saying nothing about itself.
-   */
-  const dayLine = competition?.intent === 'DE' ? `${SPEED_SET_END_CUE} ` : '';
-  return `${dayLine}${ACCESSORY_FATIGUE_CUE}`;
-}
 
 /** ⛔ COMPOSE ONE WEEK. */
 /**
@@ -2955,8 +2944,16 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           // states its own job. See `SET_END_CUE` — his words, and the two pages under them.
           // ⛔ AND IT SAID THE SAME THING ON ALL FOUR LIFTING DAYS UNTIL 2026-08-28, which was wrong
           // on the speed days — `SET_END_CUE` asks for 1-2 in reserve while a DE row prescribes 3-4.
-          // `sessionCueFor` picks by the day's competition slot; see `SPEED_SET_END_CUE`.
-          description: sessionCueFor(day),
+          /**
+           * ⛔⛔ A LIFTING DAY SAYS NOTHING ABOUT ITSELF ANY MORE (2026-09-09, §B2). Both lines that
+           * stood here are on the rows: `ACCESSORY_FATIGUE_CUE`'s p84 content is the HYP row's own
+           * *"Reps slow as the set goes"*, and `SPEED_SET_END_CUE`'s is the DE row's reps, reserve
+           * and speed word. A session line repeating what every card underneath it already says is
+           * read once and then never again.
+           * ⚠️ THE TWO CONSTANTS ARE KEPT AS THE RECORD and now have no caller — the same idiom as
+           * `STANDING_DE_SET_CUE`. Their comments are why particular phrasings must not come back.
+           */
+          description: '',
           duration: 55,
           strength_exercises: exercises,
           // ⛔ THE DAY'S STRUCTURAL FACT TRAVELS WITH THE SESSION — see `FrameDay.lowerRole`. The
