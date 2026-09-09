@@ -22,6 +22,7 @@
 // ============================================================================
 
 import type { ComposedWeek, PlannedSet, StrengthExercise } from './compose.ts';
+import { viadaCategoryOf, viadaPatternOf } from '../strength-grid/taxonomy.ts';
 
 /** ⚠️ DB shape, deliberately loose — a materialized calendar row as this reader sees it. */
 export type PlannedRowish = {
@@ -248,7 +249,33 @@ export function restateFromTest(args: {
     if (!existing) continue;
 
     let touched = false;
+    /**
+     * ⛔ A SLOT WHOSE ANSWER CHANGED IS REPLACED, NOT LEFT (Michael, 2026-09-08: "rebuild it now").
+     * The rule below matches by NAME, so when the composer's answer for a cell changes (the braced
+     * hinge went from Back Extension to Weighted Reverse Hyper), the calendar row never matched and
+     * kept the old movement forever; only a new plan got the change. Pairing: an unmatched existing
+     * by-feel row and an unmatched fresh row in the SAME cell (category + pattern) are the same slot,
+     * and the fresh row replaces the old one wholesale. Never a delete — a row with no same-cell
+     * successor is still left alone — and never on a session already done (gated above).
+     */
+    const nameOf = (e: StrengthExercise | null | undefined) => String(e?.name ?? '').toLowerCase();
+    const cellOf = (e: StrengthExercise) => `${viadaCategoryOf(String(e.name)) ?? '?'}|${viadaPatternOf(String(e.name)) ?? '?'}`;
+    const existingNames = new Set(existing.map(nameOf));
+    const freshUnplaced = wanted.filter((w) => !existingNames.has(nameOf(w)));
+    const replacement = new Map<StrengthExercise, StrengthExercise>();
+    for (const ex of existing) {
+      if (ex?.load_prescribed !== false) continue;
+      if (wanted.some((w) => nameOf(w) === nameOf(ex))) continue;
+      const cell = cellOf(ex);
+      if (cell.startsWith('?') || cell.endsWith('?')) continue;
+      const at = freshUnplaced.findIndex((w) => w.load_prescribed === false && cellOf(w) === cell);
+      if (at < 0) continue;
+      replacement.set(ex, freshUnplaced[at]);
+      freshUnplaced.splice(at, 1);
+    }
     const next = existing.map((ex) => {
+      const swapped = replacement.get(ex);
+      if (swapped) { touched = true; return { ...swapped }; }
       const fresh = wanted.find((w) => String(w.name).toLowerCase() === String(ex?.name ?? '').toLowerCase());
       // ⛔ A ROW THE COMPOSER NO LONGER AUTHORS IS LEFT ALONE. The accessory floor can fill a session
       // differently between runs; silently deleting a movement the athlete can already see on their
