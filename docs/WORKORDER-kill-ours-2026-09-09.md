@@ -61,7 +61,13 @@ writes the sentence. Never paraphrase the book in prose. The citation lives in t
    - Long run the DAY AFTER heavy legs: p144 does not cover the next day. No cut. The warning states only
      the fact: `Friday heavy legs, Saturday long run. The run is on legs that have not recovered.` (p130,
      p131). Michael, 2026-09-09: "don't take liberties that aren't ours."
-   - Speed lower day after a long session: same treatment, the two sessions and the day, p131 fact.
+   - The remaining four cases (hard run on the heavy leg day; a hard session the day before or after heavy
+     legs; long run the day before heavy legs; heavy legs after a long session), APPROVED (Michael, 2026-09-09):
+     · Lifting after a hard or long run: `[Day]: heavy legs after [session]. Tired legs cause you to lift
+       slowly and establish improper coordination patterns.` (p77)
+     · Hard or long run after lifting: `[Day]: [session] after heavy leg training. Legs will be fatigued,
+       session suffers.` (p130, p131)
+     [Day] and [session] from the athlete's own picks.
    The four deleted claims (§A.3) do not come back.
 7. Plyo row note (compose.ts ~2139). Facts: each drill done separately, multiple times, ample rest, full
    focus on technique, balance, consistent quality (p227); until the movement is optimised for the day and
