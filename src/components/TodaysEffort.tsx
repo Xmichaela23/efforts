@@ -9,7 +9,7 @@ import { useStrengthOrderingPreference } from '@/lib/use-strength-ordering-prefe
 import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
-import { Calendar, Clock, Dumbbell, Activity, X, Copy, ArrowLeftRight } from 'lucide-react';
+import { Calendar, Clock, Dumbbell, Activity, X, Copy, ArrowLeftRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
 // ⛔ SAME RULE AS THE CALENDAR AND THE WORKOUT VIEW — one definition of "missed a planned slot".
 import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
@@ -315,6 +315,25 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       return `${startMonth} ${start.getDate()} – ${endMonth} ${end.getDate()}`;
     }
   };
+
+  /**
+   * ⛔ DAY NAVIGATION ON THE DATE LINE (Michael, 2026-09-09) — a chevron each side and a horizontal
+   * swipe, one day at a time, past or future with no stops. ⚠️ IT REUSES `week:navigate`: that event
+   * means "make this the active date", which is exactly what this asks for, and a second event doing
+   * the same thing to the same state is how two navigations start disagreeing. Only its NAME is
+   * about weeks, and renaming it would touch the calendar for nothing.
+   */
+  const handleDayNav = (direction: 'prev' | 'next') => {
+    const next = addDays(new Date(activeDate + 'T12:00:00'), direction === 'prev' ? -1 : 1);
+    window.dispatchEvent(new CustomEvent('week:navigate', { detail: { date: toDateOnlyString(next) } }));
+  };
+
+  /**
+   * ⛔ THE SWIPE IS THE DATE LINE'S AND STOPS THERE. The decks below run their own pointer handlers,
+   * so a gesture that starts here must not travel — `stopPropagation` on every phase, and
+   * `touchAction: 'pan-y'` so a vertical scroll still scrolls rather than being eaten.
+   */
+  const dateSwipe = useRef<{ x: number; moved: number } | null>(null);
 
   const handleWeekNav = (direction: 'prev' | 'next') => {
     const newDate = direction === 'prev' 
@@ -1703,7 +1722,52 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               * line already used. The city and the race countdown keep their own line below, since
               * neither is about the day.
               */}
-            <div className="flex items-baseline justify-between gap-2">
+            <div
+              className="flex items-baseline justify-between gap-2"
+              style={{ touchAction: 'pan-y' }}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                dateSwipe.current = { x: e.clientX, moved: 0 };
+              }}
+              onPointerMove={(e) => {
+                if (!dateSwipe.current) return;
+                e.stopPropagation();
+                dateSwipe.current.moved = e.clientX - dateSwipe.current.x;
+                /**
+                 * ⛔ CAPTURE ONLY ONCE IT IS A DRAG, NOT ON EVERY TOUCH. Two failures, one each way:
+                 *   · WITHOUT capture, the pointerup landed on whichever chevron the swipe had
+                 *     travelled over, so that button's click fired `prev` while the swipe fired
+                 *     `next` and the date did not move.
+                 *   · CAPTURING ON pointerdown retargets the pointer events to this row, so the
+                 *     browser dispatches the following `click` here rather than on the button — and
+                 *     the chevrons stopped working entirely.
+                 * Capturing at the 8 px mark separates them: a tap never captures and reaches its
+                 * button; a drag captures and finishes here.
+                 */
+                if (Math.abs(dateSwipe.current.moved) > 8) {
+                  try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* older webviews */ }
+                }
+              }}
+              onPointerUp={(e) => {
+                const g = dateSwipe.current;
+                dateSwipe.current = null;
+                if (!g) return;
+                e.stopPropagation();
+                // Same 60 px the decks use, so one gesture threshold governs the screen.
+                if (g.moved < -60) handleDayNav('next');
+                else if (g.moved > 60) handleDayNav('prev');
+              }}
+              onPointerCancel={(e) => { e.stopPropagation(); dateSwipe.current = null; }}
+            >
+              <button
+                type="button"
+                aria-label="Previous day"
+                /* ⚠️ A DRAG IS NOT A TAP — the same rule the decks keep. */
+                onClick={(e) => { e.stopPropagation(); if (Math.abs(dateSwipe.current?.moved ?? 0) > 8) return; handleDayNav('prev'); }}
+                className="p-0.5 -ml-1 rounded-xl flex-shrink-0 self-center text-white/40 hover:text-white/85 transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
               <span
                 className="text-[0.82rem] font-light tracking-wide truncate"
                 style={{
@@ -1732,6 +1796,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   {blockLabel}
                 </span>
               ) : null}
+              <button
+                type="button"
+                aria-label="Next day"
+                onClick={(e) => { e.stopPropagation(); if (Math.abs(dateSwipe.current?.moved ?? 0) > 8) return; handleDayNav('next'); }}
+                className="p-0.5 -mr-1 rounded-xl flex-shrink-0 self-center text-white/40 hover:text-white/85 transition-colors"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
 
             {/* The city, and the race countdown — neither is about the day, so neither joins the
@@ -1855,11 +1927,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                  */
                 const isCompletedRow = (w: { workout_status?: unknown }) =>
                   String(w?.workout_status ?? '').toLowerCase() === 'completed';
-                if (rendersAsSessionCard(workout as never)) {
+                if (rendersAsSessionCard(workout as never, isPastDate)) {
                   return wrap(
                     <TodaySession
                       session={workout as never}
                       useImperial={useImperial}
+                      isPastDate={isPastDate}
                       onOpen={() => (isCompletedRow(workout)
                         ? onEditEffort?.(workout)
                         : setSelectedPlannedWorkout(workout))}

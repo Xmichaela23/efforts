@@ -354,13 +354,18 @@ export const CompletedSessionCard: React.FC<{
  * planned work; a finished row carries provider attribution, a checkmark and its own metrics, and
  * changing it was not asked for.
  */
-export function rendersAsSessionCard(session: TodayRow): boolean {
+export function rendersAsSessionCard(session: TodayRow, isPastDate = false): boolean {
   const status = String((session as { workout_status?: unknown })?.workout_status ?? '').toLowerCase();
-  // ⛔ A DONE SESSION IS A CARD TOO NOW (Michael, 2026-09-09) — the greyed one, with its headline and
-  // the Performance tab's tiles. What is left for the old pill row is a SKIPPED session, which says
-  // why it was skipped and is not a reading of anything.
-  if (status === 'skipped') return false;
+  // ⛔ A DONE SESSION IS A CARD TOO (Michael, 2026-09-09) — the greyed one, with its headline and the
+  // Performance tab's tiles. A DONE session is a card on any day, past or future.
   if (status === 'completed') return true;
+  if (status === 'skipped') return false;
+  /**
+   * ⛔ A PLANNED SESSION ON A DAY THAT HAS PASSED IS A MISS, NOT A PLAN (Michael, 2026-09-09). It
+   * drops to the pill row rather than opening as a deck: the cues tell an athlete how to do work in
+   * front of them, and on a day already gone there is no work in front of them.
+   */
+  if (isPastDate) return false;
   if (!isFromPlan(session)) return false;
   return isStrengthRow(session) || isEnduranceRow(session);
 }
@@ -370,8 +375,8 @@ export function rendersAsSessionCard(session: TodayRow): boolean {
  * Returns null for anything else, so the caller keeps its existing row for a completed session or
  * one the athlete brought in.
  */
-const TodaySession: React.FC<{ session: TodayRow; useImperial: boolean; onOpen?: () => void }> = ({
-  session, useImperial, onOpen,
+const TodaySession: React.FC<{ session: TodayRow; useImperial: boolean; isPastDate?: boolean; onOpen?: () => void }> = ({
+  session, useImperial, isPastDate = false, onOpen,
 }) => {
   const status = String((session as { workout_status?: unknown })?.workout_status ?? '').toLowerCase();
   if (status === 'skipped') return null;
@@ -382,6 +387,7 @@ const TodaySession: React.FC<{ session: TodayRow; useImperial: boolean; onOpen?:
     return <CompletedSessionCard workout={session as Record<string, unknown>} useImperial={useImperial} onOpen={onOpen} />;
   }
 
+  if (isPastDate) return null;
   if (!isFromPlan(session)) return null;
 
   const sport = displayDisciplineOf(session as never);

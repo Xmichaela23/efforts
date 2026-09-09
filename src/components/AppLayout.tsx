@@ -1824,7 +1824,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   {/* ⛔ TWO TABS ON HOME (work order 2026-09-09 §1). Today is the screen Home opens
                       on; Week is the same calendar as before, one tap away. Neither is a new screen
                       — what changed is which of the two the athlete lands on. */}
-                  <HomeTabs value={homeLens} onChange={setHomeLens} />
+                  {/* ⛔ TAPPING TODAY RETURNS TO TODAY (Michael, 2026-09-09). The date line can now
+                      walk any distance into the past or the future, so the tab that says "Today"
+                      has to mean it — otherwise the only way back is to count days. */}
+                  <HomeTabs
+                    value={homeLens}
+                    onChange={(lens) => {
+                      if (lens === 'today') setSelectedDate(new Date().toLocaleDateString('en-CA'));
+                      setHomeLens(lens);
+                    }}
+                  />
 
                   {/* Today — fills the panel now that the calendar is behind a tab. */}
                   <div hidden={homeLens !== 'today'} style={{ flex: 1, minHeight: 0, display: homeLens === 'today' ? 'flex' : 'none', flexDirection: 'column' }}>
@@ -1923,6 +1932,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                       handleBackToDashboard();
                     }
                     setShowGoals(false);
+                    // Same reset as the Today tab above: Home means today.
+                    setSelectedDate(new Date().toLocaleDateString('en-CA'));
+                    setHomeLens('today');
                     setActiveBottomNav('home');
                   }}
                   className={`${tabBase} ${tabChrome} ${homeActive ? tabActive : ''}`}
