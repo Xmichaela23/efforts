@@ -131,6 +131,15 @@ the canonical run/ride/swim/strength; Profile still writes running/cycling/swimm
     2026-09-09; the "top of the band → add weight" trigger was ours and is removed (cue and last-time note).
   - SKILL: words still needed. Page: 3–5 reps at 75–85%, 3–4 in reserve, form and consistency before speed, no
     fatigue, ample rest, first session of the day (p218, p219, p142).
+  - Anaerobic ride, APPROVED 2026-09-09: `Go by feel. Stay above the floor. No ceiling. Each set harder than
+    the last.` (p237: floor not target, 110% rising to 125–130%, beat the last effort). The built 110–120%
+    intervals stay; the line says what the number is.
+  - Endurance ride, APPROVED 2026-09-09: `Easy, under 75 percent. Spend a few minutes of the ride paying
+    attention to how you pedal (smooth circles, not stomping) and how you sit on the bike. Truly easy.` (p239,
+    p275 "easy work should be easy")
+  - Hard run, APPROVED 2026-09-09: `Stay near threshold as long as you can without falling apart.` (p233, p110)
+  - Long run, APPROVED 2026-09-09: `Easy the whole way. Stopping for a bit is fine. Be able to speak long
+    sentences easily the whole time.` (p235, p211 talk test)
   - Endurance stop rule: heart rate up 5% at the same output, or output down 5% at the same heart rate (p107).
   - Lifting cost line: counted work sets vs 14 (p86).
 - Also decided: a 3-week check-in on the calculated max (p245, ~1% every 3 weeks) — separate piece, not built.
