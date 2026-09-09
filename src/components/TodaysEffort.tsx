@@ -40,6 +40,8 @@ import PlannedSessionHeader from './PlannedSessionHeader';
 // ⛔ TODAY'S LINES (work order 2026-09-09 §2) — what each set is FOR, under the row that says what
 // it is. Every athlete-facing word lives in `@/lib/today-lines`; nothing new is spelled out here.
 import TodaySessionLines, { TodaySpacingLine } from './TodaySessionLines';
+// ⛔ §3d — a lift and the plyo day swipe as a deck, a ride or run is one glass card.
+import TodaySession, { rendersAsSessionCard } from './SessionDeck';
 // ⛔ §3b — the weather block above the date, and the week's load bars + counts under the day.
 import TodayWeather from './TodayWeather';
 import TodayWeekBlocks from './TodayWeekBlocks';
@@ -197,6 +199,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [locTried, setLocTried] = useState(false);
   const [cityName, setCityName] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * ⛔ §3d — the grid drifts against the scroll and the bleed follows the session in view. Both are
+   * read off ONE scroll listener (below): a second listener on the same element is a second thing
+   * running on every frame of a drag.
+   * ⚠️ `sessionInView` IS AN INDEX INTO `displayWorkouts`, resolved from which session card is
+   * nearest the top of the panel. 0 until the athlete scrolls, so the screen opens on the day's
+   * first session exactly as §3b.4 left it.
+   */
+  const [parallax, setParallax] = useState(0);
+  const [sessionInView, setSessionInView] = useState(0);
+  const sessionRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [selectedPlannedWorkout, setSelectedPlannedWorkout] = useState<any | null>(null);
   const [executingWorkout, setExecutingWorkout] = useState<any | null>(null);
   const [markingComplete, setMarkingComplete] = useState(false);
@@ -1406,6 +1419,38 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     }
   };
 
+  /**
+   * ⛔ §3d — ONE SCROLL LISTENER FEEDS BOTH the grid's drift and the bleed's colour. It runs on
+   * every frame of a flick, so it does no work beyond reading `scrollTop` and a handful of
+   * `offsetTop`s, and it writes state only when the resolved session actually changes.
+   *
+   * ⚠️ `offsetTop`, NOT `getBoundingClientRect` — the rect forces layout on a scrolling element and
+   * this is the one place in the file that would do it sixty times a second.
+   */
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const top = el.scrollTop;
+      setParallax(Math.round(top * 0.25));
+      // The session in view is the LAST one whose top has passed the panel's upper third.
+      const line = top + el.clientHeight * 0.34;
+      let next = 0;
+      sessionRefs.current.forEach((node, i) => {
+        // ⚠️ `offsetTop === 0` ON A LATER SESSION MEANS "NOT LAID OUT YET", not "at the top". The
+        // first pass runs before layout settles, and without this guard every session satisfied the
+        // test at once — the LAST one won and the screen opened on the wrong sport's colour.
+        if (!node) return;
+        if (i > 0 && node.offsetTop === 0) return;
+        if (node.offsetTop <= line) next = i;
+      });
+      setSessionInView((prev) => (prev === next ? prev : next));
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [displayWorkouts]);
+
   const isPastDate = activeDate < today;
   const isToday = activeDate === today;
 
@@ -1447,7 +1492,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   return (
     <div className="w-full h-full flex flex-col" style={{ position:'relative', overflow: 'hidden', zIndex: 0 }}>
-      {/* Omni-inspired diamond-grid texture (matches reference) */}
+      {/**
+        * Omni-inspired diamond-grid texture (matches reference).
+        *
+        * ⛔ IT DRIFTS AGAINST THE SCROLL (work order §3d) — about a quarter of scroll speed, so the
+        * cards read as floating over the grid rather than painted onto it. ⚠️ ONLY THE FOUR LINE
+        * LAYERS MOVE; the vignette stays centred, or the dark corners would slide off the panel.
+        */}
       <div
         aria-hidden="true"
         style={{
@@ -1466,7 +1517,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             radial-gradient(ellipse at center, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.55) 100%)
           `,
           backgroundSize: '26px 26px, 26px 26px, 52px 52px, 52px 52px, cover',
-          backgroundPosition: 'center, center, center, center, center',
+          backgroundPosition: `center ${-parallax}px, center ${-parallax}px, center ${-parallax}px, center ${-parallax}px, center`,
         }}
       />
       {/**
@@ -1483,8 +1534,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         * information.
         */}
       {(() => {
-        const first = displayWorkouts[0];
-        const rgb = first ? getDisciplineColorRgb(displayDisciplineOf(first)) : null;
+        /**
+         * ⛔ THE BLEED FOLLOWS THE SESSION IN VIEW (§3d), not just the day's first one (§3b.4).
+         * Lift orange becomes ride green as the ride card scrolls up. `sessionInView` is the index
+         * the scroll handler resolves; before a scroll it is 0, so the screen still opens on the
+         * first session's colour and §3b.4 is unchanged for a day nobody scrolls.
+         */
+        const inView = displayWorkouts[Math.min(sessionInView, Math.max(0, displayWorkouts.length - 1))];
+        const rgb = inView ? getDisciplineColorRgb(displayDisciplineOf(inView)) : null;
         return (
           <div
             aria-hidden="true"
@@ -1753,7 +1810,32 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 only on a day that is a lift and a ride or run; every other day gets nothing. */}
             <TodaySpacingLine rows={displayWorkouts as never} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.30rem' }}>
-              {displayWorkouts.map((workout) => {
+              {displayWorkouts.map((workout, sessionIdx) => {
+                /* ⛔ ONE MEASURED WRAPPER PER SESSION, so the scroll handler can say which one is in
+                   view without every card having to know its own index. */
+                const wrap = (node: React.ReactNode) => (
+                  <div key={workout.id} ref={(el) => { sessionRefs.current[sessionIdx] = el; }}>
+                    {node}
+                  </div>
+                );
+                /**
+                 * ⛔⛔ A PLANNED SESSION FROM THE PLAN IS A DECK OR A CARD NOW (work order §3d) — a
+                 * lift and the plyo day swipe one row at a time, a ride or run is one glass card.
+                 * `TodaySession` returns null for anything else, and the pill below is what
+                 * "anything else" gets: a COMPLETED session, which carries provider attribution and
+                 * its own metrics, and one the athlete brought in. Those were not part of §3d and
+                 * are deliberately untouched.
+                 */
+                if (rendersAsSessionCard(workout as never)) {
+                  return wrap(
+                    <TodaySession
+                      session={workout as never}
+                      useImperial={useImperial}
+                      onOpen={() => setSelectedPlannedWorkout(workout)}
+                    />,
+                  );
+                }
+
                 const workoutType = workout.type || workout.workout_type || '';
                 /**
                  * ⛔ THE DISPLAY DISCIPLINE FEEDS THE COLOUR; THE WIRE TYPE STILL FEEDS THE

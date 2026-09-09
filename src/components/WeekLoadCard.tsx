@@ -60,39 +60,33 @@ const FORM_ZONE_CLS: Record<string, string> = {
   transitional: 'text-white/50', 'high risk': 'text-[#FF5A5F]',
 };
 
-/** One cell of row 1: the number in white, the label grey under it, the change small beside it. */
-const StatCell: React.FC<{ label: string; value: string | null; change?: string | null; after?: React.ReactNode }> = ({
-  label, value, change, after,
-}) => (
+/**
+ * One cell, as the mockup draws it: the grey label on top, the number under it, and one small muted
+ * word or figure trailing the number.
+ *
+ * ⚠️ THE SMALL SLOT CARRIES DIFFERENT THINGS ON THE TWO ROWS, and the mockup is deliberate about it:
+ * on fitness and fatigue it is this week's CHANGE, on form it is Friel's ZONE WORD, and on the sport
+ * row it is the UNIT. In every case it is the thing the number needs to be read correctly.
+ */
+const Cell: React.FC<{ label: React.ReactNode; value: string; small?: React.ReactNode }> = ({ label, value, small }) => (
   <div className="flex flex-col gap-0.5 min-w-0">
-    <span className="flex items-baseline gap-1 min-w-0">
-      <span className="text-[17px] font-light tabular-nums leading-none" style={{ color: 'rgba(255,255,255,0.92)' }}>
-        {value ?? '—'}
-      </span>
-      {change ? <span className="text-[10.5px] tabular-nums leading-none" style={{ color: 'rgba(255,255,255,0.42)' }}>{change}</span> : null}
-    </span>
-    <span className="flex items-baseline gap-1 text-[11px] leading-none truncate" style={{ color: 'rgba(255,255,255,0.45)' }}>
+    <span className="flex items-center gap-1.5 text-[12px] leading-none truncate" style={{ color: 'rgba(255,255,255,0.38)' }}>
       {label}
-      {after}
+    </span>
+    <span className="text-[18px] font-semibold tabular-nums leading-none" style={{ color: 'rgba(255,255,255,0.95)' }}>
+      {value}
+      {small ? <small className="ml-1 text-[12px] font-medium" style={{ color: 'rgba(255,255,255,0.62)' }}>{small}</small> : null}
     </span>
   </div>
 );
 
-/** One cell of row 2: the value in white, a sport-colour dot before the grey label. */
-const SportCell: React.FC<{ label: string; value: string; sport: string }> = ({ label, value, sport }) => (
-  <div className="flex flex-col gap-0.5 min-w-0">
-    <span className="text-[15px] font-light tabular-nums leading-none" style={{ color: 'rgba(255,255,255,0.92)' }}>
-      {value}
-    </span>
-    <span className="flex items-center gap-1.5 text-[11px] leading-none truncate" style={{ color: 'rgba(255,255,255,0.45)' }}>
-      <span
-        aria-hidden="true"
-        className="inline-block rounded-full flex-shrink-0"
-        style={{ width: 6, height: 6, background: getDisciplineColor(sport) }}
-      />
-      {label}
-    </span>
-  </div>
+/** A sport-colour dot before the label — the colour is on the mark, never on the figure. */
+const Dot: React.FC<{ sport: string }> = ({ sport }) => (
+  <span
+    aria-hidden="true"
+    className="inline-block rounded-full flex-shrink-0"
+    style={{ width: 6, height: 6, background: getDisciplineColor(sport) }}
+  />
 );
 
 const WeekLoadCard: React.FC<{
@@ -118,15 +112,17 @@ const WeekLoadCard: React.FC<{
   const wk = ff?.week_ago ?? null;
   const zone = formZone(ff?.form);
 
-  const metrics: Array<{ label: string; value: string; sport: string }> = [];
+  /** ⚠️ THE UNIT IS ITS OWN FIELD so it can sit in the small slot beside the figure (the mockup). */
+  const metrics: Array<{ label: string; value: string; unit: string; sport: string }> = [];
   const d = weeklyStats?.distances;
+  const distUnit = useImperial ? 'mi' : 'km';
   if (d) {
     if ((d.run_meters ?? 0) > 0)
-      metrics.push({ label: 'Run', sport: 'run', value: useImperial ? `${(d.run_meters! / 1609.34).toFixed(1)} mi` : `${(d.run_meters! / 1000).toFixed(1)} km` });
+      metrics.push({ label: 'Run', sport: 'run', unit: distUnit, value: useImperial ? (d.run_meters! / 1609.34).toFixed(1) : (d.run_meters! / 1000).toFixed(1) });
     if ((d.cycling_meters ?? 0) > 0)
-      metrics.push({ label: 'Bike', sport: 'bike', value: useImperial ? `${(d.cycling_meters! / 1609.34).toFixed(1)} mi` : `${(d.cycling_meters! / 1000).toFixed(1)} km` });
+      metrics.push({ label: 'Bike', sport: 'bike', unit: distUnit, value: useImperial ? (d.cycling_meters! / 1609.34).toFixed(1) : (d.cycling_meters! / 1000).toFixed(1) });
     if ((d.swim_meters ?? 0) > 0)
-      metrics.push({ label: 'Swim', sport: 'swim', value: useImperial ? `${Math.round(d.swim_meters! / 0.9144)} yd` : `${Math.round(d.swim_meters!)} m` });
+      metrics.push({ label: 'Swim', sport: 'swim', unit: useImperial ? 'yd' : 'm', value: useImperial ? String(Math.round(d.swim_meters! / 0.9144)) : String(Math.round(d.swim_meters!)) });
   }
 
   let totalVol = 0;
@@ -143,16 +139,17 @@ const WeekLoadCard: React.FC<{
     }
   }
   if (totalVol > 0)
-    metrics.push({ label: 'Lifted', sport: 'strength', value: `${totalVol.toLocaleString()} ${useImperial ? 'lb' : 'kg'}` });
+    metrics.push({ label: 'Lifted', sport: 'strength', unit: useImperial ? 'lb' : 'kg', value: totalVol.toLocaleString() });
 
   const hasNumbers = ff != null && fmt1(ff.fitness) != null;
   if (!hasNumbers && metrics.length === 0) return null;
 
   return (
     <div className={`galaxy-card readout-texture readout-texture--nova rounded-xl border border-white/[0.10] px-3 py-3 ${className}`}>
-      {/* ⛔ THE HEADER LINE: the word, then the chevron immediately right of it. No ⓘ — one control. */}
-      <div className="flex items-center gap-1.5">
-        <span className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase">LOAD</span>
+      {/* ⛔ THE HEADER LINE: the word left, the chevron at the far right (the mockup's `.load .h`).
+          No ⓘ — one control, and it opens the explanation and the bars together. */}
+      <div className="flex items-center justify-between">
+        <span className="readout-label text-[12px] tracking-[0.1em] uppercase">LOAD</span>
         {/* ⚠️ NO CHEVRON WHERE THERE IS NOTHING TO OPEN. A control that reveals an empty space
             teaches the athlete to stop tapping controls. */}
         {onToggle && (hasNumbers || hasBars) ? (
@@ -164,7 +161,7 @@ const WeekLoadCard: React.FC<{
             className="p-0.5 rounded-xl text-white/40 hover:text-white/85 transition-colors"
           >
             <ChevronDown
-              className="h-3.5 w-3.5"
+              className="h-4 w-4"
               style={{ transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform 180ms ease' }}
             />
           </button>
@@ -172,17 +169,15 @@ const WeekLoadCard: React.FC<{
       </div>
 
       {hasNumbers ? (
-        <div className="mt-2.5 grid grid-cols-3 gap-x-3">
-          <StatCell label="fitness" value={String(fmt1(ff!.fitness))} change={delta(ff!.fitness, wk?.fitness)} />
-          <StatCell label="fatigue" value={String(fmt1(ff!.fatigue))} change={delta(ff!.fatigue, wk?.fatigue)} />
-          <StatCell
+        <div className="mt-2.5 grid grid-cols-3 gap-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.10)' }}>
+          <Cell label="fitness" value={String(fmt1(ff!.fitness))} small={delta(ff!.fitness, wk?.fitness)} />
+          <Cell label="fatigue" value={String(fmt1(ff!.fatigue))} small={delta(ff!.fatigue, wk?.fatigue)} />
+          <Cell
             label="form"
             value={`${(ff!.form ?? 0) > 0 ? '+' : ''}${fmt1(ff!.form)}`}
-            change={delta(ff!.form, wk?.form)}
-            /* ⚠️ FRIEL'S ZONE WORD STAYS, beside the label rather than beside the number — it is the
-               one thing on this card that says what the figure MEANS, and losing it in a redraw
-               would be a content change nobody asked for. */
-            after={zone ? <span className={FORM_ZONE_CLS[zone] ?? 'text-white/45'}>{zone}</span> : null}
+            /* ⚠️ FORM'S SMALL SLOT IS FRIEL'S ZONE WORD, NOT ITS DELTA — the mockup's own choice, and
+               the right one: the zone says what the number MEANS, which a change of −5 does not. */
+            small={zone ? <span className={FORM_ZONE_CLS[zone] ?? 'text-white/55'}>{zone}</span> : null}
           />
         </div>
       ) : (
@@ -190,9 +185,14 @@ const WeekLoadCard: React.FC<{
       )}
 
       {metrics.length > 0 && (
-        <div className="mt-3 grid grid-cols-3 gap-x-3">
+        <div className="mt-2 grid grid-cols-3 gap-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.10)' }}>
           {metrics.map((m) => (
-            <SportCell key={m.label} label={m.label} value={m.value} sport={m.sport} />
+            <Cell
+              key={m.label}
+              label={<><Dot sport={m.sport} />{m.label}</>}
+              value={m.value}
+              small={m.unit}
+            />
           ))}
         </div>
       )}
