@@ -1,5 +1,35 @@
 # Engine State
 
+## 🧭 THE TRAIN MENU THREAD — Run + Strength is true to p246 (written 2026-09-07 night, PM chat; all SHIPPED)
+
+> Third live thread beside the two below (State-screen 09-04, book-engine 09-01). Nothing here re-opens
+> either. Orders: `WORKORDER-train-menu-reshape-2026-09-07.md` (§1-7) and
+> `WORKORDER-run-strength-rotate-2026-09-07.md` (§1-9, the terminal's own §7-9 record what shipped).
+> Layout memory: the menu is Standard Focus / Run Focus / Ride Focus; races stay under the race entry.
+
+### WHAT SHIPPED, in order (all on main, web from the push, iOS synced, none device-checked)
+| Commit | What the athlete sees | Functions |
+|---|---|---|
+| `7693c0a9` | Train = three tiles. Strength Focus, Athletic Focus and the Strong/Heavy screen are gone. Run Focus opens the p246 frame, now named **Run + Strength** everywhere (frame `displayName` + goal label). Ride cannot be picked on that frame (the plan builder fences it; `RIDE_EQUIVALENT` stays for the All Rounder). | generate-strength-plan 237 · coach 570 · rematerialize-standing-block 114 |
+| `32bca15d` | Endurance step on Run + Strength: easy-swims card off; riding clause off the lifting line. | none |
+| `3489cb1f` | Run Focus opens a "Run" program list; Ride Focus its own with Ride + Strength dimmed; run icon is the app's. | none |
+| `cc9419df` | Card copy (Michael's words): *"You get stronger. Your speed and mileage hold. Twelve weeks: four lifting days, four runs. The long run stays under 100 minutes."* Door line: barbell kit, comfortable full hour, ~3 h running, 7-9 h total (the 7-9 is OURS, lifting has no page times). | none |
+| `ef27ede3` | Endurance step = four run rows in the frame's day order. Easy run locked 30 min. Long run chips 68/75/90 (68 = the app's LSD ladder floor; his level-2 floor is 60). Hard runs rotate, no control. Hours, days, running-experience and the hard-workout pickers are gone from this path. Posture screen gone. Eight screens end to end. | none |
+| `d4b8fc51` | Wednesday NT was building as a **25-minute** row: described as distance, no threshold pace → reps carried no time. Now time-prescribed, 59 min. **Standard Focus's Wednesday carried the same invented mile and is corrected too** (its fingerprint moved by that one row). | coach 571 · generate-strength-plan 238 · rematerialize-standing-block 115 · endurance-checkpoint 19 |
+| `0539ad91` | Wednesday's pinned shape (8×4 min @ 90%) was not on the page. Now p233-234's three level-3 sessions that satisfy p247's 5-8 min rule rotate: 6×6 @ 88% (59), 4×8:30 @ 85% (55), 8×5 @ 90% (69). Standard Focus untouched by fingerprint. | coach 572 · generate-strength-plan 239 · rematerialize-standing-block 116 · endurance-checkpoint 20 · compute-snapshot 228 |
+
+### RULINGS (Michael, 2026-09-07) — the book only, no jargon
+- **Rotate, don't ask.** On Run + Strength the engine rotates his workouts at the page's levels (p112). *"Maybe a more surgical option later."* The only athlete choice on the run side is the long-run length.
+- **No Muscle / hypertrophy tier, no dose dial.** Audience is the lean, defined rider-runner; the page's default 8-12 sets/muscle IS that prescription. p244 / p252 do not get built.
+- **Separate the bike from the run.** The All Rounder is the only two-sport week in the book. Ride + Strength (p279, notes p280) is the next build; Cycling Base p278 is NOT a prerequisite for our rider (reader advice; inverts).
+- **Card copy carries the page's facts, not ours.** The 25 mi/wk advanced-tier threshold came OFF the card for that reason.
+- **Old marathon builder** goes when Long Run + Strength (p250/251) lands; not before.
+
+### OPEN, none blocking
+- The long-run chip reads 68 (honest, ugly). Options: 70 on the chip building 68, or leave.
+- Accessory picks still a wizard step on Run + Strength; moving them behind Adjust is the remaining step to five screens. Separate ruling.
+- Ride + Strength: transcribe p279/p280 into SOURCE as a new Part, then a work order. Pages are on disk at `/Users/michaelambp/Efforts_Local_Folder/book-sources/viada-hybrid-athlete/`.
+
 ## 🧭 NEXT SESSION — START HERE (written 2026-09-04 evening — the "one absolute reference per State number" session)
 
 > ⚠️ Two live threads. THIS block is the State-screen thread. The 2026-09-01 banner below is the

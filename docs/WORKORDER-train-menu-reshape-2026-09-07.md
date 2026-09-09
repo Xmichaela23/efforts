@@ -1,5 +1,7 @@
 # Work order — Train menu reshape: Strong becomes "Run + Strength" (2026-09-07)
 
+> **STATUS: SHIPPED 2026-09-07** — `7693c0a9`, then `3489cb1f` (program list) and `cc9419df` (card copy). Record in `ENGINE-STATE.md`, top block.
+
 Decided in conversation with Michael, 2026-09-07. Source of every program named here is
 `SOURCE-viada-hybrid-athlete.md` Part E0 (the roster) and the pages cited. No hypertrophy tier,
 no dose dial, no "Muscle" position anywhere — ruled out for the audience (lean, defined

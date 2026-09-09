@@ -1,5 +1,7 @@
 # Work order — Run + Strength asks nothing the page answers (2026-09-07, evening)
 
+> **STATUS: SHIPPED 2026-09-07/08** — `ef27ede3` (§1-6), `d4b8fc51` (§8), `0539ad91` (§9). Record in `ENGINE-STATE.md`, top block.
+
 Ruled by Michael 2026-09-07: on Run + Strength the engine ROTATES the run workouts; no athlete
 choice on the endurance side for now ("maybe a more surgical option later"). p112 is the rule:
 hold the load, vary "across slightly different set durations and intensities" session to session.
