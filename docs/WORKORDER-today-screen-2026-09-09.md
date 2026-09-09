@@ -81,14 +81,29 @@ Data: today's rows from `get-week` (the rows `TodaysEffort.tsx` already loads). 
 - Scores, badges, streaks. Any "coach" sentence.
 - The set-word sheet stays on the logger (WORKORDER-kill-ours §B.4) with the same four lines.
 
-## 3b. Polish, after the basics ship (Michael, 2026-09-09)
+## 3b. Polish, GO (Michael, 2026-09-09: "give this a little life")
 
-- Weather on Today: already on Home (`WeatherDisplay.tsx`, `useWeather.ts`: temperature, feels like,
-  humidity, wind, precipitation, daily high and low, sunrise and sunset). Keep it, place it at the top.
-- Dew point: not in `sessionWeather.ts` today. Add if the weather provider returns it; otherwise leave out.
-- The workouts in detail: the built intervals for a ride or run (the `steps_preset` rendered the way the
-  plan card renders them), under the family line. Lifts stay as rows + cues; the logger has the rest.
-- Tomorrow: the next day's sessions, name and time only, at the bottom. No cues, no lines.
+1. **Weather block at the top of Today**, above the date. From `useWeather.ts` / `sessionWeather.ts`:
+   temperature and feels-like, condition as an ICON, sunrise and sunset times, wind. Icons from
+   `lucide-react` (already a dependency): Sun, Cloud, CloudSun, CloudRain, CloudSnow, CloudFog,
+   CloudLightning. No emoji, ever. The condition today is `'—'` because `get-weather` asks Open-Meteo for no
+   weather code (`get-weather/index.ts` ~319, ~413): add `weather_code` to the hourly request and map the
+   WMO code to the icon (0 Sun · 1–3 CloudSun/Cloud · 45–48 CloudFog · 51–67, 80–82 CloudRain · 71–77, 85–86
+   CloudSnow · 95–99 CloudLightning). Dew point: Open-Meteo has `dew_point_2m`; add it to the same request
+   and show it beside humidity. Deploy `get-weather` when this lands.
+2. **The load card moves from State to Today.** `LoadWeeksCard.tsx` (five weekly bars per sport, this week
+   last) renders on Today below the day's sessions, one per sport the athlete does. It comes off State in
+   the same change; nothing else on State moves.
+3. **This week's counts**, one row under the load card, numbers only: miles run, miles ridden, pounds
+   lifted. Miles from the week's completed workouts' distance (the same figure the calendar rows carry);
+   pounds from the week's logged sets, weight × reps summed, the figure `StrengthCompletedView.tsx` already
+   shows per session. Labels `Run` / `Ride` / `Lifted`, units `mi` / `lb` (km / kg when the athlete's units
+   say so). No sentence.
+4. **Colour follows the day**: the soft sport-colour bleed at the top of the screen
+   (docs/REFERENCE-wizard-visual-language.md) takes the colour of the day's first session; a rest day keeps
+   the neutral bleed.
+5. The workouts in detail (built intervals under the family line) and Tomorrow (next day's sessions, name
+   and time only) stay on the list, after 1–4.
 
 ## 3c. Lifting session time (Michael, 2026-09-09)
 
