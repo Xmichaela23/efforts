@@ -37,6 +37,9 @@ import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 import { swappedStructureIsStale } from '@/lib/session-discipline-swap';
 // ⛔ ONE PLANNED-SESSION HEADER, shared by all three surfaces. See the component.
 import PlannedSessionHeader from './PlannedSessionHeader';
+// ⛔ TODAY'S LINES (work order 2026-09-09 §2) — what each set is FOR, under the row that says what
+// it is. Every athlete-facing word lives in `@/lib/today-lines`; nothing new is spelled out here.
+import TodaySessionLines, { TodaySpacingLine } from './TodaySessionLines';
 // ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
 import { plannedDurationMinutes } from '@/lib/planned-session/duration';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
@@ -1720,8 +1723,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             </p>
           </div>
         ) : (
-          // “Titles only” list: tap opens bottom sheet (planned) or detail (completed)
+          // Tap opens bottom sheet (planned) or detail (completed). Each planned session carries the
+          // day's own lines beneath it — work order 2026-09-09 §2.
           <div>
+            {/* ⛔ THE SPACING LINE, ABOVE THE SESSIONS AND CARRYING NO SPORT COLOUR (§2b). It shows
+                only on a day that is a lift and a ride or run; every other day gets nothing. */}
+            <TodaySpacingLine rows={displayWorkouts as never} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.30rem' }}>
               {displayWorkouts.map((workout) => {
                 const workoutType = workout.type || workout.workout_type || '';
@@ -2033,20 +2040,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         </div>
                       </div>
                     )}
+                    {/* ⛔ WHAT EACH SET IS FOR (work order 2026-09-09 §2), under the row that says
+                        what it is. Nothing on a completed row, nothing on a session the athlete
+                        brought in, nothing where the book has no line. See `TodaySessionLines`. */}
+                    <TodaySessionLines session={workout as never} />
                   </button>
                 );
               })}
             </div>
-            {/* Two-a-day spacing (p108, the hybrid two-a-day rule): a lift and an endurance session on
-                one date. Words are Michael's (2026-09-08). */}
-            {(() => {
-              const kinds = new Set(displayWorkouts.map((w: any) => String(w?.type || '').toLowerCase()));
-              const hasLift = kinds.has('strength');
-              const hasEndurance = ['run', 'ride', 'bike', 'cycling', 'swim', 'walk'].some((k) => kinds.has(k));
-              return hasLift && hasEndurance ? (
-                <p className="m-0 mt-2 px-1 text-[12px] text-white/55">Two sessions today. Six to eight hours apart.</p>
-              ) : null;
-            })()}
+            {/* ⛔ THE SPACING LINE MOVED TO THE TOP OF THE DAY (work order 2026-09-09 §2.1), and it
+                gained the second half the page always had: what to do when the two sessions cannot
+                be six to eight hours apart. The block that stood here printed the lead sentence
+                alone, keyed off the row's TYPE rather than its tags, and counted a swim or a walk as
+                the endurance half of a pairing p145 writes about a ride or a run. See
+                `TodaySpacingLine` above the list. */}
           </div>
         )}
         </div>

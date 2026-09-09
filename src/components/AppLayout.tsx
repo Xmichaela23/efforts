@@ -8,6 +8,8 @@ import WorkoutCalendar from './WorkoutCalendar';
 import WorkoutDetail from './WorkoutDetail';
 import GarminAutoSync from './GarminAutoSync';
 import TodaysEffort from './TodaysEffort';
+// Home's two tabs (work order 2026-09-09 §1): Today opens; Week is the calendar behind a tab.
+import HomeTabs, { type HomeLens } from './HomeTabs';
 import StrengthLogger from './StrengthLogger';
 import PilatesYogaLogger from './PilatesYogaLogger';
 import AllPlansInterface from './AllPlansInterface';
@@ -212,7 +214,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [showContext, setShowContext] = useState(false);
   const [contextFocusWorkoutId, setContextFocusWorkoutId] = useState<string | null>(null);
   const [activeBottomNav, setActiveBottomNav] = useState<'home' | 'plans' | 'insights'>('home');
-  
+  // ⛔ HOME OPENS ON TODAY (work order 2026-09-09 §1). The calendar it used to sit above is now the
+  // second tab, the way State has Status / Adjust / Schedule.
+  const [homeLens, setHomeLens] = useState<HomeLens>('today');
+
   // Post-workout feedback popup state
   const [feedbackWorkout, setFeedbackWorkout] = useState<{
     id: string;
@@ -1816,8 +1821,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                       'inset 0 -1px 0 rgba(0,0,0,0.60)',
                   }}
                 >
-                  {/* Today's efforts - fixed height */}
-                  <div style={{ height: 'var(--todays-h)', flexShrink: 0 }}>
+                  {/* ⛔ TWO TABS ON HOME (work order 2026-09-09 §1). Today is the screen Home opens
+                      on; Week is the same calendar as before, one tap away. Neither is a new screen
+                      — what changed is which of the two the athlete lands on. */}
+                  <HomeTabs value={homeLens} onChange={setHomeLens} />
+
+                  {/* Today — fills the panel now that the calendar is behind a tab. */}
+                  <div hidden={homeLens !== 'today'} style={{ flex: 1, minHeight: 0, display: homeLens === 'today' ? 'flex' : 'none', flexDirection: 'column' }}>
                     <TodaysEffort
                       selectedDate={selectedDate}
                       onAddEffort={handleAddEffort}
@@ -1826,18 +1836,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     />
                   </div>
 
-                  {/* Divider */}
-                  <div
-                    aria-hidden="true"
-                    style={{
-                      height: 1,
-                      margin: '8px 0',
-                      background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.10), transparent)',
-                    }}
-                  />
-
-                  {/* WorkoutCalendar - fills remaining space */}
-                  <div data-first-run="calendar" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                  {/* WorkoutCalendar - the Week tab, unchanged. */}
+                  <div hidden={homeLens !== 'week'} style={{ position: 'relative', flex: 1, minHeight: 0, display: homeLens === 'week' ? 'flex' : 'none', flexDirection: 'column' }}>
                     <WorkoutCalendar
                       onAddEffort={() => handleAddEffort('run')}
                       onSelectType={handleSelectEffortType}
@@ -1852,6 +1852,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                       workouts={workouts}
                       plannedWorkouts={[]}
                     />
+                    {/* ⛔ ADDING A WORKOUT BY HAND LIVES ON THE WEEK TAB NOW (work order §1) — tap a
+                        day, then add, the way TrainingPeaks and TrainerRoad do it. The calendar's
+                        day tap already sets the date every logger and builder opens on, so the
+                        menu that used to sit in the tab bar simply moved to where the date is
+                        chosen. ⚠️ THE MENU ITSELF IS UNCHANGED; only where it hangs. */}
+                    <div style={{ position: 'absolute', right: 14, bottom: 14, zIndex: 5 }}>
+                      <LogFAB onSelectType={handleSelectEffortType} />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1956,11 +1964,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                       the front door — Train / Race / Build — and "focus" is the word it uses
                       throughout ("Choose your focus", Standard Focus, Run Focus). A tab labelled
                       Goals opening a screen that never says "goal" is one name too many. The
-                      internal `showGoals` state keeps its name; only what the athlete reads changed. */}
+                      internal `showGoals` state keeps its name; only what the athlete reads changed.
+                      ⛔⛔ AND "Focus" → "+" (work order 2026-09-09 §1). The bar is Home · State · +,
+                      and the + is where a plan gets built: the training card, the race entry and the
+                      current plan. The screen behind it is untouched, and `data-first-run="focus"`
+                      stays on this button, so the first-run spotlight lands on the +. */}
                   <span aria-hidden="true" className={sigilClass('eye-mark', goalsActive)} />
-                  <span className={labelClass}>Focus</span>
+                  {/* ⚠️ THE ACCESSIBLE NAME KEEPS THE EXISTING WORD. "+" alone is not a name a
+                      screen reader can announce, and inventing a new sentence for it would be a
+                      new athlete-facing line. "Focus" is the word the screen behind it already
+                      uses and the word the first-run spotlight already says. */}
+                  <span className={labelClass} aria-label="Focus">+</span>
                 </Button>
-                <LogFAB onSelectType={handleSelectEffortType} />
                   </>
                 );
               })()}
