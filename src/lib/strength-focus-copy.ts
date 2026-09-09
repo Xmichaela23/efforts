@@ -382,24 +382,15 @@ export const BAR_SPEED_COPY: Record<BarSpeedMoment, string> = {
 export const BAR_SPEED_AMRAP_AFTER = 'Not to failure — you train tomorrow.';
 
 /**
- * ⛔ THE ASSISTANCE CUE — shown ONCE per accessory exercise, not per set.
+ * ⛔⛔ DELETED 2026-09-09 — `ACCESSORY_SET_CUE`, THE PREVIOUS PROGRAM'S ASSISTANCE LINE.
+ * (WORKORDER-kill-ours-2026-09-09 §A.2.)
  *
- * An assistance row prescribes a rep TOTAL ("25 total") and no weight, which is the block saying
- * *"get this many, however you like."* Nothing on the card said so, so the number read as a single
- * set — Michael, on his own plan: *"25 chin ups? lol i can do 5."* The prescription never asked for
- * twenty-five in a row, and the row that carries it never mentioned that.
+ * It read *"Split these into as many sets as you need. Leave a rep or two — never to failure."* Both
+ * halves came from the archived programme, not from Viada, and the only rows it could still reach are
+ * rep-total rows the standing plan no longer builds. A line with no page and no live row comes off.
  *
- * **Basis: the previous program, the previous program.** Assistance is done across as many sets as it takes and is
- * explicitly NOT taken to failure (p.24, p.102); doing too much assistance is named as the single
- * most common mistake lifters make with the programme. Both halves of the line are his, in order.
- *
- * ⚠️ IT CONTAINS "as many" AND "failure", AND THAT IS NOT A LINT MISS. `bar-speed-copy.test.ts`
- * bans those words on the BAR_SPEED_COPY lines because there they would mean rep-chasing on a
- * prescribed set. Here "as many" governs SETS (the opposite of chasing reps in one) and "failure"
- * appears as an explicit stop rule. Same words, inverted sense. **Do not widen that lint over this
- * constant** — pin the intent instead, as `strength-accessory-copy.test.ts` does.
+ * ⚠️ THE STANDING PLAN'S OWN VERSION IS BELOW AND IS UNCHANGED — its two clauses are p86 and p218.
  */
-export const ACCESSORY_SET_CUE = 'Split these into as many sets as you need. Leave a rep or two — never to failure.';
 
 /**
  * ⛔ THE STANDING PLAN'S OWN CUE (2026-08-24, Michael on device, day one of his block). The the previous program
@@ -467,8 +458,9 @@ export const STANDING_ACCESSORY_SET_CUE = '8 to 12 reps, 1 to 2 in reserve. Reps
  * session-line block records at length: *the claim is his, the words are ours, the citation lives in
  * the code.* ⚠️ Do not "restore" the participle to match the page.
  *
- * ⛔⛔ AND HE ASKED WHETHER THIS WHOLE LINE WAS VIADA'S. **HALF OF IT IS NOT, AND BOTH OURS EARN
- * THEIR PLACE.** Recorded so nobody trims them as unsourced:
+ * ⛔⛔ AND HE ASKED WHETHER THIS WHOLE LINE WAS VIADA'S. **HALF OF IT WAS NOT, AND ON 2026-09-09
+ * BOTH HALVES CAME OFF.** ⚠️ The argument below is kept as the RECORD OF A REVERSED CALL — read the
+ * block under it before restoring either clause:
  *
  *   · *"If you get more than N, log it."* — **OURS. Not in the book.** It stays because after the
  *     2026-08-28 RIR change the heavy rows carry NO reserve target (p218 gives ME none), so the
@@ -478,18 +470,30 @@ export const STANDING_ACCESSORY_SET_CUE = '8 to 12 reps, 1 to 2 in reserve. Reps
  *   · *"Assistance if you need it, added weight if you don't."* — **OURS. Not in the book.** It is
  *     the only thing on the screen that explains the Assist/+ column running in both directions.
  *
- * ⚠️ **BOTH ARE ABOUT THE APP, NOT ABOUT THE TRAINING**, and neither claims to be his. That is the
+ * ⚠️ **BOTH ARE ABOUT THE APP, NOT ABOUT THE TRAINING**, and neither claims to be his. That was the
  * test for whether an unsourced clause may ship: a training claim needs a page, an instruction about
- * how to use this screen does not.
+ * how to use this screen does not. ⛔ **THAT TEST IS RETIRED — see the block immediately below.**
  */
-export const STANDING_ME_SET_CUE = (band: string, opts?: { loadPrescribed?: boolean }): string => {
-  const hi = String(band).match(/(\d+)\s*$/)?.[1] ?? '';
-  const more = hi ? ` If you get more than ${hi}, log it.` : '';
-  const direction = opts?.loadPrescribed === false
-    ? " Assistance if you need it, added weight if you don't."
-    : '';
-  return `${band} reps, stop short of failure.${more}${direction}`;
-};
+/**
+ * ── ⛔⛔ 2026-09-09: BOTH UNSOURCED CLAUSES ARE DELETED — "never use ours" ────────────────────────
+ *
+ * Michael, 2026-09-09, on *"If you get more than N, log it."*: **"never use ours."** The exception
+ * the block above argued for — *a training claim needs a page, an instruction about how to use this
+ * screen does not* — is **retired**. An athlete reads a line on a set row as training instruction
+ * whatever it is about, so every athlete-facing line has to trace to a page.
+ *
+ * ⛔ WHAT CAME OFF, AND WHY NEITHER IS MISSED (WORKORDER-kill-ours-2026-09-09 §A.1):
+ *   · *"If you get more than N, log it."* — the rep stepper is no longer capped, so an athlete who
+ *     gets six can enter six. The line was closing a hole the input no longer has.
+ *   · *"Assistance if you need it, added weight if you don't."* — the Assist/+ column carries its own
+ *     labels, in both directions, on the control itself.
+ *
+ * ⚠️ WHAT IS LEFT IS p219 AND ONLY p219: the band the row prescribes, and his stop rule.
+ * ⚠️ `opts` IS GONE WITH THE DIRECTION CLAUSE. The row no longer says anything different about a
+ * priced and an unpriced lift, so there is nothing for a caller to tell it.
+ */
+export const STANDING_ME_SET_CUE = (band: string): string =>
+  `${band} reps, stop short of failure.`;
 
 /**
  * ⛔ THE DE ROW'S OWN INSTRUCTION (2026-08-25, Michael on the close-grip card: "move the bar fast

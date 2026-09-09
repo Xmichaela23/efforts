@@ -39,7 +39,6 @@ import {
   chooseDayMap,
   defaultCompetitionLifts,
   frameFixedDaysFor,
-  HAIRCUT_CAUSE_IS_OURS,
   isHardSlot,
   isLongSlot,
   weekdayForFrameDay,
@@ -182,6 +181,13 @@ const tradeOffs = {
   hardOnLowerWithNote: 0,
   /** A keystone clearance the athlete broke, WITH a sentence naming the day and the shortfall. */
   keystoneBreakWithNote: 0,
+  /**
+   * ⛔ A keystone clearance the athlete broke that the block deliberately SAYS NOTHING about
+   * (2026-09-09, kill-ours §A.3/§B.6). Four shapes, listed exhaustively at the check site. Counted
+   * rather than ignored so the number is visible in the sweep's own log — if it moves, somebody
+   * changed which breaks are silent.
+   */
+  keystoneBreakSilentByRuling: 0,
 };
 
 // ── VIADA'S PLACEMENT LAWS, AS CHECKS (2026-08-26) ───────────────────────────────────────────────
@@ -382,6 +388,23 @@ function checkPlacementLaws(
         tradeOffs.hardOnLowerWithNote++;
         continue;
       }
+      /**
+       * ⛔⛔ A HARD **RUN** ON THE ME LOWER DAY IS SILENT BY RULING (2026-09-09, kill-ours §A.3).
+       *
+       * Its sentence claimed *"squats and deadlifts opening on legs that already ran hard come in
+       * under the weights the test priced"* — no page — and §B.6 approved words for the RIDE arm
+       * only. Michael writes the run sentence when he writes it; until then the block says nothing
+       * rather than saying something unsourced.
+       *
+       * ⚠️ NARROW ON PURPOSE: the ME lower day, and a RUN. A hard ride there still speaks (p145,
+       * p77), and any hard session on the DE lower day still speaks through
+       * `hard_on_speed_leg_day`, whose sentence was never in question.
+       */
+      const meWeekdays = lower.me.map(dayOf);
+      if (t.s.type === 'run' && meWeekdays.includes(t.s.day as Weekday)) {
+        tradeOffs.keystoneBreakSilentByRuling++;
+        continue;
+      }
       fails.push(`week ${wk}: hard endurance on the lower-body day ${t.s.day} because the ATHLETE `
         + `put it there, and NOTHING SAYS SO — ${t.s.name} · notes=[${dayNotes()}]`);
       continue;
@@ -438,6 +461,32 @@ function checkPlacementLaws(
       (subjectDay != null && c.days.includes(DAYS[subjectDay]))
       || (blockerDay != null && c.days.includes(DAYS[blockerDay])));
     if (covered) { tradeOffs.keystoneBreakWithNote++; continue; }
+    /**
+     * ⛔⛔ FOUR BREAKS ARE DELIBERATELY UNNAMED SINCE 2026-09-09, AND THE LIST IS EXHAUSTIVE
+     * (WORKORDER-kill-ours §A.3 and §B.6).
+     *
+     * Their sentences carried claims with no page — *"come in under the weights the test priced"*,
+     * *"carries injury risk rather than a hard day"*, *"a tendon cost rather than a comfort one"* —
+     * and §B.6 supplies replacement words for only ONE arm of the three rules: the same-day hard
+     * RIDE beside heavy legs, plus the long run the day AFTER heavy legs. Everything else waits for
+     * Michael to write it, because the standing rule is silence over an unsourced claim.
+     *
+     * ⛔ SO THE HARNESS STILL FAILS ON A SILENT BREAK — it just knows which four are silent BY
+     * RULING and counts them instead. **Do not widen this list to make a new failure go away.** A
+     * break outside it is a break nobody decided to leave unnamed, which is the bug this criterion
+     * has always been for.
+     */
+    const sameDay = subjectDay != null && blockerDay != null && subjectDay === blockerDay;
+    const blockerIsRide = blockerDay != null && view.typed.some((t) =>
+      t.load === 'hard_cardio' && t.s.type === 'ride' && t.s.day === DAYS[blockerDay]);
+    const silentByRuling =
+      // 1-2 · a hard session on the heavy leg day — only the SAME-DAY RIDE has words.
+      (u.load === 'heavy_lower' && u.system === 'heavy_legs' && !(sameDay && blockerIsRide))
+      // 3 · the long run STACKED on the heavy leg day. Only the day-apart case has words.
+      || (u.load === 'long_run' && u.system === 'heavy_legs' && sameDay)
+      // 4 · heavy legs after a long session, either spacing. `heavy_legs_after_long` emits nothing.
+      || u.system === 'long_effort';
+    if (silentByRuling) { tradeOffs.keystoneBreakSilentByRuling++; continue; }
     const athleteCaused = touchedLabels.has(u.unit) || touchedLabels.has(u.blockedBy);
     fails.push(`week ${wk}: KEYSTONE break the ${athleteCaused ? 'ATHLETE asked for and NOTHING NAMES' : 'ENGINE placed'}`
       + ` — ${u.unit} on ${where} needs ${u.system} clear; ${u.blockedBy} leaves it outstanding, `
@@ -470,8 +519,12 @@ function checkPlacementLaws(
   // the athlete can actually see is the pair of sentences `exerciseForSlot` writes, and those are
   // what this asserts:
   //   · the reduction engaged → p247's *"the run the day before is still in the legs"*.
-  //   · the reduction dropped → `HAIRCUT_CAUSE_IS_OURS`, our stated reading of his p280 reason.
-  // Exactly one of them is true of a block, and which one must match the calendar.
+  //   · the reduction dropped → **nothing is said at all** since 2026-09-09. The sentence that used
+  //     to explain it (`HAIRCUT_CAUSE_IS_OURS`) was an athlete-facing line whose whole content was
+  //     that it had no page, and kill-ours §C.9 deleted it. p247 applies where p247's layout holds
+  //     and is silent where it does not; the silence needs no note.
+  // So only ONE direction is still assertable, and it is the load-bearing one: a compensated break
+  // must SAY it was compensated. The uncompensated case is checked as an ABSENCE instead.
   {
     // ⚠️ NAMES THE FRAME'S ME LOWER DAYS — one for `strength_5k`, so the sentences below read the
     // same as they always did.
@@ -480,20 +533,28 @@ function checkPlacementLaws(
       const before = [...daysBeforeMeLower].join(' and ');
       const adjacency = hardRunTheDayBefore;
       const saysReduced = spoken.some((t) => t.includes('three and a half per cent'));
-      const saysDropped = spoken.some((t) => t === HAIRCUT_CAUSE_IS_OURS);
       if (adjacency && !saysReduced) {
         fails.push(`week ${wk}: hard RUN on ${before}, ME Lower on ${meWeekday}, and the block never `
           + `says the lower-body weights were reduced — p247's one compensated break, UNCOMPENSATED`);
       }
-      if (!adjacency && !saysDropped) {
-        fails.push(`week ${wk}: no hard run on ${before} (ME Lower is ${meWeekday}) and the block `
-          + `never says the reduction was dropped — either it is reducing for a cause that is not `
-          + `there, or nothing explains the number`);
-      }
-      if (adjacency && saysDropped && !saysReduced) {
-        fails.push(`week ${wk}: a hard RUN sits on ${before} and the block claims the reduction was `
-          + `dropped because the hard work is on the bike — the sentence contradicts the calendar`);
-      }
+      /**
+       * ⛔⛔ THE SECOND DIRECTION IS NO LONGER ASSERTABLE, AND SAYING SO IS BETTER THAN FAKING IT.
+       *
+       * It used to read *"no adjacency → the block SAYS the reduction was dropped"*, and it was
+       * checkable only because a sentence announced the drop. That sentence was `HAIRCUT_CAUSE_IS_OURS`
+       * — an athlete-facing line whose whole content was that it had no page — and kill-ours §C.9
+       * deleted it on 2026-09-09. **There is now nothing on the block to read in that direction.**
+       *
+       * ⚠️ A DRAFT REPLACED IT WITH *"no adjacency → the reduction sentence is ABSENT"* and that
+       * over-claims: the sweep finds ~29 shapes where the harness sees no hard run the day before ME
+       * Lower and the composer reduced anyway. `hardRunBeforeLower` is asked PER SLOT inside
+       * `exerciseForSlot` while this harness measures one adjacency per week, and on a frame with more
+       * than one lower day the two are not the same question. **That gap predates this order and is
+       * not evidence about it.** Left as a finding rather than papered over with a looser assertion.
+       *
+       * ⛔ WHAT STILL HOLDS, AND IT IS THE LOAD-BEARING HALF: p247's compensated break must SAY it was
+       * compensated. That arm is above and is unchanged.
+       */
     }
   }
 
@@ -711,10 +772,12 @@ function report(name: string, cases: Case[], check: (c: Case) => string[]): numb
   console.log(`  ${name}: ${cases.length} combinations, ${total} failures in `
     + `${byClass.size} class(es), ${tradeOffs.liftOnBlockedWithNote} stated lift-on-day-off trade-offs`);
   console.log(`    · stated trade-offs: hard-on-lower-with-note ${tradeOffs.hardOnLowerWithNote}, `
-    + `keystone-break-with-note ${tradeOffs.keystoneBreakWithNote}`);
+    + `keystone-break-with-note ${tradeOffs.keystoneBreakWithNote}, `
+    + `keystone-break-silent-by-ruling ${tradeOffs.keystoneBreakSilentByRuling}`);
   tradeOffs.liftOnBlockedWithNote = 0;
   tradeOffs.hardOnLowerWithNote = 0;
   tradeOffs.keystoneBreakWithNote = 0;
+  tradeOffs.keystoneBreakSilentByRuling = 0;
   for (const [k, v] of [...byClass.entries()].sort((a, b) => b[1].n - a[1].n)) {
     console.log(`    ✗ [${v.n}×] ${k}`);
     console.log(`        e.g. ${v.first}`);

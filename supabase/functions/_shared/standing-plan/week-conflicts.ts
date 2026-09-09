@@ -37,7 +37,15 @@ export type ConflictRule =
   /** Heavy legs inside the shadow of the long session. `heavy_lower` short of `long_effort`. */
   | 'heavy_legs_after_long'
   /** p246 keeps endurance off BOTH lower days; the speed day has no clearance, only a cost. */
-  | 'hard_on_speed_leg_day';
+  | 'hard_on_speed_leg_day'
+  /**
+   * ⛔ AN EASY RUN ON THE HEAVY LEG DAY — p144's rule 5, and the ONLY conflict here that changes the
+   * week rather than describing it. He puts the work that tolerates pre-fatigue last and says the
+   * VT1 run can be cut *"by a third or so after a hard leg workout"* for the same adaptation, so the
+   * composer makes the cut and this names it. ⚠️ SAME DAY ONLY — p144 covers the session and the day
+   * and says nothing about tomorrow.
+   */
+  | 'easy_run_with_heavy_legs';
 
 /**
  * ⛔ STRUCTURED, NOT A SENTENCE (2026-08-26). A later slice attaches actions to these — *"maybe give
@@ -247,6 +255,33 @@ function apartPhrase(a: Weekday, b: Weekday): 'same' | 'adjacent' | 'two' {
 }
 
 /**
+ * ⛔ THE EASY RUNS THAT SHARE A DAY WITH THE HEAVY LEG SESSION — ONE OWNER, TWO CALLERS (2026-09-09).
+ *
+ * `compose.ts` shortens these runs by a third (p144 rule 5) and rule 5 below names them. Both ask
+ * this function, so the sentence can never describe a cut the plan did not make.
+ *
+ * ⚠️ RUNS ONLY. p144's clause is about VT1 RUN volume; he says nothing about trimming a ride, and
+ * `phraseFor` would have no word for it either.
+ * ⚠️ `easy` IS THE LAW'S WORD, so a declined hard slot that the week rewrote to easy running counts,
+ * and a hard run on the same day does not — that day is a different rule.
+ */
+export function easyRunOnHeavyLegDays(
+  typed: TypedSession[],
+): Array<{ day: Weekday; run: TypedSession }> {
+  const heavyDays = new Set(
+    typed.filter((t) => t.load === 'heavy_lower').map((t) => t.s.day as Weekday),
+  );
+  const out: Array<{ day: Weekday; run: TypedSession }> = [];
+  for (const t of typed) {
+    if (t.load !== 'easy' || t.s.type !== 'run') continue;
+    const day = t.s.day as Weekday;
+    if (!heavyDays.has(day)) continue;
+    out.push({ day, run: t });
+  }
+  return out;
+}
+
+/**
  * ⛔ EVERY CONFLICT IN ONE BUILT WEEK, WITH ITS COST. Empty on a clean week — never `[]` standing in
  * for "we did not look", because every caller reaches this by having a placed week in hand.
  *
@@ -295,69 +330,66 @@ export function weekConflicts(args: {
     const apart = apartPhrase(sDay, bDay);
 
     if (u.load === 'heavy_lower' && u.system === 'heavy_legs') {
-      // ⛔ A HARD SESSION AND THE HEAVY LEG DAY ON ONE DAY. ⚠️ The ride's arm says the cost is
-      // smaller and still says there is one — D-453 prices it at 12h against the run's 24h, and a
-      // sentence that dismissed it would be the plan telling the athlete a stacked day is free.
-      const ride = blocker.s.type === 'ride';
-      push({
-        kind: 'cost',
-        rule: 'hard_with_heavy_legs',
-        days,
-        sessions,
-        shortBy: u.shortBy,
-        text: apart === 'same'
-          ? (ride
-            ? `${sDay} has ${phraseFor(blocker)} and ${phraseFor(subject)} on it. Riding hard costs `
-              + 'the legs less than running hard does, so the barbell work gives up less here — it '
-              + 'still opens on legs that have already worked.'
-            : `${sDay} has ${phraseFor(blocker)} and ${phraseFor(subject)} on it. Squats and `
-              + 'deadlifts opening on legs that already ran hard come in under the weights the test '
-              + 'priced.')
-          : `${phraseFor(subject)} on ${sDay} follows ${phraseFor(blocker)} on ${bDay}. Heavy `
-            + 'squats and deadlifts inside a day of hard work come in under the weights the test priced.',
-      });
+      /**
+       * ⛔⛔ THREE OF THIS RULE'S FOUR SENTENCES ARE GONE AND ONE IS HIS (2026-09-09, kill-ours §A.3
+       * and §B.6). *"Riding hard costs the legs less than running hard does"* and *"come in under the
+       * weights the test priced"* are claims with no page — the second one twice — and the standing
+       * rule is that a claim without a page comes off rather than being softened.
+       *
+       * ⛔ WHAT SHIPS IS THE SAME-DAY RIDE CASE, in Michael's own words off p145 and p77: the two
+       * sessions, the day, and the order to run them in. ⚠️ THE OTHER THREE ARMS ARE SILENT UNTIL HE
+       * WRITES THEM — the hard RUN on the heavy day, and either sport a day apart. Silence over an
+       * unsourced claim is the standing rule (`voiceViolation`'s own drop), and the athlete still has
+       * the calendar in front of them. **Do not fill these in from the deleted sentences.**
+       */
+      if (apart === 'same' && blocker.s.type === 'ride') {
+        push({
+          kind: 'cost',
+          rule: 'hard_with_heavy_legs',
+          days,
+          sessions,
+          shortBy: u.shortBy,
+          text: `${sDay}: hard ride and heavy legs. Lifts in the first session, 6 to 8 hours before `
+            + 'the ride.',
+        });
+      }
       continue;
     }
 
     if (u.load === 'long_run' && u.system === 'heavy_legs') {
-      // ⛔ THE INJURY-PREVENTION HALF, and the sentence says so in those terms rather than in hours.
-      // `model.ts`: squatting the day before a long RUN "puts damaged, depleted legs into an impact
-      // session". The ride has no such rule and gets no such sentence.
-      push({
-        kind: 'cost',
-        rule: 'long_after_heavy_legs',
-        days,
-        sessions,
-        shortBy: u.shortBy,
-        text: apart === 'same'
-          ? `${sDay} has ${phraseFor(subject)} and ${phraseFor(blocker)} on it. A long run on legs `
-            + 'that have not had a day clear of hard work is where this plan carries injury risk '
-            + 'rather than a hard day.'
-          : `${phraseFor(subject)} on ${sDay} comes within a day of ${phraseFor(blocker)} on `
-            + `${bDay}. A long run on legs that have not had a day clear of hard work is where this `
-            + 'plan carries injury risk rather than a hard day.',
-      });
+      /**
+       * ⛔ *"carries injury risk rather than a hard day"* HAS NO PAGE AND IS DELETED (§A.3). p144 does
+       * not reach the next day and nothing else prices the risk, so the sentence states the fact and
+       * stops: the two sessions, their days, and what the legs are (p130, p131). Michael's words,
+       * 2026-09-09 — *"don't take liberties that aren't ours."*
+       * ⚠️ THE SAME-DAY ARM IS SILENT. He wrote the day-apart sentence; a long run stacked on the
+       * heavy day is a different claim and is not his yet.
+       * ⚠️ `bDay` LEADS BECAUSE THE HEAVY DAY COMES FIRST — subject is the long run, blocker is the
+       * lift, and his sentence reads in calendar order.
+       */
+      if (apart !== 'same') {
+        push({
+          kind: 'cost',
+          rule: 'long_after_heavy_legs',
+          days,
+          sessions,
+          shortBy: u.shortBy,
+          text: `${bDay} heavy legs, ${sDay} long run. The run is on legs that have not recovered.`,
+        });
+      }
       continue;
     }
 
-    if (u.system === 'long_effort') {
-      // ⛔ `model.ts`'s own reason, in its own words: a long ride has no eccentric damage but it is
-      // the most glycogen-expensive session in the block, and squatting heavy on empty quads is a
-      // tendon problem rather than a comfort one.
-      push({
-        kind: 'cost',
-        rule: 'heavy_legs_after_long',
-        days,
-        sessions,
-        shortBy: u.shortBy,
-        text: apart === 'same'
-          ? `${sDay} has ${phraseFor(subject)} and ${phraseFor(blocker)} on it. Heavy squats and `
-            + 'deadlifts on legs a long session has emptied is a tendon cost rather than a comfort one.'
-          : `${phraseFor(subject)} on ${sDay} comes within two days of ${phraseFor(blocker)} on `
-            + `${bDay}. Heavy squats and deadlifts on legs a long session has emptied is a tendon `
-            + 'cost rather than a comfort one.',
-      });
-    }
+    /**
+     * ⛔⛔ HEAVY LEGS AFTER A LONG SESSION IS SILENT AS OF 2026-09-09 (§A.3), AND THE RULE ID STAYS.
+     *
+     * Its sentence claimed *"a tendon cost rather than a comfort one"* — `model.ts`'s own framing,
+     * with no page behind it — and §B.6 gives this case no replacement words. The clearance is still
+     * computed, the id still exists, and nothing is emitted until Michael writes the line.
+     * ⚠️ DO NOT REVIVE THE OLD TEXT. It is quoted here only so a reader can see what was removed and
+     * why: the tendon claim is ours, not p130's.
+     */
+    if (u.system === 'long_effort') continue;
   }
 
   // ── 4: THE FRAME RULE (p246 §E1a). Days 2 and 5 print NO endurance; the speed day carries no
@@ -387,6 +419,31 @@ export function weekConflicts(args: {
         });
       }
     }
+  }
+
+  /**
+   * ── 5: THE EASY RUN ON THE HEAVY LEG DAY (p144 rule 5, 2026-09-09) ─────────────────────────────
+   *
+   * ⛔ THE ONLY RULE HERE THAT REPORTS A CHANGE RATHER THAN A COST. p144: *"work that benefits from
+   * pre-fatigue goes last — almost always VT1-intensity endurance… you could cut your VT1 run volume
+   * by a third or so after a hard leg workout and get the same overall adaptations."* The composer
+   * makes that cut (`cutEasyRunsOnHeavyLegDay`) and this names it, so the shortened row is explained
+   * rather than read as a plan that shrank on its own.
+   *
+   * ⚠️ SAME DAY ONLY, WHICH IS THE PAGE'S OWN REACH. He writes about the session and the day; the
+   * next morning is not covered and gets nothing.
+   * ⚠️ AND IT ASKS `easyRunOnHeavyLegDays`, THE SAME FUNCTION THE COMPOSER CUTS WITH — one owner, so
+   * a run the warning names is always a run the plan actually shortened.
+   */
+  for (const { day, run } of easyRunOnHeavyLegDays(typed)) {
+    const heavy = typed.find((t) => t.load === 'heavy_lower' && t.s.day === day);
+    push({
+      kind: 'cost',
+      rule: 'easy_run_with_heavy_legs',
+      days: [day],
+      sessions: [...(heavy ? [heavy.s.name] : []), run.s.name],
+      text: `${day}: heavy legs and an easy run. The run is cut by a third.`,
+    });
   }
 
   // ⛔ TWO HARD ENDURANCE SESSIONS ON ONE DAY, OR A HARD ONE BESIDE THE LONG ONE (Michael,

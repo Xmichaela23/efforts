@@ -71,7 +71,6 @@ import {
   assignSports, assignedSlot, isHardSlot, isLongSlot, SWIM_SLOT, SWIM_IS_EASY_ONLY, type SportMix,
 } from './sport-slots.ts';
 import {
-  HAIRCUT_CAUSE_IS_OURS,
   INTENSITY_STARTS_LOW_IS_OURS,
   ME_SET_LADDER_IS_OURS,
   prescribedLoad,
@@ -161,7 +160,7 @@ import { translateEnduranceSession } from './session-vocabulary.ts';
 import { enduranceLedgerFor, type EnduranceLedger } from './endurance-ledger.ts';
 import { archetypesFor } from '../endurance-library/index.ts';
 import type { EnduranceSession } from '../endurance-library/index.ts';
-import { weekConflicts, type WeekConflict } from './week-conflicts.ts';
+import { easyRunOnHeavyLegDays, typedSessionsOf, weekConflicts, type WeekConflict } from './week-conflicts.ts';
 import {
   DEFAULT_SIZE, easyFillHours, EASY_FILL_SPEC, FREE_ENDURANCE_DAYS, ladderOf,
   REST_DAY_RUNG, rungAt, rungForMinutes, sayHours, sizeFor, slotSpans, weekVolumeBounds,
@@ -209,13 +208,6 @@ export type StrengthExercise = {
   /** ⛔ HIS reps-in-reserve for this slot's intent. Absent on ME — see `targetRirForIntent`. */
   target_rir?: number;
   /**
-   * ⛔ HOW THIS ROW'S WEIGHT WAS ARRIVED AT, when it was not the athlete's own tested lift.
-   * `derived_ratio` = the working number of this pattern's tested lift × the movement's catalogue
-   * ratio. Absent means the weight is the tested lift's own, or there is no weight.
-   * ⚠️ A DISPLAY SURFACE SHOULD NOT RENDER THE TWO IDENTICALLY. Nothing branches on it yet — the
-   * `notes` line carries the same fact in words so the athlete sees it either way.
-   */
-  /**
    * ⛔⛔ HOW THIS ROW'S WEIGHT WAS ARRIVED AT — **INCLUDING WHEN THERE ISN'T ONE** (widened 2026-09-01).
    *
    * ⛔ THE DEFECT IT CLOSES IS A READING DEFECT, AND IT IS THE MOST-REPORTED ONE IN THIS PROJECT.
@@ -225,15 +217,20 @@ export type StrengthExercise = {
    * investigated, and turns out to be the design. **The row now says WHICH kind of by-feel it is,
    * in the box the athlete already reads.**
    *
-   * `derived_ratio`   a number, from the tested lift's prescribed weight × this movement's ratio
    * `auto_regulated`  no number BY DESIGN — p218 gives HYP reps and a reserve and no load
    * `no_tested_lift`  no number POSSIBLE — this pattern has no tested lift (a pull, chiefly)
    * `per_side`        no number HONEST — per-hand or single-leg; one figure would read as doubled
-   * `awaiting_test`   no number YET — the test has not been logged, so nothing is priced
+   * `awaiting_test`   no number YET — **this row IS a tested lift** and its test is not logged
    *
-   * ⚠️ ABSENT still means the weight is the tested lift's own. That is unchanged.
+   * ⛔⛔ `derived_ratio` IS GONE (2026-09-09, WORKORDER-de-row-by-feel §3). It meant *"the tested
+   * lift's prescribed weight × this movement's catalogue ratio"*, and no page relates one lift's max
+   * to another's. Nothing prices off a ratio any more, so no row can carry this value.
+   * ⚠️ AND THE MEANING OF ABSENT WIDENED WITH IT. It still means the weight is the tested lift's own
+   * — and it now ALSO means a by-feel row that is none of the four cases above: not the tested lift,
+   * not per-side, on a pattern that does have one. Those rows say nothing, because there is no true
+   * sentence for them in this list and inventing one is a new athlete-facing line.
    */
-  load_basis?: 'derived_ratio' | 'auto_regulated' | 'no_tested_lift' | 'per_side' | 'awaiting_test';
+  load_basis?: 'auto_regulated' | 'no_tested_lift' | 'per_side' | 'awaiting_test';
   /**
    * ⛔⛔ THE NAME OF THE EXECUTION THIS ATHLETE'S KIT ACTUALLY REACHES — DISPLAY ONLY (2026-08-31).
    *
@@ -1562,112 +1559,32 @@ function exerciseForSlot(
     && movement.toLowerCase() === String(args.competitionLifts[pattern]).toLowerCase();
 
   /**
-   * ⛔⛔ A COMPOUND IN A TOP SET GETS A NUMBER TOO (Michael, off a seeded 12-week export, 2026-08-27:
-   * *"they should all get numbers"*, then *"so lets supply the numbers"*).
+   * ⛔⛔⛔ THE `derived` BLOCK IS DELETED — **NO LIFT IS PRICED OFF ANOTHER LIFT** (2026-09-09,
+   * WORKORDER-de-row-by-feel).
    *
-   * ⛔ THE DEFECT, IN HIS OWN WEEK: *"W2 Tue: Back Squat 1x1-5 @ 110 | trap bar deadlift 1x1-5 @ By
-   * feel"*. **Two top sets on the same day, one prescribed and one by feel** — and nobody takes a
-   * heavy top set by feel. Every non-competition movement fell through the test above, including the
-   * ones sitting in the same pattern as a lift that WAS tested.
+   * Michael: *"never use ours."* A ratio between two lifts is the purest form of ours — **no page in
+   * the corpus relates one lift's max to another's.** p214 is explicit that a percentage needs a
+   * tested max ON THAT LIFT (*"testing your 5-rep max prior to the program"*), and p218 prescribes a
+   * row with no percentage by its reps and its reserve instead. So both arms went:
    *
-   * ⛔ THE RATIO IS THE APP'S, NOT A NEW TABLE. `exercise-config.ts` already carries `primaryRef` and
-   * `ratio` on every movement — front squat 0.85 of squat, trap bar deadlift 1.0 of deadlift, close
-   * grip bench 0.9 of bench — and `strength-grid/taxonomy.ts` describes the scheme and names the
-   * front squat's 0.85 outright. The composer simply was not reading it.
+   *   · the CROSS-PATTERN arm (added 2026-09-03) — a DE row on a pattern with no tested lift priced
+   *     off its catalogue `primaryRef`. That is what put a Barbell Row at 70% of 80% of a bench.
+   *   · the SAME-PATTERN arm — a front squat at 0.85 of the tested squat, a close-grip bench at 0.9
+   *     of the tested bench. **The same invention with a shorter chain.**
    *
-   * ⛔⛔ THREE GATES, AND EACH ONE IS A DEFECT THIS REPO HAS ALREADY SHIPPED ONCE:
+   * ⛔ WHAT STILL CARRIES A NUMBER: a row whose movement **is** one of the tested lifts. That is
+   * `movementIsTested` above, it reads that lift's OWN working number, and p218's band is applied to
+   * it — a DE Bench Press in the DE slot still gets 70 to 80 per cent of the bench. Everything else
+   * is `By feel`, which the DE line already describes in his own terms (reps, reserve, move fast).
    *
-   *   1. **TOP SETS ONLY.** ME and DE — the `1x1-5` and `4x2-4` rows. ⛔ The `3x6-12` growth work
-   *      STAYS by feel and that is correct, not a gap: p83 makes reps-in-reserve the target, so the
-   *      weight is an OUTPUT of the rule rather than an input — the athlete picks the dumbbell that
-   *      leaves them one or two. It is also how Strong and Hevy behave. A computed number on a
-   *      3x10 curl is false precision on work where their judgement is the better input.
-   *   2. **THE MOVEMENT'S OWN `primaryRef` MUST BE THIS PATTERN'S TESTED LIFT.** Not merely present.
-   *      A barbell row's `primaryRef` is `bench` because a row LOADS at ~80% of a bench — that map
-   *      answers "which number do I derive from", not "which pattern is this".
-   *   3. ⛔⛔ **AND A PATTERN WITH NO NAMED COMPETITION LIFT IS EXCLUDED ENTIRELY, WHICH IS WHAT
-   *      KEEPS PULL-UPS OUT.** `LIFT_FOR_PATTERN` maps `pull_upper` to `bench` and that mapping is
-   *      the acknowledged-wrong one — it is what produced *"pull up @ 205 lb"* in the composer's
-   *      first smoke run. `defaultCompetitionLifts()` deliberately leaves `pull_upper` unset, so the
-   *      `competitionLifts[pattern] != null` test below excludes the whole pattern by construction
-   *      rather than by a name blocklist. ⚠️ A pull has no same-pattern tested lift and stays by
-   *      feel. Its own tested field (`performance_numbers.pullupMaxReps`) is a REPS capacity, not a
-   *      load, and does not solve this.
-   *
-   * ⚠️ NO `primaryRef`, NO RATIO, OR A RATIO OF ZERO → BY FEEL. Nothing is default-guessed; the
-   * catalogue's own rule is that an unknown name is never treated as a category by default.
-   * ⚠️ ONE CHAIN, AND IT IS THE EXISTING ONE: tested set → predicted 1RM → working number (96%) →
-   * × the movement's ratio. ⛔ No second path off a stored 1RM — `working-number.ts`'s header exists
-   * to keep those apart.
+   * ⚠️ THE CATALOGUE `ratio` FIELD IS UNTOUCHED AND STILL USED — display format and swap logic read
+   * it. Nothing prices off it.
+   * ⚠️ AND THE FROZEN-LIFT ARITHMETIC THAT USED TO LIVE BELOW WENT WITH IT (the week-1 base, the
+   * carried plate step, the one-step clamp). Every one of those existed to stop a DERIVED weight
+   * drifting from its ratio. With no derived weight there is nothing to keep in step.
    */
-  const derived = (() => {
-    if (movementIsTested) return null;
-    if (slot.intent !== 'ME' && slot.intent !== 'DE') return null;
-    // (the no-tested-lift case is handled below, after the catalogue entry is read)
-    const cfg = resolveExerciseConfig(movement).config;
-    /**
-     * ⛔ THE MOVEMENT'S OWN REFERENCE, CHECKED AGAINST WHAT THIS PATTERN ACTUALLY TESTED — see
-     * `TESTED_LIFTS_FOR_PATTERN`. This was `cfg.primaryRef !== testedLift`, which asked whether the
-     * movement derives from the pattern's ONE nominated lift and so could never price an overhead
-     * press on a push day, however the day was filled.
-     */
-    const ownLift = cfg ? TESTED_LIFT_FOR_REF[String(cfg.primaryRef)] : undefined;
-    if (!cfg || !ownLift) return null;
-    // 2026-09-03 (Michael: "are we being too strict to arrive at a number to prescribe somebody?"): a
-    // pattern with NO tested lift (pull_upper) may price a LOADED DE row off the lift its catalogue entry
-    // references, at that entry's ratio — a barbell row at ~80% of bench, the field's own band (a strict
-    // row ≈ 75–85% of bench). Gate 3 still holds for BODYWEIGHT movements (displayFormat 'bodyweight',
-    // ratio 0): the 205-lb pull-up cannot come back through here. ME on such a pattern stays by feel.
-    // ⚠️ only when the athlete HAS named competition lifts — a block with none prescribes nothing at all.
-    const anyNamed = Object.values(args.competitionLifts ?? {}).some((v) => v != null && v !== '');
-    const crossPattern = args.competitionLifts[pattern] == null;
-    if (crossPattern) {
-      if (!anyNamed || slot.intent !== 'DE' || cfg.displayFormat === 'bodyweight') return null;
-    } else {
-      if (testedLift == null) return null;
-      if (!TESTED_LIFTS_FOR_PATTERN[pattern].includes(ownLift)) return null;
-    }
-    /**
-     * ⛔⛔ ONE NUMBER, ONE BAR — A PER-HAND OR UNILATERAL MOVEMENT STAYS BY FEEL. The catalogue marks
-     * a dumbbell bench `displayFormat: 'perHand'` with `ratioIsTotal: true`, so its 0.8 is the TOTAL
-     * across both hands and has to be halved before it means anything to the athlete. Emitting the
-     * total on a row that says "90 lb" invites them to load 90s — a doubled prescription on a top
-     * set, which is a worse failure than no number at all.
-     *
-     * ⚠️ THIS IS ALSO WHAT KEEPS MICHAEL'S OWN BY-FEEL LIST INTACT. Dumbbell bench and split squats
-     * were named as staying by feel; they are exactly the `perHand` rows. What is left is the
-     * whole-bar work he named — trap bar deadlift, front squat, close grip bench — where one weight
-     * on the row is the weight on the bar.
-     */
-    if (cfg.displayFormat === 'perHand' || cfg.isUnilateral === true || cfg.ratioIsTotal === true) return null;
-    /**
-     * ⛔⛔ AND A DUMBBELL MOVEMENT STAYS BY FEEL WHATEVER ITS TAGS SAY (2026-09-01). **One number,
-     * one bar** is the rule this block already states; the three tags above were the only way it was
-     * being enforced, and they miss.
-     *
-     * ⛔ MEASURED, THE HOUR IT BECAME REACHABLE. p220's `seated db press` is catalogued
-     * `displayFormat: 'total'` with `isUnilateral: false`, so it passed all three tags and the day-1
-     * speed row printed **"Seated DB Press @ 45"**. To a lifter that reads as 45s in each hand —
-     * ninety pounds — on a row meant to be forty-five across both. That is the doubled prescription
-     * this block exists to prevent, arriving through a tag rather than through the maths.
-     *
-     * ⚠️ THE TEST IS THE GEAR ROUTE, NOT THE NAME. If every way to reach the movement needs
-     * dumbbells or kettlebells, it is held in two hands and one figure cannot describe it.
-     * ⚠️ THE CATALOGUE TAG IS LEFT ALONE. Re-tagging one entry fixes one row; this fixes the class.
-     */
-    const routes = gearRoutesFor(movement);
-    const twoHanded = routes.length > 0
-      && routes.every((r) => r.includes('dumbbells') || r.includes('kettlebell'));
-    if (twoHanded) return null;
-    const ratio = Number(cfg.ratio);
-    if (!Number.isFinite(ratio) || ratio <= 0) return null;
-    // ⚠️ THE NUMBER COMES FROM THE LIFT THE MOVEMENT REFERENCES, which is the whole point of the
-    // change above — an overhead press prices off the tested press, not off the bench.
-    const w = args.workingNumbers?.[ownLift];
-    return w ? { working: w, ratio, refLift: ownLift } : null; // the ratio is applied where the weight is priced (byRatio below)
-  })();
 
-  const working = movementIsTested ? args.workingNumbers?.[testedLift] : derived?.working;
+  const working = movementIsTested ? args.workingNumbers?.[testedLift] : undefined;
 
   // ⛔ HYP CARRIES NO PERCENTAGE (p218 gives it reps, tempo and RIR and no load), so a HYP row states
   // the movement and the reps and NOTHING about the weight — the same `load_prescribed: false`
@@ -1687,7 +1604,23 @@ function exerciseForSlot(
      * ⚠️ AND ONLY WHAT IS LEFT IS "not yet" — the athlete has a test ahead of them and this row is
      * waiting on it.
      */
-    const byFeel: NonNullable<StrengthExercise['load_basis']> = pct == null
+    /**
+     * ⛔⛔ AND `awaiting_test` HAD TO BE NARROWED THE DAY THE RATIOS DIED (2026-09-09).
+     *
+     * Its sentence is *"weights arrive once you log the test"*, and it is the ONE basis that promises
+     * a number later. It used to be the catch-all for any priced intent that had no working number
+     * yet — correct while a front squat WAS priced off the tested squat, and **false the moment it is
+     * not**: the squat test is logged, the number is on file, and no test will ever put a weight on
+     * the front squat row. Leaving it would have been the app waiting for something that is never
+     * coming, which is exactly the failure `per_side` was carved out of.
+     *
+     * ⛔ SO IT IS NOW THE TESTED MOVEMENT'S OWN CASE ONLY: this row IS one of the four lifts, and its
+     * test has not been read yet. ⚠️ **A row that is not a tested lift and not per-side carries NO
+     * basis at all** — absent, so the formatter prints no sentence. There is no true one in the
+     * existing four, and writing a fifth is a new athlete-facing line: not this order's to write.
+     * (Raised with Michael, 2026-09-09.)
+     */
+    const byFeel: NonNullable<StrengthExercise['load_basis']> | null = pct == null
       ? 'auto_regulated'
       : (testedLift == null || args.competitionLifts[pattern] == null)
         ? 'no_tested_lift'
@@ -1695,18 +1628,18 @@ function exerciseForSlot(
             const cfg = resolveExerciseConfig(movement).config;
             if (cfg?.displayFormat === 'perHand' || cfg?.isUnilateral === true || cfg?.ratioIsTotal === true) return true;
             /**
-             * ⚠️ THE SAME TWO-HANDED TEST THE PRICING USES — see the `derived` block. Without it a
-             * seated DB press read *"weights arrive once you log the test"*, and no test will ever
-             * price it: it is held in two hands and one figure cannot describe it.
+             * ⚠️ THE TWO-HANDED TEST — a seated DB press read *"weights arrive once you log the
+             * test"*, and no test will ever price it: it is held in two hands and one figure cannot
+             * describe it.
              */
             const routes = gearRoutesFor(movement);
             return routes.length > 0
               && routes.every((r) => r.includes('dumbbells') || r.includes('kettlebell'));
-          })() ? 'per_side' : 'awaiting_test');
+          })() ? 'per_side' : (movementIsTested ? 'awaiting_test' : null));
     return {
       exercise: {
         name: rowDisplayName(movement, slot),
-        load_basis: byFeel,
+        ...(byFeel ? { load_basis: byFeel } : {}),
         ...(rowExecutionName(movement, slot, args.equipment)
           ? { execution_name: rowExecutionName(movement, slot, args.equipment)! }
           : {}),
@@ -1771,85 +1704,18 @@ function exerciseForSlot(
   const primaryWeight = Number.isFinite(earnedLb) && earnedLb > 0 ? floorWeight + earnedLb : floorWeight;
 
   /**
-   * ⛔⛔ A DERIVED LIFT TAKES ITS RATIO OF THE PRIMARY'S **PRESCRIBED** WEIGHT, NOT OF THE WORKING
-   * NUMBER — and the difference is the whole bug (Michael's own 12-week export, 2026-08-27).
-   *
-   * ⛔ THREE LIFTS NEVER MOVED IN TWELVE WEEKS:
-   *     front squat (ME)       W3 @ 90  →  W12 @ 90
-   *     front squat (DE)       W2 @ 70  →  W12 @ 70
-   *     close grip bench (DE)  W2 @ 95  →  W12 @ 95
-   * while the lifts they derive from moved correctly at his rate — bench 135→140, squat 105→110,
-   * deadlift 155→160. **The trap bar deadlift moved and the others did not, because its ratio is
-   * exactly 1.0.** That is the tell.
-   *
-   * ⛔ THE CAUSE WAS ROUNDING, NOT THE LADDER. `me-history.ts` already keys the earned ladder by
-   * PATTERN, so beating reps on a front squat does advance `press_lower` — that half worked. What
-   * broke is that the derived weight was recomputed from scratch each week as
-   * `working × rise × ratio`, rounded to the plate step. p247's rate is 1% every three weeks, so the
-   * primary gains about 5 lb across a block; at a 0.85 ratio that is 4.25 lb on the front squat,
-   * which rounds straight back to where it started. **The lift was frozen unless the primary jumped
-   * a whole step at once, which at these numbers it never does.**
-   *
-   * ⛔⛔ SO THE RATIO IS APPLIED TO A NUMBER THAT HAS ALREADY BEEN QUANTIZED. The squat's 105 → 110
-   * becomes 89.25 → 93.5, which rounds 90 → 95: the derived lift moves exactly when the lift it
-   * comes from moves, in the same number of steps.
-   *
-   * ⚠️ AND THIS IS THE BOUND, RATHER THAN A CLAMP ON TOP OF ONE. The brief proposed carrying the
-   * derived weight forward by its own increment and clamping it to within a step of `primary ×
-   * ratio`. Recomputing from the primary's own prescribed weight reaches the same place with no
-   * carried state and no clamp: the answer IS `round(primary × ratio)` every week, so it cannot
-   * drift from the ratio at all — a front squat can never creep toward the squat's own number. The
-   * only slack is the rounding step itself, which is the clamp the brief asked for, structurally.
-   * ⚠️ IT ALSO INHERITS THE EARNED LADDER FOR FREE: `primaryWeight` already carries the pattern's
-   * earned offset on an ME slot, so a front squat that earns a jump on `press_lower` gets its share.
-   * ⚠️ THE STEP IS THE ATHLETE'S OWN — `roundTo` is their smallest plate pair, doubled, the same
-   * figure `prescribedLoad` rounds to and `advanceStep` honours.
+   * ⛔ THE PRESCRIBED WEIGHT IS THE PRIMARY'S, FULL STOP (2026-09-09). Between 2026-08-27 and today a
+   * long arithmetic block sat here — a week-1 base, a carried plate step, a one-step clamp back to
+   * the ratio — and **every line of it existed to stop a DERIVED weight freezing or drifting**. With
+   * no lift priced off another lift there is no derived weight, so the whole apparatus is deleted
+   * rather than left inert. See the `derived` block's own note above for why the ratios went.
    */
-  const plateStep = Number.isFinite(args.roundTo) && (args.roundTo ?? 0) > 0 ? (args.roundTo as number) : 5;
-  /**
-   * ⛔⛔ AND THE DERIVED LIFT CARRIES ITS OWN STEP, BECAUSE THE RATIO ALONE STILL FROZE IT
-   * (2026-08-27, Michael's second export). Applying the ratio to the primary's PRESCRIBED weight
-   * fixed the heavy rows — 105 → 110 becomes 90 → 95 — and left the fast ones stuck:
-   *
-   *     Back Squat (DE)   W2 @ 80  →  W5 @ 85     the primary moved
-   *     front squat (DE)  W2 @ 70  →  W12 @ 70    0.85 x 80 = 68 and 0.85 x 85 = 72.25,
-   *                                               and both round to 70
-   *
-   * One step of the primary is 4.25 lb on the derived lift, so whether it moves at all depends on
-   * which side of a rounding boundary the multiplication lands. That is a coin toss, not a
-   * progression.
-   *
-   * ⛔ SO THE DERIVED LIFT TAKES A WHOLE STEP WHEN THE PRIMARY TAKES ONE. The base is still the
-   * ratio — `round(primary at week 1 x ratio)` — and every step the primary has gained since is
-   * added as a full plate step rather than as its 85% shadow.
-   *
-   * ⚠️ AND IT IS CLAMPED, WHICH IS WHAT STOPS IT DRIFTING. A lift advancing on its own step forever
-   * would wander toward the primary's own number; if the carried figure ever sits more than one step
-   * from `primary x ratio`, the ratio wins and it re-derives. Over a block the primary gains one or
-   * two steps, so the carry stays well inside that — but the guard is what makes the rule safe
-   * rather than lucky.
-   * ⚠️ WEEK 1 IS THE BASE WHATEVER THE BLOCK DOES, so the arithmetic is the same for a tested block
-   * and a skipped one: `prescribedLoad` is pure, and asking it for week 1 costs nothing.
-   */
-  const weight = (() => {
-    if (!derived) return primaryWeight;
-    const round = (n: number) => Math.max(plateStep, Math.round(n / plateStep) * plateStep);
-    const primaryBase = prescribedLoad({
-      working, frame: args.frame, week: 1, isLower, hardRunBeforeLower,
-      pctOfWorkingNumber: pct, roundTo: plateStep,
-    }).weight;
-    const steps = Math.round((primaryWeight - primaryBase) / plateStep);
-    const carried = round(primaryBase * derived.ratio) + steps * plateStep;
-    const byRatio = round(primaryWeight * derived.ratio);
-    // ⛔ THE RATIO IS THE AUTHORITY WHEN THE CARRY HAS DRIFTED PAST ONE STEP OF IT.
-    return Math.abs(carried - primaryWeight * derived.ratio) <= plateStep ? carried : byRatio;
-  })();
+  const weight = primaryWeight;
 
-  if (isLower && !hardRunBeforeLower && !notes.some((n) => n.text === HAIRCUT_CAUSE_IS_OURS)) {
-    // ⛔ SAID OUT LOUD, BECAUSE IT IS OUR READING. The lower-body weights are NOT reduced this block,
-    // and the reason is that the hard session moved to the bike.
-    notes.push({ kind: 'ours', text: HAIRCUT_CAUSE_IS_OURS });
-  }
+  // ⛔ THE "NO REDUCTION THIS BLOCK" NOTE IS DELETED (2026-09-09, kill-ours §C.9). It said out loud
+  // that dropping p247's lower-body reduction for a bike-heavy week was OUR reading of his p280
+  // reason — an athlete-facing sentence whose whole content was that it had no page. The behaviour is
+  // unchanged: p247 applies where p247's own layout holds, and says nothing where it does not.
   if (isLower && haircut < 1 && !notes.some((n) => n.cite === 'Viada p247' && n.text.includes('lower-body'))) {
     notes.push({
       kind: 'source',
@@ -1902,44 +1768,15 @@ function exerciseForSlot(
    * the one that does not.
    */
   /**
-   * ⛔⛔ AND IT HAS TO STATE WHAT THE NUMBER ON THE ROW ACTUALLY IS (2026-08-31, Michael's own
-   * screen). This read *"About 85% of your bench press"* beside a DE incline row prescribing 90 lb
-   * — and 90 is **58%** of his 155 bench, not 85%. The 85 is the movement RATIO, the estimate of
-   * this lift's max against the tested one; the sentence stated it as a fraction of the weight. Two
-   * numbers on one card, neither of which described the number in front of him, on a row whose
-   * weight is correct — the arithmetic was never wrong, the sentence was.
+   * ⛔⛔ `derivedNote` IS DELETED (2026-09-09, WORKORDER-de-row-by-feel §3).
    *
-   * ⛔ SO IT NAMES BOTH STEPS, IN THE ORDER THEY HAPPEN: the intent's percentage is OF THIS LIFT'S
-   * OWN estimated max, and that estimate is the ratio of the tested lift. `weight = pct × ratio ×
-   * working number`, and the line now reads as that chain rather than collapsing it into one
-   * misleading fraction.
+   * It read *"70% of what this lift's own max works out to — about 80% of your bench press —
+   * derived, not tested."* The sentence was honest about being an estimate and the estimate itself
+   * had no page: **no page relates one lift's max to another's.** The row it described is now `By
+   * feel`, so the note is deleted rather than reworded — there is no number left to explain.
+   * ⚠️ NOTHING REPLACES IT. The DE line the row already carries (reps, reserve, move fast) is p218's
+   * own way of prescribing a set with no percentage, and it was approved.
    */
-  const derivedNote = (() => {
-    if (!derived) return null;
-    /**
-     * ⚠️ THE ATHLETE'S OWN NAME ONLY WHERE IT IS THE SAME LIFT (fixed 2026-09-01). `refLift` used to
-     * be the pattern's single tested lift, so the athlete's competition name was always the right
-     * word for it. A pattern can now price from EITHER of its tested lifts, and passing the push
-     * day's competition name for an overhead-press derivation printed *"100% of your bench press"*
-     * on a row derived from the tested PRESS.
-     * ⚠️ THE CLOSING CLAUSE STAYS LOWERCASE AND LAST — `standing-plan-derived-load.test.ts` pins the
-     * literal *"derived, not tested"* as this row's contract.
-     */
-    const sameLift = derived.refLift === LIFT_FOR_PATTERN[pattern];
-    const refName = testedLiftName(
-      derived.refLift,
-      sameLift ? args.competitionLifts[pattern] : null,
-    ).toLowerCase();
-    /**
-     * ⚠️ A RATIO OF ONE IS NOT AN ESTIMATE AND MUST NOT READ AS ONE. *"about 100% of your overhead
-     * press"* describes a lift as a fraction of itself. The row is priced straight off that test.
-     */
-    if (Math.round(derived.ratio * 100) === 100) {
-      return `${Math.round((pct ?? 0) * 100)}% of your tested ${refName} — derived, not tested.`;
-    }
-    return `${Math.round((pct ?? 0) * 100)}% of what this lift's own max works out to — about `
-      + `${Math.round(derived.ratio * 100)}% of your ${refName} — derived, not tested.`;
-  })();
 
   return {
     exercise: {
@@ -1955,7 +1792,6 @@ function exerciseForSlot(
       reps,
       weight,
       percent_1rm: pct,
-      ...(derived ? { load_basis: 'derived_ratio' as const, notes: derivedNote! } : {}),
       ...(targetRir != null ? { target_rir: targetRir } : {}),
       // ⛔ WHAT THEY GOT, ON THE ROW (item 6). `reps` above is the BAND and stays "1-5" — every
       // reader that parses it (`isRepBandRow`, `hasRepTotal`, the leading-digit prefill) is anchored
@@ -2039,14 +1875,34 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], 
     const seed = args.seed1RMs?.[lift];
     const steps = seed ? pretestSession(lift, seed, args.roundTo ?? 5) : null;
     if (!steps) {
-      // ⛔ NO SEED IS NOT A REASON TO SKIP THE TEST. It is a reason to run it by feel and say so.
+      /**
+       * ⛔⛔ NO NUMBER ON FILE IS NOT A REASON TO SKIP THE TEST, AND AS OF 2026-09-09 IT IS NOT A
+       * REASON TO RUN IT VAGUELY EITHER (WORKORDER-kill-ours §B.5).
+       *
+       * ⛔ WHAT CAME OFF: *"No max on file to aim the warm-ups — work up until the last set is
+       * genuinely hard."* *"Genuinely hard"* is not a prescription and it is not on a page — it was
+       * the composer admitting it had nothing to aim with, in the box the athlete reads.
+       *
+       * ⛔ WHAT REPLACES IT IS p215's OWN OPENING INSTRUCTION. The page starts the ramp from a weight
+       * the lifter chooses by feel — one they could get eight with, where ten would be near failure —
+       * taken for six. That weight IS `A`, the unit the other two steps are multiples of, so once the
+       * athlete logs set 1 the app fills set 2 at 1.10 × A for five and set 3 at 1.15 × A for max
+       * reps: **the same three steps a seeded row already prescribes**, with the athlete supplying
+       * the number instead of the file.
+       *
+       * ⚠️ THE STEPS ARE FILLED ON THE LOGGER, NOT HERE — `createStandingTestExercise` in
+       * `StrengthLogger.tsx`, off the logged set 1. The composer cannot know a weight the athlete has
+       * not chosen yet, and inventing one is the thing this branch exists because it must not do.
+       * ⚠️ THE ROW STAYS `load_prescribed: false` and the shape stays `6, 5, max`, so every reader
+       * that counts steps or parses the rep string is unchanged.
+       */
       exercises.push({
         name: names[lift],
         reps: '6, 5, max',
         weight: 'By feel',
         load_prescribed: false,
         slot_intent: TEST_LIFT_INTENT,
-        notes: 'No max on file to aim the warm-ups — work up until the last set is genuinely hard.',
+        notes: 'Last set as many reps as possible. It sets your numbers.',
       });
       continue;
     }
@@ -2057,7 +1913,10 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], 
       weight: steps[steps.length - 1].weight,
       load_prescribed: true,
       slot_intent: TEST_LIFT_INTENT,
-      notes: 'Test set — the last set is taken for max clean reps, and it sets the block\'s numbers.',
+      // 2026-09-09, Michael's words (WORKORDER-kill-ours §B.5, p215): the last set is taken for max
+      // reps and the block's numbers come off it. *"Test set —"* was a label for a row that already
+      // says Test in its session name, and *"clean"* is the form rule, which lives on the set itself.
+      notes: 'Last set as many reps as possible. It sets your numbers.',
       set_plan: steps.map((s) => ({
         weight: s.weight,
         reps: s.reps === 'max' ? 1 : s.reps,
@@ -2135,8 +1994,17 @@ function plyoRows(args: ComposeArgs, notes: ComposeNote[]): StrengthExercise[] {
     reps: PLYO_DOSE.effortsPerDrill.hi,
     weight: 'Bodyweight',
     load_prescribed: false,
-    notes: `${PLYO_DOSE.effortsPerDrill.lo}–${PLYO_DOSE.effortsPerDrill.hi} efforts, full rest between. `
-      + `${PLYO_FAMILIES[family].benefit}. Stop when the movement stops being crisp.`,
+    /**
+     * ⛔ 2026-09-09 (WORKORDER-kill-ours §B.7). *"3–4 efforts"* is our number — p227 says each drill
+     * is done *"multiple times"* and gives no figure — and *"stop when the movement stops being
+     * crisp"* was our paraphrase. Both come off the row. What replaces them is his own stop rule in
+     * Michael's words: repeat until the movement is optimised for the day and the athlete is
+     * confident in it, then move on; ample rest; fatigue, poor form and imprecise movement are
+     * absolute no-nos (p227).
+     * ⚠️ THE BENEFIT PHRASE LEADS, as it does today — it is his table's own column and it stays.
+     */
+    notes: `${PLYO_FAMILIES[family].benefit}. Repeat until it feels right and you are confident, `
+      + 'then move on. Full rest between. Tired or sloppy, stop.',
   }));
 }
 
@@ -2925,7 +2793,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * one, so the frame still calls day 1 hard after the week has converted it to easy running.
    * ⚠️ AND THE SPORT MUST BE `run`. p280 is why: hard riding does not land on the legs the way
    * running does, which is the whole reason the substituted case drops the reduction
-   * (`HAIRCUT_CAUSE_IS_OURS`).
+   * (p247's own layout; the note that used to say so came off on 2026-09-09).
    */
   /**
    * ⛔ EVERY ME LOWER DAY THE FRAME HAS, ASKED OF THE FRAME (2026-08-30) — see `FrameDay.lowerRole`.
@@ -4005,6 +3873,46 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * chapter (pp.69-125, no page photographed); rule 6 gives the same two figures on a page that WAS
    * read, in the context of a session before resistance work. Naming one alone would overstate it.
    */
+  /**
+   * ⛔⛔ p144 RULE 5 — THE EASY RUN ON THE HEAVY LEG DAY IS CUT BY A THIRD (2026-09-09).
+   *
+   * > *"work that benefits from pre-fatigue goes last — almost always VT1-intensity endurance… you
+   * > could cut your VT1 run volume by a third or so after a hard leg workout and get the same
+   * > overall adaptations."*
+   *
+   * This sentence has sat in this file as a COMMENT since 2026-08-26 and nothing acted on it. The
+   * work order's warning says the run *is* cut, so the cut has to be real or the sentence is a false
+   * claim about the row underneath it.
+   *
+   * ⛔ SAME DAY ONLY, WHICH IS THE PAGE'S REACH. He is describing a session order inside one day.
+   * ⛔ RUNS ONLY. He writes about VT1 run volume; there is no counterpart for a ride and none is
+   * invented here.
+   * ⚠️ THE WORK TOKEN AND THE DURATION MOVE BY THE SAME NUMBER OF MINUTES, so a warm-up or cool-down
+   * wrapper is untouched and the row's total still equals the sum of its steps. Cutting the total by
+   * a third while trimming only the middle would have left the two disagreeing.
+   * ⚠️ IT RUNS AFTER PLACEMENT AND BEFORE THE CONFLICTS, so it reads the days the athlete actually
+   * has and the warning below describes a cut that has already happened.
+   * ⚠️ **THE WEEK'S TOTAL HOURS DROP BY THIS MUCH AND `volume` DOES NOT KNOW.** `volume` is the
+   * verdict on the athlete's typed target and is solved from the specs before any session is built,
+   * so it still reports the pre-cut figure. Raised here rather than fixed quietly: re-solving the
+   * target against a cut the source prescribes is a decision about what the target MEANS, and it is
+   * not this work order's.
+   */
+  {
+    const typedForCut = typedSessionsOf(sessions, args.frame, args.column);
+    for (const { run } of easyRunOnHeavyLegDays(typedForCut)) {
+      const steps = run.s.steps_preset;
+      if (!Array.isArray(steps)) continue;
+      const at = steps.findIndex((t) => /^run_easy_\d+min$/.test(String(t)));
+      if (at < 0) continue;
+      const was = Number(String(steps[at]).match(/^run_easy_(\d+)min$/)![1]);
+      const now = Math.max(1, Math.round((was * 2) / 3));
+      if (now >= was) continue;
+      steps[at] = `run_easy_${now}min`;
+      run.s.duration = Math.max(1, Number(run.s.duration || was) - (was - now));
+    }
+  }
+
   const conflicts = weekConflicts({
     sessions,
     frame: args.frame,

@@ -116,9 +116,26 @@ Deno.test('⛔ NO BY-FEEL ROW IS SILENT, AND NONE OF THEM LIES ABOUT WHY', () =>
            */
           const unpriced = String(e.weight ?? '').toLowerCase() === 'by feel';
           const isTestRow = Array.isArray(s.tags) && s.tags.includes('1rm_test');
-          if (unpriced && !isTestRow) {
-            assert(e.load_basis,
-              `⛔ ${a.key} w${w.week} "${e.name}" is by feel and says nothing about why`);
+          /**
+           * ⛔⛔ NARROWED 2026-09-09 (WORKORDER-de-row-by-feel). **Some by-feel rows are now silent
+           * ON PURPOSE, and that is the honest state rather than a regression.**
+           *
+           * Until today a movement that was not itself a tested lift was priced off one that was —
+           * a front squat at 0.85 of the squat — so every by-feel row fell into one of four named
+           * reasons. With no lift priced off another lift there is a FIFTH shape: a row that is not
+           * the tested lift, is not per-side, and sits on a pattern that does have one. **None of
+           * the four sentences is true of it** — `awaiting_test` would promise a number that is
+           * never coming (the test is already logged) and `no_tested_lift` would be false about the
+           * pattern — and writing a fifth is a new athlete-facing line, which needs Michael's yes.
+           *
+           * ⚠️ SO THE ASSERTION IS NOW: a by-feel row either says why, or says nothing — it may
+           * never say the WRONG thing. The two lies-about-why checks below carry the weight, and
+           * `awaiting_test` is additionally pinned to rows that ARE a tested lift.
+           */
+          if (unpriced && !isTestRow && e.load_basis === 'awaiting_test') {
+            assert(e.slot_intent === 'ME' || e.slot_intent === 'DE',
+              `⛔ ${a.key} w${w.week} "${e.name}" promises a weight after the test on a slot the `
+              + 'test does not price');
           }
           if (e.slot_intent === 'HYP') {
             assert(e.load_basis !== 'awaiting_test',
@@ -126,7 +143,10 @@ Deno.test('⛔ NO BY-FEEL ROW IS SILENT, AND NONE OF THEM LIES ABOUT WHY', () =>
               + 'p218 gives HYP no load — that promise can never be kept.');
           }
           if (typeof e.weight === 'number') {
-            assert(e.load_basis == null || e.load_basis === 'derived_ratio',
+            // ⚠️ `derived_ratio` LEFT THIS LINE ON 2026-09-09 — the value no longer exists. A priced
+            // row carries NO basis at all now, because the only way to be priced is to be a tested
+            // lift reading its own number.
+            assert(e.load_basis == null,
               `⛔ ${a.key} w${w.week} "${e.name}" carries a weight AND a by-feel reason`);
           }
         }

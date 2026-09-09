@@ -301,6 +301,40 @@ export function restateFromTest(args: {
         touched = true;
         return { ...ex, ...shape };
       }
+      /**
+       * ⛔⛔ A ROW THAT WAS PRICED OFF ANOTHER LIFT GOES BACK TO `By feel` (2026-09-09,
+       * WORKORDER-de-row-by-feel §4).
+       *
+       * The composer no longer prices a movement off a different lift's max, so a calendar row still
+       * carrying `derived_ratio` is a weight the engine would not author today — with a warm-up
+       * ladder built from it and a note explaining a derivation that no longer happens. The diff
+       * below cannot see it: `topWorkWeight(fresh)` is null on a by-feel row, so `weightMoves` is
+       * false and the stale number survives every rebuild.
+       *
+       * ⛔ GATED ON THE OLD ROW'S OWN MARKER, and deliberately nothing wider. `load_prescribed ===
+       * false` on the fresh row is true for a dozen ordinary reasons — a missing working number
+       * chief among them — and blanking on that would strip real weights the first time a test read
+       * came back empty. `derived_ratio` can only have been written by the deleted block.
+       *
+       * ⚠️ NEVER A DELETE AND NEVER ON A DONE SESSION — `isDone` gates the whole loop above, and this
+       * rewrites the row in place.
+       * ⚠️ THE WARM-UP LADDER, THE PERCENTAGE AND THE NOTE GO WITH THE WEIGHT. Leaving the ramp would
+       * put prescribed warm-up weights under a row that says By feel.
+       */
+      if ((er as { load_basis?: string }).load_basis === 'derived_ratio'
+        && (fresh as { load_prescribed?: boolean }).load_prescribed === false) {
+        touched = true;
+        return {
+          ...ex,
+          ...shape,
+          weight: 'By feel',
+          load_prescribed: false,
+          load_basis: undefined,
+          notes: undefined,
+          percent_1rm: undefined,
+          set_plan: fresh.set_plan,
+        };
+      }
       const to = topWorkWeight(fresh);
       /**
        * ⚠️ ONLY A PRESCRIBED WEIGHT REPLACES ANYTHING. A HYP row carries no percentage by design

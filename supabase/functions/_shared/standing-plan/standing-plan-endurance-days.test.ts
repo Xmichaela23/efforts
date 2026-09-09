@@ -66,7 +66,31 @@ Deno.test('⛔⛔ AND THE HOURS ARE DIVIDED ACROSS THOSE DAYS, NOT TOPPED UP AFT
    */
   const asked = week(HIS, 3, 4, { run: 3, ride: 2 });
   const built = minutes(asked, 'run');
-  assert(Math.abs(built - 180) <= 15, `three hours asked over three days built ${built} minutes`);
+  /**
+   * ⛔⛔ p144's CUT IS ADDED BACK BEFORE THE COMPARISON (2026-09-09), AND IT IS NOT A LOOSENED
+   * TOLERANCE. Rule 5 shortens the easy run that shares a day with the heavy leg session by a third —
+   * *"you could cut your VT1 run volume by a third or so after a hard leg workout and get the same
+   * overall adaptations"* — so the week deliberately builds LESS than the athlete asked for on
+   * exactly those days. That is the source's prescription, not a sizing miss.
+   *
+   * ⛔ THE ±15 STAYS AS IT WAS, and it has to: the bug this test was written for built 2h39 against a
+   * 3h ask (21 minutes short), so widening the window would have walked straight past it. The cut is
+   * measured and named instead — a cut run is now two thirds of its original, so what came off is
+   * half of what is left.
+   *
+   * ⚠️ **AND THIS IS THE COLLISION THE CUT CREATES, RECORDED RATHER THAN HIDDEN.** The athlete's
+   * typed weekly hours and p144's cut disagree by construction, and `volume` — solved before any
+   * session is built — still reports the pre-cut figure. Whether the target should be re-solved
+   * against the cut is a decision about what the target MEANS, and it is open.
+   */
+  const p144Cut = asked.sessions
+    .filter((s) => s.type === 'run')
+    .filter((s) => (asked as unknown as { conflicts: { rule: string; days: string[] }[] }).conflicts
+      .some((c) => c.rule === 'easy_run_with_heavy_legs'
+        && c.days.includes((s as unknown as { day: string }).day)))
+    .reduce((t, s) => t + (Number(s.duration) || 0) / 2, 0);
+  assert(Math.abs(built + p144Cut - 180) <= 15,
+    `three hours asked over three days built ${built} minutes (p144 cut ${Math.round(p144Cut)})`);
 });
 
 Deno.test('⛔⛔ A STATED DAY COUNT IS EXACT — the hours do not buy a day they did not ask for', () => {

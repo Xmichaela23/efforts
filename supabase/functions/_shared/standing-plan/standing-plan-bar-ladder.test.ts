@@ -223,7 +223,14 @@ Deno.test('⛔⛔ THERE IS NO PERCENTAGE BACK-OFF — `STALL_BACKOFF` may not co
   // earned, so there is nothing to back off FROM. ⚠️ This asserts the ABSENCE deliberately — the
   // constant was exported and read by nothing, which is exactly how it would get quietly restored.
   assertEquals((progression as Record<string, unknown>).STALL_BACKOFF, undefined);
-  assert(!progression.THRESHOLDS_ARE_OURS.includes('ten per cent'));
+  // ⚠️ READS `PROGRESSION_DEADBAND_IS_HIS` SINCE 2026-09-09. `THRESHOLDS_ARE_OURS` was rebuilt from
+  // p245 and renamed (kill-ours §C.8); the claim asserted here — that no percentage cut is described
+  // anywhere in the progression's own prose — is unchanged.
+  assert(!progression.PROGRESSION_DEADBAND_IS_HIS.includes('ten per cent'));
+  assertEquals((progression as Record<string, unknown>).THRESHOLDS_ARE_OURS, undefined,
+    'the ours-labelled thresholds constant came back');
+  // ⛔ AND THE UNUSED FIXED COUNT STAYS DELETED — it had no caller and no page (§C.8).
+  assertEquals((progression as Record<string, unknown>).FREEZE_WEEKS_BEFORE_SAYING_SO, undefined);
 });
 
 Deno.test('⛔⛔ A REP DROP INSIDE THE BAND IS NOT A STALL — 4 then 3 then 3 costs nothing', () => {

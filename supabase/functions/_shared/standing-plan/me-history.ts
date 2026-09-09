@@ -170,9 +170,11 @@ export const DELOAD_MISSED_WEEK_RESETS_IS_OURS =
   + 'Counting a missed week as a BAD week stays refused: that would read absence as failure.';
 
 /**
- * ⛔ TWO IN A ROW, and the number is HIS — the one place in this module where a threshold is not
- * ours. p245 says two. It happens to match `STALL_CONFIRMATIONS` and `ME_CLEAN_SESSIONS_TO_EARN`,
- * which are ours and were chosen for symmetry with it.
+ * ⛔ TWO IN A ROW, and the number is HIS — p245 says two.
+ * ⚠️ IT MATCHES `STALL_CONFIRMATIONS` AND `ME_CLEAN_SESSIONS_TO_EARN`, and as of 2026-09-09 those two
+ * are HIS as well rather than ours-for-symmetry: p245's sentence is about this lift and this signal,
+ * so the ladder reads it directly (`PROGRESSION_DEADBAND_IS_HIS`). ⚠️ THIS ONE COUNTS **WEEKS** and
+ * those count **SESSIONS** — one page, two clocks. Do not collapse them.
  */
 export const DELOAD_CONSECUTIVE_BAD_WEEKS = 2;
 

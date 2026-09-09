@@ -47,21 +47,18 @@ export const LOWER_HAIRCUT_PHASE_OUT_WEEKS = 9;
 export const LOWER_HAIRCUT_CITE = 'Viada p247';
 
 /**
- * ⛔ WHY THE HAIRCUT ASKS WHAT DAY 1 ACTUALLY IS, and which half of that is ours.
+ * ⛔⛔ `HAIRCUT_CAUSE_IS_OURS` IS DELETED (2026-09-09, WORKORDER-kill-ours §C.9).
  *
- * HIS: the reduction, its size, its phase-out rate and its length — and its CAUSE, named on the page
- * as Monday's run landing before Tuesday's ME lower.
+ * It was an athlete-facing note that said, in as many words, *"this is our reading"* — that a
+ * bike-heavy week does not inherit p247's lower-body reduction, inferred from p280's *"hard riding
+ * does not land on the legs the way running does."* Michael's ruling, 2026-09-09: **never use ours.**
  *
- * ⚠️ OURS: that a bike-heavy mix does not inherit it. He states the haircut once, for this frame's
- * run layout, and the corpus contains nothing about the substituted case. What points our way is his
- * OWN reasoning for the substitution (p280 — hard riding does not land on the legs the way running
- * does), which is why the inference is stated rather than silent.
- */
-export const HAIRCUT_CAUSE_IS_OURS =
-  'The source ties the lower-body reduction to the hard RUN that lands the day before the heavy leg '
-  + 'session, and says nothing about what happens when that session is a ride. Dropping the reduction '
-  + 'for a week whose hard work is on the bike is our reading of his own reason for moving it there — '
-  + 'riding hard does not land on the legs the way running does.';
+ * ⛔ NOTHING ABOUT THE HAIRCUT'S BEHAVIOUR CHANGES, AND THAT IS THE POINT. p247 states the reduction
+ * for one layout — the hard run landing the day before the ME lower session — and `hardRunBeforeLower`
+ * is that layout, asked. Where the layout holds, the page applies. Where it does not, the page is
+ * silent and so is the plan. **What came off is the paragraph explaining the silence, not the
+ * silence itself**; a rule that stops at the edge of its page needs no note saying so.
+ */;
 
 /**
  * What fraction of the working number a LOWER-body slot uses in a given week.
@@ -106,9 +103,10 @@ export function prescribedLoad(args: {
    * a half per cent off the squat for a session he says does not tax the lifts would be the plan
    * contradicting itself one page apart.
    *
-   * ⚠️ **AND THE SUBSTITUTED CASE IS OURS.** The source states the haircut once, for this frame's run
-   * layout, and never says what happens when day 1 is a ride. Reading "no run before the leg day" as
-   * "no lingering fatigue to allow for" is our inference — see `HAIRCUT_CAUSE_IS_OURS`.
+   * ⚠️ **AND THE SUBSTITUTED CASE IS SIMPLY OUTSIDE THE PAGE.** The source states the haircut once,
+   * for this frame's run layout, and never says what happens when day 1 is a ride. The rule applies
+   * where its own layout holds and stops there. ⛔ The note that used to explain that to the athlete
+   * was ours and was deleted on 2026-09-09 — see the block above `LOWER_HAIRCUT_INITIAL`.
    *
    * ⚠️ ABSENT DEFAULTS TO TRUE, which is the run layout and the pre-slice-4 behaviour exactly. A
    * caller that has not thought about it gets the conservative arm.
@@ -146,15 +144,17 @@ export function prescribedLoad(args: {
  * Rotate the rep ranges → repeatedly succeed or beat them → raise the theoretical max → build the
  * next weeks from it. **That is exactly what ships.** Different words, two different pages.
  *
- * ⚠️ WHAT IS STILL OURS INSIDE IT: the reps-in-reserve condition on the top of the range, and the
- * two-session confirmation (`STALL_CONFIRMATIONS`). He gives no number for *"after a period of
- * time"*, and the RIR gate is the field's, not his — see the notes on those two.
+ * ⚠️ WHAT IS STILL OURS INSIDE IT: the reps-in-reserve condition on the top of the range. He gives no
+ * number for *"after a period of time"* and the RIR gate is the field's, not his.
+ * ⛔ THE TWO-SESSION CONFIRMATION IS NO LONGER ON THAT LIST (2026-09-09). `STALL_CONFIRMATIONS` was
+ * relabelled HIS off p245's *"the ME lifts underperform 2 weeks in a row"* — the value is unchanged;
+ * see `PROGRESSION_DEADBAND_IS_HIS`.
  */
 export const DOUBLE_PROGRESSION_IS_HIS =
   'Rotating through rep ranges and raising the working max once the athlete repeatedly succeeds at '
-  + 'them or outperforms is his — the "circle of maxes", p123. Requiring the top of the range at the '
-  + 'prescribed reps-in-reserve, and confirming over two sessions, is ours; he gives no number for '
-  + '"after a period of time".';
+  + 'them or outperforms is his — the "circle of maxes", p123. Confirming over two sessions is his '
+  + 'too — p245 sets that bar for this lift. Requiring the top of the range at the prescribed '
+  + 'reps-in-reserve is ours; he gives no number for "after a period of time".';
 
 export type SetResult = { reps: number; rir?: number | null };
 
@@ -173,19 +173,39 @@ export type ProgressionVerdict =
   | 'no_evidence';
 
 /**
- * ⛔ STALL HANDLING IS GENERIC AND PREDATES ANY ONE AUTHOR (pivot §4): nothing logged = no evidence
- * = hold; a miss holds. All thresholds are fixed numbers and all of them are ours.
+ * ⛔⛔ REBUILT FROM THE PAGES ON 2026-09-09 (WORKORDER-kill-ours §C.8). **The numbers did not move;
+ * their authority did.** What stood here was `THRESHOLDS_ARE_OURS` — *"two confirmations before
+ * anything moves, and four unmoved weeks before the plan says a lift is frozen. Fixed numbers, ours,
+ * from field practice."* Two fixed counts, defended by nothing but the field.
  *
- * ⚠️ NEVER ACT ON A SINGLE READING. `STALL_CONFIRMATIONS = 2` is the deadband and it now runs in
- * BOTH directions: one session finishing the rep range is a good day, two in a row is what moves the
- * bar (`barLadderStep`). One short session is a bad day; the undo needs a failed set or three
- * falling sessions.
+ * ⛔ THE DEADBAND IS **TWO, AND IT IS HIS.** p245, verbatim: *"If performance begins to suffer,
+ * particularly **if the ME lifts underperform 2 weeks in a row**, consider running a single deload
+ * week."* Two consecutive readings is the evidence bar the source itself sets on this exact lift and
+ * this exact signal, so the ladder uses his number rather than a symmetrical one of ours.
+ * ⚠️ IT RUNS IN BOTH DIRECTIONS. He states it for the bad direction; taking two clean sessions as
+ * the bar for the good direction is the same threshold read the other way, and it is the
+ * conservative arm on both (nothing moves on one session, up or down).
+ * ⚠️ `me-history.ts`'s `DELOAD_CONSECUTIVE_BAD_WEEKS` is the same p245 sentence counted in WEEKS.
+ * One page, two clocks — do not collapse them.
+ *
+ * ⛔ AND `FREEZE_WEEKS_BEFORE_SAYING_SO = 4` IS DELETED OUTRIGHT. It was a fixed ours number with **no
+ * caller** — nothing in the engine or on a screen ever read it — so there was nothing to rebuild
+ * from a page. The rate the source does give is the one that matters and it already lives in
+ * `scheduledRise`: *"1 percent every 3 weeks as a starting point"*, *"every 3 to 4 weeks"* (p245,
+ * p247) and *"1% every four weeks or so"* (p251). If a surface ever needs to say a lift has stalled,
+ * it reads that interval; it does not get a second constant of ours.
+ *
+ * ⛔ THE MECHANISM ITSELF IS p123's circle of maxes — see `DOUBLE_PROGRESSION_IS_HIS` above. Rotate
+ * the rep ranges, raise the max once the athlete repeatedly succeeds, build the next weeks off it.
+ *
+ * ⚠️ WHAT IS STILL GENERIC AND SAYS SO: nothing logged = no evidence = hold, and a miss holds.
+ * Neither is a threshold; both are the refusal to read silence as a result.
  */
 export const STALL_CONFIRMATIONS = 2;
-export const FREEZE_WEEKS_BEFORE_SAYING_SO = 4;
-export const THRESHOLDS_ARE_OURS =
-  'Two confirmations before anything moves, and four unmoved weeks before the plan says a lift is '
-  + 'frozen. Fixed numbers, ours, from field practice.';
+export const PROGRESSION_DEADBAND_IS_HIS =
+  'Nothing moves on one session. Two readings in a row is the source\'s own evidence bar for this '
+  + 'signal — p245, "if the ME lifts underperform 2 weeks in a row" — and the ladder uses it in both '
+  + 'directions. The mechanism is his circle of maxes, p123.';
 
 /**
  * ⛔⛔ THERE IS NO PERCENTAGE BACK-OFF, AND ITS ABSENCE IS THE RULING (Michael, 2026-08-26).
@@ -323,7 +343,8 @@ export const ME_SET_LADDER_IS_OURS =
   + 'from field practice — he states the condition in words ("progressing well, with recovery to '
   + 'spare") and gives no rule.';
 
-/** ⛔ TWO IN A ROW, NEVER ONE. The same deadband `STALL_CONFIRMATIONS` states for the other direction. */
+/** ⛔ TWO IN A ROW, NEVER ONE — p245's own bar, the same one `STALL_CONFIRMATIONS` states for the
+ *  other direction. See `PROGRESSION_DEADBAND_IS_HIS`. */
 export const ME_CLEAN_SESSIONS_TO_EARN = 2;
 
 /**

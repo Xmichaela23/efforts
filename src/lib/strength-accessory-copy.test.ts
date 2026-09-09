@@ -1,54 +1,51 @@
 /**
- * ACCESSORY_SET_CUE — the assistance-work cue (2026-08-01).
+ * THE ASSISTANCE CUE — and as of 2026-09-09 there is only ONE of them.
  *
  * Run from repo root:  deno test src/lib/strength-accessory-copy.test.ts --no-check
  *
- * ⛔ WHY THIS FILE EXISTS SEPARATELY FROM `bar-speed-copy.test.ts`.
+ * ⛔⛔ `ACCESSORY_SET_CUE` IS DELETED (WORKORDER-kill-ours §A.2). It read *"Split these into as many
+ * sets as you need. Leave a rep or two — never to failure."* Both halves came from the ARCHIVED
+ * programme rather than from Viada, and the only rows it could still reach — a rep TOTAL with no
+ * weight — are rows the standing plan no longer builds. A line with no page and no live row comes
+ * off, and the whole reason this file existed separately went with it.
  *
- * That file bans four words on the bar-speed lines — `until`, `as many`, `failure`, `fails` —
- * because on a PRESCRIBED set they mean rep-chasing: go until something breaks down. This line
- * contains two of them, deliberately, in the opposite sense:
+ * ⛔ WHY THIS FILE STAYS. `STANDING_ACCESSORY_SET_CUE` is the surviving cue and it carries the SAME
+ * lint problem for a different reason: `bar-speed-copy.test.ts` bans `until`, `as many`, `failure`
+ * and `fails` on the bar-speed lines because on a PRESCRIBED set they mean rep-chasing, and this cue
+ * uses "failure" as a STOP RULE — *"never to failure"* — which is the thing the ban protects. **If
+ * someone later widens that lint over every exported copy constant, this file is the record of why
+ * that would be wrong.** Pin the intent, not the absence of a substring.
  *
- *   · "as many" governs SETS, not reps. Splitting a rep total across sets is the opposite of
- *     grinding it out in one.
- *   · "failure" appears as a STOP RULE — "never to failure" — which is the thing the ban protects.
- *
- * So the two rules are not in tension; they are about different objects. **If someone later widens
- * the bar-speed lint to cover every exported copy constant, this test is the record of why that
- * would be wrong.** Pin the intent, not the absence of a substring.
- *
- * Basis: the previous program, the previous program. — assistance is performed across as many sets as needed and
- * explicitly not to failure (p.24, p.102); doing too much assistance is the most common mistake
- * lifters make with the programme.
+ * Basis: Viada p86 and p218 — the hypertrophy dose, 8 to 12 reps with 1 to 2 in reserve, and reps
+ * slowing as the set goes. HYP carries no load percentage anywhere in the source.
  */
-import { assert, assertStringIncludes } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { ACCESSORY_SET_CUE, BAR_SPEED_COPY, STANDING_ACCESSORY_SET_CUE } from './strength-focus-copy.ts';
+import { assert, assertEquals, assertStringIncludes } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import * as copy from './strength-focus-copy.ts';
+import { BAR_SPEED_COPY, STANDING_ACCESSORY_SET_CUE } from './strength-focus-copy.ts';
 
-Deno.test('accessory cue — states BOTH halves of the instruction: split the sets, stop short', () => {
-  // Half 1: the rep total is not one set.
-  assertStringIncludes(ACCESSORY_SET_CUE.toLowerCase(), 'sets');
-  // Half 2: the explicit stop rule. This is the clause that makes the word "failure" correct here.
-  assertStringIncludes(ACCESSORY_SET_CUE.toLowerCase(), 'never to failure');
+Deno.test('⛔ THE ARCHIVED PROGRAMME\'S ASSISTANCE LINE IS GONE AND MAY NOT COME BACK', () => {
+  /**
+   * ⛔ ASSERTED AS AN ABSENCE, DELIBERATELY. The constant was exported and read from exactly one
+   * render branch; a future session restoring "a cue for non-standing sessions" would reach for this
+   * name first. Michael, 2026-09-09: **never use ours** — and this line was not even ours, it was
+   * another author's, on a Viada block.
+   */
+  assertEquals((copy as Record<string, unknown>).ACCESSORY_SET_CUE, undefined);
+  /**
+   * ⚠️ CHECKED AT THE IMPORT, NOT BY SCANNING FOR THE NAME. The logger's comment blocks still discuss
+   * the deleted cue at length — that is the record, and it is meant to stay — so a substring sweep
+   * would fail on the very documentation that explains the deletion. A constant that is not imported
+   * cannot be rendered.
+   */
+  const logger = Deno.readTextFileSync(new URL('../components/StrengthLogger.tsx', import.meta.url));
+  const imports = logger.slice(0, logger.indexOf('export default'));
+  assertEquals(/^\s*ACCESSORY_SET_CUE,\s*$/m.test(imports), false,
+    'the deleted assistance cue is imported again');
 });
 
-Deno.test('accessory cue — it is a STOP rule, never an instruction to reach failure', () => {
-  const s = ACCESSORY_SET_CUE.toLowerCase();
-  // The failure mode this guards: a future edit drops "never" and the line inverts into the exact
-  // advice the previous program names as the most common mistake with the programme.
-  assert(!/\b(to|until)\s+failure\b/.test(s.replace(/never to failure/g, '')),
-    `"failure" may appear only inside the "never to failure" stop rule: ${ACCESSORY_SET_CUE}`);
-});
-
-Deno.test('accessory cue — no imperative to add load, and no rep-count promise', () => {
-  const s = ACCESSORY_SET_CUE.toLowerCase();
-  for (const banned of ['heavier', 'add weight', 'push hard', 'max']) {
-    assert(!s.includes(banned), `accessory cue must not contain "${banned}": ${ACCESSORY_SET_CUE}`);
-  }
-});
-
-Deno.test('accessory cue — it is NOT one of the bar-speed lines (different object, different rules)', () => {
+Deno.test('the surviving cue stays out of BAR_SPEED_COPY — different object, different rules', () => {
   const barSpeedLines = Object.values(BAR_SPEED_COPY);
-  assert(!barSpeedLines.includes(ACCESSORY_SET_CUE),
+  assert(!barSpeedLines.includes(STANDING_ACCESSORY_SET_CUE),
     'the accessory cue must stay out of BAR_SPEED_COPY — it would fail that table\'s vocabulary lint');
 });
 

@@ -20,7 +20,6 @@ import {
   defaultCompetitionLifts,
   EMITTED_TOKEN_SHAPES,
   FRAMES,
-  HAIRCUT_CAUSE_IS_OURS,
   HARD_ON_BIKE_CITE,
   isHardSlot,
   isLongSlot,
@@ -73,9 +72,12 @@ const STANDARD = FRAMES.strength_5k.columns.standard;
  * assert on any more — `sport-slots.ts` stopped answering a question about a weekday it cannot see.
  * What a block says is the only answer that exists, and it is also the only one the athlete reads.
  */
+// ⚠️ `dropped` IS NOW AN ABSENCE (2026-09-09, kill-ours §C.9). The sentence that used to announce a
+// dropped reduction was ours and is deleted; p247 is silent outside its own layout and so is the
+// block. "Dropped" therefore means the reduction sentence is not there.
 const haircutSaid = (wk: { notes: Array<{ text: string }> }) => ({
   reduced: wk.notes.some((n) => n.text.includes('three and a half per cent')),
-  dropped: wk.notes.some((n) => n.text === HAIRCUT_CAUSE_IS_OURS),
+  dropped: !wk.notes.some((n) => n.text.includes('three and a half per cent')),
 });
 const week2 = (mix: Record<string, number>) =>
   composeWeek({ ...BASE, week: 2, column: 'standard', sportMix: mix });
@@ -482,8 +484,6 @@ Deno.test('the haircut follows the CALENDAR, not the frame — a pinned-away har
   //    the day before the leg day, and that difference is the whole point of the fix.
   assert(STANDARD.find((d) => d.day === 1)!.endurance.some((sl) => isHardSlot(sl)),
     'frame day 1 no longer carries a hard slot; this test no longer proves what it claims');
-  assert(wk.notes.some((n) => n.text === HAIRCUT_CAUSE_IS_OURS),
-    'the reduction was kept for a run that is not the day before the leg day');
   assert(!wk.notes.some((n) => n.text.includes('three and a half per cent')),
     'the block still claims the lower-body weights were cut for a run that has moved away');
 
@@ -540,15 +540,30 @@ Deno.test('the description counts the BUILT week — it does not recite "four ru
   assert(/test week/i.test(running.description), running.description);
 });
 
-Deno.test('a bike-mix block says out loud that the haircut was dropped, and that it is our reading', () => {
+Deno.test('a bike-mix block says NOTHING about the haircut, and the running block still says p247', () => {
+  /**
+   * ⛔⛔ INVERTED 2026-09-09 (kill-ours §C.9). This used to assert that a bike-heavy block announced
+   * the dropped reduction *"and that it is our reading"* — an athlete-facing sentence whose entire
+   * content was that it had no page. Michael: **never use ours.**
+   *
+   * ⚠️ THE BEHAVIOUR IS UNCHANGED AND THAT IS WHAT IS PINNED: the reduction still does not apply to a
+   * bike-heavy week, and the compensated run layout still carries p247's own sentence. What is gone
+   * is the paragraph explaining the silence.
+   */
   const wk = composeWeek({ ...BASE, week: 2, column: 'standard', sportMix: { runs: 1, rides: 3 } });
-  const note = wk.notes.find((n) => n.text === HAIRCUT_CAUSE_IS_OURS);
-  assert(note, 'the haircut was dropped silently');
-  assertEquals(note!.kind, 'ours');
-  // The running week keeps saying the opposite thing, in his voice.
+  assert(!wk.notes.some((n) => n.text.includes('three and a half per cent')),
+    'a bike-heavy block is applying p247\'s run-layout reduction');
+  /**
+   * ⚠️ MATCHED ON THE DELETED NOTE'S OWN OPENING, and the two near-misses are why it is that narrow.
+   * *"our reading"* also appears in the accessory dial's pullback note, and *"riding hard does not
+   * land on the legs the way running does"* is a whole sentence of `RIDE_EQUIVALENCE_IS_OURS` — a
+   * different note, about substituting the hard SESSION, that this order does not touch.
+   */
+  assert(!wk.notes.some((n) => /ties the lower-body reduction to the hard RUN/i.test(n.text)),
+    `the deleted ours-note about the dropped reduction came back: ${JSON.stringify(wk.notes.map((n) => n.text))}`);
+  // The running week keeps saying the thing that IS on a page, in his voice.
   const run = composeWeek({ ...BASE, week: 2, column: 'standard', sportMix: { runs: 4 } });
   assert(run.notes.some((n) => n.cite === 'Viada p247' && /lower-body/.test(n.text)));
-  assert(!run.notes.some((n) => n.text === HAIRCUT_CAUSE_IS_OURS));
 });
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════

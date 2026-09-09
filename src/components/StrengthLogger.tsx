@@ -30,7 +30,6 @@ import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 import {
   topSetIndex,
   barSpeedLineFor,
-  ACCESSORY_SET_CUE,
   STANDING_ACCESSORY_SET_CUE,
   STANDING_ME_SET_CUE,
   type SetDifficulty,
@@ -178,6 +177,14 @@ interface LoggedSet {
   amrap?: boolean; // AMRAP working set (baseline/retest) — open reps, RIR gate accepts 0–3 (D-224)
   repMaxTest?: boolean; // Bodyweight rep-max test (pull-ups): the clean-rep COUNT is the result — no weight, no e1RM, no RIR; 0 is valid (Q-102 baseline model)
   setHint?: string; // Hint text for baseline test sets
+  /**
+   * ⛔ p215's `A` — THE ONE WEIGHT THE ATHLETE CHOOSES, on a test row with no number on file
+   * (2026-09-09). The page's ramp is 1.00A / 1.10A / 1.15A, and a lift with nothing in Baselines has
+   * no A to compute from — so set 1 asks for it and the two steps above it are filled the moment it
+   * is logged (`handleSetComplete`). ⚠️ ONLY EVER ON SET 1 OF THAT ROW; a seeded test row prescribes
+   * all three weights and never carries this.
+   */
+  pretestAnchor?: boolean;
   /** D-097: true when the value was prefilled from the athlete's previous
    *  session for this exercise (autofill on logger open). UI dims the value
    *  so the athlete knows it's a starting suggestion, not their own log.
@@ -569,11 +576,21 @@ const slotIntentOf = (ex: unknown): string | null =>
  * THE FOUR KINDS OF SET, one line each, behind a tap on the word (Michael, 2026-09-08: "put the answer
  * where the question comes up"). p218's table in his terms; the letters spelled out because he asked.
  */
+/**
+ * ⛔⛔ ALL FOUR TEXTS REPLACED 2026-09-09 (WORKORDER-kill-ours §B.4). Michael's words, off the page.
+ *
+ * The four that stood here carried clauses no page prints — a rest rule on ME, *"Muscle."*,
+ * *"Getting tired is the point."*, *"Practice under load."* — and a percentage band on every row, on
+ * a sheet the athlete opens to find out what the word means. What ships instead is the intent, its
+ * reps and its stop rule, each traceable:
+ *   ME    p218, p219    DE   p218, p219    SKILL  p219, p76, p143    HYP  p86, p218
+ * ⚠️ THE SPELLED-OUT NAMES STAY — p219's own abbreviations, and Michael asked for the words.
+ */
 const SET_TYPE_INFO: Record<'ME' | 'DE' | 'SKILL' | 'HYP', { name: string; text: string }> = {
-  ME: { name: 'Maximal effort', text: '1 to 5 reps at 90 to 100 percent. Rest until you know you can finish the next set. Stop before you grind.' },
-  DE: { name: 'Dynamic effort', text: 'Speed. 2 to 4 reps at 70 to 80 percent, every rep as fast as you can. Leave 3 or 4 in reserve.' },
-  SKILL: { name: 'Skill', text: 'Practice under load. 3 to 5 reps at 75 to 85 percent, down under control, up fast. Leave 3 or 4 in reserve.' },
-  HYP: { name: 'Hypertrophy', text: 'Muscle. 6 to 12 reps, no percentage, pick the weight that leaves 0 to 2 in reserve. Getting tired is the point.' },
+  ME: { name: 'Maximal effort', text: '1 to 5 reps, stop short of failure.' },
+  DE: { name: 'Dynamic effort', text: 'As fast as possible on every rep. Bar slows, set is over.' },
+  SKILL: { name: 'Skill', text: 'Form and consistency over speed. Weight heavy enough to be a challenge. Every rep either improves the movement or degrades it. Performed poorly, stop.' },
+  HYP: { name: 'Hypertrophy', text: '8 to 12 reps, 1 to 2 in reserve. Reps slow as the set goes.' },
 };
 
 export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSaved, targetDate }: StrengthLoggerProps) {
@@ -1315,11 +1332,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     const emptyBarWeight = nlow.includes('overhead') || nlow.includes('ohp') ? 0 : 45;
     const planned = (plannedSetsFor(ex) ?? []) as Array<{ weight?: number; reps?: number; amrap: boolean }>;
     const hasSteps = planned.length > 0;
+    // ⛔ THE NO-STEPS SENTENCE IS DELETED (2026-09-09, WORKORDER-kill-ours §B.5). It read *"No X max
+    // on file — the ramp is open. Work up until the last set is genuinely hard."* — the client twin of
+    // the composer note the same order removed, and *"genuinely hard"* is not on a page. The blank
+    // row now carries p215's own opening instruction on set 1 instead (see `stepSets` below), so
+    // there is nothing left for a row-level note to add.
     const fileNote = onFile && onFile > 0
       ? `${name} on file: ${Math.round(onFile)} lb (typed in your baselines). The steps below are a share of that number; the last one is what you are trying to beat.`
       : hasSteps
         ? 'The steps below are a share of the number that was on file when this block was built; the last one is what you are trying to beat.'
-        : `No ${name.toLowerCase()} max on file — the ramp is open. Work up until the last set is genuinely hard.`;
+        : '';
     const composerNote = String(ex?.notes || '').trim();
     const stepSets: LoggedSet[] = hasSteps
       ? planned.map((p, i) => ({
@@ -1333,13 +1355,29 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             ? { amrap: true, setHint: TEST_LAST_SET_HINT }
             : { setHint: i === 0 ? 'Step 1 — the first ramp set, as prescribed.' : `Step ${i + 1} — heavier, as prescribed.` }),
         }))
+      /**
+       * ⛔⛔ THE BLANK-LIFT TEST — RESHAPED 2026-09-09 (WORKORDER-kill-ours §B.5).
+       *
+       * ⛔ WHAT IT WAS: three open sets and three sentences of ours — *"Work up — a moderate set. Add
+       * weight if it moved well."*, *"Heavier. Clean reps only."* — an athlete guessing a ramp, with
+       * the block's whole twelve weeks priced off wherever they happened to stop.
+       *
+       * ⛔ WHAT IT IS: **p215's own protocol, with the athlete supplying `A`.** The page starts from a
+       * weight the lifter picks — one they could get eight with, where ten would be near failure —
+       * taken for six. That is set 1, and `pretestAnchor` marks it. The moment it is logged,
+       * `handleSetComplete` fills set 2 at 1.10 × A for five and set 3 at 1.15 × A for max reps: the
+       * same two multiples a seeded row is prescribed (`PRETEST_STEPS`), off a number the athlete
+       * chose instead of one on file.
+       *
+       * ⚠️ SETS 2 AND 3 CARRY NO HINT. They are not instructions any more — they are weights the app
+       * fills in, and the row's own note carries the last set's line.
+       */
       : [
+          { weight: 0, reps: 6, setType: 'working' as const, barType: 'standard' as const, completed: false,
+            pretestAnchor: true, setHint: 'A weight for 8 to 10 reps near failure. Enter it here.' },
+          { weight: 0, reps: 5, setType: 'working' as const, barType: 'standard' as const, completed: false },
           { weight: 0, reps: undefined, setType: 'working' as const, barType: 'standard' as const, completed: false,
-            setHint: 'Work up — a moderate set. Add weight if it moved well.' },
-          { weight: 0, reps: undefined, setType: 'working' as const, barType: 'standard' as const, completed: false,
-            setHint: 'Heavier. Clean reps only.' },
-          { weight: 0, reps: undefined, setType: 'working' as const, barType: 'standard' as const, completed: false,
-            amrap: true, setHint: TEST_LAST_SET_HINT },
+            amrap: true },
         ];
     return {
       id: `ex-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -4383,6 +4421,54 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       return;
     }
 
+    /**
+     * ⛔⛔ p215's TWO STEPS, FILLED OFF THE WEIGHT THE ATHLETE JUST CHOSE (2026-09-09, kill-ours §B.5).
+     *
+     * A test row with no number on file cannot prescribe a ramp, so set 1 asks for `A` — a weight
+     * good for eight reps where ten would be near failure — and the page's own arithmetic supplies
+     * the rest: **1.10A for five, then 1.15A for max reps**, the same two multiples `PRETEST_STEPS`
+     * gives a seeded row.
+     *
+     * ⚠️ THE MULTIPLES ARE OF THE ROUNDED `A`, which is p215's own order of operations — round the
+     * unit first so the steps above it are honest additions to a bar the athlete can actually load.
+     * ⚠️ IT NEVER OVERWRITES A TYPED WEIGHT. If the athlete has already put a number on set 2 or 3,
+     * theirs stands — this fills blanks, it does not correct anyone.
+     * ⚠️ AND IT FALLS THROUGH. This writes the two steps and then lets the normal completion path
+     * run, so set 1 completes exactly as it did before.
+     */
+    if (set.pretestAnchor === true) {
+      const a = Number(set.weight);
+      const round5 = (w: number) => Math.max(5, Math.round(w / 5) * 5);
+      /**
+       * ⚠️ ONE PASS, AND IT COMPLETES THE SET ITSELF. `updateSet` maps over the `exercises` CLOSURE,
+       * so a second call in the same handler builds off the pre-first-call array and silently drops
+       * the earlier write. Marking set 1 done and filling sets 2 and 3 is therefore ONE map, and this
+       * branch returns rather than falling through to the completion paths below.
+       * ⚠️ NO RIR PROMPT, for the same reason the AMRAP and rep-max branches below skip it: this is a
+       * measurement step, and the number it produces is a weight and a rep count.
+       * ⚠️ A BLANK WEIGHT STILL COMPLETES. `a` non-positive means nothing to multiply, so the two
+       * steps stay open and the athlete fills them by hand — the honest degradation.
+       */
+      const filled = exercises.map((ex) => {
+        if (ex.id !== exerciseId) return ex;
+        const sets = [...ex.sets];
+        sets[setIndex] = { ...sets[setIndex], completed: true, prefilled: false, from_previous: false };
+        if (Number.isFinite(a) && a > 0) {
+          for (const [offset, mult] of [[1, 1.10], [2, 1.15]] as const) {
+            const at = setIndex + offset;
+            const next = sets[at];
+            if (!next || next.completed || Number(next.weight) > 0) continue;
+            sets[at] = { ...next, weight: round5(a * mult), prefilled: true };
+          }
+        }
+        return { ...ex, sets };
+      });
+      setExercises(filled);
+      saveSessionProgress(filled, attachedAddons, notesText, notesRpe);
+      autoStartRestForSet(exerciseId, setIndex);
+      return;
+    }
+
     // If RIR was already entered inline, just mark complete (don't prompt again)
     if (set.rir !== undefined && set.rir !== null) {
       updateSet(exerciseId, setIndex, { completed: true });
@@ -5484,12 +5570,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               && (typeof (e as { weight?: unknown }).weight === 'number'
                 || (e as { load_prescribed?: boolean }).load_prescribed === true))
             && exercises.findIndex((e) => isAssistanceRow(e)) === exerciseIndex && (
+            /* ⛔ 2026-09-09: THE NON-STANDING ARM IS GONE WITH `ACCESSORY_SET_CUE` (kill-ours §A.2).
+               Its line was the archived programme's, not Viada's, and the rows it could still reach —
+               a rep TOTAL with no weight — are rows the standing plan no longer builds. Off a
+               standing-plan session this block now renders nothing rather than an unsourced line. */
+            Array.isArray(scheduledWorkout?.tags)
+            && scheduledWorkout.tags.some((t: unknown) => String(t) === 'standing_plan') && (
             <p className="mx-3 mb-1.5 mt-2 text-[12px] font-medium text-white/72 leading-snug">
-              {Array.isArray(scheduledWorkout?.tags)
-                && scheduledWorkout.tags.some((t: unknown) => String(t) === 'standing_plan')
-                ? STANDING_ACCESSORY_SET_CUE
-                : ACCESSORY_SET_CUE}
+              {STANDING_ACCESSORY_SET_CUE}
             </p>
+            )
           )}
           {/* ⛔ THE ACCENT MEANS "THIS IS THE PRESCRIPTION" (2026-08-14, Michael: "we keep big lift
               orange, accessories white?"). The main lift is the thing the programme drives — a
@@ -6001,11 +6091,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // Readable, not the .38 the first pass used — these are labels the athlete reads
                   // mid-set with a bar in their hands.
                   const labelCls = 'text-[10px] font-semibold uppercase tracking-[0.08em] text-white/[0.88] leading-none';
-                  // ONE bar-speed cue for the whole lift, right under the title (Michael 2026-08-10) —
-                  // the previous program's explosive-rep instruction, main the previous program lifts only. It was repeated on every
-                  // working set's detail line; that space now carries plate math. `barSpeedCueFor` with
-                  // an empty set returns the work_set line and misses to null off the main lifts.
-                  const titleCue = barSpeedCueFor(exercise, {} as any);
+                  /**
+                   * ⛔⛔ THE TITLE CUE IS DELETED (2026-09-09, WORKORDER-kill-ours §A.2).
+                   *
+                   * It was `barSpeedCueFor(exercise, {})` — an empty set, which returns the work_set
+                   * line *"Every rep explosive and controlled."* That sentence is the archived
+                   * programme's instruction for a set under a percentage of a training max, it has no
+                   * Viada page, and the only rows it could still reach are unlabelled ones the
+                   * standing plan no longer builds. A line with no page comes off.
+                   *
+                   * ⚠️ THE PER-SET CUE IS UNTOUCHED. `barSpeedCueFor(exercise, set)` still runs
+                   * further down and still renders on an AMRAP / pretest set, where the line it
+                   * returns is the p215 measurement instruction rather than this one.
+                   */
                   // ⛔ THE STANDING SLOT'S OWN INSTRUCTION (2026-08-25, Michael: "we need to lose
                   // that and give clear instruction", then on the close-grip card: "move the bar
                   // fast and controlled and what the weight cue should be"). Auto-regulated ME and
@@ -6064,12 +6162,24 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                    * "no standing cue" and "no cue".
                    */
                   const standingCue: string | null | 'suppressed' = slotIntent === 'ME'
-                    ? STANDING_ME_SET_CUE(String(exercise?.target_reps || '1-5'),
-                        { loadPrescribed: exercise?.load_prescribed !== false })
+                    // ⚠️ NO `loadPrescribed` ARGUMENT SINCE 2026-09-09 — the direction clause it
+                    // selected ("Assistance if you need it…") was ours and is deleted; the Assist/+
+                    // column labels itself.
+                    ? STANDING_ME_SET_CUE(String(exercise?.target_reps || '1-5'))
                     : slotIntent === 'DE'
                       ? 'suppressed'
                       : null;
-                  const cardCueRaw = standingCue === 'suppressed' ? null : (standingCue ?? titleCue);
+                  /**
+                   * ⛔ NO FALL-THROUGH LEFT TO GUARD (2026-09-09). With `titleCue` deleted there is
+                   * nothing under `standingCue` to fall to, so `'suppressed'` and `null` now reach
+                   * the same place — and the DE row keeps its own `intentLine` below either way,
+                   * which is the line the suppression existed to protect.
+                   * ⚠️ THE SENTINEL STAYS. It is the record that a DE row renders NOTHING here on
+                   * purpose; collapsing it would leave the next reader unable to tell "no cue" from
+                   * "no standing cue", which is exactly how the previous program's words got onto a
+                   * Viada block the first time.
+                   */
+                  const cardCueRaw = standingCue === 'suppressed' ? null : standingCue;
                   // 2026-09-03 (Michael: "make sure the entire app understands the language of the book"): the
                   // book's word for the set leads the line — ME / DE / SKILL / HYP with its reps and reserve
                   // (p218's table). Same word on the plan card (strengthFormatter). DE says "move the bar fast"

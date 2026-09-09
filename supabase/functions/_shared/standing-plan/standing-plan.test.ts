@@ -426,6 +426,8 @@ Deno.test('every prescribed weight is either the tested lift\'s own or a labelle
    * or a derivation that says it is one and can name where it came from"**.
    */
   const comps = Object.values(BASE_ARGS.competitionLifts).map((c) => String(c).toLowerCase());
+  const fails: string[] = [];
+  let rowsSeen = 0;
   for (const kit of KITS) {
     for (const [week, column] of [[2, 'standard'], [3, 'standard'], [11, 'taper']] as const) {
       const wk = composeWeek({ ...BASE_ARGS, equipment: kit.equipment, week, column });
@@ -433,27 +435,27 @@ Deno.test('every prescribed weight is either the tested lift\'s own or a labelle
         if (s.type !== 'strength') continue;
         for (const e of s.strength_exercises ?? []) {
           if (typeof e.weight !== 'number') continue;
+          rowsSeen += 1;
           const where = `[${kit.label} wk${week}] "${e.name}"`;
           if (comps.includes(e.name.toLowerCase())) continue;
-          // ⛔ ANYTHING ELSE MUST DECLARE ITSELF DERIVED. A bare number on a non-competition movement
-          // is the old defect exactly.
-          assertEquals((e as { load_basis?: string }).load_basis, 'derived_ratio',
-            `${where} carries ${e.weight} and does not say where it came from`);
-          // ⛔ AND IT MUST BE DERIVABLE: same-pattern reference, whole-bar, non-zero ratio.
-          const cfg = resolveExerciseConfig(e.name).config;
-          assert(cfg?.primaryRef != null, `${where} has no primaryRef and was still weighted`);
-          assertEquals(cfg!.displayFormat === 'perHand', false, `${where} is per-hand and was weighted`);
-          // ⛔⛔ AND NEVER A BODYWEIGHT PULL. 2026-09-03 (Michael: "are we being too strict to arrive at a
-          // number?"): a LOADED pull on a DE slot may carry a weight derived off its reference lift's ratio
-          // (a barbell row at ~80% of bench), labelled derived_ratio above. A pull-up or chin-up never does.
-          assert(!/pull ?up|chin ?up/i.test(e.name), `${where} is a bodyweight pull and carries a weight`);
-          if (/row/i.test(e.name)) {
-            assertEquals((e as { slot_intent?: string }).slot_intent, 'DE', `${where} is a weighted row outside a DE slot`);
-          }
+          /**
+           * ⛔⛔ THE RULE IS BACK TO "ONLY THE TESTED LIFT" (2026-09-09,
+           * WORKORDER-de-row-by-feel). Between 2026-08-27 and today it was the weaker
+           * *"the tested lift, or a derivation that says it is one and can name where it came
+           * from"* — and the derivation was a ratio between two lifts, which no page gives.
+           *
+           * ⚠️ AND THIS LOOP WOULD NOW PASS VACUOUSLY IF LEFT AS IT WAS: with nothing derived, the
+           * `continue` above swallowed every row and the body never ran. The count below is what
+           * stops that — the same "green about something it never read" trap this file warns about
+           * everywhere else.
+           */
+          fails.push(`${where} carries ${e.weight} and is not one of the tested lifts`);
         }
       }
     }
   }
+  assertEquals(fails, [], fails.join('\n'));
+  assert(rowsSeen > 0, 'no weighted row was examined — the sweep proves nothing');
   // ⚠️ AND THE TESTED LIFTS DO GET ONE — otherwise this passes by prescribing nothing at all.
   const wk = composeWeek({ ...BASE_ARGS, week: 2, column: 'standard' });
   const numbered = wk.sessions.flatMap((s) => s.strength_exercises ?? []).filter((e) => typeof e.weight === 'number');
