@@ -91,10 +91,13 @@ Data: today's rows from `get-week` (the rows `TodaysEffort.tsx` already loads). 
    WMO code to the icon (0 Sun · 1–3 CloudSun/Cloud · 45–48 CloudFog · 51–67, 80–82 CloudRain · 71–77, 85–86
    CloudSnow · 95–99 CloudLightning). Dew point: Open-Meteo has `dew_point_2m`; add it to the same request
    and show it beside humidity. Deploy `get-weather` when this lands.
-2. **The load card moves from State to Today.** `LoadWeeksCard.tsx` (five weekly bars per sport, this week
-   last) renders on Today below the day's sessions, one per sport the athlete does. It comes off State in
-   the same change; nothing else on State moves.
-3. **This week's counts**, one row under the load card, numbers only: miles run, miles ridden, pounds
+2. **The LOAD card moves from the Week calendar to Today** (Michael, 2026-09-09; State is untouched). The
+   card with fitness / fatigue / form, run mi, bike mi, strength lb, under the day's sessions. It comes off
+   Week. A chevron down at its right edge opens the workload bars (`LoadWeeksCard.tsx`, one per sport)
+   under it; tap again closes. Closed by default; the choice is remembered on the device. The bars have
+   been on no screen since 2026-09-04 (removed from State's run card, aa235822).
+3. ~~This week's counts row~~ REMOVED 2026-09-09: the LOAD card carries the miles and pounds. Built and
+   taken off. (Was: one row under the load card, numbers only: miles run, miles ridden, pounds
    lifted. Miles from the week's completed workouts' distance (the same figure the calendar rows carry);
    pounds from the week's logged sets, weight × reps summed, the figure `StrengthCompletedView.tsx` already
    shows per session. Labels `Run` / `Ride` / `Lifted`, units `mi` / `lb` (km / kg when the athlete's units
