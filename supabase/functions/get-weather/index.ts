@@ -1,7 +1,13 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
-/** Bump when weather merge/cache semantics change so persisted workout rows refetch */
-const WEATHER_SCHEMA_VERSION = 4;
+/**
+ * Bump when weather merge/cache semantics change so persisted workout rows refetch.
+ * ⛔ 4 → 5 (2026-09-09, work order §3b.1): the request now asks Open-Meteo for `weather_code` and
+ * `dew_point_2m`. Every cached row was written without them, and without the bump a cached hit
+ * would keep returning a payload the new block has no icon and no dew point for — the screen would
+ * look broken for exactly as long as the cache lives.
+ */
+const WEATHER_SCHEMA_VERSION = 5;
 
 interface WeatherData {
   /** Representative temp for the session: avg over [start, end] when duration provided, else start-hour slot. */
@@ -12,8 +18,19 @@ interface WeatherData {
   temperature_peak_f?: number;
   temperature_avg_f?: number;
   feels_like?: number;
+  /**
+   * ⛔ `'—'` NO LONGER, WHERE OPEN-METEO ANSWERS (work order 2026-09-09 §3b.1). The archive does not
+   * return condition TEXT, which is why this shipped as an em dash — but it does return a WMO
+   * `weather_code`, and the screen wants an icon rather than a word. The code travels raw and the
+   * client maps it; a picture is a display decision and does not belong in the payload.
+   * ⚠️ STILL `'—'` when the request predates this or the code is missing, so nothing that reads
+   * `condition` has to learn a new empty value.
+   */
+  weather_code?: number;
   condition: string;
   humidity: number;
+  /** °F. Open-Meteo's `dew_point_2m`, shown beside humidity (§3b.1). Absent on rows fetched before. */
+  dew_point?: number;
   windSpeed: number;
   windDirection: number;
   precipitation: number;
@@ -316,7 +333,7 @@ async function fetchWeatherData(
 
     // Open-Meteo archive API - free, no key required
     // Use timezone=UTC so all times are in UTC (consistent with our timestamp)
-    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${rangeStart}&end_date=${rangeEnd}&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,wind_speed_10m,wind_direction_10m,precipitation&daily=sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=UTC`;
+    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${rangeStart}&end_date=${rangeEnd}&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,weather_code,wind_speed_10m,wind_direction_10m,precipitation&daily=sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=UTC`;
     
     const resp = await fetch(url);
     if (!resp.ok) {
@@ -364,6 +381,10 @@ async function fetchWeatherData(
     const windSpeed = hourly.wind_speed_10m?.[bestIdx];
     const windDir = hourly.wind_direction_10m?.[bestIdx];
     const precip = hourly.precipitation?.[bestIdx];
+    // §3b.1 — the two fields this request never asked for. Both are read at the same slot as the
+    // rest, so the whole block describes one hour rather than a mix of hours.
+    const dewPoint = hourly.dew_point_2m?.[bestIdx];
+    const weatherCode = hourly.weather_code?.[bestIdx];
 
     // Get daily high/low from the full response
     const temps = hourly.temperature_2m.filter((t: number | null) => t != null);
@@ -410,8 +431,12 @@ async function fetchWeatherData(
       temperature_peak_f,
       temperature_avg_f,
       feels_like: feelsLike != null ? Math.round(feelsLike) : undefined,
-      condition: '—', // Open-Meteo archive doesn't provide condition text
+      // ⚠️ THE ARCHIVE STILL RETURNS NO CONDITION TEXT — the em dash stays, and the icon comes off
+      // `weather_code` instead (§3b.1). Changing `condition` to a word would be inventing one.
+      condition: '—',
+      weather_code: Number.isFinite(Number(weatherCode)) ? Number(weatherCode) : undefined,
       humidity: Math.round(humidity ?? 0),
+      dew_point: Number.isFinite(Number(dewPoint)) ? Math.round(Number(dewPoint)) : undefined,
       windSpeed: Math.round(windSpeed ?? 0),
       windDirection: Math.round(windDir ?? 0),
       precipitation: precip ?? 0,

@@ -40,6 +40,9 @@ import PlannedSessionHeader from './PlannedSessionHeader';
 // ⛔ TODAY'S LINES (work order 2026-09-09 §2) — what each set is FOR, under the row that says what
 // it is. Every athlete-facing word lives in `@/lib/today-lines`; nothing new is spelled out here.
 import TodaySessionLines, { TodaySpacingLine } from './TodaySessionLines';
+// ⛔ §3b — the weather block above the date, and the week's load bars + counts under the day.
+import TodayWeather from './TodayWeather';
+import TodayWeekBlocks from './TodayWeekBlocks';
 // ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
 import { plannedDurationMinutes } from '@/lib/planned-session/duration';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
@@ -1466,30 +1469,54 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           backgroundPosition: 'center, center, center, center, center',
         }}
       />
-      {/* Glow-field behind the Today panel (restores “Today halo”) */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          left: '-16px',
-          right: '-16px',
-          top: '-24px',
-          height: '220px',
-          zIndex: 0,
-          pointerEvents: 'none',
-          mixBlendMode: 'screen',
-          backgroundImage: `
+      {/**
+        * Glow-field behind the Today panel (the “Today halo”).
+        *
+        * ⛔ THE COLOUR FOLLOWS THE DAY (work order 2026-09-09 §3b.4). The bleed used to burn all five
+        * sport hues at once, every day — the visual language's *"soft sport-colour bleed from the
+        * top"* rendered as a rainbow that said nothing about what the athlete is doing. It now takes
+        * the colour of the day's FIRST session, off the same tag-keyed display discipline the
+        * sessions themselves wear, so the top of the screen and the first card agree.
+        *
+        * ⚠️ A REST DAY KEEPS THE NEUTRAL BLEED — the five-hue field below. With nothing planned there
+        * is no sport to take a colour from, and picking one would be decoration claiming to be
+        * information.
+        */}
+      {(() => {
+        const first = displayWorkouts[0];
+        const rgb = first ? getDisciplineColorRgb(displayDisciplineOf(first)) : null;
+        return (
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              left: '-16px',
+              right: '-16px',
+              top: '-24px',
+              height: '220px',
+              zIndex: 0,
+              pointerEvents: 'none',
+              mixBlendMode: 'screen',
+              backgroundImage: rgb
+                ? `
+            radial-gradient(320px 150px at 28% 42%, rgba(${rgb}, 0.30) 0%, rgba(${rgb}, 0.0) 74%),
+            radial-gradient(300px 160px at 68% 52%, rgba(${rgb}, 0.18) 0%, rgba(${rgb}, 0.0) 74%)
+          `
+                : `
             radial-gradient(200px 120px at 18% 40%, rgba(255, 215, 0, 0.28) 0%, rgba(255, 215, 0, 0.0) 72%),
             radial-gradient(220px 140px at 40% 52%, rgba(255, 140, 66, 0.20) 0%, rgba(255, 140, 66, 0.0) 72%),
             radial-gradient(220px 140px at 60% 52%, rgba(183, 148, 246, 0.18) 0%, rgba(183, 148, 246, 0.0) 72%),
             radial-gradient(200px 120px at 82% 40%, rgba(74, 158, 255, 0.18) 0%, rgba(74, 158, 255, 0.0) 72%),
             radial-gradient(260px 170px at 50% 72%, rgba(239, 68, 68, 0.14) 0%, rgba(239, 68, 68, 0.0) 76%)
           `,
-          opacity: 0.60,
-          filter: 'blur(24px) saturate(1.12)',
-          transform: 'translateZ(0)',
-        }}
-      />
+              opacity: 0.60,
+              filter: 'blur(24px) saturate(1.12)',
+              transform: 'translateZ(0)',
+              transition: 'background-image 300ms ease',
+            }}
+          />
+        );
+      })()}
       {/* First-run card sits ABOVE the Today panel: inside it, it ate the panel's fixed height and
           pushed the session rows under the fold (seen on the demo account, 2026-09-07). */}
       {!noPlanYet ? (
@@ -1574,6 +1601,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           }}
         >
           <div className="space-y-0.5">
+            {/* ⛔ THE WEATHER SITS ABOVE THE DATE (work order 2026-09-09 §3b.1) — temperature and
+                feels-like, the condition as an icon, humidity with dew point, wind, sunrise and
+                sunset. It only draws for today; there is no historical weather to show for another
+                day. See `TodayWeather`. */}
+            {weather && isTodayDate ? (
+              <TodayWeather weather={weather} className="pb-1" />
+            ) : null}
+
             {/* Line 1: Date - Live channel (brightest, energized, more phosphor) */}
             <div>
               <span 
@@ -1588,32 +1623,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               </span>
             </div>
 
-            {/* Line 2: Weather + Location - Visible but secondary */}
-            {(weather || cityName) && (
+            {/* Line 2: Location.
+                ⛔ THE WEATHER LEFT THIS LINE (§3b.1) — it is its own block above the date now, with
+                the condition drawn rather than spelled and the dew point beside the humidity. What
+                stood here was one run-on string ending in `—`, the em dash being the condition the
+                archive never returns. The city stays. */}
+            {cityName && (
               <div className="flex items-center gap-1 flex-wrap">
-                {weather && isTodayDate && (
-                  <span className="text-[0.68rem] font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.62)', lineHeight: 1.1 }}>
-                    {Math.round(weather.temperature)}°F {weather.condition}
-                    {typeof weather.daily_high === 'number' ? ` • High ${Math.round(weather.daily_high)}°` : ''}
-                    {weather.sunrise && weather.sunset ? (()=>{ 
-                      try { 
-                        const fmt = (iso: string) => { 
-                          const d = new Date(iso); 
-                          return d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }).replace(/\s?AM|\s?PM/i, (m) => m.trim().toLowerCase()); 
-                        }; 
-                        return ` • ${fmt(weather.sunrise)}/${fmt(weather.sunset)}`; 
-                      } catch { 
-                        return ''; 
-                      }
-                    })() : ''}
-                  </span>
-                )}
-                {/* City name from geolocation (show for any date if available) */}
-                {cityName && (
-                  <span className="text-[0.68rem] font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.62)', lineHeight: 1.1 }}>
-                    {weather && isTodayDate ? ' • ' : ''}{cityName}
-                  </span>
-                )}
+                <span className="text-[0.68rem] font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.62)', lineHeight: 1.1 }}>
+                  {cityName}
+                </span>
               </div>
             )}
 
@@ -1712,7 +1731,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         <div className="px-2 overflow-x-hidden" style={{ paddingBottom: hasExpandedWorkout ? 120 : 56 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state - show "Rest" if there's an active plan, otherwise "No effort"
-          <div className="flex items-center justify-center h-full px-4">
+          <div className="px-4 py-10">
             <p className="text-center text-lg font-medium italic" style={{ color: 'rgba(255, 255, 255, 0.25)' }}>
               {trainingPlanContext
                 ? 'Rest'
@@ -1721,6 +1740,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   : 'No effort scheduled'
               }
             </p>
+            {/* ⛔ THE WEEK STILL SHOWS ON A REST DAY. The load bars and the counts describe the
+                WEEK, not the day — a rest day is exactly when an athlete looks at what the week
+                has come to. Only the day's own sessions go quiet (§2.4). */}
+            <TodayWeekBlocks weekRows={allUnifiedItems as never} className="mt-8" />
           </div>
         ) : (
           // Tap opens bottom sheet (planned) or detail (completed). Each planned session carries the
@@ -2062,6 +2085,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 alone, keyed off the row's TYPE rather than its tags, and counted a swim or a walk as
                 the endurance half of a pairing p145 writes about a ride or a run. See
                 `TodaySpacingLine` above the list. */}
+
+            {/* ⛔ THE WEEK, UNDER THE DAY (§3b.2 / §3b.3) — the load bars per sport and this week's
+                counts. It reads the week `get-week` already returned, so the day above and the
+                totals below cannot disagree about what was logged. */}
+            <TodayWeekBlocks weekRows={allUnifiedItems as never} className="mt-4" />
           </div>
         )}
         </div>
