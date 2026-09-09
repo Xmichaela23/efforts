@@ -77,6 +77,30 @@ writes the sentence. Never paraphrase the book in prose. The citation lives in t
    `Repeat until it feels right and you are confident, then move on. Full rest between. Tired or sloppy,
    stop.` The benefit phrase leads the note as it does today.
 
+## B2. Session description lines on the plan card (APPROVED, Michael, 2026-09-09)
+
+The `description` a composed session carries, shown under the session name on the plan card and drawer
+(`PlannedWorkoutSummary.tsx`). Composer `notes` (`standing_plan_notes`) never reach the client; they are
+not in scope.
+
+Delete (the row lines now carry the content):
+- Test session (`compose.ts` ~1950): `Work up in three steps. The last set is max clean reps and it is what
+  the block reads.`
+- Plyo session (`compose.ts` ~2026, `PLYO_DOSE.stopRule`): the row note carries the approved line.
+- Every lifting day (`ACCESSORY_FATIGUE_CUE`, `sessionCueFor`): `The accessories run the other way…`
+- Speed day (`SPEED_SET_END_CUE`, `sessionCueFor`): `This day trains bar speed and a clean bar path…`
+- Near-threshold run (`session-vocabulary.ts` `describeSession`): `Effort 5–6 of 10.`
+- Any endurance session: `At least this long — some recoveries carry no stated duration.`
+
+Keep:
+- Race-tempo run: `Run at race pace, with the recovery periods a quarter longer than usual.` (p247)
+
+Rewrite:
+- MLSS run: `Fatigue spread evenly across the rounds. Hills are fine, adjust pace to hold the effort.` (p231)
+- Easy and long run: `Go by heart rate. Pace varies with fatigue, hydration and weather.` (p235)
+
+A lifting session with nothing left to say carries an empty description. Goldens regenerated.
+
 ## C. Engine numbers with no page
 
 8. Progression thresholds, `THRESHOLDS_ARE_OURS` (standing-plan/progression.ts ~186): the fixed counts
