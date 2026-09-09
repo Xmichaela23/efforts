@@ -60,6 +60,21 @@ session with none shows no Swap button.
 5. The posture gate (declared posture must be `maintain`) stays as is.
 6. Just-today / rest-of-plan: the same two choices the lift swap offers, on every swap here.
 
+## 7. A swapped session is the library's session, not a shell (Michael, 2026-09-09, go)
+
+Today `swappedSessionBlock` renders `Hard ride, no target` / `Easy run, no pace target` with the OLD
+session's minutes: a 3-hour ride becomes a 3-hour run. Replace: a sport swap hands over the session the
+composer would have built for the new sport in the same band, at the athlete's level, from the book's
+library (`session-vocabulary.ts` families: hard run → `ride_anaerobic` p237; easy run → `ride_endurance`
+p239; long run → the frame's long ride; long ride → `run_lsd` p235; easy ride → `run_vt1` p235; hard ride →
+NOT offered). Steps, targets and minutes come from that library session, never from the old one. The
+level is the athlete's own for that sport (their experience answer, as the composer uses it). The
+swapped row carries the new `family:`/`band:`/`sport:` tags and the swap note. Machine swaps (trainer,
+treadmill) change nothing but the `venue:` tag, as built.
+
+Confirmation lines APPROVED as written (Michael, 2026-09-09): `Moved to the trainer` / `Moved to the
+treadmill` / `Swapped to a hike` / suffix `— this and N later`.
+
 ## Copy (Michael's words, pending)
 
 Facts per line, one line per swap on the sheet:
