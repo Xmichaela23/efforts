@@ -79,12 +79,22 @@ const PlannedSessionHeader: React.FC<PlannedSessionHeaderProps> = ({
   const color = sportColorFor(type);
   const title = deriveWorkoutTitle(w as never);
   /**
-   * ⚠️ STRENGTH SHOWS NO DURATION, deliberately and consistently with `PlannedWorkoutSummary` — a
-   * strength row's stored total is a placeholder ("45 min") that the session never honours, and
-   * printing it invites the athlete to plan around a number the app made up.
+   * ⛔⛔ A LIFT NOW SHOWS ITS MINUTES, THE SAME WAY A RIDE DOES (Michael, 2026-09-09, on Today).
+   *
+   * ⚠️ THIS REVERSES A DELIBERATE SUPPRESSION, so the reason it was suppressed is kept rather than
+   * deleted: a strength row's stored total is a FIXED FIGURE PER KIND OF SESSION, not a length
+   * computed from the day's rows — the composer stamps 55 on a lifting day, 45 on a test day and 20
+   * on the plyo day (`standing-plan/compose.ts`). The old note called that "a number the app made
+   * up" and hid it. The ruling is that an athlete planning a two-a-day needs to know a lift is an
+   * hour and the plyo block is twenty minutes, and a figure the plan itself commits to is a better
+   * answer than a blank. ⚠️ IF THE FIGURE EVER STOPS MATCHING WHAT THE SESSION TAKES, the fix is in
+   * the composer, not here.
+   *
+   * ⛔ AND IT CHANGES ALL THREE SURFACES, WHICH IS THE POINT OF THIS COMPONENT. Today's card, the
+   * drawer and the full planned screen render the same header; showing the minutes on one and not
+   * the others is exactly the divergence this file was written to end.
    */
-  const showDuration = normalizeSessionType(type) !== 'strength';
-  const duration = showDuration ? formatPlannedDuration(w) : null;
+  const duration = formatPlannedDuration(w);
 
   const titleSize = size === 'card' ? 'text-base' : 'text-base';
   const descSize = size === 'card' ? 'text-[13px]' : 'text-sm';
