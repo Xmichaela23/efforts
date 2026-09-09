@@ -1517,85 +1517,11 @@ export default function WorkoutCalendar({
         })}
       </div>
         
-      {/* Load bar + discipline totals */}
-      <div style={{ flexShrink: 0 }}>
-        {(() => {
-          const wsv = coachCtx.data?.weekly_state_v1;
-          const snap = (coachCtx.data as any)?.athlete_snapshot ?? null;
-          const loadStatus = snap?.body_response?.load_status ?? null;
-          const readiness = wsv?.trends?.readiness_state ?? null;
+      {/* ⛔ THE LOAD CARD MOVED TO TODAY (Michael, 2026-09-09) — fitness / fatigue / form and the
+          week's run, bike and strength totals. It sat here, at the bottom of the calendar; it now
+          renders under the day's sessions on Today, which is the screen an athlete opens. One owner:
+          `WeekLoadCard`. Nothing about the card changed on the way over. */}
 
-          const metrics: Array<{ label: string; value: string; type: string }> = [];
-          if (weeklyStats.distances) {
-            if (weeklyStats.distances.run_meters > 0)
-              metrics.push({ label: 'Run:', value: useImperial ? `${(weeklyStats.distances.run_meters / 1609.34).toFixed(1)} mi` : `${(weeklyStats.distances.run_meters / 1000).toFixed(1)} km`, type: 'run' });
-            if (weeklyStats.distances.cycling_meters > 0)
-              metrics.push({ label: 'Bike:', value: useImperial ? `${(weeklyStats.distances.cycling_meters / 1609.34).toFixed(1)} mi` : `${(weeklyStats.distances.cycling_meters / 1000).toFixed(1)} km`, type: 'bike' });
-            if (weeklyStats.distances.swim_meters > 0)
-              metrics.push({ label: 'Swim:', value: useImperial ? `${Math.round(weeklyStats.distances.swim_meters / 0.9144)} yd` : `${Math.round(weeklyStats.distances.swim_meters)} m`, type: 'swim' });
-          }
-          let totalVol = 0;
-          for (const item of unifiedItems) {
-            if (String(item?.type || '').toLowerCase() !== 'strength') continue;
-            for (const ex of (item?.executed?.strength_exercises ?? [])) {
-              if (!ex?.sets) continue;
-              for (const s of ex.sets) {
-                if (s.completed === false) continue;
-                const w = Number(s.weight) || 0, r = Number(s.reps) || 0;
-                if (w > 0 && r > 0) totalVol += w * r;
-              }
-            }
-          }
-          if (totalVol > 0)
-            metrics.push({ label: 'Strength:', value: `${totalVol.toLocaleString()} ${useImperial ? 'lb' : 'kg'}`, type: 'strength' });
-
-          return (
-            // ⛔ ONE textured card holding LOAD *and* the week totals — the totals were sitting on
-            // bare black below a textured LoadBar, which is what kept reading as "no texture"
-            // (Michael 2026-08-15, third showing). The spectral grid wraps the whole data block.
-            <div className="galaxy-card readout-texture readout-texture--nova rounded-xl border border-white/[0.10] mt-3 mb-4 pb-3 space-y-2">
-              {wsv && (
-                // Same three inputs State passes (hasActivePlan · planned · done) — without them the
-                // programme-aware read fell back to the bare status word, so Home and State could
-                // print different load words for the same week (2026-09-03).
-                <LoadBar
-                  load={wsv.load}
-                  loadStatus={loadStatus}
-                  weekIntent={wsv?.week?.intent}
-                  hasActivePlan={(wsv as any)?.plan?.has_active_plan === true}
-                  plannedThisWeek={weekExecTotals(wsv).planned}
-                  doneThisWeek={weekExecTotals(wsv).done}
-                  compact
-                />
-              )}
-              {metrics.length > 0 && (
-                // Second column starts at 58% so Bike/Swim line up with the verdict word above
-                // (Michael 2026-08-15: "move bike, not balanced"). LOAD's row is justify-between,
-                // so the verdict sits right-of-centre — a plain 50/50 grid put Bike left of it.
-                <div className="grid grid-cols-[60%_1fr] gap-x-4 gap-y-0.5 px-3">
-                  {/* READOUT TREATMENT, PER SPORT (2026-08-15). Each metric sets its own accent, so
-                      the label tints and the NUMBER glows in that sport's colour — the numbers were
-                      flat white while only the labels carried colour, which read as a legend rather
-                      than as instrument readouts. Same `readout-label`/`readout-num` pair State and
-                      the workout Performance tab use, so the week totals here and the discipline
-                      rows on State are one treatment. */}
-                  {metrics.map((m, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-1.5 min-w-0"
-                      style={{ ['--card-accent-rgb' as any]: getDisciplineColorRgb(m.type) }}
-                    >
-                      <span className="readout-label font-light leading-tight" style={{ fontSize: '0.82rem' }}>{m.label}</span>
-                      <span className="readout-num font-light leading-tight truncate" style={{ fontSize: '0.82rem' }}>{m.value}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })()}
-      </div>
-      
       {/* Hidden background prefetchers */}
       {prefetchNeighbors && (
         <>

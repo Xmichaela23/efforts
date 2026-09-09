@@ -300,7 +300,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   };
 
   // Unified lookup - use week range for training plan context, but filter items to active date
-  const { items: allUnifiedItems = [], loading: unifiedLoading, trainingPlanContext } = useWeekUnified(fromISO, toISO);
+  const { items: allUnifiedItems = [], weeklyStats, loading: unifiedLoading, trainingPlanContext } = useWeekUnified(fromISO, toISO);
   // First card (2026-09-07): an athlete with no plan at all gets two doors in the empty space
   // where a session would sit, instead of a 38%-opacity line that vanishes when one fetch fails.
   // `detailedPlans` is every plan on the account (AppContext), `trainingPlanContext` the week's.
@@ -1743,7 +1743,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             {/* ⛔ THE WEEK STILL SHOWS ON A REST DAY. The load bars and the counts describe the
                 WEEK, not the day — a rest day is exactly when an athlete looks at what the week
                 has come to. Only the day's own sessions go quiet (§2.4). */}
-            <TodayWeekBlocks weekRows={allUnifiedItems as never} className="mt-8" />
+            <TodayWeekBlocks weekRows={allUnifiedItems as never} weeklyStats={weeklyStats as never} className="mt-8" />
           </div>
         ) : (
           // Tap opens bottom sheet (planned) or detail (completed). Each planned session carries the
@@ -2089,7 +2089,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             {/* ⛔ THE WEEK, UNDER THE DAY (§3b.2 / §3b.3) — the load bars per sport and this week's
                 counts. It reads the week `get-week` already returned, so the day above and the
                 totals below cannot disagree about what was logged. */}
-            <TodayWeekBlocks weekRows={allUnifiedItems as never} className="mt-4" />
+            <TodayWeekBlocks weekRows={allUnifiedItems as never} weeklyStats={weeklyStats as never} className="mt-4" />
           </div>
         )}
         </div>
