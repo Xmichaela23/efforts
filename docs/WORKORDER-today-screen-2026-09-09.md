@@ -108,6 +108,29 @@ Data: today's rows from `get-week` (the rows `TodaysEffort.tsx` already loads). 
 5. The workouts in detail (built intervals under the family line) and Tomorrow (next day's sessions, name
    and time only) stay on the list, after 1–4.
 
+## 3d. The deck, GO (Michael, 2026-09-09: "it looks like a wall of words … something cool, floating"; "build it")
+
+Mockup: docs/mockups/today-deck-2026-09-09.html (open in a browser; drag, swipe, arrow keys). Build what it
+shows, with the app's own tokens and components.
+
+- A lift session on Today is a DECK: one card per row, one card visible at a time, swipe sideways (pointer
+  drag and touch; arrow keys on desktop). Card: movement name large, the kind spelled out in the sport colour
+  with a lit dot, the approved cue, the row's weight or `By feel` top right. Session name and `n of N` above
+  the deck, position dots below. The whole session takes one card's height.
+- Depth: the next cards sit behind, offset up-right, smaller, dimmer, slightly blurred (three visible); read
+  cards fall away down-left with a small rotate. CSS 3D transforms only, no library. `prefers-reduced-motion`
+  turns the transitions off.
+- A ride or run stays one card (name, time, family line, stop rule). The plyo session is a deck too, one
+  card per drill, plyo colour.
+- Glass: translucent panel over the dot grid, a thin edge in the sport colour, glow bleeding onto the grid.
+  The top bleed follows the session in view (lift orange → ride green as the ride card scrolls up). The dot
+  grid drifts against the scroll (parallax, about a quarter of scroll speed).
+- Tap a card: the drawer opens as now. Swipe is the deck's; tap is the drawer's; a drag under 60 px snaps
+  back and does not open the drawer.
+- LOAD card as the mockup draws it (§3b.2 redraw): two number rows, dot before the sport label, chevron on
+  the header line, no info icon.
+- Nothing about the words changes. Every line is the approved one.
+
 ## 3c. Lifting session time (Michael, 2026-09-09)
 
 The 45 / 55 / 20 minutes the composer stamps on test, lifting and plyo sessions are fixed numbers with no
