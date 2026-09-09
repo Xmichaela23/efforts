@@ -58,11 +58,10 @@ Deno.test('accessory cue — it is NOT one of the bar-speed lines (different obj
  * weight-finding rule, which is Viada's hypertrophy dose (Part B2: 1–2 reps in reserve, never to
  * failure) — HYP carries no load percentage anywhere in the source.
  */
-Deno.test('standing cue — states the missing weight and the finding rule, in that order', () => {
+Deno.test('standing cue — the reserve rule, in Michael\'s words (2026-09-09), and no add-weight trigger', () => {
   const s = STANDING_ACCESSORY_SET_CUE.toLowerCase();
-  assertStringIncludes(s, 'no weight is prescribed');
   assertStringIncludes(s, 'in reserve');
-  assertStringIncludes(s, 'never to failure');
+  assert(!s.includes('add weight') && !s.includes('top of the band'), 'the top-of-band trigger was ours and is gone');
 });
 
 Deno.test('standing cue — no "split these": the rows prescribe discrete sets', () => {
@@ -82,9 +81,8 @@ Deno.test('standing cue — failure appears only as the stop rule; advancing is 
   // vocabulary. The cue now carries the double-progression advance rule ON PURPOSE — what the pin
   // protects instead is that advancing stays CONDITION-GATED (top of the band earns the jump,
   // the calendar never does) and that exhortation vocabulary stays out.
-  assertStringIncludes(s, 'top of the band');
-  assert(s.indexOf('top of the band') < s.indexOf('add weight'),
-    `the condition must come before the instruction: ${STANDING_ACCESSORY_SET_CUE}`);
+  // 2026-09-09: the add-weight trigger was ours and is gone; the cue is the page's reserve rule only.
+  assert(!s.includes('add weight'), `no add-weight instruction on the cue: ${STANDING_ACCESSORY_SET_CUE}`);
   for (const banned of ['push hard', 'max', 'go for it', 'crush']) {
     assert(!s.includes(banned), `standing cue must not contain "${banned}": ${STANDING_ACCESSORY_SET_CUE}`);
   }

@@ -415,7 +415,8 @@ export const ACCESSORY_SET_CUE = 'Split these into as many sets as you need. Lea
  * Same lint note as ACCESSORY_SET_CUE: "failure" appears only inside the stop rule, pinned by
  * `strength-accessory-copy.test.ts`. Do not widen the bar-speed lint over this constant.
  */
-export const STANDING_ACCESSORY_SET_CUE = 'No weight is prescribed — find the load where the target reps leave a rep or two in reserve, never to failure. Top of the band on every set: add weight, start the band over.';
+// 2026-09-09, Michael's words, from p86 and p218. The top-of-band add-weight trigger that stood here was ours and is gone.
+export const STANDING_ACCESSORY_SET_CUE = '8 to 12 reps, 1 to 2 in reserve. Reps slow as the set goes.';
 
 /**
  * ⛔ THE ME ROW'S OWN INSTRUCTION (2026-08-25, Michael on next week's ME: Upper: "we need to lose

@@ -125,7 +125,9 @@ export function advanceNudgeFor(args: {
       : `Last time: ${reps} — top of the band.`;
   }
 
+  // 2026-09-09: "add weight" at the top of the band was our trigger, not the page's (p86: the reserve is
+  // the rule; p111: overload is not more weight every session). The fact stays; the instruction is gone.
   return reserveLogged
-    ? `Last time: ${reps} — top of the band with room to spare. Add weight.`
-    : `Last time: ${reps} — top of the band. If it felt easy, add weight.`;
+    ? `Last time: ${reps} — top of the band with room to spare.`
+    : `Last time: ${reps} — top of the band.`;
 }
