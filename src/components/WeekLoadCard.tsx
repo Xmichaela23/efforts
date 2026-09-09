@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChevronDown } from 'lucide-react';
-import { LoadKey, type LoadBarData } from '@/components/LoadBar';
+import { type LoadBarData } from '@/components/LoadBar';
 import { formZone } from '@shared/fitness-fatigue';
 import { useAppContext } from '@/contexts/AppContext';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
@@ -197,8 +197,10 @@ const WeekLoadCard: React.FC<{
         </div>
       )}
 
-      {/* ⛔ THE EXPLANATION OPENS WITH THE CHEVRON — one owner for the words, `LoadKey` in `LoadBar`. */}
-      {expanded && ff ? <LoadKey ff={ff} /> : null}
+      {/* ⛔ THE EXPLANATION IS NOT IN THIS CARD ANY MORE (2026-09-09). The chevron opens a DECK
+          beneath it — run bars, ride bars, the form table, the workload paragraph, one card at a
+          time — because everything arriving at once made the open card a wall. `TodayWeekBlocks`
+          owns the deck; this card owns the numbers and the control. */}
     </div>
   );
 };

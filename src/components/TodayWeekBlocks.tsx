@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import LoadWeeksCard from '@/components/context/LoadWeeksCard';
 import WeekLoadCard from '@/components/WeekLoadCard';
+import CardDeck, { type DeckItem } from '@/components/CardDeck';
+import { LoadKeyForm, LoadKeyWorkload, type LoadBarData } from '@/components/LoadBar';
+import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 
 /**
@@ -74,6 +77,32 @@ const TodayWeekBlocks: React.FC<{
     });
   };
 
+  /**
+   * ⛔⛔ THE OPEN CARD IS A DECK, NOT A WALL (Michael, 2026-09-09). Everything the chevron used to
+   * reveal at once — the run bars, the ride bars, the form table and the workload paragraph —
+   * arrived as one column four screens long. It is the same mechanic the session decks run
+   * (`CardDeck`): one card at a time, swiped, with position dots.
+   *
+   * ⛔ SAME WORDS, NOTHING REWRITTEN. The bars are `LoadWeeksCard` exactly as it was; the two
+   * paragraphs are `LoadKeyForm` and `LoadKeyWorkload`, the halves of the explanation State's ⓘ
+   * already showed.
+   *
+   * ⚠️ THE ORDER IS THE WORK ORDER'S: run bars, ride bars, form table, workload. A card whose data
+   * is missing is simply absent — a runner who does not ride gets three cards, not an empty one.
+   *
+   * ⚠️ THE DECK WEARS RUN GOLD. It is not about one sport, and the cards inside carry their own
+   * sport colours; a neutral edge would read as "disabled" against every other card on the screen.
+   */
+  const ff = ((data?.weekly_state_v1?.load as LoadBarData | undefined)?.fitness_fatigue) ?? null;
+  const deckItems: DeckItem[] = [
+    ...cards.map(({ sport, load }) => ({
+      key: `bars:${sport}`,
+      node: <LoadWeeksCard sport={sport} load={load} />,
+    })),
+    ...(ff ? [{ key: 'form', node: <LoadKeyForm ff={ff} /> }] : []),
+    ...(ff ? [{ key: 'workload', node: <LoadKeyWorkload /> }] : []),
+  ];
+
   return (
     <div className={className}>
       {/**
@@ -90,15 +119,17 @@ const TodayWeekBlocks: React.FC<{
         onToggle={toggle}
         /* The chevron's second reason to exist: the card knows about its own explanation, not about
            what renders beneath it. It hides the control when neither is there. */
-        hasBars={cards.length > 0}
+        hasBars={deckItems.length > 0}
       />
 
-      {cards.length > 0 && open ? (
-        <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.03]">
-          {cards.map(({ sport, load }) => (
-            <LoadWeeksCard key={sport} sport={sport} load={load} />
-          ))}
-        </div>
+      {open && deckItems.length > 0 ? (
+        <CardDeck
+          items={deckItems}
+          colour={getDisciplineColor('run')}
+          rgb={getDisciplineColorRgb('run')}
+          testId="load"
+          className="mt-3"
+        />
       ) : null}
     </div>
   );

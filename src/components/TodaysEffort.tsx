@@ -39,9 +39,8 @@ import { swappedStructureIsStale } from '@/lib/session-discipline-swap';
 import PlannedSessionHeader from './PlannedSessionHeader';
 // ⛔ TODAY'S LINES (work order 2026-09-09 §2) — what each set is FOR, under the row that says what
 // it is. Every athlete-facing word lives in `@/lib/today-lines`; nothing new is spelled out here.
-import TodaySessionLines, { TodaySpacingLine } from './TodaySessionLines';
 // ⛔ §3d — a lift and the plyo day swipe as a deck, a ride or run is one glass card.
-import TodaySession, { rendersAsSessionCard } from './SessionDeck';
+import TodaySession, { rendersAsSessionCard, TodaySpacingLine } from './SessionDeck';
 // ⛔ §3b — the weather block above the date, and the week's load bars + counts under the day.
 import TodayWeather from './TodayWeather';
 import TodayWeekBlocks from './TodayWeekBlocks';
@@ -252,6 +251,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     [homeArcReady, homeArc]
   );
   const arcNeedsGoals = useMemo(() => arcLineNeedsGoalsSetup(homeArc as ArcForHomeLine), [homeArc]);
+
+  /**
+   * ⛔ THE BLOCK LABEL, RIGHT-ALIGNED ON THE DATE LINE (Michael, 2026-09-09). It is the FIRST
+   * segment of the arc line — "Build block", "Recovery", "Base" — which used to have a row of its
+   * own under the date. ⚠️ THE STRING IS NOT REBUILT HERE: it is `buildArcLine`'s output, cut at the
+   * separator that line already uses, so the label and the sentence cannot drift.
+   * ⚠️ NOT WHEN THE ARC LINE IS THE SEASON CTA — that one is a door and keeps its own row.
+   */
+  const blockLabel = useMemo(() => {
+    if (!homeArcReady || !arcLineText || arcNeedsGoals) return null;
+    const head = arcLineText.split('·')[0]?.trim();
+    return head || null;
+  }, [homeArcReady, arcLineText, arcNeedsGoals]);
 
 
   // Use local timezone to derive YYYY-MM-DD as seen by the user
@@ -1666,65 +1678,57 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               <TodayWeather weather={weather} className="pb-1" />
             ) : null}
 
-            {/* Line 1: Date - Live channel (brightest, energized, more phosphor) */}
-            <div>
-              <span 
-                className="text-[0.82rem] font-light tracking-wide" 
-                style={{ 
-                  color: 'rgba(255, 255, 255, 1.0)', // Maximum brightness - primary instrument readout
-                  textShadow: '0 0 3px rgba(255, 240, 200, 0.25), 0 0 6px rgba(255, 240, 200, 0.15), 0 0 2px rgba(255, 255, 255, 0.2)', // Stronger backlit LCD glow with warm phosphor
+            {/**
+              * ⛔ ONE LINE, NOT FOUR (Michael, 2026-09-09): the date, the plan week and the phase
+              * run together, with the block label right-aligned and small on the same line. Four
+              * stacked lines above the sessions is what pushed LOAD off a 390×844 screen.
+              * ⚠️ NOTHING NEW IS SAID. `formatDisplayDate`, `currentWeek`, `focus` and the arc's
+              * block label are the strings that were already here, joined with the separator this
+              * line already used. The city and the race countdown keep their own line below, since
+              * neither is about the day.
+              */}
+            <div className="flex items-baseline justify-between gap-2">
+              <span
+                className="text-[0.82rem] font-light tracking-wide truncate"
+                style={{
+                  color: 'rgba(255, 255, 255, 1.0)',
+                  textShadow: '0 0 3px rgba(255, 240, 200, 0.25), 0 0 6px rgba(255, 240, 200, 0.15), 0 0 2px rgba(255, 255, 255, 0.2)',
                   lineHeight: 1.05,
                 }}
               >
                 {formatDisplayDate(activeDate)}
+                {trainingPlanContext?.currentWeek ? (
+                  <span style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.72 }}>
+                    {' · '}Week {trainingPlanContext.currentWeek}
+                  </span>
+                ) : null}
+                {trainingPlanContext?.focus ? (
+                  <span style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.72 }}>
+                    {' · '}{trainingPlanContext.focus}
+                  </span>
+                ) : null}
               </span>
+              {blockLabel ? (
+                <span
+                  className="text-[0.62rem] font-light tracking-wide flex-shrink-0"
+                  style={{ color: 'rgba(255,255,255,0.38)', lineHeight: 1.05 }}
+                >
+                  {blockLabel}
+                </span>
+              ) : null}
             </div>
 
-            {/* Line 2: Location.
-                ⛔ THE WEATHER LEFT THIS LINE (§3b.1) — it is its own block above the date now, with
-                the condition drawn rather than spelled and the dew point beside the humidity. What
-                stood here was one run-on string ending in `—`, the em dash being the condition the
-                archive never returns. The city stays. */}
-            {cityName && (
-              <div className="flex items-center gap-1 flex-wrap">
-                <span className="text-[0.68rem] font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.62)', lineHeight: 1.1 }}>
-                  {cityName}
-                </span>
-              </div>
-            )}
-
-            {/* Line 3: Week + Focus + Event - Yellow (run plan), dimmer than Today */}
-            {trainingPlanContext && (trainingPlanContext.currentWeek || trainingPlanContext.focus || (trainingPlanContext.raceDate && trainingPlanContext.weeksToRace)) && (
-              <div
-                className="text-[0.68rem] font-extralight tracking-normal"
-                style={{
-                  color: getDisciplinePhosphorCore('run'),
-                  opacity: 0.62,
-                  lineHeight: 1.1,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}
-              >
-                {trainingPlanContext.currentWeek && (
-                  <span>Week {trainingPlanContext.currentWeek}</span>
-                )}
-                {trainingPlanContext.currentWeek && trainingPlanContext.focus && (
-                  <span> • </span>
-                )}
-                {trainingPlanContext.focus && (
-                  <span>{trainingPlanContext.focus}</span>
-                )}
-                {trainingPlanContext.focus && trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
-                  <span> • </span>
-                )}
-                {trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
-                  <span className="font-light" style={{ 
-                    opacity: 0.8 // Slightly less bright than "Today" - yellow but dimmer
-                  }}>
+            {/* The city, and the race countdown — neither is about the day, so neither joins the
+                line above. */}
+            {(cityName || (trainingPlanContext?.raceDate && (trainingPlanContext?.weeksToRace ?? 0) > 0)) && (
+              <div className="flex items-center gap-1 flex-wrap text-[0.68rem] font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.55)', lineHeight: 1.1 }}>
+                {cityName ? <span>{cityName}</span> : null}
+                {cityName && trainingPlanContext?.raceDate && (trainingPlanContext?.weeksToRace ?? 0) > 0 ? <span>·</span> : null}
+                {trainingPlanContext?.raceDate && (trainingPlanContext?.weeksToRace ?? 0) > 0 ? (
+                  <span style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.62 }}>
                     {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
                   </span>
-                )}
+                ) : null}
               </div>
             )}
           </div>
@@ -1749,8 +1753,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </div>
         ) : null}
 
-        {homeArcReady && arcLineText && !(arcNeedsGoals && noPlanYet) ? (
-          <div className="flex-shrink-0 px-2 pt-2 pb-1">
+        {/* ⚠️ THE ARC LINE KEEPS ITS OWN ROW ONLY WHEN IT IS A DOOR. Its block label now rides on
+            the date line; the rest of the sentence is still worth a line when it asks for a tap. */}
+        {homeArcReady && arcLineText && arcNeedsGoals && !noPlanYet ? (
+          <div className="flex-shrink-0 px-2 pt-1">
             {arcNeedsGoals ? (
               <button
                 type="button"
@@ -1809,7 +1815,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             {/* ⛔ THE SPACING LINE, ABOVE THE SESSIONS AND CARRYING NO SPORT COLOUR (§2b). It shows
                 only on a day that is a lift and a ride or run; every other day gets nothing. */}
             <TodaySpacingLine rows={displayWorkouts as never} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.30rem' }}>
+            {/* ⛔ 14 px BETWEEN SESSIONS (Michael, 2026-09-09). Each deck and card already
+                carries its own 14 px bottom margin, so the list adds none — two gaps stacked is
+                what pushed LOAD under the fold on a two-session day. */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
               {displayWorkouts.map((workout, sessionIdx) => {
                 /* ⛔ ONE MEASURED WRAPPER PER SESSION, so the scroll handler can say which one is in
                    view without every card having to know its own index. */
@@ -2153,10 +2162,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         </div>
                       </div>
                     )}
-                    {/* ⛔ WHAT EACH SET IS FOR (work order 2026-09-09 §2), under the row that says
-                        what it is. Nothing on a completed row, nothing on a session the athlete
-                        brought in, nothing where the book has no line. See `TodaySessionLines`. */}
-                    <TodaySessionLines session={workout as never} />
                   </button>
                 );
               })}
@@ -2171,7 +2176,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             {/* ⛔ THE WEEK, UNDER THE DAY (§3b.2 / §3b.3) — the load bars per sport and this week's
                 counts. It reads the week `get-week` already returned, so the day above and the
                 totals below cannot disagree about what was logged. */}
-            <TodayWeekBlocks weekRows={allUnifiedItems as never} weeklyStats={weeklyStats as never} className="mt-4" />
+            <TodayWeekBlocks weekRows={allUnifiedItems as never} weeklyStats={weeklyStats as never} className="mt-[14px]" />
           </div>
         )}
         </div>

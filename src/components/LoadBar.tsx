@@ -84,13 +84,27 @@ const FORM_ZONE_CLS: Record<string, string> = {
  *
  * ⚠️ THE WORDS ARE UNCHANGED. Only where they live moved.
  */
-export function LoadKey({ ff }: { ff: NonNullable<LoadBarData['fitness_fatigue']> }) {
-  const fmt1 = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? null : Math.round(v));
+const keyFmt1 = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? null : Math.round(v));
+
+/**
+ * ⛔ SPLIT IN TWO (2026-09-09), because Today's open LOAD card deals them as separate cards — the
+ * form table on one, the workload paragraph on another. ⚠️ THE WORDS ARE UNCHANGED; only the
+ * boundary between them is new, and it falls where the copy already broke: the second paragraph
+ * ends *"comes from this table:"* and belongs with the table it introduces.
+ */
+export function LoadKeyWorkload() {
+  return (
+    <p className="text-[12px] text-white/65 leading-snug">
+      Every session earns workload points. Fitness averages them over the last six weeks, fatigue over the last week. The small numbers are this week's change.
+    </p>
+  );
+}
+
+export function LoadKeyForm({ ff }: { ff: NonNullable<LoadBarData['fitness_fatigue']> }) {
   const zone = formZone(ff?.form);
   return (
-    <div className="mt-1.5 text-[12px] text-white/65 leading-snug max-w-[min(100%,360px)]">
-      <p>Every session earns workload points. Fitness averages them over the last six weeks, fatigue over the last week. The small numbers are this week's change.</p>
-      <p className="mt-1">Form is one subtraction, fitness − fatigue, taken as you start the day{fmt1(ff.fitness_prior) != null && fmt1(ff.fatigue_prior) != null ? `: ${fmt1(ff.fitness_prior)} − ${fmt1(ff.fatigue_prior)} = ${(ff.form ?? 0) > 0 ? '+' : ''}${fmt1(ff.form)}` : ''}. The word beside it comes from this table:</p>
+    <div className="text-[12px] text-white/65 leading-snug">
+      <p>Form is one subtraction, fitness − fatigue, taken as you start the day{keyFmt1(ff.fitness_prior) != null && keyFmt1(ff.fatigue_prior) != null ? `: ${keyFmt1(ff.fitness_prior)} − ${keyFmt1(ff.fatigue_prior)} = ${(ff.form ?? 0) > 0 ? '+' : ''}${keyFmt1(ff.form)}` : ''}. The word beside it comes from this table:</p>
       <table className="mt-1 text-[12px] tabular-nums">
         <tbody>
           {([['above +25', 'transitional', 'fitness fading'], ['+5 to +25', 'fresh', 'race shape'], ['−10 to +5', 'grey zone', 'not building, not sharp'], ['−30 to −10', 'optimal', 'building'], ['below −30', 'high risk', '']] as Array<[string, string, string]>).map(([range, word, meaning]) => (
@@ -102,6 +116,16 @@ export function LoadKey({ ff }: { ff: NonNullable<LoadBarData['fitness_fatigue']
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/** State's ⓘ opens both halves at once, exactly as it always did. */
+export function LoadKey({ ff }: { ff: NonNullable<LoadBarData['fitness_fatigue']> }) {
+  return (
+    <div className="mt-1.5 max-w-[min(100%,360px)] space-y-1">
+      <LoadKeyWorkload />
+      <LoadKeyForm ff={ff} />
     </div>
   );
 }
