@@ -62,9 +62,17 @@ Deno.test('⛔ INTENSITY IS PRESERVED — easy stays easy, hard stays hard', () 
     'a hard session came back as an easy one — the swap re-dosed the week');
 });
 
-Deno.test('⛔ the LONG session is not swappable — it is what the block is built around', () => {
+/**
+ * ⛔⛔ REVERSED 2026-09-09 (docs/WORKORDER-endurance-swaps-2026-09-09.md §4). The long day IS
+ * swappable now, and the old reasoning is kept because it was good and the source outranked it:
+ * *"a long run is the week's key session and the thing every other placement is built around."*
+ * True — and p275 blesses the substitution anyway: *"a hike, a long ride, a team sport day, or
+ * whatever else is of interest."* The block's key session is the long EFFORT, not the long RUN.
+ * ⚠️ SWIM IS STILL REFUSED: the app does not coach swims, so a "long swim" is a booking.
+ */
+Deno.test('⛔ THE LONG SESSION OFFERS THE RIDE — p275 blesses it; the swim is still refused', () => {
   assertEquals(intensityOf(longRun), 'long');
-  assertEquals(getDisciplineSwaps(longRun, ['run', 'ride', 'swim']), []);
+  assertEquals(getDisciplineSwaps(longRun, ['run', 'ride', 'swim']).map((o) => o.to), ['ride']);
 });
 
 Deno.test('nothing is offered for a sport the athlete does not have', () => {
@@ -279,13 +287,14 @@ Deno.test('⛔ BK-EZ — an easy RIDE offers "Run instead" and "Swim instead"', 
   assertEquals(resolveMinutes({ ...bkEz, ...opts[0].patch }), 72, 'the ride lost its 72 minutes');
 });
 
-Deno.test('⛔ BK-LR — a long ride correctly offers NOTHING', () => {
+// ⛔⛔ REVERSED 2026-09-09 (§4) — see the long-run case above.
+Deno.test('⛔ BK-LR — a long ride offers the long run, and never the swim', () => {
   const bkLr = {
     id: 'b2', type: 'ride', name: 'Long Ride', workout_status: 'planned',
     date: '2026-08-22', total_duration_seconds: 6480, tags: ['long_ride'],
   };
   assertEquals(intensityOf(bkLr), 'long');
-  assertEquals(getDisciplineSwaps(bkLr, ['run', 'ride', 'swim']), []);
+  assertEquals(getDisciplineSwaps(bkLr, ['run', 'ride', 'swim']).map((o) => o.to), ['run']);
 });
 
 // ═══ HARD SESSIONS — swappable run↔ride, never to swim ═══════════════════════════════════════
@@ -326,14 +335,17 @@ Deno.test('⛔ NO FTP → THE HARD RIDE IS NOT OFFERED AT ALL (2026-08-09)', () 
   assertEquals(getDisciplineSwaps(easy, ['run', 'ride', 'swim'], [], null, null).map((o) => o.to), ['ride', 'swim']);
 });
 
-Deno.test('⛔ a hard RIDE → hard RUN is allowed and WARNS — it spends protected budget', () => {
+/**
+ * ⛔⛔ REVERSED 2026-09-09 (§3). This direction is OFF the sheet. The old reasoning stands as a
+ * caution and no longer as an offer: *"hard running costs the legs more than hard riding — the plan
+ * put this on the bike for that reason."* p138 permits the swap in ONE direction, a hard run for a
+ * hard ride when running volume is capped; the reverse is not on the page. Warning about a swap the
+ * source does not bless is still offering it, so the clause and its warning went together.
+ */
+Deno.test('⛔ A HARD RIDE OFFERS NOTHING — p138 permits hard run → hard ride only', () => {
   const bikeInt = { id: 'h2', type: 'ride', name: 'Bike Intervals', workout_status: 'planned', total_duration_seconds: 2700, tags: ['intervals'] };
-  // ⚠️ THIS DIRECTION NEEDS NO FTP — the gate only requires one when the TARGET is the ride, and
-  // here the target is the run. Asserted without it, so that stays true.
   const opts = getDisciplineSwaps(bikeInt, ['run', 'ride', 'swim'], [], null, null);
-  assertEquals(opts.map((o) => o.to), ['run'], 'a hard session must not offer a swim');
-  assert(opts[0].warnings.some((w) => /costs the legs more/i.test(w)), `warnings: ${opts[0].warnings.join(' | ')}`);
-  assertEquals(opts[0].patch.type, 'run', 'the warning became a gate');
+  assertEquals(opts.map((o) => o.to), [], 'the reverse direction is not on the page');
 });
 
 Deno.test('an EASY session still offers the swim — only hard work excludes it', () => {

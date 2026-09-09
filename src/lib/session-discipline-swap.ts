@@ -66,7 +66,61 @@ export type SwappableSession = {
   steps_preset?: string[] | null;
 };
 
+/**
+ * ⛔ THREE KINDS OF SWAP NOW (work order 2026-09-09), and they are different changes to the row:
+ *   · `discipline` — run ↔ ride ↔ swim, as before.
+ *   · `hike`       — the long day as a `walk` row (p275). Not a discipline: the plan vocabulary has
+ *                    no `hike` type, and Garmin hikes already ingest as walks, so inventing one
+ *                    would give the app a type it could never read back.
+ *   · `venue`      — the SAME session on a machine (p275). Same family, same targets, same minutes;
+ *                    only a `venue:` tag is added. It is not a swap of what is trained at all.
+ */
+export type SwapKind = 'discipline' | 'hike' | 'venue';
+
+/** The machines p275 blesses, per sport. ⛔ THE LABELS ARE PENDING MICHAEL'S WORDS — see `venueKey`. */
+export const RIDE_VENUES = ['trainer', 'rower', 'ski_erg', 'air_bike'] as const;
+export const RUN_VENUES = ['treadmill', 'elliptical', 'arc_trainer'] as const;
+export type Venue = (typeof RIDE_VENUES)[number] | (typeof RUN_VENUES)[number];
+
+/** One literal, shared with the readers that ask "was this indoors". */
+export const VENUE_PREFIX = 'venue:';
+
+/**
+ * ⛔ THE SHEET'S LINES ARE KEYS, NOT SENTENCES. Every athlete-facing line in this work order is
+ * Michael's to write ("Copy (Michael's words, pending)"), so the library hands the UI a KEY. When
+ * the words land they replace the key in one place; until then an athlete sees the key, which is
+ * unmistakably unfinished rather than plausibly wrong.
+ */
+export const SWAP_COPY_KEYS = {
+  machine: 'swap.machine.pending',
+  machineGround: 'swap.machine.ground_impact.pending',
+  easy: 'swap.easy.pending',
+  hardRunToRide: 'swap.hard_run_to_ride.pending',
+  longDay: 'swap.long_day.pending',
+} as const;
+
+/** The `venue:` a row already carries, or null. */
+export function venueOf(s: SwappableSession): Venue | null {
+  for (const t of s.tags ?? []) {
+    const raw = String(t).toLowerCase();
+    if (!raw.startsWith(VENUE_PREFIX)) continue;
+    const v = raw.slice(VENUE_PREFIX.length) as Venue;
+    if ((RIDE_VENUES as readonly string[]).includes(v) || (RUN_VENUES as readonly string[]).includes(v)) return v;
+  }
+  return null;
+}
+
 export type SwapOption = {
+  /** `discipline` unless this is the hike or a machine. */
+  kind?: SwapKind;
+  /** The machine, when `kind` is `venue`. */
+  venue?: Venue;
+  /**
+   * ⛔ A PLACEHOLDER KEY, NOT A SENTENCE (work order: *every athlete-facing line waits for Michael's
+   * words*). The sheet renders the key until the copy lands; `label` carries the same key today so a
+   * half-written line can never reach an athlete by accident.
+   */
+  copyKey?: string;
   to: Discipline;
   label: string;
   /** The patch to apply to `planned_workouts`. Duration is deliberately absent — see `buildSwap`. */
@@ -385,7 +439,6 @@ export function getDisciplineSwaps(
   const status = String(session.workout_status ?? 'planned').toLowerCase();
   if (status === 'completed' || status === 'skipped') return [];
   const band = intensityOf(session);
-  if (band === 'long') return [];
 
   const minutes = resolveMinutes(session);
   if (minutes <= 0) return [];
@@ -415,9 +468,27 @@ export function getDisciplineSwaps(
    * honest one: the app cannot write the session it would be promising.
    */
   const targets = available.filter((d) => {
+    /**
+     * ⛔ THE LONG DAY IS RUN OR RIDE (work order 2026-09-09 §4, p275: *"a hike, a long ride, a team
+     * sport day, or whatever else is of interest"*). ⚠️ NOT SWIM — the app does not coach swims, so a
+     * "long swim" would be a booking wearing the week's key session's name. The hike is added below,
+     * outside the discipline list, because it is a `walk` row rather than a discipline.
+     */
+    if (band === 'long') return d !== 'swim';
     if (band !== 'hard') return true;
     if (d === 'swim') return false;
     if (d === 'ride') return hasUsableFtp;
+    /**
+     * ⛔⛔ HARD RIDE → HARD RUN IS OFF THE SHEET (work order §3, 2026-09-09). p138 permits the swap in
+     * ONE direction — a hard run for a hard ride, when running volume is at its limit — and the
+     * reverse is not on the page.
+     *
+     * ⚠️ IT USED TO BE OFFERED WITH A WARNING, and the warning said exactly why it was wrong:
+     * *"hard running costs the legs more than hard riding — the plan put this on the bike for that
+     * reason."* Warning about a swap the source does not bless is still offering it. The clause and
+     * its warning are gone together.
+     */
+    if (d === 'run' && from === 'ride') return false;
     return true;
   });
 
@@ -517,15 +588,113 @@ export function getDisciplineSwaps(
             `swapped_from:${originOf(session) ?? from}`,
           ])],
         },
-        warnings: [
-          ...swapWarnings(to, band, sameDayOthers),
-          // The doctrine's own caution, surfaced rather than enforced.
-          ...(band === 'hard' && from === 'ride' && to === 'run'
-            ? ['Hard running costs the legs more than hard riding — the plan put this on the bike for that reason.']
-            : []),
-        ],
+        kind: 'discipline' as const,
+        /** The sheet's line for this row, by band. Pending Michael's words — see `SWAP_COPY_KEYS`. */
+        copyKey: band === 'long' ? SWAP_COPY_KEYS.longDay : band === 'hard' ? SWAP_COPY_KEYS.hardRunToRide : SWAP_COPY_KEYS.easy,
+        // ⚠️ THE HARD-RIDE-TO-HARD-RUN CAUTION IS GONE WITH THE OPTION IT WARNED ABOUT (see `targets`).
+        warnings: swapWarnings(to, band, sameDayOthers),
       };
     });
+}
+
+/**
+ * ⛔⛔ THE MACHINE AND THE HIKE ARE NOT DISCIPLINE SWAPS, AND THEY LIVE IN THEIR OWN READER.
+ *
+ * Both return `to === from`, and `getDisciplineSwaps`' every consumer maps over `to` to mean "the
+ * sport this becomes" — folding them into that list made an easy RUN report `run` as one of its
+ * options and broke nine existing assertions at once. That is not a test problem: the drawer keys
+ * its buttons on `to` as well.
+ *
+ * ⚠️ THE SHEET STILL SHOWS ONE LIST. It concatenates the two; the SPLIT is about what `to` means,
+ * not about what the athlete sees.
+ *
+ * ⛔ THE SAME GATES APPLY, and they are re-asked here rather than assumed: posture, and unstarted
+ * only. A machine on a session already logged would rewrite history exactly as a swap would.
+ */
+export function sessionSwapExtras(
+  session: SwappableSession,
+  posture?: PerDisciplinePosture | null,
+  /**
+   * The week's own rows, for p275's ground-impact rule — a run machine is offered only while another
+   * run in the week is still outdoors. ⚠️ ABSENT MEANS "NOT ASKED", and the gate then behaves as if
+   * this were the only run: the treadmill is offered and the other two are not. A missing signal is
+   * not a verdict, but it is not permission either.
+   */
+  weekSessions: ReadonlyArray<SwappableSession> = [],
+): SwapOption[] {
+  const from = disciplineOf(session.type);
+  if (!from) return [];
+  const declared = posture?.[postureKey(from)];
+  if (declared && declared !== 'maintain') return [];
+  const status = String(session.workout_status ?? 'planned').toLowerCase();
+  if (status === 'completed' || status === 'skipped') return [];
+
+  const options: SwapOption[] = [];
+  const K = SWAP_COPY_KEYS;
+
+  /**
+   * ⛔ THE MACHINE IS NOT A SWAP OF WHAT IS TRAINED (p275) — same session, same family, same targets,
+   * same minutes, performed somewhere else. It stamps `venue:` and nothing else.
+   *
+   * ⛔ THE GROUND-IMPACT GATE, p275: *"impact with the ground on at least one day"* a week. A run
+   * machine is offered only while the week still has a run that has not been moved indoors, counting
+   * THIS one — moving it is what the athlete is about to do. ⚠️ A TREADMILL STILL COUNTS AS GROUND
+   * IMPACT (work order §1), so it is offered whatever the rest of the week holds.
+   */
+  if (!venueOf(session)) {
+    if (from === 'ride') {
+      for (const v of RIDE_VENUES) {
+        options.push({ kind: 'venue', venue: v, copyKey: K.machine, to: from, label: K.machine, needsMaterialize: false, warnings: [], patch: venuePatch(session, v) });
+      }
+    } else if (from === 'run') {
+      const onTheGround = weekSessions.filter((r) => disciplineOf(r.type) === 'run' && !venueOf(r)).length;
+      for (const v of RUN_VENUES) {
+        if (v !== 'treadmill' && onTheGround <= 1) continue;
+        options.push({ kind: 'venue', venue: v, copyKey: v === 'treadmill' ? K.machine : K.machineGround, to: from, label: K.machine, needsMaterialize: false, warnings: [], patch: venuePatch(session, v) });
+      }
+    }
+  }
+
+  /**
+   * ⛔ THE HIKE IS THE LONG DAY'S THIRD OPTION (p275) — a `walk` row carrying the long session's
+   * minutes. No new type: Garmin hikes ingest as walks, so this is a type the app can read back.
+   * ⚠️ TEAM SPORT DAY IS NOT OFFERED. The page names it; the app has no type for it and could not
+   * read one back, so offering it would promise a record it cannot keep.
+   */
+  if (intensityOf(session) === 'long' && resolveMinutes(session) > 0) {
+    options.push({
+      kind: 'hike', to: from, label: K.longDay, copyKey: K.longDay,
+      needsMaterialize: false, warnings: [],
+      patch: {
+        type: 'walk',
+        steps_preset: null,
+        workout_structure: null,
+        intervals: null,
+        rendered_description: null,
+        tags: [...new Set([
+          ...(session.tags ?? []).filter((t) => !/^(run|ride|bike|swim)_/.test(String(t))),
+          'discipline_swapped',
+          `swapped_from:${originOf(session) ?? from}`,
+        ])],
+      },
+    });
+  }
+
+  return options;
+}
+
+/**
+ * The machine patch: a `venue:` tag and nothing else. ⛔ NO NAME, NO TYPE, NO DURATION — p275's
+ * machine is the same session performed elsewhere, and rewriting any of those would make it a
+ * different session wearing the same page's blessing.
+ */
+function venuePatch(session: SwappableSession, venue: Venue): Record<string, unknown> {
+  return {
+    tags: [...new Set([
+      ...(session.tags ?? []).filter((t) => !String(t).toLowerCase().startsWith(VENUE_PREFIX)),
+      `${VENUE_PREFIX}${venue}`,
+    ])],
+  };
 }
 
 /**

@@ -583,8 +583,15 @@ Deno.test('GOLDEN · swap options, no posture declared', () => {
     'B': ['ride', 'swim'],
     'C': ['run', 'swim'],    // easy ride
     'D': [],                 // hard, and no FTP passed → the bike cannot be written
-    'E': [],                 // long run
-    'F': [],                 // long ride
+    /**
+     * ⛔⛔ ROWS E AND F CHANGED (2026-09-09, WORKORDER-endurance-swaps §4). The long day used to
+     * offer nothing — *"it is what the block is built around"* — and p275 blesses the substitution
+     * anyway: *"a hike, a long ride, a team sport day, or whatever else is of interest."*
+     * ⚠️ NO SWIM ON EITHER: the app does not coach swims, so a "long swim" is a booking. The hike is
+     * not here because it is not a discipline swap — see `sessionSwapExtras`.
+     */
+    'E': ['ride'],           // long run
+    'F': ['run'],            // long ride
     'G': ['run', 'ride'],    // easy swim
     'H': [],                 // strength — a different swap exists for those
     'I': ['run', 'swim'],    // already swapped, still swappable onward
