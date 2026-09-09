@@ -1,5 +1,5 @@
 import React from 'react';
-import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
+import { getDisciplineColor, getDisciplineColorRgb, formZoneColor } from '@/lib/context-utils';
 import { formZone } from '@shared/fitness-fatigue';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -65,29 +65,24 @@ function Dot() {
   return <span className="text-white/30 select-none">·</span>;
 }
 
-// TrainingPeaks' Form zones (Friel): the word beside the form number — fresh and optimal read plain, the
-// grey zone dim, transitional dim, high risk flagged.
-const FORM_ZONE_CLS: Record<string, string> = {
-  fresh: 'text-white/85', optimal: 'text-white/85', 'grey zone': 'text-white/55',
-  transitional: 'text-white/60', 'high risk': 'text-[#FF5A5F]',
-};
+// ⛔ THE ZONE WORD'S COLOUR HAS ONE OWNER (2026-09-09) — `formZoneColor` in `context-utils`, shared
+// with Today's LOAD card, so the same word cannot read green on one screen and white on the other.
+// It used to be a local class map here, and its high-risk case borrowed the Race card's coral.
 
 // ── LoadBar ──────────────────────────────────────────────────────────────────
 // The load section: TrainingPeaks' fitness · fatigue · form on the first line (2026-09-04), then the weekly
 // composition (which discipline carried the load — our differentiator, and the same "TSS by sport" split
 // TrainingPeaks draws on its dashboard) as the primary visual. Per-day detail lives in the calendar.
 
+const keyFmt1 = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? null : Math.round(v));
+
 /**
  * ⛔ THE LOAD EXPLANATION, IN ONE PLACE (2026-09-09). Two surfaces open it — State, behind this
  * bar's ⓘ, and Today's load card, behind its chevron. It is athlete-facing copy, and a second copy
  * of these paragraphs is a second thing to keep true, so it is extracted rather than duplicated.
- *
  * ⚠️ THE WORDS ARE UNCHANGED. Only where they live moved.
- */
-const keyFmt1 = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? null : Math.round(v));
-
-/**
- * ⛔ SPLIT IN TWO (2026-09-09), because Today's open LOAD card deals them as separate cards — the
+ *
+ * ⛔ AND SPLIT IN TWO, because Today's open LOAD card deals them as separate cards — the
  * form table on one, the workload paragraph on another. ⚠️ THE WORDS ARE UNCHANGED; only the
  * boundary between them is new, and it falls where the copy already broke: the second paragraph
  * ends *"comes from this table:"* and belongs with the table it introduces.
@@ -194,7 +189,7 @@ export default function LoadBar({ load, compact }: LoadBarProps) {
             <Dot />
             <span>
               form <span className="readout-num text-[13px] text-white/85">{(ff.form ?? 0) > 0 ? '+' : ''}{fmt1(ff.form)}</span>
-              {zone && <span className={`ml-1 ${FORM_ZONE_CLS[zone] ?? 'text-white/55'}`}>{zone}</span>}
+              {zone && <span className="ml-1" style={{ color: formZoneColor(zone) }}>{zone}</span>}
             </span>
           </div>
         ) : (

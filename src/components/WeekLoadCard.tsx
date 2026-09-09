@@ -4,7 +4,7 @@ import { type LoadBarData } from '@/components/LoadBar';
 import { formZone } from '@shared/fitness-fatigue';
 import { useAppContext } from '@/contexts/AppContext';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
-import { getDisciplineColor } from '@/lib/context-utils';
+import { getDisciplineColor, formZoneColor } from '@/lib/context-utils';
 
 /**
  * ═══ THE LOAD CARD — fitness, fatigue, form, and what the week has covered ═══════════════════════
@@ -52,12 +52,6 @@ const delta = (now: number | null | undefined, then: number | null | undefined):
   if (now == null || then == null || !Number.isFinite(now) || !Number.isFinite(then)) return null;
   const d = Math.round(now - then);
   return d === 0 ? '±0' : d > 0 ? `+${d}` : `${d}`;
-};
-
-/** TrainingPeaks' Form zones (Friel) — fresh and optimal read plain, high risk is flagged. */
-const FORM_ZONE_CLS: Record<string, string> = {
-  fresh: 'text-white/70', optimal: 'text-white/70', 'grey zone': 'text-white/45',
-  transitional: 'text-white/50', 'high risk': 'text-[#FF5A5F]',
 };
 
 /**
@@ -176,8 +170,10 @@ const WeekLoadCard: React.FC<{
             label="form"
             value={`${(ff!.form ?? 0) > 0 ? '+' : ''}${fmt1(ff!.form)}`}
             /* ⚠️ FORM'S SMALL SLOT IS FRIEL'S ZONE WORD, NOT ITS DELTA — the mockup's own choice, and
-               the right one: the zone says what the number MEANS, which a change of −5 does not. */
-            small={zone ? <span className={FORM_ZONE_CLS[zone] ?? 'text-white/55'}>{zone}</span> : null}
+               the right one: the zone says what the number MEANS, which a change of −5 does not.
+               ⛔ AND THE WORD CARRIES THE COLOUR, NEVER THE NUMBER (2026-09-09) — `formZoneColor`,
+               one owner, shared with State's bar. */
+            small={zone ? <span style={{ color: formZoneColor(zone) }}>{zone}</span> : null}
           />
         </div>
       ) : (

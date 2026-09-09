@@ -55,6 +55,52 @@ export const SPORT_COLORS = {
 } as const;
 
 /**
+ * ⛔⛔ STATUS, NOT SPORT (Michael, 2026-09-09). These two are the ONLY colours in the app that mean
+ * *"this reading is good"* or *"this reading is a risk"*. They are deliberately OUTSIDE
+ * {@link SPORT_COLORS} and must never be added to it: everything in that object answers "which
+ * discipline is this", and a hue that answers two questions at once is how a green number starts
+ * reading as a ride.
+ *
+ * ⛔ DISTINCT FROM EVERY SPORT HUE, and that is the constraint that picked them. `#50C878` is the
+ * ride's vivid emerald and `#FF5A5F` is the Race card's coral, so both of these are pulled well down
+ * in saturation and luminance — status should read quieter than sport, not compete with it.
+ *
+ * ⚠️ **Basis: TrainingPeaks.** Its Performance Management Chart colours the form (TSB) bands rather
+ * than leaving them plain — green through the optimal training band, red at the high-risk end — and
+ * that is the convention being followed here. ⛔ THE HEXES ARE OURS. TrainingPeaks' own values are
+ * not published as tokens and are not claimed; what is borrowed is the decision to colour the band
+ * at all, and which two ends carry a colour. The zone boundaries themselves are Friel's, and they
+ * live in `@shared/fitness-fatigue`'s `formZone` — never restated beside a colour.
+ *
+ * ⚠️ TWO ENDS ONLY. `fresh`, `transitional` and `grey zone` stay neutral: colouring every band would
+ * make the row a traffic light, and the middle of the range is not a verdict.
+ */
+export const STATUS_COLORS = {
+  /** Muted sea green — the optimal training band. Desaturated well away from the ride's emerald. */
+  good: '#6FA287',
+  /** Muted brick red — the high-risk end. Darker and flatter than the Race card's coral. */
+  risk: '#C4645F',
+} as const;
+
+/**
+ * ⛔ ONE OWNER FOR "WHAT COLOUR IS THIS FORM WORD", because two surfaces print it — Today's LOAD
+ * card and State's `LoadBar` — and a zone that reads green on one and white on the other is the
+ * divergence every shared reader in this file exists to stop.
+ *
+ * ⚠️ IT COLOURS THE WORD, NEVER THE NUMBER. The figure stays white on both surfaces: the number is
+ * the measurement and the word is the reading of it, and only the reading carries a verdict.
+ *
+ * @param zone `formZone`'s output (Friel's bands). Anything else is neutral.
+ */
+export function formZoneColor(zone: string | null | undefined): string {
+  switch (zone) {
+    case 'optimal': return STATUS_COLORS.good;
+    case 'high risk': return STATUS_COLORS.risk;
+    default: return 'rgba(255,255,255,0.62)';
+  }
+}
+
+/**
  * ⛔ NOT A DISCIPLINE — the Focus door's Race card (2026-08-05).
  *
  * Race was run-gold, which was wrong twice over: it claimed one discipline for a card that will hold
