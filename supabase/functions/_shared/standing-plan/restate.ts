@@ -263,12 +263,15 @@ export function restateFromTest(args: {
     const existingNames = new Set(existing.map(nameOf));
     const freshUnplaced = wanted.filter((w) => !existingNames.has(nameOf(w)));
     const replacement = new Map<StrengthExercise, StrengthExercise>();
+    // ⚠️ TWO SIGNALS FOR "by feel", because rows written before `load_prescribed` was carried have
+    // only the second: the composer never prices an accessory, so its weight is the string "By feel".
+    const byFeel = (e: StrengthExercise) => e?.load_prescribed === false || /by feel/i.test(String(e?.weight ?? ''));
     for (const ex of existing) {
-      if (ex?.load_prescribed !== false) continue;
+      if (!byFeel(ex)) continue;
       if (wanted.some((w) => nameOf(w) === nameOf(ex))) continue;
       const cell = cellOf(ex);
       if (cell.startsWith('?') || cell.endsWith('?')) continue;
-      const at = freshUnplaced.findIndex((w) => w.load_prescribed === false && cellOf(w) === cell);
+      const at = freshUnplaced.findIndex((w) => byFeel(w) && cellOf(w) === cell);
       if (at < 0) continue;
       replacement.set(ex, freshUnplaced[at]);
       freshUnplaced.splice(at, 1);
