@@ -41,6 +41,8 @@ import {
   type SwapOption,
   type SwappableSession,
 } from '@/lib/session-discipline-swap';
+import { resolveSwapWrite } from '@/lib/swap-write';
+import { getStoredUserId } from '@/lib/supabase';
 import type { MatrixSessionKind } from '../../supabase/functions/_shared/schedule-session-constraints';
 import { ArrowLeftRight } from 'lucide-react';
 import { SPORT_COLORS, getDisciplineColor, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
@@ -1444,7 +1446,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     try {
                       // ⛔ THE EXISTING WRITE PATH. `updatePlannedWorkout` is the same helper Delete
                       // and the rest of this view already use — a swap must not invent a second one.
-                      await updatePlannedWorkout(id, opt.patch as Parameters<typeof updatePlannedWorkout>[1]);
+                      /* ⛔ §7 — THE SAME RESOLVER TODAY'S SHEET USES. A sport swap hands over the
+                         composer's own session for the new sport; writing `opt.patch` raw here
+                         would keep the OLD session's minutes on this screen only. */
+                      const write = await resolveSwapWrite(String(getStoredUserId() ?? ''), swapRow as never, opt);
+                      await updatePlannedWorkout(id, write.patch as Parameters<typeof updatePlannedWorkout>[1]);
                       /**
                        * ⛔ THE HARD RIDE NEEDS THE SERVER TO EXPAND ITS TOKENS INTO WATTS — see the
                        * same call in `TodaysEffort.handleApplyDisciplineSwap`. Both apply paths do

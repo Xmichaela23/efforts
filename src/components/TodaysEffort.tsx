@@ -30,6 +30,12 @@ import {
   sameSwapOn,
   type SwapOption,
 } from '@/lib/session-discipline-swap';
+/**
+ * ⛔ §7 — A SPORT SWAP HANDS OVER THE LIBRARY'S SESSION, NOT A SHELL WITH THE OLD MINUTES. The
+ * drawer applies swaps too (`UnifiedWorkoutView`), so what a swap WRITES lives in one file that both
+ * screens ask — otherwise one of them keeps writing the shell.
+ */
+import { resolveSwapWrite } from '@/lib/swap-write';
 // ⛔ EVERY WORD ON THE SWAP SHEET IS MICHAEL'S, AND LIVES IN ONE FILE.
 import { swapButtonLabel, swapLineFor, SWAP_SHEET_HEADER } from '@/lib/swap-copy';
 import { formatSwimPace } from '@/utils/workoutFormatting';
@@ -717,8 +723,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     }
     setSwappingSession(true);
     try {
+      const write = await resolveSwapWrite(userId, workout as never, option);
       const { error } = await supabase
-        .from('planned_workouts').update(option.patch).eq('id', workout.id).eq('user_id', userId);
+        .from('planned_workouts').update(write.patch).eq('id', workout.id).eq('user_id', userId);
       if (error) throw error;
       /**
        * ⛔ THE HARD RIDE IS NOT FINISHED UNTIL THE SERVER EXPANDS IT (2026-08-09). The patch wrote
@@ -730,7 +737,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
        * ⚠️ AWAITED, so the invalidations below fire against the expanded row. The same single-row
        * entry point `usePlannedWorkoutLink` and `UnifiedWorkoutView` already use — no new function.
        */
-      if (option.needsMaterialize) {
+      if (write.needsMaterialize) {
         try {
           await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(workout.id) } });
         } catch (e) {
@@ -759,7 +766,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         try {
           const q = supabase
             .from('planned_workouts')
-            .select('id,date,type,name,tags,workout_status,duration,total_duration_seconds,computed,training_plan_id')
+            .select('id,date,type,name,tags,workout_status,duration,total_duration_seconds,steps_preset,computed,training_plan_id')
             .eq('user_id', userId)
             .eq('workout_status', 'planned')
             .gt('date', String(workout.date).slice(0, 10));
@@ -777,10 +784,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               weekSessions: [],
             });
             if (!same) continue;
+            // ⚠️ RE-ASKED PER ROW HERE TOO. A later row's band can differ from today's, and the
+            // family it is handed depends on the band — so the session is resolved against THAT row.
+            const laterWrite = await resolveSwapWrite(userId, row as never, same);
             const { error: e2 } = await supabase
-              .from('planned_workouts').update(same.patch).eq('id', row.id).eq('user_id', userId);
+              .from('planned_workouts').update(laterWrite.patch).eq('id', row.id).eq('user_id', userId);
             if (e2) continue;
-            if (same.needsMaterialize) {
+            if (laterWrite.needsMaterialize) {
               try {
                 await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(row.id) } });
               } catch { /* the row is swapped either way; a re-open re-materialises it */ }

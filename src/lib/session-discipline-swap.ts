@@ -48,6 +48,8 @@ import {
 export type Discipline = Exclude<CanonicalDiscipline, 'strength'>;
 
 /** The session as the client holds it (`planned_workouts` row, loosely typed at the call site). */
+import type { LibrarySwapSession } from './swap-library-session';
+
 export type SwappableSession = {
   id?: string;
   type?: string | null;
@@ -533,68 +535,36 @@ export function getDisciplineSwaps(
     .map((to) => {
       const { name, description } = describeSwap(to, band, minutes);
       /**
-       * ═══ THE HARD RIDE IS A REAL SESSION, NOT A RELABEL (2026-08-09). ═══════════════════════════
+       * ═══ THE SESSION ITSELF IS NOT WRITTEN HERE ANY MORE (§7, 2026-09-09) ════════════════════
        *
-       * ⛔ A hard swap to the bike writes the SAME THREE TOKENS `generate-combined-plan/session-factory.ts:604`
-       * uses for its bike quality work — warm-up, the Helgerud 4×4, cool-down. `materialize-plan`'s
-       * `expandBikeToken` then turns `bike_vo2_4x4min_R4min` into work steps at
-       * `pctRange(1.1, 1.2) × FTP`, so the athlete gets real watts instead of a run wearing a ride's
-       * name.
+       * ⛔ THIS PATCH USED TO CARRY A HAND-WRITTEN 4×4 for a hard swap to the bike — warm-up, the
+       * Helgerud protocol, cool-down, 57 minutes. It was a THIRD answer: not the old session, and
+       * not the book's either. §7 rules that a sport swap hands over the composer's own session for
+       * the new sport and band, so the 4×4 is gone and `ride_anaerobic` (p237) takes its place.
        *
-       * ⚠️ NOT `bikeQualitySession`'s TOKEN LIST. That one is the bare `['bike_vo2_4x4min_R4min']` —
-       * no warm-up, no cool-down — which expands to 32 min of intervals opening cold with a maximal
-       * effort. The three-token form is the one the combined-plan factory ships and the one a human
-       * should actually ride. (`bikeQualitySession`'s own 45-vs-32 gap is a pre-existing Strong Focus
-       * inconsistency and is deliberately NOT touched here.)
+       * ⛔ AND THAT SESSION IS MERGED IN BY `withLibrarySession`, at write time, because finding the
+       * athlete's own row of the target family is a database read. What this function returns is the
+       * SHELL — type, copy, and the tags that stop `get-week` re-creating the original row.
        *
-       * ⛔ PROTOCOL LENGTH, NOT THE SOURCE SESSION'S TIME — the one place the swap's "same time" rule
-       * is broken, on purpose. 15 warm-up + 4×(4+4) + 10 cool-down = 57 min, and it is what the
-       * protocol IS. Padding it to a 63-minute run's length would add junk minutes to a session whose
-       * whole value is its structure; truncating it would break the protocol. Easy swaps stay
-       * time-matched, because an easy block has no structure to protect.
+       * ⚠️ THE FTP GATE STAYS (see `targets`). The library's ride is watts too; with no FTP it
+       * expands to interval steps carrying no targets, which is a prescription the app cannot write.
+       *
+       * ⚠️ AND `needsMaterialize` IS FALSE HERE, ALWAYS. The shell writes no tokens, so there is
+       * nothing to expand; the resolver sets it true whenever it merges a library session in. A
+       * caller that writes this patch raw gets exactly what it did before §7 for a swim.
        */
-      const HARD_RIDE_TOKENS = [
-        'warmup_bike_quality_15min_fastpedal',
-        'bike_vo2_4x4min_R4min',
-        'cooldown_bike_10min_easy',
-      ];
-      const HARD_RIDE_MIN = 15 + 4 * (4 + 4) + 10;   // 57 — warm-up + 4×4 + cool-down
-      const isHardRide = band === 'hard' && to === 'ride';
       return {
         to,
         label: to === 'ride' ? 'Ride instead' : to === 'swim' ? 'Swim instead' : 'Run instead',
-        /**
-         * ⚠️ THE CALLER MUST RE-MATERIALISE A HARD RIDE. Writing the tokens is half the job — the
-         * watts only exist once `materialize-plan` expands them for this row. Both apply paths do
-         * this; `needsMaterialize` is how they know without re-deriving the condition.
-         */
-        needsMaterialize: isHardRide,
+        needsMaterialize: false,
         patch: {
           type: to,
           name,
           description,
-          // ⛔ duration is NOT in the patch for easy swaps — it is already correct on the row and
-          // re-writing it is how a preserved value gets accidentally rounded. The HARD ride is the
-          // exception: its length is the protocol's, so it is written explicitly.
-          ...(isHardRide
-            ? {
-                duration: HARD_RIDE_MIN,
-                total_duration_seconds: HARD_RIDE_MIN * 60,
-                /**
-                 * ⛔ THE STALE STRUCTURE MUST GO HERE, and only here. `materialize-plan` overwrites
-                 * `computed` from the tokens, but `workout_structure` and `intervals` are the RUN's
-                 * and nothing else clears them — they are what printed "Walk down" on a ride.
-                 *
-                 * ⚠️ SAFE ONLY BECAUSE `total_duration_seconds` IS WRITTEN ON THE LINE ABOVE.
-                 * `computed.steps` is rung 3 of `plannedDurationSeconds`; clearing it without pinning
-                 * a total first would delete the session's duration. See the fixtures.
-                 */
-                computed: null,
-                workout_structure: null,
-                intervals: null,
-              }
-            : {}),
-          steps_preset: isHardRide ? HARD_RIDE_TOKENS : null,
+          // ⛔ duration is NOT in this patch. The library session writes its own minutes; a shell
+          // leaves the row's own time alone, because re-writing a preserved value is how it gets
+          // accidentally rounded.
+          steps_preset: null,
           /**
            * ⛔ THE STALE RENDERED COPY HAD TO GO WITH IT. `rendered_description` is the
            * materialiser's expanded prose for the ORIGINAL discipline, and several surfaces prefer
@@ -789,6 +759,71 @@ export function sameSwapOn(
   return all.find((o) => (o.kind ?? 'discipline') === want.kind
     && (o.venue ?? null) === want.venue
     && o.to === want.to) ?? null;
+}
+
+/**
+ * ═══ §7 — THE SWAP HANDS OVER THE LIBRARY'S SESSION ══════════════════════════════════════════════
+ *
+ * ⛔ THE PATCH BUILT ABOVE IS A SHELL, AND ON ITS OWN IT KEEPS THE OLD SESSION'S MINUTES — a
+ * three-hour long ride became a three-hour run. This merges the real session over it: the composer's
+ * own session for the new sport and band, at the athlete's level.
+ *
+ * ⚠️ IT IS APPLIED AT WRITE TIME, NOT WHEN THE SHEET IS DRAWN, because finding the athlete's own row
+ * of the target family is a database read and the sheet must stay cheap. The sheet shows the option;
+ * this decides what the option actually writes.
+ *
+ * ⚠️ AND THE STALE STRUCTURE GOES WITH IT. `computed`, `workout_structure` and `intervals` belong to
+ * the session being replaced; nothing else clears them, and they are what printed a run's "Walk
+ * down" on a ride. Safe here only because the new total is written on the same object — `computed`
+ * is a rung of `plannedDurationSeconds`, so clearing it without pinning a total first would delete
+ * the session's duration.
+ */
+export function withLibrarySession(
+  patch: Record<string, unknown>,
+  session: SwappableSession,
+  lib: LibrarySwapSession,
+): Record<string, unknown> {
+  const kept = (patch.tags as string[] | undefined) ?? (session.tags ?? []);
+  return {
+    ...patch,
+    name: lib.name,
+    /**
+     * ⛔ THE NEW SESSION'S OWN SENTENCE, NOT THE OLD ONE'S AND NOT NOTHING. Writing null here left
+     * the drawer reading "No description available" on every swapped row: the composed ride had a
+     * line, and the run that replaced it had none.
+     * ⚠️ `rendered_description` STILL GOES. That one is the materialiser's expanded prose for the
+     * discipline being LEFT, and several surfaces prefer it over `description` — leaving it meant a
+     * swapped ride kept printing the run's sentence.
+     */
+    description: lib.description,
+    rendered_description: null,
+    duration: lib.duration,
+    total_duration_seconds: lib.duration * 60,
+    steps_preset: [...lib.steps_preset],
+    computed: null,
+    workout_structure: null,
+    intervals: null,
+    /**
+     * ⛔ THE NEW SESSION'S OWN CLASSIFICATION REPLACES THE OLD ONE. `family:`, `band:`, `sport:`,
+     * `level:` and `intensity:` are read all over the app — Today's cue lines, the swap sheet's own
+     * band, the week reader — and a ride carrying `family:run_lsd` would be read as a long RUN by
+     * every one of them. ⚠️ `swapped_from:` and `discipline_swapped` are set by the caller's patch
+     * and survive: they are what stops `get-week` re-creating the original row.
+     */
+    tags: [...new Set([
+      /**
+       * ⛔ AND THE LONG-DAY MARKER FOLLOWS THE SPORT. `long_ride` on a run is the old session's word
+       * left on the new one — `intensityOf` still bands it long, so nothing breaks loudly, and a
+       * reader is told the week's long RIDE is a run. The marker is re-stamped for what this row is
+       * now, and only when the row it replaced carried one.
+       */
+      ...kept.filter((t) => !/^(family|level|sport|intensity|band):/.test(String(t))
+        && t !== 'long_run' && t !== 'long_ride'),
+      ...(kept.some((t) => t === 'long_run' || t === 'long_ride')
+        ? [lib.libraryTags.includes('sport:ride') ? 'long_ride' : 'long_run'] : []),
+      ...lib.libraryTags,
+    ])],
+  };
 }
 
 /**

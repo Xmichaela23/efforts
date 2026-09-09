@@ -3533,7 +3533,23 @@ export function expandTokensForRow(
       return null;
     };
     const pr = parsePaceRange(desc);
-    const pow = parsePowerRange(desc);
+    /**
+     * ⛔⛔ WATTS ARE FOR A BIKE, AND THIS PARSER WAS PUTTING THEM ON RUNS (found 2026-09-09 while
+     * verifying the endurance swaps; PRE-EXISTING, not caused by them).
+     *
+     * `parsePowerRange` treats ANY percentage in the row's prose as a percentage of FTP — the `ftp`
+     * in its pattern is optional. The composer's own long-run and easy-run sentence says *"heart rate
+     * has drifted 5% … the 5% figure rather than 10%"*, so every such run matched `5%`, and at an FTP
+     * of 200 the athlete's long run was prescribed **10–11 W**. A number with a source, attached to a
+     * session it has nothing to do with — the "score that lies" class.
+     *
+     * ⚠️ THE PACE RANGE IS UNTOUCHED. Only the power read is gated, and only to the sports that have
+     * a power meter; a swim has none either.
+     */
+    const disciplineForPower = String((row as any)?.type || '').toLowerCase();
+    const powerIsPossible = disciplineForPower === 'ride' || disciplineForPower === 'bike'
+      || disciplineForPower === 'cycling';
+    const pow = powerIsPossible ? parsePowerRange(desc) : null;
     if (pr || pow) {
       for (const st of steps) {
         const kind = String((st as any)?.kind || '').toLowerCase();
