@@ -62,8 +62,9 @@ Data: today's rows from `get-week` (the rows `TodaysEffort.tsx` already loads). 
        word VT1 on screen.
      - `family:ride_sweet_spot`: `As close to threshold as you can without going over.` (p238). APPROVED.
      - Any other family: no line. Never invent one.
-     - Stop rule, every endurance family: `Heart rate up 5 percent, or output down 5 percent: stop.` (p107).
-       APPROVED.
+     - Stop rule: REMOVED from Today (Michael, 2026-09-09). It is a mid-session rule the athlete applies with a
+       watch, and the ride/run card already reads drift against p107's 5 percent line after the session, with
+       heat and hills beside it. The endurance card carries the family line only.
    - **A workout not from the plan** (Garmin / Strava / typed): name and time only. No lines.
 3. **The week so far**: dropped from Today (2026-09-09). It lives on State.
 4. **Rest day / nothing planned**: the existing `No effort scheduled` line stays (Michael, 2026-09-09). Nothing else.
