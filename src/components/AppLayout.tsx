@@ -1213,7 +1213,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setWorkoutBeingEdited(null);
     setActiveTab('summary');
 
-    if (location.pathname === '/goals' || location.pathname === '/account' || (location.pathname === '/profile/athletic-record' || location.pathname === '/profile')) {
+    // 2026-09-08: /connections and /help are route-driven views (Michael: the tab bar did nothing on Connections).
+    if (location.pathname === '/goals' || location.pathname === '/account' || location.pathname === '/connections' || location.pathname === '/help' || (location.pathname === '/profile/athletic-record' || location.pathname === '/profile')) {
       try {
         navigate('/', { replace: true });
       } catch (e) {
@@ -1910,7 +1911,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 <Button
                   onClick={() => {
                     // Close any open views and navigate to home
-                    if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showAccount || showGear || showContext) {
+                    if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showAccount || showGear || showContext || showConnections || showSupport) {
                       handleBackToDashboard();
                     }
                     setShowGoals(false);
@@ -1926,7 +1927,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 <Button data-first-run="state"
                   onClick={() => {
                     // Close any open views and navigate to context
-                    if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showAccount) {
+                    if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showAccount || showConnections || showSupport) {
                       handleBackToDashboard();
                     }
                     setShowGoals(false);
@@ -1942,7 +1943,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 </Button>
                 <Button data-first-run="focus"
                   onClick={() => {
-                    if (selectedWorkout || showStrengthLogger || showAllPlans || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showAccount || showGear || showContext) {
+                    if (selectedWorkout || showStrengthLogger || showAllPlans || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showAccount || showGear || showContext || showConnections || showSupport) {
                       handleBackToDashboard();
                     }
                     setShowGoals(true);
