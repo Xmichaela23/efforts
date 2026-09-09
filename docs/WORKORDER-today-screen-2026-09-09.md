@@ -66,7 +66,7 @@ Data: today's rows from `get-week` (the rows `TodaysEffort.tsx` already loads). 
        APPROVED.
    - **A workout not from the plan** (Garmin / Strava / typed): name and time only. No lines.
 3. **The week so far**: dropped from Today (2026-09-09). It lives on State.
-4. **Rest day / nothing planned**: nothing shown. No line.
+4. **Rest day / nothing planned**: the existing `No effort scheduled` line stays (Michael, 2026-09-09). Nothing else.
 
 ## 2b. Look
 
@@ -98,7 +98,7 @@ Data: today's rows from `get-week` (the rows `TodaysEffort.tsx` already loads). 
    lifted. Miles from the week's completed workouts' distance (the same figure the calendar rows carry);
    pounds from the week's logged sets, weight × reps summed, the figure `StrengthCompletedView.tsx` already
    shows per session. Labels `Run` / `Ride` / `Lifted`, units `mi` / `lb` (km / kg when the athlete's units
-   say so). No sentence.
+   say so). No sentence. Labels and the `54° dew point` form APPROVED 2026-09-09.
 4. **Colour follows the day**: the soft sport-colour bleed at the top of the screen
    (docs/REFERENCE-wizard-visual-language.md) takes the colour of the day's first session; a rest day keeps
    the neutral bleed.
