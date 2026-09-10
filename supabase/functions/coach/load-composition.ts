@@ -5,8 +5,7 @@
  *   · `LoadBar.tsx` summed the seven days of `daily_load_7d` per sport, rounded the shares to 100%,
  *     picked the dominant sport and printed "N pts · last 7 days";
  *   · `LoadBar.tsx` ran Friel's form zone word itself and hard-coded the zone table's ranges;
- *   · `StateTab.tsx` built "Form −32 — high risk (TrainingPeaks)" with no regard for the week's intent,
- *     while this function's own headline says "Recovery • …" on a recovery or taper week;
+ *   · `StateTab.tsx` built "Form −32 — high risk (TrainingPeaks)" off the form number, in every week;
  *   · Today ran the zone word beside "form −21".
  * The arithmetic and the words are moved unchanged. The screens print them.
  */
@@ -94,11 +93,12 @@ export function recoveryKicker(intentLabel: string): string {
 export const isRecoveryIntent = (weekIntent: string | null | undefined) => weekIntent === 'recovery' || weekIntent === 'taper';
 
 /**
- * ⛔ STATE'S GLANCE HEADLINE. It speaks only when form is in Friel's high-risk zone (under −30), as it
- * always has. What changed is WHICH words: the coach's own headline for the week — the recovery wording
- * on a recovery or taper week, the form sentence otherwise. Null = the header prints nothing.
+ * ⛔ STATE'S GLANCE HEADLINE. It speaks only when form is in Friel's high-risk zone (under −30), and then
+ * it is always the form sentence — in a recovery or taper week too (Michael, 2026-09-10). Form below −30
+ * is the warning whatever the week was meant to be, so the coach's "Recovery • …" wording does not
+ * replace it here. Null = the header prints nothing.
  */
-export function formHeadline(form: number | null | undefined, weekIntent: string | null | undefined, intentLabel: string): string | null {
+export function formHeadline(form: number | null | undefined): string | null {
   if (form == null || !Number.isFinite(form) || formZone(form) !== 'high risk') return null;
-  return isRecoveryIntent(weekIntent) ? recoveryKicker(intentLabel) : formKicker(form, 'high risk');
+  return formKicker(form, 'high risk');
 }

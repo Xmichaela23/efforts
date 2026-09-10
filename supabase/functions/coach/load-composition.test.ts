@@ -43,11 +43,11 @@ Deno.test('zone rows: the words are formZone\'s, and exactly the current zone is
   assertEquals(formZoneRows(null).filter((r) => r.current), []);
 });
 
-Deno.test('headline: only in high risk; the recovery wording on a recovery or taper week', () => {
-  assertEquals(formHeadline(-32.4, 'build', 'Build week'), 'Form -32 — high risk (TrainingPeaks)');
-  assertEquals(formHeadline(-32.4, 'recovery', 'Recovery week'), 'Recovery • Recovery week');
-  assertEquals(formHeadline(-40, 'taper', 'Taper week'), 'Recovery • Taper week');
-  assertEquals(formHeadline(-30, 'build', 'Build week'), null, '−30 is optimal, not high risk');
-  assertEquals(formHeadline(null, 'build', 'Build week'), null);
+Deno.test('headline: only in high risk, and the form sentence in every week, light weeks included', () => {
+  assertEquals(formHeadline(-32.4), 'Form -32 — high risk (TrainingPeaks)');
+  // ⛔ A recovery or taper week keeps the form sentence (Michael, 2026-09-10) — never "Recovery • …".
+  assertEquals(formHeadline(-40), 'Form -40 — high risk (TrainingPeaks)');
+  assertEquals(formHeadline(-30), null, '−30 is optimal, not high risk');
+  assertEquals(formHeadline(null), null);
   assertEquals(formKicker(12.2, 'fresh'), 'Form +12 — fresh (TrainingPeaks)');
 });

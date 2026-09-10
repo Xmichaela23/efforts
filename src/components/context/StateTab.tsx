@@ -552,8 +552,8 @@ export default function StateTab({
   // ⛔ THE GLANCE HEADLINE READS TRAININGPEAKS' FORM, NOT THE APP'S LOAD WORD (2026-09-04, one truth with the
   // LOAD line below it). It speaks only in Friel's "high risk" zone (form under −30); otherwise nothing.
   // `loadRead` / `buildLoadHeadline` (the reconciled status → "Load a bit high") are no longer called here.
-  // ⛔ THE WORDS ARE THE COACH'S (audit 2026-09-10, H-B08) — `load.form_headline`, built beside the week's own
-  // headline so a recovery or taper week gets the recovery wording. This screen ran `formZone` itself before.
+  // ⛔ THE WORDS ARE THE COACH'S (audit 2026-09-10, H-B08) — `load.form_headline`: the form sentence whenever
+  // form is under −30, in every week including recovery and taper. This screen ran `formZone` itself before.
   const loadHeadline = load?.form_headline ?? null;
 
 
