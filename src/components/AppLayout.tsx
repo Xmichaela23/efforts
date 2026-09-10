@@ -1134,6 +1134,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   };
 
   // Profile's "Retest or rebuild on Adjust" (2026-09-06): open State; the lens is pre-set via setPendingStateLens.
+  // ⛔ THE SAME STATE THE TAB BAR OPENS (2026-09-10). This set `showContext`, which renders State in a
+  // wrapper with no height — so State's own scroll box grew to its content and the page could not
+  // scroll (Today's status card tap). The tab bar renders it in the dashboard pane with `h-full`; the
+  // event now selects that pane exactly as the State tab does.
   useEffect(() => {
     const h = () => {
       setSelectedWorkout(null);
@@ -1146,7 +1150,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       setShowStrengthPlans(false);
       setShowAthleticRecord(false);
       setShowTrainingBaselines(false);
-      setShowContext(true);
+      setShowAccount(false);
+      setShowGoals(false);
+      setShowContext(false);
+      setActiveBottomNav('insights');
       if (location.pathname === '/profile' || location.pathname === '/profile/athletic-record') {
         try { navigate('/', { replace: true }); } catch (e) { console.warn('[AppLayout] navigate from profile failed:', e); }
       }
