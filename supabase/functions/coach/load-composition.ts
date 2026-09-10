@@ -94,11 +94,13 @@ export const isRecoveryIntent = (weekIntent: string | null | undefined) => weekI
 
 /**
  * ⛔ STATE'S GLANCE HEADLINE. It speaks only when form is in Friel's high-risk zone (under −30), and then
- * it is always the form sentence — in a recovery or taper week too (Michael, 2026-09-10). Form below −30
- * is the warning whatever the week was meant to be, so the coach's "Recovery • …" wording does not
+ * it is always "Form −32 · high risk" — in a recovery or taper week too (Michael, 2026-09-10). Form below
+ * −30 is the warning whatever the week was meant to be, so the coach's "Recovery • …" wording does not
  * replace it here. Null = the header prints nothing.
+ * ⚠️ NO "(TrainingPeaks)" ON THE SCREEN. The source is in docs/STATE-SOURCES.md ("Form zone word"), not in
+ * the line. The minus is a real minus sign; the number is always negative here.
  */
 export function formHeadline(form: number | null | undefined): string | null {
   if (form == null || !Number.isFinite(form) || formZone(form) !== 'high risk') return null;
-  return formKicker(form, 'high risk');
+  return `Form −${Math.abs(Math.round(form))} · high risk`;
 }
