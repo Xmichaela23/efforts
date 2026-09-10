@@ -12,8 +12,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
  * now comes from the FORECAST endpoint's `current` block. Every row cached under schema 5 holds a
  * noon-archive number, so without the bump the wrong temperature survives the fix for as long as
  * the cache lives.
+ * ⛔ 6 → 7 (2026-09-09, SESSION WEATHER): a session's hour was read as MIDNIGHT UTC and its day was
+ * read off an archive that lags 2-5 days. Michael's Wednesday ride stored 76°F start and end for a
+ * ride ridden at about 90°F. Every stored session-weather row was written by that arithmetic, so
+ * without the bump the wrong temperature stays on every past session for as long as the row lives.
  */
-const WEATHER_SCHEMA_VERSION = 6;
+const WEATHER_SCHEMA_VERSION = 7;
 
 interface WeatherData {
   /** Representative temp for the session: avg over [start, end] when duration provided, else start-hour slot. */
@@ -37,6 +41,12 @@ interface WeatherData {
   humidity: number;
   /** °F. Open-Meteo's `dew_point_2m`, shown beside humidity (§3b.1). Absent on rows fetched before. */
   dew_point?: number;
+  /**
+   * The head unit's own average, °F. ⚠️ NOT THE TEMPERATURE — see the note in `fetchWeatherData`. A
+   * device measures its own microclimate; this is here so the reading survives, not so it is shown
+   * instead of the air.
+   */
+  device_temp_f?: number;
   windSpeed: number;
   windDirection: number;
   precipitation: number;
@@ -84,7 +94,7 @@ Deno.serve(async (req) => {
     // Validate inputs strictly
     const latNum = Number(lat);
     const lngNum = Number(lng);
-    const tsStr = typeof timestamp === 'string' ? timestamp : new Date(timestamp).toISOString();
+    let tsStr = typeof timestamp === 'string' ? timestamp : new Date(timestamp).toISOString();
     const skipCache = force_refresh === true;
     
     if (skipCache) {
@@ -111,6 +121,53 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
+
+    /**
+     * ═══ THE SESSION'S REAL START HOUR, BEFORE ANYTHING IS KEYED ON IT ═══════════════════════════
+     *
+     * ⛔ A DATE IS NOT AN HOUR, AND READING ONE AS AN HOUR IS MIDNIGHT UTC. (Michael's Wednesday
+     * ride read 76°F start and end; it was about 90°F.) `analyze-running-workout` falls back to
+     * `workout.date` when the sensor samples carry no start time, and the client's
+     * `weatherInvokeArgsFromWorkout` falls back the same way — so a bare `2026-09-09` arrives here,
+     * is parsed as `2026-09-09T00:00:00Z`, and the ride is priced at the coldest hour of the night.
+     * At US-west longitudes midnight UTC is FIVE IN THE AFTERNOON THE DAY BEFORE, so the reading is
+     * not even the right day.
+     *
+     * ⛔ THE ROW ALREADY HOLDS THE ANSWER. `ingest-activity` writes `workouts.timestamp` as the real
+     * UTC instant for both providers — Strava's `start_date`, Garmin's `startTimeInSeconds` — and
+     * nothing here was reading it. That is the fix: one column, already populated, never consulted.
+     *
+     * ⚠️ THE READ MOVED ABOVE THE CACHE KEY. It used to sit below, which meant the key, the hour
+     * bucket and the endpoint decision were all made from the WRONG instant and the corrected one
+     * arrived too late to matter.
+     */
+    let rowWeatherData: unknown = null;
+    let rowDeviceTempC: number | null = null;
+    if (workout_id) {
+      const { data: row, error: rowErr } = await supabase
+        .from('workouts')
+        .select('timestamp, weather_data, avg_temperature')
+        .eq('id', workout_id)
+        .maybeSingle();
+      if (!rowErr && row) {
+        rowWeatherData = row.weather_data ?? null;
+        if (row.avg_temperature != null && Number.isFinite(Number(row.avg_temperature))) {
+          rowDeviceTempC = Number(row.avg_temperature);
+        }
+        /**
+         * ⚠️ THE ROW WINS ONLY WHERE THE ARGUMENT IS NOT AN HOUR. A caller that sent a real instant
+         * (the analyzer, off sensor samples) is more precise than the row's summary start, and
+         * overruling it would be a regression on the path that already works. A date-only string, or
+         * one that lands exactly on midnight UTC, is not an hour anybody trained in.
+         */
+        const rowTs = typeof row.timestamp === 'string' ? row.timestamp : null;
+        const argIsHourless = !/T\d{2}:/.test(tsStr) || /T00:00:00(\.0+)?Z?$/.test(tsStr);
+        if (rowTs && argIsHourless && Number.isFinite(Date.parse(rowTs))) {
+          console.log(`🌡️ [WEATHER] Start hour corrected from the row: ${tsStr} → ${rowTs}`);
+          tsStr = new Date(rowTs).toISOString();
+        }
+      }
+    }
 
     // 1) Shared cache by geo + UTC hour bucket (day-only keys wrongly reused one hour for all workouts that day)
     const round = (n: number) => Math.round(n * 20) / 20; // ~0.05° buckets (~5.5km)
@@ -150,11 +207,26 @@ Deno.serve(async (req) => {
     const requestedDay = tsStr.slice(0, 10);
     const nowUtcDay = new Date().toISOString().slice(0, 10);
     const requestedDayIsTodayish = Math.abs(utcCalendarDayDiff(requestedDay, nowUtcDay)) <= 1;
+    /**
+     * ⛔⛔ THE ARCHIVE IS NOT A RECORD OF LAST WEEK — IT LAGS. Open-Meteo's archive is ERA5 reanalysis
+     * and trails real time by roughly two to five days; asked for a ride from Wednesday it answers
+     * with whatever the model has, which is not that ride's weather and on the most recent days is
+     * nothing at all. A session inside that lag has to come off the FORECAST endpoint, which carries
+     * its own recent past through `past_days`.
+     *
+     * ⚠️ FIVE DAYS, AND IT IS OPEN-METEO'S FIGURE, NOT ONE OF OURS — their archive documents a two-
+     * to-five-day delay. Taking the far end is the safe read: a day the archive DOES have is served
+     * just as well by the forecast endpoint's hourly series, so erring long costs nothing and erring
+     * short is exactly the bug being fixed.
+     */
+    const ARCHIVE_LAG_DAYS = 5;
+    const daysAgo = utcCalendarDayDiff(nowUtcDay, requestedDay);
+    const requestedDayWithinArchiveLag = daysAgo >= 0 && daysAgo <= ARCHIVE_LAG_DAYS;
     // ⚠️ TODAY ONLY. A date further out than day-adjacency stays on the archive and therefore keeps
     // returning nothing, exactly as before — nothing in the app asks for future weather (the Today
     // screen's `useWeather` is gated on `isTodayDate`, and a workout is always in the past), and
     // widening this to the forecast window would be building a caller that does not exist.
-    const useForecastEndpoint = requestedDayIsTodayish;
+    const useForecastEndpoint = requestedDayIsTodayish || requestedDayWithinArchiveLag;
     const wantsCurrentConditions = !workout_id && requestedDayIsTodayish;
 
     /**
@@ -200,28 +272,22 @@ Deno.serve(async (req) => {
       } catch {}
     }
 
-    // 2) Per-workout cache + device temp (°C from Garmin/Strava) to prefer over reanalysis when present
-    let deviceTempC: number | null = null;
-    if (workout_id) {
-      const { data: existing, error: existingErr } = await supabase
-        .from('workouts')
-        .select('weather_data, avg_temperature')
-        .eq('id', workout_id)
-        .maybeSingle();
-      if (!existingErr && existing?.avg_temperature != null && Number.isFinite(Number(existing.avg_temperature))) {
-        deviceTempC = Number(existing.avg_temperature);
+    /**
+     * 2) Per-workout cache + device temp (°C from Garmin/Strava), preferred over reanalysis.
+     * ⚠️ THE ROW WAS ALREADY READ ABOVE — one query, not two. It had to move up there so the real
+     * start hour could correct `tsStr` before the cache key was built from it.
+     */
+    const deviceTempC: number | null = rowDeviceTempC;
+    if (!skipCache && rowWeatherData) {
+      const cached = rowWeatherData as WeatherData & { schema_version?: number };
+      if (cached?.schema_version === WEATHER_SCHEMA_VERSION) {
+        console.log('🌡️ [WEATHER] Returning from workout cache');
+        return new Response(JSON.stringify({ weather: rowWeatherData }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        });
       }
-      if (!skipCache && !existingErr && existing?.weather_data) {
-        const cached = existing.weather_data as WeatherData & { schema_version?: number };
-        if (cached?.schema_version === WEATHER_SCHEMA_VERSION) {
-          console.log('🌡️ [WEATHER] Returning from workout cache');
-          return new Response(JSON.stringify({ weather: existing.weather_data }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
-          });
-        }
-        console.log('🌡️ [WEATHER] Workout cache schema stale or missing; refetching');
-      }
+      console.log('🌡️ [WEATHER] Workout cache schema stale or missing; refetching');
     }
 
     const weatherData = await fetchWeatherData(
@@ -430,7 +496,9 @@ async function fetchWeatherData(
         `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
         `&hourly=${HOURLY_FIELDS}${currentParam}` +
         `&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min` +
-        `&past_days=2&forecast_days=2&${UNITS}`;
+        // ⚠️ `past_days=7`, NOT 2 — it has to cover the archive's own lag (`ARCHIVE_LAG_DAYS`) plus
+        // the day of UTC adjacency, or a four-day-old session routed here finds no hour to read.
+        `&past_days=7&forecast_days=2&${UNITS}`;
       console.log(
         `🌡️ [WEATHER] Fetching Open-Meteo FORECAST at ${lat},${lng} (${opts.wantsCurrentConditions ? 'current hour' : `hourly slot ${workoutDate.toISOString()}`} dur_s=${durationSeconds ?? 'n/a'})`,
       );
@@ -570,14 +638,27 @@ async function fetchWeatherData(
     let temperature_peak_f: number | undefined;
     let temperature_avg_f: number | undefined;
 
-    if (deviceTempC != null && Number.isFinite(deviceTempC)) {
-      temperature = Math.round(deviceTempC * 9 / 5 + 32);
-      temperature_start_f = temperature;
-      temperature_end_f = temperature;
-      temperature_peak_f = temperature;
-      temperature_avg_f = temperature;
-      console.log(`🌡️ [WEATHER] Display temp from device avg (°C): ${deviceTempC} → °F ${temperature}; humidity/wind from Open-Meteo slot`);
-    } else if (
+    /**
+     * ⛔⛔ THE DEVICE NO LONGER OVERRULES OPEN-METEO, AND THIS IS WHAT MADE THE WEDNESDAY RIDE READ
+     * 76°F (measured 2026-09-09, ride `5aee2bcf`, Los Angeles, 2026-09-10T01:57Z).
+     *
+     * `workouts.avg_temperature` on that ride was 24.63 °C — exactly 76°F, and exactly the number
+     * that reached the screen for start, end, peak and average alike. Open-Meteo's own answer for
+     * that hour at those coordinates is 96.4°F, and the SAME PAYLOAD already carried its other
+     * readings unchanged: `feels_like: 93`, `daily_high: 100`, `humidity: 35`, `dew_point: 61`. The
+     * blob was internally contradictory — a 76°F ride that felt like 93°F on a 100°F day — because
+     * one field came off a bike computer and every other field came off the weather.
+     *
+     * ⚠️ A HEAD UNIT MEASURES ITS OWN MICROCLIMATE, not the air. In a jersey pocket, in shade behind
+     * a bag, or still cooling from indoors, it reads low; clamped in the sun on black bars it reads
+     * high. It is a sensor on a frame; Open-Meteo is the measurement of the air the athlete rode in,
+     * and the heat de-confound downstream (`_shared/heat-adjust.ts`) is fitted on air temperature.
+     *
+     * ⚠️ THE READING IS NOT THROWN AWAY — it travels as `device_temp_f`, its own field, so anything
+     * that wants the head unit's number can have it and nothing has to guess which one it is looking
+     * at. What changes is only which number is called the temperature.
+     */
+    if (
       durationSeconds != null &&
       durationSeconds >= 60 &&
       tempStartRounded != null &&
@@ -610,6 +691,8 @@ async function fetchWeatherData(
       weather_code: Number.isFinite(Number(weatherCode)) ? Number(weatherCode) : undefined,
       humidity: Math.round(humidity ?? 0),
       dew_point: Number.isFinite(Number(dewPoint)) ? Math.round(Number(dewPoint)) : undefined,
+      device_temp_f: deviceTempC != null && Number.isFinite(deviceTempC)
+        ? Math.round(deviceTempC * 9 / 5 + 32) : undefined,
       windSpeed: Math.round(windSpeed ?? 0),
       windDirection: Math.round(windDir ?? 0),
       precipitation: precip ?? 0,

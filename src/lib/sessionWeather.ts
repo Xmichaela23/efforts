@@ -28,6 +28,15 @@ export type SessionWeatherForDisplay = {
   humidity?: number;
   /** °F. Shown beside humidity. Absent on rows written before schema 5, and on the device fallback. */
   dew_point?: number;
+  /**
+   * ⛔ THE HEAD UNIT'S OWN AVERAGE, AND NOT THE TEMPERATURE (schema 7, 2026-09-09). It used to BE
+   * `temperature`, which is how a ride in 96°F air stored 76°F: a device measures its own
+   * microclimate — a jersey pocket, shade behind a bag, still cooling from indoors — and Open-Meteo
+   * measures the air. The reading is kept because it is real; it is no longer what the screen calls
+   * the temperature.
+   * ⚠️ ABSENT ON EVERY ROW WRITTEN BEFORE SCHEMA 7, and on any session with no device reading.
+   */
+  device_temp_f?: number;
   windSpeed?: number;
   windDirection?: number;
   precipitation?: number;
@@ -92,6 +101,7 @@ export function parseWorkoutWeatherDataForDisplay(raw: unknown): SessionWeatherF
     ...(num(w.weather_code) != null ? { weather_code: num(w.weather_code) } : {}),
     ...(humidityRaw != null ? { humidity: Math.round(humidityRaw) } : {}),
     ...(num(w.dew_point) != null ? { dew_point: Math.round(num(w.dew_point)!) } : {}),
+    ...(num(w.device_temp_f) != null ? { device_temp_f: Math.round(num(w.device_temp_f)!) } : {}),
     ...(windRaw != null ? { windSpeed: Math.round(windRaw) } : {}),
     windDirection: num(w.windDirection),
     precipitation: num(w.precipitation),
@@ -103,7 +113,12 @@ export function parseWorkoutWeatherDataForDisplay(raw: unknown): SessionWeatherF
   };
 }
 
-/** Device °C → display row when there is no `weather_data` temperature. */
+/**
+ * Device °C → display row when there is no `weather_data` temperature.
+ * ⚠️ STILL THE RIGHT FALLBACK, AND IT IS NOT WHAT SCHEMA 7 CHANGED. A device reading is a poor
+ * measurement of the air and a better one than nothing; what changed is that it no longer overrules
+ * a reading Open-Meteo actually made.
+ */
 export function sessionWeatherFromDeviceAvgTempC(avgTempC: number | null | undefined): SessionWeatherForDisplay | null {
   if (avgTempC == null || !Number.isFinite(Number(avgTempC)) || Number(avgTempC) === 0) return null;
   const f = Math.round((Number(avgTempC) * 9) / 5 + 32);
