@@ -19,7 +19,19 @@ project_efforts_strength_display_frame): form, bar speed, slow gain under cross-
   count against p86's 6–8 / 14 anchors.
 - The done card on Today (`SessionDeck.tsx`) already renders name, numbers, the four tiles, attribution.
 
-## The lines (APPROVED as written, Michael, 2026-09-09)
+## The lines, REVISED 2026-09-09 late (Michael's cuts; these supersede the list below)
+
+Ride: 1 best power (as below) · 2 longest ride (as below) · 3 `Your heart rate was [N] bpm lower at easy
+power than your last eight rides.` · 4 `Drift under 5 percent, [N] rides in a row.`
+Run: 1 fastest split (waits for best efforts) · 2 longest run · 3 `Your easy pace was [N] s/mi faster at
+the same heart rate than your last eight runs.` (easy runs are prescribed by heart rate, so the gain is
+pace at that heart rate; PACE-AT-HR-TREND-SPEC) · 4 `Drift under 5 percent, [N] runs in a row.`
+Lift, two lines only: 1 `[Lift] gets a second heavy set next time.` (the ladder's own event) · 2 `Every
+heavy set had reps to spare.` (all ME sets logged with RIR ≥ 1). CUT: "speed sets all fast" (bar speed is
+not measured), "sessions without a miss", "most work sets this block" (the plan sets the count).
+Every line ends with a full stop.
+
+## The lines (original list, kept for the cut reasons)
 
 One per session, the first true one in this order. Windows are stated in the line.
 
@@ -28,13 +40,13 @@ Ride:
    best wins). Window: since the block started, else this year.
 2. `Longest ride since [month]`.
 3. `Heart rate [N] bpm lower at easy power than your last eight rides` (the ride card's own read).
-4. `Drift under 5 percent for [N] rides running`.
+4. `Drift under 5 percent, [N] rides in a row.`
 
 Run (after best efforts is built; until then only 3 and 4):
 1. `Fastest [mile / 5K / 10K] since [month]` (grade-adjusted).
 2. `Longest run since [month]`.
 3. `Heart rate [N] bpm lower at easy pace than your last eight runs`.
-4. `Drift under 5 percent for [N] runs running`.
+4. `Drift under 5 percent, [N] runs in a row.`
 
 Lift:
 1. `A set earned on [lift]: two clean sessions at [weight]` (the ladder's own event, the day it fires).
