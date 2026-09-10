@@ -1404,37 +1404,23 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   };
 
   const handleResumePlan = async () => {
-    if (!selectedPlanDetail || !updatePlan) return;
+    if (!selectedPlanDetail || !resumePlan) return;
     try {
-      // Calculate how long the plan was paused
-      const pausedAt = selectedPlanDetail.paused_at ? new Date(selectedPlanDetail.paused_at) : null;
-      const now = new Date();
-      
-      // If we have a pause timestamp and a config with start date, adjust it
-      let updates: any = { status: 'active', paused_at: null };
-      
-      if (pausedAt && selectedPlanDetail.config?.user_selected_start_date) {
-        const pauseDurationDays = Math.floor((now.getTime() - pausedAt.getTime()) / (1000 * 60 * 60 * 24));
-        const originalStart = parseLocalDate(String(selectedPlanDetail.config.user_selected_start_date).slice(0, 10));
-        const newStart = new Date(originalStart);
-        newStart.setDate(newStart.getDate() + pauseDurationDays);
-        
-        // Update config with new start date
-        updates.config = {
-          ...selectedPlanDetail.config,
-          user_selected_start_date: formatLocalDate(newStart)
-        };
-      }
-      
-      await updatePlan(selectedPlanDetail.id, updates);
-      
-      // Just update the status and config fields, keep everything else intact
+      /**
+       * ⛔ THE SERVER PICKS THE START DATE (2026-09-10). This button shifted the start date by the days
+       * paused and wrote the plan row itself, while Past Plans' Resume called `resume-plan` — so one plan
+       * got two different sets of session dates depending on which button was pressed. Both call
+       * `resume-plan` now, and the screen prints the date it returns.
+       */
+      const result = await resumePlan(selectedPlanDetail.id);
+      const newStart = result?.new_start_date ?? null;
+
       setPlanStatus('active');
-      setSelectedPlanDetail((prev: any) => ({ 
-        ...prev, 
+      setSelectedPlanDetail((prev: any) => ({
+        ...prev,
         status: 'active',
         paused_at: null,
-        config: updates.config || prev.config
+        config: newStart ? { ...(prev?.config ?? {}), user_selected_start_date: newStart, start_date: newStart } : prev?.config,
       }));
       // Track manual status change to prevent prop updates from overriding
       lastManualStatusRef.current = { planId: selectedPlanDetail.id, status: 'active' };
@@ -2545,7 +2531,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setResumeDialog({ plan, weeksCompleted, totalWeeks });
+                        // ⛔ The week the server will resume from is the tombstone's; the dialog names that one.
+                        setResumeDialog({ plan, weeksCompleted: Number(tombstone?.weeks_completed) || 0, totalWeeks });
                       }}
                       className="shrink-0 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/20 transition-colors"
                     >
@@ -2571,7 +2558,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                   disabled={!!resumingPlanId}
                   onClick={async () => {
                     setResumingPlanId(resumeDialog.plan.id);
-                    try { await resumePlan(resumeDialog.plan.id, resumeDialog.weeksCompleted); } finally {
+                    // No week sent: "where you left off" is the server's call (resume-plan).
+                    try { await resumePlan(resumeDialog.plan.id); } finally {
                       setResumingPlanId(null); setResumeDialog(null);
                     }
                   }}

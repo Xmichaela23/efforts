@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { calibrationFromPaces, saveCalibration } from '@/lib/run-pace-calibration';
+import { saveCalibration, previewCalibration } from '@/lib/run-pace-calibration';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { X, Target, Calendar, CalendarRange, TrendingUp, ChevronRight, ChevronDown, Flag, Dumbbell, Activity, Bike, Waves, Loader2, Trash2, Pause, Play, Link2, List, Crosshair, Plus, Gauge } from 'lucide-react';
 // The one discipline palette (`SPORT_COLORS`). Never hand-pick a hex for a discipline.
@@ -7,7 +7,6 @@ import { getDisciplineColor, FOCUS_RACE_COLOR } from '@/lib/context-utils';
 import { differenceInWeeks, format } from 'date-fns';
 import { useGoals, Goal, GoalInsert } from '@/hooks/useGoals';
 import { supabase, invokeFunction, invokeFunctionFormData, getStoredUserId } from '@/lib/supabase';
-import { actualFinishSecondsPreferElapsed, type WorkoutTimeRow } from '@/lib/race-finish-seconds';
 import CourseStrategyModal from '@/components/CourseStrategyModal';
 import NonRaceBuilder from '@/components/NonRaceBuilder';
 import { useAppContext } from '@/contexts/AppContext';
@@ -860,163 +859,39 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [backfillStatus, setBackfillStatus] = useState<Record<string, BackfillStatus>>({});
   const autoBackfilledGoalsRef = useRef<Set<string>>(new Set());
 
+  /**
+   * ⛔ THE SERVER WRITES THE RESULT (2026-09-10). This called complete-race only when the goal had a
+   * plan; otherwise — and whenever complete-race found no run — it picked the longest elapsed run, ride
+   * or swim on race day itself and wrote the goal's status, current_value and race_result straight to
+   * the table. complete-race now takes the goal, matches the workout by the goal's sport and saves the
+   * result; the phone only asks.
+   */
   const backfillGoalFromWorkout = async (
     goal: Goal,
-    options: { uid: string; planId?: string | null },
   ): Promise<{ ok: true; sec: number } | { ok: false; reason: 'no_workout' | 'error'; message?: string }> => {
-    const { uid, planId } = options;
-    if (planId) {
-      try {
-        const { data, error } = await supabase.functions.invoke('complete-race', {
-          body: { plan_id: planId },
-        });
-        const serverErr =
-          (data && typeof data === 'object' && typeof (data as any).error === 'string'
-            ? (data as any).error
-            : '') || '';
-        const success = (data as any)?.success === true;
-        const actualSec = Number((data as any)?.actual_seconds);
-        if (!error && success && Number.isFinite(actualSec) && actualSec > 0) {
-          return { ok: true, sec: actualSec };
-        }
-        const isNoWorkout =
-          /no completed run found/i.test(serverErr) ||
-          /could not read finish time/i.test(serverErr);
-        if (!isNoWorkout) {
-          return {
-            ok: false,
-            reason: 'error',
-            message: serverErr || error?.message || 'complete-race failed',
-          };
-        }
-      } catch (e) {
-        return { ok: false, reason: 'error', message: (e as Error)?.message || 'complete-race threw' };
+    try {
+      const { data, error } = await supabase.functions.invoke('complete-race', {
+        body: { goal_id: goal.id },
+      });
+      const actualSec = Number((data as any)?.actual_seconds);
+      if (!error && (data as any)?.success === true && Number.isFinite(actualSec) && actualSec > 0) {
+        return { ok: true, sec: actualSec };
       }
+      const { message } = await parseFunctionError(error, data, 'complete-race failed');
+      const isNoWorkout =
+        /no completed (run|ride|swim) found/i.test(message) ||
+        /could not read finish time/i.test(message) ||
+        /no race date/i.test(message);
+      return isNoWorkout ? { ok: false, reason: 'no_workout' } : { ok: false, reason: 'error', message };
+    } catch (e) {
+      return { ok: false, reason: 'error', message: (e as Error)?.message || 'complete-race threw' };
     }
-
-    const date = (goal.target_date || '').slice(0, 10);
-    if (!date) return { ok: false, reason: 'no_workout' };
-    const sport = goalSportLower(goal.sport) || 'run';
-    const types = sport === 'ride' ? ['ride'] : sport === 'swim' ? ['swim'] : ['run'];
-    const { data: rows, error: wErr } = await supabase
-      .from('workouts')
-      .select('id, date, type, workout_status, moving_time, elapsed_time, duration, computed')
-      .eq('user_id', uid)
-      .eq('date', date)
-      .eq('workout_status', 'completed')
-      .in('type', types);
-    if (wErr) {
-      return { ok: false, reason: 'error', message: wErr.message };
-    }
-    const list = Array.isArray(rows) ? rows : [];
-    if (list.length === 0) return { ok: false, reason: 'no_workout' };
-    let bestSec = 0;
-    for (const w of list) {
-      const sec = actualFinishSecondsPreferElapsed(w as WorkoutTimeRow);
-      if (sec != null && sec > bestSec) bestSec = sec;
-    }
-    if (bestSec <= 0) return { ok: false, reason: 'no_workout' };
-    const currentPrefs =
-      goal.training_prefs && typeof goal.training_prefs === 'object'
-        ? (goal.training_prefs as Record<string, unknown>)
-        : {};
-    const { error: uErr } = await supabase
-      .from('goals')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        current_value: bestSec,
-        training_prefs: {
-          ...currentPrefs,
-          manual_athletic_record: true,
-          race_result: {
-            actual_seconds: bestSec,
-            time_source: 'workout_elapsed_preferred',
-            completed_at: new Date().toISOString(),
-          },
-        },
-        updated_at: new Date().toISOString(),
-      } as any)
-      .eq('id', goal.id)
-      .eq('user_id', uid);
-    if (uErr) return { ok: false, reason: 'error', message: uErr.message };
-    return { ok: true, sec: bestSec };
   };
 
-  const findStaleActivePlanIdsForGoal = (goal: Goal): string[] => {
-    const ids = new Set<string>();
-    const goalNameNorm = String(goal.name || '').trim().toLowerCase();
-    for (const p of currentPlans) {
-      if (p.status !== 'active' && p.status !== 'paused') continue;
-      let matches = false;
-      if (p.goal_id && p.goal_id === goal.id) matches = true;
-      const served = (p.config as { goals_served?: string[] } | undefined)?.goals_served;
-      if (Array.isArray(served) && served.includes(goal.id)) matches = true;
-      if (!matches && goalNameNorm) {
-        const planName = String(p.name || '').trim().toLowerCase();
-        const raceName = String((p.config as { race_name?: string } | undefined)?.race_name || '')
-          .trim()
-          .toLowerCase();
-        if (planName.includes(goalNameNorm) || raceName === goalNameNorm) matches = true;
-      }
-      if (matches) ids.add(p.id);
-    }
-    return [...ids];
-  };
-
-  const autoEndedPlansRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    if (loading) return;
-    const todayIso = new Date().toISOString().slice(0, 10);
-    const stalePlanIds = new Set<string>();
-    for (const g of goals) {
-      if (g.goal_type !== 'event') continue;
-      const hasResult = g.current_value != null && g.current_value > 0;
-      const racePast = !!g.target_date && String(g.target_date).slice(0, 10) < todayIso;
-      const inactive = g.status !== 'active';
-      if (!(hasResult || (inactive && racePast))) continue;
-      for (const pid of findStaleActivePlanIdsForGoal(g)) {
-        if (!autoEndedPlansRef.current.has(pid)) stalePlanIds.add(pid);
-      }
-    }
-    if (stalePlanIds.size === 0) return;
-    let cancelled = false;
-    (async () => {
-      let didEnd = false;
-      for (const planId of stalePlanIds) {
-        autoEndedPlansRef.current.add(planId);
-        try {
-          const { data, error } = await supabase.functions.invoke('end-plan', {
-            body: { plan_id: planId },
-          });
-          const serverErr =
-            (data && typeof data === 'object' && typeof (data as any).error === 'string'
-              ? (data as any).error
-              : '') || '';
-          if (error || (serverErr && !(data as any)?.success)) {
-            console.warn('[GoalsScreen] auto end-plan failed', {
-              planId,
-              err: error?.message || serverErr,
-            });
-            continue;
-          }
-          didEnd = true;
-        } catch (e) {
-          console.warn('[GoalsScreen] auto end-plan threw', e);
-        }
-      }
-      if (cancelled) return;
-      if (didEnd) {
-        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch { /* ignore */ }
-        try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch { /* ignore */ }
-        try { window.dispatchEvent(new CustomEvent('plans:invalidate')); } catch { /* ignore */ }
-        try { refreshPlans?.(); } catch { /* ignore */ }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [loading, goals, currentPlans, refreshPlans]);
+  // ⛔ NO PLAN IS ENDED FROM THIS SCREEN (2026-09-10). An effect here ended every active or paused plan
+  // whose goal looked over — matched by goal id, goals_served, or a NAME SUBSTRING, so a plan named for
+  // another race could be ended by opening Goals. complete-race ends the plan linked to the goal
+  // (plans.goal_id) when it saves the result; the athlete's own End button still calls end-plan.
 
   useEffect(() => {
     if (loading) return;
@@ -1033,38 +908,14 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     let cancelled = false;
     (async () => {
       let didAnyComplete = false;
-      let didEndAnyPlan = false;
       for (const g of candidates) {
         autoBackfilledGoalsRef.current.add(g.id);
         setBackfillStatus((s) => ({ ...s, [g.id]: { kind: 'saving' } }));
-        const plan = plansByGoalId.get(g.id);
-        const result = await backfillGoalFromWorkout(g, { uid, planId: plan?.id ?? null });
+        const result = await backfillGoalFromWorkout(g);
         if (cancelled) return;
         if (result.ok) {
           didAnyComplete = true;
           setBackfillStatus((s) => ({ ...s, [g.id]: { kind: 'idle' } }));
-          const stalePlanIds = findStaleActivePlanIdsForGoal(g);
-          for (const planId of stalePlanIds) {
-            try {
-              const { data, error } = await supabase.functions.invoke('end-plan', {
-                body: { plan_id: planId },
-              });
-              const serverErr =
-                (data && typeof data === 'object' && typeof (data as any).error === 'string'
-                  ? (data as any).error
-                  : '') || '';
-              if (error || (serverErr && !(data as any)?.success)) {
-                console.warn('[GoalsScreen] auto end-plan failed', {
-                  planId,
-                  err: error?.message || serverErr,
-                });
-              } else {
-                didEndAnyPlan = true;
-              }
-            } catch (e) {
-              console.warn('[GoalsScreen] end-plan threw', e);
-            }
-          }
         } else if (result.reason === 'no_workout') {
           setBackfillStatus((s) => ({ ...s, [g.id]: { kind: 'no_workout' } }));
         } else {
@@ -1075,21 +926,20 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
         }
       }
       if (cancelled) return;
-      if (didAnyComplete || didEndAnyPlan) {
+      if (didAnyComplete) {
         try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch { /* ignore */ }
         try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch { /* ignore */ }
         try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch { /* ignore */ }
         try { window.dispatchEvent(new CustomEvent('plans:invalidate')); } catch { /* ignore */ }
         refreshGoals();
-        if (didEndAnyPlan) {
-          try { refreshPlans?.(); } catch { /* ignore */ }
-        }
+        // complete-race may have ended the plan linked to the goal.
+        try { refreshPlans?.(); } catch { /* ignore */ }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [loading, goals, plansByGoalId, currentPlans, refreshGoals]);
+  }, [loading, goals, refreshGoals, refreshPlans]);
 
   // Only active plans not linked to any goal
   const activeUnlinkedPlans = useMemo(
@@ -1147,16 +997,35 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const isMetric = !useImperial;
   const paceUnit = isMetric ? '/km' : '/mi';
 
+  /**
+   * The paces `save-baselines` would derive from the two typed paces — a preview, nothing saved.
+   * ⛔ THE SERVER'S FORMULA (2026-09-10). This card computed them with a phone copy of the pace tables
+   * and fell back to a fixed set of paces when that returned nothing; now it shows the server's answer
+   * or no card.
+   */
+  const [calPreview, setCalPreview] = useState<{ base: number; race: number; steady: number; power: number; speed: number } | null>(null);
+  useEffect(() => {
+    setCalPreview(null);
+    const easyS = parsePace(calEasyPace), fiveKS = parsePace(calFiveKPace);
+    if (!easyS || !fiveKS || fiveKS >= easyS) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const paces = await previewCalibration(supabase, { easyPace: calEasyPace, fiveKPace: calFiveKPace, isMetric });
+      if (!cancelled) setCalPreview(paces);
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [calEasyPace, calFiveKPace, isMetric]);
+
   async function handleCalibrationSave() {
-    // ⛔ ONE CALIBRATION, ONE WRITER (D-461). This used to carry its own vDOT tables and upsert the
-    // effort columns directly — a second 5K on file beside the one Baselines keeps.
-    const result = calibrationFromPaces({ easyPace: calEasyPace, fiveKPace: calFiveKPace, isMetric });
-    if (!result) return;
+    // ⛔ THE PHONE SENDS THE TWO TYPED PACES; save-baselines stores the 5K and derives the effort columns.
+    const easyS = parsePace(calEasyPace), fiveKS = parsePace(calFiveKPace);
+    if (!easyS || !fiveKS || fiveKS >= easyS) return;
     setCalSaving(true);
     try {
       const userId = readStoredUserId();
       if (!userId) return;
-      await saveCalibration(supabase, userId, result);
+      const { error: calErr } = await saveCalibration(supabase, { easyPace: calEasyPace, fiveKPace: calFiveKPace, isMetric });
+      if (calErr) { console.warn('[GoalsScreen] calibration save failed', calErr); return; }
       const { data: bl } = await supabase.from('user_baselines').select('*').eq('user_id', userId).maybeSingle();
       setCurrentBaselines(bl);
       setShowCalibration(false);
@@ -1597,25 +1466,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                       window.alert('Enter elapsed time like 4:44 or 4:44:00.');
                       return;
                     }
-                    const currentPrefs =
-                      goal.training_prefs && typeof goal.training_prefs === 'object'
-                        ? goal.training_prefs
-                        : {};
-                    const updated = await updateGoal(goal.id, {
-                      status: 'completed',
-                      completed_at: new Date().toISOString(),
-                      current_value: seconds,
-                      training_prefs: {
-                        ...currentPrefs,
-                        manual_athletic_record: true,
-                        race_result: {
-                          actual_seconds: seconds,
-                          time_source: 'manual_elapsed',
-                          completed_at: new Date().toISOString(),
-                        },
-                      },
+                    // ⛔ The typed time goes to complete-race, which saves it on the goal (2026-09-10).
+                    const { data: savedResult, error: saveErr } = await supabase.functions.invoke('complete-race', {
+                      body: { goal_id: goal.id, manual_elapsed_seconds: seconds },
                     });
-                    if (!updated) {
+                    if (saveErr || (savedResult as any)?.success !== true) {
                       window.alert('Could not save elapsed result. Please try again.');
                       return;
                     }
@@ -2101,8 +1956,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                 if (fiveKS >= easyS) return <p className="text-xs text-red-400/70">5K pace should be faster than easy pace</p>;
                 const ratio = easyS / fiveKS;
                 if (ratio > 1.8) return <p className="text-xs text-amber-400/60">That's a large gap — double-check your paces</p>;
-                const paces = calibrationFromPaces({ easyPace: calEasyPace, fiveKPace: calFiveKPace, isMetric })?.paces
-                  ?? { base: 585, race: 537, steady: 491, power: 449, speed: 422 };
+                const paces = calPreview;
+                if (!paces) return null;
                 const fmt = (s: number) => fmtPace(isMetric ? s / 1.60934 : s);
                 return (
                   <div className="rounded-xl bg-white/[0.04] border border-white/[0.06] p-3 space-y-1">

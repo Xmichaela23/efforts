@@ -20,7 +20,6 @@ import { runThresholdTestRow, ftpTestRow } from '@/lib/baseline-tests';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import { fiveKNudgeDismissKey, type ArcFiveKLearnedDivergence } from '@/lib/arc-types';
 import { resolveCurrentFtp, pendingFtpProposal, acceptEstimatedFtp } from '@/lib/resolve-current-ftp';
-import { frielRunZones } from '@/lib/friel-zones';
 import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace, describeThresholdBasis, pendingRunThresholdProposal, acceptLearnedRunThreshold } from '@/lib/resolve-current-run-pace';
 import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
 import { ageEstimateMaxHr, resolveCurrentMaxHr } from '@/lib/resolve-current-max-hr';
@@ -429,6 +428,8 @@ const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [manualRideLTHR, setManualRideLTHR] = useState<number | null>(null);
   const [configuredZonesSource, setConfiguredZonesSource] = useState<string | null>(null);
   const [garminRestingHR, setGarminRestingHR] = useState<number | null>(null);
+  /** `configured_hr_zones` as the server saved it — the zone arrays the analysis bins on. */
+  const [storedZones, setStoredZones] = useState<Record<string, any> | null>(null);
 
   // Track initial manual HR state for change detection
   const [initialManualHR, setInitialManualHR] = useState('');
@@ -600,6 +601,7 @@ const loadBaselines = async () => {
             ? JSON.parse(row.configured_hr_zones)
             : row.configured_hr_zones;
           setConfiguredZonesSource(cfg.source || null);
+          setStoredZones(cfg);
           if (cfg.resting_heart_rate && Number(cfg.resting_heart_rate) > 30) {
             setGarminRestingHR(Number(cfg.resting_heart_rate));
           }
@@ -828,51 +830,19 @@ const getAgeBasedHREstimates = (birthday: string | undefined, gender?: string) =
   };
 };
 
-interface HRZone {
-  name: string;
-  label: string;
-  min: number;
-  max: number | null;
-  color: string;
-}
+/**
+ * ⛔ THE ZONE TABLE IS THE SERVER'S (2026-09-10). This file computed Friel and Karvonen zones for the
+ * screen AND wrote them to `configured_hr_zones`, which `compute-workout-analysis` bins every workout on
+ * first. `save-baselines` now derives and saves them (`save-baselines/derive.ts`); the screen prints the
+ * stored arrays — the same ones the analysis reads — and names each row by position.
+ */
+const ZONE_ROW_NAMES = ['Z1 Recovery', 'Z2 Aerobic', 'Z3 Tempo', 'Z4 Threshold', 'Z5 VO2max'];
 
-const ZONE_COLORS = ['#10b981', '#84cc16', '#f59e0b', '#ef4444', '#991b1b'];
-
-// Friel 5-zone model from LTHR (used by Garmin, TrainingPeaks)
-// D-286 — the zone table the athlete READS now derives from the SAME Friel model the learner applies.
-// It used to top Z2 at `round(0.90 x LTHR)` = 136 while `easy-hr.ts` cut easy at `round(0.89 x LTHR)` = 134,
-// so a 135 bpm run was "Zone 2 Aerobic" ON THIS SCREEN and "too hard to be easy" to the engine that sets
-// the athlete's plan pace. D-284 fixed the analyzer's copy and missed THIS one — the one they look at.
-// Now: easy === Z1 or Z2, by construction, at every LTHR. See src/lib/friel-zones.ts.
-const getFrielZones = (lthr: number): HRZone[] =>
-  frielRunZones(lthr).map((z, i) => ({ name: z.name, label: z.label, min: z.min, max: z.max, color: ZONE_COLORS[i] }));
-
-// Karvonen %HRR model (uses Max HR + Resting HR)
-const getKarvonenZones = (maxHR: number, restingHR: number): HRZone[] => {
-  const hrr = maxHR - restingHR;
-  const z = (pct: number) => Math.round(restingHR + hrr * pct);
-  return [
-    { name: 'Z1', label: 'Recovery',  min: 0,       max: z(0.60), color: ZONE_COLORS[0] },
-    { name: 'Z2', label: 'Aerobic',   min: z(0.60), max: z(0.70), color: ZONE_COLORS[1] },
-    { name: 'Z3', label: 'Tempo',     min: z(0.70), max: z(0.80), color: ZONE_COLORS[2] },
-    { name: 'Z4', label: 'Threshold', min: z(0.80), max: z(0.90), color: ZONE_COLORS[3] },
-    { name: 'Z5', label: 'VO2max',    min: z(0.90), max: maxHR,   color: ZONE_COLORS[4] },
-  ];
-};
-
-// Hybrid: prefer Friel (LTHR) when available, fall back to Karvonen (HRR) if resting HR known
-const getHRZones = (lthr: number | null, maxHR: number | null, restingHR: number | null): HRZone[] | null => {
-  if (lthr && lthr > 100) return getFrielZones(lthr);
-  if (maxHR && maxHR > 100 && restingHR && restingHR > 30) return getKarvonenZones(maxHR, restingHR);
-  return null;
-};
-
-const getZoneModel = (lthr: number | null, maxHR: number | null, restingHR: number | null): string => {
-  // Citations live in the ledger, not on screen (docs/STATE-SOURCES.md: Friel %LTHR, Karvonen %HRR).
-  if (lthr && lthr > 100) return 'from your threshold heart rate';
-  if (maxHR && maxHR > 100 && restingHR && restingHR > 30) return 'from your max and resting heart rate';
-  if (maxHR && maxHR > 100) return 'needs resting heart rate';
-  return '';
+// Citations live in the ledger, not on screen (docs/STATE-SOURCES.md: Friel %LTHR, Karvonen %HRR).
+const ZONE_MODEL_WORDS: Record<string, string> = {
+  friel: 'from your threshold heart rate',
+  karvonen: 'from your max and resting heart rate',
+  needs_resting: 'needs resting heart rate',
 };
 
 // Resting HR: only use real values (manual entry or Garmin device), never guess
@@ -925,114 +895,24 @@ const persist = async (next: BaselineData, hr?: { runMax?: number | null; runLth
         setData(dataToSave);
       }
     } catch { void 0; }
-    await saveUserBaselines(dataToSave as any);
-
-    // Persist manual HR zone overrides to configured_hr_zones
-    const hasManualOverrides = !!(m.runMax || m.runLthr || m.rideMax || m.rideLthr);
-    const hrChanged = JSON.stringify({ manualRunMaxHR: m.runMax, manualRunLTHR: m.runLthr, manualRideMaxHR: m.rideMax, manualRideLTHR: m.rideLthr }) !== initialManualHR || (hr && hr.resting !== undefined);
-    if (hasManualOverrides || hrChanged) {
-      const userId = getStoredUserId();
-      if (userId) {
-        const restingHR = restingOverride || garminRestingHR || 60;
-
-        /**
-         * ⛔ THROUGH THE RESOLVERS, OR THE SCREEN AND THE ENGINE PART COMPANY (2026-08-20).
-         *
-         * These read the learned columns RAW, which means no D-284 sample-count gate. The learner
-         * writes a FALLBACK when it finds no hard rides — `90% of observed max (estimated)`, with
-         * `sample_count: 0` — and a raw read takes it. Every server surface now refuses that value,
-         * so the zones saved from here would be built on a number the engine will not use: the screen
-         * showing one set of bins while workload and the analyser bin against another.
-         *
-         * ⚠️ IT IS VISIBLE ON A REAL SCREEN, WHICH IS HOW IT WAS FOUND: max HR 175, LTHR 158, and
-         * 175 × 0.90 = 157.5 → 158. The card labelled that "learned".
-         *
-         * The resolvers apply the gate, honour the athlete's typed override and their Q-174 choice,
-         * and are the same functions the server asks — so what is stored here is what the engine reads.
-         */
-        const baselinesForHr = {
-          learned_fitness: learnedFitness,
-          performance_numbers: next.performanceNumbers,
-          configured_hr_zones: { manual_run_lthr: m.runLthr, manual_ride_lthr: m.rideLthr },
-        } as never;
-        const effectiveRunLTHR = m.runLthr || resolveCurrentLthr(baselinesForHr, { sport: 'run' }).bpm || null;
-        const effectiveRunMax = m.runMax || resolveCurrentMaxHr(
-          { learned_fitness: learnedFitness } as never, { sport: 'run', allowAgeEstimate: false },
-        ).bpm || null;
-        const effectiveRideLTHR = m.rideLthr || resolveCurrentLthr(baselinesForHr, { sport: 'ride' }).bpm || null;
-        const effectiveRideMax = m.rideMax || resolveCurrentMaxHr(
-          { learned_fitness: learnedFitness } as never, { sport: 'ride', allowAgeEstimate: false },
-        ).bpm || null;
-
-        // Compute primary zone boundaries from the best available anchor
-        const primaryLTHR = effectiveRunLTHR || effectiveRideLTHR;
-        const primaryMax = effectiveRunMax || effectiveRideMax;
-
-        /**
-         * ⛔ ZONES ARE PER SPORT NOW (2026-08-20), AND THIS WAS THE REAL COLLAPSE.
-         *
-         * One `zones` array was built from `primaryLTHR` — which is `runLTHR || rideLTHR`, run
-         * PREFERRED — and `compute-workout-analysis:1580` reads it as **priority 1** for EVERY sport,
-         * above every resolver. So a ride's heart-rate zone bins were the athlete's RUNNING zones.
-         * Cycling heart rate sits 5-10 bpm below running at the same effort, so every ride binned one
-         * zone easy: real threshold work counted as tempo, and the time-in-zone the whole 80/20 read
-         * rests on was wrong for the bike.
-         *
-         * ⚠️ `zones` IS STILL WRITTEN, unchanged, and that is not laziness — Strava writes the same
-         * key with genuinely sport-agnostic zones (`strava-token-exchange:131`; Strava's own model has
-         * one HR zone set per athlete), and older rows carry it. It stays as the fallback. What is new
-         * is that when the app has a per-sport anchor it now says so instead of averaging two sports
-         * into one array.
-         */
-        const zonesFor = (lthr: number | null, maxHr: number | null) => {
-          if (lthr && lthr > 100) return getFrielZones(lthr).map(z => ({ min: z.min, max: z.max }));
-          if (maxHr && maxHr > 100) return getKarvonenZones(maxHr, restingHR).map(z => ({ min: z.min, max: z.max }));
-          return undefined;
-        };
-        const zonesRun = zonesFor(effectiveRunLTHR, effectiveRunMax);
-        const zonesRide = zonesFor(effectiveRideLTHR, effectiveRideMax);
-        const zones = zonesFor(primaryLTHR, primaryMax);
-
-        const configuredZones: Record<string, any> = {
-          source: hasManualOverrides ? 'manual' : 'learned',
-          custom_zones: hasManualOverrides,
-          updated_at: new Date().toISOString(),
-          manual_run_max_hr: m.runMax,
-          manual_run_lthr: m.runLthr,
-          manual_ride_max_hr: m.rideMax,
-          manual_ride_lthr: m.rideLthr,
-          /**
-           * ⛔ ONLY WRITTEN WHEN IT IS UNAMBIGUOUS (2026-08-20). These two were
-           * `runLTHR || rideLTHR` and `runMax || rideMax` — one number claiming to speak for two
-           * sports, and every reader that trusted it got the RUN's number for a bike. That is the
-           * collapse the per-sport arrays above exist to end, and continuing to write the collapsed
-           * value would leave the next reader a loaded gun.
-           *
-           * Written only when a single sport has an anchor, so the value cannot be the wrong sport's.
-           * With both on file it is `null` and readers use the per-sport fields, which every reader in
-           * this app now does. With neither it was null anyway.
-           *
-           * ⚠️ NOT DELETED. The KEY stays because Strava writes it (`strava-token-exchange:138`) and
-           * rows written before today carry it — a reader hitting `undefined` versus a missing key is
-           * the same answer, but removing the key from the write would strand nothing and confuse the
-           * next person reading the shape.
-           */
-          threshold_heart_rate: (effectiveRunLTHR && effectiveRideLTHR) ? null : primaryLTHR,
-          max_heart_rate: (effectiveRunMax && effectiveRideMax) ? null : primaryMax,
-          resting_heart_rate: restingHR,
-        };
-        if (zones) configuredZones.zones = zones;
-        // The per-sport arrays. Absent when that sport has no anchor — which is honest, and lets a
-        // reader fall back rather than bin a ride against running zones.
-        if (zonesRun) configuredZones.zones_run = zonesRun;
-        if (zonesRide) configuredZones.zones_ride = zonesRide;
-
-        await supabase
-          .from('user_baselines')
-          .update({ configured_hr_zones: configuredZones })
-          .eq('user_id', userId);
-      }
-    }
+    /**
+     * ⛔ THE HEART-RATE NUMBERS AS TYPED, AND NOTHING DERIVED FROM THEM (2026-09-10).
+     *
+     * This block used to resolve each sport's anchors, build Friel or Karvonen zone tables (filling a
+     * missing resting heart rate with 60) and write `configured_hr_zones` itself. `save-baselines` now
+     * resolves the anchors through the same resolvers, builds the tables with `hrZones` and saves them;
+     * it keeps the per-sport arrays and the unambiguous-scalar rule this block introduced (2026-08-20).
+     * Resting heart rate is sent only when the athlete typed or cleared it.
+     */
+    const heartRate: Record<string, number | null> = {
+      manual_run_max_hr: m.runMax,
+      manual_run_lthr: m.runLthr,
+      manual_ride_max_hr: m.rideMax,
+      manual_ride_lthr: m.rideLthr,
+      ...(((hr && hr.resting !== undefined) || customRestingHR) ? { resting_heart_rate: restingOverride } : {}),
+    };
+    const saved = await saveUserBaselines(dataToSave as any, heartRate);
+    if (saved?.configured_hr_zones) setStoredZones(saved.configured_hr_zones);
 
     setOriginalData(JSON.stringify(dataToSave)); // match the SAVED copy (incl. swimPace100_updated_at) so the button greys out post-save
     setInitialManualHR(JSON.stringify({ manualRunMaxHR: m.runMax, manualRunLTHR: m.runLthr, manualRideMaxHR: m.rideMax, manualRideLTHR: m.rideLthr }));
@@ -1298,13 +1178,15 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
         onSave={(t) => { const v = parseInt(t); if (!(v > 30)) return; setCustomRestingHR(v); void commitData((d) => d, { resting: v }); }}
         onAuto={() => { setCustomRestingHR(null); void commitData((d) => d, { resting: null }); }} />,
     );
-    const zones = getHRZones(effLthr, effMax, restingInfo.value);
-    const model = getZoneModel(effLthr, effMax, restingInfo.value);
-    const table = zones && zones.length > 0 ? (
+    // ⛔ THE STORED ARRAYS, IN THE ORDER THE ANALYSIS READS THEM: the sport's own, else the shared one.
+    const zones = (isRun ? (storedZones?.zones_run ?? storedZones?.zones) : (storedZones?.zones_ride ?? storedZones?.zones)) as
+      Array<{ min: number; max: number | null }> | undefined;
+    const model = ZONE_MODEL_WORDS[String(isRun ? storedZones?.zones_run_model : storedZones?.zones_ride_model)] ?? '';
+    const table = Array.isArray(zones) && zones.length > 0 ? (
       <div className="mt-1 space-y-0.5">
-        {zones.map((z) => (
-          <div key={z.name} className="flex items-baseline justify-between text-[12px] px-1">
-            <span className="text-white/60">{z.name} {z.label}</span>
+        {zones.map((z, i) => (
+          <div key={ZONE_ROW_NAMES[i] ?? i} className="flex items-baseline justify-between text-[12px] px-1">
+            <span className="text-white/60">{ZONE_ROW_NAMES[i] ?? `Z${i + 1}`}</span>
             <span className="tabular-nums text-white/75">{z.min}–{z.max} bpm</span>
           </div>
         ))}

@@ -193,36 +193,13 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
       }
       if (prefill?.goalId) {
         if (seconds == null || seconds <= 0) throw new Error('Missing elapsed seconds');
-        const { data: existing } = await supabase
-          .from('goals')
-          .select('training_prefs')
-          .eq('id', prefill.goalId)
-          .eq('user_id', uid)
-          .maybeSingle();
-        const currentPrefs =
-          existing?.training_prefs && typeof existing.training_prefs === 'object'
-            ? (existing.training_prefs as Record<string, unknown>)
-            : {};
-        const { error } = await supabase
-          .from('goals')
-          .update({
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-            current_value: seconds,
-            training_prefs: {
-              ...currentPrefs,
-              manual_athletic_record: true,
-              race_result: {
-                actual_seconds: seconds,
-                time_source: 'manual_elapsed',
-                completed_at: new Date().toISOString(),
-              },
-            },
-            updated_at: new Date().toISOString(),
-          } as any)
-          .eq('id', prefill.goalId)
-          .eq('user_id', uid);
-        if (error) throw error;
+        // ⛔ THE SERVER SAVES THE RESULT (2026-09-10). The phone sends the typed finish time; complete-race
+        // writes the goal, as it does for a result read off the race workout.
+        const { data: fnData, error: fnErr } = await supabase.functions.invoke('complete-race', {
+          body: { goal_id: prefill.goalId, manual_elapsed_seconds: seconds },
+        });
+        const payload = fnData as { error?: string; success?: boolean } | null;
+        if (fnErr || !payload?.success) throw new Error(payload?.error || (fnErr as Error)?.message || 'complete-race failed');
         try { window.dispatchEvent(new CustomEvent('goals:invalidate')); } catch { /* ignore */ }
         return;
       }

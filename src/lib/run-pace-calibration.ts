@@ -2,27 +2,14 @@
 // run-pace-calibration — "do we have a pace to build on, and if not, get one"
 // =============================================================================
 //
-// ⛔ WHY THIS IS A MODULE AND NOT A SECOND COPY. The race form already has this: two fields (easy
-// pace, 5K pace), a derived-zone preview, and an upsert to `user_baselines`
-// (`GoalsScreen.tsx:1126` `handleCalibrationSave`). The marathon card needs the same thing for the
-// same reason, and copying it would give the app two calibrations that can drift apart while
-// writing to one row.
-//
-// ⛔ AND THE MATH WAS ALREADY SHIPPED — THIS IS THE THIRD COPY AVOIDED, NOT THE SECOND.
-// `GoalsScreen` carries private `VDOT_5K` and `PACE_BY_VDOT` tables. `PACE_BY_VDOT` is a
-// **byte-for-byte duplicate** of `PACE_TABLE` in `src/lib/effort-score.ts`, in a different shape.
-// So this file computes nothing itself: it calls `calculateEffortScore` / `getPacesFromScore`, the
-// engine the rest of the app already uses — `effort_paces` written here is read by
-// `generate-run-plan`'s performance_build path, and `_shared/endurance/pace-zones.ts` describes
-// itself as "parity-locked to effort-score". Effort-score is canonical; GoalsScreen's copy is the
-// outlier.
-//
-// ⚠️ GOALSCREEN IS NOT REWIRED TO THIS YET. Doing it mid-device-test would put a live surface at
-// risk for a tidy-up. Its copy is numerically identical today, so nothing is lying — but that is a
-// coincidence that will not survive an edit to one of them. Re-point it in its own change.
+// ⛔ THE PHONE SENDS THE TWO TYPED PACES; THE SERVER DERIVES AND SAVES (2026-09-10).
+// This file used to turn the typed 5K pace into a 5K clock, score it with a phone copy of the VDOT
+// tables (`effort-score.ts`), and upsert the `effort_*` columns itself. `save-baselines` now does all of
+// that with the plan builder's own formula (`generate-run-plan/effort-score.ts`), and the Goals card's
+// "derived training zones" preview asks the same function with `preview: true`.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { calculateEffortScore, getPacesFromScore, type TrainingPaces } from './effort-score';
+import type { TrainingPaces } from './effort-score';
 
 /** The subset of `user_baselines` the pace gate reads. */
 export type PaceBenchmarkRow = {
@@ -71,107 +58,42 @@ export function formatPaceInput(sec: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export type CalibrationResult = {
-  /** vDOT — stored as `effort_score`. */
-  score: number;
-  paces: TrainingPaces;
-  /** The 5K time implied by the typed 5K pace, in seconds — stored as `effort_source_time`. */
-  fiveKTimeSec: number;
-  /** The typed easy pace, sec/MILE — stored as `performance_numbers.easyPace` (the typed seed). */
-  easyPaceSecPerMi: number;
-};
+export type CalibrationInput = { easyPace: string; fiveKPace: string; isMetric: boolean };
 
-/** seconds → "mm:ss" race clock, the shape `performance_numbers.fiveK` has always held. */
-export function formatRaceClock(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = Math.round(sec % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
+const calibrationBody = (input: CalibrationInput) => ({
+  calibration: {
+    five_k_pace: input.fiveKPace,
+    easy_pace: input.easyPace,
+    units: input.isMetric ? 'metric' : 'imperial',
+  },
+});
+
+/** The paces the server would derive from these two typed paces, without saving. Null when it declines. */
+export async function previewCalibration(
+  supabase: SupabaseClient,
+  input: CalibrationInput,
+): Promise<TrainingPaces | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('save-baselines', {
+      body: { ...calibrationBody(input), preview: true },
+    });
+    if (error || !data?.success) return null;
+    return (data.effort_paces as TrainingPaces) ?? null;
+  } catch {
+    return null;
+  }
 }
 
-/**
- * ⛔ THE ONE DERIVATION (2026-09-02, D-461). Every pace the app derives from a 5K comes from this
- * function and nowhere else. Input: the 5K as a race clock in seconds. Output: the `effort_*` columns
- * on `user_baselines`, which the 25-odd readers of `effort_paces` keep reading unchanged.
- *
- * Before this there were FOUR writers (the race wizard with its own inline vDOT tables, the strength
- * wizard, `generate-run-plan`, and `materialize-plan` recomputing and writing back on every build) and
- * TWO stored 5Ks (`performance_numbers.fiveK` from Baselines, `effort_source_time` from the wizards).
- * Now: the 5K lives in `performance_numbers.fiveK`, and whoever saves it calls this.
- */
-export function effortFieldsFromFiveKTimeSec(fiveKTimeSec: number): {
-  effort_score: number;
-  effort_source_distance: number;
-  effort_source_time: number;
-  effort_paces: TrainingPaces;
-  effort_paces_source: 'calculated';
-  /** ⛔ The DB check constraint allows only 'estimated' | 'verified' (probed 2026-09-02). 'self_reported'
-   *  was what the wizards wrote for months — and every one of those upserts was rejected. A typed 5K is
-   *  an estimate until a race verifies it. */
-  effort_score_status: 'estimated';
-  effort_updated_at: string;
-} {
-  const score = calculateEffortScore(5000, fiveKTimeSec);
-  return {
-    effort_score: score,
-    effort_source_distance: 5000,
-    effort_source_time: Math.round(fiveKTimeSec),
-    effort_paces: getPacesFromScore(score),
-    effort_paces_source: 'calculated',
-    effort_score_status: 'estimated',
-    effort_updated_at: new Date().toISOString(),
-  };
-}
-
-/**
- * Two self-reported paces → the effort score and training paces the plan will be built from.
- *
- * ⚠️ THE 5K PACE IS THE ONE THAT DOES THE WORK. The easy pace is asked because it is the number an
- * athlete can answer confidently and it sanity-checks the other (5K must be faster), but the score
- * is derived from the 5K only — that is what `calculateEffortScore` takes.
- *
- * Returns null when either pace is unusable or the pair is incoherent, so a caller can stay silent
- * rather than store a number nobody can stand behind.
- */
-export function calibrationFromPaces(input: {
-  easyPace: string;
-  fiveKPace: string;
-  isMetric: boolean;
-}): CalibrationResult | null {
-  const easyRaw = parsePaceInput(input.easyPace);
-  const fiveKRaw = parsePaceInput(input.fiveKPace);
-  if (!easyRaw || !fiveKRaw) return null;
-  // ⛔ A 5K SLOWER THAN EASY IS NOT A SLOW ATHLETE, IT IS A SWAPPED PAIR. Storing it would hand the
-  // plan a score computed from the wrong field.
-  if (fiveKRaw >= easyRaw) return null;
-
-  const toSecPerMile = (v: number) => (input.isMetric ? Math.round(v * 1.60934) : v);
-  const fiveKPerMile = toSecPerMile(fiveKRaw);
-  const fiveKTimeSec = Math.round(fiveKPerMile * 3.10686);
-  const score = calculateEffortScore(5000, fiveKTimeSec);
-  return { score, paces: getPacesFromScore(score), fiveKTimeSec, easyPaceSecPerMi: toSecPerMile(easyRaw) };
-}
-
-/**
- * Persist a calibration to `user_baselines`, in the shape the pace gate reads.
- *
- * ⚠️ `effort_score_status: 'self_reported'` is not decoration — it is how every downstream surface
- * knows this number came from the athlete's own estimate rather than a measured race, and the
- * distinction is the difference between a fact and a claim.
- */
+/** Save the two typed paces. The server stores the 5K on Baselines and derives the effort columns. */
 export async function saveCalibration(
   supabase: SupabaseClient,
-  userId: string,
-  result: CalibrationResult,
+  input: CalibrationInput,
 ): Promise<{ error: string | null }> {
-  // ⛔ WRITES THE 5K WHERE BASELINES KEEPS IT, then the ONE derivation (D-461).
-  const { data: row } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', userId).maybeSingle();
-  const pn = { ...((row?.performance_numbers as Record<string, unknown> | null) ?? {}) } as Record<string, unknown>;
-  pn.fiveK = formatRaceClock(result.fiveKTimeSec);
-  // `easyPace` is NOT written (D-462): easy is a heart-rate zone; no reader takes a typed easy pace.
-  const { error } = await supabase.from('user_baselines').upsert({
-    user_id: userId,
-    performance_numbers: pn,
-    ...effortFieldsFromFiveKTimeSec(result.fiveKTimeSec),
-  }, { onConflict: 'user_id' });
-  return { error: error ? error.message : null };
+  try {
+    const { data, error } = await supabase.functions.invoke('save-baselines', { body: calibrationBody(input) });
+    if (error) return { error: error.message };
+    return { error: data?.success ? null : String(data?.error || 'Could not save the calibration') };
+  } catch (e) {
+    return { error: (e as Error)?.message || 'Could not save the calibration' };
+  }
 }

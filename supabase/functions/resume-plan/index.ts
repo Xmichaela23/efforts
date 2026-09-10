@@ -1,21 +1,24 @@
 // @ts-nocheck
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { requireUser, AuthError } from '../_shared/require-user.ts'
 
 /**
- * resume-plan edge function
+ * resume-plan edge function — THE ONE RESUME (2026-09-10).
  *
- * Resumes an ended plan by:
- * 1. Reading the tombstone (or inferring weeks_completed from workout history)
- * 2. Recalculating the plan's effective start date so today maps to the
- *    requested resume week
- * 3. Setting status back to 'active'
+ * ⛔ BOTH RESUME BUTTONS CALL THIS. The plan detail's Resume (a PAUSED plan) used to shift the start
+ * date on the phone by the days paused and write the plan row itself, while Past Plans' Resume (an
+ * ENDED plan) called here — so the two buttons gave the same plan different dates for every session.
+ * The phone now sends the plan id, plus a week only when the athlete picked "Start from Week 1".
+ *
+ * Resumes a paused or ended plan by:
+ * 1. The resume week: the week the athlete picked, else tombstone.weeks_completed, else the last week
+ *    with a completed planned session, else 1
+ * 2. Recalculating the plan's effective start date so today's Monday is that week
+ * 3. Setting status back to 'active' and clearing paused_at
  * 4. Clearing the tombstone from config
- *
- * Works on any ended plan — new ones with tombstones and older ones without.
  *
  * Input:
  *   plan_id: string
- *   resume_from_week?: number  (default: tombstone.weeks_completed or 1)
+ *   resume_from_week?: number  (only the athlete's own pick)
  *
  * Output:
  *   { success, plan_id, resume_from_week, new_start_date, weeks_remaining }
@@ -40,6 +43,7 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: cors })
 
   try {
+    const { userId, supabase } = await requireUser(req)
     const body = await req.json().catch(() => ({}))
     const planId: string | null = body?.plan_id || null
     const requestedWeek: number | null = body?.resume_from_week ? Number(body.resume_from_week) : null
@@ -51,11 +55,6 @@ Deno.serve(async (req) => {
       )
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
-
     // ── 1. Read the plan ──────────────────────────────────────────────────────
     const { data: planRow, error: planErr } = await supabase
       .from('plans')
@@ -63,7 +62,7 @@ Deno.serve(async (req) => {
       .eq('id', planId)
       .single()
 
-    if (planErr || !planRow) {
+    if (planErr || !planRow || String(planRow.user_id) !== String(userId)) {
       return new Response(
         JSON.stringify({ error: 'Plan not found' }),
         { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } }
@@ -143,6 +142,7 @@ Deno.serve(async (req) => {
       .from('plans')
       .update({
         status: 'active',
+        paused_at: null,
         config: updatedConfig,
         current_week: resumeFromWeek,
       })
@@ -173,6 +173,9 @@ Deno.serve(async (req) => {
       { headers: { ...cors, 'Content-Type': 'application/json' } }
     )
   } catch (e) {
+    if (e instanceof AuthError) {
+      return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { ...cors, 'Content-Type': 'application/json' } })
+    }
     console.error('Error resuming plan:', e)
     return new Response(
       JSON.stringify({ error: String(e) }),

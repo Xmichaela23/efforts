@@ -210,7 +210,7 @@ import {
 } from '@/lib/run-volume-tables';
 // ⛔ ONE CALIBRATION, shared with the race form's. Also the ONLY vDOT engine — `effort-score.ts`.
 import {
-  hasPaceBenchmark, calibrationFromPaces, saveCalibration, formatPaceInput,
+  hasPaceBenchmark,
   type PaceBenchmarkRow,
 } from '@/lib/run-pace-calibration';
 import { supabase, getStoredUserId } from '@/lib/supabase';
@@ -2484,10 +2484,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * card renders no cap rather than one computed off nothing.
    */
   const baselinesRow = paceRow as unknown;
-  /** The typed calibration, if it is coherent. Drives the preview and the save. */
-  const calResult = calibrationFromPaces({
-    easyPace: state.calEasy, fiveKPace: state.calFiveK, isMetric: unit === 'km',
-  });
+  // ⚠️ The phone-side calibration score that sat here was never read (2026-09-10) and is gone with the
+  // phone copy of the pace tables; `save-baselines` derives paces from a typed 5K.
   const [calSaving, setCalSaving] = React.useState(false);
   const [calSaved, setCalSaved] = React.useState(false);
   /** Speed needs numbers. Either they are on file, or they were just entered here. */

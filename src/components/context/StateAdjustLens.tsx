@@ -291,11 +291,9 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
         await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), threshold_pace_min_per_mi: str, threshold_pace_source: 'manual' } });
       } else if (id === 'lthr') {
         const v = Math.round(Number(t)); if (!(v > 0)) return;
-        // The zones object Baselines writes (manual_run_lthr + the sport-agnostic threshold_heart_rate), same column.
-        const uid = getStoredUserId();
-        const zones = { ...((baselines.configured_hr_zones && typeof baselines.configured_hr_zones === 'object') ? baselines.configured_hr_zones : {}), source: 'manual', custom_zones: true, updated_at: new Date().toISOString(), manual_run_lthr: v, threshold_heart_rate: v };
-        if (uid) { const { error } = await supabase.from('user_baselines').update({ configured_hr_zones: zones }).eq('user_id', uid); if (error) throw error; }
-        await saveUserBaselines({ ...baselines, configured_hr_zones: zones, performanceNumbers: { ...(pn ?? {}), lthr_source: 'manual' } });
+        // ⛔ The typed threshold only (2026-09-10). `save-baselines` stores it and rebuilds the zone tables
+        // from it — this wrote the object itself and left the old zone arrays standing beside the new number.
+        await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), lthr_source: 'manual' } }, { manual_run_lthr: v });
       } else {
         const key = canonicalizeLiftKey(id); const v = Math.round(Number(t)); if (!key || !(v > 0)) return;
         await saveUserBaselines({ ...baselines, locked_baselines: { ...(baselines.locked_baselines ?? {}), [key]: v } });

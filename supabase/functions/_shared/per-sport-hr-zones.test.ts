@@ -7,6 +7,11 @@
  * running at the same effort, so every ride landed a zone too easy: threshold work counted as tempo,
  * and the time-in-zone the 80/20 read rests on was wrong for the bike.
  *
+ * ⛔ THE WRITER MOVED TO THE SERVER (2026-09-10). `TrainingBaselines` no longer derives or writes the
+ * zones; `save-baselines/derive.ts` does. The writer assertions below read that file, and one more pins
+ * that the screen stays out of zone maths. Behaviour of the derivation itself is pinned in
+ * `supabase/functions/save-baselines/derive.test.ts`.
+ *
  * ⚠️ THIS IS A SOURCE-SHAPE TEST, AND IT HAS TO BE. `compute-workout-analysis` is `@ts-nocheck` and
  * 5,000 lines with no unit tests, so neither the typechecker nor a fixture will catch the two ways
  * this regresses: reading the shared array for a ride again, or referring to a sport flag that is not
@@ -20,12 +25,13 @@ import { assert } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 const REPO = new URL('../../../', import.meta.url);
 const analysisSrc = await Deno.readTextFile(new URL('supabase/functions/compute-workout-analysis/index.ts', REPO));
 const baselinesSrc = await Deno.readTextFile(new URL('src/components/TrainingBaselines.tsx', REPO));
+const writerSrc = await Deno.readTextFile(new URL('supabase/functions/save-baselines/derive.ts', REPO));
 
 Deno.test('the WRITER emits a per-sport zone array for each discipline', () => {
-  assert(/zones_run\b/.test(baselinesSrc), 'no run zone array is written');
-  assert(/zones_ride\b/.test(baselinesSrc), 'no ride zone array is written');
+  assert(/zones_run\b/.test(writerSrc), 'no run zone array is written');
+  assert(/zones_ride\b/.test(writerSrc), 'no ride zone array is written');
   // And the shared one stays — Strava writes the same key with genuinely sport-agnostic zones.
-  assert(/configuredZones\.zones\s*=\s*zones\b/.test(baselinesSrc), 'the legacy shared array stopped being written');
+  assert(/cfg\.zones\s*=\s*zones\b/.test(writerSrc), 'the legacy shared array stopped being written');
 });
 
 Deno.test('the READER prefers the sport-specific array', () => {
@@ -53,33 +59,39 @@ Deno.test('the shared scalar is not written when it would be ambiguous', () => {
   // with BOTH now gets null there, so no reader can pick up the wrong sport's anchor by accident;
   // an athlete with only one still gets it, because then it is unambiguous.
   assert(
-    /threshold_heart_rate:\s*\(effectiveRunLTHR\s*&&\s*effectiveRideLTHR\)\s*\?\s*null\s*:\s*primaryLTHR/.test(baselinesSrc),
+    /threshold_heart_rate:\s*\(runLthr\s*&&\s*rideLthr\)\s*\?\s*null\s*:\s*primaryLthr/.test(writerSrc),
     'the shared threshold is being written as if it belonged to both sports again',
   );
   assert(
-    /max_heart_rate:\s*\(effectiveRunMax\s*&&\s*effectiveRideMax\)\s*\?\s*null\s*:\s*primaryMax/.test(baselinesSrc),
+    /max_heart_rate:\s*\(runMax\s*&&\s*rideMax\)\s*\?\s*null\s*:\s*primaryMax/.test(writerSrc),
     'the shared max HR is being written as if it belonged to both sports again',
   );
 });
 
-Deno.test('the SCREEN resolves its anchors — it cannot show zones the engine refuses', () => {
+Deno.test('the WRITER resolves its anchors — it cannot save zones the engine refuses', () => {
   // ⛔ FOUND ON A REAL SCREEN. Max HR 175, LTHR 158 — and 175 x 0.90 = 157.5 -> 158, which is the
   // learner's `90% of observed max (estimated)` fallback, sample_count 0. The card called it
-  // "learned". Every server surface now refuses that value, so a raw read here would save and display
-  // zones built on a number the engine will not use.
+  // "learned". Every server surface now refuses that value, so a raw read would save zones built on
+  // a number the engine will not use.
   assert(
-    /effectiveRideLTHR\s*=\s*manualRideLTHR\s*\|\|\s*resolveCurrentLthr\([^)]*\{\s*sport:\s*'ride'\s*\}\)/.test(baselinesSrc),
-    'the bike anchor is being read raw on the screen again',
+    /rideLthr\s*=\s*m\.rideLthr\s*\|\|\s*resolveCurrentLthr\([^)]*\{\s*sport:\s*'ride'\s*\}\)/.test(writerSrc),
+    'the bike anchor is being read raw by the writer',
   );
   assert(
-    /effectiveRunLTHR\s*=\s*manualRunLTHR\s*\|\|\s*resolveCurrentLthr\([^)]*\{\s*sport:\s*'run'\s*\}\)/.test(baselinesSrc),
-    'the run anchor is being read raw on the screen again',
+    /runLthr\s*=\s*m\.runLthr\s*\|\|\s*resolveCurrentLthr\([^)]*\{\s*sport:\s*'run'\s*\}\)/.test(writerSrc),
+    'the run anchor is being read raw by the writer',
   );
   const codeOnly = baselinesSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   assert(
     !/learnedFitness\?\.(run|ride)_threshold_hr\?\.value/.test(codeOnly),
     'the screen reaches past the resolver to the raw threshold column',
   );
+});
+
+Deno.test('the SCREEN does no zone maths and writes no zones (2026-09-10)', () => {
+  const codeOnly = baselinesSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  assert(!/frielRunZones|getFrielZones|getKarvonenZones|getHRZones/.test(codeOnly), 'the screen computes zone tables again');
+  assert(!/configured_hr_zones\s*:\s*configuredZones|update\(\{\s*configured_hr_zones/.test(codeOnly), 'the screen writes configured_hr_zones again');
 });
 
 Deno.test('the estimate tier anchors on the athlete\'s OWN max, not on their age', () => {

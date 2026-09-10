@@ -167,13 +167,13 @@ export default function WelcomePage() {
   /** The same save Profile uses, over whatever is already on the row. Saves run one after another
    *  (a row's blur-save and Next can fire in the same tick; the second must read the first's result). */
   const queue = React.useRef<Promise<void>>(Promise.resolve());
-  const persist = useCallback((patch: (b: any) => any) => {
+  const persist = useCallback((patch: (b: any) => any, heartRate?: Record<string, number | null>) => {
     const run = async () => {
       const current = (await loadUserBaselines?.()) ?? {
         disciplines: [], performanceNumbers: {}, equipment: {}, units: 'imperial',
         disciplineFitness: {}, benchmarks: {}, injuryHistory: '', injuryRegions: [], trainingBackground: '',
       };
-      await saveUserBaselines?.(patch(current));
+      await saveUserBaselines?.(patch(current), heartRate);
     };
     queue.current = queue.current.then(run, run);
     return queue.current;
@@ -306,16 +306,16 @@ export default function WelcomePage() {
   const finish = async () => {
     setSaving(true);
     try {
-      await persist((b) => ({ ...b, performanceNumbers: { ...(b.performanceNumbers ?? {}), ...pn }, locked_baselines: Object.keys(locked).length ? { ...(b.locked_baselines ?? {}), ...locked } : (b.locked_baselines ?? null) }));
+      // ⛔ The typed threshold goes with the save (2026-09-10); `save-baselines` stores it and builds the zones.
+      await persist(
+        (b) => ({ ...b, performanceNumbers: { ...(b.performanceNumbers ?? {}), ...pn }, locked_baselines: Object.keys(locked).length ? { ...(b.locked_baselines ?? {}), ...locked } : (b.locked_baselines ?? null) }),
+        manualRunLthr ? { manual_run_lthr: manualRunLthr } : undefined,
+      );
       const uid = getStoredUserId();
       if (uid) {
-        const { data } = await supabase.from('user_baselines').select('ui_prefs, configured_hr_zones').eq('user_id', uid).maybeSingle();
+        const { data } = await supabase.from('user_baselines').select('ui_prefs').eq('user_id', uid).maybeSingle();
         const prefs = (data?.ui_prefs && typeof data.ui_prefs === 'object') ? (data.ui_prefs as Record<string, unknown>) : {};
-        const cfg: any = typeof data?.configured_hr_zones === 'string' ? JSON.parse(data.configured_hr_zones) : (data?.configured_hr_zones ?? {});
-        const patch: Record<string, unknown> = { ui_prefs: { ...prefs, intake_done: true } };
-        // The resolvers honour manual_run_lthr directly; Profile rewrites its cached bins on its next save.
-        if (manualRunLthr) patch.configured_hr_zones = { ...cfg, manual_run_lthr: manualRunLthr };
-        await supabase.from('user_baselines').update(patch).eq('user_id', uid);
+        await supabase.from('user_baselines').update({ ui_prefs: { ...prefs, intake_done: true } }).eq('user_id', uid);
       }
       try { localStorage.removeItem(STEP_KEY); } catch { /* device copy only */ }
       navigate('/', { replace: true });
@@ -461,7 +461,7 @@ export default function WelcomePage() {
                   saveOnBlur onSave={(t) => { const sec = parsePaceText(t); if (sec == null) return; const secPerMi = metric ? sec * 1.609344 : sec; const str = paceToText(secPerMi); setPn((p) => ({ ...p, threshold_pace_min_per_mi: str, threshold_pace_source: 'manual' })); void persist((b) => ({ ...b, performanceNumbers: { ...(b.performanceNumbers ?? {}), threshold_pace_min_per_mi: str, threshold_pace_source: 'manual' } })); }} />
                 <NumberRow id="lthr" name="Threshold heart rate" hint="bpm" inputMode="numeric" sport="run" note={easyLo == null ? null : null}
                   value={lthr ? `${Math.round(lthr)} bpm · easy ${easyLo}–${easyHi}` : null} seed={lthr ? String(Math.round(lthr)) : ''}
-                  saveOnBlur onSave={(t) => { const v = parseInt(t); if (!(Number.isFinite(v) && v > 80 && v < 230)) return; setManualRunLthr(v); const uid = getStoredUserId(); if (!uid) return; void supabase.from('user_baselines').select('configured_hr_zones').eq('user_id', uid).maybeSingle().then(({ data }) => { const cfg: any = typeof data?.configured_hr_zones === 'string' ? JSON.parse(data.configured_hr_zones) : (data?.configured_hr_zones ?? {}); return supabase.from('user_baselines').update({ configured_hr_zones: { ...cfg, manual_run_lthr: v } }).eq('user_id', uid); }); }} />
+                  saveOnBlur onSave={(t) => { const v = parseInt(t); if (!(Number.isFinite(v) && v > 80 && v < 230)) return; setManualRunLthr(v); void persist((b) => b, { manual_run_lthr: v }); }} />
               </div>
             </div>
           </StepLayout>

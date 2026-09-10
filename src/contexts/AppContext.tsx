@@ -4,8 +4,6 @@ import { supabase, getStoredUserId } from '@/lib/supabase';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import { Capacitor } from '@capacitor/core';
 import { parseLocalDate } from '@/lib/dateUtils';
-import { deriveFiveKPaceFromRaceTime, resolveFiveKRaceTimeSec } from '@/lib/resolve-current-5k-pace';
-import { effortFieldsFromFiveKTimeSec } from '@/lib/run-pace-calibration';
 import { isHealthKitAvailable, requestHealthKitAuthorization } from '@/services/healthkit';
 
 export interface WorkoutInterval {
@@ -151,7 +149,12 @@ interface AppContextType {
   pausePlan: (planId: string) => Promise<any>;
   updatePlan: (planId: string, updates: any) => Promise<void>;
   refreshPlans: () => Promise<void>;
-  saveUserBaselines: (data: BaselineData) => Promise<void>;
+  /**
+   * Saves what the athlete typed through `save-baselines`, which derives and saves `fiveK_pace`, the
+   * effort score and paces, and — when `heartRate` is passed — the heart-rate zone tables. Resolves to
+   * the server's answer (`{ success, effort, performance_numbers, configured_hr_zones }`).
+   */
+  saveUserBaselines: (data: BaselineData, heartRate?: Record<string, number | null>) => Promise<any>;
   loadUserBaselines: () => Promise<BaselineData | null>;
   hasUserBaselines: () => Promise<boolean>;
   repairPlan?: (planId: string) => Promise<{ repaired: number }>;
@@ -325,40 +328,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => window.removeEventListener('plans:refresh', handleRefresh);
   }, []);
 
-  const saveUserBaselines = async (data: BaselineData) => {
+  const saveUserBaselines = async (data: BaselineData, heartRate?: Record<string, number | null>) => {
     try {
       const userId = getStoredUserId();
       if (!userId) throw new Error('User must be authenticated to save baselines');
-      // Derive `fiveK_pace` from the 5K race TIME the athlete typed. `fiveK` is a race clock ("22:30");
-      // `fiveK_pace` is the pace every plan generator, the coach and the workout card actually read.
-      const perf = { ...(data.performanceNumbers || {}) } as any;
-      const unitsSuffix = (data.units === 'metric') ? '/km' : '/mi';
-      // ⛔ RECOMPUTED ON EVERY SAVE, NOT JUST WHEN BLANK. The guard was `!perf.fiveK_pace`, so this only
-      // ever filled a hole: re-typing the 5K — or tapping "Yes" on the nudge at TrainingBaselines.tsx:459
-      // — moved the time and left the pace stale, and since `resolveCurrent5kPace` prefers a typed pace
-      // over the race time, the stale pace then WON over the fresh time.
-      //
-      // ⚠️ Nothing the athlete typed is being clobbered: this is the only line in the app that writes
-      // `fiveK_pace` and no input binds to it, so a directly-typed 5K pace does not exist and cannot be
-      // told apart from a derived one. Add a provenance flag here first if a 5K PACE field is ever added.
-      //
-      // Units live in the resolver — /5 for a metric athlete, /3.106856 miles for an imperial one. The
-      // copy that sat here divided by miles either way and appended the athlete's suffix, so a metric
-      // athlete stored seconds per MILE under a per-KM label.
-      const derivedFiveKPace = deriveFiveKPaceFromRaceTime(perf.fiveK, data.units === 'metric');
-      if (derivedFiveKPace) perf.fiveK_pace = derivedFiveKPace;
-      // Coerce unitless paces to the user's unit preference so normalizer always has a unit
-      if (typeof perf.fiveK_pace === 'string' && !/\/(mi|km)$/i.test(perf.fiveK_pace)) {
-        const m = perf.fiveK_pace.match(/^(\d{1,2}):(\d{2})$/);
-        if (m) perf.fiveK_pace = `${m[1]}:${m[2]}${unitsSuffix}`;
-      }
-      if (typeof perf.easyPace === 'string' && !/\/(mi|km)$/i.test(perf.easyPace)) {
-        const m = perf.easyPace.match(/^(\d{1,2}):(\d{2})$/);
-        if (m) perf.easyPace = `${m[1]}:${m[2]}${unitsSuffix}`;
-      }
-
+      /**
+       * ⛔ THE PHONE SENDS WHAT WAS TYPED; THE SERVER DERIVES AND SAVES (2026-09-10).
+       *
+       * This function used to derive `fiveK_pace` from the 5K clock, the effort score and training paces
+       * from the same 5K (a phone copy of the VDOT tables), and write all of it to `user_baselines`.
+       * `save-baselines` now does that with the plan builder's own formula
+       * (`generate-run-plan/effort-score.ts`); the phone copy gave identical numbers on every 5K time
+       * checked. A `fiveK_pace` or `effort_*` value in what is sent here is ignored by the server.
+       */
       const baselineRecord = {
-        user_id: userId,
         // Enhanced user details
         birthday: data.birthday,
         height: data.height,
@@ -376,31 +359,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         current_fitness: data.currentFitness,
         discipline_fitness: data.disciplineFitness,
         benchmarks: data.benchmarks,
-        performance_numbers: perf,
+        performance_numbers: { ...(data.performanceNumbers || {}) },
         injury_history: data.injuryHistory,
         injury_regions: data.injuryRegions,
         training_background: data.trainingBackground,
         equipment: data.equipment,
-        // ⛔ THE ONE DERIVATION (D-461). The 5K on this row is the only 5K; the wizard-era effort columns
-        // are derived from it here and nowhere else. No 5K on the row → the columns are left as they are.
-        ...(() => {
-          const sec = resolveFiveKRaceTimeSec({ performance_numbers: perf } as never);
-          return sec != null ? effortFieldsFromFiveKTimeSec(sec) : {};
-        })(),
         // Only written when the caller carried it (loaded rows always do) — a caller without the field
         // must not wipe a lock it never saw.
         ...(data.locked_baselines !== undefined ? { locked_baselines: data.locked_baselines } : {}),
         // Same rule as the lock map: only written when the caller carried it.
         ...(data.profile !== undefined ? { profile: data.profile ?? {} } : {}),
       };
-      const { data: existingData } = await supabase.from('user_baselines').select('id').eq('user_id', userId).single();
-      if (existingData) {
-        const { error } = await supabase.from('user_baselines').update(baselineRecord).eq('user_id', userId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('user_baselines').insert([baselineRecord]);
-        if (error) throw error;
-      }
+      const { data: saved, error } = await supabase.functions.invoke('save-baselines', {
+        body: { baselines: baselineRecord, ...(heartRate ? { heart_rate: heartRate } : {}) },
+      });
+      if (error) throw error;
+      if (!saved?.success) throw new Error(saved?.error || 'Could not save baselines');
+      return saved;
     } catch (error) {
       console.error('Error in saveUserBaselines:', error);
       throw error;
