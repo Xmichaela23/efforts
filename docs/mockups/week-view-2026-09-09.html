@@ -1,0 +1,91 @@
+<title>Week View</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --ink: #0a0b0e; --grid: rgba(255,255,255,0.055);
+    --text: #f2f0ec; --muted: rgba(242,240,236,0.62); --dim: rgba(242,240,236,0.36); --line: rgba(255,255,255,0.10);
+    --run: #FFD700; --ride: #50C878; --lift: #FF8C42; --plyo: #B9678F; --risk: #C4645F;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ink); color: var(--text); font-family: "Space Grotesk", "Helvetica Neue", Arial, sans-serif; min-height: 100vh; display: grid; place-items: center; padding: 28px 12px; }
+  .note { position: fixed; left: 16px; bottom: 14px; font-size: 12px; color: var(--dim); max-width: 280px; line-height: 1.4; }
+  .phone { width: 390px; height: 844px; border-radius: 46px; background: var(--ink); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 30px 80px rgba(0,0,0,0.7); overflow: hidden; position: relative;
+    background-image: radial-gradient(var(--grid) 1px, transparent 1.2px); background-size: 18px 18px; }
+  .bleed { position: absolute; inset: 0 0 auto 0; height: 300px; pointer-events: none; background: radial-gradient(60% 55% at 50% -10%, rgba(80,200,120,0.45), transparent 70%); mix-blend-mode: screen; opacity: .8; }
+  .brand { position: relative; text-align: center; padding: 56px 0 10px; font-weight: 500; font-size: 28px; letter-spacing: 0.02em; }
+  .tabs { position: relative; display: flex; margin: 8px 22px 0; border-bottom: 1px solid var(--line); font-size: 17px; }
+  .tabs div { flex: 1; text-align: center; padding: 12px 0; color: var(--dim); }
+  .tabs .on { color: var(--text); border-bottom: 2px solid rgba(255,255,255,0.7); }
+
+  .pane { position: absolute; inset: 172px 22px 96px; display: flex; flex-direction: column; }
+  .head { display: flex; align-items: center; justify-content: space-between; font-size: 15px; color: var(--muted); padding: 10px 4px 8px; }
+  .head b { color: var(--text); font-weight: 500; }
+  .head span { color: var(--dim); font-size: 18px; padding: 0 6px; }
+  .progress { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; font-size: 12px; color: var(--dim); padding: 0 4px 10px; font-variant-numeric: tabular-nums; }
+  .progress .bar { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.08); overflow: hidden; }
+  .progress .bar i { display: block; height: 100%; width: 20%; background: linear-gradient(90deg, var(--run), var(--ride)); border-radius: 2px; }
+
+  .days { flex: 1; display: grid; grid-template-rows: repeat(7, 1fr); border-top: 1px solid var(--line); }
+  .day { display: grid; grid-template-columns: 52px 1fr; align-items: center; border-bottom: 1px solid var(--line); padding: 0 2px; position: relative; }
+  .day .d { font-size: 12px; color: var(--dim); line-height: 1.15; letter-spacing: 0.04em; text-transform: uppercase; }
+  .day .d b { display: block; font-size: 18px; color: var(--text); font-weight: 500; letter-spacing: 0; }
+  .day .s { display: flex; flex-direction: column; gap: 4px; }
+  .row { display: grid; grid-template-columns: 10px 1fr auto auto; align-items: center; gap: 10px; font-size: 15px; }
+  .row .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
+  .row .n { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .m { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 14px; }
+  .row .k { color: var(--dim); width: 16px; text-align: right; font-size: 14px; }
+  .day.done .row .n, .day.done .row .m { color: var(--dim); }
+  .day.done .row .dot { box-shadow: none; opacity: .6; }
+  .day.done .row .k { color: var(--ride); }
+  .day.today { background: linear-gradient(90deg, rgba(80,200,120,0.12), transparent 70%); }
+  .day.today::before { content: ""; position: absolute; left: -22px; top: 8px; bottom: 8px; width: 3px; border-radius: 2px; background: var(--ride); box-shadow: 0 0 10px var(--ride); }
+  .day.rest .s { font-size: 14px; color: var(--dim); font-style: italic; }
+  .day.missed .row .dot { background: var(--risk); box-shadow: none; }
+  .day.missed .row .n { color: var(--risk); }
+  .day.missed .row .k { color: var(--risk); }
+
+  .bar-nav { position: absolute; left: 0; right: 0; bottom: 0; height: 88px; display: flex; gap: 10px; padding: 14px 22px 26px; background: linear-gradient(180deg, transparent, rgba(10,11,14,0.95) 40%); }
+  .bar-nav div { flex: 1; border-radius: 14px; border: 1px solid var(--line); display: grid; place-items: center; font-size: 13px; letter-spacing: 0.14em; color: var(--muted); background: rgba(255,255,255,0.03); }
+  .bar-nav .on { color: var(--text); border-color: rgba(255,255,255,0.25); }
+</style>
+
+<div class="phone">
+  <div class="bleed"></div>
+  <div class="brand">efforts</div>
+  <div class="tabs"><div>Today</div><div class="on">Week</div></div>
+
+  <div class="pane">
+    <div class="head"><span>&lsaquo;</span><b>Sep 7 – 13</b><span>&rsaquo;</span></div>
+    <div class="progress"><span>Done 1h 17m · 12 mi</span><div class="bar"><i></i></div><span>Planned 6h 23m · 12 mi · 5 lifts</span></div>
+
+    <div class="days">
+      <div class="day done"><div class="d">Mon<b>7</b></div><div class="s">
+        <div class="row" style="--c:var(--run)"><i class="dot"></i><span class="n">Near-threshold Run</span><span class="m">3.6 mi · 37m</span><span class="k">✓</span></div>
+        <div class="row" style="--c:var(--lift)"><i class="dot"></i><span class="n">Upper body: Push</span><span class="m">4,210 lb</span><span class="k">✓</span></div>
+      </div></div>
+      <div class="day done"><div class="d">Tue<b>8</b></div><div class="s">
+        <div class="row" style="--c:var(--lift)"><i class="dot"></i><span class="n">Lower body: Hinge</span><span class="m">8,817 lb</span><span class="k">✓</span></div>
+        <div class="row" style="--c:var(--ride)"><i class="dot"></i><span class="n">Ride</span><span class="m">8.4 mi · 40m</span><span class="k">✓</span></div>
+      </div></div>
+      <div class="day today"><div class="d">Wed<b>9</b></div><div class="s">
+        <div class="row" style="--c:var(--ride)"><i class="dot"></i><span class="n">Anaerobic Ride</span><span class="m">1h 06m</span><span class="k">⇄</span></div>
+        <div class="row" style="--c:var(--plyo)"><i class="dot"></i><span class="n">Plyometrics</span><span class="m">20m</span><span class="k"></span></div>
+      </div></div>
+      <div class="day"><div class="d">Thu<b>10</b></div><div class="s">
+        <div class="row" style="--c:var(--ride)"><i class="dot"></i><span class="n">Endurance Ride</span><span class="m">1h 15m</span><span class="k"></span></div>
+        <div class="row" style="--c:var(--lift)"><i class="dot"></i><span class="n">Upper body: Pull</span><span class="m">55m</span><span class="k"></span></div>
+      </div></div>
+      <div class="day"><div class="d">Fri<b>11</b></div><div class="s">
+        <div class="row" style="--c:var(--lift)"><i class="dot"></i><span class="n">Lower body: Push</span><span class="m">55m</span><span class="k"></span></div>
+      </div></div>
+      <div class="day"><div class="d">Sat<b>12</b></div><div class="s">
+        <div class="row" style="--c:var(--ride)"><i class="dot"></i><span class="n">Long Ride</span><span class="m">2h 45m</span><span class="k"></span></div>
+      </div></div>
+      <div class="day rest"><div class="d">Sun<b>13</b></div><div class="s">Rest</div></div>
+    </div>
+  </div>
+
+  <div class="bar-nav"><div class="on">HOME</div><div>STATE</div><div>+</div></div>
+</div>
+<p class="note">Mockup. Seven rows fill the pane. Sessions are lines with a sport dot, name, length; done days dim with real numbers; today lit in its first session's colour; the bar under the header is done over planned.</p>

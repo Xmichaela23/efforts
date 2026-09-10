@@ -166,6 +166,23 @@ glance: planned versus done for the week, and a compliance colour on missed sess
 5. **Bug.** The Week chip labels a swapped anaerobic ride easy. Chips read the row's `band:` tag, never a
    fallback to easy.
 
+## 3f. The Week tab, GO (Michael, 2026-09-09: "feels like an afterthought"; mockup approved)
+
+Mockup: docs/mockups/week-view-2026-09-09.html. Build what it shows with the app's tokens.
+
+- Seven day rows fill the pane edge to edge (grid, equal rows), no space below Sunday. Day label left
+  (weekday small caps, number large).
+- A session is a LINE, not a chip: sport dot, name, length or real numbers, and at the right a check
+  (done), the swap arrow (swapped), or nothing. Two sessions, two lines. Names are the row's own.
+- Done days dim, with real numbers: `Near-threshold Run 3.6 mi · 37m`, `Lower body: Hinge 8,817 lb`.
+  Today's row lit in its first session's colour with a 3 px bar at the left edge. Days ahead in full
+  colour. Missed sessions in the status red (`risk` token). Rest day: the word `Rest`, dim, italic.
+- Under the week header, one thin bar: done over planned, the run→ride gradient fill, `Done 1h 17m · 12 mi`
+  left and `Planned 6h 23m · 12 mi · 5 lifts` right. Replaces the two-line Planned / Done text.
+- Tap a row opens that day on the Today tab. Tap an empty part of a row adds to that day (same menu). Press
+  and hold a session line to drag it to another day (§3e.3 move).
+- No new words beyond `Done`, `Planned`, `Rest`.
+
 ## 4. Out of scope
 
 - WORKORDER-kill-ours and WORKORDER-de-row-by-feel (separate, may land first or after).
