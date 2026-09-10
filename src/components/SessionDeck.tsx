@@ -1,5 +1,5 @@
 import React from 'react';
-import CardDeck, { deckGlass, type DeckItem } from './CardDeck';
+import CardDeck, { deckGlass, type CardEmphasis, type DeckItem } from './CardDeck';
 import { getExerciseConfig } from '@/lib/exercise-config';
 import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
 import { displayDisciplineOf, normalizeDistanceKm } from '@/lib/utils';
@@ -123,8 +123,10 @@ export const SessionDeck: React.FC<{
   cards: DeckCard[];
   /** A `SPORT_COLORS` key — the display discipline, so the plyo day is not strength orange. */
   sport: string;
+  /** §3e.2 — first session of the day or not. See `CardEmphasis`. */
+  emphasis?: CardEmphasis;
   onOpen?: () => void;
-}> = ({ title, cards, sport, onOpen }) => {
+}> = ({ title, cards, sport, emphasis = 'lead', onOpen }) => {
   const colour = getDisciplineColor(sport);
   const rgb = getDisciplineColorRgb(sport);
 
@@ -137,7 +139,11 @@ export const SessionDeck: React.FC<{
         {/* ⛔ THE WEIGHT SITS ON THE NAME LINE, RIGHT. It used to be absolutely positioned above
             the name, which cost the card a whole line for four characters. */}
         <div className="flex items-baseline justify-between gap-3">
-          <div className="text-[20px] font-semibold leading-tight min-w-0" style={{ letterSpacing: '-0.01em', color: 'rgba(255,255,255,0.95)' }}>
+          {/* ⛔ ONE STEP SMALLER WHEN IT IS NOT THE FIRST SESSION (§3e.2). */}
+          <div
+            className={`${emphasis === 'lead' ? 'text-[20px]' : 'text-[17px]'} font-semibold leading-tight min-w-0`}
+            style={{ letterSpacing: '-0.01em', color: emphasis === 'lead' ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.82)' }}
+          >
             {c.name}
           </div>
           {c.meta ? (
@@ -177,6 +183,7 @@ export const SessionDeck: React.FC<{
       colour={colour}
       rgb={rgb}
       header={title}
+      emphasis={emphasis}
       onCardTap={onOpen}
       className="mb-[14px]"
     />
@@ -191,9 +198,11 @@ export const SessionCard: React.FC<{
   meta: string | null;
   lines: string[];
   sport: string;
+  /** §3e.2 — first session of the day or not. See `CardEmphasis`. */
+  emphasis?: CardEmphasis;
   onOpen?: () => void;
   venueLabel?: string | null;
-}> = ({ title, meta, lines, sport, venueLabel, onOpen }) => {
+}> = ({ title, meta, lines, sport, emphasis = 'lead', venueLabel, onOpen }) => {
   const colour = getDisciplineColor(sport);
   const rgb = getDisciplineColorRgb(sport);
   return (
@@ -202,12 +211,16 @@ export const SessionCard: React.FC<{
       className="w-full text-left"
       /* ⚠️ SAME PADDING AND TYPE AS A DECK CARD, and no fixed height — the card is as tall as its
          family line and stop rule, nothing more. */
-      style={{ ...deckGlass(rgb), padding: '14px 16px', margin: '0 0 14px', cursor: 'pointer' }}
+      style={{ ...deckGlass(rgb, emphasis), padding: '14px 16px', margin: '0 0 14px', cursor: 'pointer' }}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpen?.(); }}
     >
       {/* ⛔ THE TIME SITS ON THE NAME LINE, RIGHT — the same rule the deck card follows. */}
       <div className="flex items-baseline justify-between gap-3">
-        <div className="text-[20px] font-semibold leading-tight min-w-0" style={{ color: colour }}>
+        {/* ⛔ ONE STEP SMALLER WHEN IT IS NOT THE FIRST SESSION (§3e.2). */}
+        <div
+          className={`${emphasis === 'lead' ? 'text-[20px]' : 'text-[17px]'} font-semibold leading-tight min-w-0`}
+          style={{ color: colour, opacity: emphasis === 'lead' ? 1 : 0.86 }}
+        >
           {title}
           {/* ⛔ THE MACHINE, BESIDE THE NAME (work order 2026-09-09 §1). It is the same session
               performed somewhere else, so it qualifies the name rather than replacing it. */}
@@ -255,11 +268,14 @@ export const SessionCard: React.FC<{
  * already carries on the row. ⚠️ NO SECOND FETCH: `extractSessionDetailV1FromWorkout` reads what is
  * in hand. A row whose analysis has not landed shows line 1 and no tiles, which is the honest state.
  */
-const doneGlass = (rgb: string): React.CSSProperties => ({
+const doneGlass = (rgb: string, emphasis: CardEmphasis = 'lead'): React.CSSProperties => ({
   borderRadius: 18,
   background: 'linear-gradient(180deg, rgba(16,17,21,0.90), rgba(10,11,14,0.96))',
-  border: `1px solid rgba(${rgb},0.18)`,
-  boxShadow: `0 0 0 1px rgba(255,255,255,0.02) inset, 0 14px 40px rgba(0,0,0,0.5), 0 0 24px rgba(${rgb},0.06)`,
+  // ⛔ THINNER EDGE, NO GLOW, WHEN IT IS NOT THE FIRST SESSION (§3e.2).
+  border: `1px solid rgba(${rgb},${emphasis === 'lead' ? 0.18 : 0.10})`,
+  boxShadow: emphasis === 'lead'
+    ? `0 0 0 1px rgba(255,255,255,0.02) inset, 0 14px 40px rgba(0,0,0,0.5), 0 0 24px rgba(${rgb},0.06)`
+    : `0 0 0 1px rgba(255,255,255,0.02) inset, 0 10px 28px rgba(0,0,0,0.45)`,
 });
 
 /** `5.0 mi · 48:00` for a run or ride; `3,725 lb · 3 lifts` for a lift session. */
@@ -313,8 +329,10 @@ export function doneHeadline(workout: Record<string, unknown>, useImperial: bool
 export const CompletedSessionCard: React.FC<{
   workout: Record<string, unknown>;
   useImperial: boolean;
+  /** §3e.2 — first session of the day or not. See `CardEmphasis`. */
+  emphasis?: CardEmphasis;
   onOpen?: () => void;
-}> = ({ workout, useImperial, onOpen }) => {
+}> = ({ workout, useImperial, emphasis = 'lead', onOpen }) => {
   const sport = displayDisciplineOf(workout as never);
   const colour = getDisciplineColor(sport);
   const rgb = getDisciplineColorRgb(sport);
@@ -330,13 +348,17 @@ export const CompletedSessionCard: React.FC<{
     <button
       type="button"
       className="w-full text-left"
-      style={{ ...doneGlass(rgb), padding: '14px 16px', margin: '0 0 14px', cursor: 'pointer' }}
+      style={{ ...doneGlass(rgb, emphasis), padding: '14px 16px', margin: '0 0 14px', cursor: 'pointer' }}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpen?.(); }}
     >
       <div className="flex items-baseline justify-between gap-3">
         {/* ⚠️ THE SPORT COLOUR AT LOW ALPHA — done, not gone. A flat grey title would lose which
             sport this was, which is the one thing the row still has to say at a glance. */}
-        <div className="text-[20px] font-semibold leading-tight min-w-0 truncate" style={{ color: `${colour}8C` }}>
+        {/* ⛔ ONE STEP SMALLER WHEN IT IS NOT THE FIRST SESSION (§3e.2). */}
+        <div
+          className={`${emphasis === 'lead' ? 'text-[20px]' : 'text-[17px]'} font-semibold leading-tight min-w-0 truncate`}
+          style={{ color: `${colour}${emphasis === 'lead' ? '8C' : '6E'}` }}
+        >
           {deriveWorkoutTitle(workout as never)}
         </div>
         <span aria-label="Completed" className="text-[13px] flex-shrink-0" style={{ color: 'rgba(255,255,255,0.45)' }}>✓</span>
@@ -388,16 +410,21 @@ export function rendersAsSessionCard(session: TodayRow, isPastDate = false): boo
  * Returns null for anything else, so the caller keeps its existing row for a completed session or
  * one the athlete brought in.
  */
-const TodaySession: React.FC<{ session: TodayRow; useImperial: boolean; isPastDate?: boolean; onOpen?: () => void }> = ({
-  session, useImperial, isPastDate = false, onOpen,
-}) => {
+const TodaySession: React.FC<{
+  session: TodayRow;
+  useImperial: boolean;
+  isPastDate?: boolean;
+  /** §3e.2 — `lead` for the day's first session, `quiet` for the rest. */
+  emphasis?: CardEmphasis;
+  onOpen?: () => void;
+}> = ({ session, useImperial, isPastDate = false, emphasis = 'lead', onOpen }) => {
   const status = String((session as { workout_status?: unknown })?.workout_status ?? '').toLowerCase();
   if (status === 'skipped') return null;
 
   // ⛔ DONE FIRST. A completed session — planned or brought in — is the greyed card; everything below
   // is about work still ahead.
   if (status === 'completed') {
-    return <CompletedSessionCard workout={session as Record<string, unknown>} useImperial={useImperial} onOpen={onOpen} />;
+    return <CompletedSessionCard workout={session as Record<string, unknown>} useImperial={useImperial} emphasis={emphasis} onOpen={onOpen} />;
   }
 
   if (isPastDate) return null;
@@ -409,7 +436,7 @@ const TodaySession: React.FC<{ session: TodayRow; useImperial: boolean; isPastDa
   if (isStrengthRow(session)) {
     const cards = deckCardsFor(session, useImperial);
     if (cards.length === 0) return null;
-    return <SessionDeck title={title} cards={cards} sport={sport} onOpen={onOpen} />;
+    return <SessionDeck title={title} cards={cards} sport={sport} emphasis={emphasis} onOpen={onOpen} />;
   }
 
   if (!isEnduranceRow(session)) return null;
@@ -419,6 +446,7 @@ const TodaySession: React.FC<{ session: TodayRow; useImperial: boolean; isPastDa
       meta={formatSessionDuration(session)}
       lines={enduranceLinesFor(session)}
       sport={sport}
+      emphasis={emphasis}
       venueLabel={VENUE_LABEL[venueOf(session as never) ?? ''] ?? null}
       onOpen={onOpen}
     />

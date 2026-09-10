@@ -3,19 +3,21 @@ import { analysisNeedsAttention, analysisFailureLine } from '@/lib/analysis-stat
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
-import { normalizeDistanceMiles, formatMilesShort, typeAbbrev, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout, isPlyoSession, displayDisciplineOf } from '@/lib/utils';
-import { getDisciplineColorRgb, getDisciplineGlowColor, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
+import { normalizeDistanceKm, normalizeDistanceMiles, formatMilesShort, typeAbbrev, isBaselineTestWorkout, isPlyoSession, displayDisciplineOf } from '@/lib/utils';
+import { getDisciplineColor, getDisciplineColorRgb, getDisciplineGlowColor, getDisciplinePhosphorPill, getDisciplineGlowStyle, getDisciplinePhosphorCore, STATUS_COLORS } from '@/lib/context-utils';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { useAppContext } from '@/contexts/AppContext';
 import { Activity, ArrowLeftRight, Bike, Link2Off, Waves, Dumbbell, Move, CircleDot, Zap, type LucideIcon } from 'lucide-react';
 // ⛔ ONE GATE FOR "CAN THIS BE SWAPPED" — the same function the drawer control uses. See the glyph.
-import { availableDisciplines, getDisciplineSwaps } from '@/lib/session-discipline-swap';
+import { availableDisciplines, getDisciplineSwaps, isDisciplineSwapped } from '@/lib/session-discipline-swap';
 // ⛔ THE SAME "did this miss a planned slot" RULE the workout view uses — never a second copy.
 import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
 // ⛔ SWAP WHAT IS HELD, NOT WHAT IS TRAINED — the posture gate. One reader, shared with State.
 import { useDeclaredPosture } from '@/hooks/useDeclaredPosture';
 import { useResolvedFtp } from '@/hooks/useResolvedFtp';
 import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
+import * as PopoverPrimitive from '@radix-ui/react-popover';
+import { LogTypeMenuContent } from '@/components/LogFAB';
 import RescheduleValidationPopup from '@/components/RescheduleValidationPopup';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
@@ -45,6 +47,8 @@ interface WorkoutCalendarProps {
   onViewCompleted: () => void;
   onEditEffort: (workout: any) => void;
   onDateSelect: (date: string) => void;
+  /** §3e.3 — tapping TODAY's row opens the Today tab rather than the add menu. */
+  onOpenToday?: () => void;
   selectedDate?: string;
   onSelectRoutine?: (type: string) => void;
   currentPlans?: any[];
@@ -200,18 +204,38 @@ function derivePlannedCellLabel(w: any): string | null {
       const isGroupRideAnchor =
         hasTag('group_ride') || hasTag('anchor') || has(/group_ride|group\s*ride/i);
 
+      /**
+       * ⛔⛔ THE `band:` TAG DECIDES HARD FROM EASY, AND NOTHING ELSE MAY (§3e.5, device finding).
+       *
+       * A swapped anaerobic ride was labelled `BK-EZ`. The row carries `band:above` and
+       * `family:ride_anaerobic` — it is the hardest session in the week — and it reached the easy
+       * branch because the dispatch below never asked the band at all: it asked for an `easy` or
+       * `recovery` TAG, then fell through to a regex over the description, and a composed ride's
+       * prose says "easy" in its warm-up sentence.
+       *
+       * ⚠️ AND THE FALLBACK IS THE OTHER HALF OF THE BUG. `has(/recovery|easy/i)` matched text, so a
+       * hard session whose cue mentions easy spinning was labelled easy. Both the tag branch and the
+       * text branch are now gated behind the band: a row the composer banded `near` or `above` can
+       * never be labelled easy, whatever its words say.
+       */
+      const bandTag = tagsLower.find((t) => t.startsWith('band:'))?.slice('band:'.length) ?? null;
+      const bandedHard = bandTag === 'near' || bandTag === 'above';
+      const bandedEasy = bandTag === 'vt1_or_easier';
+
       if (isGroupRideAnchor) label = 'Group Ride';
       // Tag-first dispatch (authoritative).
       else if (hasTag('brick')) label = `BK-BRK${durStr ? ` ${durStr}` : ''}`.trim();
       else if (hasTag('openers')) label = `BK-OPN${durStr ? ` ${durStr}` : ''}`.trim();
       else if (hasTag('long_ride')) label = `BK-LR${durStr ? ` ${durStr}` : ''}`.trim();
-      else if (hasTag('recovery') || hasTag('easy')) label = `BK-EZ${durStr ? ` ${durStr}` : ''}`.trim();
+      // ⚠️ A BANDED-HARD ROW SKIPS THIS ENTIRELY, tag or no tag.
+      else if (!bandedHard && (hasTag('recovery') || hasTag('easy'))) label = `BK-EZ${durStr ? ` ${durStr}` : ''}`.trim();
       // Token / text fallback (legacy plans without authoritative tags).
       else if (has(/bike_vo2_/i) || has(/vo2/i)) label = `BK-VO2${durStr ? ` ${durStr}` : ''}`.trim();
       else if (has(/bike_thr_/i)) label = `BK-THR${durStr ? ` ${durStr}` : ''}`.trim();
       else if (has(/bike_ss_/i)) label = `BK-SS${durStr ? ` ${durStr}` : ''}`.trim();
       else if (has(/long\s*ride|long_ride/i)) label = `BK-LR${durStr ? ` ${durStr}` : ''}`.trim();
-      else if (has(/recovery|easy/i)) label = `BK-EZ${durStr ? ` ${durStr}` : ''}`.trim();
+      // ⛔ THE TEXT FALLBACK NEEDS THE BAND TO AGREE, or an unbanded row. It may never overrule one.
+      else if ((bandedEasy || bandTag == null) && has(/recovery|easy/i)) label = `BK-EZ${durStr ? ` ${durStr}` : ''}`.trim();
       else label = `BK${durStr ? ` ${durStr}` : ''}`.trim();
       return label;
     }
@@ -341,6 +365,7 @@ export default function WorkoutCalendar({
   onViewCompleted,
   onEditEffort,
   onDateSelect,
+  onOpenToday,
   selectedDate,
   onSelectRoutine,
   currentPlans = [],
@@ -349,6 +374,8 @@ export default function WorkoutCalendar({
   plannedWorkouts = []
 }: WorkoutCalendarProps) {
   const [referenceDate, setReferenceDate] = useState<Date>(new Date());
+  /** §3e.3 — which day's add menu is open. One at a time; null is closed. */
+  const [addMenuDate, setAddMenuDate] = useState<string | null>(null);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const [touchStartT, setTouchStartT] = useState<number | null>(null);
@@ -953,6 +980,56 @@ export default function WorkoutCalendar({
   }
 
 
+  /**
+   * §3e.4's two totals, off the rows already on screen. ⚠️ ONE PASS OVER THE WEEK'S OWN DAYS, not
+   * over `events` — `events` is the whole loaded range, and a total that quietly included last week
+   * would be the kind of number that looks right and is not.
+   *
+   * ⚠️ LIFTS ARE COUNTED, NOT TIMED. A lift's minutes are the least interesting thing about it and
+   * its distance is nothing, so it leaves both totals and gets its own count.
+   */
+  const weekTotals = useMemo(() => {
+    let plannedMin = 0, doneMin = 0, plannedMeters = 0, doneMeters = 0, liftsPlanned = 0, liftsDone = 0;
+    for (const day of weekDays) {
+      for (const evt of map.get(toDateOnlyString(day)) ?? []) {
+        const row = (evt as { _src?: Record<string, unknown> })?._src;
+        if (!row) continue;
+        const done = String(row.workout_status ?? '').toLowerCase() === 'completed';
+        const type = String(row.type ?? row.workout_type ?? '').toLowerCase();
+        if (type === 'strength') {
+          // ⚠️ A DONE LIFT COUNTS IN BOTH: "3 lifts planned · 2 done" only reads as progress when
+          // the planned figure is the week's whole prescription, not what is left of it.
+          liftsPlanned += 1;
+          if (done) liftsDone += 1;
+          continue;
+        }
+        const secs = resolveMovingSeconds(row);
+        const mins = secs && secs > 0 ? Math.round(secs / 60) : 0;
+        const km = normalizeDistanceKm(row as never);
+        const meters = km != null && Number.isFinite(km) && km > 0 ? km * 1000 : 0;
+        // ⚠️ A DONE SESSION COUNTS TOWARDS BOTH. "Planned 6h · Done 2h" only reads as progress when
+        // the planned figure is the whole week's work, not the part of it still outstanding.
+        plannedMin += mins; plannedMeters += meters;
+        if (done) { doneMin += mins; doneMeters += meters; }
+      }
+    }
+    const toDist = (m: number) => (useImperial ? m / 1609.34 : m / 1000);
+    return {
+      plannedMin, doneMin,
+      plannedMiles: toDist(plannedMeters),
+      doneMiles: toDist(doneMeters),
+      liftsPlanned, liftsDone,
+    };
+  }, [weekDays, map, useImperial]);
+
+  const distanceUnitLabel = useImperial ? 'mi' : 'km';
+  /** `6h 10m`, `45m`, `0m` — the shape §3e.4 prints. */
+  const fmtHm = (mins: number) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  };
+
   const weekdayFmt = new Intl.DateTimeFormat('en-US', { weekday: "short" });
   const monthFmt = new Intl.DateTimeFormat('en-US', { month: "short" });
   const rangeLabel = `${monthFmt.format(weekStart)} ${weekStart.getDate()} – ${monthFmt.format(
@@ -1094,27 +1171,57 @@ export default function WorkoutCalendar({
       </div>
 
       {/**
+        * ═══ §3e.4 — PLANNED VERSUS DONE, IN ONE LINE ═════════════════════════════════════════════
+        *
+        * Field check: TrainingPeaks' and TrainerRoad's calendars both answer "how much of this week
+        * have I actually done" at a glance, and Week answered it nowhere — the athlete had to count
+        * checkmarks.
+        *
+        * ⛔ NUMBERS ONLY, NO SENTENCE. Hours and miles for the endurance work; lifts counted as
+        * SESSIONS, because a lift's mileage is nothing and its hours are the least interesting thing
+        * about it. `Planned` and `Done` are the only two words, and both are approved.
+        *
+        * ⛔ IT IS COUNTED OFF THE ROWS ALREADY ON SCREEN — the same `events`/`map` the chips below
+        * are drawn from. Nothing is fetched, and nothing is recomputed by a second reader: a number
+        * here that disagreed with the chips under it would be worse than no number.
+        */}
+      {(weekTotals.plannedMin > 0 || weekTotals.doneMin > 0 || weekTotals.liftsPlanned > 0) ? (
+        <div
+          className="flex flex-col gap-0.5 px-1.5 pb-1.5 text-[0.72rem] font-light tabular-nums"
+          style={{ color: 'rgba(255,255,255,0.55)', position: 'relative', zIndex: 1 }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span>
+              Planned {fmtHm(weekTotals.plannedMin)}
+              {weekTotals.plannedMiles > 0 ? ` · ${weekTotals.plannedMiles.toFixed(0)} ${distanceUnitLabel}` : ''}
+            </span>
+            {weekTotals.liftsPlanned > 0 ? (
+              <span style={{ color: 'rgba(255,255,255,0.42)' }}>
+                {weekTotals.liftsPlanned} {weekTotals.liftsPlanned === 1 ? 'lift' : 'lifts'} planned · {weekTotals.liftsDone} done
+              </span>
+            ) : null}
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.72)' }}>
+            Done {fmtHm(weekTotals.doneMin)}
+            {weekTotals.doneMiles > 0 ? ` · ${weekTotals.doneMiles.toFixed(0)} ${distanceUnitLabel}` : ''}
+          </div>
+        </div>
+      ) : null}
+
+      {/**
         * Vertical timeline — the seven days as rows. Always all seven.
         *
-        * ⛔ THE ROWS SHARE THE PANE (Michael, 2026-09-09, on the device: small rows in a large empty
-        * pane). They were `repeat(7, auto)` with `flexShrink: 0`, so each row took only its own
-        * content height and everything below the seventh was dead space — on a 390×844 phone that is
-        * most of the tab. `1fr` each, with the grid itself taking the pane's remaining height, so the
-        * seven rows divide it between them.
-        *
-        * ⚠️ `minmax(40px, 1fr)`, NOT PLAIN `1fr` — a row still has a floor. `1fr` alone lets a short
-        * pane (a landscape phone, a small window, the keyboard up) crush a row below its own chips
-        * and clip them; with the floor the grid overflows instead and the pane scrolls, which it is
-        * already set up to do. 40px is the row's own resting height: 2 × 1.5 padding + the taller
-        * chip below.
+        * ⛔ ROWS AT CONTENT HEIGHT, 8 px APART (§3e.3). They were stretched to share the pane, which
+        * made an empty Thursday as tall as a Saturday carrying two sessions — the week's shape, which
+        * is the only thing this screen is for, was flattened out of it. A row is now as tall as what
+        * is in it, and a busy day looks busy.
         */}
       <div
         style={{
           display: 'grid',
-          gridTemplateRows: 'repeat(7, minmax(40px, 1fr))',
-          gap: 4,
-          flex: 1,
-          minHeight: 0,
+          gridTemplateRows: 'repeat(7, auto)',
+          gap: 8,
+          flexShrink: 0,
           paddingBottom: 4,
           position: 'relative',
           zIndex: 1,
@@ -1122,12 +1229,14 @@ export default function WorkoutCalendar({
       >
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
+          /** One reading of "today" per row — a miss is a day that has GONE, so today is never one. */
+          const todayKey = toDateOnlyString(new Date());
           const items = orderDayWorkoutsByTimingThenDiscipline(
             map.get(key) ?? [],
             weekOrderingPref,
             (e: any) => e?._src,
           );
-          const isToday = toDateOnlyString(new Date()) === key;
+          const isToday = todayKey === key;
           const isSelected = !!selectedDate && selectedDate === key;
           const isActiveDay = isToday || isSelected;
 
@@ -1144,10 +1253,36 @@ export default function WorkoutCalendar({
           const washC = contrastRgbForType(rowTypes[2] || rowTypes[1] || rowTypes[0] || '');
 
           return (
+            /**
+             * ═══ §3e.3 — THE DAY ROW IS THE ADD CONTROL ═══════════════════════════════════════════
+             *
+             * ⛔ THE FLOATING + IS GONE. It sat over the bottom-right of the pane — on top of
+             * Sunday's row — and it added to whichever day happened to be selected, which is a
+             * second, invisible piece of state. Tapping an empty part of a day now opens the same
+             * menu FOR THAT DAY, which is what TrainingPeaks and TrainerRoad do.
+             *
+             * ⚠️ TAPPING TODAY'S ROW OPENS THE TODAY TAB INSTEAD. It is the row the athlete is
+             * living in; the fastest thing it can do is take them to the screen about it.
+             *
+             * ⚠️ ONE `Root` PER ROW, AND IT RENDERS NO DOM — Radix's Root is a context provider, so
+             * the grid still sees exactly seven children.
+             */
+            <PopoverPrimitive.Root
+              key={key}
+              open={addMenuDate === key}
+              onOpenChange={(o) => setAddMenuDate(o ? key : null)}
+            >
+            <PopoverPrimitive.Anchor asChild>
             <button
               type="button"
-              key={key}
-              onClick={() => handleDayClick(d)}
+              /* ⚠️ THE ONLY NEW WORDS ON THIS SCREEN ARE THE THREE THE GO APPROVED. This is the third,
+                 and an accessible name is where it belongs: the row is a control with no label on it. */
+              aria-label={isToday ? undefined : 'Add a session'}
+              onClick={() => {
+                handleDayClick(d);
+                if (isToday) { onOpenToday?.(); return; }
+                setAddMenuDate(key);
+              }}
               onDragOver={(e) => handleDragOver(e, key)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, key)}
@@ -1323,210 +1458,118 @@ export default function WorkoutCalendar({
                     const isPlanned = workoutStatus === 'planned';
                     const workoutId = evt?._src?.id;
 
-                    const renderLabel = () => {
-                      const label = String(evt.label || '').replace(/✓+$/, '').trim();
-                      const discipline = resolveDisciplineForIcon(workoutType, label);
-                      const IconComponent = DISCIPLINE_ICONS[discipline] || Activity;
+                    /**
+                     * ═══ §3e.3 — THE CHIP IS A DOT, A LENGTH, AND WHAT HAPPENED TO IT ════════════
+                     *
+                     * ⛔ NO SPORT CODES. `BK-EZ`, `RN-LR`, `ST`, `SM-DRL` — the athlete had to learn
+                     * a private alphabet to read their own week, and the codes were wrong often
+                     * enough to be worse than nothing (§3e.5: a swapped anaerobic ride read `BK-EZ`).
+                     * The sport is the DOT's colour, which the whole app already uses for it.
+                     *
+                     * ⛔ THE SWAP ARROW MEANS "THIS WAS SWAPPED", NOT "THIS COULD BE". It used to
+                     * draw wherever a swap was AVAILABLE, which on a normal week is most chips —
+                     * a glyph on everything says nothing. It is now the mark of a row that no longer
+                     * matches the plan, which is worth a glance.
+                     */
+                    const chipMins = (() => {
+                      const secs = resolveMovingSeconds(evt?._src);
+                      return secs && secs > 0 ? Math.round(secs / 60) : 0;
+                    })();
+                    const chipLength = chipMins > 0
+                      ? `${Math.floor(chipMins / 60) > 0 ? `${Math.floor(chipMins / 60)}h ` : ''}${chipMins % 60}m`
+                      : '';
+                    const wasSwapped = isDisciplineSwapped(evt?._src as never);
 
-                      const renderDisciplineIcon = (completed: boolean) => (
-                        <span
-                          aria-label={completed ? 'Completed' : 'Planned'}
-                          className="inline-flex items-center justify-center tabular-nums flex-shrink-0"
-                          style={{
-                            marginLeft: 6,
-                            // Grows with the chip, or it starts reading as a speck beside the text.
-                            width: 18,
-                            height: 18,
-                            verticalAlign: 'middle',
-                          }}
-                        >
-                          <IconComponent
-                            size={15}
-                            strokeWidth={2}
-                            style={{
-                              color: completed ? 'rgba(255, 255, 255, 0.9)' : 'rgba(245, 245, 245, 0.5)',
-                              opacity: completed ? 1 : 0.85,
-                            }}
-                          />
-                        </span>
-                      );
+                    /**
+                     * ⛔ A PLANNED SESSION WHOSE DAY HAS GONE, WITH NOTHING LOGGED, IS A MISS (§3e.4)
+                     * — and it wears the STATUS colour, never a sport colour. Sport colour answers
+                     * "which sport"; this answers "did it happen", and the two must not be the same
+                     * ink or the week cannot be read at a glance.
+                     * ⚠️ TODAY IS NOT A MISS. The day is not over.
+                     */
+                    const isMissed = isPlanned && key < todayKey;
+                    const chipEdge = isMissed ? STATUS_COLORS.risk : null;
 
-                      const renderCompletedCheckmark = () => (
-                        <span
-                          aria-label="Completed"
-                          className="inline-flex items-center justify-center flex-shrink-0"
-                          style={{
-                            marginLeft: 4,
-                            color: 'rgba(255, 255, 255, 0.95)',
-                            fontSize: 12,
-                            fontWeight: 700,
-                            lineHeight: 1,
-                          }}
-                        >
-                          ✓
-                        </span>
-                      );
-
-                      const parts = label.match(/(\d+\.?\d*[a-z]?|:?\d+)/g) || [];
-                      const content = (() => {
-                        if (parts.length > 0) {
-                          const nonNumericParts = label.split(/(\d+\.?\d*[a-z]?|:?\d+)/g);
-                          return nonNumericParts.map((part, idx) => {
-                            const isNumeric = parts.includes(part);
-                            return isNumeric ? (
-                              <span key={idx} className="tabular-nums">{part}</span>
-                            ) : part;
-                          });
-                        }
-                        return label;
-                      })();
-
-                      if (isCompleted) {
-                        return (
-                          <>
-                            {content}
-                            {renderDisciplineIcon(true)}
-                            {renderCompletedCheckmark()}
-                            {/* "Failed" on screen (plumbing §3): a small dot on the week chip; the card says why. */}
-                            {analysisNeedsAttention(evt?._src) && (
-                              <span
-                                aria-label={analysisFailureLine(evt?._src) || 'Analysis failed'}
-                                title={analysisFailureLine(evt?._src) || 'Analysis failed'}
-                                className="inline-block w-1.5 h-1.5 rounded-full ml-1 align-middle bg-amber-300/85"
-                              />
-                            )}
-                            {/* ⛔ THE MISS, VISIBLE IN THE WEEK. Opens the activity, where the
-                                "Didn't match your planned … — link it?" button lives. */}
-                            {unmatchedIds.has(String(workoutId || '')) && (
-                              <Link2Off
-                                className="inline-block w-2.5 h-2.5 ml-1 text-amber-300/80 align-baseline"
-                                aria-label="Did not match a planned session — tap to link"
-                              />
-                            )}
-                          </>
-                        );
-                      }
-
-                      return (
-                        <>
-                          {content}
-                          {renderDisciplineIcon(false)}
-                          {/**
-                            * ⛔ SWAP-ABILITY IS VISIBLE WITHOUT OPENING ANYTHING (2026-08-08). The
-                            * control existed only inside the drawer, so the athlete had to open a
-                            * session to discover the session could be changed. The glyph is the cue.
-                            *
-                            * ⚠️ SAME GATE AS THE CONTROL ITSELF — `getDisciplineSwaps` decides, not a
-                            * second copy of its conditions. A glyph that appears where no swap exists
-                            * teaches the athlete to ignore glyphs; a glyph missing where one does is
-                            * the bug this whole thread has been about.
-                            */}
-                          {swappableIds.has(String(workoutId || '')) && (
-                            <ArrowLeftRight
-                              className="inline-block w-2.5 h-2.5 ml-1 opacity-45 align-baseline"
-                              aria-label="Can be swapped to another sport"
-                            />
-                          )}
-                        </>
-                      );
-                    };
-                    
                     return (
-                      isDone ? (
+                      <span
+                        key={`${key}-${i}`}
+                        role="button"
+                        tabIndex={0}
+                        draggable={isPlanned && !!workoutId}
+                        onDragStart={(e) => isPlanned && workoutId && handleDragStart(e, evt._src)}
+                        onDragEnd={handleDragEnd}
+                        onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch { /* the row opens or it does not */ } }}
+                        onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch { /* as above */ } } }}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-[0.4rem] flex-shrink-0 transition-all font-medium tracking-normal ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                        style={{
+                          ...phosphorPill.style,
+                          borderRadius: '8px',
+                          fontSize: '0.86rem',
+                          lineHeight: '1.24',
+                          whiteSpace: 'nowrap',
+                          backgroundColor: isDone ? 'rgba(8, 8, 8, 0.72)' : undefined,
+                          /**
+                           * ⚠️ THE MISS GETS A BED, NOT JUST AN EDGE. On a strength row the sport is
+                           * orange, and brick red at edge-alpha beside orange at edge-alpha is a
+                           * distinction nobody makes at arm's length — a missed lift looked like a
+                           * lift. The faint wash is what separates them.
+                           */
+                          backgroundImage: chipEdge
+                            ? `linear-gradient(180deg, ${STATUS_COLORS.risk}2E 0%, ${STATUS_COLORS.risk}14 100%)`
+                            : isDone
+                              ? `linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)`
+                              : `linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)`,
+                          // ⛔ THE MISS OVERRULES THE SPORT ON THE EDGE ONLY. The dot still says which
+                          // sport it was — losing that would make the whole week's misses look alike.
+                          border: `1px solid ${chipEdge ? `${chipEdge}` : `rgba(${pillRgb}, ${isDone ? 0.28 : 0.18})`}`,
+                          boxShadow: chipEdge
+                            ? `0 0 0 1px rgba(0,0,0,0.24) inset, 0 2px 8px rgba(0,0,0,0.35)`
+                            : `0 0 0 1px rgba(255,255,255,0.06) inset, 0 2px 8px rgba(0,0,0,0.35)`,
+                          color: isDone ? 'rgba(245,245,245,0.92)' : 'rgba(255,255,255,0.86)',
+                          textShadow: `0 1px 1px rgba(0,0,0,0.60)`,
+                          backdropFilter: 'blur(2px)',
+                          WebkitBackdropFilter: 'blur(2px)',
+                          transform: 'translateZ(0)',
+                        }}
+                      >
+                        {/* The sport, as the light source it already is everywhere else. */}
                         <span
-                          key={`${key}-${i}`}
-                          role="button"
-                          tabIndex={0}
-                          draggable={isPlanned && !!workoutId}
-                          onDragStart={(e) => isPlanned && workoutId && handleDragStart(e, evt._src)}
-                          onDragEnd={handleDragEnd}
-                          onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
-                          onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                          className={`px-2.5 py-[0.46rem] flex-shrink-0 transition-all font-medium tracking-normal ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                          aria-hidden="true"
+                          className="inline-block rounded-full flex-shrink-0"
                           style={{
-                            ...phosphorPill.style,
-                            // Stamp > pill: squarer corners + slightly “pressed” feel
-                            borderRadius: '6px',
-                            // ⛔ ONE STEP UP, BOTH CHIP STATES TOGETHER (2026-09-09 device finding).
-                            // `text-xs` came off the class list because it fought this line — the
-                            // utility and the inline rule were setting the same property, and the
-                            // chip's real size was whichever won. Now there is one number.
-                            fontSize: '0.86rem',
-                            lineHeight: '1.24',
-                            // A: grey ink fill with a colored rim (no “power-up” glow)
-                            // White denotes completed
-                            color: 'rgba(245,245,245,0.92)',
-                            textShadow: `0 1px 1px rgba(0,0,0,0.75)`,
-                            backdropFilter: 'blur(2px)',
-                            WebkitBackdropFilter: 'blur(2px)',
-                            // Darker “ink” bed so completed reads quieter
-                            backgroundColor: 'rgba(8, 8, 8, 0.72)',
-                            backgroundImage: `
-                              linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%),
-                              radial-gradient(80% 90% at 35% 25%, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.00) 60%),
-                              radial-gradient(90% 120% at 70% 120%, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.00) 60%),
-                              /* subtle grain (non-lane) */
-                              repeating-linear-gradient(135deg, rgba(255,255,255,0.022) 0px, rgba(255,255,255,0.022) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 22px)
-                            `,
-                            backgroundBlendMode: 'screen, normal, multiply, soft-light',
-                            backgroundClip: 'padding-box',
-                            border: '1px solid rgba(255, 255, 255, 0.2)',
-                            boxShadow: `
-                              0 0 0 1px rgba(255,255,255,0.10) inset,
-                              0 0 0 2px rgba(0,0,0,0.24) inset,
-                              0 2px 8px rgba(0,0,0,0.42)
-                            `.replace(/\s+/g,' ').trim(),
-                            whiteSpace: 'nowrap',
-                            transform: 'translateZ(0)',
+                            width: 7,
+                            height: 7,
+                            background: getDisciplineColor(workoutType),
+                            boxShadow: `0 0 8px ${getDisciplineColor(workoutType)}`,
                           }}
-                        >
-                          {renderLabel()}
-                        </span>
-                      ) : (
-                        <span
-                          key={`${key}-${i}`}
-                          role="button"
-                          tabIndex={0}
-                          draggable={isPlanned && !!workoutId}
-                          onDragStart={(e) => isPlanned && workoutId && handleDragStart(e, evt._src)}
-                          onDragEnd={handleDragEnd}
-                          onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
-                          onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                          // Non-completed returns to a pill, but keep it calm: low fill, low glow.
-                          className={`px-2.5 py-[0.46rem] flex-shrink-0 transition-all font-medium tracking-normal ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
-                          style={{
-                            ...phosphorPill.style,
-                            borderRadius: '6px',
-                            // ⛔ ONE STEP UP, BOTH CHIP STATES TOGETHER (2026-09-09 device finding).
-                            // `text-xs` came off the class list because it fought this line — the
-                            // utility and the inline rule were setting the same property, and the
-                            // chip's real size was whichever won. Now there is one number.
-                            fontSize: '0.86rem',
-                            lineHeight: '1.24',
-                            // Calm, readable capsule (no “note” shine)
-                            backgroundImage: `
-                              linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.02) 100%),
-                              radial-gradient(90% 110% at 30% 20%, rgba(${pillRgb},0.10) 0%, rgba(${pillRgb},0.00) 58%),
-                              radial-gradient(100% 120% at 70% 120%, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.00) 60%)
-                            `,
-                            backgroundBlendMode: 'screen, normal, multiply',
-                            backdropFilter: 'blur(2px)',
-                            WebkitBackdropFilter: 'blur(2px)',
-                            // Planned/upcoming uses discipline color in the text; rim stays subtle
-                            border: `1px solid rgba(${pillRgb}, 0.18)`,
-                            boxShadow: `
-                              0 0 0 1px rgba(255,255,255,0.06) inset,
-                              0 2px 8px rgba(0,0,0,0.35)
-                            `.replace(/\s+/g,' ').trim(),
-                            color: getDisciplinePhosphorCore(workoutType),
-                            textShadow: `0 1px 1px rgba(0,0,0,0.60)`,
-                            whiteSpace: 'nowrap',
-                            transform: 'translateZ(0)',
-                          }}
-                        >
-                          {renderLabel()}
-                        </span>
-                      )
+                        />
+                        {chipLength ? <span className="tabular-nums">{chipLength}</span> : null}
+                        {isDone ? (
+                          <span aria-label="Done" className="flex-shrink-0" style={{ fontSize: 12, lineHeight: 1 }}>✓</span>
+                        ) : null}
+                        {wasSwapped ? (
+                          <ArrowLeftRight
+                            className="inline-block w-3 h-3 flex-shrink-0 opacity-60"
+                            aria-label="Swapped"
+                          />
+                        ) : null}
+                        {/* "Failed" on screen (plumbing §3): a small dot; the card says why. */}
+                        {isDone && analysisNeedsAttention(evt?._src) ? (
+                          <span
+                            aria-label={analysisFailureLine(evt?._src) || 'Analysis failed'}
+                            title={analysisFailureLine(evt?._src) || 'Analysis failed'}
+                            className="inline-block w-1.5 h-1.5 rounded-full bg-amber-300/85 flex-shrink-0"
+                          />
+                        ) : null}
+                        {/* ⛔ THE MISS, VISIBLE IN THE WEEK. Opens the activity, where the
+                            "Didn't match your planned … — link it?" button lives. */}
+                        {isDone && unmatchedIds.has(String(workoutId || '')) ? (
+                          <Link2Off
+                            className="inline-block w-3 h-3 text-amber-300/80 flex-shrink-0"
+                            aria-label="Did not match a planned session — tap to link"
+                          />
+                        ) : null}
+                      </span>
                     );
                   })
                 )}
@@ -1549,6 +1592,16 @@ export default function WorkoutCalendar({
                 })()}
               </div>
             </button>
+            </PopoverPrimitive.Anchor>
+            {/* ⚠️ `bottom` and `start`, so the menu opens under the day it belongs to rather than
+                over the rows above it. */}
+            <LogTypeMenuContent
+              side="bottom"
+              align="start"
+              sideOffset={6}
+              onSelect={(t) => { setAddMenuDate(null); onSelectType?.(t); }}
+            />
+            </PopoverPrimitive.Root>
           );
         })}
       </div>

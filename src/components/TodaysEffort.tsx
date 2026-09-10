@@ -53,6 +53,7 @@ import PlannedSessionHeader from './PlannedSessionHeader';
 // it is. Every athlete-facing word lives in `@/lib/today-lines`; nothing new is spelled out here.
 // ⛔ §3d — a lift and the plyo day swipe as a deck, a ride or run is one glass card.
 import TodaySession, { rendersAsSessionCard, TodaySpacingLine } from './SessionDeck';
+import type { CardEmphasis } from './CardDeck';
 // ⛔ §3b — the weather block above the date, and the week's load bars + counts under the day.
 import TodayWeather from './TodayWeather';
 import TodayWeekBlocks from './TodayWeekBlocks';
@@ -1608,6 +1609,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     return () => el.removeEventListener('scroll', onScroll);
   }, [displayWorkouts]);
 
+  /**
+   * ⛔ WHICH CARD LEADS (§3e.2) — the first PLANNED session, not simply row zero. On a day whose
+   * first row is already logged, the work still in front of the athlete is the thing to lead with;
+   * the finished row is a record.
+   * ⚠️ A DAY THAT IS ALL DONE STILL LEADS WITH ITS FIRST ROW, so a completed day has a top of the
+   * page like every other day rather than going uniformly quiet.
+   */
+  const leadSessionId = useMemo(() => {
+    const rows = Array.isArray(displayWorkouts) ? displayWorkouts : [];
+    const firstPlanned = rows.find((w) => String(w?.workout_status ?? '').toLowerCase() !== 'completed');
+    return (firstPlanned ?? rows[0])?.id ?? null;
+  }, [displayWorkouts]);
+
   const isPastDate = activeDate < today;
   const isToday = activeDate === today;
 
@@ -1793,7 +1807,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             // Omni-inspired illuminated border that blends
             border: '0.5px solid rgba(255, 255, 255, 0.08)',
             borderRadius: '12px', // Rounded corners for mounted instrument feel
-            padding: '0.52rem 0.82rem',
+            // ⛔ 14 px, ONE BLOCK (§3e.1). The date row and the weather are one quiet object now, so
+            // the block's own padding is the only inset either of them gets.
+            padding: '14px',
             // Panel depth: top-left key light + neutral depth (rainbow reserved for the horizon/road)
             boxShadow: `
               0 0 0 1px rgba(255,255,255,0.05) inset,
@@ -1908,31 +1924,27 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               </button>
             </div>
 
-            {/**
-              * ⛔ THE WEATHER SITS UNDER THE DATE NOW, NOT ABOVE IT (Michael, 2026-09-09, on the
-              * device). The date is what the screen is about and it was arriving second, behind a
-              * temperature. ⚠️ ITS SPACING IS ITS OWN: 12 px clear above and below, 16 px of padding
-              * inside — the block was reading as another line of the header rather than a block.
-              * ⚠️ INLINE MARGINS ON PURPOSE — the wrapper above is `space-y-0.5`, which sets a 2 px
-              * top margin on every child; these override it for this one.
-              * ⚠️ TODAY ONLY. There is no historical weather to show for another day.
-              */}
-            {weather && isTodayDate ? (
-              <TodayWeather
-                weather={weather}
-                city={cityName}
-                style={{ marginTop: 12, marginBottom: 12, padding: 16 }}
-              />
-            ) : null}
-
-            {/* The race countdown. ⚠️ THE CITY LEFT THIS LINE for the sunrise/sunset row inside the
-                weather block — it says where the reading came from, not what day it is. */}
+            {/* The race countdown. ⚠️ IT SITS ABOVE THE WEATHER, not below it: §3e.1 says the block
+                ENDS at the sunrise line, and a countdown after it would be the empty band again.
+                ⚠️ THE CITY LEFT THIS LINE for the sunrise/sunset row inside the weather — it says
+                where the reading came from, not what day it is. */}
             {(trainingPlanContext?.raceDate && (trainingPlanContext?.weeksToRace ?? 0) > 0) ? (
               <div className="flex items-center gap-1 flex-wrap text-[0.68rem] font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.55)', lineHeight: 1.1 }}>
                 <span style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.62 }}>
                   {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
                 </span>
               </div>
+            ) : null}
+
+            {/**
+              * ⛔ THE WEATHER IS INSIDE THIS BLOCK, NOT A CARD IN IT (§3e.1). It had 12 px of margin
+              * and 16 px of padding of its own, which drew a second surface inside a surface — the
+              * "second card" the go rules out. It now sits in the block's own 14 px, one line of
+              * air under the date, and the block ends where its sunrise line does.
+              * ⚠️ TODAY ONLY. There is no historical weather to show for another day.
+              */}
+            {weather && isTodayDate ? (
+              <TodayWeather weather={weather} city={cityName} style={{ marginTop: 8 }} />
             ) : null}
           </div>
         </div>
@@ -2021,8 +2033,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             {/* ⛔ 14 px BETWEEN SESSIONS (Michael, 2026-09-09). Each deck and card already
                 carries its own 14 px bottom margin, so the list adds none — two gaps stacked is
                 what pushed LOAD under the fold on a two-session day. */}
+            {/**
+              * ⛔ THE FIRST SESSION IS THE BIG THING (§3e.2), AND IT IS THE FIRST PLANNED ONE — not
+              * simply row zero. On a day whose first row is already logged, the work still in front
+              * of the athlete is the thing to lead with; the finished row is a record.
+              * ⚠️ A DAY THAT IS ALL DONE STILL LEADS WITH ITS FIRST ROW rather than going uniformly
+              * quiet, so a completed day has a top of the page like every other day.
+              */}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {displayWorkouts.map((workout, sessionIdx) => {
+                const emphasis: CardEmphasis = workout?.id === leadSessionId ? 'lead' : 'quiet';
                 /* ⛔ ONE MEASURED WRAPPER PER SESSION, so the scroll handler can say which one is in
                    view without every card having to know its own index. */
                 const wrap = (node: React.ReactNode) => (
@@ -2048,6 +2068,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       session={workout as never}
                       useImperial={useImperial}
                       isPastDate={isPastDate}
+                      emphasis={emphasis}
                       onOpen={() => (isCompletedRow(workout)
                         ? onEditEffort?.(workout)
                         : setSelectedPlannedWorkout(workout))}
@@ -2177,6 +2198,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                            inset 0 -1px 0 rgba(0,0,0,0.40),
                            inset 0 0 0 0.5px rgba(255,255,255,0.08)`,
                       borderWidth: '0.5px',
+                      // ⛔ ONE STEP QUIETER WHEN IT IS NOT THE DAY'S FIRST SESSION (§3e.2). This is
+                      // the fallback row — a skipped session, or one this file still draws itself —
+                      // and it follows the same rule the card object does.
+                      ...(emphasis === 'quiet' ? { opacity: isSkipped ? 0.72 : 0.88 } : null),
                       transform: 'translateZ(0)',
                       cursor: 'pointer',
                     }}

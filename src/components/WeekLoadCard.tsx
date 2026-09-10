@@ -139,14 +139,20 @@ const WeekLoadCard: React.FC<{
   if (!hasNumbers && metrics.length === 0) return null;
 
   return (
-    <div className={`galaxy-card readout-texture readout-texture--nova rounded-xl border border-white/[0.10] px-3 py-3 ${className}`}>
+    /* ⛔ ONE STEP QUIETER THAN THE DAY'S FIRST SESSION (§3e.2) — a thinner edge, because LOAD is the
+       week's read and the session is the thing being done today. */
+    <div className={`galaxy-card readout-texture readout-texture--nova rounded-xl border border-white/[0.06] px-3 py-3 ${className}`}>
       {/* ⛔ THE HEADER LINE: the word left, the chevron at the far right (the mockup's `.load .h`).
           No ⓘ — one control, and it opens the explanation and the bars together. */}
       <div className="flex items-center justify-between">
-        <span className="readout-label text-[12px] tracking-[0.1em] uppercase">LOAD</span>
+        {/* ⛔ ONE STEP SMALLER, same rule (§3e.2). */}
+        <span className="readout-label text-[11px] tracking-[0.1em] uppercase">LOAD</span>
         {/* ⚠️ NO CHEVRON WHERE THERE IS NOTHING TO OPEN. A control that reveals an empty space
             teaches the athlete to stop tapping controls. */}
-        {onToggle && (hasNumbers || hasBars) ? (
+        {/* ⚠️ `metrics.length` IS IN THE GATE NOW (§3e.2). The dot row only shows when open, so on an
+            account with mileage but no fitness numbers yet the chevron was the only way to reach it
+            — and without this it would not have drawn at all. */}
+        {onToggle && (hasNumbers || hasBars || metrics.length > 0) ? (
           <button
             type="button"
             onClick={onToggle}
@@ -180,7 +186,14 @@ const WeekLoadCard: React.FC<{
         <div className="mt-2 text-[11px]" style={{ color: 'rgba(255,255,255,0.40)' }}>no sessions logged yet</div>
       )}
 
-      {metrics.length > 0 && (
+      {/**
+        * ⛔ THE DOT ROW ONLY WHEN OPEN (§3e.2). Closed, LOAD is ONE number row — fitness, fatigue,
+        * form. Run / Bike / Lifted is the week's mileage, which is a second question, and stacking
+        * both on a closed card is what made the card as tall as a session.
+        * ⚠️ NOTHING IS LOST. The chevron was already the control for "tell me more"; these figures
+        * now arrive with the bars rather than before them.
+        */}
+      {expanded === true && metrics.length > 0 && (
         <div className="mt-2 grid grid-cols-3 gap-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.10)' }}>
           {metrics.map((m) => (
             <Cell

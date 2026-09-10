@@ -11,21 +11,67 @@ interface LogFABProps {
   onSelectType: (type: string) => void;
 }
 
+/**
+ * ⛔ ONE MENU, TWO OPENERS (§3e.3). The Week tab's day rows open this same list — "tap a day, then
+ * add" — and the floating + is gone. The items and their look live here so the two openers cannot
+ * drift into two different menus.
+ */
+export const LOG_WORKOUT_TYPES = [
+  { type: 'log-strength', label: 'Log Strength', icon: Dumbbell },
+  { type: 'log-run', label: 'Log Run', icon: Activity },
+  { type: 'log-ride', label: 'Log Ride', icon: Bike },
+  { type: 'log-swim', label: 'Log Swim', icon: Waves },
+  { type: 'upload-course', label: 'Upload Course', icon: MapPin },
+  { type: 'log-mobility', label: 'Log Mobility', icon: Move },
+  { type: 'log-pilates-yoga', label: 'Log Pilates/Yoga', icon: CircleDot },
+] as const;
+
+/** The popover body. ⚠️ IT MUST SIT INSIDE A `PopoverPrimitive.Root` that carries its own anchor. */
+export const LogTypeMenuContent: React.FC<{
+  onSelect: (type: string) => void;
+  side?: 'top' | 'bottom';
+  align?: 'start' | 'center' | 'end';
+  sideOffset?: number;
+}> = ({ onSelect, side = 'top', align = 'end', sideOffset = 16 }) => (
+  <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Content
+      side={side}
+      align={align}
+      sideOffset={sideOffset}
+      collisionPadding={12}
+      className={cn(
+        "z-50 rounded-2xl border border-white/25 bg-black/80 backdrop-blur-xl p-3 shadow-xl",
+        "data-[state=open]:animate-in data-[state=closed]:animate-out",
+        "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+        "data-[side=top]:slide-in-from-bottom-2 duration-200"
+      )}
+      style={{ minWidth: '220px' }}
+      onOpenAutoFocus={(e) => e.preventDefault()}
+    >
+      {LOG_WORKOUT_TYPES.map((item) => {
+        const Icon = item.icon;
+        return (
+          <button
+            key={item.type}
+            onClick={() => onSelect(item.type)}
+            className="flex items-center w-full hover:bg-white/[0.12] text-white font-light tracking-wide transition-colors duration-150 rounded-lg cursor-pointer mb-1 last:mb-0"
+            style={{ fontFamily: 'Inter, sans-serif', padding: '12px 16px', minHeight: '44px' }}
+          >
+            <Icon className="h-5 w-5 mr-3" />
+            {item.label}
+          </button>
+        );
+      })}
+    </PopoverPrimitive.Content>
+  </PopoverPrimitive.Portal>
+);
+
 const LogFAB: React.FC<LogFABProps> = ({ onSelectType }) => {
   const [isOpen, setIsOpen] = useState(false);
   
   // Track touch for swipe detection - only open on confirmed taps
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
-
-  const workoutTypes = [
-    { type: 'log-strength', label: 'Log Strength', icon: Dumbbell },
-    { type: 'log-run', label: 'Log Run', icon: Activity },
-    { type: 'log-ride', label: 'Log Ride', icon: Bike },
-    { type: 'log-swim', label: 'Log Swim', icon: Waves },
-    { type: 'upload-course', label: 'Upload Course', icon: MapPin },
-    { type: 'log-mobility', label: 'Log Mobility', icon: Move },
-    { type: 'log-pilates-yoga', label: 'Log Pilates/Yoga', icon: CircleDot },
-  ];
 
   const handleSelect = (type: string) => {
     onSelectType(type);
@@ -97,37 +143,7 @@ const LogFAB: React.FC<LogFABProps> = ({ onSelectType }) => {
           </div>
         </PopoverPrimitive.Anchor>
 
-        <PopoverPrimitive.Portal>
-          <PopoverPrimitive.Content
-            side="top"
-            align="end"
-            sideOffset={16}
-            className={cn(
-              "z-50 rounded-2xl border border-white/25 bg-black/80 backdrop-blur-xl p-3 shadow-xl",
-              "data-[state=open]:animate-in data-[state=closed]:animate-out",
-              "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-              "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-              "data-[side=top]:slide-in-from-bottom-2 duration-200"
-            )}
-            style={{ minWidth: '220px' }}
-            onOpenAutoFocus={(e) => e.preventDefault()}
-          >
-            {workoutTypes.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.type}
-                  onClick={() => handleSelect(item.type)}
-                  className="flex items-center w-full hover:bg-white/[0.12] text-white font-light tracking-wide transition-colors duration-150 rounded-lg cursor-pointer mb-1 last:mb-0"
-                  style={{ fontFamily: 'Inter, sans-serif', padding: '12px 16px', minHeight: '44px' }}
-                >
-                  <Icon className="h-5 w-5 mr-3" />
-                  {item.label}
-                </button>
-              );
-            })}
-          </PopoverPrimitive.Content>
-        </PopoverPrimitive.Portal>
+        <LogTypeMenuContent onSelect={handleSelect} />
       </PopoverPrimitive.Root>
     </div>
   );

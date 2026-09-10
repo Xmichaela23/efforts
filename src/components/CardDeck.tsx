@@ -61,6 +61,13 @@ const prefersReducedMotion = (): boolean => {
 
 export type DeckItem = { key: string; node: React.ReactNode };
 
+/**
+ * ⛔ `lead` IS THE FIRST SESSION OF THE DAY, `quiet` IS EVERY OTHER CARD ON TODAY (§3e.2). It is a
+ * position on the screen, not a property of the session — the same lift is `lead` on a day it comes
+ * first and `quiet` on a day it does not.
+ */
+export type CardEmphasis = 'lead' | 'quiet';
+
 export const CardDeck: React.FC<{
   items: DeckItem[];
   /** The sport colour, as a hex — the lit edge, the active dot. */
@@ -74,8 +81,10 @@ export const CardDeck: React.FC<{
   onCardTap?: () => void;
   /** A hook for the screenshot harness to read the deck and its position. */
   testId?: string;
+  /** See `CardEmphasis` — where this card sits on Today, not what it is. */
+  emphasis?: CardEmphasis;
   className?: string;
-}> = ({ items, colour, rgb, header, padding = '14px 16px', onCardTap, testId, className = '' }) => {
+}> = ({ items, colour, rgb, header, padding = '14px 16px', onCardTap, testId, emphasis = 'lead', className = '' }) => {
   const [idx, setIdx] = useState(0);
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
@@ -290,7 +299,7 @@ export const CardDeck: React.FC<{
             tabIndex={onCardTap ? 0 : undefined}
             className="absolute text-left w-full"
             style={{
-              ...deckGlass(rgb),
+              ...deckGlass(rgb, emphasis),
               top: 0, left: 0, right: 0,
               padding,
               transformStyle: 'preserve-3d',
@@ -350,11 +359,20 @@ export const CardDeck: React.FC<{
  * reads straight through the front one. Two small changes carry the legibility without the filter,
  * and the panel is still glass.
  */
-export const deckGlass = (rgb: string): React.CSSProperties => ({
+export const deckGlass = (rgb: string, emphasis: CardEmphasis = 'lead'): React.CSSProperties => ({
   borderRadius: 18,
   background: 'linear-gradient(180deg, rgba(19,21,27,0.90), rgba(11,12,16,0.96))',
-  border: `1px solid rgba(${rgb},0.45)`,
-  boxShadow: `0 0 0 1px rgba(255,255,255,0.03) inset, 0 18px 50px rgba(0,0,0,0.55), 0 0 40px rgba(${rgb},0.18)`,
+  /**
+   * ⛔ THE FIRST SESSION IS THE BIG THING (§3e.2). Everything after it is the same object one step
+   * quieter — a thinner edge and no glow — so the eye lands on the session the athlete is about to
+   * do rather than on whichever card happens to be brightest.
+   * ⚠️ THE EDGE STILL CARRIES THE SPORT COLOUR at `quiet`. Draining it to grey would make a second
+   * ride read as disabled; it is not disabled, it is second.
+   */
+  border: `1px solid rgba(${rgb},${emphasis === 'lead' ? 0.45 : 0.22})`,
+  boxShadow: emphasis === 'lead'
+    ? `0 0 0 1px rgba(255,255,255,0.03) inset, 0 18px 50px rgba(0,0,0,0.55), 0 0 40px rgba(${rgb},0.18)`
+    : `0 0 0 1px rgba(255,255,255,0.02) inset, 0 12px 34px rgba(0,0,0,0.5)`,
   backdropFilter: 'blur(6px)',
   WebkitBackdropFilter: 'blur(6px)',
 });

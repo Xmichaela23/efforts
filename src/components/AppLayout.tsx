@@ -16,7 +16,6 @@ import AllPlansInterface from './AllPlansInterface';
 import StrengthPlansView from './StrengthPlansView';
 import WorkoutSummary from './WorkoutSummary';
 import ContextTabs from './ContextTabs';
-import LogFAB from './LogFAB';
 import ManualSwimEntry from './ManualSwimEntry';
 import GoalsScreen from './GoalsScreen';
 import UnifiedWorkoutView from './UnifiedWorkoutView';
@@ -1854,6 +1853,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                       onViewCompleted={handleViewCompleted}
                       onEditEffort={handleEditEffort}
                       onDateSelect={handleDateSelect}
+                      /* §3e.3 — tapping today's row is the fastest way to the screen about today. */
+                      onOpenToday={() => {
+                        setSelectedDate(new Date().toLocaleDateString('en-CA'));
+                        setHomeLens('today');
+                      }}
                       selectedDate={selectedDate}
                       onSelectRoutine={handleSelectRoutine}
                       currentPlans={currentPlans as any}
@@ -1862,20 +1866,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                       plannedWorkouts={[]}
                     />
                     {/* ⛔ ADDING A WORKOUT BY HAND LIVES ON THE WEEK TAB NOW (work order §1) — tap a
-                        day, then add, the way TrainingPeaks and TrainerRoad do it. The calendar's
-                        day tap already sets the date every logger and builder opens on, so the
-                        menu that used to sit in the tab bar simply moved to where the date is
-                        chosen. ⚠️ THE MENU ITSELF IS UNCHANGED; only where it hangs.
+                        day, then add, the way TrainingPeaks and TrainerRoad do it.
 
-                        ⛔ AND IT IS NO LONGER FLOATING (Michael, 2026-09-09, on the device). It was
-                        `position: absolute` at the bottom-right corner of the pane, which put it ON
-                        TOP OF Sunday's row — the last day of the week sat under the button that adds
-                        to it. Now the seven rows take the pane's height and this row takes its own
-                        beneath them, so the + is the end of the list rather than a thing covering it.
-                        ⚠️ `flexShrink: 0` so the rows give up the space, never this row. */}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 10, flexShrink: 0 }}>
-                      <LogFAB onSelectType={handleSelectEffortType} />
-                    </div>
+                        ⛔⛔ AND THE BUTTON ITSELF IS GONE (§3e.3). It was `position: absolute` over
+                        the bottom-right of the pane, on top of Sunday's row, and it added to
+                        whichever day happened to be SELECTED — a second piece of state the athlete
+                        could not see. The day row IS the control now: tapping an empty part of a day
+                        opens the same menu for that day. `WorkoutCalendar` owns it, and it is
+                        literally the same menu (`LogTypeMenuContent`), not a copy of it. */}
                   </div>
                 </div>
               </div>
