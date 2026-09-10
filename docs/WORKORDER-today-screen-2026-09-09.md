@@ -140,6 +140,32 @@ rest the timer would run for that kind of set), summed, shown as a range (low to
 Time under the bar per set is a field estimate and is marked as such in the code. The ride and run keep
 their built lengths. Shown wherever the shared header shows minutes (Today, the drawer, the planned screen).
 
+## 3e. Device round two, GO (Michael, 2026-09-09 evening)
+
+Field check (TrainingPeaks home and calendar, TrainerRoad calendar, Whoop home, Runna Today and calendar,
+2026-09-09): Today's data set matches Runna's Today (session + its instructions + week mileage) and
+TrainingPeaks' home (fitness / fatigue / form + miles). Week is missing what TP and TrainerRoad show at a
+glance: planned versus done for the week, and a compliance colour on missed sessions.
+
+1. **Today header as one block.** Date row (chevrons, `Wed, Sep 9 · Week 2 · Base`, block label right)
+   directly under the tabs; the weather under it inside the same quiet block, no second card, the block
+   ends at the sunrise line, city right-aligned on that line, 14 px padding. No empty band.
+2. **The first session is the big thing.** The first planned session card: name one step larger, glow
+   on; the second and later session cards and the LOAD card one step quieter (smaller name, thinner
+   edge). LOAD closed is one number row; the dot row (Run / Bike / Lifted) shows only when open.
+3. **Week compact.** Rows at content height, 8 px apart. Chips: sport dot, length, a check when done, the
+   swap arrow only on a swapped session. No sport codes (`BK-EZ`, `ST`, `RN`) as text. Today's row lit;
+   tapping it goes to the Today tab. Tap an empty area of a day row to add to that day (same menu as the
+   +); the floating + goes. Drag a chip to another day moves it (the same move the Schedule tab makes,
+   same warnings).
+4. **Week planned versus done.** One line above the rows: `Planned 6h 10m · 42 mi` / `Done 2h 05m · 12 mi`
+   (hours and miles for run + ride; lifts counted as sessions: `3 lifts planned · 2 done`). Data from the
+   calendar rows already loaded. A planned session whose day has passed with nothing logged gets the
+   status (missed) colour from the two status tokens (`risk` muted red edge), never a sport colour.
+   Numbers only; no sentence. Labels `Planned` / `Done` approved by the go.
+5. **Bug.** The Week chip labels a swapped anaerobic ride easy. Chips read the row's `band:` tag, never a
+   fallback to easy.
+
 ## 4. Out of scope
 
 - WORKORDER-kill-ours and WORKORDER-de-row-by-feel (separate, may land first or after).
