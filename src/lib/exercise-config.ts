@@ -3801,25 +3801,29 @@ export function normalizeLiftKey(raw: string): string {
 
 /**
  * Format weight for display with appropriate label
+ *
+ * ⛔ THE UNIT IS THE ATHLETE'S (2026-09-10, audit H-T06). This always wrote "lb"; materialize-plan passes
+ * "kg" for a metric athlete. ⚠️ A LABEL, NOT A CONVERSION — the number is whatever the resolver priced from
+ * the athlete's own baselines. The default keeps every other caller byte-identical.
  */
-export function formatWeightDisplay(weight: number | null, displayFormat: string): string {
+export function formatWeightDisplay(weight: number | null, displayFormat: string, unit: 'lb' | 'kg' = 'lb'): string {
   if (weight === null) return '';
   if (weight === 0 && displayFormat !== 'dipsAdded') return 'Bodyweight';
-  
+
   switch (displayFormat) {
     case 'perHand':
-      return `${weight} lb each`;
+      return `${weight} ${unit} each`;
     case 'perLeg':
-      return `${weight} lb per leg`;
+      return `${weight} ${unit} per leg`;
     case 'total':
-      return `${weight} lb`;
+      return `${weight} ${unit}`;
     case 'dipsAdded':
-      return `+${weight} lb`; // Added weight for dips
+      return `+${weight} ${unit}`; // Added weight for dips
     case 'band':
       return 'Band';
     case 'bodyweight':
       return 'Bodyweight';
     default:
-      return `${weight} lb`;
+      return `${weight} ${unit}`;
   }
 }

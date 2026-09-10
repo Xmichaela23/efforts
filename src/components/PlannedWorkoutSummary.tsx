@@ -8,7 +8,7 @@ const plannedMinutesOf = (workout: unknown): number | null => {
   const secs = plannedDurationSecondsOf(workout);
   return secs == null ? null : Math.max(1, Math.round(secs / 60));
 };
-import { formatStrengthExercise, plainLiftList, formatStrengthExerciseLines } from '@/utils/strengthFormatter';
+import { plainLiftList } from '@/utils/strengthFormatter';
 import { getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
@@ -305,37 +305,15 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
   const linesShown = lines;
   const isStrength = String((workout as any)?.type||'').toLowerCase()==='strength';
   const isMobility = String((workout as any)?.type||'').toLowerCase()==='mobility';
+  /**
+   * ⛔ THE SENTENCES ARE THE SERVER'S (2026-09-10, audit H-D14) — `computed.strength_lines`. The phone
+   * formatter and its authored-exercise fallback (which printed a raw "70% 1RM" and always said "lb") are
+   * gone; a row materialize-plan has not reached prints no lines.
+   */
   const strengthItems: string[] = (() => {
     if (!isStrength) return [];
-    try {
-      // Prefer computed strength steps (server-prescribed)
-      const compD = parseComputed(workout);
-      const cSteps: any[] = Array.isArray(compD?.steps) ? compD.steps : [];
-      const comp = cSteps.filter(st => String((st as any)?.kind||'').toLowerCase()==='strength').map((st:any)=> st?.strength).filter(Boolean) as any[];
-      const asLines = (arr:any[]) => arr.map((s:any)=>{
-        // Use shared formatter for consistent display
-        return formatStrengthExercise(s, 'imperial');
-      });
-      if (comp.length) return formatStrengthExerciseLines(comp, 'imperial');
-      // Fallback: authored exercises
-      const ex: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
-      if (!ex.length) return [];
-      return formatStrengthExerciseLines(ex, 'imperial', (e:any)=>{
-        // Fallback for non-materialized exercises - use shared formatter
-        // Special handling for string weights (e.g., "70% 1RM" from raw JSON)
-        if (typeof e?.weight === 'string' && e.weight.trim()) {
-          // Keep string weights as-is for raw exercises
-          const formatted = formatStrengthExercise(e, 'imperial');
-          const name = String(e?.name||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
-          const sets = Math.max(1, Number(e?.sets)||1);
-          const repsVal:any = (():any=>{ const r=e?.reps||e?.rep; if (typeof r==='string') return r.toUpperCase(); if (typeof r==='number') return Math.max(1, Math.round(r)); return undefined; })();
-          const repTxt = (typeof repsVal==='string') ? repsVal : `${Number(repsVal||0)}`;
-          const notes = e?.notes ? ` (${String(e.notes).trim()})` : '';
-          return `${name} ${sets}×${repTxt} — ${e.weight.trim()}${notes}`;
-        }
-        return formatStrengthExercise(e, 'imperial');
-      });
-    } catch { return []; }
+    const serverLines = parseComputed(workout)?.strength_lines;
+    return Array.isArray(serverLines) ? serverLines.filter((l: unknown) => typeof l === 'string' && l) : [];
   })();
 
   /** The same rows `strengthItems` reads — server steps first, authored exercises otherwise — as a plain list. */

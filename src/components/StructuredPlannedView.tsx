@@ -7,7 +7,6 @@ import { Copy } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
-import { formatStrengthExercise, formatStrengthExerciseLines } from '@/utils/strengthFormatter';
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
 import { isWorkoutKitAvailable, scheduleSwimOnWatch, buildSwimPayloadFromWorkout } from '@/services/workoutkit';
 import { Capacitor } from '@capacitor/core';
@@ -212,9 +211,10 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       // 2026-09-03: a strength session is formatted as a LIST so a printed superset (p274) comes out as one line
       // plus its sentence; per-step formatting could not see the pair.
       const allStrength = v3.length > 0 && v3.every((st:any)=> st?.strength && typeof st.strength==='object');
-      if (allStrength) {
-        const unitsAll = (String((workout as any)?.units||'').toLowerCase()==='metric') ? 'metric' : 'imperial';
-        lines.push(...formatStrengthExerciseLines(v3.map((st:any)=>st.strength), unitsAll));
+      // ⛔ THE SENTENCES ARE THE SERVER'S (2026-09-10, audit H-D14): `computed.strength_lines`, a superset pair
+      // on one line. A row materialized before the field existed prints none until it is materialized again.
+      if (allStrength && Array.isArray(computedAny?.strength_lines)) {
+        lines.push(...computedAny.strength_lines.filter((l:any)=> typeof l === 'string' && l));
       }
       // The talk-test reminder prints once per session, on the first heart-rate step; the rest carry the range.
       let talkTestSaid = false;
@@ -282,10 +282,10 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           }
         }
 
-        // Strength step formatting (using shared formatter)
+        // Strength step: the server's own line for the row (audit H-D14).
         if (st?.strength && typeof st.strength==='object') {
-          const units = (String((workout as any)?.units||'').toLowerCase()==='metric') ? 'metric' : 'imperial';
-          if (!allStrength) lines.push(formatStrengthExercise(st.strength, units));
+          const line = st.strength.display_line;
+          if (!allStrength && typeof line === 'string' && line) lines.push(line);
           return;
         }
 

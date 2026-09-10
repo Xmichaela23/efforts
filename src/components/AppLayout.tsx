@@ -320,86 +320,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         setShowAllPlans(false);
         setSelectedWorkout(null);
         // Single logger path
-        // Convert mobility_exercises → strength_exercises and open StrengthLogger
-        const raw: any[] = (() => {
-          const val: any = (planned as any)?.mobility_exercises;
-          if (Array.isArray(val)) return val as any[];
-          if (typeof val === 'string') { try { const p = JSON.parse(val); if (Array.isArray(p)) return p as any[]; } catch { /* mobility_exercises not valid JSON */ } }
-          return [] as any[];
+        // ⛔ THE LOGGER ROWS ARE THE SERVER'S (2026-09-10, audit H-T12): `computed.mobility_sets`, written by
+        // materialize-plan from the row's exercises. The phone parsed sets, reps and weight out of text here.
+        const comp: any = (() => {
+          const c = (planned as any)?.computed;
+          if (typeof c === 'string') { try { return JSON.parse(c); } catch { return null; } }
+          return c;
         })();
-        const parsed = raw.flatMap((m: any) => {
-          const baseName = String(m?.name || '').trim() || 'Mobility';
-          const notes = String(m?.description || m?.notes || '').trim();
-          const perSide = m?.per_side === true;
-          
-          // Check if this is a duration-based exercise (has duration_seconds explicitly stored)
-          if (typeof m?.duration_seconds === 'number' && m.duration_seconds > 0) {
-            const sets = m.sets || 1;
-            let w = 0;
-            if (typeof m?.weight === 'number' && Number.isFinite(m.weight)) {
-              w = m.weight;
-            } else if (typeof m?.weight === 'string') {
-              const pw = parseFloat(m.weight);
-              if (Number.isFinite(pw)) w = pw;
-            }
-            // If per_side, expand into separate L/R entries for each set
-            if (perSide) {
-              const entries: any[] = [];
-              for (let s = 0; s < sets; s++) {
-                entries.push({ name: `${baseName} (Left)`, sets: 1, duration_seconds: m.duration_seconds, weight: w, notes });
-                entries.push({ name: `${baseName} (Right)`, sets: 1, duration_seconds: m.duration_seconds, weight: w, notes });
-              }
-              return entries;
-            }
-            return [{ name: baseName, sets, duration_seconds: m.duration_seconds, weight: w, notes }];
-          }
-          
-          // Otherwise, parse as rep-based exercise
-          const durTxt = String(m?.duration || m?.plannedDuration || '').toLowerCase();
-          let sets = m.sets || 1;
-          let reps: number | undefined = undefined;
-          
-          // Check if exercise has explicit reps
-          if (typeof m?.reps === 'number' && m.reps > 0) {
-            reps = m.reps;
-          } else {
-            // Try to parse reps from duration string (e.g., "2x8" or "2 sets of 8")
-            const mr = durTxt.match(/(\d+)\s*x\s*(\d+)/i) || durTxt.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
-            if (mr) {
-              sets = parseInt(mr[1],10)||1;
-              reps = parseInt(mr[2],10)||undefined;
-            } else {
-              // Check if duration string indicates sets only (e.g., "2 sets" without reps)
-              const setsOnlyMatch = durTxt.match(/(\d+)\s*sets?/i);
-              if (setsOnlyMatch) {
-                sets = parseInt(setsOnlyMatch[1],10)||1;
-                // Don't set reps - leave undefined for "until" patterns
-              }
-            }
-          }
-          // Use preserved load if present, else parse from free text
-          let w = 0;
-          if (typeof m?.weight === 'number' && Number.isFinite(m.weight)) {
-            w = m.weight;
-          } else if (typeof m?.weight === 'string') {
-            const pw = parseFloat(m.weight);
-            if (Number.isFinite(pw)) w = pw;
-          } else {
-            const blob = `${String(m?.name||'')} ${String(m?.description||'')} ${String(m?.notes||'')} ${String(m?.duration||'')}`;
-            const mw = blob.match(/(\d+(?:\.\d+)?)\s*(lb|lbs|kg)\b/i);
-            if (mw) { const pw = parseFloat(mw[1]); if (Number.isFinite(pw)) w = pw; }
-          }
-          // If per_side, expand into separate L/R entries for each set
-          if (perSide) {
-            const entries: any[] = [];
-            for (let s = 0; s < sets; s++) {
-              entries.push({ name: `${baseName} (Left)`, sets: 1, reps, weight: w, notes });
-              entries.push({ name: `${baseName} (Right)`, sets: 1, reps, weight: w, notes });
-            }
-            return entries;
-          }
-          return [{ name: baseName, sets, reps: reps !== undefined ? reps : undefined, weight: w, notes }];
-        });
+        const parsed: any[] = Array.isArray(comp?.mobility_sets) ? comp.mobility_sets : [];
         const plannedForStrength = { ...planned, type: 'strength', strength_exercises: parsed, logger_mode: 'mobility' } as any;
         setLoggerScheduledWorkout(plannedForStrength);
         // Do NOT override selectedDate; keep performed/logged day stable.
@@ -1279,36 +1207,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           const { data } = await supabase.functions.invoke('get-week', { body: { from: today, to: today } } as any) as any;
           const items: any[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
           const mob = items.find((it:any)=> String(it?.date)===today && String(it?.type||'').toLowerCase()==='mobility' && !!it?.planned);
-          if (mob && Array.isArray(mob?.planned?.mobility_exercises)) {
-            const raw = mob.planned.mobility_exercises as any[];
-            const parsed = raw.map((m: any) => {
-              const name = String(m?.name || '').trim() || 'Mobility';
-              const notes = String(m?.description || m?.notes || '').trim();
-              
-              // Check if this is a duration-based exercise (has duration_seconds explicitly stored)
-              if (typeof m?.duration_seconds === 'number' && m.duration_seconds > 0) {
-                const sets = m.sets || 1;
-                const w = typeof m?.weight === 'number' && Number.isFinite(m.weight) ? m.weight : 
-                         (typeof m?.weight === 'string' ? (parseFloat(m.weight) || 0) : 0);
-                return { name, sets, duration_seconds: m.duration_seconds, weight: w, notes };
-              }
-              
-              // Otherwise, parse as rep-based exercise
-              const durTxt = String(m?.duration || m?.plannedDuration || '').toLowerCase();
-              let sets = m.sets || 1; let reps = 8;
-              const mr = durTxt.match(/(\d+)\s*x\s*(\d+)/i) || durTxt.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
-              if (mr) { sets = parseInt(mr[1],10)||1; reps = parseInt(mr[2],10)||8; }
-              // Preserve authored load if present
-              let w = 0;
-              if (typeof m?.weight === 'number' && Number.isFinite(m.weight)) {
-                w = m.weight;
-              } else if (typeof m?.weight === 'string') {
-                const pw = parseFloat(m.weight);
-                if (Number.isFinite(pw)) w = pw;
-              }
-              return { name, sets, reps, weight: w, notes };
-            });
-            setLoggerScheduledWorkout({ logger_mode: 'mobility', type: 'strength', name: mob?.planned?.name || 'Mobility Session', date: today, strength_exercises: parsed } as any);
+          // ⛔ The server's logger rows (2026-09-10, audit H-T12) — no parsing and no 8-rep default here.
+          const serverSets = mob?.planned_workout?.computed?.mobility_sets;
+          if (mob && Array.isArray(serverSets) && serverSets.length) {
+            setLoggerScheduledWorkout({ logger_mode: 'mobility', type: 'strength', name: mob?.planned?.name || 'Mobility Session', date: today, strength_exercises: serverSets } as any);
           } else {
             setLoggerScheduledWorkout({ logger_mode: 'mobility', type: 'strength', name: 'Mobility Session', date: today } as any);
           }
@@ -1364,46 +1266,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           const { data } = await supabase.functions.invoke('get-week', { body: { from: today, to: today } } as any) as any;
           const items: any[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
           const mob = items.find((it:any)=> String(it?.date)===today && String(it?.type||'').toLowerCase()==='mobility' && !!it?.planned);
-          if (mob && mob?.planned?.mobility_exercises) {
-            const rawVal: any = mob.planned.mobility_exercises;
-            const raw: any[] = Array.isArray(rawVal) ? rawVal as any[] : (typeof rawVal === 'string' ? (()=>{ try { const p = JSON.parse(rawVal); return Array.isArray(p)? p: []; } catch { return []; } })() : []);
-            const parsed = raw.map((m: any) => {
-              const name = String(m?.name || '').trim() || 'Mobility';
-              const notes = String(m?.description || m?.notes || '').trim();
-              
-              // Check if this is a duration-based exercise (has duration_seconds)
-              if (typeof m?.duration_seconds === 'number' && m.duration_seconds > 0) {
-                const sets = m.sets || 1;
-                let w = 0;
-                if (typeof m?.weight === 'number' && Number.isFinite(m.weight)) {
-                  w = m.weight;
-                } else if (typeof m?.weight === 'string') {
-                  const pw = parseFloat(m.weight);
-                  if (Number.isFinite(pw)) w = pw;
-                }
-                return { name, sets, duration_seconds: m.duration_seconds, weight: w, notes };
-              }
-              
-              // Otherwise, parse as rep-based exercise
-              const durTxt = String(m?.duration || m?.plannedDuration || '').toLowerCase();
-              let sets = 1; let reps = 8;
-              const mr = durTxt.match(/(\d+)\s*x\s*(\d+)/i) || durTxt.match(/(\d+)\s*sets?\s*of\s*(\d+)/i);
-              if (mr) { sets = parseInt(mr[1],10)||1; reps = parseInt(mr[2],10)||8; }
-              // Preserve load or parse from any free text as fallback
-              let w = 0;
-              if (typeof m?.weight === 'number' && Number.isFinite(m.weight)) {
-                w = m.weight;
-              } else if (typeof m?.weight === 'string') {
-                const pw = parseFloat(m.weight);
-                if (Number.isFinite(pw)) w = pw;
-              } else {
-                const blob = `${String(m?.name||'')} ${String(m?.description||'')} ${String(m?.notes||'')} ${String(m?.duration||'')}`;
-                const mw = blob.match(/(\d+(?:\.\d+)?)\s*(lb|lbs|kg)\b/i);
-                if (mw) { const pw = parseFloat(mw[1]); if (Number.isFinite(pw)) w = pw; }
-              }
-              return { name, sets, reps, weight: w, notes };
-            });
-            setLoggerScheduledWorkout({ logger_mode: 'mobility', type: 'strength', name: mob?.planned?.name || 'Mobility Session', date: today, strength_exercises: parsed } as any);
+          // ⛔ The server's logger rows (2026-09-10, audit H-T12) — no parsing and no 8-rep default here.
+          const serverSets = mob?.planned_workout?.computed?.mobility_sets;
+          if (mob && Array.isArray(serverSets) && serverSets.length) {
+            setLoggerScheduledWorkout({ logger_mode: 'mobility', type: 'strength', name: mob?.planned?.name || 'Mobility Session', date: today, strength_exercises: serverSets } as any);
           } else {
             setLoggerScheduledWorkout({ logger_mode: 'mobility', type: 'strength', name: 'Mobility Session', date: today } as any);
           }

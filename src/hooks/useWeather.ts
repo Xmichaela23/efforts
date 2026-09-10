@@ -26,12 +26,15 @@ export function useWeather({
   enabled = true,
 }: UseWeatherProps) {
   const [weather, setWeather] = useState<SessionWeatherForDisplay | null>(null);
+  // ⛔ The hot-day line, decided by `get-weather` (2026-09-10, audit H-T07). Null means say nothing.
+  const [heatNote, setHeatNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!enabled || lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng) || !timestamp) {
       setWeather(null);
+      setHeatNote(null);
       setLoading(false);
       return;
     }
@@ -63,6 +66,7 @@ export function useWeather({
         if (data?.weather) {
           const parsed = parseWorkoutWeatherDataForDisplay(data.weather);
           setWeather(parsed);
+          setHeatNote(typeof data?.heat_note === 'string' && data.heat_note ? data.heat_note : null);
         } else if (data?.error) {
           setError(String(data.error));
         }
@@ -96,5 +100,5 @@ export function useWeather({
     };
   }, [lat, lng, timestamp, workoutId, enabled, durationSeconds]);
 
-  return { weather, loading, error };
+  return { weather, heatNote, loading, error };
 }

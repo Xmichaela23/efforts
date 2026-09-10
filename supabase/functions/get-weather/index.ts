@@ -1,4 +1,19 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
+import { heatTerm } from '../_shared/heat-adjust.ts';
+
+/**
+ * ⛔ THE HOT-DAY LINE AND WHEN IT SHOWS, DECIDED HERE (2026-09-10, audit H-T07). Today's drawer printed it
+ * at 75°F or warmer, a number with no source, while the heat model (`_shared/heat-adjust.ts`) starts
+ * adjusting at `TEMP_REF_F` (60°F) — so from 61°F to 74°F the analysis corrected for heat and the drawer
+ * said nothing. It is sent above the model's own reference now, and only for today's conditions (no
+ * `workout_id`), because the words say "today". The words are the drawer's, moved.
+ */
+const HEAT_NOTE = 'Hot today. Go by conversation; heart rate reads high in the heat.';
+function heatNoteFor(weather: unknown, wantsCurrentConditions: boolean): string | null {
+  if (!wantsCurrentConditions) return null;
+  const load = heatTerm((weather as { temperature?: number } | null | undefined)?.temperature ?? null);
+  return load != null && load > 0 ? HEAT_NOTE : null;
+}
 
 /**
  * Bump when weather merge/cache semantics change so persisted workout rows refetch.
@@ -252,7 +267,7 @@ Deno.serve(async (req) => {
             w?.schema_version === WEATHER_SCHEMA_VERSION
           ) {
             console.log('🌡️ [WEATHER] Returning from shared cache');
-            return new Response(JSON.stringify({ weather: cached.weather }), {
+            return new Response(JSON.stringify({ weather: cached.weather, heat_note: heatNoteFor(cached.weather, wantsCurrentConditions) }), {
               status: 200,
               headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
             });
@@ -282,7 +297,7 @@ Deno.serve(async (req) => {
       const cached = rowWeatherData as WeatherData & { schema_version?: number };
       if (cached?.schema_version === WEATHER_SCHEMA_VERSION) {
         console.log('🌡️ [WEATHER] Returning from workout cache');
-        return new Response(JSON.stringify({ weather: rowWeatherData }), {
+        return new Response(JSON.stringify({ weather: rowWeatherData, heat_note: heatNoteFor(rowWeatherData, wantsCurrentConditions) }), {
           status: 200,
           headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
         });
@@ -365,9 +380,7 @@ Deno.serve(async (req) => {
       }
     } catch {}
 
-    return new Response(JSON.stringify({ 
-      weather: weatherData 
-    }), { 
+    return new Response(JSON.stringify({ weather: weatherData, heat_note: heatNoteFor(weatherData, wantsCurrentConditions) }), { 
       status: 200, 
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } 
     });

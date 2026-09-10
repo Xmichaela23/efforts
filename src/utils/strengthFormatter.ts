@@ -1,109 +1,17 @@
 import { kindWordFor } from '@/lib/today-lines';
 
 /**
- * Strength exercise display formatting
- * 
+ * Strength exercise display helpers
+ *
  * Smart server, dumb client:
  * - Server provides everything: weight_display, baseline_missing, required_baseline
  * - Client just reads and displays
+ *
+ * ⛔ THE ROW SENTENCE IS THE SERVER'S (2026-09-10, audit H-D14). `formatStrengthExercise` and
+ * `formatStrengthExerciseLines` moved to `supabase/functions/_shared/strength/strength-display-lines.ts`;
+ * materialize-plan stamps `strength.display_line` and `computed.strength_lines`, and the planned screens
+ * print those. Their tests moved with them.
  */
-
-/**
- * Format a strength exercise for display
- */
-export function formatStrengthExercise(
-  exercise: any,
-  _units: 'imperial' | 'metric' = 'imperial'
-): string {
-  /**
-   * ⛔⛔ THE EXECUTION THE ATHLETE'S KIT ACTUALLY REACHES, WHERE THE CANONICAL NAME SAYS MACHINE
-   * (2026-08-31, Michael's own screen). `rear delt machine` routes to dumbbells on an incline bench
-   * for him and the row named a station he does not own. The composer stamps `execution_name` when
-   * — and only when — the free-weight route is the one that resolved; absent means the canonical
-   * name is already the right one, and an athlete WITH the machine still reads the machine's name.
-   *
-   * ⚠️ DISPLAY ONLY, AND THAT IS THE WHOLE CONSTRAINT. `name` is untouched everywhere that stores,
-   * logs, matches or cites: it is the key logged-vs-planned matching runs on, and moving the WORDS
-   * would unmatch every set already logged against the old spelling.
-   */
-  const name = String(exercise?.execution_name || exercise?.name || '').replace(/_/g, ' ').trim();
-  const sets = Number(exercise?.sets) || 0;
-  const reps = exercise?.reps;
-  
-  // 2026-09-03: the book's word for the set leads (ME / DE / SKILL / HYP, p218), and the reserve the row
-  // carries is printed — the same words the logger shows under the same set.
-  const intent = String(exercise?.slot_intent || '').toUpperCase();
-  const bookWord = (intent === 'ME' || intent === 'DE' || intent === 'SKILL' || intent === 'HYP') ? intent : null;
-  const rirText = (() => {
-    const r = Number(exercise?.target_rir);
-    if (!Number.isFinite(r) || r < 0) return null;
-    const lo = Math.floor(r), hi = Math.ceil(r);
-    return lo === hi ? String(lo) : `${lo}-${hi}`;
-  })();
-  const parts: string[] = [bookWord ? `${bookWord} · ${name}` : name];
-  if (sets > 0 && reps != null) parts.push(`${sets}×${reps}`);
-  if (rirText && bookWord !== 'ME') parts.push(`· ${rirText} in reserve`);
-  
-  const weightDisplay = exercise?.weight_display;
-  if (weightDisplay && weightDisplay !== 'Bodyweight' && weightDisplay !== 'Band') {
-    // Show original weight if adjusted
-    if (exercise?.adjusted && exercise?.original_weight != null) {
-      parts.push(`@ ${weightDisplay} (was ${exercise.original_weight} lb)`);
-    } else {
-      parts.push(`@ ${weightDisplay}`);
-    }
-  } else if (exercise?.baseline_missing) {
-    parts.push(`@ [Setup Required]`);
-  }
-  
-  /**
-   * ⛔⛔ A BY-FEEL ROW SAYS WHICH KIND OF BY-FEEL IT IS (2026-09-01).
-   *
-   * ⛔ THE PROBLEM IS A READING ONE AND IT HAS COST REAL DAYS. Three of the four ways a weight is
-   * decided are deliberately "By feel" — an auto-regulated accessory, a pattern with no tested lift,
-   * a per-side movement — and on the screen all three look identical to a weight that failed to
-   * land. *"Week 2 has no weight"* gets reported, investigated, and turns out to be the design.
-   *
-   * ⚠️ THE SENTENCES ARE FOR THE ATHLETE, NOT FOR A DEBUGGER. Each one says what to DO or what to
-   * expect, in their words: pick a load, there is nothing to price this against, it arrives when you
-   * test. ⚠️ `awaiting_test` is the ONLY one that promises a number later; saying that on a curl
-   * would leave an athlete waiting for something that is never coming.
-   * ⚠️ AND NOTHING IS SAID WHERE A WEIGHT EXISTS. A priced row already answers the question.
-   */
-  if (!weightDisplay && !exercise?.baseline_missing) {
-    const why: Record<string, string> = {
-      auto_regulated: `your call — pick a weight that leaves ${rirText ?? '1-2'} in reserve`,
-      no_tested_lift: 'no tested lift for this pattern, so it stays your call',
-      per_side: 'per side — your call, so one number cannot mislead you',
-      awaiting_test: 'weights arrive once you log the test',
-    };
-    const line = why[String(exercise?.load_basis ?? '')];
-    if (line) parts.push(`— ${line}`);
-  }
-
-  if (exercise?.notes) parts.push(`(${exercise.notes})`);
-
-  /**
-   * ⛔ WHAT THEY GOT LAST TIME, ON THE ROW (2026-08-26).
-   *
-   * A heavy slot prescribes a rep BAND and nothing else — "Bench Press 1×1-5 @ 145 lb" — and the
-   * weight moves once in twelve weeks on a light bar, so a block that is progressing exactly as
-   * designed reads as FROZEN for eight weeks. The progression lives in the reps; this is the only
-   * place the athlete can see it moving.
-   *
-   * ⚠️ ABSENT MEANS ABSENT. `last_reps` is written only where the athlete has a logged result at the
-   * weight now on the row, so the line disappears the week a jump lands — correct, because there is
-   * no last time at the new weight yet, and repeating a count earned on a lighter bar would be a
-   * claim about a session that did not happen.
-   */
-  const lastReps = Array.isArray(exercise?.last_reps) ? exercise.last_reps : null;
-  const lastRep = lastReps && lastReps.length > 0 ? Number(lastReps[lastReps.length - 1]) : null;
-  if (lastRep != null && Number.isFinite(lastRep)) {
-    parts.push(`— last time ${lastRep}`);
-  }
-
-  return parts.join(' ');
-}
 
 /**
  * Check if workout needs baseline setup
@@ -116,7 +24,7 @@ export function checkWorkoutNeedsBaselines(exercises: any[]): {
 } {
   const requiredSet = new Set<string>();
   const exercisesPending: string[] = [];
-  
+
   for (const ex of exercises) {
     if (ex?.baseline_missing) {
       exercisesPending.push(ex.name);
@@ -125,7 +33,7 @@ export function checkWorkoutNeedsBaselines(exercises: any[]): {
       }
     }
   }
-  
+
   return {
     needsSetup: requiredSet.size > 0,
     requiredBaselines: Array.from(requiredSet),
@@ -144,57 +52,13 @@ export function getStrengthExercisesFromWorkout(workout: any): any[] {
       .filter((s: any) => s?.kind === 'strength')
       .map((s: any) => s.strength);
   }
-  
+
   // Not materialized: raw strength_exercises
   const raw = workout?.strength_exercises;
   if (Array.isArray(raw)) return raw;
   if (typeof raw === 'string') return JSON.parse(raw);
-  
-  return [];
-}
 
-/**
- * 2026-09-03 (Michael: supersets are the book's layout, p274). Consecutive rows sharing `superset_group` print
- * as ONE line: "HYP · Tate Press + Drag Curl · superset · 3×6-12 · 1 in reserve — your call…". Rows without a
- * mark print through `fmtOne` (default `formatStrengthExercise`).
- */
-export function formatStrengthExerciseLines(
-  items: any[],
-  units: 'imperial' | 'metric' = 'imperial',
-  fmtOne: (e: any) => string = (e) => formatStrengthExercise(e, units),
-): string[] {
-  const out: string[] = [];
-  const list = Array.isArray(items) ? items : [];
-  // The plan copy says it too (Michael 2026-09-03: "it needs to be in the plan copy"): one sentence per pair,
-  // before the list, in the words the logger uses.
-  const seen = new Set<string>();
-  for (let i = 0; i < list.length - 1; i += 1) {
-    const g = typeof list[i]?.superset_group === 'string' ? list[i].superset_group : null;
-    if (!g || seen.has(g) || list[i + 1]?.superset_group !== g) continue;
-    seen.add(g);
-    const nm = (x: any) => String(x?.execution_name || x?.name || '').replace(/_/g, ' ').trim();
-    out.push(`Superset: ${nm(list[i])} with ${nm(list[i + 1])} — one set of each, rest, then again.`);
-  }
-  for (let i = 0; i < list.length; i += 1) {
-    const e = list[i];
-    const g = typeof e?.superset_group === 'string' && e.superset_group ? e.superset_group : null;
-    const next = list[i + 1];
-    if (g && next && next.superset_group === g) {
-      const nameOf = (x: any) => String(x?.execution_name || x?.name || '').replace(/_/g, ' ').trim();
-      const intent = String(e?.slot_intent || next?.slot_intent || '').toUpperCase();
-      const bookWord = (intent === 'ME' || intent === 'DE' || intent === 'SKILL' || intent === 'HYP') ? `${intent} · ` : '';
-      const sets = Number(e?.sets) || 0;
-      const reps = e?.reps;
-      const r = Number(e?.target_rir);
-      const rirText = Number.isFinite(r) && r >= 0 ? (Math.floor(r) === Math.ceil(r) ? String(Math.floor(r)) : `${Math.floor(r)}-${Math.ceil(r)}`) : null;
-      const tail = (!e?.weight_display && String(e?.load_basis || '') === 'auto_regulated') ? ` — your call — pick a weight that leaves ${rirText ?? '1-2'} in reserve` : '';
-      out.push(`${bookWord}${nameOf(e)} + ${nameOf(next)} · superset${sets > 0 && reps != null ? ` · ${sets}×${reps}` : ''}${rirText ? ` · ${rirText} in reserve` : ''}${tail}`);
-      i += 1;
-      continue;
-    }
-    out.push(fmtOne(e));
-  }
-  return out;
+  return [];
 }
 
 /**
@@ -208,15 +72,14 @@ export function formatStrengthExerciseLines(
  * "— last time 4"; the load-basis sentences; `(was 85 lb)`. A list the athlete reads at the bar has
  * one job — what to load and how many — and every repeated phrase pushed that off the line.
  *
- * ⚠️ `formatStrengthExercise` IS UNTOUCHED. The Planned tab and the plan screens still read it; this
- * is the drawer's own shape, not a rewrite of theirs.
- *
  * ⚠️ A ROW WITH NO PRICED WEIGHT READS `By feel` — the composer's own literal for an auto-regulated
  * row, the same one Today's card shows.
+ * ⛔ A BARE NUMBER IS NOT LABELLED HERE (2026-09-10, audit H-T06): the server's `weight_display` carries
+ * the athlete's unit; the phone's "lb"/"kg" guess is gone.
  */
 export type PlainLiftLine = { heading: string | null; text: string };
 
-export function plainLiftList(items: any[], units: 'imperial' | 'metric' = 'imperial'): PlainLiftLine[] {
+export function plainLiftList(items: any[], _units: 'imperial' | 'metric' = 'imperial'): PlainLiftLine[] {
   const list = Array.isArray(items) ? items : [];
   const nameOf = (x: any) => String(x?.execution_name || x?.name || '').replace(/_/g, ' ').trim();
   const dose = (x: any) => {
@@ -228,8 +91,6 @@ export function plainLiftList(items: any[], units: 'imperial' | 'metric' = 'impe
     const d = typeof x?.weight_display === 'string' ? x.weight_display.trim() : '';
     if (d) return d;
     if (typeof x?.weight === 'string' && x.weight.trim()) return x.weight.trim();
-    const n = Number(x?.weight);
-    if (Number.isFinite(n) && n > 0) return `${Math.round(n)} ${units === 'metric' ? 'kg' : 'lb'}`;
     return 'By feel';
   };
 

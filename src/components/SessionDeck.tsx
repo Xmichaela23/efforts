@@ -51,17 +51,17 @@ const barLoaded = (movement: string): boolean =>
 
 /**
  * The row's weight, top right (§3d). ⚠️ DATA, NEVER A PRESCRIPTION THIS FILE WRITES: `weight_display`
- * is what the server priced, `weight` is the composer's own value, and `By feel` is the literal
- * string it writes on an auto-regulated row. Nothing is invented when both are absent — the corner
+ * is what the server priced, in the athlete's unit, and a string `weight` is the composer's own
+ * literal (`By feel` on an auto-regulated row). Nothing is invented when both are absent — the corner
  * stays empty.
+ * ⛔ A BARE NUMBER IS NOT LABELLED HERE ANY MORE (2026-09-10, audit H-T06). This rounded it and added
+ * "lb" or "kg" from the phone's units with no conversion; materialize-plan stamps the label on the row.
  */
-function weightLabelFor(ex: Record<string, unknown> | undefined, useImperial: boolean): string | null {
+function weightLabelFor(ex: Record<string, unknown> | undefined): string | null {
   const display = ex?.weight_display;
   if (typeof display === 'string' && display.trim()) return display.trim();
   const raw = ex?.weight;
   if (typeof raw === 'string' && raw.trim()) return raw.trim();
-  const n = Number(raw);
-  if (Number.isFinite(n) && n > 0) return `${Math.round(n)} ${useImperial ? 'lb' : 'kg'}`;
   return null;
 }
 
@@ -78,7 +78,7 @@ export function deckCardsFor(session: TodayRow, useImperial: boolean): DeckCard[
       name: line.movement,
       kind: line.kind,
       cue: line.cue,
-      meta: weightLabelFor(rows[i], useImperial),
+      meta: weightLabelFor(rows[i]),
     }))
     .filter((c) => c.name);
 }

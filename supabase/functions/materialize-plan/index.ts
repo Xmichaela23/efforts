@@ -22,6 +22,8 @@ import {
   plannedSwimDistance,
   type SwimDistanceTally,
 } from '../_shared/swim/swim-plan-summary.ts';
+import { formatStrengthExercise, formatStrengthExerciseLines, type WeightUnit } from '../_shared/strength/strength-display-lines.ts';
+import { mobilitySetsFrom } from '../_shared/mobility-sets.ts';
 import { calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
 import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts';
 // ⚠️ The SERVER canonicalizer — `exercise_log.canonical_name` is its output, so the lookup key and
@@ -2568,7 +2570,7 @@ export function expandTokensForRow(
               : calculateWeightFromConfig(name, targetPercent, baselines as any, reps, !isStrengthPrimary);
             if (result.weight != null && result.weight > 0) {
               prescribed = result.weight;
-              weightDisplay = formatWeightDisplay(result.weight, result.displayFormat);
+              weightDisplay = formatWeightDisplay(result.weight, result.displayFormat, (baselines as any)?.isMetric ? 'kg' : 'lb');
             } else if (exerciseConfig.primaryRef) {
               // Weight couldn't be calculated - baseline is missing
               baselineMissing = true;
@@ -2667,7 +2669,8 @@ export function expandTokensForRow(
           let finalWeightDisplay = weightDisplay;
           if (finalWeight != null) {
             const config = getExerciseConfig(name);
-            finalWeightDisplay = formatWeightDisplay(finalWeight, config?.displayFormat || 'total');
+            // ⛔ THE ATHLETE'S UNIT ON THE LABEL (2026-09-10, audit H-T06) — it read "lb" for every athlete.
+            finalWeightDisplay = formatWeightDisplay(finalWeight, config?.displayFormat || 'total', (baselines as any)?.isMetric ? 'kg' : 'lb');
           }
           // D-071: prevent raw "% 1RM" strings from leaking to athlete UI when
           // the resolution chain bailed (no 1RM baseline). Override with an
@@ -2976,7 +2979,7 @@ export function expandTokensForRow(
               : calculateWeightFromConfig(name, targetPercent, baselines as any, typeof reps === 'number' ? reps : undefined, !isStrengthPrimary);
             if (result.weight != null && result.weight > 0) {
               prescribed = result.weight;
-              weightDisplay = formatWeightDisplay(result.weight, result.displayFormat);
+              weightDisplay = formatWeightDisplay(result.weight, result.displayFormat, (baselines as any)?.isMetric ? 'kg' : 'lb');
             } else if (exerciseConfig.primaryRef) {
               // Weight couldn't be calculated - baseline is missing
               baselineMissing = true;
@@ -3074,7 +3077,8 @@ export function expandTokensForRow(
           let finalWeightDisplay = weightDisplay;
           if (finalWeight != null) {
             const config = getExerciseConfig(name);
-            finalWeightDisplay = formatWeightDisplay(finalWeight, config?.displayFormat || 'total');
+            // ⛔ THE ATHLETE'S UNIT ON THE LABEL (2026-09-10, audit H-T06) — it read "lb" for every athlete.
+            finalWeightDisplay = formatWeightDisplay(finalWeight, config?.displayFormat || 'total', (baselines as any)?.isMetric ? 'kg' : 'lb');
           }
           // D-071: mirror first call site — RIR-anchored fallback when
           // resolution bailed on a "% 1RM" prescription and 1RM is missing.
@@ -4270,6 +4274,10 @@ Deno.serve(async (req) => {
           console.error(`   This indicates tokens did not match any patterns or fallbacks failed`);
         }
         
+        // ⛔ A MOBILITY ROW'S LOGGER ROWS (2026-09-10, audit H-T12) — see `_shared/mobility-sets.ts`.
+        const mobilitySets = String(row?.type || '').toLowerCase() === 'mobility' ? mobilitySetsFrom((row as any)?.mobility_exercises) : [];
+        const weightUnit: WeightUnit = (baselines as any)?.isMetric ? 'kg' : 'lb';
+
         if (steps && steps.length) {
           // Count recovery steps
           const recoverySteps = steps.filter((st:any) => st.kind === 'recovery' || st.kind === 'rest').length;
@@ -4300,6 +4308,7 @@ Deno.serve(async (req) => {
                 const swim_distance = plannedSwimDistance(swim_tally, (row as any)?.pool_unit, (row as any)?.units);
                 return swim_distance ? { swim_distance } : {};
               })(),
+              ...(mobilitySets.length ? { mobility_sets: mobilitySets } : {}),
             },
             total_duration_seconds: finalTotalSeconds,
             duration: Math.max(1, finalDuration),
@@ -4312,6 +4321,31 @@ Deno.serve(async (req) => {
           if (String(row?.type || '').toLowerCase() === 'swim' && tokens.length) {
             const line = formatSwimSubtitleFromBuckets(categorizeSwimTokensForDisplay(tokens.map(String)), ' • ');
             if (line) update.friendly_summary = line;
+          }
+
+          /**
+           * ⛔ THE STRENGTH ROW'S SENTENCE AND ITS WEIGHT LABEL (2026-09-10, audit H-D14 / H-T06).
+           * `strength.display_line` per step and `computed.strength_lines` for the session are what the
+           * planned screens print (`_shared/strength/strength-display-lines.ts`). And each authored
+           * `strength_exercises` row gets the priced `weight_display` — Today's deck reads those rows, and
+           * it printed the raw number with its own "lb"/"kg" guess.
+           * ⚠️ ROW i IS STEP i. Both strength branches push exactly one step per authored row, in order,
+           * with the plan's added lifts after them; a generic "strength block" means the expansion failed
+           * and nothing is stamped.
+           */
+          if (String(row?.type || '').toLowerCase() === 'strength') {
+            const strengthRows = v3.map((st: any) => st?.strength).filter((s: any) => s && typeof s === 'object');
+            for (const s of strengthRows) s.display_line = formatStrengthExercise(s, weightUnit);
+            if (strengthRows.length) update.computed.strength_lines = formatStrengthExerciseLines(strengthRows, weightUnit);
+            const authored = Array.isArray((row as any)?.strength_exercises) ? (row as any).strength_exercises : null;
+            if (authored && authored.length && strengthRows.length >= authored.length
+              && !strengthRows.some((s: any) => s?.name === 'strength block')) {
+              update.strength_exercises = authored.map((ex: any, i: number) => {
+                const { weight_display: _stale, ...rest } = ex ?? {};
+                const d = strengthRows[i]?.weight_display;
+                return typeof d === 'string' && d.trim() ? { ...rest, weight_display: d } : rest;
+              });
+            }
           }
           
           // Update race day description to match actual pace used in computed steps
@@ -4379,6 +4413,13 @@ Deno.serve(async (req) => {
           }
 
           await supabase.from('planned_workouts').update(update).eq('id', String(row.id));
+          count += 1;
+        } else if (mobilitySets.length) {
+          // ⛔ A mobility row with no timed steps still carries its logger rows (audit H-T12). `steps: []`
+          // marks it expanded, so get-week stops asking for it; the planned-length ladder skips an empty list.
+          await supabase.from('planned_workouts')
+            .update({ computed: { normalization_version: 'v3', steps: [], mobility_sets: mobilitySets } })
+            .eq('id', String(row.id));
           count += 1;
         }
       } catch (err) {
