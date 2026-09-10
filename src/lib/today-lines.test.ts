@@ -37,46 +37,51 @@ Deno.test('one session gets no spacing line', () => {
   assertEquals(spacingLineFor([lift([{ slot_intent: 'ME', name: 'barbell bench press' }])]), null);
 });
 
-Deno.test('two sessions, easy ride: the lift leads and the ride gives way (p144, p145)', () => {
+const LEAD = 'Two sessions today. Keep them six to eight hours apart.';
+const CLOSER_LABEL = 'If they have to be closer';
+
+Deno.test('two sessions, a lift and a ride: two lines, and the preferred order with its cost (p144, p145, p77)', () => {
   const day = [lift([{ slot_intent: 'SKILL', name: 'back squat' }]), ride('ride_endurance', 'vt1_or_easier')];
   assertEquals(spacingLineFor(day), {
-    lead: 'Two sessions today. Six to eight hours apart.',
-    closerLabel: 'Closer than that:',
-    closer: 'Lift first, make the ride easier.',
+    lead: LEAD,
+    closerLabel: CLOSER_LABEL,
+    closer: 'Lift first and keep the ride easy. Riding first costs the lift its skill and speed sets.',
   });
 });
 
-Deno.test('two sessions, hard ride + a skill row: the ride leads and the skill work goes (p145)', () => {
+Deno.test('⛔ THE BAND NO LONGER PICKS A BRANCH — a hard ride reads the same lines', () => {
   const day = [lift([{ slot_intent: 'SKILL', name: 'back squat' }]), ride('ride_anaerobic', 'above')];
-  assertEquals(spacingLineFor(day)?.closer, 'Ride first, skip the skill work.');
+  assertEquals(
+    spacingLineFor(day)?.closer,
+    'Lift first and keep the ride easy. Riding first costs the lift its skill and speed sets.',
+  );
 });
 
-Deno.test('⛔ NO SKILL ROW, ONLY A SPEED ROW: the speed work is what is dropped', () => {
+Deno.test('a speed row alone keeps the second sentence', () => {
   const day = [lift([{ slot_intent: 'DE', name: 'barbell bench press' }]), ride('ride_anaerobic', 'above')];
-  assertEquals(spacingLineFor(day)?.closer, 'Ride first, drop the speed work.');
+  assertEquals(
+    spacingLineFor(day)?.closer,
+    'Lift first and keep the ride easy. Riding first costs the lift its skill and speed sets.',
+  );
 });
 
 Deno.test('a run in place of the ride uses the same lines with "run"', () => {
   assertEquals(
     spacingLineFor([lift([{ slot_intent: 'SKILL', name: 'back squat' }]), run('run_lsd', 'vt1_or_easier')])?.closer,
-    'Lift first, make the run easier.',
-  );
-  assertEquals(
-    spacingLineFor([lift([{ slot_intent: 'SKILL', name: 'back squat' }]), run('run_mlss', 'above')])?.closer,
-    'Run first, skip the skill work.',
+    'Lift first and keep the run easy. Running first costs the lift its skill and speed sets.',
   );
 });
 
-Deno.test('⛔ NO BAND, NO BRANCH — the athlete keeps the six-to-eight line and nothing is guessed', () => {
+Deno.test('a row with no band still gets both lines', () => {
   const bandless = { id: 'r', type: 'ride', training_plan_id: PLAN, tags: ['sport:ride'] };
   const out = spacingLineFor([lift([{ slot_intent: 'SKILL', name: 'back squat' }]), bandless]);
-  assertEquals(out?.lead, 'Two sessions today. Six to eight hours apart.');
-  assertEquals(out?.closer, undefined);
+  assertEquals(out?.lead, LEAD);
+  assertEquals(out?.closerLabel, CLOSER_LABEL);
 });
 
-Deno.test('⛔ A LIFT WITH NEITHER SLOT IS ASKED TO GIVE UP NOTHING', () => {
+Deno.test('⛔ A LIFT WITH NO SKILL AND NO SPEED SETS: THE SECOND SENTENCE DROPS', () => {
   const day = [lift([{ slot_intent: 'HYP', name: 'dumbbell curl' }]), ride('ride_anaerobic', 'above')];
-  assertEquals(spacingLineFor(day)?.closer, undefined);
+  assertEquals(spacingLineFor(day)?.closer, 'Lift first and keep the ride easy.');
 });
 
 Deno.test('⛔ TWO SESSIONS THAT ARE NOT A LIFT AND A RIDE GET NO LINE', () => {

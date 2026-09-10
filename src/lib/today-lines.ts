@@ -91,19 +91,21 @@ const intentOf = (ex: TodayStrengthRow | null | undefined): 'ME' | 'DE' | 'SKILL
  * ride or a run. p145's rule 6 is about how long to leave *before the resistance session*, so a day
  * with no lift on it has nothing to space.
  *
- * ⛔⛔ WHICH BRANCH THE ATHLETE READS IS DECIDED BY THE DAY'S OWN DATA — the endurance row's `band:`
- * tag — NOT by a list of rules on the screen. The two pages decide it between them:
+ * ⛔ REVISED 2026-09-10 (work order §2.1): TWO LINES ALWAYS, THE REST UNDER A CHEVRON. The earlier
+ * version picked ONE branch off the endurance row's `band:` tag and printed only that one. The screen
+ * now shows the book's preferred order with the cost of the other, whatever the ride is:
  *
- *   · **p144, rule 5** — *work that benefits from pre-fatigue goes last, almost always
- *     VT1-intensity endurance: "you could cut your VT1 run volume by a third or so after a hard leg
- *     workout and get the same overall adaptations."* An easy session (`band:vt1_or_easier`) is the
- *     one that may be shortened, so the LIFT goes first and the ride gives way.
- *   · **p145, rule 6** — *"skill movements are best in the first session, being freshest."* A session
- *     that is not easy cannot be made easier without losing what it is for, so it goes first — and
- *     the thing that then cannot be done fresh is the lift's skill work.
+ *   · **p144, rule 5** — work that benefits from pre-fatigue goes last, almost always VT1-intensity
+ *     endurance, so the LIFT goes first and the ride or run is the one kept easy.
+ *   · **p145, rule 6 / p77** — skill movements are best in the first session, being freshest, so
+ *     riding first costs the lift its skill and speed sets.
  *
- * ⚠️ NO BAND, NO BRANCH. A row carrying no `band:` tag is not a composed endurance session and this
- * file will not guess which half of the day gives way. The athlete keeps the six-to-eight line.
+ * ⛔ THE DAY'S OWN ROWS STILL DECIDE THE WORDS: the endurance row's sport picks "ride" or "run", and
+ * the lift's rows decide whether the second sentence is there at all — a lift with no skill slot and
+ * no speed slot has nothing to lose by going second, so it is not told it would.
+ *
+ * ⚠️ A SWIM DAY GETS THE FIRST LINE ONLY. No swim wording was approved, and a chevron that opens onto
+ * nothing is not drawn.
  */
 export type SpacingLine = { lead: string; closerLabel?: string; closer?: string };
 
@@ -115,33 +117,20 @@ export function spacingLineFor(rows: readonly TodayRow[]): SpacingLine | null {
   const endurance = planned.find((r) => !isStrengthRow(r) && isEnduranceRow(r));
   if (!lift || !endurance) return null;
 
-  const sport = sportOf(endurance);
-  // ⛔ THE WORD FOLLOWS THE SPORT. p144/p145's lines were approved for the ride and for the run;
-  // no swim wording was approved, so a swim day gets the lead line and no branch.
-  const noun = sport === 'run' ? 'run' : sport === 'ride' ? 'ride' : null;
-
   // p145, rule 6.
-  const lead = 'Two sessions today. Six to eight hours apart.';
-  if (!noun) return { lead };
+  const lead = 'Two sessions today. Keep them six to eight hours apart.';
 
-  const band = bandOf(endurance);
-  if (!band) return { lead };
+  const sport = sportOf(endurance);
+  if (sport !== 'run' && sport !== 'ride') return { lead };
 
-  const closerLabel = 'Closer than that:';
-
-  if (band === 'vt1_or_easier') {
-    // p144, p145.
-    return { lead, closerLabel, closer: `Lift first, make the ${noun} easier.` };
-  }
-
-  // p145. The lift gives up the work that needed to be done fresh — and the day names which work
-  // that is off its own rows: the skill slot if it has one, otherwise the speed slot.
-  const first = noun === 'run' ? 'Run' : 'Ride';
+  const closerLabel = 'If they have to be closer';
+  // p144, p145.
+  const first = `Lift first and keep the ${sport} easy.`;
+  // p145, p77. ⛔ ONLY WHEN THE LIFT HAS SOMETHING THAT NEEDS TO BE FRESH.
   const intents = rowsOf(lift).map(intentOf);
-  if (intents.includes('SKILL')) return { lead, closerLabel, closer: `${first} first, skip the skill work.` };
-  if (intents.includes('DE')) return { lead, closerLabel, closer: `${first} first, drop the speed work.` };
-  // ⛔ NOTHING TO GIVE UP, SO NOTHING IS ASKED FOR. A lift day with neither slot keeps the lead line.
-  return { lead };
+  const costs = intents.includes('SKILL') || intents.includes('DE');
+  const cost = `${sport === 'run' ? 'Running' : 'Riding'} first costs the lift its skill and speed sets.`;
+  return { lead, closerLabel, closer: costs ? `${first} ${cost}` : first };
 }
 
 // ── 2. THE LIFT SESSION ─────────────────────────────────────────────────────────────────────────

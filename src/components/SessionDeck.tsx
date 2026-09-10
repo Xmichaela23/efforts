@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChevronDown } from 'lucide-react';
 import CardDeck, { deckGlass, type CardEmphasis, type DeckItem } from './CardDeck';
 import { useSessionBoom } from '@/hooks/useSessionBoom';
 import { getExerciseConfig } from '@/lib/exercise-config';
@@ -94,6 +95,8 @@ export function deckCardsFor(session: TodayRow, useImperial: boolean): DeckCard[
  * started rendering as a deck or a card; the spacing line was the one piece of it still on screen.
  */
 export const TodaySpacingLine: React.FC<{ rows: readonly TodayRow[] }> = ({ rows }) => {
+  // ⛔ CLOSED BY DEFAULT (§2.1, 2026-09-10).
+  const [open, setOpen] = React.useState(false);
   const spacing = spacingLineFor(rows);
   if (!spacing) return null;
   return (
@@ -103,10 +106,28 @@ export const TodaySpacingLine: React.FC<{ rows: readonly TodayRow[] }> = ({ rows
       style={{ color: 'rgba(255,255,255,0.72)', padding: '0 0.35rem 12px' }}
     >
       <div>{spacing.lead}</div>
+      {/* ⛔ THE TAP THE LOAD CARD'S CHEVRON HAD: the words left, the chevron at the far right, turning
+          over when open. ⚠️ No chevron where there is nothing under it (a swim day). */}
       {spacing.closer ? (
-        <div style={{ marginTop: 2, color: 'rgba(255,255,255,0.55)' }}>
-          {spacing.closerLabel} {spacing.closer}
-        </div>
+        <>
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            className="mt-0.5 flex w-full items-center justify-between bg-transparent border-none p-0 text-left cursor-pointer text-[13px] font-light leading-snug"
+            style={{ color: 'rgba(255,255,255,0.55)' }}
+          >
+            <span>{spacing.closerLabel}</span>
+            <ChevronDown
+              className="h-4 w-4 shrink-0 text-white/40"
+              aria-hidden="true"
+              style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 180ms ease' }}
+            />
+          </button>
+          {open ? (
+            <div style={{ marginTop: 2, color: 'rgba(255,255,255,0.55)' }}>{spacing.closer}</div>
+          ) : null}
+        </>
       ) : null}
     </div>
   );
