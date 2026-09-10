@@ -41,7 +41,9 @@ import { resolveSwapWrite } from '@/lib/swap-write';
 import { swapButtonLabel, swapLineFor, SWAP_BACK_TO_PLAN, SWAP_SHEET_HEADER } from '@/lib/swap-copy';
 import { formatSwimPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout, displayDisciplineOf } from '@/lib/utils';
-import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore } from '@/lib/context-utils';
+import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore, formZoneColor } from '@/lib/context-utils';
+import { formZone } from '@shared/fitness-fatigue';
+import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
@@ -56,7 +58,6 @@ import TodaySession, { rendersAsSessionCard, TodaySpacingLine } from './SessionD
 import type { CardEmphasis } from './CardDeck';
 // ⛔ §3b — the weather block above the date, and the week's load bars + counts under the day.
 import TodayWeather from './TodayWeather';
-import TodayWeekBlocks from './TodayWeekBlocks';
 // ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
 import { plannedDurationMinutes } from '@/lib/planned-session/duration';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
@@ -206,6 +207,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [homeArc, setHomeArc] = useState<ArcContextPayload | null>(null);
   const [homeArcReady, setHomeArcReady] = useState(false);
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
+  /** §3g — the form number's only source. Same payload `LoadBar` reads on State. */
+  const coachWeek = useCoachWeekContext();
   const [baselines, setBaselines] = useState<any | null>(null);
   const [dayLoc, setDayLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [locTried, setLocTried] = useState(false);
@@ -1616,6 +1619,51 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
    * ⚠️ A DAY THAT IS ALL DONE STILL LEADS WITH ITS FIRST ROW, so a completed day has a top of the
    * page like every other day rather than going uniformly quiet.
    */
+  /**
+   * ═══ §3g — WHAT IS LEFT OF LOAD ON TODAY ═══════════════════════════════════════════════════════
+   *
+   * ⛔ THE CARD IS GONE — fitness, fatigue, form, the run / bike / lifted row and the bars deck.
+   * State keeps its own load plate and the Week tab's bar carries the week's hours and miles; Today
+   * was printing a third copy of both, on the screen with the least room for them.
+   *
+   * ⛔ ONE NUMBER SURVIVES: `form −21 · optimal`. Form is the only one of the three that says
+   * anything about TODAY — fitness and fatigue are the week's story, and the athlete opening this
+   * screen is asking whether to train now. The word carries the colour and the number never does
+   * (`formZoneColor`, the same owner State's bar reads), because the zone is what the number MEANS.
+   *
+   * ⛔ IT IS READ, NEVER COMPUTED. `weekly_state_v1.load.fitness_fatigue` off the coach payload, the
+   * same field `LoadBar` and the card that used to sit here both read. Nothing is derived on Today.
+   *
+   * ⚠️ ABSENT UNTIL THERE IS A NUMBER. An account with nothing analysed yet gets no line at all
+   * rather than a dash — the old card's "no sessions logged yet" was a sentence about the database.
+   */
+  const formLine = useMemo(() => {
+    const ff = (coachWeek.data?.weekly_state_v1?.load as { fitness_fatigue?: { form?: number | null } } | undefined)?.fitness_fatigue;
+    const raw = ff?.form;
+    if (raw == null || !Number.isFinite(Number(raw))) return null;
+    const n = Math.round(Number(raw));
+    const zone = formZone(Number(raw));
+    return (
+      <button
+        type="button"
+        /* ⛔ THE DOOR THAT ALREADY EXISTS. `open:state` is what `TrainingBaselines` fires to reach
+           State; a second route to the same screen is how two doors start disagreeing. */
+        onClick={(e) => { e.stopPropagation(); try { window.dispatchEvent(new CustomEvent('open:state')); } catch { /* no window */ } }}
+        className="flex items-baseline gap-1 flex-shrink-0 text-[0.72rem] font-light tabular-nums whitespace-nowrap"
+        aria-label="Form — open State"
+      >
+        <span style={{ color: 'rgba(255,255,255,0.38)' }}>form</span>
+        <span style={{ color: 'rgba(255,255,255,0.92)' }}>{n > 0 ? `+${n}` : n}</span>
+        {zone ? (
+          <>
+            <span style={{ color: 'rgba(255,255,255,0.38)' }}>·</span>
+            <span style={{ color: formZoneColor(zone) }}>{zone}</span>
+          </>
+        ) : null}
+      </button>
+    );
+  }, [coachWeek.data]);
+
   const leadSessionId = useMemo(() => {
     const rows = Array.isArray(displayWorkouts) ? displayWorkouts : [];
     const firstPlanned = rows.find((w) => String(w?.workout_status ?? '').toLowerCase() !== 'completed');
@@ -1943,8 +1991,32 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               * air under the date, and the block ends where its sunrise line does.
               * ⚠️ TODAY ONLY. There is no historical weather to show for another day.
               */}
-            {weather && isTodayDate ? (
-              <TodayWeather weather={weather} city={cityName} style={{ marginTop: 8 }} />
+            {(weather && isTodayDate) || formLine ? (
+              /**
+                * ⛔ THE FORM LINE RIDES AT THE TOP RIGHT OF THE WEATHER (§3g). LOAD came off Today
+                * entirely; what survives of it is ONE number, and a number that small does not
+                * deserve a card — it goes in the space the weather block was already leaving.
+                *
+                * ⚠️ ABSOLUTE, NOT A FLEX SIBLING, AND THAT IS THE WHOLE POINT. In flow it reserved a
+                * column for the block's full height, so the humidity / dew point / wind row lost
+                * ~130 px and wrapped — the weather grew a line to make room for a number that only
+                * needs to sit beside the temperature. Out of flow it costs the rows below nothing.
+                * ⚠️ IT ONLY GOES OUT OF FLOW WHERE THERE IS A BLOCK TO SIT ON. With no weather (no
+                * location, or not today) it is an ordinary right-aligned line with a height of its
+                * own, rather than an absolute element in a box with no height.
+                */
+              <div style={{ marginTop: 8, position: 'relative' }}>
+                {weather && isTodayDate ? (
+                  <>
+                    <TodayWeather weather={weather} city={cityName} />
+                    {formLine ? (
+                      <div style={{ position: 'absolute', top: 0, right: 0 }}>{formLine}</div>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="flex justify-end">{formLine}</div>
+                )}
+              </div>
             ) : null}
           </div>
         </div>
@@ -2018,10 +2090,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   : 'No effort scheduled'
               }
             </p>
-            {/* ⛔ THE WEEK STILL SHOWS ON A REST DAY. The load bars and the counts describe the
-                WEEK, not the day — a rest day is exactly when an athlete looks at what the week
-                has come to. Only the day's own sessions go quiet (§2.4). */}
-            <TodayWeekBlocks weekRows={allUnifiedItems as never} weeklyStats={weeklyStats as never} className="mt-8" />
           </div>
         ) : (
           // Tap opens bottom sheet (planned) or detail (completed). Each planned session carries the
@@ -2409,10 +2477,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 the endurance half of a pairing p145 writes about a ride or a run. See
                 `TodaySpacingLine` above the list. */}
 
-            {/* ⛔ THE WEEK, UNDER THE DAY (§3b.2 / §3b.3) — the load bars per sport and this week's
-                counts. It reads the week `get-week` already returned, so the day above and the
-                totals below cannot disagree about what was logged. */}
-            <TodayWeekBlocks weekRows={allUnifiedItems as never} weeklyStats={weeklyStats as never} className="mt-[14px]" />
+            {/* ⛔ THE LOAD CARD AND ITS BARS DECK CAME OFF TODAY (§3g). State keeps its own load
+                plate and the Week tab's bar carries the week's hours and miles; what is left here is
+                the one form number, up in the header block beside the weather. `TodayWeekBlocks` and
+                `WeekLoadCard` are deleted — nothing else rendered either of them. */}
           </div>
         )}
         </div>

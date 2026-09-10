@@ -23,9 +23,9 @@ import RescheduleValidationPopup from '@/components/RescheduleValidationPopup';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 // ⚠️ `LoadBar` IS NO LONGER IMPORTED HERE — the load card it fed left this screen for Today
-// (2026-09-09). See `WeekLoadCard`.
-// ⚠️ `weekExecTotals` went with `LoadBar` — it fed that card's planned/done inputs and nothing else
-// on this screen. It is still the shared reader State and Today's card use.
+// (2026-09-09), and came off Today too (§3g). `LoadBar` itself lives on, on State.
+// ⚠️ `weekExecTotals` went with it — it fed that card's planned/done inputs and nothing else on this
+// screen. This week's planned-versus-done is `weekTotals` below, counted off the rows on screen.
 import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 import { fetchWeekUnified } from '@/lib/fetchWeekUnified';
 import { formatPlannedSwimDistanceChip } from '@/utils/swimPlanTokens';
@@ -1580,10 +1580,10 @@ export default function WorkoutCalendar({
         })}
       </div>
         
-      {/* ⛔ THE LOAD CARD MOVED TO TODAY (Michael, 2026-09-09) — fitness / fatigue / form and the
-          week's run, bike and strength totals. It sat here, at the bottom of the calendar; it now
-          renders under the day's sessions on Today, which is the screen an athlete opens. One owner:
-          `WeekLoadCard`. Nothing about the card changed on the way over. */}
+      {/* ⛔ THE LOAD CARD IS GONE FROM BOTH SCREENS. It sat here at the bottom of the calendar, moved
+          to Today (2026-09-09), and came off Today as well (§3g) — `WeekLoadCard` and
+          `TodayWeekBlocks` are deleted. State keeps its own load plate; this tab's own answer to
+          "how much of the week is done" is the bar under the header. */}
 
       {/* Hidden background prefetchers */}
       {prefetchNeighbors && (
