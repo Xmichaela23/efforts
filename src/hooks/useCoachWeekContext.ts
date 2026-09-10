@@ -787,6 +787,28 @@ export function useCoachWeekContext(date?: string) {
         if (notInvalidated && ageOk && weekOk) {
           setData(p);
           hasCachedData.current = true;
+          /**
+           * ⛔ PAINT THE SAVED COPY, THEN ASK THE SERVER ANYWAY (2026-09-10). The server's cache read
+           * checks the saved copy against the DEPLOYED version; this read cannot know that number, so
+           * a deploy alone never reached the screen until the copy aged out. One background call with
+           * the cache allowed: a hit returns the same copy and nothing changes; a version change makes
+           * `coach` rebuild and save a new copy, and the full pipeline then repaints from it.
+           */
+          void Promise.resolve(
+            supabase.functions.invoke('coach', {
+              body: {
+                user_id: userId,
+                date: focusDate,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                skip_cache: false,
+              },
+            }),
+          )
+            .then(({ data: served }) => {
+              const servedVer = Number((served as { coach_payload_version?: number } | null)?.coach_payload_version ?? 0);
+              if (servedVer > 0 && servedVer !== cacheVer) void runPipeline(true, { force: false });
+            })
+            .catch(() => { /* the painted copy stays */ });
           return;
         }
 
