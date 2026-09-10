@@ -192,6 +192,141 @@ export const SessionDeck: React.FC<{
   );
 };
 
+// ── the lift card ───────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ═══ §3h — A LIFT OR PLYO SESSION IS ONE CARD THAT OPENS, NOT A DECK ═════════════════════════════
+ *
+ * docs/WORKORDER-today-screen-2026-09-09.md §3h (Michael, 2026-09-10). Field basis: TrainingPeaks and
+ * Runna show a session as a list with notes inline; Strong and Hevy are lists. Nothing in that set
+ * swipes through exercises, and a swipe hid four of five movements behind a gesture.
+ *
+ * CLOSED — the name and estimated time, the first two exercises (name, kind word in the sport colour,
+ * weight or `By feel` right, the approved cue under), and `N more`. OPEN — every exercise, in session
+ * order. A tap anywhere on the card toggles it; the height animates and `prefers-reduced-motion`
+ * turns that off.
+ *
+ * ⛔ THE CARD'S TAP IS THE ONLY TAP ON THE BODY. An exercise line has no handler of its own. ⛔ THE
+ * DRAWER OPENS FROM THE SESSION NAME ONLY, and that tap does not also toggle — so opening the drawer
+ * and reading the cues are two different targets rather than one gesture that does both.
+ *
+ * ⛔ NOTHING ABOUT THE WORDS CHANGES. Every cue is the approved one from `@/lib/today-lines`
+ * (`liftLinesFor`), the plyo day's is its own note, and the only text this adds is data — the weight —
+ * plus `By feel` and `N more`.
+ */
+const reducedMotion = (): boolean => {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
+};
+
+export const LiftSessionCard: React.FC<{
+  session: TodayRow;
+  useImperial: boolean;
+  emphasis?: CardEmphasis;
+  onOpen?: () => void;
+}> = ({ session, useImperial, emphasis = 'lead', onOpen }) => {
+  const sport = displayDisciplineOf(session as never);
+  const colour = getDisciplineColor(sport);
+  const rgb = getDisciplineColorRgb(sport);
+  const title = deriveWorkoutTitle(session as never);
+  const meta = formatSessionDuration(session);
+  const cards = deckCardsFor(session, useImperial);
+
+  const [open, setOpen] = React.useState(false);
+  const reduced = React.useMemo(reducedMotion, []);
+  const listRef = React.useRef<HTMLDivElement | null>(null);
+  const rowRefs = React.useRef<Array<HTMLDivElement | null>>([]);
+  const [heights, setHeights] = React.useState<{ closed: number; full: number } | null>(null);
+
+  /**
+   * ⚠️ MEASURED, NOT GUESSED. A cue wraps to one line or three depending on the phone, so "the first
+   * two exercises" is a pixel height only the rendered rows know. `ResizeObserver` keeps it true when
+   * a font lands late or the phone rotates.
+   */
+  React.useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const measure = () => {
+      const full = list.scrollHeight;
+      const second = rowRefs.current[Math.min(1, cards.length - 1)];
+      const closed = second ? second.offsetTop + second.offsetHeight : full;
+      setHeights((prev) => (prev && prev.closed === closed && prev.full === full ? prev : { closed, full }));
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(list);
+    return () => ro.disconnect();
+  }, [cards.length]);
+
+  if (cards.length === 0) return null;
+  const more = Math.max(0, cards.length - 2);
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-expanded={open}
+      onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (more > 0) setOpen((o) => !o); }}
+      onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && more > 0) { e.preventDefault(); setOpen((o) => !o); } }}
+      className="w-full text-left"
+      style={{ ...deckGlass(rgb, emphasis), padding: '14px 16px', margin: '0 0 14px', cursor: more > 0 ? 'pointer' : 'default' }}
+    >
+      <div className="flex items-baseline justify-between gap-3">
+        {/* ⛔ THE ONE DOOR TO THE DRAWER. It stops the card's toggle so the two taps stay separate. */}
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpen?.(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onOpen?.(); } }}
+          className={`${emphasis === 'lead' ? 'text-[20px]' : 'text-[17px]'} font-semibold leading-tight min-w-0 truncate`}
+          style={{ color: colour, opacity: emphasis === 'lead' ? 1 : 0.86, cursor: 'pointer' }}
+        >
+          {title}
+        </span>
+        {meta ? (
+          <span className="text-[13px] tabular-nums flex-shrink-0" style={{ color: 'rgba(255,255,255,0.62)' }}>{meta}</span>
+        ) : null}
+      </div>
+
+      <div
+        ref={listRef}
+        style={{
+          /* ⚠️ `position: relative` MAKES THIS THE ROWS' offsetParent. Without it `offsetTop` was measured
+             from an ancestor above the header, so the closed height carried the header's height too and
+             a third exercise's name line showed under the second (caught in the 390×844 screenshot). */
+          position: 'relative',
+          overflow: 'hidden',
+          height: heights ? (open ? heights.full : heights.closed) : undefined,
+          transition: reduced ? 'none' : 'height 320ms cubic-bezier(.2,.8,.2,1)',
+        }}
+      >
+        {cards.map((c, i) => (
+          <div key={c.key} ref={(el) => { rowRefs.current[i] = el; }} style={{ paddingTop: i === 0 ? 10 : 12 }}>
+            <div className="flex items-baseline justify-between gap-3">
+              <div className="min-w-0">
+                <span className="text-[16px] font-medium" style={{ color: 'rgba(255,255,255,0.95)' }}>{c.name}</span>
+                {c.kind ? (
+                  <span className="text-[11px] uppercase tracking-[0.08em] ml-2" style={{ color: colour }}>{c.kind}</span>
+                ) : null}
+              </div>
+              <span className="text-[13px] tabular-nums flex-shrink-0" style={{ color: 'rgba(255,255,255,0.62)' }}>
+                {c.meta ?? 'By feel'}
+              </span>
+            </div>
+            {c.cue ? (
+              <div className="text-[14px]" style={{ lineHeight: 1.35, marginTop: 3, color: 'rgba(255,255,255,0.72)' }}>{c.cue}</div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      {!open && more > 0 ? (
+        <div className="text-[13px]" style={{ marginTop: 10, color: 'rgba(255,255,255,0.55)' }}>{more} more</div>
+      ) : null}
+    </div>
+  );
+};
+
 // ── the single card ─────────────────────────────────────────────────────────────────────────────
 
 /** A ride or run: one card, name and time, the family line. Same glass object as a deck card. */
@@ -456,10 +591,12 @@ const TodaySession: React.FC<{
   const sport = displayDisciplineOf(session as never);
   const title = deriveWorkoutTitle(session as never);
 
+  /**
+   * ⛔ §3h — THE LIFT CARD, NOT THE DECK. `SessionDeck` stays exported for the mockup's reference and
+   * renders nowhere on Today now; `CardDeck` itself still runs other decks.
+   */
   if (isStrengthRow(session)) {
-    const cards = deckCardsFor(session, useImperial);
-    if (cards.length === 0) return null;
-    return <SessionDeck title={title} cards={cards} sport={sport} emphasis={emphasis} onOpen={onOpen} />;
+    return <LiftSessionCard session={session} useImperial={useImperial} emphasis={emphasis} onOpen={onOpen} />;
   }
 
   if (!isEnduranceRow(session)) return null;

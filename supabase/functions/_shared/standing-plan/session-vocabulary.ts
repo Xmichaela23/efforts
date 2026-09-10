@@ -647,10 +647,11 @@ function describeSession(session: EnduranceSession, raceTempo: boolean): string 
    * library session's `notes` for any reader that wants the rule; it is only no longer the row's
    * sentence.
    *
-   * ⚠️ TWO APPROVED LINES DROP OUT OF THE DRAWER WITH THIS: `run_mlss`'s *"Fatigue spread evenly
-   * across the rounds. Hills are fine, adjust pace to hold the effort."* and the easy and long runs'
-   * *"Go by heart rate. Pace varies with fatigue, hydration and weather."* The drawer's description
-   * is the family line and nothing else.
+   * ⛔ THE TWO APPROVED RUN LINES FOLLOW THE FAMILY LINE (Michael, 2026-09-10 — put back after one
+   * day out). `run_mlss`: *"Fatigue spread evenly across the rounds. Hills are fine, adjust pace to
+   * hold the effort."* (p231). `run_vt1` / `run_lsd`: *"Go by heart rate. Pace varies with fatigue,
+   * hydration and weather."* (p235). They say HOW to run the session, which the family line does not,
+   * and the drawer is where the athlete reads the session in full. Today keeps the family line alone.
    *
    * ⚠️ THE RACE-TEMPO SENTENCE STAYS, after the family line, and only on a race-tempo row. That row
    * is a different session from its family (p247: race pace, recoveries a quarter longer) and the
@@ -659,6 +660,12 @@ function describeSession(session: EnduranceSession, raceTempo: boolean): string 
   const parts: string[] = [];
   const line = familyLineFor(session.family);
   if (line) parts.push(line);
+  if (session.family === 'run_mlss') {
+    parts.push('Fatigue spread evenly across the rounds. Hills are fine, adjust pace to hold the effort.');
+  }
+  if (session.family === 'run_vt1' || session.family === 'run_lsd') {
+    parts.push('Go by heart rate. Pace varies with fatigue, hydration and weather.');
+  }
   if (raceTempo) {
     parts.push('Run at race pace, with the recovery periods a quarter longer than usual.');
   }

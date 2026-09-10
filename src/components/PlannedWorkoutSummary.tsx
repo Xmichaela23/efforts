@@ -3,7 +3,7 @@ import { normalizePlannedSession, Baselines as NormalizerBaselines, ExportHints 
 import { normalizeStructuredSession } from '@/services/plans/normalizer';
 // ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
 import { plannedDurationMinutes } from '@/lib/planned-session/duration';
-import { formatStrengthExercise, formatStrengthExerciseLines } from '@/utils/strengthFormatter';
+import { formatStrengthExercise, plainLiftList, formatStrengthExerciseLines } from '@/utils/strengthFormatter';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
@@ -30,6 +30,12 @@ interface PlannedWorkoutSummaryProps {
    * `63:00` appear twice on one screen, which is exactly what the Today's drawer was doing.
    */
   hideHeader?: boolean;
+  /**
+   * ⛔ THE PLANNED LIFT DRAWER'S PLAIN LIST (Michael, 2026-09-10): `name · sets × reps · weight`, the
+   * kind word once above each run of rows, no cues, no repeated phrases, no `(was 85 lb)`. Only the
+   * Today drawer passes it; the plan screens keep the full formatter.
+   */
+  plainLiftList?: boolean;
   /**
    * ⛔ THE CALLER ALREADY PRINTED THE DESCRIPTION (2026-08-08). `buildWeeklySubtitle`'s last resort
    * is `rendered_description || description` — correct when this block stands alone, and a DUPLICATE
@@ -309,7 +315,7 @@ function buildStructuredSubtitleOnly(workout: any, baselines?: Baselines): strin
   } catch { return undefined; }
 }
 
-export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ workout, baselines, exportHints, hideLines, suppressNotes, suppressDescriptionFallback, hideHeader }) => {
+export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ workout, baselines, exportHints, hideLines, suppressNotes, suppressDescriptionFallback, hideHeader, plainLiftList: plainLift }) => {
   const minutes = (()=>{
     const t = String((workout as any)?.type||'').toLowerCase();
     if (t==='strength') return null; // avoid misleading 45min placeholders
@@ -382,6 +388,18 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
         return formatStrengthExercise(e, 'imperial');
       });
     } catch { return []; }
+  })();
+
+  /** The same rows `strengthItems` reads — server steps first, authored exercises otherwise — as a plain list. */
+  const plainLiftRows = (() => {
+    if (!isStrength || !plainLift) return [] as ReturnType<typeof plainLiftList>;
+    try {
+      const compD = parseComputed(workout);
+      const cSteps: any[] = Array.isArray(compD?.steps) ? compD.steps : [];
+      const comp = cSteps.filter((st) => String((st as any)?.kind || '').toLowerCase() === 'strength').map((st: any) => st?.strength).filter(Boolean);
+      const ex: any[] = comp.length ? comp : (Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : []);
+      return plainLiftList(ex, 'imperial');
+    } catch { return [] as ReturnType<typeof plainLiftList>; }
   })();
 
   // Endurance detail lines from computed steps (no coach notes)
@@ -730,12 +748,29 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
             {enduranceLines.map((ln, idx)=> (<li key={idx}>{ln}</li>))}
           </ul>
         )}
-        {!hideLines && isStrength && (
+        {/* ⛔ THE PLAIN LIST REPLACES BOTH the subtitle line and the formatted bullets. The header
+            above already carries the name and time; the subtitle and bullets are where the repeated
+            reserve phrases, the cues and `(was 85 lb)` lived. */}
+        {!hideLines && isStrength && plainLift && plainLiftRows.length > 0 ? (
+          <div className="mt-1 text-sm text-gray-200 font-light tracking-normal">
+            {plainLiftRows.map((row, idx) => (
+              <React.Fragment key={idx}>
+                {row.heading ? (
+                  <div className="text-[11px] uppercase tracking-[0.08em] text-white/55" style={{ marginTop: idx === 0 ? 0 : 10, marginBottom: 2 }}>
+                    {row.heading}
+                  </div>
+                ) : null}
+                <div className="tabular-nums" style={{ lineHeight: 1.45 }}>{row.text}</div>
+              </React.Fragment>
+            ))}
+          </div>
+        ) : null}
+        {!hideLines && isStrength && !plainLift && (
           <div className="text-sm text-gray-200 font-light tracking-normal mt-1">
             <span>{lines}</span>
           </div>
         )}
-        {!hideLines && isStrength && strengthItems.length>0 && (
+        {!hideLines && isStrength && !plainLift && strengthItems.length>0 && (
           <ul className="list-disc pl-5 mt-1 text-sm text-gray-200 font-light tracking-normal">
             {strengthItems.map((ln, idx)=> (<li key={idx}>{ln}</li>))}
           </ul>

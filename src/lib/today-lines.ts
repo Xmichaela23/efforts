@@ -147,7 +147,7 @@ export function spacingLineFor(rows: readonly TodayRow[]): SpacingLine | null {
 // ── 2. THE LIFT SESSION ─────────────────────────────────────────────────────────────────────────
 
 /** The book's own word for the slot, spelled out (p218's intent table). */
-const KIND_WORD: Record<'ME' | 'DE' | 'SKILL' | 'HYP', string> = {
+export const KIND_WORD: Record<'ME' | 'DE' | 'SKILL' | 'HYP', string> = {
   ME: 'Maximal effort',
   DE: 'Dynamic effort',
   SKILL: 'Skill',
@@ -258,4 +258,13 @@ export function enduranceLinesFor(session: TodayRow): string[] {
   const family = familyOf(session);
   const line = familyLineFor(family);
   return line ? [line] : [];
+}
+
+/**
+ * The spelled-out kind word for a row, or null. ⛔ ONE OWNER — Today's card and the planned lift
+ * drawer both print it, so both read it here (2026-09-10).
+ */
+export function kindWordFor(ex: { slot_intent?: unknown } | null | undefined): string | null {
+  const v = String(ex?.slot_intent ?? '').toUpperCase();
+  return v === 'ME' || v === 'DE' || v === 'SKILL' || v === 'HYP' ? KIND_WORD[v] : null;
 }

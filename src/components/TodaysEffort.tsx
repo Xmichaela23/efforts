@@ -2663,6 +2663,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                      * "~63 min printed twice" on this surface.
                      */
                     hideHeader
+                    /* §3h — the planned lift drawer is a plain list: name · sets × reps · weight. */
+                    plainLiftList
                   />
                   {/* ⛔ RULING 7 (Michael 2026-09-02): a hot day changes nothing in the zone — heart rate simply
                       reads high while the run is still conversational. ONE line, today only (the weather here
