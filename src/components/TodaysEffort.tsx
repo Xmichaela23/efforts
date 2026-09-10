@@ -1973,13 +1973,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     {' · '}Week {trainingPlanContext.currentWeek}
                   </span>
                 ) : null}
-                {trainingPlanContext?.focus ? (
+                {/* ⛔ THE WORDS AFTER THE WEEK ARE THE SERVER'S (2026-09-10): a standing plan's name,
+                    "Test" or "Light week"; a race plan's phase. `focus` only for a get-week that
+                    predates `weekLabel`. */}
+                {(trainingPlanContext?.weekLabel !== undefined ? trainingPlanContext?.weekLabel : trainingPlanContext?.focus) ? (
                   <span style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.72 }}>
-                    {' · '}{trainingPlanContext.focus}
+                    {' · '}{trainingPlanContext?.weekLabel !== undefined ? trainingPlanContext.weekLabel : trainingPlanContext.focus}
                   </span>
                 ) : null}
               </span>
-              {blockLabel ? (
+              {/* ⛔ NO BLOCK LABEL ON A STANDING PLAN — it has no build or peak to name. Race plans keep it. */}
+              {blockLabel && !trainingPlanContext?.standingPlan ? (
                 <span
                   className="text-[0.62rem] font-light tracking-wide flex-shrink-0"
                   style={{ color: 'rgba(255,255,255,0.38)', lineHeight: 1.05 }}

@@ -23,6 +23,7 @@ import { buildExistsKeys, plannedKey } from './planned-exists-key.ts';
 // The ONE answer to "what block is this, on this date" — same function the coach payload's block
 // card is built from, so the calendar's phase word cannot disagree with State's (2026-08-15).
 import { resolveBlockIdentity } from '../_shared/block-identity.ts';
+import { weekLabelFor } from './week-label.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 // ⛔ THE ONE completed-set/exercise hydration shape (2026-08-11) — shared with workout-detail and the
 // client so a logged field (resistance_level band assist, amrap, duration_seconds) can't be dropped
@@ -1442,11 +1443,17 @@ Deno.serve(async (req)=>{
             notes = null;
           }
           
+          // ⛔ THE DATE LINE'S WORDS (2026-09-10, `week-label.ts`): a standing plan by its name, "Test" or
+          // "Light week"; a race plan by its phase. `standingPlan` tells Today to print no block label.
+          const weekLabel = weekLabelFor({ config, planName: planData.name, week: currentWeek, phaseFocus: focus });
+
           trainingPlanContext = {
             planName: planData.name,
             currentWeek,
             durationWeeks,
             focus: focus,
+            weekLabel: weekLabel.label,
+            standingPlan: weekLabel.standingPlan,
             notes: notes,
             keyWorkouts: weekSummary.key_workouts || [],
             // Race info from config
