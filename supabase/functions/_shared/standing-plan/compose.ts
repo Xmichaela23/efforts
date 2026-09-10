@@ -176,6 +176,7 @@ import {
   type WorkingNumber,
 } from './working-number.ts';
 import { rampFor, RAMP_NOTE, slotTakesRamp } from './warmup.ts';
+import { restFieldsForRow } from '../strength/rest-seconds.ts';
 
 // ── the app's existing plan-row shape. Nothing new. ─────────────────────────────────────────────
 
@@ -258,6 +259,11 @@ export type StrengthExercise = {
    *  a frame accessory cell. `name` is the catalogue spelling, `display` what the athlete reads. */
   swap_options?: { name: string; display: string }[];
   set_plan?: PlannedSet[];
+  /** Seconds the logger's countdown runs after a work set / a warm-up set, and the line beside it.
+   *  Stamped on every row by `composeWeek` from `_shared/strength/rest-seconds.ts` (2026-09-10, H-S07). */
+  rest_seconds?: number;
+  warmup_rest_seconds?: number;
+  rest_cue?: string;
 };
 
 export type PlanSession = {
@@ -2121,7 +2127,7 @@ export const SET_END_CUE =
  * happens inside it. It belongs somewhere; it does not belong here.
  *
  * ⚠️ NO REST CONTENT, ON ANY OF THESE LINES. Rest renders under the countdown
- * (`strength-rest-timer.ts`, carrying p78's rule from `strength-grid/intents.ts`). One owner, one
+ * (`strength/rest-seconds.ts`, carrying p78's rule from `strength-grid/intents.ts`). One owner, one
  * place — and `SET_END_CUE`'s own comment is the precedent: said weekly it becomes wallpaper.
  *
  * ⚠️ PASSES `voiceViolation` UNAIDED — measured 2026-08-28, alone and joined to the accessory line.
@@ -3930,6 +3936,18 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       if (now >= was) continue;
       steps[at] = `run_easy_${now}min`;
       run.s.duration = Math.max(1, Number(run.s.duration || was) - (was - now));
+    }
+  }
+
+  /**
+   * ⛔ REST, ON EVERY ROW THIS WEEK WRITES (2026-09-10, audit H-S07). The logger used to decide how long
+   * the countdown runs after each set; it now prints `rest_seconds` (work sets), `warmup_rest_seconds`
+   * (the ramp) and `rest_cue` off the row. One pass here, after every session is built, so no row
+   * producer above can be missed. The numbers are `restFieldsForRow`'s — OURS, see that file.
+   */
+  for (const s of sessions) {
+    for (const row of s.strength_exercises ?? []) {
+      Object.assign(row, restFieldsForRow(row as unknown as Record<string, unknown>));
     }
   }
 

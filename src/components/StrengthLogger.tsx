@@ -17,7 +17,6 @@ import { advanceNudgeFor } from '@/lib/advance-nudge';
 import { useAppContext } from '@/contexts/AppContext';
 import { getInSlotAlternatives, type AlternativeOption } from '@/lib/exercise-alternatives';
 import { formatRirTarget, rirSuggestedIntegers, rirLoggedSeed } from '@/lib/rir-format';
-import { estimate1RM } from '@/lib/estimate-1rm';
 import {
   getExerciseConfig,
 } from '@/lib/exercise-config';
@@ -75,10 +74,10 @@ import { roleForExercise, isMainBarbellLift } from '@/lib/exercise-role';
 import { equipmentForExercise, isBodyweightLogged, isDurationLogged } from '@/lib/strength-logging-mode';
 // [Step 5] The one gate for "does a band mean help on this movement" — shared with the server pricer.
 import { isBandAssistedMovement } from '@/lib/band-assistance';
-import { strengthTestKey } from '@shared/strength-test-key.ts';
-// Rest-timer lengths + the plyo test, extracted so both are testable and the main-lift question is
-// asked of the shared classifier rather than a private regex.
-import { calculateRestTime, isPlyometricMovement as isPlyometric, restBucketForIntent, restCueForBucket, WARMUP_REST_SEC, REST_MINUTES_ARE_OURS } from '@/lib/strength-rest-timer';
+// ⛔ THE PRETEST STEP WEIGHTS ARE THE SERVER'S FUNCTION (2026-09-10, audit H-S02) — the anchor fill in handleSetComplete.
+import { pretestStepWeights } from '@shared/standing-plan/working-number';
+// The plyo name test, for how a plyo row is drawn. Rest lengths are the server's (`rest_seconds` on the row).
+import { isPlyometricMovement as isPlyometric } from '@/lib/strength-rest-timer';
 import { PLYO_FAMILIES, PLYO_FAMILY_IDS, type PlyoFamily } from '@shared/standing-plan/plyo';
 import { executionHowTo, executionName } from '@shared/strength-grid/grid.ts';
 
@@ -230,6 +229,12 @@ interface LoggedExercise {
   slot_intent?: string; // Standing-plan slot intent as data ('ME'|'DE'|'SKILL'|'HYP'), 2026-08-26
   /** 2026-09-03: rows of one printed superset (p274) share this mark; the logger lays them out as one block. */
   superset_group?: string;
+  /** 2026-09-10 (audit H-S07): the server's rest after a work set / a warm-up set, and the line beside the countdown. */
+  rest_seconds?: number;
+  warmup_rest_seconds?: number;
+  rest_cue?: string;
+  /** 2026-09-10 (audit H-S02): on a test row with no max on file, the increment the anchor's steps round to. */
+  anchor_round_to?: number;
   // D-322: the working %1RM the PLAN authored for this slot (0.785 = "78.5% 1RM"), carried
   // straight off `computed.steps[].strength.percent_1rm`. Its one job is to let a SWAP derive
   // the substitute's weight at the intensity the block actually intended, instead of
@@ -306,10 +311,9 @@ const calculateTotalVolume = (exercises: LoggedExercise[]): number => {
 // ⛔ `isMainCompound` AND `isPlyometric` LIVED HERE AND ARE GONE (2026-08-03).
 // `isMainCompound` was the SEVENTH private exercise classifier in the app and it disagreed with
 // `MAIN_BARBELL_LIFTS`: Push Press and Military Press matched none of its words, so two main lifts
-// rested like accessories. Rest length now comes from `src/lib/strength-rest-timer.ts`, which asks
-// the shared classifier — and which can be unit-run, unlike a function inside this file.
-// `isPlyometric` moved to the same module unchanged, so the rest timer and the render gates below
-// read ONE copy instead of two.
+// rested like accessories. Rest length is now stamped on each planned row by the server
+// (`_shared/strength/rest-seconds.ts`, 2026-09-10, audit H-S07); the logger prints it.
+// `isPlyometric` is imported for the render gates below.
 
 // ⛔ HISTORY IS KEYED ON THE SERVER'S `canonicalize` (2026-09-10, audit H-S05 / H-S06). The D-097
 // prefill and the D-122 "last:" anchor used `normalizeLiftKey` (lowercase, strip (Left)/(Right),
@@ -562,7 +566,8 @@ const PlateMath: React.FC<{
  * The rest timer used to see only a movement name and a rep count, so a max-effort pull-up rested
  * ninety seconds while a max-effort bench on the same day rested three minutes. `slot_intent` is
  * stamped by the standing-plan composer (`compose.ts:1171, 1372`) and is the row saying which of the
- * four intents it is; `calculateRestTime` turns that into one of three rest buckets.
+ * four intents it is. The server turns that into the row's rest (2026-09-10, audit H-S07); this reader
+ * stays for the logger's intent cues.
  *
  * ⚠️ THE ROW\'S OWN FIELD ONLY — NEVER PARSED OUT OF `notes`. The render path does parse the notes
  * for an intent, but only behind a check that the whole workout is tagged `standing_plan`; without
@@ -571,6 +576,17 @@ const PlateMath: React.FC<{
  */
 const slotIntentOf = (ex: unknown): string | null =>
   (ex as { slot_intent?: string } | null | undefined)?.slot_intent ?? null;
+
+/**
+ * ⛔ THE ROW'S REST, AS THE SERVER STAMPED IT (2026-09-10, audit H-S07). The logger ran the rest rule itself
+ * on every set; the composer and materialize-plan now put `rest_seconds`, `warmup_rest_seconds` and
+ * `rest_cue` on the row, and this copies them onto the logged exercise. Absent → no countdown.
+ */
+const restFieldsOf = (row: any): { rest_seconds?: number; warmup_rest_seconds?: number; rest_cue?: string } => ({
+  ...(Number(row?.rest_seconds) > 0 ? { rest_seconds: Number(row.rest_seconds) } : {}),
+  ...(Number(row?.warmup_rest_seconds) > 0 ? { warmup_rest_seconds: Number(row.warmup_rest_seconds) } : {}),
+  ...(typeof row?.rest_cue === 'string' && row.rest_cue.trim() ? { rest_cue: row.rest_cue } : {}),
+});
 
 /**
  * THE FOUR KINDS OF SET, one line each, behind a tap on the word (Michael, 2026-09-08: "put the answer
@@ -720,34 +736,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // The tick's only job: move `now` so the derived elapsed re-renders. Elapsed is never accumulated.
   const [clockNowMs, setClockNowMs] = useState<number>(() => Date.now());
   const [isInitialized, setIsInitialized] = useState(false);
-  const [pendingOrOptions, setPendingOrOptions] = useState<Array<{ label: string; name: string; sets: number; reps: number }> | null>(null);
-  const [performanceNumbers, setPerformanceNumbers] = useState<any | null>(null);
-  // The 1RM an AMRAP has to beat to be a PR — YOUR BEST MEASURED 1RM, learned from your logged AMRAP
-  // history (`learned_fitness.strength_1rms`, ratcheted up-only, D-223). Loaded at mount, so it holds
-  // your PRIOR sessions — this AMRAP isn't in it yet. Falls back to the typed number only when you've
-  // never logged this lift. the previous program: keep breaking rep records and the 1RM goes up.
-  const bestMeasuredOneRmFor = (name: string): number | undefined => {
-    const t = String(name || '').toLowerCase();
-    const learned: any = learnedStrength1rms || {};
-    const pn: any = performanceNumbers || {};
-    // strength_1rms entries are objects ({ value, last_logged, sample_count }); older shapes may be bare.
-    const learnedVal = (k: string): number | undefined => {
-      const e = learned?.[k];
-      if (typeof e === 'number') return e;
-      return typeof e?.value === 'number' ? e.value : undefined;
-    };
-    const pick = (learnedKey: string, ...pnKeys: string[]): number | undefined => {
-      const lv = learnedVal(learnedKey);
-      if (typeof lv === 'number') return lv;
-      for (const k of pnKeys) if (typeof pn?.[k] === 'number') return pn[k];
-      return undefined;
-    };
-    if (t.includes('deadlift')) return pick('deadlift', 'deadlift');
-    if (t.includes('bench')) return pick('bench', 'bench');
-    if (t.includes('overhead') || t.includes('ohp')) return pick('overhead_press', 'overhead', 'overheadPress1RM');
-    if (t.includes('squat')) return pick('squat', 'squat');
-    return undefined;
-  };
+  // ⛔ THE AMRAP "PR" BADGE IS GONE (2026-09-10, audit H-S09). It compared an estimated max with no rep ceiling
+  // against a stored max found by substring (a front squat against the back squat). The server's rep-record
+  // rule (`_shared/strength/all-out-set.ts`) is not on this row, so the badge comes off.
   // D-322 line 12: per-lift MEASURED 1RMs from `learned_fitness.strength_1rms`, keyed snake_case
   // ('hip_thrust', 'barbell_row'). Read only by the added-exercise weight chain.
   const [learnedStrength1rms, setLearnedStrength1rms] = useState<Record<string, any>>({});
@@ -1156,239 +1147,41 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return null;
   };
 
-  // Helper: which saved max a lift maps to — the server's own map (`_shared/strength-test-key.ts`),
-  // read here only for the stored max a test row names as "on file".
-  const getBaselineKeyForExercise = (exerciseName: string) => strengthTestKey(exerciseName);
-
-  // Baselines launcher (Q-097/Q-102): ~88% top-set seed off a stored 1RM (canonical keys, mirrors materialize's
-  // read side); undefined → no stored 1RM → createBaselineTestExercise bar-starts into the discovery loop.
-  /** The typed max on file for a lift, as stored — the number a test row names as "on file". */
-  const storedMaxFor = (name: string, perf: any): number | undefined => {
-    const k = getBaselineKeyForExercise(name);
-    const p = perf || {};
-    const stored =
-      k === 'overheadPress1RM' ? Number(p.overheadPress1RM ?? p.overhead)
-      : k === 'bench' ? Number(p.bench ?? p.bench_press ?? p.benchPress)
-      : k === 'squat' ? Number(p.squat ?? p.squat1RM ?? p.squat_1rm)
-      : k === 'deadlift' ? Number(p.deadlift ?? p.dead_lift)
-      : NaN; // pull-ups / unknown → bodyweight, no seed
-    return Number.isFinite(stored) && stored > 0 ? stored : undefined;
-  };
-  const baselineSeedFor = (name: string, perf: any): number | undefined => {
-    const stored = storedMaxFor(name, perf);
-    return stored != null ? Math.max(5, Math.round((stored * 0.88) / 5) * 5) : undefined;
-  };
-
-  // Helper: create baseline/retest exercise structure — warm-up ramp + ONE AMRAP working set.
-  // `suggestedWeight` (the wk12 retest's ~88% top weight, in lb) pre-fills a %-based ramp + the test set.
-  // Entry (no 1RM) passes nothing → the athlete-chosen hint ramp. Same structure both ways. (D-224)
-  const createBaselineTestExercise = (exerciseName: string, suggestedWeight?: number): LoggedExercise => {
-    // Pull-ups: a rep-MAX test, not a %1RM lift. Bodyweight warm-up guidance, then ONE all-out set — the
-    // clean-rep COUNT is the result (no working weight, no e1RM). 0 reps is a valid baseline. (Q-102 baseline model)
-    const pn = exerciseName.toLowerCase();
-    if (pn.includes('pull up') || pn.includes('pullup') || pn.includes('pull up')) {
-      return {
-        id: `ex-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        name: exerciseName,
-        expanded: true,
-        sets: [
-          {
-            weight: 0, reps: 5, setType: 'warmup',
-            setHint: 'Scap pulls — hang and draw the shoulder blades down/back, no elbow bend.',
-            barType: 'standard', completed: false,
-          },
-          {
-            weight: 0, reps: 3, setType: 'warmup',
-            setHint: '2–3 easy pull-ups, then rest ~2 min before the test set.',
-            barType: 'standard', completed: false,
-          },
-          {
-            weight: 0,
-            reps: undefined, // open — the athlete logs the actual clean-rep count (0 is valid)
-            setType: 'working',
-            repMaxTest: true,
-            setHint: 'ONE all-out set: strict, full range, no kipping — the count only means something if the reps are clean. Stop the moment form breaks.',
-            barType: 'standard', completed: false,
-          },
-        ],
-      };
-    }
-    // Q-097/Q-102: one ramp SHAPE, per-lift DOSING (Michael's OHP session — a press is not a deadlift).
-    // Reps are guidance, not prescription — feel hints carry the warmup; the reps field stays empty/optional
-    // (only the AMRAP test set is structured). Weight dosing scales per lift: when a 1RM exists, express the
-    // ramp as %-of-max anchors (self-scaling to any lift/athlete); otherwise per-lift add-hints for discovery.
-    const nlow = exerciseName.toLowerCase();
-    const isOHP = nlow.includes('overhead') || nlow.includes('ohp');
-    const emptyBarWeight = isOHP ? 0 : 45; // OHP might need a lighter start (DBs / empty bar)
-    const hasSug = typeof suggestedWeight === 'number' && suggestedWeight > 0;
-    const round5 = (w: number) => Math.max(0, Math.round(w / 5) * 5);
-    // Per-lift add increment for the no-1RM discovery path — generic "25–50 lb" overshoots a press.
-    const addBy = isOHP ? '10–20 lb' : nlow.includes('bench') ? '20–30 lb' : '25–50 lb';
-    // Bar-start for the no-1RM discovery test set: an empty bar (95 for deadlift — bumpers off the floor).
-    const barStart = nlow.includes('deadlift') ? 95 : 45;
-    // suggestedWeight is the ~88% test weight, so % of 1RM ≈ ×(pct/0.88) of it: ~50% → ×0.57, ~70% → ×0.80.
-
-    return {
-      id: `ex-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name: exerciseName,
-      expanded: true,
-      sets: [
-        // Warmup 1: empty bar — groove the movement (rep range is guidance in the hint, field stays empty)
-        {
-          weight: emptyBarWeight,
-          reps: undefined,
-          setType: 'warmup',
-          setHint: 'Empty bar — a few easy reps to groove the movement (5–10 is plenty).',
-          barType: 'standard',
-          completed: false
-        },
-        // Warmup 2: ~50% of max (1RM known) or a per-lift add (discovery) — easy
-        {
-          weight: hasSug ? round5(suggestedWeight! * 0.57) : 0,
-          reps: undefined,
-          setType: 'warmup',
-          setHint: hasSug ? '~50% of max — easy (3–5 reps)' : `Add ${addBy} — should feel easy (3–5 reps).`,
-          barType: 'standard',
-          completed: false
-        },
-        // Warmup 3: ~70% of max (1RM known) or a per-lift add (discovery) — moderate, one last primer
-        {
-          weight: hasSug ? round5(suggestedWeight! * 0.80) : 0,
-          reps: undefined,
-          setType: 'warmup',
-          setHint: hasSug ? '~70% of max — moderate, one last primer (2–3 reps)' : `Add ${addBy} more — moderate, one last primer (2–3 reps).`,
-          barType: 'standard',
-          completed: false
-        },
-        // Working set — ONE all-out AMRAP set (open reps). SAME shape as the wk12 retest → same cluster
-        // e1RM + ratchet-up guard. amrap:true → the RIR gate accepts RIR 0–3 (AMRAP is near-failure). (D-224)
-        {
-          // 1RM known → ~88% top set (retest). No 1RM → bar-start (45 / DL 95); the discovery loop below
-          // walks the athlete up to a real 3–6RM test weight. Either way, athlete can adjust.
-          weight: hasSug ? round5(suggestedWeight!) : barStart,
-          reps: undefined, // AMRAP — athlete logs actual reps
-          setType: 'working',
-          amrap: true,
-          prefilled: hasSug, // D-204: pre-filled weight; cleared on first athlete edit
-          setHint: hasSug
-            ? 'AMRAP: as many CLEAN reps as you can (aim ~3–6). Stop at ~RPE 9 (one hard rep left) or on form break — never grind solo.'
-            : 'AMRAP: as many CLEAN reps as you can. Aim ~3–6. If you got more than ~8, it was too light — rest, add weight, and go again. Stop at ~RPE 9 or on form break — never grind solo.',
-          barType: 'standard',
-          completed: false
-        }
-      ]
-    };
-  };
-
   /**
-   * ⛔⛔ A PLAN'S TEST DAY, AS THE PLAN WROTE IT (SPEC-test-day-2026-09-01, parts A + B).
+   * ⛔⛔ A TEST SESSION'S ROWS ARE THE SERVER'S (2026-09-10, audit H-S01 / H-S02, Stage 3 item 21).
    *
-   * ⛔ THE DEFECT THIS REPLACES: the `1rm_test` arm below handed every tested lift of a STANDING
-   * PLAN to `createBaselineTestExercise`, which threw the composer's p215 ramp away and built the
-   * generic baseline test instead — empty bar, ~57%, ~80%, then ONE all-out set at the plan's top
-   * weight with *"aim ~3–6. Stop at ~RPE 9"*. On the one session whose purpose is finding a limit,
-   * the copy told the athlete to stop; and when the plan had no seed for the lift ("By feel"), the
-   * same builder started him at the empty bar. Michael, 2026-09-01, squatting 80 × 9 against a real
-   * ~125: *"it capped me"* · *"It's like this thing doesn't know it's a test."*
+   * WHAT WAS HERE: two builders. One gave the Baselines launcher and a non-plan retest a top set at 88% of
+   * the typed max, warm-ups at about 57% and 80% of that, an empty bar at 45 (none on the press), a deadlift
+   * start at 95 with no max on file, and rep-range and effort cues of its own. The other gave a plan's test
+   * row its `set_plan` steps, an empty-bar warm-up, the step hints and the note naming the max on file.
    *
-   * WHAT THIS BUILDS INSTEAD — the row the composer actually wrote:
-   *   · one empty-bar warm-up (p215: warm up to ~75%; the plan's first step IS the 75% set);
-   *   · the plan's steps as prescribed (`set_plan`: 6 reps at 75%, 5 at 82.5%, then the 86.25% set
-   *     flagged `amrap`), each with its weight — the last one says plainly that it sets the block's
-   *     numbers. ⛔ NO REP TARGET AND NO RPE STOP ON THE LAST SET.
-   *   · with NO seed (the composer's "By feel" row, no `set_plan`): three open steps — work up,
-   *     heavier, then the last one for max clean reps. Still no cap; the athlete is told the ramp is
-   *     open because nothing is on file, not started at the bar and told to aim for 3–6.
-   *   · the row's note names the number on file and where it came from, so the athlete knows what
-   *     the ramp is a share of and what they are trying to beat.
-   *
-   * ⛔ `planned_name` IS DELIBERATELY NOT STAMPED — Michael's 2026-08-31 ruling ("no swap"): that
-   * field is what renders the Swap control, and the tested lift is the movement every working number
-   * is priced off. ⚠️ CONSEQUENCE, stated: State's off-plan read keys on that same marker, so a plan
-   * test session reads as UNKNOWN there (`offPlan.known: false`) — silence, not a wrong word. The
-   * honest marker for a tested lift is its `amrap` set; teaching the server that is a FIXLIST item.
-   *
-   * ⚠️ REACHED ONLY FOR A `standing_plan` SESSION. The week-12 "Retest — …" sessions carry
-   * `1rm_test` without `standing_plan` and keep the builder they had. The "Baseline Test: …"
-   * launcher is a different branch and is untouched.
-   *
-   * ⚠️ NOT HERE (spec C–F, report-first): which number the ramp is a share of, the open-ended
-   * ladder, the ask on tap-out, and the guard on the block's re-pricing. This makes the row honest
-   * about what the plan prescribed; it does not change what the plan prescribes.
+   * WHAT IS HERE: `strength-test-session` builds every test session (`_shared/strength/test-session.ts`) —
+   * the empty bar, then p215's three steps off the plan's `set_plan` or the typed max, or the anchor rows
+   * with no max on file — and this copies its rows onto the logger's shape, word for word and number for
+   * number. The 88% top set, the 57/80% warm-ups, the 95 lb start and those cues are deleted.
    */
-  const TEST_LAST_SET_HINT =
-    'Last set — as many CLEAN reps as you can at this weight. This set sets the block\'s numbers. Stop when form breaks.';
-  const createStandingTestExercise = (ex: any, onFile: number | undefined): LoggedExercise => {
-    const name = String(ex?.name || '').trim();
-    const nlow = name.toLowerCase();
-    const emptyBarWeight = nlow.includes('overhead') || nlow.includes('ohp') ? 0 : 45;
-    const planned = (plannedSetsFor(ex) ?? []) as Array<{ weight?: number; reps?: number; amrap: boolean }>;
-    const hasSteps = planned.length > 0;
-    // ⛔ THE NO-STEPS SENTENCE IS DELETED (2026-09-09, WORKORDER-kill-ours §B.5). It read *"No X max
-    // on file — the ramp is open. Work up until the last set is genuinely hard."* — the client twin of
-    // the composer note the same order removed, and *"genuinely hard"* is not on a page. The blank
-    // row now carries p215's own opening instruction on set 1 instead (see `stepSets` below), so
-    // there is nothing left for a row-level note to add.
-    const fileNote = onFile && onFile > 0
-      ? `${name} on file: ${Math.round(onFile)} lb (typed in your baselines). The steps below are a share of that number; the last one is what you are trying to beat.`
-      : hasSteps
-        ? 'The steps below are a share of the number that was on file when this block was built; the last one is what you are trying to beat.'
-        : '';
-    const composerNote = String(ex?.notes || '').trim();
-    const stepSets: LoggedSet[] = hasSteps
-      ? planned.map((p, i) => ({
-          weight: Number(p.weight) > 0 ? Number(p.weight) : 0,
-          reps: p.amrap ? undefined : (Number(p.reps) > 0 ? Number(p.reps) : undefined),
-          setType: 'working' as const,
-          barType: 'standard' as const,
-          completed: false,
-          prefilled: true, // D-204: the plan's weight; cleared on first athlete edit
-          ...(p.amrap
-            ? { amrap: true, setHint: TEST_LAST_SET_HINT }
-            : { setHint: i === 0 ? 'Step 1 — the first ramp set, as prescribed.' : `Step ${i + 1} — heavier, as prescribed.` }),
-        }))
-      /**
-       * ⛔⛔ THE BLANK-LIFT TEST — RESHAPED 2026-09-09 (WORKORDER-kill-ours §B.5).
-       *
-       * ⛔ WHAT IT WAS: three open sets and three sentences of ours — *"Work up — a moderate set. Add
-       * weight if it moved well."*, *"Heavier. Clean reps only."* — an athlete guessing a ramp, with
-       * the block's whole twelve weeks priced off wherever they happened to stop.
-       *
-       * ⛔ WHAT IT IS: **p215's own protocol, with the athlete supplying `A`.** The page starts from a
-       * weight the lifter picks — one they could get eight with, where ten would be near failure —
-       * taken for six. That is set 1, and `pretestAnchor` marks it. The moment it is logged,
-       * `handleSetComplete` fills set 2 at 1.10 × A for five and set 3 at 1.15 × A for max reps: the
-       * same two multiples a seeded row is prescribed (`PRETEST_STEPS`), off a number the athlete
-       * chose instead of one on file.
-       *
-       * ⚠️ SETS 2 AND 3 CARRY NO HINT. They are not instructions any more — they are weights the app
-       * fills in, and the row's own note carries the last set's line.
-       */
-      : [
-          { weight: 0, reps: 6, setType: 'working' as const, barType: 'standard' as const, completed: false,
-            pretestAnchor: true, setHint: 'A weight for 8 to 10 reps near failure. Enter it here.' },
-          { weight: 0, reps: 5, setType: 'working' as const, barType: 'standard' as const, completed: false },
-          { weight: 0, reps: undefined, setType: 'working' as const, barType: 'standard' as const, completed: false,
-            amrap: true },
-        ];
-    return {
-      id: `ex-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      name,
-      notes: [fileNote, composerNote].filter(Boolean).join(' '),
-      expanded: true,
-      sets: [
-        {
-          weight: emptyBarWeight,
-          reps: undefined,
-          setType: 'warmup',
-          setHint: 'Empty bar — a few easy reps to groove the movement.',
-          barType: 'standard',
-          completed: false,
-        },
-        ...stepSets,
-      ],
-    };
-  };
+  const testSessionToLogged = (rows: any[]): LoggedExercise[] => rows.map((r: any, i: number) => ({
+    id: `ex-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
+    name: String(r?.name || ''),
+    ...(r?.planned_name ? { planned_name: String(r.planned_name) } : {}),
+    ...(typeof r?.target_reps === 'string' ? { target_reps: r.target_reps } : {}),
+    ...(typeof r?.target_rir === 'number' ? { target_rir: r.target_rir } : {}),
+    ...(r?.notes ? { notes: String(r.notes) } : {}),
+    ...(Number(r?.anchor_round_to) > 0 ? { anchor_round_to: Number(r.anchor_round_to) } : {}),
+    expanded: true,
+    sets: (Array.isArray(r?.sets) ? r.sets : []).map((s: any) => ({
+      weight: Number(s?.weight) > 0 ? Number(s.weight) : 0,
+      reps: Number(s?.reps) > 0 ? Number(s.reps) : undefined,
+      setType: s?.set_type === 'warmup' ? 'warmup' : 'working',
+      barType: 'standard',
+      completed: false,
+      ...(s?.amrap ? { amrap: true } : {}),
+      ...(s?.rep_max_test ? { repMaxTest: true } : {}),
+      ...(s?.pretest_anchor ? { pretestAnchor: true } : {}),
+      ...(s?.set_hint ? { setHint: String(s.set_hint) } : {}),
+      ...(s?.prefilled ? { prefilled: true } : {}),
+    } as LoggedSet)),
+  } as LoggedExercise));
 
   // ⛔ THE 1RM MATH IS GONE FROM THIS FILE (2026-07-30). It lives in `save-baseline-test`.
   //
@@ -2238,149 +2031,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     expanded: true
   });
 
-  // Parse a textual strength description into structured exercises
-  const parseStrengthDescription = (desc: string): LoggedExercise[] => {
-    if (!desc || typeof desc !== 'string') return [];
-    // Drop any lead-in before a colon (e.g., "Strength – Power...:")
-    const afterColon = desc.includes(':') ? desc.split(':').slice(1).join(':') : desc;
-    // Split on bullets, semicolons, commas, or newlines
-    const parts = afterColon
-      .split(/•|;|\n|,/) // bullets, semicolons, newlines, commas
-      .map(s => s.trim())
-      .filter(Boolean);
-
-    const results: LoggedExercise[] = [];
-    const round5 = (n:number) => Math.max(5, Math.round(n/5)*5);
-    const oneRmOf = (name: string): number | undefined => {
-      const t = name.toLowerCase();
-      if (t.includes('deadlift')) return typeof performanceNumbers?.deadlift==='number'? performanceNumbers.deadlift: undefined;
-      if (t.includes('bench')) return typeof performanceNumbers?.bench==='number'? performanceNumbers.bench: undefined;
-      if (t.includes('overhead') || t.includes('ohp')) return typeof performanceNumbers?.overhead==='number'? performanceNumbers.overhead: (typeof performanceNumbers?.overheadPress1RM==='number'? performanceNumbers.overheadPress1RM: undefined);
-      if (t.includes('squat')) return typeof performanceNumbers?.squat==='number'? performanceNumbers.squat: undefined;
-      return undefined;
-    };
-    for (const p of parts) {
-      // Examples: "Back Squat 3x5 — 225 lb", "Bench Press 4×6", "Deadlift 5x3 - 315 lb"
-      const m = p.match(/^\s*(.*?)\s+(\d+)\s*[x×]\s*(\d+)(?:.*?[—–-]\s*(\d+)\s*(?:lb|lbs|kg)?\b)?/i);
-      if (m) {
-        const name = m[1].trim();
-        const sets = parseInt(m[2], 10);
-        const reps = parseInt(m[3], 10);
-        const weight = m[4] ? parseInt(m[4], 10) : 0;
-        const ex: LoggedExercise = {
-          id: `${Date.now()}-${name}-${Math.random().toString(36).slice(2,8)}`,
-          name,
-          sets: Array.from({ length: sets }, () => ({
-            reps,
-            weight,
-            barType: 'standard',
-            rir: undefined,
-            completed: false
-          })),
-          expanded: true
-        };
-        results.push(ex);
-        continue;
-      }
-      // Percent pattern e.g., Bench 5x5 @ 70%
-      const mp = p.match(/^\s*(.*?)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%/i);
-      if (mp) {
-        const name = mp[1].trim();
-        const sets = parseInt(mp[2],10);
-        const reps = parseInt(mp[3],10);
-        const pct = parseInt(mp[4],10);
-        const one = oneRmOf(name);
-        const w = one ? round5(one*(pct/100)) : 0;
-        const ex: LoggedExercise = {
-          id: `${Date.now()}-${name}-${Math.random().toString(36).slice(2,8)}`,
-          name,
-          sets: Array.from({ length: sets }, () => ({ reps, weight: w, barType: 'standard', rir: undefined, completed: false })),
-          expanded: true
-        };
-        results.push(ex);
-        continue;
-      }
-    }
-    return results;
-  };
-
-  const extractOrOptions = (desc: string): Array<{ label: string; name: string; sets: number; reps: number }> | null => {
-    try {
-      const body = String(desc || '');
-      const tokens = body
-        .split(/\n|;|\u2022/) // newlines, semicolons, bullets
-        .map(s=>s.trim())
-        .filter(Boolean);
-      for (const t of tokens) {
-        // explicit OR keyword
-        if (/\bOR\b/i.test(t)) {
-          const parts = t.split(/\bOR\b/i).map(s=>s.trim()).filter(Boolean);
-          if (parts.length >= 2) {
-            const opts: Array<{ label: string; name: string; sets: number; reps: number }> = [];
-            for (const p of parts.slice(0,3)){
-              const m = p.match(/^(.*?)\s+(\d+)\s*[x×]\s*(\d+)(?:\s*[–-]\s*(\d+))?/i);
-              if (m){
-                const rawName = m[1].replace(/\s*\(.*?\)\s*/g,'').replace(/\s*optional:?\s*$/i,'').trim();
-                const name = rawName.includes('/') ? rawName : rawName.replace(/\s+\bor\b\s+/i,'/');
-                const sets = parseInt(m[2],10);
-                const reps = parseInt(m[3],10); // lower bound
-                const label = name;
-                opts.push({ label, name, sets, reps });
-              }
-            }
-            if (opts.length>=2) return opts;
-          }
-        }
-        // slash-based alt in the exercise name: e.g., "Pull-Ups/Chin-Ups 4x6"
-        const m = t.match(/^(.*?)\s+(\d+)\s*[x×]\s*(\d+)/i);
-        if (m && /\//.test(m[1])) {
-          const rawName = m[1].replace(/\s*\(.*?\)\s*/g,'').trim();
-          const sets = parseInt(m[2],10);
-          const reps = parseInt(m[3],10);
-          const names = rawName.split('/').map(s=>s.trim()).filter(Boolean).slice(0,3);
-          if (names.length >= 2) {
-            return names.map(n => ({ label: names.join('/'), name: n, sets, reps }));
-          }
-        }
-      }
-    } catch {}
-    return null;
-  };
-
-  // Parse strength tokens from steps_preset if available
-  const parseStepsPreset = (stepsPreset?: string[]): LoggedExercise[] => {
-    try {
-      const arr = Array.isArray(stepsPreset) ? stepsPreset : [];
-      const out: LoggedExercise[] = [];
-      const round5 = (n:number) => Math.max(5, Math.round(n/5)*5);
-      const push = (name:string, sets:number, reps:number, w:number) => {
-        out.push({
-          id: `${Date.now()}-${name}-${Math.random().toString(36).slice(2,8)}`,
-          name,
-          expanded: true,
-          sets: Array.from({ length: sets }, () => ({ reps, weight: w||0, barType: 'standard', rir: undefined, completed: false }))
-        });
-      };
-      for (const tok0 of arr) {
-        const tok = String(tok0).toLowerCase();
-        // strength_deadlift_5x3_75pct | 70percent | 70%
-        const m = tok.match(/^strength_([a-z_]+)_(\d+)x(\d+).*?(\d{1,3})\s*(?:pct|percent|%)?/i);
-        if (m) {
-          const nameKey = m[1].replace(/_/g,' ');
-          const sets = parseInt(m[2],10);
-          const reps = parseInt(m[3],10);
-          const pct = parseInt(m[4],10);
-          const lift = nameKey.includes('dead')?'deadlift':nameKey.includes('bench')?'bench':nameKey.includes('overhead')||nameKey.includes('ohp')?'overhead':'squat';
-          const one = typeof performanceNumbers?.[lift]==='number'? performanceNumbers[lift]: undefined;
-          const w = one? round5(one*(pct/100)) : 0;
-          push(nameKey.replace(/\b1rm\b/i,''), sets, reps, w);
-          continue;
-        }
-        // Generic strength token: strength_<name>_SxR_<pct>
-      }
-      return out;
-    } catch { return []; }
-  };
+  // ⛔ THE OLD-ROW PARSERS ARE GONE (2026-09-10, audit H-S03). A row with no computed steps had its weights
+  // built here from a percent parsed out of the description × the typed max (an unknown lift read as squat),
+  // and a "Choose one:" menu from "OR" text. materialize-plan writes those rows' steps (get-week backfills
+  // them), and the logger waits for that.
 
   // ── THE PER-SET PRESCRIPTION ────────────────────────────────────────────────────────────────
   // the previous program prescribes three sets at three DIFFERENT weights (docs/SPEC-get-stronger.md §1). Every
@@ -2424,7 +2078,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const steps: any[] = Array.isArray(computed?.steps) ? computed.steps : [];
       if (!steps.length) return [];
       const byName: Record<string, LoggedExercise> = {};
-      const round5 = (n:number) => Math.max(5, Math.round(n/5)*5);
       
       // Helper to extract resistance level from notes
       const extractResistance = (notes: string | undefined): string | undefined => {
@@ -2488,7 +2141,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
          * the same mistake at the other end of the band.
          */
         const isMeSlotRow = String(s?.slot_intent || '') === 'ME';
-        const weightNum = typeof s?.weight === 'number' ? round5(s.weight) : 0;
+        // ⛔ THE SERVER'S WEIGHT, UNCHANGED (2026-09-10, audit H-S04) — no re-rounding to 5 lb, no 5 lb floor.
+        const weightNum = typeof s?.weight === 'number' ? s.weight : 0;
         const sets = Number(s?.sets) || 0;
         const notes = s?.notes;
         const exerciseType = equipmentForExercise(name);
@@ -2522,7 +2176,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             name,
             expanded: true,
             sets: [] as LoggedSet[],
-            timer: 90,
             unit: 'lb',
             notes: rawNotes || undefined,
             rir: null,
@@ -2536,6 +2189,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             // materialized before then fall back to the notes regex in the cue detection.
             slot_intent: typeof s?.slot_intent === 'string' ? s.slot_intent : undefined,
             superset_group: typeof s?.superset_group === 'string' && s.superset_group ? s.superset_group : undefined,
+            ...restFieldsOf(s), // 2026-09-10, H-S07: the server's rest numbers and cue
             // ⛔ IS THIS ROW ONE OF THE BLOCK'S ASSISTANCE SLOTS? The composer marks them
             // `load_prescribed: false` — assistance in the previous program is never priced off a percentage
             // ("the engine prescribes NO weight for assistance work. Ever."). Carried through so the
@@ -2570,7 +2224,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const targetSets = isRepTotalRow ? 1 : Math.max(1, planned?.length ?? sets);
         for (let i=0;i<targetSets;i+=1) {
           const p = planned?.[i];
-          const setWeight = p?.weight != null ? round5(p.weight) : weightNum;
+          const setWeight = p?.weight != null ? p.weight : weightNum;
           const setReps = p?.reps ?? reps;
           const setAmrap = p ? p.amrap : isAmrap === true;
           const baseSet: any = {
@@ -2847,9 +2501,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // ingest) and the client had never loaded it — so hip thrust, which has a real e1RM, could
         // only ever be priced off deadlift x 0.90.
         const pnResp = await supabase.from('user_baselines')
-          .select('performance_numbers, learned_fitness').eq('user_id', userId).single();
-        const pn = (pnResp as any)?.data?.performance_numbers || null;
-        if (pn) setPerformanceNumbers(pn);
+          .select('learned_fitness').eq('user_id', userId).single();
         try {
           const lfRaw = (pnResp as any)?.data?.learned_fitness;
           const lf = typeof lfRaw === 'string' ? JSON.parse(lfRaw || '{}') : (lfRaw || {});
@@ -2868,20 +2520,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     };
   }, []);
 
-  // Baselines launcher (Q-097/Q-102): the named test builds synchronously, before the async 1RM load
-  // resolves → it first lands on bar-start. When performance_numbers arrives, re-seed the ~88% weights
-  // ONCE, and only while the test is pristine (no set completed), so we never clobber the athlete's own
-  // entries. Tag-retests (no lower/upper type) seed from computed.steps instead → skipped here.
-  const baselineReseededRef = useRef(false);
-  useEffect(() => {
-    if (baselineReseededRef.current || !performanceNumbers) return;
-    if (!isBaselineTestWorkout(scheduledWorkout || {}) || !getBaselineTestType(scheduledWorkout)) return;
-    baselineReseededRef.current = true;
-    setExercises((prev) => {
-      if (!prev.length || !prev.every((ex) => ex.sets.every((s) => !s.completed))) return prev;
-      return prev.map((ex) => createBaselineTestExercise(ex.name, baselineSeedFor(ex.name, performanceNumbers)));
-    });
-  }, [performanceNumbers, scheduledWorkout]);
 
   // Guard to ensure initialization runs only once per open
   const didInitRef = useRef(false);
@@ -3047,208 +2685,45 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       }
     }
 
-    // A baseline/retest (1rm_test) must build its warm-up ramp via createBaselineTestExercise below —
-    // NOT load raw from computed.steps (which is the single scored AMRAP set and would return early,
-    // skipping the ramp). Gate this branch out for those so control reaches the baseline builder.
+    // A baseline/retest (1rm_test) opens with the server's test rows (below), not raw from computed.steps.
     if (!isBaselineTestWorkout(workoutToLoad) && (workoutToLoad as any)?.computed && Array.isArray((workoutToLoad as any).computed?.steps)) {
-      const srcHdr = (workoutToLoad as any).rendered_description || (workoutToLoad as any).description || '';
-      const orOpts = extractOrOptions(srcHdr);
-      let exs = parseFromComputed((workoutToLoad as any).computed);
-      if (orOpts && orOpts.length>1) {
-        // Suppress auto-prefill of any exercise that matches OR options (normalize names)
-        const norm = (s:string)=>String(s||'').toLowerCase()
-          .replace(/\s*\(.*?\)\s*/g,'')
-          .replace(/\s*@.*$/,'')
-          .replace(/\s*[—-].*$/,'')
-          .replace(/\s+/g,' ')
-          .trim();
-        const optionBases = orOpts.map(o=>norm(o.name));
-        exs = exs.filter(e=>!optionBases.includes(norm(e.name)));
-        setPendingOrOptions(orOpts);
-      }
+      const exs = parseFromComputed((workoutToLoad as any).computed);
       if (exs.length) {
         setExercises(exs);
         exercisesLoadedFromWorkout = true;
-        // Initialize rest timers for pre-populated exercises
-        setTimeout(() => {
-          exs.forEach((exercise, exIndex) => {
-            exercise.sets.forEach((set, setIndex) => {
-              if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
-                const restTime = calculateRestTime(exercise.name, set.reps, slotIntentOf(exercise));
-                const restTimerKey = `${exercise.id}-${setIndex}`;
-                setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: restTime, running: false } }));
-              }
-            });
-          });
-        }, 100);
         setIsInitialized(true);
         return;
       }
     }
     
-    // Named "Baseline Test: Lower/Upper" → rebuild the fixed warmup-to-max structure. A TAG-based
-    // 1rm_test (the strength-primary retest, named "Retest — …") has no lower/upper type, so fall
-    // through to its OWN planned exercises below — but the baselineTestResults compute + the
-    // Save-baselines button still fire because isBaselineTestWorkout is true (Q-097 write-back).
+    /**
+     * ⛔⛔ A TEST SESSION OPENS WITH THE SERVER'S ROWS (2026-09-10, audit H-S01 / H-S02).
+     *
+     * The Baselines launcher's "Baseline Test: Lower / Upper / Full" (no planned row — the name says which)
+     * and every planned `1rm_test` session (a plan's test week, a retest) ask `strength-test-session`, which
+     * builds the empty bar and p215's steps; the logger prints what comes back. ⚠️ With no answer the session
+     * stays empty — nothing is built here in its place.
+     * ⚠️ A COMPLETED workout carrying the tag falls through to its own logged rows below.
+     */
     if (isBaselineTestWorkout(workoutToLoad)) {
       const testType = getBaselineTestType(workoutToLoad);
-      if (testType) {
-        const testExercises = testType === 'lower' ? ['Back Squat', 'Deadlift']
-          : testType === 'upper' ? ['Bench Press', 'Overhead Press', 'Pull ups']
-          : ['Back Squat', 'Deadlift', 'Bench Press', 'Overhead Press', 'Pull ups']; // 'full' / both
-        // Baselines launcher (Q-097/Q-102): the Lower/Upper/Full links run the SAME guided AMRAP flow as the
-        // plan retest — seed each lift's test set at ~88% off the stored 1RM when one exists; otherwise
-        // createBaselineTestExercise bar-starts (45 / DL 95) into the discovery loop. One flow, two entry
-        // points, no separate math. `performanceNumbers` loads async — if it isn't in yet this first build
-        // bar-starts, and the re-seed effect below fills the ~88% weights the moment the 1RM arrives.
-        setExercises(testExercises.map(name => createBaselineTestExercise(name, baselineSeedFor(name, performanceNumbers))));
+      const isOpenPlanned = !!workoutToLoad?.id
+        && String((workoutToLoad as any)?.workout_status || 'planned').toLowerCase() !== 'completed';
+      const plannedId = !testType && isOpenPlanned ? String(workoutToLoad.id) : null;
+      if (testType || plannedId) {
         exercisesLoadedFromWorkout = true;
         setIsInitialized(true);
-        return;
-      }
-      // TAG-retest ("Retest — Bench Press", 1rm_test but no lower/upper/full): rebuild each planned lift with
-      // the SAME warm-up ramp + AMRAP working set as the baseline test, pre-filling the ~88% suggested weight
-      // (materialize already converted 88% 1RM → lb). One tool — entry and retest share this exact structure.
-      const plannedRetest = (workoutToLoad?.strength_exercises ?? []) as any[];
-      if (plannedRetest.length > 0) {
-        // The resolved ~88% lb lives in computed.steps — materialize does NOT write it back into
-        // strength_exercises, whose weight stays the "88% 1RM" string. Seed the ramp's top set from
-        // the resolved computed weight; fall back to a numeric strength_exercises weight if present.
-        const resolved = ((workoutToLoad as any)?.computed && Array.isArray((workoutToLoad as any).computed?.steps))
-          ? parseFromComputed((workoutToLoad as any).computed) : [];
-        /**
-         * ⛔⛔⛔ ONLY THE TESTED LIFTS GET THE RAMP — THE ACCESSORIES COME THROUGH AS THEMSELVES
-         * (2026-08-31).
-         *
-         * ⛔ WHAT THIS BRANCH DID: rebuilt EVERY planned exercise as a warm-up ramp plus an AMRAP set.
-         * Correct for the week-12 retest, whose session is nothing but tested lifts. **Wrong for a
-         * plan's test week**, which carries the two tested lifts AND its accessories — a calf raise
-         * would have arrived as an empty-bar ramp into an all-out single.
-         *
-         * ⛔ THE MARKER IS THE `amrap` FLAG THE COMPOSER ALREADY STAMPS, not the name and not the
-         * position: `testDaySession` puts it on exactly one set of each tested lift, and
-         * `readTestWeek` reads that same flag to decide which set set the block's numbers. One
-         * marker, both ends.
-         *
-         * ⚠️ AND THIS IS WHAT GIVES THE ATHLETE THEIR WARM-UP. p215 says *"warm up to roughly 75% of
-         * the predicted max"* and gives no scheme for getting there; `createBaselineTestExercise`
-         * carries ours — empty bar, ~50%, ~70% — and the plan's test week was falling through to a
-         * plain pre-fill, so it handed over the three scored steps cold.
-         */
-        const isTestedLift = (ex: Record<string, unknown>): boolean => {
-          const plan = Array.isArray(ex?.set_plan) ? ex.set_plan as Array<Record<string, unknown>> : [];
-          if (plan.some((st) => st?.amrap === true)) return true;
-          /**
-           * ⚠️ AND THE `ME` INTENT WHEN THERE IS NO `set_plan` AT ALL. An athlete with no max on file
-           * gets a test row that says "By feel" and carries no resolved sets — so the amrap flag has
-           * nothing to sit on, and that athlete is exactly the one who most needs the ramp. The
-           * composer stamps `slot_intent` on the tested lifts either way; the accessories carry none.
-           */
-          return String(ex?.slot_intent || '').toUpperCase() === 'ME';
-        };
-        setExercises(plannedRetest.map((ex, i) => {
-          if (!isTestedLift(ex)) {
-            // ⚠️ AN ACCESSORY, AS PRESCRIBED. Same shape the ordinary pre-fill builds — name, notes and
-            // its own planned sets — so the athlete logs the row the plan actually gave them.
-            const planned = (plannedSetsFor(ex) ?? []) as Array<Record<string, unknown>>;
-            /**
-             * ⛔⛔ THE PRESCRIBED NAME IS STAMPED HERE, AND ITS ABSENCE WAS THE DEFECT (2026-08-31,
-             * Michael's own two screens, side by side, same build). `planned_name` is what the
-             * logger keys BOTH row controls off — `:5335` renders **Swap** when it is set, `:5347`
-             * renders **Add this exercise to the plan** when it is not — and this branch built every
-             * row without it. So a test session's rows were indistinguishable from exercises the
-             * athlete had typed in themselves: the prescribed lift lost the action that belongs to
-             * it and gained the one that does not, and a floor row could not be swapped at all.
-             * ⚠️ IT IS THE ROW'S OWN NAME, not a display string. `substituted_for` is derived at save
-             * by comparing this to `name`, so seeding anything else would read as a swap the athlete
-             * never made.
-             */
-            const plannedReps = ex?.target_reps ?? ex?.reps;
-            return {
-              id: `ex-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
-              name: String(ex?.name || '').trim(),
-              planned_name: String(ex?.name || '').trim(),
-              /**
-               * ⚠️ AND THE PRESCRIPTION TRAVELS WITH IT. Without `target_reps` the band label never
-               * renders and `exOpenRepBand` (:5782) is false, so an auto-regulated row on a test day
-               * showed no target at all; without `target_rir` the accessory lost the reserve its plan
-               * row carries (his ab wheel arrived at 1.5 and saved with none).
-               */
-              target_reps: (typeof plannedReps === 'string' && /\d/.test(plannedReps))
-                ? plannedReps.trim()
-                : (typeof plannedReps === 'number' && plannedReps > 0 ? String(plannedReps) : undefined),
-              target_rir: typeof ex?.target_rir === 'number' ? ex.target_rir : undefined,
-              notes: String(ex?.notes || '').trim() || undefined,
-              expanded: true,
-              sets: (planned.length > 0 ? planned : Array.from({ length: Number(ex?.sets) || 3 }))
-                .map((st: Record<string, unknown> | undefined) => ({
-                  weight: Number(st?.weight) > 0 ? Number(st?.weight) : 0,
-                  reps: Number(st?.reps) > 0 ? Number(st?.reps) : undefined,
-                  setType: 'working' as const,
-                  barType: 'standard' as const,
-                  completed: false,
-                })),
-            } as LoggedExercise;
-          }
-          const liftName = String(ex?.name || '').split('—')[0].trim(); // "Bench Press — AMRAP test set" → "Bench Press"
-          /**
-           * ⛔⛔⛔ THE **SCORED** SET SEEDS THE RAMP, NOT THE FIRST ONE (2026-08-31).
-           *
-           * ⛔ THE DEFECT, CAUGHT BY MICHAEL BEFORE HE LIFTED: his plan prescribed the max-rep set at
-           * **130** — the source's pretest is 75%, then +10%, then +5% more — and the logger opened
-           * that session with the top set at **115**. Two different tests for one session, and the
-           * one he would have performed was the lighter.
-           *
-           * ⛔ WHY `sets[0]` WAS EVER RIGHT: the week-12 retest resolves to ONE scored set, so the
-           * first set IS the top set. **A plan's test week resolves to THREE**, and the first of those
-           * is the opening build. This branch was written for the retest and inherited by the test
-           * week when it started being recognised as a test.
-           *
-           * ⚠️ THE `amrap` FLAG IS THE MARKER, with the LAST set as the fallback — the same flag
-           * `readTestWeek` scores on, so the set the logger opens at and the set the block reads are
-           * the same set by construction.
-           */
-          const rsets = Array.isArray(resolved[i]?.sets) ? resolved[i].sets : [];
-          const scored = rsets.find((st) => (st as { amrap?: boolean })?.amrap === true) ?? rsets[rsets.length - 1];
-          const rw = Number(scored?.weight);
-          const planTop = (() => {
-            const plan = Array.isArray(ex?.set_plan) ? ex.set_plan as Array<Record<string, unknown>> : [];
-            const top = plan.find((st) => st?.amrap === true) ?? plan[plan.length - 1];
-            return Number(top?.weight);
-          })();
-          const w = Number.isFinite(rw) && rw > 0
-            ? rw
-            : (Number.isFinite(planTop) && planTop > 0 ? planTop : Number(ex?.weight));
-          /**
-           * ⛔⛔ A TESTED LIFT GETS NEITHER CONTROL — NOT "Add to plan", AND NOT SWAP EITHER
-           * (Michael, 2026-08-31: *"no swap"*).
-           *
-           * ⛔ THE FIRST FIX STAMPED `planned_name` HERE and that turned the wrong button into a
-           * different wrong button. Swap substitutes one movement for another — and the movement on
-           * this row is the one the block's every working number is derived from. Substituting it
-           * does not change a session, it changes what the next eleven weeks are priced off.
-           * ⚠️ **A test day is a test day.** The row is the measurement; there is nothing here to
-           * exchange, so no control is offered and the Add button is suppressed alongside it (see
-           * the `Add` gate at the render site, which reads the same scored-set marker).
-           * ⚠️ THE ACCESSORY BRANCH ABOVE IS UNCHANGED and still carries its prescription — those
-           * rows are ordinary work and swapping one costs the test nothing.
-           */
-          /**
-           * ⛔⛔ A STANDING PLAN'S TEST ROW IS BUILT AS THE PLAN WROTE IT (SPEC-test-day-2026-09-01
-           * A + B). Only the week-12 "Retest — …" sessions (`1rm_test` without `standing_plan`)
-           * still go through `createBaselineTestExercise` — that builder collapses the plan's three
-           * steps into one all-out set with "aim ~3–6 · stop at RPE 9", the cap that cost Michael a
-           * test on 2026-09-01. See `createStandingTestExercise`.
-           */
-          const isStandingPlan = (Array.isArray((workoutToLoad as any)?.tags) ? (workoutToLoad as any).tags : [])
-            .map((t: unknown) => String(t).toLowerCase()).includes('standing_plan');
-          if (isStandingPlan) {
-            return createStandingTestExercise(ex, storedMaxFor(liftName || String(ex?.name || ''), performanceNumbers));
-          }
-          return createBaselineTestExercise(liftName || String(ex?.name || ''), Number.isFinite(w) && w > 0 ? w : undefined);
-        }));
-        exercisesLoadedFromWorkout = true;
-        setIsInitialized(true);
+        (async () => {
+          try {
+            const { data } = await supabase.functions.invoke('strength-test-session', {
+              body: plannedId ? { planned_workout_id: plannedId } : { test_type: testType },
+            });
+            const rows = Array.isArray((data as any)?.exercises) ? (data as any).exercises : [];
+            if (rows.length === 0) return;
+            const built = testSessionToLogged(rows);
+            setExercises((prev) => (prev.length === 0 ? built : prev));
+          } catch { /* no rows: the session stays empty */ }
+        })();
         return;
       }
     }
@@ -3272,6 +2747,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const rawTargetReps = exercise.target_reps ?? exercise.reps;
         const isRepTotalRow = hasRepTotal(rawTargetReps);
         const result = {
+          ...restFieldsOf(exercise),
           id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
           name: cleanName || '',
           notes: rawNotes || undefined,
@@ -3326,45 +2802,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
       setExercises(prePopulatedExercises);
       exercisesLoadedFromWorkout = true;
-      // Initialize rest timers for pre-populated exercises
-      setTimeout(() => {
-        prePopulatedExercises.forEach((exercise) => {
-          exercise.sets.forEach((set, setIndex) => {
-            if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
-              const restTime = calculateRestTime(exercise.name, set.reps, slotIntentOf(exercise));
-              const restTimerKey = `${exercise.id}-${setIndex}`;
-              setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: restTime, running: false } }));
-            }
-          });
-        });
-      }, 100);
-    } else if (workoutToLoad && ((workoutToLoad as any).steps_preset?.length > 0 || typeof (workoutToLoad as any).rendered_description === 'string' || typeof (workoutToLoad as any).description === 'string')) {
-      // Fallback: parse rendered_description first, then description
-      const stepsArr: string[] = Array.isArray((workoutToLoad as any).steps_preset) ? (workoutToLoad as any).steps_preset : [];
-      const viaTokens = parseStepsPreset(stepsArr);
-      const src = (workoutToLoad as any).rendered_description || (workoutToLoad as any).description || '';
-      const parsed = viaTokens.length>0 ? viaTokens : parseStrengthDescription(src);
-      const orOpts = extractOrOptions(src);
-      if (parsed.length > 0) {
-        setExercises(parsed);
-        exercisesLoadedFromWorkout = true;
-        // Initialize rest timers for parsed exercises
-        setTimeout(() => {
-          parsed.forEach((exercise) => {
-            exercise.sets.forEach((set, setIndex) => {
-              if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
-                const restTime = calculateRestTime(exercise.name, set.reps, slotIntentOf(exercise));
-                const restTimerKey = `${exercise.id}-${setIndex}`;
-                setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: restTime, running: false } }));
-              }
-            });
-          });
-        }, 100);
-        if (orOpts && orOpts.length > 1) setPendingOrOptions(orOpts);
-      } else {
-        setExercises([createEmptyExercise()]);
-        if (orOpts && orOpts.length > 1) setPendingOrOptions(orOpts);
-      }
     } else {
       setExercises([createEmptyExercise()]);
     }
@@ -3401,18 +2838,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             if (exs.length) { 
               setExercises(prev=> {
                 const final = isPlaceholder(prev) ? exs : (prev.length? prev: exs);
-                // Initialize rest timers for loaded exercises
-                setTimeout(() => {
-                  final.forEach((exercise) => {
-                    exercise.sets.forEach((set, setIndex) => {
-                      if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
-                        const restTime = calculateRestTime(exercise.name, set.reps, slotIntentOf(exercise));
-                        const restTimerKey = `${exercise.id}-${setIndex}`;
-                        setTimers(prevTimers => ({ ...prevTimers, [restTimerKey]: { seconds: restTime, running: false } }));
-                      }
-                    });
-                  });
-                }, 100);
                 return final;
               }); 
               return; 
@@ -3426,6 +2851,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 const rawNotes = String(exercise.notes || exercise.description || weightAsNotes || '').trim();
                 const cleanName = rawName.split(' - ')[0].split(' | ')[0].trim();
                 return {
+                  ...restFieldsOf(exercise),
                   id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
                   name: cleanName || '',
                   notes: rawNotes || undefined,
@@ -3465,18 +2891,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               if (pre.length) {
                 setExercises(prev => {
                   const final = isPlaceholder(prev) ? pre : (prev.length? prev: pre);
-                  // Initialize rest timers for loaded exercises
-                  setTimeout(() => {
-                    final.forEach((exercise) => {
-                      exercise.sets.forEach((set, setIndex) => {
-                        if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
-                          const restTime = calculateRestTime(exercise.name, set.reps, slotIntentOf(exercise));
-                          const restTimerKey = `${exercise.id}-${setIndex}`;
-                          setTimers(prevTimers => ({ ...prevTimers, [restTimerKey]: { seconds: restTime, running: false } }));
-                        }
-                      });
-                    });
-                  }, 100);
                   return final;
                 }); 
                 return; 
@@ -3510,18 +2924,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           if (exs.length) { 
             setExercises(prev=> {
               const final = isPlaceholder(prev) ? exs : (prev.length? prev: exs);
-              // Initialize rest timers for loaded exercises
-              setTimeout(() => {
-                final.forEach((exercise) => {
-                  exercise.sets.forEach((set, setIndex) => {
-                    if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
-                      const restTime = calculateRestTime(exercise.name, set.reps, slotIntentOf(exercise));
-                      const restTimerKey = `${exercise.id}-${setIndex}`;
-                      setTimers(prevTimers => ({ ...prevTimers, [restTimerKey]: { seconds: restTime, running: false } }));
-                    }
-                  });
-                });
-              }, 100);
               return final;
             }); 
             return; 
@@ -3542,6 +2944,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             const rawTargetReps = exercise.target_reps ?? exercise.reps;
             const isRepTotalRow = hasRepTotal(rawTargetReps);
             return {
+              ...restFieldsOf(exercise),
               id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
               name: cleanName || '',
               notes: rawNotes || undefined,
@@ -3594,55 +2997,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           if (pre.length>0) {
             setExercises(prev => {
               const final = isPlaceholder(prev) ? pre : (prev.length? prev : pre);
-              // Initialize rest timers for loaded exercises
-              setTimeout(() => {
-                final.forEach((exercise) => {
-                  exercise.sets.forEach((set, setIndex) => {
-                    if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
-                      const restTime = calculateRestTime(exercise.name, set.reps, slotIntentOf(exercise));
-                      const restTimerKey = `${exercise.id}-${setIndex}`;
-                      setTimers(prevTimers => ({ ...prevTimers, [restTimerKey]: { seconds: restTime, running: false } }));
-                    }
-                  });
-                });
-              }, 100);
               return final;
             });
             return;
           }
         }
-        const steps: string[] = Array.isArray((data as any).steps_preset) ? (data as any).steps_preset : [];
-        const viaTok = parseStepsPreset(steps);
-        const src2 = (data as any).rendered_description || (data as any).description || '';
-        const parsed2 = viaTok.length>0 ? viaTok : parseStrengthDescription(src2);
-        const isPlaceholder = (arr: LoggedExercise[]) => {
-          if (!Array.isArray(arr) || arr.length !== 1) return false;
-          const e = arr[0] as any;
-          const blankName = !String(e?.name||'').trim();
-          const sets = Array.isArray(e?.sets) ? e.sets : [];
-          const blankSets = sets.length === 0 || sets.every((s:any)=> (Number(s?.reps)||0)===0 && (Number(s?.weight)||0)===0 && !s?.completed);
-          return blankName && blankSets;
-        };
-        if (parsed2.length>0) {
-          setExercises(prev => {
-            const final = isPlaceholder(prev) ? parsed2 : (prev.length? prev: parsed2);
-            // Initialize rest timers for loaded exercises
-            setTimeout(() => {
-              final.forEach((exercise) => {
-                exercise.sets.forEach((set, setIndex) => {
-                  if (set.reps && set.reps > 0 && set.duration_seconds === undefined) {
-                    const restTime = calculateRestTime(exercise.name, set.reps, slotIntentOf(exercise));
-                    const restTimerKey = `${exercise.id}-${setIndex}`;
-                    setTimers(prevTimers => ({ ...prevTimers, [restTimerKey]: { seconds: restTime, running: false } }));
-                  }
-                });
-              });
-            }, 100);
-            return final;
-          });
-        }
-        const or2 = extractOrOptions(src2);
-        if (or2 && or2.length>1) setPendingOrOptions(prev => prev || or2);
       } catch {}
     })();
     }  // close runFreshInit (D-110 A2)
@@ -3655,15 +3014,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }
   }, [lockManualPrefill, isInitialized]);
 
-  // Ensure timers exist for current sets (default 90s)
+  // Drop timers for deleted sets. (It no longer creates a 90-second rest entry for every set: a rest
+  // countdown starts only from the row's server number, in autoStartRestForSet. 2026-09-10, H-S07.)
   useEffect(() => {
     const next: { [key: string]: { seconds: number; running: boolean } } = { ...timers };
-    exercises.forEach(ex => {
-      ex.sets.forEach((_, idx) => {
-        const k = `${ex.id}-${idx}`;
-        if (!next[k]) next[k] = { seconds: 90, running: false };
-      });
-    });
     // Remove timers for deleted sets. Key is `${exId}-${idx}` (rest) or `${exId}-set-${idx}` (duration),
     // and exId is a UUID/slug WITH HYPHENS — so `k.split('-')` mis-parsed it (took only the first segment
     // as exId), matched no exercise, and DELETED valid running timers the instant they armed. That's why
@@ -4109,33 +3463,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }
   };
 
-  // Add warmup set to baseline test exercise
-  const addWarmupSet = (exerciseId: string, insertBeforeIndex: number) => {
-    const updatedExercises = exercises.map(exercise => {
-      if (exercise.id === exerciseId) {
-        const newSets = [...exercise.sets];
-        // Find the last warmup set to suggest next weight
-        const warmupSets = newSets.filter(s => s.setType === 'warmup');
-        const lastWarmup = warmupSets[warmupSets.length - 1];
-        const suggestedWeight = lastWarmup && lastWarmup.weight > 0 ? lastWarmup.weight + 25 : 0;
-        
-        const newWarmupSet: LoggedSet = {
-          weight: suggestedWeight,
-          reps: 3,
-          setType: 'warmup',
-          setHint: 'Add 25-50 lbs, should feel moderate',
-          barType: 'standard',
-          completed: false
-        };
-        
-        newSets.splice(insertBeforeIndex, 0, newWarmupSet);
-        return { ...exercise, sets: newSets };
-      }
-      return exercise;
-    });
-    setExercises(updatedExercises);
-    saveSessionProgress(updatedExercises, attachedAddons, notesText, notesRpe);
-  };
+  // ⛔ "Add warmup set" IS GONE (2026-09-10, audit H-S01). It added a set at the last warm-up + 25 lb for 3 reps
+  // with a phone-written hint. A test's warm-up is the server's row.
 
   const updateSet = (exerciseId: string, setIndex: number, updates: Partial<LoggedSet>) => {
     const updatedExercises = exercises.map(exercise => {
@@ -4170,20 +3499,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // "Save as baseline" now sends every set and `save-baseline-test` picks, with the same gates
         // and the test read-back's rule (heaviest completed set, the scored set on a tie).
         
-        // Auto-calculate rest time when reps change (for rep-based exercises)
-        if ('reps' in updates && updatedSet.reps !== undefined && updatedSet.duration_seconds === undefined) {
-          const restTime = calculateRestTime(exercise.name, updatedSet.reps, slotIntentOf(exercise));
-          const restTimerKey = `${exerciseId}-${setIndex}`;
-          // Only set if timer doesn't exist or is at default value
-          setTimers(prev => {
-            const current = prev[restTimerKey];
-            if (!current || current.seconds === 90) {
-              return { ...prev, [restTimerKey]: { seconds: restTime, running: false } };
-            }
-            return prev;
-          });
-        }
-        
         return { ...exercise, sets: newSets };
       }
       return exercise;
@@ -4217,13 +3532,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         };
         const updatedExercise = { ...exercise, sets: [...exercise.sets, newSet] };
         
-        // Auto-calculate rest time for the new set if it has reps
-        if (newSet.reps && newSet.reps > 0 && newSet.duration_seconds === undefined) {
-          const restTime = calculateRestTime(exercise.name, newSet.reps, slotIntentOf(exercise));
-          const restTimerKey = `${exerciseId}-${updatedExercise.sets.length - 1}`;
-          setTimers(prev => ({ ...prev, [restTimerKey]: { seconds: restTime, running: false } }));
-        }
-
         return updatedExercise;
       }
       return exercise;
@@ -4276,11 +3584,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       if (set.duration_seconds !== undefined) return;          // no rest after a duration hold
       if (setIndex >= ex.sets.length - 1) return;              // no rest after the last set
       const restKey = `${exerciseId}-${setIndex}`;
-      const calculatedRest = set.setType === 'warmup'
-        ? WARMUP_REST_SEC
-        : (typeof set.reps === 'number' && set.reps > 0)
-          ? calculateRestTime(ex.name, set.reps, slotIntentOf(ex))
-          : 90;
+      // ⛔ THE ROW'S OWN NUMBER (2026-09-10, audit H-S07). The server stamps `rest_seconds` and, on a row with a
+      // ramp, `warmup_rest_seconds`. A row with neither (an exercise added here, a workout with no plan) gets
+      // no countdown.
+      const calculatedRest = set.setType === 'warmup' ? ex.warmup_rest_seconds : ex.rest_seconds;
+      if (!(typeof calculatedRest === 'number' && calculatedRest > 0)) return;
       setRestDismissed((prev) => { if (!prev.has(restKey)) return prev; const n = new Set(prev); n.delete(restKey); return n; });
       setTimers((prev) => {
         if (prev[restKey]?.running) return prev;                // already running — don't restart
@@ -4372,7 +3680,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
      */
     if (set.pretestAnchor === true) {
       const a = Number(set.weight);
-      const round5 = (w: number) => Math.max(5, Math.round(w / 5) * 5);
+      // ⛔ THE STEPS ARE `pretestStepWeights` — A rounded first, then 1.10A and 1.15A rounded, with a collided
+      // warm-up left blank — at the increment the server put on the row (2026-09-10, audit H-S02).
+      const stepWeights = Number(exercise.anchor_round_to) > 0 ? pretestStepWeights(a, Number(exercise.anchor_round_to)) : null;
       /**
        * ⚠️ ONE PASS, AND IT COMPLETES THE SET ITSELF. `updateSet` maps over the `exercises` CLOSURE,
        * so a second call in the same handler builds off the pre-first-call array and silently drops
@@ -4387,12 +3697,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (ex.id !== exerciseId) return ex;
         const sets = [...ex.sets];
         sets[setIndex] = { ...sets[setIndex], completed: true, prefilled: false, from_previous: false };
-        if (Number.isFinite(a) && a > 0) {
-          for (const [offset, mult] of [[1, 1.10], [2, 1.15]] as const) {
+        if (stepWeights) {
+          for (const offset of [1, 2] as const) {
+            const w = stepWeights[offset];
             const at = setIndex + offset;
             const next = sets[at];
-            if (!next || next.completed || Number(next.weight) > 0) continue;
-            sets[at] = { ...next, weight: round5(a * mult), prefilled: true };
+            if (w == null || !next || next.completed || Number(next.weight) > 0) continue;
+            sets[at] = { ...next, weight: w, prefilled: true };
           }
         }
         return { ...ex, sets };
@@ -5104,9 +4415,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
            * ⛔ HIS RULE, BESIDE THE CLOCK (Michael, 2026-08-27). Viada p78 gives a readiness
            * condition and NO NUMBER OF MINUTES — so the countdown alone is us answering a question he
            * deliberately did not answer with a number. The sentence says what the clock is standing
-           * in for, and `REST_MINUTES_ARE_OURS` says whose the minutes are.
+           * in for; whose the minutes are is recorded on the server.
            *
-           * ⚠️ THE WORDING IS IMPORTED, NOT WRITTEN HERE. `restCueForBucket` returns the same string
+           * ⚠️ THE WORDING IS THE SERVER'S, NOT WRITTEN HERE. The row's `rest_cue` is the same string
            * the plan's own notes carry, out of `strength-grid/intents.ts`. p84's opposite rule for
            * muscle-building work comes down the same path.
            *
@@ -5116,7 +4427,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
            * the countdown it always had.
            */
           const restEx = exercises.find((e) => activeKey.startsWith(`${e.id}-`));
-          const restBucket = restBucketForIntent(slotIntentOf(restEx));
+          const restCue = restEx?.rest_cue ?? null;
           return (
             /* ⛔ THE PILL BODY NO LONGER SWALLOWS TAPS (2026-08-27). It is `sticky` over the top of
                the scrolling set list, so whichever row is scrolled under it was losing its taps to a
@@ -5126,7 +4437,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                tradeoff of pinning it, and it is not what made a cell hard to hit. */
             <div className={`pointer-events-none bg-strength/20 border border-strength/50 text-[#FFE6D5] shadow-lg backdrop-blur-md ${
               // A pill with nothing under it stays a pill; a pill carrying his rule is a small card.
-              restBucket ? 'max-w-[19rem] px-3.5 py-2 rounded-2xl' : 'flex items-center gap-2 px-3 py-1.5 rounded-full'
+              restCue ? 'max-w-[19rem] px-3.5 py-2 rounded-2xl' : 'flex items-center gap-2 px-3 py-1.5 rounded-full'
             }`}>
               <div className="flex items-center gap-2">
               <span className="text-xs uppercase tracking-wide text-strength/80">Rest</span>
@@ -5146,11 +4457,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 Skip
               </button>
               </div>
-              {restBucket && (
+              {restCue && (
                 <div className="pt-1.5">
-                  <p className="text-[12px] leading-snug text-[#FFE6D5]/85">{restCueForBucket(restBucket)}</p>
-                  {/* Whose minutes these are is recorded in strength-rest-timer.ts (REST_MINUTES_ARE_OURS)
-                      and docs/STATE-SOURCES.md, not on the screen (Michael, 2026-09-07: "LLM slop"). */}
+                  <p className="text-[12px] leading-snug text-[#FFE6D5]/85">{restCue}</p>
+                  {/* Whose minutes these are is recorded in strength/rest-seconds.ts and docs/STATE-SOURCES.md,
+                      not on the screen (Michael, 2026-09-07: "LLM slop"). */}
                 </div>
               )}
             </div>
@@ -5416,35 +4727,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 )}
               </div>
             ))}
-          </div>
-        )}
-        {pendingOrOptions && pendingOrOptions.length > 1 && (
-          <div className="px-3">
-            <div className="flex items-center flex-wrap gap-2 text-sm">
-              <span className="text-white/70">Choose one:</span>
-              {pendingOrOptions.map((opt, idx) => (
-                <button
-                  key={idx}
-                  className="px-2 py-1 rounded-full bg-white/[0.08] backdrop-blur-md border-2 border-white/20 text-white/90 hover:bg-white/[0.12] hover:border-white/30 transition-all duration-300 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]"
-                  style={{ fontFamily: 'Inter, sans-serif' }}
-                  onClick={() => {
-                    // Replace/add the chosen OR as simple prefilled sets (lower rep bound)
-                    setExercises(prev => {
-                      const next = [...prev, {
-                        id: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
-                        name: opt.name,
-                        expanded: true,
-                        sets: Array.from({ length: Math.max(1, opt.sets) }, () => ({ reps: Math.max(1,opt.reps), weight: 0, barType: 'standard', rir: undefined, completed: false }))
-                      } as LoggedExercise];
-                      return orderExercises(next);
-                    });
-                    setPendingOrOptions(null);
-                  }}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
           </div>
         )}
         {exercises.map((exercise, exerciseIndex) => {
@@ -6298,16 +5580,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         const workingSetIndex = exercise.sets.findIndex((s) => s.setType === 'working');
                         const firstWarmupIndex = exercise.sets.findIndex((s) => s.setType === 'warmup');
                         const exHasWarmupRamp = firstWarmupIndex >= 0;
-                        const showAddWarmupButton = exIsBaselineTest && setIndex === workingSetIndex && workingSetIndex > 0;
                         const done = set.completed === true;
-                        // AMRAP PR — the top set's estimated 1RM beats the recorded 1RM for this lift.
-                        // Only the four main lifts have a recorded number; everything else returns false.
-                        const amrapE1rm = (set.amrap && done && Number(set.weight) > 0 && Number(set.reps) > 0)
-                          ? Math.round(estimate1RM(Number(set.weight), Number(set.reps)))
-                          : null;
-                        const bestPriorOneRm = set.amrap && done ? bestMeasuredOneRmFor(exercise.name) : undefined;
-                        const isAmrapPR = amrapE1rm != null && bestPriorOneRm != null && amrapE1rm > bestPriorOneRm;
-
                         // ⛔ 44px TALL, AND IT IS NOT A COSMETIC CHANGE (Michael, 2026-08-27: "dumbell
                         // bench press was hard to enter weight and rep had to hit it a lot").
                         //
@@ -6608,8 +5881,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           && typeof exercise.target_rir === 'number')
                           ? `${formatRirTarget(exercise.target_rir)} in reserve`
                           : null;
+                        // An AMRAP with no target prints nothing (2026-09-10, audit H-S17): the "5" had no source.
                         const repHint = set.amrap
-                          ? `AMRAP · ${exercise.target_reps ? String(exercise.target_reps).replace(/\+$/, '') : '5'} minimum`
+                          ? (exercise.target_reps ? `AMRAP · ${String(exercise.target_reps).replace(/\+$/, '')} minimum` : null)
                           : (exHasRepTotal
                             ? null
                             : (exercise.target_reps ? `target ${String(exercise.target_reps).replace(/\+$/, '')}` : null));
@@ -6656,18 +5930,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               </div>
                             )}
 
-                            {showAddWarmupButton && (
-                              <div className="mb-1.5 pl-[30px]">
-                                <button
-                                  onClick={() => addWarmupSet(exercise.id, setIndex)}
-                                  className="text-[12px] px-2.5 py-1 rounded-md border border-white/20 text-white/70 hover:text-white hover:bg-white/[0.08] transition-colors flex items-center gap-1"
-                                >
-                                  <Plus className="h-3 w-3" />
-                                  Add warmup set
-                                </button>
-                              </div>
-                            )}
-
                             {/* AMRAP's instruction sits ABOVE its set — mirroring how the bar-speed
                                 cue sits above the exercise (Michael 2026-08-11). */}
                             {set.amrap && (targetHint || cue) && (
@@ -6676,16 +5938,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               // its own px-1.5 and no container). Same vertical line as "SET".
                               <div className="pt-0.5 pb-2 text-[12px] font-medium text-strength/90 leading-snug">
                                 {[targetHint, cue].filter(Boolean).join(' — ')}
-                              </div>
-                            )}
-
-                            {/* AMRAP PR — the top set's estimated 1RM beat the recorded number for this
-                                lift. The record itself lands on State/Performance; this is the badge in
-                                the moment it's hit (Michael 2026-08-11). */}
-                            {isAmrapPR && (
-                              <div className="pb-2 flex items-center gap-2" role="status" aria-label={`Personal record — estimated 1RM ${amrapE1rm} pounds`}>
-                                <span className="text-[12px] font-bold uppercase tracking-wider text-strength">PR</span>
-                                <span className="text-[12px] font-medium text-strength/90">new best — est. 1RM {amrapE1rm} lb</span>
                               </div>
                             )}
 

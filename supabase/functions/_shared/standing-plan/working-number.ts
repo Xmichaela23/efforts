@@ -242,12 +242,7 @@ export function pretestSession(
   // upper two steps are multiples of that rounded number — his arithmetic, not three independent
   // fractions. Rounding A first is what keeps 1.1A and 1.15A honest additions to the weight the
   // athlete actually put on the bar.
-  const warmup = Math.round((predictedFromFile * PRETEST_WARMUP_FRACTION) / step) * step;
-  const stepped = PRETEST_STEPS.map((s) => ({
-    fractionOfPredicted: s.fractionOfPredicted,
-    weight: Math.round((warmup * s.multipleOfWarmup) / step) * step,
-    reps: s.reps,
-  }));
+  const weights = pretestStepWeights(predictedFromFile * PRETEST_WARMUP_FRACTION, step)!;
 
   /**
    * ⛔⛔ A COLLIDED WARM-UP IS DROPPED, NEVER PRESCRIBED, AND THE MEASURED STEP NEVER MOVES.
@@ -270,12 +265,29 @@ export function pretestSession(
    * ⚠️ Same rule, same reasoning as `warmup.ts` (*"rungs that collide are dropped, not nudged
    * apart"*) — the two ramps now agree.
    */
-  const measured = stepped[stepped.length - 1];
-  const kept = stepped.filter((s, i) => {
-    if (i === stepped.length - 1) return true;
-    return stepped.slice(i + 1).every((later) => later.weight !== s.weight);
-  });
-  return kept.length > 0 ? kept : [measured];
+  return PRETEST_STEPS
+    .map((s, i) => ({ fractionOfPredicted: s.fractionOfPredicted, weight: weights[i], reps: s.reps }))
+    .filter((s): s is { fractionOfPredicted: number; weight: number; reps: number | 'max' } => s.weight != null);
+}
+
+/**
+ * ⛔ THE STEP WEIGHTS OFF A WARM-UP WEIGHT `A` — one entry per `PRETEST_STEPS` step, `null` where a
+ * collided warm-up is dropped (the rule and its reasons are in `pretestSession` above, OURS).
+ *
+ * ⛔ A IS ROUNDED FIRST, then each step is a multiple of the rounded A, rounded again (p215's order).
+ * `pretestSession` calls this with 0.75 × the max on file. The logger calls it (2026-09-10, audit H-S02)
+ * with the weight the athlete types on a test row that has no max on file, to fill steps 2 and 3 as they
+ * are typed — the same function, so A = 137 fills 150 and 155, where the phone's own arithmetic
+ * (unrounded A × 1.10 / 1.15) filled 150 and 160.
+ */
+export function pretestStepWeights(warmupWeight: number, roundTo: number): (number | null)[] | null {
+  if (!Number.isFinite(warmupWeight) || warmupWeight <= 0) return null;
+  const step = Number.isFinite(roundTo) && roundTo > 0 ? roundTo : 5;
+  const warmup = Math.round(warmupWeight / step) * step;
+  const weights = PRETEST_STEPS.map((s) => Math.round((warmup * s.multipleOfWarmup) / step) * step);
+  return weights.map((w, i) => (
+    i === weights.length - 1 || weights.slice(i + 1).every((later) => later !== w) ? w : null
+  ));
 }
 
 /**

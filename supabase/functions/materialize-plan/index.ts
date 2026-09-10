@@ -22,6 +22,7 @@ import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts
 // the stored key are the same function's answer. The client mirror lacks the Q-197 plural rule.
 import { canonicalize as canonicalizeName } from '../_shared/canonicalize.ts';
 import { executionHowTo, executionName } from '../_shared/strength-grid/grid.ts';
+import { restFieldsForRow } from '../_shared/strength/rest-seconds.ts';
 import { getExerciseConfig, getBaseline1RM, formatWeightDisplay, getMovementGroup, resolveSwapSeedWeight } from '../../../src/lib/exercise-config.ts';
 import { resolveProfile, getTargetRir, protocolUsesRir } from '../_shared/strength-profiles.ts';
 
@@ -2750,6 +2751,9 @@ export function expandTokensForRow(
             // box); the intent now travels as `slot_intent` and the logger's ME/DE cues read it.
             // Unlisted it dies here, and every standing cue falls back to the legacy notes regex.
             ...((['ME','DE','SKILL','HYP'].includes(String((ex as any)?.slot_intent))) ? { slot_intent: (ex as any).slot_intent } : {}),
+            // ⛔ AND THE REST (2026-09-10, audit H-S07) — the logger's countdown prints these. The composer's
+            // stamp passes through; a row no composer wrote gets the same rule's numbers here.
+            ...restFieldsForRow({ ...(ex as any), name, reps, set_plan: carrySetPlan(ex, finalWeight) }),
             ...(typeof (ex as any)?.superset_group === 'string' && (ex as any).superset_group ? { superset_group: (ex as any).superset_group } : {}), // 2026-09-03: the pair mark travels
             // ⛔ AND CARRY LAST TIME'S RESULT (2026-08-26) — the same whitelist, the fifth time. The
             // heavy slot prints a rep BAND and nothing else, so a block that is progressing correctly
@@ -3152,6 +3156,9 @@ export function expandTokensForRow(
             // box); the intent now travels as `slot_intent` and the logger's ME/DE cues read it.
             // Unlisted it dies here, and every standing cue falls back to the legacy notes regex.
             ...((['ME','DE','SKILL','HYP'].includes(String((ex as any)?.slot_intent))) ? { slot_intent: (ex as any).slot_intent } : {}),
+            // ⛔ AND THE REST (2026-09-10, audit H-S07) — the logger's countdown prints these. The composer's
+            // stamp passes through; a row no composer wrote gets the same rule's numbers here.
+            ...restFieldsForRow({ ...(ex as any), name, reps, set_plan: carrySetPlan(ex, finalWeight) }),
             ...(typeof (ex as any)?.superset_group === 'string' && (ex as any).superset_group ? { superset_group: (ex as any).superset_group } : {}), // 2026-09-03: the pair mark travels
             // ⛔ AND CARRY LAST TIME'S RESULT (2026-08-26) — the same whitelist, the fifth time. The
             // heavy slot prints a rep BAND and nothing else, so a block that is progressing correctly

@@ -12,9 +12,12 @@ interface HistoricalSession {
   sets: number;
   reps: number;
   weight: number;
-  isPR: boolean;
-  percentOfMax: number;
 }
+
+// ⛔ "(PR)" AND "N% OF MAX" ARE GONE (2026-09-10, audit H-S10). The phone called the newest session a
+// record when its best weight equalled the 12-week top weight, and printed each session as a share of
+// that top weight. Neither is the server's rep-record rule (`_shared/strength/all-out-set.ts`), and this
+// read carries no server flag, so both come off rather than being re-decided here.
 
 const StrengthSummaryView: React.FC<StrengthSummaryViewProps> = ({ workoutData }) => {
   const { liftTrends, loading } = useExerciseLog(12);
@@ -44,18 +47,12 @@ const StrengthSummaryView: React.FC<StrengthSummaryViewProps> = ({ workoutData }
       const sessions = trend.entries
         .slice(-4)
         .reverse()
-        .map((entry, index) => {
-          const allWeights = trend.entries.map(e => e.best_weight);
-          const maxWeight = Math.max(...allWeights);
-          return {
-            date: entry.date,
-            sets: entry.sets_completed,
-            reps: entry.best_reps,
-            weight: entry.best_weight,
-            isPR: entry.best_weight === maxWeight && index === 0,
-            percentOfMax: maxWeight > 0 ? Math.round((entry.best_weight / maxWeight) * 100) : 0,
-          } as HistoricalSession;
-        });
+        .map((entry) => ({
+          date: entry.date,
+          sets: entry.sets_completed,
+          reps: entry.best_reps,
+          weight: entry.best_weight,
+        } as HistoricalSession));
 
       if (sessions.length > 0) {
         exerciseHistory[exerciseName] = sessions;
@@ -106,9 +103,7 @@ const StrengthSummaryView: React.FC<StrengthSummaryViewProps> = ({ workoutData }
               <div key={index} className="flex justify-between text-sm">
                 <span className="text-gray-600">
                   {formatDate(session.date)}: {session.sets}x{session.reps} @ {session.weight} lbs
-                  {session.isPR && <span className="text-gray-900"> (PR)</span>}
                 </span>
-                <span className="text-gray-500">{session.percentOfMax}% of max</span>
               </div>
             ))}
           </div>

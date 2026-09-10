@@ -17,18 +17,19 @@
  * ⛔ THE FORMULA IS THE WORK ORDER'S, VERBATIM: for each row, `sets × (time under the bar + the rest
  * the timer would run for that kind of set)`, summed, shown as a range.
  *
- * ⚠️ THE REST IS NOT RE-DECIDED HERE. `calculateRestTime` is the app's one answer to "how long does
- * the clock run after a set of this kind", and it is the same function the logger starts the
- * countdown with. A second opinion about rest is how two screens end up disagreeing about the same
- * set. ⛔ Note what that means for provenance: the source gives a rest RULE and no minutes, so every
- * figure underneath this estimate is ours — see `REST_MINUTES_ARE_OURS` in that file.
+ * ⚠️ THE REST IS NOT RE-DECIDED HERE. It is the number the logger's countdown runs: the row's stamped
+ * `rest_seconds` / `warmup_rest_seconds` (2026-09-10, audit H-S07), and on a row stamped before those
+ * fields existed, `restSecondsFor` — the rule the stamp comes from. A second opinion about rest is how
+ * two screens end up disagreeing about the same set. ⛔ Note what that means for provenance: the source
+ * gives a rest RULE and no minutes, so every figure underneath this estimate is ours — see
+ * `REST_MINUTES_ARE_OURS` in `strength/rest-seconds.ts`.
  *
  * ⚠️ THE TIMER'S OWN SUPPRESSIONS ARE DELIBERATELY NOT MODELLED. The logger skips the countdown
  * after the last set of a row, and on the first half of a superset, because there is nothing for the
  * athlete to wait through — but time still passes there. Those are display rules, not a claim that
  * the rest is free, and the work order asks for `sets × (work + rest)`.
  */
-import { calculateRestTime, WARMUP_REST_SEC } from '../../../src/lib/strength-rest-timer.ts';
+import { restSecondsFor, WARMUP_REST_SEC } from './strength/rest-seconds.ts';
 
 /**
  * ⛔⛔ OURS, AND THE ONE ESTIMATE IN THIS FILE THAT IS NOT READ OFF A ROW. The source gives no tempo
@@ -59,6 +60,8 @@ type StrengthRow = {
   target_reps?: unknown;
   slot_intent?: unknown;
   set_plan?: unknown;
+  rest_seconds?: unknown;
+  warmup_rest_seconds?: unknown;
 };
 
 const positive = (v: unknown): number | null => {
@@ -131,11 +134,11 @@ export function strengthSessionSeconds(rows: unknown): SessionMinutes | null {
     const intent = typeof raw?.slot_intent === 'string' ? raw.slot_intent : null;
 
     for (const set of setsOf(raw)) {
-      // ⛔ THE TIMER'S OWN ANSWER. A warm-up set takes the warm-up clock; everything else asks
-      // `calculateRestTime`, which reads the slot intent first and the movement and rep count after.
+      // ⛔ THE COUNTDOWN'S OWN NUMBER. The row's stamp where it carries one; otherwise the rule the
+      // stamp comes from, which reads the slot intent first and the movement and rep count after.
       const rest = set.warmup
-        ? WARMUP_REST_SEC
-        : calculateRestTime(name, set.reps?.hi ?? undefined, intent);
+        ? (positive(raw?.warmup_rest_seconds) ?? WARMUP_REST_SEC)
+        : (positive(raw?.rest_seconds) ?? restSecondsFor(name, set.reps?.hi ?? undefined, intent));
       const reps = set.reps;
       low += rest + (reps ? reps.lo * SEC_PER_REP_LOW : 0);
       high += rest + (reps ? reps.hi * SEC_PER_REP_HIGH : 0);
