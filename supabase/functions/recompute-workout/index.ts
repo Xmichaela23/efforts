@@ -2,7 +2,7 @@
  * recompute-workout — THE canonical post-process orchestrator (fan-out ordering fix, 2026-07-17).
  *
  * Ordered, awaited chain — "await what you read":
- *   auto-attach → [summary] → analysis → workload ∥ adaptation → facts(skip_snapshot) → analyze → snapshot(watermark)
+ *   auto-attach → [summary] → analysis → workload ∥ adaptation → facts(skip_snapshot) → analyze → boom → snapshot(watermark)
  *
  * Every entry path fires this fire-and-forget so the webhook ack stays fast while correctness comes
  * from ordering INSIDE the chain (not from the webhook awaiting it). See docs/AUDIT-fanout-ordering-2026-07-17.md.
@@ -23,7 +23,7 @@ import {
 } from './orchestrator-lib.ts';
 
 type RecomputeStep =
-  | 'auto-attach' | 'summary' | 'analysis' | 'workload' | 'adaptation' | 'facts' | 'analyze' | 'snapshot';
+  | 'auto-attach' | 'summary' | 'analysis' | 'workload' | 'adaptation' | 'facts' | 'analyze' | 'boom' | 'snapshot';
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -159,6 +159,16 @@ Deno.serve(withAlarm('recompute-workout', async (req) => {
     });
     if (r?.error) { fail('analyze', r.error); console.warn(`[recompute-workout] ${analyzeFn} failed (continuing):`, r.error.message); }
     else steps.push('analyze');
+  }
+
+  // ── 5b. the good-news line (audit H-T14) — reads what 0–5 wrote, so it runs after the analyser.
+  //    Non-fatal and NOT a failure: a session with no line is the normal answer, and a failed read here
+  //    must not show the athlete "analysis failed" over a session that analysed fine.
+  //    ⚠️ ITS OWN FUNCTION: the rule reaches the standing-plan composer, ~190 modules this one never loads.
+  {
+    const r = await invokeWithRetry(serviceClient, 'compute-session-boom', { workout_id, user_id: workout.user_id });
+    if (r?.error) console.warn('[recompute-workout] compute-session-boom failed (non-fatal):', r.error.message);
+    else steps.push('boom');
   }
 
   // ── 6. compute-snapshot — OWNED here, AFTER analyze, with a fresh input watermark (F3 guard).

@@ -237,6 +237,16 @@ Deno.serve(async (req) => {
             error: invokeError.message
           });
         } else {
+          // ⛔ THE GOOD-NEWS LINE READS WHAT THE ANALYSER JUST WROTE (audit H-T14) — the same step
+          // recompute-workout runs after its analyser. Non-fatal: the analysis above already landed.
+          try {
+            const { error: boomErr } = await supabase.functions.invoke('compute-session-boom', {
+              body: { workout_id: w.id, user_id: user.id },
+            });
+            if (boomErr) console.warn(`[BULK-REANALYZE] compute-session-boom failed for ${w.id} (non-fatal):`, boomErr.message);
+          } catch (boomErr: any) {
+            console.warn(`[BULK-REANALYZE] compute-session-boom failed for ${w.id} (non-fatal):`, boomErr?.message ?? boomErr);
+          }
           // Extract HR drift from response if available
           const hrDrift = data?.analysis?.heart_rate_analysis?.hr_drift_bpm ?? null;
           results.push({

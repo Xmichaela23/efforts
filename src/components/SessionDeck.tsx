@@ -1,7 +1,6 @@
 import React from 'react';
 import { ChevronDown } from 'lucide-react';
 import CardDeck, { deckGlass, type CardEmphasis, type DeckItem } from './CardDeck';
-import { useSessionBoom } from '@/hooks/useSessionBoom';
 import { getExerciseConfig } from '@/lib/exercise-config';
 import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
 import { displayDisciplineOf, normalizeDistanceKm } from '@/lib/utils';
@@ -475,6 +474,20 @@ export function doneHeadline(workout: Record<string, unknown>, useImperial: bool
   return parts.length ? parts.join(' · ') : null;
 }
 
+/**
+ * ⛔ THE GOOD-NEWS LINE IS THE SERVER'S (2026-09-10, audit H-T14): `computed.session_boom_v1`, stored
+ * by recompute-workout and sent on the get-week row. The drawer prints the same stored value as
+ * `session_detail_v1.boom`. Nothing is worked out here.
+ */
+function boomLineOf(workout: Record<string, unknown>): string | null {
+  let c: unknown = workout?.computed;
+  if (typeof c === 'string') {
+    try { c = JSON.parse(c); } catch { return null; }
+  }
+  const line = (c as { session_boom_v1?: { line?: unknown } } | null)?.session_boom_v1?.line;
+  return typeof line === 'string' && line ? line : null;
+}
+
 export const CompletedSessionCard: React.FC<{
   workout: Record<string, unknown>;
   useImperial: boolean;
@@ -482,7 +495,7 @@ export const CompletedSessionCard: React.FC<{
   emphasis?: CardEmphasis;
   onOpen?: () => void;
 }> = ({ workout, useImperial, emphasis = 'lead', onOpen }) => {
-  const boom = useSessionBoom(workout as never);
+  const boom = boomLineOf(workout);
   const sport = displayDisciplineOf(workout as never);
   const colour = getDisciplineColor(sport);
   const rgb = getDisciplineColorRgb(sport);

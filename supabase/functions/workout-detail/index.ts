@@ -34,6 +34,8 @@ import { normalizeCompletedStrengthExercise } from '../../../src/lib/normalize-s
 import { resolveBodyweightLb } from '../_shared/workload.ts';
 // ⛔ ONE MOVING TIME PER FINISHED SESSION (2026-09-10, audit H-D10) — the rule get-week stamps too.
 import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
+// ⛔ THE GOOD-NEWS LINE (2026-09-10, audit H-T14) — stored by recompute-workout, passed through here.
+import type { SessionBoomV1 } from '../_shared/session-boom/types.ts';
 // The all-out set: the rep record, the standard 1RM formula (D-339) and the rep ceiling above which
 // it stops holding. Shared with `coach` (Q-254 slice 1) so State and Performance read one function.
 import {
@@ -257,8 +259,12 @@ function enrichSessionDetailForResponse(
   rowSd: any,
   sessionDetailV1: any | null,
 ): any {
+  // ⛔ THE GOOD-NEWS LINE (audit H-T14) — the one `recompute-workout` stored on the row, attached here on
+  // EVERY answer, the cached copy included, and never persisted inside `session_detail_v1`. A copy
+  // cached before the chain last ran would otherwise serve yesterday's line.
+  const boom = sessionBoomFromRow(rowSd);
   if (!sessionDetailV1 || typeof sessionDetailV1 !== 'object') {
-    return { stale: true, stale_reason: 'analysis_missing' };
+    return { stale: true, stale_reason: 'analysis_missing', boom };
   }
   const base = stripResponseOnlySessionDetailFields(sessionDetailV1 as Record<string, unknown>) as any;
   const rowPlanned = rowSd?.planned_id != null && String(rowSd.planned_id).trim() !== '' ? String(rowSd.planned_id) : '';
@@ -281,9 +287,19 @@ function enrichSessionDetailForResponse(
   // response stale — that stranded athletes on “Analysis updating…” forever.
 
   if (stale) {
-    return { ...base, stale, stale_reason };
+    return { ...base, boom, stale, stale_reason };
   }
-  return { ...base, stale: false };
+  return { ...base, boom, stale: false };
+}
+
+/** `computed.session_boom_v1`, or null. `computed` can arrive as a JSON string. */
+function sessionBoomFromRow(row: any): SessionBoomV1 | null {
+  let c = row?.computed;
+  if (typeof c === 'string') {
+    try { c = JSON.parse(c); } catch { return null; }
+  }
+  const b = c && typeof c === 'object' ? (c as any).session_boom_v1 : null;
+  return b && typeof b === 'object' && typeof b.line === 'string' ? b : null;
 }
 
 function processingCompleteFromWorkoutRow(row: any): boolean {

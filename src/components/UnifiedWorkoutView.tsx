@@ -20,7 +20,6 @@ import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { supabase } from '@/lib/supabase';
 // ✅ REMOVED: Client-side analysis - server provides all analysis data
 import { useWorkoutDetail } from '@/hooks/useWorkoutDetail';
-import { useSessionBoom } from '@/hooks/useSessionBoom';
 import { usePlannedWorkoutLink } from '@/hooks/usePlannedWorkoutLink';
 import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 // ⛔ THE SWAP LOGIC IS NOT REBUILT HERE (2026-08-08). `session-discipline-swap.ts` owns the options,
@@ -129,8 +128,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const isCompleted = (typeof (workout as any)?.is_executed === 'boolean'
     ? (workout as any).is_executed
     : (executedFlagRow as any)?.is_executed) === true;
-  /** §booms — the same resolver the done card on Today reads. Null on anything with nothing to say. */
-  const boomLine = useSessionBoom(isCompleted ? (workout as never) : null);
   // Workout type flags — declared HERE (not later in the body) because the tab-routing effects
   // below reference `isStrengthFamily` in their dependency arrays, which are evaluated at render
   // time. A later `const` would be in the temporal dead zone → "Cannot access before initialization".
@@ -332,6 +329,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     // ⚠️ The Details tab reads it too: its Workload tile prints `session_detail_v1.load.workload` (H-D07).
     fetchSessionDetail: isCompleted && (activeTab === 'summary' || activeTab === 'completed'),
   });
+  /** §booms — the server's line (`session_detail_v1.boom`, audit H-T14). Null on anything with nothing to say. */
+  const boomLine: string | null = (sessionDetailV1 as { boom?: { line?: unknown } } | null)?.boom?.line as string ?? null;
   // Layered merge: workout (scaffolding) < hydratedCompleted (server-computed track/display_metrics) < updatedWorkoutData (fresh scalars).
   // updatedWorkoutData (raw SELECT *) has no `track` or `display_metrics` columns, so server-computed fields survive the spread.
   const completedData: any = isCompleted
@@ -965,9 +964,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
         {/**
           * ⛔ ONE LINE OF GOOD NEWS, UNDER THE HEADER (docs/WORKORDER-booms-2026-09-09.md, "Where").
-          * THE SAME LINE the done card on Today prints, from the same resolver — a session that is a
-          * best on one screen and unremarkable on the other is the divergence `session-boom.ts`
-          * exists as one owner to prevent. Nothing when there is nothing true to say.
+          * THE SAME LINE the done card on Today prints: both read the one the server stored
+          * (`computed.session_boom_v1`, sent here as `session_detail_v1.boom`, audit H-T14). A session
+          * that is a best on one screen and unremarkable on the other is the divergence one stored
+          * value prevents. Nothing when there is nothing true to say.
           */}
         {boomLine ? (
           <div className="text-[14px] mt-1.5" style={{ lineHeight: 1.35, color: 'rgba(255,255,255,0.92)' }}>

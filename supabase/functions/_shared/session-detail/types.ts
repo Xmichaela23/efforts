@@ -91,6 +91,12 @@ export type StrengthTestResultV1 = {
 export type SessionDetailV1 = {
   version: 1;
   /**
+   * The line of good news on a done session (2026-09-10, audit H-T14). Worked out once by
+   * `compute-session-boom` and stored in `workouts.computed.session_boom_v1`; workout-detail attaches it
+   * on every response and never saves it inside the session detail. Null = no line.
+   */
+  boom?: import('../session-boom/types.ts').SessionBoomV1 | null;
+  /**
    * ⛔ WHAT BLOCK THIS SESSION BELONGED TO (Q-230 / audit F9). Resolved once by
    * `_shared/block-identity.ts` — the same card the coach payload carries — so Performance and State
    * cannot give different answers about the same session.
