@@ -9,8 +9,6 @@ import {
   type ArcSetupPayload,
 } from '@/lib/parse-arc-setup';
 import type { GoalInsert } from '@/hooks/useGoals';
-import { fetchArcContext } from '@/lib/fetch-arc-context';
-import { enrichGoalInsertWithArcContext } from '@/lib/enrichArcGoalTrainingPrefs';
 import { inferEventSportForTri } from '@/lib/tri-goal-helpers';
 import { fixTransposedEasyBikeRunAgainstSwimOrder } from '@/lib/tri-preferred-days-sanity';
 import { normalizeTrainingIntent, trainingIntentToPrefsGoalType, type TrainingIntent } from '@/lib/training-intent';
@@ -309,8 +307,11 @@ export async function persistArcSetup(payload: ArcSetupPayload): Promise<Persist
   const userId = getStoredUserId();
   if (!userId) return { ok: false, error: 'Not signed in' };
 
-  const arcCtx = await fetchArcContext();
-  const validGoals = collectValidGoals(payload).map((g) => enrichGoalInsertWithArcContext(g, arcCtx));
+  // ⛔ THE GOAL IS INSERTED AS THE ATHLETE ANSWERED (2026-09-10, audit H-W08). The phone used to fill
+  // fitness level, goal type, training intent, strength frequency, equipment, limiter sport and tri
+  // approach before the insert, and the server only fills blanks, so the phone's guesses won.
+  // `create-goal-and-materialize-plan` fills them now and writes them back to the goal.
+  const validGoals = collectValidGoals(payload);
   const idPatch =
     payload.athlete_identity &&
     typeof payload.athlete_identity === 'object' &&

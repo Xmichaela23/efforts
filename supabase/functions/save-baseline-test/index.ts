@@ -24,6 +24,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser } from '../_shared/require-user.ts';
 import { estimate1RM } from '../../../src/lib/estimate-1rm.ts';
+import { pickTestLifts } from './pick.ts';
 
 /**
  * ⛔ THE OHP WRITE GUARD (D-224), MOVED SERVER-SIDE UNCHANGED. Overhead press has ONE canonical key —
@@ -108,8 +109,19 @@ Deno.serve(async (req) => {
     const { userId } = await requireUser(req);
     const payload = await req.json();
 
-    const lifts = Array.isArray(payload?.lifts) ? payload.lifts : [];
-    if (lifts.length === 0) return json({ success: false, reason: 'no_lifts' }, 400);
+    // ⛔ THE SERVER PICKS THE SET AND THE LIFT (2026-09-10, audit H-S08). The logger sends every set of
+    // the session (`exercises`) and `pickTestLifts` chooses the saved max by the test read-back's rule.
+    // `lifts` — one set per lift, already chosen on the phone — is what an app bundle from before this
+    // change still sends; it is read only when `exercises` is absent.
+    const sentSets = Array.isArray(payload?.exercises);
+    const lifts = sentSets
+      ? pickTestLifts(payload.exercises, payload?.session)
+      : (Array.isArray(payload?.lifts) ? payload.lifts : []);
+    if (lifts.length === 0) {
+      return sentSets
+        ? json({ success: false, reason: 'no_test_set' })
+        : json({ success: false, reason: 'no_lifts' }, 400);
+    }
 
     /** `{ [baselineKey]: 'keep' | 'update' }` — absent on the first call. */
     const decisions: Record<string, string> = payload?.decisions && typeof payload.decisions === 'object'

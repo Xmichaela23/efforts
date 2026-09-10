@@ -106,6 +106,7 @@ import {
 // how this wrapper starts sending bands the engine 400s on (it sent two of them until 2026-08-06).
 // Same cross-function import precedent as `effort-score` above and `adapt-plan:25`.
 import { APPROACH_CONSTRAINTS } from '../generate-run-plan/types.ts';
+import { scheduleWeekOneTests } from './week-one-tests.ts';
 
 type GoalAction = 'keep' | 'replace';
 type RequestMode = 'create' | 'build_existing' | 'link_existing';
@@ -747,8 +748,20 @@ function inferLimiterSportFromArc(arc: ArcContext): 'swim' | 'bike' | 'run' {
 }
 
 /**
- * Arc-created goals may omit tri training_prefs; never fail "Missing fitness" — fill from ArcContext.
- * Matches persist-side enrichment in ArcSetupChat.
+ * CTL on the combined engine's scale from the last weeks' `athlete_snapshot.workload_total` (load
+ * points per week, divided by 7, held to 15-120), or null when no week carries load.
+ */
+function ctlFromWeeklyLoads(snapshots: Array<{ workload_total?: unknown }> | null | undefined): number | null {
+  const recentLoads = (snapshots || []).map((s) => Number(s.workload_total || 0)).filter((v) => v > 0);
+  if (recentLoads.length === 0) return null;
+  const avgWeeklyLoad = recentLoads.reduce((a, b) => a + b, 0) / recentLoads.length;
+  return Math.round(Math.min(120, Math.max(15, avgWeeklyLoad / 7)));
+}
+
+/**
+ * Goals may omit training_prefs; never fail "Missing fitness" — fill from ArcContext.
+ * ⛔ THE ONLY FILL (2026-09-10, audit H-W08): the phone's own enrichment before insert is gone, so
+ * these are the values a goal gets, and `build_existing` writes them back to the goal row.
  */
 function mergeTrainingPrefsWithArcDefaults(
   trainingPrefs: Record<string, unknown> | null | undefined,
@@ -763,7 +776,8 @@ function mergeTrainingPrefsWithArcDefaults(
   const isRun = sport === 'run';
 
   if (isTri || isRun) {
-    if (!String(tp.fitness ?? '').trim()) tp.fitness = 'intermediate';
+    // ⚠️ NO FITNESS FILL HERE ANY MORE (2026-09-10). A blank level used to become 'intermediate' on
+    // this line; the caller now infers it from the athlete's training (`inferTrainingFitnessLevel`).
     if (!String(tp.goal_type ?? '').trim()) tp.goal_type = 'complete';
   }
 
@@ -1324,9 +1338,8 @@ async function buildCombinedPlan(
     ? recentLoads.reduce((a, b) => a + b, 0) / recentLoads.length
     : 0;
   // Convert load points to approximate CTL (daily TSS equivalent)
-  let currentCTL = avgWeeklyLoad > 0
-    ? Math.round(Math.min(120, Math.max(15, avgWeeklyLoad / 7)))
-    : ({ beginner: 20, intermediate: 40, advanced: 65 }[fitness] ?? 35);
+  let currentCTL = ctlFromWeeklyLoads(snapshots)
+    ?? ({ beginner: 20, intermediate: 40, advanced: 65 }[fitness] ?? 35);
 
   // Normalize distance for the combined plan engine
   function normalizeDistance(sport: string, dist: string | null): string {
@@ -2361,6 +2374,31 @@ Deno.serve(async (req: Request) => {
         resolvedGoal.sport,
         arcForPlanning,
       );
+      /**
+       * ⛔ A TRAINING LEVEL NOBODY PICKED IS INFERRED HERE (2026-09-10, audit H-B17). The race form
+       * used to pre-pick one from the fitness score or weekly miles (cut-offs with no source), and the
+       * setup wizard's enrichment and the merge above filled 'intermediate'. A blank level is now the
+       * server's inference from the athlete's training — CTL from the last six weeks' load, learned
+       * FTP and threshold pace, recent races — and it is stored on the goal with the other prefs.
+       */
+      const sportForFitness = String(resolvedGoal.sport || '').toLowerCase();
+      if (['run', 'triathlon', 'tri'].includes(sportForFitness) && !String(mergedPrefs.fitness ?? '').trim()) {
+        const { data: fitnessSnaps } = await supabase
+          .from('athlete_snapshot')
+          .select('workload_total')
+          .eq('user_id', user_id)
+          .order('week_start', { ascending: false })
+          .limit(6);
+        const inferredFitness = inferTrainingFitnessLevel({
+          wizardFitnessRaw: null,
+          currentCtl: ctlFromWeeklyLoads(fitnessSnaps) ?? Number.NaN,
+          arc: arcForPlanning,
+          trainingIntent: mergedPrefs.training_intent != null ? String(mergedPrefs.training_intent) : undefined,
+          wizardSwimExperienceTier: mergedPrefs.swim_experience != null ? String(mergedPrefs.swim_experience) : undefined,
+        });
+        mergedPrefs.fitness = inferredFitness.level;
+        console.log('[create-goal] training level inferred:', inferredFitness.level, inferredFitness.reasons.join(', '));
+      }
       const sportForBackfill = String(resolvedGoal.sport || '').toLowerCase();
       if (sportForBackfill === 'triathlon' || sportForBackfill === 'tri') {
         const { notes, optimizer_snapshot } = backfillTriTrainingPrefsDefenseInDepth(mergedPrefs, arcForPlanning);
@@ -3154,6 +3192,7 @@ Deno.serve(async (req: Request) => {
             }
             await invokeFunction(functionsBaseUrl, serviceKey, 'activate-plan', { plan_id: gsPlanId });
             await retireCompetingActivePlans(supabase, user_id, gsPlanId, { mode, existing_goal_id, replace_plan_id });
+            await scheduleWeekOneTests({ supabase, functionsBaseUrl, serviceKey, userId: user_id, goalId: createdGoalId, planId: gsPlanId });
             await bustTrainingCachesAfterPlanChange('strength_plan');
             return new Response(JSON.stringify({
               success: true, mode, goal_id: createdGoalId, plan_id: gsPlanId, sport: 'strength', combined: false,
@@ -3262,6 +3301,7 @@ Deno.serve(async (req: Request) => {
         if (runLinkErr) throw new AppError('plan_link_failed', runLinkErr.message);
         await invokeFunction(functionsBaseUrl, serviceKey, 'activate-plan', { plan_id: runPlanId });
         await retireCompetingActivePlans(supabase, user_id, runPlanId, { mode, existing_goal_id, replace_plan_id });
+        await scheduleWeekOneTests({ supabase, functionsBaseUrl, serviceKey, userId: user_id, goalId: createdGoalId, planId: runPlanId });
         await bustTrainingCachesAfterPlanChange('run_plan');
         return new Response(JSON.stringify({
           success: true, mode, goal_id: createdGoalId, plan_id: runPlanId, sport: 'run', combined: false,
@@ -3282,6 +3322,7 @@ Deno.serve(async (req: Request) => {
           }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
         createdPlanId = combinedResult.plan_id;
+        await scheduleWeekOneTests({ supabase, functionsBaseUrl, serviceKey, userId: user_id, goalId: createdGoalId, planId: combinedResult.plan_id });
         await bustTrainingCachesAfterPlanChange('combined_plan');
         return new Response(JSON.stringify({
           success: true, mode, goal_id: createdGoalId, plan_id: combinedResult.plan_id,
@@ -3401,6 +3442,7 @@ Deno.serve(async (req: Request) => {
             );
           }
           createdPlanId = combinedResult.plan_id;
+          await scheduleWeekOneTests({ supabase, functionsBaseUrl, serviceKey, userId: user_id, goalId: createdGoalId, planId: combinedResult.plan_id });
           await bustTrainingCachesAfterPlanChange('combined_plan');
           return new Response(
             JSON.stringify({
@@ -3612,6 +3654,7 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      await scheduleWeekOneTests({ supabase, functionsBaseUrl, serviceKey, userId: user_id, goalId: createdGoalId, planId: triPlanId });
       await bustTrainingCachesAfterPlanChange('triathlon_plan');
 
       return new Response(
@@ -4020,6 +4063,7 @@ Deno.serve(async (req: Request) => {
           );
         }
         createdPlanId = combinedResult.plan_id;
+        await scheduleWeekOneTests({ supabase, functionsBaseUrl, serviceKey, userId: user_id, goalId: createdGoalId, planId: combinedResult.plan_id });
         await bustTrainingCachesAfterPlanChange('combined_plan');
         return new Response(
           JSON.stringify({
@@ -4321,6 +4365,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    await scheduleWeekOneTests({ supabase, functionsBaseUrl, serviceKey, userId: user_id, goalId: createdGoalId, planId: generatedPlanId });
     await bustTrainingCachesAfterPlanChange('run_plan');
 
     return new Response(

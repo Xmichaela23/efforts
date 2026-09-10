@@ -347,6 +347,45 @@ export const TEST_READ_ABSTAINS =
   'A lift with no completed test set keeps no working number, and the block leaves its slots on the '
   + '"by feel" contract rather than prescribing off a set nobody proved was taken.';
 
+/** One logged set as the test read-back weighs it. */
+export type TestSetCandidate = { weight: number; reps: number; amrap: boolean; date: string };
+
+/**
+ * A logged set that can be a test set at all, or null. Used by `readTestWeek` below and by
+ * `save-baseline-test`, which picks the saved max from a session's sets by this same rule (2026-09-10).
+ *
+ * ⚠️ COMPLETED ONLY. An untouched set carries whatever the prefill left in it, and reading that as a
+ * measurement prescribes a block off a number nobody lifted.
+ * ⚠️ A SET THE ROW ITSELF CALLS A WARM-UP IS NOT THE TEST — the composer's ramp flags its warm-up
+ * steps; a flagged warm-up heavier than the top set is a logging slip, not a max.
+ */
+export function testSetFromLogged(
+  set: Record<string, unknown> | null | undefined,
+  date: string,
+): TestSetCandidate | null {
+  if (set?.completed !== true) return null;
+  if (set?.warmup === true) return null;
+  const weight = Number(set?.weight);
+  const reps = Number(set?.reps);
+  if (!Number.isFinite(weight) || weight <= 0) return null;
+  if (!Number.isInteger(reps) || reps < 1) return null;
+  return { weight, reps, amrap: set?.amrap === true, date };
+}
+
+/**
+ * Does `next` replace `prior` as the test set?
+ *
+ * ⛔ THE LATEST TEST WINS (2026-09-05): a retest dated after the session on record replaces it
+ * outright — an athlete who retested meant the new answer, heavier or not. Within one date,
+ * ⚠️ HEAVIEST COMPLETED SET WINS; at equal weight the flagged set, then the later set.
+ */
+export function testSetReplaces(prior: TestSetCandidate | undefined, next: TestSetCandidate): boolean {
+  if (!prior) return true;
+  if (next.date > prior.date) return true;
+  if (next.date < prior.date) return false;
+  return next.weight > prior.weight || (next.weight === prior.weight && (next.amrap || !prior.amrap));
+}
+
 /**
  * Pull the working numbers out of week one's logged sessions.
  *
@@ -383,7 +422,7 @@ export function readTestWeek(
   };
   for (const lift of TESTED_LIFTS) wanted.set(nameFor(lift).toLowerCase(), lift);
 
-  const best = new Map<TestedLift, { weight: number; reps: number; amrap: boolean; date: string }>();
+  const best = new Map<TestedLift, TestSetCandidate>();
   for (const row of rows ?? []) {
     // ⛔ PROVABLY WEEK ONE, OR A ROW TAGGED AS A TEST — or it is not the test.
     if (Number(row?.week_number) !== TEST_WEEK_INDEX && row?.is_test !== true) continue;
@@ -394,26 +433,9 @@ export function readTestWeek(
       if (!lift) continue;
       const sets = Array.isArray(ex?.sets) ? ex.sets : [];
       for (const set of sets as Record<string, unknown>[]) {
-        // ⚠️ COMPLETED ONLY. An untouched set carries whatever the prefill left in it, and reading
-        // that as a measurement prescribes a block off a number nobody lifted.
-        if (set?.completed !== true) continue;
-        // ⚠️ A SET THE ROW ITSELF CALLS A WARM-UP IS NOT THE TEST — the composer's ramp flags its
-        // warm-up steps; a flagged warm-up heavier than the top set is a logging slip, not a max.
-        if (set?.warmup === true) continue;
-        const weight = Number(set?.weight);
-        const reps = Number(set?.reps);
-        if (!Number.isFinite(weight) || weight <= 0) continue;
-        if (!Number.isInteger(reps) || reps < 1) continue;
-        const amrap = set?.amrap === true;
-        const prior = best.get(lift);
-        // ⛔ THE LATEST TEST WINS (2026-09-05): a retest dated after the session on record replaces it
-        // outright — an athlete who retested meant the new answer, heavier or not. Within one date,
-        // ⚠️ HEAVIEST COMPLETED SET WINS; at equal weight the flagged set, then the later set.
-        const newer = !!prior && rowDate > prior.date;
-        const older = !!prior && rowDate < prior.date;
-        if (!prior || newer || (!older && (weight > prior.weight || (weight === prior.weight && (amrap || !prior.amrap))))) {
-          best.set(lift, { weight, reps, amrap, date: rowDate });
-        }
+        const candidate = testSetFromLogged(set, rowDate);
+        if (!candidate) continue;
+        if (testSetReplaces(best.get(lift), candidate)) best.set(lift, candidate);
       }
     }
   }

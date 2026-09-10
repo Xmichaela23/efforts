@@ -4,8 +4,6 @@ import { Activity, AlertTriangle, Bike, Waves, Check, Dumbbell, Info, Footprints
 import { GalaxyButton } from '@/components/ui/galaxy-button';
 import { StepLayout } from '@/components/wizard/StepLayout';
 import { KnowYourNumbersStep, type NumbersChoice } from '@/components/wizard/KnowYourNumbersStep';
-import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
-import { runThresholdTestRow, ftpTestRow, RETEST_OFFSET_DAYS, addDaysISO } from '@/lib/baseline-tests';
 // ⛔ THE ENDURANCE WEEK — one screen replacing `volume` + `hardday` on the strength path (2026-08-24).
 import EnduranceWeekCard from './EnduranceWeekCard';
 /**
@@ -1495,15 +1493,10 @@ function assemblePayload(
           // sub-20-week plan never reaches the table's taper tail. Miles, canonicalised.
           ...(isRace && typeof canonLongRunMi === 'number' && canonLongRunMi > 0
             ? { recent_long_run_miles: Math.round(canonLongRunMi) } : {}),
-          // ⛔ DERIVED, NOT ASKED (2026-08-04). The hours tier came out of the flow — it was a
-          // third estimate of a quantity the athlete had already given twice, and the one they are
-          // worst at guessing. Downstream still wants a number (`scaledWeeklyTSS`), so it is
-          // computed from the miles at the easy pace this athlete actually has, plus a fifth for
-          // warmups, strides and the fact that not every mile is easy.
-          ...(isRace && typeof targetWeeklyMiles === 'number' && targetWeeklyMiles > 0
-            ? { weekly_hours_available: Math.max(3, Math.round(
-                (targetWeeklyMiles * (easyPaceMinPerMile ?? 10) * 1.2) / 60)) }
-            : {}),
+          // ⛔ NO WEEKLY HOURS ARE SENT (2026-09-10, audit H-W09). The race path computed them here from
+          // miles x easy pace (10:00/mi when none) x 1.2, and the block below then overwrote that with
+          // the "light" tier's 6 — a number the athlete never gave, stored on the goal and printed in
+          // the plan export. The race flow asks miles and days, not hours.
           // ⛔ WHAT THE ATHLETE IS ACTUALLY CHASING, PERSISTED (Q-230 Part B).
           //
           // The goal id was the FIRST thing this screen knew and the only thing it never saved.
@@ -1546,7 +1539,6 @@ function assemblePayload(
             // Blank stays legal — an athlete who pinned nothing keeps the seeded count and the engine
             // picks the days, which is what every block before today did.
             days_per_week: isRace && state.trainingDays.length >= 4 ? state.trainingDays.length : state.daysPerWeek,
-            weekly_hours_available: hoursForTier(state.commitment),
           }),
           // ⛔ 'out' MEANS ZERO, AND IT DID NOT (2026-08-06). Michael, on a preview built after
           // picking None: *"its also prescribing strength when user says none."* This read
@@ -1773,7 +1765,7 @@ function assemblePayload(
           ...(isStrengthFocusPath && state.focus === 'standard' ? { focus: 'standard' } : {}),
           // "Know your numbers?" — Use current on strength = no test week; the block prices off the numbers on
           // file (`generate-strength-plan` reads `skip_test_week`; create-goal forwards it). Retest = the default
-          // test week. The endurance answers travel as data and are acted on client-side after the build.
+          // test week. The endurance answers travel as data; create-goal inserts the week-one tests with the plan.
           ...(isStrengthFocusPath && state.numbersChoice?.strength === 'use' ? { skip_test_week: true } : {}),
           ...(state.numbersChoice && Object.keys(state.numbersChoice).length > 0 ? { baseline_numbers: state.numbersChoice } : {}),
           ...(unavailableDays?.length ? { unavailable_days: [...unavailableDays] } : {}),
@@ -3657,7 +3649,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * workouts already in context, so the line and the built tier cannot disagree.
    */
   const { workouts: ctxWorkouts } = useAppContext();
-  const { addPlannedWorkout } = usePlannedWorkouts() as { addPlannedWorkout: (row: Record<string, unknown>) => Promise<unknown> };
   const numbersInclude = {
     strength: state.posture?.strength != null && state.posture?.strength !== 'out',
     run: state.posture?.run != null && state.posture?.run !== 'out',
@@ -3665,18 +3656,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     swim: state.posture?.swim != null && state.posture?.swim !== 'out',
   };
   /**
-   * Retest on an endurance number = the book's test session in week one, the same planned row Training
-   * Baselines schedules. Runs after the plan exists (`onBuilt`). Placement is OURS (see RETEST_OFFSET_DAYS).
+   * ⛔ THE WEEK-ONE TESTS ARE BUILT BY THE SERVER (2026-09-10, audit H-W03). Retest on an endurance
+   * number used to insert the test sessions from here after the plan came back, every one labelled
+   * week 1 whatever its date. The answer travels on the goal (`baseline_numbers`) and
+   * `create-goal-and-materialize-plan` inserts them with the plan, labelled with the week they fall in.
    */
-  const scheduleRetests = async (planId: string | null) => {
-    const c = state.numbersChoice ?? {};
-    const start = state.startDate || planWeekStartISO();
-    const rows: Array<Record<string, unknown>> = [];
-    const inPlan = planId ? { training_plan_id: planId, week_number: 1 } : {};
-    if (numbersInclude.run && c.run === 'test') rows.push({ ...runThresholdTestRow(addDaysISO(start, RETEST_OFFSET_DAYS.run)), ...inPlan });
-    if (numbersInclude.bike && c.ftp === 'test') rows.push({ ...ftpTestRow(addDaysISO(start, RETEST_OFFSET_DAYS.ftp)), ...inPlan });
-    for (const r of rows) await addPlannedWorkout(r);
-  };
   /**
    * ⛔⛔ THE HISTORY READ, WITH ITS AS-OF DATE (2026-08-26 evening). It was called with the workouts
    * alone; the second argument is the date to measure back from, and without it every read returned
@@ -4117,7 +4101,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     // and the block renders under CURRENT on that same screen — an acknowledgement in between
     // answers a question nobody asked, and on a short phone it pushed the plan itself down into the
     // region that collapses. The Arc season wizard keeps its banner; see the note on `complete()`.
-    void complete(payloadNow(), { announcePlanReady: false, onBuilt: scheduleRetests });
+    void complete(payloadNow(), { announcePlanReady: false });
   };
 
   /**

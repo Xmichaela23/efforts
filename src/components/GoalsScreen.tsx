@@ -598,24 +598,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
     if (!showEventForm) return;
     const sources: { fitness?: string; goal?: string; strength?: string } = {};
 
-    // === Fitness level ===
-    if (!eventFitness) {
-      const vdot = currentBaselines?.effort_score;
-      const weeklyMi = currentBaselines?.current_volume?.run
-        ? parseFloat(currentBaselines.current_volume.run) || 0
-        : 0;
-
-      if (vdot && vdot > 0) {
-        setEventFitness(vdot >= 45 ? 'advanced' : vdot >= 33 ? 'intermediate' : 'beginner');
-        sources.fitness = `From your fitness score (${Math.round(vdot)} vDOT)`;
-      } else if (weeklyMi > 0) {
-        setEventFitness(weeklyMi >= 30 ? 'advanced' : weeklyMi >= 12 ? 'intermediate' : 'beginner');
-        sources.fitness = `Avg ${Math.round(weeklyMi)} mi/week`;
-      } else if (currentSnapshot) {
-        setEventFitness('intermediate');
-        sources.fitness = 'Estimated from your activity';
-      }
-    }
+    // ⛔ NO TRAINING LEVEL IS PRE-PICKED (2026-09-10, audit H-B17). This chose one from the fitness
+    // score (45 / 33) or weekly miles (30 / 12), cut-offs with no source, and a level sent from here
+    // replaces the server's own inference. Left unpicked, the server infers it from the athlete's
+    // training (`inferTrainingFitnessLevel`) and stores it on the goal.
 
     // === Training goal (complete vs speed) ===
     if (!eventTrainingGoal) {
@@ -1215,7 +1201,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   const [existingGoalPrompt, setExistingGoalPrompt] = useState<{ existing: Goal; action?: 'keep' | 'replace' | 'combine' } | null>(null);
 
   async function handleSaveEvent(directAction?: 'keep' | 'replace' | 'combine') {
-    if (!eventName.trim() || !eventDate || !eventFitness || !eventTrainingGoal) return;
+    if (!eventName.trim() || !eventDate || !eventTrainingGoal) return;
     setGoalFlowError(null);
 
     const sameSportGoal = activeGoals.find(
@@ -1245,9 +1231,10 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       // spread (which evaluates to `false` when condition is falsy and can leak
       // non-serializable references in some bundler/engine combos on iOS).
       const trainingPrefs: Record<string, string | number> = {
-        fitness: String(eventFitness),
         goal_type: String(eventTrainingGoal),
       };
+      // Only a level the athlete tapped; unpicked, the server infers it.
+      if (eventFitness) trainingPrefs.fitness = String(eventFitness);
       if (eventStrength !== 'none') {
         trainingPrefs.strength_protocol = String(eventStrength);
         trainingPrefs.strength_frequency = Number(eventStrengthFreq);
@@ -2497,7 +2484,6 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                       <div>
                         <span className="text-sm font-medium text-white/90">{fitnessLabels[eventFitness]?.[0]}</span>
                         <span className="block text-xs text-white/40 mt-0.5">{fitnessLabels[eventFitness]?.[1]}</span>
-                        {prefillSource.fitness && <span className="block text-xs text-white/25 mt-1">↑ {prefillSource.fitness}</span>}
                       </div>
                       <button onClick={() => setOverrideFitness(true)} className="text-xs text-white/30 hover:text-white/60 transition-colors shrink-0 ml-3">Change</button>
                     </div>
@@ -2692,7 +2678,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
               <p className="text-xs text-white/40">This can take a few moments. You can leave this screen — your plan will be ready when you come back.</p>
             </div>
           ) : (
-            <button onClick={handleSaveEvent} disabled={!eventName.trim() || !eventDate || !eventFitness || !eventTrainingGoal || (requiresDistance && !eventDistance)} className="w-full mt-4 rounded-xl bg-white/[0.15] py-3 text-base font-medium text-white/90 hover:bg-white/[0.20] disabled:opacity-40 disabled:cursor-not-allowed transition-all">Save & Build Plan</button>
+            <button onClick={handleSaveEvent} disabled={!eventName.trim() || !eventDate || !eventTrainingGoal || (requiresDistance && !eventDistance)} className="w-full mt-4 rounded-xl bg-white/[0.15] py-3 text-base font-medium text-white/90 hover:bg-white/[0.20] disabled:opacity-40 disabled:cursor-not-allowed transition-all">Save & Build Plan</button>
           )}
           {!saving && requiresDistance && !eventDistance && (
             <p className="mt-2 text-xs text-white/35">Select a race distance to continue.</p>

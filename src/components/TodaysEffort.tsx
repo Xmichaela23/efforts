@@ -63,7 +63,6 @@ import type { CardEmphasis } from './CardDeck';
 // ⛔ §3b — the weather block above the date, and the week's load bars + counts under the day.
 import TodayWeather from './TodayWeather';
 // ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
-import { plannedDurationMinutes } from '@/lib/planned-session/duration';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import WorkoutExecutionView from './WorkoutExecutionView';
 import PlannedWorkoutSummary from './PlannedWorkoutSummary';
@@ -585,108 +584,27 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     }
   };
   
-  // Mark workout as complete - creates workout record like imported/hooked workouts
+  /**
+   * ⛔ THE PHONE SENDS THE TAP (2026-09-10, audit H-T09). `mark-planned-complete` marks the planned row
+   * done and, for a run, walk or ride, creates the finished row with the planned session's own length.
+   * This used to insert that row here, with a length from the phone's duration reader or 30 minutes
+   * when it found none.
+   */
   const handleMarkComplete = async (workout: any) => {
     try {
       setMarkingComplete(true);
-      const userId = getStoredUserId();
-      if (!userId) {
-        toast({ title: 'Error', description: 'Please log in to mark workout as complete', variant: 'destructive' });
+      const { data, error } = await supabase.functions.invoke('mark-planned-complete', {
+        body: { planned_id: workout.id },
+      });
+      if (error || !data?.success) {
+        const detail = (data as { error?: string } | null)?.error || error?.message || 'Unknown error';
+        toast({ title: 'Error', description: `Failed to mark as complete: ${detail}`, variant: 'destructive' });
         return;
       }
-      
-      const workoutType = (workout.type || workout.workout_type || '').toLowerCase();
-      const isRun = ['run', 'running', 'walk'].includes(workoutType);
-      const isRide = ['ride', 'bike', 'cycling'].includes(workoutType);
-      
-      // Only create workout record for run/ride (these trigger RPE popup)
-      if (isRun || isRide) {
-        /**
-         * ⛔ ONE PLANNED-DURATION READER (stage 2) — and this one WRITES, so it mattered most.
-         *
-         * It read `computed.total_duration_seconds` only, and the ternary's precedence made it worse:
-         * a row with `duration` set but no computed total took the true branch, computed
-         * `Math.round(0 / 60)` → `0`, and only then fell through `|| workout.duration || 30`. A row
-         * storing its total at the ROOT — priority 1 for every other reader — got 30 minutes written
-         * into the `workouts` row it creates.
-         *
-         * ⚠️ The 30-minute default is KEPT for the genuinely-unknown case: this row is being created
-         * to trigger the RPE prompt, and it needs some duration to exist.
-         */
-        const durationMinutes = plannedDurationMinutes(workout)
-          ?? (Number.isFinite(Number(workout.duration)) && Number(workout.duration) > 0 ? Number(workout.duration) : 30);
-        
-        // Create workout record in workouts table (like imported/hooked workouts)
-        const workoutData: any = {
-          user_id: userId,
-          type: workoutType,
-          date: workout.date || activeDate,
-          workout_status: 'completed',
-          name: workout.name || workout.rendered_description || workout.description || `${workoutType} workout`,
-          
-          // Basic metrics (minimal since no actual workout data)
-          duration: durationMinutes,
-          moving_time: durationMinutes,
-          elapsed_time: durationMinutes,
-          
-          // Link to planned workout
-          planned_id: workout.id,
-          
-          // Provider info
-          provider: 'manual',
-          completedmanually: true,
-          
-          // Analysis status
-          analysis_status: 'pending',
-        };
-        
-        // Insert workout record
-        const { data: createdWorkout, error: insertError } = await supabase
-          .from('workouts')
-          .insert(workoutData)
-          .select('id')
-          .single();
-        
-        if (insertError) {
-          console.error('Error creating workout:', insertError);
-          toast({ title: 'Error', description: `Failed to create workout: ${insertError.message}`, variant: 'destructive' });
-          return;
-        }
-        
-        // Also update planned_workouts status
-        const { error: updateError } = await supabase
-          .from('planned_workouts')
-          .update({ workout_status: 'completed', skip_reason: null, skip_note: null })
-          .eq('id', workout.id)
-          .eq('user_id', userId);
-        
-        if (updateError) {
-          console.error('Error updating planned workout:', updateError);
-          // Don't fail the whole operation if this fails
-        }
-        
-        toast({ title: 'Workout marked as complete', variant: 'success' });
-        setSelectedPlannedWorkout(null);
-        
-        // Refresh the view - the RPE popup will appear via realtime subscription
-        invalidateWorkoutScreens();
-      } else {
-        // For non-run/ride workouts, just update planned_workouts status
-        const { error } = await supabase
-          .from('planned_workouts')
-          .update({ workout_status: 'completed', skip_reason: null, skip_note: null })
-          .eq('id', workout.id)
-          .eq('user_id', userId);
-        
-        if (error) {
-          toast({ title: 'Error', description: `Failed to mark as complete: ${error.message}`, variant: 'destructive' });
-        } else {
-          toast({ title: 'Workout marked as complete', variant: 'success' });
-          setSelectedPlannedWorkout(null);
-          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-          try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
-        }
-      }
+      toast({ title: 'Workout marked as complete', variant: 'success' });
+      setSelectedPlannedWorkout(null);
+      // Refresh the view - the RPE popup will appear via realtime subscription
+      invalidateWorkoutScreens();
     } catch (err) {
       console.error('Error marking workout as complete:', err);
       toast({ title: 'Error', description: 'Failed to mark workout as complete', variant: 'destructive' });

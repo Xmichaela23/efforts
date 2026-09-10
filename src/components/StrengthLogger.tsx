@@ -75,7 +75,7 @@ import { roleForExercise, isMainBarbellLift } from '@/lib/exercise-role';
 import { equipmentForExercise, isBodyweightLogged, isDurationLogged } from '@/lib/strength-logging-mode';
 // [Step 5] The one gate for "does a band mean help on this movement" — shared with the server pricer.
 import { isBandAssistedMovement } from '@/lib/band-assistance';
-import { canWritePullupCapacity } from '@/lib/pullup-progression';
+import { strengthTestKey } from '@shared/strength-test-key.ts';
 // Rest-timer lengths + the plyo test, extracted so both are testable and the main-lift question is
 // asked of the shared classifier rather than a private regex.
 import { calculateRestTime, isPlyometricMovement as isPlyometric, restBucketForIntent, restCueForBucket, WARMUP_REST_SEC, REST_MINUTES_ARE_OURS } from '@/lib/strength-rest-timer';
@@ -1156,17 +1156,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return null;
   };
 
-  // Helper: identify which baseline this exercise maps to
-  const getBaselineKeyForExercise = (exerciseName: string): 'squat' | 'deadlift' | 'bench' | 'overheadPress1RM' | 'pullupMaxReps' | null => {
-    const name = exerciseName.toLowerCase();
-    if (name.includes('squat') && !name.includes('goblet') && !name.includes('jump')) return 'squat';
-    if (name.includes('deadlift')) return 'deadlift';
-    if (name.includes('bench') && name.includes('press')) return 'bench';
-    if ((name.includes('overhead') || name.includes('ohp')) && name.includes('press')) return 'overheadPress1RM';
-    // Pull-ups: rep-based bodyweight tracked lift — the max-clean-rep COUNT is stored (integer), NOT a %1RM (Q-102).
-    if (name.includes('pull up') || name.includes('pullup') || name.includes('pull up')) return 'pullupMaxReps';
-    return null;
-  };
+  // Helper: which saved max a lift maps to — the server's own map (`_shared/strength-test-key.ts`),
+  // read here only for the stored max a test row names as "on file".
+  const getBaselineKeyForExercise = (exerciseName: string) => strengthTestKey(exerciseName);
 
   // Baselines launcher (Q-097/Q-102): ~88% top-set seed off a stored 1RM (canonical keys, mirrors materialize's
   // read side); undefined → no stored 1RM → createBaselineTestExercise bar-starts into the discovery loop.
@@ -1407,13 +1399,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   //
   // The phone now collects weight and reps and sends them. That is all it knows.
 
-  // State for baseline test results
-  // ⚠️ WEIGHT, REPS AND WHICH LIFT — nothing derived. The estimated max used to live in this state and
-  // be rendered live as you typed; it is now returned by the server after the save, because the value
-  // that gets STORED and the value the athlete READS have to be the same one.
-  const [baselineTestResults, setBaselineTestResults] = useState<{
-    [exerciseId: string]: { weight: number; reps: number; baselineKey: string }
-  }>({});
+  // ⛔ NO CHOSEN TEST SET IS HELD HERE (2026-09-10, audit H-S08). This state kept, per exercise, the set
+  // the logger had decided was the test and the lift it mapped to. The save now sends every set and
+  // `save-baseline-test` picks both; what it saved comes back in `baselineServerResults`.
   /** ⚠️ RENDERED — see the baseline-result block in the JSX. This was written and read by NOTHING for
    *  the first hours of its life, which is the exact fault this day was spent removing. Caught in the
    *  self-audit, not by a test: no test can see that a value is never displayed. */
@@ -1456,14 +1444,26 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
    * So abandoning the dialog cannot leave a half-applied save.
    */
   const postBaselineTest = async (decisions?: Record<string, 'keep' | 'update'>) => {
-    const lifts = Object.values(baselineTestResults).map((r) => ({
-      baselineKey: r.baselineKey,
-      weight: r.weight,
-      reps: r.reps,
+    // ⛔ EVERY SET OF THE SESSION, AS LOGGED (2026-09-10, audit H-S08). The server picks which set is
+    // the test and which saved max it writes, by the test read-back's rule.
+    const sent = exercises.map((ex) => ({
+      name: ex.name,
+      sets: ex.sets.map((s) => ({
+        weight: s.weight,
+        reps: s.reps,
+        completed: s.completed === true,
+        setType: s.setType,
+        amrap: (s as { amrap?: boolean }).amrap === true,
+        repMaxTest: (s as { repMaxTest?: boolean }).repMaxTest === true,
+        rir: s.rir,
+        rir_autofilled: s.rir_autofilled,
+        resistance_level: s.resistance_level,
+      })),
     }));
-    if (lifts.length === 0) return null;
+    if (!sent.some((ex) => ex.sets.some((s) => s.completed))) return null;
+    const session = { name: scheduledWorkout?.name ?? null, tags: scheduledWorkout?.tags ?? null };
     const { data, error } = await supabase.functions.invoke('save-baseline-test', {
-      body: { lifts, ...(decisions ? { decisions } : {}) },
+      body: { exercises: sent, session, ...(decisions ? { decisions } : {}) },
     });
     if (error) throw error;
     if (data && data.success === false) throw new Error(data.reason || 'save_failed');
@@ -1504,7 +1504,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   ) => {
     setBaselineServerResults(computed);
     alert(message);
-    setBaselineTestResults({});
     window.dispatchEvent(new CustomEvent('baseline:saved'));
   };
 
@@ -4164,77 +4163,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         };
         newSets[setIndex] = updatedSet;
         
-        // Check if this is a baseline test working set that was just completed with RIR 2-3
-        // Also check if RIR was just added to an already-completed working set
-        // !rir_autofilled: a baseline 1RM must come from a confirmed effort, not an
-        // auto-saved/ prefilled RIR that merely happens to fall in the 2–3 gate (D-203).
-        // A TAG-based 1rm_test retest accepts a near-max SINGLE too (RIR 0–3): the courtesy max-check is
-        // a heavy single, not a sub-max working set. Named baselines stay 2–3 (sub-max estimate path).
-        const isTagRetest = isBaselineTestWorkout(scheduledWorkout) && !getBaselineTestType(scheduledWorkout);
-        // AMRAP baseline/retest sets are taken to ~RPE 9 (RIR ~1), so accept RIR 0–3 for them (tag-retest OR any
-        // set flagged amrap). Named non-AMRAP baselines keep the 2–3 sub-max gate. (D-224)
-        // Pull-up rep-max test: the clean-rep COUNT is the result — no weight, no e1RM, no RIR gate. 0 is a
-        // valid baseline ("goal: your first pull-up"). Stored via the same {reps,baselineKey} shape (value
-        // = reps) so the ratchet-up / down-write write path treats "more reps = better" like "more weight = better". (Q-102)
-        if ((updatedSet as any).repMaxTest === true && updatedSet.setType === 'working' && updatedSet.completed
-            && typeof updatedSet.reps === 'number' && updatedSet.reps >= 0) {
-          const baselineKey = getBaselineKeyForExercise(exercise.name);
-          // ⛔ A BAND-ASSISTED REP-MAX IS NOT A REP-MAX. Added 2026-08-13 with the pull-up
-          // progression, and it is a BUG FIX: this write had no assist check at all, so a test taken
-          // on a band wrote the assisted count into `performance_numbers.pullupMaxReps` — where it
-          // becomes the athlete's tested capacity, scales their assistance volume, resolves their
-          // bodyweight RIR in materialize-plan, and shows on the State strength row as a number they
-          // cannot actually do. The LOAD path has known about band assist since D-351; the CAPACITY
-          // path never did. Reads the same `resistance_level` the logger already writes.
-          if (baselineKey && canWritePullupCapacity(exercise.name, updatedSet)) {
-            setBaselineTestResults(prev => ({
-              ...prev,
-              [exerciseId]: {
-                weight: 0,
-                reps: updatedSet.reps!,
-                // ⚠️ The rep COUNT is the stored value for this lift — no formula, no 5-lb rounding,
-                // and 0 is legal. The server knows that (`isRepCountLift`); this side just reports reps.
-                baselineKey,
-              },
-            }));
-          }
-        }
-
-        // AMRAP 1RM test (tag-retest OR any amrap-flagged working set): NO RIR gate — the AMRAP protocol is
-        // the near-max signal; compute the e1RM straight from weight×reps on completion. A legacy NON-amrap
-        // working set in a baseline-tagged workout keeps the sub-max RIR 2–3 !autofilled gate. (Q-097)
-        /**
-         * ⛔⛔ ON A TEST ROW, ONLY THE SCORED SET MAY WRITE THE BASELINE (2026-08-31).
-         *
-         * `isTagRetest` is true for the whole session, so this accepted ANY completed working set —
-         * and `setBaselineTestResults` is keyed by exercise, last write wins. Log one more set after
-         * the AMRAP and the number on its way to `user_baselines` became that set's, not the test's.
-         * ⚠️ THE GUARD IS "DOES THIS ROW HAVE A SCORED SET AT ALL". Where one exists the flag is the
-         * marker and nothing else qualifies; where none does — a named baseline's sub-max path, a
-         * lift the athlete added themselves — every branch below is exactly as it was.
-         */
-        const rowHasScoredSet = exercise.sets.some((st) => (st as { amrap?: boolean }).amrap === true);
-        const thisSetIsScored = (updatedSet as { amrap?: boolean }).amrap === true;
-        const isAmrapBaseline = (isTagRetest || thisSetIsScored) && (!rowHasScoredSet || thisSetIsScored);
-        const amrapReady = isAmrapBaseline && updatedSet.setType === 'working' && updatedSet.completed
-          && updatedSet.weight && updatedSet.weight > 0 && updatedSet.reps && updatedSet.reps > 0;
-        const submaxReady = !isAmrapBaseline && updatedSet.setType === 'working' && updatedSet.completed
-          && updatedSet.rir !== undefined && !updatedSet.rir_autofilled
-          && updatedSet.rir >= 2 && updatedSet.rir <= 3
-          && updatedSet.weight && updatedSet.weight > 0 && updatedSet.reps && updatedSet.reps > 0;
-        if (amrapReady || submaxReady) {
-          const baselineKey = getBaselineKeyForExercise(exercise.name);
-          if (baselineKey) {
-            setBaselineTestResults(prev => ({
-              ...prev,
-              [exerciseId]: {
-                weight: updatedSet.weight!,
-                reps: updatedSet.reps!,
-                baselineKey
-              }
-            }));
-          }
-        }
+        // ⛔ WHICH SET IS THE TEST IS NOT DECIDED HERE (2026-09-10, audit H-S08). This block chose, as
+        // each set was ticked, the set that becomes the saved max — the pull-up rep-max count, the
+        // scored set, or a sub-max set at a confirmed RIR 2–3 — and kept the last one per exercise.
+        // "Save as baseline" now sends every set and `save-baseline-test` picks, with the same gates
+        // and the test read-back's rule (heaviest completed set, the scored set on a tie).
         
         // Auto-calculate rest time when reps change (for rep-based exercises)
         if ('reps' in updates && updatedSet.reps !== undefined && updatedSet.duration_seconds === undefined) {
@@ -6365,7 +6298,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         const firstWarmupIndex = exercise.sets.findIndex((s) => s.setType === 'warmup');
                         const exHasWarmupRamp = firstWarmupIndex >= 0;
                         const showAddWarmupButton = exIsBaselineTest && setIndex === workingSetIndex && workingSetIndex > 0;
-                        const result = baselineTestResults[exercise.id];
                         const done = set.completed === true;
                         // AMRAP PR — the top set's estimated 1RM beats the recorded 1RM for this lift.
                         // Only the four main lifts have a recorded number; everything else returns false.
@@ -6982,13 +6914,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 </div>
                               );
                             })()}
-                            {exIsBaselineTest && isWorking && result && (
-                              <div className="mt-2 ml-[30px] mr-1 p-2.5 bg-white/[0.04] border border-white/15 rounded-lg">
-                                <div className="text-[13px] text-white/70">
-                                  Test set recorded: {result.weight > 0 ? `${result.weight} lb × ` : ''}{result.reps} reps
-                                </div>
-                              </div>
-                            )}
 
                             {/* D-134 confirm-on-Done, non-blocking. The set is ALREADY saved with
                                 the suggested RIR and rest is already running; this only lets the
@@ -7046,7 +6971,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 })()}
                 
                 {/* Baseline test save button (after all sets) */}
-                {isBaselineTestWorkout(scheduledWorkout || {}) && Object.keys(baselineTestResults).length > 0 && (
+                {isBaselineTestWorkout(scheduledWorkout || {}) && exercises.some((ex) => ex.sets.some((s) => s.completed === true && s.setType === 'working')) && (
                   <div className="mt-3 ml-8">
                     <GalaxyButton
                       variant="primary"

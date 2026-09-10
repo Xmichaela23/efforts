@@ -1107,39 +1107,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         if (error) throw error;
         const savedWorkout = data?.workout;
         if (!savedWorkout?.id) throw new Error('Save failed');
-        
-        // Auto-attach to planned workout if possible
-        try {
-          const { data, error } = await supabase.functions.invoke('auto-attach-planned', {
-            body: { workout_id: savedWorkout?.id }
-          });
-          
-          if (!error && data?.attached) {
-            // Realtime subscription will automatically refresh via database triggers
-          }
-        } catch (e) {
-          console.warn('[AppLayout] auto-attach after import failed:', e);
-        }
 
-        // Calculate workload for completed workout
-        try {
-          await supabase.functions.invoke('calculate-workload', {
-            body: {
-              workout_id: savedWorkout.id,
-              workout_data: {
-                type: workout.type ?? savedWorkout.type,
-                duration: workout.duration ?? savedWorkout.duration,
-                steps_preset: workout.steps_preset,
-                strength_exercises: workout.strength_exercises,
-                mobility_exercises: workout.mobility_exercises,
-                workout_status: 'completed'
-              }
-            }
-          });
-        } catch (e) {
-          console.warn('[AppLayout] calculate-workload after import failed:', e);
-        }
-        
+        // ⛔ NOTHING ELSE IS ASKED FOR (2026-09-10, audit H-D06). This used to call auto-attach-planned
+        // and then calculate-workload with a `workout_data` object built here — and calculate-workload
+        // uses the caller's data whenever it is sent. `save-imported-workout` already runs
+        // `recompute-workout`, which attaches and computes the workload once, from the saved row.
+
         if (isFeedbackType(workout.type) && savedWorkout.id) {
           setFeedbackWorkout({
             id: savedWorkout.id,

@@ -16,6 +16,7 @@ import { isPerformedStrengthSet } from '../_shared/strength/performed-set.ts';
 import { matchExercises } from '../_shared/strength/match-exercises.ts';
 import { buildSubstitutionNote } from '../_shared/strength/substitution-note.ts';
 import { rirVerdictFromDelta } from '../_shared/strength-profiles.ts';
+import { strengthTestKey } from '../_shared/strength-test-key.ts';
 
 /**
  * =============================================================================
@@ -759,16 +760,8 @@ function detectStrengthTest(workout: any, plannedWorkout: any): boolean {
   return tags.includes('1rm_test');
 }
 
-// Canonical baseline key from an exercise name — mirrors StrengthLogger.getBaselineKeyForExercise.
-function strengthTestKey(name: string): 'squat' | 'deadlift' | 'bench' | 'overheadPress1RM' | 'pullupMaxReps' | null {
-  const n = String(name || '').toLowerCase();
-  if (n.includes('squat') && !n.includes('goblet') && !n.includes('jump')) return 'squat';
-  if (n.includes('deadlift')) return 'deadlift';
-  if (n.includes('bench') && n.includes('press')) return 'bench';
-  if ((n.includes('overhead') || n.includes('ohp')) && n.includes('press')) return 'overheadPress1RM';
-  if (n.includes('pull-up') || n.includes('pullup') || n.includes('pull up')) return 'pullupMaxReps';
-  return null;
-}
+// Canonical baseline key from an exercise name: `strengthTestKey` from `_shared/strength-test-key.ts`,
+// the one map `save-baseline-test` and the logger also read (2026-09-10).
 
 const DEADLIFT_TEST_NOTE = "e1RM formulas read deadlift conservative — a flat number isn't necessarily a flat lift.";
 
