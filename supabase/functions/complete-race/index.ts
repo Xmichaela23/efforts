@@ -21,6 +21,9 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { actualFinishSecondsPreferElapsed } from '../_shared/race-finish-seconds.ts'
 import { executeEndPlan } from '../_shared/end-plan-core.ts'
+// ⛔ The race-day pick is shared with coach's `post_race_unofficial` (2026-09-10, audit H-B10), so the finish
+// State shows after race day is read off the same workout this function saves.
+import { pickRaceDayWorkout, typeMatchesGoalSport } from '../_shared/race-day-workout.ts'
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -31,21 +34,6 @@ const cors = {
 function normDate(s: string | null | undefined): string | null {
   if (!s) return null
   return String(s).slice(0, 10)
-}
-
-/** Which workout types count as the race for this goal's sport. Unknown sport → run, as before. */
-function typeMatchesGoalSport(goalSport: unknown): (t: string) => boolean {
-  const s = String(goalSport || '').toLowerCase()
-  if (s === 'ride' || s.startsWith('bike') || s.includes('cycl')) {
-    return (t) => ['ride', 'bike', 'cycling'].includes((t || '').toLowerCase())
-  }
-  if (s.startsWith('swim')) {
-    return (t) => ['swim', 'swimming'].includes((t || '').toLowerCase())
-  }
-  return (t) => {
-    const x = (t || '').toLowerCase()
-    return x === 'run' || x === 'running' || !x
-  }
 }
 
 Deno.serve(async (req) => {
@@ -158,19 +146,7 @@ Deno.serve(async (req) => {
           if (one && matches(String((one as { type?: string }).type || ''))) pick = one
         }
       }
-      if (!pick) {
-        const same = rows.filter((r) => matches(String((r as { type?: string }).type || '')))
-        if (same.length === 1) {
-          pick = same[0]
-        } else if (same.length > 1) {
-          // Prefer longest by distance in computed
-          const dist = (r: any) => {
-            const m = Number(r?.computed?.overall?.distance_m)
-            return Number.isFinite(m) && m > 0 ? m : 0
-          }
-          pick = same.reduce((a, b) => (dist(a) >= dist(b) ? a : b))
-        }
-      }
+      if (!pick) pick = pickRaceDayWorkout(rows, goal.sport)
       if (!pick) {
         const noun = String(goal.sport || '').toLowerCase().startsWith('swim') ? 'swim'
           : /ride|bike|cycl/.test(String(goal.sport || '').toLowerCase()) ? 'ride' : 'run'

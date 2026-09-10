@@ -343,6 +343,11 @@ export type CoachWeekContextResponseV1 = {
     /** When the result was recorded (ISO) or `target_date` if unknown. */
     completed_at: string;
   } | null;
+  /**
+   * After race day, before a result is saved: the race-day workout `complete-race` would save, its finish,
+   * days since the race and the gap to the model (2026-09-10, audit H-B10). State prints it; null = nothing.
+   */
+  post_race_unofficial?: import('./post-race-unofficial.ts').PostRaceUnofficialV1 | null;
   training_state: {
     // Deterministic, plan-aware topline (frontend should render this verbatim)
     code: 'strain_ok' | 'strained' | 'overstrained' | 'need_more_data';

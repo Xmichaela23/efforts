@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Trophy, Plus, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -10,17 +10,15 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { actualFinishSecondsPreferElapsed, type WorkoutTimeRow } from '@/lib/race-finish-seconds';
-import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
-import { suggestBaselineUpdate, type BaselineSuggestion } from '@shared/state-trend';
+import { acceptMeasuredNumber } from '@/lib/accept-measured';
 
-// Step 1 Part 2 — hybrid suggest-with-confirm. A subtle line under a baseline when the computed
-// learned aggregate diverges (gated: ≥3 samples, ≥medium confidence, fresh, ≥5%). Never
-// auto-applies — the athlete taps Update.
-function SuggestionLine({ sug, display, onConfirm }: { sug: BaselineSuggestion; display: string; onConfirm: () => void }) {
+// "Logged suggests … Update" — a subtle line under a baseline. Never auto-applies — the athlete taps Update.
+// ⛔ THE SERVER BUILDS IT (2026-09-10, audit H-B12): `athletic-record` sends the line with locked lifts
+// respected, and Update saves through `save-baselines`, the endpoint Profile's accepts use.
+function SuggestionLine({ sug, onConfirm }: { sug: RecordSuggestion; onConfirm: () => void }) {
   return (
     <div className="mt-1 flex items-center gap-2 text-[11px] text-amber-300/80">
-      <span>Logged suggests <span className="tabular-nums">{display}</span> ({sug.divergencePct > 0 ? '+' : ''}{sug.divergencePct}%)</span>
+      <span>Logged suggests <span className="tabular-nums">{sug.display}</span> ({sug.pct_display})</span>
       <button
         type="button"
         onClick={onConfirm}
@@ -72,6 +70,20 @@ type AddRacePrefill = {
   elapsedSeconds?: number;
 };
 
+/** `athletic-record`'s payload (`supabase/functions/athletic-record/record.ts`), printed as sent. */
+type RecordSuggestion = { computed: number; display: string; pct_display: string };
+type RecordFinish = { seconds: number; display: string; date: string | null };
+type AthleticRecord = {
+  run_bests: { '10k': RecordFinish | null; half: RecordFinish | null; marathon: RecordFinish | null };
+  five_k_baseline: string | null;
+  ftp_best: { watts: number; date: string } | null;
+  longest_ride: { seconds: number; display: string; date: string | null } | null;
+  swim_pace_100: { value: string | null; suggestion: RecordSuggestion | null };
+  lifts: Array<{ key: string; value: number | null; locked: boolean; suggestion: RecordSuggestion | null }>;
+  baselines_updated_at: string | null;
+  has_content: boolean;
+};
+
 export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () => void }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -80,12 +92,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const [pn, setPn] = useState<Record<string, unknown>>({});
-  const [learned, setLearned] = useState<Record<string, any>>({});
-  const [actedKeys, setActedKeys] = useState<Set<string>>(new Set()); // suggestions confirmed/dismissed this session
-  const [resolvedFtp, setResolvedFtp] = useState<number | null>(null);
-  const [longestRideSec, setLongestRideSec] = useState<number | null>(null);
-  const [longestRideDate, setLongestRideDate] = useState<string | null>(null);
+  const [record, setRecord] = useState<AthleticRecord | null>(null);
 
   const [addOpen, setAddOpen] = useState(false);
   const [addName, setAddName] = useState('');
@@ -102,6 +109,16 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
     | null
   >(null);
 
+  // ⛔ THE PERSONAL-RECORDS CARD COMES FROM THE SERVER (2026-09-10, audit H-B11 / H-B12). This page no longer
+  // picks a marathon, prints the current FTP as the best, scans rides, or builds the suggestion lines.
+  const refreshRecord = useCallback(async () => {
+    const { data, error } = await supabase.functions.invoke('athletic-record', { body: {} });
+    if (error) console.warn('[AthleticRecord] record', error);
+    const rec = (data as { record?: AthleticRecord } | null)?.record ?? null;
+    setRecord(rec);
+    if (rec?.baselines_updated_at) setLastUpdated(rec.baselines_updated_at);
+  }, []);
+
   const load = useCallback(async () => {
     const uid = getStoredUserId();
     if (!uid) {
@@ -110,7 +127,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
     }
     setLoading(true);
     try {
-      const [{ data: goalRows }, { data: bl }, rideResult] = await Promise.all([
+      const [{ data: goalRows }] = await Promise.all([
         supabase
           .from('goals')
           .select('id, name, target_date, distance, sport, current_value, target_time, training_prefs, status, goal_type')
@@ -119,45 +136,17 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
           .eq('status', 'completed')
           .not('current_value', 'is', null)
           .order('target_date', { ascending: false }),
-        supabase.from('user_baselines').select('performance_numbers, learned_fitness, updated_at').eq('user_id', uid).maybeSingle(),
-        supabase
-          .from('workouts')
-          .select('id, date, type, workout_status, moving_time, elapsed_time, duration, computed')
-          .eq('user_id', uid)
-          .eq('workout_status', 'completed')
-          .eq('type', 'ride'),
+        refreshRecord(),
       ]);
 
       const gr = (goalRows || []) as RaceRow[];
       setRaces(gr);
-      if (bl?.updated_at) setLastUpdated(String(bl.updated_at));
-      const perf = (bl?.performance_numbers as Record<string, unknown>) || {};
-      setPn(perf);
-      setLearned((bl?.learned_fitness as Record<string, any>) || {});
-      // FTP via shared precedence helper. Permissive (accepts learned medium+/manual/
-      // learned-low) — display surface benefits from any non-null FTP. Documented
-      // behavior change: prior code preferred manual over learned regardless of
-      // confidence; resolver prefers learned (≥medium) over manual.
-      setResolvedFtp(resolveCurrentFtp(bl as any).value);
-
-      const rides = Array.isArray(rideResult.data) ? rideResult.data : [];
-      let best = 0;
-      let bestDate: string | null = null;
-      for (const w of rides) {
-        const sec = actualFinishSecondsPreferElapsed(w as WorkoutTimeRow);
-        if (sec != null && sec > best) {
-          best = sec;
-          bestDate = (w as { date?: string }).date ? String((w as { date: string }).date).slice(0, 10) : null;
-        }
-      }
-      setLongestRideSec(best > 0 ? best : null);
-      setLongestRideDate(bestDate);
     } catch (e) {
       console.warn('[AthleticRecord] load', e);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshRecord]);
 
   useEffect(() => {
     void load();
@@ -282,28 +271,7 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
     })();
   }, [location.search, location.state, persistRaceResult, load]);
 
-  const hasContent =
-    races.length > 0 ||
-    (typeof pn.ftp === 'number' && pn.ftp > 0) ||
-    resolvedFtp != null ||
-    (typeof (pn.fiveK_pace || pn.fiveK) === 'string' && String(pn.fiveK_pace || pn.fiveK).trim() !== '') ||
-    (typeof pn.swimPace100 === 'string' && (pn.swimPace100 as string).trim() !== '') ||
-    typeof pn.squat === 'number' ||
-    typeof pn.deadlift === 'number' ||
-    typeof pn.bench === 'number' ||
-    typeof pn.overheadPress1RM === 'number' ||
-    longestRideSec != null;
-
-  // Display reflects the resolved FTP (single source of truth via the precedence helper).
-  // Prior code: `pn.ftp ?? resolvedFtp` — manual-then-learned. Now learned (≥medium) wins.
-  const ftpDisplay = resolvedFtp;
-  const fiveKDisplay = String(pn.fiveK_pace || pn.fiveK || '').trim();
-  const marathonPrDisplay = useMemo(() => {
-    const r = races.find(
-      (x) => /marathon|26\.2|42/i.test(String(x.distance || x.name || '')) && x.current_value != null,
-    );
-    return r?.current_value != null ? fmtGoalClock(Math.round(r.current_value)) : '—';
-  }, [races]);
+  const hasContent = races.length > 0 || record?.has_content === true;
 
   const runDisc = (
     <div className="space-y-2">
@@ -311,19 +279,19 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
       <ul className="text-sm text-white/80 space-y-1.5">
         <li className="flex justify-between">
           <span className="text-white/50">5K</span>
-          <span className="tabular-nums">{fiveKDisplay || '—'}</span>
+          <span className="tabular-nums">{record?.five_k_baseline || '—'}</span>
         </li>
         <li className="flex justify-between">
           <span className="text-white/50">10K</span>
-          <span className="tabular-nums">—</span>
+          <span className="tabular-nums">{record?.run_bests['10k']?.display ?? '—'}</span>
         </li>
         <li className="flex justify-between">
           <span className="text-white/50">Half</span>
-          <span className="tabular-nums">—</span>
+          <span className="tabular-nums">{record?.run_bests.half?.display ?? '—'}</span>
         </li>
         <li className="flex justify-between">
           <span className="text-white/50">Marathon</span>
-          <span className="tabular-nums text-emerald-200/90">{marathonPrDisplay}</span>
+          <span className="tabular-nums text-emerald-200/90">{record?.run_bests.marathon?.display ?? '—'}</span>
         </li>
       </ul>
     </div>
@@ -357,43 +325,23 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
     }
   }
 
-  // ── Step 1 Part 2: baseline suggest-with-confirm ──────────────────────────────
-  const sugAsOf = new Date().toISOString().slice(0, 10);
-  const parseMmSs = (s: unknown): number | null => {
-    const m = /^(\d+):(\d{2})$/.exec(String(s ?? '').trim());
-    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
-  };
-  const fmtMmSs = (sec: number): string => {
-    const mm = Math.floor(sec / 60); const ss = Math.round(sec % 60);
-    return `${mm}:${String(ss).padStart(2, '0')}`;
-  };
-  const toAgg = (m: any) => (m && Number(m.value) > 0)
-    ? { value: Number(m.value), confidence: m.confidence, sample_count: Number(m.sample_count), last_logged: m.last_logged ?? null }
-    : null;
-  // strength: lbs vs lbs (learned key = canonical name)
-  const strengthSug = (pnKey: string, learnedKey: string, label: string): BaselineSuggestion | null =>
-    suggestBaselineUpdate({ key: pnKey, label, baseline: Number(pn[pnKey]), learned: toAgg(learned?.strength_1rms?.[learnedKey]), asOf: sugAsOf });
-  // swim: learned s/100m → s/100yd to compare with the typed 100yd pace
-  const swimSug = (): BaselineSuggestion | null => {
-    const baseYd = parseMmSs(pn.swimPace100);
-    const lr = learned?.swim_pace_per_100m;
-    if (baseYd == null || !lr || !(Number(lr.value) > 0)) return null;
-    return suggestBaselineUpdate({
-      key: 'swimPace100', label: 'Swim 100yd', baseline: baseYd,
-      learned: { value: Math.round(Number(lr.value) * 0.9144), confidence: lr.confidence, sample_count: Number(lr.sample_count) },
-      asOf: sugAsOf,
-    });
-  };
-  const confirmSuggestion = async (key: string, writeValue: number | string) => {
-    const uid = getStoredUserId(); if (!uid) return;
-    const nextPn = { ...pn, [key]: writeValue };
-    const { error } = await supabase
-      .from('user_baselines')
-      .update({ performance_numbers: nextPn, updated_at: new Date().toISOString() })
-      .eq('user_id', uid);
-    if (error) { window.alert(error.message || 'Could not update baseline'); return; }
-    setPn(nextPn);
-    setActedKeys((prev) => new Set(prev).add(key));
+  // ── "Logged suggests … Update": the phone sends the number the line showed; save-baselines checks and saves ──
+  const confirmSuggestion = async (kind: 'lift' | 'swim_pace', value: number, lift?: string) => {
+    const res = await acceptMeasuredNumber(supabase, kind, value, lift);
+    if (!res.ok) {
+      console.warn('[AthleticRecord] update baseline failed:', res.error);
+      window.alert('Could not update baseline');
+      return;
+    }
+    // ⛔ A LOCKED 1RM RESTATES THE BLOCK'S WEIGHTS — the same call Profile makes when a lock changes.
+    if (res.locked) {
+      try {
+        await supabase.functions.invoke('rematerialize-standing-block', { body: { apply: true } });
+      } catch (e) {
+        console.warn('[AthleticRecord] restate after lock change failed:', e);
+      }
+    }
+    await refreshRecord();
   };
 
   return (
@@ -550,15 +498,24 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
                 <ul className="text-sm text-white/80 space-y-1.5">
                   <li className="flex justify-between">
                     <span className="text-white/50">FTP (best)</span>
-                    <span className="tabular-nums">{ftpDisplay != null ? `${ftpDisplay}W` : '—'}</span>
+                    <span className="tabular-nums text-right">
+                      {record?.ftp_best ? (
+                        <>
+                          {`${record.ftp_best.watts}W`}
+                          <span className="text-white/40 text-xs ml-1">({record.ftp_best.date})</span>
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </span>
                   </li>
                   <li className="flex justify-between">
                     <span className="text-white/50">Longest ride (elapsed)</span>
                     <span className="tabular-nums text-right">
-                      {longestRideSec != null ? (
+                      {record?.longest_ride ? (
                         <>
-                          {fmtGoalClock(longestRideSec)}
-                          {longestRideDate && <span className="text-white/40 text-xs ml-1">({longestRideDate})</span>}
+                          {record.longest_ride.display}
+                          {record.longest_ride.date && <span className="text-white/40 text-xs ml-1">({record.longest_ride.date})</span>}
                         </>
                       ) : (
                         '—'
@@ -571,33 +528,35 @@ export default function AthleticRecordPage({ onClose: _onClose }: { onClose: () 
                 <p className="text-xs font-semibold text-white/70">Swim</p>
                 <p className="text-sm text-white/80">
                   100yd pace:{' '}
-                  <span className="tabular-nums text-white/90">{(pn.swimPace100 as string) || '—'}</span>
+                  <span className="tabular-nums text-white/90">{record?.swim_pace_100.value || '—'}</span>
                 </p>
-                {(() => {
-                  const sug = !actedKeys.has('swimPace100') ? swimSug() : null;
-                  return sug ? <SuggestionLine sug={sug} display={fmtMmSs(sug.computed)} onConfirm={() => confirmSuggestion('swimPace100', fmtMmSs(sug.computed))} /> : null;
-                })()}
+                {record?.swim_pace_100.suggestion && (
+                  <SuggestionLine
+                    sug={record.swim_pace_100.suggestion}
+                    onConfirm={() => confirmSuggestion('swim_pace', record.swim_pace_100.suggestion!.computed)}
+                  />
+                )}
               </div>
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-white/70">Strength</p>
                 <ul className="text-sm text-white/80 space-y-1.5">
                   {([
-                    ['Deadlift', 'deadlift', 'deadlift'],
-                    ['Squat', 'squat', 'squat'],
-                    ['Bench', 'bench', 'bench_press'],
-                    ['OHP', 'overheadPress1RM', 'overhead_press'],
-                  ] as const).map(([label, pnKey, learnedKey]) => {
-                    const v = pn[pnKey];
-                    const sug = !actedKeys.has(pnKey) ? strengthSug(pnKey, learnedKey, label) : null;
+                    ['Deadlift', 'deadlift'],
+                    ['Squat', 'squat'],
+                    ['Bench', 'bench'],
+                    ['OHP', 'overheadPress1RM'],
+                  ] as const).map(([label, key]) => {
+                    const row = record?.lifts.find((l) => l.key === key) ?? null;
+                    const sug = row?.suggestion ?? null;
                     return (
-                      <li key={pnKey}>
+                      <li key={key}>
                         <div className="flex justify-between">
                           <span className="text-white/50">{label}</span>
                           <span className="tabular-nums">
-                            {typeof v === 'number' && v > 0 ? `${v} lbs` : '—'}
+                            {row?.value != null ? `${row.value} lbs` : '—'}
                           </span>
                         </div>
-                        {sug && <SuggestionLine sug={sug} display={`${sug.computed} lbs`} onConfirm={() => confirmSuggestion(pnKey, sug.computed)} />}
+                        {sug && <SuggestionLine sug={sug} onConfirm={() => confirmSuggestion('lift', sug.computed, key)} />}
                       </li>
                     );
                   })}

@@ -1,5 +1,6 @@
 import React from 'react';
 import type {
+  CoachWeekContextV1,
   RaceReadinessV1,
   RaceFinishProjectionV1,
   FitnessVerdictDivergence,
@@ -74,7 +75,8 @@ function RaceSection({
     goal_target_seconds: number | null;
     modelProjected?: { seconds: number; display: string } | null;
   } | null;
-  postRaceUnofficial: { loggedSeconds: number; workoutId: string; daysAfterRace: number } | null;
+  /** Coach's `post_race_unofficial` — printed as sent (audit H-B10). */
+  postRaceUnofficial: NonNullable<CoachWeekContextV1['post_race_unofficial']> | null;
   /** D-212 Piece 4 — block-adaptation third axis (the N-way room), rendered compact + drivers-gated. */
   blockVerdict: BlockVerdictResult | null;
   /** D-212 Cut 2 — spine↔projection divergence for the displayed goal; null/empty = aligned, render nothing. */
@@ -101,12 +103,6 @@ function RaceSection({
       : statedSec != null
         ? fmtGoalClock(statedSec)
         : projection?.plan_goal_display ?? null;
-
-  const modelProjected = rr
-    && Number.isFinite(rr.predicted_finish_time_seconds) &&
-    rr.predicted_finish_time_seconds > 0
-    ? { seconds: rr.predicted_finish_time_seconds, display: rr.predicted_finish_display }
-    : null;
 
   if (officialResult) {
     return (
@@ -147,13 +143,11 @@ function RaceSection({
   }
 
   if (postRaceUnofficial) {
-    const wk = postRaceUnofficial.daysAfterRace;
-    const postLabel = wk === 1 ? '1 day after race' : wk < 7 ? `${wk} days after race` : 'after your race';
     return (
       <div className="px-3 py-3 space-y-2.5">
         <div className="flex items-center justify-between gap-3">
           <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase shrink-0">RACE</span>
-          <span className="text-[13px] text-white/55 text-right leading-snug">{distLabel} · {postLabel}</span>
+          <span className="text-[13px] text-white/55 text-right leading-snug">{distLabel} · {postRaceUnofficial.days_after_label}</span>
         </div>
         {statedGoalDisplay != null && (
           <div className="flex flex-col gap-0.5">
@@ -166,20 +160,20 @@ function RaceSection({
         <div className="flex flex-col gap-0.5">
           <p className="text-[12px] text-white/65 leading-snug">Your finish (from log)</p>
           <span className="text-[22px] font-semibold tabular-nums text-emerald-300/90 tracking-tight">
-            {fmtGoalClock(postRaceUnofficial.loggedSeconds)}
+            {postRaceUnofficial.logged_display}
           </span>
           <p className="text-[12px] text-white/60 leading-snug max-w-[min(100%,320px)]">
             Elapsed (chip) time if your device reported it; otherwise we fall back to other durations. The large “Projected” block is hidden after race day so this stays primary.
           </p>
         </div>
-        {modelProjected && (
+        {postRaceUnofficial.model_projected_display != null && (
           <div className="space-y-1">
             <p className="text-[12px] text-white/65 leading-snug">Model had projected (pre-race)</p>
             <p className="text-[20px] font-semibold tabular-nums text-white/75">
-              {modelProjected.display}
+              {postRaceUnofficial.model_projected_display}
             </p>
             <p className="text-[13px] text-white/50">
-              {fmtSignedDeltaVsModel(postRaceUnofficial.loggedSeconds, modelProjected.seconds)}
+              {postRaceUnofficial.gap_display}
             </p>
           </div>
         )}

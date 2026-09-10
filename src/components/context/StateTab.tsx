@@ -17,7 +17,6 @@ import { supabase, getStoredUserId, invokeFunctionFormData, invokeFunction } fro
 import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
 import CourseStrategyModal from '@/components/CourseStrategyModal';
 import { pickRaceFinishProjectionV1FromCoachData, pickRaceReadinessFromCoachData } from '@/lib/coach-payload';
-import { actualFinishSecondsPreferElapsed, type WorkoutTimeRow } from '@/lib/race-finish-seconds';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import type { ArcReadiness } from '@/lib/arc-types';
 import { shouldShowNudge } from '@/lib/nudge-policy';
@@ -78,11 +77,6 @@ export default function StateTab({
   const [fetchedOfficialResult, setFetchedOfficialResult] = useState<{
     actual_seconds: number;
     goal_target_seconds: number | null;
-  } | null>(null);
-  const [postRaceUnofficial, setPostRaceUnofficial] = useState<{
-    loggedSeconds: number;
-    workoutId: string;
-    daysAfterRace: number;
   } | null>(null);
   const [longitudinalSignals, setLongitudinalSignals] = useState<unknown>(null);
   // Daily check-in readiness (Q-049). Named distinctly from the local
@@ -233,117 +227,6 @@ export default function StateTab({
     };
   }, [resolvedGoalId]);
 
-  useEffect(() => {
-    const d = data as CoachWeekContextV1 | null;
-    if (!d?.weekly_state_v1) {
-      setPostRaceUnofficial(null);
-      return;
-    }
-    if (fetchedOfficialResult) {
-      setPostRaceUnofficial(null);
-      return;
-    }
-    const wsv0 = d.weekly_state_v1;
-    const asY0 = d.as_of_date?.slice(0, 10) || '';
-    const gc0 = d.goal_context;
-    const planId0 = wsv0.plan?.plan_id ?? null;
-    const gLink =
-      planId0 && gc0?.goals
-        ? gc0.goals.find(g => g.plan_id === planId0 && isRunPrimary(g))
-        : undefined;
-    const planA = (d as CoachWeekContextV1 & { plan?: { active_plans?: Array<{ plan_id?: string; race_date?: string | null }> } }).plan
-      ?.active_plans;
-    const entry0 = planId0 && planA ? planA.find(p => p.plan_id === planId0) : undefined;
-    const raceY0 =
-      gLink?.target_date?.slice(0, 10) ||
-      (entry0?.race_date ? String(entry0.race_date).slice(0, 10) : null);
-    if (!raceY0 || asY0 <= raceY0) {
-      setPostRaceUnofficial(null);
-      return;
-    }
-    const t0 = new Date(raceY0 + 'T12:00:00').getTime();
-    const t1 = new Date(asY0 + 'T12:00:00').getTime();
-    const dayDiff = Math.floor((t1 - t0) / 86400000);
-    if (dayDiff < 1) {
-      setPostRaceUnofficial(null);
-      return;
-    }
-    const lcr = d.last_completed_race;
-    if (lcr) {
-      if (resolvedGoalId && lcr.goal_id === resolvedGoalId) {
-        setPostRaceUnofficial(null);
-        return;
-      }
-      if (gLink?.id && lcr.goal_id === gLink.id) {
-        setPostRaceUnofficial(null);
-        return;
-      }
-      if (gc0?.primary_event?.id && lcr.goal_id === gc0.primary_event.id) {
-        setPostRaceUnofficial(null);
-        return;
-      }
-    }
-    const uid = getStoredUserId();
-    if (!uid) {
-      setPostRaceUnofficial(null);
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      const { data: wrows, error: wErr } = await supabase
-        .from('workouts')
-        .select('id, date, type, workout_status, moving_time, elapsed_time, duration, computed, name')
-        .eq('user_id', uid)
-        .eq('date', raceY0)
-        .eq('workout_status', 'completed');
-      if (cancelled) return;
-      if (wErr) {
-        if (!cancelled) setPostRaceUnofficial(null);
-        return;
-      }
-      const rows = Array.isArray(wrows) ? wrows : [];
-      if (rows.length === 0) {
-        if (!cancelled) setPostRaceUnofficial(null);
-        return;
-      }
-      const runish = (t: string) => {
-        const x = (t || '').toLowerCase();
-        return x === 'run' || x === 'running' || !x;
-      };
-      const runs = rows.filter((r) => runish(String((r as { type?: string }).type || '')));
-      let pick: (typeof rows)[0] | null = null;
-      if (runs.length === 1) pick = runs[0] ?? null;
-      else if (runs.length > 1) {
-        const dist = (r: (typeof rows)[0]) => {
-          const m = Number(
-            (r as { computed?: { overall?: { distance_m?: number } } })?.computed?.overall?.distance_m,
-          );
-          return Number.isFinite(m) && m > 0 ? m : 0;
-        };
-        pick = runs.reduce((a, b) => (dist(a) >= dist(b) ? a : b));
-      }
-      if (!pick) {
-        if (!cancelled) setPostRaceUnofficial(null);
-        return;
-      }
-      const sec = actualFinishSecondsPreferElapsed(pick as WorkoutTimeRow);
-      if (sec == null || !Number.isFinite(sec) || sec <= 0) {
-        if (!cancelled) setPostRaceUnofficial(null);
-        return;
-      }
-      if (!cancelled) {
-        setPostRaceUnofficial({
-          loggedSeconds: sec,
-          workoutId: String((pick as { id: string }).id),
-          daysAfterRace: dayDiff,
-        });
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [data, resolvedGoalId, fetchedOfficialResult]);
-
   if (loading && !data) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -424,6 +307,9 @@ export default function StateTab({
     (activePlanEntry?.race_date ? String(activePlanEntry.race_date).slice(0, 10) : null);
 
   const lastCompletedRace = data.last_completed_race ?? null;
+  // ⛔ THE SERVER'S UNOFFICIAL FINISH (2026-09-10, audit H-B10): coach reads the race-day workout complete-race
+  // would save, with days since the race and the gap to the model. This screen no longer finds a run itself.
+  const postRaceUnofficial = data.post_race_unofficial ?? null;
   const officialFromCoach =
     lastCompletedRace &&
     ((resolvedGoalId && lastCompletedRace.goal_id === resolvedGoalId) ||

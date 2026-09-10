@@ -17,12 +17,16 @@
  *   preview?:     true — with `calibration`, return the derived score and paces without saving.
  *   accept?:      { kind: 'ftp' | 'run_threshold', value } — "use this number": the value the button showed
  *                 (watts, or seconds per km). Saved on its own; see `acceptMeasuredForSave`.
+ *                 { kind: 'lift', lift, value } | { kind: 'swim_pace', value } — My Record's "Logged suggests …
+ *                 Update" (2026-09-10, audit H-B12): the logged lift in pounds, or seconds per 100 yd. Checked
+ *                 against `_shared/baseline-suggestions.ts`, which respects locked lifts.
  *   zones?:       true, alone — READ ONLY: the zone rows Profile and Welcome print (2026-09-10, audit
  *                 H-B04–H-B06). Nothing is saved. See `zones.ts`.
  * }
  * → { success, effort, performance_numbers, configured_hr_zones, zones }
  *   accept → { success, accepted: { kind, value }, learned_fitness, performance_numbers, zones }, or 409 with
  *            `error: 'nothing_to_accept' | 'value_changed'`
+ *            lift / swim_pace → { success, accepted: { kind, lift, value, locked }, performance_numbers, locked_baselines }
  *   zones  → { success, zones: { power, swim_pace, run_easy_hr } }
  */
 import { requireUser, AuthError } from '../_shared/require-user.ts';
@@ -35,6 +39,7 @@ import {
   performanceNumbersForSave,
 } from './derive.ts';
 import { zonesForBaselinesRow } from './zones.ts';
+import { acceptRecordSuggestion } from '../_shared/baseline-suggestions.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -98,8 +103,37 @@ Deno.serve(async (req) => {
     if (accept) {
       const kind = String(accept.kind);
       const value = Number(accept.value);
-      if ((kind !== 'ftp' && kind !== 'run_threshold') || !Number.isFinite(value) || value <= 0) {
-        return json({ error: 'accept needs kind ftp | run_threshold and a positive value' }, 400);
+      if (!['ftp', 'run_threshold', 'lift', 'swim_pace'].includes(kind) || !Number.isFinite(value) || value <= 0) {
+        return json({ error: 'accept needs kind ftp | run_threshold | lift | swim_pace and a positive value' }, 400);
+      }
+      if (kind === 'lift' || kind === 'swim_pace') {
+        const { data: row, error: rowErr } = await supabase
+          .from('user_baselines')
+          .select('learned_fitness, performance_numbers, locked_baselines')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (rowErr) throw rowErr;
+        const rec = acceptRecordSuggestion({
+          kind,
+          lift: accept.lift != null ? String(accept.lift) : null,
+          value,
+          performanceNumbers: parseJson(row?.performance_numbers) as Record<string, unknown> | null,
+          learnedFitness: parseJson(row?.learned_fitness) as Record<string, unknown> | null,
+          lockedBaselines: parseJson(row?.locked_baselines) as Record<string, unknown> | null,
+          asOf: nowIso.slice(0, 10),
+        });
+        if (!rec.ok) return json({ error: rec.reason }, rec.reason === 'unknown_lift' ? 400 : 409);
+        const { error: recErr } = await supabase
+          .from('user_baselines')
+          .update({ performance_numbers: rec.performance_numbers, locked_baselines: rec.locked_baselines, updated_at: nowIso })
+          .eq('user_id', userId);
+        if (recErr) throw recErr;
+        return json({
+          success: true,
+          accepted: { kind, lift: kind === 'lift' ? String(accept.lift) : null, value: rec.accepted_value, locked: rec.locked },
+          performance_numbers: rec.performance_numbers,
+          locked_baselines: rec.locked_baselines,
+        });
       }
       const { data: cur, error: curErr } = await supabase
         .from('user_baselines')

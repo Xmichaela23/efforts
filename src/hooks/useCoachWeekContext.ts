@@ -382,6 +382,18 @@ export type CoachWeekContextV1 = {
     actual_seconds: number;
     completed_at: string;
   } | null;
+  /** After race day, before a result is saved: the finish from the race-day workout. State prints it. */
+  post_race_unofficial?: {
+    goal_id: string | null;
+    race_date: string;
+    workout_id: string;
+    logged_seconds: number;
+    logged_display: string;
+    days_after_race: number;
+    days_after_label: string;
+    model_projected_display: string | null;
+    gap_display: string | null;
+  } | null;
   interference: {
     aerobic: string;
     structural: string;
