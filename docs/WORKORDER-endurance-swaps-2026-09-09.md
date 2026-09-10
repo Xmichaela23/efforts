@@ -75,6 +75,15 @@ treadmill) change nothing but the `venue:` tag, as built.
 Confirmation lines APPROVED as written (Michael, 2026-09-09): `Moved to the trainer` / `Moved to the
 treadmill` / `Swapped to a hike` / suffix `— this and N later`.
 
+## 8. Device findings and copy, 2026-09-09 evening (APPROVED)
+
+- Ride instead line becomes: `The plan's hard ride. For when running is at your limit but you want to
+  push.` (p138). Replaces `Allowed when running is at your limit.`
+- A swapped session offers its original as the FIRST option on the Instead sheet: the option name is the
+  original session's own name (e.g. `Near-threshold Run`), line under it `Back to the plan.` Restores the
+  original row, tags and structure. A machine swap offers `Outdoors`, same line `Back to the plan.`
+- The drawer's `No description available` placeholder renders nothing.
+
 ## Copy (Michael's words, pending)
 
 Facts per line, one line per swap on the sheet:
