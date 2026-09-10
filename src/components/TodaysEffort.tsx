@@ -1647,6 +1647,47 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     );
   }, [coachWeek.data]);
 
+  /**
+   * The week's own totals, off the rows already loaded. ⚠️ THE SAME SOURCE THE WEEK TAB'S BAR IS
+   * COUNTED FROM — `weeklyStats.distances` for the endurance mileage (what `get-week` returned) and
+   * the week's logged sets for the weight moved. Nothing is fetched and nothing is derived twice.
+   *
+   * ⚠️ POUNDS, NOT SESSIONS. The Week bar counts lifts as sessions because a bar's job is
+   * planned-versus-done; this line is "what did the week come to", and for lifting that is the
+   * weight that moved.
+   */
+  const weekTotalsLine = useMemo(() => {
+    const d = (weeklyStats as { distances?: { run_meters?: number; cycling_meters?: number } } | null)?.distances;
+    const toDist = (m: number) => (useImperial ? m / 1609.34 : m / 1000);
+    const unit = useImperial ? 'mi' : 'km';
+    const parts: string[] = [];
+    // ⛔ THE SPORT LEADS, THEN ITS NUMBER (approved 2026-09-09). "11.2 mi run" puts the unit before
+    // the noun and reads backwards aloud; "run 11.2 mi" is what a person says.
+    if ((d?.run_meters ?? 0) > 0) parts.push(`run ${toDist(d!.run_meters!).toFixed(1)} ${unit}`);
+    if ((d?.cycling_meters ?? 0) > 0) parts.push(`ride ${toDist(d!.cycling_meters!).toFixed(1)} ${unit}`);
+
+    let volume = 0;
+    for (const item of (Array.isArray(allUnifiedItems) ? allUnifiedItems : []) as Array<Record<string, unknown>>) {
+      if (String(item?.type ?? '').toLowerCase() !== 'strength') continue;
+      const exercises = (item?.executed as { strength_exercises?: Array<{ sets?: Array<Record<string, unknown>> }> } | null)?.strength_exercises;
+      for (const ex of exercises ?? []) {
+        for (const set of ex?.sets ?? []) {
+          if (set?.completed === false) continue;
+          const reps = Number(set?.reps) || 0;
+          const weight = Number(set?.weight) || 0;
+          if (reps > 0 && weight > 0) volume += reps * weight;
+        }
+      }
+    }
+    if (volume > 0) {
+      const shown = useImperial ? volume : volume * 0.453592;
+      parts.push(`${Math.round(shown).toLocaleString()} ${useImperial ? 'lb' : 'kg'}`);
+    }
+
+    // ⚠️ NOTHING LOGGED IS NO LINE AT ALL, rather than a lone separator with an empty tail.
+    return parts.length > 0 ? parts.join(' · ') : null;
+  }, [weeklyStats, allUnifiedItems, useImperial]);
+
   const leadSessionId = useMemo(() => {
     const rows = Array.isArray(displayWorkouts) ? displayWorkouts : [];
     const firstPlanned = rows.find((w) => String(w?.workout_status ?? '').toLowerCase() !== 'completed');
@@ -2001,6 +2042,28 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 )}
               </div>
             ) : null}
+
+            {/**
+              * ⛔ WHAT THE WEEK HAS COME TO, IN ONE LINE (Michael, 2026-09-09). LOAD's Run / Bike /
+              * Lifted row came off Today with the card (§3g), and the week's mileage went with it —
+              * but "how much have I done this week" is a question an athlete asks on the screen they
+              * open, not one they navigate to. It is the same reading the Week tab's own bar is
+              * counted from: the week's rows, as `get-week` returned them.
+              *
+              * ⛔ NUMBERS ONLY, AND A SPORT WITH NOTHING IS ABSENT — a `0.0 mi ride` on a runner's
+              * week is a column of zeroes teaching the athlete to stop reading the line.
+              * ⚠️ IT SITS UNDER THE SUNRISE ROW, so the weather block still ends where it did and
+              * the Garmin derived-data line stays last.
+              */}
+            {weekTotalsLine ? (
+              <div
+                className="text-[0.7rem] font-light tabular-nums truncate"
+                style={{ color: 'rgba(255,255,255,0.55)', marginTop: 8 }}
+              >
+                {weekTotalsLine}
+              </div>
+            ) : null}
+
             {/* Garmin API Brand Guidelines v6.30.2025 — derived-data attribution, verbatim, as the
                 header block's footer. Not in a tooltip, not behind the form line's tap. */}
             {formLine && garminDerived ? <GarminDerivedDataLine style={{ marginTop: 6 }} /> : null}

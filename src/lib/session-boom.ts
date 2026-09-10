@@ -34,6 +34,7 @@ import { POWER_CURVE_DURATIONS } from './bike-ftp-estimator';
  *  fixture (`session-boom.test.ts`) that must run outside Vite. */
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { meSetsFromHistory } from '@shared/standing-plan/progression';
+import { isEasyPrescribedRun } from '@shared/easy-hr';
 import type { MeSessionOutcome } from '@shared/standing-plan/progression';
 /** ⚠️ THE BAND LIVES WITH THE COMPOSER, not the ladder — `compose.ts` owns "how many sets is an ME
  *  slot", and the ladder is handed it. Importing it from anywhere else would be a second answer. */
@@ -84,11 +85,21 @@ export type BoomInput = {
   blockStartISO?: string | null;
   /** `me_history_v1.history` off the coach payload — the ladder's own walk. */
   meHistory?: Partial<Record<string, MeHistoryEntry[]>> | null;
-  /** `me_history_v1.at_weight`. Read WITH the history or not at all (it is one reading). */
+  /**
+   * `me_history_v1.at_weight`. ⚠️ NO LINE READS IT SINCE THE REVISION — the earned-set line named
+   * the weight ("two clean sessions at 145 lb") and now names only the lift. Kept on the input
+   * rather than deleted because it arrives with `history` as one reading and the caller already
+   * passes both; dropping half of a paired field is how the pair comes back unpaired.
+   */
   meAtWeight?: Partial<Record<string, number>> | null;
   /** `exercise_log` rows for this session. */
   logToday?: BoomExerciseLogRow[] | null;
-  /** `exercise_log` rows for earlier sessions in the window, any lift. */
+  /**
+   * `exercise_log` rows for earlier sessions in the window, any lift.
+   * ⚠️ UNREAD SINCE THE REVISION — the two lines it fed ("most work sets this block", "N sessions
+   * without a miss") were cut. The hook still fetches one query for both today's rows and these; a
+   * caller that stops passing them costs nothing.
+   */
   logPrior?: BoomExerciseLogRow[] | null;
   useImperial?: boolean;
 };
@@ -139,12 +150,59 @@ function driftPct(w: BoomWorkout): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * ⛔ PACE AT THE SAME HEART RATE, OFF THE READ THAT ALREADY COMPUTES IT (revised 2026-09-09).
+ *
+ * `fact-packet/build.ts` builds `vs_similar.trend_points` for every run: the pool of recent similar
+ * runs plus this one flagged `is_current`, each carrying `pace_sec_per_mi`, `avg_hr` and
+ * `pace_at_hr` — pace per 100 bpm, D-050 / Q-025's own normalisation. Nothing is measured here; the
+ * points are read and one subtraction is done on them.
+ *
+ * ⚠️ `docs/PACE-AT-HR-TREND-SPEC.md` STILL SAYS "spec only, not implemented" AND IS STALE. The field
+ * is on the row (`build.ts:946`, `:1024`) with a direction classifier beside it. Believing the doc
+ * would have left this line unbuilt.
+ *
+ * THE ARITHMETIC. A prior run's `pace_at_hr` is what it would run per 100 bpm; at THIS run's heart
+ * rate it would have run `pace_at_hr × hr / 100`. The mean of those, minus what this run actually
+ * ran, is the seconds per mile gained at the same heart rate.
+ *
+ * ⚠️ EASY RUNS ONLY, and the gate is the app's own (`isEasyPrescribedRun`, `_shared/easy-hr.ts`).
+ * The line says "your easy pace"; on a tempo run the pool is tempo runs and the word would be false.
+ */
+function paceAtHrGainSecPerMi(w: BoomWorkout): number | null {
+  const facts = (parseAnalysis(w)?.fact_packet_v1 as Record<string, unknown> | undefined)?.facts as
+    Record<string, unknown> | undefined;
+  if (!facts) return null;
+  if (!isEasyPrescribedRun(facts.workout_type)) return null;
+
+  const pts = ((facts.vs_similar as Record<string, unknown> | undefined)?.trend_points ?? []) as
+    Array<{ pace_sec_per_mi?: unknown; avg_hr?: unknown; pace_at_hr?: unknown; is_current?: unknown }>;
+  if (!Array.isArray(pts) || pts.length === 0) return null;
+
+  const cur = pts.find((p) => p?.is_current === true);
+  const curPace = Number(cur?.pace_sec_per_mi);
+  const curHr = Number(cur?.avg_hr);
+  if (!Number.isFinite(curPace) || !Number.isFinite(curHr) || curHr <= 0) return null;
+
+  // ⚠️ THE LAST EIGHT, AND EIGHT MEANS EIGHT — the line says so, and a mean of three would be a
+  // different claim wearing the same sentence.
+  const priors = pts
+    .filter((p) => p?.is_current !== true && Number.isFinite(Number(p?.pace_at_hr)))
+    .slice(-8)
+    .map((p) => Number(p.pace_at_hr));
+  if (priors.length < 8) return null;
+
+  const meanAtHr = priors.reduce((a, b) => a + b, 0) / priors.length;
+  const theirPaceAtMyHr = meanAtHr * curHr / 100;
+  return Math.round(theirPaceAtMyHr - curPace);
+}
+
 /** p107's line, the one `AdherenceChips` already measures against. */
 const DRIFT_LINE_PCT = 5;
 
 /**
  * ⚠️ OURS: a streak has to be at least two to be a streak. p107 gives the 5 per cent; it says nothing
- * about how many sessions in a row is worth remarking on, and "for 1 rides running" is not a
+ * about how many sessions in a row is worth remarking on, and "1 rides in a row" is not a
  * sentence. Two is the smallest number that makes the word `running` true.
  */
 const MIN_STREAK = 2;
@@ -200,34 +258,53 @@ function enduranceLine(input: BoomInput, isRide: boolean): string | null {
         // saying it does would make the line meaningless on exactly the day it first appears.
         if (best <= 0 || w <= best) continue;
         const name = seconds === 1200 ? '20-minute' : seconds === 300 ? '5-minute' : seconds === 60 ? '1-minute' : '5-second';
-        return `Best ${name} power since ${win.month}: ${Math.round(w)} W`;
+        return `Best ${name} power since ${win.month}: ${Math.round(w)} W.`;
       }
     }
 
-    // 2. Longest ride. ⚠️ BY MOVING TIME, the length every other surface on Today and Week prints,
-    // through `resolveMovingSeconds` — the app's one reader for how long a session was.
+  }
+
+  /**
+   * 2. The longest one. ⛔ THE RUN GETS THIS TOO (revised 2026-09-09) — only the fastest SPLIT waits
+   * for best efforts; how long a run was needs no grade-adjusted machinery at all.
+   * ⚠️ BY MOVING TIME, the length every other surface on Today and Week prints, through
+   * `resolveMovingSeconds` — the app's one reader for how long a session was.
+   */
+  {
     const mineSecs = resolveMovingSeconds(workout as never) ?? 0;
     if (mineSecs > 0 && earlier.length > 0) {
       const longest = earlier.reduce((acc, p) => Math.max(acc, resolveMovingSeconds(p as never) ?? 0), 0);
-      if (longest > 0 && mineSecs > longest) return `Longest ride since ${win.month}`;
+      if (longest > 0 && mineSecs > longest) return `Longest ${noun} since ${win.month}.`;
     }
   }
 
-  // 3. Heart rate lower at easy power / easy pace than the last eight.
-  const mineHr = hrAtEasyPower(workout);
-  if (mineHr != null) {
-    const priorHr = earlier
-      .map((p) => hrAtEasyPower(p))
-      .filter((n): n is number => n != null)
-      .slice(0, 8);
-    if (priorHr.length === 8) {
-      const mean = priorHr.reduce((a, b) => a + b, 0) / priorHr.length;
-      const lower = Math.round(mean - mineHr);
-      if (lower >= 1) {
-        return isRide
-          ? `Heart rate ${lower} bpm lower at easy power than your last eight rides`
-          : `Heart rate ${lower} bpm lower at easy pace than your last eight runs`;
+  /**
+   * 3. THE AEROBIC GAIN, AND IT IS A DIFFERENT MEASUREMENT ON EACH SPORT (revised 2026-09-09).
+   *
+   * ⛔ A RIDE IS PRESCRIBED BY POWER, so the gain is heart rate AT a power. A RUN is prescribed by
+   * HEART RATE, so holding heart rate constant and reading the heart rate back says nothing — the
+   * gain is the PACE at that heart rate. Michael: "easy runs are prescribed by heart rate, so the
+   * gain is pace at that heart rate."
+   */
+  if (isRide) {
+    const mineHr = hrAtEasyPower(workout);
+    if (mineHr != null) {
+      const priorHr = earlier
+        .map((p) => hrAtEasyPower(p))
+        .filter((n): n is number => n != null)
+        .slice(0, 8);
+      if (priorHr.length === 8) {
+        const mean = priorHr.reduce((a, b) => a + b, 0) / priorHr.length;
+        const lower = Math.round(mean - mineHr);
+        if (lower >= 1) {
+          return `Your heart rate was ${lower} bpm lower at easy power than your last eight rides.`;
+        }
       }
+    }
+  } else {
+    const faster = paceAtHrGainSecPerMi(workout);
+    if (faster != null && faster >= 1) {
+      return `Your easy pace was ${faster} s/mi faster at the same heart rate than your last eight runs.`;
     }
   }
 
@@ -242,7 +319,7 @@ function enduranceLine(input: BoomInput, isRide: boolean): string | null {
       if (d == null) continue;
       if (d < DRIFT_LINE_PCT) streak += 1; else break;
     }
-    if (streak >= MIN_STREAK) return `Drift under 5 percent for ${streak} ${noun}s running`;
+    if (streak >= MIN_STREAK) return `Drift under 5 percent, ${streak} ${noun}s in a row.`;
   }
 
   return null;
@@ -253,12 +330,21 @@ function enduranceLine(input: BoomInput, isRide: boolean): string | null {
  */
 function liftLine(input: BoomInput): string | null {
   const { workout } = input;
-  const unit = input.useImperial === false ? 'kg' : 'lb';
   const day = weekdayOf(workout?.date);
   const week = Number(workout?.week_number);
 
   /**
-   * 1. A set earned. ⛔ THE LADDER'S OWN EVENT, REPLAYED THROUGH THE LADDER'S OWN FUNCTION.
+   * ⛔ TWO LINES ONLY (revised 2026-09-09). Three were cut, each for a reason worth keeping:
+   *   · "Speed sets all fast" — BAR SPEED IS NOT MEASURED. The app knows a set was logged and what
+   *     RIR the athlete wrote on it; it does not know whether the bar moved fast. The line was
+   *     asserting the one thing a dynamic-effort set is FOR, off data that cannot see it.
+   *   · "Most work sets this block" — THE PLAN SETS THE COUNT. Congratulating an athlete for a
+   *     number the composer chose is congratulating them for opening the app.
+   *   · "N sessions without a miss" — cut with them.
+   */
+
+  /**
+   * 1. A SET EARNED. ⛔ THE LADDER'S OWN EVENT, REPLAYED THROUGH THE LADDER'S OWN FUNCTION.
    * `meSetsFromHistory` walks the outcomes the server already stored; running it with and without
    * this session's entry is the only honest way to ask "did THIS session earn the set" without
    * writing a second copy of `ME_CLEAN_SESSIONS_TO_EARN` and the cap that sits beside it.
@@ -275,11 +361,26 @@ function liftLine(input: BoomInput): string | null {
     const after = meSetsFromHistory(outcomes, ME_SETS_BAND).sets;
     if (after <= before) continue;
     const movement = String(last?.movement ?? '').trim();
-    const weight = Number(input.meAtWeight?.[pattern]);
-    if (!movement || !Number.isFinite(weight) || weight <= 0) continue;
-    return `A set earned on ${movement}: two clean sessions at ${Math.round(weight)} ${unit}`;
+    if (!movement) continue;
+    /**
+     * ⛔⛔ THE APPROVED LINE SAYS "a second heavy set", SO IT ONLY FIRES ON THE SECOND.
+     *
+     * The ladder runs one to three (`ME_SETS_BAND`), so the same event can earn a THIRD set — and
+     * this sentence would then be printing "second" over a third. That is the score that lies:
+     * a real event described with the wrong number. Rather than invent a word Michael has not
+     * approved ("a third heavy set"), the third rung says nothing at all and the athlete is told
+     * nothing false.
+     * ⚠️ ONE WORD FIXES IT if he wants the third covered — see the work order's REVISED section.
+     */
+    if (after !== 2) continue;
+    return `${movement} gets a second heavy set next time.`;
   }
 
+  /**
+   * 2. EVERY HEAVY SET WITH REPS TO SPARE — RIR ≥ 1 on every logged ME set. ⚠️ AN ABSENT RIR IS NOT
+   * A ZERO (D-324): the athlete did not say, and a line claiming reps to spare on a set nobody
+   * graded would be inventing the grade. A session with any ungraded heavy set does not qualify.
+   */
   const exercises = loggedExercises(workout);
   const intentOf = (name: string): string | null => {
     const hit = (input.logToday ?? []).find((r) =>
@@ -288,58 +389,9 @@ function liftLine(input: BoomInput): string | null {
     const intent = String(hit?.slot_intent ?? '').trim().toLowerCase();
     return intent || null;
   };
-
-  // 2. Every heavy set with reps to spare. ⛔ RIR ≥ 1 ON EVERY LOGGED ME SET. ⚠️ AN ABSENT RIR IS NOT
-  // A ZERO (D-324) — the athlete did not say, and a line claiming reps to spare on a set nobody
-  // graded would be inventing the grade. A session with any ungraded heavy set does not qualify.
   const meSets = exercises.filter((e) => intentOf(e.name) === 'me').flatMap((e) => e.sets);
   if (meSets.length > 0 && meSets.every((s) => typeof s.rir === 'number' && s.rir >= 1)) {
-    return 'Every heavy set with reps to spare';
-  }
-
-  // 3. Speed sets all fast. ⛔ EVERY DE SET LOGGED, AND NONE AT RIR 0 — a speed set taken to failure
-  // is not a speed set. ⚠️ Absent RIR is allowed here: the claim is that none was ground out, and a
-  // set the athlete did not grade is not evidence that one was.
-  const deSets = exercises.filter((e) => intentOf(e.name) === 'de').flatMap((e) => e.sets);
-  if (deSets.length > 0 && deSets.every((s) => s.completed) && !deSets.some((s) => s.rir === 0)) {
-    return 'Speed sets all fast';
-  }
-
-  /**
-   * 4. Most work sets this block. ⛔ ONLY WHILE STILL UNDER 14 (p86). The page's own upper anchor is
-   * 14; a line congratulating an athlete for passing it would be the app cheering the thing the
-   * source warns about. ⚠️ `sets_completed` off `exercise_log`, summed — not a recount of the sets.
-   */
-  const setsToday = (input.logToday ?? []).reduce((a, r) => a + (Number(r?.sets_completed) || 0), 0);
-  if (setsToday > 0 && setsToday < 14) {
-    const byWorkout = new Map<string, number>();
-    for (const r of input.logPrior ?? []) {
-      const k = String(r?.workout_id ?? r?.date ?? '');
-      if (!k) continue;
-      byWorkout.set(k, (byWorkout.get(k) ?? 0) + (Number(r?.sets_completed) || 0));
-    }
-    const priorMax = [...byWorkout.values()].reduce((a, b) => Math.max(a, b), 0);
-    if (priorMax > 0 && setsToday > priorMax) return `Most work sets this block: ${setsToday}`;
-  }
-
-  /**
-   * 5. Sessions on one lift without a miss. ⛔ A MISS IS A LOGGED SET AT ZERO REPS — the one reading
-   * the rep band cannot contain, and the same event the bar ladder undoes a step for.
-   */
-  for (const ex of exercises) {
-    if (ex.sets.length === 0) continue;
-    if (ex.sets.some((s) => s.completed && (Number(s.reps) || 0) <= 0)) continue;
-    const name = ex.name.trim().toLowerCase();
-    const priorDates = new Set<string>();
-    for (const r of input.logPrior ?? []) {
-      const rn = String(r?.exercise_name ?? '').trim().toLowerCase();
-      const rc = String(r?.canonical_name ?? '').trim().toLowerCase();
-      if (rn !== name && rc !== name) continue;
-      const d = String(r?.date ?? '').slice(0, 10);
-      if (d) priorDates.add(d);
-    }
-    const n = priorDates.size + 1;
-    if (n >= MIN_STREAK) return `${n} sessions on ${ex.name} without a miss`;
+    return 'Every heavy set had reps to spare.';
   }
 
   return null;

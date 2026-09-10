@@ -237,9 +237,11 @@ const FAMILY_LINE: Record<string, string> = {
   // p237.
   ride_anaerobic: 'Go by feel. Stay above the floor. No ceiling. Each set harder than the last.',
   // p239, p275.
-  ride_endurance:
-    'Easy, under 75 percent. Spend a few minutes of the ride paying attention to how you pedal '
-    + '(smooth circles, not stomping) and how you sit on the bike. Truly easy.',
+  // ⛔ REWRITTEN 2026-09-09 (approved). "Easy, under 75 percent." named no percentage OF anything —
+  // the athlete could not tell whether it meant FTP, max heart rate or effort — and the pedalling
+  // paragraph after it was three instructions where the session needs one. The talk test is the
+  // check an athlete can actually run mid-ride.
+  ride_endurance: 'Easy, under 75 percent of FTP. You should be able to talk in full sentences.',
   // p233, p110 — the hard run, both families.
   run_mlss: 'Stay near threshold as long as you can without falling apart.',
   run_near_threshold: 'Stay near threshold as long as you can without falling apart.',

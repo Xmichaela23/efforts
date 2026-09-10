@@ -30,7 +30,7 @@ Deno.test('ride 1 — best power, and the LONGEST duration that is a best wins',
     prior: [ride('2026-08-01', curve({ '5s': 850, '20min': 250 }))],
     blockStartISO: BLOCK,
   });
-  assertEquals(line, 'Best 20-minute power since July: 265 W');
+  assertEquals(line, 'Best 20-minute power since July: 265 W.');
 });
 
 Deno.test('ride 1 — a 5 s best alone still speaks', () => {
@@ -38,7 +38,7 @@ Deno.test('ride 1 — a 5 s best alone still speaks', () => {
     workout: ride('2026-09-09', curve({ '5s': 900, '20min': 240 })),
     prior: [ride('2026-08-01', curve({ '5s': 850, '20min': 250 }))],
     blockStartISO: BLOCK,
-  }), 'Best 5-second power since July: 900 W');
+  }), 'Best 5-second power since July: 900 W.');
 });
 
 Deno.test('⛔ ride 1 — the FIRST ride of a window beats nothing', () => {
@@ -55,7 +55,7 @@ Deno.test('⛔ ride 1 — a ride BEFORE the block does not set the bar', () => {
     workout: ride('2026-09-09', curve({ '20min': 265 })),
     prior: [ride('2026-06-01', curve({ '20min': 300 })), ride('2026-08-01', curve({ '20min': 250 }))],
     blockStartISO: BLOCK,
-  }), 'Best 20-minute power since July: 265 W');
+  }), 'Best 20-minute power since July: 265 W.');
 });
 
 Deno.test('ride 2 — longest ride', () => {
@@ -63,7 +63,7 @@ Deno.test('ride 2 — longest ride', () => {
     workout: ride('2026-09-09', mins(180)),
     prior: [ride('2026-08-01', mins(150)), ride('2026-07-20', mins(120))],
     blockStartISO: BLOCK,
-  }), 'Longest ride since July');
+  }), 'Longest ride since July.');
 });
 
 Deno.test('ride 3 — heart rate lower at easy power than the last EIGHT', () => {
@@ -72,7 +72,7 @@ Deno.test('ride 3 — heart rate lower at easy power than the last EIGHT', () =>
     workout: ride('2026-09-09', hr(134)),
     prior: priors,
     blockStartISO: BLOCK,
-  }), 'Heart rate 6 bpm lower at easy power than your last eight rides');
+  }), 'Your heart rate was 6 bpm lower at easy power than your last eight rides.');
 });
 
 Deno.test('⛔ ride 3 — seven rides is not eight', () => {
@@ -94,7 +94,7 @@ Deno.test('ride 4 — drift under the line, N rides running', () => {
     workout: ride('2026-09-09', drift(3.1)),
     prior: [ride('2026-09-05', drift(4.2)), ride('2026-09-01', drift(2.0)), ride('2026-08-28', drift(6.5))],
     blockStartISO: BLOCK,
-  }), 'Drift under 5 percent for 3 rides running');
+  }), 'Drift under 5 percent, 3 rides in a row.');
 });
 
 Deno.test('⛔ ride 4 — one ride is not a run of anything', () => {
@@ -116,70 +116,120 @@ Deno.test('⛔ THE ORDER IS THE WORK ORDER\'S — power beats length beats heart
     workout: ride('2026-09-09', { computed: { power_curve: { '20min': 265 }, overall: { duration_s_moving: 9999 } }, workout_analysis: { bike_fitness_v1: { hr_at_band: 120 }, session_detail_v1: { classification: { decoupling: { pct: 1 } } } } }),
     prior: priors,
     blockStartISO: BLOCK,
-  }), 'Best 20-minute power since July: 265 W');
+  }), 'Best 20-minute power since July: 265 W.');
 });
 
 /* ── RUN ─────────────────────────────────────────────────────────────────────────────────────── */
 
-Deno.test('run 3 and 4 are built; 1 and 2 are not (best efforts is not built)', () => {
-  const run = (date: string, extra = {}) => ({ id: `x-${date}`, date, type: 'run', workout_status: 'completed', ...extra });
-  const priors = Array.from({ length: 8 }, (_, i) => run(`2026-08-0${i + 1}`, hr(150)));
-  assertEquals(sessionBoomLine({ workout: run('2026-09-09', hr(145)), prior: priors, blockStartISO: BLOCK }),
-    'Heart rate 5 bpm lower at easy pace than your last eight runs');
-  assertEquals(sessionBoomLine({
-    workout: run('2026-09-09', drift(2.0)),
-    prior: [run('2026-09-05', drift(3.0))],
-    blockStartISO: BLOCK,
-  }), 'Drift under 5 percent for 2 runs running');
-  // ⛔ No "Longest run since" — a run that is the longest of the window says nothing yet.
-  assertEquals(sessionBoomLine({ workout: run('2026-09-09', mins(180)), prior: [run('2026-08-01', mins(60))], blockStartISO: BLOCK }), null);
+const runRow = (date: string, extra = {}) => ({ id: `x-${date}`, date, type: 'run', workout_status: 'completed', ...extra });
+
+/** `fact_packet_v1.facts.vs_similar.trend_points` — what `fact-packet/build.ts` writes per run. */
+const paceAtHr = (curPace: number, curHr: number, priorPaceAtHr: number[], type = 'easy') => ({
+  workout_analysis: {
+    fact_packet_v1: {
+      facts: {
+        workout_type: type,
+        vs_similar: {
+          trend_points: [
+            ...priorPaceAtHr.map((v, i) => ({ date: `2026-08-0${i + 1}`, pace_at_hr: v, avg_hr: 150, pace_sec_per_mi: 600 })),
+            { date: '2026-09-09', is_current: true, pace_sec_per_mi: curPace, avg_hr: curHr, pace_at_hr: Math.round(curPace * 100 / curHr * 10) / 10 },
+          ],
+        },
+      },
+    },
+  },
 });
 
-/* ── LIFT ────────────────────────────────────────────────────────────────────────────────────── */
+Deno.test('run 2 — the longest run IS built (only the fastest split waits for best efforts)', () => {
+  assertEquals(sessionBoomLine({
+    workout: runRow('2026-09-09', mins(180)),
+    prior: [runRow('2026-08-01', mins(90))],
+    blockStartISO: BLOCK,
+  }), 'Longest run since July.');
+});
+
+Deno.test('run 3 — pace at the SAME heart rate, off the trend read', () => {
+  // Eight priors at 4.00 s/mi per bpm; at 150 bpm they would run 600 s/mi. This run ran 590.
+  assertEquals(sessionBoomLine({
+    workout: runRow('2026-09-09', paceAtHr(590, 150, Array(8).fill(400))),
+    prior: [],
+    blockStartISO: BLOCK,
+  }), 'Your easy pace was 10 s/mi faster at the same heart rate than your last eight runs.');
+});
+
+Deno.test('⛔ run 3 — SEVEN priors is not eight', () => {
+  assertEquals(sessionBoomLine({
+    workout: runRow('2026-09-09', paceAtHr(590, 150, Array(7).fill(400))),
+    prior: [], blockStartISO: BLOCK,
+  }), null);
+});
+
+Deno.test('⛔ run 3 — NOT ON A HARD RUN. The line says "your easy pace"', () => {
+  assertEquals(sessionBoomLine({
+    workout: runRow('2026-09-09', paceAtHr(590, 150, Array(8).fill(400), 'tempo')),
+    prior: [], blockStartISO: BLOCK,
+  }), null);
+});
+
+Deno.test('⛔ run 3 — slower at the same heart rate says nothing', () => {
+  assertEquals(sessionBoomLine({
+    workout: runRow('2026-09-09', paceAtHr(615, 150, Array(8).fill(400))),
+    prior: [], blockStartISO: BLOCK,
+  }), null);
+});
+
+Deno.test('run 4 — drift', () => {
+  assertEquals(sessionBoomLine({
+    workout: runRow('2026-09-09', drift(2.0)),
+    prior: [runRow('2026-09-05', drift(3.0))],
+    blockStartISO: BLOCK,
+  }), 'Drift under 5 percent, 2 runs in a row.');
+});
+
+/* ── LIFT — TWO LINES ONLY ───────────────────────────────────────────────────────────────────── */
 
 const SETS = (n: number, rir: number | null, reps = 4) =>
   Array.from({ length: n }, () => ({ reps, weight: 145, completed: true, ...(rir == null ? {} : { rir }) }));
 
-Deno.test('lift 1 — a set earned, off the ladder\'s own history', () => {
-  // Wednesday 2026-09-09, week 3. Two cleans in a row is the earn (ME_CLEAN_SESSIONS_TO_EARN).
+const clean = (week: number, day = 'Wednesday', movement = 'Bench Press') =>
+  ({ week, day, movement, outcome: 'clean' });
+
+Deno.test('lift 1 — the lift gets a second heavy set next time', () => {
   assertEquals(sessionBoomLine({
     workout: lift('2026-09-09'),
     prior: [],
-    meHistory: { push_upper: [
-      { week: 2, day: 'Wednesday', movement: 'Bench Press', outcome: 'clean' },
-      { week: 3, day: 'Wednesday', movement: 'Bench Press', outcome: 'clean' },
-    ] },
-    meAtWeight: { push_upper: 145 },
-  }), 'A set earned on Bench Press: two clean sessions at 145 lb');
+    meHistory: { push_upper: [clean(2), clean(3)] },
+  }), 'Bench Press gets a second heavy set next time.');
 });
 
 Deno.test('⛔ lift 1 — one clean session earns nothing', () => {
   assertEquals(sessionBoomLine({
-    workout: lift('2026-09-09'),
-    prior: [],
-    meHistory: { push_upper: [{ week: 3, day: 'Wednesday', movement: 'Bench Press', outcome: 'clean' }] },
-    meAtWeight: { push_upper: 145 },
+    workout: lift('2026-09-09'), prior: [],
+    meHistory: { push_upper: [clean(3)] },
+  }), null);
+});
+
+Deno.test('⛔ lift 1 — THE THIRD RUNG SAYS NOTHING. The approved line says "a second"', () => {
+  // clean, clean → a second set. Then clean, clean again → a third, which this sentence cannot name.
+  assertEquals(sessionBoomLine({
+    workout: lift('2026-09-09'), prior: [],
+    meHistory: { push_upper: [clean(1), clean(1), clean(2), clean(3)] },
   }), null);
 });
 
 Deno.test('⛔ lift 1 — an OLDER rung is not re-announced when an old session is opened', () => {
   assertEquals(sessionBoomLine({
-    workout: lift('2026-09-09', { week_number: 5 }),
-    prior: [],
-    meHistory: { push_upper: [
-      { week: 2, day: 'Monday', movement: 'Bench Press', outcome: 'clean' },
-      { week: 3, day: 'Monday', movement: 'Bench Press', outcome: 'clean' },
-    ] },
-    meAtWeight: { push_upper: 145 },
+    workout: lift('2026-09-09', { week_number: 5 }), prior: [],
+    meHistory: { push_upper: [clean(2, 'Monday'), clean(3, 'Monday')] },
   }), null);
 });
 
-Deno.test('lift 2 — every heavy set with reps to spare', () => {
+Deno.test('lift 2 — every heavy set had reps to spare', () => {
   assertEquals(sessionBoomLine({
     workout: lift('2026-09-09', { strength_exercises: [{ name: 'Bench Press', sets: SETS(3, 2) }] }),
     prior: [],
     logToday: [{ exercise_name: 'Bench Press', slot_intent: 'ME', sets_completed: 3, date: '2026-09-09', workout_id: 'l-2026-09-09' }],
-  }), 'Every heavy set with reps to spare');
+  }), 'Every heavy set had reps to spare.');
 });
 
 Deno.test('⛔ lift 2 — an UNGRADED heavy set is not reps to spare (D-324: absent is not zero)', () => {
@@ -198,44 +248,20 @@ Deno.test('⛔ lift 2 — a heavy set at RIR 0 is not reps to spare', () => {
   }), null);
 });
 
-Deno.test('lift 3 — speed sets all fast', () => {
+Deno.test('⛔ THE THREE CUT LIFT LINES SAY NOTHING (revised 2026-09-09)', () => {
+  // "Speed sets all fast" — bar speed is not measured.
   assertEquals(sessionBoomLine({
     workout: lift('2026-09-09', { strength_exercises: [{ name: 'Speed Squat', sets: SETS(6, 4, 3) }] }),
     prior: [],
-    logToday: [{ exercise_name: 'Speed Squat', slot_intent: 'DE', sets_completed: 6, date: '2026-09-09', workout_id: 'l-2026-09-09' }],
-  }), 'Speed sets all fast');
-});
-
-Deno.test('⛔ lift 3 — a speed set ground out to failure is not fast', () => {
-  assertEquals(sessionBoomLine({
-    workout: lift('2026-09-09', { strength_exercises: [{ name: 'Speed Squat', sets: [...SETS(5, 4, 3), ...SETS(1, 0, 3)] }] }),
-    prior: [],
-    logToday: [{ exercise_name: 'Speed Squat', slot_intent: 'DE', sets_completed: 6, date: '2026-09-09', workout_id: 'l-2026-09-09' }],
+    logToday: [{ exercise_name: 'Speed Squat', slot_intent: 'DE', sets_completed: 6, date: '2026-09-09', workout_id: 'w-now' }],
   }), null);
-});
-
-Deno.test('lift 4 — most work sets this block', () => {
+  // "Most work sets this block" — the plan sets the count.
   assertEquals(sessionBoomLine({
-    workout: lift('2026-09-09', { strength_exercises: [] }),
-    prior: [],
+    workout: lift('2026-09-09', { strength_exercises: [] }), prior: [],
     logToday: [{ exercise_name: 'Bench Press', sets_completed: 9, date: '2026-09-09', workout_id: 'w-now' }],
-    logPrior: [
-      { exercise_name: 'Bench Press', sets_completed: 4, date: '2026-09-02', workout_id: 'w-1' },
-      { exercise_name: 'Row', sets_completed: 4, date: '2026-09-02', workout_id: 'w-1' },
-    ],
-  }), 'Most work sets this block: 9');
-});
-
-Deno.test('⛔ lift 4 — NEVER at 14 or over (p86 is a ceiling as well as a floor)', () => {
-  assertEquals(sessionBoomLine({
-    workout: lift('2026-09-09', { strength_exercises: [] }),
-    prior: [],
-    logToday: [{ exercise_name: 'Bench Press', sets_completed: 15, date: '2026-09-09', workout_id: 'w-now' }],
-    logPrior: [{ exercise_name: 'Bench Press', sets_completed: 8, date: '2026-09-02', workout_id: 'w-1' }],
+    logPrior: [{ exercise_name: 'Bench Press', sets_completed: 4, date: '2026-09-02', workout_id: 'w-1' }],
   }), null);
-});
-
-Deno.test('lift 5 — sessions on one lift without a miss', () => {
+  // "N sessions without a miss".
   assertEquals(sessionBoomLine({
     workout: lift('2026-09-09', { strength_exercises: [{ name: 'Deadlift', sets: SETS(2, 2) }] }),
     prior: [],
@@ -244,29 +270,35 @@ Deno.test('lift 5 — sessions on one lift without a miss', () => {
       { exercise_name: 'Deadlift', sets_completed: 2, date: '2026-09-02', workout_id: 'w-1' },
       { exercise_name: 'Deadlift', sets_completed: 2, date: '2026-08-26', workout_id: 'w-2' },
     ],
-  }), '3 sessions on Deadlift without a miss');
-});
-
-Deno.test('⛔ lift 5 — a set at zero reps is a miss', () => {
-  assertEquals(sessionBoomLine({
-    workout: lift('2026-09-09', { strength_exercises: [{ name: 'Deadlift', sets: [...SETS(1, 2), { reps: 0, weight: 315, completed: true }] }] }),
-    prior: [],
-    logToday: [{ exercise_name: 'Deadlift', sets_completed: 2, date: '2026-09-09', workout_id: 'w-now' }],
-    logPrior: [{ exercise_name: 'Deadlift', sets_completed: 2, date: '2026-09-02', workout_id: 'w-1' }],
   }), null);
 });
 
-Deno.test('⛔ lift order — the earned set beats every line under it', () => {
+Deno.test('⛔ lift order — the earned set beats the line under it', () => {
   assertEquals(sessionBoomLine({
     workout: lift('2026-09-09', { strength_exercises: [{ name: 'Bench Press', sets: SETS(3, 2) }] }),
     prior: [],
-    meHistory: { push_upper: [
-      { week: 2, day: 'Wednesday', movement: 'Bench Press', outcome: 'clean' },
-      { week: 3, day: 'Wednesday', movement: 'Bench Press', outcome: 'clean' },
-    ] },
-    meAtWeight: { push_upper: 145 },
+    meHistory: { push_upper: [clean(2), clean(3)] },
     logToday: [{ exercise_name: 'Bench Press', slot_intent: 'ME', sets_completed: 3, date: '2026-09-09', workout_id: 'l-2026-09-09' }],
-  }), 'A set earned on Bench Press: two clean sessions at 145 lb');
+  }), 'Bench Press gets a second heavy set next time.');
+});
+
+Deno.test('⛔ EVERY LINE ENDS WITH A FULL STOP (revised 2026-09-09)', () => {
+  const lines = [
+    sessionBoomLine({ workout: ride('2026-09-09', curve({ '20min': 265 })), prior: [ride('2026-08-01', curve({ '20min': 250 }))], blockStartISO: BLOCK }),
+    sessionBoomLine({ workout: ride('2026-09-09', mins(180)), prior: [ride('2026-08-01', mins(60))], blockStartISO: BLOCK }),
+    sessionBoomLine({ workout: ride('2026-09-09', hr(134)), prior: Array.from({ length: 8 }, (_, i) => ride(`2026-08-0${i + 1}`, hr(140))), blockStartISO: BLOCK }),
+    sessionBoomLine({ workout: ride('2026-09-09', drift(3.1)), prior: [ride('2026-09-05', drift(4.2))], blockStartISO: BLOCK }),
+    sessionBoomLine({ workout: runRow('2026-09-09', paceAtHr(590, 150, Array(8).fill(400))), prior: [], blockStartISO: BLOCK }),
+    sessionBoomLine({ workout: lift('2026-09-09'), prior: [], meHistory: { push_upper: [clean(2), clean(3)] } }),
+    sessionBoomLine({
+      workout: lift('2026-09-09', { strength_exercises: [{ name: 'Bench Press', sets: SETS(3, 2) }] }), prior: [],
+      logToday: [{ exercise_name: 'Bench Press', slot_intent: 'ME', sets_completed: 3, date: '2026-09-09', workout_id: 'l-2026-09-09' }],
+    }),
+  ];
+  for (const line of lines) {
+    assertEquals(typeof line, 'string');
+    assertEquals(line!.endsWith('.'), true, line!);
+  }
 });
 
 /* ── THE SILENCE ─────────────────────────────────────────────────────────────────────────────── */

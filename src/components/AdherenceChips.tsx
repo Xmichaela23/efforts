@@ -72,12 +72,16 @@ export default function AdherenceChips({
   dense = false,
 }: AdherenceChipsProps) {
   const numCls = dense ? 'readout-num text-sm whitespace-nowrap' : 'readout-num text-lg whitespace-nowrap';
-  const labelCls = dense
-    ? 'readout-label text-[9px] uppercase text-center whitespace-nowrap'
-    : 'readout-label text-[11px] uppercase text-center whitespace-nowrap';
-  const subCls = dense
-    ? 'text-[9px] text-white/40 text-center leading-snug whitespace-nowrap'
-    : 'text-[10px] text-white/40 text-center leading-snug whitespace-nowrap';
+  /**
+   * ⛔ 12 px, AND THE MUTED TOKEN AT 0.7 (Michael, 2026-09-09, on the device). The tile label and its
+   * sub-label were 9 px on the done card — smaller than any other text on the screen — at 40 per
+   * cent white. The number above them is the tile's answer and the label is what the number MEANS;
+   * at that size and that alpha the meaning was unreadable and the figure floated on its own.
+   * ⚠️ THE SAME SIZE DENSE AND NOT. The dense variant existed to fit four tiles across a card, and
+   * what it actually bought was four unreadable ones — the tiles wrap, and wrapping is fine.
+   */
+  const labelCls = 'readout-label text-[12px] uppercase text-center whitespace-nowrap';
+  const subCls = 'text-[12px] text-white/70 text-center leading-snug whitespace-nowrap';
   const rowCls = dense
     ? 'flex items-start justify-between w-full px-0 gap-1'
     : 'flex items-start justify-between w-full px-3';
