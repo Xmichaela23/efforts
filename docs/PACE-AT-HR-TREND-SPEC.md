@@ -1,3 +1,5 @@
+> **STATUS CORRECTED 2026-09-09:** this is BUILT. `fact-packet/build.ts` writes `pace_at_hr` on every run's trend points with a direction classifier beside it; the Today good-news line (docs/WORKORDER-booms-2026-09-09.md, run line 3) reads it. The "spec only, not implemented" wording below is history.
+
 # PACE-AT-HR TREND SPEC
 
 **Status:** spec only. Filed against Q-025. **Not implemented**. Do not ship without an explicit go-ahead.
