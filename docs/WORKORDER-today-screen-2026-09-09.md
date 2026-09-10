@@ -191,6 +191,22 @@ header block, right of the weather rows: `form −21 · optimal`, the word in th
 number white. Tap it opens State. Nothing else of the card remains on Today. `WeekLoadCard` and the
 LOAD deck: delete if no other screen renders them.
 
+## 3h. The lift card replaces the deck (Michael, 2026-09-10, go)
+
+The swipe deck for lift and plyo sessions comes off Today. In its place, one card per session, the same
+height as the deck card was, that expands on tap:
+- Closed: session name and estimated time on the header line; the first two exercises, each as a line
+  (name, the kind word in the sport colour, weight or `By feel` right) with its approved cue under it; a
+  last line `4 more` (the count of the remaining exercises). Tap anywhere on the card and it opens.
+- Open: all exercises with their cues, in session order. Tap again and it closes. The ride or run card
+  below moves with it. Height animates; `prefers-reduced-motion` turns that off.
+- Plyo sessions the same shape, plyo colour, the approved plyo note as the cue.
+- Tap on an exercise line does nothing; the card's tap is the only tap. The drawer opens from the
+  header line only (session name), so the cue card and the drawer do not fight.
+- Ride and run cards unchanged. The mockup docs/mockups/today-deck-2026-09-09.html stays for reference.
+- Field basis: TrainingPeaks and Runna show a session as a list with notes inline; Strong and Hevy are
+  lists. Nothing in that set swipes through exercises.
+
 ## 4. Out of scope
 
 - WORKORDER-kill-ours and WORKORDER-de-row-by-feel (separate, may land first or after).
