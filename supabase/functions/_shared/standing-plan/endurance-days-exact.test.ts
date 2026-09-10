@@ -70,12 +70,23 @@ Deno.test('⛔ a stated zero-run / two-ride week keeps its LONG ride', () => {
       enduranceDaysBySport: { run: 0, ride: 2 }, targetRideHours: 6,
     } as never,
     weeks: 2, goalName: 'Strong Focus',
-  }) as never as { sessions_by_week: Record<string, { type: string; duration?: number }[]> };
+  }) as never as {
+    sessions_by_week: Record<string, { type: string; duration?: number; tags?: string[] }[]>;
+    notes: { kind: string; text: string }[];
+  };
   const wk1 = row.sessions_by_week['1'] ?? [];
   const rides = wk1.filter((s) => ['ride', 'bike'].includes(String(s.type).toLowerCase()));
   assertEquals(rides.length, 2, 'the stated ride count was not honoured');
   assertEquals(wk1.filter((s) => String(s.type).toLowerCase() === 'run').length, 0, 'a stated zero built runs');
   const hours = rides.reduce((t, s) => t + (s.duration ?? 0), 0) / 60;
-  // ⛔ THE LONG RIDE IS THE TEST. Two short hard rides come to ~2h20; with the long one kept it is ~6h.
-  assert(hours > 5, `two rides against a 6h ask built only ${hours.toFixed(2)}h — the long ride was dropped`);
+  // ⛔ THE LONG RIDE IS THE TEST. Two short hard rides come to ~2h20; with the long one kept it is more.
+  // ⚠️ > 5h → > 4h ON 2026-09-10, A RULING (Michael: "as printed, always"). The long ride here is the
+  // ride with work, which now rides p239's fixed length (L3 180 min) instead of stretching to the ask,
+  // so the week is ~4h05 and says so in a warning rather than stretching the printed ride.
+  assert(rides.some((s) => (s.tags ?? []).includes('family:ride_endurance')), 'the long ride was dropped');
+  assert(hours > 4, `two rides against a 6h ask built only ${hours.toFixed(2)}h — the long ride was dropped`);
+  assert(
+    row.notes.some((n) => n.kind === 'warning' && /6h/.test(n.text)),
+    'the week built under the 6h ask with no sentence',
+  );
 });

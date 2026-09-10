@@ -130,7 +130,13 @@ Deno.test('⛔ THE TYPED HOURS SIZE THE WEEK — and his 4h was under the floor 
    * mapping. The point of the assertion is unchanged — the untargeted week sits at the library's
    * midpoint, and that is the "before" the sizing item is measured against.
    */
-  assert(Math.abs(midpoint - 5.22) < 0.1, `the untargeted week left the midpoint: ${midpoint}h`);
+  /**
+   * ⛔ THE MIDPOINT MOVED TO ~4h28 ON 2026-09-10, AND IT IS A RULING (Michael: "as printed, always").
+   * The endurance ride with work now rides p239 exactly — L1 85 min, L2 125, L3 180 — instead of being
+   * sized off the library's band, so the alternate weeks that carry it are shorter than the sized
+   * version was (L2 170 → 125). The point of the assertion is unchanged: this is the untargeted "before".
+   */
+  assert(Math.abs(midpoint - 4.47) < 0.1, `the untargeted week left the midpoint: ${midpoint}h`);
 
   /**
    * ⛔⛔ AND HIS FOUR HOURS WERE NEVER REACHABLE — the finding this test exists to keep. These slots'
@@ -159,8 +165,11 @@ Deno.test('⛔ THE TYPED HOURS SIZE THE WEEK — and his 4h was under the floor 
 
   // ⛔ AND A TARGET INSIDE THE BAND IS DELIVERED. ⚠️ Tolerance, because the interior of the dial is a
   // staircase — the builders round to whole reps and steps, which is what "about" is honest about.
+  // ⚠️ 0.2 → 0.25 ON 2026-09-10, A RULING (Michael: "as printed, always"). The ride with work is now
+  // p239's fixed length (L2 125 min), so the steady ride is the only one the dial still sizes and its
+  // steps are wider: asked 5h builds ~4h48 (steady 100 min), asked 5.5h builds 5h30.
   const asked5 = hours(build(HIS_SLOTS, undefined, 5, EXPERIENCED));
-  assert(Math.abs(asked5 - 5) < 0.2, `asked 5h, built ${asked5.toFixed(2)}h`);
+  assert(Math.abs(asked5 - 5) < 0.25, `asked 5h, built ${asked5.toFixed(2)}h`);
   assert(asked5 > hours(asked4), 'asking for more did not get more');
 });
 
@@ -928,7 +937,15 @@ Deno.test('⛔⛔ THE BIKE-ONLY FLOOR COMES DOWN TOO — and dropping the RIDE l
    * ⛔ THE CLAIM IS UNCHANGED: a three-hour ask must not be handed the five-hour standard column.
    */
   const lowRider = build(allRide, undefined, 3, { ride: 'newer' });
-  assert(minutes(lowRider) <= 250,
+  /**
+   * ⛔ THE BAR MOVED FROM 250 TO 270 MINUTES ON 2026-09-10, AND IT IS A RULING, NOT A DRIFT (Michael:
+   * the with-work ride is p239 as printed, always — even past the athlete's ask). Level 1 prints 85
+   * minutes (20 easy · 4 rounds · 45 at VT1 with sprints), where the sized version was shorter, so a
+   * three-hour ask now builds 267. ⚠️ THAT IS OVER THE ASK BY DESIGN: the printed session wins over the
+   * typed hours for this one ride. ⛔ THE CLAIM IS OTHERWISE UNCHANGED: a three-hour ask must not be
+   * handed the five-hour standard column (≥ 290 below).
+   */
+  assert(minutes(lowRider) <= 270,
     `a three-hour ride ask still built ${minutes(lowRider)} minutes`);
   assertEquals(lowRider.sessions.filter((s) => s.type === 'ride').length, 4,
     'the tier dropped a ride instead of shrinking one');

@@ -16,7 +16,7 @@
 // ============================================================================
 
 import type { EnduranceSession, FamilyId } from '../endurance-library/index.ts';
-import { familyLineFor } from './family-lines.ts';
+import { familyLineFor, RIDE_ENDURANCE_DRAWER_NOTE } from './family-lines.ts';
 // ⛔ THE SOURCE'S OWN CLASSIFICATION — see `ENDURANCE_CLASS`, and see the tag list below.
 import { ENDURANCE_CLASS, classToken, FAMILIES } from '../endurance-library/index.ts';
 
@@ -196,6 +196,41 @@ function embeddedBlockTokens(session: EnduranceSession, steadyIndex = 0): string
   return out;
 }
 
+/**
+ * p239's ride with work, as tokens in the order it is ridden:
+ *   `bike_endurance_20min` · `round_4x_120s80-180s70` (× sets) with `bike_recovery_5min` between them ·
+ *   `bike_vt1sprint_45min_10s_every9min`.
+ * ⚠️ THE VT1 BOUT TRAVELS AS ONE TOKEN, not as its pieces: the materializer cuts it again, so the
+ * watch sees the same (interval − sprint) + sprint pieces the library built.
+ */
+function printedRideTokens(session: EnduranceSession): string[] {
+  const out: string[] = [];
+  let vt1Seconds = 0;
+  let sprintSeconds = 0;
+  let everySeconds = 0;
+  for (const block of session.blocks) {
+    const steps = block.steps.filter((st) => st.seconds != null && (st.seconds as number) > 0);
+    const kinds = steps.map((st) => (st.intensity as { kind?: string } | null)?.kind);
+    if (kinds.includes('all_out')) {
+      const sprint = steps.find((st) => (st.intensity as { kind?: string }).kind === 'all_out')!;
+      const easy = steps.find((st) => (st.intensity as { kind?: string }).kind === 'vt1');
+      sprintSeconds = sprint.seconds as number;
+      everySeconds = (easy?.seconds as number ?? 0) + sprintSeconds;
+      vt1Seconds += block.repeat * everySeconds;
+      continue;
+    }
+    if (steps.length === 1 && kinds[0] === 'vt1') { vt1Seconds += block.repeat * (steps[0].seconds as number); continue; }
+    const compound = compoundRoundToken(block as never);
+    if (compound) { out.push(compound); continue; }
+    if (steps.length === 1 && kinds[0] === 'easy') { out.push(`bike_recovery_${minutes(steps[0].seconds as number)}min`); continue; }
+    if (steps.length === 1) { out.push(`bike_endurance_${minutes(steps[0].seconds as number)}min`); continue; }
+  }
+  if (vt1Seconds > 0 && sprintSeconds > 0 && everySeconds > 0) {
+    out.push(`bike_vt1sprint_${minutes(vt1Seconds)}min_${Math.round(sprintSeconds)}s_every${minutes(everySeconds)}min`);
+  }
+  return out;
+}
+
 function addOnTokens(session: EnduranceSession): string[] {
   const out: string[] = [];
   for (const block of session.blocks) {
@@ -362,6 +397,12 @@ export function translateEnduranceSession(
   const tags = [
     'standing_plan', `family:${session.family}`, `level:${session.level}`, `sport:${sport}`,
     `intensity:${classToken(session.family)}`, `band:${klass.band}`,
+    /**
+     * ⛔ THE ARCHETYPE TRAVELS ON THE ROW (2026-09-10). Today and the drawer pick the endurance ride's
+     * line by it — p239 prints a plain ride and a ride with work, and they read differently. It was
+     * known here and dropped at the row, so the client could not tell the two apart.
+     */
+    ...(session.archetype ? [`archetype:${session.archetype}`] : []),
   ];
   let work: string[];
 
@@ -549,6 +590,15 @@ export function translateEnduranceSession(
     }
 
     case 'ride_endurance': {
+      /**
+       * ⛔⛔ THE PRINTED RIDE WITH WORK TRANSLATES IN ITS OWN ORDER (2026-09-10) — the opening spin,
+       * the round sets with the spin between them, then the VT1 bout with its sprints. The steady-first
+       * branch below put the steady minutes at the front and never saw a sprint at all.
+       */
+      if (session.blocks.some((b) => b.steps.some((st) => (st.intensity as { kind?: string } | null)?.kind === 'all_out'))) {
+        work = printedRideTokens(session);
+        break;
+      }
       // ⛔ CONTINUOUS. `bike_endurance_{n}min` is 65-75% of FTP, which is his "below 75%" (p239).
       /**
        * ⛔ AND THE TEMPO BLOCKS TRAVEL WITH IT (2026-08-30). p239 level 2's second option is
@@ -658,8 +708,10 @@ function describeSession(session: EnduranceSession, raceTempo: boolean): string 
    * sentence is the only place the difference is stated.
    */
   const parts: string[] = [];
-  const line = familyLineFor(session.family);
+  const line = familyLineFor(session.family, session.archetype);
   if (line) parts.push(line);
+  // ⛔ THE PEDALLING NOTE, UNDER THE LINE, IN THE DRAWER ONLY (2026-09-10, p239).
+  if (session.family === 'ride_endurance') parts.push(RIDE_ENDURANCE_DRAWER_NOTE);
   if (session.family === 'run_mlss') {
     parts.push('Fatigue spread evenly across the rounds. Hills are fine, adjust pace to hold the effort.');
   }
@@ -703,6 +755,9 @@ export const EMITTED_TOKEN_SHAPES: { shape: RegExp; example: string }[] = [
   { shape: /^round_\d+x_(?:r?\d+s(?:\d+|vt1|easy|racepace))(?:-r?\d+s(?:\d+|vt1|easy|racepace))*(?:_R\d+s)?$/,
     example: 'round_3x_15s130-45s105-60svt1_R120s' },
   { shape: /^bike_endurance_\d+min$/, example: 'bike_endurance_90min' },
+  // ⛔ p239's ride with work (2026-09-10): the spin between round sets, and the VT1 bout with sprints.
+  { shape: /^bike_recovery_\d+min$/, example: 'bike_recovery_5min' },
+  { shape: /^bike_vt1sprint_\d+min_\d+s_every\d+min$/, example: 'bike_vt1sprint_45min_10s_every9min' },
   { shape: /^swim_warmup_\d+m$/, example: 'swim_warmup_300m' },
   { shape: /^swim_cooldown_\d+m$/, example: 'swim_cooldown_200m' },
   { shape: /^swim_aerobic_\d+x\d+m_r\d+$/, example: 'swim_aerobic_6x200m_r20' },
@@ -722,6 +777,8 @@ export const MATERIALIZER_RIDE_PATTERNS: RegExp[] = [
   // (`pctRange(1.1, 1.2)`); it was missing from this CACHE only because nothing emitted it.
   /bike_vo2_(\d+)x(\d+)min_r(\d+)min/i,
   /bike_endurance_(\d+)min/,
+  /bike_recovery_\d+min/,
+  /bike_vt1sprint_(\d+)min_(\d+)s_every(\d+)min/,
 ];
 export const MATERIALIZER_SWIM_PATTERNS: RegExp[] = [
   /swim_(warmup|cooldown)_(\d+)(yd|m)/,

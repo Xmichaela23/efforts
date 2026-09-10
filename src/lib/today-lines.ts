@@ -256,7 +256,9 @@ export function liftLinesFor(
  */
 export function enduranceLinesFor(session: TodayRow): string[] {
   const family = familyOf(session);
-  const line = familyLineFor(family);
+  // ⚠️ THE ARCHETYPE PICKS THE ENDURANCE RIDE'S LINE (plain / with work). A row without the tag — any row
+  // written before 2026-09-10 — gets the plain line, which is what every such row actually is.
+  const line = familyLineFor(family, tagValue(session, 'archetype'));
   return line ? [line] : [];
 }
 

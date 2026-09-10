@@ -480,7 +480,15 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           return `${mmss(lo)}–${mmss(hi)}/${unit}`;
         } catch { return undefined; }
       };
-      const powerStr = (st:any) => (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : undefined;
+      /**
+       * ⛔ ONE NUMBER WHEN THE RANGE IS ONE NUMBER (2026-09-10). p239's "2 min @ 80%" is a single
+       * percentage, and `pctRange(0.8, 0.8)` came back as `134–134 W` — a range that is not one.
+       */
+      const powerStr = (st:any) => {
+        if (!(st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number')) return undefined;
+        const lo = Math.round(st.powerRange.lower), hi = Math.round(st.powerRange.upper);
+        return lo === hi ? `${lo} W` : `${lo}–${hi} W`;
+      };
       /**
        * ⛔ WHAT THE STEP IS PRESCRIBED BY (Michael 2026-09-02, D-462 + the materializer's stampRunPrescription).
        * Easy steps carry `prescription: 'heart_rate'` + `hr_range` (bpm) — the heart rate is the target and the
@@ -497,7 +505,8 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
         if (hr) return ` (${hr}${pace ? ` · ref ${pace}` : ''})`;
         const rpe = rpeStr(st);
         if (pace) return ` (${pace}${rpe ? ` · ${rpe}` : ''})`;
-        if (power) return ` (${power})`;
+        // ⛔ POWER READS `40:00 · 109–126 W`, not `40:00 (109–126 W)` (2026-09-10).
+        if (power) return ` · ${power}`;
         if (rpe) return ` (${rpe})`;
         return '';
       };
@@ -588,14 +597,27 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
             count += 1; j += hasRec ? 2 : 1;
           }
           const workAnno = anno(st, workPace, workPower);
-          const restAnno = hasRec ? ` ${restLabel}${anno(next, restPace, restPower)}` : '';
+          /**
+           * ⛔ A RIDE'S RECOVERY READS `5:00 easy` (2026-09-10) — the spin between efforts carries a
+           * recovery band, not a target anyone rides to, so its watts are noise on the line. A run's
+           * recovery keeps its pace or heart-rate annotation, which it is prescribed by.
+           */
+          const restIsEasySpin = hasRec && !restPace && !hrStr(next) && !rpeStr(next);
+          const restAnno = hasRec ? (restIsEasySpin ? ` ${restLabel} easy` : ` ${restLabel}${anno(next, restPace, restPower)}`) : '';
           const countDisplay = Math.max(1, Number(count)||0);
-          out.push(`${countDisplay} × ${workLabel}${workAnno}${restAnno}`);
+          // ⛔ NO "1 ×" (2026-09-10). A single step is its length — and its recovery its own line — the
+          // count prints only when the effort repeats.
+          if (countDisplay > 1) out.push(`${countDisplay} × ${workLabel}${workAnno}${restAnno}`);
+          else {
+            out.push(`${workLabel}${workAnno}`);
+            if (hasRec) out.push(restAnno.trim());
+          }
           if (j <= i) { i += 1; continue; }
           i = j; continue;
         }
-        if (typeof st?.seconds==='number') { out.push(`1 × ${fmtTime(st.seconds)}`); i+=1; continue; }
-        if (typeof st?.distanceMeters==='number') { out.push(`1 × ${fmtDist(st.distanceMeters)}`); i+=1; continue; }
+        // ⛔ A LONE RECOVERY READS `5:00 easy`; any other lone step is its length alone — no "1 ×".
+        if (typeof st?.seconds==='number') { out.push(isRec(st) ? `${fmtTime(st.seconds)} easy` : fmtTime(st.seconds)); i+=1; continue; }
+        if (typeof st?.distanceMeters==='number') { out.push(isRec(st) ? `${fmtDist(st.distanceMeters)} easy` : fmtDist(st.distanceMeters)); i+=1; continue; }
         i += 1;
       }
       return out;

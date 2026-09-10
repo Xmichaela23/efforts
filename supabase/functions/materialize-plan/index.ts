@@ -2243,6 +2243,25 @@ function expandBikeToken(tok: string, baselines: Baselines): any[] {
   // VO2: bike_vo2_5x4min_R4min
   m = lower.match(/bike_vo2_(\d+)x(\d+)min_r(\d+)min/);
   if (m) { const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60; for(let i=0;i<reps;i++){ out.push({ id: uid(), kind:'work', duration_s: work, power_range: pctRange(1.1,1.2) }); if(rest && i < reps - 1) out.push({ id: uid(), kind:'recovery', duration_s: rest }); } return out; }
+  /**
+   * ⛔ p239's VT1 BOUT WITH SPRINTS (2026-09-10): `bike_vt1sprint_45min_10s_every9min`.
+   * (interval − sprint) at the endurance band, then the sprint, repeated; the last piece without a
+   * sprint when the bout does not divide evenly. ⚠️ THE SPRINT CARRIES NO POWER TARGET — p239 says
+   * all-out, and all-out is deliberately unresolved (p229), not a percentage. ⚠️ Matched BEFORE
+   * `bike_endurance_`, whose unanchored regex would not match this token but stays first-come anyway.
+   */
+  m = lower.match(/bike_vt1sprint_(\d+)min_(\d+)s_every(\d+)min/);
+  if (m) {
+    const total = parseInt(m[1], 10) * 60, sprint = parseInt(m[2], 10), every = parseInt(m[3], 10) * 60;
+    const n = every > sprint ? Math.floor(total / every) : 0;
+    for (let k = 0; k < n; k += 1) {
+      out.push({ id: uid(), kind: 'work', duration_s: every - sprint, power_range: pctRange(0.65, 0.75) });
+      out.push({ id: uid(), kind: 'work', duration_s: sprint, label: 'Sprint' });
+    }
+    const tail = total - n * every;
+    if (tail > 0) out.push({ id: uid(), kind: 'work', duration_s: tail, power_range: pctRange(0.65, 0.75) });
+    return out;
+  }
   // Endurance z2 time: bike_endurance_90min_Z2
   m = lower.match(/bike_endurance_(\d+)min/);
   if (m) { const sec=parseInt(m[1],10)*60; out.push({ id: uid(), kind:'work', duration_s: sec, power_range: pctRange(0.65,0.75) }); return out; }

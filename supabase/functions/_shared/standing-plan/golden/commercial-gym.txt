@@ -91,7 +91,7 @@ WEEK 02  column=standard
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1 · auto_regulated
-  [Thursday] ride     Ride — 205 min
+  [Thursday] ride     Ride — 180 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 265           | 90% · plan 45wx5 145wx5 200wx3 240wx2 265x
@@ -191,7 +191,7 @@ WEEK 04  column=standard
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1 · auto_regulated
-  [Thursday] ride     Ride — 175 min
+  [Thursday] ride     Ride — 180 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · plan 45wx5 150wx5 205wx3 245wx2 270x
@@ -291,7 +291,7 @@ WEEK 06  column=standard
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1 · auto_regulated
-  [Thursday] ride     Ride — 176 min
+  [Thursday] ride     Ride — 180 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · plan 45wx5 150wx5 205wx3 245wx2 270x
@@ -390,7 +390,7 @@ WEEK 08  column=standard
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1 · auto_regulated
-  [Thursday] ride     Ride — 205 min
+  [Thursday] ride     Ride — 180 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · plan 45wx5 150wx5 205wx3 245wx2 270x
@@ -488,7 +488,7 @@ WEEK 10  column=standard
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1 · auto_regulated
-  [Thursday] ride     Ride — 175 min
+  [Thursday] ride     Ride — 180 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · plan 45wx5 150wx5 205wx3 245wx2 270x
@@ -586,7 +586,7 @@ WEEK 12  column=standard
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Spider Curl                    3x6-12       @ By feel       | RIR 1 · auto_regulated
-  [Thursday] ride     Ride — 176 min
+  [Thursday] ride     Ride — 180 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
       ME     Back Squat                     1x1-5        @ 270           | 90% · plan 45wx5 150wx5 205wx3 245wx2 270x

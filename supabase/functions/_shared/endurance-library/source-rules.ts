@@ -346,6 +346,22 @@ export const WORK_BANDS: Record<FamilyId, Record<Level, DoseBand>> = {
  * p235 describes an LSD run; the specific insert is generated from the family's bands and the
  * athlete's own threshold.
  */
+/**
+ * p239's endurance ride with work, one level, as printed: an opening easy spin · `sets` of
+ * `roundsPerSet` rounds of (2 min @ 80% / 3 min @ 70%), an easy spin between sets · a VT1 bout with a
+ * 10-second all-out sprint every `sprintEverySeconds`.
+ */
+export type PrintedRide = {
+  openSeconds: number;
+  sets: number;
+  roundsPerSet: number;
+  round: Array<{ seconds: number; pct: number }>;
+  betweenSetsSeconds: number;
+  finishSeconds: number;
+  sprintSeconds: number;
+  sprintEverySeconds: number;
+};
+
 export type ArchetypeShape =
   /** Timed work reps, optionally with a second prescribed segment and optionally grouped into sets. */
   | 'intervals'
@@ -445,6 +461,19 @@ export type Archetype = {
    * level rises, and its middle level starts its second round partway down rather than at the top.
    */
   ladderByLevel?: Partial<Record<Level, number[][]>>;
+  /**
+   * ⛔⛔ THE SESSION AS PRINTED, PER LEVEL — and it OVERRIDES the shape builder (Michael, 2026-09-10).
+   *
+   * An archetype is normally the METHOD, sized off a band, never one of his workouts copied out (see
+   * the note above `ARCHETYPES`). p239's endurance ride with work is the exception he ruled on: the
+   * generic `continuous_with_inserts` shape built it as a steady bout sized to whatever the inserts
+   * left, placed FIRST, then N rounds with a 5-minute rest after each — so the 20-minute opening
+   * spin, the sets of four back-to-back rounds, the easy spin between sets and the whole sprint finish
+   * were all absent, and level 1 rode 35 minutes steady and five rested rounds. The shape had no slot
+   * for any of those, and `insertShare: 0.29` (an average of the three levels) could not recover them.
+   * The printed structure is therefore carried here verbatim and built as it reads.
+   */
+  printedByLevel?: Partial<Record<Level, PrintedRide>>;
   /** Seconds of easy recovery between ladder rounds, where the source states one. */
   ladderRoundRest?: number;
   /** Which levels the source offers this shape at. Absent = all three. */
@@ -1210,7 +1239,23 @@ export const FAMILIES: Record<FamilyId, {
         float: { band: { lo: 180, hi: 180 }, intensity: pct(0.70), label: 'Steady' },
         recovery: { kind: 'stated', band: { lo: 300, hi: 300 }, intensity: easy },
         // Computed from his three level examples: the tempo blocks take 24%, 31% and 33% of the ride.
+        // ⚠️ SUPERSEDED FOR THIS ARCHETYPE by `printedByLevel` below; kept because the shape builder is
+        // still the fallback for any level the table does not carry.
         insertShare: 0.29,
+        /**
+         * ⛔ p239 AS PRINTED (docs/SOURCE-viada-hybrid-athlete.md, Endurance p239):
+         *   L1  20-min easy spin · 4 rounds of (2 min @ 80% / 3 min @ 70%) · 45 min @ VT1 with a
+         *       10-second all-out sprint every 9 minutes
+         *   L2  20-min easy spin · 2 sets of 4 rounds … with 5-min easy spin between sets · 60 min @ VT1
+         *       with a 10-second all-out sprint every 8 minutes
+         *   L3  20-min easy spin · 3 sets of 4 rounds … with 5-min easy spin between sets · 90 min @ VT1
+         *       with a 10-second all-out sprint every 9 minutes
+         */
+        printedByLevel: {
+          1: { openSeconds: 20 * 60, sets: 1, roundsPerSet: 4, round: [{ seconds: 120, pct: 0.80 }, { seconds: 180, pct: 0.70 }], betweenSetsSeconds: 0, finishSeconds: 45 * 60, sprintSeconds: 10, sprintEverySeconds: 9 * 60 },
+          2: { openSeconds: 20 * 60, sets: 2, roundsPerSet: 4, round: [{ seconds: 120, pct: 0.80 }, { seconds: 180, pct: 0.70 }], betweenSetsSeconds: 5 * 60, finishSeconds: 60 * 60, sprintSeconds: 10, sprintEverySeconds: 8 * 60 },
+          3: { openSeconds: 20 * 60, sets: 3, roundsPerSet: 4, round: [{ seconds: 120, pct: 0.80 }, { seconds: 180, pct: 0.70 }], betweenSetsSeconds: 5 * 60, finishSeconds: 90 * 60, sprintSeconds: 10, sprintEverySeconds: 9 * 60 },
+        },
         cite: 'Viada p239',
       },
     ],

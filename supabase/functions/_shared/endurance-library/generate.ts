@@ -41,6 +41,7 @@ import {
   WRAPPERS,
   type Archetype,
 } from './source-rules.ts';
+import type { PrintedRide } from './source-rules.ts';
 import { anchorFor, resolveEnduranceAnchors, UNKNOWN_ANCHORS, type EnduranceAnchors, type EnduranceBaselines } from './anchors.ts';
 import type {
   AnchorReport,
@@ -596,6 +597,75 @@ function buildContinuousWithInserts(ctx: BuildContext): Block[] {
   ];
 }
 
+/**
+ * ⛔⛔ p239's ENDURANCE RIDE WITH WORK, BUILT IN THE ORDER IT IS PRINTED (Michael, 2026-09-10).
+ *
+ * Easy spin · the sets of four back-to-back rounds, an easy spin between sets · the VT1 bout with a
+ * 10-second all-out sprint every N minutes. ⛔ NO DOSE SIZING and no floor or cap on the bouts: every
+ * number is the page's, and the session is exactly as long as the page makes it (L1 85 min, L2 125,
+ * L3 180).
+ * ⚠️ THE SPRINT IS `all_out`, deliberately unresolved (p229): no watts are invented for it.
+ * ⚠️ THE VT1 BOUT IS CUT INTO (interval − sprint) + sprint pieces, the last piece without a sprint
+ * when the bout does not divide evenly (level 2: seven sprints, then four minutes easy).
+ */
+function buildPrintedRide(ctx: BuildContext, p: PrintedRide): Block[] {
+  const { sport, anchor } = ctx;
+  const blocks: Block[] = [{
+    repeat: 1,
+    label: 'Easy spin',
+    steps: [step('work', 'Easy spin', p.openSeconds, { kind: 'below_pct', hi: 0.75 }, sport, anchor)],
+    restBetween: null,
+  }];
+  for (let set = 0; set < p.sets; set += 1) {
+    blocks.push({
+      repeat: p.roundsPerSet,
+      label: p.sets > 1 ? `Set ${set + 1} of ${p.sets}` : 'Rounds',
+      steps: p.round.map((r, i) => step(
+        i === 0 ? 'work' : 'float',
+        i === 0 ? 'Push' : 'Steady',
+        r.seconds,
+        { kind: 'pct_threshold', lo: r.pct, hi: r.pct },
+        sport,
+        anchor,
+      )),
+      restBetween: null,
+    });
+    if (set < p.sets - 1 && p.betweenSetsSeconds > 0) {
+      blocks.push({
+        repeat: 1,
+        label: 'Easy spin between sets',
+        steps: [step('recovery', 'Easy spin', p.betweenSetsSeconds, { kind: 'easy' }, sport, anchor)],
+        restBetween: null,
+      });
+    }
+  }
+  const sprints = Math.floor(p.finishSeconds / p.sprintEverySeconds);
+  const tail = p.finishSeconds - sprints * p.sprintEverySeconds;
+  if (sprints > 0) {
+    blocks.push({
+      repeat: sprints,
+      label: 'VT1 with sprints',
+      /**
+       * ⚠️ THE VT1 RIDING IS A `float`, NOT `work` — it is what sits between the sprints, exactly as a
+       * near-threshold run's VT1 float sits between its efforts (`StepRole`). Marked `work`, the
+       * library's own guards read two back-to-back efforts with no gap, and a 530-second "easy bout"
+       * under the adaptation floor; neither is what p239 prints, which is one 45-minute VT1 bout with
+       * sprints in it.
+       */
+      steps: [
+        step('float', 'VT1', p.sprintEverySeconds - p.sprintSeconds, { kind: 'vt1' }, sport, anchor),
+        step('work', 'Sprint', p.sprintSeconds, { kind: 'all_out' }, sport, anchor),
+      ],
+      restBetween: null,
+    });
+  }
+  if (tail > 0) {
+    // The bout's last minutes after its final sprint — the same bout, so the same role.
+    blocks.push({ repeat: 1, label: 'VT1', steps: [step('float', 'VT1', tail, { kind: 'vt1' }, sport, anchor)], restBetween: null });
+  }
+  return blocks;
+}
+
 function buildContinuousWithFinish(ctx: BuildContext): Block[] {
   const { archetype: a, sport, anchor } = ctx;
   const finishSeconds = Math.round(lerp(a.repBand, levelT(ctx.level)));
@@ -802,7 +872,12 @@ export function buildEnduranceSession(req: SessionRequest): EnduranceSession {
       case 'intervals': blocks = buildIntervals(ctx); break;
       case 'distance_intervals': blocks = buildDistanceIntervals(ctx); break;
       case 'continuous': blocks = buildContinuous(ctx); break;
-      case 'continuous_with_inserts': blocks = buildContinuousWithInserts(ctx); break;
+      case 'continuous_with_inserts': {
+        // ⛔ THE PRINTED SESSION WINS WHERE THE ARCHETYPE CARRIES ONE — see `Archetype.printedByLevel`.
+        const printed = archetype.printedByLevel?.[req.level];
+        blocks = printed ? buildPrintedRide(ctx, printed) : buildContinuousWithInserts(ctx);
+        break;
+      }
       case 'continuous_with_finish': blocks = buildContinuousWithFinish(ctx); break;
       case 'descending': blocks = buildDescending(ctx); break;
     }
