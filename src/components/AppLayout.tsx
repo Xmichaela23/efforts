@@ -1853,9 +1853,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                       onViewCompleted={handleViewCompleted}
                       onEditEffort={handleEditEffort}
                       onDateSelect={handleDateSelect}
-                      /* §3e.3 — tapping today's row is the fastest way to the screen about today. */
-                      onOpenToday={() => {
-                        setSelectedDate(new Date().toLocaleDateString('en-CA'));
+                      /* §3f — a session line opens THAT DAY on Today. The date line there already
+                         walks any distance into the past or the future, so the week hands it a day
+                         rather than always snapping back to today. */
+                      onOpenToday={(dateISO) => {
+                        setSelectedDate(dateISO || new Date().toLocaleDateString('en-CA'));
                         setHomeLens('today');
                       }}
                       selectedDate={selectedDate}

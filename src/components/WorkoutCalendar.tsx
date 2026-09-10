@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { analysisNeedsAttention, analysisFailureLine } from '@/lib/analysis-state';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase, getStoredUserId } from '@/lib/supabase';
@@ -16,6 +16,7 @@ import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
 import { useDeclaredPosture } from '@/hooks/useDeclaredPosture';
 import { useResolvedFtp } from '@/hooks/useResolvedFtp';
 import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
+import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { LogTypeMenuContent } from '@/components/LogFAB';
 import RescheduleValidationPopup from '@/components/RescheduleValidationPopup';
@@ -47,8 +48,8 @@ interface WorkoutCalendarProps {
   onViewCompleted: () => void;
   onEditEffort: (workout: any) => void;
   onDateSelect: (date: string) => void;
-  /** §3e.3 — tapping TODAY's row opens the Today tab rather than the add menu. */
-  onOpenToday?: () => void;
+  /** §3f — a session line opens THAT DAY on the Today tab. */
+  onOpenToday?: (dateISO: string) => void;
   selectedDate?: string;
   onSelectRoutine?: (type: string) => void;
   currentPlans?: any[];
@@ -376,6 +377,8 @@ export default function WorkoutCalendar({
   const [referenceDate, setReferenceDate] = useState<Date>(new Date());
   /** §3e.3 — which day's add menu is open. One at a time; null is closed. */
   const [addMenuDate, setAddMenuDate] = useState<string | null>(null);
+
+
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const [touchStartT, setTouchStartT] = useState<number | null>(null);
@@ -430,49 +433,140 @@ export default function WorkoutCalendar({
     setDragOverDate(null);
   };
 
-  // Handle drop - validate and show popup
-  const handleDrop = async (e: React.DragEvent, targetDate: string) => {
-    e.preventDefault();
-    setDragOverDate(null);
-
-    if (!draggedWorkout || !draggedWorkout.id) return;
-
-    const oldDate = draggedWorkout.date || toDateOnlyString(new Date());
-    
-    // Don't validate if dropping on same date
-    if (oldDate === targetDate) {
-      setDraggedWorkout(null);
-      return;
-    }
+  /**
+   * ⛔ ONE MOVE, TWO GESTURES (§3f). The mouse's drop and the finger's press-and-hold both end here,
+   * so the validation, the warnings and the confirm popup cannot differ between them. This was
+   * inline in `handleDrop`, which is why touch had no move at all.
+   */
+  const beginReschedule = useCallback(async (workout: any, targetDate: string) => {
+    if (!workout?.id) return;
+    const oldDate = workout.date || toDateOnlyString(new Date());
+    if (oldDate === targetDate) return;
 
     try {
-      // Call validation edge function
       const { data, error } = await supabase.functions.invoke('validate-reschedule', {
-        body: {
-          workout_id: draggedWorkout.id,
-          new_date: targetDate
-        }
+        body: { workout_id: workout.id, new_date: targetDate },
       });
-
       if (error) {
         console.error('Validation error:', error);
         return;
       }
-
-      // Show validation popup
       setValidationResult(data);
       setReschedulePending({
-        workoutId: draggedWorkout.id,
+        workoutId: workout.id,
         oldDate,
         newDate: targetDate,
-        workoutName: draggedWorkout.name || `${draggedWorkout.type} workout`
+        workoutName: workout.name || `${workout.type} workout`,
       });
       setShowValidationPopup(true);
-      setDraggedWorkout(null);
     } catch (err) {
       console.error('Error validating reschedule:', err);
     }
+  }, []);
+
+  // Handle drop - validate and show popup
+  const handleDrop = async (e: React.DragEvent, targetDate: string) => {
+    e.preventDefault();
+    setDragOverDate(null);
+    const workout = draggedWorkout;
+    setDraggedWorkout(null);
+    await beginReschedule(workout, targetDate);
   };
+
+  /**
+   * ═══ §3f — PRESS AND HOLD TO MOVE A SESSION ════════════════════════════════════════════════════
+   *
+   * ⛔ HTML5 DRAG DOES NOT EXIST ON TOUCH. `draggable` + `dragstart` fire for a mouse and never for
+   * a finger, so the move this calendar has always had was a desktop-only feature on a phone-first
+   * app. The finger gets its own path to the SAME move — `beginReschedule`, one owner, so the touch
+   * path can never validate differently from the mouse path.
+   *
+   * ⚠️ THE HOLD IS WHAT SEPARATES IT FROM A TAP AND FROM A SCROLL. 450 ms, cancelled by any travel
+   * over 10 px before it fires — a thumb that starts moving was scrolling or swiping the week, and
+   * stealing that gesture is how a calendar becomes impossible to scroll past.
+   */
+  const daysGridRef = useRef<HTMLDivElement | null>(null);
+  const longPress = useRef<{ timer: ReturnType<typeof setTimeout> | null; x: number; y: number; row: any; from: string } | null>(null);
+  const [touchDragId, setTouchDragId] = useState<string | null>(null);
+  const [touchDragOver, setTouchDragOver] = useState<string | null>(null);
+  /** Refs as well as state: the native listener below reads them without re-binding on every drag. */
+  const touchDragRef = useRef<{ row: any; from: string; over: string | null } | null>(null);
+
+  const cancelLongPress = useCallback(() => {
+    if (longPress.current?.timer) clearTimeout(longPress.current.timer);
+    longPress.current = null;
+    touchDragRef.current = null;
+    setTouchDragId(null);
+    setTouchDragOver(null);
+  }, []);
+
+  const beginLongPress = useCallback((e: React.TouchEvent, row: any, from: string) => {
+    const planned = String(row?.workout_status ?? '').toLowerCase() !== 'completed';
+    if (!planned || !row?.id) return;
+    const t = e.touches[0];
+    if (!t) return;
+    if (longPress.current?.timer) clearTimeout(longPress.current.timer);
+    longPress.current = {
+      x: t.clientX,
+      y: t.clientY,
+      row,
+      from,
+      timer: setTimeout(() => {
+        touchDragRef.current = { row, from, over: null };
+        setTouchDragId(String(row.id));
+        // ⚠️ A NUDGE SO THE HOLD IS FELT, where the device offers one. Silent on the rest.
+        try { (navigator as { vibrate?: (n: number) => void }).vibrate?.(12); } catch { /* not offered */ }
+      }, 450),
+    };
+  }, []);
+
+  /**
+   * ⛔ A NATIVE, NON-PASSIVE `touchmove` — React's own is passive, and a passive listener cannot
+   * call `preventDefault()`. Without that call the page keeps scrolling under a session the athlete
+   * is trying to carry to another day, which is not a drag, it is a fight.
+   *
+   * ⚠️ IT ONLY TAKES THE GESTURE ONCE THE HOLD HAS FIRED. Before that it does the opposite job:
+   * any travel over 10 px CANCELS the pending hold and hands the gesture back to the page.
+   */
+  useEffect(() => {
+    const el = daysGridRef.current;
+    if (!el) return;
+    const onMove = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!t) return;
+
+      const pending = longPress.current;
+      if (pending?.timer && !touchDragRef.current) {
+        if (Math.abs(t.clientX - pending.x) > 10 || Math.abs(t.clientY - pending.y) > 10) {
+          clearTimeout(pending.timer);
+          longPress.current = null;
+        }
+        return;
+      }
+      if (!touchDragRef.current) return;
+
+      e.preventDefault();
+      const under = document.elementFromPoint(t.clientX, t.clientY) as HTMLElement | null;
+      const day = under?.closest('[data-day]') as HTMLElement | null;
+      const over = day?.getAttribute('data-day') ?? null;
+      if (touchDragRef.current.over !== over) {
+        touchDragRef.current.over = over;
+        setTouchDragOver(over);
+      }
+    };
+    el.addEventListener('touchmove', onMove, { passive: false });
+    return () => el.removeEventListener('touchmove', onMove);
+  }, []);
+
+  const endLongPress = useCallback(() => {
+    const drag = touchDragRef.current;
+    if (longPress.current?.timer) clearTimeout(longPress.current.timer);
+    longPress.current = null;
+    touchDragRef.current = null;
+    setTouchDragId(null);
+    setTouchDragOver(null);
+    if (drag?.over && drag.over !== drag.from) void beginReschedule(drag.row, drag.over);
+  }, [beginReschedule]);
 
   // Handle confirm reschedule
   const handleConfirmReschedule = async () => {
@@ -1023,11 +1117,75 @@ export default function WorkoutCalendar({
   }, [weekDays, map, useImperial]);
 
   const distanceUnitLabel = useImperial ? 'mi' : 'km';
-  /** `6h 10m`, `45m`, `0m` — the shape §3e.4 prints. */
-  const fmtHm = (mins: number) => {
+
+  /**
+   * ⛔ HOW LONG, THE ONE WAY (§3f). `1h 06m` · `37m`. The minutes are zero-padded ONLY beside an
+   * hour, which is what the mockup prints and what stops `1h 6m` reading as a typo.
+   */
+  const fmtDur = (mins: number) => {
     const h = Math.floor(mins / 60);
     const m = mins % 60;
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    return h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`;
+  };
+
+  /** How much of the week's planned work is done. Clamped, because a long day can overshoot. */
+  const weekProgressPct = weekTotals.plannedMin > 0
+    ? Math.max(0, Math.min(1, weekTotals.doneMin / weekTotals.plannedMin))
+    : 0;
+
+  /**
+   * ⛔ WHAT A SESSION LINE SAYS ON THE RIGHT (§3f): the LENGTH while it is still ahead, the REAL
+   * NUMBERS once it is done — `3.6 mi · 37m` for a ride or run, `8,817 lb` for a lift.
+   *
+   * ⚠️ A LIFT PRINTS NEITHER DISTANCE NOR, WHEN DONE, ITS DURATION. Its mileage is nothing and the
+   * time it took is the least interesting thing about it; the weight moved is the fact.
+   */
+  const sessionLineMeta = (row: any, imperial: boolean): string => {
+    const done = String(row?.workout_status ?? '').toLowerCase() === 'completed';
+    const isLift = String(row?.type ?? row?.workout_type ?? '').toLowerCase() === 'strength';
+    const secs = resolveMovingSeconds(row);
+    const mins = secs && secs > 0 ? Math.round(secs / 60) : 0;
+
+    if (isLift && done) {
+      const exercises = Array.isArray(row?.executed?.strength_exercises)
+        ? row.executed.strength_exercises
+        : Array.isArray(row?.strength_exercises) ? row.strength_exercises : [];
+      let volume = 0;
+      for (const ex of exercises) {
+        for (const set of ex?.sets ?? []) {
+          if (set?.completed === false) continue;
+          const reps = Number(set?.reps) || 0;
+          const weight = Number(set?.weight) || 0;
+          if (reps > 0 && weight > 0) volume += reps * weight;
+        }
+      }
+      if (volume > 0) {
+        const shown = imperial ? volume : volume * 0.453592;
+        return `${Math.round(shown).toLocaleString()} ${imperial ? 'lb' : 'kg'}`;
+      }
+      return mins > 0 ? fmtDur(mins) : '';
+    }
+
+    const parts: string[] = [];
+    if (done) {
+      const km = normalizeDistanceKm(row);
+      if (km != null && Number.isFinite(km) && km > 0) {
+        parts.push(imperial ? `${(km * 0.621371).toFixed(1)} ${distanceUnitLabel}` : `${km.toFixed(1)} ${distanceUnitLabel}`);
+      }
+    }
+    if (mins > 0) parts.push(fmtDur(mins));
+    return parts.join(' · ');
+  };
+
+  /**
+   * A sport token plus an alpha, for today's wash. ⚠️ THE TOKENS ARE HEX (`SPORT_COLORS`), so this
+   * is the one place that needs to turn one into an `rgba` rather than every call site guessing.
+   */
+  const hexA = (hex: string, alpha: number): string => {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex).trim());
+    if (!m) return hex;
+    const n = parseInt(m[1], 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
   };
 
   const weekdayFmt = new Intl.DateTimeFormat('en-US', { weekday: "short" });
@@ -1171,58 +1329,71 @@ export default function WorkoutCalendar({
       </div>
 
       {/**
-        * ═══ §3e.4 — PLANNED VERSUS DONE, IN ONE LINE ═════════════════════════════════════════════
+        * ═══ §3f — DONE OVER PLANNED, ONE BAR ════════════════════════════════════════════════════
         *
-        * Field check: TrainingPeaks' and TrainerRoad's calendars both answer "how much of this week
-        * have I actually done" at a glance, and Week answered it nowhere — the athlete had to count
-        * checkmarks.
+        * ⛔ IT REPLACES THE TWO-LINE Planned / Done TEXT (§3e.4 shipped that; the mockup replaces
+        * it). Two stacked sentences of numbers made the athlete do the division themselves; the bar
+        * IS the division, and the two figures stay beside it for the athlete who wants them.
         *
-        * ⛔ NUMBERS ONLY, NO SENTENCE. Hours and miles for the endurance work; lifts counted as
-        * SESSIONS, because a lift's mileage is nothing and its hours are the least interesting thing
-        * about it. `Planned` and `Done` are the only two words, and both are approved.
-        *
-        * ⛔ IT IS COUNTED OFF THE ROWS ALREADY ON SCREEN — the same `events`/`map` the chips below
-        * are drawn from. Nothing is fetched, and nothing is recomputed by a second reader: a number
-        * here that disagreed with the chips under it would be worse than no number.
+        * ⛔ THE FILL IS THE RUN → RIDE GRADIENT, the same two sport tokens the rest of the app uses.
+        * ⚠️ NUMBERS COUNTED OFF THE ROWS ALREADY ON SCREEN — nothing fetched, nothing recomputed by
+        * a second reader. A figure here that disagreed with the lines under it is worse than none.
         */}
       {(weekTotals.plannedMin > 0 || weekTotals.doneMin > 0 || weekTotals.liftsPlanned > 0) ? (
         <div
-          className="flex flex-col gap-0.5 px-1.5 pb-1.5 text-[0.72rem] font-light tabular-nums"
-          style={{ color: 'rgba(255,255,255,0.55)', position: 'relative', zIndex: 1 }}
+          className="grid items-center gap-2.5 px-1 pb-2.5 text-[0.7rem] font-light tabular-nums"
+          style={{ gridTemplateColumns: 'auto 1fr auto', color: 'rgba(255,255,255,0.38)', position: 'relative', zIndex: 1 }}
         >
-          <div className="flex items-center justify-between gap-3">
-            <span>
-              Planned {fmtHm(weekTotals.plannedMin)}
-              {weekTotals.plannedMiles > 0 ? ` · ${weekTotals.plannedMiles.toFixed(0)} ${distanceUnitLabel}` : ''}
-            </span>
-            {weekTotals.liftsPlanned > 0 ? (
-              <span style={{ color: 'rgba(255,255,255,0.42)' }}>
-                {weekTotals.liftsPlanned} {weekTotals.liftsPlanned === 1 ? 'lift' : 'lifts'} planned · {weekTotals.liftsDone} done
-              </span>
-            ) : null}
-          </div>
-          <div style={{ color: 'rgba(255,255,255,0.72)' }}>
-            Done {fmtHm(weekTotals.doneMin)}
-            {weekTotals.doneMiles > 0 ? ` · ${weekTotals.doneMiles.toFixed(0)} ${distanceUnitLabel}` : ''}
-          </div>
+          <span style={{ color: 'rgba(255,255,255,0.62)' }}>
+            Done {fmtDur(weekTotals.doneMin)}
+            {weekTotals.doneMiles >= 0.05 ? ` · ${weekTotals.doneMiles.toFixed(0)} ${distanceUnitLabel}` : ''}
+          </span>
+          <span
+            aria-hidden="true"
+            className="block rounded-full overflow-hidden"
+            style={{ height: 4, background: 'rgba(255,255,255,0.08)' }}
+          >
+            <span
+              className="block h-full rounded-full"
+              style={{
+                width: `${Math.round(weekProgressPct * 100)}%`,
+                background: `linear-gradient(90deg, ${getDisciplineColor('run')}, ${getDisciplineColor('ride')})`,
+                transition: 'width 320ms ease',
+              }}
+            />
+          </span>
+          <span>
+            Planned {fmtDur(weekTotals.plannedMin)}
+            {weekTotals.plannedMiles >= 0.05 ? ` · ${weekTotals.plannedMiles.toFixed(0)} ${distanceUnitLabel}` : ''}
+            {weekTotals.liftsPlanned > 0 ? ` · ${weekTotals.liftsPlanned} ${weekTotals.liftsPlanned === 1 ? 'lift' : 'lifts'}` : ''}
+          </span>
         </div>
       ) : null}
 
       {/**
-        * Vertical timeline — the seven days as rows. Always all seven.
+        * ═══ §3f — SEVEN ROWS, AND A SESSION IS A LINE ═══════════════════════════════════════════
         *
-        * ⛔ ROWS AT CONTENT HEIGHT, 8 px APART (§3e.3). They were stretched to share the pane, which
-        * made an empty Thursday as tall as a Saturday carrying two sessions — the week's shape, which
-        * is the only thing this screen is for, was flattened out of it. A row is now as tall as what
-        * is in it, and a busy day looks busy.
+        * Michael, 2026-09-09: the Week tab *"feels like an afterthought"*. It was seven little cards
+        * of chips floating in a pane; the mockup makes it a week — rows edge to edge that divide the
+        * pane between them, and a session written out rather than abbreviated into a badge.
+        *
+        * ⛔ ROWS FILL THE PANE, `1fr` EACH, WITH A HAIRLINE BETWEEN. No gaps, no card chrome, no
+        * space below Sunday. The row IS the day; the line between two days is all the structure the
+        * eye needs.
+        *
+        * ⛔ A SESSION IS A LINE: sport dot · name · length or real numbers · a mark at the right.
+        * The name is the row's OWN name, not a code derived from it — every abbreviation this screen
+        * used to print (`BK-EZ`, `RN-LR`, `ST`) was a private alphabet the athlete had to learn, and
+        * it was wrong often enough to be worse than nothing.
         */}
       <div
+        ref={daysGridRef}
         style={{
           display: 'grid',
-          gridTemplateRows: 'repeat(7, auto)',
-          gap: 8,
-          flexShrink: 0,
-          paddingBottom: 4,
+          gridTemplateRows: 'repeat(7, 1fr)',
+          flex: 1,
+          minHeight: 0,
+          borderTop: '1px solid rgba(255,255,255,0.10)',
           position: 'relative',
           zIndex: 1,
         }}
@@ -1237,364 +1408,164 @@ export default function WorkoutCalendar({
             (e: any) => e?._src,
           );
           const isToday = todayKey === key;
-          const isSelected = !!selectedDate && selectedDate === key;
-          const isActiveDay = isToday || isSelected;
+          const isPast = key < todayKey;
 
-          // Row-level road wash reacts to the workouts in this day.
-          const rowTypes = Array.from(
-            new Set(
-              (items || [])
-                .map((evt: any) => String(evt?._src?.type || evt?._src?.workout_type || '').toLowerCase())
-                .filter(Boolean)
-            )
-          ).slice(0, 3);
-          const washA = contrastRgbForType(rowTypes[0] || '');
-          const washB = contrastRgbForType(rowTypes[1] || rowTypes[0] || '');
-          const washC = contrastRgbForType(rowTypes[2] || rowTypes[1] || rowTypes[0] || '');
+          /**
+           * ⛔ TODAY IS LIT IN ITS FIRST SESSION'S COLOUR (the mockup) — the wash and the 3 px bar
+           * both. The day's own work is what colours it; a fixed accent would say the same thing on
+           * a lifting Tuesday and a long-ride Saturday.
+           * ⚠️ A TODAY WITH NOTHING ON IT gets a neutral bar rather than a borrowed sport colour.
+           */
+          const leadSport = items.length > 0 ? displayDisciplineOf(items[0]?._src) : null;
+          const todayColour = leadSport ? getDisciplineColor(leadSport) : 'rgba(242,240,236,0.55)';
 
           return (
-            /**
-             * ═══ §3e.3 — THE DAY ROW IS THE ADD CONTROL ═══════════════════════════════════════════
-             *
-             * ⛔ THE FLOATING + IS GONE. It sat over the bottom-right of the pane — on top of
-             * Sunday's row — and it added to whichever day happened to be selected, which is a
-             * second, invisible piece of state. Tapping an empty part of a day now opens the same
-             * menu FOR THAT DAY, which is what TrainingPeaks and TrainerRoad do.
-             *
-             * ⚠️ TAPPING TODAY'S ROW OPENS THE TODAY TAB INSTEAD. It is the row the athlete is
-             * living in; the fastest thing it can do is take them to the screen about it.
-             *
-             * ⚠️ ONE `Root` PER ROW, AND IT RENDERS NO DOM — Radix's Root is a context provider, so
-             * the grid still sees exactly seven children.
-             */
             <PopoverPrimitive.Root
               key={key}
               open={addMenuDate === key}
               onOpenChange={(o) => setAddMenuDate(o ? key : null)}
             >
             <PopoverPrimitive.Anchor asChild>
-            <button
-              type="button"
-              /* ⚠️ THE ONLY NEW WORDS ON THIS SCREEN ARE THE THREE THE GO APPROVED. This is the third,
-                 and an accessible name is where it belongs: the row is a control with no label on it. */
-              aria-label={isToday ? undefined : 'Add a session'}
-              onClick={() => {
-                handleDayClick(d);
-                if (isToday) { onOpenToday?.(); return; }
-                setAddMenuDate(key);
-              }}
+            {/**
+              * ⛔ A `div`, NOT A `button`. It contains the session lines, which are controls of their
+              * own — a button inside a button is invalid HTML that browsers may drop or relocate,
+              * and this row used to be exactly that.
+              *
+              * ⚠️ THE ONLY NEW WORDS ON THIS SCREEN ARE Done, Planned AND Rest. `Add a session` is
+              * the row's accessible name, approved with §3e; it is not printed.
+              */}
+            <div
+              data-day={key}
+              role="button"
+              tabIndex={0}
+              aria-label="Add a session"
+              onClick={() => { handleDayClick(d); setAddMenuDate(key); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleDayClick(d); setAddMenuDate(key); } }}
               onDragOver={(e) => handleDragOver(e, key)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, key)}
-              className={[
-                // compact rows so Today can breathe
-                "w-full flex items-center gap-2 px-2 py-1.5 rounded transition-all",
-                "hover:bg-white/[0.02]",
-                dragOverDate === key ? "ring-1 ring-white/20 bg-white/[0.03]" : "",
-              ].join(" ")}
+              className="grid items-center relative cursor-pointer transition-colors"
               style={{
-                position: 'relative',
-                borderRadius: '6px',
-                // Omni-inspired illuminated border that blends
-                border: isToday ? '0.5px solid rgba(255, 255, 255, 0.18)' : '0.5px solid rgba(255, 255, 255, 0.12)',
+                gridTemplateColumns: '52px 1fr',
+                borderBottom: '1px solid rgba(255,255,255,0.10)',
+                paddingLeft: 10,
+                paddingRight: 2,
+                minWidth: 0,
                 background: isToday
-                  ? `
-                      /* dial back internal glow; keep a readable dark bed */
-                      radial-gradient(ellipse at left, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.18) 100%),
-                      radial-gradient(ellipse at 24% 50%, rgba(255, 215, 0, 0.10) 0%, rgba(255, 215, 0, 0.0) 70%),
-                      radial-gradient(ellipse at 76% 50%, rgba(74, 158, 255, 0.08) 0%, rgba(74, 158, 255, 0.0) 72%)
-                    ` // Today: lower internal wash, keep focus on pills
-                  : isSelected
-                    ? 'radial-gradient(ellipse at left, rgba(255,255,255,0.08) 0%, rgba(0,0,0,0.18) 100%)' // Selected: eye-catch, but less than Today
-                  : 'radial-gradient(ellipse at left, rgba(255,255,255,0.04) 0%, rgba(0,0,0,0.25) 100%)', // Week rows: mid glow
-                opacity: 1.0,
-                // More visible Omni glow for today
-                boxShadow: isToday
-                  ? `
-                      inset 0 0 0 1px rgba(255,255,255,0.10),
-                      0 0 20px rgba(255, 215, 0, 0.18),
-                      0 0 28px rgba(255, 140, 66, 0.12),
-                      0 0 24px rgba(183, 148, 246, 0.11),
-                      0 0 22px rgba(74, 158, 255, 0.10),
-                      0 0 34px rgba(239, 68, 68, 0.07)
-                    `.replace(/\s+/g,' ').trim()
-                  : isSelected
-                    ? 'inset 0 0 0 1px rgba(255,255,255,0.07), 0 0 16px rgba(255,255,255,0.10), 0 0 22px rgba(74,158,255,0.10)'
-                    : 'none',
+                  ? `linear-gradient(90deg, ${hexA(todayColour, 0.12)}, transparent 70%)`
+                  : dragOverDate === key || touchDragOver === key
+                    ? 'rgba(255,255,255,0.05)'
+                    : 'transparent',
               }}
             >
-              {/* Reactive “road tint” that adapts to the row’s workout types.
-                  Kept at the edges + behind a dark center so pills stay clean. */}
-              {items.length > 0 && (
+              {/* ⛔ TODAY'S 3 px BAR, at the pane's left edge. */}
+              {isToday ? (
                 <span
                   aria-hidden="true"
                   style={{
-                    position: 'absolute',
-                    inset: 0,
-                    borderRadius: 6,
-                    pointerEvents: 'none',
-                    zIndex: 0,
-                    // Edge-biased emission + center suppression
-                    backgroundImage: `
-                      radial-gradient(140px 48px at 12% 55%, rgba(${washA}, 0.14) 0%, rgba(${washA}, 0.0) 72%),
-                      radial-gradient(160px 56px at 88% 55%, rgba(${washB}, 0.14) 0%, rgba(${washB}, 0.0) 74%),
-                      radial-gradient(220px 70px at 50% 40%, rgba(${washC}, 0.08) 0%, rgba(${washC}, 0.0) 78%),
-                      linear-gradient(90deg,
-                        rgba(0,0,0,0.45) 0%,
-                        rgba(0,0,0,0.00) 26%,
-                        rgba(0,0,0,0.00) 74%,
-                        rgba(0,0,0,0.45) 100%
-                      )
-                    `,
-                    backgroundBlendMode: 'screen, screen, screen, normal',
-                    opacity: 0.60,
-                    filter: 'blur(10px) saturate(1.05)',
-                    transform: 'translateZ(0)',
+                    position: 'absolute', left: 0, top: 8, bottom: 8, width: 3, borderRadius: 2,
+                    background: todayColour, boxShadow: `0 0 10px ${todayColour}`,
                   }}
                 />
-              )}
-              {/* Side-gutter texture lives INSIDE the row (so it isn't covered by the row's own background) */}
-              <span
-                aria-hidden="true"
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  borderRadius: 6,
-                  pointerEvents: 'none',
-                  zIndex: 0,
-                  opacity: 0.14,
-                  // Keep visible on iOS: avoid exotic blend modes
-                  mixBlendMode: 'normal',
-                  backgroundImage: `
-                    /* LEFT rail + fade-in */
-                    linear-gradient(90deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.00) 46%),
-                    /* RIGHT rail + fade-in */
-                    linear-gradient(270deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.00) 46%),
-                    /* left ticks (kept near edge via local gradient weighting) */
-                    repeating-linear-gradient(155deg, rgba(255,255,255,0.022) 0px, rgba(255,255,255,0.022) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 18px),
-                    /* right ticks */
-                    repeating-linear-gradient(25deg, rgba(255,255,255,0.020) 0px, rgba(255,255,255,0.020) 1px, rgba(255,255,255,0.0) 1px, rgba(255,255,255,0.0) 20px),
-                    /* center suppression so it reads as "sides" */
-                    linear-gradient(90deg, rgba(0,0,0,0.00) 0%, rgba(0,0,0,0.55) 32%, rgba(0,0,0,0.55) 68%, rgba(0,0,0,0.00) 100%)
-                  `,
-                  backgroundSize: 'auto, auto, auto, auto, auto',
-                  backgroundPosition: 'left top, right top, left top, right top, center',
-                  backgroundBlendMode: 'screen, screen, normal, normal, normal',
-                  filter: 'blur(0.2px)',
-                }}
-              />
-              {/* Left: Day label - bright and visible (compact) */}
-              <div className="flex-shrink-0 w-9 text-left" style={{ position: 'relative', zIndex: 1 }}>
-                <div
-                  className="text-xs font-light leading-tight"
-                  style={{
-                    color: isActiveDay ? 'rgba(255, 255, 255, 0.96)' : 'rgba(255, 255, 255, 0.75)',
-                    textShadow: isToday
-                      ? '0 0 8px rgba(255,215,0,0.28), 0 0 14px rgba(255,140,66,0.20), 0 0 14px rgba(183,148,246,0.16)'
-                      : isSelected
-                        ? '0 0 8px rgba(255,255,255,0.14), 0 0 12px rgba(74,158,255,0.12)'
-                      : 'none',
-                  }}
-                >
-                  {weekdayFmt.format(d)}
-                </div>
-                <div
-                  className="text-xs font-light tabular-nums leading-tight"
-                  style={{
-                    color: isActiveDay ? 'rgba(255, 255, 255, 0.92)' : 'rgba(255, 255, 255, 0.7)',
-                    textShadow: isToday
-                      ? '0 0 10px rgba(255,215,0,0.34), 0 0 16px rgba(74,158,255,0.18), 0 0 20px rgba(239,68,68,0.12)'
-                      : isSelected
-                        ? '0 0 10px rgba(255,255,255,0.18), 0 0 16px rgba(74,158,255,0.14)'
-                      : 'none',
-                  }}
-                >
+              ) : null}
+
+              {/* The day. Weekday small and dim, the number large. */}
+              <div
+                className="text-[12px] uppercase"
+                style={{ color: 'rgba(242,240,236,0.36)', lineHeight: 1.15, letterSpacing: '0.04em' }}
+              >
+                {weekdayFmt.format(d)}
+                <b className="block text-[18px] font-medium" style={{ color: 'rgba(242,240,236,1)', letterSpacing: 0 }}>
                   {d.getDate()}
-                </div>
+                </b>
               </div>
 
-              {/* Right: Workout chips - horizontal flow (compact) */}
-              <div className="flex-1 flex items-center gap-1.5 flex-wrap min-h-[24px]" style={{ position: 'relative', zIndex: 1 }}>
-                {items.length > 0 && (
-                  items.map((evt, i) => {
-                    // Check actual workout_status from _src
-                    const workoutStatus = String((evt?._src?.workout_status || '')).toLowerCase();
-                    const isCompleted = workoutStatus === 'completed';
-                    /**
-                     * ⛔ THE DISPLAY DISCIPLINE, NOT THE WIRE TYPE — one seam, feeding the pill, the
-                     * glow, the icon and the text colour below. `displayDisciplineOf` returns the
-                     * row's own `type` for everything except the tagged plyo day, which is
-                     * `type: 'strength'` and must not wear strength's orange.
-                     */
-                    const workoutType = displayDisciplineOf(evt?._src);
-                    
-                    // Determine glow state based on date and status
-                    // Fill rule: ONLY completed workouts get fills. Today's uncompleted workouts = no fill.
-                    // State hierarchy: Completed (done, filled) > Today (active, no fill, strongest glow) > This Week (week, no fill) > Future (idle, no fill)
-                    let glowState: 'idle' | 'week' | 'done' | 'active' = 'idle';
-                    if (isCompleted) {
-                      glowState = 'done'; // Completed workouts get fill and medium-high glow
-                    } else if (isToday) {
-                      glowState = 'active'; // Today's uncompleted workouts get strongest glow but NO fill
-                    } else {
-                      // Check if this week (within current week range)
-                      const workoutDate = evt?._src?.date || key;
-                      const today = new Date();
-                      const currentWeekStart = startOfWeek(today);
-                      const currentWeekEnd = new Date(currentWeekStart);
-                      currentWeekEnd.setDate(currentWeekStart.getDate() + 6);
-                      currentWeekEnd.setHours(23, 59, 59, 59);
-                      
-                      const workoutDateObj = new Date(workoutDate + 'T12:00:00');
-                      const isThisWeek = workoutDateObj >= currentWeekStart && workoutDateObj <= currentWeekEnd;
-                      
-                      glowState = isThisWeek ? 'week' : 'idle'; // This week = medium glow, future = very faint
-                    }
-                    
-                    const phosphorPill = getDisciplinePhosphorPill(workoutType, glowState);
-                    const pillRgb = getDisciplineColorRgb(workoutType);
-                    const isDone = glowState === 'done';
-                    
-                    const isPlanned = workoutStatus === 'planned';
-                    const workoutId = evt?._src?.id;
+              <div className="flex flex-col gap-1 min-w-0">
+                {items.length === 0 ? (
+                  /* ⛔ `Rest` ONLY WHERE A PLAN SAYS SO. A day with no plan behind it has nothing to
+                     say about itself, and calling it rest would be the app inventing a prescription. */
+                  trainingPlanContext ? (
+                    <span className="text-[14px] italic" style={{ color: 'rgba(242,240,236,0.36)' }}>Rest</span>
+                  ) : null
+                ) : items.map((evt: any, i: number) => {
+                  const row = evt?._src;
+                  const done = String(row?.workout_status ?? '').toLowerCase() === 'completed';
+                  const planned = !done && String(row?.workout_status ?? '').toLowerCase() !== 'skipped';
+                  const missed = planned && isPast;
+                  const swapped = isDisciplineSwapped(row as never);
+                  const sport = displayDisciplineOf(row);
+                  const colour = getDisciplineColor(sport);
+                  /* ⚠️ THE ROW'S OWN NAME, and the sport word only when it has none — never a code. */
+                  const name = deriveWorkoutTitle(row as never) || String(row?.type ?? '').replace(/^./, (c: string) => c.toUpperCase());
+                  const meta = sessionLineMeta(row, useImperial);
 
-                    /**
-                     * ═══ §3e.3 — THE CHIP IS A DOT, A LENGTH, AND WHAT HAPPENED TO IT ════════════
-                     *
-                     * ⛔ NO SPORT CODES. `BK-EZ`, `RN-LR`, `ST`, `SM-DRL` — the athlete had to learn
-                     * a private alphabet to read their own week, and the codes were wrong often
-                     * enough to be worse than nothing (§3e.5: a swapped anaerobic ride read `BK-EZ`).
-                     * The sport is the DOT's colour, which the whole app already uses for it.
-                     *
-                     * ⛔ THE SWAP ARROW MEANS "THIS WAS SWAPPED", NOT "THIS COULD BE". It used to
-                     * draw wherever a swap was AVAILABLE, which on a normal week is most chips —
-                     * a glyph on everything says nothing. It is now the mark of a row that no longer
-                     * matches the plan, which is worth a glance.
-                     */
-                    const chipMins = (() => {
-                      const secs = resolveMovingSeconds(evt?._src);
-                      return secs && secs > 0 ? Math.round(secs / 60) : 0;
-                    })();
-                    const chipLength = chipMins > 0
-                      ? `${Math.floor(chipMins / 60) > 0 ? `${Math.floor(chipMins / 60)}h ` : ''}${chipMins % 60}m`
-                      : '';
-                    const wasSwapped = isDisciplineSwapped(evt?._src as never);
-
-                    /**
-                     * ⛔ A PLANNED SESSION WHOSE DAY HAS GONE, WITH NOTHING LOGGED, IS A MISS (§3e.4)
-                     * — and it wears the STATUS colour, never a sport colour. Sport colour answers
-                     * "which sport"; this answers "did it happen", and the two must not be the same
-                     * ink or the week cannot be read at a glance.
-                     * ⚠️ TODAY IS NOT A MISS. The day is not over.
-                     */
-                    const isMissed = isPlanned && key < todayKey;
-                    const chipEdge = isMissed ? STATUS_COLORS.risk : null;
-
-                    return (
+                  return (
+                    <div
+                      key={`${key}-${i}`}
+                      role="button"
+                      tabIndex={0}
+                      draggable={planned && !!row?.id}
+                      onDragStart={(e) => planned && row?.id && handleDragStart(e, row)}
+                      onDragEnd={handleDragEnd}
+                      /* ⛔ TAP A SESSION → THAT DAY ON TODAY (§3f). The line is the door to the day;
+                         the space around it is the door to adding one. */
+                      onClick={(e) => { e.stopPropagation(); onOpenToday?.(key); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onOpenToday?.(key); } }}
+                      /* ⛔ PRESS AND HOLD TO MOVE IT (§3f). See `beginLongPress` — HTML5 drag never
+                         fires on touch, so the finger gets its own path to the SAME move. */
+                      onTouchStart={(e) => beginLongPress(e, row, key)}
+                      onTouchEnd={endLongPress}
+                      onTouchCancel={cancelLongPress}
+                      className="grid items-center gap-2.5 text-[15px] min-w-0"
+                      style={{
+                        gridTemplateColumns: '10px minmax(0,1fr) auto 16px',
+                        opacity: touchDragId && touchDragId === String(row?.id ?? '') ? 0.45 : 1,
+                        cursor: planned && row?.id ? 'grab' : 'pointer',
+                      }}
+                    >
                       <span
-                        key={`${key}-${i}`}
-                        role="button"
-                        tabIndex={0}
-                        draggable={isPlanned && !!workoutId}
-                        onDragStart={(e) => isPlanned && workoutId && handleDragStart(e, evt._src)}
-                        onDragEnd={handleDragEnd}
-                        onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch { /* the row opens or it does not */ } }}
-                        onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch { /* as above */ } } }}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-[0.4rem] flex-shrink-0 transition-all font-medium tracking-normal ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                        aria-hidden="true"
+                        className="inline-block rounded-full"
                         style={{
-                          ...phosphorPill.style,
-                          borderRadius: '8px',
-                          fontSize: '0.86rem',
-                          lineHeight: '1.24',
-                          whiteSpace: 'nowrap',
-                          backgroundColor: isDone ? 'rgba(8, 8, 8, 0.72)' : undefined,
-                          /**
-                           * ⚠️ THE MISS GETS A BED, NOT JUST AN EDGE. On a strength row the sport is
-                           * orange, and brick red at edge-alpha beside orange at edge-alpha is a
-                           * distinction nobody makes at arm's length — a missed lift looked like a
-                           * lift. The faint wash is what separates them.
-                           */
-                          backgroundImage: chipEdge
-                            ? `linear-gradient(180deg, ${STATUS_COLORS.risk}2E 0%, ${STATUS_COLORS.risk}14 100%)`
-                            : isDone
-                              ? `linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)`
-                              : `linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)`,
-                          // ⛔ THE MISS OVERRULES THE SPORT ON THE EDGE ONLY. The dot still says which
-                          // sport it was — losing that would make the whole week's misses look alike.
-                          border: `1px solid ${chipEdge ? `${chipEdge}` : `rgba(${pillRgb}, ${isDone ? 0.28 : 0.18})`}`,
-                          boxShadow: chipEdge
-                            ? `0 0 0 1px rgba(0,0,0,0.24) inset, 0 2px 8px rgba(0,0,0,0.35)`
-                            : `0 0 0 1px rgba(255,255,255,0.06) inset, 0 2px 8px rgba(0,0,0,0.35)`,
-                          color: isDone ? 'rgba(245,245,245,0.92)' : 'rgba(255,255,255,0.86)',
-                          textShadow: `0 1px 1px rgba(0,0,0,0.60)`,
-                          backdropFilter: 'blur(2px)',
-                          WebkitBackdropFilter: 'blur(2px)',
-                          transform: 'translateZ(0)',
+                          width: 8, height: 8,
+                          background: missed ? STATUS_COLORS.risk : colour,
+                          boxShadow: done || missed ? 'none' : `0 0 8px ${colour}`,
+                          opacity: done ? 0.6 : 1,
                         }}
+                      />
+                      <span
+                        className="truncate"
+                        style={{ color: missed ? STATUS_COLORS.risk : done ? 'rgba(242,240,236,0.36)' : 'rgba(242,240,236,1)' }}
                       >
-                        {/* The sport, as the light source it already is everywhere else. */}
-                        <span
-                          aria-hidden="true"
-                          className="inline-block rounded-full flex-shrink-0"
-                          style={{
-                            width: 7,
-                            height: 7,
-                            background: getDisciplineColor(workoutType),
-                            boxShadow: `0 0 8px ${getDisciplineColor(workoutType)}`,
-                          }}
-                        />
-                        {chipLength ? <span className="tabular-nums">{chipLength}</span> : null}
-                        {isDone ? (
-                          <span aria-label="Done" className="flex-shrink-0" style={{ fontSize: 12, lineHeight: 1 }}>✓</span>
-                        ) : null}
-                        {wasSwapped ? (
+                        {name}
+                      </span>
+                      <span
+                        className="text-[14px] tabular-nums flex-shrink-0"
+                        style={{ color: done ? 'rgba(242,240,236,0.36)' : 'rgba(242,240,236,0.62)' }}
+                      >
+                        {meta}
+                      </span>
+                      {/* ⛔ ONE MARK, OR NOTHING: a check when it is done, the swap arrow when the
+                          row no longer matches the plan. Never both — a swapped session that is done
+                          is done, and that is the fact worth the pixels. */}
+                      <span className="text-[14px] text-right flex-shrink-0" style={{ width: 16 }}>
+                        {done ? (
+                          <span aria-label="Done" style={{ color: getDisciplineColor('ride') }}>✓</span>
+                        ) : swapped ? (
                           <ArrowLeftRight
-                            className="inline-block w-3 h-3 flex-shrink-0 opacity-60"
                             aria-label="Swapped"
-                          />
-                        ) : null}
-                        {/* "Failed" on screen (plumbing §3): a small dot; the card says why. */}
-                        {isDone && analysisNeedsAttention(evt?._src) ? (
-                          <span
-                            aria-label={analysisFailureLine(evt?._src) || 'Analysis failed'}
-                            title={analysisFailureLine(evt?._src) || 'Analysis failed'}
-                            className="inline-block w-1.5 h-1.5 rounded-full bg-amber-300/85 flex-shrink-0"
-                          />
-                        ) : null}
-                        {/* ⛔ THE MISS, VISIBLE IN THE WEEK. Opens the activity, where the
-                            "Didn't match your planned … — link it?" button lives. */}
-                        {isDone && unmatchedIds.has(String(workoutId || '')) ? (
-                          <Link2Off
-                            className="inline-block w-3 h-3 text-amber-300/80 flex-shrink-0"
-                            aria-label="Did not match a planned session — tap to link"
+                            className="inline-block w-3.5 h-3.5"
+                            style={{ color: missed ? STATUS_COLORS.risk : 'rgba(242,240,236,0.36)' }}
                           />
                         ) : null}
                       </span>
-                    );
-                  })
-                )}
-                
-                
-                {items.length === 0 && loadingDebounced && (
-                  <>
-                    <span className="h-[18px] rounded w-full bg-white/[0.03]" />
-                    <span className="h-[18px] rounded w-3/4 bg-white/[0.03]" />
-                  </>
-                )}
-                {items.length === 0 && !loadingDebounced && (() => {
-                  const isRestDay = trainingPlanContext;
-                  if (isRestDay) {
-                    return (
-                      <span className="text-xs italic" style={{ color: 'rgba(255, 255, 255, 0.2)' }}>Rest</span>
-                    );
-                  }
-                  return null;
-                })()}
+                    </div>
+                  );
+                })}
               </div>
-            </button>
+            </div>
             </PopoverPrimitive.Anchor>
-            {/* ⚠️ `bottom` and `start`, so the menu opens under the day it belongs to rather than
-                over the rows above it. */}
+            {/* ⚠️ `bottom` and `start`, so the menu opens under the day it belongs to. */}
             <LogTypeMenuContent
               side="bottom"
               align="start"
