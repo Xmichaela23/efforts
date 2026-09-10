@@ -13,11 +13,13 @@ import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts'
 import { powerZoneBoundaries as powerZoneBoundariesFor } from '../_shared/endurance/display-zones.ts';
 import { runEasyZone3FloorBpm } from '../_shared/easy-hr.ts';
 import { paceToGAP } from '../_shared/gap.ts'; // ONE canonical Grade-Adjusted Pace (Minetti) — no inline copy
+import { isIndoorSession } from '../_shared/indoor-session.ts';
+import { buildDisplaySeries } from './display-series.ts';
 // The bike FTP estimator's two per-ride substrates: the widened power-curve durations and the
 // heart-rate/power minute-blocks. Pure, shared with the learner (docs/SPEC-ftp-estimator-2026-09-04.md).
 import { POWER_CURVE_DURATIONS } from '../../../src/lib/bike-ftp-estimator.ts';
 
-const ANALYSIS_VERSION = 'v0.2.2'; // Ride: power curve at 12 durations (FTP estimator substrate); hr_power_blocks no longer written (power-only FTP, 2026-09-04)
+const ANALYSIS_VERSION = 'v0.2.3'; // 2026-09-10 (audit H-D01–H-D03): display series for the Details map, and `time_s` on each split. v0.2.2: ride power curve at 12 durations (FTP estimator substrate); hr_power_blocks no longer written (power-only FTP, 2026-09-04)
 
 
 function smoothEMA(values: (number|null)[], alpha = 0.25): (number|null)[] {
@@ -973,7 +975,9 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
     // Load workout essentials
     const { data: w, error: wErr } = await supabase
       .from('workouts')
-      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed, date, timestamp, swim_data, pool_length, number_of_active_lengths, distance, moving_time, planned_id, threshold_heart_rate, default_max_heart_rate')
+      // name, provider_sport, strava_data, start_position_lat: the indoor rule (no grade or VAM series indoors).
+      // elevation_gain, elevation_loss, metrics: the recorded totals the running climb ends on (audit H-D03).
+      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed, date, timestamp, swim_data, pool_length, number_of_active_lengths, distance, moving_time, planned_id, threshold_heart_rate, default_max_heart_rate, name, provider_sport, strava_data, start_position_lat, elevation_gain, elevation_loss, metrics')
       .eq('id', workout_id)
       .maybeSingle();
     if (wErr) throw wErr;
@@ -1462,6 +1466,8 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
             n: out.length+1,
             t0: Math.max(0,(s.t||0)-t0),
             t1: Math.max(0,(e.t||0)-t0),
+            // The split's time, as the Details map's splits table prints it (audit H-D01).
+            time_s: Math.round(dur_s),
             distance_m: Math.round(dist_m),
             avgPace_s_per_km: pace!=null? Math.round(pace): null,
             avgGapPace_s_per_km: gapPace,
@@ -1489,11 +1495,34 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
   const speed_sm = hasRows ? smoothEMA(speed_mps, 0.18) : [];
   const grade_sm = hasRows ? smoothEMA(grade_percent, 0.25) : [];
 
+  /**
+   * ⛔ THE DETAILS MAP PLOTS THESE AND DERIVES NOTHING (2026-09-10, audit H-D02 / H-D03). Smoothing,
+   * windows and the running climb live in display-series.ts, every number there marked. Computed on
+   * the full recording; workout-detail thins every array of this object together, so they stay aligned.
+   * The ten keys above them are unchanged: analyze-cycling-workout and workout-detail read those.
+   */
+  // The row's own recorded totals (the numbers the Details tab prints), or null.
+  const recordedM = (v: unknown): number | null => (v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+  const displaySeries = hasRows
+    ? buildDisplaySeries({
+        time_s,
+        distance_m,
+        elevation_m: elevation_sm,
+        hr_bpm,
+        cadence: isRide ? cadence_rpm : cadence_spm.map((v, i) => (v != null ? v : cadence_rpm[i])),
+        power_w: power_watts,
+        isRide,
+        indoor: isIndoorSession(w),
+        total_gain_m: recordedM(w.elevation_gain ?? w.metrics?.elevation_gain),
+        total_loss_m: recordedM(w.elevation_loss ?? w.metrics?.elevation_loss),
+      })
+    : {};
+
   const analysis: any = {
       version: ANALYSIS_VERSION,
       computedAt: new Date().toISOString(),
       input,
-    // Always return consistent series structure with all 10 fields (even if empty)
+    // Always return consistent series structure with all 10 fields (even if empty), then the display series
     series: {
       time_s: hasRows ? time_s : [],
       distance_m: hasRows ? distance_m : [],
@@ -1504,7 +1533,8 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
       cadence_spm: hasRows ? cadence_spm : [],
       cadence_rpm: hasRows ? cadence_rpm : [],
       power_watts: hasRows ? power_watts : [],
-      grade_percent: hasRows ? grade_sm : []
+      grade_percent: hasRows ? grade_sm : [],
+      ...displaySeries,
     },
       events: {
         laps: Array.isArray(laps) ? laps.slice(0, 50) : [],

@@ -6,6 +6,7 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { resolvePoolLength } from '../_shared/swim/resolve-pool-length.ts';
 import { metabolicCostPerMeter } from '../_shared/gap.ts'; // ONE canonical Minetti cost — no inline copy
+import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
 
 // ---------- small helpers ----------
 const ydToM = (yd:number)=> yd * 0.9144;
@@ -656,7 +657,7 @@ Deno.serve(async (req) => {
     // Load workout + planned link
     const { data: w, error: workoutError } = await supabase
       .from('workouts')
-      .select('id,user_id,planned_id,computed,metrics,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,user_corrected_pool_length_m,environment,pool_length,number_of_active_lengths,distance,moving_time,avg_power,avg_temperature,weather_data')
+      .select('id,user_id,planned_id,computed,metrics,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,user_corrected_pool_length_m,environment,pool_length,number_of_active_lengths,distance,moving_time,avg_power,avg_temperature,weather_data,elevation_gain')
       .eq('id', workout_id)
       .maybeSingle();
     try { 
@@ -919,6 +920,24 @@ Deno.serve(async (req) => {
           if (Number.isFinite(distM) && distM > 0) {
             computedPayload.overall.avg_pace_s_per_mi = paceSecPerMiFromMetersSeconds(distM, secs);
           }
+        }
+      } catch { /* non-fatal */ }
+      /**
+       * ⛔ THE AVERAGE VAM THE DETAILS MAP'S "(avg)" PILL PRINTS (2026-09-10, audit H-D04). It used to be
+       * written by one branch only (sessions with no plan), and even there it read `elevation_gain`, a
+       * column this function never selected, so it was always null and the pill read a column only
+       * file imports fill. Now every branch writes it here: the recorded gain over the session's one
+       * moving time (the same seconds Details and the calendar print). Null on a swim, and when the
+       * row has no gain above zero or no moving time.
+       */
+      try {
+        if (computedPayload?.overall) {
+          const gainM = Number((w as any)?.elevation_gain ?? (w as any)?.metrics?.elevation_gain);
+          const movingS = completedMovingSeconds({ ...(w as any), computed: computedPayload });
+          computedPayload.overall.avg_vam = (String((w as any)?.type || '').toLowerCase() !== 'swim'
+            && Number.isFinite(gainM) && gainM > 0 && movingS != null && movingS > 0)
+            ? Math.round(gainM / (movingS / 3600))
+            : null;
         }
       } catch { /* non-fatal */ }
       const normalized = normalizeComputedPaces(computedPayload);
@@ -1470,16 +1489,7 @@ Deno.serve(async (req) => {
               return Number.isFinite(mx) ? Math.round(mx) : null;
             } catch { return null; }
           })(),
-          avg_vam: ((): number | null => {
-            try {
-              const elevGainM = Number((w as any)?.elevation_gain);
-              const durMin = Number((w as any)?.moving_time);
-              if (Number.isFinite(elevGainM) && elevGainM > 0 && Number.isFinite(durMin) && durMin > 0) {
-                const hours = (durMin * 60) / 3600; return Math.round(elevGainM / hours);
-              }
-              return null;
-            } catch { return null; }
-          })()
+          // `avg_vam` is written for every branch in `writeComputed` (audit H-D04).
         },
         quality: {
           mode: laps.length ? 'lap' : 'split',

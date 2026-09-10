@@ -14,6 +14,7 @@ import { formatSpeed } from "../utils/workoutFormatting";
 import { isVirtualActivity, getVirtualWorkoutLabel } from "../utils/workoutNames";
 import { isIndoorSession } from "@shared/indoor-session";
 import { getDisciplineColorRgb, SPORT_COLORS } from "@/lib/context-utils";
+import { extractSessionDetailV1FromWorkout } from "@/hooks/useWorkoutDetail";
 
 // Route simplification now happens server-side in workout-detail
 
@@ -40,25 +41,32 @@ function readStoredBasemap(): 'standard' | 'outdoor' | 'hybrid' | 'topo' {
 }
 
 /** ---------- Types ---------- */
+/**
+ * One point of the server's series (compute-workout-analysis, display-series.ts; thinned by
+ * workout-detail). ⛔ Every value is plotted or printed as the server sent it (2026-09-10, audit H-D02).
+ */
 type Sample = {
-  t_s: number;              // seconds from start
-  d_m: number;              // cumulative meters
-  elev_m_sm: number | null; // smoothed elevation (m)
-  pace_s_per_km: number | null;
-  speed_mps?: number | null;
-  hr_bpm: number | null;
-  vam_m_per_h: number | null;
-  grade: number | null;
-  cad_spm?: number | null;
-  cad_rpm?: number | null;
-  power_w?: number | null;
+  t_s: number;                    // series.time_s
+  d_m: number;                    // series.distance_m
+  elev_m_sm: number | null;       // series.elevation_m (smoothed on the server)
+  pace_s_per_km: number | null;   // series.pace_display_s_per_km
+  speed_mps?: number | null;      // series.speed_mps
+  hr_bpm: number | null;          // series.hr_display_bpm
+  vam_m_per_h: number | null;     // series.vam_m_per_h
+  grade_pct: number | null;       // series.grade_display_pct
+  cad?: number | null;            // series.cadence_display
+  power_w?: number | null;        // series.power_display_w
+  power_raw_w?: number | null;    // series.power_watts (the power axis reaches the real peaks)
+  gain_m: number | null;          // series.elevation_gain_cum_m
+  loss_m: number | null;          // series.elevation_loss_cum_m
 };
+/** One row of the server's `computed.analysis.events.splits.{mi|km}` (audit H-D01). */
 type Split = {
-  startIdx: number; endIdx: number;
-  time_s: number; dist_m: number;
+  n: number; t0: number; t1: number;
+  time_s?: number | null;
   avgPace_s_per_km: number | null;
   avgHr_bpm: number | null;
-  gain_m: number; avgGrade: number | null;
+  avgGrade_pct: number | null;
 };
 type MetricTab = "pace" | "spd" | "bpm" | "cad" | "pwr" | "elev" | "vam";
 
@@ -142,7 +150,8 @@ const fmtYAxis = (value: number, metric: string, workoutType: string = 'run', us
 };
 const fmtDist = (m: number, useMi = true) => (useMi ? `${(m / 1609.34).toFixed(1)} mi` : `${(m / 1000).toFixed(2)} km`);
 const fmtAlt = (m: number, useFeet = true) => (useFeet ? `${Math.round(m * 3.28084)} ft` : `${Math.round(m)} m`);
-const fmtPct = (x: number | null) => (x == null || !Number.isFinite(x) ? "—" : `${(x * 100).toFixed(1)}%`);
+/** The server sends grade in percent. */
+const fmtPct = (pct: number | null | undefined) => (pct == null || !Number.isFinite(pct) ? "—" : `${pct.toFixed(1)}%`);
 const fmtVAM = (mPerH: number | null, useFeet = true) => (mPerH == null || !Number.isFinite(mPerH) ? "—" : useFeet ? `${Math.round(mPerH * 3.28084)} ft/h` : `${Math.round(mPerH)} m/h`);
 
 /** ---------- Map Enhancement Helpers ---------- */
@@ -375,66 +384,7 @@ function downsampleTrackLngLat(points: [number, number][], epsilonMeters = 7, ma
   return reduced;
 }
 
-/** ---------- Basic smoothing & robust domain helpers ---------- */
-const movAvg = (arr: number[], w = 5) => {
-  if (arr.length === 0 || w <= 1) return arr.slice();
-  const half = Math.floor(w / 2);
-  const out: number[] = new Array(arr.length);
-  for (let i = 0; i < arr.length; i++) {
-    let s = 0, n = 0;
-    for (let k = -half; k <= half; k++) {
-      const j = i + k;
-      if (j >= 0 && j < arr.length && Number.isFinite(arr[j])) { s += arr[j]; n++; }
-    }
-    out[i] = n ? s / n : arr[i];
-  }
-  return out;
-};
-
-// NaN-aware moving average: averages only valid values in the window; returns NaN if none valid
-function nanAwareMovAvg(arr: (number|null|undefined)[], w = 5): number[] {
-  if (arr.length === 0 || w <= 1) return arr.map(v => (Number.isFinite(v as any) ? Number(v) : NaN));
-  const half = Math.floor(w / 2);
-  const out: number[] = new Array(arr.length).fill(NaN);
-  for (let i = 0; i < arr.length; i++) {
-    let s = 0, n = 0;
-    for (let k = -half; k <= half; k++) {
-      const j = i + k;
-      const v = arr[j];
-      if (j >= 0 && j < arr.length && Number.isFinite(v as any)) { s += Number(v); n++; }
-    }
-    out[i] = n ? s / n : NaN;
-  }
-  return out;
-}
-
-// Enhanced smoothing with outlier detection and clamping
-const smoothWithOutlierHandling = (arr: number[], windowSize = 7, outlierThreshold = 3) => {
-  if (arr.length === 0) return arr.slice();
-  
-  // First pass: detect outliers using robust statistics
-  const finite = arr.filter(v => Number.isFinite(v));
-  if (finite.length < 3) return arr.slice();
-  
-  // Calculate robust percentiles for outlier detection
-  const sorted = [...finite].sort((a, b) => a - b);
-  const q1 = sorted[Math.floor(sorted.length * 0.25)];
-  const q3 = sorted[Math.floor(sorted.length * 0.75)];
-  const iqr = q3 - q1;
-  const outlierThresholdValue = outlierThreshold * iqr;
-  
-  // Clamp outliers
-  const clamped = arr.map(v => {
-    if (!Number.isFinite(v)) return v;
-    if (v < q1 - outlierThresholdValue) return q1 - outlierThresholdValue;
-    if (v > q3 + outlierThresholdValue) return q3 + outlierThresholdValue;
-    return v;
-  });
-  
-  // Apply moving average with larger window for better smoothing
-  return movAvg(clamped, windowSize);
-};
-
+/** ---------- Axis-domain helpers (the y-axis range only; no plotted value passes through them) ---------- */
 // Winsorize data using robust percentiles
 const winsorize = (arr: number[], lowerPct = 5, upperPct = 95) => {
   const finite = arr.filter(v => Number.isFinite(v));
@@ -455,59 +405,6 @@ const pct = (vals: number[], p: number) => {
   const i = clamp(Math.floor((p / 100) * (a.length - 1)), 0, a.length - 1);
   return a[i];
 };
-
-// Simple median filter with odd window size
-function medianFilter(arr: (number|null)[], w: number): (number|null)[] {
-  if (w < 3 || arr.length === 0) return arr.slice();
-  const half = Math.floor(w / 2);
-  const out: (number|null)[] = new Array(arr.length);
-  for (let i = 0; i < arr.length; i++) {
-    const window: number[] = [];
-    for (let k = -half; k <= half; k++) {
-      const j = i + k;
-      const v = arr[j];
-      if (j >= 0 && j < arr.length && Number.isFinite(v as any)) window.push(v as number);
-    }
-    out[i] = window.length ? window.sort((a,b)=>a-b)[Math.floor(window.length/2)] : arr[i];
-  }
-  return out;
-}
-
-/** ---------- Splits ---------- */
-function buildSplit(samples: Sample[], s: number, e: number): Split {
-  const S = samples[s], E = samples[e];
-  const dist = Math.max(0, E.d_m - S.d_m), time = Math.max(1, E.t_s - S.t_s);
-  let sumHr = 0, nHr = 0, gain = 0, sumG = 0, nG = 0;
-  for (let i = s + 1; i <= e; i++) {
-    const h = samples[i].hr_bpm; if (Number.isFinite(h as any)) { sumHr += h as number; nHr++; }
-    const e1 = (samples[i].elev_m_sm ?? samples[i - 1].elev_m_sm ?? 0) as number;
-    const e0 = (samples[i - 1].elev_m_sm ?? e1) as number;
-    const dh = e1 - e0; if (dh > 0) gain += dh;
-    let g = samples[i].grade;
-    if (!Number.isFinite(g as any)) {
-      const dd = Math.max(1, samples[i].d_m - samples[i - 1].d_m);
-      g = dh / dd;
-    }
-    if (Number.isFinite(g as any)) { sumG += g as number; nG++; }
-  }
-  return {
-    startIdx: s, endIdx: e, time_s: time, dist_m: dist,
-    avgPace_s_per_km: dist > 0 ? time / (dist / 1000) : null,
-    avgHr_bpm: nHr ? Math.round(sumHr / nHr) : null,
-    gain_m: gain, avgGrade: nG ? sumG / nG : null
-  };
-}
-function computeSplits(samples: Sample[], metersPerSplit: number): Split[] {
-  if (samples.length < 2) return [];
-  const out: Split[] = [];
-  // Start from distance 0, not samples[0].d_m, to ensure first split (mile 1) is included
-  let start = 0, next = metersPerSplit;
-  for (let i = 1; i < samples.length; i++) {
-    if (samples[i].d_m >= next) { out.push(buildSplit(samples, start, i)); start = i + 1; next += metersPerSplit; }
-  }
-  if (start < samples.length - 1) out.push(buildSplit(samples, start, samples.length - 1));
-  return out;
-}
 
 /** ---------- Tiny UI atoms ---------- */
 const Pill = ({ label, value, subValue, active=false, titleAttr, width, onClick, metricType }: { label: string; value: string | number; subValue?: string; active?: boolean; titleAttr?: string; width?: number; onClick?: () => void; metricType?: string }) => {
@@ -552,109 +449,6 @@ const Pill = ({ label, value, subValue, active=false, titleAttr, width, onClick,
   );
 };
 
-/** Same pipeline as chart CAD/PWR tabs — use for scrub pills on any tab. */
-function buildScrubCadenceSeries(normalizedSamples: Sample[], isOutdoorGlobal: boolean): number[] {
-  const cad = normalizedSamples.map(s => {
-    if (Number.isFinite(s.cad_rpm as any)) return Number(s.cad_rpm);
-    if (Number.isFinite(s.cad_spm as any)) return Number(s.cad_spm);
-    return NaN;
-  });
-  const validOnly = cad.map(v => (Number.isFinite(v) && v >= 40 && v <= 220 ? v : NaN));
-  const interpolated: number[] = new Array(validOnly.length).fill(NaN);
-  let lastValid: number | null = null;
-  let lastValidIdx = -1;
-  for (let i = 0; i < validOnly.length; i++) {
-    const v = validOnly[i];
-    if (Number.isFinite(v)) {
-      if (lastValid !== null && lastValidIdx >= 0 && i - lastValidIdx > 1) {
-        const gap = i - lastValidIdx;
-        for (let j = lastValidIdx + 1; j < i; j++) {
-          const t = (j - lastValidIdx) / gap;
-          interpolated[j] = lastValid + t * ((v as number) - lastValid);
-        }
-      }
-      interpolated[i] = v as number;
-      lastValid = v as number;
-      lastValidIdx = i;
-    }
-  }
-  const firstValid = interpolated.find(v => Number.isFinite(v));
-  const lastValidVal = [...interpolated].reverse().find(v => Number.isFinite(v));
-  for (let i = 0; i < interpolated.length; i++) {
-    if (!Number.isFinite(interpolated[i])) {
-      interpolated[i] = i < lastValidIdx ? (firstValid ?? 80) : (lastValidVal ?? 80);
-    }
-  }
-  const wins = winsorize(interpolated, 5, 95);
-  const smoothingWindow = isOutdoorGlobal ? 35 : 40;
-  const smoothed = smoothWithOutlierHandling(wins, smoothingWindow, 2.0);
-  return smoothed.map(v => (Number.isFinite(v) ? v : NaN));
-}
-
-function hasGPSData(workoutData?: any): boolean {
-  if (!workoutData) return false;
-  if (Array.isArray(workoutData.track) && workoutData.track.length > 10) return true;
-  if (((workoutData as any)?.gps_data?.length || 0) > 10) return true;
-  return false;
-}
-
-/** Smoothed power for the PWR chart only — NaN stays NaN when coasting / downhill (no fake fill). */
-function buildScrubPowerSeries(normalizedSamples: Sample[], isOutdoorGlobal: boolean, workoutData?: any): number[] {
-  const pwr = normalizedSamples.map(s => Number.isFinite(s.power_w as any) ? Number(s.power_w) : NaN);
-  const cleaned = pwr.map(v => {
-    if (!Number.isFinite(v)) return NaN;
-    if (v < 0 || v > 2000) return NaN;
-    return v;
-  });
-  if (isOutdoorGlobal) {
-    const wins = winsorize(cleaned as number[], 2, 98);
-    const smoothed = smoothWithOutlierHandling(wins, 15, 2.5);
-    return smoothed.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
-  }
-  const isIndoor = !hasGPSData(workoutData);
-  const workoutType = String((workoutData as any)?.type || 'run').toLowerCase();
-  const smoothingWindow = (workoutType === 'ride' || workoutType === 'bike' || workoutType === 'cycling') && isIndoor ? 25 : 20;
-  const wins = winsorize(cleaned as number[], 2, 98);
-  const smoothed = smoothWithOutlierHandling(wins, smoothingWindow, 2.5);
-  return smoothed.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
-}
-
-function rawPowerAt(samples: Sample[], i: number): number | null {
-  const s = samples[Math.min(Math.max(0, i), Math.max(0, samples.length - 1))];
-  const w = s?.power_w;
-  return Number.isFinite(w as any) ? Number(w) : null;
-}
-
-function rawCadenceAt(samples: Sample[], i: number, isRide: boolean): number | null {
-  const s = samples[Math.min(Math.max(0, i), Math.max(0, samples.length - 1))];
-  if (isRide) {
-    if (Number.isFinite(s?.cad_rpm as any)) return Number(s.cad_rpm);
-    if (Number.isFinite(s?.cad_spm as any)) return Number(s.cad_spm);
-  } else {
-    if (Number.isFinite(s?.cad_spm as any)) return Number(s.cad_spm);
-    if (Number.isFinite(s?.cad_rpm as any)) return Number(s.cad_rpm);
-  }
-  return null;
-}
-
-/** Scrub pill: prefer instantaneous raw; else chart-smoothed cadence (raw is sparse after bucketing/downsample). */
-function cadenceAtScrub(
-  samples: Sample[],
-  idx: number,
-  isRide: boolean,
-  chartCadence: number[],
-): number | null {
-  const raw = rawCadenceAt(samples, idx, isRide);
-  if (raw != null) return raw;
-  const hasCadenceData = samples.some(
-    (s) => Number.isFinite(s.cad_spm as any) || Number.isFinite(s.cad_rpm as any),
-  );
-  if (!hasCadenceData || chartCadence.length === 0) return null;
-  const i = Math.min(Math.max(0, idx), Math.max(0, chartCadence.length - 1));
-  const v = chartCadence[i];
-  return Number.isFinite(v) ? Number(v) : null;
-}
-
 /** ---------- Main Component ---------- */
 function EffortsViewerMapbox({
   samples,
@@ -663,13 +457,16 @@ function EffortsViewerMapbox({
   useFeet = true,
   compact = false,
   workoutData,
+  sessionDetail,
 }: {
-  samples: any; // either Sample[] or raw series object {time_s, distance_m, elevation_m, pace_s_per_km, hr_bpm}
+  samples: any; // the server's series object (display_metrics.series, else computed.analysis.series)
   trackLngLat: [number, number][];
   useMiles?: boolean;
   useFeet?: boolean;
   compact?: boolean;
   workoutData?: any;
+  /** `session_detail_v1` as the screen already holds it — on a first open the workout row does not carry it yet. */
+  sessionDetail?: any;
 }) {
   /**
    * ⛔ THE SAME ANSWER FOR THE WEATHER AND THE STRIP. An indoor session has no weather to show and no
@@ -691,22 +488,31 @@ function EffortsViewerMapbox({
     return Number.isFinite(c) && c !== 0 ? Math.round(c * 9 / 5 + 32) : null;
   }, [workoutData]);
 
-  /** Normalize samples to Sample[] regardless of upstream shape */
+  /**
+   * ⛔ THE SERVER'S SERIES, POINT FOR POINT (2026-09-10, audit H-D02). This used to rebuild elevation
+   * (its own EMA), grade (a ±9-point window clamped to ±30%, trimmed at 2/98 and smoothed twice more)
+   * and VAM (with GPS speed and grade cut-offs) from the raw samples. compute-workout-analysis now sends
+   * every line ready to plot (display-series.ts, each window marked there); a series it did not send
+   * plots nothing. ⚠️ The thinning below picks points for drawing; it changes no value.
+   */
   const normalizedSamples: Sample[] = useMemo(() => {
-    const isSampleArray = Array.isArray(samples) && (samples.length === 0 || typeof samples[0]?.t_s === 'number');
-    if (isSampleArray) return samples as Sample[];
     const s = samples || {};
+    const arr = (k: string): (number | null)[] => (Array.isArray(s[k]) ? s[k] : []);
+    const num = (a: (number | null)[], i: number): number | null => (Number.isFinite(a[i] as any) ? Number(a[i]) : null);
     const time_s: number[] = Array.isArray(s.time_s) ? s.time_s : (Array.isArray(s.time) ? s.time : []);
-    const distance_m: (number|null)[] = Array.isArray(s.distance_m) ? s.distance_m : [];
-    const elevation_m: (number|null)[] = Array.isArray(s.elevation_m) ? s.elevation_m : [];
-    const pace_s_per_km: (number|null)[] = Array.isArray(s.pace_s_per_km) ? s.pace_s_per_km : [];
-    const hr_bpm: (number|null)[] = Array.isArray(s.hr_bpm) ? s.hr_bpm : [];
-    const speed_mps: (number|null)[] = Array.isArray(s.speed_mps) ? s.speed_mps : [];
-    const cad_spm: (number|null)[] = Array.isArray(s.cadence_spm) ? s.cadence_spm : [];
-    const cad_rpm: (number|null)[] = Array.isArray(s.cadence_rpm) ? s.cadence_rpm : [];
-    const power_w: (number|null)[] = Array.isArray(s.power_watts) ? s.power_watts : [];
-    const len = Math.min(distance_m.length, time_s.length || distance_m.length);
-    
+    const distance_m = arr('distance_m');
+    const elevation_m = arr('elevation_m');
+    const pace_s_per_km = arr('pace_display_s_per_km');
+    const hr_bpm = arr('hr_display_bpm');
+    const speed_mps = arr('speed_mps');
+    const cad = arr('cadence_display');
+    const power_w = arr('power_display_w');
+    const power_raw_w = arr('power_watts');
+    const grade_pct = arr('grade_display_pct');
+    const vam = arr('vam_m_per_h');
+    const gain = arr('elevation_gain_cum_m');
+    const loss = arr('elevation_loss_cum_m');
+
     // Find peak indices BEFORE downsampling to ensure they're preserved
     const peakIndices = new Set<number>();
     
@@ -746,115 +552,26 @@ function EffortsViewerMapbox({
     // Downsample indices to ~2000 pts while preserving 1 km/1 mi split boundaries AND peak values
     const splitMeters = useMiles ? 1609.34 : 1000;
     const idxs = downsampleSeriesByDistance(distance_m as number[], 2000, splitMeters, peakIndices);
-    const out: Sample[] = [];
-    let ema: number | null = null, lastE: number | null = null, lastD: number | null = null, lastT: number | null = null;
-    const a = 0.18; // elevation EMA factor (outdoor-friendly)
-    // pace EMA (server-only)
-    let paceEma: number | null = null; const ap = 0.25;
-    // Outdoor detection (GPS present) -> enable sanity checks
-    const isOutdoor = Array.isArray(trackLngLat) && trackLngLat.length >= 20;
-
-    for (let k=0;k<idxs.length;k++){
-      const i = idxs[k];
-      const t = Number(time_s?.[i] ?? i) || 0;
-      const d = Number(distance_m?.[i] ?? 0) || 0;
-      const e = typeof elevation_m?.[i] === 'number' ? Number(elevation_m[i]) : null;
-      if (e != null) ema = (ema==null ? e : a*e + (1-a)*ema);
-      const es = (ema != null) ? ema : (e != null ? e : (lastE != null ? lastE : 0));
-      let grade: number | null = null, vam: number | null = null;
-      if (lastE != null && lastD != null && lastT != null){
-        const ddRaw = d - lastD;
-        const dtRaw = t - lastT;
-        const dd = Math.max(1, ddRaw);
-        const dh = es - lastE;
-        const dt = Math.max(1, dtRaw);
-        // GPS sanity filters for single-step anomalies
-        if (isOutdoor) {
-          const instSpeed = dd / dt; // m/s
-          const instGrade = Math.abs(dh / dd);
-          const badSpeed = instSpeed > (workoutData?.type === 'ride' ? 18 : 7.5);
-          const badGrade = instGrade > 0.45 && dd < 30;
-          if (!badSpeed && !badGrade) {
-            grade = dh / dd;
-            vam = (dh/dt) * 3600;
-          } else {
-            grade = null;
-            vam = null;
-          }
-        } else {
-          grade = dh / dd;
-          vam = (dh/dt) * 3600;
-        }
-        /**
-         * ⛔ NO GRADE AND NO VAM INDOORS (2026-09-09). Both are altitude over distance, and indoors
-         * there is no altitude — on a trainer or a treadmill the field is empty, and on Zwift it is
-         * a fictional one that would plot a climb the athlete's legs never did. ⚠️ AFTER the branch
-         * above rather than inside it, because Zwift's polyline passes the `isOutdoor` point-count
-         * test and would otherwise take the outdoor path.
-         */
-        if (indoor) { grade = null; vam = null; }
-      }
-      // Only use server pace; no client derivation
-      const paceVal: number | null = Number.isFinite(pace_s_per_km?.[i] as any) ? Number(pace_s_per_km[i]) : null;
-      // Don't apply EMA to pace - use raw values to preserve peaks
-      out.push({
-        t_s: t,
-        d_m: d,
-        elev_m_sm: es,
-        pace_s_per_km: paceVal,
-        speed_mps: Number.isFinite(speed_mps?.[i] as any) ? Number(speed_mps[i]) : null,
-        hr_bpm: Number.isFinite(hr_bpm?.[i]) ? Number(hr_bpm[i]) : null,
-        grade,
-        vam_m_per_h: vam,
-        cad_spm: Number.isFinite(cad_spm?.[i] as any) ? Number(cad_spm[i]) : null,
-        cad_rpm: Number.isFinite(cad_rpm?.[i] as any) ? Number(cad_rpm[i]) : null,
-        power_w: Number.isFinite(power_w?.[i] as any) ? Number(power_w[i]) : null
-      });
-      lastE = es; lastD = d; lastT = t;
-    }
-    // Compute robust, rolling-window grade and smooth it further to avoid jumpiness (outdoor tuned)
-    try {
-      const n = out.length; if (n >= 3) {
-        const elev = out.map(s => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : 0);
-        const dist = out.map(s => Number.isFinite(s.d_m as any) ? (s.d_m as number) : 0);
-        const windowPts = 9; // calmer: ~18-pt span
-        const rawGrade: number[] = new Array(n).fill(0);
-        for (let i = 0; i < n; i++) {
-          const j = Math.max(0, i - windowPts);
-          const k2 = Math.min(n - 1, i + windowPts);
-          const dd = Math.max(20, (dist[k2] - dist[j])); // require ≥20 m span to reduce noise
-          const dh = (elev[k2] - elev[j]);
-          rawGrade[i] = clamp(dh / dd, -0.30, 0.30);
-        }
-        const wins = winsorize(rawGrade, 2, 98); // outdoor: slightly tighter
-        const sm = smoothWithOutlierHandling(wins, 9, 2.5);
-        // Final calming EMA
-        const emaAlpha = 0.2;
-        let ema: number | null = null;
-        const finalG: number[] = new Array(n).fill(0);
-        for (let i = 0; i < n; i++) {
-          const v = Number.isFinite(sm[i]) ? (sm[i] as number) : rawGrade[i];
-          ema = ema == null ? v : (emaAlpha * v + (1 - emaAlpha) * ema);
-          finalG[i] = clamp(ema, -0.30, 0.30);
-        }
-        for (let i = 0; i < n; i++) out[i].grade = finalG[i];
-      }
-    } catch {}
-    return out;
+    return idxs.map((i): Sample => ({
+      t_s: Number(time_s?.[i] ?? i) || 0,
+      d_m: Number(distance_m?.[i] ?? 0) || 0,
+      elev_m_sm: num(elevation_m, i),
+      pace_s_per_km: num(pace_s_per_km, i),
+      speed_mps: num(speed_mps, i),
+      hr_bpm: num(hr_bpm, i),
+      vam_m_per_h: num(vam, i),
+      grade_pct: num(grade_pct, i),
+      cad: num(cad, i),
+      power_w: num(power_w, i),
+      power_raw_w: num(power_raw_w, i),
+      gain_m: num(gain, i),
+      loss_m: num(loss, i),
+    }));
   }, [samples, useMiles]);
 
   const isOutdoorGlobal = useMemo(() =>
     Array.isArray(trackLngLat) && trackLngLat.length > 1,
   [trackLngLat]);
-
-  const scrubCadenceSeries = useMemo(
-    () => buildScrubCadenceSeries(normalizedSamples, isOutdoorGlobal),
-    [normalizedSamples, isOutdoorGlobal],
-  );
-  const scrubPowerSeries = useMemo(
-    () => buildScrubPowerSeries(normalizedSamples, isOutdoorGlobal, workoutData),
-    [normalizedSamples, isOutdoorGlobal, workoutData],
-  );
 
   // Default tab: prefer SPEED when speed_mps exists; else PACE when pace exists; else BPM
   const defaultTab: MetricTab = useMemo(() => {
@@ -866,7 +583,6 @@ function EffortsViewerMapbox({
     return "bpm";
   }, [normalizedSamples]);
   const [tab, setTab] = useState<MetricTab>(defaultTab);
-  const [showVam, setShowVam] = useState(false);
   const [showMapInfo, setShowMapInfo] = useState(false);
   const [idx, setIdx] = useState(0);
   const [locked, setLocked] = useState(false);
@@ -990,22 +706,15 @@ function EffortsViewerMapbox({
   // Map rendering moved to MapEffort component (use dN for total)
   const dTotal = distCalc.dN;
   const distNow = distCalc.distMono[idx] ?? distCalc.d0;
-  const atEnd = useMemo(() => {
-    const nearEndByIdx = idx >= (normalizedSamples.length - 2);
-    const nearEndByDist = Math.abs((dTotal ?? 0) - (distNow ?? 0)) <= 25; // within 25 m of finish
-    return nearEndByIdx || nearEndByDist;
-  }, [idx, normalizedSamples.length, dTotal, distNow]);
 
   // Thumb scrubbing metrics (use scrubbed distance if available, otherwise current)
   const currentDistance = scrubDistance !== null ? scrubDistance : distNow;
   const currentSample = getCurrentSample(normalizedSamples, currentDistance);
   const isRide = workoutData?.type === 'ride';
   
-  // Format metrics for thumb scrubbing (power aligned with chart PWR series when meter data exists)
+  // Format metrics for thumb scrubbing — the server's series at the cursor
   const currentSpeed = formatSpeedForScrub(currentSample?.speed_mps, isRide, useMiles);
-  const hasPowerMeter = normalizedSamples.some(s => Number.isFinite(s.power_w as any));
-  const rawPowerIdx = rawPowerAt(normalizedSamples, idx);
-  const currentPower = formatPowerForScrub(hasPowerMeter && rawPowerIdx != null ? rawPowerIdx : null);
+  const currentPower = formatPowerForScrub(currentSample?.power_w ?? null);
   const currentHR = formatHRForScrub(currentSample?.hr_bpm);
   const currentGrade = formatGradeForScrub(currentSample?.grade_pct);
   const currentDistanceFormatted = formatDistanceForScrub(currentDistance, useMiles);
@@ -1019,139 +728,19 @@ function EffortsViewerMapbox({
   const pl = 60;                    // left padding (space for Y labels - increased for 3-digit numbers)
   const pr = 12;                    // right padding
 
-  // cumulative positive gain (m) and loss (m), used for the InfoCard
-  const { cumGain_m, cumLoss_m } = useMemo(() => {
-    if (!normalizedSamples.length) return { cumGain_m: [0], cumLoss_m: [0] };
-    const g: number[] = [0];
-    const l: number[] = [0];
-    for (let i = 1; i < normalizedSamples.length; i++) {
-      const e1 = normalizedSamples[i].elev_m_sm ?? normalizedSamples[i - 1].elev_m_sm ?? 0;
-      const e0 = normalizedSamples[i - 1].elev_m_sm ?? e1;
-      const dh = e1 - e0;
-      g[i] = g[i - 1] + (dh > 0 ? dh : 0);
-      l[i] = l[i - 1] + (dh < 0 ? -dh : 0);
-    }
-    return { cumGain_m: g, cumLoss_m: l };
-  }, [normalizedSamples]);
-
-  // Direction-aware, thresholded cumulative gain/loss (ignore tiny bumps/noise)
-  // Counts only significant elevation changes: at least ~1.5 m (≈5 ft) over ≥ 20 m
-  const { sigGain_m, sigLoss_m } = useMemo(() => {
-    if (!normalizedSamples.length) return { sigGain_m: [0], sigLoss_m: [0] };
-    const MIN_ELEV_M = 1.5;   // ~5 ft
-    const MIN_DIST_M = 20;    // segment distance threshold
-    const gain: number[] = [0];
-    const loss: number[] = [0];
-    let cumG = 0, cumL = 0;
-    let anchorE = (normalizedSamples[0].elev_m_sm ?? 0) as number;
-    let anchorD = (normalizedSamples[0].d_m ?? 0) as number;
-    for (let i = 1; i < normalizedSamples.length; i++) {
-      const e = (normalizedSamples[i].elev_m_sm ?? anchorE) as number;
-      const d = (normalizedSamples[i].d_m ?? anchorD) as number;
-      const dh = e - anchorE;
-      const dd = d - anchorD;
-      if (dd >= MIN_DIST_M && Math.abs(dh) >= MIN_ELEV_M) {
-        if (dh > 0) cumG += dh; else cumL += -dh;
-        anchorE = e; anchorD = d;
-      }
-      gain[i] = cumG; loss[i] = cumL;
-    }
-    return { sigGain_m: gain, sigLoss_m: loss };
-  }, [normalizedSamples]);
-
-  // Prefer provider-reported total elevation gain when present, else fallback to series-derived
-  const totalGain_m = useMemo(() => {
-    const provider = Number.isFinite(workoutData?.elevation_gain)
-      ? Number(workoutData.elevation_gain)
-      : Number.isFinite(workoutData?.metrics?.elevation_gain)
-        ? Number(workoutData.metrics.elevation_gain)
-        : null;
-    const derived = cumGain_m[cumGain_m.length - 1] ?? 0;
-    return Number.isFinite(provider as any) ? (provider as number) : derived;
-  }, [workoutData, cumGain_m]);
-
-  const totalLoss_m = useMemo(() => {
-    const provider = Number.isFinite(workoutData?.elevation_loss)
-      ? Number(workoutData.elevation_loss)
-      : Number.isFinite(workoutData?.metrics?.elevation_loss)
-        ? Number(workoutData.metrics.elevation_loss)
-        : null;
-    const derived = cumLoss_m[cumLoss_m.length - 1] ?? 0;
-    return Number.isFinite(provider as any) ? (provider as number) : derived;
-  }, [workoutData, cumLoss_m]);
-
-  // Show total gain as the value on the Elevation pill when not on ELEV tab
-  const gainPillText = useMemo(() => fmtAlt(totalGain_m, useFeet), [totalGain_m, useFeet]);
-
-  // Which raw metric array are we plotting?
+  // Which series are we plotting? The server's, as sent (audit H-D02): no smoothing, trimming or filling here.
   const metricRaw: number[] = useMemo(() => {
-    // Elevation (already EMA smoothed when building samples)
-    if (tab === "elev") {
-      // Return ACTUAL elevation values, not relative changes
-      const elev = normalizedSamples.map(s => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : NaN);
-      return elev;
-    }
-    // VAM (vertical ascent meters/hour) - moderate smoothing to balance detail and smoothness
-    if (tab === "vam") {
-      const vam = normalizedSamples.map(s => Number.isFinite(s.vam_m_per_h as any) ? (s.vam_m_per_h as number) : NaN);
-      const finite = vam.filter(Number.isFinite) as number[];
-      if (import.meta.env?.DEV) console.log('[VAM DEBUG] samples:', normalizedSamples.length, 'finite vam:', finite.length, 'first 5:', finite.slice(0, 5), 'range:', finite.length ? [Math.min(...finite), Math.max(...finite)] : 'none');
-      // Single pass smoothing with 20-second window - preserves more detail than double pass
-      const smoothed = nanAwareMovAvg(vam as any, 20);
-      return smoothed.map(v => (Number.isFinite(v) ? v : NaN));
-    }
-    // Speed (m/s → present directly, NO smoothing to preserve actual peaks)
-    if (tab === "spd") {
-      const spd = normalizedSamples.map(s => Number.isFinite(s.speed_mps as any) ? (s.speed_mps as number) : NaN);
-      if (import.meta.env?.DEV) console.log('[viewer] plotting SPEED points', spd.filter(Number.isFinite).length);
-      
-      // Return RAW speed data - no smoothing, no outlier removal
-      // This preserves actual max speed peaks (e.g., 34.5 mph sprints)
-      return spd;
-    }
-    // Pace - calculate from time/distance (not GPS pace field which is inaccurate)
-    if (tab === "pace") {
-      // Calculate pace using rolling window of time/distance (like splits do)
-      // This gives accurate pace that matches the splits table
-      const windowSize = 30; // ~30 second window
-      const calculated: number[] = [];
-      
-      for (let i = 0; i < normalizedSamples.length; i++) {
-        // Find window boundaries (±15 samples)
-        const startIdx = Math.max(0, i - Math.floor(windowSize / 2));
-        const endIdx = Math.min(normalizedSamples.length - 1, i + Math.floor(windowSize / 2));
-        
-        const startSample = normalizedSamples[startIdx];
-        const endSample = normalizedSamples[endIdx];
-        
-        const timeDelta = endSample.t_s - startSample.t_s;
-        const distDelta = endSample.d_m - startSample.d_m;
-        
-        // Calculate pace as sec/km (time / distance_in_km)
-        if (distDelta > 10 && timeDelta > 0) { // Need at least 10m to calculate
-          const paceSecPerKm = timeDelta / (distDelta / 1000);
-          calculated.push(paceSecPerKm);
-        } else {
-          calculated.push(NaN);
-        }
-      }
-      
-      // Apply additional smoothing for clean appearance
-      const smoothed = nanAwareMovAvg(calculated, 30);
-      return smoothed.map(v => (Number.isFinite(v) ? v : NaN));
-    }
-    // Heart rate - enhanced smoothing with outlier handling
-    if (tab === "bpm") {
-      const hr = normalizedSamples.map(s => Number.isFinite(s.hr_bpm as any) ? (s.hr_bpm as number) : NaN);
-      // Apply winsorizing first, then enhanced smoothing
-      const winsorized = winsorize(hr, 5, 95);
-      return smoothWithOutlierHandling(winsorized, 7, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
-    }
-    if (tab === "cad") return scrubCadenceSeries;
-    if (tab === "pwr") return scrubPowerSeries;
-    // Default fallback (shouldn't be reached)
+    const pick = (f: (s: Sample) => number | null | undefined) =>
+      normalizedSamples.map((s) => { const v = f(s); return Number.isFinite(v as any) ? Number(v) : NaN; });
+    if (tab === "elev") return pick((s) => s.elev_m_sm);
+    if (tab === "vam") return pick((s) => s.vam_m_per_h);
+    if (tab === "spd") return pick((s) => s.speed_mps);
+    if (tab === "pace") return pick((s) => s.pace_s_per_km);
+    if (tab === "bpm") return pick((s) => s.hr_bpm);
+    if (tab === "cad") return pick((s) => s.cad);
+    if (tab === "pwr") return pick((s) => s.power_w);
     return [];
-  }, [normalizedSamples, tab, distCalc, scrubCadenceSeries, scrubPowerSeries]);
+  }, [normalizedSamples, tab]);
 
   // Enhanced domain calculation with robust percentiles and outlier handling
   const yDomain = useMemo<[number, number]>(() => {
@@ -1220,7 +809,7 @@ function EffortsViewerMapbox({
     // POWER domain: use RAW power values (before smoothing) to capture all peaks
     if (tab === 'pwr') {
       const rawPowerValues = normalizedSamples
-        .map(s => Number.isFinite(s.power_w as any) ? Number(s.power_w) : NaN)
+        .map(s => Number.isFinite(s.power_raw_w as any) ? Number(s.power_raw_w) : NaN)
         .filter(v => Number.isFinite(v) && v >= 0 && v <= 2000) as number[]; // Only valid positive values
       
       if (rawPowerValues.length) {
@@ -1442,9 +1031,21 @@ function EffortsViewerMapbox({
     return d;
   }, [normalizedSamples, yDomain, tab, distCalc, pl, pr, pb]);
 
-  // Splits + active split
-  const splits = useMemo(() => computeSplits(normalizedSamples, useMiles ? 1609.34 : 1000), [normalizedSamples, useMiles]);
-  const activeSplitIx = useMemo(() => splits.findIndex(sp => idx >= sp.startIdx && idx <= sp.endIdx), [idx, splits]);
+  /**
+   * ⛔ THE SPLITS ARE THE SERVER'S (2026-09-10, audit H-D01): `computed.analysis.events.splits.{mi|km}`,
+   * the rows the Performance tab's mile splits come from. The phone used to cut its own from the thinned
+   * series, starting at 0 m, with its own elevation smoothing. The highlighted row is the one whose time
+   * holds the cursor.
+   */
+  const splits: Split[] = useMemo(() => {
+    const ev = workoutData?.computed?.analysis?.events?.splits;
+    const rows = useMiles ? ev?.mi : ev?.km;
+    return Array.isArray(rows) ? rows : [];
+  }, [workoutData, useMiles]);
+  const activeSplitIx = useMemo(() => {
+    const t = normalizedSamples[idx]?.t_s;
+    return Number.isFinite(t) ? splits.findIndex(sp => t >= sp.t0 && t <= sp.t1) : -1;
+  }, [idx, splits, normalizedSamples]);
 
   // Scrub helpers
   const svgRef = useRef<SVGSVGElement>(null);
@@ -1532,61 +1133,34 @@ function EffortsViewerMapbox({
     setIsScrubbing(false);
   };
 
-  // Helper functions to get averages from workoutData (same source as Summary)
-  const getAvgPace = useMemo(() => {
-    // Use same source as Summary: computed.overall.avg_pace_s_per_mi converted to km
-    const avgPaceMi = Number.isFinite(workoutData?.computed?.overall?.avg_pace_s_per_mi) 
-      ? Number(workoutData.computed.overall.avg_pace_s_per_mi)
-      : (Number.isFinite(workoutData?.avg_pace) ? Number(workoutData.avg_pace) 
-      : (Number.isFinite(workoutData?.metrics?.avg_pace) ? Number(workoutData.metrics.avg_pace) : null));
-    // Convert from per-mile to per-km if needed (if avg_pace is in sec/km, no conversion needed)
-    // For now, assume computed.overall.avg_pace_s_per_mi is in sec/mi, others might be sec/km
-    if (avgPaceMi != null && workoutData?.computed?.overall?.avg_pace_s_per_mi) {
-      return avgPaceMi / 1.60934; // Convert mi to km
-    }
-    return avgPaceMi; // Already in sec/km or null
-  }, [workoutData]);
-
-  const getAvgSpeed = useMemo(() => {
-    // Speed in m/s from avg_speed_kmh
-    const avgSpeedKmh = Number.isFinite(workoutData?.metrics?.avg_speed) 
-      ? Number(workoutData.metrics.avg_speed)
-      : (Number.isFinite(workoutData?.avg_speed) ? Number(workoutData.avg_speed) : null);
-    return avgSpeedKmh != null ? avgSpeedKmh / 3.6 : null; // Convert km/h to m/s
-  }, [workoutData]);
-
-  const getAvgHR = useMemo(() => {
-    return Number.isFinite(workoutData?.avg_heart_rate) 
-      ? Number(workoutData.avg_heart_rate)
-      : (Number.isFinite(workoutData?.metrics?.avg_heart_rate) ? Number(workoutData.metrics.avg_heart_rate) : null);
-  }, [workoutData]);
-
-  const getAvgPower = useMemo(() => {
-    return Number.isFinite(workoutData?.avg_power) 
-      ? Number(workoutData.avg_power)
-      : (Number.isFinite(workoutData?.metrics?.avg_power) ? Number(workoutData.metrics.avg_power) : null);
-  }, [workoutData]);
-
-  const getAvgCadence = useMemo(() => {
-    if (workoutData?.type === 'ride') {
-      return Number.isFinite(workoutData?.avg_cadence) 
-        ? Number(workoutData.avg_cadence)
-        : (Number.isFinite(workoutData?.avg_bike_cadence) ? Number(workoutData.avg_bike_cadence)
-        : (Number.isFinite(workoutData?.metrics?.avg_bike_cadence) ? Number(workoutData.metrics.avg_bike_cadence) : null));
-    } else {
-      return Number.isFinite(workoutData?.avg_cadence) 
-        ? Number(workoutData.avg_cadence)
-        : (Number.isFinite(workoutData?.avg_running_cadence) ? Number(workoutData.avg_running_cadence)
-        : (Number.isFinite(workoutData?.avg_run_cadence) ? Number(workoutData.avg_run_cadence) : null));
-    }
-  }, [workoutData]);
+  /**
+   * ⛔ THE "(avg)" PILLS PRINT THE SESSION'S SERVER NUMBERS (2026-09-10, audit H-D04). Each pill used to
+   * walk its own ladder of columns, and pace guessed its unit ("others might be sec/km"). Pace and heart
+   * rate are the Performance tab's (`session_detail_v1.completed_totals`); speed, power and cadence are
+   * the Details tab's (`display_metrics`); VAM is `computed.overall.avg_vam`. Missing prints "—".
+   */
+  const finiteOrNull = (v: unknown): number | null => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
+  // The screen's session detail when it has one (a first open), else the copy saved on the workout.
+  const completedTotals = useMemo(
+    () => ((sessionDetail ?? extractSessionDetailV1FromWorkout(workoutData)) as any)?.completed_totals ?? null,
+    [sessionDetail, workoutData],
+  );
+  // sec/mi → sec/km only because the pace formatter takes sec/km; it prints /mi again.
+  const avgPaceSecPerMi = finiteOrNull(completedTotals?.avg_pace_s_per_mi);
+  const getAvgPace = avgPaceSecPerMi != null ? avgPaceSecPerMi / 1.60934 : null;
+  const getAvgSpeed = finiteOrNull(workoutData?.display_metrics?.avg_speed_mps);
+  const getAvgHR = finiteOrNull(completedTotals?.avg_hr);
+  const getAvgPower = finiteOrNull(workoutData?.display_metrics?.avg_power);
+  const getAvgCadence = finiteOrNull(workoutData?.type === 'ride'
+    ? workoutData?.display_metrics?.avg_cycling_cadence_rpm
+    : workoutData?.display_metrics?.avg_running_cadence_spm);
+  const getAvgVam = finiteOrNull(workoutData?.computed?.overall?.avg_vam);
 
   // Cursor & current values
   const s = normalizedSamples[idx] || normalizedSamples[normalizedSamples.length - 1];
   const cx = xFromDist(s?.d_m ?? 0);
   const currentMetricRaw = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : 0;
   const cy = yFromValue(currentMetricRaw);
-  const gainNow_m = cumGain_m[Math.min(idx, cumGain_m.length - 1)] ?? 0;
   const altNow_m  = (s?.elev_m_sm ?? 0);
   
   // Debug: Log cursor value vs Y-axis position for pace chart
@@ -2069,9 +1643,8 @@ function EffortsViewerMapbox({
               label="Power" 
               value={(() => {
                 if (!isScrubbing) return getAvgPower != null ? `${Math.round(getAvgPower)} W` : '—';
-                if (!normalizedSamples.some(s => Number.isFinite(s.power_w as any))) return '—';
-                const w = rawPowerAt(normalizedSamples, idx);
-                return w != null ? `${Math.round(w)} W` : '—';
+                const w = s?.power_w;
+                return Number.isFinite(w as any) ? `${Math.round(w as number)} W` : '—';
               })()} 
               subValue={isScrubbing ? undefined : "(avg)"}
               active={tab==="pwr"} 
@@ -2105,16 +1678,7 @@ function EffortsViewerMapbox({
             label="Grade"
             value={(() => {
               if (isScrubbing) {
-                const i = Math.min(idx, Math.max(0, normalizedSamples.length - 1));
-                const sNow = normalizedSamples[i];
-                let g = Number(sNow?.grade);
-                if (!Number.isFinite(g)) {
-                  const prev = normalizedSamples[Math.max(0, i - 1)] || sNow;
-                  const dd = Math.max(1, (sNow?.d_m ?? 0) - (prev?.d_m ?? (sNow?.d_m ?? 0)));
-                  const dh = (sNow?.elev_m_sm ?? 0) - (prev?.elev_m_sm ?? (sNow?.elev_m_sm ?? 0));
-                  g = dh / dd;
-                }
-                return fmtPct(g);
+                return fmtPct(s?.grade_pct);
               } else {
                 // No avg_grade in workoutData, show "—"
                 return '—';
@@ -2131,10 +1695,9 @@ function EffortsViewerMapbox({
             label="Cadence" 
             value={(() => {
               const unit = workoutData?.type === 'ride' ? ' rpm' : ' spm';
-              const isRide = workoutData?.type === 'ride';
               if (!isScrubbing) return getAvgCadence != null ? `${Math.round(getAvgCadence)}${unit}` : '—';
-              const c = cadenceAtScrub(normalizedSamples, idx, !!isRide, scrubCadenceSeries);
-              return c != null ? `${Math.round(c)}${unit}` : '—';
+              const c = s?.cad;
+              return Number.isFinite(c as any) ? `${Math.round(c as number)}${unit}` : '—';
             })()} 
             subValue={isScrubbing ? undefined : "(avg)"}
             active={tab==="cad"} 
@@ -2148,9 +1711,8 @@ function EffortsViewerMapbox({
               label="Power" 
               value={(() => {
                 if (!isScrubbing) return getAvgPower != null ? `${Math.round(getAvgPower)} W` : '—';
-                if (!normalizedSamples.some(s => Number.isFinite(s.power_w as any))) return '—';
-                const w = rawPowerAt(normalizedSamples, idx);
-                return w != null ? `${Math.round(w)} W` : '—';
+                const w = s?.power_w;
+                return Number.isFinite(w as any) ? `${Math.round(w as number)} W` : '—';
               })()} 
               subValue={isScrubbing ? undefined : "(avg)"}
               active={tab==="pwr"} 
@@ -2171,9 +1733,7 @@ function EffortsViewerMapbox({
                   }
                   return s?.vam_m_per_h != null ? fmtVAM(s.vam_m_per_h, useFeet) : '—';
                 } else {
-                  // Use avg_vam from workoutData if available
-                  const avgVam = Number.isFinite(workoutData?.avg_vam) ? Number(workoutData.avg_vam) : null;
-                  return avgVam != null ? fmtVAM(avgVam, useFeet) : '—';
+                  return getAvgVam != null ? fmtVAM(getAvgVam, useFeet) : '—';
                 }
               })()} 
               subValue={isScrubbing ? undefined : "(avg)"}
@@ -2234,23 +1794,22 @@ function EffortsViewerMapbox({
               </div>
             )}
           </div>
-          {/* Elevation Gain/Loss - show totals when not scrubbing */}
+          {/**
+            * ⛔ ELEVATION GAIN/LOSS IS THE SERVER'S RUNNING CLIMB (2026-09-10, audit H-D03), at the cursor
+            * or at the finish. Its last point is the session's recorded total, so the readout no longer
+            * jumps from a phone sum to the device total 25 m from the end. No series, no readout.
+            */}
+          {(() => {
+            const at = isScrubbing ? s : normalizedSamples[normalizedSamples.length - 1];
+            const gainNow = at?.gain_m;
+            const lossNow = at?.loss_m;
+            if (!Number.isFinite(gainNow as any) || !Number.isFinite(lossNow as any)) return <div />;
+            return (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
             <div style={{ fontSize: 13, color: "rgba(255, 255, 255, 0.9)", fontWeight: 700, whiteSpace: "nowrap" }}>
-              {(() => {
-                const gainNow = isScrubbing 
-                  ? (atEnd ? (Number.isFinite(totalGain_m) ? totalGain_m : (sigGain_m[sigGain_m.length - 1] ?? 0)) : (sigGain_m[Math.min(idx, sigGain_m.length - 1)] ?? 0))
-                  : (Number.isFinite(totalGain_m) ? totalGain_m : (sigGain_m[sigGain_m.length - 1] ?? 0));
-                const lossNow = isScrubbing
-                  ? (atEnd ? (Number.isFinite(totalLoss_m) ? totalLoss_m : (sigLoss_m[sigLoss_m.length - 1] ?? 0)) : (sigLoss_m[Math.min(idx, sigLoss_m.length - 1)] ?? 0))
-                  : (Number.isFinite(totalLoss_m) ? totalLoss_m : (sigLoss_m[sigLoss_m.length - 1] ?? 0));
-                if (useFeet) {
-                  const gft = Math.round(gainNow * 3.28084);
-                  const lft = Math.round(lossNow * 3.28084);
-                  return `+${gft} / -${lft} ft`;
-                }
-                return `+${Math.round(gainNow)} / -${Math.round(lossNow)} m`;
-              })()}
+              {useFeet
+                ? `+${Math.round((gainNow as number) * 3.28084)} / -${Math.round((lossNow as number) * 3.28084)} ft`
+                : `+${Math.round(gainNow as number)} / -${Math.round(lossNow as number)} m`}
             </div>
             {!isScrubbing && (
               <div style={{ fontSize: 11, color: "rgba(255, 255, 255, 0.6)", fontWeight: 500, marginTop: 2, transition: "opacity 150ms ease" }}>
@@ -2258,6 +1817,8 @@ function EffortsViewerMapbox({
               </div>
             )}
           </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -2438,7 +1999,7 @@ function EffortsViewerMapbox({
               // AND SPEED STAY — those are sensor readings, and they are as real on a trainer as
               // they are on a road.
               indoor ? null : "elev",
-              normalizedSamples.some(s=>Number.isFinite(s.cad_rpm as any) || Number.isFinite(s.cad_spm as any)) ? "cad" : null,
+              normalizedSamples.some(s=>Number.isFinite(s.cad as any)) ? "cad" : null,
               workoutData?.type === 'run' && normalizedSamples.some(s=>Number.isFinite(s.power_w as any)) ? "pwr" : null,
               !indoor && workoutData?.type !== 'run' && normalizedSamples.some(s=>Number.isFinite(s.vam_m_per_h as any)) ? "vam" : null
             ].filter(Boolean) as MetricTab[]
@@ -2492,11 +2053,11 @@ function EffortsViewerMapbox({
             const cell = (c: any) => <div style={{ padding: "6px 2px", background: active ? "rgba(255, 255, 255, 0.1)" : undefined, borderRadius: 8, color: active ? "rgba(255, 255, 255, 0.95)" : "rgba(255, 255, 255, 0.9)" }}>{c}</div>;
             return (
               <React.Fragment key={i}>
-                {cell(i + 1)}
-                {cell(fmtTime(sp.time_s))}
+                {cell(sp.n)}
+                {cell(Number.isFinite(sp.time_s as any) ? fmtTime(sp.time_s as number) : '—')}
                 {cell(workoutData?.type === 'ride' ? fmtSpeed(sp.avgPace_s_per_km, useMiles) : fmtPace(sp.avgPace_s_per_km, useMiles))}
                 {cell(Number.isFinite(sp.avgHr_bpm as any) ? `${Math.round(sp.avgHr_bpm as number)} bpm` : '—')}
-                {cell(fmtPct(sp.avgGrade))}
+                {cell(fmtPct(sp.avgGrade_pct))}
               </React.Fragment>
             );
           })}
@@ -2512,117 +2073,3 @@ function EffortsViewerMapbox({
 /* duplicate marker cleanup */
 
 export default React.memo(EffortsViewerMapbox);
-
-/** ------------ Separate, toggleable VAM chart (lazy-computed) ------------ */
-function VamChart({
-  samples,
-  distMono,
-  d0,
-  dN,
-  idx,
-  useFeet,
-}: {
-  samples: any[];
-  distMono: number[];
-  d0: number;
-  dN: number;
-  idx: number;
-  useFeet: boolean;
-}) {
-  const W = 700, H = 200; const P = 20; const pl = 66; const pr = 8;
-  const SVG_HEIGHT = H + 30;
-  const xFromDist = (d: number) => {
-    const range = Math.max(1, dN - d0);
-    const ratio = (d - d0) / range;
-    return pl + ratio * (W - pl - pr);
-  };
-
-  // Compute VAM only when this chart is mounted
-  const vam: number[] = React.useMemo(() => {
-    const n = samples.length;
-    if (n < 2) return [];
-    const elev = samples.map((s:any) => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : NaN);
-    const time = samples.map((s:any) => Number.isFinite(s.t_s as any) ? (s.t_s as number) : NaN);
-    const out = new Array(n).fill(NaN) as number[];
-    const windowSec = 7;
-    for (let i = 0; i < n; i++) {
-      const t1 = time[i]; if (!Number.isFinite(t1)) continue;
-      let j = i; while (j > 0 && Number.isFinite(time[j - 1]) && (t1 - (time[j - 1] as number)) < windowSec) j--;
-      const dt = (t1 - (time[j] ?? t1));
-      const dd = (distMono[i] - (distMono[j] ?? distMono[i]));
-      const de = (elev[i] - (elev[j] ?? elev[i]));
-      const speed = dt > 0 ? dd / dt : 0;
-      if (!(dt >= 3 && dd >= 5 && speed >= 0.5)) continue;
-      const grade = clamp((dd > 0 ? de / dd : 0), -0.30, 0.30);
-      const vam_m_per_h = grade * speed * 3600;
-      out[i] = vam_m_per_h;
-    }
-    const med = medianFilter(out, 11) as (number|null)[];
-    const medNum = med.map(v => (Number.isFinite(v as any) ? (v as number) : NaN));
-    const wins = winsorize(medNum, 5, 95);
-    const smooth = smoothWithOutlierHandling(wins, 7, 2.0);
-    for (let i = 0; i < smooth.length; i++) {
-      const v = smooth[i]; if (!Number.isFinite(v)) continue;
-      if (Math.abs(v as number) > 10000) smooth[i] = NaN; else if (Math.abs(v as number) > 3000) smooth[i] = v > 0 ? 3000 : -3000;
-    }
-    return smooth;
-  }, [samples, distMono, d0, dN]);
-
-  const yDomain = React.useMemo<[number, number]>(() => {
-    const vals = vam.filter((v) => Number.isFinite(v)) as number[];
-    if (!vals.length) return [-1, 1];
-    const abs = winsorize(vals.map(v => Math.abs(v)), 2, 98);
-    const P90 = pct(abs, 90);
-    const floor = 450; // m/h minimum span
-    const span = Math.max(P90, floor);
-    return [-span, span];
-  }, [vam]);
-
-  const yFromValue = (v: number) => {
-    const [a, b] = yDomain; const t = (v - a) / (b - a || 1);
-    return H - P - t * (H - P * 2);
-  };
-
-  const linePath = React.useMemo(() => {
-    const n = vam.length; if (n < 2) return "";
-    let d = `M ${xFromDist(distMono[0] ?? d0)} ${yFromValue(Number.isFinite(vam[0]) ? (vam[0] as number) : 0)}`;
-    for (let i = 1; i < n; i++) {
-      d += ` L ${xFromDist(distMono[i] ?? d0)} ${yFromValue(Number.isFinite(vam[i]) ? (vam[i] as number) : 0)}`;
-    }
-    return d;
-  }, [vam, distMono, d0, dN, yDomain]);
-
-  const yTicks = React.useMemo(() => {
-    const [a, b] = yDomain; const step = (b - a) / 4;
-    return new Array(5).fill(0).map((_, i) => a + i * step);
-  }, [yDomain]);
-
-  const cx = xFromDist(distMono[idx] ?? d0);
-  const cy = yFromValue(Number.isFinite(vam[Math.min(idx, vam.length - 1)]) ? (vam[Math.min(idx, vam.length - 1)] as number) : 0);
-
-  return (
-    <div style={{ marginTop: 12 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '0 6px 6px 6px' }}>
-        <div style={{ fontWeight: 700, color: '#0f172a' }}>VAM</div>
-        <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>{fmtVAM(Number.isFinite(vam[idx] as any) ? (vam[idx] as number) : null, useFeet)}</div>
-      </div>
-      <svg viewBox={`-10 0 ${W + 10} ${SVG_HEIGHT}`} width="100%" height={SVG_HEIGHT} style={{ display: 'block', borderRadius: 12, background: '#fff', border: '1px solid #eef2f7', overflow: 'visible' }}>
-        {[0, 1, 2, 3, 4].map((i) => {
-          const x = pl + i * ((W - pl - pr) / 4);
-          return <line key={i} x1={x} x2={x} y1={P} y2={H - P} stroke="#eef2f7" strokeDasharray="4 4" />;
-        })}
-        {yTicks.map((v, i) => (
-          <g key={i}>
-            <line x1={pl} x2={W - pr} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#f3f6fb" />
-            <text x={pl - 8} y={yFromValue(v) - 4} fill="#94a3b8" fontSize={16} fontWeight={700} textAnchor="end">
-              {fmtVAM(v, useFeet)}
-            </text>
-          </g>
-        ))}
-        <path d={linePath} fill="none" stroke="#94a3b8" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-        <line x1={cx} x2={cx} y1={P} y2={H - P} stroke="#0ea5e9" strokeWidth={1.5} />
-        <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
-      </svg>
-    </div>
-  );
-}

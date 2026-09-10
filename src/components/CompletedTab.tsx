@@ -1916,44 +1916,8 @@ const formatMovingTime = () => {
         // If series exists (even old format with only 'sampling' key), proceed
         // EffortsViewerMapbox will handle empty arrays gracefully
 
-         const time_s = Array.isArray(series?.time_s) ? series.time_s : (Array.isArray(series?.time) ? series.time : []);
-         const distance_m = Array.isArray(series?.distance_m) ? series.distance_m : [];
-         const elev = Array.isArray(series?.elevation_m) ? series.elevation_m : [];
-         const pace = Array.isArray(series?.pace_s_per_km) ? series.pace_s_per_km : [];
-         const hr = Array.isArray(series?.hr_bpm) ? series.hr_bpm : [];
-        // Trust server-provided series as single source of truth (no client-side fallbacks)
-         const len = Math.min(distance_m.length, time_s.length || distance_m.length);
-         const samples = (()=>{
-           const out:any[] = [];
-           let ema: number | null = null, lastE: number | null = null, lastD: number | null = null, lastT: number | null = null;
-           const a = 0.2;
-           for (let i=0;i<len;i++){
-             const t = Number(time_s?.[i] ?? i) || 0;
-             const d = Number(distance_m?.[i] ?? 0) || 0;
-             const e = typeof elev?.[i] === 'number' ? Number(elev[i]) : null;
-             if (e != null) ema = (ema==null ? e : a*e + (1-a)*ema);
-             const es = (ema != null) ? ema : (e != null ? e : (lastE != null ? lastE : 0));
-             let grade: number | null = null, vam: number | null = null;
-             if (lastE != null && lastD != null && lastT != null){
-               const dd = Math.max(1, d - lastD);
-               const dh = es - lastE;
-               const dt = Math.max(1, t - lastT);
-               grade = dh / dd;
-               vam = (dh/dt) * 3600;
-             }
-             out.push({
-               t_s: t,
-               d_m: d,
-               elev_m_sm: es,
-               pace_s_per_km: Number.isFinite(pace?.[i]) ? Number(pace[i]) : null,
-               hr_bpm: Number.isFinite(hr?.[i]) ? Number(hr[i]) : null,
-               grade,
-               vam_m_per_h: vam
-             });
-             lastE = es; lastD = d; lastT = t;
-           }
-           return out;
-         })();
+        // ⛔ NO SAMPLES ARE REBUILT HERE (2026-09-10, audit H-D02). This built an unused copy of the series
+        // with its own elevation smoothing, grade and VAM; the chart plots the server's display series.
         // Check if this is an indoor/treadmill workout (EffortsViewerMapbox will show placeholder)
         const workout = hydrated || workoutData;
         const isVirtual = isVirtualActivity(workout);
@@ -2021,6 +1985,7 @@ const formatMovingTime = () => {
               useFeet={mapProps.useFeet}
               compact={mapProps.compact}
               workoutData={mapWorkoutData}
+              sessionDetail={sessionDetail}
               />
           </div>
         );
