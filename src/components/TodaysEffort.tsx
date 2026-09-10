@@ -1545,24 +1545,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     if (raw == null || !Number.isFinite(Number(raw))) return null;
     const n = Math.round(Number(raw));
     const zone = formZone(Number(raw));
+    // ⛔ A TYPOGRAPHIC MINUS, as the work order prints it (`form −21 · optimal`).
+    const shown = n > 0 ? `+${n}` : n < 0 ? `\u2212${Math.abs(n)}` : '0';
     return (
-      <button
-        type="button"
-        /* ⛔ THE DOOR THAT ALREADY EXISTS. `open:state` is what `TrainingBaselines` fires to reach
-           State; a second route to the same screen is how two doors start disagreeing. */
-        onClick={(e) => { e.stopPropagation(); try { window.dispatchEvent(new CustomEvent('open:state')); } catch { /* no window */ } }}
-        className="flex items-baseline gap-1 flex-shrink-0 text-[0.72rem] font-light tabular-nums whitespace-nowrap"
-        aria-label="Form — open State"
-      >
-        <span style={{ color: 'rgba(255,255,255,0.38)' }}>form</span>
-        <span style={{ color: 'rgba(255,255,255,0.92)' }}>{n > 0 ? `+${n}` : n}</span>
+      <span className="inline-flex items-baseline gap-1 tabular-nums whitespace-nowrap">
+        <span style={{ color: 'rgba(255,255,255,0.45)' }}>form</span>
+        <span style={{ color: 'rgba(255,255,255,0.92)' }}>{shown}</span>
         {zone ? (
           <>
             <span style={{ color: 'rgba(255,255,255,0.38)' }}>·</span>
             <span style={{ color: formZoneColor(zone) }}>{zone}</span>
           </>
         ) : null}
-      </button>
+      </span>
     );
   }, [coachWeek.data]);
 
@@ -1938,64 +1933,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               * air under the date, and the block ends where its sunrise line does.
               * ⚠️ TODAY ONLY. There is no historical weather to show for another day.
               */}
-            {(weather && isTodayDate) || formLine ? (
-              /**
-                * ⛔ THE FORM LINE RIDES AT THE TOP RIGHT OF THE WEATHER (§3g). LOAD came off Today
-                * entirely; what survives of it is ONE number, and a number that small does not
-                * deserve a card — it goes in the space the weather block was already leaving.
-                *
-                * ⚠️ ABSOLUTE, NOT A FLEX SIBLING, AND THAT IS THE WHOLE POINT. In flow it reserved a
-                * column for the block's full height, so the humidity / dew point / wind row lost
-                * ~130 px and wrapped — the weather grew a line to make room for a number that only
-                * needs to sit beside the temperature. Out of flow it costs the rows below nothing.
-                * ⚠️ IT ONLY GOES OUT OF FLOW WHERE THERE IS A BLOCK TO SIT ON. With no weather (no
-                * location, or not today) it is an ordinary right-aligned line with a height of its
-                * own, rather than an absolute element in a box with no height.
-                */
-              /**
-                * ⛔ THE GARMIN DERIVED-DATA LINE SITS DIRECTLY UNDER THE FORM LINE, in the same right
-                * column (Michael, 2026-09-10, docs/WORKORDER-garmin-strava-attribution-2026-09-09.md §7).
-                * As the block's last line it sat under the weather rows and read as the weather's
-                * source; here it credits the form number it belongs to. Same 12 px, Garmin's wording.
-                */
-              <div style={{ marginTop: 8, position: 'relative' }}>
-                {weather && isTodayDate ? (
-                  <>
-                    <TodayWeather weather={weather} city={cityName} />
-                    {formLine ? (
-                      <div className="flex flex-col items-end" style={{ position: 'absolute', top: 0, right: 0, maxWidth: '12rem' }}>
-                        {formLine}
-                        {garminDerived ? <GarminDerivedDataLine className="text-right" style={{ marginTop: 2 }} /> : null}
-                      </div>
-                    ) : null}
-                  </>
-                ) : (
-                  <div className="flex flex-col items-end">
-                    {formLine}
-                    {garminDerived ? <GarminDerivedDataLine className="text-right" style={{ marginTop: 2 }} /> : null}
-                  </div>
-                )}
-              </div>
-            ) : null}
-
             {/**
-              * ⛔ WHAT THE WEEK HAS COME TO, IN ONE LINE (Michael, 2026-09-09). LOAD's Run / Bike /
-              * Lifted row came off Today with the card (§3g), and the week's mileage went with it —
-              * but "how much have I done this week" is a question an athlete asks on the screen they
-              * open, not one they navigate to. It is the same reading the Week tab's own bar is
-              * counted from: the week's rows, as `get-week` returned them.
-              *
-              * ⛔ NUMBERS ONLY, AND A SPORT WITH NOTHING IS ABSENT — a `0.0 mi ride` on a runner's
-              * week is a column of zeroes teaching the athlete to stop reading the line.
-              * ⚠️ IT SITS UNDER THE SUNRISE ROW, so the weather block still ends where it did. The
-              * Garmin derived-data line no longer follows it; it sits under the form line (§7).
+              * ⛔ THE HEADER IS THE DATE AND THE WEATHER, NOTHING ELSE (Michael, 2026-09-10). The form
+              * line, the week's totals and the Garmin line moved to the status card at the bottom of
+              * Today — one block per subject.
+              * ⚠️ TODAY ONLY. There is no historical weather to show for another day.
               */}
-            {weekTotalsLine ? (
-              <div
-                className="text-[0.7rem] font-light tabular-nums truncate"
-                style={{ color: 'rgba(255,255,255,0.55)', marginTop: 8 }}
-              >
-                {weekTotalsLine}
+            {weather && isTodayDate ? (
+              <div style={{ marginTop: 8 }}>
+                <TodayWeather weather={weather} city={cityName} />
               </div>
             ) : null}
           </div>
@@ -2430,12 +2376,46 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 the endurance half of a pairing p145 writes about a ride or a run. See
                 `TodaySpacingLine` above the list. */}
 
-            {/* ⛔ THE LOAD CARD AND ITS BARS DECK CAME OFF TODAY (§3g). State keeps its own load
-                plate and the Week tab's bar carries the week's hours and miles; what is left here is
-                the one form number, up in the header block beside the weather. `TodayWeekBlocks` and
-                `WeekLoadCard` are deleted — nothing else rendered either of them. */}
           </div>
         )}
+        {/**
+          * ═══ THE STATUS CARD, AT THE BOTTOM OF TODAY (Michael, 2026-09-10) ═════════════════════
+          *
+          * ⛔ ONE BLOCK PER SUBJECT. The header is the day and its weather; this card is where the
+          * athlete stands: form, the week's totals, and Garmin's derived-data line last. The three
+          * lines are the ones the header carried, off the same readers — nothing is recomputed.
+          * ⛔ THE CARD IS THE DOOR TO STATE, through `open:state`, the event `TrainingBaselines`
+          * already fires. ⚠️ No sport colour: it belongs to no session.
+          * ⚠️ THE GARMIN LINE KEEPS ITS RULE: a Garmin connection or row, and a form number to credit.
+          * ⚠️ NO NUMBERS, NO CARD — an account with nothing analysed or logged gets nothing here.
+          */}
+        {formLine || weekTotalsLine ? (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); try { window.dispatchEvent(new CustomEvent('open:state')); } catch { /* no window */ } }}
+            aria-label="Form and the week so far — open State"
+            className="block w-full text-left cursor-pointer"
+            style={{
+              borderRadius: 14,
+              padding: '10px 14px',
+              background: 'linear-gradient(180deg, rgba(19,21,27,0.72), rgba(11,12,16,0.84))',
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            {formLine ? <span className="block text-[13px] font-light">{formLine}</span> : null}
+            {weekTotalsLine ? (
+              <span
+                className="block text-[13px] font-light tabular-nums"
+                style={{ color: 'rgba(255,255,255,0.72)', marginTop: formLine ? 4 : 0 }}
+              >
+                {weekTotalsLine}
+              </span>
+            ) : null}
+            {garminDerived && formLine ? (
+              <GarminDerivedDataLine className="text-[12px]" style={{ marginTop: 6 }} />
+            ) : null}
+          </button>
+        ) : null}
         </div>
         </div>
 
