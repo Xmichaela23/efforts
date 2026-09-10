@@ -22,7 +22,8 @@ export type PlannedPool = { pool_unit: 'yd' | 'm'; pool_length_m: number };
 const SHORT_COURSE_YD_IN_M = 22.86;
 const SHORT_COURSE_M = 25;
 
-function unitOf(v: unknown): 'yd' | 'm' | null {
+/** A saved pool unit, read the one way — shared with `pool-label.ts`. */
+export function poolUnitOf(v: unknown): 'yd' | 'm' | null {
   const t = String(v ?? '').trim().toLowerCase();
   if (t === 'yd' || t === 'y' || t === 'yard' || t === 'yards') return 'yd';
   if (t === 'm' || t === 'meter' || t === 'meters' || t === 'metre' || t === 'metres') return 'm';
@@ -40,7 +41,7 @@ export function plannedPoolFor(
 ): PlannedPool | null {
   if (String(row?.type ?? '').toLowerCase() !== 'swim') return null;
   if (String(row?.environment ?? '').toLowerCase() === 'open_water') return null;
-  const setUnit = unitOf(row?.pool_unit);
+  const setUnit = poolUnitOf(row?.pool_unit);
   const setLength = Number(row?.pool_length_m);
   const hasLength = Number.isFinite(setLength) && setLength > 0;
   const units = String(row?.units ?? '').toLowerCase();

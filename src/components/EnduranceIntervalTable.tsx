@@ -67,6 +67,8 @@ type EnduranceIntervalTableProps = {
       swim_distance_status?: 'at_or_above' | 'below' | null;
       swim_duration_pct_of_plan?: number | null;
       swim_duration_status?: 'at_or_above' | 'below' | null;
+      /** The server's pool label from the saved unit (audit H-D08 / H-D13). */
+      pool_display?: string | null;
     };
     planned_totals?: {
       duration_s?: number | null;
@@ -518,7 +520,6 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
   const avgHr = (ct as any).avg_hr as number | null | undefined;
   const hrSeries = (sd as any)?.hr_series as number[] | null | undefined;
 
-  const poolLm = Number(swimExtras?.poolLengthM) > 0 ? Number(swimExtras?.poolLengthM) : null;
   const lengths = Number(swimExtras?.lengths) > 0 ? Number(swimExtras?.lengths) : null;
   const finsUsed = !!swimExtras?.finsUsed;
 
@@ -537,7 +538,9 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
   // (the unit was wrapping awkwardly under "Pace").
   if (pace100 != null && pace100 > 0) metrics.push([`${formatSwimPace(pace100)} /100${per100Unit}`, 'Pace']);
   if (avgHr != null && avgHr > 0) metrics.push([`${Math.round(avgHr)}`, 'Avg HR']);
-  if (poolLm != null) { const isYd = poolLm >= 20 && poolLm <= 26; metrics.push([isYd ? `${Math.round(poolLm / 0.9144)} yd` : `${Math.round(poolLm)} m`, 'Pool']); }
+  // ⛔ THE POOL LABEL IS THE SERVER'S (2026-09-10, audit H-D13): `completed_totals.pool_display`, from the saved
+  // unit. This called any pool from 20 to 26 m yards, so a 25 m pool read "27 yd".
+  if (ct.pool_display) metrics.push([ct.pool_display, 'Pool']);
   if (lengths != null) metrics.push([String(lengths), 'Lengths']);
 
   // D-166 refinement: week/phase context ("Week 5 · Build") rides at the top of the card — it lived in

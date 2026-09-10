@@ -57,7 +57,11 @@ interface CompletedTabProps {
   onAddGear?: () => void; // Callback to open gear management
   isHydrating?: boolean; // True while GPS/sensor data is still loading
   /** `session_detail_v1` — the Workload tile prints its `load.workload` (audit H-D07). */
-  sessionDetail?: { load?: { workload?: number | null } | null } | null;
+  sessionDetail?: {
+    load?: { workload?: number | null } | null;
+    /** The pool label from the saved unit (audit H-D08). */
+    completed_totals?: { pool_display?: string | null } | null;
+  } | null;
 }
 
 
@@ -1329,12 +1333,9 @@ const formatMovingTime = () => {
          {/* Pool length */}
          <div className="px-0.5 py-1">
            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
-             {(() => {
-               const Lm = Number(poolLengthMeters ?? (workoutData as any)?.pool_length);
-               if (!Lm) return 'N/A';
-               const isYd = Lm >= 20 && Lm <= 26;
-               return isYd ? `${Math.round(Lm / 0.9144)} yd` : `${Lm} m`;
-             })()}
+             {/* ⛔ THE SERVER'S POOL LABEL (2026-09-10, audit H-D08): `completed_totals.pool_display`, from the saved
+                 unit. This called any pool from 20 to 26 m yards, so a 25 m pool read "27 yd". */}
+             {sessionDetail?.completed_totals?.pool_display || 'N/A'}
            </div>
            <div className="text-xs font-light" style={metricLabelStyle}>Pool</div>
          </div>

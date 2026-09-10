@@ -276,6 +276,10 @@ export type SessionDetailV1 = {
     swim_distance_status?: 'at_or_above' | 'below' | null;
     swim_duration_pct_of_plan?: number | null;
     swim_duration_status?: 'at_or_above' | 'below' | null;
+    /** 2026-09-10 (audit H-D08 / H-D13), swim only: the pool label from the saved unit ("25 yd", "25 m"); null with no length. */
+    pool_display?: string | null;
+    /** The saved pool unit behind `pool_display`; null when none was saved (the label then reads metres). */
+    pool_unit?: 'yd' | 'm' | null;
   };
   planned_totals: {
     duration_s: number | null;

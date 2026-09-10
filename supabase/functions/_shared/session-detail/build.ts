@@ -7,6 +7,7 @@ import type { SessionDetailV1, SegmentVerdictV1, IntervalRow, SessionInterpretat
 import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
 import { pacingVariability, stampIntervalCompare } from './interval-compare.ts';
 import { planShare } from './swim-plan-share.ts';
+import { poolLabel } from '../swim/pool-label.ts';
 import { isIndoorSession } from '../indoor-session.ts';
 import type { VerdictDirection } from '../core-verdict.ts';
 import type { ArcPerformanceBridgeV1 } from './arc-performance-bridge.ts';
@@ -246,6 +247,11 @@ export type SessionDetailInput = {
    *  resolveSwimScalars; null for non-swims (which keep computed.overall, GPS-authoritative). */
   completedSwimScalars?: SwimScalars | null;
   /**
+   * 2026-09-10 (audit H-D08 / H-D13): the completed swim's pool as saved — the corrected, device and planned
+   * lengths (metres), the saved and planned units, and the athlete's unit setting. See `swim/pool-label.ts`.
+   */
+  completedPool?: import('../swim/pool-label.ts').PoolLabelInput | null;
+  /**
    * ⛔ THE SESSION'S MOVING SECONDS, FROM `_shared/moving-seconds.ts` (2026-09-10, audit H-D10) — the
    * number `get-week` stamps as `moving_seconds` for the done card and the Week row. workout-detail is
    * the DB reader and passes it; absent (fixtures, older callers) → `computed.overall` as before.
@@ -391,6 +397,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     loadStatus,
     completedComputed,
     completedSwimScalars,
+    completedPool,
     completedMovingS,
     completedRunScalars,
     loadContext,
@@ -827,6 +834,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     completedTotals.swim_distance_status = dist.status;
     completedTotals.swim_duration_pct_of_plan = dur.pct;
     completedTotals.swim_duration_status = dur.status;
+    // ⛔ THE POOL LABEL FROM THE SAVED UNIT (audit H-D08 / H-D13) — `_shared/swim/pool-label.ts`.
+    const pool = poolLabel(completedPool);
+    completedTotals.pool_display = pool.label;
+    completedTotals.pool_unit = pool.unit;
   }
 
   // Single planned/executed row must match completed_totals (same source as Details / chips).

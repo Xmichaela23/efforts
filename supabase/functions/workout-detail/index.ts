@@ -246,8 +246,11 @@ const STRENGTH_VOLUME_VERSION = 2;
  *   3 — intervals[].executed.band / gap_band, intervals[].race_compare and pacing.variability (2026-09-10,
  *       audit H-D11 / H-D12). A copy stored at v2 has none, and the interval table would print no
  *       colours, no goal-race percent and no pacing mark.
+ *   4 — completed_totals.pool_display / pool_unit, and the swim's share of plan (swim_distance_pct_of_plan,
+ *       swim_duration_pct_of_plan and their status words) (2026-09-10, audit H-D08 / H-D13). A copy stored at
+ *       v3 has none, and the pool-swim card would print no pool and no distance or duration pills.
  */
-const SESSION_TOTALS_VERSION = 3;
+const SESSION_TOTALS_VERSION = 4;
 
 type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_missing';
 
@@ -656,14 +659,19 @@ async function runSessionDetailPipelineAndPersist(
     // read raw — `weight` is free text, and 70 typed in kilograms is a person while 70 read as pounds
     // is not. A failed read leaves null, and null is scored exactly as it was before D-348.
     let bodyweightLb: number | null = null;
-    if (isStrengthLikePerfSession(row)) {
+    // The athlete's unit setting also names a swim's pool when no unit was saved (audit H-D08 / H-D13) —
+    // the same read, widened to swims.
+    let athleteUnits: string | null = null;
+    const isSwimRow = String((row as any)?.type ?? '').toLowerCase() === 'swim';
+    if (isStrengthLikePerfSession(row) || isSwimRow) {
       try {
         const { data: ubRow } = await supabase
           .from('user_baselines')
           .select('weight, units')
           .eq('user_id', userId)
           .maybeSingle();
-        bodyweightLb = resolveBodyweightLb(ubRow as any);
+        if (isStrengthLikePerfSession(row)) bodyweightLb = resolveBodyweightLb(ubRow as any);
+        athleteUnits = typeof (ubRow as any)?.units === 'string' ? (ubRow as any).units : null;
       } catch (bwErr) {
         console.warn('[workout-detail] body weight read failed (non-fatal, prices as pre-D-348):', bwErr instanceof Error ? bwErr.message : bwErr);
       }
@@ -967,6 +975,19 @@ async function runSessionDetailPipelineAndPersist(
       // D-182: for swims, pass the RAW-column scalar (moving/elapsed/distance/HR) so the card reads the
       // SAME authoritative numbers the narrative does — never computed.overall (sample-derived, has been
       // wrong: moving > elapsed). Null for non-swims (they keep computed.overall in build.ts).
+      // ⛔ THE POOL AS SAVED, FOR THE POOL LABEL (2026-09-10, audit H-D08 / H-D13) — the three lengths the one
+      // resolver reads (metres), both saved units and the athlete's setting. This function reads the row; the
+      // builder writes the words (`_shared/swim/pool-label.ts`).
+      completedPool: ((row?.type ?? (detail as any)?.type) === 'swim')
+        ? {
+            user_corrected_length_m: (row as any)?.user_corrected_pool_length_m ?? null,
+            length_m: (row as any)?.pool_length ?? (detail as any)?.pool_length ?? null,
+            plan_length_m: (row as any)?.plan_pool_length_m ?? null,
+            unit: (row as any)?.pool_unit ?? null,
+            plan_unit: (row as any)?.plan_pool_unit ?? null,
+            athlete_units: athleteUnits,
+          }
+        : null,
       completedSwimScalars: ((row?.type ?? (detail as any)?.type) === 'swim')
         ? resolveSwimScalars({
             moving_time: (detail as any).moving_time ?? (detail as any).metrics?.moving_time,
@@ -1529,7 +1550,9 @@ Deno.serve(async (req) => {
       }
       const forceRefresh = body?.force_refresh === true || urlForceRefresh;
 
-      const selectSd = baseSel + ',swim_data,number_of_active_lengths,pool_length,weather_data';
+      // The pool as saved — every length the one resolver reads, and both units — so the builder can write the
+      // pool label (audit H-D08 / H-D13).
+      const selectSd = baseSel + ',swim_data,number_of_active_lengths,pool_length,pool_unit,user_corrected_pool_length_m,plan_pool_length_m,plan_pool_unit,weather_data';
       let qSd = supabase.from('workouts').select(selectSd).eq('id', id) as any;
       qSd = qSd.eq('user_id', userId);
       let sdRes = await qSd.maybeSingle();
@@ -1594,7 +1617,7 @@ Deno.serve(async (req) => {
     }
 
     const gpsSel = opts.include_gps ? ',gps_track' : '';
-    const swimSel = opts.include_swim ? ',swim_data,number_of_active_lengths,pool_length' : '';
+    const swimSel = opts.include_swim ? ',swim_data,number_of_active_lengths,pool_length,pool_unit,user_corrected_pool_length_m,plan_pool_length_m,plan_pool_unit' : '';
     const select = baseSel + gpsSel + swimSel;
 
     let query = supabase.from('workouts').select(select).eq('id', id) as any;
