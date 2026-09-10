@@ -12,8 +12,8 @@ import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.t
 import {
   getDisciplineSwaps, sessionSwapExtras, intensityOf, venueOf, VENUE_PREFIX, isPlanTwin, sameSwapOn,
   revertOptions, originalNameOf, SWAPPED_NAME_PREFIX,
-} from './session-discipline-swap.ts';
-import { swapButtonLabel, swapLineFor, SWAP_BACK_TO_PLAN, VENUE_OUTDOORS } from './swap-copy.ts';
+} from '../../supabase/functions/_shared/session-swap/swap.ts';
+import { swapButtonLabel, swapLineFor, SWAP_BACK_TO_PLAN, VENUE_OUTDOORS } from '../../supabase/functions/_shared/session-swap/copy.ts';
 
 const ALL = ['run', 'ride', 'swim'] as const;
 const base = { workout_status: 'planned', total_duration_seconds: 3600 };

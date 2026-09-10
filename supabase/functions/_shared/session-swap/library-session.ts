@@ -1,6 +1,8 @@
 /**
  * ═══ A SWAPPED SESSION IS THE LIBRARY'S SESSION ══════════════════════════════════════════════════
  *
+ * ⛔ MOVED TO THE SERVER UNCHANGED (2026-09-10, audit H-T15) — was `src/lib/swap-library-session.ts`.
+ *
  * docs/WORKORDER-endurance-swaps-2026-09-09.md §7.
  *
  * ⛔ THE OLD SWAP HANDED OVER A SHELL. It kept the ORIGINAL session's minutes and wrote a sentence —
@@ -21,11 +23,11 @@ import {
   buildEnduranceSession,
   type FamilyId,
   type Level,
-} from '../../supabase/functions/_shared/endurance-library/index.ts';
-import { translateEnduranceSession } from '../../supabase/functions/_shared/standing-plan/session-vocabulary.ts';
-import type { Discipline, IntensityBand, SwappableSession } from './session-discipline-swap';
+} from '../endurance-library/index.ts';
+import { translateEnduranceSession } from '../standing-plan/session-vocabulary.ts';
+import type { Discipline, IntensityBand, SwappableSession } from './swap.ts';
 // ⛔ ONE DURATION READER FOR THE WHOLE APP — `planned-session/enforcement.test.ts` pins it by name.
-import { plannedDurationSeconds } from './planned-session/duration';
+import { plannedDurationSeconds } from '../../../../src/lib/planned-session/duration.ts';
 
 /**
  * ⛔ WHICH SESSION THE BOOK HANDS OVER, by the sport being left and its band.

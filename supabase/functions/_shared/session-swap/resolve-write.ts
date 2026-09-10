@@ -3,26 +3,23 @@
  *
  * docs/WORKORDER-endurance-swaps-2026-09-09.md §7.
  *
- * ⛔ TWO SCREENS APPLY A SWAP — Today's sheet and the workout drawer — and they each wrote
- * `option.patch` straight to the row. §7 makes the write more than the patch: a sport swap has to
- * hand over the composer's own session for the new sport, which needs a read the pure library cannot
- * do. Putting that in one screen would leave the other one still writing a shell, so it lives here
- * and both screens ask the same question.
+ * ⛔ MOVED TO THE SERVER (2026-09-10, audit H-T15). This was `src/lib/swap-write.ts`: Today's sheet and
+ * the workout drawer each ran it on the phone and wrote its patch to the row themselves. `swap-session`
+ * runs it now — for the line under a sport swap on the sheet, and for the write — and the phone posts
+ * the tap. The only change is that the database client is passed in rather than imported.
  *
- * ⚠️ THE PURE LIBRARY STILL DECIDES WHAT IS OFFERED. This file only resolves what the offered thing
- * writes; every gate — posture, band, the ground-impact rule, unstarted-only — stays in
- * `session-discipline-swap`.
+ * ⚠️ `swap.ts` STILL DECIDES WHAT IS OFFERED. This file only resolves what the offered thing writes;
+ * every gate — posture, band, the ground-impact rule, unstarted-only — stays there.
  */
-import { supabase } from '@/lib/supabase';
 import {
   disciplineOf,
   intensityOf,
+  originOf,
   withLibrarySession,
   type SwapOption,
   type SwappableSession,
-} from './session-discipline-swap';
-import { originOf } from './session-discipline-swap';
-import { swapTargetFamily, librarySwapSession } from './swap-library-session';
+} from './swap.ts';
+import { swapTargetFamily, librarySwapSession } from './library-session.ts';
 
 /** `2026-09-14` → `Monday`. The names `sessions_by_week` authors days under. */
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
@@ -66,6 +63,9 @@ export type SwapWrite = {
   needsMaterialize: boolean;
 };
 
+// deno-lint-ignore no-explicit-any
+type Db = any;
+
 /**
  * The row the swap writes, resolved against the athlete's own plan.
  *
@@ -79,6 +79,7 @@ export type SwapWrite = {
  * patch the library built rather than being refused.
  */
 export async function resolveSwapWrite(
+  supabase: Db,
   userId: string,
   row: SwappableSession & { id?: string; type?: string | null },
   option: SwapOption,
@@ -104,7 +105,7 @@ export async function resolveSwapWrite(
   if (option.kind === 'revert') {
     // The machine's revert is the tag the library already built — no session to restore.
     if (option.venue) return plain;
-    return resolveRevertToPlan(userId, row);
+    return resolveRevertToPlan(supabase, userId, row);
   }
   // ⛔ A MACHINE OR A HIKE IS NOT A SPORT SWAP. p275's machine is the same session performed
   // elsewhere, so there is no other session to hand over — it changes a tag and nothing else.
@@ -129,7 +130,7 @@ export async function resolveSwapWrite(
       // `librarySwapSession` refuses those; asking for one row would hand it nothing to fall back on.
       .limit(8);
     template = (Array.isArray(data) ? data : [])
-      .find((r: any) => !(r?.tags ?? []).includes('discipline_swapped')) as never ?? null;
+      .find((r: { tags?: string[] | null }) => !(r?.tags ?? []).includes('discipline_swapped')) as never ?? null;
   } catch (e) {
     console.warn('[swap] could not read the athlete\'s own session for', family, e);
   }
@@ -145,8 +146,14 @@ export async function resolveSwapWrite(
  * ⚠️ THE LOOKUP IS THE SERVER'S: plan → `sessions_by_week[week_number]` → the sessions authored for
  * this DATE'S day name → the one whose type is the discipline the row was swapped FROM. That last
  * clause is what makes it unambiguous on a day carrying two sessions.
+ *
+ * ⛔ IT NEEDS THE ROW'S `week_number`, AND ON THE PHONE IT NEVER HAD ONE (found moving this, 2026-09-10).
+ * Today's sheet passed get-week's `planned_workout`, which carries no `week_number`, so this returned
+ * "not found" on every tap of the way back; the rest-of-plan loop selected no `week_number` either.
+ * `swap-session` passes the stored row, which has it.
  */
 async function resolveRevertToPlan(
+  supabase: Db,
   userId: string,
   row: SwappableSession & { id?: string; date?: string | null; week_number?: number | null; training_plan_id?: string | null },
 ): Promise<SwapWrite> {
@@ -198,9 +205,13 @@ async function resolveRevertToPlan(
    * `name`, `description`, `rendered_description`, `steps_preset`, `duration`,
    * `total_duration_seconds`, `computed`, `workout_structure`, `intervals`, `tags`.
    *
-   * ⚠️ THE DURATIONS GO TO NULL RATHER THAN THE BLOB'S. The blob authors tokens, not a total; the
+   * ⚠️ THE TOTAL GOES TO NULL RATHER THAN THE BLOB'S. The blob authors tokens, not a total; the
    * total is `materialize-plan`'s answer for this athlete, and writing a stale one would survive the
    * expansion and print a length the steps do not add up to.
+   * ⛔ `duration` IS LEFT FOR `materialize-plan` TO REWRITE, NOT NULLED (2026-09-10). The column is
+   * not-null on the live table, so this patch used to fail outright — never seen, because the phone
+   * never got this far (see `week_number` above). The expander writes `duration` from the steps it
+   * builds, which replaces the swapped session's minutes.
    *
    * ⚠️ AND THE TAGS ARE THE AUTHORED ONES OUTRIGHT — no merge. `discipline_swapped`,
    * `swapped_from:`, `swapped_name:` and any `venue:` all have to go, and every tag the swap added
@@ -221,7 +232,6 @@ async function resolveRevertToPlan(
       mobility_exercises: Array.isArray(authored.mobility_exercises) ? authored.mobility_exercises : null,
       intervals: null,
       computed: null,
-      duration: null,
       total_duration_seconds: null,
       tags: Array.isArray(authored.tags) ? authored.tags : [],
     },

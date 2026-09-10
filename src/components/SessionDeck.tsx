@@ -11,7 +11,7 @@ import AdherenceChips from './AdherenceChips';
 import { ProviderAttributionLine } from './ProviderAttribution';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 // ⛔ THE MACHINE'S NAME IS MICHAEL'S WORD, from the one file that holds the swap sheet's words.
-import { VENUE_LABEL } from '@/lib/swap-copy';
+import { VENUE_LABEL } from '@shared/session-swap/copy.ts';
 import { venueOf } from '@/lib/session-discipline-swap';
 import { formatSessionDuration } from './PlannedSessionHeader';
 import {

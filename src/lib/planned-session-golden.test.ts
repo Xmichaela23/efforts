@@ -37,7 +37,7 @@ import {
   getDisciplineSwaps,
   intensityOf,
   resolveMinutes,
-} from './session-discipline-swap.ts';
+} from '../../supabase/functions/_shared/session-swap/swap.ts';
 import { normalizeSport, rankAssociateCandidates } from './associate-candidates.ts';
 import {
   disciplineFromPostureKey,

@@ -13,33 +13,9 @@ import { Calendar, Clock, Dumbbell, Activity, X, Copy, ArrowLeftRight, ChevronLe
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
 // ⛔ SAME RULE AS THE CALENDAR AND THE WORKOUT VIEW — one definition of "missed a planned slot".
 import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
-// ⛔ SWAP WHAT IS HELD, NOT WHAT IS TRAINED — the posture gate. One reader, shared with State.
-import { useDeclaredPosture } from '@/hooks/useDeclaredPosture';
-import { useResolvedFtp } from '@/hooks/useResolvedFtp';
-// ⛔ ONE SHARED SWAP LAYER (2026-08-08). Pure logic + the clearance law live in the lib; this file
-// owns only the UI and the write. Every plan type — marathon, Strong Focus, combined, tri — renders
-// planned sessions through here, so the swap is inherited rather than re-implemented per generator.
-import {
-  availableDisciplines,
-  getDisciplineSwaps,
-  revertOptions,
-  matrixKindFor,
-  intensityOf,
-  disciplineOf,
-  sessionSwapExtras,
-  isPlanTwin,
-  sameSwapOn,
-  type SwapOption,
-} from '@/lib/session-discipline-swap';
-/**
- * ⛔ §7 — A SPORT SWAP HANDS OVER THE LIBRARY'S SESSION, NOT A SHELL WITH THE OLD MINUTES. The
- * drawer applies swaps too (`UnifiedWorkoutView`), so what a swap WRITES lives in one file that both
- * screens ask — otherwise one of them keeps writing the shell.
- */
-import { resolveSwapWrite } from '@/lib/swap-write';
-// ⛔ EVERY WORD ON THE SWAP SHEET IS MICHAEL'S, AND LIVES IN ONE FILE.
-import { swapButtonLabel, SWAP_BACK_TO_PLAN, SWAP_SHEET_HEADER } from '@/lib/swap-copy';
-import SwapPreviewLine from './SwapPreviewLine';
+// ⛔ THE SWAP IS THE SERVER'S (2026-09-10, audit H-T15). `swap-session` sends which swaps a session
+// offers, with the words each shows, and writes the tap; this file renders the sheet and posts it.
+import { useSwapSheet, useSportSwapIds, postSwap, type SwapSheetOption } from '@/hooks/useSwapSheet';
 import { formatSwimPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout, displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore, formZoneColor } from '@/lib/context-utils';
@@ -247,9 +223,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
    * a plan is not a setting to inherit from the last session the athlete happened to change.
    */
   const [swapRestOfPlan, setSwapRestOfPlan] = useState(false);
-  const declaredPosture = useDeclaredPosture();
-  // ⛔ Gates the HARD-ride swap: no usable FTP, no watts, so it is not offered.
-  const resolvedFtp = useResolvedFtp();
+  // The open session's sheet, as `swap-session` sends it.
+  const swapSheet = useSwapSheet(selectedPlannedWorkout?.id ? String(selectedPlannedWorkout.id) : null);
   const [dismissedNotes, setDismissedNotes] = useState<Set<string>>(new Set());
   const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(new Set());
 
@@ -383,6 +358,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const noPlanYet = !loading && !unifiedLoading && !trainingPlanContext
     && Object.keys(detailedPlans ?? {}).length === 0;
   
+  // ⛔ WHICH OF THE WEEK'S SESSIONS CARRY THE SWAP GLYPH — the server's answer (`swap-session`, 2026-09-10).
+  const weekPlannedIds = useMemo(
+    () => (Array.isArray(allUnifiedItems) ? allUnifiedItems : [])
+      .map((it: any) => it?.planned_workout?.id)
+      .filter(Boolean)
+      .map(String),
+    [allUnifiedItems],
+  );
+  const sportSwapIds = useSportSwapIds(weekPlannedIds);
+
   // Filter to only items for the active date
   const unifiedItems = allUnifiedItems.filter((item: any) => {
     const itemDate = String(item?.date || '').slice(0, 10);
@@ -614,15 +599,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   };
 
   /**
-   * ⛔ THE SAME WRITE PATH AS SKIP, DELIBERATELY. `handleApplySkip` below patches
-   * `planned_workouts` and fires `planned:invalidate` + `week:invalidate`; a swap is the same kind of
-   * athlete-owned edit to a planned row and must not invent a second one. The DIFFERENCE is only
-   * which columns move.
+   * ⛔ THE TAP IS POSTED; THE SERVER WRITES (2026-09-10, audit H-T15). `swap-session` re-derives the
+   * option from the stored row, writes it (and each later repeat for "Rest of plan"), expands the new
+   * sessions through `materialize-plan` and returns the toast's words. This handler used to resolve
+   * the patch, write it, expand it and loop the later rows itself.
    *
    * ⚠️ NEVER BLOCKED. A swap with warnings is still applied — the warnings are shown beside the
    * button, not in place of it. That is the guardrail rule: warn, do not gate.
    */
-  const handleApplyDisciplineSwap = async (workout: any, option: SwapOption, restOfPlan = false) => {
+  const handleApplyDisciplineSwap = async (workout: any, option: SwapSheetOption, restOfPlan = false) => {
     const userId = getStoredUserId();
     if (!userId || !workout?.id) {
       toast({ title: 'Error', description: 'Please log in to change a session', variant: 'destructive' });
@@ -630,114 +615,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     }
     setSwappingSession(true);
     try {
-      const write = await resolveSwapWrite(userId, workout as never, option);
-      /**
-       * ⛔ A RESTORE THAT FOUND NOTHING IS NOT A RESTORE (§8). `resolveSwapWrite` reads the plan's
-       * authored session out of `sessions_by_week`; if the plan has moved on and no longer holds
-       * this day's session, the honest outcome is the error path, not an empty patch written over a
-       * swapped row and reported as success.
-       */
-      if (write.ok === false) throw new Error('The plan no longer holds this session');
-      const { error } = await supabase
-        .from('planned_workouts').update(write.patch).eq('id', workout.id).eq('user_id', userId);
-      if (error) throw error;
-      /**
-       * ⛔ THE HARD RIDE IS NOT FINISHED UNTIL THE SERVER EXPANDS IT (2026-08-09). The patch wrote
-       * TOKENS (`warmup_bike_quality_15min_fastpedal` · `bike_vo2_4x4min_R4min` ·
-       * `cooldown_bike_10min_easy`); the WATTS only exist once `materialize-plan` runs
-       * `expandBikeToken` against the athlete's FTP. Without this call the athlete opens a session
-       * with a name, a length, and no steps.
-       *
-       * ⚠️ AWAITED, so the invalidations below fire against the expanded row. The same single-row
-       * entry point `usePlannedWorkoutLink` and `UnifiedWorkoutView` already use — no new function.
-       */
-      if (write.needsMaterialize) {
-        try {
-          await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(workout.id) } });
-        } catch (e) {
-          // ⚠️ The swap itself succeeded; only the expansion failed. Say so rather than implying the
-          // whole action failed — the row is a ride either way, and a re-open re-materialises it.
-          console.warn('[swap] materialize-plan failed for the hard ride:', e);
-        }
-      }
-      /**
-       * ═══ REST OF PLAN ═════════════════════════════════════════════════════════════════════════
-       *
-       * ⛔ EVERY LATER REPEAT OF THIS SESSION, RE-ASKED ONE ROW AT A TIME. `sameSwapOn` builds each
-       * row its OWN patch — a machine patch carries that row's tag list, a hike patch that row's
-       * minutes — because copying this row's patch across would overwrite theirs with ours.
-       *
-       * ⚠️ TODAY IS ALREADY WRITTEN ABOVE AND IS NOT REVISITED (`gt` on the date). And a row that
-       * cannot take the swap is SKIPPED, not forced: `sameSwapOn` returns null for a session already
-       * logged, already indoors, or no longer the long day.
-       *
-       * ⚠️ THE FAILURE IS NON-FATAL. Today's swap has already succeeded by this point; if the later
-       * rows fail, the athlete is told what did happen rather than shown an error for a write that
-       * worked. Nothing is rolled back — a reverted swap the athlete asked for is the worse outcome.
-       */
-      let alsoWritten = 0;
-      if (restOfPlan) {
-        try {
-          const q = supabase
-            .from('planned_workouts')
-            .select('id,date,type,name,tags,workout_status,duration,total_duration_seconds,steps_preset,computed,training_plan_id')
-            .eq('user_id', userId)
-            .eq('workout_status', 'planned')
-            .gt('date', String(workout.date).slice(0, 10));
-          const planId = (workout as any)?.training_plan_id ?? null;
-          const { data: later } = await (planId ? q.eq('training_plan_id', planId) : q);
-          const rows = Array.isArray(later) ? later : [];
-          for (const row of rows) {
-            if (!isPlanTwin(workout as never, row as never)) continue;
-            const same = sameSwapOn(row as never, option, {
-              available: availableDisciplines(Array.isArray(allUnifiedItems) ? allUnifiedItems : []),
-              posture: declaredPosture,
-              ftp: resolvedFtp,
-              // The ground-impact gate wants that row's OWN week, which is not loaded. Absent means
-              // "not asked": the treadmill is offered, and nothing else is.
-              weekSessions: [],
-            });
-            if (!same) continue;
-            // ⚠️ RE-ASKED PER ROW HERE TOO. A later row's band can differ from today's, and the
-            // family it is handed depends on the band — so the session is resolved against THAT row.
-            const laterWrite = await resolveSwapWrite(userId, row as never, same);
-            // ⚠️ A LATER ROW WHOSE ORIGINAL CANNOT BE FOUND IS SKIPPED, not written empty — the same
-            // rule the rest of this loop already follows for a row that cannot take the swap.
-            if (laterWrite.ok === false) continue;
-            const { error: e2 } = await supabase
-              .from('planned_workouts').update(laterWrite.patch).eq('id', row.id).eq('user_id', userId);
-            if (e2) continue;
-            if (laterWrite.needsMaterialize) {
-              try {
-                await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(row.id) } });
-              } catch { /* the row is swapped either way; a re-open re-materialises it */ }
-            }
-            alsoWritten += 1;
-          }
-        } catch (e) {
-          console.warn('[swap] rest-of-plan write failed after today succeeded:', e);
-        }
-      }
-
-      const what = option.kind === 'revert'
-        /**
-         * ⛔ THE SHEET'S OWN LINE, USED AS THE RECEIPT (§8). Michael approved `Back to the plan.` as
-         * the words under the option and gave no separate confirmation for it; saying anything else
-         * here would be a line he has not written. ⚠️ IF HE WANTS A DIFFERENT CONFIRMATION, this is
-         * the one place it changes — the `— this and N later` suffix below still applies.
-         */
-        ? SWAP_BACK_TO_PLAN
-        : option.kind === 'venue'
-          ? `Moved to the ${(swapButtonLabel(option) || 'machine').toLowerCase()}`
-          : option.kind === 'hike'
-            ? 'Swapped to a hike'
-            : `Swapped to a ${option.to === 'ride' ? 'ride' : option.to}`;
-      toast({
-        // ⛔ SAY HOW MANY, NOT "rest of plan". The athlete asked for the rest of the plan; what they
-        // get is the sessions it actually held, and that number is the receipt.
-        title: alsoWritten > 0 ? `${what} — this and ${alsoWritten} later` : what,
-        variant: 'default',
-      });
+      const { receipt } = await postSwap(String(workout.id), option.id, restOfPlan);
+      toast({ title: receipt, variant: 'default' });
       setSelectedPlannedWorkout(null);
       setPlannedDrawerStep('detail');
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
@@ -2121,9 +2000,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                  */
                 const swapGlyph = (() => {
                   if (!isPlannedRow || isCompleted) return null;
-                  const week = Array.isArray(allUnifiedItems) ? allUnifiedItems : [];
-                  const opts = getDisciplineSwaps(workout as never, availableDisciplines(week as never), [], declaredPosture, resolvedFtp);
-                  if (opts.length === 0) return null;
+                  // ⛔ THE SERVER SAYS WHICH SESSIONS OFFER A SPORT SWAP (`swap-session`, 2026-09-10).
+                  if (!sportSwapIds.has(String(workout?.id ?? ''))) return null;
                   const openSwap = () => {
                     setSelectedPlannedWorkout(workout);
                     setSwapRestOfPlan(false);
@@ -2629,56 +2507,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 const w = selectedPlannedWorkout;
                 const sheetSkipped = w && String(w.workout_status || '').toLowerCase() === 'skipped';
                 /**
-                 * ⚠️ THE SPORTS ON OFFER COME FROM THE ATHLETE'S OWN WEEK, not a new field — a plan
-                 * that has never contained a swim is not evidence they can swim. `unifiedItems` is
-                 * the week the client already holds, so this costs no fetch.
+                 * ⛔ THE OPTIONS ARE THE SERVER'S (2026-09-10, audit H-T15): the way back first, then
+                 * the machine and the hike, then the sports — each with its label, its line and its
+                 * warnings. `useSwapSheet` fetched them for the open session.
                  */
-                /**
-                 * ⛔ ONE SHEET, TWO READERS (work order 2026-09-09). `getDisciplineSwaps` answers
-                 * "which SPORT can this become"; `sessionSwapExtras` answers "the same session on a
-                 * machine, or the long day as a hike" — neither of which is a sport change, and both
-                 * of which return `to === from`. They are separate so `to` keeps one meaning; the
-                 * athlete sees one list.
-                 */
-                /**
-                 * ⛔ AND THE WAY BACK IS FIRST (§8, 2026-09-09). A session the athlete already
-                 * changed offers its original before it offers a third option.
-                 */
-                const swapOptions: SwapOption[] = w
-                  ? [...revertOptions(w, (w as any)?.training_plan_id ?? null), ...sessionSwapExtras(
-                      w,
-                      declaredPosture,
-                      // p275's ground-impact rule needs the WEEK, not the day.
-                      Array.isArray(allUnifiedItems) ? (allUnifiedItems as never) : [],
-                    ), ...getDisciplineSwaps(
-                      w,
-                      // ⛔ THE WEEK, NOT THE DAY (2026-08-08). `unifiedItems` is filtered to
-                      // `activeDate`, so asking it which sports the athlete has answered with only
-                      // today's — usually just the one the open session already is, so no other
-                      // sport was ever offered and the control never rendered.
-                      availableDisciplines(Array.isArray(allUnifiedItems) ? allUnifiedItems : []),
-                      // The rest of that day, in the law's vocabulary, so the warnings are real.
-                      (Array.isArray(unifiedItems) ? unifiedItems : [])
-                        .filter((it: any) => String(it?.date).slice(0, 10) === String(w.date).slice(0, 10)
-                          && it?.id !== w.id)
-                        .map((it: any) => {
-                          const d = disciplineOf(it?.type);
-                          const kind = String(it?.type || '').toLowerCase() === 'strength'
-                            ? (/squat|deadlift|lunge|leg/i.test(String(it?.name || '')) ? 'lower_body_strength' : 'upper_body_strength')
-                            : d ? matrixKindFor(d, intensityOf(it)) : null;
-                          return kind ? { kind, label: String(it?.name || 'another session') } : null;
-                        })
-                        .filter(Boolean) as Array<{ kind: any; label: string }>,
-                      declaredPosture,
-                      // ⛔ Gates the HARD ride only — see `useResolvedFtp`. Easy swaps ignore it.
-                      resolvedFtp,
-                    )]
-                  : [];
+                const swapOptions: SwapSheetOption[] = w && swapSheet ? swapSheet.options : [];
                 if (plannedDrawerStep === 'swap' && w) {
                   return (
                     <div className="flex flex-col gap-2 w-full">
-                      {/* ⛔ MICHAEL'S HEADER (2026-09-09), from `swap-copy` with every other word here. */}
-                      <div className="text-[13px] text-white/70 pb-1">{SWAP_SHEET_HEADER}</div>
+                      {/* ⛔ MICHAEL'S HEADER (2026-09-09), sent by `swap-session` with every other word here. */}
+                      <div className="text-[13px] text-white/70 pb-1">{swapSheet?.header}</div>
                       {/* ⛔ THE SAME TWO CHOICES THE LIFT SWAP OFFERS (work order §6). Just today is the
                           default — one row — and Rest of plan writes this session's later repeats too.
                           ⛔ AN EASY SESSION OFFERS JUST TODAY ONLY (Michael, 2026-09-10). Easy work can
@@ -2690,7 +2528,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           onClick={() => setSwapRestOfPlan(false)}
                           className={`px-2.5 py-1 rounded-xl text-[12px] border transition-colors ${!swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/70 hover:text-white/80'}`}
                         >Just today</button>
-                        {intensityOf(w as never) !== 'easy' ? (
+                        {swapSheet?.rest_of_plan ? (
                           <button
                             type="button"
                             onClick={() => setSwapRestOfPlan(true)}
@@ -2702,16 +2540,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         <button
                           /* ⚠️ THE KEY IS THE KIND AND THE TARGET — a machine and a sport swap can
                              both carry the same `to`, so `to` alone repeats. */
-                          key={`${opt.kind ?? 'discipline'}:${opt.venue ?? opt.to}`}
+                          key={opt.id}
                           type="button"
                           disabled={swappingSession}
-                          onClick={() => handleApplyDisciplineSwap(w, opt, swapRestOfPlan && intensityOf(w as never) !== 'easy')}
+                          onClick={() => handleApplyDisciplineSwap(w, opt, swapRestOfPlan && swapSheet?.rest_of_plan === true)}
                           className="w-full px-4 py-3 rounded-xl text-left text-white border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] transition-colors disabled:opacity-50"
                         >
-                          <div className="text-sm font-medium">{swapButtonLabel(opt)}</div>
+                          <div className="text-sm font-medium">{opt.label}</div>
                           {/* ⛔ THE SESSION YOU GET, OR THE MACHINE'S / THE WAY BACK'S APPROVED LINE —
-                              `SwapPreviewLine` asks the same resolver the tap writes with. */}
-                          <SwapPreviewLine row={w as never} option={opt} className="text-[12px] text-white/55 mt-1" />
+                              resolved by the server with the same resolver the tap writes with. */}
+                          {opt.line ? <div className="text-[12px] text-white/55 mt-1">{opt.line}</div> : null}
                           {/* ⛔ WARN, NEVER GATE — the button above still works. */}
                           {opt.warnings.map((warn) => (
                             <div key={warn} className="text-[12px] text-amber-200/80 mt-1">{warn}</div>

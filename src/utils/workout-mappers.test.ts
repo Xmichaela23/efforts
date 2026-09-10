@@ -23,7 +23,7 @@ import {
   availableDisciplines,
   getDisciplineSwaps,
   resolveMinutes,
-} from '../lib/session-discipline-swap.ts';
+} from '../../supabase/functions/_shared/session-swap/swap.ts';
 
 /**
  * A faithful mirror of `get-week:1489 toPlannedWorkout`, restricted to the fields this suite reads.

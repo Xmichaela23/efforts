@@ -31,21 +31,8 @@ import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 // calendar, into this view. Same logic, correct surface.
 // ⛔ THE UNMATCHED CUE — one rule, unit-tested, shared with the calendar and Today's card.
 import { unmatchedPrompt } from '@/lib/associate-candidates';
-// ⛔ SWAP WHAT IS HELD, NOT WHAT IS TRAINED — the posture gate. One reader, shared with State.
-import { useDeclaredPosture } from '@/hooks/useDeclaredPosture';
-import { useResolvedFtp } from '@/hooks/useResolvedFtp';
-import {
-  availableDisciplines,
-  disciplineOf,
-  getDisciplineSwaps,
-  intensityOf,
-  matrixKindFor,
-  type SwapOption,
-  type SwappableSession,
-} from '@/lib/session-discipline-swap';
-import { resolveSwapWrite } from '@/lib/swap-write';
-import { getStoredUserId } from '@/lib/supabase';
-import type { MatrixSessionKind } from '../../supabase/functions/_shared/schedule-session-constraints';
+// ⛔ THE SWAP IS THE SERVER'S (2026-09-10, audit H-T15): `swap-session` sends the options and writes the tap.
+import { useSwapSheet, postSwap, type SwapSheetOption } from '@/hooks/useSwapSheet';
 import { ArrowLeftRight } from 'lucide-react';
 import { SPORT_COLORS, getDisciplineColor, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
@@ -148,10 +135,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
    * hook DOES changed. The one substantive edit is `isCompleted` reading `workout?.` instead of
    * `workout.` — it now evaluates on the null render, where it would have thrown.
    */
-  const declaredPosture = useDeclaredPosture();
-  // ⛔ Gates the HARD-ride swap — see `useResolvedFtp`. Must sit ABOVE the guard (Stage H).
-  const resolvedFtp = useResolvedFtp();
-
   // plannedWorkouts context removed; rely on server unified data/routes
   //
   // ⛔ A STATUS STRING IS A CLAIM, NOT EVIDENCE. This read `workout_status === 'completed'` and
@@ -540,6 +523,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     })();
   }, [activeTab, isCompleted, (workout as any)?.id, (workout as any)?.planned_id, linkedPlanned?.id, hydratedPlanned?.id]);
 
+  // ⛔ THE DRAWER'S SWAP OPTIONS, FROM `swap-session` — a hook, so above the guard (Stage H).
+  const swapSheetId = (unifiedWorkout as any)?.id ?? (workout as any)?.id ?? null;
+  const swapSheet = useSwapSheet(!isCompleted && swapSheetId ? String(swapSheetId) : null);
+
   /**
    * ═══ STAGE H · THE GUARD. Every hook above; nothing but rendering below. ═══════════════════════
    *
@@ -561,39 +548,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   }
 
   /**
-   * ═══ THE SWAP, COMPUTED ONCE FOR THIS SCREEN (2026-08-09). ═══════════════════════════════════
+   * ═══ THE SWAP, ASKED OF THE SERVER ONCE FOR THIS SCREEN (2026-09-10, audit H-T15). ═══════════
    *
-   * ⛔ IT USED TO LIVE INSIDE THE DELETE/RESCHEDULE BLOCK, which renders BELOW the planned header —
-   * so the header could not offer the swap without computing the gate a second time. Two
-   * computations of one gate on one screen is precisely how the three surfaces drifted apart in the
-   * first place. One computation, two consumers: the header glyph and the button beside Delete.
-   *
-   * ⛔ `it.planned_workout ?? it` — NOT `it.planned`. `get-week`'s internal `planned` object carries
-   * no `type` (the sport is on the ITEM), so mapping the week through it made
-   * `availableDisciplines` answer `[]` and the swap returned nothing for EVERY planned session on
-   * this screen, for every athlete. The `?? it.planned_workout` fallback that would have worked was
-   * unreachable, because `it.planned` is always truthy.
+   * ⛔ `swap-session` sends this session's options; the drawer lists the sport swaps among them — it
+   * never listed the machine, the hike or the way back — for the header glyph and the button beside
+   * Delete alike. One answer, two consumers.
    */
-  type SwapRowT = SwappableSession & { date?: string | null };
-  const swapRow = ((unifiedWorkout || workout) ?? {}) as SwapRowT;
-  const swapWeek = (Array.isArray(unifiedItems) ? unifiedItems : []).map((it: any) =>
-    (it?.planned_workout ?? it) as SwapRowT);
-  const swapSameDay = swapWeek
-    .filter((it) => String(it?.date).slice(0, 10) === String(swapRow?.date).slice(0, 10)
-      && String(it?.id) !== String(swapRow?.id))
-    .map((it): { kind: MatrixSessionKind; label: string } | null => {
-      const d = disciplineOf(it?.type);
-      const kind: MatrixSessionKind | null =
-        String(it?.type || '').toLowerCase() === 'strength'
-          ? (/squat|deadlift|lunge|leg/i.test(String(it?.name || ''))
-            ? 'lower_body_strength' : 'upper_body_strength')
-          : d ? matrixKindFor(d, intensityOf(it)) : null;
-      return kind ? { kind, label: String(it?.name || 'another session') } : null;
-    })
-    .filter((x): x is { kind: MatrixSessionKind; label: string } => x !== null);
-  const swapOptions: SwapOption[] = !isCompleted && swapRow
-    ? getDisciplineSwaps(swapRow, availableDisciplines(swapWeek), swapSameDay, declaredPosture, resolvedFtp)
-    : [];
+  const swapRow = ((unifiedWorkout || workout) ?? {}) as { id?: string | null; date?: string | null };
+  const swapOptions: SwapSheetOption[] = (swapSheet?.options ?? []).filter((o) => o.sport);
 
   const getWorkoutType = () => {
     // Trust explicit stored type first (prevents misclassification when provider field is missing/ambiguous)
@@ -1458,30 +1420,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   // ⛔ HOISTED — computed once near the top of this component so the planned
                   // header and this button ask the SAME gate. See `swapOptions` there.
                   const row = swapRow;
-                  const applySwap = async (opt: SwapOption) => {
+                  const applySwap = async (opt: SwapSheetOption) => {
                     const id = String(row?.id || '');
                     if (!id) return;
                     setSwapping(true);
                     try {
-                      // ⛔ THE EXISTING WRITE PATH. `updatePlannedWorkout` is the same helper Delete
-                      // and the rest of this view already use — a swap must not invent a second one.
-                      /* ⛔ §7 — THE SAME RESOLVER TODAY'S SHEET USES. A sport swap hands over the
-                         composer's own session for the new sport; writing `opt.patch` raw here
-                         would keep the OLD session's minutes on this screen only. */
-                      const write = await resolveSwapWrite(String(getStoredUserId() ?? ''), swapRow as never, opt);
-                      await updatePlannedWorkout(id, write.patch as Parameters<typeof updatePlannedWorkout>[1]);
-                      /**
-                       * ⛔ THE HARD RIDE NEEDS THE SERVER TO EXPAND ITS TOKENS INTO WATTS — see the
-                       * same call in `TodaysEffort.handleApplyDisciplineSwap`. Both apply paths do
-                       * this, and `needsMaterialize` is why neither re-derives the condition.
-                       */
-                      if (opt.needsMaterialize) {
-                        try {
-                          await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: id } });
-                        } catch (e) {
-                          console.warn('[Swap] materialize-plan failed for the hard ride:', e);
-                        }
-                      }
+                      // ⛔ THE TAP IS POSTED (2026-09-10). `swap-session` writes the row — the same
+                      // session Today's sheet hands over — and expands it through `materialize-plan`.
+                      await postSwap(id, opt.id, false);
                       invalidateWorkoutScreens();
                       setShowSwapPanel(false);
                       onClose();
@@ -1500,7 +1446,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       <div className="text-[13px] text-white/70">Same day, same time. Pick the sport you want instead.</div>
                       {swapOptions.map((opt) => (
                         <button
-                          key={opt.to}
+                          key={opt.id}
                           type="button"
                           disabled={swapping}
                           onClick={() => applySwap(opt)}

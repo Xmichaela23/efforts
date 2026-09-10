@@ -24,7 +24,7 @@ import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   availableDisciplines,
   getDisciplineSwaps,
-} from '../session-discipline-swap.ts';
+} from '../../../supabase/functions/_shared/session-swap/swap.ts';
 
 /** A `planned_workout` as `get-week`'s `toPlannedWorkout` emits it (D-403). */
 const plannedWorkout = (o: Record<string, unknown>) => ({

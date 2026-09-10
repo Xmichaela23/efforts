@@ -8,13 +8,11 @@ import { getDisciplineColor, getDisciplineColorRgb, getDisciplineGlowColor, getD
 import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { useAppContext } from '@/contexts/AppContext';
 import { Activity, ArrowLeftRight, Bike, Link2Off, Waves, Dumbbell, Move, CircleDot, Zap, type LucideIcon } from 'lucide-react';
-// ⛔ ONE GATE FOR "CAN THIS BE SWAPPED" — the same function the drawer control uses. See the glyph.
-import { availableDisciplines, getDisciplineSwaps, isDisciplineSwapped } from '@/lib/session-discipline-swap';
+import { isDisciplineSwapped } from '@/lib/session-discipline-swap';
+// ⛔ ONE GATE FOR "CAN THIS BE SWAPPED" — the server's, the same answer Today's cards use. See the glyph.
+import { useSportSwapIds } from '@/hooks/useSwapSheet';
 // ⛔ THE SAME "did this miss a planned slot" RULE the workout view uses — never a second copy.
 import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
-// ⛔ SWAP WHAT IS HELD, NOT WHAT IS TRAINED — the posture gate. One reader, shared with State.
-import { useDeclaredPosture } from '@/hooks/useDeclaredPosture';
-import { useResolvedFtp } from '@/hooks/useResolvedFtp';
 import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 import { GARMIN_BLUE } from '@/components/ProviderAttribution';
@@ -962,17 +960,6 @@ export default function WorkoutCalendar({
   }, [workouts, plannedWorkouts, plannedWeekRows, workoutsWeekRows, fromISO, toISO]);
 
   /**
-   * ⛔ WHICH SESSIONS CAN BE SWAPPED — computed ONCE for the whole week, from the same events the
-   * chips render from (2026-08-08).
-   *
-   * ⚠️ IT ASKS `getDisciplineSwaps`, it does not re-state its conditions. Unstarted, endurance, not
-   * the long session, a resolvable duration and another sport available are five rules, and a second
-   * copy of them here is how the glyph and the control start disagreeing about the same session.
-   *
-   * ⚠️ THE WEEK IS THE UNIT for "which sports does this athlete have" — a single day answers "run"
-   * for a Tuesday holding a run and a lift, which is what hid this control everywhere until now.
-   */
-  /**
    * ⛔ COMPLETED ACTIVITIES THAT MISSED A PLANNED SLOT — TrainingPeaks shows this in the week, not
    * only inside the activity, so an athlete learns about a miss while looking at their calendar
    * rather than by opening something (2026-08-08).
@@ -1003,21 +990,15 @@ export default function WorkoutCalendar({
     return ids;
   }, [events]);
 
-  const declaredPosture = useDeclaredPosture();
-  // ⛔ Gates the HARD-ride swap — the chip must agree with the surfaces it leads to.
-  const resolvedFtp = useResolvedFtp();
-  const swappableIds = useMemo(() => {
-    const rows = (events ?? [])
-      .map((e) => (e as { _src?: unknown })?._src)
-      .filter(Boolean) as Array<Parameters<typeof getDisciplineSwaps>[0] & { id?: string }>;
-    const available = availableDisciplines(rows);
-    const ids: Set<string> = new Set();
-    for (const r of rows) {
-      if (getDisciplineSwaps(r, available, [], declaredPosture, resolvedFtp).length > 0) ids.add(String(r?.id ?? ''));
-    }
-    ids.delete('');
-    return ids;
-  }, [events, declaredPosture, resolvedFtp]);
+  /**
+   * ⛔ WHICH SESSIONS CAN BE SWAPPED — the server's answer for the week's rows (`swap-session`,
+   * 2026-09-10, audit H-T15), the same question Today's cards ask, so the chip and the control agree.
+   */
+  const eventRowIds = useMemo(
+    () => (events ?? []).map((e) => String((e as { _src?: { id?: unknown } })?._src?.id ?? '')).filter(Boolean),
+    [events],
+  );
+  const swappableIds = useSportSwapIds(eventRowIds);
 
 
   // Day-stacked ordering (Bug: calendar cells ignored strength_ordering_preference —

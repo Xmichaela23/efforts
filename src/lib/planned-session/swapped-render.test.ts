@@ -26,7 +26,7 @@ import {
   withLibrarySession,
   swappedStructureIsStale,
   getDisciplineSwaps,
-} from '../session-discipline-swap.ts';
+} from '../../../supabase/functions/_shared/session-swap/swap.ts';
 import { deriveWorkoutTitle } from '../derive-workout-title.ts';
 import { plannedDurationSeconds } from './duration.ts';
 
@@ -64,7 +64,7 @@ const SWAPPED_HARD_RIDE = {
   workout_structure: { title: 'Hill Repeats', type: 'endurance_session' },
 };
 
-import { librarySwapSession, swapTargetFamily } from '../swap-library-session.ts';
+import { librarySwapSession, swapTargetFamily } from '../../../supabase/functions/_shared/session-swap/library-session.ts';
 
 Deno.test('⛔ the swapped row is IDENTIFIABLE without relying on cleared columns', () => {
   assert(isDisciplineSwapped(SWAPPED_EASY_RIDE as never));

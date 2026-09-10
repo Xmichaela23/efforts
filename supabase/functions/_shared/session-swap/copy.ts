@@ -1,6 +1,9 @@
 /**
  * ═══ THE SWAP SHEET'S WORDS ══════════════════════════════════════════════════════════════════════
  *
+ * ⛔ MOVED TO THE SERVER UNCHANGED (2026-09-10, audit H-T15) — was `src/lib/swap-copy.ts`. `swap-session`
+ * sends these words with each option; the phone reads only `VENUE_LABEL`, for a row already indoors.
+ *
  * docs/WORKORDER-endurance-swaps-2026-09-09.md. ⛔ EVERY LINE HERE IS MICHAEL'S, GIVEN 2026-09-09,
  * and each carries the page it came from IN THE CODE. Nothing else may be added: a swap whose line
  * he has not written is not offered.

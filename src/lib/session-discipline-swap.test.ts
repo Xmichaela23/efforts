@@ -20,7 +20,7 @@ import {
   originOf,
   resolveMinutes,
   SWAPPED_FROM_PREFIX,
-} from './session-discipline-swap.ts';
+} from '../../supabase/functions/_shared/session-swap/swap.ts';
 import { SWAPPED_FROM_PREFIX as SERVER_SWAPPED_FROM_PREFIX } from '../../supabase/functions/get-week/planned-exists-key.ts';
 import { SWAP_TAG } from '../../supabase/functions/activate-plan/preserve-athlete-edits.ts';
 
