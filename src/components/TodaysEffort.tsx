@@ -2030,16 +2030,28 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 * location, or not today) it is an ordinary right-aligned line with a height of its
                 * own, rather than an absolute element in a box with no height.
                 */
+              /**
+                * ⛔ THE GARMIN DERIVED-DATA LINE SITS DIRECTLY UNDER THE FORM LINE, in the same right
+                * column (Michael, 2026-09-10, docs/WORKORDER-garmin-strava-attribution-2026-09-09.md §7).
+                * As the block's last line it sat under the weather rows and read as the weather's
+                * source; here it credits the form number it belongs to. Same 12 px, Garmin's wording.
+                */
               <div style={{ marginTop: 8, position: 'relative' }}>
                 {weather && isTodayDate ? (
                   <>
                     <TodayWeather weather={weather} city={cityName} />
                     {formLine ? (
-                      <div style={{ position: 'absolute', top: 0, right: 0 }}>{formLine}</div>
+                      <div className="flex flex-col items-end" style={{ position: 'absolute', top: 0, right: 0, maxWidth: '12rem' }}>
+                        {formLine}
+                        {garminDerived ? <GarminDerivedDataLine className="text-right" style={{ marginTop: 2 }} /> : null}
+                      </div>
                     ) : null}
                   </>
                 ) : (
-                  <div className="flex justify-end">{formLine}</div>
+                  <div className="flex flex-col items-end">
+                    {formLine}
+                    {garminDerived ? <GarminDerivedDataLine className="text-right" style={{ marginTop: 2 }} /> : null}
+                  </div>
                 )}
               </div>
             ) : null}
@@ -2053,8 +2065,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               *
               * ⛔ NUMBERS ONLY, AND A SPORT WITH NOTHING IS ABSENT — a `0.0 mi ride` on a runner's
               * week is a column of zeroes teaching the athlete to stop reading the line.
-              * ⚠️ IT SITS UNDER THE SUNRISE ROW, so the weather block still ends where it did and
-              * the Garmin derived-data line stays last.
+              * ⚠️ IT SITS UNDER THE SUNRISE ROW, so the weather block still ends where it did. The
+              * Garmin derived-data line no longer follows it; it sits under the form line (§7).
               */}
             {weekTotalsLine ? (
               <div
@@ -2064,10 +2076,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 {weekTotalsLine}
               </div>
             ) : null}
-
-            {/* Garmin API Brand Guidelines v6.30.2025 — derived-data attribution, verbatim, as the
-                header block's footer. Not in a tooltip, not behind the form line's tap. */}
-            {formLine && garminDerived ? <GarminDerivedDataLine style={{ marginTop: 6 }} /> : null}
           </div>
         </div>
 

@@ -130,26 +130,32 @@ const TodayWeather: React.FC<{
       {/* ⛔ SUNRISE AND SUNSET ARE THE ICONS, so the row carries two times and no labels — and the
           city sits at the far end of it. ⚠️ THE ROW DRAWS FOR THE CITY ALONE TOO: an athlete whose
           weather row carries no sunrise (a device-temperature fallback) must still be told where
-          this reading is from, not silently lose it. */}
-      {(up || down || city) ? (
-        <div className="flex items-center justify-between gap-x-3 text-[0.7rem] font-light">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 tabular-nums">
-            {up ? (
-              <span className={chip}>
-                <Sunrise aria-hidden="true" className="h-3 w-3" />
-                {up}
-              </span>
-            ) : null}
-            {down ? (
-              <span className={chip}>
-                <Sunset aria-hidden="true" className="h-3 w-3" />
-                {down}
-              </span>
-            ) : null}
-          </div>
-          {city ? <span className="truncate text-right">{city}</span> : null}
+          this reading is from, not silently lose it.
+          ⛔ AND THE SOURCE CREDIT ENDS IT (Michael, 2026-09-10, attribution work order §7): Open-Meteo's
+          licence requires an on-screen credit. `Weather by Open-Meteo`, the smallest text on the
+          block (11 px, muted), right-aligned after the city — so the row now always draws. */}
+      <div className="flex items-center justify-between gap-x-3 text-[0.7rem] font-light">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 tabular-nums">
+          {up ? (
+            <span className={chip}>
+              <Sunrise aria-hidden="true" className="h-3 w-3" />
+              {up}
+            </span>
+          ) : null}
+          {down ? (
+            <span className={chip}>
+              <Sunset aria-hidden="true" className="h-3 w-3" />
+              {down}
+            </span>
+          ) : null}
         </div>
-      ) : null}
+        <div className="flex items-baseline justify-end gap-x-2 min-w-0">
+          {city ? <span className="truncate text-right">{city}</span> : null}
+          <span className="text-[11px] whitespace-nowrap" style={{ color: 'rgba(255,255,255,0.45)' }}>
+            Weather by Open-Meteo
+          </span>
+        </div>
+      </div>
     </div>
   );
 };
