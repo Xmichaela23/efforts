@@ -28,7 +28,9 @@
  * has ONE home instead of two, since the component imports it from here.
  */
 import { isMainBarbellLift } from './exercise-role.ts';
-import { REST_BETWEEN_SETS_RULE, REST_BETWEEN_SETS_RULE_HYP } from '@shared/strength-grid/intents.ts';
+// ⚠️ A RELATIVE PATH, NOT `@shared` (2026-09-10): the server's session-length estimate
+// (`_shared/strength-session-minutes.ts`) imports this file, and the edge bundle has no `@shared` alias.
+import { REST_BETWEEN_SETS_RULE, REST_BETWEEN_SETS_RULE_HYP } from '../../supabase/functions/_shared/strength-grid/intents.ts';
 
 /**
  * Plyometric / explosive movement — needs full neural recovery between sets.

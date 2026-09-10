@@ -24,8 +24,8 @@ import optionalUiSpec from '@/services/plans/optional-ui-spec.json';
 import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
 import { categorizeSwimTokensForDisplay } from '@/utils/swimPlanTokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
-// ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
-import { plannedDurationMinutes, plannedDurationSeconds } from '@/lib/planned-session/duration';
+// ⛔ THE SERVER'S PLANNED LENGTH, READ (2026-09-10, audit H-T01). See `plannedDurationSecondsOf`.
+import { plannedDurationSecondsOf } from './PlannedSessionHeader';
 import { formatWizardPrefsMarkdownLines, formatPlanConfigPrefsMarkdownLines } from '@/lib/format-wizard-prefs-export';
 import { computeDayTimings, orderDayWorkoutsByTimingThenDiscipline, type StrengthOrderingPreference } from '@/lib/pairing-timing';
 import { plainIntent } from '@/lib/plain-intent';
@@ -69,13 +69,6 @@ function extractTypeFromText(text?: string): string | undefined {
   return undefined;
 }
 
-function extractMinutesFromText(text?: string): number | undefined {
-  if (!text) return undefined;
-  const m = text.match(/(\d{1,3})\s*min\b/i);
-  if (m) return parseInt(m[1], 10);
-  return undefined;
-}
-
 // Humanize steps_preset tokens and estimate duration
 function humanizeToken(token: string): string {
   const t = token.toLowerCase();
@@ -104,87 +97,9 @@ function summarizeSteps(steps?: string[]): string[] {
   return steps.map(humanizeToken);
 }
 
-function estimateMinutesFromSteps(steps?: string[]): number {
-  if (!Array.isArray(steps)) return 0;
-  let total = 0;
-  for (const tok of steps) {
-    const m = tok.toLowerCase().match(/(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/);
-    if (m) {
-      const a = parseInt(m[1], 10);
-      const b = m[2] ? parseInt(m[2], 10) : a;
-      total += Math.round((a + b) / 2);
-    }
-  }
-  return total;
-}
-
-// Estimate duration from description like "4mi @ 7:30/mi"
-function estimateMinutesFromDescription(desc?: string): number {
-  if (!desc) return 0;
-  const s = desc.toLowerCase();
-  // distance in miles
-  let m = s.match(/(\d+(?:\.\d+)?)\s*mi[^\d]*(\d+):(\d{2})\s*\/\s*mi/);
-  if (m) {
-    const dist = parseFloat(m[1]);
-    const pace = parseInt(m[2], 10) * 60 + parseInt(m[3], 10);
-    return Math.round((dist * pace) / 60);
-  }
-  // distance in km
-  m = s.match(/(\d+(?:\.\d+)?)\s*km[^\d]*(\d+):(\d{2})\s*\/\s*km/);
-  if (m) {
-    const distKm = parseFloat(m[1]);
-    const paceSec = parseInt(m[2], 10) * 60 + parseInt(m[3], 10);
-    const minutes = (distKm * paceSec) / 60;
-    return Math.round(minutes);
-  }
-  return 0;
-}
-
-// Estimate interval block duration from steps_preset + description pace
-function estimateMinutesFromIntervals(steps?: string[], desc?: string): number {
-  if (!Array.isArray(steps) || !desc) return 0;
-  const joined = steps.join(' ').toLowerCase();
-  const m = joined.match(/(?:interval|cruise)_(\d+)x(\d+(?:\.\d+)?)(m|mi)/i);
-  if (!m) return 0;
-  const reps = parseInt(m[1], 10);
-  const per = parseFloat(m[2]);
-  const unit = m[3].toLowerCase();
-  const perMiles = unit === 'm' ? per / 1609.34 : per; // meters → miles
-
-  // Resolve pace from description (already token-resolved)
-  // Handle formats: "@ 7:43/mi", or "@ 7:43 + 0:45/mi"
-  let paceSec: number | null = null;
-  let pm = desc.match(/@(.*?)\b/); // capture after @ up to next whitespace
-  if (pm) {
-    const seg = pm[1];
-    let mm: RegExpMatchArray | null = null;
-    // 7:43/mi + 0:45/mi OR 7:43 + 0:45/mi
-    mm = String(seg).match(/(\d+):(\d{2})(?:\/(mi|km))?\s*[+\-−]\s*(\d+):(\d{2})\/(mi|km)/i);
-    if (mm) {
-      const base = parseInt(mm[1], 10) * 60 + parseInt(mm[2], 10);
-      const off = parseInt(mm[4], 10) * 60 + parseInt(mm[5], 10);
-      paceSec = base + off; // assume plus; minus uncommon for quality
-    }
-    if (!paceSec) {
-      mm = String(seg).match(/(\d+):(\d{2})\/(mi|km)/i);
-      if (mm) paceSec = parseInt(mm[1], 10) * 60 + parseInt(mm[2], 10);
-    }
-  }
-  if (!paceSec) return 0;
-
-  // Rest between reps: _R2min or _R2-3min → average
-  const rm = joined.match(/_r(\d+)(?:-(\d+))?min/i);
-  let restMin = 0;
-  if (rm) {
-    const ra = parseInt(rm[1], 10);
-    const rb = rm[2] ? parseInt(rm[2], 10) : ra;
-    const avg = (ra + rb) / 2;
-    restMin = avg * Math.max(0, reps - 1);
-  }
-
-  const workMin = (reps * perMiles * paceSec) / 60;
-  return Math.round(workMin + restMin);
-}
+// ⛔ THE FOUR MINUTE ESTIMATORS THAT LIVED HERE ARE DELETED (2026-09-10, audit H-T01) — minutes out of
+// step tokens, out of prose, from distance × pace, and from interval reps priced at the description's
+// pace. A plan session's length is the server's stored total or the builder's authored minutes.
 
 function capitalize(w?: string) { return w ? w.charAt(0).toUpperCase() + w.slice(1) : ''; }
 
@@ -523,10 +438,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           else out.push(String((workout as any).rendered_description || (workout as any).description || ''));
         }
         return out;
-      // ⛔ ONE DURATION READER (stage 4). The key was `computed?.total_duration_seconds`, which is
-      // one rung of the ladder — so a row whose total sits at the ROOT never invalidated this memo.
+      // ⛔ KEYED ON THE SERVER'S PLANNED LENGTH (2026-09-10, audit H-T01), the field the loaders set.
       // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [disc, (workout as any)?.id, plannedDurationSeconds(workout)]);
+      }, [disc, (workout as any)?.id, (workout as any)?.planned_duration_seconds]);
       return (<ul className="list-disc pl-5">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>);
     } catch { return (<span>{(workout as any).rendered_description || (workout as any).description}</span>); }
   });
@@ -733,11 +647,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             const computed = w.computed || {};
             const renderedDesc = w.rendered_description || w.description || '';
             /**
-             * ⛔ ONE PLANNED-DURATION READER (stage 2). This read `computed.total_duration_seconds`
-             * and nothing else — so a row carrying the total at its ROOT (priority 1 everywhere else)
-             * fell through to `w.duration`, or to 0. It now agrees with the calendar and the card.
+             * ⛔ THE STORED LENGTH THE SERVER WROTE (2026-09-10, audit H-T01). A `planned_workouts` row's
+             * `total_duration_seconds` is `materialize-plan`'s answer; it rides on the normalised row as
+             * `planned_duration_seconds` so every screen below reads one field. The phone ladder and the
+             * `duration`-column fallback are deleted: a row the server has not sized prints no length.
              */
-            const duration = plannedDurationMinutes(w) ?? (typeof w.duration === 'number' ? w.duration : 0);
+            const plannedSecs = plannedDurationSecondsOf(w);
+            const duration = plannedSecs == null ? 0 : Math.max(1, Math.round(plannedSecs / 60));
             // Parse steps_preset/export_hints/intervals which may be JSON strings
             const stepsPresetParsed = parseMaybeJson((w as any).steps_preset);
             const exportHintsParsed = parseMaybeJson((w as any).export_hints);
@@ -759,6 +675,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               type: (String((w as any).type).toLowerCase() === 'bike' ? 'ride' : (w as any).type) as any,
               description: renderedDesc || mapBike(resolvePaces(w.description || '')),
               duration,
+              planned_duration_seconds: plannedSecs,
               intensity: typeof w.intensity === 'string' ? w.intensity : undefined,
               day: dayName,
               completed: false,
@@ -901,29 +818,31 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               // label-divergence entry.
               const name = deriveWorkoutTitle(s as any);
               const stepsSummary = summarizeSteps((s as any).steps_preset);
-              const stepsPreset = (s as any).steps_preset as string[] | undefined;
-              const estFromSteps = estimateMinutesFromSteps(stepsPreset);
-              const estFromIntervals = estimateMinutesFromIntervals(stepsPreset, description);
-              // Structured normalization (preferred)
+              // Structured normalization (preferred) — for the summary line only.
               const hasStructured = (s as any).workout_structure && typeof (s as any).workout_structure === 'object';
               let structuredSummary: string | undefined;
-              let structuredMinutes = 0;
               try {
                 if (hasStructured) {
                   const res = normalizeStructuredSession(s, bl || {} as any);
                   structuredSummary = res.friendlySummary || undefined;
-                  structuredMinutes = res.durationMinutes || 0;
                 }
               } catch {}
-              const duration = (typeof s.duration === 'number' && Number.isFinite(s.duration))
-                ? s.duration
-                : (structuredMinutes || estFromIntervals || estFromSteps || estimateMinutesFromDescription(description) || extractMinutesFromText(rawDesc) || 0);
+              /**
+               * ⛔ AN UNMATERIALIZED SESSION PRINTS ITS AUTHORED `duration` AND NOTHING ELSE (2026-09-10,
+               * audit H-T01). The blob's minutes are what the plan builder wrote. The phone estimates that
+               * stood behind them — minutes out of the step tokens, interval reps priced at the
+               * description's pace, distance × pace from the prose, the structured normaliser's own total
+               * — are deleted; a session the builder gave no length prints none.
+               */
+              const authoredMin = typeof s.duration === 'number' && Number.isFinite(s.duration) && s.duration > 0 ? s.duration : null;
+              const duration = authoredMin ?? 0;
               const base = {
                 id: s.id || `${pd.id}-w${w}-${idx}`,
                 name,
                 type: mappedType || 'run',
                 description: [structuredSummary || description, (!structuredSummary && stepsSummary.length) ? `(${stepsSummary.join(' • ')})` : ''].filter(Boolean).join(' '),
                 duration,
+                planned_duration_seconds: authoredMin != null ? Math.round(authoredMin * 60) : null,
                 intensity: typeof s.intensity === 'string' ? s.intensity : undefined,
                 day: s.day,
                 completed: false,
@@ -1289,14 +1208,15 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             const dayName = numToDay[(w as any).day_number as number] || (w as any).day || '';
             const computed = (w as any).computed || {};
             const renderedDesc = (w as any).rendered_description || (w as any).description || '';
-            // ⛔ ONE PLANNED-DURATION READER (stage 2) — same fix as the sibling mapper above.
-            const duration = plannedDurationMinutes(w) ?? (typeof (w as any).duration === 'number' ? (w as any).duration : 0);
+            // ⛔ THE STORED LENGTH THE SERVER WROTE (2026-09-10, audit H-T01) — same read as the sibling mapper above.
+            const plannedSecs = plannedDurationSecondsOf(w);
+            const duration = plannedSecs == null ? 0 : Math.max(1, Math.round(plannedSecs / 60));
             const parseMaybeJson = (v: any) => { if (Array.isArray(v)) return v; if (v && typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
             const tags = (() => { const raw=(w as any).tags; if (Array.isArray(raw)) return raw; try { const p=JSON.parse(raw); return Array.isArray(p)?p:[]; } catch { return []; } })();
             const steps_preset = parseMaybeJson((w as any).steps_preset) || null;
             const export_hints = parseMaybeJson((w as any).export_hints) || null;
             const intervals = parseMaybeJson((w as any).intervals) || [];
-            return { ...w, day: dayName, duration, tags, steps_preset, export_hints, intervals, rendered_description: renderedDesc };
+            return { ...w, day: dayName, duration, planned_duration_seconds: plannedSecs, tags, steps_preset, export_hints, intervals, rendered_description: renderedDesc };
           });
           weekCacheRef.current.set(key, normalized);
           let weeks: any[];
@@ -1586,21 +1506,12 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       })
       .reduce((total: number, w: any) => {
         /**
-         * ⛔ ONE PLANNED-DURATION READER (stage 2). This summed `computed.total_duration_seconds`
-         * only, so every row storing its total at the ROOT was counted as `duration` minutes or as
-         * zero — a weekly total that quietly undercounted whichever rows materialization stored the
-         * other way.
+         * ⛔ ONE FIELD (2026-09-10, audit H-T01): the row's `duration`, which the loaders above set from
+         * the server's stored length (or, for an unmaterialized session, the builder's authored minutes).
+         * The phone ladder that ran first here is deleted.
          */
-        const mins = plannedDurationMinutes(w);
-        if (mins != null) return total + mins;
-        // Fallback: `duration` (stored in minutes by the generator) for rows with no structure at all.
         const min = Number((w as any)?.duration);
-        if (Number.isFinite(min) && min > 0) {
-          return total + min;
-        }
-        // Priority 3: Fallback to weekly summary estimated_hours (from generator)
-        // This ensures we have a value even if materialization hasn't run yet
-        return total;
+        return Number.isFinite(min) && min > 0 ? total + min : total;
       }, 0);
   };
 

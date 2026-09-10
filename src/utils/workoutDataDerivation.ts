@@ -1,29 +1,23 @@
-export const getDurationSeconds = (workout: any): number | null => {
-  // 2026-09-03 (Michael: "45:00"): moving time in SECONDS when the import kept them (Garmin writes
-  // metrics.moving_time_seconds; the Strava import now does too). The minute columns round every
-  // moving time to :00, and computed.overall.duration_s_moving is built from those minutes on Strava rows.
-  const secs = Number(workout?.metrics?.moving_time_seconds);
-  if (Number.isFinite(secs) && secs > 0) return secs;
-  // Prefer computed (already in seconds)
-  const computed = workout?.computed?.overall?.duration_s_moving;
-  if (Number.isFinite(computed)) return Number(computed);
-  
-  // Fallback: moving_time is stored in minutes, convert to seconds
-  const minutes = workout?.moving_time ?? workout?.metrics?.moving_time ?? null;
-  return Number.isFinite(minutes) ? Number(minutes) * 60 : null;
-};
+/**
+ * ⛔ NO MOVING-TIME READER LIVES HERE ANY MORE (2026-09-10, audit H-D10). `getDurationSeconds` checked
+ * `metrics.moving_time_seconds`, then `computed.overall.duration_s_moving`, then the minute columns —
+ * the opposite order from the other phone resolver, so the calendar and the details screen could show
+ * different times for one Strava row. Moving time is the server's `moving_seconds`, read where it is
+ * shown (`useWorkoutData`).
+ */
 
 export const getElapsedSeconds = (workout: any): number | null => {
   // Prefer computed elapsed (already in seconds)
   const computed = workout?.computed?.overall?.duration_s_elapsed;
   if (Number.isFinite(computed)) return Number(computed);
-  
+
   // Fallback: elapsed_time is in minutes, convert to seconds
   const elapsedMin = workout?.elapsed_time ?? workout?.metrics?.elapsed_time ?? null;
   const elapsedSec = Number.isFinite(elapsedMin) ? Number(elapsedMin) * 60 : null;
-  
-  // Use whichever is greater: elapsed or moving (handles Garmin rounding)
-  const movingSec = getDurationSeconds(workout);
+
+  // Use whichever is greater: elapsed or the server's moving time (handles Garmin rounding)
+  const movingRaw = Number(workout?.moving_seconds);
+  const movingSec = Number.isFinite(movingRaw) && movingRaw > 0 ? movingRaw : null;
   if (elapsedSec && movingSec) return Math.max(elapsedSec, movingSec);
   return elapsedSec ?? movingSec;
 };

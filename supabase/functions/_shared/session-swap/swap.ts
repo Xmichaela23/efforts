@@ -34,8 +34,10 @@
 // A second copy of the clearance matrix on the client is the divergence this codebase keeps paying
 // for; there is exactly one.
 
-// ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
-import { plannedDurationSeconds } from '../../../../src/lib/planned-session/duration.ts';
+// ⛔ ONE PLANNED-DURATION READER — the server's (2026-09-10, audit H-T01). The phone ladder this read
+// (`src/lib/planned-session/duration.ts`) is deleted; the swap gate asks the same resolver get-week
+// prints the session's length from, so the button and the length on the card cannot disagree.
+import { resolvePlannedDurationSeconds as plannedDurationSeconds } from '../planned-duration.ts';
 // ⛔ ONE VOCABULARY (stage 1). See `src/lib/discipline.ts` for why `ride`, and why unknown is null.
 import { normalizeDiscipline, postureKey, type Discipline as CanonicalDiscipline } from '../../../../src/lib/discipline.ts';
 // ⛔ ONE POSTURE SANITISER, and it is the server's. `@shared/state-trend` is already imported by the

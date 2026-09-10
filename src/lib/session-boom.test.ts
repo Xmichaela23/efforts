@@ -20,7 +20,9 @@ const lift = (date: string, extra: Partial<BoomWorkout> = {}): BoomWorkout => ({
 const curve = (o: Record<string, number>) => ({ computed: { power_curve: o } });
 const hr = (n: number) => ({ workout_analysis: { bike_fitness_v1: { hr_at_band: n } } });
 const drift = (pct: number) => ({ workout_analysis: { session_detail_v1: { classification: { decoupling: { pct } } } } });
-const mins = (n: number) => ({ computed: { overall: { duration_s_moving: n * 60 } } });
+/** A session's length as the server sends it: `moving_seconds` on a get-week row, the stored
+ *  `computed.overall.duration_s_moving` on a table row — the same number, both carried (2026-09-10). */
+const mins = (n: number) => ({ moving_seconds: n * 60, computed: { overall: { duration_s_moving: n * 60 } } });
 
 /* ── RIDE ────────────────────────────────────────────────────────────────────────────────────── */
 

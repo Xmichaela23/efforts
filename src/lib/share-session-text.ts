@@ -1,5 +1,4 @@
 import { parseExercises, shareBody } from '@shared/strava/strength-description.ts';
-import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 
 /**
  * The text a completed session becomes when the athlete shares it with a friend (2026-09-07).
@@ -8,7 +7,7 @@ import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
  * the site. No picture, no card — text is what a share sheet carries.
  *
  * The endurance line reads the same fields Home's completed row reads (`getCompactEnduranceMetrics`
- * in TodaysEffort.tsx): computed.overall first, the row's own columns as fallback.
+ * in TodaysEffort.tsx). ⛔ ITS LENGTH IS THE SERVER'S `moving_seconds` (2026-09-10, audit H-D10).
  */
 
 const fmtHMS = (secs: number): string => {
@@ -23,22 +22,21 @@ const fmtDate = (iso: string): string => {
   return Number.isNaN(d.getTime()) ? String(iso).slice(0, 10) : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 };
 
-/** Session length in seconds, the way the Strava share derives it. */
+/**
+ * Session length in seconds — the server's `moving_seconds` (2026-09-10, audit H-D10). This used to
+ * try provider seconds, the phone's moving-time resolver and three minute columns in turn; a row the
+ * server sent no time for shares no time.
+ */
 export function sessionSeconds(w: any): number {
-  const metrics = (w?.metrics ?? {}) as Record<string, unknown>;
-  const trueSeconds = Number(metrics.moving_time_seconds) || Number(metrics.total_elapsed_time_seconds) || 0;
-  if (trueSeconds > 0) return trueSeconds;
-  const moving = Number(resolveMovingSeconds(w));
-  if (Number.isFinite(moving) && moving > 0) return moving;
-  const minutes = Number(w?.elapsed_time) || Number(w?.moving_time) || Number(w?.duration) || 0;
-  return minutes > 0 ? Math.round(minutes * 60) : 0;
+  const n = Number(w?.moving_seconds);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
 }
 
 export function enduranceLine(w: any, useImperial: boolean): string {
   const type = String(w?.type || '').toLowerCase();
   const overall = w?.computed?.overall || w?.overall || {};
   const distM = Number(overall?.distance_m ?? overall?.distanceMeters ?? overall?.distance_meters);
-  const durS = Number(overall?.duration_s_moving ?? overall?.moving_seconds ?? overall?.duration_s) || sessionSeconds(w);
+  const durS = sessionSeconds(w);
   const avgHr = Number(overall?.avg_hr ?? w?.avg_heart_rate ?? w?.metrics?.avg_heart_rate);
   const elevM = Number(overall?.elevation_gain_m ?? w?.elevation_gain ?? w?.metrics?.elevation_gain);
   const parts: string[] = [];

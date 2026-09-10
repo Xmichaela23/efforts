@@ -20,8 +20,8 @@ import { formatRirTarget, rirSuggestedIntegers, rirLoggedSeed } from '@/lib/rir-
 import { estimate1RM } from '@/lib/estimate-1rm';
 import {
   getExerciseConfig,
-  normalizeLiftKey,
 } from '@/lib/exercise-config';
+import { canonicalize } from '@shared/canonicalize';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { createWorkoutMetadata } from '@/utils/workoutMetadata';
 import CoreTimer from '@/components/CoreTimer';
@@ -311,13 +311,13 @@ const calculateTotalVolume = (exercises: LoggedExercise[]): number => {
 // `isPlyometric` moved to the same module unchanged, so the rest timer and the render gates below
 // read ONE copy instead of two.
 
-// Normalize an exercise name for cross-session matching: lowercase, strip
-// (Left)/(Right) suffixes, collapse whitespace, drop a trailing plural 's' (Q-197).
-// Shared by the D-097 prefill, the D-122 "last:" anchor, and the D-322 swap seed so
-// all three key prior sessions the same way. The rules now live in exercise-config
-// (`normalizeLiftKey`) because the SERVER's swap seed has to key history identically —
-// two copies of these regexes is exactly how the two sides drift apart.
-const normalizeExerciseName = normalizeLiftKey;
+// ⛔ HISTORY IS KEYED ON THE SERVER'S `canonicalize` (2026-09-10, audit H-S05 / H-S06). The D-097
+// prefill and the D-122 "last:" anchor used `normalizeLiftKey` (lowercase, strip (Left)/(Right),
+// drop a plural 's'), so a plan's "Barbell Back Squat" never found a logged "Back Squat" and the
+// Previous column stayed blank on a lift done for months. `exercise_log.canonical_name` IS
+// `canonicalize`'s output, and `workout-detail` keys `previous_strength_by_exercise` with it too,
+// so the logger, the log and the Performance screen now agree on what a lift is called.
+const historyKey = (raw: string): string => canonicalize(String(raw || ''));
 
 // Rest-end LOCAL NOTIFICATIONS (away-alert): iOS suspends the JS countdown when the app is backgrounded,
 // so a scheduled local notification is the only way to buzz the athlete when rest ends while they're out
@@ -2702,7 +2702,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (!userId) return;
         const todayDate = targetDate || getStrengthLoggerDateString();
         const currentNames = new Set<string>(
-          exercises.map((ex) => normalizeExerciseName(ex.name)).filter(Boolean),
+          exercises.map((ex) => historyKey(ex.name)).filter((k) => k && k !== 'unknown'),
         );
         if (currentNames.size === 0) return;
         const { data: priorRows } = await supabase
@@ -2723,7 +2723,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           } catch { priorEx = []; }
           if (!Array.isArray(priorEx)) continue;
           for (const ex of priorEx) {
-            const nn = normalizeExerciseName(ex?.name || '');
+            const nn = historyKey(ex?.name || '');
             if (!nn || !currentNames.has(nn) || previousByName[nn]) continue;
             const priorSets = Array.isArray(ex?.sets) ? ex.sets : [];
             if (priorSets.length === 0) continue;
@@ -2753,7 +2753,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               .order('date', { ascending: false })
               .limit(400);
             for (const lr of (Array.isArray(logRows) ? logRows : [])) {
-              const cands = [normalizeExerciseName(String((lr as any)?.exercise_name || '')), normalizeExerciseName(String((lr as any)?.canonical_name || ''))];
+              // `canonical_name` is already `canonicalize`'s output; the display name is keyed the same way.
+              const cands = [String((lr as any)?.canonical_name || '').trim(), historyKey(String((lr as any)?.exercise_name || ''))];
               const nn = cands.find((c) => c && missing.includes(c) && !previousByName[c]);
               if (!nn) continue;
               const w = Number((lr as any)?.best_weight); const r = Number((lr as any)?.best_reps);
@@ -2781,7 +2782,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const isTestWorkoutForFill = isBaselineTestWorkout(scheduledWorkout || {});
         setExercises((prev) => prev.map((ex) => {
           if (isTestWorkoutForFill) return ex;
-          const priorSets = previousByName[normalizeExerciseName(ex.name)];
+          const priorSets = previousByName[historyKey(ex.name)];
           if (!priorSets) return ex;
           const newSets = ex.sets.map((set, i) => {
             const untouched =
@@ -5975,7 +5976,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   const exIsPlyo = exEquip === 'plyo' || isPlyometric(exercise.name);
                   const exIsBaselineTest = isBaselineTestWorkout(scheduledWorkout || {});
                   const exLoggerMode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
-                  const priorSetsForEx = previousSessionByName[normalizeExerciseName(exercise.name)];
+                  const priorSetsForEx = previousSessionByName[historyKey(exercise.name)];
 
                   // The LOAD column. An assist-capable movement always has one — the band IS the
                   // load (D-351) — so it survives the bodyweight test that would otherwise hide it.
@@ -6142,7 +6143,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     loadPrescribed: exercise?.load_prescribed,
                     slotIntent: slotIntent,
                     notes: exercise?.notes,
-                    prior: previousSessionByName[normalizeExerciseName(exercise.name)],
+                    prior: previousSessionByName[historyKey(exercise.name)],
                     // ⛔ SO THE LINE CANNOT SAY "Add weight" ON A ROW WITH NO WEIGHT BOX. See
                     // `advanceNudgeFor` — it asks `isBodyweightLogged`, the same classifier this
                     // component's own bodyweight gate uses.

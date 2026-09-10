@@ -30,9 +30,6 @@
  * reads as the ride's and are built.
  */
 import { POWER_CURVE_DURATIONS } from './bike-ftp-estimator';
-/** ⚠️ RELATIVE, NOT `@/` — `deno.json` maps `@shared/` and nothing else, and this file has a
- *  fixture (`session-boom.test.ts`) that must run outside Vite. */
-import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { meSetsFromHistory } from '@shared/standing-plan/progression';
 import { isEasyPrescribedRun } from '@shared/easy-hr';
 import type { MeSessionOutcome } from '@shared/standing-plan/progression';
@@ -47,6 +44,8 @@ export type BoomWorkout = {
   type?: string | null;
   workout_status?: string | null;
   week_number?: number | null;
+  /** The server's moving time for this session (`get-week`, 2026-09-10). */
+  moving_seconds?: number | null;
   computed?: Record<string, unknown> | null;
   workout_analysis?: unknown;
   strength_exercises?: unknown;
@@ -267,13 +266,19 @@ function enduranceLine(input: BoomInput, isRide: boolean): string | null {
   /**
    * 2. The longest one. ⛔ THE RUN GETS THIS TOO (revised 2026-09-09) — only the fastest SPLIT waits
    * for best efforts; how long a run was needs no grade-adjusted machinery at all.
-   * ⚠️ BY MOVING TIME, the length every other surface on Today and Week prints, through
-   * `resolveMovingSeconds` — the app's one reader for how long a session was.
+   * ⚠️ BY MOVING TIME, AND BOTH SIDES ARE THE SERVER'S (2026-09-10, audit H-D10). This session's is
+   * the `moving_seconds` get-week stamps — the length Today and Week print. The earlier sessions come
+   * straight from the `workouts` table, so theirs is the `computed.overall.duration_s_moving` the
+   * server stored. The phone's moving-time resolver that sat on both sides is deleted.
+   * ⛔ THIS LINE MOVES TO INGEST (audit item 27, the good-news line computed into
+   * `session_detail_v1`); until then it compares server values and derives none.
    */
   {
-    const mineSecs = resolveMovingSeconds(workout as never) ?? 0;
+    const mineSecs = Number(workout?.moving_seconds) || 0;
     if (mineSecs > 0 && earlier.length > 0) {
-      const longest = earlier.reduce((acc, p) => Math.max(acc, resolveMovingSeconds(p as never) ?? 0), 0);
+      const storedMoving = (p: BoomWorkout) =>
+        Number((p?.computed as { overall?: { duration_s_moving?: unknown } } | null | undefined)?.overall?.duration_s_moving) || 0;
+      const longest = earlier.reduce((acc, p) => Math.max(acc, storedMoving(p)), 0);
       if (longest > 0 && mineSecs > longest) return `Longest ${noun} since ${win.month}.`;
     }
   }

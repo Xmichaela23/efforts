@@ -2,12 +2,11 @@ import React, { useEffect, useState } from 'react';
 // ⛔ ONE SWAP PREDICATE + ONE CLEAN BLOCK, shared by all three surfaces.
 import { swappedSessionBlock, swappedStructureIsStale } from '@/lib/session-discipline-swap';
 // ⛔ ONE PLANNED-SESSION HEADER, shared by all three surfaces.
-import PlannedSessionHeader from './PlannedSessionHeader';
+import PlannedSessionHeader, { plannedDurationSecondsOf } from './PlannedSessionHeader';
 import { Copy } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
-import { resolvePlannedDurationMinutes } from '@/utils/resolvePlannedDuration';
 import { formatStrengthExercise, formatStrengthExerciseLines } from '@/utils/strengthFormatter';
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
 import { isWorkoutKitAvailable, scheduleSwimOnWatch, buildSwimPayloadFromWorkout } from '@/services/workoutkit';
@@ -145,7 +144,6 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   // text). Keyed by index into `lines` so `lines` stays string[] (handleDownloadWorkout still serializes
   // plain strings). Drill-aware filtering is already applied upstream where `equip` is computed.
   const lineEquip: Record<number, string> = {};
-  let totalSecsFromSteps = 0;
   // Strength: rely on server-computed steps only (single source of truth)
   let preferStrengthLines = false;
   // Prefer server-computed v3 steps when present
@@ -234,8 +232,8 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       // The talk-test reminder prints once per session, on the first heart-rate step; the rest carry the range.
       let talkTestSaid = false;
       v3.forEach((st:any)=>{
+        // The step's own time, for its line. ⚠️ No longer summed into a session total — see `plannedSecs`.
         const secs = typeof st?.seconds==='number' ? st.seconds : undefined;
-        if (typeof secs==='number' && secs>0) totalSecsFromSteps += Math.max(1, Math.round(secs));
         const distM = typeof st?.distanceMeters==='number' ? st.distanceMeters : undefined;
         const distYdRaw = ((): number | undefined => {
           const d1 = (st as any)?.distance_yd; const d2 = (st as any)?.distanceYd; const d3 = (st as any)?.distance_yds;
@@ -575,8 +573,14 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   }
   // Removed all token fallback paths: structured JSON is the single source of truth
 
-  // Duration: single-source resolver (canonical computed totals)
-  const durationMin: number | null = resolvePlannedDurationMinutes(workout);
+  /**
+   * ⛔ ONE LENGTH ON ONE SCREEN, AND IT IS THE SERVER'S (2026-09-10, audit H-T01). This screen printed
+   * TWO: the header read the stored total only (`resolvePlannedDurationMinutes`) and "Total duration"
+   * summed the steps' seconds — so a row whose steps and total disagreed showed both. Both now print
+   * `plannedDurationSecondsOf`, and the step sum is gone.
+   */
+  const plannedSecs: number | null = plannedDurationSecondsOf(workout);
+  const durationMin: number | null = plannedSecs == null ? null : Math.max(1, Math.round(plannedSecs / 60));
   const computedMilesFromSteps: number | null = (() => {
     try {
       if (!hasComputedV3) return null;
@@ -888,8 +892,8 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         );
       })() : (
       <div className="p-1">
-        {totalSecsFromSteps>0 && (
-          <div className="text-xs text-gray-300 font-light tracking-normal mb-1">Total duration: {(() => { const m=Math.floor(totalSecsFromSteps/60); const s=totalSecsFromSteps%60; return `${m}:${String(s).padStart(2,'0')}`; })()}</div>
+        {plannedSecs != null && plannedSecs > 0 && (
+          <div className="text-xs text-gray-300 font-light tracking-normal mb-1">Total duration: {(() => { const m=Math.floor(plannedSecs/60); const s=plannedSecs%60; return `${m}:${String(s).padStart(2,'0')}`; })()}</div>
         )}
         <ul className="list-none space-y-1">
           {(lines.length

@@ -29,6 +29,13 @@ import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 // client so a logged field (resistance_level band assist, amrap, duration_seconds) can't be dropped
 // by a hand-listed rebuild on any one path. See the file header.
 import { normalizeCompletedStrengthExercise } from '../../../src/lib/normalize-strength-set.ts';
+// ⛔ ONE VALUE PER FACT (2026-09-10, audit Stage 2 items 10–12). The planned length and its header
+// words, the finished moving time, and the pounds a lift moved are decided by these three and sent
+// on every item; the phone prints them and computes none of them.
+import { plannedDurationFields } from './planned-duration-label.ts';
+import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
+import { completedStrengthVolume, isPerformedSet } from '../_shared/strength/session-volume.ts';
+import { resolveBodyweightLb } from '../_shared/workload.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -458,8 +465,11 @@ Deno.serve(async (req)=>{
     const workouts = Array.isArray(wkRaw) ? wkRaw : [];
     // Fetch user FTP for power range calculations
     let userFtp = null;
+    // D-349 body weight, read through the one resolver, so a lift's pounds here are workout-detail's.
+    let bodyweightLb = null;
     try {
-      const { data: baselines } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness').eq('user_id', userId).maybeSingle();
+      const { data: baselines } = await supabase.from('user_baselines').select('performance_numbers, learned_fitness, weight, units').eq('user_id', userId).maybeSingle();
+      bodyweightLb = resolveBodyweightLb(baselines);
       // FTP via the resolver (learned-first) so week-view power ranges match every other surface — was
       // manual-only `performance_numbers.ftp` (CAPABILITY-MAP straggler).
       userFtp = resolveCurrentFtp({ learned_fitness: baselines?.learned_fitness, performance_numbers: baselines?.performance_numbers }).value;
@@ -775,6 +785,7 @@ Deno.serve(async (req)=>{
           }) : null;
           planned = {
             id: p.id,
+            ...plannedDurationFields(p),
             name: p?.name ?? null,
             steps: processedSteps,
             total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
@@ -913,6 +924,30 @@ Deno.serve(async (req)=>{
         deviceInfo = w.device_info || null;
       }
       
+      /**
+       * ⛔ THE FINISHED SESSION'S NUMBERS, DECIDED HERE (2026-09-10, audit H-D10 / H-T04). The moving
+       * time is `completedMovingSeconds` — the rule workout-detail passes to `session_detail_v1`, so the
+       * done card, the Week row and Performance read one figure — and it is written into
+       * `executed.overall` too, so any reader of the overall agrees. A lift's pounds are the completed
+       * side of `session_detail_v1.strength_volume`, priced with the same body weight.
+       */
+      const movingSeconds = status === 'completed' ? completedMovingSeconds(w) : null;
+      if (movingSeconds != null && executed?.overall && typeof executed.overall === 'object') {
+        executed.overall.duration_s_moving = movingSeconds;
+      }
+      const isLiftLike = String(type) === 'strength' || String(type) === 'mobility';
+      const strengthVolumeLb = status === 'completed' && isLiftLike && Array.isArray(executed?.strength_exercises)
+        ? completedStrengthVolume(executed.strength_exercises, bodyweightLb).completed_total_lb
+        : null;
+      /**
+       * The lift's set count on Today's line, counted the way `session_detail_v1.strength_totals` counts
+       * it: a performed set (`isPerformedSet`) that carries reps. The line counted every set on the row,
+       * ticked or not, on the phone (2026-09-10, audit H-T04).
+       */
+      const strengthSetsCompleted = status === 'completed' && isLiftLike && Array.isArray(executed?.strength_exercises)
+        ? executed.strength_exercises.reduce((n: number, ex: any) =>
+          n + (Array.isArray(ex?.sets) ? ex.sets.filter((s: any) => isPerformedSet(s) && (Number(s?.reps) || 0) > 0).length : 0), 0)
+        : null;
       return {
         id: w.id,
         date,
@@ -920,6 +955,9 @@ Deno.serve(async (req)=>{
         status,
         planned,
         executed,
+        moving_seconds: movingSeconds,
+        strength_volume_lb: strengthVolumeLb,
+        strength_sets_completed: strengthSetsCompleted,
         planned_id: w.planned_id || null,
         // computed: same shape as DB row for UI compatibility (MobileSummary, etc.)
         computed: w?.computed ?? null,
@@ -1051,6 +1089,7 @@ Deno.serve(async (req)=>{
         }) : null;
         const planned = {
           id: p.id,
+          ...plannedDurationFields(p),
           name: p?.name || null,
           steps: processedSteps,
           total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
@@ -1131,6 +1170,7 @@ Deno.serve(async (req)=>{
         }) : null;
         const planned = {
           id: p.id,
+          ...plannedDurationFields(p),
           name: p?.name || null,
           steps: processedSteps,
           total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
@@ -1566,6 +1606,9 @@ Deno.serve(async (req)=>{
         // resort of `resolveMinutes` for rows that carry no structure at all, and its absence here
         // is why the client mapper had to exist. See D-403 (`docs/DECISIONS-LOG-2.md`).
         duration: p.duration ?? null,
+        // ⛔ THE LENGTH AND ITS WORDS, FROM THE SERVER (2026-09-10) — see `planned-duration-label.ts`.
+        planned_duration_seconds: p.planned_duration_seconds ?? null,
+        planned_duration_label: p.planned_duration_label ?? null,
         strength_exercises: p.strength_exercises ?? null,
         mobility_exercises: p.mobility_exercises ?? null,
         tags: Array.isArray(p.tags) ? p.tags : [],
@@ -1606,6 +1649,10 @@ Deno.serve(async (req)=>{
         garmin_activity_id: item.garmin_activity_id || null,
         device_info: item.device_info || null,
         planned_id: item.planned?.id || item.planned_id || null,
+        // ⛔ The item's own figures (see `unify`), so a row read off `completed_workout` prints the same.
+        moving_seconds: item.moving_seconds ?? null,
+        strength_volume_lb: item.strength_volume_lb ?? null,
+        strength_sets_completed: item.strength_sets_completed ?? null,
       };
     };
     const itemsWithPlannedWorkout = itemsWithAI.map((it) => {
@@ -1626,6 +1673,9 @@ Deno.serve(async (req)=>{
         completed: workloadCompleted,
         sessions_planned: sessionsPlanned,
         sessions_completed: sessionsCompleted,
+        // ⛔ THE WEEK'S LIFTED POUNDS (2026-09-10, audit H-T05) — the sum of the items' own
+        // `strength_volume_lb`, so Today's week line adds up the numbers its cards print.
+        strength_volume_lb: itemsWithAI.reduce((s, it) => s + (typeof it?.strength_volume_lb === 'number' ? it.strength_volume_lb : 0), 0),
         distances: {
           run_meters: runMeters,
           swim_meters: swimMeters,

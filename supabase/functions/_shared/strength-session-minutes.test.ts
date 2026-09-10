@@ -1,7 +1,7 @@
 /**
  * ⛔ A LIFTING SESSION IS AS LONG AS ITS OWN ROWS SAY (work order 2026-09-09 §3c).
  *
- *   ~/.deno/bin/deno test --no-check --sloppy-imports src/lib/strength-session-minutes.test.ts
+ *   ~/.deno/bin/deno test --no-check supabase/functions/_shared/strength-session-minutes.test.ts
  *
  * ⚠️ THE FIXTURES ARE REAL ROWS, copied off a Standard plan built through the wizard on a throwaway
  * account (2026-09-09). A fixture invented to suit the formula proves the formula agrees with
@@ -76,42 +76,8 @@ Deno.test('the pricing itself still answers for plyo rows — the suppression is
   assertEquals(formatStrengthSessionMinutes(PLYO), '5–10 min');
 });
 
-/**
- * ⛔⛔ THE PLYO DAY SHOWS NO TIME AT ALL (Michael, 2026-09-09), and this pins WHERE that is decided.
- *
- * The rows carry no effort count to price — `compose.ts` puts the band's top in `reps` as the row's
- * *recorded-efforts capacity*, and says the logger records rather than targets — and the source
- * gives the drill day no length either. Nothing on the row, nothing on the page, so no figure.
- *
- * ⚠️ SOURCE-READ RATHER THAN CALLED, the same way `strength-rest-timer.test.ts` pins the logger's
- * own reader: `formatSessionDuration` lives in a `.tsx` and cannot be imported here. What matters is
- * the ORDER — the plyo guard must return before the strength estimate is reached, or the drill day
- * gets a range again.
- */
-Deno.test('⛔ THE PLYO GUARD RUNS BEFORE THE ESTIMATE, AND IT IS KEYED ON THE TAG', () => {
-  const src = Deno.readTextFileSync(new URL('../components/PlannedSessionHeader.tsx', import.meta.url));
-  const fn = src.slice(src.indexOf('export function formatSessionDuration'));
-  const body = fn.slice(0, fn.indexOf('\n}'));
-  const guard = body.indexOf('isPlyoSession');
-  const estimate = body.indexOf('formatStrengthSessionMinutes');
-  assert(guard > -1, 'the plyo guard is gone from formatSessionDuration');
-  assert(estimate > -1, 'the strength estimate is gone from formatSessionDuration');
-  assert(guard < estimate, 'the plyo guard must return before the strength estimate is reached');
-  assert(/return null/.test(body.slice(guard, estimate)), 'the plyo guard must return null, not a figure');
-});
-
-/** ⛔ AND THE COLOUR COMES OFF THE SAME TAG-KEYED SEAM THE CALENDAR USES, never off the wire type. */
-Deno.test('⛔ THE HEADER COLOURS BY THE DISPLAY DISCIPLINE, SO PLYO IS NOT STRENGTH ORANGE', () => {
-  const src = Deno.readTextFileSync(new URL('../components/PlannedSessionHeader.tsx', import.meta.url));
-  assert(
-    /const color = sportColorFor\(displayDisciplineOf\(w\)\)/.test(src),
-    'the header stopped colouring by displayDisciplineOf — the plyo day is back in strength orange',
-  );
-  assert(
-    /if \(raw === 'plyo'\) return SPORT_COLORS\.plyo/.test(src),
-    'sportColorFor stopped answering for the plyo display key, so it falls through to grey',
-  );
-});
+// ⚠️ THE PLYO DAY'S SUPPRESSION IS NO LONGER A PHONE HEADER RULE: get-week sends no label for a row
+// tagged `plyo` (pinned in get-week/planned-duration-label.test.ts).
 
 Deno.test('⛔ NOTHING USABLE MEANS NULL, so the caller can keep the stored length', () => {
   assertEquals(strengthSessionMinutes([]), null);

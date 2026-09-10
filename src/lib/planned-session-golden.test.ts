@@ -28,8 +28,6 @@
  *   ~/.deno/bin/deno test --no-check --allow-read src/lib/planned-session-golden.test.ts
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { resolveMovingSeconds } from '../utils/resolveMovingSeconds.ts';
-import { resolvePlannedDurationMinutes } from '../utils/resolvePlannedDuration.ts';
 import { deriveWorkoutTitle } from './derive-workout-title.ts';
 import {
   availableDisciplines,
@@ -45,19 +43,16 @@ import {
   normalizeSessionType,
   postureKey,
 } from './discipline.ts';
-import {
-  plannedDurationMinutes,
-  plannedDurationSeconds,
-  storedPlannedTotalSeconds,
-} from './planned-session/duration.ts';
-
-/** Which readers each surface calls — the coverage claim, checkable rather than asserted in prose. */
+/**
+ * Which server field each surface prints, and which readers it still calls — the coverage claim,
+ * checkable rather than asserted in prose. ⛔ No surface resolves a length (2026-09-10, audit H-T01).
+ */
 export const SURFACE_READERS = {
-  'calendar chip': ['resolveMovingSeconds', 'getDisciplineSwaps', 'availableDisciplines'],
-  "today's card": ['resolveMovingSeconds', 'deriveWorkoutTitle', 'getDisciplineSwaps', 'disciplineOf', 'intensityOf'],
-  "today's drawer": ['getDisciplineSwaps', 'disciplineOf', 'intensityOf'],
-  'workout view': ['getDisciplineSwaps', 'disciplineOf', 'intensityOf'],
-  'planned summary': ['resolvePlannedDurationMinutes', 'deriveWorkoutTitle'],
+  'calendar chip': ['planned_duration_seconds', 'moving_seconds', 'swap-session sport_swap'],
+  "today's card": ['planned_duration_label', 'moving_seconds', 'deriveWorkoutTitle', 'swap-session sport_swap'],
+  "today's drawer": ['planned_duration_label', 'swap-session sheet'],
+  'workout view': ['planned_duration_seconds', 'swap-session sheet'],
+  'planned summary': ['planned_duration_seconds', 'deriveWorkoutTitle'],
 } as const;
 
 // ── The row shapes the app actually produces ─────────────────────────────────────────────────
@@ -162,51 +157,16 @@ const ROWS: Array<{ label: string; row: Row }> = [
 const byLabel = (prefix: string): Row => ROWS.find((r) => r.label.startsWith(prefix))!.row;
 
 // ── DURATION ─────────────────────────────────────────────────────────────────────────────────
-
-Deno.test('GOLDEN · duration — every reader, every shape', () => {
-  const golden: Record<string, { moving: number | null; plannedMin: number | null; swapMin: number }> = {
-    // moving = resolveMovingSeconds (authoritative, 4 priorities)
-    // plannedMin = resolvePlannedDurationMinutes (root total ONLY, null otherwise — deliberate)
-    // swapMin = resolveMinutes (the swap gate; delegates to moving)
-    'A': { moving: 3780, plannedMin: null, swapMin: 63 },
-    'B': { moving: 3000, plannedMin: 50, swapMin: 50 },
-    'C': { moving: 4320, plannedMin: null, swapMin: 72 },
-    'D': { moving: 1800, plannedMin: null, swapMin: 30 },
-    'E': { moving: 4560, plannedMin: 76, swapMin: 76 },
-    'F': { moving: 6480, plannedMin: 108, swapMin: 108 },
-    'G': { moving: 3600, plannedMin: 60, swapMin: 60 },
-    'H': { moving: 3600, plannedMin: 60, swapMin: 60 },
-    'I': { moving: 3780, plannedMin: 63, swapMin: 63 },
-    'J': { moving: 3000, plannedMin: 50, swapMin: 50 },
-    'K': { moving: null, plannedMin: null, swapMin: 0 },
-    'L': { moving: 4320, plannedMin: 72, swapMin: 72 },
-  };
-  for (const [key, want] of Object.entries(golden)) {
-    const row = byLabel(`${key} ·`);
-    assertEquals(resolveMovingSeconds(row), want.moving, `${key}: resolveMovingSeconds`);
-    assertEquals(resolvePlannedDurationMinutes(row), want.plannedMin, `${key}: resolvePlannedDurationMinutes`);
-    assertEquals(resolveMinutes(row as never), want.swapMin, `${key}: resolveMinutes`);
-  }
-});
-
-Deno.test('⚠️ DRIFT · the two duration readers disagree on 3 of 12 shapes', () => {
-  /**
-   * `resolvePlannedDurationMinutes` returns null wherever the total is not stored at the root, while
-   * `resolveMovingSeconds` finds the time in steps or intervals. Rows A, C, D, K are the gap — and A
-   * is the exact shape that made the swap glyph vanish from Today's card while the row printed 63:00.
-   *
-   * ⛔ STAGE 2 MUST NOT "FIX" THIS BY ADDING FALLBACKS to the badge reader. Its null is deliberate: a
-   * wrong duration on a displayed badge is a lie. The fix is that everything ELSE stops using it as a
-   * general duration source. This assertion should still hold after stage 2.
-   */
-  const disagree = ROWS.filter(({ row }) => {
-    const moving = resolveMovingSeconds(row);
-    const badge = resolvePlannedDurationMinutes(row);
-    const movingMin = moving == null ? null : Math.round(moving / 60);
-    return movingMin !== badge;
-  }).map(({ label }) => label.slice(0, 1));
-  assertEquals(disagree, ['A', 'C', 'D']);
-});
+//
+// ⛔ DELETED 2026-09-10 (audit H-T01 / H-D10), with the phone readers they pinned:
+//   · 'GOLDEN · duration — every reader, every shape' pinned `resolveMovingSeconds`,
+//     `resolvePlannedDurationMinutes` and the swap gate's minutes over rows A–L.
+//   · '⚠️ DRIFT · the two duration readers disagree on 3 of 12 shapes' pinned the gap between the
+//     stored-total-only badge and the full ladder (rows A, C, D).
+// Both readers are gone. The phone prints the server's `planned_duration_seconds` and
+// `moving_seconds`; the order is settled once in `supabase/functions/_shared/planned-duration.ts`
+// (stored total first — its own tests pin every rung), and `enforcement.test.ts` keeps the phone
+// from growing a reader again.
 
 // ── DISCIPLINE ───────────────────────────────────────────────────────────────────────────────
 
@@ -302,235 +262,22 @@ Deno.test('GOLDEN (stage 1) · the NON-DISCIPLINE planned types survive the migr
   assertEquals(ranked.sameSport[0].crossSportNote, null, 'and carries no cross-sport warning');
 });
 
-// ── STAGE 2 — the shapes stage 0 never covered ───────────────────────────────────────────────
+// ── STAGE 2 / STAGE 3 DURATION FIXTURES — DELETED 2026-09-10 (audit H-T01) ───────────────────────
 //
-// ⛔ A SEPARATE BLOCK, ON PURPOSE. These are NOT appended to `ROWS`: the ⚠️ DRIFT assertion above
-// pins the disagreement set as exactly `['A','C','D']`, and rows M–P are more of that same family,
-// so folding them in would move a stage-0 pinned value for no reason other than bookkeeping. Stage
-// 0's twelve stay exactly as stage 0 left them; new coverage lands beside them.
-//
-// ⚠️ STAGE 1'S LESSON, APPLIED. The walk regression survived because the fixtures pinned only the
-// shapes the readers already agreed on. Every rung stage 2 MOVED gets a row here, including the two
-// it moved from a reader that was about to be deleted.
-
-const STAGE2_ROWS: Array<{ label: string; row: Row }> = [
-  {
-    label: 'M · distance-only steps priced from a pace target — computeMinutes\' one real capability',
-    row: {
-      id: 'm', type: 'run', name: 'Intervals', workout_status: 'planned', date: '2026-08-21',
-      total_duration_seconds: null, tags: ['intervals'],
-      // 6 × 800m at 7:30/mi → 800 × (450 / 1609.34) ≈ 223.7s each ≈ 1342s total.
-      computed: {
-        total_duration_seconds: null,
-        steps: Array.from({ length: 6 }, () => ({ distanceMeters: 800, paceTarget: '7:30/mi' })),
-      },
-    },
-  },
-  {
-    label: 'N · `computed` arrives as a JSON STRING (direct table reads do this)',
-    row: {
-      id: 'n', type: 'ride', name: 'Easy Ride', workout_status: 'planned', date: '2026-08-21',
-      total_duration_seconds: null, tags: ['easy'],
-      computed: JSON.stringify({ total_duration_seconds: 2700, steps: [] }),
-    },
-  },
-  {
-    label: 'O · prose only — the duration exists nowhere but the token text',
-    row: {
-      id: 'o', type: 'run', name: 'Easy Run', workout_status: 'planned', date: '2026-08-21',
-      total_duration_seconds: null, tags: ['easy_run'], computed: null,
-      steps_preset: ['warmup_run_quality_12min', 'easy_run_40min'],
-    },
-  },
-  {
-    label: 'P · root total AND a steps-sum that DISAGREES — the summary\'s old outlier',
-    row: {
-      id: 'p', type: 'run', name: 'Easy Run', workout_status: 'planned', date: '2026-08-21',
-      total_duration_seconds: 3600, tags: ['easy_run'],
-      computed: { total_duration_seconds: null, steps: [{ seconds: 1200 }, { seconds: 1200 }] },
-    },
-  },
-];
-
-Deno.test('GOLDEN (stage 2) · plannedDurationSeconds — the one ladder, every rung', () => {
-  /**
-   * ⛔ EVERY RUNG STAGE 2 MOVED, PINNED. Two of them existed in only ONE reader before this stage and
-   * would have been silently lost by a naive collapse:
-   *
-   *   M — distance-based steps priced from pace. Lived ONLY in `computeMinutes`. Without it a
-   *       session authored as "6 × 800m @ 5k pace" reads as having no duration at all.
-   *   N — `computed` as a JSON string. `computeMinutes` parsed it; `resolveMovingSeconds` did not and
-   *       returned null. The transport's shape is no longer a source of disagreement.
-   *
-   * ⚠️ M IS AN ESTIMATE AND IS ALLOWED TO BE. 800m at 7:30/mi is ~223.7s; six of them ~1342s. It is
-   * pinned exactly so a change to the pace maths shows up here rather than on a device.
-   */
-  const golden: Record<string, number | null> = {
-    'M': 1342,   // 6 × 800m @ 7:30/mi, priced from the pace target
-    'N': 2700,   // parsed out of the JSON string
-    'O': 720,    // FIRST token wins: warmup 12min, not the 40min that follows
-    'P': 3600,   // the stored root total, NOT the 2400s the steps sum to
-  };
-  for (const [key, want] of Object.entries(golden)) {
-    const row = STAGE2_ROWS.find((r) => r.label.startsWith(`${key} ·`))!.row;
-    assertEquals(plannedDurationSeconds(row), want, `${key}: plannedDurationSeconds`);
-  }
-});
-
-Deno.test('GOLDEN (stage 2) · the badge reader gained NO fallbacks', () => {
-  /**
-   * ⛔ SPEC §1's STANDING RULE. `resolvePlannedDurationMinutes` feeds a displayed badge and a wrong
-   * duration on screen is a lie, so it reads the authoritative stored total and returns null
-   * otherwise. Stage 2 made it a wrapper — over `storedPlannedTotalSeconds`, NOT over
-   * `plannedDurationSeconds`, which would have handed it the whole ladder and quietly ended its
-   * null contract. This test is what makes that distinction load-bearing rather than a comment.
-   */
-  for (const { label, row } of STAGE2_ROWS) {
-    const key = label.slice(0, 1);
-    const badge = resolvePlannedDurationMinutes(row);
-    if (key === 'P') {
-      assertEquals(badge, 60, 'P: it HAS a stored total, so the badge shows it');
-    } else {
-      assertEquals(badge, null, `${key}: no stored root total → the badge stays hidden`);
-    }
-  }
-  // And the accessor it wraps agrees, rung for rung.
-  assertEquals(storedPlannedTotalSeconds({ total_duration_seconds: 3600 }), 3600);
-  assertEquals(storedPlannedTotalSeconds({ computed: { total_duration_seconds: 3600 } }), null);
-  assertEquals(storedPlannedTotalSeconds({}), null);
-  assertEquals(storedPlannedTotalSeconds(null), null);
-});
-
-Deno.test('⚠️ CHANGED (stage 2) · the summary now prefers the stored total over the steps-sum', () => {
-  /**
-   * ⛔ THE ONE DELIBERATE BEHAVIOUR CHANGE IN STAGE 2, STATED OUT LOUD. Row P carries a root total of
-   * 3600s and steps summing to 2400s.
-   *
-   *     before — PlannedWorkoutSummary.computeMinutes → 40 min   (steps-sum first, "client authoritative")
-   *              calendar / Today's card / swap gate  → 60 min   (stored total first)
-   *     after  — every surface                        → 60 min
-   *
-   * `computeMinutes` was the ONLY reader that preferred the steps-sum, so on a row like this the
-   * summary printed a different number from the chip the athlete tapped to reach it. SPEC §1 names
-   * the stored-total-first ladder authoritative; the summary was the outlier and now agrees.
-   *
-   * ⚠️ IF THIS EVER NEEDS REVERSING, reverse it HERE and in `plannedDurationSeconds` together — the
-   * point of one reader is that the question has one answer.
-   */
-  const p = STAGE2_ROWS.find((r) => r.label.startsWith('P ·'))!.row;
-  assertEquals(plannedDurationSeconds(p), 3600, 'the stored total wins');
-  assertEquals(plannedDurationMinutes(p), 60);
-
-  // The sum the old reader would have returned, shown so the change is legible rather than asserted.
-  const steps = (p.computed as { steps: Array<{ seconds: number }> }).steps;
-  assertEquals(steps.reduce((a, s) => a + s.seconds, 0), 2400, 'what computeMinutes used to answer');
-});
-
-Deno.test('GOLDEN (stage 2) · resolveMovingSeconds still answers stage 0 exactly, planned AND completed', () => {
-  /**
-   * ⛔ THE COMPLETED BRANCH DID NOT MOVE, and this is the assertion that holds that line. Stage 2
-   * extracted the PLANNED half only; `resolveMovingSeconds` keeps its `workout_status` gate and
-   * delegates. Row J is completed and must still be read as executed time, not as a planned total.
-   */
-  for (const { label, row } of ROWS) {
-    const key = label.slice(0, 1);
-    const isPlanned = String(row.workout_status ?? '').toLowerCase() === 'planned';
-    if (isPlanned) {
-      assertEquals(
-        resolveMovingSeconds(row), plannedDurationSeconds(row),
-        `${key}: planned rows delegate to the one reader`,
-      );
-    }
-  }
-  const j = byLabel('J ·');
-  assertEquals(String(j.workout_status), 'completed');
-  assertEquals(resolveMovingSeconds(j), 3000, 'J: moving_time 50min — the COMPLETED branch, untouched');
-  // ⚠️ And the planned reader is NOT what produced that: it would read J's root total. Same number
-  // here by coincidence of the fixture, different question — which is exactly why they stay separate.
-  assertEquals(plannedDurationSeconds(j), 3000);
-});
-
-// ── STAGE 3 — the SERVER's row shape ─────────────────────────────────────────────────────────
-//
-// ⛔ THE CLIENT MAPPER IS GONE, so `planned_workout` from `get-week` is the only planned row any
-// surface sees. These pin that the shape it emits still feeds the one duration reader correctly —
-// especially the two capabilities stage 2 rescued, whose survival across the server shape was NOT
-// self-evident and is the guardrail this stage was given.
-
-const SERVER_ROWS: Array<{ label: string; row: Row }> = [
-  {
-    label: 'Q · server row — `duration` (minutes) and nothing else, the field stage 3 added',
-    row: {
-      id: 'q', type: 'run', name: 'Easy Run', workout_status: 'planned', date: '2026-08-11',
-      total_duration_seconds: null, computed: null, duration: 50, tags: ['easy_run'],
-    },
-  },
-  {
-    label: 'R · server row — distance steps carrying the SERVER\'s pace_range shape',
-    row: {
-      id: 'r', type: 'run', name: 'Intervals', workout_status: 'planned', date: '2026-08-21',
-      total_duration_seconds: null, duration: null, tags: ['intervals'],
-      // ⚠️ `get-week:1010` builds this from `paceTarget`: sec-per-MILE, ±5%, `unit: 'mi'`.
-      computed: {
-        total_duration_seconds: null,
-        steps: Array.from({ length: 6 }, () => ({
-          distanceMeters: 800,
-          pace_range: { lower: 428, upper: 473, unit: 'mi' },
-        })),
-      },
-    },
-  },
-  {
-    label: 'S · server row — steps sum, the shape that hid the glyph',
-    row: {
-      id: 's', type: 'run', name: 'Easy Run', workout_status: 'planned', date: '2026-08-18',
-      total_duration_seconds: null, duration: null, tags: ['easy_run'],
-      computed: { total_duration_seconds: null, steps: [{ seconds: 1890 }, { seconds: 1890 }] },
-    },
-  },
-];
-
-Deno.test('GOLDEN (stage 3) · the server contract feeds the one duration reader', () => {
-  const golden: Record<string, { secs: number | null; swapMin: number }> = {
-    // ⚠️ Q: `duration` is MINUTES and is NOT a rung of `plannedDurationSeconds` — deliberately. It is
-    // the swap gate's own last resort (`resolveMinutes`), for rows with no structure at all. So the
-    // seconds reader says "I don't know" and the gate still sizes the session. Both are correct.
-    'Q': { secs: null, swapMin: 50 },
-    'R': { secs: 1344, swapMin: 22 },   // 6 × 800m at the midpoint of 428-473 sec/mi (450.5)
-    'S': { secs: 3780, swapMin: 63 },
-  };
-  for (const [key, want] of Object.entries(golden)) {
-    const row = SERVER_ROWS.find((r) => r.label.startsWith(`${key} ·`))!.row;
-    assertEquals(plannedDurationSeconds(row), want.secs, `${key}: plannedDurationSeconds`);
-    assertEquals(resolveMinutes(row as never), want.swapMin, `${key}: resolveMinutes`);
-  }
-});
-
-Deno.test('⛔ (stage 3) · the two capabilities stage 2 rescued survive the SERVER shape', () => {
-  /**
-   * ⛔ THE GUARDRAIL THIS STAGE WAS GIVEN, ANSWERED EXPLICITLY.
-   *
-   * 1. DISTANCE-PRICED STEPS — survive, and are in fact SAFER on this path. Stage 2's fixture M
-   *    priced them from a `paceTarget` STRING; the server parses that string itself and emits a
-   *    numeric `pace_range` in sec/mi (`get-week:1010`), which `stepSeconds` reads first. Row R
-   *    proves the numeric form prices to the same ~1342s as the string form did.
-   *
-   * 2. JSON-STRING `computed` — **cannot occur on this path at all.** `toPlannedWorkout` BUILDS
-   *    `computed` as an object (`{ steps, total_duration_seconds }`) or null; it never passes a
-   *    string through. The capability stays in `plannedDurationSeconds` because the DIRECT table
-   *    readers still exist (`usePlannedWorkoutLink`, `StrengthLogger`) and those do see the string
-   *    form. It is not dead code — it is simply not reachable from the server contract.
-   */
-  const r = SERVER_ROWS.find((x) => x.label.startsWith('R ·'))!.row;
-  const m = { computed: { steps: Array.from({ length: 6 }, () => ({ distanceMeters: 800, paceTarget: '7:30/mi' })) } };
-  const viaServer = plannedDurationSeconds(r)!;
-  const viaString = plannedDurationSeconds(m)!;
-  assert(Math.abs(viaServer - viaString) <= 2, `numeric ${viaServer} vs string ${viaString} must agree`);
-
-  // The server never emits a string `computed` — but the reader must still handle one, for the
-  // direct-table paths the client still has.
-  assertEquals(plannedDurationSeconds({ computed: JSON.stringify({ total_duration_seconds: 2700 }) }), 2700);
-});
+// ⛔ WHAT EACH DELETED TEST PINNED, so the removal is legible:
+//   · 'GOLDEN (stage 2) · plannedDurationSeconds — the one ladder, every rung' — the phone ladder's
+//     rungs: distance steps priced at a pace target (M), a JSON-string `computed` (N), minutes read
+//     out of the step tokens (O), and a stored total beating a step sum that disagrees (P).
+//   · 'GOLDEN (stage 2) · the badge reader gained NO fallbacks' — `resolvePlannedDurationMinutes`
+//     answered from the stored total only.
+//   · '⚠️ CHANGED (stage 2) · the summary now prefers the stored total over the steps-sum' — row P.
+//   · 'GOLDEN (stage 2) · resolveMovingSeconds still answers stage 0 exactly' — its planned branch
+//     delegated to the ladder and its completed branch read `moving_time`.
+//   · 'GOLDEN (stage 3) · the server contract feeds the one duration reader' and
+//     '⛔ (stage 3) · the two capabilities stage 2 rescued survive the SERVER shape' — the phone ladder
+//     over get-week's row shape (Q, R, S).
+// The server owns those rules now — the stored total first, distance priced at pace, a JSON-string
+// `computed` read, and NO prose minutes (`_shared/planned-duration.ts`, dropped deliberately there).
 
 Deno.test('GOLDEN · availableDisciplines over a real week', () => {
   // The Strong Focus week from the device screenshots: run + ride + strength on the calendar.

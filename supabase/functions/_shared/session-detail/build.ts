@@ -27,6 +27,11 @@ import { strengthSetVolume, barLbForExercise } from '../workload.ts';
 // for the 200-vs-700 split this replaced. `canonicalize` is deliberately NOT consulted (Q-249).
 import { typeForExercise } from '../../../../src/lib/exercise-role.ts';
 import { isBandAssistedMovement } from '../../../../src/lib/band-assistance.ts';
+// The strength Performance table's rows, count and totals (audit H-S11–H-S15).
+import { buildStrengthSlots } from './strength-slots.ts';
+// ⛔ THE COMPLETED SIDE'S PRICING LIVES IN ONE FILE (2026-09-10, audit H-T04) so `get-week` sends the
+// same pounds for the done card and the Week row that this contract prints on Performance.
+import { completedStrengthVolume } from '../strength/session-volume.ts';
 
 // Server-authored Tier-1 route readout (Familiar Routes, "arm of State"). The honest, effort-aware
 // headline the client renders VERBATIM — no client-side re-derivation. Heat is parked; this is the
@@ -238,6 +243,12 @@ export type SessionDetailInput = {
    *  computed.overall is sample-derived and has been wrong). Resolved in workout-detail via
    *  resolveSwimScalars; null for non-swims (which keep computed.overall, GPS-authoritative). */
   completedSwimScalars?: SwimScalars | null;
+  /**
+   * ⛔ THE SESSION'S MOVING SECONDS, FROM `_shared/moving-seconds.ts` (2026-09-10, audit H-D10) — the
+   * number `get-week` stamps as `moving_seconds` for the done card and the Week row. workout-detail is
+   * the DB reader and passes it; absent (fixtures, older callers) → `computed.overall` as before.
+   */
+  completedMovingS?: number | null;
   /** D-185: RUN pace + HR scalars from the ONE run resolver (resolveRunScalars — computed.overall
    *  primary with the narrative-trusted guard/reconciliation, raw columns fallback). Resolved in
    *  workout-detail; null for non-runs. So the card reads the SAME guarded pace/HR the narrative does. */
@@ -378,6 +389,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     loadStatus,
     completedComputed,
     completedSwimScalars,
+    completedMovingS,
     completedRunScalars,
     loadContext,
     weatherTempF,
@@ -719,7 +731,9 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const plannedTotals: SessionDetailV1['planned_totals'] = buildPlannedTotals(plannedComp, plannedSession, plannedRowRaw);
 
   // ── Completed totals ───────────────────────────────────────────────────────
-  const completedDurS = fin(compOverall?.duration_s_moving);
+  // ⛔ ONE MOVING TIME PER SESSION (2026-09-10, audit H-D10): the server rule workout-detail passes,
+  // which is the `moving_seconds` get-week stamps for the same session.
+  const completedDurS = completedMovingS !== undefined ? fin(completedMovingS) : fin(compOverall?.duration_s_moving);
   const completedDistM = fin(compOverall?.distance_m);
   const swimUnit = plannedTotals.swim_unit || 'yd';
   // D-182: for SWIMS, moving-seconds + distance + avg-HR come from the RAW-column scalar
@@ -772,6 +786,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   })();
   const completedTotals: SessionDetailV1['completed_totals'] = {
     duration_s: (type === 'swim' && completedElapsedS != null && completedElapsedS > 0) ? completedElapsedS : swimDurS,
+    // ⛔ THE MOVING TIME, EVERY SPORT (2026-09-10) — equal to workout-detail's and get-week's
+    // `moving_seconds`. `duration_s` above stays ELAPSED on a swim (D-163: the swim block shows pool
+    // time), so a screen comparing moving times reads this, never `duration_s`.
+    moving_s: swimDurS,
     distance_m: swimDistM,
     // Land pace (min/mi) + GAP are meaningless for a swim — null them so the swim screen never
     // renders "5:03/mi". Swim pace lives in swim_pace_per_100_s. (Layer 1: numbers honest; the
@@ -1247,6 +1265,15 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         }));
       return withRIR.length > 0 ? withRIR : null;
     })(),
+    // ⛔ THE PERFORMANCE TABLE, ROW BY ROW, plus its count and totals (2026-09-10, audit H-S11–H-S15).
+    ...buildStrengthSlots({
+      type,
+      plannedRowRaw,
+      completedStrengthExercises,
+      strengthVolume,
+      bodyweightLb,
+      exerciseAdherence: (wa as any)?.detailed_analysis?.exercise_adherence,
+    }),
     readiness: (() => {
       if (readinessUnavailable || !readinessSnapshot) return null;
       return packageSessionDetailReadiness(readinessSnapshot);
@@ -1337,29 +1364,16 @@ function buildPlannedTotals(
   plannedComp: any, plannedSession: PlannedSession | null, plannedRowRaw: any,
 ): SessionDetailV1['planned_totals'] {
   const steps: any[] = Array.isArray(plannedComp?.steps) ? plannedComp.steps : [];
-  const durS = (() => {
-    const t = fin(plannedComp?.total_duration_seconds);
-    if (t != null && t > 0) return t;
-    let sum = 0;
-    for (const st of steps) {
-      sum += Number(st?.seconds || st?.duration || st?.duration_sec || st?.durationSeconds || 0) || 0;
-    }
-    if (sum > 0) return sum;
-    const fromSession = fin(plannedSession?.duration_seconds);
-    if (fromSession != null && fromSession > 0) return fromSession;
-    // ⛔ THE FOURTH READER OF "HOW LONG WAS THIS PLANNED" (2026-08-02).
-    //
-    // D-361 found three surfaces each answering this in one place, so an unstructured session —
-    // "~108 min easy", no steps, length stated only in the `duration` COLUMN — was invisible to the
-    // attach matcher and scored 0% by the cycling analyzer. `resolvePlannedDurationSeconds` became
-    // the one answer. This function was never wired to it and is the same bug's fourth face: the ride
-    // resolved 59% duration adherence correctly through the shared resolver while `planned_totals`
-    // came back null, so the Duration chip could not say "64 of 108 min" and fell back to a percentage.
-    //
-    // ⚠️ `duration` is MINUTES; the resolver owns that conversion. Do not re-derive it here — that is
-    // exactly how a fifth answer gets written.
-    return fin(resolvePlannedDurationSeconds(plannedRowRaw));
-  })();
+  /**
+   * ⛔ ONE PLANNED LENGTH (2026-09-10, audit H-T01). This read `computed.total_duration_seconds`, then
+   * its own step sum, then the ledger's session, and only then the shared resolver (D-361, 2026-08-02)
+   * — a fourth ladder in a fourth order. It is now the resolver's answer outright, the number
+   * `get-week` sends as `planned_duration_seconds`, so the duration chip grades against the length
+   * Today printed. The ledger's session is read only when there is no planned row at all.
+   */
+  const durS = plannedRowRaw
+    ? fin(resolvePlannedDurationSeconds(plannedRowRaw))
+    : fin(plannedSession?.duration_seconds);
   const distM = (() => {
     let m = 0;
     for (const st of steps) {
@@ -2359,16 +2373,9 @@ function matchPlannedToCompleted(plannedExs: any[], compEx: any): any | null {
  * ⛔ PER-EXERCISE VOLUME LOAD (D-349). PRICES ONLY — IT DOES NOT PAIR. See `strength_volume` in
  * types.ts for why pairing stays on the client.
  *
- * ⚠️ THE COMPLETED SET FILTER MUST MATCH `compute-facts` AND THE TABLE, or the footer total will not
- * equal the rows above it. Both drop an untouched prefill (D-204: a prescription the athlete never
- * engaged is not a receipt) and keep legacy sets that carry no flag.
+ * ⚠️ THE COMPLETED SIDE IS `completedStrengthVolume` (`_shared/strength/session-volume.ts`, 2026-09-10)
+ * — moved unchanged, with its set filter, so `get-week` prices the done card with the same function.
  */
-function isPerformedSet(s: any): boolean {
-  return s && typeof s === 'object'
-    && s.completed !== false
-    && !(s.completed !== true && s.prefilled === true);
-}
-
 function buildStrengthVolume(
   type: string,
   plannedRowRaw: { strength_exercises?: any[] } | null | undefined,
@@ -2382,23 +2389,7 @@ function buildStrengthVolume(
 
   const bw = typeof bodyweightLb === 'number' && bodyweightLb > 0 ? bodyweightLb : null;
 
-  const completed = compExs.map((ex: any) => {
-    const bandIsAssistance = isBandAssistedMovement(String(ex?.name ?? ''));
-    // ⛔ The band is the LOAD on these, not help and not the body — asked of the shared type axis so
-    // a blank band box prices at the token rather than bodyweight x reps (2026-08-03).
-    const bandIsLoad = typeForExercise(String(ex?.name ?? '')) === 'band';
-    const setsArr = Array.isArray(ex?.sets) ? ex.sets : (Array.isArray(ex?.setsArray) ? ex.setsArray : []);
-    // ⛔ A CURL IS NOT A BODYWEIGHT MOVEMENT (2026-08-28, Michael). Same type axis as the two band
-    // flags beside it; an unweighted LOADED accessory prices zero rather than the athlete's weight.
-    const bodyIsLoad = typeForExercise(String(ex?.name ?? '')) === 'bodyweight' || bandIsAssistance;
-    // ⛔ A barbell lift with a blank weight box is the bar, not zero (2026-08-29).
-    const barLb = barLbForExercise(String(ex?.name ?? ''));
-    const volume_lb = setsArr.filter(isPerformedSet).reduce(
-      (sum: number, s: any) => sum + strengthSetVolume(s, { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad, barLb }),
-      0,
-    );
-    return { name: String(ex?.name ?? ''), volume_lb: Math.round(volume_lb) };
-  });
+  const { completed } = completedStrengthVolume(compExs, bw);
 
   const planned = plannedExs.map((ex: any) => {
     const bandIsAssistance = isBandAssistedMovement(String(ex?.name ?? ''));

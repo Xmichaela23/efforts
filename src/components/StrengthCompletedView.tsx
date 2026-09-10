@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import StrengthCompareTable, { type StrengthVolumePayload } from './StrengthCompareTable';
+import StrengthCompareTable, { type StrengthVolumePayload, type StrengthSlot } from './StrengthCompareTable';
 import { useAppContext } from '@/contexts/AppContext';
 import { parseLocalDate } from '@/lib/dateUtils';
 import { getSessionRPE, getWorkoutNotes, getWorkoutReadiness } from '@/utils/workoutMetadata';
@@ -17,8 +17,12 @@ interface StrengthCompletedViewProps {
     stale_reason?: 'recomputing' | 'attach_pending' | 'analysis_missing';
     strength_weight_deviation?: { direction: string; message: string; show_prompt: boolean } | null;
     strength_volume_deviation?: { direction: string; message: string; show_prompt: boolean } | null;
-    /** D-349 — server-priced volume load, passed straight to the compare table. */
+    /** D-349 — server-priced volume load: each exercise's `volume_lb` and the session total. */
     strength_volume?: StrengthVolumePayload | null;
+    /** The compare table's rows (audit H-S12). */
+    strength_slots?: StrengthSlot[] | null;
+    /** Sets / reps / volume tiles and "X lbs total" (audit H-S15). */
+    strength_totals?: { sets_completed: number; reps_completed: number; volume_lb: number } | null;
   } | null;
 }
 
@@ -31,6 +35,8 @@ interface CompletedExercise {
   notes?: string;
   reps?: number;
   weight?: number;
+  /** Place in the saved `strength_exercises` — the index `strength_volume.completed` is built in. */
+  raw_index?: number;
 }
 
 const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutData, plannedWorkout: passedPlannedWorkout, session_detail_v1 }) => {
@@ -77,43 +83,10 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
     return sameDay || null;
   }, [workouts, workoutData.date, workoutData.type]);
 
-  // FIXED: Calculate volume for an exercise - count sets with actual data
-  const calculateExerciseVolume = (sets: Array<{ reps: number; weight: number; completed?: boolean }>) => {
-    return sets
-      .filter(set => set.reps > 0 && set.weight > 0) // Changed from completed check to data check
-      .reduce((total, set) => total + (set.reps * set.weight), 0);
-  };
-
-  // Calculate planned vs actual comparison for an exercise - supports both strength and mobility
-  const getExerciseComparison = (exerciseName: string, completedSets: any[]) => {
-    const plannedExercises = (plannedWorkout?.strength_exercises || plannedWorkout?.mobility_exercises);
-    if (!plannedExercises) return null;
-    
-    const plannedExercise = plannedExercises.find(
-      (ex: any) => ex.name.toLowerCase() === exerciseName.toLowerCase()
-    );
-    
-    if (!plannedExercise) return null;
-
-    const plannedVolume = plannedExercise.sets * plannedExercise.reps * (plannedExercise.weight || 0);
-    const actualVolume = calculateExerciseVolume(completedSets);
-    const volumeDiff = actualVolume - plannedVolume;
-
-    return {
-      planned: {
-        sets: plannedExercise.sets,
-        reps: plannedExercise.reps,
-        weight: plannedExercise.weight || 0,
-        volume: plannedVolume
-      },
-      actual: {
-        volume: actualVolume
-      },
-      diff: {
-        volume: volumeDiff
-      }
-    };
-  };
+  // ⛔ NO VOLUME IS COUNTED HERE (2026-09-10, audit H-S15). `calculateExerciseVolume` summed
+  // `reps × weight` with 0-weight sets skipped, so a chin-up or a banded set read 0 lb here while
+  // Performance printed the server's price. Each exercise's lb is `strength_volume.completed[n].volume_lb`
+  // and the totals are `strength_totals` — the numbers Performance prints.
 
   // Parse possibly stringified JSONB columns
   const parseExercises = (raw: any): any[] => {
@@ -162,7 +135,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
   };
 
   // Sanitize completed exercises to avoid rendering raw objects by mistake
-  const completedExercises = getCompletedExercises().map((ex: any) => {
+  const completedExercises = getCompletedExercises().map((ex: any, raw_index: number) => {
     // Extract clean exercise name (text before colon, or full name if no colon)
     const cleanName = ex?.name ? String(ex.name).split(':')[0].trim() : '';
     
@@ -180,7 +153,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
         const generatedSets = Array.from({ length: numSets }, () =>
           normalizeCompletedStrengthSet({ reps, weight, completed: true }));
 
-        return { ...ex, name: cleanName, sets: generatedSets };
+        return { ...ex, name: cleanName, sets: generatedSets, raw_index };
       }
     }
     
@@ -193,34 +166,15 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
           .filter((s: any) => !isUntouchedPrefill(s))
           .map(normalizeCompletedStrengthSet)
       : [];
-    return { ...ex, name: cleanName, sets: safeSets };
+    return { ...ex, name: cleanName, sets: safeSets, raw_index };
   // D-204: drop exercises with no performed sets (pure untouched prefills) so skipped
   // prescribed exercises don't render as completed in the Details receipts.
   }).filter((ex: any) => Array.isArray(ex?.sets) && ex.sets.length > 0);
 
-  // Calculate total workout statistics
-  const workoutStats = useMemo(() => {
-    let totalSets = 0;
-    let totalReps = 0;
-    let totalVolume = 0;
-    
-    completedExercises.forEach((exercise: CompletedExercise) => {
-      if (exercise.sets && Array.isArray(exercise.sets)) {
-        // Exercise with sets array.
-        // Sets/reps count every set that did work (reps > 0), including bodyweight
-        // (pull-ups) and band (face pulls) exercises that carry no external weight.
-        // Volume stays weight-gated — a 0 lb set contributes 0 to volume regardless.
-        const setsWithReps = exercise.sets.filter(set => set.reps > 0);
-        totalSets += setsWithReps.length;
-        totalReps += setsWithReps.reduce((sum, set) => sum + (set.reps || 0), 0);
-        totalVolume += calculateExerciseVolume(exercise.sets);
-      }
-    });
-
-    return {
-      actual: { sets: totalSets, reps: totalReps, volume: totalVolume }
-    };
-  }, [completedExercises]);
+  // The session's totals and each exercise's pounds — the server's (audit H-S15). Absent on a view
+  // opened without `session_detail_v1`, and then nothing is printed rather than a second count.
+  const totals = session_detail_v1?.strength_totals ?? null;
+  const exerciseVolumes = session_detail_v1?.strength_volume?.completed ?? [];
 
   const isMobility = String(workoutData?.type || '').toLowerCase() === 'mobility';
   const sessionDetailStale = session_detail_v1?.stale === true;
@@ -261,8 +215,8 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
         )}
         <div className="flex items-center justify-between text-sm text-white/60">
           <div className="flex items-center gap-4">
-            {!isMobility && workoutStats.actual.volume > 0 && (
-              <span className="font-medium">{workoutStats.actual.volume.toLocaleString()} {weightUnit} total</span>
+            {!isMobility && totals && totals.volume_lb > 0 && (
+              <span className="font-medium">{totals.volume_lb.toLocaleString()} {weightUnit} total</span>
             )}
             {(workoutData as any).workload_actual || (workoutData as any).workload_planned ? (
               <span>
@@ -328,27 +282,10 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
       )}
 
       {/* Exercises */}
-      {showComparison && plannedWorkout ? (() => {
-        const plannedExercises = ((plannedWorkout as any).strength_exercises || (plannedWorkout as any).mobility_exercises || []).map((ex: any) => {
-          const setsArr = Array.isArray(ex.sets) ? ex.sets : [];
-          const setsNum = setsArr.length || (typeof ex.sets === 'number' ? ex.sets : 0);
-          const repsNum = typeof ex.reps === 'number' ? ex.reps : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.reps)||0), 0) / setsArr.length) : 0);
-          const weightNum = typeof ex.weight === 'number' ? ex.weight : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.weight)||0), 0) / setsArr.length) : 0);
-          const durationNum = typeof ex.duration_seconds === 'number' ? ex.duration_seconds : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.duration_seconds)||0), 0) / setsArr.length) : 0);
-          return { name: ex.name, sets: setsNum, reps: repsNum, weight: weightNum, duration_seconds: durationNum };
-        });
-        const completedForTable = completedExercises.map((ex: any) => ({ name: ex.name, setsArray: Array.isArray(ex.sets) ? ex.sets : [] }));
-        
-        return (
-          <StrengthCompareTable
-            planned={plannedExercises}
-            completed={completedForTable}
-            // D-349 — server-priced volume load. Without it this table's lb column would simply be
-            // absent here; it is never re-derived on the client.
-            strengthVolume={session_detail_v1?.strength_volume ?? null}
-          />
-        );
-      })() : (
+      {showComparison && plannedWorkout ? (
+        // ⛔ THE SAME ROWS PERFORMANCE DRAWS — `strength_slots`, paired on the server (audit H-S12).
+        <StrengthCompareTable slots={session_detail_v1?.strength_slots ?? null} />
+      ) : (
         // Clean completed view (default)
         <div className="space-y-6">
           {completedExercises.length === 0 ? (
@@ -362,14 +299,15 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
               // Regular exercise with sets array
               if (!exercise.sets || !Array.isArray(exercise.sets)) return null;
               
-              const exerciseVolume = calculateExerciseVolume(exercise.sets);
+              const exerciseVolume = typeof exercise.raw_index === 'number'
+                ? (exerciseVolumes[exercise.raw_index]?.volume_lb ?? 0) : 0;
               const hasWeight = exercise.sets.some(s => s.weight && s.weight > 0);
 
               return (
                 <div key={exercise.id || index} className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-white">{exercise.name}</h3>
-                    {hasWeight && exerciseVolume > 0 && (
+                    {exerciseVolume > 0 && (
                       <div className="text-right">
                         <div className="text-sm font-medium text-white/70">
                           {exerciseVolume.toLocaleString()} {weightUnit}
@@ -475,19 +413,19 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
       )}
 
       {/* Workout Statistics - only show for strength (has weight data) */}
-      {!isMobility && workoutStats.actual.volume > 0 && (
+      {!isMobility && totals && totals.volume_lb > 0 && (
         <div className="py-4">
           <div className="grid grid-cols-3 gap-4 text-center text-white">
             <div>
-              <div className="text-lg font-semibold">{workoutStats.actual.sets}</div>
+              <div className="text-lg font-semibold">{totals.sets_completed}</div>
               <div className="text-xs text-white/50">Total Sets</div>
             </div>
             <div>
-              <div className="text-lg font-semibold">{workoutStats.actual.reps}</div>
+              <div className="text-lg font-semibold">{totals.reps_completed}</div>
               <div className="text-xs text-white/50">Total Reps</div>
             </div>
             <div>
-              <div className="text-lg font-semibold">{workoutStats.actual.volume.toLocaleString()}</div>
+              <div className="text-lg font-semibold">{totals.volume_lb.toLocaleString()}</div>
               <div className="text-xs text-white/50">Volume ({weightUnit})</div>
             </div>
           </div>

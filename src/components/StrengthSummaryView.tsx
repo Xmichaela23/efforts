@@ -1,6 +1,7 @@
 import React from 'react';
 import { useExerciseLog } from '@/hooks/useExerciseLog';
-import { canonicalize } from '@/lib/canonicalize';
+// ⛔ THE SERVER'S NAME KEYS (2026-09-10, audit H-S06) — the copy in `src/lib/canonicalize.ts` is gone.
+import { canonicalize } from '@shared/canonicalize';
 
 interface StrengthSummaryViewProps {
   workoutData: any;

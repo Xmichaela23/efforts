@@ -1,15 +1,11 @@
 import React from 'react';
 import { SPORT_COLORS } from '@/lib/context-utils';
-// ⛔ ONE VOCABULARY / ONE DURATION READER (D-403). See `src/lib/discipline.ts` and
-// `src/lib/planned-session/duration.ts`.
+// ⛔ ONE VOCABULARY (D-403). See `src/lib/discipline.ts`.
 import { normalizeSessionType } from '@/lib/discipline';
-import { plannedDurationMinutes } from '@/lib/planned-session/duration';
-// ⛔ A LIFTING SESSION IS PRICED OFF ITS ROWS, NOT OFF A CONSTANT (work order 2026-09-09 §3c).
-import { formatStrengthSessionMinutes } from '@/lib/strength-session-minutes';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
-// ⛔ ONE TAG-KEYED SEAM between the wire type and what an athlete sees — the plyo day's colour, and
-// the reader that says a session IS the plyo day. The calendar already colours by these.
-import { displayDisciplineOf, isPlyoSession } from '@/lib/utils';
+// ⛔ ONE TAG-KEYED SEAM between the wire type and what an athlete sees — the plyo day's colour.
+// The calendar already colours by it.
+import { displayDisciplineOf } from '@/lib/utils';
 
 /**
  * ═══ ONE HEADER FOR A PLANNED SESSION. Three surfaces render it; none of them own it. ═══════════
@@ -73,41 +69,48 @@ export function sportColorFor(type: unknown): string {
   return SPORT_COLORS[key as keyof typeof SPORT_COLORS] ?? '#64748b';
 }
 
+/**
+ * ⛔ HOW LONG A PLANNED SESSION IS — THE SERVER'S NUMBER, READ, NEVER RESOLVED (2026-09-10, audit
+ * H-T01). The phone used to answer this with its own five-rung ladder (`plannedDurationSeconds`:
+ * stored total, computed total, step sum with distance priced at pace, intervals, minutes scraped out
+ * of the description), and the server answered it with a different one, so the Performance chip could
+ * grade against a length Today did not print. That ladder is deleted; the server settles the order.
+ *
+ * ⚠️ TWO ROW SHAPES, ONE SERVER VALUE EACH — this picks the field, it computes nothing:
+ *   · a `get-week` row carries `planned_duration_seconds`, the server's one answer;
+ *   · a row read straight from `planned_workouts` (a hydrated drawer row, the plan screen's loaders)
+ *     carries the `total_duration_seconds` column `materialize-plan` wrote.
+ * A row with neither prints nothing.
+ */
+export function plannedDurationSecondsOf(workout: unknown): number | null {
+  const w = (workout ?? {}) as Record<string, unknown>;
+  const raw = 'planned_duration_seconds' in w ? w.planned_duration_seconds : w.total_duration_seconds;
+  const n = Number(raw);
+  return raw != null && Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+}
+
 /** `63:00` — the same shape the calendar chip and the card have always printed. */
 export function formatPlannedDuration(workout: unknown): string | null {
-  const mins = plannedDurationMinutes(workout as Record<string, unknown>);
-  return mins == null || mins <= 0 ? null : `${mins}:00`;
+  const secs = plannedDurationSecondsOf(workout);
+  return secs == null ? null : `${Math.max(1, Math.round(secs / 60))}:00`;
 }
 
 /**
- * ⛔ A LIFT IS PRICED OFF ITS OWN ROWS; A RIDE AND A RUN KEEP THEIR BUILT LENGTH (work order §3c).
+ * ⛔ THE HEADER'S LENGTH IS `planned_duration_label`, SENT BY THE SERVER (2026-09-10, audit H-T02).
  *
- * The two answer different questions and that is why they print differently. An endurance session's
- * length is PRESCRIBED — the plan built a 66-minute ride and the athlete rides for 66 minutes, so
- * `66:00` is a fact. A lifting session's length is a CONSEQUENCE of its sets and its rest clock, and
- * nobody knows it to the minute in advance, so it prints as `30–40 min`.
+ * The words are unchanged — `66:00` for a ride or run, `30–40 min` for a lift, nothing on the plyo
+ * day — but none of them is decided here any more. The lift's range was estimated on the phone from
+ * its rows at two to four seconds a rep plus the rest clock (`strength-session-minutes.ts`, deleted),
+ * and the plyo day's blank was a tag check here; both are the server's now.
  *
- * ⚠️ THE FALLBACK IS THE STORED TOTAL, NOT A BLANK. A strength row whose exercises did not travel —
- * a legacy row, a session the athlete typed — still shows the length the plan stored. Losing a
- * number that was on screen is worse than showing a rougher one.
+ * ⚠️ A ROW WITHOUT THE LABEL (read straight from the table) prints the stored total in the same
+ * `mm:00` shape — the stored column is the server's too — or nothing.
  */
 export function formatSessionDuration(workout: unknown): string | null {
   const w = (workout ?? {}) as Record<string, unknown>;
-  /**
-   * ⛔⛔ THE PLYO DAY SHOWS NO TIME AT ALL (Michael, 2026-09-09). Its rows carry no effort count to
-   * price — `compose.ts` puts the band's top in `reps` as *"the row's recorded-efforts capacity; the
-   * logger records, never targets"* — and the source gives the drill day no length either. With
-   * nothing on the row and nothing on the page, any figure here would be invented, so there is none.
-   *
-   * ⚠️ BY THE TAG, NEVER THE NAME. `isPlyoSession` is the shared reader; the session is
-   * `type: 'strength'` on the wire and its name is a display string.
-   */
-  if (isPlyoSession(w)) return null;
-
-  const type = String(w.type ?? (w as { workout_type?: unknown }).workout_type ?? '');
-  if (normalizeSessionType(type) === 'strength') {
-    const estimated = formatStrengthSessionMinutes(w.strength_exercises);
-    if (estimated) return estimated;
+  if ('planned_duration_label' in w) {
+    const label = w.planned_duration_label;
+    return typeof label === 'string' && label.trim() ? label : null;
   }
   return formatPlannedDuration(w);
 }
@@ -139,8 +142,8 @@ const PlannedSessionHeader: React.FC<PlannedSessionHeaderProps> = ({
    * up" and hid it, which was the right reading of a wrong number.
    *
    * ⛔⛔ AND §3c THEN REPLACED THE NUMBER RATHER THAN THE SUPPRESSION. The three constants are gone
-   * from the screen: a lifting session is now priced off its own rows and shown as a range — see
-   * `formatSessionDuration` and `@/lib/strength-session-minutes`.
+   * from the screen: a lifting session is priced off its own rows and shown as a range — by the
+   * server since 2026-09-10 (`planned_duration_label`, see `formatSessionDuration`).
    *
    * ⛔ IT CHANGES ALL THREE SURFACES, WHICH IS THE POINT OF THIS COMPONENT. Today's card, the drawer
    * and the full planned screen render the same header; showing the minutes on one and not the

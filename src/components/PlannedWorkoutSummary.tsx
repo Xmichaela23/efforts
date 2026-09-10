@@ -1,8 +1,14 @@
 import React from 'react';
 import { normalizePlannedSession, Baselines as NormalizerBaselines, ExportHints } from '@/services/plans/normalizer';
 import { normalizeStructuredSession } from '@/services/plans/normalizer';
-// ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
-import { plannedDurationMinutes } from '@/lib/planned-session/duration';
+// ⛔ THE SERVER'S PLANNED LENGTH, READ (2026-09-10, audit H-T01). See `plannedDurationSecondsOf`.
+import { plannedDurationSecondsOf } from './PlannedSessionHeader';
+
+/** Minutes for a subtitle, off the server's planned length. Null when the server sent none. */
+const plannedMinutesOf = (workout: unknown): number | null => {
+  const secs = plannedDurationSecondsOf(workout);
+  return secs == null ? null : Math.max(1, Math.round(secs / 60));
+};
 import { formatStrengthExercise, plainLiftList, formatStrengthExerciseLines } from '@/utils/strengthFormatter';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getDisciplinePhosphorCore } from '@/lib/context-utils';
@@ -153,27 +159,21 @@ function buildWeeklySubtitle(workout: any, baselines?: Baselines, skipDescriptio
         }
         
         /**
-         * ⛔ ONE DURATION READER (stage 4). Two IDENTICAL copies of this ladder survived stage 2 —
-         * it deleted `computeMinutes` and missed these, because they sit in the subtitle builders
-         * rather than the badge path. The enforcement scan found them.
-         *
-         * ⚠️ `?? duration` IS KEPT: the accessor answers in seconds and knows nothing about the
-         * `duration` MINUTES column, which is the only time some library-plan rows carry.
+         * ⛔ THE SERVER'S PLANNED LENGTH (2026-09-10, audit H-T01). This was the phone ladder plus a
+         * `duration`-column fallback; the plan screen's rows now carry `planned_duration_seconds` and
+         * a get-week row always did, so there is one field and no fallback.
          */
-        let durationMins: number | null = plannedDurationMinutes(workout);
-        if (durationMins == null && typeof (workout as any)?.duration === 'number' && (workout as any).duration > 0) {
-          durationMins = Math.round((workout as any).duration);
-        }
+        const durationMins = plannedMinutesOf(workout);
         if (durationMins && durationMins > 0) {
           parts.push(`${durationMins}min`);
         }
-        
+
         // Add RPE if available
         const rpe = metadata.session_rpe;
         if (typeof rpe === 'number' && rpe > 0) {
           parts.push(`RPE ${rpe}/10`);
         }
-        
+
         // Add focus areas if available
         const focusAreas = metadata.focus_area;
         if (Array.isArray(focusAreas) && focusAreas.length > 0) {
@@ -188,9 +188,9 @@ function buildWeeklySubtitle(workout: any, baselines?: Baselines, skipDescriptio
           const focusList = focusAreas.map((f: string) => focusLabels[f] || f).join(', ');
           if (focusList) parts.push(focusList);
         }
-        
+
         if (parts.length > 0) return parts.join(' • ');
-        
+
         // Fallback to description if no structured data
         if (skipDescriptionFallback) return undefined;
         const desc = String((workout as any)?.rendered_description || (workout as any)?.description || '').trim();
@@ -254,18 +254,8 @@ function buildStructuredSubtitleOnly(workout: any, baselines?: Baselines): strin
         else if (/yoga.*restorative|yin.*yoga|restorative.*yoga/i.test(combined)) parts.push('Restorative');
       }
       
-      /**
-       * ⛔ ONE DURATION READER (stage 4). Two IDENTICAL copies of this ladder survived stage 2 —
-       * it deleted `computeMinutes` and missed these, because they sit in the subtitle builders
-       * rather than the badge path. The enforcement scan found them.
-       *
-       * ⚠️ `?? duration` IS KEPT: the accessor answers in seconds and knows nothing about the
-       * `duration` MINUTES column, which is the only time some library-plan rows carry.
-       */
-      let durationMins: number | null = plannedDurationMinutes(workout);
-      if (durationMins == null && typeof (workout as any)?.duration === 'number' && (workout as any).duration > 0) {
-        durationMins = Math.round((workout as any).duration);
-      }
+      // ⛔ THE SERVER'S PLANNED LENGTH (2026-09-10, audit H-T01) — same field as the builder above.
+      const durationMins = plannedMinutesOf(workout);
       if (durationMins && durationMins > 0) {
         parts.push(`${durationMins}min`);
       }
@@ -319,7 +309,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
   const minutes = (()=>{
     const t = String((workout as any)?.type||'').toLowerCase();
     if (t==='strength') return null; // avoid misleading 45min placeholders
-    return plannedDurationMinutes(workout);
+    return plannedMinutesOf(workout);
   })();
   /**
    * ⚠️ ALSO A SWAP LEAK. `computeSwimYards` falls back to `computed.steps[].distanceMeters`, so a

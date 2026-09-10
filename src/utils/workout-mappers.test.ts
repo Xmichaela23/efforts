@@ -44,6 +44,9 @@ function serverPlannedWorkout(item: Record<string, any>): Record<string, unknown
     steps_preset: p.steps_preset ?? null,
     total_duration_seconds: p.total_duration_seconds ?? null,
     duration: p.duration ?? null,
+    // ⛔ 2026-09-10 (audit H-T01 / H-T02): the length the phone PRINTS — the server's, never resolved there.
+    planned_duration_seconds: p.planned_duration_seconds ?? null,
+    planned_duration_label: p.planned_duration_label ?? null,
     tags: Array.isArray(p.tags) ? p.tags : [],
   };
 }
@@ -159,4 +162,7 @@ Deno.test('⛔ DRIFT GUARD — the mirror above matches the real `toPlannedWorko
   // And the field stage 3 added is really there, in the deployed shape.
   assert(real.has('duration'), '`duration` is missing from get-week toPlannedWorkout — stage 3 regressed');
   assert(real.has('total_duration_seconds'), '`total_duration_seconds` vanished from the contract');
+  // ⛔ And the two fields every planned-length surface now prints (2026-09-10, audit H-T01 / H-T02).
+  assert(real.has('planned_duration_seconds'), '`planned_duration_seconds` is missing from get-week toPlannedWorkout');
+  assert(real.has('planned_duration_label'), '`planned_duration_label` is missing from get-week toPlannedWorkout');
 });

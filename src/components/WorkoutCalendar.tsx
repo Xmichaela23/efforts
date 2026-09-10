@@ -13,7 +13,9 @@ import { isDisciplineSwapped } from '@/lib/session-discipline-swap';
 import { useSportSwapIds } from '@/hooks/useSwapSheet';
 // ⛔ THE SAME "did this miss a planned slot" RULE the workout view uses — never a second copy.
 import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
-import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
+// ⛔ THE SERVER'S NUMBERS, READ (2026-09-10, audit H-T01 / H-D10 / H-T04): `planned_duration_seconds`
+// ahead, `moving_seconds` and `strength_volume_lb` once done. The phone resolvers are deleted.
+import { plannedDurationSecondsOf } from './PlannedSessionHeader';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 import { GARMIN_BLUE } from '@/components/ProviderAttribution';
 import { garminDevicesForWeek } from '@/lib/provider-attribution';
@@ -166,12 +168,12 @@ function derivePlannedCellLabel(w: any): string | null {
     else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
     const isOptional = tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
     
-    // Use single source of truth for duration calculation
-    const secs = resolveMovingSeconds(w);
+    // ⛔ The server's planned length (`planned_duration_seconds`) — never resolved here.
+    const secs = plannedDurationSecondsOf(w);
     const mins = secs && secs > 0 ? Math.round(secs / 60) : 0;
     const durStr = mins > 0 ? `${mins}:00` : '';
 
-    const has = (pat: RegExp) => steps.some(s => pat.test(s)) || pat.test(txt);
+    const has =(pat: RegExp) => steps.some(s => pat.test(s)) || pat.test(txt);
 
     // RUN
     if (type === 'run') {
@@ -866,8 +868,8 @@ export default function WorkoutCalendar({
           const isPlanned = String(w?.workout_status||'').toLowerCase() === 'planned';
           const type = String(w?.type || '').toLowerCase();
           if (isPlanned && (type === 'run' || type === 'ride' || type === 'bike' || type === 'swim')) {
-            // Use single source of truth for duration calculation
-            const secs = resolveMovingSeconds(w);
+            // ⛔ The server's planned length — never resolved here.
+            const secs = plannedDurationSecondsOf(w);
             const mins = secs && secs > 0 ? Math.round(secs / 60) : 0;
             const durStr = mins > 0 ? `${mins}:00` : '';
             labelBase = durStr ? `${t} ${durStr}`.trim() : t;
@@ -886,8 +888,8 @@ export default function WorkoutCalendar({
               /\d+m\b|\d+\s*min\b/i.test(labelBase) ||
               /\b\d{1,4}:\d{2}\b/.test(labelBase);
             if (!hasDuration) {
-              // Use single source of truth for duration calculation
-              const secs = resolveMovingSeconds(w);
+              // ⛔ The server's planned length — never resolved here.
+              const secs = plannedDurationSecondsOf(w);
               const mins = secs && secs > 0 ? Math.round(secs / 60) : 0;
               const durStr = mins > 0 ? `${mins}:00` : '';
               if (durStr) {
@@ -1080,7 +1082,8 @@ export default function WorkoutCalendar({
           if (done) liftsDone += 1;
           continue;
         }
-        const secs = resolveMovingSeconds(row);
+        // ⛔ THE SERVER'S TIME: moving time for a done session, the planned length for one ahead.
+        const secs = done ? Number(row.moving_seconds) : plannedDurationSecondsOf(row);
         const mins = secs && secs > 0 ? Math.round(secs / 60) : 0;
         const km = normalizeDistanceKm(row as never);
         const meters = km != null && Number.isFinite(km) && km > 0 ? km * 1000 : 0;
@@ -1134,22 +1137,17 @@ export default function WorkoutCalendar({
   const sessionLineMeta = (row: any, imperial: boolean): string => {
     const done = String(row?.workout_status ?? '').toLowerCase() === 'completed';
     const isLift = String(row?.type ?? row?.workout_type ?? '').toLowerCase() === 'strength';
-    const secs = resolveMovingSeconds(row);
+    // ⛔ THE SERVER'S TIME (2026-09-10, audit H-D10): `moving_seconds` once done, the planned length ahead.
+    const secs = done ? Number(row?.moving_seconds) : plannedDurationSecondsOf(row);
     const mins = secs && secs > 0 ? Math.round(secs / 60) : 0;
 
     if (isLift && done) {
-      const exercises = Array.isArray(row?.executed?.strength_exercises)
-        ? row.executed.strength_exercises
-        : Array.isArray(row?.strength_exercises) ? row.strength_exercises : [];
-      let volume = 0;
-      for (const ex of exercises) {
-        for (const set of ex?.sets ?? []) {
-          if (set?.completed === false) continue;
-          const reps = Number(set?.reps) || 0;
-          const weight = Number(set?.weight) || 0;
-          if (reps > 0 && weight > 0) volume += reps * weight;
-        }
-      }
+      /**
+       * ⛔ THE WEIGHT MOVED IS `strength_volume_lb`, PRICED BY THE SERVER (2026-09-10, audit H-T04). This
+       * summed reps × weight here and skipped every 0 lb set, so a chin-up, a band or an empty bar
+       * counted nothing on the Week row and something on the Performance tab.
+       */
+      const volume = Number(row?.strength_volume_lb) || 0;
       if (volume > 0) {
         const shown = imperial ? volume : volume * 0.453592;
         return `${Math.round(shown).toLocaleString()} ${imperial ? 'lb' : 'kg'}`;

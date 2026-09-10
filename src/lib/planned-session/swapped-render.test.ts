@@ -12,7 +12,7 @@
  *
  * ⚠️ THE FIX IS AT RENDER, AND DELIBERATELY SO. Blanking those columns in the patch would fix rows
  * swapped from now on and leave every ALREADY-swapped row broken — and `computed.steps` is the
- * THIRD RUNG of `plannedDurationSeconds`, so a session whose total was never materialised keeps its
+ * THIRD RUNG of the server's planned-length reader, so a session whose total was never materialised keeps its
  * only copy of the duration there. Deleting it would destroy the one thing a swap preserves.
  * The data stays readable; the renderers stop displaying it.
  *
@@ -28,7 +28,12 @@ import {
   getDisciplineSwaps,
 } from '../../../supabase/functions/_shared/session-swap/swap.ts';
 import { deriveWorkoutTitle } from '../derive-workout-title.ts';
-import { plannedDurationSeconds } from './duration.ts';
+/**
+ * ⛔ THE SERVER'S PLANNED-LENGTH READER (2026-09-10, audit H-T01). These fixtures used the phone ladder
+ * (`./duration.ts`, deleted). The server settles the same order — the stored total first — so the
+ * lengths below are unchanged; what they prove is that a swap preserves the data that length is read from.
+ */
+import { resolvePlannedDurationSeconds as plannedDurationSeconds } from '../../../supabase/functions/_shared/planned-duration.ts';
 
 /**
  * ⛔ THE REAL SHAPE. An easy run materialised to distance steps with a pace target, then swapped to

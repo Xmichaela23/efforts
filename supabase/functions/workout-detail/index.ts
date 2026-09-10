@@ -30,6 +30,8 @@ import { normalizeCompletedStrengthExercise } from '../../../src/lib/normalize-s
 // D-349: unit-aware, human-bounded body-weight resolver — the same one the load score and the
 // backfill use, so a session's lb column and its load score are priced off an identical number.
 import { resolveBodyweightLb } from '../_shared/workload.ts';
+// ⛔ ONE MOVING TIME PER FINISHED SESSION (2026-09-10, audit H-D10) — the rule get-week stamps too.
+import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
 // The all-out set: the rep record, the standard 1RM formula (D-339) and the rep ceiling above which
 // it stops holding. Shared with `coach` (Q-254 slice 1) so State and Performance read one function.
 import {
@@ -159,6 +161,10 @@ function isSessionDetailStale(workoutRow: { updated_at?: string | null; planned_
     if (!Number.isFinite(svv) || svv < STRENGTH_VOLUME_VERSION) return true;
   }
 
+  // 2026-09-10 — the totals' one planned length and one moving time; see SESSION_TOTALS_VERSION.
+  const tv = Number((sessionDetail as any)?.totals_v);
+  if (!Number.isFinite(tv) || tv < SESSION_TOTALS_VERSION) return true;
+
   const writtenMs =
     msFromTimestampField(analysis.session_detail_updated_at) ??
     msFromTimestampField(analysis.updated_at);
@@ -218,8 +224,20 @@ const BLOCK_CARD_VERSION = 3;
  * "refresh until the field appears" would make every non-strength session refresh forever.
  *
  *   1 — per-exercise volume load priced by `strengthSetVolume`, both sides (2026-08-01)
+ *   2 — `strength_slots` / `strength_counts` / `strength_totals`: the Performance table, its count
+ *       and its totals built on the server (2026-09-10, audit H-S11–H-S15). A copy stored at v1 has
+ *       none of them, and the table would render empty until the session was recomputed.
  */
-const STRENGTH_VOLUME_VERSION = 1;
+const STRENGTH_VOLUME_VERSION = 2;
+
+/**
+ * ⛔ THE TOTALS' SCHEMA VERSION (2026-09-10, audit H-T01 / H-D10). `planned_totals.duration_s` now comes
+ * from the one planned-length ladder and `completed_totals` gained `moving_s` from the one moving-time
+ * rule. A stored copy below this version would keep serving the old numbers from the cache fast path
+ * for up to a day, so it refreshes once. ⚠️ Every session, not only planned or strength ones — both
+ * numbers exist on every sport.
+ */
+const SESSION_TOTALS_VERSION = 1;
 
 type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_missing';
 
@@ -284,7 +302,8 @@ function processingCompleteFromWorkoutRow(row: any): boolean {
  */
 function buildDetailCoreForSession(row: any): { detail: any; processingComplete: boolean } {
   const detail = normalizeBasic(row);
-  try { (detail as any).computed = (()=>{ try { return typeof row.computed === 'string' ? JSON.parse(row.computed) : (row.computed || null); } catch { return row.computed || null; } })(); } catch {}
+  (detail as any).moving_seconds = completedMovingSeconds(row);
+  try { (detail as any).computed =(()=>{ try { return typeof row.computed === 'string' ? JSON.parse(row.computed) : (row.computed || null); } catch { return row.computed || null; } })(); } catch {}
   try { (detail as any).metrics  = (()=>{ try { return typeof row.metrics  === 'string' ? JSON.parse(row.metrics)  : (row.metrics  || null); } catch { return row.metrics  || null; } })(); } catch {}
   try { (detail as any).workout_analysis = (()=>{ try { return typeof row.workout_analysis === 'string' ? JSON.parse(row.workout_analysis) : (row.workout_analysis || null); } catch { return row.workout_analysis || null; } })(); } catch {}
   try {
@@ -913,6 +932,8 @@ async function runSessionDetailPipelineAndPersist(
         start_position_lat: (row as any)?.start_position_lat,
       } : null,
       completedStrengthExercises: Array.isArray(compStrengthArr) ? compStrengthArr : null,
+      // ⛔ The moving seconds get-week stamps for this session (audit H-D10) — this function reads the row.
+      completedMovingS: completedMovingSeconds(row),
       bodyweightLb, // D-349 — the builder prices; this function is the DB reader (Law 4).
       observations,
       workoutAnalysis: wa,
@@ -1120,6 +1141,8 @@ async function runSessionDetailPipelineAndPersist(
       // indistinguishable from a pre-D-349 one, so a session that legitimately has no volume would
       // refresh on every open forever.
       (sessionDetailV1 as Record<string, unknown>).strength_volume_v = STRENGTH_VOLUME_VERSION;
+      // Stamped on every session, for the same reason — see SESSION_TOTALS_VERSION.
+      (sessionDetailV1 as Record<string, unknown>).totals_v = SESSION_TOTALS_VERSION;
     }
     if (sessionDetailV1 && blockForSession) {
       (sessionDetailV1 as Record<string, unknown>).block = {
@@ -1564,6 +1587,9 @@ Deno.serve(async (req) => {
 
     // Normalize light fields only (Phase 1: no heavy processing/downsampling)
     const detail = normalizeBasic(row);
+    // ⛔ THE SESSION'S MOVING SECONDS (2026-09-10, audit H-D10) — the same figure get-week's item carries
+    // and `session_detail_v1.completed_totals.moving_s` reports. The phone prints this; it derives none.
+    (detail as any).moving_seconds = completedMovingSeconds(row);
 
     // No derived fallbacks here; detail is a thin wrapper around stored data.
 
@@ -1729,13 +1755,10 @@ Deno.serve(async (req) => {
     const getDistM = () => { const distKm = Number.isFinite(d?.distance) ? Number(d.distance) * 1000 : null; const distM = d?.computed?.overall?.distance_m ?? null; return Number.isFinite(distM) && distM > 0 ? Number(distM) : (Number.isFinite(distKm) ? Number(distKm) : null); };
     const distM = (_isSwim && _swimSc?.distanceMeters != null) ? _swimSc.distanceMeters : getDistM();
     const distKm = Number.isFinite(distM) && distM > 0 ? distM / 1000 : null;
-    // 2026-09-03: moving time in SECONDS when the import kept them (metrics.moving_time_seconds — Garmin,
-    // and now Strava); the minute column rounded every Details moving time to :00.
-    const _mvSecs = Number(d?.metrics?.moving_time_seconds);
-    const durS = (_isSwim && _swimSc?.movingSeconds != null)
-      ? _swimSc.movingSeconds
-      : (!_isSwim && Number.isFinite(_mvSecs) && _mvSecs > 0) ? _mvSecs
-      : (Number.isFinite(d?.computed?.overall?.duration_s_moving) ? Number(d.computed.overall.duration_s_moving) : (Number.isFinite(d?.moving_time ?? d?.metrics?.moving_time) ? Number(d.moving_time ?? d.metrics.moving_time) * 60 : null));
+    // ⛔ THE DETAILS TAB'S MOVING TIME IS THE SESSION'S ONE MOVING TIME (2026-09-10, audit H-D10). This
+    // ran its own ladder (true seconds, then computed, then minutes; the 2026-09-03 "45:00" fix lives
+    // on as rung 2 of `completedMovingSeconds`), so Details and the calendar could differ by seconds.
+    const durS = (detail as any).moving_seconds ?? null;
     const elapsedS = (_isSwim && _swimSc?.elapsedSeconds != null)
       ? _swimSc.elapsedSeconds
       : (Number.isFinite(d?.computed?.overall?.duration_s_elapsed) ? Number(d.computed.overall.duration_s_elapsed) : (Number.isFinite(d?.elapsed_time ?? d?.metrics?.elapsed_time) ? Number(d.elapsed_time ?? d.metrics.elapsed_time) * 60 : null) ?? durS);

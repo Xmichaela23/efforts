@@ -244,6 +244,12 @@ export type SessionDetailV1 = {
   // ── Completed & planned totals (AdherenceChips) ───────────────────────────
   completed_totals: {
     duration_s: number | null;
+    /**
+     * ⛔ MOVING SECONDS, EVERY SPORT (2026-09-10, audit H-D10) — equal to `moving_seconds` on
+     * workout-detail's workout and on get-week's item for the same session. `duration_s` stays elapsed
+     * on a swim (D-163); compare moving times on this field.
+     */
+    moving_s?: number | null;
     distance_m: number | null;
     avg_pace_s_per_mi: number | null;
     avg_gap_s_per_mi: number | null;
@@ -520,6 +526,67 @@ export type SessionDetailV1 = {
     avg_rir: number | null;
     rir_verdict: 'too_easy' | 'on_target' | 'too_hard' | null;
   }> | null;
+
+  /**
+   * ⛔ THE STRENGTH PERFORMANCE TABLE, ONE ROW PER SLOT (2026-09-10, audit H-S11 / H-S12 / H-S13).
+   * Built by `strength-slots.ts` from `matchExercises`; the phone renders it and pairs nothing.
+   * `completed_sets` holds performed sets only (ticked, or legacy with no flag), each carrying
+   * `set_index` — its place in the saved row, for the edit.
+   */
+  strength_slots?: Array<{
+    /** The row's title: the planned name, else what was logged. */
+    name: string;
+    planned_name: string | null;
+    executed_name: string | null;
+    status: 'done' | 'swapped' | 'not_logged' | 'unplanned';
+    /** 'not logged' / 'not in the plan' (only when a plan is attached), else null. */
+    status_label: string | null;
+    /** heavy / speed / skill / hypertrophy, from the slot's intent. */
+    intent_word: string | null;
+    /** Printed after "Planned": "25 total · by feel" or "3×6-12 · by feel". */
+    target_label: string | null;
+    planned_sets: Array<{
+      weight: number;
+      weight_display?: string;
+      reps?: number;
+      /** The plan's own words for a range ("6-12"), never a midpoint. */
+      reps_text?: string;
+      duration_seconds?: number;
+      rir?: number;
+      amrap?: boolean;
+    }>;
+    completed_sets: Array<Record<string, unknown>>;
+    sets_done: number;
+    reps_done: number;
+    /** A rep total the plan asked for (assistance), else null. */
+    reps_target: number | null;
+    /** "18 of 25 reps" when `reps_target` is set. */
+    reps_line: string | null;
+    volume_lb: number;
+    planned_volume_lb: number;
+    /** Null when the plan priced no load for this row. */
+    volume_delta_lb: number | null;
+    volume_direction: 'up' | 'down' | 'even' | null;
+    avg_rir: number | null;
+    target_rir: number | null;
+    rir_verdict: 'too_easy' | 'on_target' | 'too_hard' | null;
+    rir_concern: boolean;
+    /** The advice line for the verdict, else null. */
+    rir_line: string | null;
+    /** Moved well / Worked for it / Grind — the word on the top set. */
+    difficulty_word: string | null;
+    /** No weight column on this row. */
+    bodyweight: boolean;
+    band_assisted: boolean;
+    /** Key into `previous_strength_by_exercise` (`canonicalize` of `name`). */
+    previous_key: string;
+  }> | null;
+
+  /** "Completed X of Y exercises" — null when no plan is attached (audit H-S12). */
+  strength_counts?: { exercises_completed: number; exercises_planned: number } | null;
+
+  /** Performed sets with reps, their reps, and `strength_volume.completed_total_lb` (audit H-S14 / H-S15). */
+  strength_totals?: { sets_completed: number; reps_completed: number; volume_lb: number } | null;
 
   /** Strength only: server-computed deviations. */
   strength_weight_deviation?: {

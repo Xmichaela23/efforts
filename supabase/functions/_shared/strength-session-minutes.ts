@@ -3,6 +3,11 @@
  *
  * docs/WORKORDER-today-screen-2026-09-09.md §3c.
  *
+ * ⛔ MOVED TO THE SERVER UNCHANGED (2026-09-10, audit H-T02, Stage 2 item 10) — was
+ * `src/lib/strength-session-minutes.ts`. `get-week` prints a lifting session's header length from it
+ * (`planned_duration_label`), so the phone no longer prices a session off its rows.
+ * ⛔ SHARED = DEPLOY TRAP: grep -rln "strength-session-minutes" supabase/functions
+ *
  * ⛔ WHAT THIS REPLACES, AND WHY. The composer stamps a FIXED figure on every strength session —
  * 55 on a lifting day, 45 on a test day, 20 on the plyo day (`standing-plan/compose.ts`). Those are
  * three constants with no page behind them and no relationship to what the day actually prescribes:
@@ -23,7 +28,7 @@
  * athlete to wait through — but time still passes there. Those are display rules, not a claim that
  * the rest is free, and the work order asks for `sets × (work + rest)`.
  */
-import { calculateRestTime, WARMUP_REST_SEC } from './strength-rest-timer';
+import { calculateRestTime, WARMUP_REST_SEC } from '../../../src/lib/strength-rest-timer.ts';
 
 /**
  * ⛔⛔ OURS, AND THE ONE ESTIMATE IN THIS FILE THAT IS NOT READ OFF A ROW. The source gives no tempo

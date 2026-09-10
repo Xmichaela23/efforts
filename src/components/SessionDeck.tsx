@@ -5,7 +5,6 @@ import { useSessionBoom } from '@/hooks/useSessionBoom';
 import { getExerciseConfig } from '@/lib/exercise-config';
 import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
 import { displayDisciplineOf, normalizeDistanceKm } from '@/lib/utils';
-import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
 import { extractSessionDetailV1FromWorkout } from '@/hooks/useWorkoutDetail';
 import AdherenceChips from './AdherenceChips';
 import { ProviderAttributionLine } from './ProviderAttribution';
@@ -439,29 +438,22 @@ const doneGlass = (rgb: string, emphasis: CardEmphasis = 'lead'): React.CSSPrope
 /** `5.0 mi · 48:00` for a run or ride; `3,725 lb · 3 lifts` for a lift session. */
 export function doneHeadline(workout: Record<string, unknown>, useImperial: boolean): string | null {
   /**
-   * ⚠️ THE DURATION FALLS BACK TO THE PERFORMANCE PAYLOAD'S OWN `completed_totals.duration_s`.
-   * `get-week`'s `completed_workout` block does not always carry a moving time, and the number the
-   * tiles below already print is the same session's — reading it is not a second opinion.
+   * ⛔ BOTH NUMBERS ARE THE SERVER'S (2026-09-10, audit H-D10 / H-T04).
+   *   · The weight moved is `strength_volume_lb`. This summed reps × weight here and skipped every 0 lb
+   *     set, so a chin-up, a band or an empty bar counted nothing on the card and something on the
+   *     Performance tab for the same session.
+   *   · The time is `moving_seconds`. It was the phone's moving-time resolver with the Performance
+   *     payload's `completed_totals.duration_s` behind it — two readers, one number. A row the server
+   *     sent no time for prints none.
    */
-  const sdTotals = (extractSessionDetailV1FromWorkout(workout) as { completed_totals?: { duration_s?: unknown } } | null)?.completed_totals;
   const parts: string[] = [];
   if (String(workout?.type ?? '').toLowerCase() === 'strength') {
-    // ⛔ THE SAME `reps × weight` SUM the load card and `StrengthCompletedView` print, gated the same
-    // way: a 0 lb set contributes nothing.
     const exercises = Array.isArray((workout as { executed?: { strength_exercises?: unknown } })?.executed?.strength_exercises)
-      ? ((workout as { executed: { strength_exercises: Array<{ sets?: Array<{ reps?: unknown; weight?: unknown; completed?: unknown }> }> } }).executed.strength_exercises)
+      ? ((workout as { executed: { strength_exercises: Array<{ sets?: unknown[] }> } }).executed.strength_exercises)
       : Array.isArray(workout?.strength_exercises)
-        ? (workout.strength_exercises as Array<{ sets?: Array<{ reps?: unknown; weight?: unknown; completed?: unknown }> }>)
+        ? (workout.strength_exercises as Array<{ sets?: unknown[] }>)
         : [];
-    let volume = 0;
-    for (const ex of exercises) {
-      for (const s of ex?.sets ?? []) {
-        if (s?.completed === false) continue;
-        const reps = Number(s?.reps) || 0;
-        const weight = Number(s?.weight) || 0;
-        if (reps > 0 && weight > 0) volume += reps * weight;
-      }
-    }
+    const volume = Number(workout?.strength_volume_lb) || 0;
     const lifts = exercises.filter((ex) => Array.isArray(ex?.sets) && ex.sets.length > 0).length;
     if (volume > 0) parts.push(`${Math.round(useImperial ? volume : volume * 0.453592).toLocaleString()} ${useImperial ? 'lb' : 'kg'}`);
     if (lifts > 0) parts.push(`${lifts} ${lifts === 1 ? 'lift' : 'lifts'}`);
@@ -472,9 +464,8 @@ export function doneHeadline(workout: Record<string, unknown>, useImperial: bool
   if (km != null && Number.isFinite(km) && km > 0) {
     parts.push(useImperial ? `${(km * 0.621371).toFixed(1)} mi` : `${km.toFixed(1)} km`);
   }
-  const moving = resolveMovingSeconds(workout as never);
-  const secs = moving != null && Number.isFinite(moving) && moving > 0 ? moving : Number(sdTotals?.duration_s);
-  if (secs != null && Number.isFinite(secs) && secs > 0) {
+  const secs = Number(workout?.moving_seconds);
+  if (Number.isFinite(secs) && secs > 0) {
     const s = Math.round(secs);
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);

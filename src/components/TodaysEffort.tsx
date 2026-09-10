@@ -21,13 +21,12 @@ import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkCol
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore, formZoneColor } from '@/lib/context-utils';
 import { formZone } from '@shared/fitness-fatigue';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
-import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 // ⛔ ONE SWAP PREDICATE, shared by all three surfaces.
 import { swappedStructureIsStale } from '@/lib/session-discipline-swap';
 // ⛔ ONE PLANNED-SESSION HEADER, shared by all three surfaces. See the component.
-import PlannedSessionHeader from './PlannedSessionHeader';
+import PlannedSessionHeader, { plannedDurationSecondsOf } from './PlannedSessionHeader';
 // ⛔ TODAY'S LINES (work order 2026-09-09 §2) — what each set is FOR, under the row that says what
 // it is. Every athlete-facing word lives in `@/lib/today-lines`; nothing new is spelled out here.
 // ⛔ §3d — a lift and the plyo day swipe as a deck, a ride or run is one glass card.
@@ -514,7 +513,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       const type = String(w?.type || '').toLowerCase();
       const overall = (w as any)?.computed?.overall || (w as any)?.overall || {};
       const distM = Number(overall?.distance_m ?? overall?.distanceMeters ?? overall?.distance_meters);
-      const durS = Number(overall?.duration_s_moving ?? overall?.moving_seconds ?? overall?.duration_s) || Number(resolveMovingSeconds(w));
+      // ⛔ THE SERVER'S MOVING TIME (2026-09-10, audit H-D10) — `moving_seconds`, not a ladder over `overall`.
+      const durS = Number(w?.moving_seconds);
       const avgHr = Number(overall?.avg_hr ?? w?.avg_heart_rate ?? w?.metrics?.avg_heart_rate);
       const elevM = Number(overall?.elevation_gain_m ?? w?.elevation_gain ?? w?.metrics?.elevation_gain);
 
@@ -912,7 +912,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     // Display Moving Time (mm:ss) for non-strength; blank for strength
     const duration = (() => {
       if (workout.type === 'strength') return '';
-      const sec = resolveMovingSeconds(workout);
+      // ⛔ THE SERVER'S NUMBERS (2026-09-10, audit H-T01 / H-D10): moving time done, planned length ahead.
+      const sec = workout.workout_status === 'completed' ? Number(workout.moving_seconds) : plannedDurationSecondsOf(workout);
       if (Number.isFinite(sec as any) && (sec as number) > 0) {
         const s = Math.round(sec as number);
         const m = Math.floor(s/60);
@@ -1007,21 +1008,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         })();
         
         if (exercises.length > 0) {
-          // Calculate total volume (sets × reps × weight)
-          let totalVolume = 0;
-          let totalSets = 0;
-          exercises.forEach(ex => {
-            const sets = ex.sets || [];
-            totalSets += sets.length;
-            sets.forEach((s: any) => {
-              const reps = Number(s?.reps) || 0;
-              const weight = Number(s?.weight) || 0;
-              if (reps > 0 && weight > 0) {
-                totalVolume += reps * weight;
-              }
-            });
-          });
-          
+          /**
+           * ⛔ THE WEIGHT MOVED IS THE SERVER'S `strength_volume_lb` (2026-09-10, audit H-T04). This
+           * summed reps × weight here and skipped every 0 lb set, so a chin-up or a banded set counted
+           * nothing on this line while the Performance tab counted it. The set count is the server's too
+           * (`strength_sets_completed`, performed sets only); the phone counted every set on the row.
+           */
+          const totalVolume = Number((workout as any)?.strength_volume_lb) || 0;
+          const totalSets = Number((workout as any)?.strength_sets_completed) || 0;
+
           const metrics: any[] = [];
           metrics.push({ icon: Dumbbell, value: `${exercises.length} exercises` });
           if (totalSets > 0) {
@@ -1103,7 +1098,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         const isRide = workout.type === 'ride' || workout.type === 'bike';
         const overall = (workout as any)?.computed?.overall || {};
         const distM = Number(overall?.distance_m ?? overall?.distanceMeters);
-        const durS = Number(overall?.duration_s_moving ?? overall?.moving_seconds ?? overall?.duration_s);
+        // ⛔ THE SERVER'S MOVING TIME (2026-09-10, audit H-D10).
+        const durS = Number((workout as any)?.moving_seconds);
         // Prefer canonical m/s; if missing, derive from distance_m / duration_s_moving
         let avgSpeedMpsOverall = Number(overall?.avg_speed_mps);
         if (!(Number.isFinite(avgSpeedMpsOverall) && avgSpeedMpsOverall > 0) && Number.isFinite(distM) && distM > 0 && Number.isFinite(durS) && durS > 0) {
@@ -1151,7 +1147,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           const preferYards = !!useImperial; // user preference from baselines
           const comp = (workout as any)?.computed?.overall;
           let distM: number | null = Number(comp?.distance_m);
-          let durS: number | null = Number(comp?.duration_s_moving ?? comp?.duration_s);
+          // ⛔ THE SERVER'S MOVING TIME (2026-09-10, audit H-D10) — no second reader below it.
+          const durS: number | null = Number((workout as any)?.moving_seconds);
           if (!(Number.isFinite(distM) && (distM as number) > 0)) {
             // Try pool metadata
             const poolLenM = Number((workout as any)?.pool_length_m ?? (workout as any)?.pool_length);
@@ -1167,8 +1164,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               } catch {}
             }
           }
-          // Exact moving seconds via shared resolver (parses metrics JSON if needed)
-          durS = Number(resolveMovingSeconds(workout));
           // As a last resort, distance from km field
           if (!(Number.isFinite(distM) && (distM as number) > 0)) {
             const km = computeDistanceKm(workout);
@@ -1442,8 +1437,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   /**
    * The week's own totals, off the rows already loaded. ⚠️ THE SAME SOURCE THE WEEK TAB'S BAR IS
-   * COUNTED FROM — `weeklyStats.distances` for the endurance mileage (what `get-week` returned) and
-   * the week's logged sets for the weight moved. Nothing is fetched and nothing is derived twice.
+   * COUNTED FROM — `weeklyStats.distances` for the endurance mileage and `weeklyStats.strength_volume_lb`
+   * for the weight moved, both what `get-week` returned. Nothing is fetched and nothing is derived here.
    *
    * ⚠️ POUNDS, NOT SESSIONS. The Week bar counts lifts as sessions because a bar's job is
    * planned-versus-done; this line is "what did the week come to", and for lifting that is the
@@ -1459,19 +1454,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     if ((d?.run_meters ?? 0) > 0) parts.push(`run ${toDist(d!.run_meters!).toFixed(1)} ${unit}`);
     if ((d?.cycling_meters ?? 0) > 0) parts.push(`ride ${toDist(d!.cycling_meters!).toFixed(1)} ${unit}`);
 
-    let volume = 0;
-    for (const item of (Array.isArray(allUnifiedItems) ? allUnifiedItems : []) as Array<Record<string, unknown>>) {
-      if (String(item?.type ?? '').toLowerCase() !== 'strength') continue;
-      const exercises = (item?.executed as { strength_exercises?: Array<{ sets?: Array<Record<string, unknown>> }> } | null)?.strength_exercises;
-      for (const ex of exercises ?? []) {
-        for (const set of ex?.sets ?? []) {
-          if (set?.completed === false) continue;
-          const reps = Number(set?.reps) || 0;
-          const weight = Number(set?.weight) || 0;
-          if (reps > 0 && weight > 0) volume += reps * weight;
-        }
-      }
-    }
+    /**
+     * ⛔ THE WEEK'S WEIGHT MOVED IS `weekly_stats.strength_volume_lb` (2026-09-10, audit H-T05). The
+     * server prices every set the way the Performance tab does; this used to sum reps × weight over the
+     * week's items here and skip every 0 lb set.
+     */
+    const volume = Number((weeklyStats as { strength_volume_lb?: unknown } | null)?.strength_volume_lb) || 0;
     if (volume > 0) {
       const shown = useImperial ? volume : volume * 0.453592;
       parts.push(`${Math.round(shown).toLocaleString()} ${useImperial ? 'lb' : 'kg'}`);

@@ -63,23 +63,23 @@ const show = (v: Violation[]) => v.map((x) => `\n  ${x.file}:${x.line}  ${x.text
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-Deno.test('⛔ ENFORCEMENT · no new duration ladders — read `plannedDurationSeconds`', async () => {
+Deno.test('⛔ ENFORCEMENT · no phone duration ladders — print the server\'s planned length', async () => {
   /**
-   * The four readers this replaced: `resolveMovingSeconds`, `resolvePlannedDuration`,
-   * `PlannedWorkoutSummary.computeMinutes`, and inline reads in `AllPlansInterface` (×3) and
-   * `TodaysEffort`. All gone or delegating.
+   * ⛔ REWRITTEN 2026-09-10 (audit H-T01). This test defended ONE PHONE LADDER
+   * (`src/lib/planned-session/duration.ts`) against a fifth; the ladder itself is now deleted, because
+   * the server answered the same question in a different order. The phone prints get-week's
+   * `planned_duration_seconds` / `planned_duration_label`, or a table row's stored
+   * `total_duration_seconds`, through ONE shape reader: `plannedDurationSecondsOf` in
+   * `PlannedSessionHeader.tsx`. Reading the column anywhere else is a new ladder.
    */
   const ALLOWED = new Set([
-    // THE ACCESSOR ITSELF, and the two readers that now delegate to it.
-    'src/lib/planned-session/duration.ts',
-    'src/utils/resolveMovingSeconds.ts',
-    'src/utils/resolvePlannedDuration.ts',
+    // THE ONE SHAPE READER — picks the server field by row shape and computes nothing.
+    'src/components/PlannedSessionHeader.tsx',
     // SHAPE DEFINITIONS — these declare the field, they do not resolve a duration from it.
     'src/types/planned-workout.ts',
     'src/types/workoutExecution.ts',
-    'src/lib/session-discipline-swap.ts',
     // STRUCTURE CONSUMERS — handed an already-resolved `computed`/structure blob, never a planned
-    // row, so the row accessor does not apply. See the scope note in `duration.ts`.
+    // row, so the row reader does not apply.
     'src/components/workout-execution/PreRunScreen.tsx',
     'src/services/plans/templates/workoutDisplayTemplates.ts',
     'src/services/watchConnectivity.ts',
@@ -100,8 +100,48 @@ Deno.test('⛔ ENFORCEMENT · no new duration ladders — read `plannedDurationS
   const v = await scan(/\.total_duration_seconds\b/, (f) => ALLOWED.has(f) || f.endsWith('.test.ts'));
   assertEquals(
     v, [],
-    `New duration reader(s). Call plannedDurationSeconds(row) from ` +
-    `'@/lib/planned-session/duration' instead of reading the column:${show(v)}\n`,
+    `New duration reader(s). Print the server's planned_duration_seconds / planned_duration_label, ` +
+    `via plannedDurationSecondsOf from 'PlannedSessionHeader', instead of reading the column:${show(v)}\n`,
+  );
+});
+
+Deno.test('⛔ ENFORCEMENT · the deleted phone resolvers stay deleted', async () => {
+  /**
+   * ⛔ 2026-09-10 (audit H-T01 / H-T02 / H-D10). Each of these computed a number the server now sends:
+   *   · `plannedDurationSeconds` / `plannedDurationMinutes` / `storedPlannedTotalSeconds` — planned length;
+   *   · `resolvePlannedDurationMinutes` — the stored-total-only badge;
+   *   · `resolveMovingSeconds` / `getDurationSeconds` — finished moving time, in two opposite orders;
+   *   · `strengthSessionMinutes` / `formatStrengthSessionMinutes` — a lift's "30–40 min", now
+   *     `planned_duration_label`.
+   * ⚠️ AND THE PROVIDER FIELD THEY LADDERED OVER: `metrics.moving_time_seconds` is the server's input
+   * to `moving_seconds`, not a thing a screen reads.
+   */
+  const RESOLVERS = /\b(plannedDurationSeconds|plannedDurationMinutes|storedPlannedTotalSeconds|resolvePlannedDurationMinutes|resolveMovingSeconds|getDurationSeconds|strengthSessionMinutes|formatStrengthSessionMinutes)\s*\(|metrics\??\.moving_time_seconds/;
+  const v = await scan(RESOLVERS, (f) => f.endsWith('.test.ts'));
+  assertEquals(
+    v, [],
+    `A deleted phone resolver is back. Print the server field (planned_duration_seconds, ` +
+    `planned_duration_label, moving_seconds) instead:${show(v)}\n`,
+  );
+});
+
+Deno.test('⛔ ENFORCEMENT · no private lifted-volume sums on the done card, the Week row or Today', async () => {
+  /**
+   * ⛔ 2026-09-10 (audit H-T04 / H-T05). Three screens summed reps × weight and skipped every 0 lb set,
+   * so a chin-up, a band or an empty bar counted nothing on the card and something on the Performance
+   * tab. They print `strength_volume_lb` (per session) and `weekly_stats.strength_volume_lb` now.
+   * ⚠️ SCOPED TO THE THREE FILES THAT PRINTED IT. The strength detail components are a separate
+   * change (audit H-S15) and are not scanned here.
+   */
+  const FILES = new Set([
+    'src/components/SessionDeck.tsx',
+    'src/components/WorkoutCalendar.tsx',
+    'src/components/TodaysEffort.tsx',
+  ]);
+  const v = await scan(/\breps\s*\*\s*weight\b/, (f) => !FILES.has(f));
+  assertEquals(
+    v, [],
+    `A private volume sum is back. Print strength_volume_lb from get-week instead:${show(v)}\n`,
   );
 });
 

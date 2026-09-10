@@ -26,8 +26,8 @@ import {
 } from '../endurance-library/index.ts';
 import { translateEnduranceSession } from '../standing-plan/session-vocabulary.ts';
 import type { Discipline, IntensityBand, SwappableSession } from './swap.ts';
-// ⛔ ONE DURATION READER FOR THE WHOLE APP — `planned-session/enforcement.test.ts` pins it by name.
-import { plannedDurationSeconds } from '../../../../src/lib/planned-session/duration.ts';
+// ⛔ ONE DURATION READER FOR THE WHOLE APP — the server's `_shared/planned-duration.ts` (2026-09-10).
+import { resolvePlannedDurationSeconds as plannedDurationSeconds } from '../planned-duration.ts';
 
 /**
  * ⛔ WHICH SESSION THE BOOK HANDS OVER, by the sport being left and its band.

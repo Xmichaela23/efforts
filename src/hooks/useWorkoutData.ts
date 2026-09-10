@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { getDistanceMeters, getDurationSeconds, getElapsedSeconds, computeDistanceKm } from '../utils/workoutDataDerivation';
+import { getDistanceMeters, getElapsedSeconds, computeDistanceKm } from '../utils/workoutDataDerivation';
 
 export type WorkoutDataNormalized = {
   distance_m: number | null;
@@ -71,7 +71,11 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
     }
     const distance_m = getDistanceMeters(workoutData);
     const distance_km = computeDistanceKm(workoutData);
-    const duration_s = getDurationSeconds(workoutData);
+    // ⛔ THE SERVER'S MOVING TIME (2026-09-10, audit H-D10): `moving_seconds` from workout-detail, read.
+    const duration_s = (() => {
+      const n = Number(workoutData?.moving_seconds);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    })();
     const elapsed_s = getElapsedSeconds(workoutData);
     const elevation_gain_m = Number.isFinite(workoutData?.elevation_gain) ? Number(workoutData.elevation_gain) : null;
     const avg_power = Number.isFinite(workoutData?.avg_power) ? Number(workoutData.avg_power) : (Number.isFinite(workoutData?.metrics?.avg_power) ? Number(workoutData.metrics.avg_power) : null);
