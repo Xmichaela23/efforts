@@ -60,10 +60,18 @@ function clock(iso: string | undefined): string | null {
 
 const chip = 'inline-flex items-center gap-1 whitespace-nowrap';
 
-const TodayWeather: React.FC<{ weather?: SessionWeatherForDisplay | null; className?: string }> = ({
-  weather,
-  className = '',
-}) => {
+const TodayWeather: React.FC<{
+  weather?: SessionWeatherForDisplay | null;
+  /**
+   * ⛔ THE CITY RIDES ON THE SUNRISE/SUNSET LINE (Michael, 2026-09-09, on the device). It had a row
+   * of its own under the date, where it read as a fourth fact about the day; it is not about the
+   * day, it is where these numbers were measured — so it belongs beside them, right-aligned.
+   */
+  city?: string | null;
+  className?: string;
+  /** The block's own spacing, set by the screen that places it. */
+  style?: React.CSSProperties;
+}> = ({ weather, city, className = '', style }) => {
   if (!weather || !Number.isFinite(Number(weather.temperature))) return null;
 
   const Icon = weatherIconFor(weather.weather_code);
@@ -86,7 +94,7 @@ const TodayWeather: React.FC<{ weather?: SessionWeatherForDisplay | null; classN
   return (
     <div
       className={`flex flex-col gap-1 ${className}`}
-      style={{ color: 'rgba(255,255,255,0.62)' }}
+      style={{ color: 'rgba(255,255,255,0.62)', ...style }}
     >
       {/* The reading itself, with the condition as a picture beside it. */}
       <div className="flex items-center gap-2">
@@ -119,21 +127,27 @@ const TodayWeather: React.FC<{ weather?: SessionWeatherForDisplay | null; classN
         </div>
       ) : null}
 
-      {/* ⛔ SUNRISE AND SUNSET ARE THE ICONS, so the row carries two times and no labels. */}
-      {(up || down) ? (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[0.7rem] font-light tabular-nums">
-          {up ? (
-            <span className={chip}>
-              <Sunrise aria-hidden="true" className="h-3 w-3" />
-              {up}
-            </span>
-          ) : null}
-          {down ? (
-            <span className={chip}>
-              <Sunset aria-hidden="true" className="h-3 w-3" />
-              {down}
-            </span>
-          ) : null}
+      {/* ⛔ SUNRISE AND SUNSET ARE THE ICONS, so the row carries two times and no labels — and the
+          city sits at the far end of it. ⚠️ THE ROW DRAWS FOR THE CITY ALONE TOO: an athlete whose
+          weather row carries no sunrise (a device-temperature fallback) must still be told where
+          this reading is from, not silently lose it. */}
+      {(up || down || city) ? (
+        <div className="flex items-center justify-between gap-x-3 text-[0.7rem] font-light">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 tabular-nums">
+            {up ? (
+              <span className={chip}>
+                <Sunrise aria-hidden="true" className="h-3 w-3" />
+                {up}
+              </span>
+            ) : null}
+            {down ? (
+              <span className={chip}>
+                <Sunset aria-hidden="true" className="h-3 w-3" />
+                {down}
+              </span>
+            ) : null}
+          </div>
+          {city ? <span className="truncate text-right">{city}</span> : null}
         </div>
       ) : null}
     </div>

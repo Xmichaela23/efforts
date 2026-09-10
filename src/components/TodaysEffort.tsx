@@ -22,6 +22,7 @@ import { useResolvedFtp } from '@/hooks/useResolvedFtp';
 import {
   availableDisciplines,
   getDisciplineSwaps,
+  revertOptions,
   matrixKindFor,
   intensityOf,
   disciplineOf,
@@ -37,7 +38,7 @@ import {
  */
 import { resolveSwapWrite } from '@/lib/swap-write';
 // ⛔ EVERY WORD ON THE SWAP SHEET IS MICHAEL'S, AND LIVES IN ONE FILE.
-import { swapButtonLabel, swapLineFor, SWAP_SHEET_HEADER } from '@/lib/swap-copy';
+import { swapButtonLabel, swapLineFor, SWAP_BACK_TO_PLAN, SWAP_SHEET_HEADER } from '@/lib/swap-copy';
 import { formatSwimPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout, displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore } from '@/lib/context-utils';
@@ -724,6 +725,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     setSwappingSession(true);
     try {
       const write = await resolveSwapWrite(userId, workout as never, option);
+      /**
+       * ⛔ A RESTORE THAT FOUND NOTHING IS NOT A RESTORE (§8). `resolveSwapWrite` reads the plan's
+       * authored session out of `sessions_by_week`; if the plan has moved on and no longer holds
+       * this day's session, the honest outcome is the error path, not an empty patch written over a
+       * swapped row and reported as success.
+       */
+      if (write.ok === false) throw new Error('The plan no longer holds this session');
       const { error } = await supabase
         .from('planned_workouts').update(write.patch).eq('id', workout.id).eq('user_id', userId);
       if (error) throw error;
@@ -787,6 +795,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             // ⚠️ RE-ASKED PER ROW HERE TOO. A later row's band can differ from today's, and the
             // family it is handed depends on the band — so the session is resolved against THAT row.
             const laterWrite = await resolveSwapWrite(userId, row as never, same);
+            // ⚠️ A LATER ROW WHOSE ORIGINAL CANNOT BE FOUND IS SKIPPED, not written empty — the same
+            // rule the rest of this loop already follows for a row that cannot take the swap.
+            if (laterWrite.ok === false) continue;
             const { error: e2 } = await supabase
               .from('planned_workouts').update(laterWrite.patch).eq('id', row.id).eq('user_id', userId);
             if (e2) continue;
@@ -802,11 +813,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         }
       }
 
-      const what = option.kind === 'venue'
-        ? `Moved to the ${(swapButtonLabel(option) || 'machine').toLowerCase()}`
-        : option.kind === 'hike'
-          ? 'Swapped to a hike'
-          : `Swapped to a ${option.to === 'ride' ? 'ride' : option.to}`;
+      const what = option.kind === 'revert'
+        /**
+         * ⛔ THE SHEET'S OWN LINE, USED AS THE RECEIPT (§8). Michael approved `Back to the plan.` as
+         * the words under the option and gave no separate confirmation for it; saying anything else
+         * here would be a line he has not written. ⚠️ IF HE WANTS A DIFFERENT CONFIRMATION, this is
+         * the one place it changes — the `— this and N later` suffix below still applies.
+         */
+        ? SWAP_BACK_TO_PLAN
+        : option.kind === 'venue'
+          ? `Moved to the ${(swapButtonLabel(option) || 'machine').toLowerCase()}`
+          : option.kind === 'hike'
+            ? 'Swapped to a hike'
+            : `Swapped to a ${option.to === 'ride' ? 'ride' : option.to}`;
       toast({
         // ⛔ SAY HOW MANY, NOT "rest of plan". The athlete asked for the rest of the plan; what they
         // get is the sessions it actually held, and that number is the receipt.
@@ -1534,8 +1553,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       day: 'numeric'
     });
 
+    /**
+     * ⛔ TODAY DOES NOT SAY "TODAY" (Michael, 2026-09-09, on the device). It sits under a tab that
+     * already says Today, on the screen Home opens on — so the word was the second time the athlete
+     * was told, and it cost the weekday. `Wed, Sep 9` says the same thing and says which day it is.
+     * ⚠️ YESTERDAY AND TOMORROW KEEP THEIRS. Their tab still says "Today", so those two words are
+     * the only thing telling the athlete they have walked off it.
+     */
     if (isToday) {
-      return `Today, ${compactDate}`;
+      return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     } else if (isYesterday) {
       return `Yesterday, ${compactDate}`;
     } else if (isTomorrow) {
@@ -1789,14 +1815,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           }}
         >
           <div className="space-y-0.5">
-            {/* ⛔ THE WEATHER SITS ABOVE THE DATE (work order 2026-09-09 §3b.1) — temperature and
-                feels-like, the condition as an icon, humidity with dew point, wind, sunrise and
-                sunset. It only draws for today; there is no historical weather to show for another
-                day. See `TodayWeather`. */}
-            {weather && isTodayDate ? (
-              <TodayWeather weather={weather} className="pb-1" />
-            ) : null}
-
             {/**
               * ⛔ ONE LINE, NOT FOUR (Michael, 2026-09-09): the date, the plan week and the phase
               * run together, with the block label right-aligned and small on the same line. Four
@@ -1890,19 +1908,32 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               </button>
             </div>
 
-            {/* The city, and the race countdown — neither is about the day, so neither joins the
-                line above. */}
-            {(cityName || (trainingPlanContext?.raceDate && (trainingPlanContext?.weeksToRace ?? 0) > 0)) && (
+            {/**
+              * ⛔ THE WEATHER SITS UNDER THE DATE NOW, NOT ABOVE IT (Michael, 2026-09-09, on the
+              * device). The date is what the screen is about and it was arriving second, behind a
+              * temperature. ⚠️ ITS SPACING IS ITS OWN: 12 px clear above and below, 16 px of padding
+              * inside — the block was reading as another line of the header rather than a block.
+              * ⚠️ INLINE MARGINS ON PURPOSE — the wrapper above is `space-y-0.5`, which sets a 2 px
+              * top margin on every child; these override it for this one.
+              * ⚠️ TODAY ONLY. There is no historical weather to show for another day.
+              */}
+            {weather && isTodayDate ? (
+              <TodayWeather
+                weather={weather}
+                city={cityName}
+                style={{ marginTop: 12, marginBottom: 12, padding: 16 }}
+              />
+            ) : null}
+
+            {/* The race countdown. ⚠️ THE CITY LEFT THIS LINE for the sunrise/sunset row inside the
+                weather block — it says where the reading came from, not what day it is. */}
+            {(trainingPlanContext?.raceDate && (trainingPlanContext?.weeksToRace ?? 0) > 0) ? (
               <div className="flex items-center gap-1 flex-wrap text-[0.68rem] font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.55)', lineHeight: 1.1 }}>
-                {cityName ? <span>{cityName}</span> : null}
-                {cityName && trainingPlanContext?.raceDate && (trainingPlanContext?.weeksToRace ?? 0) > 0 ? <span>·</span> : null}
-                {trainingPlanContext?.raceDate && (trainingPlanContext?.weeksToRace ?? 0) > 0 ? (
-                  <span style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.62 }}>
-                    {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
-                  </span>
-                ) : null}
+                <span style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.62 }}>
+                  {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
+                </span>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
 
@@ -2423,7 +2454,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       if (note) parts.push(note);
                       return parts.join(' · ');
                     }
-                    const desc = w?.rendered_description || w?.description || 'No description available';
+                    /**
+                     * ⛔ NO PLACEHOLDER (§8, 2026-09-09). This read `|| 'No description available'`,
+                     * so a session with nothing to say said so — a sentence that tells the athlete
+                     * about the DATABASE, never about the session, sitting where the session's own
+                     * words belong. A row with no description now renders nothing at all and the
+                     * drawer closes up around it.
+                     */
+                    const desc = w?.rendered_description || w?.description || '';
+                    if (!String(desc).trim()) return null;
                     if (/strides/i.test(desc)) {
                       const parts = desc.split(/(strides)/i);
                       return (
@@ -2573,8 +2612,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                  * of which return `to === from`. They are separate so `to` keeps one meaning; the
                  * athlete sees one list.
                  */
+                /**
+                 * ⛔ AND THE WAY BACK IS FIRST (§8, 2026-09-09). A session the athlete already
+                 * changed offers its original before it offers a third option.
+                 */
                 const swapOptions: SwapOption[] = w
-                  ? [...sessionSwapExtras(
+                  ? [...revertOptions(w, (w as any)?.training_plan_id ?? null), ...sessionSwapExtras(
                       w,
                       declaredPosture,
                       // p275's ground-impact rule needs the WEEK, not the day.

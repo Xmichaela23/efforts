@@ -77,7 +77,12 @@ export type SwappableSession = {
  *   · `venue`      — the SAME session on a machine (p275). Same family, same targets, same minutes;
  *                    only a `venue:` tag is added. It is not a swap of what is trained at all.
  */
-export type SwapKind = 'discipline' | 'hike' | 'venue';
+/**
+ *   · `revert`     — back to the plan (§8). Not a swap at all: it undoes one. It is listed FIRST on
+ *                    the sheet, because the athlete looking at a session they already changed is
+ *                    more often looking for the way back than for a third option.
+ */
+export type SwapKind = 'discipline' | 'hike' | 'venue' | 'revert';
 
 /** The machines p275 blesses, per sport. ⛔ THE LABELS ARE PENDING MICHAEL'S WORDS — see `venueKey`. */
 /**
@@ -176,6 +181,54 @@ export function originOf(s: SwappableSession): Discipline | null {
 
 /** The tag every swapped row carries, beside `swapped_from:<origin>`. */
 export const SWAPPED_TAG = 'discipline_swapped';
+
+/**
+ * ⛔ THE ORIGINAL SESSION'S NAME, CARRIED ON THE ROW (§8, 2026-09-09).
+ *
+ * The revert option is NAMED for the session the plan authored — `Near-threshold Run`, not "Run
+ * instead" — and by the time the sheet is drawn that name is gone: the swap overwrites `name` with
+ * the library session's, and `withLibrarySession` replaces `family:`/`sport:`/`band:` with the new
+ * sport's. `swapped_from:` survives, but it holds a DISCIPLINE, not a name.
+ *
+ * ⚠️ A TAG, BECAUSE THE SHEET IS SYNCHRONOUS. The authored name lives in `plans.sessions_by_week`,
+ * and that is a database read — fine at write time (`resolveSwapWrite` already does one) and wrong
+ * at draw time, where it would turn every option button into a loading state. The tag is written
+ * once, by the swap, and read for free thereafter.
+ *
+ * ⚠️ THE EARLIEST NAME WINS, exactly as `swapped_from:` keeps the earliest DISCIPLINE. run → ride →
+ * swim must still offer the run the plan authored; recording each hop would offer the ride, which
+ * the plan never prescribed.
+ */
+export const SWAPPED_NAME_PREFIX = 'swapped_name:';
+
+/** The name of the session the plan authored, off a previous swap's tag. Null when never swapped. */
+export function originalNameOf(s: SwappableSession): string | null {
+  for (const t of s.tags ?? []) {
+    const raw = String(t);
+    if (!raw.startsWith(SWAPPED_NAME_PREFIX)) continue;
+    const name = raw.slice(SWAPPED_NAME_PREFIX.length).trim();
+    if (name) return name;
+  }
+  return null;
+}
+
+/**
+ * The tags a swap writes: the row's own, minus the source sport's step markers, plus the three that
+ * point back at what the plan asked for.
+ *
+ * ⛔ ONE BUILDER, TWO CALLERS. The discipline patch and the hike patch each had this list inline and
+ * they had already drifted once (the hike clears `workout_structure`, the discipline patch does
+ * not). The origin tags are the half that must never drift, so they are built here.
+ */
+function swapOriginTags(session: SwappableSession, from: Discipline): string[] {
+  const authored = originalNameOf(session) ?? (typeof session.name === 'string' ? session.name.trim() : '');
+  return [...new Set([
+    ...(session.tags ?? []).filter((t) => !/^(run|ride|bike|swim)_/.test(String(t))),
+    SWAPPED_TAG,
+    `${SWAPPED_FROM_PREFIX}${originOf(session) ?? from}`,
+    ...(authored ? [`${SWAPPED_NAME_PREFIX}${authored}`] : []),
+  ])];
+}
 
 /**
  * ⛔ IS THIS ROW A SWAP? The one predicate every SURFACE asks before it renders structure.
@@ -588,11 +641,8 @@ export function getDisciplineSwaps(
            * look for. Recording the immediately-previous discipline would leave the blob's run
            * unmatched on the second swap and the duplicate would come straight back.
            */
-          tags: [...new Set([
-            ...(session.tags ?? []).filter((t) => !/^(run|ride|bike|swim)_/.test(String(t))),
-            'discipline_swapped',
-            `swapped_from:${originOf(session) ?? from}`,
-          ])],
+          // ⚠️ `swapOriginTags` also stamps `swapped_name:` — the name the revert option wears (§8).
+          tags: swapOriginTags(session, from),
         },
         kind: 'discipline' as const,
         /** The sheet's line for this row, by band. Pending Michael's words — see `SWAP_COPY_KEYS`. */
@@ -677,16 +727,76 @@ export function sessionSwapExtras(
         workout_structure: null,
         intervals: null,
         rendered_description: null,
-        tags: [...new Set([
-          ...(session.tags ?? []).filter((t) => !/^(run|ride|bike|swim)_/.test(String(t))),
-          'discipline_swapped',
-          `swapped_from:${originOf(session) ?? from}`,
-        ])],
+        tags: swapOriginTags(session, from),
       },
     });
   }
 
   return options;
+}
+
+/**
+ * ═══ §8 — BACK TO THE PLAN ═══════════════════════════════════════════════════════════════════════
+ *
+ * ⛔ A SESSION THE ATHLETE ALREADY CHANGED OFFERS ITS ORIGINAL FIRST (Michael, 2026-09-09, on the
+ * device). Until now the sheet only ever offered MORE changes: having moved a run to the bike, the
+ * only route back was to swap the ride to a run — which writes the library's run, not the run the
+ * plan wrote, and leaves the row tagged as a swap forever.
+ *
+ * ⚠️ TWO SHAPES, AND THEY UNDO DIFFERENT THINGS:
+ *   · A MACHINE reverts by dropping one tag. The session never changed — same family, same targets,
+ *     same minutes — so there is nothing to restore and the option is named `Outdoors`.
+ *   · A SPORT SWAP (or the hike) reverts to the row the plan authored: its type, name, description,
+ *     structure and tags, read back out of `plans.sessions_by_week` at write time by
+ *     `resolveSwapWrite`. The option is named for that session.
+ *
+ * ⛔ THE SPORT REVERT IS OFFERED ONLY WHEN IT CAN BE NAMED AND FOUND — a `swapped_name:` tag and a
+ * `training_plan_id`. A row swapped before §8 shipped carries no name, and a row with no plan has no
+ * authored session to go back to; in both cases the honest sheet says nothing rather than offering a
+ * button whose promise it cannot keep. ⚠️ THE FIRST CASE HEALS ITSELF: the next swap of that row
+ * stamps the name.
+ */
+export function revertOptions(session: SwappableSession, planId?: string | null): SwapOption[] {
+  const from = disciplineOf(session.type);
+  const status = String(session.workout_status ?? 'planned').toLowerCase();
+  if (status === 'completed' || status === 'skipped') return [];
+
+  const out: SwapOption[] = [];
+
+  // ⚠️ THE SPORT'S WAY BACK GOES FIRST when a row is both swapped and indoors — "back to the plan"
+  // is the whole way back, and it takes the machine with it.
+  const authored = originalNameOf(session);
+  if (isDisciplineSwapped(session) && authored && planId) {
+    out.push({
+      kind: 'revert',
+      to: originOf(session) ?? from ?? 'run',
+      label: authored,
+      copyKey: 'swap.back_to_plan',
+      // ⚠️ EMPTY ON PURPOSE. The restore is a database read (`resolveSwapWrite`), the same place the
+      // swap's own library session is resolved. A pure library cannot build this patch.
+      patch: {},
+      needsMaterialize: true,
+      warnings: [],
+    });
+  }
+
+  const venue = venueOf(session);
+  if (venue && from) {
+    out.push({
+      kind: 'revert',
+      venue,
+      to: from,
+      label: '',
+      copyKey: 'swap.back_to_plan',
+      needsMaterialize: false,
+      warnings: [],
+      patch: {
+        tags: (session.tags ?? []).filter((t) => !String(t).toLowerCase().startsWith(VENUE_PREFIX)),
+      },
+    });
+  }
+
+  return out;
 }
 
 /**
@@ -747,6 +857,13 @@ export function sameSwapOn(
   },
 ): SwapOption | null {
   const all = [
+    /**
+     * ⚠️ THE WAY BACK IS RE-ASKED PER ROW TOO (§8). "Rest of plan" on a revert means every later
+     * repeat goes back to what the plan authored — and each of those has its OWN authored session,
+     * so each gets its own answer. A later row that was never swapped returns nothing and is left
+     * alone, exactly like a row that cannot take a swap.
+     */
+    ...revertOptions(row, (row as { training_plan_id?: string | null }).training_plan_id ?? null),
     ...sessionSwapExtras(row, ctx.posture ?? null, ctx.weekSessions ?? []),
     /**
      * ⚠️ NO SAME-DAY LIST FOR A FUTURE ROW. That argument only produces WARNINGS, and a warning is a

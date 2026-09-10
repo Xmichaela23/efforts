@@ -11,7 +11,9 @@
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   getDisciplineSwaps, sessionSwapExtras, intensityOf, venueOf, VENUE_PREFIX, isPlanTwin, sameSwapOn,
+  revertOptions, originalNameOf, SWAPPED_NAME_PREFIX,
 } from './session-discipline-swap.ts';
+import { swapButtonLabel, swapLineFor, SWAP_BACK_TO_PLAN, VENUE_OUTDOORS } from './swap-copy.ts';
 
 const ALL = ['run', 'ride', 'swim'] as const;
 const base = { workout_status: 'planned', total_duration_seconds: 3600 };
@@ -189,4 +191,114 @@ Deno.test('⛔ A ROW THAT CANNOT TAKE THE SWAP IS LEFT ALONE, NOT FORCED', () =>
   assertEquals(sameSwapOn(logged, chosen, { available: ALL }), null);
   const alreadyIndoors = { ...easyRide, tags: [...easyRide.tags, `${VENUE_PREFIX}trainer`] };
   assertEquals(sameSwapOn(alreadyIndoors, chosen, { available: ALL }), null);
+});
+
+/* ═══ §8 — BACK TO THE PLAN ═══════════════════════════════════════════════════════════════════════
+ *
+ * ⚠️ THESE PIN THE REFUSALS AS HARD AS THE OFFER. The revert writes over a session the athlete can
+ * see; a version that offers it where it cannot deliver is worse than one that never offers it.
+ */
+
+const PLAN = 'plan-1';
+
+Deno.test('⛔ §8 — the swap stamps the ORIGINAL name, and a second swap does not overwrite it', () => {
+  const first = getDisciplineSwaps(hardRun, ALL, [], null, 250).find((o) => o.to === 'ride')!;
+  const swapped = { ...hardRun, type: 'ride', name: 'Anaerobic Ride', tags: first.patch.tags as string[] };
+  assertEquals(originalNameOf(swapped), 'Hard Run');
+
+  // run → ride → swim must still name the RUN: it is what the plan authored.
+  const second = getDisciplineSwaps({ ...swapped, tags: [...(swapped.tags), 'band:vt1_or_easier'] }, ALL, [], null, 250)
+    .find((o) => o.to === 'swim');
+  if (second) {
+    const twice = { ...swapped, type: 'swim', tags: second.patch.tags as string[] };
+    assertEquals(originalNameOf(twice), 'Hard Run');
+  }
+});
+
+Deno.test('⛔ §8 — a swapped session offers its original FIRST, named for that session', () => {
+  const first = getDisciplineSwaps(hardRun, ALL, [], null, 250).find((o) => o.to === 'ride')!;
+  const swapped = { ...hardRun, type: 'ride', name: 'Anaerobic Ride', tags: first.patch.tags as string[] };
+
+  const opts = revertOptions(swapped, PLAN);
+  assertEquals(opts.length, 1);
+  assertEquals(opts[0].kind, 'revert');
+  assertEquals(opts[0].to, 'run');                       // the discipline the plan asked for
+  assertEquals(swapButtonLabel(opts[0]), 'Hard Run');    // the SESSION the plan asked for
+  assertEquals(swapLineFor(opts[0]), SWAP_BACK_TO_PLAN);
+});
+
+Deno.test('⛔ §8 — a machine offers Outdoors, and the same line', () => {
+  const trainer = sessionSwapExtras(easyRide).find((o) => o.venue === 'trainer')!;
+  const indoors = { ...easyRide, tags: trainer.patch.tags as string[] };
+  assertEquals(venueOf(indoors), 'trainer');
+
+  const opts = revertOptions(indoors, PLAN);
+  assertEquals(opts.length, 1);
+  assertEquals(swapButtonLabel(opts[0]), VENUE_OUTDOORS);
+  assertEquals(swapLineFor(opts[0]), SWAP_BACK_TO_PLAN);
+  // ⛔ IT DROPS THE VENUE AND NOTHING ELSE — the machine never changed the session.
+  const tags = opts[0].patch.tags as string[];
+  assert(!tags.some((t) => t.startsWith(VENUE_PREFIX)), tags.join(','));
+  assert(tags.includes('family:ride_endurance'), tags.join(','));
+});
+
+Deno.test('⛔ §8 — the trainer\'s revert does not wear the trainer\'s own line', () => {
+  const trainer = sessionSwapExtras(easyRide).find((o) => o.venue === 'trainer')!;
+  const indoors = { ...easyRide, tags: trainer.patch.tags as string[] };
+  const back = revertOptions(indoors, PLAN)[0];
+  // Both carry `venue: 'trainer'`; only the kind tells them apart.
+  assertEquals(swapLineFor(trainer), 'Same session, indoors.');
+  assertEquals(swapLineFor(back), SWAP_BACK_TO_PLAN);
+});
+
+Deno.test('⛔ §8 — an UNSWAPPED session offers no way back', () => {
+  assertEquals(revertOptions(hardRun, PLAN).length, 0);
+  assertEquals(revertOptions(easyRide, PLAN).length, 0);
+});
+
+Deno.test('⛔ §8 — no plan, no name, or already logged: the sport revert is NOT offered', () => {
+  const first = getDisciplineSwaps(hardRun, ALL, [], null, 250).find((o) => o.to === 'ride')!;
+  const swapped = { ...hardRun, type: 'ride', name: 'Anaerobic Ride', tags: first.patch.tags as string[] };
+
+  // No plan to read the authored session back out of.
+  assertEquals(revertOptions(swapped, null).length, 0);
+
+  // Swapped before §8 shipped: `swapped_from:` but no `swapped_name:`.
+  const legacy = { ...swapped, tags: swapped.tags.filter((t) => !t.startsWith(SWAPPED_NAME_PREFIX)) };
+  assertEquals(revertOptions(legacy, PLAN).length, 0);
+
+  // Already done. Putting the plan back would rewrite history, not a plan.
+  assertEquals(revertOptions({ ...swapped, workout_status: 'completed' }, PLAN).length, 0);
+  assertEquals(revertOptions({ ...swapped, workout_status: 'skipped' }, PLAN).length, 0);
+});
+
+Deno.test('⛔ §8 — both at once: the sport\'s way back comes before the machine\'s', () => {
+  const first = getDisciplineSwaps(hardRun, ALL, [], null, 250).find((o) => o.to === 'ride')!;
+  const swappedThenIndoors = {
+    ...hardRun,
+    type: 'ride',
+    name: 'Anaerobic Ride',
+    tags: [...(first.patch.tags as string[]), `${VENUE_PREFIX}trainer`],
+  };
+  const opts = revertOptions(swappedThenIndoors, PLAN);
+  assertEquals(opts.length, 2);
+  assertEquals(swapButtonLabel(opts[0]), 'Hard Run');
+  assertEquals(swapButtonLabel(opts[1]), VENUE_OUTDOORS);
+});
+
+Deno.test('⛔ §8 — rest of plan: a later swapped twin is re-asked and gets its OWN name', () => {
+  const first = getDisciplineSwaps(hardRun, ALL, [], null, 250).find((o) => o.to === 'ride')!;
+  const today = { ...hardRun, type: 'ride', name: 'Anaerobic Ride', tags: first.patch.tags as string[], training_plan_id: PLAN };
+
+  const laterSource = { ...hardRun, name: 'Near-threshold Run' };
+  const laterFirst = getDisciplineSwaps(laterSource, ALL, [], null, 250).find((o) => o.to === 'ride')!;
+  const later = { ...laterSource, type: 'ride', name: 'Anaerobic Ride', tags: laterFirst.patch.tags as string[], training_plan_id: PLAN };
+
+  const chosen = revertOptions(today, PLAN)[0];
+  const same = sameSwapOn(later, chosen, { available: ALL })!;
+  assert(same, 'the later twin should also go back');
+  assertEquals(swapButtonLabel(same), 'Near-threshold Run');
+
+  // A later row that was never swapped is left alone.
+  assertEquals(sameSwapOn(laterSource, chosen, { available: ALL }), null);
 });
