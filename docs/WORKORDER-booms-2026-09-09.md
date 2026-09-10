@@ -19,7 +19,7 @@ project_efforts_strength_display_frame): form, bar speed, slow gain under cross-
   count against p86's 6–8 / 14 anchors.
 - The done card on Today (`SessionDeck.tsx`) already renders name, numbers, the four tiles, attribution.
 
-## The lines (facts; exact wording pending Michael)
+## The lines (APPROVED as written, Michael, 2026-09-09)
 
 One per session, the first true one in this order. Windows are stated in the line.
 
@@ -39,7 +39,7 @@ Run (after best efforts is built; until then only 3 and 4):
 Lift:
 1. `A set earned on [lift]: two clean sessions at [weight]` (the ladder's own event, the day it fires).
 2. `Every heavy set with reps to spare` (all ME sets logged with RIR ≥ 1).
-3. `Speed sets all fast` (every DE set logged; no RIR 0). Wording pending.
+3. `Speed sets all fast` (every DE set logged; no RIR 0).
 4. `Most work sets this block: [N]` (only if still under 14, p86; never celebrate 14+).
 5. `[N] sessions on [lift] without a miss` (no failed ME set; window this block).
 
