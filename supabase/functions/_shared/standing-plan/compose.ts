@@ -3105,9 +3105,32 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         // slot the pre-pass misses lands somewhere real instead of `undefined`.
         day: enduranceDays.get(`${day.day}:${i}`) ?? dayNameFor(args, day.day),
         ...row,
-        // ⚠️ A SUBSTITUTED SLOT SAYS SO ON THE ROW. The frame's own line is kept verbatim so a reader
-        // can still find the row on the page it came from.
-        ...(assigned.substituted ? { tags: [...row.tags, 'sport_assigned'] } : {}),
+        /**
+         * ⛔ THE LONG DAY SAYS SO ON THE ROW (2026-09-09), AND IT DID NOT BEFORE.
+         *
+         * The frame knows which slot is the long one — `EnduranceSlot.role`, read by `isLongSlot` —
+         * and the composed ROW carried nothing about it. That is invisible while the long slot is a
+         * RUN, because `family:run_lsd` is itself the long day. ⚠️ A LONG RIDE HAS NO SUCH FAMILY:
+         * it composes as `ride_endurance` at a bigger level, exactly like the week's easy ride, so
+         * every reader downstream saw a 2h30 Saturday ride as an EASY ride. The swap sheet then
+         * offered it the easy swap, and p275's long-day options — a long run, a hike — could not be
+         * reached at all on a plan whose long day is a ride.
+         *
+         * ⚠️ NO NEW WORD. `long_run` and `long_ride` are already the app's vocabulary and already
+         * read by `intensityOf`; this stamps the one the slot's sport calls for. Additive: nothing
+         * is renamed and no existing reader changes behaviour.
+         */
+        ...(() => {
+          const extra: string[] = [];
+          if (isLongSlot(slot)) {
+            const w = row.type === 'ride' ? 'long_ride' : row.type === 'run' ? 'long_run' : null;
+            if (w && !row.tags.includes(w)) extra.push(w);
+          }
+          // ⚠️ A SUBSTITUTED SLOT SAYS SO ON THE ROW. The frame's own line is kept verbatim so a
+          // reader can still find the row on the page it came from.
+          if (assigned.substituted) extra.push('sport_assigned');
+          return extra.length ? { tags: [...row.tags, ...extra] } : {};
+        })(),
       });
     });
   }

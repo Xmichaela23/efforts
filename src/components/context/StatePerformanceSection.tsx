@@ -35,7 +35,10 @@ import StrengthCalibrationNotice from '@/components/StrengthCalibrationNotice';
 import { EnduranceReadCards, fmtEff } from '@/components/context/StrengthReadCards';
 import ViadaWeekCard from '@/components/context/ViadaWeekCard';
 import EnduranceCheckpointSheet from '@/components/context/EnduranceCheckpointSheet';
-import LoadWeeksCard from '@/components/context/LoadWeeksCard';
+// ⛔ `LoadWeeksCard` WAS IMPORTED HERE AND NEVER RENDERED — a dead import, so the load bars have
+// never actually been on State. They render on Today now (work order 2026-09-09 §3b.2), via
+// `TodayWeekBlocks`. Recorded rather than silently deleted: §3b.2 says the card "moves from State",
+// and the next reader looking for what was removed will find nothing was.
 // ⛔ COLLAPSE TO ONE LINE PER SPORT (Round 3, 2026-09-01) — each sport shows a change-leading summary
 // and expands on tap. The summary wording is a set of pure functions so the confidence rule is pinned.
 import { fmtDayShort, latestPoint, strengthGlanceRows, type SportRow , fitTrend} from '@/lib/sport-summary';

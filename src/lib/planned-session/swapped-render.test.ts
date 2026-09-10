@@ -23,6 +23,7 @@ import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.t
 import {
   isDisciplineSwapped,
   swappedSessionBlock,
+  withLibrarySession,
   swappedStructureIsStale,
   getDisciplineSwaps,
 } from '../session-discipline-swap.ts';
@@ -62,6 +63,8 @@ const SWAPPED_HARD_RIDE = {
   ] },
   workout_structure: { title: 'Hill Repeats', type: 'endurance_session' },
 };
+
+import { librarySwapSession, swapTargetFamily } from '../swap-library-session.ts';
 
 Deno.test('⛔ the swapped row is IDENTIFIABLE without relying on cleared columns', () => {
   assert(isDisciplineSwapped(SWAPPED_EASY_RIDE as never));
@@ -139,42 +142,129 @@ Deno.test('⚠️ THE PATCH STILL LEAVES THE SOURCE STRUCTURE ON THE ROW — pin
 
 // ═══ THE HARD RIDE (2026-08-09) — a real 4×4, not a relabelled run ═══════════════════════════
 
-Deno.test('⛔ HARD + FTP → the real 4×4 tokens at PROTOCOL length, not the run\'s time', () => {
-  /**
-   * ⛔ THE THREE-TOKEN FORM `generate-combined-plan/session-factory.ts:604` ships — warm-up, the
-   * Helgerud 4×4, cool-down. NOT `bikeQualitySession`'s bare `['bike_vo2_4x4min_R4min']`, which has
-   * no warm-up and opens cold with a maximal effort.
-   *
-   * ⛔ AND THE TIME IS THE PROTOCOL'S, NOT THE SOURCE SESSION'S. The hill run below is 63 min; the
-   * ride is 57. This is the ONE place the swap's "same time" rule is deliberately broken — padding
-   * a 4×4 to fill someone else's hour adds junk minutes to a session whose value is its structure.
-   */
+/**
+ * ⛔⛔ SUPERSEDED BY §7 (2026-09-09) — everything the old test asserted is now the WRONG answer.
+ *
+ * The hard swap to the bike used to write a hand-written Helgerud 4×4 at 57 minutes. That was a
+ * THIRD session: not the run being left, and not the book's either. §7 hands over the composer's own
+ * `ride_anaerobic` (p237) instead, at the athlete's level, and the merge that does it is
+ * `withLibrarySession` — so the pure library returns a SHELL and writes no tokens at all.
+ */
+Deno.test('⛔ HARD + FTP → a shell, because the SESSION is the library\'s (§7)', () => {
   const hill = {
     id: 'h9', type: 'run', name: 'Hill Repeats', workout_status: 'planned', date: '2026-08-20',
-    total_duration_seconds: 3780, tags: ['intervals'],          // 63 min
+    // ⚠️ THREE HOURS, DELIBERATELY ABSURD FOR A HARD RUN — it is the number that must NOT survive.
+    total_duration_seconds: 10800, tags: ['intervals'],
     computed: { steps: [{ seconds: 900, label: 'Warm up 1.5 mi easy' }, { seconds: 120, label: 'Walk down' }] },
     workout_structure: { title: 'Hill Repeats' },
   };
   const [ride] = getDisciplineSwaps(hill as never, ['run', 'ride'], [], null, 250);
   assertEquals(ride.to, 'ride');
-  assertEquals(ride.patch.steps_preset, [
-    'warmup_bike_quality_15min_fastpedal',
-    'bike_vo2_4x4min_R4min',
-    'cooldown_bike_10min_easy',
-  ]);
-  assertEquals(ride.patch.duration, 57, '15 warm-up + 4×(4+4) + 10 cool-down');
-  assertEquals(ride.patch.total_duration_seconds, 57 * 60);
-  assert(ride.needsMaterialize, 'the watts only exist after materialize-plan expands the tokens');
+  assertEquals(ride.patch.steps_preset, null, 'the shell writes no tokens — the library session does');
+  assertEquals(ride.needsMaterialize, false, 'nothing to expand until a library session is merged in');
+  assert(!('duration' in ride.patch), 'the shell does not touch the row\'s time either');
 
-  // ⛔ THE RUN'S STRUCTURE IS CLEARED — this is the only patch that may do it, because it writes a
-  // total on the same line. "Walk down" cannot survive onto a bike.
-  assertEquals(ride.patch.computed, null);
-  assertEquals(ride.patch.workout_structure, null);
-  assertEquals(ride.patch.intervals, null);
+  /**
+   * ⛔ AND THE LIBRARY SESSION IS WHAT REACHES THE ROW. Steps, minutes and classification come from
+   * it; the run's structure is cleared, because "Walk down" cannot survive onto a bike, and that is
+   * safe only because the merge writes a total on the same object.
+   */
+  const lib = librarySwapSession(hill as never, 'run', 'hard', null)!;
+  assertEquals(lib.family, 'ride_anaerobic', 'p237 is the hard ride the page hands over');
+  const patch = withLibrarySession(ride.patch, hill as never, lib);
+  assertEquals(patch.steps_preset, lib.steps_preset);
+  assertEquals(patch.total_duration_seconds, lib.duration * 60);
+  assertEquals(patch.computed, null);
+  assertEquals(patch.workout_structure, null);
+  assertEquals(patch.intervals, null);
+  assertEquals(plannedDurationSeconds({ ...hill, ...patch } as never), lib.duration * 60);
 
-  // And the resulting row still knows how long it is, from the total the patch pinned.
-  const swapped = { ...hill, ...ride.patch };
-  assertEquals(plannedDurationSeconds(swapped as never), 57 * 60);
+  // ⛔ AND NOT THE RUN'S THREE HOURS — the whole point of §7.
+  assert((patch.total_duration_seconds as number) !== 10800, 'the old session\'s time must not survive');
+
+  // The new session's own classification replaces the run's; the swap marker survives it.
+  const tags = patch.tags as string[];
+  assert(tags.includes('family:ride_anaerobic'), tags.join(','));
+  assert(tags.includes('sport:ride'), tags.join(','));
+  assert(!tags.includes('family:run_mlss'), tags.join(','));
+  assert(tags.includes('discipline_swapped'), tags.join(','));
+  assert(tags.some((t) => t.startsWith('swapped_from:')), tags.join(','));
+});
+
+/**
+ * ⛔ THE ATHLETE'S OWN ROW WINS OVER A FRESH BUILD. Their plan holds the composer's session for that
+ * family — their level, their volume, their baselines — and re-deriving it here would be a second
+ * composer. The build is the fallback for a plan with no session of that family at all.
+ */
+Deno.test('⛔ §7 · the template is the athlete\'s own composed session', () => {
+  const longRide = {
+    id: 'lr', type: 'ride', name: 'Ride', workout_status: 'planned',
+    total_duration_seconds: 7200, tags: ['standing_plan', 'family:ride_endurance', 'band:vt1_or_easier', 'level:1'],
+  };
+  const theirLongRun = {
+    id: 'x', type: 'run', name: 'Long Run', workout_status: 'planned',
+    total_duration_seconds: 98 * 60, steps_preset: ['longrun_97min_easypace'],
+    tags: ['standing_plan', 'family:run_lsd', 'level:2', 'sport:run', 'intensity:lsd', 'band:vt1_or_easier'],
+  };
+  const lib = librarySwapSession(longRide as never, 'ride', 'long', theirLongRun as never)!;
+  assertEquals(lib.fromLibraryBuild, false, 'their own row was used');
+  assertEquals(lib.duration, 98);
+  assertEquals(lib.steps_preset, ['longrun_97min_easypace']);
+  assert(lib.libraryTags.includes('level:2'), lib.libraryTags.join(','));
+
+  // A row of the WRONG family is not a template — it falls back to the build rather than handing
+  // over somebody else's session.
+  const wrong = librarySwapSession(longRide as never, 'ride', 'long', { ...theirLongRun, tags: ['family:run_vt1'] } as never)!;
+  assertEquals(wrong.fromLibraryBuild, true);
+  assertEquals(wrong.family, 'run_lsd');
+
+  /**
+   * ⛔⛔ AND A ROW THAT IS ITSELF A SWAP IS NOT A TEMPLATE. It carries the target family, so it
+   * matches; it is a COPY of the composer's session, not the composer's session. Left in, the second
+   * swap of a block copies the first swap's row and inherits every gap in it — which is exactly how
+   * a missing description propagated onto a row whose own library session had a sentence.
+   */
+  const alreadySwapped = { ...theirLongRun, description: null,
+    tags: [...theirLongRun.tags, 'discipline_swapped', 'swapped_from:ride'] };
+  const fresh = librarySwapSession(longRide as never, 'ride', 'long', alreadySwapped as never)!;
+  assertEquals(fresh.fromLibraryBuild, true, 'a swapped row must not be copied');
+  assert(fresh.description, 'the library session has its own sentence');
+});
+
+/**
+ * ⛔ THE LONG-DAY MARKER FOLLOWS THE SPORT. `long_ride` left on a run reads as "the week's long ride
+ * is a run" to anyone who looks — and the marker is what makes the long day recognisable at all when
+ * the long slot is a ride, since a long ride composes as `ride_endurance` like any easy one.
+ */
+Deno.test('⛔ §7 · long_ride becomes long_run when the long day changes sport', () => {
+  const longRide = {
+    id: 'lr2', type: 'ride', name: 'Ride', workout_status: 'planned', total_duration_seconds: 9000,
+    tags: ['standing_plan', 'family:ride_endurance', 'level:2', 'sport:ride', 'band:vt1_or_easier', 'long_ride'],
+  };
+  const [run] = getDisciplineSwaps(longRide as never, ['run', 'ride'], [], null, 250);
+  const lib = librarySwapSession(longRide as never, 'ride', 'long', null)!;
+  const tags = withLibrarySession(run.patch, longRide as never, lib).tags as string[];
+  assert(tags.includes('long_run'), tags.join(','));
+  assert(!tags.includes('long_ride'), tags.join(','));
+  assert(tags.includes('family:run_lsd'), tags.join(','));
+
+  // ⚠️ AND A SESSION THAT WAS NEVER THE LONG DAY DOES NOT BECOME ONE.
+  const easyRun = { id: 'e2', type: 'run', name: 'Easy Run', workout_status: 'planned',
+    total_duration_seconds: 2400, tags: ['standing_plan', 'family:run_vt1', 'level:2', 'band:vt1_or_easier'] };
+  const [ride] = getDisciplineSwaps(easyRun as never, ['run', 'ride'], [], null, 250);
+  const easyLib = librarySwapSession(easyRun as never, 'run', 'easy', null)!;
+  const easyTags = withLibrarySession(ride.patch, easyRun as never, easyLib).tags as string[];
+  assert(!easyTags.some((t) => t === 'long_run' || t === 'long_ride'), easyTags.join(','));
+});
+
+Deno.test('⛔ §7 · a machine is not a sport swap, and the page blesses one direction', () => {
+  // p138: a hard RIDE is not handed a run.
+  assertEquals(swapTargetFamily('ride', 'hard'), null);
+  assertEquals(swapTargetFamily('run', 'hard'), 'ride_anaerobic');   // p237
+  assertEquals(swapTargetFamily('run', 'easy'), 'ride_endurance');   // p239
+  assertEquals(swapTargetFamily('run', 'long'), 'ride_endurance');   // p239, the frame's long ride
+  assertEquals(swapTargetFamily('ride', 'long'), 'run_lsd');         // p235
+  assertEquals(swapTargetFamily('ride', 'easy'), 'run_vt1');         // p235
 });
 
 Deno.test('⛔ HARD without FTP → the ride is NOT OFFERED (no watts, no session)', () => {
@@ -205,8 +295,8 @@ Deno.test('⛔ EASY swaps are UNCHANGED by all of this — no FTP, no tokens, ti
 Deno.test('⛔ THE RENDER SPLIT — stale run structure is hidden, a REAL bike session is not', () => {
   /**
    * ⚠️ THE INTERACTION THAT COULD HAVE BROKEN THE FEATURE SILENTLY. The swapped-render guard hides
-   * `computed.steps` on swapped rows — correct for an easy swap, and it would have HIDDEN THE 4×4
-   * on a hard one. `steps_preset` is the tell: present ⇒ written for the target sport and expanded
+   * `computed.steps` on swapped rows — correct for an easy swap, and it would have HIDDEN THE HARD
+   * RIDE'S OWN STEPS on a hard one. `steps_preset` is the tell: present ⇒ written for the target sport and expanded
    * for it; absent ⇒ whatever is in `computed` belongs to the sport left behind.
    */
   const easySwapped = { type: 'ride', tags: ['discipline_swapped', 'swapped_from:run'], steps_preset: null,
@@ -214,8 +304,8 @@ Deno.test('⛔ THE RENDER SPLIT — stale run structure is hidden, a REAL bike s
   assert(swappedStructureIsStale(easySwapped as never), 'the run steps must be suppressed');
 
   const hardSwapped = { type: 'ride', tags: ['discipline_swapped', 'swapped_from:run'],
-    steps_preset: ['warmup_bike_quality_15min_fastpedal', 'bike_vo2_4x4min_R4min', 'cooldown_bike_10min_easy'],
+    steps_preset: ['warmup_bike_quality_13min_fastpedal', 'round_1x_45s110-r300seasy-45s112'],
     computed: { steps: [{ duration_s: 240, power_range: { lower: 275, upper: 300 } }] } };
-  assert(!swappedStructureIsStale(hardSwapped as never), 'the REAL 4×4 must render');
+  assert(!swappedStructureIsStale(hardSwapped as never), 'the REAL bike session must render');
   assert(isDisciplineSwapped(hardSwapped as never), 'it is still a swap, for every other purpose');
 });

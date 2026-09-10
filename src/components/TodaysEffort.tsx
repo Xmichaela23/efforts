@@ -9,7 +9,7 @@ import { useStrengthOrderingPreference } from '@/lib/use-strength-ordering-prefe
 import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
-import { Calendar, Clock, Dumbbell, Activity, X, Copy, ArrowLeftRight } from 'lucide-react';
+import { Calendar, Clock, Dumbbell, Activity, X, Copy, ArrowLeftRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
 // ⛔ SAME RULE AS THE CALENDAR AND THE WORKOUT VIEW — one definition of "missed a planned slot".
 import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
@@ -25,10 +25,21 @@ import {
   matrixKindFor,
   intensityOf,
   disciplineOf,
+  sessionSwapExtras,
+  isPlanTwin,
+  sameSwapOn,
   type SwapOption,
 } from '@/lib/session-discipline-swap';
+/**
+ * ⛔ §7 — A SPORT SWAP HANDS OVER THE LIBRARY'S SESSION, NOT A SHELL WITH THE OLD MINUTES. The
+ * drawer applies swaps too (`UnifiedWorkoutView`), so what a swap WRITES lives in one file that both
+ * screens ask — otherwise one of them keeps writing the shell.
+ */
+import { resolveSwapWrite } from '@/lib/swap-write';
+// ⛔ EVERY WORD ON THE SWAP SHEET IS MICHAEL'S, AND LIVES IN ONE FILE.
+import { swapButtonLabel, swapLineFor, SWAP_SHEET_HEADER } from '@/lib/swap-copy';
 import { formatSwimPace } from '@/utils/workoutFormatting';
-import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout } from '@/lib/utils';
+import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout, displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { resolveMovingSeconds } from '../utils/resolveMovingSeconds';
 import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
@@ -37,6 +48,13 @@ import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 import { swappedStructureIsStale } from '@/lib/session-discipline-swap';
 // ⛔ ONE PLANNED-SESSION HEADER, shared by all three surfaces. See the component.
 import PlannedSessionHeader from './PlannedSessionHeader';
+// ⛔ TODAY'S LINES (work order 2026-09-09 §2) — what each set is FOR, under the row that says what
+// it is. Every athlete-facing word lives in `@/lib/today-lines`; nothing new is spelled out here.
+// ⛔ §3d — a lift and the plyo day swipe as a deck, a ride or run is one glass card.
+import TodaySession, { rendersAsSessionCard, TodaySpacingLine } from './SessionDeck';
+// ⛔ §3b — the weather block above the date, and the week's load bars + counts under the day.
+import TodayWeather from './TodayWeather';
+import TodayWeekBlocks from './TodayWeekBlocks';
 // ⛔ ONE PLANNED-DURATION READER (stage 2). See `src/lib/planned-session/duration.ts`.
 import { plannedDurationMinutes } from '@/lib/planned-session/duration';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
@@ -191,12 +209,29 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [locTried, setLocTried] = useState(false);
   const [cityName, setCityName] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * ⛔ §3d — the grid drifts against the scroll and the bleed follows the session in view. Both are
+   * read off ONE scroll listener (below): a second listener on the same element is a second thing
+   * running on every frame of a drag.
+   * ⚠️ `sessionInView` IS AN INDEX INTO `displayWorkouts`, resolved from which session card is
+   * nearest the top of the panel. 0 until the athlete scrolls, so the screen opens on the day's
+   * first session exactly as §3b.4 left it.
+   */
+  const [parallax, setParallax] = useState(0);
+  const [sessionInView, setSessionInView] = useState(0);
+  const sessionRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [selectedPlannedWorkout, setSelectedPlannedWorkout] = useState<any | null>(null);
   const [executingWorkout, setExecutingWorkout] = useState<any | null>(null);
   const [markingComplete, setMarkingComplete] = useState(false);
   const [skippingSession, setSkippingSession] = useState(false);
   const [plannedDrawerStep, setPlannedDrawerStep] = useState<'detail' | 'skip' | 'swap'>('detail');
   const [swappingSession, setSwappingSession] = useState(false);
+  /**
+   * ⛔ THE SWAP'S SCOPE (work order 2026-09-09 §6) — the same Just today / Rest of plan the lift
+   * swap offers. ⚠️ IT RESETS TO "just today" EVERY TIME THE SHEET OPENS: rewriting the rest of
+   * a plan is not a setting to inherit from the last session the athlete happened to change.
+   */
+  const [swapRestOfPlan, setSwapRestOfPlan] = useState(false);
   const declaredPosture = useDeclaredPosture();
   // ⛔ Gates the HARD-ride swap: no usable FTP, no watts, so it is not offered.
   const resolvedFtp = useResolvedFtp();
@@ -233,6 +268,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     [homeArcReady, homeArc]
   );
   const arcNeedsGoals = useMemo(() => arcLineNeedsGoalsSetup(homeArc as ArcForHomeLine), [homeArc]);
+
+  /**
+   * ⛔ THE BLOCK LABEL, RIGHT-ALIGNED ON THE DATE LINE (Michael, 2026-09-09). It is the FIRST
+   * segment of the arc line — "Build block", "Recovery", "Base" — which used to have a row of its
+   * own under the date. ⚠️ THE STRING IS NOT REBUILT HERE: it is `buildArcLine`'s output, cut at the
+   * separator that line already uses, so the label and the sentence cannot drift.
+   * ⚠️ NOT WHEN THE ARC LINE IS THE SEASON CTA — that one is a door and keeps its own row.
+   */
+  const blockLabel = useMemo(() => {
+    if (!homeArcReady || !arcLineText || arcNeedsGoals) return null;
+    const head = arcLineText.split('·')[0]?.trim();
+    return head || null;
+  }, [homeArcReady, arcLineText, arcNeedsGoals]);
 
 
   // Use local timezone to derive YYYY-MM-DD as seen by the user
@@ -285,6 +333,25 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     }
   };
 
+  /**
+   * ⛔ DAY NAVIGATION ON THE DATE LINE (Michael, 2026-09-09) — a chevron each side and a horizontal
+   * swipe, one day at a time, past or future with no stops. ⚠️ IT REUSES `week:navigate`: that event
+   * means "make this the active date", which is exactly what this asks for, and a second event doing
+   * the same thing to the same state is how two navigations start disagreeing. Only its NAME is
+   * about weeks, and renaming it would touch the calendar for nothing.
+   */
+  const handleDayNav = (direction: 'prev' | 'next') => {
+    const next = addDays(new Date(activeDate + 'T12:00:00'), direction === 'prev' ? -1 : 1);
+    window.dispatchEvent(new CustomEvent('week:navigate', { detail: { date: toDateOnlyString(next) } }));
+  };
+
+  /**
+   * ⛔ THE SWIPE IS THE DATE LINE'S AND STOPS THERE. The decks below run their own pointer handlers,
+   * so a gesture that starts here must not travel — `stopPropagation` on every phase, and
+   * `touchAction: 'pan-y'` so a vertical scroll still scrolls rather than being eaten.
+   */
+  const dateSwipe = useRef<{ x: number; moved: number } | null>(null);
+
   const handleWeekNav = (direction: 'prev' | 'next') => {
     const newDate = direction === 'prev' 
       ? addDays(weekStart, -7) 
@@ -294,7 +361,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   };
 
   // Unified lookup - use week range for training plan context, but filter items to active date
-  const { items: allUnifiedItems = [], loading: unifiedLoading, trainingPlanContext } = useWeekUnified(fromISO, toISO);
+  const { items: allUnifiedItems = [], weeklyStats, loading: unifiedLoading, trainingPlanContext } = useWeekUnified(fromISO, toISO);
   // First card (2026-09-07): an athlete with no plan at all gets two doors in the empty space
   // where a session would sit, instead of a 38%-opacity line that vanishes when one fetch fails.
   // `detailedPlans` is every plan on the account (AppContext), `trainingPlanContext` the week's.
@@ -648,7 +715,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
    * ⚠️ NEVER BLOCKED. A swap with warnings is still applied — the warnings are shown beside the
    * button, not in place of it. That is the guardrail rule: warn, do not gate.
    */
-  const handleApplyDisciplineSwap = async (workout: any, option: SwapOption) => {
+  const handleApplyDisciplineSwap = async (workout: any, option: SwapOption, restOfPlan = false) => {
     const userId = getStoredUserId();
     if (!userId || !workout?.id) {
       toast({ title: 'Error', description: 'Please log in to change a session', variant: 'destructive' });
@@ -656,8 +723,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     }
     setSwappingSession(true);
     try {
+      const write = await resolveSwapWrite(userId, workout as never, option);
       const { error } = await supabase
-        .from('planned_workouts').update(option.patch).eq('id', workout.id).eq('user_id', userId);
+        .from('planned_workouts').update(write.patch).eq('id', workout.id).eq('user_id', userId);
       if (error) throw error;
       /**
        * ⛔ THE HARD RIDE IS NOT FINISHED UNTIL THE SERVER EXPANDS IT (2026-08-09). The patch wrote
@@ -669,7 +737,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
        * ⚠️ AWAITED, so the invalidations below fire against the expanded row. The same single-row
        * entry point `usePlannedWorkoutLink` and `UnifiedWorkoutView` already use — no new function.
        */
-      if (option.needsMaterialize) {
+      if (write.needsMaterialize) {
         try {
           await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(workout.id) } });
         } catch (e) {
@@ -678,7 +746,73 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           console.warn('[swap] materialize-plan failed for the hard ride:', e);
         }
       }
-      toast({ title: `Swapped to a ${option.to === 'ride' ? 'ride' : option.to}`, variant: 'default' });
+      /**
+       * ═══ REST OF PLAN ═════════════════════════════════════════════════════════════════════════
+       *
+       * ⛔ EVERY LATER REPEAT OF THIS SESSION, RE-ASKED ONE ROW AT A TIME. `sameSwapOn` builds each
+       * row its OWN patch — a machine patch carries that row's tag list, a hike patch that row's
+       * minutes — because copying this row's patch across would overwrite theirs with ours.
+       *
+       * ⚠️ TODAY IS ALREADY WRITTEN ABOVE AND IS NOT REVISITED (`gt` on the date). And a row that
+       * cannot take the swap is SKIPPED, not forced: `sameSwapOn` returns null for a session already
+       * logged, already indoors, or no longer the long day.
+       *
+       * ⚠️ THE FAILURE IS NON-FATAL. Today's swap has already succeeded by this point; if the later
+       * rows fail, the athlete is told what did happen rather than shown an error for a write that
+       * worked. Nothing is rolled back — a reverted swap the athlete asked for is the worse outcome.
+       */
+      let alsoWritten = 0;
+      if (restOfPlan) {
+        try {
+          const q = supabase
+            .from('planned_workouts')
+            .select('id,date,type,name,tags,workout_status,duration,total_duration_seconds,steps_preset,computed,training_plan_id')
+            .eq('user_id', userId)
+            .eq('workout_status', 'planned')
+            .gt('date', String(workout.date).slice(0, 10));
+          const planId = (workout as any)?.training_plan_id ?? null;
+          const { data: later } = await (planId ? q.eq('training_plan_id', planId) : q);
+          const rows = Array.isArray(later) ? later : [];
+          for (const row of rows) {
+            if (!isPlanTwin(workout as never, row as never)) continue;
+            const same = sameSwapOn(row as never, option, {
+              available: availableDisciplines(Array.isArray(allUnifiedItems) ? allUnifiedItems : []),
+              posture: declaredPosture,
+              ftp: resolvedFtp,
+              // The ground-impact gate wants that row's OWN week, which is not loaded. Absent means
+              // "not asked": the treadmill is offered, and nothing else is.
+              weekSessions: [],
+            });
+            if (!same) continue;
+            // ⚠️ RE-ASKED PER ROW HERE TOO. A later row's band can differ from today's, and the
+            // family it is handed depends on the band — so the session is resolved against THAT row.
+            const laterWrite = await resolveSwapWrite(userId, row as never, same);
+            const { error: e2 } = await supabase
+              .from('planned_workouts').update(laterWrite.patch).eq('id', row.id).eq('user_id', userId);
+            if (e2) continue;
+            if (laterWrite.needsMaterialize) {
+              try {
+                await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(row.id) } });
+              } catch { /* the row is swapped either way; a re-open re-materialises it */ }
+            }
+            alsoWritten += 1;
+          }
+        } catch (e) {
+          console.warn('[swap] rest-of-plan write failed after today succeeded:', e);
+        }
+      }
+
+      const what = option.kind === 'venue'
+        ? `Moved to the ${(swapButtonLabel(option) || 'machine').toLowerCase()}`
+        : option.kind === 'hike'
+          ? 'Swapped to a hike'
+          : `Swapped to a ${option.to === 'ride' ? 'ride' : option.to}`;
+      toast({
+        // ⛔ SAY HOW MANY, NOT "rest of plan". The athlete asked for the rest of the plan; what they
+        // get is the sessions it actually held, and that number is the receipt.
+        title: alsoWritten > 0 ? `${what} — this and ${alsoWritten} later` : what,
+        variant: 'default',
+      });
       setSelectedPlannedWorkout(null);
       setPlannedDrawerStep('detail');
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
@@ -872,7 +1006,23 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     return items
       .map((it:any) => {
         const isCompleted = String(it?.status||'').toLowerCase()==='completed';
-        if (isCompleted) return it?.completed_workout ?? mapUnifiedItemToCompleted(it);
+        if (isCompleted) {
+          const row = it?.completed_workout ?? mapUnifiedItemToCompleted(it);
+          /**
+           * ⛔ THE PERFORMANCE PAYLOAD AND THE NAME RIDE ON THE ITEM, NOT INSIDE `completed_workout`
+           * (2026-09-09). `get-week` emits `workout_analysis` and `name` at the item's top level; the
+           * server's `completed_workout` block carries neither, and this branch prefers that block —
+           * so the completed card reached the screen with no `session_detail_v1` and the four
+           * Performance tiles had nothing to draw.
+           * ⚠️ THE BLOCK STILL WINS WHERE IT HAS A VALUE. This only fills what it does not carry, so
+           * a row whose analysis genuinely has not run still shows no tiles — the honest state.
+           */
+          return {
+            ...row,
+            workout_analysis: row?.workout_analysis ?? it?.workout_analysis ?? null,
+            name: row?.name ?? it?.name ?? null,
+          };
+        }
         return it?.planned_workout ?? null;
       })
       .filter(Boolean);
@@ -1400,6 +1550,38 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     }
   };
 
+  /**
+   * ⛔ §3d — ONE SCROLL LISTENER FEEDS BOTH the grid's drift and the bleed's colour. It runs on
+   * every frame of a flick, so it does no work beyond reading `scrollTop` and a handful of
+   * `offsetTop`s, and it writes state only when the resolved session actually changes.
+   *
+   * ⚠️ `offsetTop`, NOT `getBoundingClientRect` — the rect forces layout on a scrolling element and
+   * this is the one place in the file that would do it sixty times a second.
+   */
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const top = el.scrollTop;
+      setParallax(Math.round(top * 0.25));
+      // The session in view is the LAST one whose top has passed the panel's upper third.
+      const line = top + el.clientHeight * 0.34;
+      let next = 0;
+      sessionRefs.current.forEach((node, i) => {
+        // ⚠️ `offsetTop === 0` ON A LATER SESSION MEANS "NOT LAID OUT YET", not "at the top". The
+        // first pass runs before layout settles, and without this guard every session satisfied the
+        // test at once — the LAST one won and the screen opened on the wrong sport's colour.
+        if (!node) return;
+        if (i > 0 && node.offsetTop === 0) return;
+        if (node.offsetTop <= line) next = i;
+      });
+      setSessionInView((prev) => (prev === next ? prev : next));
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => el.removeEventListener('scroll', onScroll);
+  }, [displayWorkouts]);
+
   const isPastDate = activeDate < today;
   const isToday = activeDate === today;
 
@@ -1441,7 +1623,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   return (
     <div className="w-full h-full flex flex-col" style={{ position:'relative', overflow: 'hidden', zIndex: 0 }}>
-      {/* Omni-inspired diamond-grid texture (matches reference) */}
+      {/**
+        * Omni-inspired diamond-grid texture (matches reference).
+        *
+        * ⛔ IT DRIFTS AGAINST THE SCROLL (work order §3d) — about a quarter of scroll speed, so the
+        * cards read as floating over the grid rather than painted onto it. ⚠️ ONLY THE FOUR LINE
+        * LAYERS MOVE; the vignette stays centred, or the dark corners would slide off the panel.
+        */}
       <div
         aria-hidden="true"
         style={{
@@ -1460,33 +1648,63 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             radial-gradient(ellipse at center, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.55) 100%)
           `,
           backgroundSize: '26px 26px, 26px 26px, 52px 52px, 52px 52px, cover',
-          backgroundPosition: 'center, center, center, center, center',
+          backgroundPosition: `center ${-parallax}px, center ${-parallax}px, center ${-parallax}px, center ${-parallax}px, center`,
         }}
       />
-      {/* Glow-field behind the Today panel (restores “Today halo”) */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'absolute',
-          left: '-16px',
-          right: '-16px',
-          top: '-24px',
-          height: '220px',
-          zIndex: 0,
-          pointerEvents: 'none',
-          mixBlendMode: 'screen',
-          backgroundImage: `
+      {/**
+        * Glow-field behind the Today panel (the “Today halo”).
+        *
+        * ⛔ THE COLOUR FOLLOWS THE DAY (work order 2026-09-09 §3b.4). The bleed used to burn all five
+        * sport hues at once, every day — the visual language's *"soft sport-colour bleed from the
+        * top"* rendered as a rainbow that said nothing about what the athlete is doing. It now takes
+        * the colour of the day's FIRST session, off the same tag-keyed display discipline the
+        * sessions themselves wear, so the top of the screen and the first card agree.
+        *
+        * ⚠️ A REST DAY KEEPS THE NEUTRAL BLEED — the five-hue field below. With nothing planned there
+        * is no sport to take a colour from, and picking one would be decoration claiming to be
+        * information.
+        */}
+      {(() => {
+        /**
+         * ⛔ THE BLEED FOLLOWS THE SESSION IN VIEW (§3d), not just the day's first one (§3b.4).
+         * Lift orange becomes ride green as the ride card scrolls up. `sessionInView` is the index
+         * the scroll handler resolves; before a scroll it is 0, so the screen still opens on the
+         * first session's colour and §3b.4 is unchanged for a day nobody scrolls.
+         */
+        const inView = displayWorkouts[Math.min(sessionInView, Math.max(0, displayWorkouts.length - 1))];
+        const rgb = inView ? getDisciplineColorRgb(displayDisciplineOf(inView)) : null;
+        return (
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              left: '-16px',
+              right: '-16px',
+              top: '-24px',
+              height: '220px',
+              zIndex: 0,
+              pointerEvents: 'none',
+              mixBlendMode: 'screen',
+              backgroundImage: rgb
+                ? `
+            radial-gradient(320px 150px at 28% 42%, rgba(${rgb}, 0.30) 0%, rgba(${rgb}, 0.0) 74%),
+            radial-gradient(300px 160px at 68% 52%, rgba(${rgb}, 0.18) 0%, rgba(${rgb}, 0.0) 74%)
+          `
+                : `
             radial-gradient(200px 120px at 18% 40%, rgba(255, 215, 0, 0.28) 0%, rgba(255, 215, 0, 0.0) 72%),
             radial-gradient(220px 140px at 40% 52%, rgba(255, 140, 66, 0.20) 0%, rgba(255, 140, 66, 0.0) 72%),
             radial-gradient(220px 140px at 60% 52%, rgba(183, 148, 246, 0.18) 0%, rgba(183, 148, 246, 0.0) 72%),
             radial-gradient(200px 120px at 82% 40%, rgba(74, 158, 255, 0.18) 0%, rgba(74, 158, 255, 0.0) 72%),
             radial-gradient(260px 170px at 50% 72%, rgba(239, 68, 68, 0.14) 0%, rgba(239, 68, 68, 0.0) 76%)
           `,
-          opacity: 0.60,
-          filter: 'blur(24px) saturate(1.12)',
-          transform: 'translateZ(0)',
-        }}
-      />
+              opacity: 0.60,
+              filter: 'blur(24px) saturate(1.12)',
+              transform: 'translateZ(0)',
+              transition: 'background-image 300ms ease',
+            }}
+          />
+        );
+      })()}
       {/* First-run card sits ABOVE the Today panel: inside it, it ate the panel's fixed height and
           pushed the session rows under the fold (seen on the demo account, 2026-09-07). */}
       {!noPlanYet ? (
@@ -1571,81 +1789,118 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           }}
         >
           <div className="space-y-0.5">
-            {/* Line 1: Date - Live channel (brightest, energized, more phosphor) */}
-            <div>
-              <span 
-                className="text-[0.82rem] font-light tracking-wide" 
-                style={{ 
-                  color: 'rgba(255, 255, 255, 1.0)', // Maximum brightness - primary instrument readout
-                  textShadow: '0 0 3px rgba(255, 240, 200, 0.25), 0 0 6px rgba(255, 240, 200, 0.15), 0 0 2px rgba(255, 255, 255, 0.2)', // Stronger backlit LCD glow with warm phosphor
+            {/* ⛔ THE WEATHER SITS ABOVE THE DATE (work order 2026-09-09 §3b.1) — temperature and
+                feels-like, the condition as an icon, humidity with dew point, wind, sunrise and
+                sunset. It only draws for today; there is no historical weather to show for another
+                day. See `TodayWeather`. */}
+            {weather && isTodayDate ? (
+              <TodayWeather weather={weather} className="pb-1" />
+            ) : null}
+
+            {/**
+              * ⛔ ONE LINE, NOT FOUR (Michael, 2026-09-09): the date, the plan week and the phase
+              * run together, with the block label right-aligned and small on the same line. Four
+              * stacked lines above the sessions is what pushed LOAD off a 390×844 screen.
+              * ⚠️ NOTHING NEW IS SAID. `formatDisplayDate`, `currentWeek`, `focus` and the arc's
+              * block label are the strings that were already here, joined with the separator this
+              * line already used. The city and the race countdown keep their own line below, since
+              * neither is about the day.
+              */}
+            <div
+              className="flex items-baseline justify-between gap-2"
+              style={{ touchAction: 'pan-y' }}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                dateSwipe.current = { x: e.clientX, moved: 0 };
+              }}
+              onPointerMove={(e) => {
+                if (!dateSwipe.current) return;
+                e.stopPropagation();
+                dateSwipe.current.moved = e.clientX - dateSwipe.current.x;
+                /**
+                 * ⛔ CAPTURE ONLY ONCE IT IS A DRAG, NOT ON EVERY TOUCH. Two failures, one each way:
+                 *   · WITHOUT capture, the pointerup landed on whichever chevron the swipe had
+                 *     travelled over, so that button's click fired `prev` while the swipe fired
+                 *     `next` and the date did not move.
+                 *   · CAPTURING ON pointerdown retargets the pointer events to this row, so the
+                 *     browser dispatches the following `click` here rather than on the button — and
+                 *     the chevrons stopped working entirely.
+                 * Capturing at the 8 px mark separates them: a tap never captures and reaches its
+                 * button; a drag captures and finishes here.
+                 */
+                if (Math.abs(dateSwipe.current.moved) > 8) {
+                  try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* older webviews */ }
+                }
+              }}
+              onPointerUp={(e) => {
+                const g = dateSwipe.current;
+                dateSwipe.current = null;
+                if (!g) return;
+                e.stopPropagation();
+                // Same 60 px the decks use, so one gesture threshold governs the screen.
+                if (g.moved < -60) handleDayNav('next');
+                else if (g.moved > 60) handleDayNav('prev');
+              }}
+              onPointerCancel={(e) => { e.stopPropagation(); dateSwipe.current = null; }}
+            >
+              <button
+                type="button"
+                aria-label="Previous day"
+                /* ⚠️ A DRAG IS NOT A TAP — the same rule the decks keep. */
+                onClick={(e) => { e.stopPropagation(); if (Math.abs(dateSwipe.current?.moved ?? 0) > 8) return; handleDayNav('prev'); }}
+                className="p-0.5 -ml-1 rounded-xl flex-shrink-0 self-center text-white/40 hover:text-white/85 transition-colors"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span
+                className="text-[0.82rem] font-light tracking-wide truncate"
+                style={{
+                  color: 'rgba(255, 255, 255, 1.0)',
+                  textShadow: '0 0 3px rgba(255, 240, 200, 0.25), 0 0 6px rgba(255, 240, 200, 0.15), 0 0 2px rgba(255, 255, 255, 0.2)',
                   lineHeight: 1.05,
                 }}
               >
                 {formatDisplayDate(activeDate)}
+                {trainingPlanContext?.currentWeek ? (
+                  <span style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.72 }}>
+                    {' · '}Week {trainingPlanContext.currentWeek}
+                  </span>
+                ) : null}
+                {trainingPlanContext?.focus ? (
+                  <span style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.72 }}>
+                    {' · '}{trainingPlanContext.focus}
+                  </span>
+                ) : null}
               </span>
+              {blockLabel ? (
+                <span
+                  className="text-[0.62rem] font-light tracking-wide flex-shrink-0"
+                  style={{ color: 'rgba(255,255,255,0.38)', lineHeight: 1.05 }}
+                >
+                  {blockLabel}
+                </span>
+              ) : null}
+              <button
+                type="button"
+                aria-label="Next day"
+                onClick={(e) => { e.stopPropagation(); if (Math.abs(dateSwipe.current?.moved ?? 0) > 8) return; handleDayNav('next'); }}
+                className="p-0.5 -mr-1 rounded-xl flex-shrink-0 self-center text-white/40 hover:text-white/85 transition-colors"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
             </div>
 
-            {/* Line 2: Weather + Location - Visible but secondary */}
-            {(weather || cityName) && (
-              <div className="flex items-center gap-1 flex-wrap">
-                {weather && isTodayDate && (
-                  <span className="text-[0.68rem] font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.62)', lineHeight: 1.1 }}>
-                    {Math.round(weather.temperature)}°F {weather.condition}
-                    {typeof weather.daily_high === 'number' ? ` • High ${Math.round(weather.daily_high)}°` : ''}
-                    {weather.sunrise && weather.sunset ? (()=>{ 
-                      try { 
-                        const fmt = (iso: string) => { 
-                          const d = new Date(iso); 
-                          return d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }).replace(/\s?AM|\s?PM/i, (m) => m.trim().toLowerCase()); 
-                        }; 
-                        return ` • ${fmt(weather.sunrise)}/${fmt(weather.sunset)}`; 
-                      } catch { 
-                        return ''; 
-                      }
-                    })() : ''}
-                  </span>
-                )}
-                {/* City name from geolocation (show for any date if available) */}
-                {cityName && (
-                  <span className="text-[0.68rem] font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.62)', lineHeight: 1.1 }}>
-                    {weather && isTodayDate ? ' • ' : ''}{cityName}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Line 3: Week + Focus + Event - Yellow (run plan), dimmer than Today */}
-            {trainingPlanContext && (trainingPlanContext.currentWeek || trainingPlanContext.focus || (trainingPlanContext.raceDate && trainingPlanContext.weeksToRace)) && (
-              <div
-                className="text-[0.68rem] font-extralight tracking-normal"
-                style={{
-                  color: getDisciplinePhosphorCore('run'),
-                  opacity: 0.62,
-                  lineHeight: 1.1,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}
-              >
-                {trainingPlanContext.currentWeek && (
-                  <span>Week {trainingPlanContext.currentWeek}</span>
-                )}
-                {trainingPlanContext.currentWeek && trainingPlanContext.focus && (
-                  <span> • </span>
-                )}
-                {trainingPlanContext.focus && (
-                  <span>{trainingPlanContext.focus}</span>
-                )}
-                {trainingPlanContext.focus && trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
-                  <span> • </span>
-                )}
-                {trainingPlanContext.raceDate && trainingPlanContext.weeksToRace && trainingPlanContext.weeksToRace > 0 && (
-                  <span className="font-light" style={{ 
-                    opacity: 0.8 // Slightly less bright than "Today" - yellow but dimmer
-                  }}>
+            {/* The city, and the race countdown — neither is about the day, so neither joins the
+                line above. */}
+            {(cityName || (trainingPlanContext?.raceDate && (trainingPlanContext?.weeksToRace ?? 0) > 0)) && (
+              <div className="flex items-center gap-1 flex-wrap text-[0.68rem] font-light tracking-normal" style={{ color: 'rgba(255, 255, 255, 0.55)', lineHeight: 1.1 }}>
+                {cityName ? <span>{cityName}</span> : null}
+                {cityName && trainingPlanContext?.raceDate && (trainingPlanContext?.weeksToRace ?? 0) > 0 ? <span>·</span> : null}
+                {trainingPlanContext?.raceDate && (trainingPlanContext?.weeksToRace ?? 0) > 0 ? (
+                  <span style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.62 }}>
                     {trainingPlanContext.weeksToRace} {trainingPlanContext.weeksToRace === 1 ? 'wk' : 'wks'} till {trainingPlanContext.raceName || 'race'}
                   </span>
-                )}
+                ) : null}
               </div>
             )}
           </div>
@@ -1670,8 +1925,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </div>
         ) : null}
 
-        {homeArcReady && arcLineText && !(arcNeedsGoals && noPlanYet) ? (
-          <div className="flex-shrink-0 px-2 pt-2 pb-1">
+        {/* ⚠️ THE ARC LINE KEEPS ITS OWN ROW ONLY WHEN IT IS A DOOR. Its block label now rides on
+            the date line; the rest of the sentence is still worth a line when it asks for a tap. */}
+        {homeArcReady && arcLineText && arcNeedsGoals && !noPlanYet ? (
+          <div className="flex-shrink-0 px-2 pt-1">
             {arcNeedsGoals ? (
               <button
                 type="button"
@@ -1709,7 +1966,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         <div className="px-2 overflow-x-hidden" style={{ paddingBottom: hasExpandedWorkout ? 120 : 56 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state - show "Rest" if there's an active plan, otherwise "No effort"
-          <div className="flex items-center justify-center h-full px-4">
+          <div className="px-4 py-10">
             <p className="text-center text-lg font-medium italic" style={{ color: 'rgba(255, 255, 255, 0.25)' }}>
               {trainingPlanContext
                 ? 'Rest'
@@ -1718,19 +1975,70 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   : 'No effort scheduled'
               }
             </p>
+            {/* ⛔ THE WEEK STILL SHOWS ON A REST DAY. The load bars and the counts describe the
+                WEEK, not the day — a rest day is exactly when an athlete looks at what the week
+                has come to. Only the day's own sessions go quiet (§2.4). */}
+            <TodayWeekBlocks weekRows={allUnifiedItems as never} weeklyStats={weeklyStats as never} className="mt-8" />
           </div>
         ) : (
-          // “Titles only” list: tap opens bottom sheet (planned) or detail (completed)
+          // Tap opens bottom sheet (planned) or detail (completed). Each planned session carries the
+          // day's own lines beneath it — work order 2026-09-09 §2.
           <div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.30rem' }}>
-              {displayWorkouts.map((workout) => {
+            {/* ⛔ THE SPACING LINE, ABOVE THE SESSIONS AND CARRYING NO SPORT COLOUR (§2b). It shows
+                only on a day that is a lift and a ride or run; every other day gets nothing. */}
+            <TodaySpacingLine rows={displayWorkouts as never} />
+            {/* ⛔ 14 px BETWEEN SESSIONS (Michael, 2026-09-09). Each deck and card already
+                carries its own 14 px bottom margin, so the list adds none — two gaps stacked is
+                what pushed LOAD under the fold on a two-session day. */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {displayWorkouts.map((workout, sessionIdx) => {
+                /* ⛔ ONE MEASURED WRAPPER PER SESSION, so the scroll handler can say which one is in
+                   view without every card having to know its own index. */
+                const wrap = (node: React.ReactNode) => (
+                  <div key={workout.id} ref={(el) => { sessionRefs.current[sessionIdx] = el; }}>
+                    {node}
+                  </div>
+                );
+                /**
+                 * ⛔⛔ TODAY IS ONE CARD OBJECT AT THREE STATES. A planned lift or plyo day swipes as
+                 * a deck, a planned ride or run is one glass card, and a COMPLETED session is the
+                 * same card greyed (Michael, 2026-09-09). ⚠️ THE PILL ROW BELOW IS NOW ONLY FOR A
+                 * SKIPPED SESSION, which says why it was skipped and is not a reading of anything.
+                 *
+                 * ⛔ AND A DONE SESSION OPENS ON PERFORMANCE, not in the planned drawer.
+                 * `handleEditEffort` already routes a completed row there (`AppLayout`: *"Completed:
+                 * open on Performance tab"*), so this asks for the door that exists.
+                 */
+                const isCompletedRow = (w: { workout_status?: unknown }) =>
+                  String(w?.workout_status ?? '').toLowerCase() === 'completed';
+                if (rendersAsSessionCard(workout as never, isPastDate)) {
+                  return wrap(
+                    <TodaySession
+                      session={workout as never}
+                      useImperial={useImperial}
+                      isPastDate={isPastDate}
+                      onOpen={() => (isCompletedRow(workout)
+                        ? onEditEffort?.(workout)
+                        : setSelectedPlannedWorkout(workout))}
+                    />,
+                  );
+                }
+
                 const workoutType = workout.type || workout.workout_type || '';
+                /**
+                 * ⛔ THE DISPLAY DISCIPLINE FEEDS THE COLOUR; THE WIRE TYPE STILL FEEDS THE
+                 * REASONING (2026-09-09). The plyo day is `type: 'strength'` and must not wear
+                 * strength's orange — the same seam the calendar draws its magenta chip from. Only
+                 * the pill, the glow and the title colour move; `isEnduranceType` below keeps
+                 * asking the real type, because that question is about what the session IS.
+                 */
+                const displayType = displayDisciplineOf(workout);
                 const isCompleted = workout.workout_status === 'completed';
                 const isSkipped = String(workout.workout_status || '').toLowerCase() === 'skipped';
                 const isPlannedRow = !isCompleted;
                 const glowState: 'idle' | 'week' | 'done' | 'active' = isCompleted ? 'done' : 'week';
-                const phosphorPill = getDisciplinePhosphorPill(workoutType, glowState);
-                const pillRgb = getDisciplineColorRgb(workoutType);
+                const phosphorPill = getDisciplinePhosphorPill(displayType, glowState);
+                const pillRgb = getDisciplineColorRgb(displayType);
                 const providerAttr = isCompleted ? getProviderAttribution(workout) : { source: null as any };
                 const showImportAttribution = isCompleted && !!providerAttr?.source;
                 const showEnduranceDetails = isCompleted && isEnduranceType(workoutType);
@@ -1772,6 +2080,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   if (opts.length === 0) return null;
                   const openSwap = () => {
                     setSelectedPlannedWorkout(workout);
+                    setSwapRestOfPlan(false);
                     setPlannedDrawerStep('swap');
                   };
                   return (
@@ -1912,7 +2221,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       <div
                         className="font-medium tracking-normal text-base"
                         style={{
-                          color: isCompleted ? 'rgba(255, 255, 255, 0.92)' : getDisciplinePhosphorCore(workoutType),
+                          color: isCompleted ? 'rgba(255, 255, 255, 0.92)' : getDisciplinePhosphorCore(displayType),
                           // Legibility: slight dark edge + faint discipline bloom
                           textShadow: isCompleted
                             ? `0 1px 1px rgba(0,0,0,0.65), 0 0 8px rgba(0,0,0,0.45)`
@@ -2037,16 +2346,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 );
               })}
             </div>
-            {/* Two-a-day spacing (p108, the hybrid two-a-day rule): a lift and an endurance session on
-                one date. Words are Michael's (2026-09-08). */}
-            {(() => {
-              const kinds = new Set(displayWorkouts.map((w: any) => String(w?.type || '').toLowerCase()));
-              const hasLift = kinds.has('strength');
-              const hasEndurance = ['run', 'ride', 'bike', 'cycling', 'swim', 'walk'].some((k) => kinds.has(k));
-              return hasLift && hasEndurance ? (
-                <p className="m-0 mt-2 px-1 text-[12px] text-white/55">Two sessions today. Six to eight hours apart.</p>
-              ) : null;
-            })()}
+            {/* ⛔ THE SPACING LINE MOVED TO THE TOP OF THE DAY (work order 2026-09-09 §2.1), and it
+                gained the second half the page always had: what to do when the two sessions cannot
+                be six to eight hours apart. The block that stood here printed the lead sentence
+                alone, keyed off the row's TYPE rather than its tags, and counted a swim or a walk as
+                the endurance half of a pairing p145 writes about a ride or a run. See
+                `TodaySpacingLine` above the list. */}
+
+            {/* ⛔ THE WEEK, UNDER THE DAY (§3b.2 / §3b.3) — the load bars per sport and this week's
+                counts. It reads the week `get-week` already returned, so the day above and the
+                totals below cannot disagree about what was logged. */}
+            <TodayWeekBlocks weekRows={allUnifiedItems as never} weeklyStats={weeklyStats as never} className="mt-[14px]" />
           </div>
         )}
         </div>
@@ -2256,8 +2566,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                  * that has never contained a swim is not evidence they can swim. `unifiedItems` is
                  * the week the client already holds, so this costs no fetch.
                  */
+                /**
+                 * ⛔ ONE SHEET, TWO READERS (work order 2026-09-09). `getDisciplineSwaps` answers
+                 * "which SPORT can this become"; `sessionSwapExtras` answers "the same session on a
+                 * machine, or the long day as a hike" — neither of which is a sport change, and both
+                 * of which return `to === from`. They are separate so `to` keeps one meaning; the
+                 * athlete sees one list.
+                 */
                 const swapOptions: SwapOption[] = w
-                  ? getDisciplineSwaps(
+                  ? [...sessionSwapExtras(
+                      w,
+                      declaredPosture,
+                      // p275's ground-impact rule needs the WEEK, not the day.
+                      Array.isArray(allUnifiedItems) ? (allUnifiedItems as never) : [],
+                    ), ...getDisciplineSwaps(
                       w,
                       // ⛔ THE WEEK, NOT THE DAY (2026-08-08). `unifiedItems` is filtered to
                       // `activeDate`, so asking it which sports the athlete has answered with only
@@ -2279,23 +2601,42 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       declaredPosture,
                       // ⛔ Gates the HARD ride only — see `useResolvedFtp`. Easy swaps ignore it.
                       resolvedFtp,
-                    )
+                    )]
                   : [];
                 if (plannedDrawerStep === 'swap' && w) {
                   return (
                     <div className="flex flex-col gap-2 w-full">
-                      <div className="text-[13px] text-white/70 pb-1">
-                        Same day, same time. Pick the sport you want instead.
+                      {/* ⛔ MICHAEL'S HEADER (2026-09-09), from `swap-copy` with every other word here. */}
+                      <div className="text-[13px] text-white/70 pb-1">{SWAP_SHEET_HEADER}</div>
+                      {/* ⛔ THE SAME TWO CHOICES THE LIFT SWAP OFFERS (work order §6). Just today is the
+                          default — one row — and Rest of plan writes this session's later repeats too. */}
+                      <div className="flex items-center gap-2 pb-1">
+                        <button
+                          type="button"
+                          onClick={() => setSwapRestOfPlan(false)}
+                          className={`px-2.5 py-1 rounded-xl text-[12px] border transition-colors ${!swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/70 hover:text-white/80'}`}
+                        >Just today</button>
+                        <button
+                          type="button"
+                          onClick={() => setSwapRestOfPlan(true)}
+                          className={`px-2.5 py-1 rounded-xl text-[12px] border transition-colors ${swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/70 hover:text-white/80'}`}
+                        >Rest of plan</button>
                       </div>
                       {swapOptions.map((opt) => (
                         <button
-                          key={opt.to}
+                          /* ⚠️ THE KEY IS THE KIND AND THE TARGET — a machine and a sport swap can
+                             both carry the same `to`, so `to` alone repeats. */
+                          key={`${opt.kind ?? 'discipline'}:${opt.venue ?? opt.to}`}
                           type="button"
                           disabled={swappingSession}
-                          onClick={() => handleApplyDisciplineSwap(w, opt)}
+                          onClick={() => handleApplyDisciplineSwap(w, opt, swapRestOfPlan)}
                           className="w-full px-4 py-3 rounded-xl text-left text-white border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] transition-colors disabled:opacity-50"
                         >
-                          <div className="text-sm font-medium">{opt.label}</div>
+                          <div className="text-sm font-medium">{swapButtonLabel(opt)}</div>
+                          {/* ⛔ MICHAEL'S LINE, FROM `swap-copy` — one owner for every word here. */}
+                          {swapLineFor(opt) ? (
+                            <div className="text-[12px] text-white/55 mt-1">{swapLineFor(opt)}</div>
+                          ) : null}
                           {/* ⛔ WARN, NEVER GATE — the button above still works. */}
                           {opt.warnings.map((warn) => (
                             <div key={warn} className="text-[12px] text-amber-200/80 mt-1">{warn}</div>
@@ -2342,7 +2683,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               {swapOptions.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => setPlannedDrawerStep('swap')}
+                  onClick={() => { setSwapRestOfPlan(false); setPlannedDrawerStep('swap'); }}
                   className="w-full px-4 py-3 rounded-xl font-medium tracking-wide text-white/85 border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] transition-colors flex items-center justify-center gap-2"
                 >
                   <ArrowLeftRight className="w-4 h-4" />

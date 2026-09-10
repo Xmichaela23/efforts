@@ -1,5 +1,5 @@
 import React from 'react';
-import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
+import { getDisciplineColor, getDisciplineColorRgb, formZoneColor } from '@/lib/context-utils';
 import { formZone } from '@shared/fitness-fatigue';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -65,17 +65,80 @@ function Dot() {
   return <span className="text-white/30 select-none">·</span>;
 }
 
-// TrainingPeaks' Form zones (Friel): the word beside the form number — fresh and optimal read plain, the
-// grey zone dim, transitional dim, high risk flagged.
-const FORM_ZONE_CLS: Record<string, string> = {
-  fresh: 'text-white/85', optimal: 'text-white/85', 'grey zone': 'text-white/55',
-  transitional: 'text-white/60', 'high risk': 'text-[#FF5A5F]',
-};
+// ⛔ THE ZONE WORD'S COLOUR HAS ONE OWNER (2026-09-09) — `formZoneColor` in `context-utils`, shared
+// with Today's LOAD card, so the same word cannot read green on one screen and white on the other.
+// It used to be a local class map here, and its high-risk case borrowed the Race card's coral.
 
 // ── LoadBar ──────────────────────────────────────────────────────────────────
 // The load section: TrainingPeaks' fitness · fatigue · form on the first line (2026-09-04), then the weekly
 // composition (which discipline carried the load — our differentiator, and the same "TSS by sport" split
 // TrainingPeaks draws on its dashboard) as the primary visual. Per-day detail lives in the calendar.
+
+const keyFmt1 = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? null : Math.round(v));
+
+/**
+ * ⛔ THE LOAD EXPLANATION, IN ONE PLACE (2026-09-09). Two surfaces open it — State, behind this
+ * bar's ⓘ, and Today's load card, behind its chevron. It is athlete-facing copy, and a second copy
+ * of these paragraphs is a second thing to keep true, so it is extracted rather than duplicated.
+ * ⚠️ SO A CHANGE HERE LANDS ON BOTH — which is the point: Michael's new form sentence reached State
+ * and Today in one edit, and neither can drift from the other.
+ *
+ * ⛔ AND SPLIT IN TWO, because Today's open LOAD card deals them as separate cards — the form table
+ * on one, the workload paragraph on another. The boundary falls between the two subjects: what a
+ * workload point is, and what form is.
+ */
+export function LoadKeyWorkload() {
+  return (
+    <p className="text-[12px] text-white/65 leading-snug">
+      Every session earns workload points. Fitness averages them over the last six weeks, fatigue over the last week. The small numbers are this week's change.
+    </p>
+  );
+}
+
+export function LoadKeyForm({ ff }: { ff: NonNullable<LoadBarData['fitness_fatigue']> }) {
+  const zone = formZone(ff?.form);
+  return (
+    <div className="text-[12px] text-white/65 leading-snug">
+      {/**
+        * ⛔ MICHAEL'S LINE (2026-09-09), VERBATIM. It replaced *"Form is one subtraction, fitness −
+        * fatigue, taken as you start the day … The word beside it comes from this table:"* — which
+        * named the arithmetic and never said what the SIGN means, the one thing a reader wants from
+        * a number that can go negative.
+        * ⚠️ AND NO LEAD-IN ABOVE THE TABLE. The old sentence ended by introducing it; his does not,
+        * and the table is left to stand on its own.
+        * ⚠️ THE NUMBERS ARE LIVE — his "47 − 63 = −16" is the shape, not the values. The sentence is
+        * dropped entirely when either number is missing, rather than printed with a blank in it.
+        */}
+      <p>
+        Form is fitness minus fatigue. Below zero you are training harder than usual, building but tired. Above zero you are rested.
+        {keyFmt1(ff.fitness_prior) != null && keyFmt1(ff.fatigue_prior) != null
+          ? ` Today: ${keyFmt1(ff.fitness_prior)} − ${keyFmt1(ff.fatigue_prior)} = ${(ff.form ?? 0) > 0 ? '+' : (ff.form ?? 0) < 0 ? '−' : ''}${Math.abs(keyFmt1(ff.form) ?? 0)}.`
+          : ''}
+      </p>
+      <table className="mt-1 text-[12px] tabular-nums">
+        <tbody>
+          {([['above +25', 'transitional', 'fitness fading'], ['+5 to +25', 'fresh', 'race shape'], ['−10 to +5', 'grey zone', 'not building, not sharp'], ['−30 to −10', 'optimal', 'building'], ['below −30', 'high risk', '']] as Array<[string, string, string]>).map(([range, word, meaning]) => (
+            <tr key={word} className={zone === word ? 'text-white/95' : 'text-white/55'}>
+              <td className="pr-3 py-0.5 whitespace-nowrap">{range}</td>
+              <td className="pr-3 py-0.5 whitespace-nowrap">{zone === word ? '▸ ' : ''}{word}</td>
+              <td className="py-0.5">{meaning}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** State's ⓘ opens both halves at once, exactly as it always did. */
+export function LoadKey({ ff }: { ff: NonNullable<LoadBarData['fitness_fatigue']> }) {
+  return (
+    <div className="mt-1.5 max-w-[min(100%,360px)] space-y-1">
+      <LoadKeyWorkload />
+      <LoadKeyForm ff={ff} />
+    </div>
+  );
+}
 
 export default function LoadBar({ load, compact }: LoadBarProps) {
   const [showKey, setShowKey] = React.useState(false);
@@ -141,30 +204,14 @@ export default function LoadBar({ load, compact }: LoadBarProps) {
             <Dot />
             <span>
               form <span className="readout-num text-[13px] text-white/85">{(ff.form ?? 0) > 0 ? '+' : ''}{fmt1(ff.form)}</span>
-              {zone && <span className={`ml-1 ${FORM_ZONE_CLS[zone] ?? 'text-white/55'}`}>{zone}</span>}
+              {zone && <span className="ml-1" style={{ color: formZoneColor(zone) }}>{zone}</span>}
             </span>
           </div>
         ) : (
           <span className="text-[11px] text-white/40 leading-none">no sessions logged yet</span>
         )}
       </div>
-      {showKey && ff && (
-        <div className="mt-1.5 text-[12px] text-white/65 leading-snug max-w-[min(100%,360px)]">
-          <p>Every session earns workload points. Fitness averages them over the last six weeks, fatigue over the last week. The small numbers are this week's change.</p>
-          <p className="mt-1">Form is one subtraction, fitness − fatigue, taken as you start the day{fmt1(ff.fitness_prior) != null && fmt1(ff.fatigue_prior) != null ? `: ${fmt1(ff.fitness_prior)} − ${fmt1(ff.fatigue_prior)} = ${(ff.form ?? 0) > 0 ? '+' : ''}${fmt1(ff.form)}` : ''}. The word beside it comes from this table:</p>
-          <table className="mt-1 text-[12px] tabular-nums">
-            <tbody>
-              {([['above +25', 'transitional', 'fitness fading'], ['+5 to +25', 'fresh', 'race shape'], ['−10 to +5', 'grey zone', 'not building, not sharp'], ['−30 to −10', 'optimal', 'building'], ['below −30', 'high risk', '']] as Array<[string, string, string]>).map(([range, word, meaning]) => (
-                <tr key={word} className={zone === word ? 'text-white/95' : 'text-white/55'}>
-                  <td className="pr-3 py-0.5 whitespace-nowrap">{range}</td>
-                  <td className="pr-3 py-0.5 whitespace-nowrap">{zone === word ? '▸ ' : ''}{word}</td>
-                  <td className="py-0.5">{meaning}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {showKey && ff && <LoadKey ff={ff} />}
 
       {/* Composition strip — the primary load visual (full surface only). */}
       {!compact && comp.length > 0 && total > 0 && (

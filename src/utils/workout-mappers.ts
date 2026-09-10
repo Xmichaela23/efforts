@@ -55,6 +55,19 @@ export function mapUnifiedItemToCompleted(item: any): any {
     device_info: item.device_info || null,
     // Link to planned workout (for attached workouts)
     planned_id: item.planned?.id || item.planned_id || null,
+    /**
+     * ⛔ THE PERFORMANCE PAYLOAD AND THE ROW'S NAME, CARRIED (2026-09-09). `get-week` has selected
+     * and emitted both on the item for a while; this mapper dropped them, so a completed row on
+     * Today reached the screen with no `workout_analysis` — and the four Performance tiles, which
+     * read `workout_analysis.session_detail_v1`, had nothing to draw. The card fell back to its
+     * headline and looked like a session whose analysis had not landed.
+     *
+     * ⚠️ NOTHING IS COMPUTED HERE AND NOTHING IS DEFAULTED to a shape. Absent stays absent, so a row
+     * whose analysis genuinely has not run still shows no tiles — which is the honest state and the
+     * one this carry must not disguise.
+     */
+    workout_analysis: item.workout_analysis ?? null,
+    name: item.name ?? item.executed?.name ?? null,
   };
   
   return mapped;

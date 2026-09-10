@@ -4,7 +4,12 @@ import { SPORT_COLORS } from '@/lib/context-utils';
 // `src/lib/planned-session/duration.ts`.
 import { normalizeSessionType } from '@/lib/discipline';
 import { plannedDurationMinutes } from '@/lib/planned-session/duration';
+// ⛔ A LIFTING SESSION IS PRICED OFF ITS ROWS, NOT OFF A CONSTANT (work order 2026-09-09 §3c).
+import { formatStrengthSessionMinutes } from '@/lib/strength-session-minutes';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
+// ⛔ ONE TAG-KEYED SEAM between the wire type and what an athlete sees — the plyo day's colour, and
+// the reader that says a session IS the plyo day. The calendar already colours by these.
+import { displayDisciplineOf, isPlyoSession } from '@/lib/utils';
 
 /**
  * ═══ ONE HEADER FOR A PLANNED SESSION. Three surfaces render it; none of them own it. ═══════════
@@ -54,7 +59,15 @@ export type PlannedSessionHeaderProps = {
  * so walks, mobility and pilates/yoga must keep their own colours instead of collapsing to grey.
  */
 export function sportColorFor(type: unknown): string {
-  const canonical = normalizeSessionType(typeof type === 'string' ? type : String(type ?? ''));
+  const raw = (typeof type === 'string' ? type : String(type ?? '')).trim().toLowerCase();
+  /**
+   * ⛔ `plyo` IS A DISPLAY DISCIPLINE, NOT A WIRE TYPE, so it is answered before the canonical
+   * normalizer — which correctly returns `null` for it, since the session is `type: 'strength'`
+   * everywhere that reasons about it. Callers pass `displayDisciplineOf(row)`, the tag-keyed seam
+   * the calendar already colours by; this is the other end of it.
+   */
+  if (raw === 'plyo') return SPORT_COLORS.plyo;
+  const canonical = normalizeSessionType(raw);
   if (!canonical) return '#64748b';                       // unknown stays grey — never a guess
   const key = canonical === 'ride' ? 'bike' : canonical;  // SPORT_COLORS keys the bike as `bike`
   return SPORT_COLORS[key as keyof typeof SPORT_COLORS] ?? '#64748b';
@@ -66,6 +79,39 @@ export function formatPlannedDuration(workout: unknown): string | null {
   return mins == null || mins <= 0 ? null : `${mins}:00`;
 }
 
+/**
+ * ⛔ A LIFT IS PRICED OFF ITS OWN ROWS; A RIDE AND A RUN KEEP THEIR BUILT LENGTH (work order §3c).
+ *
+ * The two answer different questions and that is why they print differently. An endurance session's
+ * length is PRESCRIBED — the plan built a 66-minute ride and the athlete rides for 66 minutes, so
+ * `66:00` is a fact. A lifting session's length is a CONSEQUENCE of its sets and its rest clock, and
+ * nobody knows it to the minute in advance, so it prints as `30–40 min`.
+ *
+ * ⚠️ THE FALLBACK IS THE STORED TOTAL, NOT A BLANK. A strength row whose exercises did not travel —
+ * a legacy row, a session the athlete typed — still shows the length the plan stored. Losing a
+ * number that was on screen is worse than showing a rougher one.
+ */
+export function formatSessionDuration(workout: unknown): string | null {
+  const w = (workout ?? {}) as Record<string, unknown>;
+  /**
+   * ⛔⛔ THE PLYO DAY SHOWS NO TIME AT ALL (Michael, 2026-09-09). Its rows carry no effort count to
+   * price — `compose.ts` puts the band's top in `reps` as *"the row's recorded-efforts capacity; the
+   * logger records, never targets"* — and the source gives the drill day no length either. With
+   * nothing on the row and nothing on the page, any figure here would be invented, so there is none.
+   *
+   * ⚠️ BY THE TAG, NEVER THE NAME. `isPlyoSession` is the shared reader; the session is
+   * `type: 'strength'` on the wire and its name is a display string.
+   */
+  if (isPlyoSession(w)) return null;
+
+  const type = String(w.type ?? (w as { workout_type?: unknown }).workout_type ?? '');
+  if (normalizeSessionType(type) === 'strength') {
+    const estimated = formatStrengthSessionMinutes(w.strength_exercises);
+    if (estimated) return estimated;
+  }
+  return formatPlannedDuration(w);
+}
+
 const PlannedSessionHeader: React.FC<PlannedSessionHeaderProps> = ({
   workout,
   description,
@@ -75,16 +121,32 @@ const PlannedSessionHeader: React.FC<PlannedSessionHeaderProps> = ({
   className = '',
 }) => {
   const w = (workout ?? {}) as Record<string, unknown>;
-  const type = String(w.type ?? (w as { workout_type?: unknown }).workout_type ?? '');
-  const color = sportColorFor(type);
+  /**
+   * ⛔ THE DISPLAY DISCIPLINE, NOT THE WIRE TYPE — the same seam the calendar colours by
+   * (`displayDisciplineOf`, keyed on the `plyo` tag). The plyo day is `type: 'strength'` and must
+   * not wear strength's orange: it is a drill day, and a four-lift week reading as five lifting
+   * sessions is the confusion that colour exists to end.
+   */
+  const color = sportColorFor(displayDisciplineOf(w));
   const title = deriveWorkoutTitle(w as never);
   /**
-   * ⚠️ STRENGTH SHOWS NO DURATION, deliberately and consistently with `PlannedWorkoutSummary` — a
-   * strength row's stored total is a placeholder ("45 min") that the session never honours, and
-   * printing it invites the athlete to plan around a number the app made up.
+   * ⛔⛔ A LIFT NOW SHOWS ITS MINUTES, THE SAME WAY A RIDE DOES (Michael, 2026-09-09, on Today).
+   *
+   * ⚠️ THIS REVERSES A DELIBERATE SUPPRESSION, so the reason it was suppressed is kept rather than
+   * deleted: a strength row's stored total is a FIXED FIGURE PER KIND OF SESSION, not a length
+   * computed from the day's rows — the composer stamps 55 on a lifting day, 45 on a test day and 20
+   * on the plyo day (`standing-plan/compose.ts`). The old note called that "a number the app made
+   * up" and hid it, which was the right reading of a wrong number.
+   *
+   * ⛔⛔ AND §3c THEN REPLACED THE NUMBER RATHER THAN THE SUPPRESSION. The three constants are gone
+   * from the screen: a lifting session is now priced off its own rows and shown as a range — see
+   * `formatSessionDuration` and `@/lib/strength-session-minutes`.
+   *
+   * ⛔ IT CHANGES ALL THREE SURFACES, WHICH IS THE POINT OF THIS COMPONENT. Today's card, the drawer
+   * and the full planned screen render the same header; showing the minutes on one and not the
+   * others is exactly the divergence this file was written to end.
    */
-  const showDuration = normalizeSessionType(type) !== 'strength';
-  const duration = showDuration ? formatPlannedDuration(w) : null;
+  const duration = formatSessionDuration(w);
 
   const titleSize = size === 'card' ? 'text-base' : 'text-base';
   const descSize = size === 'card' ? 'text-[13px]' : 'text-sm';

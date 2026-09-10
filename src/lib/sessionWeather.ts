@@ -18,8 +18,16 @@ export type SessionWeatherForDisplay = {
   temperature_avg_f?: number;
   feels_like?: number;
   condition: string;
+  /**
+   * WMO weather code from Open-Meteo (work order 2026-09-09 §3b.1). The archive returns no
+   * condition TEXT — `condition` stays `'—'` — so this is what the screen draws its icon from.
+   * ⚠️ ABSENT ON EVERY ROW WRITTEN BEFORE `WEATHER_SCHEMA_VERSION` 5. A reader must cope with that.
+   */
+  weather_code?: number;
   /** Omitted when unknown (e.g. device-only fallback). */
   humidity?: number;
+  /** °F. Shown beside humidity. Absent on rows written before schema 5, and on the device fallback. */
+  dew_point?: number;
   windSpeed?: number;
   windDirection?: number;
   precipitation?: number;
@@ -81,7 +89,9 @@ export function parseWorkoutWeatherDataForDisplay(raw: unknown): SessionWeatherF
     temperature_avg_f: num(w.temperature_avg_f),
     feels_like: num(w.feels_like),
     condition,
+    ...(num(w.weather_code) != null ? { weather_code: num(w.weather_code) } : {}),
     ...(humidityRaw != null ? { humidity: Math.round(humidityRaw) } : {}),
+    ...(num(w.dew_point) != null ? { dew_point: Math.round(num(w.dew_point)!) } : {}),
     ...(windRaw != null ? { windSpeed: Math.round(windRaw) } : {}),
     windDirection: num(w.windDirection),
     precipitation: num(w.precipitation),

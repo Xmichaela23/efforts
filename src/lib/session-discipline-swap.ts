@@ -48,6 +48,8 @@ import {
 export type Discipline = Exclude<CanonicalDiscipline, 'strength'>;
 
 /** The session as the client holds it (`planned_workouts` row, loosely typed at the call site). */
+import type { LibrarySwapSession } from './swap-library-session';
+
 export type SwappableSession = {
   id?: string;
   type?: string | null;
@@ -66,7 +68,71 @@ export type SwappableSession = {
   steps_preset?: string[] | null;
 };
 
+/**
+ * ⛔ THREE KINDS OF SWAP NOW (work order 2026-09-09), and they are different changes to the row:
+ *   · `discipline` — run ↔ ride ↔ swim, as before.
+ *   · `hike`       — the long day as a `walk` row (p275). Not a discipline: the plan vocabulary has
+ *                    no `hike` type, and Garmin hikes already ingest as walks, so inventing one
+ *                    would give the app a type it could never read back.
+ *   · `venue`      — the SAME session on a machine (p275). Same family, same targets, same minutes;
+ *                    only a `venue:` tag is added. It is not a swap of what is trained at all.
+ */
+export type SwapKind = 'discipline' | 'hike' | 'venue';
+
+/** The machines p275 blesses, per sport. ⛔ THE LABELS ARE PENDING MICHAEL'S WORDS — see `venueKey`. */
+/**
+ * ⛔⛔ ONE MACHINE PER SPORT, AND THE OTHER FIVE ARE CUT (Michael, 2026-09-09: *"the five other
+ * machines are cut, not pending"*). p275 also blesses the rower, ski erg, air bike, elliptical and
+ * arc trainer; they are not in the app and nothing is held back waiting for a label.
+ *
+ * ⚠️ THE GROUND-IMPACT GATE BELOW OUTLIVES THEM ON PURPOSE. p275's rule — *"impact with the ground
+ * on at least one day"* a week — is the source's, not a consequence of this list, and the treadmill
+ * is exempt from it because it keeps feet on the ground. The gate costs one line and is the thing a
+ * second run machine would need on day one.
+ */
+export const RIDE_VENUES = ['trainer'] as const;
+export const RUN_VENUES = ['treadmill'] as const;
+export type Venue = (typeof RIDE_VENUES)[number] | (typeof RUN_VENUES)[number];
+
+/** One literal, shared with the readers that ask "was this indoors". */
+export const VENUE_PREFIX = 'venue:';
+
+/**
+ * ⛔ THE SHEET'S LINES ARE KEYS, NOT SENTENCES. Every athlete-facing line in this work order is
+ * Michael's to write ("Copy (Michael's words, pending)"), so the library hands the UI a KEY. When
+ * the words land they replace the key in one place; until then an athlete sees the key, which is
+ * unmistakably unfinished rather than plausibly wrong.
+ */
+export const SWAP_COPY_KEYS = {
+  machine: 'swap.machine.pending',
+  machineGround: 'swap.machine.ground_impact.pending',
+  easy: 'swap.easy.pending',
+  hardRunToRide: 'swap.hard_run_to_ride.pending',
+  longDay: 'swap.long_day.pending',
+} as const;
+
+/** The `venue:` a row already carries, or null. */
+export function venueOf(s: SwappableSession): Venue | null {
+  for (const t of s.tags ?? []) {
+    const raw = String(t).toLowerCase();
+    if (!raw.startsWith(VENUE_PREFIX)) continue;
+    const v = raw.slice(VENUE_PREFIX.length) as Venue;
+    if ((RIDE_VENUES as readonly string[]).includes(v) || (RUN_VENUES as readonly string[]).includes(v)) return v;
+  }
+  return null;
+}
+
 export type SwapOption = {
+  /** `discipline` unless this is the hike or a machine. */
+  kind?: SwapKind;
+  /** The machine, when `kind` is `venue`. */
+  venue?: Venue;
+  /**
+   * ⛔ A PLACEHOLDER KEY, NOT A SENTENCE (work order: *every athlete-facing line waits for Michael's
+   * words*). The sheet renders the key until the copy lands; `label` carries the same key today so a
+   * half-written line can never reach an athlete by accident.
+   */
+  copyKey?: string;
   to: Discipline;
   label: string;
   /** The patch to apply to `planned_workouts`. Duration is deliberately absent — see `buildSwap`. */
@@ -190,9 +256,35 @@ export type IntensityBand = 'easy' | 'hard' | 'long';
 export function intensityOf(s: SwappableSession): IntensityBand {
   const tags = (s.tags ?? []).map((t) => String(t).toLowerCase());
   const name = String(s.name ?? '').toLowerCase();
+
+  /**
+   * ⛔⛔ THE COMPOSER'S OWN BANDS COME FIRST (2026-09-09), AND NOT READING THEM WAS A LIVE BUG.
+   *
+   * Every composed endurance row carries `band:` off `ENDURANCE_CLASS` — `above` / `near` / `below`
+   * / `vt1_or_easier` — and `family:`. This function read neither: it matched a hand-written tag
+   * list (`intervals`, `tempo`, `threshold`…) and a name regex, and the standing plan writes none of
+   * those words. **An Anaerobic Ride (`band:above`) therefore banded EASY**, and the swap sheet
+   * offered it "Run instead" under the easy-work line — the one swap p138 does not bless in that
+   * direction, sold with a sentence about easy work.
+   *
+   * ⚠️ THE LONG DAY IS ITS FAMILY, NOT ITS NAME. `family:run_lsd` is what the composer stamps on the
+   * long run; the row carries no `long` tag at all, so this used to band it long off the WORD "Long"
+   * in its name. One rename and the week's key session would have started offering easy swaps.
+   *
+   * ⚠️ THE OLD LADDER STAYS UNDERNEATH for every row that carries no `band:` — a marathon-generator
+   * row, a library plan, anything built before these tags existed. A missing signal is not a verdict.
+   */
+  const family = tags.find((t) => t.startsWith('family:'))?.slice('family:'.length);
+  if (family === 'run_lsd' || family === 'ride_long') return 'long';
+
   if (tags.includes('long_run') || tags.includes('long_ride') || tags.includes('long') || /\blong\b/.test(name)) {
     return 'long';
   }
+
+  const band = tags.find((t) => t.startsWith('band:'))?.slice('band:'.length);
+  if (band === 'above' || band === 'near' || band === 'below') return 'hard';
+  if (band === 'vt1_or_easier') return 'easy';
+
   const hard = ['intervals', 'tempo', 'threshold', 'hard_run', 'vo2', 'quality', 'race_day'];
   if (tags.some((t) => hard.includes(t)) || /interval|tempo|threshold|hill repeat/.test(name)) return 'hard';
   return 'easy';
@@ -385,7 +477,6 @@ export function getDisciplineSwaps(
   const status = String(session.workout_status ?? 'planned').toLowerCase();
   if (status === 'completed' || status === 'skipped') return [];
   const band = intensityOf(session);
-  if (band === 'long') return [];
 
   const minutes = resolveMinutes(session);
   if (minutes <= 0) return [];
@@ -415,9 +506,27 @@ export function getDisciplineSwaps(
    * honest one: the app cannot write the session it would be promising.
    */
   const targets = available.filter((d) => {
+    /**
+     * ⛔ THE LONG DAY IS RUN OR RIDE (work order 2026-09-09 §4, p275: *"a hike, a long ride, a team
+     * sport day, or whatever else is of interest"*). ⚠️ NOT SWIM — the app does not coach swims, so a
+     * "long swim" would be a booking wearing the week's key session's name. The hike is added below,
+     * outside the discipline list, because it is a `walk` row rather than a discipline.
+     */
+    if (band === 'long') return d !== 'swim';
     if (band !== 'hard') return true;
     if (d === 'swim') return false;
     if (d === 'ride') return hasUsableFtp;
+    /**
+     * ⛔⛔ HARD RIDE → HARD RUN IS OFF THE SHEET (work order §3, 2026-09-09). p138 permits the swap in
+     * ONE direction — a hard run for a hard ride, when running volume is at its limit — and the
+     * reverse is not on the page.
+     *
+     * ⚠️ IT USED TO BE OFFERED WITH A WARNING, and the warning said exactly why it was wrong:
+     * *"hard running costs the legs more than hard riding — the plan put this on the bike for that
+     * reason."* Warning about a swap the source does not bless is still offering it. The clause and
+     * its warning are gone together.
+     */
+    if (d === 'run' && from === 'ride') return false;
     return true;
   });
 
@@ -426,68 +535,36 @@ export function getDisciplineSwaps(
     .map((to) => {
       const { name, description } = describeSwap(to, band, minutes);
       /**
-       * ═══ THE HARD RIDE IS A REAL SESSION, NOT A RELABEL (2026-08-09). ═══════════════════════════
+       * ═══ THE SESSION ITSELF IS NOT WRITTEN HERE ANY MORE (§7, 2026-09-09) ════════════════════
        *
-       * ⛔ A hard swap to the bike writes the SAME THREE TOKENS `generate-combined-plan/session-factory.ts:604`
-       * uses for its bike quality work — warm-up, the Helgerud 4×4, cool-down. `materialize-plan`'s
-       * `expandBikeToken` then turns `bike_vo2_4x4min_R4min` into work steps at
-       * `pctRange(1.1, 1.2) × FTP`, so the athlete gets real watts instead of a run wearing a ride's
-       * name.
+       * ⛔ THIS PATCH USED TO CARRY A HAND-WRITTEN 4×4 for a hard swap to the bike — warm-up, the
+       * Helgerud protocol, cool-down, 57 minutes. It was a THIRD answer: not the old session, and
+       * not the book's either. §7 rules that a sport swap hands over the composer's own session for
+       * the new sport and band, so the 4×4 is gone and `ride_anaerobic` (p237) takes its place.
        *
-       * ⚠️ NOT `bikeQualitySession`'s TOKEN LIST. That one is the bare `['bike_vo2_4x4min_R4min']` —
-       * no warm-up, no cool-down — which expands to 32 min of intervals opening cold with a maximal
-       * effort. The three-token form is the one the combined-plan factory ships and the one a human
-       * should actually ride. (`bikeQualitySession`'s own 45-vs-32 gap is a pre-existing Strong Focus
-       * inconsistency and is deliberately NOT touched here.)
+       * ⛔ AND THAT SESSION IS MERGED IN BY `withLibrarySession`, at write time, because finding the
+       * athlete's own row of the target family is a database read. What this function returns is the
+       * SHELL — type, copy, and the tags that stop `get-week` re-creating the original row.
        *
-       * ⛔ PROTOCOL LENGTH, NOT THE SOURCE SESSION'S TIME — the one place the swap's "same time" rule
-       * is broken, on purpose. 15 warm-up + 4×(4+4) + 10 cool-down = 57 min, and it is what the
-       * protocol IS. Padding it to a 63-minute run's length would add junk minutes to a session whose
-       * whole value is its structure; truncating it would break the protocol. Easy swaps stay
-       * time-matched, because an easy block has no structure to protect.
+       * ⚠️ THE FTP GATE STAYS (see `targets`). The library's ride is watts too; with no FTP it
+       * expands to interval steps carrying no targets, which is a prescription the app cannot write.
+       *
+       * ⚠️ AND `needsMaterialize` IS FALSE HERE, ALWAYS. The shell writes no tokens, so there is
+       * nothing to expand; the resolver sets it true whenever it merges a library session in. A
+       * caller that writes this patch raw gets exactly what it did before §7 for a swim.
        */
-      const HARD_RIDE_TOKENS = [
-        'warmup_bike_quality_15min_fastpedal',
-        'bike_vo2_4x4min_R4min',
-        'cooldown_bike_10min_easy',
-      ];
-      const HARD_RIDE_MIN = 15 + 4 * (4 + 4) + 10;   // 57 — warm-up + 4×4 + cool-down
-      const isHardRide = band === 'hard' && to === 'ride';
       return {
         to,
         label: to === 'ride' ? 'Ride instead' : to === 'swim' ? 'Swim instead' : 'Run instead',
-        /**
-         * ⚠️ THE CALLER MUST RE-MATERIALISE A HARD RIDE. Writing the tokens is half the job — the
-         * watts only exist once `materialize-plan` expands them for this row. Both apply paths do
-         * this; `needsMaterialize` is how they know without re-deriving the condition.
-         */
-        needsMaterialize: isHardRide,
+        needsMaterialize: false,
         patch: {
           type: to,
           name,
           description,
-          // ⛔ duration is NOT in the patch for easy swaps — it is already correct on the row and
-          // re-writing it is how a preserved value gets accidentally rounded. The HARD ride is the
-          // exception: its length is the protocol's, so it is written explicitly.
-          ...(isHardRide
-            ? {
-                duration: HARD_RIDE_MIN,
-                total_duration_seconds: HARD_RIDE_MIN * 60,
-                /**
-                 * ⛔ THE STALE STRUCTURE MUST GO HERE, and only here. `materialize-plan` overwrites
-                 * `computed` from the tokens, but `workout_structure` and `intervals` are the RUN's
-                 * and nothing else clears them — they are what printed "Walk down" on a ride.
-                 *
-                 * ⚠️ SAFE ONLY BECAUSE `total_duration_seconds` IS WRITTEN ON THE LINE ABOVE.
-                 * `computed.steps` is rung 3 of `plannedDurationSeconds`; clearing it without pinning
-                 * a total first would delete the session's duration. See the fixtures.
-                 */
-                computed: null,
-                workout_structure: null,
-                intervals: null,
-              }
-            : {}),
-          steps_preset: isHardRide ? HARD_RIDE_TOKENS : null,
+          // ⛔ duration is NOT in this patch. The library session writes its own minutes; a shell
+          // leaves the row's own time alone, because re-writing a preserved value is how it gets
+          // accidentally rounded.
+          steps_preset: null,
           /**
            * ⛔ THE STALE RENDERED COPY HAD TO GO WITH IT. `rendered_description` is the
            * materialiser's expanded prose for the ORIGINAL discipline, and several surfaces prefer
@@ -517,15 +594,236 @@ export function getDisciplineSwaps(
             `swapped_from:${originOf(session) ?? from}`,
           ])],
         },
-        warnings: [
-          ...swapWarnings(to, band, sameDayOthers),
-          // The doctrine's own caution, surfaced rather than enforced.
-          ...(band === 'hard' && from === 'ride' && to === 'run'
-            ? ['Hard running costs the legs more than hard riding — the plan put this on the bike for that reason.']
-            : []),
-        ],
+        kind: 'discipline' as const,
+        /** The sheet's line for this row, by band. Pending Michael's words — see `SWAP_COPY_KEYS`. */
+        copyKey: band === 'long' ? SWAP_COPY_KEYS.longDay : band === 'hard' ? SWAP_COPY_KEYS.hardRunToRide : SWAP_COPY_KEYS.easy,
+        // ⚠️ THE HARD-RIDE-TO-HARD-RUN CAUTION IS GONE WITH THE OPTION IT WARNED ABOUT (see `targets`).
+        warnings: swapWarnings(to, band, sameDayOthers),
       };
     });
+}
+
+/**
+ * ⛔⛔ THE MACHINE AND THE HIKE ARE NOT DISCIPLINE SWAPS, AND THEY LIVE IN THEIR OWN READER.
+ *
+ * Both return `to === from`, and `getDisciplineSwaps`' every consumer maps over `to` to mean "the
+ * sport this becomes" — folding them into that list made an easy RUN report `run` as one of its
+ * options and broke nine existing assertions at once. That is not a test problem: the drawer keys
+ * its buttons on `to` as well.
+ *
+ * ⚠️ THE SHEET STILL SHOWS ONE LIST. It concatenates the two; the SPLIT is about what `to` means,
+ * not about what the athlete sees.
+ *
+ * ⛔ THE SAME GATES APPLY, and they are re-asked here rather than assumed: posture, and unstarted
+ * only. A machine on a session already logged would rewrite history exactly as a swap would.
+ */
+export function sessionSwapExtras(
+  session: SwappableSession,
+  posture?: PerDisciplinePosture | null,
+  /**
+   * The week's own rows, for p275's ground-impact rule — a run machine is offered only while another
+   * run in the week is still outdoors. ⚠️ ABSENT MEANS "NOT ASKED", and the gate then behaves as if
+   * this were the only run: the treadmill is offered and the other two are not. A missing signal is
+   * not a verdict, but it is not permission either.
+   */
+  weekSessions: ReadonlyArray<SwappableSession> = [],
+): SwapOption[] {
+  const from = disciplineOf(session.type);
+  if (!from) return [];
+  const declared = posture?.[postureKey(from)];
+  if (declared && declared !== 'maintain') return [];
+  const status = String(session.workout_status ?? 'planned').toLowerCase();
+  if (status === 'completed' || status === 'skipped') return [];
+
+  const options: SwapOption[] = [];
+  const K = SWAP_COPY_KEYS;
+
+  /**
+   * ⛔ THE MACHINE IS NOT A SWAP OF WHAT IS TRAINED (p275) — same session, same family, same targets,
+   * same minutes, performed somewhere else. It stamps `venue:` and nothing else.
+   *
+   * ⛔ THE GROUND-IMPACT GATE, p275: *"impact with the ground on at least one day"* a week. A run
+   * machine is offered only while the week still has a run that has not been moved indoors, counting
+   * THIS one — moving it is what the athlete is about to do. ⚠️ A TREADMILL STILL COUNTS AS GROUND
+   * IMPACT (work order §1), so it is offered whatever the rest of the week holds.
+   */
+  if (!venueOf(session)) {
+    if (from === 'ride') {
+      for (const v of RIDE_VENUES) {
+        options.push({ kind: 'venue', venue: v, copyKey: K.machine, to: from, label: K.machine, needsMaterialize: false, warnings: [], patch: venuePatch(session, v) });
+      }
+    } else if (from === 'run') {
+      const onTheGround = weekSessions.filter((r) => disciplineOf(r.type) === 'run' && !venueOf(r)).length;
+      for (const v of RUN_VENUES) {
+        if (v !== 'treadmill' && onTheGround <= 1) continue;
+        options.push({ kind: 'venue', venue: v, copyKey: v === 'treadmill' ? K.machine : K.machineGround, to: from, label: K.machine, needsMaterialize: false, warnings: [], patch: venuePatch(session, v) });
+      }
+    }
+  }
+
+  /**
+   * ⛔ THE HIKE IS THE LONG DAY'S THIRD OPTION (p275) — a `walk` row carrying the long session's
+   * minutes. No new type: Garmin hikes ingest as walks, so this is a type the app can read back.
+   * ⚠️ TEAM SPORT DAY IS NOT OFFERED. The page names it; the app has no type for it and could not
+   * read one back, so offering it would promise a record it cannot keep.
+   */
+  if (intensityOf(session) === 'long' && resolveMinutes(session) > 0) {
+    options.push({
+      kind: 'hike', to: from, label: K.longDay, copyKey: K.longDay,
+      needsMaterialize: false, warnings: [],
+      patch: {
+        type: 'walk',
+        steps_preset: null,
+        workout_structure: null,
+        intervals: null,
+        rendered_description: null,
+        tags: [...new Set([
+          ...(session.tags ?? []).filter((t) => !/^(run|ride|bike|swim)_/.test(String(t))),
+          'discipline_swapped',
+          `swapped_from:${originOf(session) ?? from}`,
+        ])],
+      },
+    });
+  }
+
+  return options;
+}
+
+/**
+ * The machine patch: a `venue:` tag and nothing else. ⛔ NO NAME, NO TYPE, NO DURATION — p275's
+ * machine is the same session performed elsewhere, and rewriting any of those would make it a
+ * different session wearing the same page's blessing.
+ */
+function venuePatch(session: SwappableSession, venue: Venue): Record<string, unknown> {
+  return {
+    tags: [...new Set([
+      ...(session.tags ?? []).filter((t) => !String(t).toLowerCase().startsWith(VENUE_PREFIX)),
+      `${VENUE_PREFIX}${venue}`,
+    ])],
+  };
+}
+
+/**
+ * ═══ REST OF PLAN ════════════════════════════════════════════════════════════════════════════════
+ *
+ * ⛔ THE SAME TWO CHOICES THE LIFT SWAP OFFERS (work order 2026-09-09 §6). "Just today" writes one
+ * row; "Rest of plan" writes this session's every later repeat.
+ *
+ * ⚠️ A PATCH IS NOT PORTABLE, WHICH IS THE WHOLE REASON THIS EXISTS. Every patch the library builds
+ * is derived from the row it was built for — the machine patch carries THAT row's whole tag list, the
+ * hike patch carries THAT row's minutes, the hard ride's name carries THAT row's length. Copying one
+ * row's patch onto another would overwrite the second row's tags with the first's. So a later row is
+ * re-asked from scratch and gets its own answer.
+ *
+ * ⛔ AND IT IS RE-ASKED, NOT ASSUMED. A later row that cannot take this swap — already logged,
+ * already indoors, a long day that is no longer long — returns null and is left alone. The athlete
+ * asked for the swap wherever it holds, not for it to be forced where it does not.
+ */
+export function isPlanTwin(session: SwappableSession, row: SwappableSession): boolean {
+  const fam = (t?: readonly string[] | null) =>
+    (t ?? []).find((x) => String(x).startsWith('family:')) ?? null;
+  const a = fam(session.tags);
+  /**
+   * ⚠️ `family:` FIRST, THE SPORT ONLY AS A FALLBACK. The composer stamps a family on every standing
+   * plan row and it is what "this session, every week" actually means. A row with no family — a
+   * marathon-generator row, a hand-added session — is matched on its sport instead, which is looser;
+   * it is the widest identity this library will assume, and it never crosses sports.
+   */
+  if (a) return fam(row.tags) === a;
+  const d = disciplineOf(session.type);
+  return !!d && disciplineOf(row.type) === d;
+}
+
+/** The same swap, re-derived against a LATER row. Null when it does not hold there. */
+export function sameSwapOn(
+  row: SwappableSession,
+  chosen: { kind?: SwapKind; venue?: Venue; to: Discipline },
+  ctx: {
+    available: ReadonlyArray<Discipline>;
+    posture?: PerDisciplinePosture | null;
+    ftp?: number | null;
+    /** That row's own week, for the ground-impact gate. Absent behaves as `sessionSwapExtras` does. */
+    weekSessions?: ReadonlyArray<SwappableSession>;
+  },
+): SwapOption | null {
+  const all = [
+    ...sessionSwapExtras(row, ctx.posture ?? null, ctx.weekSessions ?? []),
+    /**
+     * ⚠️ NO SAME-DAY LIST FOR A FUTURE ROW. That argument only produces WARNINGS, and a warning is a
+     * thing said on the sheet to the athlete looking at it — it cannot be said about a day that is
+     * not on screen. The swap itself is identical either way.
+     */
+    ...getDisciplineSwaps(row, ctx.available, [], ctx.posture ?? null, ctx.ftp ?? null),
+  ];
+  const want = { kind: chosen.kind ?? 'discipline', venue: chosen.venue ?? null, to: chosen.to };
+  return all.find((o) => (o.kind ?? 'discipline') === want.kind
+    && (o.venue ?? null) === want.venue
+    && o.to === want.to) ?? null;
+}
+
+/**
+ * ═══ §7 — THE SWAP HANDS OVER THE LIBRARY'S SESSION ══════════════════════════════════════════════
+ *
+ * ⛔ THE PATCH BUILT ABOVE IS A SHELL, AND ON ITS OWN IT KEEPS THE OLD SESSION'S MINUTES — a
+ * three-hour long ride became a three-hour run. This merges the real session over it: the composer's
+ * own session for the new sport and band, at the athlete's level.
+ *
+ * ⚠️ IT IS APPLIED AT WRITE TIME, NOT WHEN THE SHEET IS DRAWN, because finding the athlete's own row
+ * of the target family is a database read and the sheet must stay cheap. The sheet shows the option;
+ * this decides what the option actually writes.
+ *
+ * ⚠️ AND THE STALE STRUCTURE GOES WITH IT. `computed`, `workout_structure` and `intervals` belong to
+ * the session being replaced; nothing else clears them, and they are what printed a run's "Walk
+ * down" on a ride. Safe here only because the new total is written on the same object — `computed`
+ * is a rung of `plannedDurationSeconds`, so clearing it without pinning a total first would delete
+ * the session's duration.
+ */
+export function withLibrarySession(
+  patch: Record<string, unknown>,
+  session: SwappableSession,
+  lib: LibrarySwapSession,
+): Record<string, unknown> {
+  const kept = (patch.tags as string[] | undefined) ?? (session.tags ?? []);
+  return {
+    ...patch,
+    name: lib.name,
+    /**
+     * ⛔ THE NEW SESSION'S OWN SENTENCE, NOT THE OLD ONE'S AND NOT NOTHING. Writing null here left
+     * the drawer reading "No description available" on every swapped row: the composed ride had a
+     * line, and the run that replaced it had none.
+     * ⚠️ `rendered_description` STILL GOES. That one is the materialiser's expanded prose for the
+     * discipline being LEFT, and several surfaces prefer it over `description` — leaving it meant a
+     * swapped ride kept printing the run's sentence.
+     */
+    description: lib.description,
+    rendered_description: null,
+    duration: lib.duration,
+    total_duration_seconds: lib.duration * 60,
+    steps_preset: [...lib.steps_preset],
+    computed: null,
+    workout_structure: null,
+    intervals: null,
+    /**
+     * ⛔ THE NEW SESSION'S OWN CLASSIFICATION REPLACES THE OLD ONE. `family:`, `band:`, `sport:`,
+     * `level:` and `intensity:` are read all over the app — Today's cue lines, the swap sheet's own
+     * band, the week reader — and a ride carrying `family:run_lsd` would be read as a long RUN by
+     * every one of them. ⚠️ `swapped_from:` and `discipline_swapped` are set by the caller's patch
+     * and survive: they are what stops `get-week` re-creating the original row.
+     */
+    tags: [...new Set([
+      /**
+       * ⛔ AND THE LONG-DAY MARKER FOLLOWS THE SPORT. `long_ride` on a run is the old session's word
+       * left on the new one — `intensityOf` still bands it long, so nothing breaks loudly, and a
+       * reader is told the week's long RIDE is a run. The marker is re-stamped for what this row is
+       * now, and only when the row it replaced carried one.
+       */
+      ...kept.filter((t) => !/^(family|level|sport|intensity|band):/.test(String(t))
+        && t !== 'long_run' && t !== 'long_ride'),
+      ...(kept.some((t) => t === 'long_run' || t === 'long_ride')
+        ? [lib.libraryTags.includes('sport:ride') ? 'long_ride' : 'long_run'] : []),
+      ...lib.libraryTags,
+    ])],
+  };
 }
 
 /**
