@@ -56,6 +56,8 @@ interface CompletedTabProps {
   workoutType?: string;
   onAddGear?: () => void; // Callback to open gear management
   isHydrating?: boolean; // True while GPS/sensor data is still loading
+  /** `session_detail_v1` — the Workload tile prints its `load.workload` (audit H-D07). */
+  sessionDetail?: { load?: { workload?: number | null } | null } | null;
 }
 
 
@@ -69,7 +71,14 @@ interface GearItem {
   total_distance?: number; // in meters
 }
 
-const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, onAddGear, isHydrating }) => {
+const CompletedTab: React.FC<CompletedTabProps> = ({ workoutData, workoutType, onAddGear, isHydrating, sessionDetail }) => {
+  /**
+   * ⛔ THE WORKLOAD TILE PRINTS THE SESSION'S LOAD AND NOTHING ELSE (2026-09-10, audit H-D07). It
+   * printed `workload_actual`, and the PLANNED workload under the same label when the actual was
+   * missing. `session_detail_v1.load.workload` is the figure the Performance tab uses; null prints no
+   * number.
+   */
+  const sessionWorkload = typeof sessionDetail?.load?.workload === 'number' ? sessionDetail.load.workload : null;
   const { useImperial } = useAppContext();
   const compact = useCompact();
   const queryClient = useQueryClient();
@@ -1457,7 +1466,7 @@ const formatMovingTime = () => {
 
           <div className="px-0.5 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
-              {(workoutData as any)?.workload_actual || (workoutData as any)?.workload_planned || 'N/A'}
+              {sessionWorkload != null ? String(Math.round(sessionWorkload)) : ''}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
               <div className="text-xs font-light" style={metricLabelStyle}>Workload</div>
@@ -1714,7 +1723,7 @@ const formatMovingTime = () => {
 
           <div className="px-0.5 py-1">
             <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
-              {(workoutData as any)?.workload_actual || (workoutData as any)?.workload_planned || 'N/A'}
+              {sessionWorkload != null ? String(Math.round(sessionWorkload)) : ''}
             </div>
             <div className="text-xs text-muted-foreground font-normal">
               <div className="text-xs font-light" style={metricLabelStyle}>Workload</div>

@@ -21,6 +21,8 @@ import {
 } from '../_shared/plan-context.ts';
 import { buildSessionRaceReadiness } from '../_shared/session-detail/race-readiness.ts';
 import { canonicalize } from '../_shared/canonicalize.ts';
+// ⛔ THE ONE "WAS THIS DONE" (2026-09-10, audit H-T10) — the same rule get-week sends.
+import { isExecutedWorkout } from '../_shared/is-executed.ts';
 // ⛔ THE ONE completed-set/exercise hydration shape (2026-08-11). Both normalizers below used to
 // rebuild each set by hand — `{reps, weight, rir, completed, prefilled}` — dropping `resistance_level`
 // (band assist), `amrap` and `duration_seconds`. This scope=workout hydrator is the object that WINS
@@ -236,8 +238,11 @@ const STRENGTH_VOLUME_VERSION = 2;
  * rule. A stored copy below this version would keep serving the old numbers from the cache fast path
  * for up to a day, so it refreshes once. ⚠️ Every session, not only planned or strength ones — both
  * numbers exist on every sport.
+ *   1 — planned_totals.duration_s / completed_totals.moving_s (2026-09-10)
+ *   2 — classification.decoupling.line: the drift line the adherence chip prints (2026-09-10, audit
+ *       H-D09). A copy stored at v1 has no line, and the chip under a real drift would print nothing.
  */
-const SESSION_TOTALS_VERSION = 1;
+const SESSION_TOTALS_VERSION = 2;
 
 type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_missing';
 
@@ -1389,6 +1394,8 @@ function normalizeBasic(w: any) {
     date: String(w?.date || '').slice(0,10),
     type,
     workout_status: String(w?.workout_status || 'completed'),
+    // ⛔ Read by the drawer instead of its own rule (audit H-T10). The stored row, not the default above.
+    is_executed: isExecutedWorkout(w),
     planned_id: w?.planned_id || null,
     name: w?.name || null,
     // Basic metrics (pass-through; units as stored)
@@ -1471,6 +1478,7 @@ Deno.serve(async (req) => {
     // Select minimal set plus optional blobs (shared column list)
     const baseSel = [
       'id','user_id','date','type','workout_status','planned_id','name','metrics','computed','workout_analysis',
+      'completedmanually', // a receipt for is_executed (_shared/is-executed.ts)
       'analysis_status','analysis_error','analysis_updated_at', // "failed" on screen (plumbing work order §3)
       'avg_heart_rate','max_heart_rate','avg_power','max_power','avg_cadence','max_cadence',
       'avg_speed','max_speed','max_pace','distance','duration','elapsed_time','moving_time','calories','steps','elevation_gain','elevation_loss',

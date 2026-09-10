@@ -1,5 +1,4 @@
 import React from 'react';
-import { DRIFT_LIMITS } from '@shared/state-trend';
 import {
   type SessionInterpretationV1,
 } from '@/utils/performance-format';
@@ -158,22 +157,16 @@ export default function AdherenceChips({
     const isSwim = /swim/i.test(sportType);
     const isPoolSwim = !!sd.classification?.is_pool_swim;
 
-    const decoupling = (sd.classification as any)?.decoupling as { pct: number | null; basis: 'gap' | 'raw' | 'hr' | null; whole_session?: boolean } | null | undefined;
+    const decoupling = (sd.classification as any)?.decoupling as { pct: number | null; basis: 'gap' | 'raw' | 'hr' | null; whole_session?: boolean; line?: string | null } | null | undefined;
     const driftPct = decoupling?.pct ?? null;
     const driftValue = driftPct != null ? `${driftPct.toFixed(1)}%` : null;
-    const driftSubtitle = (() => {
-      if (driftPct == null) return 'Heart-rate drift';
-      const line = DRIFT_LIMITS.hybridPct;
-      const d = Math.round((driftPct - line) * 10) / 10;
-      // 2026-09-03, Michael: one short line per chip, plain words.
-      // a FALL in heart rate has no room to compute (2026-09-03) — it is under the line, full stop
-      const room = driftPct <= 0 ? `fell · line ${line}%` : (d > 0 ? `${d.toFixed(1)} over the ${line}% line` : `line ${line}%`);
-      const t = (sd as any)?.weather?.temperature_f;
-      const heat = typeof t === 'number' && Number.isFinite(t) ? ` · ${Math.round(t)}°F` : '';
-      // one line only; "whole session" and "hills" are said in the Heart rate row below
-      void heat;
-      return room;
-    })();
+    /**
+     * ⛔ THE SERVER'S DRIFT LINE (2026-09-10, audit H-D09). This built its own sentence from
+     * `DRIFT_LIMITS.hybridPct` while the Heart rate row below printed build.ts's, from a separate 5 in
+     * different words. `classification.decoupling.line` is the one line both print; with no percentage
+     * the chip keeps its label, and with a percentage but no line it says nothing under the number.
+     */
+    const driftSubtitle = driftPct == null ? 'Heart-rate drift' : (decoupling?.line ?? '');
     // 2026-09-03 (Michael: "we add an execution score, right? Drift?"): the header is Workload · Execution ·
     // Duration · Drift on every planned run and ride. The pace/GAP percentage that sat here was the blended
     // interval pace score and read as a mystery number; it lives per row in the interval table. Easy and

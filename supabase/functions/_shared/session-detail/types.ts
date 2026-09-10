@@ -381,6 +381,9 @@ export type SessionDetailV1 = {
       /** true when the session had intervals: the number covers the whole session, intervals included,
        *  so it is not the same read as a steady run. Stated on the screen, never hidden. */
       whole_session?: boolean;
+      /** The one drift line ("1.0 over the 5% line"), printed by the Drift chip and the Heart rate row
+       *  alike (audit H-D09, `driftLineFor` in build.ts). Null when there is no percentage. */
+      line?: string | null;
     } | null;
     /** D-264 step-0 receipt: HR drift (bpm) as it flows through the fixed pipeline
      *  (buildActualSession → session), proving the nested key reaches session_detail. */

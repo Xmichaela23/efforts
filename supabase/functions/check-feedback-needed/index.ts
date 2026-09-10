@@ -37,14 +37,27 @@ Deno.serve(async (req) => {
       );
     }
 
+    /**
+     * ⛔ ONE RULE FOR EVERY WAY THE POPUP CAN OPEN (2026-09-10, audit H-T11). Opening a finished
+     * session used to ask the phone's own 7-day rule, and a live insert or update asked no date at
+     * all — so an old ride pulled in by a history import could still open the popup. The phone now
+     * sends `workout_id` on those paths and this answers for that one workout with the same filters
+     * as the general check below.
+     */
+    let body: { workout_id?: unknown } = {};
+    try { body = await req.json(); } catch { body = {}; }
+    const workoutId = typeof body?.workout_id === 'string' && body.workout_id.trim() ? body.workout_id.trim() : null;
+
     // Query for most recent completed run/ride/swim without RPE
     // Server-side logic: determines which workout needs feedback
     // Single source of truth: server checks database for dismissals
     // D-162: swims now get the popup too (feel/RPE + pool length + equipment confirmation).
-    const { data: workouts, error } = await supabase
+    let q = supabase
       .from('workouts')
       .select('id, type, name, gear_id, rpe, date, feedback_dismissed_at')
-      .eq('user_id', user.id)
+      .eq('user_id', user.id);
+    if (workoutId) q = q.eq('id', workoutId);
+    const { data: workouts, error } = await q
       .eq('workout_status', 'completed')
       .in('type', ['run', 'ride', 'swim'])
       .is('rpe', null)

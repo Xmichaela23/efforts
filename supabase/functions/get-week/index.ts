@@ -36,6 +36,9 @@ import { plannedDurationFields } from './planned-duration-label.ts';
 import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
 import { completedStrengthVolume, isPerformedSet } from '../_shared/strength/session-volume.ts';
 import { resolveBodyweightLb } from '../_shared/workload.ts';
+// ⛔ ONE "WAS IT DONE" AND THE WEEK BAR'S TOTALS (2026-09-10, audit H-T10 / H-T03).
+import { isExecutedWorkout } from '../_shared/is-executed.ts';
+import { weekBarTotals } from './week-totals.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -443,6 +446,8 @@ Deno.serve(async (req)=>{
       'gear_id',
       'workout_metadata',
       'workout_analysis',
+      // a manual "Mark as Complete" is a receipt for `is_executed` (_shared/is-executed.ts)
+      'completedmanually',
       'name',
       'timestamp',
       // "failed" on screen (docs/WORKORDER-plumbing-2026-09-07.md §3): the Home rows read these.
@@ -958,6 +963,8 @@ Deno.serve(async (req)=>{
         moving_seconds: movingSeconds,
         strength_volume_lb: strengthVolumeLb,
         strength_sets_completed: strengthSetsCompleted,
+        // ⛔ THE ONE "WAS THIS DONE" (audit H-T10) — the drawer's rule, run here on the stored row.
+        is_executed: isExecutedWorkout({ ...w, workout_status: w?.workout_status || status }),
         planned_id: w.planned_id || null,
         // computed: same shape as DB row for UI compatibility (MobileSummary, etc.)
         computed: w?.computed ?? null,
@@ -1653,6 +1660,7 @@ Deno.serve(async (req)=>{
         moving_seconds: item.moving_seconds ?? null,
         strength_volume_lb: item.strength_volume_lb ?? null,
         strength_sets_completed: item.strength_sets_completed ?? null,
+        is_executed: item.is_executed === true,
       };
     };
     const itemsWithPlannedWorkout = itemsWithAI.map((it) => {
@@ -1676,6 +1684,9 @@ Deno.serve(async (req)=>{
         // ⛔ THE WEEK'S LIFTED POUNDS (2026-09-10, audit H-T05) — the sum of the items' own
         // `strength_volume_lb`, so Today's week line adds up the numbers its cards print.
         strength_volume_lb: itemsWithAI.reduce((s, it) => s + (typeof it?.strength_volume_lb === 'number' ? it.strength_volume_lb : 0), 0),
+        // ⛔ THE WEEK BAR (audit H-T03): planned_minutes, done_minutes, planned_meters, done_meters,
+        // lifts_planned, lifts_done — see week-totals.ts for what each counts.
+        ...weekBarTotals(itemsWithAI),
         distances: {
           run_meters: runMeters,
           swim_meters: swimMeters,

@@ -26,7 +26,6 @@ import AccountPage from './AccountPage';
 import SupportContent from '@/components/SupportContent';
 import Connections from '@/components/Connections';
 import AthleticRecordPage from './AthleticRecordPage';
-import { parseLocalDate } from '@/lib/dateUtils';
 import Gear from './Gear';
 import PostWorkoutFeedback from './PostWorkoutFeedback';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
@@ -531,91 +530,42 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   }, [activeBottomNav, selectedWorkout]);
 
   // Check when viewing a completed workout (post-workout summary)
-  // For specific workouts, check if THAT workout needs feedback (not the most recent)
-  // Always check database for authoritative state (local state may be stale)
-  useEffect(() => {
-    if (!selectedWorkout) return;
-    
-    const workoutStatus = String(selectedWorkout.workout_status || '').toLowerCase();
-    const workoutType = selectedWorkout.type;
-
-    // Only check completed run/ride workouts (don't check RPE locally - check DB)
-    if (workoutStatus === 'completed' &&
-        isFeedbackType(workoutType) &&
-        !feedbackWorkout) {
-      const workoutId = String(selectedWorkout.id);
-      
-      // For selected workouts, only check server-side dismissal (don't use client-side cache)
-      // Client-side cache is only for general checkForFeedbackNeeded to prevent duplicate popups
-      // When user explicitly selects a workout, always check server state
-
-      // Always check database for authoritative state (local state may be stale)
-      const checkSpecificWorkout = async () => {
-        try {
-          const userId = getStoredUserId();
-          if (!userId) {
-            return;
-          }
-
-          // Check if this specific workout is dismissed or has RPE (authoritative DB state)
-          // Check both rpe column and workout_metadata.session_rpe (normalized field)
-          const { data: workout, error } = await supabase
-            .from('workouts')
-            .select('id, type, name, gear_id, rpe, feedback_dismissed_at, date, workout_metadata')
-            .eq('id', workoutId)
-            .eq('user_id', userId)
-            .single();
-
-          if (error) {
-            return;
-          }
-          
-          if (!workout) {
-            return;
-          }
-
-          // Check both rpe column and workout_metadata.session_rpe (for run/ride, RPE is in rpe column)
-          const workoutMetadata = typeof workout.workout_metadata === 'string' 
-            ? JSON.parse(workout.workout_metadata) 
-            : (workout.workout_metadata || {});
-          const hasRpe = workout.rpe != null || workoutMetadata.session_rpe != null;
-
-          // Only show if: no RPE, not dismissed, and within last 7 days
-          const workoutDate = parseLocalDate(String(workout.date).slice(0, 10));
-          const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-          const isWithin7Days = workoutDate >= sevenDaysAgo;
-
-          if (!hasRpe && 
-              !workout.feedback_dismissed_at && 
-              isWithin7Days) {
-            // Double-check workout still exists before showing popup
-            const { data: workoutVerify, error: verifyError } = await supabase
-              .from('workouts')
-              .select('id, type, name, gear_id, rpe')
-              .eq('id', workoutId)
-              .single();
-
-            if (verifyError || !workoutVerify) {
-              return;
-            }
-
-            // Don't add to feedbackShownIdsRef for selected workouts - we always check server state
-            // feedbackShownIdsRef is only for general checkForFeedbackNeeded to prevent duplicate popups
-            setFeedbackWorkout({
-              id: workoutId,
-              type: workout.type as 'run' | 'ride' | 'swim',
-              name: workout.name || `${workout.type} workout`,
-              existingGearId: workout.gear_id || null,
-              existingRpe: workout.rpe || null,
-            });
-          }
-        } catch (e) {
-          console.warn('[AppLayout] checkSpecificWorkout feedback path failed:', e);
-        }
-      };
-
-      checkSpecificWorkout();
+  /**
+   * ⛔ ONE ANSWER TO "DOES THIS WORKOUT GET THE RATING POPUP" (2026-09-10, audit H-T11). Opening a
+   * finished workout used to run the phone's own rule (no rating, not dismissed, dated within 7 days)
+   * and a live insert or update ran no date rule at all, while `check-feedback-needed` asks only about
+   * today or yesterday. Every path now sends the workout id there and shows what it answers.
+   * `feedbackShownIdsRef` stays: it stops one session from asking twice, it decides nothing about the
+   * workout.
+   */
+  const askServerAboutFeedback = async (workoutId: string, markShown: boolean) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('check-feedback-needed', {
+        body: { workout_id: workoutId },
+      });
+      if (error || !data?.needs_feedback || !data?.workout) return;
+      const w = data.workout;
+      if (markShown) {
+        if (feedbackShownIdsRef.current.has(String(w.id))) return;
+        feedbackShownIdsRef.current.add(String(w.id));
+      }
+      setFeedbackWorkout({
+        id: String(w.id),
+        type: w.type as 'run' | 'ride' | 'swim',
+        name: w.name || `${w.type} workout`,
+        existingGearId: w.existing_gear_id || null,
+        existingRpe: w.existing_rpe || null,
+      });
+    } catch (e) {
+      console.warn('[AppLayout] check-feedback-needed for one workout failed:', e);
     }
+  };
+
+  // For specific workouts, ask the server whether THAT workout needs feedback (not the most recent).
+  useEffect(() => {
+    if (!selectedWorkout?.id || feedbackWorkout) return;
+    // Selecting a workout always re-asks; the session cache is for the automatic paths only.
+    void askServerAboutFeedback(String(selectedWorkout.id), false);
     // Depend on selectedWorkout ID and feedbackWorkout state
     // When feedbackWorkout is cleared (null), we should check the selected workout again
   }, [selectedWorkout?.id, feedbackWorkout === null ? 'cleared' : 'set']);
@@ -639,27 +589,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             filter: `user_id=eq.${userId}`,
           },
           (payload: any) => {
-            const newWorkout = payload.new;
-            const workoutType = String(newWorkout?.type || '').toLowerCase();
-            const workoutId = String(newWorkout?.id || '');
-            const workoutStatus = String(newWorkout?.workout_status || '').toLowerCase();
-            
-            // Only show popup for completed runs/rides without RPE
-            // Note: Server is source of truth for dismissals, but realtime is fast-path optimization
-            if (isFeedbackType(workoutType) &&
-                workoutStatus === 'completed' &&
-                workoutId &&
-                !feedbackShownIdsRef.current.has(workoutId) &&
-                !newWorkout.rpe && // Only check RPE, not gear_id
-                !newWorkout.feedback_dismissed_at) { // Server tracks dismissals
-              feedbackShownIdsRef.current.add(workoutId);
-              setFeedbackWorkout({
-                id: workoutId,
-                type: workoutType as 'run' | 'ride' | 'swim',
-                name: newWorkout.name || `${workoutType} workout`,
-                existingGearId: newWorkout.gear_id || null,
-                existingRpe: newWorkout.rpe || null,
-              });
+            const workoutId = String(payload?.new?.id || '');
+            // A new workout row is the moment to ask; whether it gets the popup is the server's answer.
+            if (workoutId && !feedbackShownIdsRef.current.has(workoutId)) {
+              void askServerAboutFeedback(workoutId, true);
             }
           }
         )
@@ -674,29 +607,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           (payload: any) => {
             const updatedWorkout = payload.new;
             const oldWorkout = payload.old;
-            const workoutType = String(updatedWorkout?.type || '').toLowerCase();
             const workoutId = String(updatedWorkout?.id || '');
             const workoutStatus = String(updatedWorkout?.workout_status || '').toLowerCase();
             const oldStatus = String(oldWorkout?.workout_status || '').toLowerCase();
-            
-            // Trigger when workout_status transitions to 'completed' OR rpe becomes null
+            // The moment to ask: the row just became completed, or its rating was cleared. Whether it
+            // gets the popup is the server's answer.
             const justCompleted = workoutStatus === 'completed' && oldStatus !== 'completed';
-            const rpeBecameNull = !updatedWorkout.rpe && oldWorkout.rpe !== null;
-            
-            if ((justCompleted || rpeBecameNull) &&
-                isFeedbackType(workoutType) &&
-                workoutId &&
-                !feedbackShownIdsRef.current.has(workoutId) &&
-                !updatedWorkout.rpe &&
-                !updatedWorkout.feedback_dismissed_at) { // Server tracks dismissals
-              feedbackShownIdsRef.current.add(workoutId);
-              setFeedbackWorkout({
-                id: workoutId,
-                type: workoutType as 'run' | 'ride' | 'swim',
-                name: updatedWorkout.name || `${workoutType} workout`,
-                existingGearId: updatedWorkout.gear_id || null,
-                existingRpe: updatedWorkout.rpe || null,
-              });
+            const rpeBecameNull = !updatedWorkout?.rpe && oldWorkout?.rpe != null;
+            if ((justCompleted || rpeBecameNull) && workoutId && !feedbackShownIdsRef.current.has(workoutId)) {
+              void askServerAboutFeedback(workoutId, true);
             }
           }
         )

@@ -52,50 +52,12 @@ const getUnifiedPlannedWorkout = (workout: any, isCompleted: boolean, hydratedPl
   return workout;
 };
 
-function isPersistedLlmRaceReadiness(rr: unknown): boolean {
-  return !!rr && typeof rr === 'object' && typeof (rr as { verdict?: string }).verdict === 'string';
-}
-
-/** Prefer edge `session_detail_v1`; merge LLM `race_readiness` + `race` from persisted workout_analysis when the detail query is stale. */
-function mergeSessionDetailRaceReadiness(
-  fromEdge: Record<string, unknown> | null | undefined,
-  workoutAnalysis: unknown,
-): Record<string, unknown> | null {
-  let wa: any = workoutAnalysis;
-  if (typeof wa === 'string') {
-    try { wa = JSON.parse(wa); } catch { wa = null; }
-  }
-  const embedded =
-    wa && typeof wa === 'object' ? (wa as { session_detail_v1?: unknown }).session_detail_v1 : null;
-  const rrEmb =
-    embedded && typeof embedded === 'object'
-      ? (embedded as { race_readiness?: unknown }).race_readiness
-      : null;
-  const rrEmbOk = isPersistedLlmRaceReadiness(rrEmb) ? rrEmb : null;
-  const stRace =
-    wa && typeof wa === 'object'
-      ? (wa as { session_state_v1?: { race?: unknown } }).session_state_v1?.race
-      : null;
-  const raceEmb = stRace && typeof stRace === 'object' ? (stRace as Record<string, unknown>) : null;
-  if (fromEdge && typeof fromEdge === 'object') {
-    const rrEdge = (fromEdge as { race_readiness?: unknown }).race_readiness;
-    const raceEdge = (fromEdge as { race?: unknown }).race;
-    const next = { ...fromEdge } as Record<string, unknown>;
-    if (!rrEdge && rrEmbOk) {
-      next.race_readiness = rrEmbOk;
-    }
-    if (!raceEdge && raceEmb) {
-      next.race = raceEmb;
-    }
-    return next;
-  }
-  if (embedded && typeof embedded === 'object') {
-    const e = { ...(embedded as Record<string, unknown>) };
-    if (!e.race && raceEmb) e.race = raceEmb;
-    return e;
-  }
-  return null;
-}
+/**
+ * ⛔ NO RACE-READINESS MERGE (2026-09-10, audit H-T13). When the live `session_detail_v1` carried no
+ * race readiness block, this screen filled it — and `race` — from an older copy stored in
+ * `workout_analysis`, so a verdict the server had since dropped could come back on screen. The
+ * Performance tab now shows the detail workout-detail built, as built.
+ */
 
 interface UnifiedWorkoutViewProps {
   workout: any;
@@ -148,24 +110,25 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   // GENEROUS — any one marker will do — because the failure direction that matters is calling a
   // planned row done, not being briefly cautious about a real one. A genuine completed session
   // carries at least one of these; a bare planned row carries none of them.
-  const looksExecuted = (() => {
-    const w: any = workout || {};
-    if (w.executed) return true;                       // unified item's executed block
-    if (w.completedManually === true) return true;     // logger-saved session
-    if (Number(w.distance) > 0 || Number(w.moving_time) > 0 || Number(w.elapsed_time) > 0) return true;
-    if (w.workout_analysis || w.computed?.intervals?.length) return true;
-    // Strength/mobility: a set that was actually performed. A prescription is not a receipt (D-204).
-    for (const field of ['strength_exercises', 'mobility_exercises']) {
-      const raw = w[field];
-      const arr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : []);
-      if (Array.isArray(arr) && arr.some((ex: any) => Array.isArray(ex?.sets) && ex.sets.some((s: any) => (Number(s?.reps) || 0) > 0 || (Number(s?.duration_seconds) || 0) > 0 || (Number(s?.weight) || 0) > 0)))
-        return true;
-    }
-    return false;
-  })();
-  // ⚠️ `workout?.` — STAGE H. This ran only after the `!workout` guard and could assume a row; it now
-  // evaluates on the null render too. `looksExecuted` already handled it (`workout || {}`).
-  const isCompleted = String(workout?.workout_status || workout?.status || '').toLowerCase() === 'completed' && looksExecuted;
+  //
+  // ⛔ THE CORROBORATION IS THE SERVER'S NOW (2026-09-10, audit H-T10). This file ran its own "does it
+  // look executed" rule; `get-week` derived status with a different one. `get-week` and `workout-detail`
+  // send `is_executed` from `_shared/is-executed.ts` — this rule, moved — and the drawer reads it.
+  // ⚠️ A ROW THAT ARRIVED WITHOUT THE FLAG (AppLayout refreshes the open row straight from the table
+  // after an edit) asks workout-detail for it; until that answers, the row opens as planned, the safe
+  // direction the rule above chose.
+  const wid = String((workout as any)?.id || '');
+  const flagMissing = typeof (workout as any)?.is_executed !== 'boolean'
+    && String(workout?.workout_status || workout?.status || '').toLowerCase() === 'completed';
+  const { workout: executedFlagRow } = useWorkoutDetail(flagMissing ? wid : undefined, {
+    include_gps: false,
+    include_sensors: false,
+    include_swim: false,
+    resolution: 'low',
+  });
+  const isCompleted = (typeof (workout as any)?.is_executed === 'boolean'
+    ? (workout as any).is_executed
+    : (executedFlagRow as any)?.is_executed) === true;
   /** §booms — the same resolver the done card on Today reads. Null on anything with nothing to say. */
   const boomLine = useSessionBoom(isCompleted ? (workout as never) : null);
   // Workout type flags — declared HERE (not later in the body) because the tab-routing effects
@@ -359,7 +322,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   });
 
   // Phase 1: On-demand completed detail hydration (gps/sensors) with fallback to context object
-  const wid = String((workout as any)?.id || '');
   const { workout: hydratedCompleted, session_detail_v1: sessionDetailV1, loading: detailLoading, sessionDetailLoading } = useWorkoutDetail(isCompleted ? wid : undefined, {
     include_gps: true,
     include_sensors: true,
@@ -367,7 +329,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     resolution: 'high',
     normalize: true,
     version: 'v1',
-    fetchSessionDetail: isCompleted && activeTab === 'summary',
+    // ⚠️ The Details tab reads it too: its Workload tile prints `session_detail_v1.load.workload` (H-D07).
+    fetchSessionDetail: isCompleted && (activeTab === 'summary' || activeTab === 'completed'),
   });
   // Layered merge: workout (scaffolding) < hydratedCompleted (server-computed track/display_metrics) < updatedWorkoutData (fresh scalars).
   // updatedWorkoutData (raw SELECT *) has no `track` or `display_metrics` columns, so server-computed fields survive the spread.
@@ -375,14 +338,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     ? { ...(workout || {}), ...(hydratedCompleted || {}), ...(updatedWorkoutData || {}) }
     : workout;
 
-  const workoutAnalysisForSessionMerge =
-    (updatedWorkoutData as { workout_analysis?: unknown } | null)?.workout_analysis ??
-    (hydratedCompleted as { workout_analysis?: unknown } | null)?.workout_analysis ??
-    (workout as { workout_analysis?: unknown })?.workout_analysis;
-  const sessionDetailV1Merged = useMemo(
-    () => mergeSessionDetailRaceReadiness(sessionDetailV1, workoutAnalysisForSessionMerge),
-    [sessionDetailV1, workoutAnalysisForSessionMerge],
-  );
 
   useEffect(() => {
     const pid = linkedPlanned?.id;
@@ -1587,7 +1542,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 <MobileSummary
                   planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)}
                   completed={isCompleted ? completedData : null}
-                  session_detail_v1={sessionDetailV1Merged}
+                  session_detail_v1={sessionDetailV1}
                   sessionDetailLoading={!!sessionDetailLoading}
                 />
               </div>
@@ -1608,6 +1563,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                             workoutData={completedData}
                             onAddGear={onAddGear}
                             isHydrating={detailLoading}
+                            sessionDetail={sessionDetailV1 as never}
                           />
                         </div>
                       ) : (workout.type === 'strength' || workout.type === 'mobility' || workout.type === 'pilates_yoga') ? (
@@ -1616,7 +1572,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                           <StrengthCompletedView 
                             workoutData={completedData}
                             plannedWorkout={linkedPlanned}
-                            session_detail_v1={sessionDetailV1Merged}
+                            session_detail_v1={sessionDetailV1}
                           />
                           {assocOpen && (
                             <AssociatePlannedDialog

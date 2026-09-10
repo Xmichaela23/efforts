@@ -852,6 +852,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         assessment: (['good','needs_work'] as const).includes(assessment as any) ? assessment : null,
         confounded,
         whole_session: wholeSession,
+        line: driftLineFor(Math.round(pct * 10) / 10),
       };
     }
     // ⛔ NEVER WITHHELD (Michael 2026-09-03: "drift is going to be important"). When the pace-to-heart-rate
@@ -861,10 +862,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     // 3 min skipped) — one definition for runs and rides.
     const rideDrift = (wa as any)?.hr_drift_v1;
     if (rideDrift && typeof rideDrift.pct === 'number' && Number.isFinite(rideDrift.pct)) {
-      return { pct: Math.round(rideDrift.pct * 10) / 10, basis: 'hr' as const, assessment: null, confounded: false, whole_session: wholeSession };
+      const hrPct = Math.round(rideDrift.pct * 10) / 10;
+      return { pct: hrPct, basis: 'hr' as const, assessment: null, confounded: false, whole_session: wholeSession, line: driftLineFor(hrPct) };
     }
     if (pct == null && basis == null && assessment == null) return null;
-    return { pct: null, basis: (basis === 'gap' || basis === 'raw') ? basis : null, assessment: null, confounded, whole_session: wholeSession };
+    return { pct: null, basis: (basis === 'gap' || basis === 'raw') ? basis : null, assessment: null, confounded, whole_session: wholeSession, line: null };
   })();
 
   /**
@@ -2023,9 +2025,8 @@ export function buildAnalysisDetailRows(
       // whole session, intervals included — said plainly so it is not read as a steady-run drift.
       const pctAny = typeof decoupling?.pct === 'number' && Number.isFinite(decoupling.pct) ? decoupling.pct : null;
       if (!decouplingShown && pctAny != null) {
-        const line = 5;
-        const d = Math.round((pctAny - line) * 10) / 10;
-        const room = pctAny <= 0 ? `heart rate fell · line ${line}%` : (d > 0 ? `${d.toFixed(1)} over the ${line}% line` : `line ${line}%`);
+        // ⛔ THE ONE DRIFT LINE (audit H-D09) — the same words the Drift chip prints.
+        const room = driftLineFor(pctAny);
         // ⛔ "hills mixed in" IS NOT SAID INDOORS. The `raw` basis means terrain was not adjusted
         // for; on a trainer or a treadmill there was no terrain, so the suffix would be inventing a
         // cause. The percentage stands as measured.
@@ -2475,6 +2476,21 @@ function buildStrengthVolume(
     completed_total_lb: completed.reduce((s, e) => s + e.volume_lb, 0),
     bodyweight_lb: bw,
   };
+}
+
+/**
+ * ⛔ THE DRIFT LINE, ONCE (2026-09-10, audit H-D09). The Drift chip wrote its own sentence from the
+ * shared `DRIFT_LIMITS.hybridPct` and this file wrote the Heart rate row's from a separate literal 5,
+ * in different words. `classification.decoupling.line` carries this and both print it.
+ * ⚠️ THE LINE IS 5%: Viada p107's session-termination rule for a hybrid athlete, and Friel's aerobic
+ * decoupling line (docs/STATE-SOURCES.md) — the same figure as `DRIFT_LIMITS.hybridPct`.
+ */
+export const DRIFT_LINE_PCT = 5;
+export function driftLineFor(pct: number | null | undefined): string | null {
+  if (typeof pct !== 'number' || !Number.isFinite(pct)) return null;
+  const line = DRIFT_LINE_PCT;
+  const d = Math.round((pct - line) * 10) / 10;
+  return pct <= 0 ? `heart rate fell · line ${line}%` : (d > 0 ? `${d.toFixed(1)} over the ${line}% line` : `line ${line}%`);
 }
 
 function computeStrengthWeightDeviation(

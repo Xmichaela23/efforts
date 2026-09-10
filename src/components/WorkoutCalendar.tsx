@@ -1060,47 +1060,25 @@ export default function WorkoutCalendar({
 
 
   /**
-   * §3e.4's two totals, off the rows already on screen. ⚠️ ONE PASS OVER THE WEEK'S OWN DAYS, not
-   * over `events` — `events` is the whole loaded range, and a total that quietly included last week
-   * would be the kind of number that looks right and is not.
-   *
-   * ⚠️ LIFTS ARE COUNTED, NOT TIMED. A lift's minutes are the least interesting thing about it and
-   * its distance is nothing, so it leaves both totals and gets its own count.
+   * ⛔ THE WEEK BAR PRINTS `weekly_stats` (2026-09-10, audit H-T03). Its two totals were summed here
+   * off the rows on screen, and a finished session's planned row is hidden there, so its ACTUAL time
+   * was added to "Planned" — the plan grew as the athlete trained. get-week now counts them
+   * (`get-week/week-totals.ts`): planned minutes and metres at each session's planned length, done at
+   * its moving time and recorded distance, lifts counted. The only thing left here is the unit.
    */
   const weekTotals = useMemo(() => {
-    let plannedMin = 0, doneMin = 0, plannedMeters = 0, doneMeters = 0, liftsPlanned = 0, liftsDone = 0;
-    for (const day of weekDays) {
-      for (const evt of map.get(toDateOnlyString(day)) ?? []) {
-        const row = (evt as { _src?: Record<string, unknown> })?._src;
-        if (!row) continue;
-        const done = String(row.workout_status ?? '').toLowerCase() === 'completed';
-        const type = String(row.type ?? row.workout_type ?? '').toLowerCase();
-        if (type === 'strength') {
-          // ⚠️ A DONE LIFT COUNTS IN BOTH: "3 lifts planned · 2 done" only reads as progress when
-          // the planned figure is the week's whole prescription, not what is left of it.
-          liftsPlanned += 1;
-          if (done) liftsDone += 1;
-          continue;
-        }
-        // ⛔ THE SERVER'S TIME: moving time for a done session, the planned length for one ahead.
-        const secs = done ? Number(row.moving_seconds) : plannedDurationSecondsOf(row);
-        const mins = secs && secs > 0 ? Math.round(secs / 60) : 0;
-        const km = normalizeDistanceKm(row as never);
-        const meters = km != null && Number.isFinite(km) && km > 0 ? km * 1000 : 0;
-        // ⚠️ A DONE SESSION COUNTS TOWARDS BOTH. "Planned 6h · Done 2h" only reads as progress when
-        // the planned figure is the whole week's work, not the part of it still outstanding.
-        plannedMin += mins; plannedMeters += meters;
-        if (done) { doneMin += mins; doneMeters += meters; }
-      }
-    }
+    const ws = (weeklyStats ?? {}) as Record<string, unknown>;
+    const n = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
     const toDist = (m: number) => (useImperial ? m / 1609.34 : m / 1000);
     return {
-      plannedMin, doneMin,
-      plannedMiles: toDist(plannedMeters),
-      doneMiles: toDist(doneMeters),
-      liftsPlanned, liftsDone,
+      plannedMin: n(ws.planned_minutes),
+      doneMin: n(ws.done_minutes),
+      plannedMiles: toDist(n(ws.planned_meters)),
+      doneMiles: toDist(n(ws.done_meters)),
+      liftsPlanned: n(ws.lifts_planned),
+      liftsDone: n(ws.lifts_done),
     };
-  }, [weekDays, map, useImperial]);
+  }, [weeklyStats, useImperial]);
 
   /** The week's own devices, off the rows already on screen. Absent when none of them are Garmin. */
   const garminDevices = useMemo(
