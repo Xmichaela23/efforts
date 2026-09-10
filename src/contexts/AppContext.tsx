@@ -544,31 +544,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  // Calculate current week based on plan start date and today
-  const calculateCurrentWeekForPlan = (plan: any): number => {
-    try {
-      // Get start date from config
-      const startDateStr = plan.config?.user_selected_start_date || plan.config?.start_date;
-      if (!startDateStr) return plan.current_week || 1;
-      
-      const startDate = parseLocalDate(String(startDateStr).slice(0, 10));
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Normalize to midnight
-      
-      const diffTime = today.getTime() - startDate.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      
-      // Week 1 starts on day 0-6, Week 2 on day 7-13, etc.
-      const weekNumber = Math.max(1, Math.floor(diffDays / 7) + 1);
-      
-      // Cap at plan duration
-      const maxWeeks = plan.duration || plan.duration_weeks || plan.config?.duration_weeks || 52;
-      return Math.min(weekNumber, maxWeeks);
-    } catch {
-      return plan.current_week || 1;
-    }
-  };
-
   const loadPlans = async () => {
     try {
       setPlansLoading(true);
@@ -579,24 +554,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setDetailedPlans({});
         return;
       }
-      const { data: plans, error } = await supabase.from('plans').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-      if (error) return;
-      
-      // Calculate dynamic current week for each plan based on start date
-      const active = plans?.filter(p => p.status === 'active' || p.status === 'paused').map(plan => ({ 
-        ...plan, 
-        currentWeek: calculateCurrentWeekForPlan(plan)
-      })) || [];
-      const completed = plans?.filter(p => p.status === 'completed' || p.status === 'ended').map(plan => ({ 
-        ...plan, 
-        currentWeek: calculateCurrentWeekForPlan(plan)
-      })) || [];
-      
+      /**
+       * ⛔ THE PLANS COME FROM `plan-overview`, WITH THEIR WEEK ALREADY COUNTED (2026-09-10, audit H-B09).
+       * This read the table and counted the current week from the raw start date, never moved back to
+       * its Monday, so a plan that began mid-week read one week here and another on Today. The server
+       * counts it with `get-week`'s rule and sends `current_week_index`, `current_phase`, `total_weeks`
+       * and `progress_pct`; `currentWeek` carries the index under the name the screens already read.
+       * A plan the server cannot place carries no week.
+       */
+      const { data: overview, error } = await supabase.functions.invoke('plan-overview', {
+        body: { as_of: new Date().toLocaleDateString('en-CA') },
+      });
+      if (error || !overview?.success) return;
+      const plans: any[] = (Array.isArray(overview.plans) ? overview.plans : []).map((plan: any) => ({
+        ...plan,
+        currentWeek: plan.current_week_index ?? undefined,
+      }));
+
+      const active = plans.filter(p => p.status === 'active' || p.status === 'paused');
+      const completed = plans.filter(p => p.status === 'completed' || p.status === 'ended');
+
       setCurrentPlans(active);
       setCompletedPlans(completed);
       const detailed: any = {};
-      plans?.forEach(plan => {
-        detailed[plan.id] = { ...plan, currentWeek: calculateCurrentWeekForPlan(plan) };
+      plans.forEach(plan => {
+        detailed[plan.id] = plan;
       });
       setDetailedPlans(detailed);
     } catch (error) {

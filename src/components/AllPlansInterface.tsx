@@ -445,56 +445,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     } catch { return (<span>{(workout as any).rendered_description || (workout as any).description}</span>); }
   });
 
-  // Calculate current week based on plan start date and today's date
-  const calculateCurrentWeek = async (planId: string): Promise<number> => {
-    try {
-      // Get plan's start date from planned_workouts (Week 1 Monday)
-      const { data: w1 } = await supabase
-        .from('planned_workouts')
-        .select('date, day_number')
-        .eq('training_plan_id', planId)
-        .eq('week_number', 1)
-        .order('day_number', { ascending: true })
-        .limit(1);
-      
-      if (Array.isArray(w1) && w1.length > 0) {
-        const anchor = w1[0] as any;
-        const startDate = parseLocalDate(String(anchor.date).slice(0, 10));
-        const anchorMid = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const diffTime = today.getTime() - anchorMid.getTime();
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        
-        // Calculate week number (1-based)
-        const weekNumber = Math.max(1, Math.floor(diffDays / 7) + 1);
-        
-        return weekNumber;
-      }
-      
-      // Fallback: try to get start date from plan config
-      const { data: planRow } = await supabase
-        .from('plans')
-        .select('config')
-        .eq('id', planId)
-        .maybeSingle();
-      
-      if (planRow?.config?.user_selected_start_date) {
-        const startDate = parseLocalDate(String(planRow.config.user_selected_start_date).slice(0, 10));
-        const anchorMid = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const diffTime = today.getTime() - anchorMid.getTime();
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        const weekNumber = Math.max(1, Math.floor(diffDays / 7) + 1);
-        
-        return weekNumber;
-      }
-    } catch {}
-    
-    // Default to week 1 if calculation fails
-    return 1;
-  };
+  // ⛔ THE CURRENT WEEK IS `plan-overview`'s (2026-09-10, audit H-B09). This counted it from the first
+  // week-1 row's date, then from the raw configured start — neither moved back to its Monday, and
+  // neither the way Today counts. The detail load below reads the server's `current_week_index`.
 
   const handlePlanClick = async (planId: string) => {
     // Guard: if we already have this plan open in detail view, skip expensive re-load
@@ -883,21 +836,27 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           }
 
           pd.weeks = weeksOut;
-
-          // compute totals for header
-          const totalWorkouts = weeksOut.reduce((sum, wk) => sum + (wk.workouts?.length || 0), 0);
-          pd.totalWorkouts = totalWorkouts;
         } catch {}
       }
 
-      // Calculate and set the current week based on plan start date
-      const calculatedCurrentWeek = await calculateCurrentWeek(planId);
-      
-      // Update the plan detail with the calculated current week
-      pd.currentWeek = calculatedCurrentWeek;
-      
+      /**
+       * ⛔ THE WEEK, EACH WEEK'S PHASE AND THE PLAN'S TOTALS ARE `plan-overview`'s (2026-09-10, audit
+       * H-B09 / H-P03 / H-P02). The header's "workouts" used to count only the week loaded here, and the
+       * total and avg/wk were summed over whichever weeks had been opened; the server sums every week
+       * of the plan. A plan the server cannot place selects week 1 and shows no current week.
+       */
+      try {
+        const { data: ov } = await supabase.functions.invoke('plan-overview', {
+          body: { plan_id: planId, as_of: new Date().toLocaleDateString('en-CA') },
+        });
+        pd.overview = ov?.success ? ov.overview : null;
+      } catch {
+        pd.overview = null;
+      }
+      pd.currentWeek = pd.overview?.current_week_index ?? null;
+
       setSelectedPlanDetail(pd);
-      setSelectedWeek(calculatedCurrentWeek);
+      setSelectedWeek(pd.currentWeek ?? 1);
       
       setPlanStatus(pd.status || 'active');
       setCurrentView('detail');
@@ -1493,27 +1452,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getWeeklyVolume = (week: any, excludeRaceDay: boolean = false) => {
-    if (!week || !Array.isArray(week.workouts)) return 0;
-    return week.workouts
-      .filter((w: any) => {
-        const tags = Array.isArray(w?.tags) ? w.tags.map((t: string) => t.toLowerCase()) : [];
-        // Exclude optional workouts
-        if (tags.includes('optional')) return false;
-        // Exclude race day if requested (for average calculation)
-        if (excludeRaceDay && (tags.includes('race_day') || /race\s+day/i.test(w?.name || ''))) return false;
-        return true;
-      })
-      .reduce((total: number, w: any) => {
-        /**
-         * ⛔ ONE FIELD (2026-09-10, audit H-T01): the row's `duration`, which the loaders above set from
-         * the server's stored length (or, for an unmaterialized session, the builder's authored minutes).
-         * The phone ladder that ran first here is deleted.
-         */
-        const min = Number((w as any)?.duration);
-        return Number.isFinite(min) && min > 0 ? total + min : total;
-      }, 0);
-  };
+  // ⛔ NO WEEKLY VOLUME IS ADDED UP HERE (2026-09-10, audit H-P02). The optional / race-day rules this
+  // summed with moved to `_shared/plan-overview.ts`, which sums every week of the plan.
 
   /**
    * Same-day ordering for markdown export. Honors §6.2 / §6.5 AM/PM pairing metadata first
@@ -1825,35 +1765,12 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
   // Plan Detail View
   if (currentView === 'detail' && selectedPlanDetail) {
-    const progress = selectedPlanDetail.duration ? Math.round((selectedPlanDetail.currentWeek / selectedPlanDetail.duration) * 100) : 0;
     const currentWeekData = selectedPlanDetail.weeks && selectedPlanDetail.weeks.length > 0 ? selectedPlanDetail.weeks.find((w: any) => w.weekNumber === selectedWeek) : null;
-    // Calculate total volume from workouts (prefer computed, fallback to planned duration)
-    // Include race day in total
-    const totalVolume = selectedPlanDetail.weeks && selectedPlanDetail.weeks.length > 0 
-      ? selectedPlanDetail.weeks.reduce((total: number, week: any) => total + getWeeklyVolume(week, false), 0)
-      : 0;
-    
-    // Calculate training volume (excluding race day) for average calculation
-    const trainingVolume = selectedPlanDetail.weeks && selectedPlanDetail.weeks.length > 0 
-      ? selectedPlanDetail.weeks.reduce((total: number, week: any) => total + getWeeklyVolume(week, true), 0)
-      : 0;
-    
-    // Fallback: Use weekly_summaries.estimated_hours if workouts don't have computed durations yet
-    const fallbackTotal = (() => {
-      const weeklySummaries: any = (selectedPlanDetail as any)?.config?.weekly_summaries || {};
-      return Object.values(weeklySummaries).reduce((sum: number, ws: any) => {
-        const hrs = Number(ws?.estimated_hours) || 0;
-        return sum + Math.round(hrs * 60); // Convert hours to minutes
-      }, 0);
-    })();
-    
-    const finalTotalVolume = totalVolume > 0 ? totalVolume : fallbackTotal;
-    // For average: use training volume (excluding race day) divided by number of weeks
-    // This gives average weekly training time, not including the one-time race event
-    const finalTrainingVolume = trainingVolume > 0 ? trainingVolume : fallbackTotal;
-    const averageWeeklyVolume = selectedPlanDetail.duration && selectedPlanDetail.duration > 0 
-      ? Math.round(finalTrainingVolume / selectedPlanDetail.duration) 
-      : 0;
+    /**
+     * ⛔ THE HEADER PRINTS `plan-overview` (2026-09-10, audit H-P02 / H-B09): its session count, total
+     * minutes, weekly average, week of the plan and progress. Absent when the server sent nothing.
+     */
+    const overview: any = (selectedPlanDetail as any).overview ?? null;
 
     return (
       <div className="flex min-h-0 min-w-0 flex-1 flex-col" style={{ fontFamily: 'Inter, sans-serif' }}>
@@ -2044,28 +1961,40 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             
             {/* Compact, single-line stats */}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/60 mb-3">
-              <span>
-                <span className={`font-semibold ${getDisciplineTextClass('run')}`}>{selectedPlanDetail.duration || 0}</span> wk
-              </span>
-              <span>
-                <span className={`font-semibold ${getDisciplineTextClass('run')}`}>{selectedPlanDetail.totalWorkouts || 0}</span> workouts
-              </span>
-              <span>
-                <span className={`font-semibold ${getDisciplineTextClass('run')}`}>{formatDuration(finalTotalVolume)}</span> total
-              </span>
-              <span>
-                <span className={`font-semibold ${getDisciplineTextClass('run')}`}>{formatDuration(averageWeeklyVolume)}</span> avg/wk
-              </span>
+              {overview?.total_weeks != null && (
+                <span>
+                  <span className={`font-semibold ${getDisciplineTextClass('run')}`}>{overview.total_weeks}</span> wk
+                </span>
+              )}
+              {overview && (
+                <span>
+                  <span className={`font-semibold ${getDisciplineTextClass('run')}`}>{overview.totals.sessions}</span> workouts
+                </span>
+              )}
+              {overview && (
+                <span>
+                  <span className={`font-semibold ${getDisciplineTextClass('run')}`}>{formatDuration(overview.totals.minutes)}</span> total
+                </span>
+              )}
+              {overview?.totals?.avg_minutes_per_week != null && (
+                <span>
+                  <span className={`font-semibold ${getDisciplineTextClass('run')}`}>{formatDuration(overview.totals.avg_minutes_per_week)}</span> avg/wk
+                </span>
+              )}
             </div>
 
             {/* Slim progress row */}
-            <div className="flex items-center justify-between text-xs text-white/60 mb-1">
-              <span>Progress</span>
-              <span>Week {selectedPlanDetail.currentWeek || 1} of {selectedPlanDetail.duration || 0}</span>
-            </div>
-            <div className="w-full bg-white/10 rounded-full h-1.5">
-              <div className="bg-white rounded-full h-1.5 transition-all duration-300" style={{ width: `${progress}%` }}></div>
-            </div>
+            {overview?.current_week_index != null && overview?.total_weeks != null && (
+              <>
+                <div className="flex items-center justify-between text-xs text-white/60 mb-1">
+                  <span>Progress</span>
+                  <span>Week {overview.current_week_index} of {overview.total_weeks}</span>
+                </div>
+                <div className="w-full bg-white/10 rounded-full h-1.5">
+                  <div className="bg-white rounded-full h-1.5 transition-all duration-300" style={{ width: `${overview.progress_pct ?? 0}%` }}></div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -2159,13 +2088,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         ) : (
           <>
             {(() => {
-              const totalWeeks = selectedPlanDetail.duration || selectedPlanDetail.duration_weeks || (selectedPlanDetail.weeks ? selectedPlanDetail.weeks.length : 0);
+              const totalWeeks = overview?.total_weeks ?? 0;
               const nums = Array.from({ length: Math.max(0, Number(totalWeeks) || 0) }, (_, i) => i + 1);
               return nums.length > 0 ? (
                 <div className="flex items-center gap-2 overflow-x-auto py-2 -mx-1 px-1">
                   {nums.map((wn: number) => {
                     const isSelected = selectedWeek === wn;
-                    const isCurrent = wn === (selectedPlanDetail.currentWeek || 0);
+                    const isCurrent = wn === overview?.current_week_index;
                     return (
                       <button
                         key={wn}
@@ -2193,69 +2122,34 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               ) : null;
             })()}
 
-            {currentWeekData && (
-              <div className="text-sm text-white/70 px-1 py-2">
-                {(() => {
-                  const focusText = String(currentWeekData.focus || '').toLowerCase();
-                  const stage = /taper/.test(focusText)
-                    ? 'Taper'
-                    : /deload|recovery/.test(focusText)
-                    ? 'Deload'
-                    : /peak/.test(focusText)
-                    ? 'Peak'
-                    : 'Build';
-                  
-                  // Calculate cumulative totals for all weeks in this phase
-                  // Find all weeks with the same phase/stage
-                  const allWeeks = selectedPlanDetail.weeks || [];
-                  const phaseWeeks = allWeeks.filter((w: any) => {
-                    const wFocus = String(w?.focus || '').toLowerCase();
-                    if (stage === 'Taper') return /taper/.test(wFocus);
-                    if (stage === 'Deload') return /deload|recovery/.test(wFocus);
-                    if (stage === 'Peak') return /peak/.test(wFocus);
-                    return !/taper|deload|recovery|peak/.test(wFocus); // Build phase
-                  });
-                  
-                  // Calculate cumulative totals for the phase
-                  const phaseMiles = phaseWeeks.reduce((total: number, week: any) => {
-                    const weeklySummariesObj: any = (selectedPlanDetail as any)?.config?.weekly_summaries || 
-                      (selectedPlanDetail as any)?.weekly_summaries || {};
-                    const wsKey = String(week.weekNumber);
-                    const ws: any = weeklySummariesObj?.[wsKey] || {};
-                    const miles = typeof ws?.total_miles === 'number' ? ws.total_miles : 0;
-                    return total + miles;
-                  }, 0);
-                  
-                  const phaseVolume = phaseWeeks.reduce((total: number, week: any) => {
-                    return total + getWeeklyVolume(week, true); // Exclude race day from phase totals
-                  }, 0);
-                  
-                  const phaseWorkoutCount = phaseWeeks.reduce((total: number, week: any) => {
-                    const count = (week?.workouts || []).filter((w: any) => {
-                      if (w.type === 'rest') return false;
-                      const tags = Array.isArray(w?.tags) ? w.tags : [];
-                      return !tags.includes('optional');
-                    }).length;
-                    return total + count;
-                  }, 0);
-                  
-                  return (
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <span className="text-white font-medium">{stage}</span>
-                      {phaseMiles > 0 && (
-                        <span className="text-white/60">{phaseMiles.toFixed(1)} mi</span>
-                      )}
-                      {phaseVolume > 0 && (
-                        <span className="text-white/60">{formatDuration(phaseVolume)}</span>
-                      )}
-                      {phaseWorkoutCount > 0 && (
-                        <span className="text-white/60">{phaseWorkoutCount} workouts</span>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
+            {(() => {
+              /**
+               * ⛔ THE PHASE AND ITS TOTALS ARE `plan-overview`'s (2026-09-10, audit H-P03). This guessed
+               * Taper / Deload / Peak from the week's text and called the rest Build, then added up miles,
+               * minutes and sessions over the weeks it guessed shared that word. The server sends the
+               * plan's own phase for each week and each phase's totals over the whole plan; a week the
+               * plan names no phase for shows no line.
+               */
+              const wk = (overview?.weeks ?? []).find((w: any) => w.week === selectedWeek);
+              const ph = wk?.phase ? (overview?.phases ?? []).find((p: any) => p.phase === wk.phase) : null;
+              if (!ph) return null;
+              return (
+                <div className="text-sm text-white/70 px-1 py-2">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="text-white font-medium">{ph.phase}</span>
+                    {ph.miles != null && ph.miles > 0 && (
+                      <span className="text-white/60">{ph.miles.toFixed(1)} mi</span>
+                    )}
+                    {ph.minutes > 0 && (
+                      <span className="text-white/60">{formatDuration(ph.minutes)}</span>
+                    )}
+                    {ph.sessions > 0 && (
+                      <span className="text-white/60">{ph.sessions} workouts</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {(() => {
               const weeklySummariesObj: any = (selectedPlanDetail as any)?.config?.weekly_summaries || (selectedPlanDetail as any)?.weekly_summaries || (selectedPlanDetail as any)?.template?.weekly_summaries || {};

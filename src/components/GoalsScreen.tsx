@@ -146,19 +146,21 @@ function getSportIcon(s: string | null) {
 }
 
 // Active strength-primary (Get Strong) block → a live summary for the goal card: phase·week, this
-// week's session counts, progress. Derived entirely from the persisted plan config (no extra fetch).
-type BlockSummary = { phaseName: string; wk: number; totalWeeks: number; strengthN: number; endSport: 'run' | 'bike' | null; endN: number };
-function strengthBlockSummary(plan: { currentWeek?: number; config?: any } | undefined): BlockSummary | null {
+// week's session counts, progress.
+// ⛔ THE PHASE, THE WEEK AND THE PROGRESS ARE THE SERVER'S (2026-09-10, audit H-P03 / H-B09). This read
+// the block's raw phase list and worked out its own week and percentage; `plan-overview` sends
+// `current_phase`, `total_weeks` and `progress_pct` on the plan. The session counts are the plan's own
+// config fields, printed as stored.
+type BlockSummary = { phaseName: string | null; wk: number | null; totalWeeks: number | null; progressPct: number | null; strengthN: number; endSport: 'run' | 'bike' | null; endN: number };
+function strengthBlockSummary(plan: { currentWeek?: number; config?: any; current_phase?: string | null; total_weeks?: number | null; progress_pct?: number | null } | undefined): BlockSummary | null {
   const cfg = plan?.config;
   if (!cfg || cfg.source !== 'strength_primary') return null;
-  const phases: Array<{ name: string; start_week: number; end_week: number }> = cfg.phase_structure?.phases ?? [];
-  const totalWeeks = phases.length ? Math.max(...phases.map((p) => Number(p.end_week) || 0)) : (Number(plan?.currentWeek) || 0);
-  const wk = Math.max(1, Number(plan?.currentWeek) || 1);
-  const phase = phases.find((p) => wk >= p.start_week && wk <= p.end_week) ?? phases[0];
   const endSport = cfg.endurance_sport === 'run' || cfg.endurance_sport === 'bike' ? cfg.endurance_sport : null;
   return {
-    phaseName: phase?.name ?? 'Training',
-    wk, totalWeeks,
+    phaseName: plan?.current_phase ?? null,
+    wk: plan?.currentWeek ?? null,
+    totalWeeks: plan?.total_weeks ?? null,
+    progressPct: plan?.progress_pct ?? null,
     strengthN: Number(cfg.strength_frequency) || 0,
     endSport,
     endN: endSport ? (Number(cfg.endurance_frequency) || 0) : 0,
@@ -1374,7 +1376,9 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                 <div className="mt-2.5 space-y-2">
                   <p className="text-sm text-white/70">
                     {blockSummary.phaseName}
-                    {blockSummary.totalWeeks > 0 && <span className="text-white/40"> · Week {blockSummary.wk} of {blockSummary.totalWeeks}</span>}
+                    {blockSummary.wk != null && blockSummary.totalWeeks != null && blockSummary.totalWeeks > 0 && (
+                      <span className="text-white/40">{blockSummary.phaseName ? ' · ' : ''}Week {blockSummary.wk} of {blockSummary.totalWeeks}</span>
+                    )}
                   </p>
                   <div className="flex items-center gap-3 text-xs text-white/55">
                     {blockSummary.strengthN > 0 && (
@@ -1387,9 +1391,9 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
                       </span>
                     )}
                   </div>
-                  {blockSummary.totalWeeks > 0 && (
+                  {blockSummary.progressPct != null && (
                     <div className="h-1 w-full overflow-hidden rounded-full bg-white/10" aria-hidden>
-                      <div className="h-full rounded-full bg-teal-400/70" style={{ width: `${Math.min(100, Math.round((blockSummary.wk / blockSummary.totalWeeks) * 100))}%` }} />
+                      <div className="h-full rounded-full bg-teal-400/70" style={{ width: `${blockSummary.progressPct}%` }} />
                     </div>
                   )}
                 </div>
