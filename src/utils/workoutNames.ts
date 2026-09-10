@@ -1,3 +1,5 @@
+import { isIndoorSession } from '@shared/indoor-session';
+
 /**
  * Generate a nice, human-readable workout name
  * Examples: "Los Angeles Run", "Los Angeles Ride", "Lap Swim", "Open Water Swim"
@@ -11,82 +13,20 @@
  * NOT assume indoor. We only return true for indoor when we have positive confirmation.
  */
 export function isVirtualActivity(workout: any): boolean {
-  const providerSport = (workout?.provider_sport || '').toLowerCase();
-  const activityType = (workout?.activity_type || '').toLowerCase();
-  const name = (workout?.name || '').toLowerCase();
-  const type = (workout?.type || '').toLowerCase();
-  
-  // Check provider sport type for explicit virtual/indoor indicators
-  const isVirtualSport = (
-    providerSport.includes('virtual') ||
-    providerSport === 'indoorcycling' ||
-    providerSport.includes('treadmill') ||
-    activityType.includes('virtual') ||
-    activityType === 'indoorcycling' ||
-    activityType.includes('treadmill')
-  );
-  
-  // If provider explicitly says it's virtual/indoor, trust it
-  if (isVirtualSport) return true;
-  
-  // Check workout name for Zwift indicators
-  const isZwiftWorkout = (
-    name.includes('zwift') ||
-    name.includes('watopia') ||
-    name.includes('makuri') ||
-    (name.includes('innsbruck') && name.includes('zwift'))
-  );
-  
-  if (isZwiftWorkout) return true;
-  
-  // Check for explicit trainer flag from Strava
-  const isTrainer = workout?.strava_data?.original_activity?.trainer === true;
-  if (isTrainer) return true;
-  
-  // For runs/walks, we need to determine indoor vs outdoor
-  // But we must be STABLE - don't flip based on whether gps_track has loaded yet
-  if (type === 'run' || type === 'walk') {
-    // Check for GPS data - handle both array and JSON string formats
-    let hasGpsTrack = false;
-    const gpsTrack = workout?.gps_track;
-    if (Array.isArray(gpsTrack) && gpsTrack.length > 0) {
-      hasGpsTrack = true;
-    } else if (typeof gpsTrack === 'string' && gpsTrack.length > 10) {
-      // It's a JSON string that hasn't been parsed - assume it has GPS data
-      hasGpsTrack = true;
-    }
-    
-    // Check for start position (lat/lng) - this is often available even in minimal fetches
-    const hasStartPosition = (
-      (Number.isFinite(workout?.start_position_lat) && workout.start_position_lat !== 0) ||
-      (Number.isFinite(workout?.starting_latitude) && workout.starting_latitude !== 0)
-    );
-    
-    // If gps_track is undefined (not yet loaded), check other indicators
-    // Don't assume indoor just because gps_track hasn't loaded
-    if (gpsTrack === undefined || gpsTrack === null) {
-      // If we have start position, it's likely outdoor
-      if (hasStartPosition) return false;
-      // If gps_track hasn't loaded yet, default to outdoor (false) to avoid UI flicker
-      // The function will be called again after hydration with full data
-      return false;
-    }
-    
-    // If gps_track explicitly exists but is empty, it's indoor
-    if (Array.isArray(gpsTrack) && gpsTrack.length === 0) {
-      // Double-check with start position - if we have coords, it might be outdoor
-      // with failed GPS recording
-      if (hasStartPosition) return false;
-      return true;
-    }
-    
-    // If we have GPS track data, it's outdoor
-    if (hasGpsTrack) return false;
-  }
-  
-  return false;
+  /**
+   * ⛔ ONE OWNER NOW — `src/lib/indoor-session.ts` (2026-09-09). This held its own ladder: provider
+   * words, Zwift names, Strava's `trainer`, and a run-or-walk GPS test. It missed Garmin's
+   * `indoor_cycling` / `indoor_running` (it matched only the separator-less `indoorcycling`),
+   * Strava's `virtual` flag, our own `venue:` tag, a RIDE with no track at all, and a track that
+   * never leaves a 100 m circle. Rather than grow a second ladder beside it for the card and the
+   * map, the question moved to one file and this delegates.
+   *
+   * ⚠️ THE NAME STAYS because a dozen call sites use it and its meaning has not changed — only its
+   * accuracy. `getVirtualWorkoutLabel` below still reads it, so a treadmill run now gets the indoor
+   * label it always should have had.
+   */
+  return isIndoorSession(workout);
 }
-
 /**
  * Get a friendly label for virtual workout source
  * Only called when isVirtualActivity() returns true

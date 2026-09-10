@@ -99,8 +99,14 @@ export const RIDE_VENUES = ['trainer'] as const;
 export const RUN_VENUES = ['treadmill'] as const;
 export type Venue = (typeof RIDE_VENUES)[number] | (typeof RUN_VENUES)[number];
 
-/** One literal, shared with the readers that ask "was this indoors". */
-export const VENUE_PREFIX = 'venue:';
+/**
+ * One literal, shared with the readers that ask "was this indoors".
+ * ⛔ IT MOVED TO `@shared/indoor-session` (2026-09-09) and is re-exported here so no call site had to
+ * change. The server reads the same tag to decide whether a session gets a heat or a hills line, and
+ * a prefix that lived only in a client file would have been two literals within a week.
+ */
+export { VENUE_PREFIX } from '@shared/indoor-session';
+import { VENUE_PREFIX } from '@shared/indoor-session';
 
 /**
  * ⛔ THE SHEET'S LINES ARE KEYS, NOT SENTENCES. Every athlete-facing line in this work order is

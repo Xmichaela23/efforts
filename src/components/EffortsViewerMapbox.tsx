@@ -12,6 +12,7 @@ import {
 } from "@/lib/sessionWeather";
 import { formatSpeed } from "../utils/workoutFormatting";
 import { isVirtualActivity, getVirtualWorkoutLabel } from "../utils/workoutNames";
+import { isIndoorSession } from "@shared/indoor-session";
 import { getDisciplineColorRgb, SPORT_COLORS } from "@/lib/context-utils";
 
 // Route simplification now happens server-side in workout-detail
@@ -670,6 +671,26 @@ function EffortsViewerMapbox({
   compact?: boolean;
   workoutData?: any;
 }) {
+  /**
+   * ⛔ THE SAME ANSWER FOR THE WEATHER AND THE STRIP. An indoor session has no weather to show and no
+   * map-derived column to plot; asking the question a second way here is exactly the divergence
+   * `indoor-session.ts` exists to stop.
+   */
+  const indoor = useMemo(() => isIndoorSession(workoutData as never), [workoutData]);
+
+  /**
+   * The head unit's own reading, when the session has one. ⚠️ SCHEMA 7 KEEPS IT AS ITS OWN FIELD
+   * (`device_temp_f`) precisely so it can be printed here without pretending to be the air; older
+   * rows carry only `workouts.avg_temperature` in °C, so both are read.
+   */
+  const indoorTempF = useMemo(() => {
+    const w = workoutData as any;
+    const stored = Number(w?.weather_data?.device_temp_f);
+    if (Number.isFinite(stored)) return Math.round(stored);
+    const c = Number(w?.avg_temperature);
+    return Number.isFinite(c) && c !== 0 ? Math.round(c * 9 / 5 + 32) : null;
+  }, [workoutData]);
+
   /** Normalize samples to Sample[] regardless of upstream shape */
   const normalizedSamples: Sample[] = useMemo(() => {
     const isSampleArray = Array.isArray(samples) && (samples.length === 0 || typeof samples[0]?.t_s === 'number');
@@ -764,6 +785,14 @@ function EffortsViewerMapbox({
           grade = dh / dd;
           vam = (dh/dt) * 3600;
         }
+        /**
+         * ⛔ NO GRADE AND NO VAM INDOORS (2026-09-09). Both are altitude over distance, and indoors
+         * there is no altitude — on a trainer or a treadmill the field is empty, and on Zwift it is
+         * a fictional one that would plot a climb the athlete's legs never did. ⚠️ AFTER the branch
+         * above rather than inside it, because Zwift's polyline passes the `isOutdoor` point-count
+         * test and would otherwise take the outdoor path.
+         */
+        if (indoor) { grade = null; vam = null; }
       }
       // Only use server pace; no client derivation
       const paceVal: number | null = Number.isFinite(pace_s_per_km?.[i] as any) ? Number(pace_s_per_km[i]) : null;
@@ -871,6 +900,8 @@ function EffortsViewerMapbox({
     } catch { return undefined; }
   }, [workoutData?.achievements]);
   
+
+
   // Memoize raw track to prevent unnecessary re-renders
   const memoizedRawTrack = useMemo(() => {
     return Array.isArray(trackLngLat) && trackLngLat.length > 1 ? trackLngLat : undefined;
@@ -881,9 +912,20 @@ function EffortsViewerMapbox({
     Array.isArray(trackLngLat) && trackLngLat.length > 1 ? trackLngLat : [],
   [trackLngLat]);
 
-  /** Don't show treadmill card when we already have a polyline or GPS start (hydration / gps_track vs `track` lag). */
+  /**
+   * ⛔ ONE INDOOR RULE, AND IT OUTRANKS THE TRACK (2026-09-09). This used to return early the moment
+   * a renderable track or a GPS start existed — so a Zwift ride, which carries a full fictional
+   * polyline, drew a MAP OF NOWHERE, and a trainer ride whose watch caught one fix before it went
+   * inside drew a map of a driveway. A statement about what the session was (source type, Strava's
+   * flags, our `venue:` tag) beats the presence of coordinates.
+   *
+   * ⚠️ THE TRACK STILL DECIDES WHERE NOTHING SAID ANYTHING. `isIndoorSession` falls back to the
+   * track's own spread — a session inside a 100 m circle went nowhere — and says nothing at all
+   * while `gps_track` has not loaded, so the placeholder cannot flash over a real map on open.
+   */
   const showIndoorPlaceholder = useMemo(() => {
     if (!workoutData) return false;
+    if (isIndoorSession(workoutData as never)) return true;
     const hasRenderableTrack = Array.isArray(trackLngLat) && trackLngLat.length > 1;
     const w = workoutData as any;
     const startLat = w?.start_position_lat ?? w?.starting_latitude;
@@ -891,6 +933,7 @@ function EffortsViewerMapbox({
     if (hasRenderableTrack || hasGpsStart) return false;
     return isVirtualActivity(workoutData);
   }, [workoutData, trackLngLat]);
+
   
   useEffect(() => {
     try {
@@ -1571,10 +1614,26 @@ function EffortsViewerMapbox({
       {/* Map header with weather, source, and theme toggle */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 6px 6px 6px", paddingLeft: 8, paddingRight: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <WeatherDisplay 
-            weather={weatherForHeader}
-            loading={weatherLoadingEffective}
-          />
+          {/**
+            * ⛔ NO WEATHER BLOCK INDOORS (2026-09-09). A forecast for the coordinates the ride
+            * started at is the weather of a street the athlete never rode down — the "score that
+            * lies" class: a real number attached to a session it did not happen to.
+            * ⚠️ THE DEVICE'S OWN READING STILL SHOWS, once, because it is the only temperature that
+            * was actually measured where the session happened. It is labelled `Indoor` so nobody
+            * reads it as the air.
+            */}
+          {indoor ? (
+            indoorTempF != null ? (
+              <div style={{ fontSize: 13, color: "#64748b", whiteSpace: "nowrap" }}>
+                Indoor {indoorTempF}°
+              </div>
+            ) : null
+          ) : (
+            <WeatherDisplay 
+              weather={weatherForHeader}
+              loading={weatherLoadingEffective}
+            />
+          )}
           {/* PR count badge - tap to open PR card */}
           {(() => {
             const prSegments = memoizedSegments?.filter(s => s.pr_rank === 1) ?? [];
@@ -2373,10 +2432,15 @@ function EffortsViewerMapbox({
               workoutData?.type !== 'run' && normalizedSamples.some(s=>Number.isFinite(s.speed_mps as any)) ? "spd" : null,
               workoutData?.type !== 'run' && normalizedSamples.some(s=>Number.isFinite(s.power_w as any)) ? "pwr" : null,
               "bpm",
-              "elev",
+              // ⛔ ELEVATION AND VAM ARE MAP-DERIVED AND COME OFF INDOORS (2026-09-09). Both are
+              // computed from the track's altitude; on a trainer or a treadmill there is no
+              // altitude, and on Zwift there is a fictional one. ⚠️ HEART RATE, CADENCE, POWER, PACE
+              // AND SPEED STAY — those are sensor readings, and they are as real on a trainer as
+              // they are on a road.
+              indoor ? null : "elev",
               normalizedSamples.some(s=>Number.isFinite(s.cad_rpm as any) || Number.isFinite(s.cad_spm as any)) ? "cad" : null,
               workoutData?.type === 'run' && normalizedSamples.some(s=>Number.isFinite(s.power_w as any)) ? "pwr" : null,
-              workoutData?.type !== 'run' && normalizedSamples.some(s=>Number.isFinite(s.vam_m_per_h as any)) ? "vam" : null
+              !indoor && workoutData?.type !== 'run' && normalizedSamples.some(s=>Number.isFinite(s.vam_m_per_h as any)) ? "vam" : null
             ].filter(Boolean) as MetricTab[]
           ) ).map((t) => {
             // Chart colors for each metric

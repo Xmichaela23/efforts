@@ -5,6 +5,7 @@
 import { halvesSteady, notSteadyLine } from '../ride-halves-steady.ts';
 import type { SessionDetailV1, SegmentVerdictV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
 import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
+import { isIndoorSession } from '../indoor-session.ts';
 import type { VerdictDirection } from '../core-verdict.ts';
 import type { ArcPerformanceBridgeV1 } from './arc-performance-bridge.ts';
 import { mergeArcPerformanceNarrative } from './arc-performance-bridge.ts';
@@ -211,6 +212,13 @@ export type SessionDetailInput = {
   /** Raw planned_workouts row with strength_exercises (for strength weight deviation) and `tags`
    *  (for `venue:` — the session the athlete moved indoors). */
   plannedRowRaw?: { strength_exercises?: any[]; computed?: any; tags?: string[] | null } | null;
+  /**
+   * The completed `workouts` row's own indoor evidence — `provider_sport`, `strava_data`, `gps_track`,
+   * `start_position_lat`, `name`, `type`. ⚠️ THE BUILDER ONLY READS IT (Law 4); `workout-detail` is
+   * the DB reader that passes it. Absent falls back to the planned row's `venue:` tag alone, which is
+   * what this decided on before.
+   */
+  completedRowForIndoor?: Record<string, unknown> | null;
   /** Completed workout strength_exercises (for strength weight deviation) */
   completedStrengthExercises?: any[] | null;
   /**
@@ -361,6 +369,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     match,
     plannedSession,
     plannedRowRaw,
+    completedRowForIndoor,
     completedStrengthExercises,
     bodyweightLb,
     observations,
@@ -852,7 +861,15 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
    */
   const indoorVenue = (() => {
     const tags = (plannedRowRaw as any)?.tags;
-    return Array.isArray(tags) && tags.some((t: unknown) => String(t ?? '').startsWith('venue:'));
+    if (Array.isArray(tags) && tags.some((t: unknown) => String(t ?? '').startsWith('venue:'))) return true;
+    /**
+     * ⛔ AND THE SOURCE'S OWN WORD, NOT ONLY THE ATHLETE'S (2026-09-09). This read the `venue:` tag
+     * alone, so a ride Strava flagged `trainer`, a Zwift ride, a Garmin `indoor_cycling` or a
+     * treadmill run — none of which carry a tag, because the athlete never swapped anything — got
+     * "the heat drove it" off an outdoor forecast and "hills mixed in" off a fictional altitude.
+     * `isIndoorSession` is the one predicate the card, the map and the metric strip also read.
+     */
+    return isIndoorSession(completedRowForIndoor ?? null);
   })();
 
   // ── Analysis detail rows ───────────────────────────────────────────────────

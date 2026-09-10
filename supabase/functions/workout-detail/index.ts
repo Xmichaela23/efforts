@@ -895,6 +895,23 @@ async function runSessionDetailPipelineAndPersist(
       match,
       plannedSession,
       plannedRowRaw,
+      /**
+       * ⛔ THE SESSION'S OWN INDOOR EVIDENCE (2026-09-09). The builder decides whether a heat or a
+       * hills line is said; until now it could only see the planned row's `venue:` tag, so a
+       * Strava-trainer or Zwift or treadmill session — which carries no tag, because the athlete
+       * never swapped anything — got both explanations off weather it was never in.
+       * ⚠️ THIS FUNCTION IS THE DB READER (Law 4). It hands the row over; `isIndoorSession` in
+       * `_shared` is the one rule, shared with the card, the map and the metric strip.
+       */
+      completedRowForIndoor: row ? {
+        type: (row as any)?.type,
+        name: (row as any)?.name,
+        provider_sport: (row as any)?.provider_sport,
+        activity_type: (row as any)?.activity_type,
+        strava_data: (row as any)?.strava_data,
+        gps_track: (row as any)?.gps_track,
+        start_position_lat: (row as any)?.start_position_lat,
+      } : null,
       completedStrengthExercises: Array.isArray(compStrengthArr) ? compStrengthArr : null,
       bodyweightLb, // D-349 — the builder prices; this function is the DB reader (Law 4).
       observations,
