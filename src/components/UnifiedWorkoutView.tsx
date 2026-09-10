@@ -1,6 +1,7 @@
 import { useAppContext } from '@/contexts/AppContext';
 import { shareSession, shareSessionText } from '@/lib/share-session-text';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { getProviderAttribution } from '@/lib/provider-attribution';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { X, Calendar, ListCollapse, List } from 'lucide-react';
@@ -1135,21 +1136,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
         {/* Row 2: Source attribution + View link */}
         {(() => {
-          const source = (workout as any)?.source;
-          const isStravaImported = (workout as any)?.is_strava_imported;
+          /* ⛔ ONE READER (docs/WORKORDER-garmin-strava-attribution-2026-09-09.md): the same
+             `getProviderAttribution` Today's done card and the Week tab ask, so the drawer can never
+             disagree with them about where a row came from. The inline reader it replaced read the
+             same fields (`source`, `is_strava_imported`, the two ids, `device_info`). */
+          const attribution = getProviderAttribution(workout);
+          const { source, deviceName, deviceIsGarmin } = attribution;
           const stravaId = (workout as any)?.strava_activity_id;
-          const garminId = (workout as any)?.garmin_activity_id;
-          const deviceInfo = (() => {
-            try {
-              const di = (workout as any)?.device_info || (workout as any)?.deviceInfo;
-              if (typeof di === 'string') return JSON.parse(di);
-              return di;
-            } catch { /* device_info string not JSON — omit device line */ return null; }
-          })();
-          const rawDeviceName = deviceInfo?.device_name || deviceInfo?.deviceName || deviceInfo?.product;
-          const deviceName = rawDeviceName?.replace(/^Garmin\s+/i, '');
 
-          if (source === 'strava' || stravaId || isStravaImported) {
+          if (source === 'strava') {
             const stravaUrl = stravaId ? `https://www.strava.com/activities/${stravaId}` : null;
             
             return (
@@ -1159,7 +1154,16 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   alt="Powered by Strava" 
                   className="h-3"
                 />
-                {deviceName && <span className="text-gray-400 text-xs">via {deviceName}</span>}
+                {/* ⛔ A GARMIN DEVICE THROUGH STRAVA IS STILL GARMIN DATA (work order §5). Garmin API
+                    Brand Guidelines v6.30.2025 want "Garmin [device model]"; Strava's own notice on
+                    Garmin attribution (developers.strava.com/guidelines) defers to it. So "via Edge
+                    540" becomes "Garmin Edge 540 via Strava", in Garmin's blue; a non-Garmin device
+                    keeps its "via [device]" line. */}
+                {deviceName && deviceIsGarmin ? (
+                  <span className="text-[#007CC3] font-light text-xs">Garmin {deviceName} via Strava</span>
+                ) : deviceName ? (
+                  <span className="text-gray-400 text-xs">via {deviceName}</span>
+                ) : null}
                 {stravaUrl && (
                   <>
                     <span className="text-gray-300">•</span>
@@ -1177,7 +1181,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             );
           }
 
-          if (source === 'garmin' || garminId) {
+          if (source === 'garmin') {
             // ⛔ THE ID WITH "-detail" STRIPPED — see `garminConnectId`. `/app/activity/` is the address
             // Garmin serves today; `/modern/activity/` only redirects to it, so link straight there.
             const garminUrl = garminConnectId ? `https://connect.garmin.com/app/activity/${garminConnectId}` : null;

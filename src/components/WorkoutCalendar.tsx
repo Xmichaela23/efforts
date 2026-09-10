@@ -17,6 +17,7 @@ import { useDeclaredPosture } from '@/hooks/useDeclaredPosture';
 import { useResolvedFtp } from '@/hooks/useResolvedFtp';
 import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
+import { ProviderAttributionLine } from '@/components/ProviderAttribution';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { LogTypeMenuContent } from '@/components/LogFAB';
 import RescheduleValidationPopup from '@/components/RescheduleValidationPopup';
@@ -1543,10 +1544,17 @@ export default function WorkoutCalendar({
                         {name}
                       </span>
                       <span
-                        className="text-[14px] tabular-nums flex-shrink-0"
+                        className="text-[14px] tabular-nums flex-shrink-0 inline-flex items-baseline gap-1.5"
                         style={{ color: done ? 'rgba(242,240,236,0.36)' : 'rgba(242,240,236,0.62)' }}
                       >
                         {meta}
+                        {/* ⛔ WHERE A DONE ROW CAME FROM, AFTER ITS NUMBERS (docs/WORKORDER-garmin-strava-
+                            attribution-2026-09-09.md §2). Garmin API Brand Guidelines v6.30.2025: a
+                            multi-entry display of Garmin device-sourced data attributes "per entry",
+                            "Garmin [device model]", never in a tooltip. developers.strava.com/guidelines:
+                            the unaltered Powered by Strava mark for a Strava row. 12 px, never smaller
+                            than the 14 px numbers' own small text. */}
+                        {done ? <ProviderAttributionLine workout={row} /> : null}
                       </span>
                       {/* ⛔ ONE MARK, OR NOTHING: a check when it is done, the swap arrow when the
                           row no longer matches the plan. Never both — a swapped session that is done

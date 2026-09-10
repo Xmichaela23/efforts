@@ -12,6 +12,7 @@ import { formatLocalDate } from '@/lib/dateUtils';
 // instead. See SPEC-strength-language, Step 2.
 import { capabilitiesForExercise } from '@/lib/exercise-role';
 import LoadBar from '@/components/LoadBar';
+import { useGarminDataPresence } from '@/hooks/useGarminDataPresence';
 import { formZone } from '@shared/fitness-fatigue';
 import StateBodyBlock from './StateBodyBlock';
 import { supabase, getStoredUserId, invokeFunctionFormData, invokeFunction } from '@/lib/supabase';
@@ -93,6 +94,8 @@ export default function StateTab({
   const [nudgeDismissNonce, setNudgeDismissNonce] = useState(0);
   const swimNudge = useSwimBaselineNudge(); // D-200: honored-swim-gated swim re-test nudge (State only)
   const { useImperial } = useAppContext(); // imperial → yards, metric → meters — for the SWIM sessions row distance
+  // docs/WORKORDER-garmin-strava-attribution-2026-09-09.md §3 — the load plate's derived-data footer.
+  const garminDerived = useGarminDataPresence();
 
   useEffect(() => {
     fetchArcContext().then((arc) => {
@@ -813,6 +816,7 @@ export default function StateTab({
           hasActivePlan={wsv.plan.has_active_plan === true}
           plannedThisWeek={weekExecTotals.planned}
           doneThisWeek={weekExecTotals.done}
+          garminDerived={garminDerived}
         />
 
         {showTopLastRaceCard && lastCompletedRace && <StateLastRaceCard lastCompletedRace={lastCompletedRace} />}

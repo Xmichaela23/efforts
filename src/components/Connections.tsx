@@ -965,7 +965,10 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
       case 'strava':
         return 'Connect Strava and new activities arrive on their own after each workout.';
       case 'garmin':
-        return 'Connect Garmin and new activities arrive on their own after each workout.';
+        // ⛔ THE FULL APP NAME HERE TOO (docs/WORKORDER-garmin-strava-attribution-2026-09-09.md §4).
+        // Garmin API Brand Guidelines v6.30.2025: when presenting the connection, "use the full app
+        // name" — never "Garmin" for "Garmin Connect". This read "Connect Garmin and …".
+        return 'Connect to Garmin Connect and new activities arrive on their own after each workout.';
       default:
         return `Connect your ${provider} account to sync data.`;
     }

@@ -55,6 +55,9 @@ import PlannedSessionHeader from './PlannedSessionHeader';
 // it is. Every athlete-facing word lives in `@/lib/today-lines`; nothing new is spelled out here.
 // ⛔ §3d — a lift and the plyo day swipe as a deck, a ride or run is one glass card.
 import TodaySession, { rendersAsSessionCard, TodaySpacingLine } from './SessionDeck';
+import { getProviderAttribution } from '@/lib/provider-attribution';
+import { GarminDerivedDataLine, ProviderAttributionLine } from './ProviderAttribution';
+import { useGarminDataPresence } from '@/hooks/useGarminDataPresence';
 import type { CardEmphasis } from './CardDeck';
 // ⛔ §3b — the weather block above the date, and the week's load bars + counts under the day.
 import TodayWeather from './TodayWeather';
@@ -209,6 +212,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
   /** §3g — the form number's only source. Same payload `LoadBar` reads on State. */
   const coachWeek = useCoachWeekContext();
+  /**
+   * docs/WORKORDER-garmin-strava-attribution-2026-09-09.md §3 — the form number is DERIVED from
+   * Garmin device-sourced rows, so the header block carries Garmin's derived-data line under it
+   * (Garmin API Brand Guidelines v6.30.2025). Only with a Garmin connection or a Garmin row in the
+   * loaded window, and only under a form line — with no number there is nothing derived to attribute.
+   */
+  const garminDerived = useGarminDataPresence();
   const [baselines, setBaselines] = useState<any | null>(null);
   const [dayLoc, setDayLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [locTried, setLocTried] = useState(false);
@@ -509,36 +519,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     return ['run', 'ride', 'bike', 'cycling'].includes(t);
   };
 
-  // Provider + device attribution for completed imports (Strava/Garmin)
-  const getProviderAttribution = (w: any): { source: 'strava' | 'garmin' | null; deviceName?: string } => {
-    try {
-      const provider = String(w?.provider || '').toLowerCase();
-      const id = String(w?.id || '');
-      const stravaId = (w as any)?.strava_activity_id;
-      const garminId = (w as any)?.garmin_activity_id;
-      const isStravaImported = !!(w as any)?.strava_data || !!stravaId || id.startsWith('strava_') || provider === 'strava';
-      const isGarminImported = !!(w as any)?.garmin_data || !!garminId || id.startsWith('garmin_') || provider === 'garmin';
-
-      const deviceInfo = (() => {
-        try {
-          const di = (w as any)?.device_info || (w as any)?.deviceInfo || (w as any)?.deviceInfo;
-          if (typeof di === 'string') return JSON.parse(di);
-          return di;
-        } catch {
-          return null;
-        }
-      })();
-      const rawDeviceName =
-        deviceInfo?.device_name || deviceInfo?.deviceName || deviceInfo?.product || deviceInfo?.name || deviceInfo?.model;
-      const deviceName = typeof rawDeviceName === 'string' ? rawDeviceName.replace(/^Garmin\s+/i, '') : undefined;
-
-      if (provider === 'strava' || isStravaImported) return { source: 'strava', deviceName };
-      if (provider === 'garmin' || isGarminImported) return { source: 'garmin', deviceName };
-      return { source: null };
-    } catch {
-      return { source: null };
-    }
-  };
+  // Provider + device attribution for completed imports (Strava/Garmin) — LIFTED to
+  // src/lib/provider-attribution.ts (docs/WORKORDER-garmin-strava-attribution-2026-09-09.md) so the
+  // done card, the Week tab and the drawer read the same answer. `getProviderAttribution` is imported.
 
   // Compact metrics line for completed endurance workouts (matches the older “detail” cards)
   const getCompactEnduranceMetrics = (w: any): string[] => {
@@ -2018,6 +2001,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 )}
               </div>
             ) : null}
+            {/* Garmin API Brand Guidelines v6.30.2025 — derived-data attribution, verbatim, as the
+                header block's footer. Not in a tooltip, not behind the form line's tap. */}
+            {formLine && garminDerived ? <GarminDerivedDataLine style={{ marginTop: 6 }} /> : null}
           </div>
         </div>
 
@@ -2393,37 +2379,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       {/* Right side: import attribution. The planned duration is the shared
                           header's job now, so this branch is completed-only. */}
                       {showImportAttribution ? (
-
-                        <div
-                          className="flex items-center gap-1.5 flex-shrink-0"
-                          style={{
-                            opacity: 0.78,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {providerAttr.source === 'strava' ? (
-                            <>
-                              <img
-                                src="/icons/strava-powered-by.svg"
-                                alt="Powered by Strava"
-                                className="h-3"
-                              />
-                              {providerAttr.deviceName && (
-                                <span className="text-xs font-light" style={{ color: 'rgba(255,255,255,0.55)' }}>
-                                  via {providerAttr.deviceName}
-                                </span>
-                              )}
-                            </>
-                          ) : providerAttr.source === 'garmin' ? (
-                            /* ⛔ "Garmin [device model]", the form their API brand guidelines set for data
-                               (v 6.30.2025). The logo is optional beside it, the text is not, and no
-                               typeface is specified. "Garmin Connect" is the app name and lives on the
-                               connection screen. Never absent: with no model, Garmin alone is the source. */
-                            <span className="text-xs font-light" style={{ color: 'rgba(0, 124, 195, 0.95)' }}>
-                              {providerAttr.deviceName ? `Garmin ${providerAttr.deviceName}` : 'Garmin'}
-                            </span>
-                          ) : null}
-                        </div>
+                        /* Garmin API Brand Guidelines v6.30.2025 / developers.strava.com/guidelines —
+                           the shared line (src/components/ProviderAttribution.tsx): "Garmin [device
+                           model]", "Garmin [model] via Strava", or the Powered by Strava mark. */
+                        <ProviderAttributionLine workout={workout} className="flex-shrink-0" style={{ opacity: 0.78 }} />
                       ) : null}
                     </div>
                     )}

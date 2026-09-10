@@ -6,6 +6,7 @@ import { displayDisciplineOf, normalizeDistanceKm } from '@/lib/utils';
 import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
 import { extractSessionDetailV1FromWorkout } from '@/hooks/useWorkoutDetail';
 import AdherenceChips from './AdherenceChips';
+import { ProviderAttributionLine } from './ProviderAttribution';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 // ⛔ THE MACHINE'S NAME IS MICHAEL'S WORD, from the one file that holds the swap sheet's words.
 import { VENUE_LABEL } from '@/lib/swap-copy';
@@ -363,6 +364,14 @@ export const CompletedSessionCard: React.FC<{
         </div>
         <span aria-label="Completed" className="text-[13px] flex-shrink-0" style={{ color: 'rgba(255,255,255,0.45)' }}>✓</span>
       </div>
+
+      {/* ⛔ WHERE THE ROW CAME FROM, DIRECTLY UNDER THE NAME (docs/WORKORDER-garmin-strava-attribution-
+          2026-09-09.md §1). Garmin API Brand Guidelines v6.30.2025: an overview card of Garmin
+          device-sourced data carries "Garmin [device model]" "directly beneath or adjacent to the
+          primary title", never in a tooltip. developers.strava.com/guidelines: the unaltered Powered
+          by Strava mark for a Strava row; a Garmin device through Strava reads "Garmin [model] via
+          Strava". The old pill row had this line and the card had dropped it. */}
+      <ProviderAttributionLine workout={workout} className="block" style={{ marginTop: 3 }} />
 
       {headline ? (
         <div className="text-[15px] tabular-nums" style={{ lineHeight: 1.35, marginTop: 6, color: 'rgba(255,255,255,0.62)' }}>

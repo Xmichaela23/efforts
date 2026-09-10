@@ -1,6 +1,7 @@
 import React from 'react';
 import { getDisciplineColor, getDisciplineColorRgb, formZoneColor } from '@/lib/context-utils';
 import { formZone } from '@shared/fitness-fatigue';
+import { GarminDerivedDataLine } from '@/components/ProviderAttribution';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +39,13 @@ interface LoadBarProps {
   hasActivePlan?: boolean;
   plannedThisWeek?: number;
   doneThisWeek?: number;
+  /**
+   * docs/WORKORDER-garmin-strava-attribution-2026-09-09.md §3 — fitness, fatigue and form are
+   * DERIVED from Garmin device-sourced rows, so the plate carries Garmin's derived-data line as its
+   * footer (Garmin API Brand Guidelines v6.30.2025: "globally — such as in a header or footer").
+   * The caller answers WHETHER (`useGarminDataPresence`); false on an account with no Garmin data.
+   */
+  garminDerived?: boolean;
 }
 
 // ⛔ THE LOAD WORD IS OFF THIS BAR (2026-09-04). `loadRead` (src/lib/load-read.ts) still gates the glance
@@ -140,7 +148,7 @@ export function LoadKey({ ff }: { ff: NonNullable<LoadBarData['fitness_fatigue']
   );
 }
 
-export default function LoadBar({ load, compact }: LoadBarProps) {
+export default function LoadBar({ load, compact, garminDerived = false }: LoadBarProps) {
   const [showKey, setShowKey] = React.useState(false);
   // ⛔ THE LOAD READ IS TRAININGPEAKS' PMC, WHOLE (2026-09-04, Michael: "each metric has to have an absolute
   // reference point", never a hodgepodge). Fitness · Fatigue · Form, and Friel's Form zone word beside form.
@@ -268,6 +276,9 @@ export default function LoadBar({ load, compact }: LoadBarProps) {
           </div>
         </div>
       )}
+      {/* Garmin API Brand Guidelines v6.30.2025 — derived-data attribution, verbatim, as the plate's
+          footer. Never in the ⓘ key above: "never bury the Garmin attribution in … expandable containers". */}
+      {garminDerived ? <GarminDerivedDataLine className="mt-2.5" /> : null}
     </div>
   );
 }

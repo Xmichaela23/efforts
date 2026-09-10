@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { analysisFailureLine, describeRecomputeError, type AnalysisRow } from '@/lib/analysis-state';
 import { Loader2 } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
@@ -11,6 +11,8 @@ import SessionNarrative, { NextUp } from './SessionNarrative';
 import { StrengthTestResult } from './StrengthTestResult';
 import EnduranceIntervalTable from './EnduranceIntervalTable';
 import AdherenceChips from './AdherenceChips';
+import { GarminDerivedDataLine } from './ProviderAttribution';
+import { useGarminDataPresence } from '@/hooks/useGarminDataPresence';
 import { formatDuration } from '@/utils/workoutFormatting';
 import AppleHealthSwimEnrichment from './AppleHealthSwimEnrichment';
 
@@ -61,6 +63,14 @@ type MobileSummaryProps = {
 };
 
 export default function MobileSummary({ planned, completed, session_detail_v1, sessionDetailLoading, hideTopAdherence }: MobileSummaryProps & { hideTopAdherence?: boolean }) {
+  /**
+   * docs/WORKORDER-garmin-strava-attribution-2026-09-09.md §3 — the four tiles (workload, execution,
+   * duration, drift) are DERIVED from the session's device data, so the tab carries Garmin's
+   * derived-data line under them (Garmin API Brand Guidelines v6.30.2025). The window here is this
+   * one session plus the athlete's connection; an account with no Garmin data gets no line.
+   */
+  const garminDerivedRows = useMemo(() => (completed ? [completed] : []), [completed]);
+  const garminDerived = useGarminDataPresence(garminDerivedRows);
   const { useImperial } = useAppContext();
 
   const sd = session_detail_v1;
@@ -306,6 +316,9 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         noPlannedCompare={noPlannedCompare}
         hideTopAdherence={hideTopAdherence || !!sd?.race?.is_goal_race || type === 'swim'}
       />
+      {/* Garmin API Brand Guidelines v6.30.2025 — derived-data attribution, verbatim, under the tiles.
+          Not inside a tooltip or a collapsed section. */}
+      {garminDerived ? <GarminDerivedDataLine className="px-1 pt-1 pb-2" /> : null}
 
       {/* Macro discipline trend removed from Performance (lives on State). Swim's in-card trend is a
           separate placement, deferred. */}
