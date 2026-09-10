@@ -1192,7 +1192,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
         ))}
         <p className="text-[12px] text-white/50 px-1 mt-1">{model}</p>
       </div>
-    ) : <p className="text-[12px] text-white/50">Heart-rate zones appear once there is a threshold or a max heart rate: type one, or add your birthday for an age estimate.</p>;
+    ) : <p className="text-[12px] text-white/50">Heart-rate zones need a threshold heart rate, or a max and a resting heart rate.</p>;
     return { rows, table };
   };
   const equipmentChips = (discipline: 'swimming' | 'strength', options: string[]) => (
