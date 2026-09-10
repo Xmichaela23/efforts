@@ -1,5 +1,6 @@
 import React from 'react';
 import CardDeck, { deckGlass, type CardEmphasis, type DeckItem } from './CardDeck';
+import { useSessionBoom } from '@/hooks/useSessionBoom';
 import { getExerciseConfig } from '@/lib/exercise-config';
 import { getDisciplineColor, getDisciplineColorRgb } from '@/lib/context-utils';
 import { displayDisciplineOf, normalizeDistanceKm } from '@/lib/utils';
@@ -334,6 +335,7 @@ export const CompletedSessionCard: React.FC<{
   emphasis?: CardEmphasis;
   onOpen?: () => void;
 }> = ({ workout, useImperial, emphasis = 'lead', onOpen }) => {
+  const boom = useSessionBoom(workout as never);
   const sport = displayDisciplineOf(workout as never);
   const colour = getDisciplineColor(sport);
   const rgb = getDisciplineColorRgb(sport);
@@ -376,6 +378,18 @@ export const CompletedSessionCard: React.FC<{
       {headline ? (
         <div className="text-[15px] tabular-nums" style={{ lineHeight: 1.35, marginTop: 6, color: 'rgba(255,255,255,0.62)' }}>
           {headline}
+        </div>
+      ) : null}
+
+      {/**
+        * ⛔ ONE LINE OF GOOD NEWS, UNDER THE NUMBERS AND ABOVE THE TILES
+        * (docs/WORKORDER-booms-2026-09-09.md, "Where"). 14 px, white, no badge and no colour — the
+        * fact is the whole thing. ⚠️ MOST SESSIONS HAVE NO LINE and render nothing here, which is
+        * what keeps it worth reading on the sessions that do.
+        */}
+      {boom ? (
+        <div className="text-[14px]" style={{ lineHeight: 1.35, marginTop: 6, color: 'rgba(255,255,255,0.92)' }}>
+          {boom}
         </div>
       ) : null}
 

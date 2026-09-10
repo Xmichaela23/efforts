@@ -20,6 +20,7 @@ import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { supabase } from '@/lib/supabase';
 // ✅ REMOVED: Client-side analysis - server provides all analysis data
 import { useWorkoutDetail } from '@/hooks/useWorkoutDetail';
+import { useSessionBoom } from '@/hooks/useSessionBoom';
 import { usePlannedWorkoutLink } from '@/hooks/usePlannedWorkoutLink';
 import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 // ⛔ THE SWAP LOGIC IS NOT REBUILT HERE (2026-08-08). `session-discipline-swap.ts` owns the options,
@@ -182,6 +183,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   // ⚠️ `workout?.` — STAGE H. This ran only after the `!workout` guard and could assume a row; it now
   // evaluates on the null render too. `looksExecuted` already handled it (`workout || {}`).
   const isCompleted = String(workout?.workout_status || workout?.status || '').toLowerCase() === 'completed' && looksExecuted;
+  /** §booms — the same resolver the done card on Today reads. Null on anything with nothing to say. */
+  const boomLine = useSessionBoom(isCompleted ? (workout as never) : null);
   // Workout type flags — declared HERE (not later in the body) because the tab-routing effects
   // below reference `isStrengthFamily` in their dependency arrays, which are evaluated at render
   // time. A later `const` would be in the temporal dead zone → "Cannot access before initialization".
@@ -1042,6 +1045,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             )
           )}
         </div>
+
+        {/**
+          * ⛔ ONE LINE OF GOOD NEWS, UNDER THE HEADER (docs/WORKORDER-booms-2026-09-09.md, "Where").
+          * THE SAME LINE the done card on Today prints, from the same resolver — a session that is a
+          * best on one screen and unremarkable on the other is the divergence `session-boom.ts`
+          * exists as one owner to prevent. Nothing when there is nothing true to say.
+          */}
+        {boomLine ? (
+          <div className="text-[14px] mt-1.5" style={{ lineHeight: 1.35, color: 'rgba(255,255,255,0.92)' }}>
+            {boomLine}
+          </div>
+        ) : null}
 
         {/**
           * ⛔ SHARE A LIFT TO STRAVA — THE ATHLETE PRESSES IT, NOTHING ELSE DOES (2026-09-03, Michael:
