@@ -177,6 +177,10 @@ export function useArcSetupComplete() {
       const plan = (data as { plan?: Record<string, unknown> }).plan ?? null;
       const skip = (data as { skip_test_week?: unknown }).skip_test_week;
       if (plan && skip && typeof skip === 'object') plan._skip_test_week = skip;
+      // What the builder prints about this preview (2026-09-10, audit H-P05, H-P07, H-W05, H-W06) —
+      // attached the same way, for the same reason.
+      const readout = (data as { readout?: unknown }).readout;
+      if (plan && readout && typeof readout === 'object') plan._readout = readout;
       return plan;
     },
     [],

@@ -39,6 +39,10 @@ import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../..
 // note on `current_weekly_miles` below. Same file the run generator's tables live in, so the two
 // cannot drift; `create-goal-and-materialize-plan` must be redeployed when it changes.
 import { TIER_SEEDS, type IntakeTier } from '../../../src/lib/run-volume-tables.ts';
+import { weeksUntilRace } from '../_shared/weeks-until-race.ts';
+// What the builder prints about a preview (2026-09-10, audit H-P07, H-W06, H-P05).
+import { raceIntakeReadout, raceWeekNote } from './race-readout.ts';
+import { weekOneSummary } from '../_shared/week-one-summary.ts';
 import { buildSwimCutoffPressureV1, type SwimCutoffPressureV1 } from '../_shared/swim-cutoff-pressure.ts';
 import { recomputeRaceProjectionsForUser } from '../_shared/recompute-goal-race-projections.ts';
 import { normalizeTrainingIntent, trainingIntentToPrefsGoalType } from '../_shared/training-intent.ts';
@@ -142,6 +146,11 @@ interface CreateGoalRequest {
    * `build_existing` skips persisting the merged `training_prefs` until a non-preview call.
    */
   preview?: boolean;
+  /**
+   * With `preview`: `'intake'` returns only the builder's numbers for the answers so far (`readout`),
+   * without generating a plan — the race and endurance steps ask on every tap (audit item 26).
+   */
+  preview_scope?: 'intake';
   /**
    * Ephemeral conflict preferences accumulated by the conflict-resolution UI loop.
    * Merged into `training_prefs.conflict_preferences` in memory so week-builder can honour
@@ -269,13 +278,7 @@ function weeksBetween(a: Date, b: Date): number {
   return Math.floor(ms / (7 * 24 * 60 * 60 * 1000));
 }
 
-// How many weeks of plan do we need to cover a future race date?
-// Uses ceil so a race on day 48 (6.857 weeks) counts as 7 plan weeks,
-// placing the race correctly in the final week rather than one week past it.
-function weeksUntilRace(today: Date, raceDate: Date): number {
-  const ms = raceDate.getTime() - today.getTime();
-  return Math.ceil(ms / (7 * 24 * 60 * 60 * 1000));
-}
+// `weeksUntilRace` lives in `_shared/weeks-until-race.ts` so the season wizard's readout counts alike.
 
 function distanceToApiValue(distance: string | null): string {
   if (!distance) return '';
@@ -3029,6 +3032,22 @@ Deno.serve(async (req: Request) => {
                 return Object.keys(out).length > 0 ? { endurance_slots: out } : {};
               })(),
               /**
+               * ⛔ THE SAME ANSWER KEYED BY THE SCREEN'S ROWS (2026-09-10, audit H-W05). The builder
+               * sends this now; `generate-strength-plan` maps it onto the frame's slots. Same
+               * validation: a malformed map is dropped whole.
+               */
+              ...(() => {
+                const raw = (gsTp as Record<string, unknown>).endurance_slot_answers;
+                if (!raw || typeof raw !== 'object') return {};
+                const rowKeys = new Set(['hard1', 'hard2', 'hard3', 'easy', 'long']);
+                const out: Record<string, string> = {};
+                for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+                  if (!rowKeys.has(k) || (v !== 'run' && v !== 'ride')) return {};
+                  out[k] = v;
+                }
+                return Object.keys(out).length > 0 ? { endurance_slot_answers: out } : {};
+              })(),
+              /**
                * ⛔⛔ HOW MANY DAYS A WEEK EACH SPORT RUNS OVER — and this hop was DROPPING IT
                * (2026-08-27, off Michael's own export). The wizard collected "Run: 3, Ride: 2", the
                * goal recorded it, and the week built two runs: `generate-strength-plan` reads
@@ -3115,6 +3134,8 @@ Deno.serve(async (req: Request) => {
                 return Number.isFinite(n) && n >= 1 ? { swim_easy_sessions: Math.min(2, n) } : {};
               })(),
               ...(bodyPreview ? { preview: true } : {}),
+              // The endurance step asks for its numbers without the block (2026-09-10, audit H-W05).
+              ...(bodyPreview && raw.preview_scope === 'intake' ? { preview_scope: 'intake' } : {}),
             };
             console.log(`[create-goal] Get Strong → strength-primary: sport=${gsSport ?? 'strength-only'} weeks=${gsBody.duration_weeks}`);
             const gsGen = await invokeFunction(functionsBaseUrl, serviceKey, 'generate-strength-plan', gsBody);
@@ -3122,6 +3143,17 @@ Deno.serve(async (req: Request) => {
               return new Response(JSON.stringify({
                 success: true, mode, goal_id: createdGoalId, preview: true, sport: 'strength', combined: false,
                 plan: gsGen?.plan ?? null,
+                /**
+                 * ⛔ WHAT THE BUILDER PRINTS ABOUT THIS PREVIEW (2026-09-10, audit H-W05, H-P05): the
+                 * endurance step's numbers, and the sample week's counts and sentences.
+                 */
+                readout: {
+                  intake: gsGen?.intake ?? null,
+                  week_one: weekOneSummary(
+                    gsGen?.plan?.sessions_by_week?.['1'] ?? null,
+                    Array.isArray(gsGen?.plan?.placement_compromises) ? gsGen.plan.placement_compromises.length : 0,
+                  ),
+                },
                 /**
                  * ⛔ THE SKIP OFFER RIDES OUT WITH THE PREVIEW (Standing Plan, slice 3). The builder
                  * cannot offer to skip the test week unless it is told whether the evidence for it
@@ -3275,6 +3307,12 @@ Deno.serve(async (req: Request) => {
             success: true, mode, goal_id: createdGoalId, preview: true,
             sport: 'run', combined: false,
             run_preview: runGen?.preview ?? null, plan: runGen?.plan ?? null,
+            readout: {
+              week_one: weekOneSummary(
+                runGen?.plan?.sessions_by_week?.['1'] ?? null,
+                Array.isArray(runGen?.plan?.placement_compromises) ? runGen.plan.placement_compromises.length : 0,
+              ),
+            },
           }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
         const runPlanId = runGen?.plan_id;
@@ -3661,7 +3699,15 @@ Deno.serve(async (req: Request) => {
     if (!distanceApi) throw new AppError('missing_distance', 'Select a race distance to build a plan.');
     const floorWeeks = MIN_WEEKS[distanceApi]?.[fitness] ?? 4;
     const weeksOut = weeksUntilRace(new Date(), new Date(`${resolvedGoal.target_date}T12:00:00`));
+    const intakeOnly = bodyPreview && raw.preview_scope === 'intake';
     if (weeksOut < 1) {
+      // ⛔ The race step says the date has passed from this, not from its own count (audit H-P07).
+      if (intakeOnly) {
+        return new Response(JSON.stringify({
+          success: true, mode, goal_id: null, preview: true, sport: 'run', combined: false, plan: null,
+          readout: { race_intake: { date_passed: true } },
+        }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
       throw new AppError('race_date_in_past', 'Race date must be in the future.');
     }
     let adaptiveMarathonDecision: any = null;
@@ -3915,6 +3961,45 @@ Deno.serve(async (req: Request) => {
       : durationWeeksRaw;
     if (raceWeekOfPlan != null && durationWeeks !== durationWeeksRaw) {
       console.log(`[create-goal] duration trimmed ${durationWeeksRaw} → ${durationWeeks} weeks: race day falls in plan week ${raceWeekOfPlan} counting from ${plan_start_date}`);
+    }
+
+    /**
+     * ⛔ THE LONG RUN THE GENERATOR ENTERS THE ARC AT — the typed answer, unless it is the untouched
+     * tier seed and the snapshot says more. See the note where it is handed to `generate-run-plan`.
+     * Resolved here so the intake quotes the arc built from the same number.
+     */
+    const resolvedRecentLongRunMi: number | null = (() => {
+      const typed = Number((resolvedGoal?.training_prefs as Record<string, unknown> | undefined)?.recent_long_run_miles);
+      const seed = TIER_SEEDS[fitness as IntakeTier]?.longRunMi;
+      const untouchedSeed = Number.isFinite(typed) && seed != null && typed === seed;
+      const resolved = (untouchedSeed && recent_long_run_miles != null && recent_long_run_miles > typed)
+        ? recent_long_run_miles
+        : (Number.isFinite(typed) && typed > 0 ? typed : recent_long_run_miles);
+      return resolved != null ? resolved : null;
+    })();
+    /**
+     * ⛔ THE RACE INTAKE'S NUMBERS (2026-09-10, audit H-P07): weeks, the mileage floor, the tier note
+     * and the longest run, from the block length and inputs this function hands the generator.
+     */
+    const raceIntake = (() => {
+      const tp = (resolvedGoal?.training_prefs ?? {}) as Record<string, unknown>;
+      const num = (v: unknown) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : null);
+      return raceIntakeReadout({
+        distanceApi,
+        fitness,
+        durationWeeks,
+        typedWeeklyMi: num(tp.target_weekly_miles),
+        typedLongRunMi: num(tp.recent_long_run_miles),
+        entryLongRunMi: resolvedRecentLongRunMi,
+        startISO: plan_start_date ?? null,
+        raceISO: resolvedGoal?.target_date ?? null,
+      });
+    })();
+    if (intakeOnly) {
+      return new Response(JSON.stringify({
+        success: true, mode, goal_id: null, preview: true, sport: 'run', combined: false, plan: null,
+        readout: { race_intake: raceIntake },
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     /**
@@ -4190,15 +4275,7 @@ Deno.serve(async (req: Request) => {
       // there is no "when" to go with the typed number. Only the peak-pivot branch in
       // `sustainable.getLongRunMiles` reads the pair, and only for a peaked athlete on a ≤10-week
       // plan. Left as is rather than invented; noted so the mismatch is not read as a fact.
-      ...((() => {
-        const typed = Number((resolvedGoal?.training_prefs as Record<string, unknown> | undefined)?.recent_long_run_miles);
-        const seed = TIER_SEEDS[fitness as IntakeTier]?.longRunMi;
-        const untouchedSeed = Number.isFinite(typed) && seed != null && typed === seed;
-        const resolved = (untouchedSeed && recent_long_run_miles != null && recent_long_run_miles > typed)
-          ? recent_long_run_miles
-          : (Number.isFinite(typed) && typed > 0 ? typed : recent_long_run_miles);
-        return resolved != null ? { recent_long_run_miles: resolved } : {};
-      })()),
+      ...(resolvedRecentLongRunMi != null ? { recent_long_run_miles: resolvedRecentLongRunMi } : {}),
       ...(weeks_since_peak_long_run != null ? { weeks_since_peak_long_run } : {}),
       ...(current_acwr != null ? { current_acwr } : {}),
       ...(volume_trend ? { volume_trend } : {}),
@@ -4298,6 +4375,21 @@ Deno.serve(async (req: Request) => {
         // belongs — after this point they have committed, and a cost stated after the decision is
         // not a cost, it is an excuse.
         ...(advisories.length ? { advisories } : {}),
+        /**
+         * ⛔ WHAT THE BUILDER PRINTS ABOUT THIS PREVIEW (2026-09-10, audit H-P07, H-W06, H-P05): the
+         * intake's numbers, the club-night note checked against this week, and the sample week.
+         */
+        readout: {
+          race_intake: raceIntake,
+          race_week_note: raceWeekNote(
+            resolvedGoal?.training_prefs?.preferred_days ?? null,
+            generated?.plan?.sessions_by_week ?? null,
+          ),
+          week_one: weekOneSummary(
+            generated?.plan?.sessions_by_week?.['1'] ?? null,
+            Array.isArray(generated?.plan?.placement_compromises) ? generated.plan.placement_compromises.length : 0,
+          ),
+        },
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 

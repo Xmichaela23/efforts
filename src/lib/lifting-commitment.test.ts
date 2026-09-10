@@ -64,13 +64,19 @@ Deno.test('⛔ THE SUMMARY LINE COUNTS DAYS, NOT SESSIONS — and stays silent w
     'the plyo day was counted as a lifting day',
   );
 
-  const src = Deno.readTextFileSync(new URL('../components/WeekGrid.tsx', import.meta.url).pathname);
-  assert(
-    /!\(s\.tags \?\? \[\]\)\.includes\('plyo'\)/.test(src),
-    'the plyo exclusion is gone from the summary count — a four-lift week will read five again',
+  // ⚠️ RE-POINTED 2026-09-10 (audit H-P05): the server counts the week (`_shared/week-one-summary.ts`)
+  // and `WeekGrid` prints the count.
+  const server = Deno.readTextFileSync(
+    new URL('../../supabase/functions/_shared/week-one-summary.ts', import.meta.url).pathname,
   );
   assert(
-    /liftDays > 0 \? </.test(src),
+    /s\.type === 'strength' && !isPlyo\(s\)/.test(server)
+      && /\(s\.tags \?\? \[\]\)\.includes\('plyo'\)/.test(server),
+    'the plyo exclusion is gone from the summary count — a four-lift week will read five again',
+  );
+  const src = Deno.readTextFileSync(new URL('../components/WeekGrid.tsx', import.meta.url).pathname);
+  assert(
+    /summary\.lift_days > 0 \? </.test(src),
     'the guard that keeps a run-only week from reading "0 lifts" is gone',
   );
 });

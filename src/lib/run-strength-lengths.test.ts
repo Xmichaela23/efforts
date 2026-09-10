@@ -18,9 +18,17 @@ import { composeWeek } from '../../supabase/functions/_shared/standing-plan/comp
 import { defaultCompetitionLifts } from '../../supabase/functions/_shared/standing-plan/frame-resolver.ts';
 import { FRAMES } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 import { frameSlots } from './standing-plan-week-copy.ts';
-import {
-  EASY_RUN_FIXED_MIN, LONG_RUN_CHIP_CEILING_MIN, longRunDefaultMinutes, longRunLengthOptions,
-} from './run-strength-week.ts';
+// ⛔ THE NUMBERS ARE THE FRAME'S AND THE CHIPS ARE THE SERVER'S (2026-09-10, audit H-P06) — read from
+// where the screen now gets them, so this sweep tests what the athlete is shown.
+import { enduranceIntakeReadout } from '../../supabase/functions/_shared/standing-plan/intake-readout.ts';
+
+const RSW = FRAMES.strength_5k.runStrengthWeek!;
+const EASY_RUN_FIXED_MIN = RSW.easyRunMinutes;
+const LONG_RUN_CHIP_CEILING_MIN = RSW.longRunChipCeilingMinutes;
+const chips = () =>
+  enduranceIntakeReadout({ frame: 'strength_5k', answers: SLOTS, baselines: BASELINES }).run_strength_week!;
+const longRunLengthOptions = (_slots: unknown, _opts: unknown): number[] => chips().long_run_options;
+const longRunDefaultMinutes = (_options: number[]): number | null => chips().long_run_default;
 
 const BASELINES = {
   units: 'imperial',

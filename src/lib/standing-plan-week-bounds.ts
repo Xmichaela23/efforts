@@ -55,7 +55,9 @@ import {
   weekVolumeBounds,
   type SlotSpec,
 } from '../../supabase/functions/_shared/standing-plan/volume-bounds.ts';
-import { frameSlots, type SlotKey, type SlotSelection, type SlotSport } from './standing-plan-week-copy';
+// ⚠️ WITH ITS EXTENSION: `generate-strength-plan` imports this file since 2026-09-10 (audit H-W05), and
+// Deno does not resolve an extensionless relative import.
+import { frameSlots, type SlotKey, type SlotSelection, type SlotSport } from './standing-plan-week-copy.ts';
 import type { FrameId } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 
 /**

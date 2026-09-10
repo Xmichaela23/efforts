@@ -68,7 +68,9 @@ Deno.test('⛔ the TIMELINE gate stays hard — it is a different kind of claim'
   const decl = SRC.match(/const raceCanContinue = ([^;]+);/);
   assert(decl, 'raceCanContinue has gone — the timeline gate was the one hard refusal and it stays');
   const expr = decl[1];
-  assert(/raceWeeks !== null/.test(expr), 'the race gate no longer rejects a date that has passed');
+  // ⚠️ RE-POINTED 2026-09-10 (audit H-P07): the weeks are the race preview's, which sends none for a
+  // date that has passed, so the gate reads `planWeeks`.
+  assert(/planWeeks !== null/.test(expr), 'the race gate no longer rejects a date that has passed');
   assert(/state\.raceDate/.test(expr), 'the race gate no longer requires a date');
 
   const level = SRC.match(/const levelCanContinue = ([^;]+);/);

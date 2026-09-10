@@ -45,38 +45,41 @@ export type WizardArcContext = {
   performanceNumbers: Record<string, unknown> | null;
   /** From `user_baselines.units` — drives route stats display in wizard. */
   units: 'metric' | 'imperial';
-  swimSessions28: number;
-  swimSessions90: number;
-  /** Completed runs in last 28 days (for placement-step hints). */
-  runSessions28: number;
-  /** Completed rides in last 28 days. */
-  bikeSessions28: number;
-  /** Longest completed run in last 28 days (km); null if unknown / no runs. */
-  longestRunKm28: number | null;
-  /** Any marathon-length or marathon-labeled completed run in last ~90 days. */
-  recentMarathonLikeRun: boolean;
+  /**
+   * ⛔ THE HISTORY READOUT IS THE SERVER'S (2026-09-10, audit H-W10) — get-arc-context's
+   * `builder.history`: session counts, the advice sentences, weeks to race and the confirm screen's
+   * conflict rows. The wizard no longer reads the workouts table or counts anything. Null until loaded.
+   */
+  history?: WizardHistoryReadout | null;
+};
+
+/** get-arc-context `builder.history` — see `get-arc-context/history-readout.ts`. */
+export type WizardHistoryReadout = {
+  swim_sessions_28: number;
+  run_sessions_28: number;
+  bike_sessions_28: number;
+  history_lines: string[];
+  swim_note: string;
+  run_quality_hint: string;
+  bike_quality_hint: string;
+  suggested: { swim_intent: 'focus' | 'race' | null; swim_experience: 'steady' | 'learning' | null };
+  weeks_to_race: number | null;
+  schedule_conflicts: {
+    group_run: string | null;
+    long_ride: string | null;
+    none_line: string | null;
+    long_days_same: [string, string] | null;
+  } | null;
 };
 
 async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
-  const today = new Date().toISOString().slice(0, 10);
-  const start90 = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
-  const start28 = new Date(Date.now() - 28 * 86_400_000).toISOString().slice(0, 10);
-
-  const [baselinesRes, volumeRes] = await Promise.all([
-    supabase
-      .from('user_baselines')
-      .select('learned_fitness, equipment, performance_numbers, units')
-      .eq('user_id', userId)
-      .maybeSingle(),
-    supabase
-      .from('workouts')
-      .select('date, type, distance, name')
-      .eq('user_id', userId)
-      .eq('workout_status', 'completed')
-      .in('type', ['swim', 'swimming', 'run', 'ride'])
-      .gte('date', start90)
-      .lte('date', today),
-  ]);
+  // ⛔ THE WORKOUTS READ AND ITS COUNTS ARE DELETED (2026-09-10, audit H-W10) — get-arc-context's
+  // `builder.history` carries them. Only the baselines row is read here.
+  const baselinesRes = await supabase
+    .from('user_baselines')
+    .select('learned_fitness, equipment, performance_numbers, units')
+    .eq('user_id', userId)
+    .maybeSingle();
 
   const baseline = baselinesRes.data as Record<string, unknown> | null;
 
@@ -96,115 +99,17 @@ async function loadWizardArcContext(userId: string): Promise<WizardArcContext> {
   const units: 'metric' | 'imperial' =
     rawUnits === 'metric' || rawUnits === 'imperial' ? rawUnits : 'imperial';
 
-  const volRows = (volumeRes.data ?? []) as {
-    date?: string;
-    type?: string;
-    distance?: number | null;
-    name?: string | null;
-  }[];
-  const in28 = (d: string) => typeof d === 'string' && d.slice(0, 10) >= start28;
-
-  let swimSessions28 = 0;
-  let swimSessions90 = 0;
-  let runSessions28 = 0;
-  let bikeSessions28 = 0;
-  let longestRunKm28 = 0;
-  let recentMarathonLikeRun = false;
-
-  for (const r of volRows) {
-    const d = typeof r.date === 'string' ? r.date.slice(0, 10) : '';
-    const t = String(r.type ?? '').toLowerCase();
-    const isSwim = t === 'swim' || t === 'swimming';
-    const isRun = t === 'run';
-    const isRide = t === 'ride';
-    const distKm =
-      typeof r.distance === 'number' && Number.isFinite(r.distance) && r.distance > 0 ? r.distance : 0;
-    const nm = String(r.name ?? '').toLowerCase();
-
-    if (isRun && d >= start90.slice(0, 10) && d <= today.slice(0, 10)) {
-      if (distKm >= 38) recentMarathonLikeRun = true;
-      if (/marathon|26\.2|42\.195|42k|42\.2|full\s*marathon|fm\b/.test(nm)) {
-        recentMarathonLikeRun = true;
-      }
-      if (in28(d) && distKm > longestRunKm28) longestRunKm28 = distKm;
-    }
-
-    if (isSwim) swimSessions90 += 1;
-    if (!in28(d)) continue;
-    if (isSwim) swimSessions28 += 1;
-    if (isRun) runSessions28 += 1;
-    if (isRide) bikeSessions28 += 1;
-  }
-
   return {
     learnedFitness,
     equipment,
     performanceNumbers,
     units,
-    swimSessions28,
-    swimSessions90,
-    runSessions28,
-    bikeSessions28,
-    longestRunKm28: longestRunKm28 > 0 ? Math.round(longestRunKm28 * 10) / 10 : null,
-    recentMarathonLikeRun,
   };
 }
 
-/** Recent run volume → Arc hint on tri run-quality placement (after pinned quality bike). */
-function hintRunQualityPlacementFromHistory(arc: WizardArcContext | null): string | null {
-  if (!arc) return null;
-  const n = arc.runSessions28;
-
-  const lead: string[] = [];
-  if (arc.recentMarathonLikeRun) {
-    lead.push(
-      'A recent marathon-length run shows in your history — favor folding weekday hard running into the long run unless back-to-back hard days already feel easy.',
-    );
-  } else if (arc.longestRunKm28 != null && arc.longestRunKm28 >= 25) {
-    lead.push(
-      `Longest run in the last ~month ~${arc.longestRunKm28} km — strong single-session stimulus; pick the separate mid-week option only if Thu-style intervals still feel fresh.`,
-    );
-  } else if (arc.longestRunKm28 != null && arc.longestRunKm28 >= 21) {
-    lead.push(
-      `Longest recent run ~${arc.longestRunKm28} km — half-marathon-ish volume on file; folding into the long run stays the lower-risk weekday pattern.`,
-    );
-  }
-
-  let tier: string;
-  if (n >= 10) {
-    tier = `${n} completed runs in the last 4 weeks — strong run rhythm; a separate mid-week hard run after your hard bike day often works if you bounce back quickly on the run.`;
-  } else if (n >= 6) {
-    tier = `${n} runs in the last 4 weeks — you're running regularly; pick the separate mid-week option if hard days back-to-back have felt fine, or fold into the long run for fewer pinned hard weekdays.`;
-  } else if (n >= 3) {
-    tier = `${n} runs in the last 4 weeks — either pattern can work; folding into the long run is the lower weekday-stress option.`;
-  } else if (n >= 1) {
-    tier = `${n} run${n === 1 ? '' : 's'} in the last 4 weeks — folding harder running into the long run often fits while run consistency builds.`;
-  } else {
-    tier = `No runs logged in the last 4 weeks — putting harder blocks on the long run keeps mid-week simpler until running is back in rhythm.`;
-  }
-
-  const prefix = lead.length > 0 ? `${lead.join(' ')} ` : '';
-  return `${prefix}${tier}`;
-}
-
-/** Recent ride volume → Arc hint on tri bike-quality placement (after pinned quality run). */
-function hintBikeQualityPlacementFromHistory(arc: WizardArcContext | null): string | null {
-  if (!arc) return null;
-  const n = arc.bikeSessions28;
-  if (n >= 10) {
-    return `${n} completed rides in the last 4 weeks — high bike frequency; a separate mid-week hard bike session may match what your legs already expect.`;
-  }
-  if (n >= 6) {
-    return `${n} rides in the last 4 weeks — if stacking hard bike beside your hard run day feels like a lot, folding the harder work into the long ride frees up mid-week.`;
-  }
-  if (n >= 3) {
-    return `${n} rides in the last 4 weeks — moderate bike volume; either choice is reasonable — long-ride bias helps when the week gets cramped.`;
-  }
-  if (n >= 1) {
-    return `${n} ride${n === 1 ? '' : 's'} in the last 4 weeks — folding structured bike work into the long ride can spare adjacent hard days.`;
-  }
-  return `No rides logged in the last 4 weeks — folding harder bike work into the long ride keeps weekday stress lower while cycling consistency returns.`;
-}
+// ⛔ `hintRunQualityPlacementFromHistory` AND `hintBikeQualityPlacementFromHistory` ARE DELETED
+// (2026-09-10, audit H-W10). Their sentences are written by get-arc-context from its own counts
+// (`history.run_quality_hint`, `history.bike_quality_hint`).
 
 /** Format seconds-per-km as "m:ss/mi" (matches app-wide imperial display) */
 function fmtPaceKm(secPerKm: number): string {
@@ -214,12 +119,6 @@ function fmtPaceKm(secPerKm: number): string {
   return `${min}:${sec.toString().padStart(2, '0')}/mi`;
 }
 
-/** Format seconds-per-100yd as "m:ss/100yd" */
-function fmtSwimPace(secPer100: number): string {
-  const min = Math.floor(secPer100 / 60);
-  const sec = Math.round(secPer100 % 60);
-  return `${min}:${sec.toString().padStart(2, '0')}/100yd`;
-}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -565,7 +464,7 @@ function sanitizeGroupRideRouteUrl(raw: string): string | undefined {
   }
 }
 
-function assemblePayload(state: WizardState): ArcSetupPayload {
+function assemblePayload(state: WizardState, weeksToRace: number | null = null): ArcSetupPayload {
   const primaryRace = state.races.find(r => r.priority === 'A') || state.races[0]!;
   const triPlan = isTri(primaryRace?.distance || '');
   const { swimDays } = inferDays(state);
@@ -603,9 +502,8 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
   }
 
   // Build the summary line
-  const weeksOut = primaryRace?.targetDate
-    ? Math.round((new Date(primaryRace.targetDate + 'T12:00:00').getTime() - Date.now()) / 604_800_000)
-    : null;
+  // ⛔ THE SERVER'S COUNT (get-arc-context `history.weeks_to_race`, audit H-W10); absent, the clause is left out.
+  const weeksOut = weeksToRace;
   const intentLabel = state.trainingIntent === 'performance' ? 'performance build'
     : state.trainingIntent === 'first_race' ? 'first-time finish'
     : 'strong finish';
@@ -1166,25 +1064,8 @@ function Step3Swim({
   const primary = state.races.find(r => r.priority === 'A') ?? state.races[0];
   const is703 = String(primary?.distance ?? '').toLowerCase().includes('70.3');
 
-  const swimPaceSec: number | null = (() => {
-    const pn = arc?.performanceNumbers;
-    if (!pn) return null;
-    const raw = pn['swimPacePer100'] ?? pn['swimPace100'] ?? pn['swim_pace_100_yd'] ?? pn['swim_pace_per_100_sec'];
-    const n = Number(raw);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  })();
-
-  const swimNote = arc
-    ? arc.swimSessions28 >= 3
-      ? `Last 4 weeks: about ${arc.swimSessions28} swims/week on your log — good rhythm if you want swim focus.`
-      : arc.swimSessions28 === 2
-      ? `Last 4 weeks: 2 swims/week on your log.${swimPaceSec ? ` Pace on file: ${fmtSwimPace(swimPaceSec)}.` : ''}`
-      : arc.swimSessions28 === 1
-      ? `Last 4 weeks: 1 swim on your log.${swimPaceSec ? ` Pace on file: ${fmtSwimPace(swimPaceSec)}.` : ''}`
-      : swimPaceSec
-        ? `No swims in the last 4 weeks on your log — pace on file is ${fmtSwimPace(swimPaceSec)}; weekly yardage still matters for race durability.`
-        : `No swims in the last 4 weeks on your log — early weeks are often about rhythm and feel before chasing pace.`
-    : null;
+  // ⛔ THE SERVER'S SENTENCE, FROM ITS OWN COUNT AND THE PACE ON FILE (2026-09-10, audit H-W10).
+  const swimNote = arc?.history?.swim_note ?? null;
 
   const title = 'Swimming — experience & weekly yardage';
   const subtitle = is703
@@ -1579,7 +1460,7 @@ function StepTriRunQualityPlacement({
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   const ride = state.groupRideDay ? cap(state.groupRideDay) : 'group ride';
   const canContinue = state.runQualityPlacement !== null;
-  const historyHint = hintRunQualityPlacementFromHistory(arc);
+  const historyHint = arc?.history?.run_quality_hint ?? null;
 
   return (
     <StepLayout
@@ -1634,7 +1515,7 @@ function StepTriBikeQualityPlacement({
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   const rn = state.groupRunDay ? cap(state.groupRunDay) : 'run anchor';
   const canContinue = state.bikeQualityPlacement !== null;
-  const historyHint = hintBikeQualityPlacementFromHistory(arc);
+  const historyHint = arc?.history?.bike_quality_hint ?? null;
 
   return (
     <StepLayout
@@ -1675,8 +1556,12 @@ function StepTriBikeQualityPlacement({
 }
 
 function Step6LongDays({
-  state, setState, onNext, onBack, step, totalSteps,
-}: { state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void; step: number; totalSteps: number }) {
+  state, setState, onNext, onBack, step, totalSteps, longDaysWarning,
+}: {
+  state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void; step: number; totalSteps: number;
+  /** get-arc-context's two sentences when both long days are the same day (audit H-W10). */
+  longDaysWarning?: [string, string] | null;
+}) {
   const [custom, setCustom] = useState(false);
   const canContinue = !!(state.longRideDay && state.longRunDay);
 
@@ -1730,14 +1615,10 @@ function Step6LongDays({
           ends up pinned to both. DayPicker.exclude prevents same-day
           selection during manual entry, but this serves as a defensive
           surface if state ever lands in the same-day configuration. */}
-      {state.longRideDay && state.longRunDay && state.longRideDay === state.longRunDay && (
+      {longDaysWarning && (
         <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-3.5 py-2.5">
-          <p className="text-[13px] text-red-200 font-medium">
-            Long ride and long run on the same day is a very heavy load.
-          </p>
-          <p className="text-[12px] text-red-200/75 mt-0.5">
-            Most athletes split these across Saturday and Sunday. You can continue, but the planner will flag this.
-          </p>
+          <p className="text-[13px] text-red-200 font-medium">{longDaysWarning[0]}</p>
+          <p className="text-[12px] text-red-200/75 mt-0.5">{longDaysWarning[1]}</p>
         </div>
       )}
     </StepLayout>
@@ -2224,9 +2105,10 @@ function Step9Confirm({
 }) {
   const primaryRace = state.races.find(r => r.priority === 'A') || state.races[0];
   const tri = isTri(primaryRace?.distance || '');
-  const weeksOut = primaryRace?.targetDate
-    ? Math.round((new Date(primaryRace.targetDate + 'T12:00:00').getTime() - Date.now()) / 604_800_000)
-    : null;
+  // ⛔ WEEKS TO RACE AND THE CONFLICT ROWS ARE THE SERVER'S (2026-09-10, audit H-W10) — get-arc-context
+  // counts weeks the way create-goal sizes the block (rounded up) and checks the day picks sent.
+  const weeksOut = arc?.history?.weeks_to_race ?? null;
+  const scheduleConflicts = arc?.history?.schedule_conflicts ?? null;
 
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -2254,9 +2136,7 @@ function Step9Confirm({
     });
   }
   if (state.hasGroupRun && state.groupRunDay) {
-    const conflict = tri && state.hasGroupRide && state.groupRideDay === state.groupRunDay
-      ? 'Same day as group ride — planner will flag this'
-      : undefined;
+    const conflict = scheduleConflicts?.group_run ?? undefined;
     schedule.push({
       label: 'Group run / track night',
       value: `${cap(state.groupRunDay)} · ${state.groupRunIntensity === 'quality_run' ? 'hard (quality)' : 'easy (aerobic)'}`,
@@ -2284,10 +2164,7 @@ function Step9Confirm({
   if (tri) {
     const longRide = state.longRideDay || 'saturday';
     const longRun = state.longRunDay || 'sunday';
-    const rideRunConflict = longRide === longRun ? 'Long ride and long run on the same day — planner will flag this' : undefined;
-    const rideGroupConflict = !rideRunConflict && state.hasGroupRide && state.groupRideDay === longRide
-      ? 'Same day as group ride — planner will flag this' : undefined;
-    schedule.push({ label: 'Long ride', value: cap(longRide), conflict: rideRunConflict ?? rideGroupConflict });
+    schedule.push({ label: 'Long ride', value: cap(longRide), conflict: scheduleConflicts?.long_ride ?? undefined });
     schedule.push({ label: 'Long run', value: cap(longRun) });
   } else {
     schedule.push({ label: 'Long run', value: cap(state.longRunDay || 'sunday') });
@@ -2323,13 +2200,11 @@ function Step9Confirm({
     learned_fitness: arc?.learnedFitness, performance_numbers: arc?.performanceNumbers,
   } as never).sec_per_km;
   const fitnessLines: string[] = [];
-  if (arc && arc.swimSessions28 > 0) fitnessLines.push(`Swim: ${arc.swimSessions28} sessions in last 4 weeks`);
-  if (arc && arc.runSessions28 > 0) fitnessLines.push(`Run: ${arc.runSessions28} sessions in last 4 weeks`);
-  if (arc && arc.bikeSessions28 > 0) fitnessLines.push(`Bike: ${arc.bikeSessions28} sessions in last 4 weeks`);
+  // ⛔ THE SESSION-COUNT LINES ARE THE SERVER'S (audit H-W10).
+  fitnessLines.push(...(arc?.history?.history_lines ?? []));
   if (ftp) fitnessLines.push(`Bike FTP: ~${ftp}w`);
   if (threshSec) fitnessLines.push(`Run threshold: ${fmtPaceKm(threshSec)}`);
 
-  const conflicts = schedule.filter(r => r.conflict);
 
   return (
     <StepLayout
@@ -2407,9 +2282,9 @@ function Step9Confirm({
             </div>
           ))}
         </div>
-        {conflicts.length === 0 && (
-          <p className="text-[11px] text-white/25 mt-3">No conflicts detected. Planner will optimize spacing.</p>
-        )}
+        {scheduleConflicts?.none_line ? (
+          <p className="text-[11px] text-white/25 mt-3">{scheduleConflicts.none_line}</p>
+        ) : null}
       </div>
 
       {/* Fitness baselines */}
@@ -2616,13 +2491,34 @@ export default function ArcSetupWizard() {
       swim_intent: tri && state.swimIntent ? state.swimIntent : null,
     };
   }, [state.races, state.daysPerWeek, state.strengthIncluded, state.strengthIntent, state.swimIntent]);
+  /**
+   * ⛔ AND THE HISTORY READOUT (2026-09-10, audit H-W10): session counts, the advice sentences, weeks to
+   * race and the confirm screen's conflict rows, for the race date and day picks sent.
+   */
+  const historyAsk = useMemo(() => {
+    const primary = state.races.find((r) => r.priority === 'A') || state.races[0];
+    return {
+      race_date: primary?.targetDate || null,
+      schedule: {
+        tri: isTri(primary?.distance || ''),
+        has_group_ride: !!state.hasGroupRide,
+        group_ride_day: state.groupRideDay || null,
+        has_group_run: !!state.hasGroupRun,
+        group_run_day: state.groupRunDay || null,
+        long_ride_day: state.longRideDay || null,
+        long_run_day: state.longRunDay || null,
+      },
+    };
+  }, [state.races, state.hasGroupRide, state.groupRideDay, state.hasGroupRun, state.groupRunDay,
+      state.longRideDay, state.longRunDay]);
   const frequencyAskKey = JSON.stringify(frequencyAsk);
+  const readoutAskKey = JSON.stringify([frequencyAsk, historyAsk]);
   useEffect(() => {
     if (!getStoredUserId()) return;
     let cancelled = false;
     const today = new Date().toISOString().slice(0, 10);
     supabase.functions
-      .invoke('get-arc-context', { body: { focus_date: today, session_frequency: frequencyAsk } })
+      .invoke('get-arc-context', { body: { focus_date: today, session_frequency: frequencyAsk, history: historyAsk } })
       .then(({ data, error: fnError }) => {
         if (cancelled) return;
         if (fnError) { console.warn('[ArcSetupWizard] readout load failed', fnError); return; }
@@ -2633,23 +2529,32 @@ export default function ArcSetupWizard() {
       .catch((e) => { if (!cancelled) console.warn('[ArcSetupWizard] readout load failed', e); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [frequencyAskKey]);
+  }, [readoutAskKey]);
   const tierCounts = builderAskKey === frequencyAskKey ? builder?.session_frequency_by_tier ?? null : null;
+  /** get-arc-context's history readout for the answers last sent (audit H-W10). */
+  const wizardHistory = (builder as { history?: WizardHistoryReadout } | null)?.history ?? null;
+  const arcForSteps = useMemo<WizardArcContext | null>(
+    () => (arcCtx ? { ...arcCtx, history: wizardHistory } : null),
+    [arcCtx, wizardHistory],
+  );
+  // Swim: pre-select frequency + experience tier from the server's count (athlete can override).
+  const suggestedSwim = wizardHistory?.suggested ?? null;
+  useEffect(() => {
+    if (!suggestedSwim) return;
+    setState((prev) => {
+      const patch: Partial<WizardState> = {};
+      if (prev.swimIntent === null && suggestedSwim.swim_intent) patch.swimIntent = suggestedSwim.swim_intent;
+      if (prev.swimExperience === null && suggestedSwim.swim_experience) patch.swimExperience = suggestedSwim.swim_experience;
+      return Object.keys(patch).length ? { ...prev, ...patch } : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestedSwim?.swim_intent, suggestedSwim?.swim_experience]);
 
   // Pre-select answers when Arc data arrives (only if athlete hasn't answered yet)
   useEffect(() => {
     if (!arcCtx) return;
     setState(prev => {
       const patch: Partial<WizardState> = {};
-
-      // Swim: pre-select frequency + experience tier from recent sessions (athlete can override)
-      if (prev.swimIntent === null && arcCtx.swimSessions28 >= 2) {
-        patch.swimIntent = arcCtx.swimSessions28 >= 3 ? 'focus' : 'race';
-      }
-      if (prev.swimExperience === null) {
-        if (arcCtx.swimSessions28 >= 3) patch.swimExperience = 'steady';
-        else if (arcCtx.swimSessions28 === 0) patch.swimExperience = 'learning';
-      }
 
       // Strength: pre-select yes if strength equipment is on file
       if (prev.strengthIncluded === null) {
@@ -2676,9 +2581,9 @@ export default function ArcSetupWizard() {
   }, [stepIdx, navigate]);
 
   const handleConfirm = useCallback(async () => {
-    const payload = assemblePayload(state);
+    const payload = assemblePayload(state, wizardHistory?.weeks_to_race ?? null);
     await complete(payload);
-  }, [state, complete]);
+  }, [state, complete, wizardHistory]);
 
   // When the race changes and step sequence changes, clamp stepIdx
   const clampedSteps = getSteps(state);
@@ -2719,22 +2624,25 @@ export default function ArcSetupWizard() {
               <Step2Intent {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
             )}
             {currentStep === 'swim' && (
-              <Step3Swim {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />
+              <Step3Swim {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcForSteps} />
             )}
             {currentStep === 'bike' && (
-              <Step4Bike {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />
+              <Step4Bike {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcForSteps} />
             )}
             {currentStep === 'rq_placement' && (
-              <StepTriRunQualityPlacement {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />
+              <StepTriRunQualityPlacement {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcForSteps} />
             )}
             {currentStep === 'run' && (
-              <Step5Run {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />
+              <Step5Run {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcForSteps} />
             )}
             {currentStep === 'bq_placement' && (
-              <StepTriBikeQualityPlacement {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />
+              <StepTriBikeQualityPlacement {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcForSteps} />
             )}
             {currentStep === 'longdays' && (
-              <Step6LongDays {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
+              <Step6LongDays
+                {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps}
+                longDaysWarning={wizardHistory?.schedule_conflicts?.long_days_same ?? null}
+              />
             )}
             {currentStep === 'budget' && (
               <Step7Budget {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
@@ -2743,7 +2651,7 @@ export default function ArcSetupWizard() {
               <Step7BHours {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} counts={tierCounts} />
             )}
             {currentStep === 'strength' && (
-              <Step8Strength {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} builder={builder} />
+              <Step8Strength {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcForSteps} builder={builder} />
             )}
             {currentStep === 'strength_ordering' && (
               <Step8bStrengthOrdering {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
@@ -2756,7 +2664,7 @@ export default function ArcSetupWizard() {
                 step={visualStep}
                 totalSteps={totalSteps}
                 saving={saving}
-                arc={arcCtx}
+                arc={arcForSteps}
               />
             )}
           </>

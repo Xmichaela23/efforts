@@ -9,6 +9,7 @@
 import { getArcContext, type ArcContext } from '../_shared/arc-context.ts';
 import { requireUser } from '../_shared/require-user.ts';
 import { buildIntakeReadout, type SessionFrequencyAsk } from './intake-readout.ts';
+import { buildHistoryReadout, HISTORY_WINDOW_DAYS, type HistoryAsk } from './history-readout.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,6 +35,8 @@ Deno.serve(async (req) => {
       focus_date?: string;
       date?: string;
       session_frequency?: SessionFrequencyAsk;
+      /** The season wizard's history readout (audit H-W10); absent sends none. */
+      history?: HistoryAsk;
     };
     const raw = body.focus_date ?? body.date;
     const focusDateISO =
@@ -53,7 +56,27 @@ Deno.serve(async (req) => {
       asOf: focusDateISO,
       sessionFrequency: body.session_frequency ?? null,
     });
-    return new Response(JSON.stringify({ arc: { ...arc, builder } }), {
+    const history = body.history && typeof body.history === 'object'
+      ? await (async () => {
+        const from = new Date(Date.parse(`${focusDateISO}T00:00:00Z`) - HISTORY_WINDOW_DAYS.swim * 86_400_000)
+          .toISOString().slice(0, 10);
+        const { data } = await supabase
+          .from('workouts')
+          .select('date, type, distance, name')
+          .eq('user_id', userId)
+          .eq('workout_status', 'completed')
+          .in('type', ['swim', 'swimming', 'run', 'ride'])
+          .gte('date', from)
+          .lte('date', focusDateISO);
+        return buildHistoryReadout({
+          rows: data ?? [],
+          today: focusDateISO,
+          performanceNumbers: (arc as { performance_numbers?: Record<string, unknown> }).performance_numbers ?? null,
+          ask: body.history!,
+        });
+      })()
+      : null;
+    return new Response(JSON.stringify({ arc: { ...arc, builder: history ? { ...builder, history } : builder } }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {

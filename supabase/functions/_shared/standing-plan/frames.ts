@@ -298,6 +298,27 @@ export type FrameDay = {
   themeTag?: string;
 };
 
+/**
+ * ⛔ THE RUN + STRENGTH WEEK'S RUN LENGTHS (WORKORDER-run-strength-rotate-2026-09-07), moved here from
+ * the phone (2026-09-10, audit H-P06). The screen asks one thing — how long the long run is — and
+ * states the easy run. The long run's chips are the lengths `slotLengthOptions` says the `run_lsd`
+ * ladder builds exactly, up to the ceiling below; the server works them out and the phone prints them.
+ */
+export type RunStrengthWeek = {
+  /**
+   * p246's VT1 slot at level 1, whose ladder is 25 to 30 minutes (p235: *"the level refers almost
+   * strictly to duration"*). 30 is the top of that rung and builds exactly.
+   */
+  easyRunMinutes: number;
+  /**
+   * OURS — Michael, 2026-09-07: the chips stop one rung short of p247's 100-minute long-run cap, so a
+   * default never touches the cap.
+   */
+  longRunChipCeilingMinutes: number;
+  /** OURS — Michael, 2026-09-07: the middle chip opens selected. */
+  longRunDefaultMinutes: number;
+};
+
 export type Frame = {
   id: FrameId;
   /** ⛔ NEVER SHOWN TO AN ATHLETE (pivot §1). Internal only. */
@@ -320,6 +341,11 @@ export type Frame = {
   cite: string;
   /** ⛔ THE PROGRAM OWNS THIS (pivot §6). Not an athlete dial. */
   liftingDays: number;
+  /**
+   * The Run + Strength week's run lengths (2026-09-10, audit H-P06) — the numbers its one screen
+   * states and sends. Only `strength_5k` carries them; see `RunStrengthWeek`.
+   */
+  runStrengthWeek?: RunStrengthWeek;
   columns: Record<ColumnKind, FrameDay[]>;
   /** His rate anchor for THIS frame — see `RATE_ANCHOR`. */
   workingNumberRatePerWeek: number;
@@ -861,6 +887,7 @@ export const FRAMES: Record<FrameId, Frame> = {
     displayName: 'Run + Strength',
     cite: 'Viada pp246-247',
     liftingDays: 4,
+    runStrengthWeek: { easyRunMinutes: 30, longRunChipCeilingMinutes: 90, longRunDefaultMinutes: 75 },
     columns: { standard: STRENGTH_5K_STANDARD, taper: STRENGTH_5K_TAPER },
     workingNumberRatePerWeek: RATE_ANCHOR.strength_5k.perWeek,
   },

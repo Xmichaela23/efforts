@@ -261,7 +261,9 @@ Deno.test('the per-slot answer survives BOTH hops to the engine', async () => {
   const client = await Deno.readTextFile(
     new URL('../../../../src/components/NonRaceBuilder.tsx', import.meta.url).pathname,
   );
-  assert(/endurance_slots:\s*derivedCounts\.slots/.test(client), 'the wizard sends only totals');
+  // ⛔ THE ROW ANSWERS TRAVEL AS ANSWERED since 2026-09-10 (audit H-W05); `generate-strength-plan` maps
+  // them onto the frame's slots, so the phone assembles nothing from the bounds module.
+  assert(/endurance_slot_answers:\s*derivedCounts\.answers/.test(client), 'the wizard sends only totals');
 
   const goal = await Deno.readTextFile(
     new URL('../../create-goal-and-materialize-plan/index.ts', import.meta.url).pathname,

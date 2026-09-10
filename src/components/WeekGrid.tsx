@@ -31,6 +31,7 @@ import { getDisciplineColor } from '@/lib/context-utils';
 import { isPlyoSession } from '@/lib/utils';
 import { WEEK_DAYS as ORDER, isEnduranceSession, type WeekSession } from '@/lib/week-budget';
 import { plainIntent } from '@/lib/plain-intent';
+import type { WeekOneSummary } from '@/lib/builder-readout';
 
 export type WeekGridSession = WeekSession;
 
@@ -39,6 +40,7 @@ export default function WeekGrid({
   notes = [],
   className = '',
   title,
+  summary,
 }: {
   sessions: WeekGridSession[];
   /** The solver's own words for what it could not honour. Printed verbatim, never paraphrased. */
@@ -51,13 +53,14 @@ export default function WeekGrid({
    * week" for the whole block.
    */
   title?: string;
+  /**
+   * ⛔ THE SERVER'S SUMMARY OF THIS WEEK (2026-09-10, audit H-P05) — the day counts, the minutes and
+   * the two sentences, from `_shared/week-one-summary.ts`. Absent prints no summary and no sentences.
+   */
+  summary?: WeekOneSummary | null;
 }) {
-  // Two upper lifts on consecutive days — worth a word, because it looks like an oversight.
-  const UPPER = /Bench Press|Overhead Press/;
-  const upperIdx = ORDER
-    .map((d, i) => (sessions.some((s) => s.day === d && s.type === 'strength' && UPPER.test(s.name)) ? i : -1))
-    .filter((i) => i >= 0);
-  const adjacentPressDays = upperIdx.length === 2 && Math.abs(upperIdx[0] - upperIdx[1]) === 1;
+  // ⛔ THE PRESS-DAYS CHECK, THE DAY COUNTS AND THE BALANCE SENTENCE LEFT THIS FILE (2026-09-10, audit
+  // H-P05). They are worked out on the server and arrive as `summary`.
 
   // ⛔ MOVED TO `@/lib/plain-intent` (2026-08-28). It lived here as two lines and was used HERE
   // ONLY, so the logger header, the calendar and the plan download screen all still printed
@@ -79,44 +82,21 @@ export default function WeekGrid({
   /** 41 → "41m"; 126 → "2h06". Same shape as the week total above it. */
   const fmtMins = (m: number) => (m >= 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}` : `${m}m`);
 
-  const activeDays = new Set(sessions.map((s) => s.day)).size;
-  const mins = sessions.reduce((a, s) => a + (Number(s.duration) || 0), 0);
-  /**
-   * ⛔ THE LIFTING COUNT IN THE SUMMARY (Michael, 2026-08-25) — the commitment the block is built
-   * around, stated where the week is totalled rather than only inferable by reading seven rows.
-   *
-   * ⛔ COUNTED OFF THE WEEK IN FRONT OF THE ATHLETE, NOT OFF THE FRAME. `lifting-commitment.ts`
-   * derives the FRAME's number for the choosing step, where there is no built week yet; here there
-   * IS one, and the honest number is what this grid is actually showing. If the two ever disagree,
-   * this line is right and the mismatch is the finding.
-   * ⚠️ DAYS, NOT SESSIONS. Two strength rows can share one day, and "4 lifts" means four lifting
-   * DAYS — the thing the athlete is committing to.
-   *
-   * ⛔⛔ THE PLYO DAY IS `type: 'strength'` AND IS NOT A LIFTING DAY (found on the dev preview,
-   * 2026-08-25). `compose.ts` `plyoSession` emits the frame's day-3 plyo block as a strength
-   * session carrying A-Skips and hops — no barbell — so counting `type === 'strength'` read a
-   * four-lift week as "5 lifts", two lines under a step that had just promised four.
-   * ⚠️ EXCLUDED BY ITS TAG, NOT BY ITS NAME. `tags: ['standing_plan', 'plyo']` is stable; the name
-   * is a display string, and matching on one is what the label renames just had to unpick twice.
-   */
-  const liftDays = new Set(
-    sessions
-      .filter((s) => s.type === 'strength' && !(s.tags ?? []).includes('plyo'))
-      .map((s) => s.day),
-  ).size;
-
   return (
     <div className={`space-y-2 ${className}`}>
       {title && (
         <p className="text-white/50 text-[11px] uppercase tracking-[0.08em]">{title}</p>
       )}
-      <p className="text-white/75 text-sm">
-        {activeDays} training {activeDays === 1 ? 'day' : 'days'}, {7 - activeDays} rest
-        {/* ⚠️ SILENT ON A WEEK WITH NO LIFTING — the grid also serves run-only plans, and "0 lifts"
-            there is a fact about a discipline that is not in the block. */}
-        {liftDays > 0 ? <>{' · '}{liftDays} {liftDays === 1 ? 'lift' : 'lifts'}</> : null}
-        {' · '}about {Math.floor(mins / 60)}h{mins % 60 ? String(mins % 60).padStart(2, '0') : ''} a week
-      </p>
+      {summary ? (
+        <p className="text-white/75 text-sm">
+          {summary.training_days} training {summary.training_days === 1 ? 'day' : 'days'}, {summary.rest_days} rest
+          {/* ⚠️ SILENT ON A WEEK WITH NO LIFTING — the grid also serves run-only plans, and "0 lifts"
+              there is a fact about a discipline that is not in the block. Lifting DAYS, plyo excluded
+              — the server counts them. */}
+          {summary.lift_days > 0 ? <>{' · '}{summary.lift_days} {summary.lift_days === 1 ? 'lift' : 'lifts'}</> : null}
+          {' · '}about {Math.floor(summary.total_minutes / 60)}h{summary.total_minutes % 60 ? String(summary.total_minutes % 60).padStart(2, '0') : ''} a week
+        </p>
+      ) : null}
 
       <div>
         {ORDER.map((d) => {
@@ -217,64 +197,18 @@ export default function WeekGrid({
         })}
       </div>
 
-      {adjacentPressDays && (
-        <p className="text-white/40 text-xs leading-tight">Press days sit together on purpose — no recovery gap needed.</p>
-      )}
+      {summary?.press_days_note ? (
+        <p className="text-white/40 text-xs leading-tight">{summary.press_days_note}</p>
+      ) : null}
 
-      {/* ⛔ THE WEEK EXPLAINS ITSELF, AND THE POINT IS BALANCING STRESSORS (Michael, 2026-08-26:
-          "it should be about balancing stressors — isn't that viada's whole thing"). It is —
-          SOURCE-viada p130 (consolidation: examine what each session requires and arrange the week
-          so nothing that needs to recover fails to, so no session becomes "a heavily fatigued
-          write-off") and p131 (the heavy sessions must come fresh in the systems they need). The
-          old notes only spoke when something FAILED, in apology voice; this states what the layout
-          is FOR. Derived from the placed week itself, so it can never disagree with the grid above
-          it. Silent when there is nothing to explain (no hard/long sessions). */}
-      {(() => {
-        /**
-         * ⛔ ONLY WHEN IT IS TRUE (Michael, 2026-08-26: "and is it true?"). Two honesty gates:
-         * (1) it renders only when the solver reported NO conflicts — a week where pins forced
-         * stacking is arranged around the athlete's days, not around balance, and the notes below
-         * are the true story there; (2) it claims the spacing's PURPOSE, never per-session
-         * freshness — the book's own default sends Monday's run into Tuesday's heavy legs and
-         * compensates with the 3.5% cut (p247), so "every session starts fresh" would be a lie
-         * even on the untouched week.
-         */
-        if (notes.length > 0) return null;
-        const endur = sessions.filter(isEnduranceSession);
-        const hardN = endur.filter((s) => /^Hard\b/i.test(s.name)).length;
-        const longest = endur.reduce<WeekGridSession | null>(
-          (a, s) => ((Number(s.duration) || 0) > (Number(a?.duration) || 0) ? s : a), null);
-        const hasLong = longest && (Number(longest.duration) || 0) >= 75;
-        if (hardN === 0 && !hasLong) return null;
-        const liftDayNames = ORDER.filter((d) =>
-          sessions.some((s) => s.day === d && s.type === 'strength' && !(s.tags ?? []).includes('plyo')));
-        if (liftDayNames.length === 0) return null;
-        const say = (xs: string[]) =>
-          xs.length === 1 ? xs[0] : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
-        // ⚠️ NO DAY ON THE LONG SESSION (Michael, 2026-08-26: "but the scheduler put it on sat") —
-        // its weekday is the scheduler's own output, so citing it as a cause would be circular.
-        // The sentence names WHAT is in the week; the grid above shows where everything landed.
-        const additions = [
-          hardN === 0 ? '' : hardN === 1 ? 'one hard session' : hardN === 2 ? 'two hard sessions' : `${hardN} hard sessions`,
-          hasLong ? `a long ${longest!.type === 'ride' ? 'ride' : 'run'}` : '',
-        ].filter(Boolean).join(' and ');
-        /**
-         * ⛔ PRINCIPLE FIRST, PLACEMENT AFTER (Michael, 2026-08-26: "you're thinking backwards").
-         * The week is not an outcome to be explained by its sessions — it IS the stress-balanced
-         * arrangement, and the sessions were placed into it. So the sentence leads with what the
-         * week is, then where things sit. No causality, no agency, no engine internals.
-         */
-        const hardClause = [
-          hardN === 0 ? '' : hardN === 1 ? 'the hard session' : 'the hard sessions',
-          hasLong ? `the long ${longest!.type === 'ride' ? 'ride' : 'run'}` : '',
-        ].filter(Boolean).join(' and ');
-        return (
-          <p className="pt-2 border-t border-white/10 text-white/60 text-sm leading-relaxed">
-            This week is arranged to balance the stressors — lifting on {say(liftDayNames)},
-            {' '}{hardClause} spaced around it.
-          </p>
-        );
-      })()}
+      {/* ⛔ THE WEEK EXPLAINS ITSELF, AND THE POINT IS BALANCING STRESSORS (Michael, 2026-08-26) —
+          SOURCE-viada p130 and p131. The server writes the sentence from the placed week, and only
+          when the solver reported no compromise (`_shared/week-one-summary.ts`). */}
+      {summary?.balance_note ? (
+        <p className="pt-2 border-t border-white/10 text-white/60 text-sm leading-relaxed">
+          {summary.balance_note}
+        </p>
+      ) : null}
 
       {/* What the solver could not honour, in its own words. Never hidden, never reworded. */}
       {notes.length > 0 && (

@@ -34,12 +34,11 @@ import {
 } from '@/lib/standing-plan-week-copy';
 import { runWeekCommitmentLine } from '@/lib/lifting-commitment';
 /**
- * ⛔ THE NUMBERS LIVE NEXT DOOR so a test can call them — see `run-strength-week.ts`. The card draws
- * them and owns none of them.
+ * ⛔ THE NUMBERS ARE THE SERVER'S (2026-09-10, audit H-P06). The easy run's length, the long-run chips
+ * and their default come back with the preview (`readout`); the card draws them and owns none of them.
  */
-import {
-  EASY_RUN_FIXED_MIN, longRunLengthOptions, RUN_STRENGTH_WEEK_SUB,
-} from '@/lib/run-strength-week';
+import { runStrengthWeekSub } from '@/lib/run-strength-week';
+import type { EnduranceIntakeReadout } from '@/lib/builder-readout';
 import { FAMILIES } from '../../supabase/functions/_shared/endurance-library/index.ts';
 import type { FrameId } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 
@@ -62,9 +61,8 @@ function sessionNameFor(family: string, archetype: string | null | undefined): s
 
 type Props = {
   frame: FrameId;
-  /** Every row on this frame is a run — `fixedSportScope` writes it and `allowedSlotSports` holds it. */
-  slots: SlotSelection;
-  baselines?: unknown;
+  /** The server's lengths for this week. Null until it answers — the rows then state no length. */
+  readout: EnduranceIntakeReadout['run_strength_week'];
   /** The athlete's per-session lengths. Only the long row carries a pick; the easy row is a constant. */
   slotMinutes?: Partial<Record<SlotKey, number>>;
   onSlotMinutes: (key: SlotKey, minutes: number) => void;
@@ -76,7 +74,8 @@ export default function RunStrengthWeekCard(props: Props) {
   // ⛔ THE FRAME'S OWN DAY ORDER — p246 runs day 1, day 3, day 4, day 6. `frameSlots` walks the
   // column, so the rows cannot drift from the week the composer builds.
   const rows = frameSlots(frame);
-  const longOptions = longRunLengthOptions(props.slots, { baselines: props.baselines, frame });
+  const longOptions = props.readout?.long_run_options ?? [];
+  const easyMinutes = props.readout?.easy_run_minutes ?? null;
   const pickedLong = props.slotMinutes?.long;
 
   return (
@@ -87,7 +86,9 @@ export default function RunStrengthWeekCard(props: Props) {
         {runWeekCommitmentLine(frame) ? (
           <p className="text-white/85 text-sm leading-relaxed">{runWeekCommitmentLine(frame)}</p>
         ) : null}
-        <p className="text-white/55 text-sm leading-relaxed mt-1">{RUN_STRENGTH_WEEK_SUB}</p>
+        {easyMinutes != null ? (
+          <p className="text-white/55 text-sm leading-relaxed mt-1">{runStrengthWeekSub(easyMinutes)}</p>
+        ) : null}
       </div>
       <div className="space-y-2">
         {rows.map((row) => {
@@ -118,7 +119,7 @@ export default function RunStrengthWeekCard(props: Props) {
           const lengthNow = isLong
             ? (pickedLong != null && longOptions.includes(pickedLong) ? sessionLengthLabel(pickedLong) : null)
             : isEasy
-              ? sessionLengthLabel(EASY_RUN_FIXED_MIN)
+              ? (easyMinutes != null ? sessionLengthLabel(easyMinutes) : null)
               : SESSION_LENGTH_VARIES;
           const session = sessionNameFor(row.family, row.archetype ?? null);
           return (

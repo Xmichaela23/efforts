@@ -16,7 +16,7 @@ import { assignDaysViaSolver } from './assign-days-solver.ts';
 // ⛔ ONE SCAN FOR "WHERE IS THIS ATHLETE IN THE LONG-RUN ROW", shared with the race-day-anchored arc
 // the sustainable generator builds. A second copy here is how the intake and the engine start
 // entering the same table at different rungs. See that file's header for the deploy consequence.
-import { longRunEntryIndex } from '../../../../src/lib/run-volume-tables.ts';
+import { ENGINE_START_CLAMP_FRACTION, longRunEntryIndex } from '../../../../src/lib/run-volume-tables.ts';
 
 export abstract class BaseGenerator {
   protected params: GeneratorParams;
@@ -213,7 +213,8 @@ export abstract class BaseGenerator {
     const currentMiles = this.params.current_weekly_miles;
     if (!currentMiles || currentMiles <= 0) return tableStart;
 
-    let effective = Math.max(tableStart * 0.7, Math.min(tablePeak * 0.95, currentMiles));
+    // The floor fraction is one constant, read by the intake's mileage floor too (audit H-P07).
+    let effective = Math.max(tableStart * ENGINE_START_CLAMP_FRACTION, Math.min(tablePeak * 0.95, currentMiles));
 
     // ACWR fatigue guard
     const acwr = this.params.current_acwr;

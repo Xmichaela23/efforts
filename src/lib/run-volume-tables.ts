@@ -457,8 +457,10 @@ export const TYPICAL_PEAK_LONG_RUN_MI: Record<string, [number, number]> = {
  * That silent override is the whole reason a typed number needed validating: without this, an
  * athlete typing 12 mi/wk as an "intermediate" gets a 21 mi/wk week one and is never told.
  *
- * ⚠️ REUSED, NOT CHOSEN. If the clamp in the generator changes, change it here in the same breath —
- * `runVolumeFloorMi` below is only honest while the two agree.
+ * ⛔ ONE COPY (2026-09-10, audit H-P07). This was a hand copy of the generator's literal `0.7`; the
+ * generator reads this constant now, so the intake's floor and the engine's clamp cannot come apart.
+ * The phone no longer calls `runVolumeFloorMi` — `create-goal-and-materialize-plan` does and returns
+ * the floor with the race preview.
  */
 export const ENGINE_START_CLAMP_FRACTION = 0.7;
 
@@ -584,6 +586,9 @@ export function marathonPrerequisiteFor(opts: {
  * ⚠️ APPLIED TO WEEK ONE ONLY. The ramp pulls the ratio down every week after that (weekly volume
  * climbs toward `peakWeekly` while the long run climbs more slowly), so week 1 is the binding case
  * for a typed starting mileage. Later weeks are the engine's problem, not the intake's.
+ *
+ * OURS — 0.35 and 0.30 have no source cited here (audit H-P07); the 25-30% guidance above is named
+ * without a reference.
  */
 export const MAX_LONG_RUN_SHARE: Record<string, number> = {
   beginner: 0.35,
@@ -712,7 +717,7 @@ export const TIER_SEEDS: Record<IntakeTier, { weeklyMi: number; longRunMi: numbe
  *
  * ⚠️ 25% BELOW THE SEED IS THE TRIGGER, and it is a threshold not a science: far enough that the
  * numbers genuinely disagree, loose enough that editing 30 down to 27 says nothing. It exists so
- * the line is rare — a signal that fires often is decoration.
+ * the line is rare — a signal that fires often is decoration. OURS — no source (audit H-P07).
  */
 export function tierMismatchNote(
   tier: IntakeTier,

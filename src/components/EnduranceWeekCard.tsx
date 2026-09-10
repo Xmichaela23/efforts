@@ -80,7 +80,9 @@ import {
   type SlotSelection,
   type SlotSport,
 } from '@/lib/standing-plan-week-copy';
-import { experienceChips, weekBounds, slotLengthOptions, slotFixedMinutes } from '@/lib/standing-plan-week-bounds';
+// ⛔ NOTHING FROM `standing-plan-week-bounds` (2026-09-10, audit H-W05): the lengths, fixed doses, chip
+// numbers and hours bounds arrive as `intake`, worked out on the server by the same functions.
+import type { EnduranceIntakeReadout } from '@/lib/builder-readout';
 import type { EnduranceExperience, ExperienceTier, FrameId } from '../../supabase/functions/_shared/standing-plan/frames.ts';
 /**
  * ⛔ HOW MANY DAYS ONE SPORT CAN RUN OVER. Seven is the week; the engine caps what it can actually
@@ -109,9 +111,12 @@ export type EnduranceWeekCardProps = {
    * predates a second frame — the rows, their days and their options all come off it.
    */
   frame?: FrameId;
-  /** The athlete's baselines row — the caps resolve every session against their own anchors. */
-  baselines?: unknown;
-  easyPaceSecPerMi?: number | null;
+  /**
+   * ⛔ THE SERVER'S NUMBERS FOR THIS SCREEN (2026-09-10, audit H-W05) — per row the lengths offered,
+   * the fixed length or that it varies, the experience chips, and whether each sport holds hours worth
+   * a dial. Each part is printed only while it describes the rows on screen; absent prints none.
+   */
+  intake: EnduranceIntakeReadout | null;
   /**
    * ⛔⛔ THE ATHLETE'S OWN EXPERIENCE ANSWER, PER SPORT — the sole input to how long the hard sessions
    * and the long session are (Michael, 2026-08-27). The hours this screen quotes come from the levels
@@ -134,9 +139,6 @@ export type EnduranceWeekCardProps = {
   rideDays: string;
   onRideDays: (v: string) => void;
   rideHours: string;
-  /** ⛔ THE ENGINE'S OWN SENTENCE per sport — `fixedHoursLine`. Null when the sport fixes nothing. */
-  runFixedLine?: string | null;
-  rideFixedLine?: string | null;
   onRideHours: (v: string) => void;
   unit: 'mi' | 'km';
   /** Rendered inside the open hard-slot row — VO2 vs speed, club session. */
@@ -268,25 +270,22 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
     return () => window.clearTimeout(t);
   }, [chosen]);
 
-  const bounds = weekBounds(slotsNow, {
-    baselines: props.baselines as never,
-    easyPaceSecPerMi: props.easyPaceSecPerMi,
-    experience: props.experience,
-    frame,
-  });
+  /**
+   * ⛔⛔ THE SERVER'S READOUT, READ ONLY WHILE IT DESCRIBES THESE ROWS (2026-09-10, audit H-W05). It
+   * echoes the sport answers and workout picks it was worked out for. Between a tap and the next
+   * answer it describes a different week, so what depends on the whole week prints nothing.
+   */
+  const intake = props.intake;
+  const sameAnswers = !!intake && frameSlots(frame).every((s) =>
+    (intake.slots?.[s.key] ?? null) === (slotsNow[s.key] ?? null)
+    && (intake.archetypes?.[s.key] ?? null) === (props.hardArchetypes?.[s.key] ?? null));
   /**
    * ⛔⛔ THE TWO CHIPS' NUMBERS, COMPUTED — never typed. `experienceChips` runs the engine's own
    * `ladderOf` and `weekVolumeBounds` against the slot answers four rows above and the athlete's own
    * baselines, so a run on the first hard slot and a run on the second give different numbers.
    * ⚠️ NULL FOR A SPORT THAT FILLS NO SLOT — there is nothing for the answer to size, so no chip.
    */
-  const chips = experienceChips(slotsNow, {
-    baselines: props.baselines as never,
-    // ⛔ THE VARIANT THE ATHLETE PICKED INSIDE THE HARD ROW BEATS THE FRAME'S OWN SHAPE, in the
-    // composer and therefore here. Without it the chip quotes the session they just replaced.
-    archetypes: props.hardArchetypes,
-    frame,
-  });
+  const chips = (sameAnswers ? intake!.experience_chips : null) ?? { run: null, ride: null };
 
   /**
    * ⛔⛔ WHICH HOUR DIALS EXIST — THE SPORTS THE ATHLETE KEEPS, NOT THE SPORTS THEIR SLOTS CARRY.
@@ -306,7 +305,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
    */
   const sportsWithHours: SlotSport[] = (['run', 'ride'] as const).filter((sp) =>
     (props.allowedSports?.includes(sp) ?? false)
-    || (sp === 'run' ? !!bounds.runMilesInput : !!bounds.rideHours));
+    || (sameAnswers && !!intake!.has_bounds[sp]));
   /**
    * ⛔ THE ONE LINE THAT SURVIVED THE RATE LINE (Michael, 2026-08-26: *"E kill it"* — this was not
    * what he killed). It is a real p247 fact and the only thing on the screen naming WHICH lifts the
@@ -451,22 +450,19 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
            * ⚠️ `lengths` IS NULL ON A QUALITY ROW and `fixed` is null on every other, because the
            * frame's own `role` decides which question a row is: p246 and p274 own the quality doses.
            */
-          const lengths = dayOrdered
-            ? slotLengthOptions(key, slotsNow, { baselines: props.baselines as never, frame })
+          const row = intake?.rows?.[key];
+          // ⚠️ A ROW'S LENGTHS COUNT ONLY FOR THE SPORT THEY WERE WORKED OUT FOR — see `sameAnswers`.
+          const rowCurrent = !!row && row.sport === (slotsNow[key] ?? null);
+          const lengths = dayOrdered && rowCurrent && row!.length_options
+            ? { options: row!.length_options }
             : null;
           /**
            * ⛔⛔ THE ROW'S OWN PIN TRAVELS INTO THE LENGTH (2026-08-31). Without the athlete's picked
            * shape this asked an archetype-less ladder and printed one week's answer as the session's
            * dose — see `slotFixedMinutes`. `null` back means the session rotates and the row says so.
            */
-          const fixed = dayOrdered
-            ? slotFixedMinutes(key, slotsNow, {
-              baselines: props.baselines as never, frame,
-              archetype: props.hardArchetypes?.[key] ?? null,
-            })
-            : null;
-          const varies = dayOrdered && hardKeys.includes(key) && lengths == null && fixed == null
-            && slotsNow[key] != null;
+          const fixed = dayOrdered && sameAnswers ? row?.fixed_minutes ?? null : null;
+          const varies = dayOrdered && sameAnswers && !!row?.length_varies;
           /**
            * ⛔ THE ROW STATES ITS LENGTH, ANSWERED OR NOT. A quality row shows the dose it is fixed
            * at; an easy or long row shows what the athlete set. ⚠️ A row with a pick and no answer
@@ -1207,7 +1203,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
 
       {/* ⚠️ SAID WHEN IT IS TRUE, not always. Some sessions carry recoveries the source gives no
           duration for, so their totals are floors — and a cap built on a floor is a floor too. */}
-      {bounds.isLowerBound ? (
+      {sameAnswers && intake!.is_lower_bound ? (
         <p className="text-white/35 text-xs leading-snug">
           Some sessions carry recoveries with no stated length, so these are the shortest the week can be.
         </p>

@@ -12,9 +12,8 @@ import EnduranceWeekCard from './EnduranceWeekCard';
  * screen and stays untouched through this order.
  */
 import RunStrengthWeekCard from './RunStrengthWeekCard';
-import {
-  EASY_RUN_FIXED_MIN, longRunDefaultMinutes, longRunLengthOptions,
-} from '@/lib/run-strength-week';
+// ⛔ WHAT THE SERVER SAYS ABOUT THE ANSWERS SO FAR (2026-09-10, audit item 26) — see `builder-readout.ts`.
+import { fetchIntakeReadout, type BuilderReadout } from '@/lib/builder-readout';
 // ⛔ THE HARD SLOT'S SESSION CHOICES — one component, shared with anything that renders a slot.
 import HardSlotChoices from './HardSlotChoices';
 import {
@@ -50,23 +49,16 @@ import {
   EXPERIENCE_WHEN_UNASKED,
 } from '@/lib/standing-plan-week-copy';
 import { CLUB_SESSION_CONTROL_VISIBLE, ENGINE_PICK_ROW_LABEL, hardSlotDefault, slotFamilyFact, slotVariantOptions, variantsTakenBy, type HardSlotKey } from '@/lib/hard-slot-choices';
-// ⛔ `SLOT_FAMILY` IS NOT IMPORTED HERE. It is the 5K frame's four rows, and indexing it by a
-// five-row frame's keys is what blanked the app on 2026-08-30. `familyMapFor` takes the frame.
-import { builtFamily, familyMapFor, prunedSlotMinutes } from '@/lib/standing-plan-week-bounds';
+// ⛔ NOTHING FROM `standing-plan-week-bounds` IS IMPORTED HERE (2026-09-10, audit H-W05). The endurance
+// step's lengths, fixed doses and chip numbers come back from the server, and the row answers travel
+// as answered for `generate-strength-plan` to map onto the frame.
 import { hardPairInFrameOrder, RIDE_EQUIVALENT } from '../../supabase/functions/_shared/standing-plan/index.ts';
-import {
-  fixedHoursLine, slotSpans, type SlotSpec,
-} from '../../supabase/functions/_shared/standing-plan/volume-bounds.ts';
 import { resolveEnduranceAnchors } from '../../supabase/functions/_shared/endurance-library/index.ts';
-import { experienceChips, slotsForEngine } from '@/lib/standing-plan-week-bounds';
 import { useArcSetupComplete } from '@/hooks/useArcSetupComplete';
 import { useAppContext } from '@/contexts/AppContext';
-// ⛔ THE SAME functions the SERVER's tier gate runs — client-reachable by design, so the line the
-// wizard shows and the tier the composer builds cannot disagree (item 8, 2026-08-24).
-import { demonstratedRunVolume, demonstratedWeeklyMinutes } from '../../supabase/functions/_shared/standing-plan/demonstrated-history.ts';
+// ⛔ THE HISTORY LINE IS THE SERVER'S (2026-09-10, audit H-W10): `generate-strength-plan` counts the
+// same runs its tier gate reads and returns the sentence with the intake readout.
 import {
-  advancedTierSessions,
-  experienceLevels,
   FRAMES,
   type EnduranceExperience,
   type ExperienceTier,
@@ -198,12 +190,9 @@ import {
   scheduleBlockedReason as scheduleGateReason,
   scheduleBlockedReasons as scheduleGateReasons,
 } from '@/lib/schedule-gate';
-// ⛔ ONE COPY OF THE MILEAGE TABLES, shared with `generate-run-plan`. The intake must judge a typed
-// week against the SAME numbers the engine builds from, or it is guessing at the athlete.
-import {
-  validateWeeklyMiles, TIER_SEEDS, tierMismatchNote, longRunCeiling,
-  TYPICAL_PEAK_LONG_RUN_MI, type IntakeTier,
-} from '@/lib/run-volume-tables';
+// ⛔ THE MILEAGE TABLES ARE READ ON THE SERVER (2026-09-10, audit H-P07). The race preview returns the
+// weeks, the floor, the tier note, the longest run and the tier seeds; only the tier's type is read here.
+import type { IntakeTier } from '@/lib/run-volume-tables';
 import type { PaceBenchmarkRow } from '@/lib/run-pace-calibration';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import WeekGrid from '@/components/WeekGrid';
@@ -213,7 +202,7 @@ import {
 } from '@/lib/week-rules-copy';
 // ⛔ ONE READING OF THE WEEK, shared with whatever renders it next — the letters under the day chips
 // are the same rule on all three intake cards, so the rule cannot live on any one of them.
-import { roundMiles, roundRideMinutes, splitNote, weekDayRoles, DAY_ROLE_TITLE, type DayRole } from '@/lib/week-budget';
+import { weekDayRoles, DAY_ROLE_TITLE, type DayRole } from '@/lib/week-budget';
 /**
  * ⛔ THE RIDE-COUNT RANGE HAS ONE OWNER (stage 4, 2026-08-21). It was written out FIVE times — two
  * pickers here, a validator in `create-goal-and-materialize-plan`, a clamp in
@@ -591,21 +580,8 @@ function parseTargetTime(raw: string): number | null {
   return sec >= 600 && sec <= 86400 ? sec : null;
 }
 
-/**
- * Whole weeks from today to the race, the way the SERVER counts them
- * (`create-goal…:243` `weeksUntilRace` — ceil, from today, not from plan start).
- *
- * ⚠️ DISPLAY ONLY, AND IT IS AN APPROXIMATION. The server takes
- * `max(floor, min(weeksOut, 20))` and can cap far lower in its race-support / bridge-peak modes,
- * which this cannot predict. Every place it is shown says "about".
- */
-function weeksUntilRaceApprox(raceISO: string): number | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(raceISO)) return null;
-  const ms = new Date(`${raceISO}T12:00:00`).getTime() - Date.now();
-  if (!Number.isFinite(ms)) return null;
-  const w = Math.ceil(ms / (7 * 24 * 60 * 60 * 1000));
-  return w > 0 ? Math.min(20, w) : null;
-}
+// ⛔ `weeksUntilRaceApprox` IS DELETED (2026-09-10, audit H-P07). The block's weeks come from the race
+// preview — the length `create-goal` hands the generator, support modes and the race-week trim included.
 const DAYS: DayName[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const DAY_SHORT: Record<DayName, string> = {
   monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun',
@@ -1374,7 +1350,14 @@ function assemblePayload(
     const slots = state.slotSports ?? emptySlotSports(wizardFrame);
     const runs = keys.filter((k) => slots[k] === 'run').length;
     const rides = keys.filter((k) => slots[k] === 'ride').length;
-    return { runs, rides, slots: slotsForEngine(slots, wizardFrame) };
+    // ⛔ THE ROW ANSWERS AS ANSWERED (2026-09-10, audit H-W05) — `generate-strength-plan` maps them onto
+    // the frame's slots, including the unadded hard row it builds as the frame's easy session.
+    const answers: Partial<Record<SlotKey, SlotSport>> = {};
+    for (const k of keys) {
+      const v = slots[k];
+      if (v === 'run' || v === 'ride') answers[k] = v;
+    }
+    return { runs, rides, answers };
   })();
   return {
     summary: isRace
@@ -1795,7 +1778,8 @@ function assemblePayload(
            * who chose "Hard 1 = Run, Long = Ride" got "Hard 1 = Ride, Long = Run" — the same mix, a
            * different week, nothing said. The wizard's own agreement test caught it.
            */
-          ...(isStrengthFocusPath ? { endurance_slots: derivedCounts.slots } : {}),
+          ...(isStrengthFocusPath && Object.keys(derivedCounts.answers).length > 0
+            ? { endurance_slot_answers: derivedCounts.answers } : {}),
           /** Easy-swim add-on (Michael, 2026-08-24): 1–2 easy/technique swims OUTSIDE the four
            *  slots. 0/absent = none. The composer appends them; they never take a session spot. */
           /** ⛔ THE VARIANT PICKS, keyed the engine's way (same keys as endurance_slots). Only the
@@ -1992,6 +1976,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     { available: boolean; summary: string; window_days: number } | null
   >(null);
   const [previewing, setPreviewing] = React.useState(false);
+  /**
+   * ⛔ WHAT THE SERVER SAYS ABOUT THE ANSWERS SO FAR (2026-09-10, audit H-P07, H-P06, H-P05, H-W05,
+   * H-W06, H-W10): the race intake's numbers, the endurance step's numbers, the club-night note and
+   * the sample week's summary. `intakeKey` is the answers the last intake readout was asked for.
+   */
+  const [readout, setReadout] = React.useState<BuilderReadout | null>(null);
+  const [intakeKey, setIntakeKey] = React.useState<string | null>(null);
   const { arc } = useArcSetupContext();
 
   // Don't gate: every athlete is OFFERED all four disciplines (matches the ungated matrix). The seed
@@ -2378,28 +2369,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const isRaceGoal = state.goal === 'marathon';
   /** The discipline the race develops. Everything else is held or parked (Michael, 2026-08-04). */
   const raceDiscipline: Discipline = RACE_DISCIPLINE[state.raceDistance] ?? 'run';
-  const raceWeeks = state.raceDate ? weeksUntilRaceApprox(state.raceDate) : null;
   /**
-   * ⛔ HOW LONG THE BLOCK WILL ACTUALLY BE — the week race day falls in, counted from the plan's own
-   * first Monday, NOT from today.
-   *
-   * `raceWeeks` is weeks-from-now, which is the right question for "can this be planned at all" and
-   * the wrong one for "how many weeks is it". They differ whenever the plan opens on a later Monday:
-   * a Sunday race 66 days out is 10 weeks away and plan week 9. The server trims the block to the
-   * race week for exactly this reason (`planWeekContaining`, `_shared/planning-context.ts`), so a
-   * screen quoting `raceWeeks` describes a plan one week longer than the one it builds.
-   *
-   * ⚠️ THE GATE STILL READS `raceWeeks`. This is display and arithmetic only — race-week support
-   * mode depends on a race that is days away, and re-pointing the gate would change who gets in.
+   * ⛔ THE RACE INTAKE'S NUMBERS ARE THE SERVER'S (2026-09-10, audit H-P07). `create-goal` returns them
+   * with the race preview: the block length it hands the generator — floor, 20-week cap, support
+   * modes and the trim to race week included — whether the date has passed, the mileage floor, the
+   * tier note and the longest run. The phone counted weeks from today and capped at 20 itself.
    */
-  const planWeeks = (() => {
-    if (!state.raceDate || !state.startDate) return raceWeeks;
-    const start = new Date(`${state.startDate}T00:00:00`).getTime();
-    const race = new Date(`${state.raceDate}T00:00:00`).getTime();
-    if (!Number.isFinite(start) || !Number.isFinite(race) || race < start) return raceWeeks;
-    const week = Math.floor((race - start) / (7 * 24 * 60 * 60 * 1000)) + 1;
-    return raceWeeks != null ? Math.min(raceWeeks, week) : week;
-  })();
+  const raceIntake = isRaceGoal ? readout?.race_intake ?? null : null;
+  const planWeeks: number | null = raceIntake?.weeks ?? null;
   // The race card cannot continue on a date alone: level picks the volume table the whole plan is
   // built from, and a blank one would fall to the silent `intermediate` this card exists to replace.
   /**
@@ -2455,7 +2432,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * Distance is given by the card being Marathon, and elevation is deliberately NOT here — it is an
    * input, not a requirement. Someone who knows nothing but which race and when gets a plan.
    */
-  const raceCanContinue = !!state.raceName.trim() && !!state.raceDate && raceWeeks !== null;
+  const raceCanContinue = !!state.raceName.trim() && !!state.raceDate && planWeeks !== null;
 
   /**
    * ⛔ TWO HARD DAYS BACK TO BACK — STATED, NEVER BLOCKED (§5.2b).
@@ -3112,24 +3089,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * accumulating-marks row those were written for, and this pass does not touch it.
    */
 
-  const clubCollision = (() => {
-    if (!isRaceGoal || state.runClubIntensity !== 'quality') return null;
-    const club = state.qualityDays.run;
-    const long = state.longRunDay;
-    if (!club || !long) return null;
-    const order = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    const i = order.indexOf(club), j = order.indexOf(long);
-    if (i < 0 || j < 0) return null;
-    if (i === j) {
-      return 'That is your long run day. The plan will keep the long run there and place its hard '
-        + 'session elsewhere in the week.';
-    }
-    const gap = Math.min(Math.abs(i - j), order.length - Math.abs(i - j));
-    if (gap > 1) return null;
-    return 'That sits next to your long run — two hard days back to back, with about 24 hours '
-      + 'between them instead of the 48 to 72 most plans leave. It is kept as you set it. Moving '
-      + 'the long run, if it is the one that can move, opens the gap.';
-  })();
+  /**
+   * ⛔ THE CLUB NIGHT BESIDE THE LONG RUN — THE SERVER'S NOTE (2026-09-10, audit H-W06). The race
+   * preview says it only when the week it built puts the hard session and the long run where the
+   * sentence says (`race-readout.ts` `raceWeekNote`). The phone said it from the two picks alone.
+   */
+  const clubCollision = isRaceGoal && state.runClubIntensity === 'quality'
+    ? readout?.race_week_note ?? null
+    : null;
   /**
    * Level card: a tier and a weekly mileage. ⚠️ THE LONGEST RUN IS NOT GATED (2026-08-06) — it is
    * no longer prefilled, and requiring a number we stopped supplying would turn "I don't have one"
@@ -3165,26 +3132,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * they are under a 27-mile floor — the same unit slip the bike card's "hours, not miles" note was
    * written to catch, in the other direction.
    */
-  const typedMilesCanonical = typeof state.targetMiles === 'number' && state.targetMiles > 0
-    ? (unit === 'km' ? state.targetMiles / 1.609344 : state.targetMiles)
-    : null;
-  const milesVerdict = isRaceGoal && state.fitness
-    ? validateWeeklyMiles(RACE_DISTANCE_API[state.raceDistance] ?? '', state.fitness, typedMilesCanonical)
-    : null;
-  /** Floor + week-1 long run back in the athlete's unit, for the copy. Miles in, display unit out. */
-  const toDisplayMi = (mi: number) => Math.round(unit === 'km' ? mi * 1.609344 : mi);
-  const milesFloorDisplay = milesVerdict ? Math.ceil(unit === 'km' ? milesVerdict.requiredMi * 1.609344 : milesVerdict.requiredMi) : null;
-  const longRunDisplay = milesVerdict ? toDisplayMi(milesVerdict.longRunWeek1Mi) : null;
-  const typedLongRunCanonical = typeof state.longRunMiles === 'number' && state.longRunMiles > 0
-    ? (unit === 'km' ? state.longRunMiles / 1.609344 : state.longRunMiles)
-    : null;
+  // ⛔ THE SERVER SENDS EACH DISTANCE IN BOTH UNITS, ROUNDED AS PRINTED — the phone picks one.
+  const du: 'mi' | 'km' = unit === 'km' ? 'km' : 'mi';
+  const milesVerdict = isRaceGoal && state.fitness ? raceIntake?.weekly ?? null : null;
+  const milesFloorDisplay = milesVerdict ? milesVerdict.floor[du] : null;
+  const longRunDisplay = milesVerdict ? milesVerdict.long_run_week1[du] : null;
   /** The soft signal — what they entered vs what the tier assumes. Null when they agree. */
-  const mismatchNote = state.fitness
-    ? tierMismatchNote(state.fitness as IntakeTier, {
-        weeklyMi: typedMilesCanonical,
-        longRunMi: typedLongRunCanonical,
-      })
-    : null;
+  const mismatchNote = isRaceGoal && state.fitness ? raceIntake?.tier_note ?? null : null;
 
   /**
    * ⛔ WHAT THE LONGEST RUN ACTUALLY REACHES ON THIS TIMELINE — stated before the athlete commits.
@@ -3201,22 +3155,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * ⚠️ IT IS NOT A WALL and it is not conditional on the mileage floor. The two say different
    * things: the floor is about the week the block opens on, this is about the run it ends on.
    */
-  const longRunReach = isRaceGoal && state.fitness && planWeeks
-    ? longRunCeiling(
-        RACE_DISTANCE_API[state.raceDistance] ?? '', state.fitness, planWeeks, typedLongRunCanonical,
-        { startDateISO: state.startDate, raceDateISO: state.raceDate },
-      )
-    : null;
-  const typicalPeak = TYPICAL_PEAK_LONG_RUN_MI[RACE_DISTANCE_API[state.raceDistance] ?? ''] ?? null;
   /**
-   * ⛔ AND THE HALF IS OFFERED ONLY WHEN IT IS TRUE. "The same weeks build a half" is a claim about
-   * the athlete, not about the distance: on 10 weeks off a 6-mile long run the half arc comes up
-   * short as well, and offering it then is the same silent over-promise one distance down.
+   * ⛔ AND THE HALF IS OFFERED ONLY WHEN IT IS TRUE — `half_full_arc`, the server's `longRunCeiling`
+   * on the half for the same weeks and the same entry long run.
    */
-  const halfReach = longRunReach?.shortOfTable && state.fitness
-    ? longRunCeiling('half', state.fitness, planWeeks ?? 0, typedLongRunCanonical,
-        { startDateISO: state.startDate, raceDateISO: state.raceDate })
-    : null;
+  const longRunReach = isRaceGoal && state.fitness && planWeeks ? raceIntake?.long_run ?? null : null;
 
   /**
    * ⛔ THE MILEAGE FLOOR IS ADVISORY. IT WARNS AND IT DOES NOT REFUSE. Michael's call, 2026-08-04:
@@ -3526,33 +3469,81 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * ⚠️ TODAY, NOT THE BLOCK'S START DATE. The window is the last 28 days of what the athlete has
    * actually done, which is a fact about now.
    */
-  const demonstratedRun = useMemo(
-    () => demonstratedRunVolume((ctxWorkouts ?? []) as never, new Date().toISOString().slice(0, 10)),
-    [ctxWorkouts],
-  );
   /**
-   * ⛔ WHAT THEY ACTUALLY DID PER SPORT, IN MINUTES — the low-volume tier's gate, and the same
-   * measure the engine uses. ⚠️ Minutes rather than miles because that is the unit the frame answers
-   * in; the mileage figure above still feeds the ADVANCED tier, which is a different question.
+   * ⛔⛔ THE INTAKE READOUT (2026-09-10, audit H-W05, H-P06, H-W10, H-P07). The endurance step and the
+   * race and level steps ask `create-goal` for their numbers with `preview_scope: 'intake'`, which
+   * answers without composing the block. Asked again 400 ms after an answer those numbers depend on
+   * changes. `intakeFresh` is the readout only when it was asked for the answers now on screen — the
+   * gates and the effects that write state read that; the cards print the last readout and check
+   * row by row that it still describes what they show.
+   * ⚠️ THE PHONE'S 28-DAY HISTORY READ AND ITS EXPERIENCE-CHIP ARITHMETIC ARE DELETED — the history
+   * line and the chip numbers come back in this readout.
    */
-  const demonstratedMinutes = useMemo(() => {
-    const asOf = new Date().toISOString().slice(0, 10);
-    return {
-      run: demonstratedWeeklyMinutes((ctxWorkouts ?? []) as never, asOf, 'run').weeklyMinutes,
-      ride: demonstratedWeeklyMinutes((ctxWorkouts ?? []) as never, asOf, 'ride').weeklyMinutes,
-    };
-  }, [ctxWorkouts]);
+  const intakeAsk: string | null = (() => {
+    if (!state.goal) return null;
+    if (currentStep === 'endurance') {
+      return JSON.stringify({
+        frame: wizardFrame,
+        slots: slotSportsNow,
+        picks: state.hardDays.map((h) => [
+          (h as { slot?: string }).slot ?? null, (h as { archetype?: string }).archetype ?? null,
+        ]),
+        experience: state.enduranceExperience ?? null,
+        start: state.startDate ?? null,
+      });
+    }
+    if (isRaceGoal && (currentStep === 'race' || currentStep === 'level')) {
+      return JSON.stringify({
+        date: state.raceDate, distance: state.raceDistance, fitness: state.fitness,
+        miles: state.targetMiles, longRun: state.longRunMiles, start: state.startDate,
+        intent: state.raceIntent, unit,
+      });
+    }
+    return null;
+  })();
+  const intakeFresh = intakeAsk != null && intakeAsk === intakeKey ? readout?.intake ?? null : null;
+  useEffect(() => {
+    if (!intakeAsk) return;
+    let cancelled = false;
+    const step = currentStep;
+    const t = setTimeout(() => {
+      void fetchIntakeReadout(payloadNow()).then((r) => {
+        if (cancelled) return;
+        setReadout((prev) => ({
+          ...(prev ?? {}),
+          ...(step === 'endurance' ? { intake: r?.intake ?? null } : { race_intake: r?.race_intake ?? null }),
+        }));
+        setIntakeKey(r ? intakeAsk : null);
+      });
+    }, 400);
+    return () => { cancelled = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intakeAsk]);
   /**
-   * ⛔⛔ THE TWO EXPERIENCE CHIPS' OWN NUMBERS, COMPUTED FROM THE SLOTS (2026-08-27). Read here as
-   * well as in the card because the SCREEN needs them for two jobs the card cannot do: gating
-   * Continue, and falling the selection back when the hours drop under the top tier's minimum.
-   * ⚠️ ONE OWNER, READ TWICE — `experienceChips` is the same function the card renders from, so the
-   * number the athlete sees and the number the gate tests cannot come apart.
+   * ⛔⛔ THE TWO EXPERIENCE CHIPS' NUMBERS ARE THE SERVER'S (2026-09-10, audit H-W05) — the readout the
+   * card prints, read here for the two jobs the card cannot do: gating Continue, and falling the
+   * selection back when the hours drop under the top tier's minimum. Only a readout for the answers
+   * on screen counts.
    */
-  const experienceOptions = useMemo(
-    () => experienceChips(slotSportsNow, { baselines: (baselinesRow ?? {}) as never, frame: wizardFrame }),
-    [slotSportsNow, baselinesRow, wizardFrame],
-  );
+  const experienceOptions = intakeFresh?.experience_chips ?? { run: null, ride: null };
+  /**
+   * ⛔⛔ A LENGTH THE NEW SPORT CANNOT BUILD IS DROPPED — when the readout for the new answers arrives,
+   * against the lengths it offers that row. Found on the rendered page: a 2h30 long RIDE, switched to
+   * a long RUN, would have gone to the composer and built a 100-minute run under a screen promising
+   * two and a half hours. ⚠️ Dropped rather than clamped: they chose a length for a ride.
+   * ⚠️ ONLY WHERE THE ROWS CARRY A PICKER — the day-ordered frames. The Run + Strength screen seeds
+   * its own two lengths from the same readout.
+   */
+  useEffect(() => {
+    if (currentStep !== 'endurance' || !intakeFresh || rotateOnlyRunPath(state) || !weekIsDayOrdered(wizardFrame)) return;
+    const mins = state.slotMinutes ?? {};
+    const kept: Partial<Record<SlotKey, number>> = {};
+    for (const [k, v] of Object.entries(mins)) {
+      if ((intakeFresh.rows[k as SlotKey]?.length_options ?? []).includes(Number(v))) kept[k as SlotKey] = Number(v);
+    }
+    if (Object.keys(kept).length !== Object.keys(mins).length) setState((st) => ({ ...st, slotMinutes: kept }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intakeFresh]);
   /** The sports that actually fill a slot. ⚠️ A sport the athlete keeps but whose slots carry none
    *  of it has nothing for the answer to size, so it has no chips and no question. */
   const experienceSportsWithSlots: SlotSport[] = (['run', 'ride'] as const)
@@ -3652,46 +3643,43 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * reset to 75 on the next render.
    */
   const rotateOnlyRun = rotateOnlyRunPath(state);
-  const longRunOptions = useMemo(
-    () => (rotateOnlyRun
-      ? longRunLengthOptions(slotSportsNow, { baselines: baselinesRow, frame: wizardFrame })
-      : []),
-    [rotateOnlyRun, wizardFrame, slotSportsNow, baselinesRow],
-  );
+  /**
+   * ⛔ THE TWO LENGTHS ARE THE SERVER'S (2026-09-10, audit H-P06): the frame's easy-run minutes and
+   * long-run default, and the long-run chips the `run_lsd` ladder builds up to the frame's ceiling.
+   */
+  const runStrengthWeek = rotateOnlyRun ? intakeFresh?.run_strength_week ?? null : null;
   React.useEffect(() => {
-    if (!rotateOnlyRun) return;
-    const seedLong = longRunDefaultMinutes(longRunOptions);
+    if (!runStrengthWeek) return;
+    const seedLong = runStrengthWeek.long_run_default;
+    const easy = runStrengthWeek.easy_run_minutes;
     setState((st) => {
       const now = st.slotMinutes ?? {};
-      const needEasy = Number(now.easy) !== EASY_RUN_FIXED_MIN;
+      const needEasy = Number(now.easy) !== easy;
       const needLong = seedLong != null && !(Number(now.long) > 0);
       if (!needEasy && !needLong) return st;
       return {
         ...st,
         slotMinutes: {
           ...now,
-          ...(needEasy ? { easy: EASY_RUN_FIXED_MIN } : {}),
+          ...(needEasy ? { easy } : {}),
           ...(needLong ? { long: seedLong } : {}),
         },
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rotateOnlyRun, longRunOptions.join(',')]);
+  }, [runStrengthWeek?.easy_run_minutes, runStrengthWeek?.long_run_default]);
   /** ⛔ THE ONE GATE ON THAT SCREEN — a length the chips actually offer, so a stale value cannot pass. */
   const longRunAnswered = !rotateOnlyRun
-    || (state.slotMinutes?.long != null && longRunOptions.includes(state.slotMinutes.long));
+    || (state.slotMinutes?.long != null
+      && (runStrengthWeek?.long_run_options ?? []).includes(state.slotMinutes.long));
 
   const experienceUnanswered: SlotSport[] = experienceAsked
     .filter((sp) => state.enduranceExperience?.[sp] !== 'newer'
       && state.enduranceExperience?.[sp] !== 'experienced');
 
-  const tierLine = useMemo(() => {
-    const vol = demonstratedRun;
-    const extra = advancedTierSessions(vol.weeklyMiles);
-    if (extra <= 0) return null;
-    return `Your history supports a ${4 + extra}-session endurance week — ${extra} extra easy `
-      + `run${extra === 1 ? '' : 's'} (${vol.source}).`;
-  }, [demonstratedRun]);
+  // ⛔ THE HISTORY LINE IS THE SERVER'S (2026-09-10, audit H-W10) — counted 35 days back from the block's
+  // start, the window the composer's tier gate reads, not from the workouts this screen had loaded.
+  const tierLine = intakeFresh?.tier_line ?? null;
 
   /** ⛔ ONE LONG SESSION, ONE PIN (B1). When the long slot is a ride, a stale long-RUN pin is the
    *  phantom pref that reached a built goal ("Long Run: sunday" on a week with no long run). */
@@ -3875,63 +3863,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     return { runs, rides: keys.length - runs };
   })();
 
-  /**
-   * ⛔ THE FIXED-HOURS SENTENCE, PER SPORT — the one line the volume fields carry. Built from the
-   * athlete's current slot picks so it moves as they change a sport.
-   * ⚠️ NULL UNTIL EVERY SLOT IS ANSWERED, and null when the sport fixes nothing in this week.
-   */
-  const enduranceAnchorsNow = React.useMemo(
-    () => resolveEnduranceAnchors((baselinesRow ?? {}) as never),
-    [baselinesRow],
-  );
-  const fixedHoursLineFor = (sport: 'run' | 'ride'): string | null => {
-    if (!allSlotsChosen(slotSportsNow, wizardFrame)) return null;
-    /**
-     * ⛔ THE EXPERIENCE ANSWER APPLIES HERE TOO. This sentence names the hours the week FIXES, and
-     * the engine builds those sessions at the levels the answer picks — quoting the frame's printed
-     * levels to an athlete whose block is built at the smaller ones is the screen lying about the
-     * plan.
-     * ⚠️ THE INPUT MOVED ON 2026-08-27. It was the athlete's last 28 days of logged training,
-     * compared against the frame's own floor; history is out of the level entirely now.
-     */
-    const tierLevels = experienceLevels(state.enduranceExperience);
-    /**
-     * ⛔⛔ THE FRAME'S OWN FAMILIES, NOT `SLOT_FAMILY` (fixed 2026-08-30). This walked the CHOSEN
-     * frame's row keys and looked each one up in the 5K frame's four-entry map, so `hard3` came back
-     * undefined and reading `.family` off it took the whole app to a blank screen. It runs only once
-     * every row is answered, which is why it fired on the fifth tap.
-     * ⚠️ AND `builtFamily` REPLACES THE RAW `RIDE_EQUIVALENT` LOOKUP: that table maps RUN families to
-     * ride ones and has no entry for a slot the frame already prescribes as a ride, so the old line
-     * would have resolved p274's two rides to nothing even with the map fixed.
-     */
-    const families = familyMapFor(wizardFrame);
-    const specs = slotKeysFor(wizardFrame).map((k) => {
-      const s = slotSportsNow[k];
-      if (!s) return null;
-      const fam = families[k];
-      if (!fam) return null;
-      const eq = builtFamily(fam, s);
-      if (!eq) return null;
-      const family = eq.family;
-      return {
-        key: k,
-        spec: {
-          family,
-          level: (tierLevels[family] as typeof fam.level | undefined) ?? fam.level,
-          archetype: eq.archetype,
-          sport: s,
-        },
-      };
-    }).filter(Boolean) as Array<{ key: SlotKey; spec: SlotSpec }>;
-    const spans = slotSpans(specs.map((x) => x.spec), enduranceAnchorsNow);
-    const keyOf = (span: { spec: SlotSpec }) => specs.find((x) => x.spec === span.spec)?.key;
-    return fixedHoursLine(
-      spans,
-      sport,
-      (span) => hardSlotKeysFor(wizardFrame).includes(keyOf(span) as SlotKey),
-      (span) => keyOf(span) === 'long',
-    );
-  };
+  // ⛔ `fixedHoursLineFor` IS DELETED (2026-09-10, audit H-W05). It assembled the frame's families, levels
+  // and spans on the phone to write a sentence the card had already stopped printing (its props were
+  // passed and never read).
 
   const payloadNow = () => {
     // canonicalize the typed mileage (display unit → miles) before it leaves the client
@@ -4017,6 +3951,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           .filter((c) => !!c && typeof c.text === 'string')
         : [],
     );
+    // ⛔ WHAT THE SERVER SAYS ABOUT THIS WEEK (2026-09-10, audit H-P05, H-W06, H-P07): the sample week's
+    // counts and sentences, the club-night note, and the race intake's numbers for these answers.
+    const r = (plan as { _readout?: BuilderReadout } | null)?._readout ?? null;
+    setReadout((prev) => ({
+      ...(prev ?? {}),
+      week_one: r?.week_one ?? null,
+      race_week_note: r?.race_week_note ?? null,
+      ...(r?.race_intake ? { race_intake: r.race_intake } : {}),
+    }));
     setPreviewing(false);
   };
 
@@ -4059,7 +4002,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   }, [currentStep, state.hardDays.length, hardDayAvailable]);
 
   React.useEffect(() => {
-    if (currentStep !== 'schedule') return;
+    // ⛔ AND ON THE RACE WEEK CARD (2026-09-10, audit H-W06): the club-night note is read off the week
+    // this preview builds, so the card asks for it as the days are picked.
+    if (currentStep !== 'schedule' && !(isRaceGoal && currentStep === 'days')) return;
     // ⚠️ NO LONG-DAY PRECONDITION ANY MORE (2026-09-10): with no tap the server places the long
     // session, and the long row prints that day from this preview.
     const t = setTimeout(() => { void runPreview(); }, 400);
@@ -4083,7 +4028,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   }, [currentStep, state.longRunDay, state.longRideDay, state.runDays, state.rideDays,
       state.qualityDays, state.hardDays, state.targetMiles, state.targetRunHours, state.rideHours,
       // ⚠️ THE EXPERIENCE ANSWER CHANGES EVERY HARD SESSION'S LENGTH, so it changes the preview.
-      unavailableDays, state.slotSports, state.swimEasySessions, state.enduranceExperience]);
+      unavailableDays, state.slotSports, state.swimEasySessions, state.enduranceExperience,
+      state.runClubIntensity, state.trainingDays]);
 
   /**
    * ⛔ THE CONFIRM SCREEN SHOWS THE WEEK, NOT A BUTTON THAT OFFERS ONE. Michael, 2026-07-29:
@@ -4430,13 +4376,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   race (its race-support and bridge-peak modes cap at 2 and 6 weeks). Stating a
                   number this screen cannot guarantee as though it were fixed is the failure this
                   file keeps having; the hedge is the honest half. */}
-              {raceWeeks !== null && planWeeks !== null && (
+              {planWeeks !== null && (
                 <p className="text-white/70 text-sm mt-1.5">
                   About {planWeeks} week{planWeeks === 1 ? '' : 's'} of training
-                  {planWeeks === 20 ? ' — the longest block we build to a single race.' : '.'}
+                  {raceIntake?.weeks_at_cap ? ' — the longest block we build to a single race.' : '.'}
                 </p>
               )}
-              {state.raceDate && raceWeeks === null && (
+              {state.raceDate && raceIntake?.date_passed && (
                 <p className="text-amber-400/70 text-sm mt-1.5">That date has already passed.</p>
               )}
             </div>
@@ -4534,7 +4480,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     // ⛔ RESEED ON EVERY TAP, INCLUDING A RE-TAP. Someone who edits, changes their
                     // mind about the tier, and comes back expects the new tier's numbers — not
                     // their edits to the old one silently kept under a different heading.
-                    targetMiles: TIER_SEEDS[t.id].weeklyMi,
+                    // ⚠️ THE SEED IS THE SERVER'S (audit H-P07); with no readout yet the field is left as it is.
+                    targetMiles: raceIntake?.tier_seeds?.[t.id]?.weeklyMi ?? st.targetMiles,
                     // ⛔ THE LONG-RUN SEED IS GONE (2026-08-06). It stayed prefilled at the tier's
                     // number — 6 for a beginner — and that number is not decoration: it is the rung
                     // `buildLongRunArc` enters the table at, so an athlete who never touched the
@@ -4642,19 +4589,19 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 {/* ⛔ THE CEILING, STATED. Where the block's longest run lands, against what the
                     distance normally asks for. Fact, then consequence, then the alternative — no
                     instruction, and no wall: they continue either way. */}
-                {longRunReach?.shortOfTable && typicalPeak && planWeeks && (
+                {longRunReach?.short_of_table && longRunReach.typical && planWeeks && (
                   <div className="rounded-lg border border-white/12 bg-white/[0.03] p-2.5">
                     <p className="text-white/85 text-xs leading-relaxed">
                       Over {planWeeks} weeks from where you are now, the longest run in this block
-                      reaches about {toDisplayMi(longRunReach.peakLongRunMi)} {unit}. Most{' '}
-                      {state.raceDistance.toLowerCase()} plans peak at {toDisplayMi(typicalPeak[0])}{' '}
-                      to {toDisplayMi(typicalPeak[1])}.
+                      reaches about {longRunReach.peak[du]} {unit}. Most{' '}
+                      {state.raceDistance.toLowerCase()} plans peak at {longRunReach.typical[0][du]}{' '}
+                      to {longRunReach.typical[1][du]}.
                     </p>
                     <p className="text-white/60 text-xs mt-1.5 leading-relaxed">
                       The block builds and tapers either way, and the last long run sits two to three
                       weeks before race day. The gap shows up late in the race, over the distance
                       nothing in training covered.
-                      {halfReach && !halfReach.shortOfTable
+                      {longRunReach.half_full_arc
                         ? ' The same weeks build a half marathon to its full arc.'
                         : ''}
                     </p>
@@ -5917,8 +5864,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         >
           <RunStrengthWeekCard
             frame={wizardFrame}
-            slots={slotSportsNow}
-            baselines={baselinesRow}
+            readout={runStrengthWeek}
             slotMinutes={state.slotMinutes}
             onSlotMinutes={(key, minutes) => setState((st) => ({
               ...st,
@@ -5955,7 +5901,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
            * ⚠️ AND THE LENGTH GATE IS EMPTY ON `strength_5k` BY CONSTRUCTION — `unansweredLengths`
            * asks the frame, and a frame with no picker offers no row to leave blank.
            */
-          canContinue={allSlotsChosen(slotSportsNow, wizardFrame)
+          // ⚠️ AND ON THE SERVER'S READOUT FOR THESE ANSWERS (2026-09-10, audit H-W05): the experience
+          // question and the length rows are only known once it has answered.
+          canContinue={intakeFresh != null
+            && allSlotsChosen(slotSportsNow, wizardFrame)
             && experienceUnanswered.length === 0
             && (!weekIsDayOrdered(wizardFrame)
               || unansweredLengths(slotSportsNow, state.slotMinutes, wizardFrame).length === 0)}
@@ -5982,6 +5931,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           <EnduranceWeekCard
             // ⛔ THE ROWS ARE THE FRAME'S — how many, what each is for, and which day it lands on.
             frame={wizardFrame}
+            // ⛔ AND EVERY NUMBER ON THEM IS THE SERVER'S — the last intake readout (audit H-W05).
+            intake={readout?.intake ?? null}
             allowedSports={allowedSlotSports.length > 0 ? allowedSlotSports : undefined}
             slots={slotSportsNow}
             /** ⛔ THE SAME ANSWER THE ENGINE BUILDS THE LEVELS FROM, so the hours this screen quotes
@@ -6038,19 +5989,13 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 hard2: (order.hard2 ?? null) as SlotSport | null,
               };
               /**
-               * ⛔⛔ AND A LENGTH THE NEW SPORT CANNOT BUILD IS DROPPED — see `prunedSlotMinutes`.
-               * Found on the rendered page: a 2h30 long RIDE, switched to a long RUN, left the row
-               * reading 2h30 over a picker offering 1h08 to 1h40, and the stale 150 would have gone
-               * to the composer and built a 100-minute run under a screen promising two and a half
-               * hours. ⚠️ Dropped rather than clamped: they chose a length for a ride, and clamping
-               * would answer for the run a question they have not been asked.
+               * ⛔⛔ A LENGTH THE NEW SPORT CANNOT BUILD IS DROPPED when the server's readout for the new
+               * answers arrives — see the effect beside `intakeFresh`. Until then the row prints no
+               * length (its readout names the old sport) and Continue waits.
                */
-              const minutes = prunedSlotMinutes(slots, st.slotMinutes, {
-                baselines: (baselinesRow ?? {}) as never, frame: wizardFrame,
-              });
               // ⛔ THE HARD SLOTS' SESSIONS FOLLOW THEIR SPORT — see `syncHardDays`. Without this the
               // card would offer ride sessions on a slot the engine still had down as a run.
-              return { ...st, slotSports: slots, slotMinutes: minutes, hardDays: syncHardDays(st, slots) };
+              return { ...st, slotSports: slots, hardDays: syncHardDays(st, slots) };
             })}
             /**
              * ⛔ THE SESSION CHOICES, INSIDE THE SLOT THEY BELONG TO (restored 2026-08-24). Same
@@ -6242,18 +6187,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 />
               );
             }}
-            /**
-             * ⛔ THE ENGINE WRITES THE SENTENCE, THIS SCREEN RENDERS IT (§3c, 2026-08-26).
-             * `fixedHoursLine` reads the same slot picks the composer will, so the hours named here
-             * and the hours the block states afterwards cannot come apart — which is the
-             * ask-15-get-20 defect the whole volume ruling exists to end.
-             * ⚠️ QUALITY vs LONG is read off the FRAME's own slot roles, not off the assigned sport:
-             * the long slot is the long slot whichever discipline fills it.
-             */
-            runFixedLine={fixedHoursLineFor('run')}
-            rideFixedLine={fixedHoursLineFor('ride')}
-            baselines={baselinesRow}
-            easyPaceSecPerMi={paceMinPerMile ? paceMinPerMile * 60 : null}
             runVolume={state.targetRunHours === '' ? '' : String(state.targetRunHours)}
             onRunVolume={(v) => setState((st) => ({
               ...st, targetRunHours: v === '' ? '' : Number(v), targetTouched: true,
@@ -6372,20 +6305,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     anchor concept. ⚠️ AND IT READS THE PIN LIVE RATHER THAN A SNAPSHOT: the long-day
                     toggle lives on the SCHEDULE step, two screens away, so a cached string would go
                     stale the moment the athlete walked back and cleared one. */}
-                {(() => {
-                  const miles = typeof state.targetMiles === 'number' && state.targetMiles > 0
-                    ? state.targetMiles : 0;
-                  const note = splitNote({
-                    total: miles,
-                    sessions: state.runDays,
-                    hasLongDay: !!state.longRunDay,
-                    fmt: (n) => `${roundMiles(n)} ${unit === 'km' ? 'km' : 'mi'}`,
-                    noun: 'run',
-                  });
-                  return note ? (
-                    <p className="text-white/70 text-sm mt-1.5 leading-relaxed">{note}</p>
-                  ) : null;
-                })()}
+                {/* ⛔ THE 55% SPLIT LINE IS DELETED (2026-09-10, audit H-T23). The week the server builds
+                    is the only statement of each run's distance. */}
                 <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
                   A week you can hit when work is bad, not your best one.
                 </p>
@@ -6468,21 +6389,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   {/* ⚠️ THE SAME HELPER AS THE RUN NOW. This computed its own even split inline —
                       correct while every ride was equal, and blind to the long ride the athlete had
                       pinned two screens away. One function, one rule, both sports. */}
-                  {(() => {
-                    const mins = Number(state.rideHours) > 0 ? Number(state.rideHours) * 60 : 0;
-                    const note = splitNote({
-                      total: mins,
-                      sessions: state.rideDays,
-                      hasLongDay: !!state.longRideDay,
-                      fmt: (n) => {
-                        const r = roundRideMinutes(n);
-                        const h = Math.floor(r / 60); const mm = r % 60;
-                        return h > 0 ? (mm ? `${h}h${String(mm).padStart(2, '0')}` : `${h}h`) : `${mm} min`;
-                      },
-                      noun: 'ride',
-                    });
-                    return note ?? 'Hours, not distance — terrain and wind make ride distance a poor measure.';
-                  })()}
+                  {/* ⛔ THE 55% SPLIT IS DELETED (2026-09-10, audit H-T23); the sentence it fell back to stays. */}
+                  Hours, not distance — terrain and wind make ride distance a poor measure.
                 </p>
               </div>
             )}
@@ -7119,7 +7027,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 </div>
                 {previewWeek && previewWeek.length > 0 ? (
                   <div className={previewing ? 'opacity-40 transition-opacity' : 'transition-opacity'}>
-                    <WeekGrid sessions={previewWeek} notes={[]} title="Sample week — week 1" />
+                    <WeekGrid sessions={previewWeek} notes={[]} title="Sample week — week 1" summary={readout?.week_one ?? null} />
                   </div>
                 ) : previewing ? (
                   <p className="text-white/50 text-sm">Building your week…</p>
@@ -7235,7 +7143,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 {milesVerdict?.ok === true && (
                   <p className="text-white/70 text-sm mt-1.5 leading-relaxed">
                     Week one starts near this, with a {longRunDisplay}-{unit} long run — about{' '}
-                    {milesVerdict.sharePct}% of the week.
+                    {milesVerdict.share_pct}% of the week.
                   </p>
                 )}
                 {/* ⛔ THE BASE-BUILD NOTICE — AND IT IS A NOTICE, NOT A REFUSAL (Michael, "warn, no
@@ -7653,7 +7561,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     // line, same compromise sentences, so the athlete learns it once. It also owns
                     // the endurance budget, which is DERIVED from the lifting frequency rather than
                     // hardcoded, so it stays true if the block ever runs 3 lifting days.
-                    return <WeekGrid sessions={previewWeek} notes={previewNotes} title="Sample week — week 1" />;
+                    return <WeekGrid sessions={previewWeek} notes={previewNotes} title="Sample week — week 1" summary={readout?.week_one ?? null} />;
                   })()}
                 </div>
               )}

@@ -65,6 +65,9 @@ import {
   type WorkingNumber,
   type TestedLift,
 } from '../_shared/standing-plan/index.ts';
+// The endurance intake's numbers (2026-09-10, audit H-W05): the builder prints them from the preview.
+import { enduranceIntakeReadout, rowKeyedFromFrameKeys } from '../_shared/standing-plan/intake-readout.ts';
+import { slotsForEngine } from '../../../src/lib/standing-plan-week-bounds.ts';
 /**
  * ⛔ THE ONE OWNER OF THE TRUSTED-REP CEILING (`_shared/strength/trusted-reps.ts`) — 8 reps general, 5 on the
  * deadlift, with LeSuer 1997 / Reynolds 2006 / Mayhew 2008 written out at the site. The skip check
@@ -115,6 +118,22 @@ const corsHeaders = {
 
 function json(obj: unknown, status: number): Response {
   return new Response(JSON.stringify(obj), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+}
+
+/**
+ * The endurance screen's per-row sport answers (`endurance_slot_answers`, keyed `hard1`…`long`).
+ * Validated, not trusted: an unknown row or a value other than run/ride drops the whole map.
+ */
+function slotAnswersFromBody(body: unknown): Partial<Record<'hard1' | 'hard2' | 'hard3' | 'easy' | 'long', 'run' | 'ride'>> | null {
+  const raw = (body as Record<string, unknown> | null)?.endurance_slot_answers;
+  if (!raw || typeof raw !== 'object') return null;
+  const rows = new Set(['hard1', 'hard2', 'hard3', 'easy', 'long']);
+  const out: Record<string, 'run' | 'ride'> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!rows.has(k) || (v !== 'run' && v !== 'ride')) return null;
+    out[k] = v;
+  }
+  return Object.keys(out).length > 0 ? out : null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -493,6 +512,17 @@ Deno.serve(async (req: Request) => {
          * map, so the dial assigns rather than a half-applied answer taking effect.
          */
         slots: (() => {
+          /**
+           * ⛔ THE SCREEN'S OWN ROW ANSWERS COME FIRST (2026-09-10, audit H-W05). The builder sends
+           * `endurance_slot_answers` keyed by its rows and the mapping onto the frame's keys — with an
+           * unadded hard row sent as `'none'` — happens here, not on the phone. `endurance_slots` is
+           * still read for goals stored before the change.
+           */
+          const answers = slotAnswersFromBody(body);
+          if (answers) {
+            const mapped = slotsForEngine(answers, frameId);
+            return Object.keys(mapped).length > 0 ? mapped as Record<string, 'run' | 'ride'> : null;
+          }
           const raw = (body as Record<string, unknown>).endurance_slots;
           if (!raw || typeof raw !== 'object') return null;
           const out: Record<string, 'run' | 'ride'> = {};
@@ -543,6 +573,46 @@ Deno.serve(async (req: Request) => {
         });
         return long?.[1]?.sport ?? 'run';
       })();
+
+      /**
+       * ⛔ THE ENDURANCE INTAKE'S NUMBERS (2026-09-10, audit H-W05, H-P06, H-W10) — every length, fixed
+       * dose, chip number and the history line the endurance step prints, from the answers so far.
+       * `preview_scope: 'intake'` returns them without composing the block, which is what the step
+       * asks for on every tap; a full preview carries them too.
+       */
+      const intake = enduranceIntakeReadout({
+        frame: frameId,
+        answers: slotAnswersFromBody(body)
+          ?? rowKeyedFromFrameKeys(frameId, (body as Record<string, unknown>).endurance_slots as Record<string, 'run' | 'ride'> | null),
+        archetypes: rowKeyedFromFrameKeys(
+          frameId,
+          (() => {
+            const raw = (body as Record<string, unknown>).endurance_slot_archetypes;
+            if (!raw || typeof raw !== 'object') return null;
+            const out: Record<string, string> = {};
+            for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+              if (typeof v === 'string' && v) out[k] = v;
+            }
+            return out;
+          })(),
+        ),
+        experience: (() => {
+          const raw = (body as Record<string, unknown>).endurance_experience;
+          if (!raw || typeof raw !== 'object') return null;
+          const out: Record<string, string> = {};
+          for (const sp of ['run', 'ride'] as const) {
+            const v = (raw as Record<string, unknown>)[sp];
+            if (v === 'newer' || v === 'experienced') out[sp] = v;
+          }
+          return out as never;
+        })(),
+        baselines: ub,
+        easyPaceSecPerMi: easyPaceMin != null ? easyPaceMin * 60 : null,
+        demonstrated,
+      });
+      if (preview === true && (body as Record<string, unknown>).preview_scope === 'intake') {
+        return json({ success: true, plan_id: null, plan: null, intake }, 200);
+      }
 
       /**
        * ⛔⛔ THE DAYS THE ATHLETE CANNOT TRAIN — A PIN, AND UNTIL NOW IT NEVER LEFT THE CLIENT
@@ -904,7 +974,7 @@ Deno.serve(async (req: Request) => {
          * question the screen would still have to render an answer to.
          */
         return json({
-          success: true, plan_id: null, plan: row, phase_structure: row.phaseStructure,
+          success: true, plan_id: null, plan: row, phase_structure: row.phaseStructure, intake,
         }, 200);
       }
 
