@@ -183,6 +183,14 @@ Mockup: docs/mockups/week-view-2026-09-09.html. Build what it shows with the app
   and hold a session line to drag it to another day (§3e.3 move).
 - No new words beyond `Done`, `Planned`, `Rest`.
 
+## 3g. LOAD off Today (Michael, 2026-09-09, go)
+
+The LOAD card (fitness / fatigue / form, run / bike / lifted, the bars deck) comes off Today. State keeps
+its own load plate; the Week tab's bar carries the week's hours and miles. On Today, one line in the
+header block, right of the weather rows: `form −21 · optimal`, the word in the status colour (formZoneColor),
+number white. Tap it opens State. Nothing else of the card remains on Today. `WeekLoadCard` and the
+LOAD deck: delete if no other screen renders them.
+
 ## 4. Out of scope
 
 - WORKORDER-kill-ours and WORKORDER-de-row-by-feel (separate, may land first or after).
