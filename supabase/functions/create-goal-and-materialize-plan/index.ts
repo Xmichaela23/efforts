@@ -18,6 +18,10 @@ import {
   resolveMarathonMinWeeksFromMemory,
 } from '../_shared/athlete-memory.ts';
 import { getArcContext, type ArcContext } from '../_shared/arc-context.ts';
+// ⛔ ONE RULE EACH, shared with get-arc-context's intake readout so the builder prints what this gate
+// and this limiter decide (2026-09-10).
+import { hasPaceBenchmark } from '../_shared/pace-benchmark.ts';
+import { inferLimiterSportFromArc } from '../_shared/limiter-sport.ts';
 import { inferTrainingFitnessLevel, deriveSwimFitness } from '../_shared/infer-training-fitness.ts';
 import {
   computeRunPlanningSignals,
@@ -726,26 +730,7 @@ async function buildRunObservedFitness(
   }
 }
 
-function inferLimiterSportFromArc(arc: ArcContext): 'swim' | 'bike' | 'run' {
-  const swim = arc.swim_training_from_workouts;
-  if (swim && swim.completed_swim_sessions_last_90_days === 0) return 'swim';
-  /**
-   * ⛔ THROUGH THE FTP RESOLVER (2026-08-19, TRUTH-MAP §5). This read the learned estimate's
-   * `confidence` raw and called the bike the limiter whenever it was `low` — including for an athlete
-   * who had TYPED an FTP. A number the athlete asserted is not a data gap, so the bike was being named
-   * as the weak discipline on the strength of an estimate the app was not even using.
-   *
-   * The resolver reports `low` only when a low-confidence learned value is genuinely what it landed on
-   * (its `learned-low` tier) — i.e. exactly when there is nothing better.
-   */
-  const resolvedFtp = resolveCurrentFtp({
-    learned_fitness: arc.learned_fitness, performance_numbers: arc.performance_numbers,
-  } as never);
-  if (resolvedFtp.source === 'learned-low' || (resolvedFtp.value == null && arc.learned_fitness)) {
-    return 'bike';
-  }
-  return 'run';
-}
+// `inferLimiterSportFromArc` moved to `_shared/limiter-sport.ts` (2026-09-10).
 
 /**
  * CTL on the combined engine's scale from the last weeks' `athlete_snapshot.workload_total` (load
@@ -3954,13 +3939,7 @@ Deno.serve(async (req: Request) => {
     }
 
     if (goalType === 'speed') {
-      const hasRaceTime = baseline?.effort_source_distance && baseline?.effort_source_time;
-      const hasEffortScore = !!baseline?.effort_score;
-      const hasThresholdPace = !!baseline?.effort_paces?.race;
-      const learnedForGate = parseLearnedFitnessForSeed(baseline?.learned_fitness);
-      const hasLearnedRunPace = learnedPaceUsable(learnedForGate?.run_threshold_pace_sec_per_km)
-        || learnedPaceUsable(learnedForGate?.run_easy_pace_sec_per_km);
-      if (!hasRaceTime && !hasEffortScore && !hasThresholdPace && !hasLearnedRunPace) {
+      if (!hasPaceBenchmark(baseline)) {
         throw new AppError('missing_pace_benchmark', 'Pace benchmark required: enter a recent race result or run quick calibration first.');
       }
     }

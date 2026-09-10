@@ -11,7 +11,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { TrainingPaces } from './effort-score';
 
-/** The subset of `user_baselines` the pace gate reads. */
+/** A `user_baselines` row as the builder reads it. */
 export type PaceBenchmarkRow = {
   effort_score?: number | null;
   effort_source_distance?: number | null;
@@ -20,28 +20,10 @@ export type PaceBenchmarkRow = {
   learned_fitness?: Record<string, unknown> | null;
 } | null | undefined;
 
-/**
- * ⛔ THE SAME PREDICATE THE SERVER USES, AND IT HAS TO STAY THE SAME ONE.
- *
- * `create-goal-and-materialize-plan:3295` refuses a `goal_type: 'speed'` build unless one of four
- * signals is on file. If the intake's idea of "we have a pace" is looser than the server's, the
- * athlete answers a question, walks five more screens, and is turned down at the Build button —
- * which is the dead-end this whole module exists to prevent. If it is tighter, they are asked to
- * calibrate something they already have.
- *
- * ⚠️ Mirrored, not imported: the server predicate is inline in a `@ts-nocheck` handler and cannot
- * be imported from the client. Change one, change both.
- */
-export function hasPaceBenchmark(row: PaceBenchmarkRow): boolean {
-  if (!row) return false;
-  const hasRaceTime = !!row.effort_source_distance && !!row.effort_source_time;
-  const hasEffortScore = !!row.effort_score;
-  const hasThresholdPace = !!row.effort_paces?.race;
-  const lf = (row.learned_fitness ?? {}) as Record<string, unknown>;
-  const usable = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v > 0;
-  const hasLearnedRunPace = usable(lf.run_threshold_pace_sec_per_km) || usable(lf.run_easy_pace_sec_per_km);
-  return hasRaceTime || hasEffortScore || hasThresholdPace || hasLearnedRunPace;
-}
+// ⛔ `hasPaceBenchmark` STOOD HERE AND IS DELETED (2026-09-10, audit item 20). It was the phone's copy of
+// the create-goal speed gate and read learned paces as plain numbers, so a learned pace never counted.
+// The one rule is `supabase/functions/_shared/pace-benchmark.ts`; the builder prints get-arc-context's
+// `builder.has_pace_benchmark`.
 
 /** `mm:ss` → seconds. Returns null on anything else; an unparseable pace is not a zero pace. */
 export function parsePaceInput(s: string): number | null {

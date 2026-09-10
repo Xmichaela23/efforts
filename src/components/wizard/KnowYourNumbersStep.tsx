@@ -20,15 +20,22 @@
  *
  * NO WRITES. This screen reads Baselines and records a choice; it never writes `user_baselines`.
  *
+ * ⛔ THE LIFTS COME FROM THE SERVER (2026-09-10, audit item 20). This screen used to pick each lift
+ * itself — locked, then typed, then learned — while the block prices off the capacity resolver, which
+ * puts trusted learned ahead of typed. The row could print the typed squat over a block built on the
+ * learned one. `strength` is get-arc-context's readout: each lift as the resolver returns it, how many
+ * barbell lifts have a number, and the Use current / Retest default. Until it arrives the Strength row
+ * is not shown.
+ *
  * SOURCES for the words on screen: the 1RM keys and pull-up rep count are Baselines' own
  * (`STRENGTH_LIFT_FIELDS`, Q-102 `0` valid); FTP wording from `resolveCurrentFtp` (learned = from your
- * rides, manual = typed); threshold pace from `resolveCurrentRunThresholdPace`. No number on this
- * screen is computed here.
+ * rides, manual = typed); threshold pace from `resolveCurrentRunThresholdPace`.
  */
 import React from 'react';
 import { StepLayout } from '@/components/wizard/StepLayout';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { resolveCurrentRunThresholdPace } from '@/lib/resolve-current-run-pace';
+import type { IntakeReadout } from '@/lib/intake-readout-types';
 
 export type NumbersChoiceKey = 'strength' | 'ftp' | 'run';
 export type NumbersChoice = Partial<Record<NumbersChoiceKey, 'use' | 'test'>>;
@@ -42,38 +49,15 @@ export type BaselinesRowLike = {
 
 /** Same rows, same keys, same order as Training Baselines' 1RM block. */
 export const LIFT_FIELDS = [
-  { key: 'squat', label: 'Squat', learnedKey: 'squat', reps: false },
-  { key: 'bench', label: 'Bench', learnedKey: 'bench_press', reps: false },
-  { key: 'deadlift', label: 'Deadlift', learnedKey: 'deadlift', reps: false },
-  { key: 'overheadPress1RM', label: 'OHP', learnedKey: 'overhead_press', reps: false },
-  { key: 'pullupMaxReps', label: 'Pull-ups', learnedKey: null, reps: true },
+  { key: 'squat', label: 'Squat', reps: false },
+  { key: 'bench', label: 'Bench', reps: false },
+  { key: 'deadlift', label: 'Deadlift', reps: false },
+  { key: 'overheadPress1RM', label: 'OHP', reps: false },
+  { key: 'pullupMaxReps', label: 'Pull-ups', reps: true },
 ] as const;
 export type LiftKey = (typeof LIFT_FIELDS)[number]['key'];
 
-const num = (v: unknown): number | null => {
-  if (v == null || v === '') return null;
-  const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) ? n : null;
-};
-
-/** One lift's number on file: locked > typed > learned (trusted) — the order Baselines displays. */
-export function liftOnFile(row: BaselinesRowLike, f: (typeof LIFT_FIELDS)[number]): { value: number; source: 'typed' | 'learned' } | null {
-  const pn = (row?.performance_numbers ?? {}) as Record<string, unknown>;
-  const locked = (row?.locked_baselines ?? {}) as Record<string, unknown>;
-  const lf = (row?.learned_fitness ?? {}) as Record<string, unknown>;
-  const lockedV = num(locked[f.key]);
-  if (lockedV != null && lockedV > 0) return { value: Math.round(lockedV), source: 'typed' };
-  const typed = num(pn[f.key]);
-  if (typed != null && (f.reps ? typed >= 0 : typed > 0)) return { value: Math.round(typed), source: 'typed' };
-  if (f.learnedKey) {
-    const s1 = (lf.strength_1rms ?? {}) as Record<string, { value?: unknown; confidence?: unknown }>;
-    const e = s1[f.learnedKey];
-    const v = num(e?.value);
-    const conf = String(e?.confidence ?? '');
-    if (v != null && v > 0 && (conf === 'medium' || conf === 'high')) return { value: Math.round(v), source: 'learned' };
-  }
-  return null;
-}
+export type StrengthOnFile = Pick<IntakeReadout, 'lifts' | 'barbell_lifts_on_file' | 'strength_default'>;
 
 export function formatSecPerMi(sec: number, metric: boolean): string {
   const s = metric ? sec / 1.609344 : sec;
@@ -105,10 +89,12 @@ function Toggle({ k, value, canUse, onSet, useLabel = 'Use current', testLabel =
 }
 
 export function KnowYourNumbersStep({
-  step, totalSteps, row, include, choice, onChoice, onBack, onContinue,
+  step, totalSteps, row, strength, include, choice, onChoice, onBack, onContinue,
 }: {
   step: number; totalSteps: number;
   row: BaselinesRowLike;
+  /** get-arc-context's strength readout; null until it arrives. */
+  strength: StrengthOnFile | null;
   include: NumbersInclude;
   choice: NumbersChoice;
   onChoice: (next: NumbersChoice) => void;
@@ -118,32 +104,30 @@ export function KnowYourNumbersStep({
   const metric = String(row?.units ?? '').toLowerCase() === 'metric';
   const pn = (row?.performance_numbers ?? {}) as Record<string, unknown>;
 
-  // strength — all four barbell lifts are needed to price a block off file; pull-ups ride along (Q-102)
-  const lifts = LIFT_FIELDS.map((f) => ({ f, onFile: liftOnFile(row, f) }));
+  const lifts = LIFT_FIELDS.map((f) => ({ f, onFile: strength?.lifts?.[f.key] ?? null }));
   const barbell = lifts.filter((l) => !l.f.reps);
-  const strengthComplete = barbell.every((l) => l.onFile != null);
-  const strengthAny = barbell.some((l) => l.onFile != null);
+  const strengthComplete = strength?.barbell_lifts_on_file === 'all';
+  const strengthAny = strength?.barbell_lifts_on_file === 'all' || strength?.barbell_lifts_on_file === 'some';
 
   const ftp = resolveCurrentFtp(row as never);
   const thr = resolveCurrentRunThresholdPace(row as never);
   const swimOnFile = typeof pn.swimPace100 === 'string' && pn.swimPace100.trim() !== '' ? String(pn.swimPace100) : null;
 
-  // Use current is offered from ONE lift on file (2026-09-04): the lifts with numbers price, the rest are
-  // tested in week one in their own session. Nothing on file at all → the test week.
-  const strengthChoice: 'use' | 'test' = choice.strength ?? (strengthAny ? 'use' : 'test');
+  const strengthChoice: 'use' | 'test' = choice.strength ?? strength?.strength_default ?? 'test';
   const ftpChoice: 'use' | 'test' = choice.ftp ?? (ftp.value != null ? 'use' : 'test');
   const runChoice: 'use' | 'test' = choice.run ?? (thr.sec_per_mi != null ? 'use' : 'test');
 
   // Seed the effective defaults into wizard state once, so an untouched screen still carries its answer
-  // to the payload (use what is on file, test what is not). Only keys the athlete has not set.
+  // to the payload (use what is on file, test what is not). Only keys the athlete has not set; the
+  // strength key waits for the server's default.
   React.useEffect(() => {
     const seeded: NumbersChoice = {};
-    if (include.strength && choice.strength == null) seeded.strength = strengthChoice;
+    if (include.strength && choice.strength == null && strength) seeded.strength = strength.strength_default;
     if (include.bike && choice.ftp == null) seeded.ftp = ftpChoice;
     if (include.run && choice.run == null) seeded.run = runChoice;
     if (Object.keys(seeded).length > 0) onChoice({ ...seeded, ...choice });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [strengthAny, ftp.value, thr.sec_per_mi]);
+  }, [strength?.strength_default, ftp.value, thr.sec_per_mi]);
 
   const set = (k: NumbersChoiceKey, v: 'use' | 'test') => onChoice({ ...choice, [k]: v });
 
@@ -165,7 +149,7 @@ export function KnowYourNumbersStep({
         Optional. Keep what is on file or test in week one. Numbers are typed on Profile, not here.
       </p>
       <div className="flex flex-col gap-3">
-        {include.strength && rowShell(
+        {include.strength && strength && rowShell(
           'Strength',
           strengthAny
             ? (

@@ -132,7 +132,7 @@ Deno.test('buildPreferredDays — posture-gated; out → no long day; anchor →
   const pd2 = buildPreferredDays(runOnly, { anchorDiscipline: 'bike', anchorDay: 'tuesday' });
   assertEquals(pd2.long_ride, undefined);           // bike out → no long ride
   assertEquals(pd2.quality_bike, undefined);        // anchor on an out discipline → omitted
-  assertEquals(pd2.long_run, 'sunday');             // default day when none picked
+  assertEquals(pd2.long_run, undefined);            // no day picked → none sent; the preview places it (audit H-W01)
 
   // no anchor → no quality_* (the planner places them)
   const pd3 = buildPreferredDays(runOnly, {});

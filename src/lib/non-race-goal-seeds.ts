@@ -191,7 +191,13 @@ export function buildPreferredDays(
    */
   const longSlotExcludes = (d: 'run' | 'bike') =>
     sched.longSlotSport != null && sched.longSlotSport !== (d === 'bike' ? 'ride' : 'run');
-  if (present('run') && !longSlotExcludes('run')) out.long_run = sched.longRunDay || 'sunday';
+  /**
+   * ⛔ NO DAY PICKED, NO DAY SENT (2026-09-10, audit item 20). This fell back to `'sunday'` here and
+   * `'saturday'` for the ride — the same default-on-the-wire this note describes, on every path. The
+   * build pinned the fallback while the schedule chip showed a different day. Absent now means the
+   * engine places the long session, and the chip prints the day the preview placed it on.
+   */
+  if (present('run') && !longSlotExcludes('run') && sched.longRunDay) out.long_run = sched.longRunDay;
   /**
    * ⛔ THE DAYS THE ATHLETE CAN TRAIN (2026-08-06). The rest are theirs — rest is the REMAINDER, not
    * a second question, which is why this is one list and not two.
@@ -201,7 +207,7 @@ export function buildPreferredDays(
    * preference and will spend a rest day before it drops a session.
    */
   if (sched.trainingDays && sched.trainingDays.length > 0) out.training_days = [...sched.trainingDays];
-  if (present('bike') && !longSlotExcludes('bike')) out.long_ride = sched.longRideDay || 'saturday';
+  if (present('bike') && !longSlotExcludes('bike') && sched.longRideDay) out.long_ride = sched.longRideDay;
   // The kept club session = a hard day. Posture-gated both ways: a quality day for a discipline the
   // athlete dropped is not a day, it is a leftover.
   if (sched.anchorDiscipline && sched.anchorDay && present(sched.anchorDiscipline)) {

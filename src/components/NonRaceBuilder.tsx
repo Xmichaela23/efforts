@@ -159,12 +159,10 @@ import {
   accessoryCostLine, INTENT_ALLOCATION_NOTE, interlockLine, RUN_GROUND_NOTE, RUN_GROUND_OPTIONS,
   SESSION_PRESCRIPTION, singleSlotOptions, SINGLE_SLOT_NOTE,
 } from '@/lib/hard-day-menus';
-import { solveWizardWeek } from '@/lib/suggest-hard-days';
 import {
   conflictsOf, familyOf, hardIntensityOf, placedHardDays, placedHardSessions, type PreviewCompromise,
 } from '@/lib/preview-week-read';
-import { resolveCurrent5kPace } from '@/lib/resolve-current-5k-pace';
-import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
+import type { IntakeReadout } from '@/lib/intake-readout-types';
 
 /**
  * ⛔ TWO HARD ENDURANCE DAYS IS THE CEILING (§1i, 2026-08-17) — and the SCREEN enforces it, not only
@@ -206,11 +204,7 @@ import {
   validateWeeklyMiles, TIER_SEEDS, tierMismatchNote, longRunCeiling,
   TYPICAL_PEAK_LONG_RUN_MI, type IntakeTier,
 } from '@/lib/run-volume-tables';
-// ⛔ ONE CALIBRATION, shared with the race form's. Also the ONLY vDOT engine — `effort-score.ts`.
-import {
-  hasPaceBenchmark,
-  type PaceBenchmarkRow,
-} from '@/lib/run-pace-calibration';
+import type { PaceBenchmarkRow } from '@/lib/run-pace-calibration';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import WeekGrid from '@/components/WeekGrid';
 import { liftingCommitmentLine, liftingDaysForFrame } from '@/lib/lifting-commitment';
@@ -220,20 +214,6 @@ import {
 // ⛔ ONE READING OF THE WEEK, shared with whatever renders it next — the letters under the day chips
 // are the same rule on all three intake cards, so the rule cannot live on any one of them.
 import { roundMiles, roundRideMinutes, splitNote, weekDayRoles, DAY_ROLE_TITLE, type DayRole } from '@/lib/week-budget';
-/**
- * ⛔ THE NO-OPINION ANSWER, AND ITS IDENTITY IS STABLE ON PURPOSE. Off the `schedule` step the solve
- * does not run, and this stands in for it. A fresh object literal here would change identity on every
- * render and re-fire the pre-fill effects that depend on it — which is the loop this file already
- * paid for once (see the `touchedUnits` note). Same shape `solveWizardWeek` returns from its own
- * catch: no suggestion is a legal answer, and it is better than a wrong one.
- */
-const IDLE_WIZARD_WEEK = {
-  hardDays: [] as Array<string | null>,
-  longRun: null as string | null,
-  longRide: null as string | null,
-  health: { ok: true, collisions: [] as string[] },
-  relocations: [] as Array<{ unit: string; session: string; sessionId: string; from: number; to: number }>,
-};
 /**
  * ⛔ THE RIDE-COUNT RANGE HAS ONE OWNER (stage 4, 2026-08-21). It was written out FIVE times — two
  * pickers here, a validator in `create-goal-and-materialize-plan`, a clamp in
@@ -1040,22 +1020,9 @@ function VolumeWhyToggle({ open, onToggle }: { open: boolean; onToggle: () => vo
 // One card, one question, options limited to the disciplines they kept — so there is no second slot
 // to refuse, no greying, and the doctrine's reason gets stated once instead of split across two
 // sections most athletes only ever see one of.
-// Mirror ArcSetupWizard's chip→tier derivation (:2103-2109): barbell present → full_barbell; else DB
-// present → dumbbell_based; else bodyweight_bands. Drives the equipment-aware strength developer default
-// (5×5 needs loadable resistance; a bodyweight/bands athlete falls back to durability).
-function equipmentTierFromArc(arc: unknown): 'full_barbell' | 'dumbbell_based' | 'bodyweight_bands' {
-  const chips = ((((arc as { equipment?: { strength?: unknown } } | null)?.equipment?.strength) as string[] | undefined) ?? [])
-    .map((s) => String(s).toLowerCase());
-  // A commercial / full gym HAS barbells — recognize it (was falling through to bodyweight_bands →
-  // durability instead of 5×5; the engine-side resolver already treats 'Commercial gym' as barbell).
-  const hasBarbell = chips.some((s) =>
-    s.includes('barbell') || s.includes('rack') || /\bbar\b/.test(s) ||
-    s.includes('commercial') || s.includes('full gym'));
-  const hasDumbbell = chips.some((s) => s.includes('dumbbell') || /\bdb\b/.test(s));
-  if (hasBarbell) return 'full_barbell';
-  if (hasDumbbell) return 'dumbbell_based';
-  return 'bodyweight_bands';
-}
+// ⛔ `equipmentTierFromArc` STOOD HERE AND IS DELETED (2026-09-10, audit item 20). It matched chip
+// words on the phone and ignored 1RMs; the tier is now get-arc-context's `builder.equipment_tier`,
+// from `resolveStrengthEquipmentTier3` — the function create-goal stamps the goal with.
 
 export type NonRaceState = {
   /**
@@ -1563,10 +1530,9 @@ function assemblePayload(
           // `buildPreferredDays` omits both when no day is picked.
           preferred_days: buildPreferredDays(state.posture, {
             trainingDays: state.trainingDays,
-            // ⛔ SEEDED LONG DAYS DO NOT TRAVEL (Q-287, 2026-08-26) — same gate as `hard_days`
-            // below and the same rule `wizardSolveInput` already applies (`longRunPinned`). The
-            // schedule step pre-fills these from the engine's own suggestion; a day ships only when
-            // the athlete tapped it (every tap site calls `touch`) or the club owns it.
+            // ⛔ ONLY A TAPPED LONG DAY TRAVELS (Q-287, 2026-08-26) — same gate as `hard_days` below:
+            // a day ships only when the athlete tapped it (every tap site calls `touch`) or the club
+            // owns it. Nothing pre-fills these any more (2026-09-10); an untapped long day is the engine's.
             longRunDay: (state.longClub || touchedUnits?.longRun) ? state.longRunDay : '',
             longRideDay: (state.longClub || touchedUnits?.longRide) ? state.longRideDay : '',
             /**
@@ -1633,9 +1599,8 @@ function assemblePayload(
                    * ⛔⛔ A SEEDED DAY IS NOT A PICK, AND IT NO LONGER TRAVELS AS ONE (Q-287,
                    * confirmed live 2026-08-26 — Michael: "I made NO adjustments to the schedule
                    * handed to me", yet the stored goal and the compromise notes read his untouched
-                   * seeds back as choices). The pre-fill writes the engine's suggestion into
-                   * `h.day`; `touchedUnits` is the only place that knows whose answer it is — the
-                   * SOLVER input already gates on it (`pinned:` below at `wizardSolveInput`), and
+                   * seeds back as choices). The phone pre-fill that wrote suggestions into `h.day`
+                   * is gone (2026-09-10); `touchedUnits` still decides whose answer a day is, and
                    * the server payload never did. A day now ships only when the athlete tapped it
                    * (or it is a club's — the world's answer, not a preference). An untouched slot
                    * ships day-less, which is already the slice-8 contract: "engine, propose one".
@@ -2036,7 +2001,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // the goal went bike-shaped → unsupported. A developed discipline without baselines is handled
   // downstream (calibration prompt), not by hiding it.
   const athleteDisciplines = useMemo<Discipline[]>(() => DISCIPLINE_ORDER, []);
-  const equipmentTier = useMemo(() => equipmentTierFromArc(arc), [arc]);
+  // ⛔ get-arc-context's intake readout (`arc.builder`): equipment tier, hard days it can price, the pace
+  // gate's answer and the lifts on file. The builder prints these and works none of them out; null until
+  // the arc arrives.
+  const builder = (arc as { builder?: IntakeReadout } | null)?.builder ?? null;
+  const equipmentTier = builder?.equipment_tier;
   const unit = (arc as { units?: string } | null)?.units === 'metric' ? 'km' : 'mi'; // display unit for typed mileage; store canonical miles
   // Inline maintenance cap (shown live as the athlete types) = 180 min/wk ÷ their easy pace [Wilson 2012, D-222].
   const easySecPerKm = Number((arc as { easy?: { sec_per_km?: number } } | null)?.easy?.sec_per_km);
@@ -2056,7 +2025,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const [expandedAssistanceDay, setExpandedAssistanceDay] = useState<LiftDay | null>(LIFT_DAYS[0]);
   /**
    * The athlete's declared kit, for the picker's equipment GATE (slice 4). ⛔ ARC IS THE SOURCE — the
-   * same `equipment.strength` chips `equipmentTierFromArc` reads two hundred lines up. An empty list
+   * `equipment.strength` chips the server's tier is worked out from (`builder.equipment_tier`). An empty list
    * means "we do not know", and `canPerform` treats that as ungated rather than as "owns nothing";
    * anything else would hand a new athlete three days of push-ups.
    */
@@ -2093,24 +2062,19 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * for one in the first place. Both halves exist on purpose: the screen is the humane end (never
    * offer what cannot be built) and the engine is the honest one (the wire cannot smuggle one past).
    *
-   * ⛔ FED FROM THE RESOLVERS, NOT RE-DERIVED. `resolveCurrent5kPace` and `resolveCurrentFtp` are
-   * the single source of truth for their fact and already run client-side elsewhere
-   * (`TrainingBaselines.tsx` uses the FTP one). This asks them the same question the server will.
-   *
-   * ⚠️ THE RUN TESTS THE 5K, NOT A THRESHOLD PACE — there is no independent threshold pace on the
-   * athlete; the app derives it as 5K + 20 s/mi. Gating on the derived number would refuse athletes
-   * who have everything the session needs.
+   * ⛔ THE SERVER SAYS WHICH HARD DAYS IT CAN PRICE (2026-09-10, audit item 20):
+   * `builder.hard_days_priceable` — the run when there is a threshold pace, the pace materialize-plan
+   * writes hard runs from; the ride when there is an FTP. This used to offer the run off a 5K, which no
+   * longer derives a threshold pace, so a 5K-only athlete was offered a hard run that built with no
+   * pace target. Nothing is offered until the readout arrives.
    * ⚠️ AND THE REASON IS NOT A MISSING FIELD, IT IS A MISSING PROGRESSION. A session that cannot
    * state a pace or a wattage cannot get faster on purpose — that is what the copy says, rather
    * than naming a database column at someone.
    */
-  const hardDayAvailable = useMemo<{ run: boolean; bike: boolean }>(() => {
-    const baselines = (arc ?? {}) as never;
-    return {
-      run: resolveCurrent5kPace(baselines).sec_per_mi != null,
-      bike: resolveCurrentFtp(baselines).value != null,
-    };
-  }, [arc]);
+  const hardDayAvailable = useMemo<{ run: boolean; bike: boolean }>(
+    () => builder?.hard_days_priceable ?? { run: false, bike: false },
+    [builder],
+  );
   // The same (i) mechanic on "How much" — the volume rationale that used to sit between the two
   // inputs and push the second one off the screen.
   const [showVolumeWhy, setShowVolumeWhy] = useState(false);
@@ -2439,37 +2403,34 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // The race card cannot continue on a date alone: level picks the volume table the whole plan is
   // built from, and a blank one would fall to the silent `intermediate` this card exists to replace.
   /**
-   * ⛔ DO WE ALREADY HAVE A PACE TO BUILD ON? Read once, with the SAME predicate the server uses
-   * (`hasPaceBenchmark`). `null` = not looked up yet, so the card stays quiet rather than asking
-   * for a calibration the athlete may not need.
+   * ⛔ DO WE ALREADY HAVE A PACE TO BUILD ON? The server's answer (2026-09-10, audit item 20):
+   * `builder.has_pace_benchmark`, the create-goal speed gate's own rule (`_shared/pace-benchmark.ts`).
+   * The phone copy that stood here wanted plain numbers where learned paces are stored as
+   * `{ value, confidence }`, so an athlete whose only pace was learned was asked to calibrate when the
+   * server would have built. Until the readout arrives the card stays quiet.
    *
-   * ⚠️ A SEPARATE READ FROM THE ARC, DELIBERATELY. The Arc gives this builder an easy pace and
-   * nothing else about running; the server's gate accepts four different signals. Judging on the
-   * one field the Arc happens to expose would ask experienced athletes to re-enter numbers they
-   * already have on file.
+   * ⚠️ THE BASELINES ROW IS STILL READ — the numbers step and the endurance-week caps print from it.
    */
   const [paceRow, setPaceRow] = React.useState<PaceBenchmarkRow | null>(null);
-  const [paceChecked, setPaceChecked] = React.useState(false);
   React.useEffect(() => {
     let cancelled = false;
     void (async () => {
       const uid = getStoredUserId();
-      if (!uid) { if (!cancelled) setPaceChecked(true); return; }
+      if (!uid) return;
       const { data } = await supabase
         .from('user_baselines')
         // ⛔ `performance_numbers` ADDED 2026-08-24 for the endurance-week screen: the ride caps
         // resolve against the athlete's FTP and the rate line prints pounds off their squat. Both
         // live in that column, and a SELECT that omits it is the projection footgun this repo has
         // hit repeatedly — the resolver would abstain and the screen would show no ride cap at all.
-        .select('effort_score, effort_source_distance, effort_source_time, effort_paces, learned_fitness, performance_numbers, locked_baselines, units')
+        .select('effort_paces, learned_fitness, performance_numbers, locked_baselines, units')
         .eq('user_id', uid).maybeSingle();
       if (cancelled) return;
       setPaceRow(data as PaceBenchmarkRow);
-      setPaceChecked(true);
     })();
     return () => { cancelled = true; };
   }, []);
-  const paceOnFile = paceChecked && hasPaceBenchmark(paceRow);
+  const paceOnFile = builder?.has_pace_benchmark === true;
   /**
    * ⛔ THE BASELINES THE ENDURANCE-WEEK CAPS RESOLVE AGAINST. Same row, same shape the engine's
    * `resolveEnduranceAnchors` reads — run pace, ride watts. ⚠️ Null until the fetch lands, and the
@@ -2481,7 +2442,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const [calSaving, setCalSaving] = React.useState(false);
   const [calSaved, setCalSaved] = React.useState(false);
   /** Speed needs numbers. Either they are on file, or they were just entered here. */
-  const speedNeedsCalibration = state.raceIntent === 'speed' && paceChecked && !paceOnFile && !calSaved;
+  const speedNeedsCalibration = state.raceIntent === 'speed' && builder != null && !paceOnFile && !calSaved;
 
   /**
    * ⛔ THE INTENT IS REQUIRED, AND SO IS A PACE IF THEY PICKED SPEED. Without the second half the
@@ -2590,6 +2551,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     return placedHardSessions(previewWeek, state.hardDays).map((x) => (x ? familyOf(x) : undefined));
   }, [previewWeek, state.hardDays]);
   /**
+   * ⛔ THE DAY THE PREVIEW PUT EACH LONG SESSION ON (2026-09-10, audit item 20) — by the `long_run` /
+   * `long_ride` tag the composer stamps on the long slot, never by name. The long row prints it when
+   * the athlete has not tapped a day, and the schedule gate takes it as the long day's answer.
+   */
+  const placedLongDays = useMemo<{ run: DayName | ''; ride: DayName | '' }>(() => {
+    const dayOf = (tag: string): DayName | '' => {
+      const s = (previewWeek ?? []).find((x) => Array.isArray(x.tags) && x.tags.includes(tag));
+      return (s ? String(s.day ?? '').toLowerCase() : '') as DayName | '';
+    };
+    return { run: dayOf('long_run'), ride: dayOf('long_ride') };
+  }, [previewWeek]);
+  /**
    * ⛔ THE PLACED WEEK, GROUPED BY DAY — the master strip's only input (round 3, 2026-08-25).
    *
    * ⚠️ SAME ARRAY THE WORDED LIST TAKES. `WeekGrid` receives `previewWeek` directly and groups it
@@ -2635,13 +2608,11 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
     const pick = state.hardDays[i]?.day as DayName | '' | undefined;
     /**
      * ⛔ THE BUILT WEEK WINS ONCE IT EXISTS (Michael, 2026-09-03: chips, dots and the warning line
-     * all read the server's answer; the phone's solver is the pre-fill only). Before the preview
-     * has come back, a blocked tap shows the phone's replacement so the chip is never on a day off.
+     * all read the server's answer). Before the preview has come back, a blocked tap shows no day
+     * rather than a day off; the phone's own replacement day is gone with its solver (2026-09-10).
      */
     if (previewWeek?.length && placedDays[i]) return placedDays[i]!;
-    if (pick && isBlockedDay(pick)) {
-      return (suggestedHardDays[i] as DayName | undefined) || placedDays[i] || '';
-    }
+    if (pick && isBlockedDay(pick)) return placedDays[i] || '';
     if (touchedUnits[`hard:${i}`] && pick) return pick;
     return placedDays[i] || pick || '';
   };
@@ -2791,9 +2762,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    */
   const [unavailableDays, setUnavailableDays] = useState<DayName[]>([]);
 
-  // ⚠️ DECLARED ABOVE `wizardSolveInput` (2026-08-25): the solve now reads it to tell the
-  //    athlete's pins from the engine's own placements, and a `const` cannot be read above
-  //    its own declaration.
+  // ⚠️ DECLARED HIGH (2026-08-25): the payload and the pin cues read it to tell the athlete's pins
+  //    from the engine's own placements, and a `const` cannot be read above its own declaration.
   /**
    * ⛔ PRISTINE VS DIRTY — AND IT IS PRIORITY ZERO, because without it the smart default is a
    * HOSTAGE SITUATION (Michael, 2026-08-18).
@@ -2817,94 +2787,34 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const [touchedUnits, setTouchedUnits] = useState<Record<string, boolean>>({});
   const touch = (key: string) => setTouchedUnits((t) => (t[key] ? t : { ...t, [key]: true }));
 
-  const wizardSolveInput = React.useMemo(
-    () => ({
-      hardDays: state.hardDays.map((h, i) => ({
-        discipline: h.discipline, day: h.day, ownership: h.ownership,
-        /**
-         * ⛔⛔ WHOSE ANSWER THE DAY IS, HANDED TO THE SOLVER (2026-08-25). The pre-fill writes the
-         * engine's own suggestion into `h.day`, and every named day used to come back as a pin — so
-         * the engine's proposal became an absolute the engine could not move, and marking that day
-         * unavailable afterwards changed nothing. `touchedUnits` is the only place that knows the
-         * difference, and it is here.
-         */
-        pinned: h.ownership === 'club' || !!touchedUnits[`hard:${i}`],
-      })),
-      longRunDay: state.longRunDay,
-      longRideDay: state.longRideDay,
-      // ⛔ SAME RULE FOR THE TWO LONG SLOTS. A club long session is pinned by its nature (slice 2b).
-      /**
-       * ⛔ THE FRAME HAS ONE LONG SLOT AND THIS IS ITS SPORT — without it the health model builds a
-       * Long Run AND a Long Ride, and the spare writes a clearance warning about a session the plan
-       * never builds (Michael's screen, 2026-08-26).
-       */
-      longSlotSport,
-      longRunPinned: !!state.longClub || !!touchedUnits.longRun,
-      longRidePinned: !!state.longClub || !!touchedUnits.longRide,
-      runDays: state.runDays,
-      rideDays: state.rideDays,
-      swimDays: state.posture?.swim === 'maintain' ? state.swimDays : 0,
-      // ⛔ THE REST-DAY PINS REACH THE CLIENT MODEL TOO (pins-win slice 2). `week-model`'s
-      // `unavailableDays` keeps the free units off them, so the conflict badge is computed against
-      // the week the athlete is actually asking for rather than a seven-day one.
-      unavailableDays,
-    }),
-    [state.hardDays, state.longRunDay, state.longRideDay, state.runDays, state.rideDays,
-      state.swimDays, state.posture?.swim, unavailableDays, touchedUnits, state.longClub],
-  );
   /**
-   * ⛔ AND THE FIRST RENDER OF THE STEP IS ARMED ON THE NEXT FRAME, WHICH `useDeferredValue` ALONE
-   * DOES NOT DO. On React 18 it returns the value UNCHANGED on the initial render — there is no
-   * previous value to fall back to — so arriving at the schedule step would still pay the full
-   * unpinned solve before the card's first paint. (React 19's `initialValue` argument exists for
-   * exactly this; this project is on 18.3.)
-   *
-   * ⚠️ SO THE CARD PAINTS ONCE WITH NO SUGGESTION AND THE DAYS FILL IN ON THE NEXT FRAME. That is
-   * the right trade and not a compromise: these are SUGGESTIONS, the athlete can override every one
-   * of them, and the alternative is a frozen screen for as long as the solve takes — on his shape
-   * 457 ms on a desktop, and a phone is 3-5× that.
-   */
-  const [solveArmed, setSolveArmed] = useState(false);
-  React.useEffect(() => {
-    if (currentStep !== 'schedule') { setSolveArmed(false); return; }
-    const id = requestAnimationFrame(() => setSolveArmed(true));
-    return () => cancelAnimationFrame(id);
-  }, [currentStep]);
-  // ⚠️ `null` OFF THE SCHEDULE STEP, not a cheaper input — the answer is unused there, and computing
-  // one anyway is what this change exists to stop.
-  const deferredSolveInput = React.useDeferredValue(
-    currentStep === 'schedule' && solveArmed ? wizardSolveInput : null,
-  );
-  const wizardWeek = React.useMemo(
-    () => (deferredSolveInput ? solveWizardWeek(deferredSolveInput) : IDLE_WIZARD_WEEK),
-    [deferredSolveInput],
-  );
-  const suggestedHardDays = wizardWeek.hardDays;
-  const suggestedLongDays = { run: wizardWeek.longRun, ride: wizardWeek.longRide };
-  /**
-   * ⚠️ DECLARED BELOW `suggestedLongDays` AND `unavailableDays`, both of which it reads — a `const`
-   * cannot be evaluated above its own declaration, and this block used to sit 180 lines higher.
+   * ⛔ THE PHONE'S WEEK SOLVE IS GONE (2026-09-10, audit item 20). `solveWizardWeek` pre-filled the
+   * hard and long days and stood in for the verdict until the preview came back, working from its own
+   * session list — while the Standing Plan week is placed by a different function on the server. It
+   * could say "balanced" over a week the server built with two hard runs on one day. Suggested days now
+   * come from the preview week, and there is no verdict until the preview returns.
    */
   /**
-   * ⛔ THE LONG ROW'S DAY, AND A BLOCKED ONE RESOLVES THE SAME WAY THE HARD SLOTS DO (2026-08-25
-   * afternoon) — the athlete's answer stays in state, the chip shows where the engine put it.
-   * ⚠️ `longRowMoved` is what stops the row calling that replacement "yours".
+   * ⛔ THE LONG ROW'S DAY. The athlete's tap when there is one and it is not a blocked day; otherwise
+   * the day the preview placed the long session on (`placedLongDays`). A blocked tap stays in state and
+   * the chip shows where the engine put it.
+   * ⚠️ `longRowIsOwn` is what stops the row calling the preview's day "yours".
    */
   const longRowOwn = (scheduleRunShown ? state.longRunDay : state.longRideDay) || '';
   const longRowMoved = !!longRowOwn && unavailableDays.includes(String(longRowOwn).toLowerCase() as DayName);
-  const longRowDay = longRowMoved
-    ? ((scheduleRunShown ? suggestedLongDays.run : suggestedLongDays.ride) || longRowOwn)
-    : longRowOwn;
+  const longRowIsOwn = !!longRowOwn && !longRowMoved;
+  const longRowDay = longRowIsOwn
+    ? longRowOwn
+    : (scheduleRunShown ? placedLongDays.run : placedLongDays.ride);
   /**
-   * ⛔ THE CONFLICT LINE READS THE BUILT WEEK (Michael, 2026-09-03). It read the phone's own
-   * solver, which could say "balanced" over a week the server had built with two hard runs on a
-   * Wednesday. Now: once the preview is back, the collisions are the compromises carrying a
-   * conflict rule, in the plan's own words. Before it is back, the phone's solve stands in.
+   * ⛔ THE CONFLICT LINE READS THE BUILT WEEK (Michael, 2026-09-03): the collisions are the compromises
+   * carrying a conflict rule, in the plan's own words. ⛔ AND NOTHING BEFORE IT (2026-09-10): null until
+   * the preview is back, and null when it failed — no badge rather than a guessed one.
    */
   const previewConflicts = useMemo(() => conflictsOf(previewCompromises), [previewCompromises]);
   const scheduleHealthState = previewWeek?.length
     ? { ok: previewConflicts.length === 0, collisions: previewConflicts.map((c) => c.text) }
-    : wizardWeek.health;
+    : null;
   const [healthOpen, setHealthOpen] = useState(false);
   /** The engine's own list of pins it could not reach — see the override row on the week step. */
   const [overridesOpen, setOverridesOpen] = useState(false);
@@ -3023,38 +2933,12 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
 
 
   /**
-   * ⛔⛔ IT PRE-FILLED A LONG DAY FOR A DISCIPLINE THE CARD IS NOT SHOWING, AND THE ENGINE REPORTED
-   * IT AS A COMPROMISE EVERY SINGLE TIME (found on the dev preview, 2026-08-25).
-   *
-   * On the strength path the week has ONE long session and the slot screen already said which sport
-   * it is — that is why `scheduleRunShown` / `scheduleRideShown` render exactly one long row (B1,
-   * 2026-08-24, the note on `longSlotSport`). These two effects never learned it: on a long-RIDE
-   * week the run effect still wrote `longRunDay = Sunday`, `buildPreferredDays` still shipped it as
-   * `preferred_days.long_run`, and `chooseDayMap` answered — correctly — *"This week has one long
-   * session and it is a ride, so the long run pinned to Sunday is not in it."*
-   *
-   * ⛔ SO EVERY LONG-RIDE ATHLETE CARRIED A PERMANENT FALSE COMPROMISE about a day they were never
-   * shown and never chose. It was invisible until this pass rendered `placement_compromises`; the
-   * screen was discarding them, which is what let a phantom pin sit there unnoticed.
-   *
-   * ⚠️ THE GUARD IS THE SAME PREDICATE THE ROW USES, deliberately — one owner for "is this
-   * discipline's long day a question on this card". A second test here is how they drift apart.
+   * ⛔ THE THREE PRE-FILL EFFECTS THAT STOOD BELOW ARE DELETED (2026-09-10, audit item 20). They wrote
+   * the phone solver's suggested long run, long ride and hard days into state on the schedule step.
+   * An untapped day now stays empty in state: the row prints the preview's day, and the wire carries
+   * only what the athlete tapped.
    */
-  /**
-   * ⛔⛔ AND AN ENGINE-OWNED DAY IS REWRITTEN WHEN THE ATHLETE BLOCKS IT (2026-08-25).
-   *
-   * The guard below is `!st.longRunDay` — fill an EMPTY field once, never overwrite. That is right
-   * for an athlete's answer and wrong for the engine's own, and it is half of the bug that put a
-   * hard run on a day marked "can't train": the engine filled Friday, the athlete blocked Friday,
-   * and the field was no longer empty so nothing rewrote it. `staleEngineDay` is the one exception —
-   * a day nobody touched that the athlete has since said they cannot train.
-   *
-   * ⚠️ THE OTHER HALF IS IN THE SOLVE, and both are needed. Releasing the field here alone would
-   * re-fill it with the same Friday, because `buildWizardWeek` was handing that day back to the
-   * solver as an absolute (`HardSlot.pinned`).
-   */
-  // ⚠️ MEMOISED ON THE ROW IT READS, so the three effects below can name it in their deps without
-  // re-running on every render — a fresh closure each time would make them fire in a loop.
+  // ⚠️ MEMOISED ON THE ROW IT READS.
   const isBlockedDay = React.useCallback(
     (d: string | null | undefined): boolean =>
       !!d && unavailableDays.includes(String(d).toLowerCase() as DayName),
@@ -3077,35 +2961,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    * ⚠️ THE WIRE CARRIES THE ANSWER, NOT THE WORKAROUND. `hard_days` ships the tapped day and
    * `unavailable_days` ships beside it; the engine resolves the pair, exactly as it does here.
    */
-  React.useEffect(() => {
-    if (currentStep !== 'schedule' || !scheduleRunShown || touchedUnits.longRun) return;
-    setState((st) => {
-      if (st.longRunDay || !suggestedLongDays.run) return st;
-      return { ...st, longRunDay: suggestedLongDays.run as typeof st.longRunDay };
-    });
-  }, [currentStep, scheduleRunShown, suggestedLongDays.run, touchedUnits.longRun]);
-  React.useEffect(() => {
-    if (currentStep !== 'schedule' || !scheduleRideShown || touchedUnits.longRide) return;
-    setState((st) => {
-      if (st.longRideDay || !suggestedLongDays.ride) return st;
-      return { ...st, longRideDay: suggestedLongDays.ride as typeof st.longRideDay };
-    });
-  }, [currentStep, scheduleRideShown, suggestedLongDays.ride, touchedUnits.longRide]);
-
-  React.useEffect(() => {
-    if (currentStep !== 'schedule') return;
-    setState((st) => {
-      let touched = false;
-      const next = st.hardDays.map((h, i) => {
-        if (h.day || h.ownership === 'club' || touchedUnits[`hard:${i}`]) return h;
-        const s = suggestedHardDays[i];
-        if (!s) return h;
-        touched = true;
-        return { ...h, day: s as typeof h.day };
-      });
-      return touched ? { ...st, hardDays: next } : st;
-    });
-  }, [currentStep, suggestedHardDays, touchedUnits]);
 
 
   /**
@@ -3544,8 +3399,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const scheduleGateInput = {
     runShown: scheduleRunShown,
     rideShown: scheduleRideShown,
-    longRunDay: state.longRunDay,
-    longRideDay: state.longRideDay,
+    // ⛔ THE PREVIEW'S DAY ANSWERS THE LONG-DAY QUESTION TOO (2026-09-10). With no tap the engine places
+    // the long session and the row prints that day; the phone solver's pre-fill used to satisfy this.
+    longRunDay: state.longRunDay || placedLongDays.run,
+    longRideDay: state.longRideDay || placedLongDays.ride,
     // ⛔ Strength path: the counts are the SLOTS' — the gate must never demand a number the
     // athlete was never asked (the count rows are hidden there). Read off state directly: the
     // component-scope `derivedCounts` declares later in this function body.
@@ -4203,7 +4060,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
 
   React.useEffect(() => {
     if (currentStep !== 'schedule') return;
-    if (!state.longRunDay && !state.longRideDay) return;   // nothing to solve around yet
+    // ⚠️ NO LONG-DAY PRECONDITION ANY MORE (2026-09-10): with no tap the server places the long
+    // session, and the long row prints that day from this preview.
     const t = setTimeout(() => { void runPreview(); }, 400);
     return () => clearTimeout(t);
     /**
@@ -6869,7 +6727,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   <span className="text-xs" style={{ color: `rgba(${longRowRgb},0.85)` }}>
                     {longRowDay
                       ? `${DAY_SHORT[longRowDay as DayName]}${
-                        longRowMoved ? ' — placed' : state.longClub ? ' — club' : ' — yours'}`
+                        !longRowIsOwn ? ' — placed' : state.longClub ? ' — club' : ' — yours'}`
                       : (state.longClub ? 'Which day does it meet?' : 'Tap a day')}
                   </span>
                 </div>
@@ -6877,7 +6735,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   selected={longRowDay ? [longRowDay as DayName] : []}
                   plain
                   pinned={(state.longClub || !!touchedUnits[scheduleRunShown ? 'longRun' : 'longRide'])
-                    && !!longRowDay && !longRowMoved}
+                    && longRowIsOwn}
                   accentRgb={longRowRgb}
                   roles={{}}
                   stacked={[]}
@@ -7139,7 +6997,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                 the clearance model and was being read as "the week is what you asked for", which it
                 was not — so the badge does not render its tick while a pin is outstanding. It still
                 renders in full whenever it has a collision of its own to report. */}
-            {(state.hardDays.length > 0 || state.longRunDay || state.longRideDay)
+            {/* ⛔ NO BADGE UNTIL THE PREVIEW IS BACK (2026-09-10) — both states come from the server's week. */}
+            {scheduleHealthState
               && !(scheduleHealthState.ok && weekNotes.length > 0) && (
               <button
                 type="button"
@@ -7640,6 +7499,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         <KnowYourNumbersStep
           step={stepNo('numbers')} totalSteps={steps.length}
           row={paceRow as never}
+          strength={builder}
           include={numbersInclude}
           choice={state.numbersChoice ?? {}}
           onChoice={(next) => setState((st) => ({ ...st, numbersChoice: next }))}
@@ -7671,7 +7531,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               expander should still meet it here. Same state, same words, same neutral surface.
               ⚠️ IT DOES NOT BLOCK. The Continue key is unaffected: this is the cost stated, not a
               gate, which is the ruling the whole engine runs on. */}
-          {!scheduleHealthState.ok && (
+          {scheduleHealthState && !scheduleHealthState.ok && (
             <button
               type="button"
               onClick={() => setHealthOpen((v) => !v)}

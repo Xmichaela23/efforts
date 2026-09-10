@@ -127,31 +127,25 @@ const LEDGER: Record<string, Reason> = {
   'lthr::supabase/functions/calculate-workload/index.ts': 'output-key',
   // ── run easy pace ────────────────────────────────────────────────────────
   'run easy pace::supabase/functions/learn-fitness-profile/index.ts': 'writer',
-  'run easy pace::src/components/TrainingBaselines.tsx': 'receipt',
-  'run easy pace::src/lib/run-pace-calibration.ts': 'presence-gate',
   'run easy pace::supabase/functions/generate-combined-plan/index.ts': 'reconciler-input',
   'run easy pace::supabase/functions/_shared/block-adaptation/index.ts': 'comparator',
   'run easy pace::supabase/functions/adapt-plan/index.ts': 'comparator',
-  // Remaining raw read is the SERVER PACE GATE (`:3630` `learnedPaceUsable`) — a presence test
-  // mirrored by `run-pace-calibration.ts:hasPaceBenchmark` on the client. Change one, change both;
-  // it asks whether ANY signal exists, not what the value is. The seed and the limiter are routed.
-  'run easy pace::supabase/functions/create-goal-and-materialize-plan/index.ts': 'presence-gate',
+  // The pace gate (2026-09-10, audit H-B13): one presence test on the server, used by create-goal and
+  // get-arc-context's `has_pace_benchmark`. It asks whether ANY signal exists, not what the value is.
+  'run easy pace::supabase/functions/_shared/pace-benchmark.ts': 'presence-gate',
 
   // ── run threshold pace ───────────────────────────────────────────────────
   'run threshold pace::supabase/functions/learn-fitness-profile/index.ts': 'writer',
   'run threshold pace::supabase/functions/compute-workout-analysis/index.ts': 'writer',
   'run threshold pace::src/components/TrainingBaselines.tsx': 'receipt',
-  'run threshold pace::src/lib/run-pace-calibration.ts': 'presence-gate',
   // Updates the learned threshold after a race (reads the prior to diff, writes the next).
   'run threshold pace::supabase/functions/_shared/race-feedback.ts': 'writer',
-  // Remaining raw read is the SERVER PACE GATE (`:3630` `learnedPaceUsable`) — a presence test
-  // mirrored by `run-pace-calibration.ts:hasPaceBenchmark` on the client. Change one, change both;
-  // it asks whether ANY signal exists, not what the value is. The seed and the limiter are routed.
-  'run threshold pace::supabase/functions/create-goal-and-materialize-plan/index.ts': 'presence-gate',
+  // The pace gate (2026-09-10, audit H-B13): one presence test on the server, used by create-goal and
+  // get-arc-context's `has_pace_benchmark`. It asks whether ANY signal exists, not what the value is.
+  'run threshold pace::supabase/functions/_shared/pace-benchmark.ts': 'presence-gate',
 
   // ── ftp ──────────────────────────────────────────────────────────────────
   'ftp::supabase/functions/learn-fitness-profile/index.ts': 'writer',
-  'ftp::src/components/TrainingBaselines.tsx': 'receipt',
   'ftp::supabase/functions/_shared/block-adaptation/index.ts': 'comparator',
   'ftp::supabase/functions/adapt-plan/index.ts': 'comparator',
   // compute-snapshot's bike anchor (`deriveBike`) was routed 2026-09-04 through `appliedLearnedFtp`
@@ -168,7 +162,6 @@ const LEDGER: Record<string, Reason> = {
   // rests on easy riding. The NUMBER is never touched; the file already routes lthr through
   // `resolveCurrentLthr` (:18). Same shape as the three `receipt` rows this file already carries
   // for run easy pace, run threshold pace and ftp.
-  'lthr::src/components/TrainingBaselines.tsx': 'receipt',
 
   // ── swim css (no owner by design — tracked, not chased) ──────────────────
   'swim css::supabase/functions/learn-fitness-profile/index.ts': 'writer',

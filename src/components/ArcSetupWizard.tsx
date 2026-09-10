@@ -30,13 +30,7 @@ import type { ArcSetupPayload } from '@/lib/parse-arc-setup';
 import { loadArcWizardDraft, saveArcWizardDraft, clearArcWizardDraft } from '@/lib/arc-wizard-draft-storage';
 import type { GroupRideRouteSnapshot } from '@/lib/group-ride-route-snapshot';
 import { climbNoticeTier, stravaRouteUrlLooksFetchable, formatGroupRideRouteStatsLine } from '@/lib/group-ride-route-snapshot';
-import {
-  computeSessionFrequencyDefaults,
-  type LimiterSport,
-  type SwimFreqIntent,
-  type StrengthFreqIntent,
-  type DaysPerWeek,
-} from '@/lib/session-frequency-defaults';
+import type { IntakeReadout } from '@/lib/intake-readout-types';
 import { parseTimeToSeconds, type RaceDistance } from '@/lib/effort-score';
 
 // ─── Arc context (client-side slice) ─────────────────────────────────────────
@@ -635,42 +629,19 @@ function assemblePayload(state: WizardState): ArcSetupPayload {
       ? state.groupRideRouteSnapshot
       : undefined;
 
-  // §SESSION-FREQUENCY-DEFAULTS — derive per-discipline session counts from athlete-supplied
-  // weekly hours (Step 7B). Fallback to tier-2 midpoint (9hr) when the athlete bypasses the
+  // Weekly hours from Step 7B. Fallback to tier-2 midpoint (9hr) when the athlete bypasses the
   // step somehow — keeps the engine receiving a sane value rather than NaN.
+  // ⛔ `session_frequency_defaults` IS NO LONGER SENT (2026-09-10, audit item 20). create-goal never
+  // forwarded it; the combined plan's reconciler works the counts out from the goal's own answers, and
+  // the hours cards print the server's counts for the same answers.
   const weeklyHoursValue = typeof state.weeklyHours === 'number' && Number.isFinite(state.weeklyHours)
     ? state.weeklyHours
     : 9;
-  const swimIntentForFreq: SwimFreqIntent | undefined =
-    triPlan && (state.swimIntent === 'focus' || state.swimIntent === 'race') ? state.swimIntent : undefined;
-  const strengthIntentForFreq: StrengthFreqIntent =
-    !state.strengthIncluded
-      ? 'none'
-      : state.strengthIntent === 'performance'
-        ? 'performance'
-        : 'support';
-  const daysForMatrix = (() => {
-    const d = state.daysPerWeek ?? 7;
-    if (d <= 4) return 4 as const;
-    if (d === 5) return 5 as const;
-    if (d === 6) return 6 as const;
-    return 7 as const;
-  })();
-  const sessionFrequencyDefaults = computeSessionFrequencyDefaults({
-    weekly_hours_available: weeklyHoursValue,
-    days_per_week: daysForMatrix,
-    ...(swimIntentForFreq ? { swim_intent: swimIntentForFreq } : {}),
-    strength_intent: strengthIntentForFreq,
-    // limiter_sport is inferred server-side from Arc context (see
-    // create-goal-and-materialize-plan/inferLimiterSportFromArc); the wizard doesn't ask.
-    // The §4 limiter shift will fire there once the goal is persisted with limiter_sport set.
-  });
 
   const trainingPrefs: Record<string, unknown> = {
     training_intent: state.trainingIntent || 'completion',
     days_per_week: state.daysPerWeek || 7,
     weekly_hours_available: weeklyHoursValue,
-    session_frequency_defaults: sessionFrequencyDefaults,
     preferred_days: preferredDays,
     strength_frequency: strengthFreq,
     ...(triPlan &&
@@ -1814,9 +1785,11 @@ function Step7Budget({
 /**
  * Hours-tier cards. The `sessions` line used to be a hard-coded string and drifted from the
  * engine matrix (10–12 hrs · 2 swims promised but engine returned 3 at 6–7 days; §2.1 strength
- * deduction added another conditional that the static text didn't capture). Now `benefit` stays
- * static while `sessions` is computed at render time from the athlete's known strength_intent
- * and days_per_week via `computeSessionFrequencyDefaults`. Same source of truth as the engine.
+ * deduction added another conditional that the static text didn't capture). `benefit` stays static.
+ * ⛔ THE SESSIONS LINE IS THE SERVER'S (2026-09-10, audit item 20): get-arc-context's
+ * `builder.session_frequency_by_tier` for these `value`s and the athlete's answers, with the limiter
+ * sport the goal build applies. The phone's own count left the limiter and swim intent out and
+ * clamped 4 days to 5 while the payload sent 4.
  */
 const HOURS_TIERS: Array<{
   label: string;
@@ -1830,48 +1803,13 @@ const HOURS_TIERS: Array<{
   { label: '14+ hrs', value: 15, benefit: 'Full commitment. Only sustainable with flexible schedule and strong recovery habits.' },
 ];
 
-/**
- * Map wizard state to the StrengthFreqIntent the engine sees. `strengthIncluded === false`
- * → 'none'; otherwise pass through (`'performance'` for Hybrid, `'support'` for Durability).
- * Null/unset returns undefined so `computeSessionFrequencyDefaults` falls back to tier baseline.
- */
-function wizardStrengthIntent(state: WizardState): StrengthFreqIntent | undefined {
-  if (state.strengthIncluded === false) return 'none';
-  if (state.strengthIntent === 'performance') return 'performance';
-  if (state.strengthIntent === 'support') return 'support';
-  return undefined;
-}
-
-/**
- * Clamp wizard days_per_week input to the matrix-supported {5, 6, 7} range. The engine's matrix
- * doesn't have a 4-day cell and clamps internally; mirror that here so the card preview matches
- * what the engine will actually return.
- */
-function wizardDaysPerWeek(state: WizardState): DaysPerWeek {
-  const d = state.daysPerWeek;
-  if (d === 5 || d === 6 || d === 7) return d;
-  if (typeof d === 'number' && d >= 7) return 7;
-  if (typeof d === 'number' && d <= 5) return 5;
-  return 6;
-}
-
-/** Render the swim/bike/run prescription line for a given hours-tier value, using the athlete's
- *  current strength_intent + days_per_week. Returns "X swims · Y bikes · Z runs". */
-function formatHoursTierSessions(hoursValue: number, state: WizardState): string {
-  const defaults = computeSessionFrequencyDefaults({
-    weekly_hours_available: hoursValue,
-    days_per_week: wizardDaysPerWeek(state),
-    strength_intent: wizardStrengthIntent(state),
-  });
-  const s = defaults.swims_per_week;
-  const b = defaults.bikes_per_week;
-  const r = defaults.runs_per_week;
-  return `${s} ${s === 1 ? 'swim' : 'swims'} · ${b} ${b === 1 ? 'bike' : 'bikes'} · ${r} ${r === 1 ? 'run' : 'runs'}`;
-}
-
 function Step7BHours({
-  state, setState, onNext, onBack, step, totalSteps,
-}: { state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void; step: number; totalSteps: number }) {
+  state, setState, onNext, onBack, step, totalSteps, counts,
+}: {
+  state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void; step: number; totalSteps: number;
+  /** The server's sessions a week per hours value, for the current answers; null while not loaded. */
+  counts: IntakeReadout['session_frequency_by_tier'] | null;
+}) {
   return (
     <StepLayout
       step={step} totalSteps={totalSteps}
@@ -1882,11 +1820,11 @@ function Step7BHours({
       <div className="grid grid-cols-1 gap-2.5">
         {HOURS_TIERS.map(({ label, value, benefit }) => {
           const selected = state.weeklyHours === value;
-          // Reactive session line: reflects the actual matrix cell the engine will return given
-          // the athlete's already-chosen strength_intent + days_per_week. §2.1 deduction applies
-          // for Hybrid athletes (one tier lower at borderline hours/days). No drift between card
-          // preview and emitted plan.
-          const sessions = formatHoursTierSessions(value, state);
+          // The server's count for this hours value and the athlete's answers. No count, no line.
+          const c = counts?.[String(value)];
+          const sessions = c
+            ? `${c.swims} ${c.swims === 1 ? 'swim' : 'swims'} · ${c.bikes} ${c.bikes === 1 ? 'bike' : 'bikes'} · ${c.runs} ${c.runs === 1 ? 'run' : 'runs'}`
+            : null;
           return (
             <button
               key={value}
@@ -1901,9 +1839,11 @@ function Step7BHours({
               <div className={`text-[17px] font-semibold ${selected ? 'text-teal-100' : 'text-white/85'}`}>
                 {label}
               </div>
-              <div className={`text-[13px] ${selected ? 'text-teal-100/85' : 'text-white/65'}`}>
-                {sessions}
-              </div>
+              {sessions && (
+                <div className={`text-[13px] ${selected ? 'text-teal-100/85' : 'text-white/65'}`}>
+                  {sessions}
+                </div>
+              )}
               <div className={`text-[13px] leading-snug ${selected ? 'text-teal-100/65' : 'text-white/50'}`}>
                 {benefit}
               </div>
@@ -1922,8 +1862,13 @@ function Step7BHours({
 }
 
 function Step8Strength({
-  state, setState, onNext, onBack, step, totalSteps, arc,
-}: { state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void; step: number; totalSteps: number; arc: WizardArcContext | null }) {
+  state, setState, onNext, onBack, step, totalSteps, arc, builder,
+}: {
+  state: WizardState; setState: WizardSetState; onNext: () => void; onBack: () => void; step: number; totalSteps: number;
+  arc: WizardArcContext | null;
+  /** get-arc-context's intake readout; null while not loaded. */
+  builder: IntakeReadout | null;
+}) {
   // Gate acknowledgment for the spec §2 trade-off (performance intent without barbell or DBs).
   // Reset whenever the athlete leaves performance intent so the warning always re-prompts.
   const [gateAcknowledged, setGateAcknowledged] = useState(false);
@@ -1935,50 +1880,20 @@ function Step8Strength({
     ? (arc.equipment.strength as string[]).filter(Boolean)
     : [];
 
-  // Equipment detection mirrors `_shared/strength-equipment-tier.ts` (kept inline because edge
-  // helpers can't be imported by the Vite bundle). Conservative checks; barbell-or-DB unlocks
-  // performance protocol per docs/STRENGTH-PROTOCOL.md §2.
-  const equipLower = equipList.map((s) => String(s).toLowerCase());
-  const hasBarbellChip = equipLower.some(
-    (s) => s.includes('barbell') || s.includes('rack') || s.includes('cage') || s.includes('commercial gym'),
-  );
-  const hasDumbbellChip = equipLower.some((s) => s.includes('dumbbell') || /\bdb\b/.test(s));
-  const tier3IsBwBands = !hasBarbellChip && !hasDumbbellChip;
-  // Spec §8.2: when athlete has DBs but no barbell, ask DB max for the cap-and-scale-reps logic.
-  const tier3IsDumbbellBased = hasDumbbellChip && !hasBarbellChip;
-
-  // §5 1RM presence — any compound entry unlocks accurate loading.
-  const pn = arc?.performanceNumbers ?? null;
-  const has1RM = (() => {
-    if (!pn) return false;
-    const num = (v: unknown): boolean => {
-      const n = Number(v);
-      return Number.isFinite(n) && n > 0;
-    };
-    return (
-      num((pn as Record<string, unknown>).squat) ||
-      num((pn as Record<string, unknown>).squat1RM) ||
-      num((pn as Record<string, unknown>).squat_1rm) ||
-      num((pn as Record<string, unknown>).deadlift) ||
-      num((pn as Record<string, unknown>).dead_lift) ||
-      num((pn as Record<string, unknown>).bench) ||
-      num((pn as Record<string, unknown>).bench_press) ||
-      num((pn as Record<string, unknown>).benchPress) ||
-      num((pn as Record<string, unknown>).ohp) ||
-      num((pn as Record<string, unknown>).overhead_press) ||
-      num((pn as Record<string, unknown>).overhead) ||
-      num((pn as Record<string, unknown>).overheadPress1RM)
-    );
-  })();
-
+  // ⛔ THE TIER, THE PERFORMANCE GATE AND THE 1RM CHECK ARE THE SERVER'S (2026-09-10, audit item 20):
+  // get-arc-context's readout, from `resolveStrengthEquipmentTier3`, `gateStrengthIntentByTier` and the
+  // capacity resolver — the functions the goal is built with. This step matched chip words itself and
+  // ignored 1RMs, so an athlete with dumbbells and two compound 1RMs on file was treated as dumbbell-based
+  // while the build called them full barbell. None of the three shows until the readout arrives.
   const showGateWarning = state.strengthIncluded === true &&
     state.strengthIntent === 'performance' &&
-    tier3IsBwBands;
+    builder?.performance_downgraded === true;
   const show1RMWarning = state.strengthIncluded === true &&
     state.strengthIntent === 'performance' &&
     !showGateWarning &&
-    !has1RM;
-  const showDbMaxInput = state.strengthIncluded === true && tier3IsDumbbellBased;
+    builder?.barbell_lifts_on_file === 'none';
+  // Spec §8.2: when athlete has DBs but no barbell, ask DB max for the cap-and-scale-reps logic.
+  const showDbMaxInput = state.strengthIncluded === true && builder?.equipment_tier === 'dumbbell_based';
 
   const canContinue =
     state.strengthIncluded !== null &&
@@ -2682,6 +2597,45 @@ export default function ArcSetupWizard() {
       .catch(e => console.warn('[ArcSetupWizard] arc context load failed', e));
   }, []);
 
+  /**
+   * ⛔ THE SERVER'S READOUT FOR THESE ANSWERS (2026-09-10, audit item 20). get-arc-context returns
+   * `arc.builder`: the equipment tier and performance gate the strength step prints, whether any barbell
+   * lift has a number, and — for the answers sent — the sessions a week behind each hours card. Asked
+   * again when an answer those counts depend on changes (sent as the goal payload carries them); a count
+   * prints only for the answers it was worked out for.
+   */
+  const [builder, setBuilder] = useState<IntakeReadout | null>(null);
+  const [builderAskKey, setBuilderAskKey] = useState<string | null>(null);
+  const frequencyAsk = useMemo(() => {
+    const primary = state.races.find((r) => r.priority === 'A') || state.races[0];
+    const tri = isTri(primary?.distance || '');
+    return {
+      hours: HOURS_TIERS.map((t) => t.value),
+      days_per_week: state.daysPerWeek || 7,
+      strength_intent: state.strengthIncluded && state.strengthIntent ? state.strengthIntent : null,
+      swim_intent: tri && state.swimIntent ? state.swimIntent : null,
+    };
+  }, [state.races, state.daysPerWeek, state.strengthIncluded, state.strengthIntent, state.swimIntent]);
+  const frequencyAskKey = JSON.stringify(frequencyAsk);
+  useEffect(() => {
+    if (!getStoredUserId()) return;
+    let cancelled = false;
+    const today = new Date().toISOString().slice(0, 10);
+    supabase.functions
+      .invoke('get-arc-context', { body: { focus_date: today, session_frequency: frequencyAsk } })
+      .then(({ data, error: fnError }) => {
+        if (cancelled) return;
+        if (fnError) { console.warn('[ArcSetupWizard] readout load failed', fnError); return; }
+        const b = (data as { arc?: { builder?: IntakeReadout } } | null)?.arc?.builder ?? null;
+        setBuilder(b);
+        setBuilderAskKey(b ? frequencyAskKey : null);
+      })
+      .catch((e) => { if (!cancelled) console.warn('[ArcSetupWizard] readout load failed', e); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frequencyAskKey]);
+  const tierCounts = builderAskKey === frequencyAskKey ? builder?.session_frequency_by_tier ?? null : null;
+
   // Pre-select answers when Arc data arrives (only if athlete hasn't answered yet)
   useEffect(() => {
     if (!arcCtx) return;
@@ -2786,10 +2740,10 @@ export default function ArcSetupWizard() {
               <Step7Budget {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
             )}
             {currentStep === 'hours' && (
-              <Step7BHours {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
+              <Step7BHours {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} counts={tierCounts} />
             )}
             {currentStep === 'strength' && (
-              <Step8Strength {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} />
+              <Step8Strength {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} arc={arcCtx} builder={builder} />
             )}
             {currentStep === 'strength_ordering' && (
               <Step8bStrengthOrdering {...sharedProps} onNext={next} onBack={back} step={visualStep} totalSteps={totalSteps} />
