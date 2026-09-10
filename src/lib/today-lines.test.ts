@@ -217,3 +217,24 @@ Deno.test('families and bands are read off the tags, never off a name', () => {
   assertEquals(bandOf(ride('ride_endurance', 'vt1_or_easier')), 'vt1_or_easier');
   assertEquals(familyOf({ type: 'ride', name: 'Cyc endurance (level 1)' }), null);
 });
+
+// ⛔ THE RIDE WITH WORK'S SPRINT INTERVAL IS THE BUILT RIDE'S (p239: 9 at levels 1 and 3, 8 at level 2).
+const withWork = (level: number, every: number | null) => ({
+  id: 'ride', type: 'ride', training_plan_id: PLAN,
+  tags: ['standing_plan', 'family:ride_endurance', `level:${level}`, 'sport:ride', 'band:vt1_or_easier', 'archetype:mixed'],
+  steps_preset: every == null
+    ? ['bike_endurance_20min']
+    : ['bike_endurance_20min', 'round_4x_120s80-180s70', `bike_vt1sprint_45min_10s_every${every}min`],
+});
+
+Deno.test('the ride with work reads its sprint interval off the row: 9, 8, 9', () => {
+  const line = (n: number) =>
+    `Easy ride with a block of 2-minute pushes, then a 10-second sprint every ${n} minutes. Everything else under 75 percent of FTP.`;
+  assertEquals(enduranceLinesFor(withWork(1, 9)), [line(9)]);
+  assertEquals(enduranceLinesFor(withWork(2, 8)), [line(8)]);
+  assertEquals(enduranceLinesFor(withWork(3, 9)), [line(9)]);
+});
+
+Deno.test('⛔ A RIDE WITH WORK AND NO SPRINT TOKEN GETS NO LINE — never a fixed number', () => {
+  assertEquals(enduranceLinesFor(withWork(1, null)), []);
+});

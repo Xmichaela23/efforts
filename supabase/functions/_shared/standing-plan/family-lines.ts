@@ -25,7 +25,7 @@ export const FAMILY_LINE: Readonly<Record<string, string>> = {
   // p237.
   ride_anaerobic: 'Go by feel. Stay above the floor. No ceiling. Each set harder than the last.',
   // p239, p211. REVISED 2026-09-10 (approved): lead with what the ride is. The plain version; the
-  // with-work version is `RIDE_ENDURANCE_WITH_WORK_LINE`, chosen by archetype in `familyLineFor`.
+  // with-work version is `rideWithWorkLine`, chosen by archetype in `familyLineFor`.
   ride_endurance: 'Easy ride, under 75 percent of FTP the whole way. You should be able to talk in full sentences.',
   // p233, p110 — the hard run, both family ids.
   run_mlss: 'Stay near threshold as long as you can without falling apart.',
@@ -41,11 +41,25 @@ export const FAMILY_LINE: Readonly<Record<string, string>> = {
 /**
  * ⛔ THE ENDURANCE RIDE HAS TWO APPROVED LINES, ONE PER p239 VERSION (Michael, 2026-09-10). The
  * `mixed` archetype is the ride with work in it; every other ride_endurance session is the plain one.
- * ⚠️ THE LINE SAYS "every 9 minutes", verbatim as approved. p239 prints level 2's sprint every 8 —
- * the level-2 row therefore reads 9 over a ride that sprints every 8. Flagged, not reworded.
+ * ⛔ THE SPRINT INTERVAL COMES FROM THE BUILT SESSION, never a fixed word (2026-09-10): p239 prints a
+ * sprint every 9 minutes at levels 1 and 3 and every 8 at level 2.
  */
-export const RIDE_ENDURANCE_WITH_WORK_LINE =
-  'Easy ride with a block of 2-minute pushes, then a 10-second sprint every 9 minutes. Everything else under 75 percent of FTP.';
+export function rideWithWorkLine(sprintEveryMinutes: number): string {
+  return `Easy ride with a block of 2-minute pushes, then a 10-second sprint every ${sprintEveryMinutes} minutes. Everything else under 75 percent of FTP.`;
+}
+
+/**
+ * The sprint interval, in minutes, off a planned row's own tokens — the token the builder writes for
+ * the VT1-with-sprints block (`bike_vt1sprint_45min_10s_every9min`). Null when the row has none.
+ */
+export function sprintEveryMinutesFromTokens(tokens: unknown): number | null {
+  if (!Array.isArray(tokens)) return null;
+  for (const t of tokens) {
+    const m = String(t).toLowerCase().match(/^bike_vt1sprint_\d+min_\d+s_every(\d+)min$/);
+    if (m && Number(m[1]) > 0) return Number(m[1]);
+  }
+  return null;
+}
 
 /**
  * ⛔ THE PEDALLING NOTE LIVES IN THE DRAWER, UNDER THE LINE — not on Today (2026-09-10). p239: several
@@ -54,9 +68,19 @@ export const RIDE_ENDURANCE_WITH_WORK_LINE =
 export const RIDE_ENDURANCE_DRAWER_NOTE =
   'Spend a few minutes of the ride paying attention to how you pedal (smooth circles, not stomping) and how you sit on the bike.';
 
-/** The approved line for a family (and, for the endurance ride, its archetype), or null. */
-export function familyLineFor(family: string | null | undefined, archetype?: string | null): string | null {
+/**
+ * The approved line for a family (and, for the endurance ride, its archetype), or null.
+ * ⚠️ A RIDE WITH WORK WHOSE SPRINT INTERVAL IS NOT KNOWN GETS NO LINE. The plain line would say "the
+ * whole way" over a ride with pushes in it, and a guessed interval is the fixed word this replaced.
+ */
+export function familyLineFor(
+  family: string | null | undefined,
+  archetype?: string | null,
+  sprintEveryMinutes?: number | null,
+): string | null {
   if (!family) return null;
-  if (family === 'ride_endurance' && archetype === 'mixed') return RIDE_ENDURANCE_WITH_WORK_LINE;
+  if (family === 'ride_endurance' && archetype === 'mixed') {
+    return sprintEveryMinutes != null && sprintEveryMinutes > 0 ? rideWithWorkLine(sprintEveryMinutes) : null;
+  }
   return FAMILY_LINE[family] ?? null;
 }

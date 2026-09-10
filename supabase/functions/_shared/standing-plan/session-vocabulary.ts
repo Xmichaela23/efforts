@@ -203,20 +203,31 @@ function embeddedBlockTokens(session: EnduranceSession, steadyIndex = 0): string
  * ⚠️ THE VT1 BOUT TRAVELS AS ONE TOKEN, not as its pieces: the materializer cuts it again, so the
  * watch sees the same (interval − sprint) + sprint pieces the library built.
  */
+/**
+ * The VT1-with-sprints block's sprint and its interval (sprint start to sprint start), or null. One
+ * reader for the token and for the drawer line, so the line's "every N minutes" is the built ride's.
+ */
+function printedSprint(session: EnduranceSession): { sprintSeconds: number; everySeconds: number } | null {
+  for (const block of session.blocks) {
+    const steps = block.steps.filter((st) => st.seconds != null && (st.seconds as number) > 0);
+    const sprint = steps.find((st) => (st.intensity as { kind?: string } | null)?.kind === 'all_out');
+    if (!sprint) continue;
+    const easy = steps.find((st) => (st.intensity as { kind?: string } | null)?.kind === 'vt1');
+    const sprintSeconds = sprint.seconds as number;
+    return { sprintSeconds, everySeconds: ((easy?.seconds as number) ?? 0) + sprintSeconds };
+  }
+  return null;
+}
+
 function printedRideTokens(session: EnduranceSession): string[] {
   const out: string[] = [];
   let vt1Seconds = 0;
-  let sprintSeconds = 0;
-  let everySeconds = 0;
+  const sprint = printedSprint(session);
   for (const block of session.blocks) {
     const steps = block.steps.filter((st) => st.seconds != null && (st.seconds as number) > 0);
     const kinds = steps.map((st) => (st.intensity as { kind?: string } | null)?.kind);
     if (kinds.includes('all_out')) {
-      const sprint = steps.find((st) => (st.intensity as { kind?: string }).kind === 'all_out')!;
-      const easy = steps.find((st) => (st.intensity as { kind?: string }).kind === 'vt1');
-      sprintSeconds = sprint.seconds as number;
-      everySeconds = (easy?.seconds as number ?? 0) + sprintSeconds;
-      vt1Seconds += block.repeat * everySeconds;
+      vt1Seconds += block.repeat * (sprint?.everySeconds ?? 0);
       continue;
     }
     if (steps.length === 1 && kinds[0] === 'vt1') { vt1Seconds += block.repeat * (steps[0].seconds as number); continue; }
@@ -225,8 +236,8 @@ function printedRideTokens(session: EnduranceSession): string[] {
     if (steps.length === 1 && kinds[0] === 'easy') { out.push(`bike_recovery_${minutes(steps[0].seconds as number)}min`); continue; }
     if (steps.length === 1) { out.push(`bike_endurance_${minutes(steps[0].seconds as number)}min`); continue; }
   }
-  if (vt1Seconds > 0 && sprintSeconds > 0 && everySeconds > 0) {
-    out.push(`bike_vt1sprint_${minutes(vt1Seconds)}min_${Math.round(sprintSeconds)}s_every${minutes(everySeconds)}min`);
+  if (vt1Seconds > 0 && sprint && sprint.sprintSeconds > 0 && sprint.everySeconds > 0) {
+    out.push(`bike_vt1sprint_${minutes(vt1Seconds)}min_${Math.round(sprint.sprintSeconds)}s_every${minutes(sprint.everySeconds)}min`);
   }
   return out;
 }
@@ -708,7 +719,9 @@ function describeSession(session: EnduranceSession, raceTempo: boolean): string 
    * sentence is the only place the difference is stated.
    */
   const parts: string[] = [];
-  const line = familyLineFor(session.family, session.archetype);
+  // ⛔ THE RIDE WITH WORK'S "every N minutes" IS THE BUILT RIDE'S OWN INTERVAL (p239: 9, 8, 9).
+  const sprint = printedSprint(session);
+  const line = familyLineFor(session.family, session.archetype, sprint ? minutes(sprint.everySeconds) : null);
   if (line) parts.push(line);
   // ⛔ THE PEDALLING NOTE, UNDER THE LINE, IN THE DRAWER ONLY (2026-09-10, p239).
   if (session.family === 'ride_endurance') parts.push(RIDE_ENDURANCE_DRAWER_NOTE);

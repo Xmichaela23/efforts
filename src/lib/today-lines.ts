@@ -15,7 +15,7 @@
  * and the row's own `slot_intent` are data; a session's NAME is a label that changes.
  */
 
-import { familyLineFor } from '@shared/standing-plan/family-lines';
+import { familyLineFor, sprintEveryMinutesFromTokens } from '@shared/standing-plan/family-lines';
 
 /** The rows a session carries. Only the fields this file reads. */
 export type TodayStrengthRow = {
@@ -247,7 +247,12 @@ export function enduranceLinesFor(session: TodayRow): string[] {
   const family = familyOf(session);
   // ⚠️ THE ARCHETYPE PICKS THE ENDURANCE RIDE'S LINE (plain / with work). A row without the tag — any row
   // written before 2026-09-10 — gets the plain line, which is what every such row actually is.
-  const line = familyLineFor(family, tagValue(session, 'archetype'));
+  // ⛔ THE WITH-WORK LINE'S SPRINT INTERVAL IS READ OFF THE ROW'S OWN TOKENS, the ride the server built.
+  const line = familyLineFor(
+    family,
+    tagValue(session, 'archetype'),
+    sprintEveryMinutesFromTokens((session as { steps_preset?: unknown } | null)?.steps_preset),
+  );
   return line ? [line] : [];
 }
 
