@@ -80,12 +80,12 @@ const keyFmt1 = (v: number | null | undefined) => (v == null || !Number.isFinite
  * ⛔ THE LOAD EXPLANATION, IN ONE PLACE (2026-09-09). Two surfaces open it — State, behind this
  * bar's ⓘ, and Today's load card, behind its chevron. It is athlete-facing copy, and a second copy
  * of these paragraphs is a second thing to keep true, so it is extracted rather than duplicated.
- * ⚠️ THE WORDS ARE UNCHANGED. Only where they live moved.
+ * ⚠️ SO A CHANGE HERE LANDS ON BOTH — which is the point: Michael's new form sentence reached State
+ * and Today in one edit, and neither can drift from the other.
  *
- * ⛔ AND SPLIT IN TWO, because Today's open LOAD card deals them as separate cards — the
- * form table on one, the workload paragraph on another. ⚠️ THE WORDS ARE UNCHANGED; only the
- * boundary between them is new, and it falls where the copy already broke: the second paragraph
- * ends *"comes from this table:"* and belongs with the table it introduces.
+ * ⛔ AND SPLIT IN TWO, because Today's open LOAD card deals them as separate cards — the form table
+ * on one, the workload paragraph on another. The boundary falls between the two subjects: what a
+ * workload point is, and what form is.
  */
 export function LoadKeyWorkload() {
   return (
@@ -99,7 +99,22 @@ export function LoadKeyForm({ ff }: { ff: NonNullable<LoadBarData['fitness_fatig
   const zone = formZone(ff?.form);
   return (
     <div className="text-[12px] text-white/65 leading-snug">
-      <p>Form is one subtraction, fitness − fatigue, taken as you start the day{keyFmt1(ff.fitness_prior) != null && keyFmt1(ff.fatigue_prior) != null ? `: ${keyFmt1(ff.fitness_prior)} − ${keyFmt1(ff.fatigue_prior)} = ${(ff.form ?? 0) > 0 ? '+' : ''}${keyFmt1(ff.form)}` : ''}. The word beside it comes from this table:</p>
+      {/**
+        * ⛔ MICHAEL'S LINE (2026-09-09), VERBATIM. It replaced *"Form is one subtraction, fitness −
+        * fatigue, taken as you start the day … The word beside it comes from this table:"* — which
+        * named the arithmetic and never said what the SIGN means, the one thing a reader wants from
+        * a number that can go negative.
+        * ⚠️ AND NO LEAD-IN ABOVE THE TABLE. The old sentence ended by introducing it; his does not,
+        * and the table is left to stand on its own.
+        * ⚠️ THE NUMBERS ARE LIVE — his "47 − 63 = −16" is the shape, not the values. The sentence is
+        * dropped entirely when either number is missing, rather than printed with a blank in it.
+        */}
+      <p>
+        Form is fitness minus fatigue. Below zero you are training harder than usual, building but tired. Above zero you are rested.
+        {keyFmt1(ff.fitness_prior) != null && keyFmt1(ff.fatigue_prior) != null
+          ? ` Today: ${keyFmt1(ff.fitness_prior)} − ${keyFmt1(ff.fatigue_prior)} = ${(ff.form ?? 0) > 0 ? '+' : (ff.form ?? 0) < 0 ? '−' : ''}${Math.abs(keyFmt1(ff.form) ?? 0)}.`
+          : ''}
+      </p>
       <table className="mt-1 text-[12px] tabular-nums">
         <tbody>
           {([['above +25', 'transitional', 'fitness fading'], ['+5 to +25', 'fresh', 'race shape'], ['−10 to +5', 'grey zone', 'not building, not sharp'], ['−30 to −10', 'optimal', 'building'], ['below −30', 'high risk', '']] as Array<[string, string, string]>).map(([range, word, meaning]) => (
