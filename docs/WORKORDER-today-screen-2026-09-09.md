@@ -33,7 +33,12 @@ Data: today's rows from `get-week` (the rows `TodaysEffort.tsx` already loads). 
    "run" for a run day. On a lift day with no skill and no speed sets the second sentence drops. The
    app already reads the day's rows to pick the branch; keep that, and show the book's preferred order
    (lift first) with the cost of the other, not one branch alone. The earlier lines below are history.
-   **Form line**: stays beside the weather in the header block (Michael, 2026-09-10).
+   **Upper-body day** (Michael, 2026-09-10): on a day whose lift is an upper-body session (frame day
+   label / tags, never the name), the "If they have to be closer" text is `Lift first and keep the ride
+   easy.` only; the sentence about riding first costing the lift drops, because that cost is a leg cost
+   (p131: fresh in the systems the session uses; p251: switch upper and lower days when legs are tired;
+   p274 pairs the upper pull day with an easy ride). The six-to-eight-hours line stays on every day.
+   **Form line**: moved to the status card (§3g, then the one-block-per-subject change).
    ORIGINAL: **Spacing line**, only when the day has two sessions. Built from the day's own data (ride or run length
    and family, lift day, set count), never a list of rules. APPROVED (Michael's words):
    - `Two sessions today. Six to eight hours apart.` (p145)
