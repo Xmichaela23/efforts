@@ -51,9 +51,18 @@ Data: today's rows from `get-week` (the rows `TodaysEffort.tsx` already loads). 
    - **Endurance session**: one line for the family, then the stop rule.
      - `family:ride_anaerobic`: `Go by feel. Stay above the floor. No ceiling. Each set harder than the last.`
        (p237). APPROVED.
-     - `family:ride_endurance`: `Easy, under 75 percent. Spend a few minutes of the ride paying attention to
-       how you pedal (smooth circles, not stomping) and how you sit on the bike. Truly easy.` (p239, p275).
-       APPROVED.
+     - `family:ride_endurance`, REVISED 2026-09-10 (Michael: lead with what the ride is). Two lines, one per
+       p239 version, chosen by the session's archetype:
+       · plain: `Easy ride, under 75 percent of FTP the whole way. You should be able to talk in full
+         sentences.` (p239, p211)
+       · with work: `Easy ride with a block of 2-minute pushes, then a 10-second sprint every 9 minutes.
+         Everything else under 75 percent of FTP.` (p239)
+       The pedalling and position note (`Spend a few minutes of the ride paying attention to how you pedal
+       (smooth circles, not stomping) and how you sit on the bike.`) moves to the drawer under the line.
+       BUILDER FIX: the with-work version must be p239 level 1 as printed (20 min easy · 4 × (2 min @ 80% /
+       3 min @ 70%) · 45 min at VT1 with a 10-second sprint every 9 minutes). Ours built 40 min steady
+       first and no sprint block; read `session-vocabulary.ts` / the endurance library for why before
+       changing, then make it match the page, levels 2 and 3 likewise. Regenerate goldens.
      - `family:run_mlss` and `family:run_near_threshold` (the Hard Run): `Stay near threshold as long as you can without
        falling apart.` (p233, p110). APPROVED.
      - `family:run_lsd` (the Long Run): `Easy the whole way. Stopping for a bit is fine. Be able to speak long
