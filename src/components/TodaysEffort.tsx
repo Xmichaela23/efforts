@@ -38,7 +38,8 @@ import {
  */
 import { resolveSwapWrite } from '@/lib/swap-write';
 // ⛔ EVERY WORD ON THE SWAP SHEET IS MICHAEL'S, AND LIVES IN ONE FILE.
-import { swapButtonLabel, swapLineFor, SWAP_BACK_TO_PLAN, SWAP_SHEET_HEADER } from '@/lib/swap-copy';
+import { swapButtonLabel, SWAP_BACK_TO_PLAN, SWAP_SHEET_HEADER } from '@/lib/swap-copy';
+import SwapPreviewLine from './SwapPreviewLine';
 import { formatSwimPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout, displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore, formZoneColor } from '@/lib/context-utils';
@@ -2767,18 +2768,23 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       {/* ⛔ MICHAEL'S HEADER (2026-09-09), from `swap-copy` with every other word here. */}
                       <div className="text-[13px] text-white/70 pb-1">{SWAP_SHEET_HEADER}</div>
                       {/* ⛔ THE SAME TWO CHOICES THE LIFT SWAP OFFERS (work order §6). Just today is the
-                          default — one row — and Rest of plan writes this session's later repeats too. */}
+                          default — one row — and Rest of plan writes this session's later repeats too.
+                          ⛔ AN EASY SESSION OFFERS JUST TODAY ONLY (Michael, 2026-09-10). Easy work can
+                          be any sport on any day; swapping every later easy ride for a run is a
+                          different plan, not a swap. Hard and long sessions keep both. */}
                       <div className="flex items-center gap-2 pb-1">
                         <button
                           type="button"
                           onClick={() => setSwapRestOfPlan(false)}
                           className={`px-2.5 py-1 rounded-xl text-[12px] border transition-colors ${!swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/70 hover:text-white/80'}`}
                         >Just today</button>
-                        <button
-                          type="button"
-                          onClick={() => setSwapRestOfPlan(true)}
-                          className={`px-2.5 py-1 rounded-xl text-[12px] border transition-colors ${swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/70 hover:text-white/80'}`}
-                        >Rest of plan</button>
+                        {intensityOf(w as never) !== 'easy' ? (
+                          <button
+                            type="button"
+                            onClick={() => setSwapRestOfPlan(true)}
+                            className={`px-2.5 py-1 rounded-xl text-[12px] border transition-colors ${swapRestOfPlan ? 'border-teal-300/60 bg-teal-400/15 text-teal-100' : 'border-white/15 bg-white/[0.04] text-white/70 hover:text-white/80'}`}
+                          >Rest of plan</button>
+                        ) : null}
                       </div>
                       {swapOptions.map((opt) => (
                         <button
@@ -2787,14 +2793,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           key={`${opt.kind ?? 'discipline'}:${opt.venue ?? opt.to}`}
                           type="button"
                           disabled={swappingSession}
-                          onClick={() => handleApplyDisciplineSwap(w, opt, swapRestOfPlan)}
+                          onClick={() => handleApplyDisciplineSwap(w, opt, swapRestOfPlan && intensityOf(w as never) !== 'easy')}
                           className="w-full px-4 py-3 rounded-xl text-left text-white border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] transition-colors disabled:opacity-50"
                         >
                           <div className="text-sm font-medium">{swapButtonLabel(opt)}</div>
-                          {/* ⛔ MICHAEL'S LINE, FROM `swap-copy` — one owner for every word here. */}
-                          {swapLineFor(opt) ? (
-                            <div className="text-[12px] text-white/55 mt-1">{swapLineFor(opt)}</div>
-                          ) : null}
+                          {/* ⛔ THE SESSION YOU GET, OR THE MACHINE'S / THE WAY BACK'S APPROVED LINE —
+                              `SwapPreviewLine` asks the same resolver the tap writes with. */}
+                          <SwapPreviewLine row={w as never} option={opt} className="text-[12px] text-white/55 mt-1" />
                           {/* ⛔ WARN, NEVER GATE — the button above still works. */}
                           {opt.warnings.map((warn) => (
                             <div key={warn} className="text-[12px] text-amber-200/80 mt-1">{warn}</div>

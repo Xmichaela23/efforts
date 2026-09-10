@@ -12,23 +12,8 @@
  * is a one-word change per line and this comment is where to look first.
  */
 
-/** Basis: Viada p137 — *"when in doubt, use cross-training for easy work, not threshold or sprint work."* */
-export const SWAP_EASY = 'Easy work can be any sport. Hard work cannot.';
 
-/**
- * Basis: Viada p138 — the swap is permitted *"if you're really pushing the limits of your tolerable
- * volume."*
- *
- * ⛔ REWRITTEN ON THE DEVICE (§8, APPROVED 2026-09-09). It read *"Allowed when running is at your
- * limit."* — a permission slip, which told the athlete the rule and not the session. The line now
- * names WHAT the option is before it names when to take it, which is the order every other line on
- * this sheet already uses.
- */
-export const SWAP_HARD_RUN_TO_RIDE =
-  "The plan's hard ride. For when running is at your limit but you want to push.";
 
-/** Basis: Viada p275 — *"a hike, a long ride, a team sport day, or whatever else is of interest."* */
-export const SWAP_LONG_DAY = 'A long ride or a hike counts as the long day.';
 
 /** Basis: Viada p275 — the same session on a machine, *"as long as you know your threshold on it."* */
 export const SWAP_MACHINE = 'Same session, indoors.';
@@ -63,9 +48,6 @@ export const VENUE_OUTDOORS = 'Outdoors';
 
 /** The sheet's line for one option, by the key the library stamped on it. */
 export const SWAP_LINE: Record<string, string> = {
-  'swap.easy.pending': SWAP_EASY,
-  'swap.hard_run_to_ride.pending': SWAP_HARD_RUN_TO_RIDE,
-  'swap.long_day.pending': SWAP_LONG_DAY,
   'swap.machine.pending': SWAP_MACHINE,
   'swap.machine.ground_impact.pending': SWAP_MACHINE_TREADMILL,
   'swap.back_to_plan': SWAP_BACK_TO_PLAN,
@@ -82,6 +64,12 @@ export function swapLineFor(opt: { kind?: string; copyKey?: string; venue?: stri
   // and would otherwise fall through to the machine's own line — the sentence for going indoors,
   // printed under the button for coming back out.
   if (opt.kind === 'revert') return SWAP_BACK_TO_PLAN;
+  /**
+   * ⛔ A SPORT SWAP AND THE HIKE HAVE NO FIXED LINE ANY MORE (2026-09-10). Their line is the session
+   * handed over — `swapSessionLine`, resolved by `SwapPreviewLine` against `resolveSwapWrite`. A
+   * fixed sentence here would be the permission rule the sheet no longer prints.
+   */
+  if ((opt.kind ?? 'discipline') === 'discipline' || opt.kind === 'hike') return null;
   if (opt.venue === 'treadmill') return SWAP_MACHINE_TREADMILL;
   return opt.copyKey ? SWAP_LINE[opt.copyKey] ?? null : null;
 }
@@ -102,4 +90,37 @@ export function swapButtonLabel(opt: { kind?: string; venue?: string; to: string
   if (opt.kind === 'venue') return VENUE_LABEL[opt.venue ?? ''] ?? '';
   if (opt.kind === 'hike') return 'Hike';
   return opt.to === 'ride' ? 'Ride instead' : opt.to === 'swim' ? 'Swim instead' : 'Run instead';
+}
+
+/**
+ * ═══ THE LINE UNDER A SPORT SWAP IS THE SESSION YOU GET (Michael, 2026-09-10) ════════════════════
+ *
+ * `[Name], [length]. Takes this [ride/run]'s place.` — built from the session the swap actually hands
+ * over, which `resolveSwapWrite` resolves: the athlete's own composed row of the target family when
+ * the plan has one, the library's session for their level when it does not. The sheet asks that one
+ * resolver rather than guessing, so the line and the row the tap writes cannot disagree.
+ *
+ * ⛔ IT REPLACES THE PERMISSION SENTENCES. "Easy work can be any sport. Hard work cannot." and "The
+ * plan's hard ride. For when running is at your limit but you want to push." told the athlete a rule;
+ * this tells them what they will be doing, which is the thing they are choosing between.
+ *
+ * ⚠️ THE LENGTH READS TWO WAYS ON PURPOSE, per the approved examples: minutes for an ordinary session
+ * (`Easy Run, 45 min.`, `Anaerobic Ride, 66 min.`), hours and minutes for the long day (`Long Run,
+ * 1h 55m.`, `Hike, 2h 45m.`), where a figure in the hundreds of minutes is the one nobody reads.
+ */
+export function swapSessionLine(args: {
+  name: string;
+  minutes: number;
+  /** The long day prints hours and minutes. */
+  long: boolean;
+  /** The sport of the session being REPLACED — the one whose place is taken. */
+  replacing: 'ride' | 'run' | 'swim';
+}): string | null {
+  const name = String(args.name ?? '').trim();
+  const mins = Math.round(Number(args.minutes));
+  if (!name || !Number.isFinite(mins) || mins <= 0) return null;
+  const length = args.long
+    ? `${Math.floor(mins / 60) > 0 ? `${Math.floor(mins / 60)}h ` : ''}${String(mins % 60).padStart(Math.floor(mins / 60) > 0 ? 2 : 1, '0')}m`
+    : `${mins} min`;
+  return `${name}, ${length}. Takes this ${args.replacing}'s place.`;
 }
