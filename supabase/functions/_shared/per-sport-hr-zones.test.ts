@@ -94,20 +94,14 @@ Deno.test('the SCREEN does no zone maths and writes no zones (2026-09-10)', () =
   assert(!/configured_hr_zones\s*:\s*configuredZones|update\(\{\s*configured_hr_zones/.test(codeOnly), 'the screen writes configured_hr_zones again');
 });
 
-Deno.test('the estimate tier anchors on the athlete\'s OWN max, not on their age', () => {
-  // ⛔ Refusing the learner's `90% of observed max` anchor must not drop the card to
-  // `Tanaka(age) x 0.88` — that swaps a formula on a MEASUREMENT for a formula on a formula. The
-  // athlete's observed peak is real (20 rides, high confidence on the account this was found on).
-  assert(
-    /const estimatedLTHR = effectiveMaxHR[\s\S]{0,120}Math\.round\(effectiveMaxHR \* 0\.88\)/.test(baselinesSrc),
-    'the LTHR estimate no longer anchors on the measured max',
-  );
-  assert(
-    /ageEstimates\s*\?\s*ageEstimates\.thresholdHR\s*:\s*null/.test(baselinesSrc),
-    'the age tier was removed entirely — it is the right answer for an athlete with no history',
-  );
-  // And the label distinguishes the two, so "est. from max" and "age est." cannot read alike.
-  assert(/'est\. from max'/.test(baselinesSrc), 'the estimate no longer says what it was estimated from');
+Deno.test('the SCREEN shows the stored threshold heart rate or nothing — no estimate from max or age (2026-09-10)', () => {
+  // ⛔ Michael, 2026-09-10: remove the 88%-of-max threshold estimate from Profile. This test used to pin
+  // that estimate (and an age tier below it); both were numbers the engine refuses to use, shown as if
+  // they were the athlete's threshold. The row now prints the resolver's value or nothing.
+  const codeOnly = baselinesSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  assert(/const effLthr = lthr\.bpm \?\? null;/.test(codeOnly), 'the threshold row falls back to an estimate again');
+  assert(!/\*\s*0\.88\b/.test(codeOnly), 'an 88%-of-max threshold estimate is back on the screen');
+  assert(!/thresholdHR/.test(codeOnly), 'an age-based threshold estimate is back on the screen');
 });
 
 Deno.test('the HR inputs show the SAME number the zones are built from', () => {

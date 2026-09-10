@@ -19,8 +19,9 @@ import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { runThresholdTestRow, ftpTestRow } from '@/lib/baseline-tests';
 import { fetchArcContext } from '@/lib/fetch-arc-context';
 import { fiveKNudgeDismissKey, type ArcFiveKLearnedDivergence } from '@/lib/arc-types';
-import { resolveCurrentFtp, pendingFtpProposal, acceptEstimatedFtp } from '@/lib/resolve-current-ftp';
-import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace, describeThresholdBasis, pendingRunThresholdProposal, acceptLearnedRunThreshold } from '@/lib/resolve-current-run-pace';
+import { resolveCurrentFtp, pendingFtpProposal } from '@/lib/resolve-current-ftp';
+import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace, describeThresholdBasis, pendingRunThresholdProposal } from '@/lib/resolve-current-run-pace';
+import { acceptMeasuredNumber } from '@/lib/accept-measured';
 import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
 import { ageEstimateMaxHr, resolveCurrentMaxHr } from '@/lib/resolve-current-max-hr';
 import { resolveStrengthCapacity } from '@shared/state-trend/capacity-resolver';
@@ -210,22 +211,25 @@ const [ftpInfoOpen, setFtpInfoOpen] = useState(false);
 // modal, not a banner; nothing moves until the tap.
 const [ftpAccepting, setFtpAccepting] = useState(false);
 const [ftpAcceptNote, setFtpAcceptNote] = useState<string>('');
-const acceptMeasuredFtp = async () => {
+/** After an accept, the screen shows the row the server saved (learned numbers and the cleared manual flag). */
+const reloadSavedBaselines = async () => {
+  const fresh = await loadUserBaselines();
+  if (!fresh) return;
+  setData(fresh as BaselineData);
+  setOriginalData(JSON.stringify(fresh));
+  const raw = (fresh as { learned_fitness?: unknown }).learned_fitness;
+  setLearnedFitness(typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return null; } })() : (raw ?? null));
+};
+// ⛔ THE PHONE SENDS THE NUMBER THE BUTTON SHOWED; save-baselines saves the accept (2026-09-10).
+const acceptMeasuredFtp = async (shownWatts: number) => {
   const userId = getStoredUserId();
   if (!userId || ftpAccepting) return;
   setFtpAccepting(true);
   try {
-    const { data: row } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', userId).maybeSingle();
-    let lf: Record<string, unknown> | null = null;
-    const raw = row?.learned_fitness;
-    if (typeof raw === 'string') { try { lf = JSON.parse(raw); } catch { lf = null; } }
-    else if (raw && typeof raw === 'object') lf = raw as Record<string, unknown>;
-    const next = acceptEstimatedFtp(lf, 'baselines');
-    if (!next) return;
-    const { error } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', userId);
-    if (error) { console.error('[TrainingBaselines] FTP accept failed:', error); return; }
-    setLearnedFitness(next);
-    const acceptedW = Math.round(Number((next.ride_ftp_accepted as { value: number }).value));
+    const res = await acceptMeasuredNumber(supabase, 'ftp', shownWatts);
+    if (!res.ok) { console.error('[TrainingBaselines] FTP accept failed:', res.error); return; }
+    await reloadSavedBaselines();
+    const acceptedW = Math.round(res.acceptedValue);
     let note = `${acceptedW} watts in use.`;
     try {
       const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } });
@@ -821,11 +825,10 @@ const getAgeBasedHREstimates = (birthday: string | undefined, gender?: string) =
   // ONE age formula (Tanaka / Gulati for female) so this matches the HRZoneChart "auto" default —
   // was 220 − age, which no other surface used (audit 2026-07-17 #5).
   const maxHR = ageEstimateMaxHr(age, gender);
-  const thresholdHR = Math.round(maxHR * 0.88);
-  
+  // ⛔ NO THRESHOLD ESTIMATE HERE (2026-09-10). An 88%-of-max threshold used to be derived for display.
+
   return {
     maxHR,
-    thresholdHR,
     age
   };
 };
@@ -1158,9 +1161,11 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
     const learnedMax = (isRun ? learnedFitness?.run_max_hr_observed?.value : learnedFitness?.ride_max_hr_observed?.value) || null;
     const lthr = resolveCurrentLthr(baselinesLike, { sport });
     const effMax = manualMax || learnedMax || (ageEstimates ? ageEstimates.maxHR : null);
-    const effLthr = lthr.bpm ?? (effMax ? Math.round(effMax * 0.88) : (ageEstimates ? ageEstimates.thresholdHR : null));
+    // ⛔ THE STORED THRESHOLD OR NOTHING (Michael, 2026-09-10). This fell back to 88% of max heart rate, then
+    // to an age estimate — a number the engine refuses to use (`resolve-current-lthr.ts`), shown as if it were one.
+    const effLthr = lthr.bpm ?? null;
     const lthrMine = isRun ? pnAny.lthr_source === 'manual' : manualLthr != null;
-    const lthrNote = lthrMine ? 'your number' : lthr.bpm != null ? (String(lthr.source ?? '').includes('estimate') || String(lthr.source ?? '').includes('max') ? 'estimated from max heart rate' : `from ${isRun ? 'runs' : 'rides'}`) : effMax ? 'estimated from max heart rate' : ageEstimates ? 'age estimate' : null;
+    const lthrNote = lthrMine ? 'your number' : lthr.bpm != null ? (String(lthr.source ?? '').includes('estimate') || String(lthr.source ?? '').includes('max') ? 'estimated from max heart rate' : `from ${isRun ? 'runs' : 'rides'}`) : null;
     const maxNote = manualMax ? 'your number' : learnedMax ? `observed in ${isRun ? 'runs' : 'rides'}` : ageEstimates ? 'age estimate' : null;
     const rows: React.ReactNode[] = [];
     rows.push(
@@ -1230,7 +1235,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
           {thrProposal && (
             <div className="flex items-center justify-between py-1 gap-3">
               <span className="text-[13px] text-white/70">Your runs measure {paceToText(thrProposal.measuredSecPerKm * 1.609344)}</span>
-              <button type="button" disabled={thrAccepting} onClick={() => void acceptThr()} style={{ borderColor: `${getDisciplineColor('run')}88`, color: getDisciplineColor('run') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{thrAccepting ? 'Applying…' : `use ${paceToText(thrProposal.measuredSecPerKm * 1.609344)}`}</button>
+              <button type="button" disabled={thrAccepting} onClick={() => void acceptThr(thrProposal.measuredSecPerKm)} style={{ borderColor: `${getDisciplineColor('run')}88`, color: getDisciplineColor('run') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{thrAccepting ? 'Applying…' : `use ${paceToText(thrProposal.measuredSecPerKm * 1.609344)}`}</button>
             </div>
           )}
           <NumberRow id="easy" name="Easy pace" editable={false} sport="run" value={paceToText(easy.sec_per_mi)} note={easy.sec_per_mi != null ? (easy.source === 'learned' ? 'from your last five easy runs' : 'threshold pace × 1.19, until five easy runs are logged') : 'follows threshold pace'} />
@@ -1266,7 +1271,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
           {proposal && (
             <div className="flex items-center justify-between py-1 gap-3">
               <span className="text-[13px] text-white/70">Your rides measure {Math.round(proposal.measured)} W</span>
-              <button type="button" disabled={ftpAccepting} onClick={() => void acceptMeasuredFtp()} style={{ borderColor: `${getDisciplineColor('bike')}88`, color: getDisciplineColor('bike') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{ftpAccepting ? 'Applying…' : `use ${Math.round(proposal.measured)} W`}</button>
+              <button type="button" disabled={ftpAccepting} onClick={() => void acceptMeasuredFtp(proposal.measured)} style={{ borderColor: `${getDisciplineColor('bike')}88`, color: getDisciplineColor('bike') }} className="text-[13px] px-3 py-1 rounded-xl border bg-white/[0.04] disabled:opacity-50">{ftpAccepting ? 'Applying…' : `use ${Math.round(proposal.measured)} W`}</button>
             </div>
           )}
           {ftpAcceptNote && <p className="text-[12px] text-white/60">{ftpAcceptNote}</p>}
@@ -1362,18 +1367,15 @@ const persistEquipmentSoon = () => { if (equipPersistRef.current) window.clearTi
 const latestData = useRef(data); latestData.current = data;
 const setDataAndPersist = () => { setLastSavedSport(activeSport ?? 'you'); void persist(latestData.current); };
 const [thrAccepting, setThrAccepting] = useState(false);
-const acceptThr = async () => {
+// ⛔ THE PHONE SENDS THE PACE THE BUTTON SHOWED (sec/km); save-baselines saves the accept and the flag.
+const acceptThr = async (shownSecPerKm: number) => {
   const uid = getStoredUserId(); if (!uid || thrAccepting) return;
   setThrAccepting(true);
   try {
-    const { data: row } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', uid).maybeSingle();
-    const raw = row?.learned_fitness; const cur = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    const next = acceptLearnedRunThreshold(cur as any, 'baselines'); if (!next) return;
-    const { error } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', uid);
-    if (error) throw error;
-    setLearnedFitness(next);
-    if (pnAny.threshold_pace_source === 'manual') await commitData((d) => ({ ...d, performanceNumbers: { ...d.performanceNumbers, threshold_pace_source: 'learned' } as any }));
-    else { try { await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); } catch { /* the accept stands */ } }
+    const res = await acceptMeasuredNumber(supabase, 'run_threshold', shownSecPerKm);
+    if (!res.ok) throw new Error(res.error);
+    await reloadSavedBaselines();
+    try { await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); } catch { /* the accept stands */ }
   } catch (e) { console.warn('[Profile] accept threshold failed:', e); }
   finally { setThrAccepting(false); }
 };

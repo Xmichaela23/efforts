@@ -12,6 +12,7 @@
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { frielRunZones } from '../../../src/lib/friel-zones.ts';
 import {
+  acceptMeasuredForSave,
   effortFieldsFromFiveKTimeSec,
   fiveKClockFromCalibration,
   hrZoneConfigForSave,
@@ -102,4 +103,30 @@ Deno.test('nothing typed and nothing changed → null, so the stored zones (Stra
   const cleared = hrZoneConfigForSave({ typed: { manual_run_lthr: null }, stored: { manual_run_lthr: 160 }, learnedFitness: null, performanceNumbers: {}, nowIso: NOW })!;
   assertEquals(cleared.manual_run_lthr, null);
   assertEquals(cleared.source, 'learned');
+});
+
+Deno.test('accept FTP → ride_ftp_accepted is the estimate shown, and a manual FTP flag is dropped', () => {
+  const lf = { ride_ftp_estimated: { value: 251.4, confidence: 'high', sample_count: 6 } };
+  const r = acceptMeasuredForSave({ kind: 'ftp', value: 251, learnedFitness: lf, performanceNumbers: { ftp: 220, ftp_source: 'manual' }, now: new Date(NOW) });
+  if (!r.ok) throw new Error(r.reason);
+  const acc = r.learned_fitness.ride_ftp_accepted as Record<string, unknown>;
+  assertEquals(acc.value, 251.4);
+  assertEquals(acc.accepted_via, 'baselines');
+  assertEquals(acc.accepted_at, NOW);
+  assertEquals(r.performance_numbers, { ftp: 220 });
+});
+
+Deno.test('accept threshold → run_threshold_pace_accepted, and a manual flag becomes learned', () => {
+  const lf = { run_threshold_pace_sec_per_km: { value: 262, confidence: 'medium' } };
+  const r = acceptMeasuredForSave({ kind: 'run_threshold', value: 262, learnedFitness: lf, performanceNumbers: { threshold_pace_source: 'manual' }, now: new Date(NOW) });
+  if (!r.ok) throw new Error(r.reason);
+  assertEquals((r.learned_fitness.run_threshold_pace_accepted as Record<string, unknown>).value, 262);
+  assertEquals(r.performance_numbers.threshold_pace_source, 'learned');
+});
+
+Deno.test('accept refuses a number the athlete did not see, and a low-confidence estimate', () => {
+  const lf = { ride_ftp_estimated: { value: 251, confidence: 'high' } };
+  assertEquals(acceptMeasuredForSave({ kind: 'ftp', value: 240, learnedFitness: lf, performanceNumbers: {}, now: new Date(NOW) }), { ok: false, reason: 'value_changed' });
+  assertEquals(acceptMeasuredForSave({ kind: 'ftp', value: 251, learnedFitness: { ride_ftp_estimated: { value: 251, confidence: 'low' } }, performanceNumbers: {}, now: new Date(NOW) }), { ok: false, reason: 'nothing_to_accept' });
+  assertEquals(acceptMeasuredForSave({ kind: 'run_threshold', value: 262, learnedFitness: null, performanceNumbers: {}, now: new Date(NOW) }), { ok: false, reason: 'nothing_to_accept' });
 });

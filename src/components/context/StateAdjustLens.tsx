@@ -16,8 +16,9 @@ import { readoutPlateStyle } from '@/lib/readout-plate';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 import { resolveStrengthCapacity, canonicalizeLiftKey } from '@shared/state-trend/capacity-resolver';
-import { resolveCurrentFtp, pendingFtpProposal, acceptEstimatedFtp } from '@/lib/resolve-current-ftp';
-import { resolveCurrentRunThresholdPace, resolveCurrentRunEasyPace, pendingRunThresholdProposal, acceptLearnedRunThreshold } from '@/lib/resolve-current-run-pace';
+import { resolveCurrentFtp, pendingFtpProposal } from '@/lib/resolve-current-ftp';
+import { resolveCurrentRunThresholdPace, resolveCurrentRunEasyPace, pendingRunThresholdProposal } from '@/lib/resolve-current-run-pace';
+import { acceptMeasuredNumber } from '@/lib/accept-measured';
 import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
 import { frielZones } from '@shared/endurance/hr-zones';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
@@ -133,13 +134,11 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       const uid = getStoredUserId(); if (!uid) return;
       setAccepting(true); setSaveNote(REPRICE_WAIT); setLastSaved('bike');
       try {
-        const { data: row } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', uid).maybeSingle();
-        const raw = row?.learned_fitness; const cur = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        const next = acceptEstimatedFtp(cur as any, 'baselines'); if (!next) return;
-        const { error } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', uid);
-        if (error) throw error;
-        if (pn?.ftp_source === 'manual') { const cleared: any = { ...(pn ?? {}) }; delete cleared.ftp_source; await saveUserBaselines({ ...baselines, performanceNumbers: cleared }); }
-        let note = `${Math.round(Number((next.ride_ftp_accepted as any).value))} W in use.`;
+        // ⛔ The shown number goes to save-baselines, which saves the accept and clears the manual flag (2026-09-10).
+        if (!proposal) return;
+        const res = await acceptMeasuredNumber(supabase, 'ftp', proposal.measured);
+        if (!res.ok) throw new Error(res.error);
+        let note = `${Math.round(res.acceptedValue)} W in use.`;
         try { note = await repriceEndurance(note); } catch { /* the accept stands */ }
         setSaveNote(note);
         await reload();
@@ -154,13 +153,11 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
       const uid = getStoredUserId(); if (!uid) return;
       setAcceptingThr(true); setSaveNote(REPRICE_WAIT); setLastSaved('run');
       try {
-        const { data: row } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', uid).maybeSingle();
-        const raw = row?.learned_fitness; const cur = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        const next = acceptLearnedRunThreshold(cur as any, 'baselines'); if (!next) return;
-        const { error } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', uid);
-        if (error) throw error;
-        if (pn?.threshold_pace_source === 'manual') await saveUserBaselines({ ...baselines, performanceNumbers: { ...(pn ?? {}), threshold_pace_source: 'learned' } });
-        let note = `${fmtPace(Number((next.run_threshold_pace_accepted as any).value) * 1.609344, metric)} in use.`;
+        // ⛔ The shown pace (sec/km) goes to save-baselines, which saves the accept and the flag (2026-09-10).
+        if (!thrProposal) return;
+        const res = await acceptMeasuredNumber(supabase, 'run_threshold', thrProposal.measuredSecPerKm);
+        if (!res.ok) throw new Error(res.error);
+        let note = `${fmtPace(res.acceptedValue * 1.609344, metric)} in use.`;
         try { note = await repriceEndurance(note); } catch { /* the accept stands */ }
         setSaveNote(note);
         await reload();

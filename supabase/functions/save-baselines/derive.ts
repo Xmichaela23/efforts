@@ -14,6 +14,51 @@ import { deriveFiveKPaceFromRaceTime, resolveFiveKRaceTimeSec } from '../../../s
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
 import { hrZones } from '../_shared/endurance/hr-zones.ts';
+import { acceptEstimatedFtp } from '../../../src/lib/resolve-current-ftp.ts';
+import { acceptLearnedRunThreshold } from '../../../src/lib/resolve-current-run-pace.ts';
+
+// ── "use this number" → the accepted learned value ───────────────────────────────────────────────
+
+export type AcceptKind = 'ftp' | 'run_threshold';
+
+/**
+ * ⛔ THE ACCEPT IS SAVED HERE (2026-09-10). Profile, Adjust and the post-workout popup each re-read
+ * `learned_fitness`, ran `acceptEstimatedFtp` / `acceptLearnedRunThreshold` on the phone and wrote the
+ * result, then cleared the manual flag with a second write. The phone now sends which number and the value
+ * it showed; this runs the same two accept functions `endurance-checkpoint` runs.
+ *
+ * ⚠️ THE VALUE MUST MATCH WHAT WOULD BE ACCEPTED. If the learner moved the estimate between the screen
+ * drawing the button and the tap, the athlete would be accepting a number they never saw — refused with
+ * `value_changed` instead. FTP in watts, threshold in seconds per km, compared rounded.
+ *
+ * The manual flag is cleared by the rules `endurance-checkpoint` already applies: FTP drops
+ * `ftp_source: 'manual'`; threshold sets `threshold_pace_source: 'learned'`.
+ */
+export function acceptMeasuredForSave(input: {
+  kind: AcceptKind;
+  value: number;
+  learnedFitness: Record<string, unknown> | null | undefined;
+  performanceNumbers: Record<string, unknown> | null | undefined;
+  now: Date;
+}):
+  | { ok: true; learned_fitness: Record<string, unknown>; performance_numbers: Record<string, unknown>; accepted_value: number }
+  | { ok: false; reason: 'nothing_to_accept' | 'value_changed' } {
+  const pn: Record<string, unknown> = { ...(input.performanceNumbers ?? {}) };
+  if (input.kind === 'ftp') {
+    const next = acceptEstimatedFtp(input.learnedFitness ?? null, 'baselines', input.now);
+    if (!next) return { ok: false, reason: 'nothing_to_accept' };
+    const accepted = Number((next.ride_ftp_accepted as { value: number }).value);
+    if (Math.round(accepted) !== Math.round(Number(input.value))) return { ok: false, reason: 'value_changed' };
+    if (pn.ftp_source === 'manual') delete pn.ftp_source;
+    return { ok: true, learned_fitness: next, performance_numbers: pn, accepted_value: accepted };
+  }
+  const next = acceptLearnedRunThreshold(input.learnedFitness ?? null, 'baselines', input.now);
+  if (!next) return { ok: false, reason: 'nothing_to_accept' };
+  const accepted = Number((next.run_threshold_pace_accepted as { value: number }).value);
+  if (Math.round(accepted) !== Math.round(Number(input.value))) return { ok: false, reason: 'value_changed' };
+  if (pn.threshold_pace_source === 'manual') pn.threshold_pace_source = 'learned';
+  return { ok: true, learned_fitness: next, performance_numbers: pn, accepted_value: accepted };
+}
 
 // ── 5K → effort score and training paces ────────────────────────────────────────────────────────
 

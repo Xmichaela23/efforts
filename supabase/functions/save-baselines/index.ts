@@ -15,11 +15,16 @@
  *                 — a present key sets the value, null clears it, an absent key keeps the stored one,
  *   calibration?: { five_k_pace: 'm:ss', easy_pace?: 'm:ss', units: 'metric' | 'imperial' },
  *   preview?:     true — with `calibration`, return the derived score and paces without saving.
+ *   accept?:      { kind: 'ftp' | 'run_threshold', value } — "use this number": the value the button showed
+ *                 (watts, or seconds per km). Saved on its own; see `acceptMeasuredForSave`.
  * }
  * → { success, effort, performance_numbers, configured_hr_zones }
+ *   accept → { success, accepted: { kind, value }, learned_fitness, performance_numbers }, or 409 with
+ *            `error: 'nothing_to_accept' | 'value_changed'`
  */
 import { requireUser, AuthError } from '../_shared/require-user.ts';
 import {
+  acceptMeasuredForSave,
   effortFieldsForPerformanceNumbers,
   effortFieldsFromFiveKTimeSec,
   fiveKClockFromCalibration,
@@ -72,6 +77,40 @@ Deno.serve(async (req) => {
       if (!calClock) return json({ error: 'preview needs a calibration' }, 400);
       const e = effortFieldsFromFiveKTimeSec(calClock.fiveKTimeSec, nowIso);
       return json({ success: true, preview: true, five_k: calClock.clock, effort_score: e.effort_score, effort_paces: e.effort_paces });
+    }
+
+    const accept = body?.accept && typeof body.accept === 'object' ? body.accept : null;
+    if (accept) {
+      const kind = String(accept.kind);
+      const value = Number(accept.value);
+      if ((kind !== 'ftp' && kind !== 'run_threshold') || !Number.isFinite(value) || value <= 0) {
+        return json({ error: 'accept needs kind ftp | run_threshold and a positive value' }, 400);
+      }
+      const { data: cur, error: curErr } = await supabase
+        .from('user_baselines')
+        .select('learned_fitness, performance_numbers')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (curErr) throw curErr;
+      const res = acceptMeasuredForSave({
+        kind,
+        value,
+        learnedFitness: parseJson(cur?.learned_fitness) as Record<string, unknown> | null,
+        performanceNumbers: parseJson(cur?.performance_numbers) as Record<string, unknown> | null,
+        now: new Date(),
+      });
+      if (!res.ok) return json({ error: res.reason }, 409);
+      const { error: accErr } = await supabase
+        .from('user_baselines')
+        .update({ learned_fitness: res.learned_fitness, performance_numbers: res.performance_numbers, updated_at: nowIso })
+        .eq('user_id', userId);
+      if (accErr) throw accErr;
+      return json({
+        success: true,
+        accepted: { kind, value: res.accepted_value },
+        learned_fitness: res.learned_fitness,
+        performance_numbers: res.performance_numbers,
+      });
     }
 
     const typed: Record<string, unknown> | null =

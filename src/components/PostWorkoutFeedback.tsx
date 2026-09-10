@@ -10,8 +10,9 @@ import { parseLocalDate } from '@/lib/dateUtils';
 import MapEffort from './MapEffort';
 import SorenessScale from './SorenessScale';
 import { readinessSorenessPatch } from '@/utils/workoutMetadata';
-import { pendingFtpProposal, acceptEstimatedFtp } from '@/lib/resolve-current-ftp';
-import { pendingRunThresholdProposal, acceptLearnedRunThreshold } from '@/lib/resolve-current-run-pace';
+import { pendingFtpProposal } from '@/lib/resolve-current-ftp';
+import { pendingRunThresholdProposal } from '@/lib/resolve-current-run-pace';
+import { acceptMeasuredNumber } from '@/lib/accept-measured';
 import {
   Select,
   SelectContent,
@@ -101,10 +102,10 @@ export default function PostWorkoutFeedback({
   // ⛔ A NEW FTP SHOWS UP HERE, THE MOMENT THE RIDE THAT MADE IT LANDS (Michael, 2026-09-05: "if someone improves
   // on FTP that should be in the pop-up after the workout for acceptance"). TrainerRoad and Garmin both surface
   // a detected FTP as a card with accept. The learner is run first so the number is fresh at this moment; the
-  // accept is the same write Training Baselines and the Adjust tab do (acceptEstimatedFtp → learned_fitness,
-  // then the unstarted endurance rows re-price). Nothing is applied on its own.
+  // accept is the same call Training Baselines and the Adjust tab make (the shown number to save-baselines, which
+  // saves the accept; then the unstarted endurance rows re-price). Nothing is applied on its own.
   const [ftpProposal, setFtpProposal] = useState<{ measured: number; applied: number } | null>(null);
-  const [thrProposal, setThrProposal] = useState<{ measuredSecPerMi: number; appliedSecPerMi: number } | null>(null);
+  const [thrProposal, setThrProposal] = useState<{ measuredSecPerKm: number; measuredSecPerMi: number; appliedSecPerMi: number } | null>(null);
   const fmtMi = (secPerMi: number) => `${Math.floor(secPerMi / 60)}:${String(Math.round(secPerMi % 60)).padStart(2, '0')}/mi`;
   const [ftpAccepting, setFtpAccepting] = useState(false);
   const [ftpNote, setFtpNote] = useState<string | null>(null);
@@ -123,7 +124,7 @@ export default function PostWorkoutFeedback({
         setFtpProposal(prop ? { measured: Math.round(prop.measured), applied: Math.round(prop.applied) } : null);
       } else {
         const prop = pendingRunThresholdProposal({ learned_fitness: lf, performance_numbers: pn } as any);
-        setThrProposal(prop ? { measuredSecPerMi: prop.measuredSecPerKm * 1.609344, appliedSecPerMi: prop.appliedSecPerKm * 1.609344 } : null);
+        setThrProposal(prop ? { measuredSecPerKm: prop.measuredSecPerKm, measuredSecPerMi: prop.measuredSecPerKm * 1.609344, appliedSecPerMi: prop.appliedSecPerKm * 1.609344 } : null);
       }
     })();
     return () => { cancelled = true; };
@@ -133,19 +134,13 @@ export default function PostWorkoutFeedback({
       const uid = getStoredUserId(); if (!uid) return;
       setFtpAccepting(true);
       try {
-        const { data: row } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', uid).maybeSingle();
-        const raw = row?.learned_fitness; const cur = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        const next = acceptLearnedRunThreshold(cur as any, 'baselines'); if (!next) return;
-        const { error } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', uid);
-        if (error) throw error;
-        let note = `${fmtMi(Number((next.run_threshold_pace_accepted as any).value) * 1.609344)} in use.`;
+        // ⛔ The shown pace (sec/km) goes to save-baselines, which saves the accept and clears a manual
+        // choice (2026-09-10). This wrote learned_fitness and the flag itself.
+        if (!thrProposal) return;
+        const res = await acceptMeasuredNumber(supabase, 'run_threshold', thrProposal.measuredSecPerKm);
+        if (!res.ok) throw new Error(res.error);
+        let note = `${fmtMi(res.acceptedValue * 1.609344)} in use.`;
         try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const d = rp as any; if (d?.queued) { const t = Number(d.rows_pending ?? 0); note += ` Updating ${t} upcoming session${t === 1 ? '' : 's'} in the background; you can close this.`; } else { const n = Number(d?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} updated.`; } } catch { /* the accept stands */ }
-        {
-          // Taking the number is choosing auto: clear a manual choice through the same column Baselines writes.
-          const { data: pnRow } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', uid).maybeSingle();
-          const pnCur: any = typeof pnRow?.performance_numbers === 'string' ? JSON.parse(pnRow.performance_numbers) : (pnRow?.performance_numbers ?? {});
-          if (pnCur && (pnCur.threshold_pace_source === 'manual')) { const cleared: any = { ...pnCur }; cleared.threshold_pace_source = 'learned'; await supabase.from('user_baselines').update({ performance_numbers: cleared }).eq('user_id', uid); }
-        }
         setFtpNote(note); setThrProposal(null);
       } catch (e) { setFtpNote('Could not apply. Try again from Adjust.'); console.warn('[PostWorkoutFeedback] threshold accept failed:', e); }
       finally { setFtpAccepting(false); }
@@ -156,20 +151,13 @@ export default function PostWorkoutFeedback({
       const uid = getStoredUserId(); if (!uid) return;
       setFtpAccepting(true);
       try {
-        const { data: row } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', uid).maybeSingle();
-        const raw = row?.learned_fitness; const cur = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        const next = acceptEstimatedFtp(cur as any, 'baselines'); if (!next) return;
-        const { error } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', uid);
-        if (error) throw error;
-        const w = Math.round(Number((next.ride_ftp_accepted as any).value));
+        // ⛔ The shown watts go to save-baselines, which saves the accept and drops a manual FTP flag (2026-09-10).
+        if (!ftpProposal) return;
+        const res = await acceptMeasuredNumber(supabase, 'ftp', ftpProposal.measured);
+        if (!res.ok) throw new Error(res.error);
+        const w = Math.round(res.acceptedValue);
         let note = `${w} W in use.`;
         try { const { data: rp } = await supabase.functions.invoke('endurance-checkpoint', { body: { reprice: true } }); const d = rp as any; if (d?.queued) { const t = Number(d.rows_pending ?? 0); note += ` Updating ${t} upcoming session${t === 1 ? '' : 's'} in the background; you can close this.`; } else { const n = Number(d?.rows_repriced ?? 0); if (n > 0) note += ` ${n} upcoming session${n === 1 ? '' : 's'} updated.`; } } catch { /* the accept stands */ }
-        {
-          // Taking the number is choosing auto: clear a manual choice through the same column Baselines writes.
-          const { data: pnRow } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', uid).maybeSingle();
-          const pnCur: any = typeof pnRow?.performance_numbers === 'string' ? JSON.parse(pnRow.performance_numbers) : (pnRow?.performance_numbers ?? {});
-          if (pnCur && (pnCur.ftp_source === 'manual')) { const cleared: any = { ...pnCur }; delete cleared.ftp_source; await supabase.from('user_baselines').update({ performance_numbers: cleared }).eq('user_id', uid); }
-        }
         setFtpNote(note); setFtpProposal(null);
       } catch (e) { setFtpNote('Could not apply. Try again from Adjust.'); console.warn('[PostWorkoutFeedback] FTP accept failed:', e); }
       finally { setFtpAccepting(false); }
