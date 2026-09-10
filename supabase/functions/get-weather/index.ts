@@ -6,8 +6,14 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
  * `dew_point_2m`. Every cached row was written without them, and without the bump a cached hit
  * would keep returning a payload the new block has no icon and no dew point for — the screen would
  * look broken for exactly as long as the cache lives.
+ * ⛔ 5 → 6 (2026-09-09, DEVICE FINDING): today no longer comes from the ARCHIVE. The Today screen
+ * asks for `<date>T12:00:00` — a placeholder meaning "today", not an hour anybody trained in — and
+ * the archive answered with the reanalysis for noon UTC. On a device at 100°F it read 82°F. Today
+ * now comes from the FORECAST endpoint's `current` block. Every row cached under schema 5 holds a
+ * noon-archive number, so without the bump the wrong temperature survives the fix for as long as
+ * the cache lives.
  */
-const WEATHER_SCHEMA_VERSION = 5;
+const WEATHER_SCHEMA_VERSION = 6;
 
 interface WeatherData {
   /** Representative temp for the session: avg over [start, end] when duration provided, else start-hour slot. */
@@ -117,7 +123,46 @@ Deno.serve(async (req) => {
       durationSeconds != null && durationSeconds >= 60
         ? Math.min(86400, Math.round(durationSeconds / 300) * 300)
         : 0;
-    const cacheKey = `${rlat}:${rlng}:${hourSlotUtc}:d${durBucket}`;
+
+    /**
+     * ⛔ TODAY IS NOT AN ARCHIVE QUESTION (2026-09-09 device finding: 82°F shown at 100°F).
+     *
+     * The Today screen asks for `<date>T12:00:00` — a PLACEHOLDER meaning "today", not an hour the
+     * athlete trained in — with no `workout_id`, because there is no session yet. The archive
+     * answered with the noon reanalysis, which is a different number from what it is like outside
+     * right now, and in a hot afternoon it is 18°F different.
+     *
+     * ⚠️ THE TWO DECISIONS ARE SEPARATE, and conflating them is how the session paths would break:
+     *
+     *  - WHICH ENDPOINT. The archive is a reanalysis and is the right source for a past day; it is
+     *    the wrong source for today. `requestedDay` within one UTC calendar day of now goes to the
+     *    forecast endpoint (`past_days` covers the adjacency), everything older stays on the
+     *    archive. ⚠️ ONE DAY, not a tuned window: an athlete's local calendar date is never more
+     *    than one UTC day from now's UTC date (offsets run ±14h), so day-adjacency is exactly the
+     *    set of dates that can BE today somewhere. Nothing is estimated about the location.
+     *
+     *  - WHICH HOUR. `current` is only right for a request that has no hour of its own. A session
+     *    request always carries `workout_id` and a real start time, and must keep reading the hour
+     *    it was run in — a run uploaded at 6pm must not be stamped with the 6pm temperature. So
+     *    `current` is for the no-workout_id case only; a today session reads the forecast
+     *    endpoint's HOURLY slot, which is the accuracy win on today's sessions for free.
+     */
+    const requestedDay = tsStr.slice(0, 10);
+    const nowUtcDay = new Date().toISOString().slice(0, 10);
+    const requestedDayIsTodayish = Math.abs(utcCalendarDayDiff(requestedDay, nowUtcDay)) <= 1;
+    // ⚠️ TODAY ONLY. A date further out than day-adjacency stays on the archive and therefore keeps
+    // returning nothing, exactly as before — nothing in the app asks for future weather (the Today
+    // screen's `useWeather` is gated on `isTodayDate`, and a workout is always in the past), and
+    // widening this to the forecast window would be building a caller that does not exist.
+    const useForecastEndpoint = requestedDayIsTodayish;
+    const wantsCurrentConditions = !workout_id && requestedDayIsTodayish;
+
+    /**
+     * ⚠️ `:cur` KEEPS THE TWO ANSWERS APART IN THE SHARED CACHE. A current-conditions row and a
+     * noon-hourly row are both "today at this location"; without the marker a session that really
+     * did start at noon would be served whatever it happens to be outside now.
+     */
+    const cacheKey = `${rlat}:${rlng}:${hourSlotUtc}:d${durBucket}${wantsCurrentConditions ? ':cur' : ''}`;
     
     if (!skipCache) {
       try {
@@ -179,7 +224,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    const weatherData = await fetchWeatherData(latNum, lngNum, tsStr, deviceTempC, durationSeconds);
+    const weatherData = await fetchWeatherData(
+      latNum,
+      lngNum,
+      tsStr,
+      deviceTempC,
+      durationSeconds,
+      { useForecastEndpoint, wantsCurrentConditions },
+    );
     
     if (!weatherData) {
       return new Response(JSON.stringify({ 
@@ -263,6 +315,37 @@ Deno.serve(async (req) => {
   }
 });
 
+/**
+ * Whole-day difference between two `YYYY-MM-DD` strings. Used only to ask "could this date be today
+ * somewhere" — see the endpoint decision in the handler.
+ */
+function utcCalendarDayDiff(a: string, b: string): number {
+  const ta = Date.parse(`${a}T00:00:00Z`);
+  const tb = Date.parse(`${b}T00:00:00Z`);
+  if (!Number.isFinite(ta) || !Number.isFinite(tb)) return Number.POSITIVE_INFINITY;
+  return Math.round((ta - tb) / 86400000);
+}
+
+/**
+ * Daily max/min for one date out of a `daily=` block. The forecast endpoint is asked for several
+ * days (`past_days` + `forecast_days`), so the old "max over every hour in the response" would have
+ * returned a four-day high. ⚠️ Returns nothing rather than a wrong day when the date is absent.
+ */
+function pickDailyHighLow(
+  daily: { time?: string[]; temperature_2m_max?: (number | null)[]; temperature_2m_min?: (number | null)[] } | undefined,
+  utcDay: string,
+): { daily_high?: number; daily_low?: number } {
+  if (!daily?.time?.length) return {};
+  const idx = daily.time.findIndex((t) => String(t).slice(0, 10) === utcDay.slice(0, 10));
+  if (idx < 0) return {};
+  const hi = daily.temperature_2m_max?.[idx];
+  const lo = daily.temperature_2m_min?.[idx];
+  return {
+    daily_high: hi != null && Number.isFinite(Number(hi)) ? Math.round(Number(hi)) : undefined,
+    daily_low: lo != null && Number.isFinite(Number(lo)) ? Math.round(Number(lo)) : undefined,
+  };
+}
+
 function parseOpenMeteoUtcHourMs(iso: string): number {
   if (!iso) return NaN;
   const s = /Z$|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`;
@@ -316,6 +399,11 @@ async function fetchWeatherData(
   timestamp: string,
   deviceTempC: number | null,
   durationSeconds: number | null,
+  /** See the endpoint / hour decision in the handler — the two flags are not the same question. */
+  opts: { useForecastEndpoint: boolean; wantsCurrentConditions: boolean } = {
+    useForecastEndpoint: false,
+    wantsCurrentConditions: false,
+  },
 ): Promise<WeatherData | null> {
   try {
     const workoutDate = new Date(timestamp);
@@ -327,14 +415,35 @@ async function fetchWeatherData(
     const rangeStart = dateStr <= endDateStr ? dateStr : endDateStr;
     const rangeEnd = dateStr >= endDateStr ? dateStr : endDateStr;
 
-    console.log(
-      `🌡️ [WEATHER] Fetching Open-Meteo archive ${rangeStart}..${rangeEnd} at ${lat},${lng} (workout ${workoutDate.toISOString()} dur_s=${durationSeconds ?? 'n/a'})`,
-    );
+    // ⛔ SAME FIELDS FROM EITHER ENDPOINT so one payload shape reaches the screen. Both are asked in
+    // °F and mph, and both `timezone=UTC` — the hourly index math parses these strings as UTC.
+    const HOURLY_FIELDS =
+      'temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,weather_code,wind_speed_10m,wind_direction_10m,precipitation';
+    const UNITS = 'temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=UTC';
 
-    // Open-Meteo archive API - free, no key required
-    // Use timezone=UTC so all times are in UTC (consistent with our timestamp)
-    const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}&start_date=${rangeStart}&end_date=${rangeEnd}&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,dew_point_2m,weather_code,wind_speed_10m,wind_direction_10m,precipitation&daily=sunrise,sunset&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=UTC`;
-    
+    let url: string;
+    if (opts.useForecastEndpoint) {
+      // ⚠️ `past_days=2` is what makes the one-day UTC adjacency safe: whichever side of the UTC
+      // date line the athlete's local today falls on, its hours are in the response.
+      const currentParam = opts.wantsCurrentConditions ? `&current=${HOURLY_FIELDS}` : '';
+      url =
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
+        `&hourly=${HOURLY_FIELDS}${currentParam}` +
+        `&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min` +
+        `&past_days=2&forecast_days=2&${UNITS}`;
+      console.log(
+        `🌡️ [WEATHER] Fetching Open-Meteo FORECAST at ${lat},${lng} (${opts.wantsCurrentConditions ? 'current hour' : `hourly slot ${workoutDate.toISOString()}`} dur_s=${durationSeconds ?? 'n/a'})`,
+      );
+    } else {
+      url =
+        `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lng}` +
+        `&start_date=${rangeStart}&end_date=${rangeEnd}` +
+        `&hourly=${HOURLY_FIELDS}&daily=sunrise,sunset&${UNITS}`;
+      console.log(
+        `🌡️ [WEATHER] Fetching Open-Meteo archive ${rangeStart}..${rangeEnd} at ${lat},${lng} (workout ${workoutDate.toISOString()} dur_s=${durationSeconds ?? 'n/a'})`,
+      );
+    }
+
     const resp = await fetch(url);
     if (!resp.ok) {
       console.error(`Open-Meteo API error: ${resp.status}`);
@@ -343,6 +452,62 @@ async function fetchWeatherData(
     
     const data = await resp.json();
     const { sunrise: srDaily, sunset: ssDaily } = pickDailySunriseSunset(data.daily, dateStr);
+
+    /**
+     * ═══ WHAT IT IS LIKE OUTSIDE RIGHT NOW ══════════════════════════════════════════════════════
+     *
+     * The Today screen's request, and only that one. `current` is Open-Meteo's own latest hour, so
+     * there is no slot to pick and no window to average — the reading is the reading.
+     *
+     * ⚠️ NO DEVICE OVERRIDE HERE, and it cannot arise: `deviceTempC` is only read off a workout row,
+     * and this branch is reached only when there is no `workout_id`. A device average is the
+     * temperature of a session that already happened; it is not the current conditions.
+     * ⚠️ NO start/end/peak/avg either — those describe an effort's window, and there is no effort.
+     */
+    if (opts.wantsCurrentConditions && data.current && typeof data.current === 'object') {
+      const cur = data.current as Record<string, unknown>;
+      const n = (v: unknown): number | undefined => {
+        const x = Number(v);
+        return Number.isFinite(x) ? x : undefined;
+      };
+      const curTemp = n(cur.temperature_2m);
+      if (curTemp != null) {
+        const curFeels = n(cur.apparent_temperature);
+        const curHum = n(cur.relative_humidity_2m);
+        const curDew = n(cur.dew_point_2m);
+        const curWind = n(cur.wind_speed_10m);
+        const curWindDir = n(cur.wind_direction_10m);
+        const curPrecip = n(cur.precipitation);
+        const curCode = n(cur.weather_code);
+        const { daily_high, daily_low } = pickDailyHighLow(data.daily, dateStr);
+
+        console.log(
+          `🌡️ [WEATHER] Current conditions ${cur.time ?? '?'}: ${Math.round(curTemp)}°F (feels ${curFeels != null ? Math.round(curFeels) : '—'}°F, rh ${curHum ?? '—'}%, dew ${curDew != null ? Math.round(curDew) : '—'}°F, code ${curCode ?? '—'}) high ${daily_high ?? '—'} low ${daily_low ?? '—'}`,
+        );
+
+        return {
+          temperature: Math.round(curTemp),
+          feels_like: curFeels != null ? Math.round(curFeels) : undefined,
+          // ⚠️ Still no condition TEXT from Open-Meteo — the em dash stays and the icon comes off
+          // `weather_code`, exactly as on the archive path.
+          condition: '—',
+          weather_code: curCode != null ? Math.round(curCode) : undefined,
+          humidity: Math.round(curHum ?? 0),
+          dew_point: curDew != null ? Math.round(curDew) : undefined,
+          windSpeed: Math.round(curWind ?? 0),
+          windDirection: Math.round(curWindDir ?? 0),
+          precipitation: curPrecip ?? 0,
+          sunrise: srDaily,
+          sunset: ssDaily,
+          daily_high,
+          daily_low,
+          timestamp: typeof cur.time === 'string' ? normalizeOpenMeteoUtcInstant(cur.time) : timestamp,
+          schema_version: WEATHER_SCHEMA_VERSION,
+        };
+      }
+      console.warn('[get-weather] forecast `current` had no temperature; falling back to the hourly slot');
+    }
+
     const hourly = data.hourly;
     
     if (!hourly || !hourly.time || !hourly.temperature_2m) {
@@ -386,10 +551,18 @@ async function fetchWeatherData(
     const dewPoint = hourly.dew_point_2m?.[bestIdx];
     const weatherCode = hourly.weather_code?.[bestIdx];
 
-    // Get daily high/low from the full response
+    /**
+     * Daily high/low. ⛔ THE OLD "max over every hour in the response" IS ONLY SAFE ON THE ARCHIVE,
+     * whose range is the session's own day (or two). The forecast endpoint is asked for four days,
+     * so that same line would have reported a four-day high as today's. The forecast path reads the
+     * `daily=` block for the one date instead, and falls back to the hourly span if it is missing.
+     */
+    const dailyFromBlock = pickDailyHighLow(data.daily, dateStr);
     const temps = hourly.temperature_2m.filter((t: number | null) => t != null);
-    const dailyHigh = temps.length ? Math.round(Math.max(...temps)) : undefined;
-    const dailyLow = temps.length ? Math.round(Math.min(...temps)) : undefined;
+    const dailyHigh =
+      dailyFromBlock.daily_high ?? (temps.length ? Math.round(Math.max(...temps)) : undefined);
+    const dailyLow =
+      dailyFromBlock.daily_low ?? (temps.length ? Math.round(Math.min(...temps)) : undefined);
 
     let temperature = Math.round(temp ?? 0);
     let temperature_start_f: number | undefined;

@@ -1,12 +1,15 @@
 // Home's two tabs (work order 2026-09-09 §1): Today is the screen Home opens on; Week is the
 // calendar that used to sit under it. Same strip as State's Status / Adjust / Schedule
 // (`StateHubTabs`) — one segmented row, active = white + underline — so the two hubs read alike.
-import { Sun, CalendarDays } from 'lucide-react';
+import { CalendarCheck, CalendarDays } from 'lucide-react';
 
 export type HomeLens = 'today' | 'week';
 
-const TABS: Array<{ key: HomeLens; label: string; Icon: typeof Sun }> = [
-  { key: 'today', label: 'Today', Icon: Sun },
+const TABS: Array<{ key: HomeLens; label: string; Icon: typeof CalendarDays }> = [
+  // ⛔ NOT A SUN (Michael, 2026-09-09, on the device): a sun beside "Today" reads as the WEATHER,
+  // and the weather is a real block a few pixels below it. A calendar day with a tick says "the day
+  // you are on"; Week keeps the calendar GRID, so the pair reads as one day out of a week.
+  { key: 'today', label: 'Today', Icon: CalendarCheck },
   // ⛔ THE FIRST-RUN SPOTLIGHT'S CALENDAR STOP LANDS HERE. The calendar is no longer on screen when
   // Home opens, so the stop that used to point at it points at the tab that opens it
   // (`FirstRunOverlay` HOME_STOPS). Its words are unchanged.

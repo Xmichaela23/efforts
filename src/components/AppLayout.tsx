@@ -1865,8 +1865,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                         day, then add, the way TrainingPeaks and TrainerRoad do it. The calendar's
                         day tap already sets the date every logger and builder opens on, so the
                         menu that used to sit in the tab bar simply moved to where the date is
-                        chosen. ⚠️ THE MENU ITSELF IS UNCHANGED; only where it hangs. */}
-                    <div style={{ position: 'absolute', right: 14, bottom: 14, zIndex: 5 }}>
+                        chosen. ⚠️ THE MENU ITSELF IS UNCHANGED; only where it hangs.
+
+                        ⛔ AND IT IS NO LONGER FLOATING (Michael, 2026-09-09, on the device). It was
+                        `position: absolute` at the bottom-right corner of the pane, which put it ON
+                        TOP OF Sunday's row — the last day of the week sat under the button that adds
+                        to it. Now the seven rows take the pane's height and this row takes its own
+                        beneath them, so the + is the end of the list rather than a thing covering it.
+                        ⚠️ `flexShrink: 0` so the rows give up the space, never this row. */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 10, flexShrink: 0 }}>
                       <LogFAB onSelectType={handleSelectEffortType} />
                     </div>
                   </div>

@@ -1093,8 +1093,33 @@ export default function WorkoutCalendar({
         </button>
       </div>
 
-      {/* Vertical Timeline - Days as horizontal rows (training log style) - always show all 7 days */}
-      <div style={{ display: 'grid', gridTemplateRows: 'repeat(7, auto)', gap: 4, flexShrink: 0, paddingBottom: 4, position: 'relative', zIndex: 1 }}>
+      {/**
+        * Vertical timeline — the seven days as rows. Always all seven.
+        *
+        * ⛔ THE ROWS SHARE THE PANE (Michael, 2026-09-09, on the device: small rows in a large empty
+        * pane). They were `repeat(7, auto)` with `flexShrink: 0`, so each row took only its own
+        * content height and everything below the seventh was dead space — on a 390×844 phone that is
+        * most of the tab. `1fr` each, with the grid itself taking the pane's remaining height, so the
+        * seven rows divide it between them.
+        *
+        * ⚠️ `minmax(40px, 1fr)`, NOT PLAIN `1fr` — a row still has a floor. `1fr` alone lets a short
+        * pane (a landscape phone, a small window, the keyboard up) crush a row below its own chips
+        * and clip them; with the floor the grid overflows instead and the pane scrolls, which it is
+        * already set up to do. 40px is the row's own resting height: 2 × 1.5 padding + the taller
+        * chip below.
+        */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateRows: 'repeat(7, minmax(40px, 1fr))',
+          gap: 4,
+          flex: 1,
+          minHeight: 0,
+          paddingBottom: 4,
+          position: 'relative',
+          zIndex: 1,
+        }}
+      >
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = orderDayWorkoutsByTimingThenDiscipline(
@@ -1254,7 +1279,7 @@ export default function WorkoutCalendar({
               </div>
 
               {/* Right: Workout chips - horizontal flow (compact) */}
-              <div className="flex-1 flex items-center gap-1 flex-wrap min-h-[20px]" style={{ position: 'relative', zIndex: 1 }}>
+              <div className="flex-1 flex items-center gap-1.5 flex-wrap min-h-[24px]" style={{ position: 'relative', zIndex: 1 }}>
                 {items.length > 0 && (
                   items.map((evt, i) => {
                     // Check actual workout_status from _src
@@ -1309,13 +1334,14 @@ export default function WorkoutCalendar({
                           className="inline-flex items-center justify-center tabular-nums flex-shrink-0"
                           style={{
                             marginLeft: 6,
-                            width: 16,
-                            height: 16,
+                            // Grows with the chip, or it starts reading as a speck beside the text.
+                            width: 18,
+                            height: 18,
                             verticalAlign: 'middle',
                           }}
                         >
                           <IconComponent
-                            size={14}
+                            size={15}
                             strokeWidth={2}
                             style={{
                               color: completed ? 'rgba(255, 255, 255, 0.9)' : 'rgba(245, 245, 245, 0.5)',
@@ -1332,7 +1358,7 @@ export default function WorkoutCalendar({
                           style={{
                             marginLeft: 4,
                             color: 'rgba(255, 255, 255, 0.95)',
-                            fontSize: 11,
+                            fontSize: 12,
                             fontWeight: 700,
                             lineHeight: 1,
                           }}
@@ -1416,12 +1442,16 @@ export default function WorkoutCalendar({
                           onDragEnd={handleDragEnd}
                           onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
                           onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
-                          className={`text-xs px-2 py-[0.38rem] flex-shrink-0 transition-all font-medium tracking-normal ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                          className={`px-2.5 py-[0.46rem] flex-shrink-0 transition-all font-medium tracking-normal ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
                           style={{
                             ...phosphorPill.style,
                             // Stamp > pill: squarer corners + slightly “pressed” feel
                             borderRadius: '6px',
-                            fontSize: '0.78rem',
+                            // ⛔ ONE STEP UP, BOTH CHIP STATES TOGETHER (2026-09-09 device finding).
+                            // `text-xs` came off the class list because it fought this line — the
+                            // utility and the inline rule were setting the same property, and the
+                            // chip's real size was whichever won. Now there is one number.
+                            fontSize: '0.86rem',
                             lineHeight: '1.24',
                             // A: grey ink fill with a colored rim (no “power-up” glow)
                             // White denotes completed
@@ -1463,11 +1493,15 @@ export default function WorkoutCalendar({
                           onClick={(e)=>{ e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} }}
                           onKeyDown={(e)=>{ if (e.key==='Enter' || e.key===' ') { e.preventDefault(); e.stopPropagation(); try { onEditEffort && evt?._src && onEditEffort(evt._src); } catch {} } }}
                           // Non-completed returns to a pill, but keep it calm: low fill, low glow.
-                          className={`text-xs px-2 py-[0.38rem] flex-shrink-0 transition-all font-medium tracking-normal ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                          className={`px-2.5 py-[0.46rem] flex-shrink-0 transition-all font-medium tracking-normal ${phosphorPill.className} ${isPlanned && workoutId ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
                           style={{
                             ...phosphorPill.style,
                             borderRadius: '6px',
-                            fontSize: '0.78rem',
+                            // ⛔ ONE STEP UP, BOTH CHIP STATES TOGETHER (2026-09-09 device finding).
+                            // `text-xs` came off the class list because it fought this line — the
+                            // utility and the inline rule were setting the same property, and the
+                            // chip's real size was whichever won. Now there is one number.
+                            fontSize: '0.86rem',
                             lineHeight: '1.24',
                             // Calm, readable capsule (no “note” shine)
                             backgroundImage: `

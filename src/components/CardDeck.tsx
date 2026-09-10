@@ -12,14 +12,46 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
  * ⛔ CSS TRANSFORMS ONLY, NO LIBRARY. `translate3d` + `rotateY` under one `perspective`, the
  * mockup's own numbers. `prefers-reduced-motion` turns the transitions off and the deck still works.
  *
- * ⛔ SWIPE IS THE DECK'S, TAP IS THE CALLER'S. A drag under 60 px snaps back and does NOT fire
- * `onCardTap` — otherwise every abandoned swipe becomes an accidental navigation.
+ * ⛔ SWIPE IS THE DECK'S, TAP IS THE CALLER'S. A drag that does not commit snaps back and does NOT
+ * fire `onCardTap` — otherwise every abandoned swipe becomes an accidental navigation.
  *
  * ⚠️ THE ARROW KEYS ARE SCOPED TO THE FOCUSED DECK, NOT TO THE WINDOW. The mockup listened on
  * `window` because it had one deck; two decks on one screen would both move on one key press.
+ *
+ * ═══ THE GESTURE, REBUILT FOR A THUMB (2026-09-09 device finding) ════════════════════════════════
+ *
+ * On the phone the deck FOUGHT THE PAGE SCROLL and asked for a drag nobody makes. Three separate
+ * causes, and all three are in the handler rather than the visuals:
+ *
+ *  1. ⛔ NO AXIS. `onPointerMove` fed every horizontal component of every gesture straight into
+ *     `dragX`, so scrolling the screen yawed the card sideways under the thumb — a thumb never
+ *     travels straight up. THE FIX IS AN AXIS LOCK: the first `AXIS_LOCK_PX` of travel decides
+ *     whether the gesture is the deck's or the page's, and once decided IT DOES NOT CHANGE for the
+ *     rest of that gesture. A vertical verdict makes the deck inert and the page scrolls normally.
+ *  2. ⛔ 60 px WAS THE WHOLE JOB. Distance was the only way to turn a card, so a fast flick that
+ *     covered 40 px did nothing. `SWIPE_PX` is halved AND velocity now commits on its own — a quick
+ *     flick turns the card at any distance past `FLICK_MIN_PX`.
+ *  3. ⛔ `pointercancel` COMMITTED THE SWIPE. When the browser took the gesture over to scroll, the
+ *     old handler ran the same `end()` as a finger lift — so a scroll that had drifted past the
+ *     threshold turned a card on the way past. Cancel now ABANDONS: snap back, nothing committed.
+ *
+ * ⚠️ AND THE TAP GUARD COUNTS BOTH AXES. It only ever measured horizontal travel, so a vertical drag
+ * left it at zero and the card's `onClick` still fired — the drawer opened when the athlete scrolled.
+ *
+ * ⚠️ TEST THIS ON TOUCH, NOT WITH A MOUSE. A mouse drag is straight, arrives as `pointerType:
+ * 'mouse'`, and never triggers a browser scroll — every one of the three bugs above is invisible to it.
  */
 
-const SWIPE_PX = 60;
+/** Distance that commits a card on its own. Halved from 60 — see the gesture note above. */
+const SWIPE_PX = 30;
+/** The first movement that decides horizontal-vs-vertical. Below this the deck does nothing at all. */
+const AXIS_LOCK_PX = 8;
+/** px/ms. A flick this fast turns the card whatever the distance. ~500 px/s. */
+const FLICK_VELOCITY = 0.5;
+/** A flick still has to be a movement, so a fast twitch in place is not a swipe. */
+const FLICK_MIN_PX = 10;
+/** Past this much travel on EITHER axis, the gesture was a drag and the tap does not fire. */
+const TAP_SLOP_PX = 8;
 /** How many cards deep the stack draws. Past this they are invisible anyway. */
 const DEPTH = 3;
 
@@ -47,9 +79,26 @@ export const CardDeck: React.FC<{
   const [idx, setIdx] = useState(0);
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
-  const startX = useRef(0);
-  const moved = useRef(0);
   const reduced = useMemo(prefersReducedMotion, []);
+
+  /**
+   * The whole gesture in one ref. ⚠️ A REF, NOT STATE — the commit decision reads the last sample at
+   * the moment the finger lifts, and a `dragX` read out of state can be a render behind it.
+   *
+   * `axis` is the lock: `null` while the gesture is still ambiguous, then `'x'` (ours) or `'y'` (the
+   * page's) for the rest of it. `movedAny` is the tap guard and counts BOTH axes.
+   */
+  const g = useRef<{
+    active: boolean;
+    startX: number;
+    startY: number;
+    lastX: number;
+    lastT: number;
+    vx: number;
+    dx: number;
+    axis: null | 'x' | 'y';
+    movedAny: number;
+  }>({ active: false, startX: 0, startY: 0, lastX: 0, lastT: 0, vx: 0, dx: 0, axis: null, movedAny: 0 });
 
   /**
    * ⛔ THE CARD IS AS TALL AS ITS OWN CONTENT, no fixed minimum. The stack has to be absolutely
@@ -106,14 +155,44 @@ export const CardDeck: React.FC<{
     };
   };
 
+  /**
+   * The finger lifted. ⛔ EITHER TEST COMMITS: far enough, or fast enough. Distance alone is what
+   * made the deck feel like hard work.
+   */
   const end = () => {
-    if (!dragging) return;
+    const s = g.current;
+    if (!s.active) return;
+    s.active = false;
     setDragging(false);
-    // ⛔ UNDER 60 px IS NOT A SWIPE. It snaps back, and the tap handler refuses to fire only when the
-    // finger actually travelled.
-    if (dragX < -SWIPE_PX) go(idx + 1);
-    else if (dragX > SWIPE_PX) go(idx - 1);
+
+    if (s.axis !== 'x') { s.dx = 0; setDragX(0); return; }
+
+    const far = Math.abs(s.dx) > SWIPE_PX;
+    const flick = Math.abs(s.vx) > FLICK_VELOCITY && Math.abs(s.dx) > FLICK_MIN_PX;
+    // ⚠️ THE FLICK'S DIRECTION IS THE VELOCITY'S, not the offset's — a flick back the other way at
+    // the end of a drag is the athlete changing their mind, and it should follow the thumb.
+    const dir = far ? Math.sign(s.dx) : Math.sign(s.vx);
+
+    s.dx = 0;
+    if ((far || flick) && dir < 0) go(idx + 1);
+    else if ((far || flick) && dir > 0) go(idx - 1);
     else setDragX(0);
+  };
+
+  /**
+   * ⛔ THE BROWSER TOOK THE GESTURE — abandon it. This is the normal end of every page scroll that
+   * started on a card, and committing a card here is what turned pages while the athlete scrolled.
+   */
+  const cancel = () => {
+    const s = g.current;
+    // ⚠️ `lostpointercapture` also fires on a NORMAL finger lift, after `end` has already committed.
+    // Without this guard it would wipe the card the athlete just turned to.
+    if (!s.active) return;
+    s.active = false;
+    s.axis = 'y';
+    s.dx = 0;
+    setDragging(false);
+    setDragX(0);
   };
 
   return (
@@ -127,19 +206,66 @@ export const CardDeck: React.FC<{
         if (e.key === 'ArrowLeft') { e.preventDefault(); go(idx - 1); }
       }}
       onPointerDown={(e) => {
-        setDragging(true);
-        startX.current = e.clientX;
-        moved.current = 0;
-        try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* older webviews */ }
+        g.current = {
+          active: true,
+          startX: e.clientX,
+          startY: e.clientY,
+          lastX: e.clientX,
+          lastT: e.timeStamp,
+          vx: 0,
+          dx: 0,
+          axis: null,
+          movedAny: 0,
+        };
+        /**
+         * ⚠️ CAPTURE ONLY ONCE THE AXIS IS OURS, NOT HERE. Capturing on pointerdown redirects every
+         * later event to this element, and on a vertical gesture that is exactly the wrong place for
+         * them — it is part of why the deck fought the scroll.
+         */
       }}
       onPointerMove={(e) => {
-        if (!dragging) return;
-        const dx = e.clientX - startX.current;
-        moved.current = Math.max(moved.current, Math.abs(dx));
+        const s = g.current;
+        if (!s.active) return;
+
+        const dx = e.clientX - s.startX;
+        const dy = e.clientY - s.startY;
+        s.movedAny = Math.max(s.movedAny, Math.abs(dx), Math.abs(dy));
+
+        // ⛔ THE LOCK. Decided once, on the first AXIS_LOCK_PX, and never revisited.
+        if (s.axis == null) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) < AXIS_LOCK_PX) return;
+          s.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+          if (s.axis === 'x') {
+            setDragging(true);
+            try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* older webviews */ }
+          } else {
+            // The page's gesture. The deck stops listening and never moves.
+            return;
+          }
+        }
+        if (s.axis !== 'x') return;
+
+        // Velocity, lightly smoothed — a single raw sample at 120 Hz is mostly noise.
+        const dt = Math.max(1, e.timeStamp - s.lastT);
+        const instant = (e.clientX - s.lastX) / dt;
+        s.vx = s.vx === 0 ? instant : s.vx * 0.3 + instant * 0.7;
+        s.lastX = e.clientX;
+        s.lastT = e.timeStamp;
+
+        s.dx = dx;
         setDragX(dx);
       }}
       onPointerUp={end}
-      onPointerCancel={end}
+      /**
+       * ⛔ `pointercancel` IS THE ONLY ABANDON SIGNAL — NOT `lostpointercapture`.
+       *
+       * ⚠️ A touch pointer is IMPLICITLY captured to whatever element it went down on (the card),
+       * and `setPointerCapture` on this container RETARGETS it — which fires `lostpointercapture` on
+       * the card, and that event BUBBLES to here. Handling it aborted the gesture at the exact
+       * moment the axis locked to horizontal, so no drag ever turned a card. Caught by the touch
+       * harness; a mouse never showed it, because a mouse has no implicit capture to lose.
+       */
+      onPointerCancel={cancel}
     >
       <div
         className="flex justify-between text-[11px] uppercase tracking-[0.06em] mb-1.5"
@@ -180,8 +306,11 @@ export const CardDeck: React.FC<{
               if (!onCardTap) return;
               e.preventDefault();
               e.stopPropagation();
-              // ⛔ A DRAG IS NOT A TAP. Anything past a few pixels was the deck's gesture.
-              if (moved.current > 8) return;
+              /**
+               * ⛔ A DRAG IS NOT A TAP — ON EITHER AXIS. `movedAny` is the reason the drawer no
+               * longer opens when the athlete scrolls the screen with a thumb on a card.
+               */
+              if (g.current.movedAny > TAP_SLOP_PX) return;
               onCardTap();
             }}
           >
