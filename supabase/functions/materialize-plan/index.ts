@@ -24,6 +24,7 @@ import {
 } from '../_shared/swim/swim-plan-summary.ts';
 import { formatStrengthExercise, formatStrengthExerciseLines, type WeightUnit } from '../_shared/strength/strength-display-lines.ts';
 import { mobilitySetsFrom } from '../_shared/mobility-sets.ts';
+import { plannedPoolFor } from '../_shared/swim/planned-pool.ts';
 import { calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
 import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts';
 // ⚠️ The SERVER canonicalizer — `exercise_log.canonical_name` is its output, so the lookup key and
@@ -4277,6 +4278,8 @@ Deno.serve(async (req) => {
         // ⛔ A MOBILITY ROW'S LOGGER ROWS (2026-09-10, audit H-T12) — see `_shared/mobility-sets.ts`.
         const mobilitySets = String(row?.type || '').toLowerCase() === 'mobility' ? mobilitySetsFrom((row as any)?.mobility_exercises) : [];
         const weightUnit: WeightUnit = (baselines as any)?.isMetric ? 'kg' : 'lb';
+        // ⛔ THE POOL A PLANNED POOL SWIM CARRIES (2026-09-10, audit H-D18) — see `_shared/swim/planned-pool.ts`.
+        const pool = plannedPoolFor(row as any, !!(baselines as any)?.isMetric);
 
         if (steps && steps.length) {
           // Count recovery steps
@@ -4305,7 +4308,7 @@ Deno.serve(async (req) => {
                 : {}),
               // ⛔ THE SWIM'S TOTAL AND ITS UNIT (2026-09-10, audit H-T20). Every surface prints `label`.
               ...(() => {
-                const swim_distance = plannedSwimDistance(swim_tally, (row as any)?.pool_unit, (row as any)?.units);
+                const swim_distance = plannedSwimDistance(swim_tally, pool?.pool_unit ?? (row as any)?.pool_unit, (row as any)?.units);
                 return swim_distance ? { swim_distance } : {};
               })(),
               ...(mobilitySets.length ? { mobility_sets: mobilitySets } : {}),
@@ -4321,6 +4324,11 @@ Deno.serve(async (req) => {
           if (String(row?.type || '').toLowerCase() === 'swim' && tokens.length) {
             const line = formatSwimSubtitleFromBuckets(categorizeSwimTokensForDisplay(tokens.map(String)), ' • ');
             if (line) update.friendly_summary = line;
+          }
+          // The pool, written only where the row lacks it — a pool the athlete set is left alone.
+          if (pool) {
+            if ((row as any)?.pool_unit !== pool.pool_unit) update.pool_unit = pool.pool_unit;
+            if (Number((row as any)?.pool_length_m) !== pool.pool_length_m) update.pool_length_m = pool.pool_length_m;
           }
 
           /**

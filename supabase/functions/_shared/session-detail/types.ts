@@ -262,6 +262,14 @@ export type SessionDetailV1 = {
      *  buoy/paddles read faster, kick/drill read slower, so pace isn't a clean unaided number. Null when
      *  no equipment was logged on this swim → nothing renders. Deterministic (detectSwimEquipment). */
     swim_pace_equipment_note: string | null;
+    /**
+     * 2026-09-10 (audit H-D13), swim only: distance and duration as a whole-number percent of plan, and
+     * whether each reached the plan. Null without a planned or a done figure. See `swim-plan-share.ts`.
+     */
+    swim_distance_pct_of_plan?: number | null;
+    swim_distance_status?: 'at_or_above' | 'below' | null;
+    swim_duration_pct_of_plan?: number | null;
+    swim_duration_status?: 'at_or_above' | 'below' | null;
   };
   planned_totals: {
     duration_s: number | null;

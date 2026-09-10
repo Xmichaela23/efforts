@@ -6,6 +6,7 @@ import { halvesSteady, notSteadyLine } from '../ride-halves-steady.ts';
 import type { SessionDetailV1, SegmentVerdictV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
 import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
 import { pacingVariability, stampIntervalCompare } from './interval-compare.ts';
+import { planShare } from './swim-plan-share.ts';
 import { isIndoorSession } from '../indoor-session.ts';
 import type { VerdictDirection } from '../core-verdict.ts';
 import type { ArcPerformanceBridgeV1 } from './arc-performance-bridge.ts';
@@ -816,6 +817,17 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     swim_work_rest: swimWorkRest, // D-194
     swim_pace_equipment_note: swimPaceEquipmentNote, // "with fins — reads faster than unaided"; null = no gear logged
   };
+  // ⛔ A SWIM'S SHARE OF ITS PLAN (2026-09-10, audit H-D13) — the pool-swim card divided these itself. The
+  // same two figures the card shows side by side: done distance and duration (elapsed pool time, D-163)
+  // against the planned distance and length.
+  if (type === 'swim') {
+    const dist = planShare(completedTotals.distance_m, plannedTotals.distance_m);
+    const dur = planShare(completedTotals.duration_s, plannedTotals.duration_s);
+    completedTotals.swim_distance_pct_of_plan = dist.pct;
+    completedTotals.swim_distance_status = dist.status;
+    completedTotals.swim_duration_pct_of_plan = dur.pct;
+    completedTotals.swim_duration_status = dur.status;
+  }
 
   // Single planned/executed row must match completed_totals (same source as Details / chips).
   if (type === 'run' && intervals.length === 1 && completedDistM != null && completedDistM > 0) {

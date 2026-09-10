@@ -102,10 +102,14 @@ export function buildSwimPayloadFromWorkout(workout: any): ScheduleSwimPayload |
     : [];
   if (!steps.length) return null;
 
-  // pool_unit: 'yd' | 'm'; pool_length_m: numeric meters.
+  // ⛔ THE ROW'S POOL, WITH NO DEFAULT (2026-09-10, audit H-D18). materialize-plan writes `pool_unit` and
+  // `pool_length_m` on every planned pool swim. This turned an empty unit into metres and a missing length
+  // into 22.86 or 25 m, while the goggles script printed yards for the same row; a row without them sends nothing.
   const rawUnit = String(workout.pool_unit || '').toLowerCase();
-  const poolUnit: 'yd' | 'm' = rawUnit === 'yd' ? 'yd' : 'm';
-  const poolLengthM = Number(workout.pool_length_m ?? workout.pool_length) || (poolUnit === 'yd' ? 22.86 : 25.0);
+  if (rawUnit !== 'yd' && rawUnit !== 'm') return null;
+  const poolUnit: 'yd' | 'm' = rawUnit;
+  const poolLengthM = Number(workout.pool_length_m);
+  if (!(Number.isFinite(poolLengthM) && poolLengthM > 0)) return null;
 
   const title =
     workout.rendered_description ||

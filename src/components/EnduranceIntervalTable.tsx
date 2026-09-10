@@ -62,6 +62,11 @@ type EnduranceIntervalTableProps = {
       avg_hr?: number | null;
       swim_pace_per_100_s?: number | null;
       swim_work_rest?: string | null; // D-194
+      /** The server's share of plan and its word (audit H-D13). */
+      swim_distance_pct_of_plan?: number | null;
+      swim_distance_status?: 'at_or_above' | 'below' | null;
+      swim_duration_pct_of_plan?: number | null;
+      swim_duration_status?: 'at_or_above' | 'below' | null;
     };
     planned_totals?: {
       duration_s?: number | null;
@@ -496,8 +501,10 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
   const plannedDurS = pt?.duration_s ?? 0;
   const plannedDistM = pt?.distance_m ?? 0;
 
-  const distPct = plannedDistM > 0 && executedDistM > 0 ? Math.round((executedDistM / plannedDistM) * 100) : null;
-  const timePct = plannedDurS > 0 && executedDurS > 0 ? Math.round((executedDurS / plannedDurS) * 100) : null;
+  // ⛔ THE SHARE OF PLAN IS THE SERVER'S (2026-09-10, audit H-D13): `completed_totals.swim_*_pct_of_plan` and
+  // its word. The card divided the totals itself; a session built before the fields existed shows no pills.
+  const distPct = ct.swim_distance_pct_of_plan ?? null;
+  const timePct = ct.swim_duration_pct_of_plan ?? null;
   if (distPct == null && timePct == null && !(executedDistM > 0)) return null;
 
   const fmtDistLocal = (m: number) => useYd ? `${Math.round(m / 0.9144)} yd` : `${Math.round(m)} m`;
@@ -566,9 +573,9 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
   })();
 
   // Adherence as a pill+dot (matches STATE/home): green at/above plan, amber below.
-  const pill = (label: string, pct: number | null) => {
+  const pill = (label: string, pct: number | null, status: string | null | undefined) => {
     if (pct == null) return null;
-    const dot = pct >= 100 ? 'bg-emerald-400' : 'bg-amber-300';
+    const dot = status === 'at_or_above' ? 'bg-emerald-400' : 'bg-amber-300';
     return (
       <div className="flex items-center gap-1.5">
         <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
@@ -624,8 +631,8 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
 
       {(distPct != null || timePct != null) && (
         <div className="mt-4 flex items-center justify-center gap-5">
-          {pill('Distance', distPct)}
-          {pill('Duration', timePct)}
+          {pill('Distance', distPct, ct.swim_distance_status)}
+          {pill('Duration', timePct, ct.swim_duration_status)}
         </div>
       )}
 

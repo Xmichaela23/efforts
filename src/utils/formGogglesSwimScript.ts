@@ -39,17 +39,16 @@ function recoverySec(st: any): number {
   )
 }
 
-function swimDisplayYards(workout: any): boolean {
-  const poolUnit = workout?.pool_unit as string | null | undefined
-  const tokensArr: string[] = Array.isArray(workout?.steps_preset)
-    ? workout.steps_preset.map((t: unknown) => String(t))
-    : []
-  const tokensJoined = tokensArr.join(' ').toLowerCase()
-  const tokensPreferYd = /\byd\b/.test(tokensJoined) || /_\d+yd\b|\d+yd_/i.test(tokensJoined)
-  const planUnitsRaw = String(workout?.units ?? '').toLowerCase()
-  if (poolUnit === 'm') return false
+/**
+ * ⛔ THE ROW'S POOL UNIT, NOTHING ELSE (2026-09-10, audit H-D18). With no unit this guessed yards from the
+ * plan's units or its tokens, while the watch export sent metres for the same row. materialize-plan writes
+ * `pool_unit` on every planned pool swim; a row without one gets no script.
+ */
+function swimDisplayYards(workout: any): boolean | null {
+  const poolUnit = String(workout?.pool_unit ?? '').toLowerCase()
   if (poolUnit === 'yd') return true
-  return planUnitsRaw === 'imperial' || tokensPreferYd
+  if (poolUnit === 'm') return false
+  return null
 }
 
 function formatDistance(st: any, displayYards: boolean): string | undefined {
@@ -218,6 +217,7 @@ export function buildFormGogglesSwimScript(workout: any): string | null {
   if (!steps.length) return null
 
   const displayYards = swimDisplayYards(workout)
+  if (displayYards == null) return null
   const { warmup, main, cooldown } = partitionSections(steps)
 
   const chunks: string[] = []
