@@ -128,7 +128,17 @@ export function spacingLineFor(rows: readonly TodayRow[]): SpacingLine | null {
   const first = `Lift first and keep the ${sport} easy.`;
   // p145, p77. ⛔ ONLY WHEN THE LIFT HAS SOMETHING THAT NEEDS TO BE FRESH.
   const intents = rowsOf(lift).map(intentOf);
-  const costs = intents.includes('SKILL') || intents.includes('DE');
+  /**
+   * ⛔ AN UPPER-BODY DAY DROPS THE SECOND SENTENCE (Michael, 2026-09-10, §2.1). Riding or running first
+   * costs the lift its legs, not its bench (p131: fresh in the systems the session uses; p251; p274
+   * pairs the upper pull day with an easy ride).
+   * ⚠️ READ OFF THE FRAME'S TAGS, NEVER THE NAME. The composer stamps `frame:` on every frame lifting
+   * day and `lower:me` / `lower:de` only on the frame's lower days; a frame day with no `lower:` tag
+   * is the frame's upper day (`compose.ts` gives it `region: 'upper'` by the same rule). Test-week and
+   * plyometric rows carry no `frame:` tag and keep the rule above.
+   */
+  const upperDay = tagValue(lift, 'frame') != null && tagValue(lift, 'lower') == null;
+  const costs = !upperDay && (intents.includes('SKILL') || intents.includes('DE'));
   const cost = `${sport === 'run' ? 'Running' : 'Riding'} first costs the lift its skill and speed sets.`;
   return { lead, closerLabel, closer: costs ? `${first} ${cost}` : first };
 }

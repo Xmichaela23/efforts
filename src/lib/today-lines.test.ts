@@ -238,3 +238,35 @@ Deno.test('the ride with work reads its sprint interval off the row: 9, 8, 9', (
 Deno.test('⛔ A RIDE WITH WORK AND NO SPRINT TOKEN GETS NO LINE — never a fixed number', () => {
   assertEquals(enduranceLinesFor(withWork(1, null)), []);
 });
+
+// ⛔ AN UPPER-BODY DAY (frame tag, no lower: tag) DROPS THE LEG-COST SENTENCE; A LOWER DAY KEEPS IT.
+const FRAME_DAY = ['standing_plan', 'frame:all_rounder', 'column:standard'];
+
+Deno.test('⛔ UPPER-BODY DAY: "Lift first and keep the ride easy." only, the chevron line stays', () => {
+  const upper = lift([{ slot_intent: 'SKILL', name: 'pull-up' }, { slot_intent: 'DE', name: 'medicine ball throw' }], FRAME_DAY);
+  const out = spacingLineFor([upper, ride('ride_endurance', 'vt1_or_easier')]);
+  assertEquals(out, {
+    lead: 'Two sessions today. Keep them six to eight hours apart.',
+    closerLabel: 'If they have to be closer',
+    closer: 'Lift first and keep the ride easy.',
+  });
+  assertEquals(spacingLineFor([upper, run('run_vt1', 'vt1_or_easier')])?.closer, 'Lift first and keep the run easy.');
+});
+
+Deno.test('⛔ UPPER OR LOWER IS NEVER READ OFF THE NAME', () => {
+  const namedUpper = { ...lift([{ slot_intent: 'SKILL', name: 'back squat' }], [...FRAME_DAY, 'lower:me']), name: 'Upper body: Push' };
+  assertEquals(
+    spacingLineFor([namedUpper, ride('ride_endurance', 'vt1_or_easier')])?.closer,
+    'Lift first and keep the ride easy. Riding first costs the lift its skill and speed sets.',
+  );
+});
+
+Deno.test('lower-body days are unchanged: lower:me and lower:de keep the second sentence', () => {
+  for (const role of ['me', 'de']) {
+    const lower = lift([{ slot_intent: 'DE', name: 'box jump' }], [...FRAME_DAY, `lower:${role}`]);
+    assertEquals(
+      spacingLineFor([lower, ride('ride_endurance', 'vt1_or_easier')])?.closer,
+      'Lift first and keep the ride easy. Riding first costs the lift its skill and speed sets.',
+    );
+  }
+});
