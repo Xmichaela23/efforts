@@ -26,7 +26,15 @@ Data: today's rows from `get-week` (the rows `TodaysEffort.tsx` already loads). 
 `target_rir`. An endurance row carries tags `family:<family>`, `level:<n>`, `sport:<run|ride|swim>`
 (`session-vocabulary.ts` ~361) and `duration`.
 
-1. **Spacing line**, only when the day has two sessions. Built from the day's own data (ride or run length
+1. **Spacing line**, REVISED 2026-09-10 (Michael). Shown only when the day has two sessions. Two lines
+   always: `Two sessions today. Keep them six to eight hours apart.` (p145). A third line `If they have to be
+   closer` with a chevron at its right; tap opens, under it: `Lift first and keep the ride easy. Riding
+   first costs the lift its skill and speed sets.` (p144, p145, p77). Closed by default. "ride" becomes
+   "run" for a run day. On a lift day with no skill and no speed sets the second sentence drops. The
+   app already reads the day's rows to pick the branch; keep that, and show the book's preferred order
+   (lift first) with the cost of the other, not one branch alone. The earlier lines below are history.
+   **Form line**: stays beside the weather in the header block (Michael, 2026-09-10).
+   ORIGINAL: **Spacing line**, only when the day has two sessions. Built from the day's own data (ride or run length
    and family, lift day, set count), never a list of rules. APPROVED (Michael's words):
    - `Two sessions today. Six to eight hours apart.` (p145)
    - then `Closer than that:` followed by one of
