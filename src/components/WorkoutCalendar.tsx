@@ -1475,7 +1475,10 @@ export default function WorkoutCalendar({
                 style={{ color: 'rgba(242,240,236,0.36)', lineHeight: 1.15, letterSpacing: '0.04em' }}
               >
                 {weekdayFmt.format(d)}
-                <b className="block text-[18px] font-medium" style={{ color: 'rgba(242,240,236,1)', letterSpacing: 0 }}>
+                {/* One weight and one colour on every day, past or future — the date column is a fixed
+                    reference and carries no state (Michael, 2026-09-09: 10–13 read bolder than 7–9). State
+                    lives on the session lines. tabular-nums so 7 and 10 sit on the same column. */}
+                <b className="block text-[18px] font-normal tabular-nums" style={{ color: 'rgba(242,240,236,0.85)', letterSpacing: 0 }}>
                   {d.getDate()}
                 </b>
               </div>
