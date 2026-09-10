@@ -12,7 +12,8 @@ import StravaPreview from '@/components/StravaPreview';
 import GarminPreview from '@/components/GarminPreview';
 import { Button } from './ui/button';
 import { SPORT_COLORS, getDisciplineColor } from '@/lib/context-utils';
-import { deriveSwimPaceBands, parsePaceToSeconds } from '@/lib/swimPaceZones';
+// ⛔ THE POWER AND SWIM ZONE ROWS ARE THE SERVER'S (2026-09-10, audit H-B05, H-B06). See the hook.
+import { useBaselineZones } from '@/hooks/useBaselineZones';
 import { supabase, getStoredUserId, getStoredAuthUser } from '@/lib/supabase';
 import { refreshGroupRideRouteSnapshotsForUser } from '@/lib/refresh-group-ride-route-snapshots';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
@@ -159,6 +160,7 @@ export const HOME_GYM_EQUIPMENT_OPTIONS: string[] = [
 
 export default function TrainingBaselines({ onClose, onOpenBaselineTest, onSignOut }: TrainingBaselinesProps) {
 const { saveUserBaselines, loadUserBaselines } = useAppContext();
+const { zones: serverZones, refresh: refreshZones } = useBaselineZones();
 /** Profile identity (2026-09-06): the sign-in email is shown, never stored; the photo is uploaded to the
  *  `avatars` bucket at `<user_id>/photo.jpg` (resized to 512px on the phone), its public URL saved to
  *  `profile.photo_url` at once so leaving without Save does not orphan the file. */
@@ -213,6 +215,7 @@ const [ftpAccepting, setFtpAccepting] = useState(false);
 const [ftpAcceptNote, setFtpAcceptNote] = useState<string>('');
 /** After an accept, the screen shows the row the server saved (learned numbers and the cleared manual flag). */
 const reloadSavedBaselines = async () => {
+  void refreshZones();
   const fresh = await loadUserBaselines();
   if (!fresh) return;
   setData(fresh as BaselineData);
@@ -859,18 +862,8 @@ const getRestingHR = (customOverride: number | null, garminValue: number | null)
   return { value: null, source: 'none' };
 };
 
-// Calculate power zones from FTP (Coggan zones)
-const getPowerZones = (ftp: number): { name: string; range: string; color: string }[] => {
-  return [
-    { name: 'Z1 Recovery', range: `< ${Math.round(ftp * 0.55)}W`, color: '#10b981' },
-    { name: 'Z2 Endurance', range: `${Math.round(ftp * 0.55)}-${Math.round(ftp * 0.75)}W`, color: '#84cc16' },
-    { name: 'Z3 Tempo', range: `${Math.round(ftp * 0.76)}-${Math.round(ftp * 0.90)}W`, color: '#f59e0b' },
-    { name: 'Z4 Threshold', range: `${Math.round(ftp * 0.91)}-${Math.round(ftp * 1.05)}W`, color: '#ef4444' },
-    { name: 'Z5 VO2max', range: `${Math.round(ftp * 1.06)}-${Math.round(ftp * 1.20)}W`, color: '#991b1b' },
-    { name: 'Z6 Anaerobic', range: `${Math.round(ftp * 1.21)}-${Math.round(ftp * 1.50)}W`, color: '#7c2d12' },
-    { name: 'Z7 Neuromuscular', range: `> ${Math.round(ftp * 1.50)}W`, color: '#581c87' },
-  ];
-};
+// ⛔ NO POWER-ZONE TABLE ON THE PHONE (2026-09-10, audit H-B05). The rows below come from `save-baselines`
+// (Coggan's seven levels, `_shared/endurance/display-zones.ts`), the table the ride analysis bins by.
 
 /**
  * Every row saves at once (2026-09-06): `persist` is the old Save button's routine, parameterised on the
@@ -916,6 +909,7 @@ const persist = async (next: BaselineData, hr?: { runMax?: number | null; runLth
     };
     const saved = await saveUserBaselines(dataToSave as any, heartRate);
     if (saved?.configured_hr_zones) setStoredZones(saved.configured_hr_zones);
+    void refreshZones();
 
     setOriginalData(JSON.stringify(dataToSave)); // match the SAVED copy (incl. swimPace100_updated_at) so the button greys out post-save
     setInitialManualHR(JSON.stringify({ manualRunMaxHR: m.runMax, manualRunLTHR: m.runLthr, manualRideMaxHR: m.rideMax, manualRideLTHR: m.rideLthr }));
@@ -1261,7 +1255,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
     const ftpAccepted = learnedFitness?.ride_ftp_accepted?.value != null;
     const ftpNote = ftpMine ? 'your number' : ftp.source === 'learned' ? (ftpAccepted ? 'accepted from your rides' : 'from your rides') : ftp.value != null ? 'typed, until your rides measure' : null;
     const hr = hrRows('ride');
-    const powerZones = ftp.value ? getPowerZones(Number(ftp.value)) : [];
+    const powerZones = serverZones?.power?.rows ?? [];
     return [
       { id: 'bike-numbers', label: 'FTP', Icon: Bike, info: 'FTP is the most power you could hold for about an hour. It sets your power zones and the targets on rides. Typing a number makes it your number; auto uses what your rides measure.', body: (
         <div className="space-y-1.5">
@@ -1300,7 +1294,8 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
   }
   if (activeSport === 'swimming') {
     const swim100 = pnAny.swimPace100 as string | undefined;
-    const bands = deriveSwimPaceBands(parsePaceToSeconds(swim100) ?? 0);
+    // ⛔ THE SERVER'S BANDS (audit H-B06), from the stored threshold 100 pace.
+    const bands = serverZones?.swim_pace?.rows ?? [];
     return [
       { id: 'swim-numbers', label: 'Pace', Icon: Waves, info: 'Your hard, steady 100 pace: the effort you could hold for a strong continuous swim. Sets your swim pace zones.', body: (
         <div className="space-y-1.5">

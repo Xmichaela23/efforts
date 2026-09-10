@@ -17,10 +17,13 @@
  *   preview?:     true — with `calibration`, return the derived score and paces without saving.
  *   accept?:      { kind: 'ftp' | 'run_threshold', value } — "use this number": the value the button showed
  *                 (watts, or seconds per km). Saved on its own; see `acceptMeasuredForSave`.
+ *   zones?:       true, alone — READ ONLY: the zone rows Profile and Welcome print (2026-09-10, audit
+ *                 H-B04–H-B06). Nothing is saved. See `zones.ts`.
  * }
- * → { success, effort, performance_numbers, configured_hr_zones }
- *   accept → { success, accepted: { kind, value }, learned_fitness, performance_numbers }, or 409 with
+ * → { success, effort, performance_numbers, configured_hr_zones, zones }
+ *   accept → { success, accepted: { kind, value }, learned_fitness, performance_numbers, zones }, or 409 with
  *            `error: 'nothing_to_accept' | 'value_changed'`
+ *   zones  → { success, zones: { power, swim_pace, run_easy_hr } }
  */
 import { requireUser, AuthError } from '../_shared/require-user.ts';
 import {
@@ -31,6 +34,7 @@ import {
   hrZoneConfigForSave,
   performanceNumbersForSave,
 } from './derive.ts';
+import { zonesForBaselinesRow } from './zones.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -63,6 +67,17 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const nowIso = new Date().toISOString();
 
+    // ⛔ THE ZONE READ. Profile and Welcome print these rows; the phone no longer builds any of them.
+    if (body?.zones === true && !body?.baselines && !body?.heart_rate && !body?.calibration && !body?.accept) {
+      const { data: cur, error: zErr } = await supabase
+        .from('user_baselines')
+        .select('performance_numbers, learned_fitness, configured_hr_zones')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (zErr) throw zErr;
+      return json({ success: true, zones: zonesForBaselinesRow(cur) });
+    }
+
     const calibration = body?.calibration && typeof body.calibration === 'object' ? body.calibration : null;
     const calClock = calibration
       ? fiveKClockFromCalibration({
@@ -88,7 +103,7 @@ Deno.serve(async (req) => {
       }
       const { data: cur, error: curErr } = await supabase
         .from('user_baselines')
-        .select('learned_fitness, performance_numbers')
+        .select('learned_fitness, performance_numbers, configured_hr_zones')
         .eq('user_id', userId)
         .maybeSingle();
       if (curErr) throw curErr;
@@ -110,6 +125,11 @@ Deno.serve(async (req) => {
         accepted: { kind, value: res.accepted_value },
         learned_fitness: res.learned_fitness,
         performance_numbers: res.performance_numbers,
+        zones: zonesForBaselinesRow({
+          performance_numbers: res.performance_numbers,
+          learned_fitness: res.learned_fitness,
+          configured_hr_zones: cur?.configured_hr_zones,
+        }),
       });
     }
 
@@ -175,6 +195,11 @@ Deno.serve(async (req) => {
       effort,
       performance_numbers: row.performance_numbers ?? null,
       configured_hr_zones: zonesCfg ?? parseJson(existing?.configured_hr_zones) ?? null,
+      zones: zonesForBaselinesRow({
+        performance_numbers: row.performance_numbers ?? storedPerf,
+        learned_fitness: existing?.learned_fitness,
+        configured_hr_zones: zonesCfg ?? existing?.configured_hr_zones,
+      }),
     });
   } catch (e) {
     if (e instanceof AuthError) return json({ error: 'unauthorized' }, 401);

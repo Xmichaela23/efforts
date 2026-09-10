@@ -16,7 +16,8 @@ import { numberWord } from '@/lib/number-word';
 import { resolveCurrentRunThresholdPace } from '@/lib/resolve-current-run-pace';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
-import { Z2_FLOOR_PCT_LTHR, EASY_CEILING_PCT_LTHR } from '@/lib/friel-zones';
+// ⛔ THE EASY HEART-RATE BAND IS THE SERVER'S (2026-09-10, audit H-B04). See the hook.
+import { useBaselineZones } from '@/hooks/useBaselineZones';
 
 /**
  * The sign-up intake (2026-09-07). Two screens after the account, Next at the bottom of each, then
@@ -112,6 +113,7 @@ export default function WelcomePage() {
   const [pn, setPn] = useState<Record<string, any>>({});
   const [manualRunLthr, setManualRunLthr] = useState<number | null>(null);
   const [locked, setLocked] = useState<Record<string, number>>({});
+  const { zones: serverZones, refresh: refreshZones } = useBaselineZones();
 
   // Screen 2
   const [gym, setGym] = useState<'commercial' | 'home' | null>(null);
@@ -174,10 +176,12 @@ export default function WelcomePage() {
         disciplineFitness: {}, benchmarks: {}, injuryHistory: '', injuryRegions: [], trainingBackground: '',
       };
       await saveUserBaselines?.(patch(current), heartRate);
+      // The band reads the stored row, so it is asked again once the save lands.
+      await refreshZones();
     };
     queue.current = queue.current.then(run, run);
     return queue.current;
-  }, [loadUserBaselines, saveUserBaselines]);
+  }, [loadUserBaselines, saveUserBaselines, refreshZones]);
 
   const aboutYouPatch = (b: any) => ({
     ...b,
@@ -296,8 +300,9 @@ export default function WelcomePage() {
   const baselinesLike = { learned_fitness: learned, performance_numbers: pn, configured_hr_zones: { manual_run_lthr: manualRunLthr } };
   const thr = resolveCurrentRunThresholdPace(baselinesLike as any);
   const lthr = manualRunLthr ?? resolveCurrentLthr(baselinesLike as any, { sport: 'run' }).bpm;
-  const easyLo = lthr ? Math.round(lthr * Z2_FLOOR_PCT_LTHR) : null;
-  const easyHi = lthr ? Math.round(lthr * EASY_CEILING_PCT_LTHR) : null;
+  // ⛔ The server's easy band (`resolveRunEasyHrBand`, 70–89% of threshold); the phone's 85–89% is gone.
+  const easyLo = serverZones?.run_easy_hr?.floor ?? null;
+  const easyHi = serverZones?.run_easy_hr?.ceiling ?? null;
   const fiveK = typeof pn.fiveK === 'string' ? pn.fiveK : null;
   const thrMine = pn.threshold_pace_source === 'manual';
   const ftp = resolveCurrentFtp(baselinesLike as any);
@@ -460,7 +465,7 @@ export default function WelcomePage() {
                   value={thr.sec_per_mi != null ? `${paceToText(metric ? thr.sec_per_mi / 1.609344 : thr.sec_per_mi)}/${metric ? 'km' : 'mi'} · ${numberWord(thr.source, thrMine)}` : null}
                   saveOnBlur onSave={(t) => { const sec = parsePaceText(t); if (sec == null) return; const secPerMi = metric ? sec * 1.609344 : sec; const str = paceToText(secPerMi); setPn((p) => ({ ...p, threshold_pace_min_per_mi: str, threshold_pace_source: 'manual' })); void persist((b) => ({ ...b, performanceNumbers: { ...(b.performanceNumbers ?? {}), threshold_pace_min_per_mi: str, threshold_pace_source: 'manual' } })); }} />
                 <NumberRow id="lthr" name="Threshold heart rate" hint="bpm" inputMode="numeric" sport="run" note={easyLo == null ? null : null}
-                  value={lthr ? `${Math.round(lthr)} bpm · easy ${easyLo}–${easyHi}` : null} seed={lthr ? String(Math.round(lthr)) : ''}
+                  value={lthr ? `${Math.round(lthr)} bpm${easyLo != null && easyHi != null ? ` · easy ${easyLo}–${easyHi}` : ''}` : null} seed={lthr ? String(Math.round(lthr)) : ''}
                   saveOnBlur onSave={(t) => { const v = parseInt(t); if (!(Number.isFinite(v) && v > 80 && v < 230)) return; setManualRunLthr(v); void persist((b) => b, { manual_run_lthr: v }); }} />
               </div>
             </div>

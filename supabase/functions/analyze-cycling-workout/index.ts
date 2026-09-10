@@ -78,21 +78,9 @@ import { runOnlyKeyScrub } from '../_shared/cross-sport-key-scrub.ts';
 // OUTPUT: { success: boolean, analysis: CyclingWorkoutAnalysis }
 // =============================================================================
 
-// Power Zone Analysis Types
-interface PowerZone {
-  lower: number; // watts
-  upper: number; // watts
-  name: string;
-}
-
-interface PowerZones {
-  zone1: PowerZone; // Active Recovery (0-55% FTP)
-  zone2: PowerZone; // Endurance (55-75% FTP)
-  zone3: PowerZone; // Tempo (75-90% FTP)
-  zone4: PowerZone; // Threshold (90-105% FTP)
-  zone5: PowerZone; // VO2max (105-120% FTP)
-  zone6: PowerZone; // Neuromuscular Power (>120% FTP)
-}
+// ⛔ NO POWER-ZONE TABLE HERE (2026-09-10, audit H-B05). A six-level table (Z6 120–200% of FTP) and its
+// types sat in this file with no caller. The one table is Coggan's seven levels in
+// `_shared/endurance/display-zones.ts`, which Profile prints and compute-workout-analysis bins by.
 
 interface HeartRateZone {
   lower: number;
@@ -434,20 +422,6 @@ function parsePhaseFromTags(tags: string[]): { phase: string | null, week: strin
   }
   
   return { phase, week, totalWeeks };
-}
-
-/**
- * Calculate power zones from FTP
- */
-function calculatePowerZones(ftp: number): PowerZones {
-  return {
-    zone1: { lower: 0, upper: ftp * 0.55, name: 'Active Recovery' },
-    zone2: { lower: ftp * 0.55, upper: ftp * 0.75, name: 'Endurance' },
-    zone3: { lower: ftp * 0.75, upper: ftp * 0.90, name: 'Tempo' },
-    zone4: { lower: ftp * 0.90, upper: ftp * 1.05, name: 'Threshold' },
-    zone5: { lower: ftp * 1.05, upper: ftp * 1.20, name: 'VO2max' },
-    zone6: { lower: ftp * 1.20, upper: ftp * 2.0, name: 'Neuromuscular Power' }
-  };
 }
 
 /**

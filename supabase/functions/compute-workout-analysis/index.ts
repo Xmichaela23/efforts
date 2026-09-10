@@ -10,6 +10,7 @@ import { computeRideEfficiency, computeRideTss, computeRideVam } from '../_share
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
+import { powerZoneBoundaries as powerZoneBoundariesFor } from '../_shared/endurance/display-zones.ts';
 import { runEasyZone3FloorBpm } from '../_shared/easy-hr.ts';
 import { paceToGAP } from '../_shared/gap.ts'; // ONE canonical Grade-Adjusted Pace (Minetti) — no inline copy
 // The bike FTP estimator's two per-ride substrates: the widened power-curve durations and the
@@ -1749,16 +1750,9 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
     const ftpForZones = (typeof userFtp === 'number' && userFtp > 0) ? userFtp : null;
     if (ftpForZones) {
       console.log('[POWER ZONES] Using FTP:', ftpForZones);
-      const powerZoneBoundaries = [
-        0,
-        ftpForZones * 0.55,   // Z1 max: Active Recovery
-        ftpForZones * 0.75,   // Z2 max: Endurance
-        ftpForZones * 0.90,   // Z3 max: Tempo
-        ftpForZones * 1.05,   // Z4 max: Threshold
-        ftpForZones * 1.20,   // Z5 max: VO2 Max
-        ftpForZones * 1.50,   // Z6 max: Anaerobic
-        Infinity              // Z6+ (anything above)
-      ];
+      // ⛔ ONE POWER TABLE (2026-09-10, audit H-B05): Coggan's seven levels, the same edges Profile's rows
+      // print from — `_shared/endurance/display-zones.ts`. Same numbers as the inline array it replaced.
+      const powerZoneBoundaries = powerZoneBoundariesFor(ftpForZones);
       const pwrZones = binsForBoundaries(power_watts, time_s, powerZoneBoundaries);
       if (pwrZones) analysis.zones.power = pwrZones as any;
     }
