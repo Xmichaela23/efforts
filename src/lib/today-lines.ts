@@ -15,6 +15,8 @@
  * and the row's own `slot_intent` are data; a session's NAME is a label that changes.
  */
 
+import { familyLineFor } from '@shared/standing-plan/family-lines';
+
 /** The rows a session carries. Only the fields this file reads. */
 export type TodayStrengthRow = {
   name?: string | null;
@@ -233,27 +235,10 @@ export function liftLinesFor(
  * composer actually stamps is `run_near_threshold` (`endurance-library/classification.ts`), so both
  * spellings are keyed to the one approved line rather than one of them silently printing nothing.
  */
-const FAMILY_LINE: Record<string, string> = {
-  // p237.
-  ride_anaerobic: 'Go by feel. Stay above the floor. No ceiling. Each set harder than the last.',
-  // p239, p275.
-  // ⛔ REWRITTEN 2026-09-09 (approved). "Easy, under 75 percent." named no percentage OF anything —
-  // the athlete could not tell whether it meant FTP, max heart rate or effort — and the pedalling
-  // paragraph after it was three instructions where the session needs one. The talk test is the
-  // check an athlete can actually run mid-ride.
-  ride_endurance: 'Easy, under 75 percent of FTP. You should be able to talk in full sentences.',
-  // p233, p110 — the hard run, both families.
-  run_mlss: 'Stay near threshold as long as you can without falling apart.',
-  run_near_threshold: 'Stay near threshold as long as you can without falling apart.',
-  // p235, p211 — the long run.
-  run_lsd:
-    'Easy the whole way. Stopping for a bit is fine. Be able to speak long sentences easily the '
-    + 'whole time.',
-  // p235, p211. ⛔ NEVER THE WORD VT1 ON SCREEN.
-  run_vt1: 'Easy. Talk test twice, at 5 minutes and at 20.',
-  // p238.
-  ride_sweet_spot: 'As close to threshold as you can without going over.',
-};
+/**
+ * ⛔ THE MAP MOVED TO `@shared/standing-plan/family-lines` (2026-09-10) so the session drawer's
+ * description reads the same approved sentence Today does. See that file.
+ */
 
 /**
  * ⛔⛔ THE STOP RULE IS OFF TODAY (Michael, 2026-09-09, §2 as revised). It read
@@ -271,6 +256,6 @@ const FAMILY_LINE: Record<string, string> = {
  */
 export function enduranceLinesFor(session: TodayRow): string[] {
   const family = familyOf(session);
-  const line = family ? FAMILY_LINE[family] : undefined;
+  const line = familyLineFor(family);
   return line ? [line] : [];
 }

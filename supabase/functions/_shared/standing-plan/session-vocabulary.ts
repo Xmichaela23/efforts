@@ -16,6 +16,7 @@
 // ============================================================================
 
 import type { EnduranceSession, FamilyId } from '../endurance-library/index.ts';
+import { familyLineFor } from './family-lines.ts';
 // ⛔ THE SOURCE'S OWN CLASSIFICATION — see `ENDURANCE_CLASS`, and see the tag list below.
 import { ENDURANCE_CLASS, classToken, FAMILIES } from '../endurance-library/index.ts';
 
@@ -633,43 +634,34 @@ export function translateEnduranceSession(
  * athlete DOES are the ones repeated here.
  */
 function describeSession(session: EnduranceSession, raceTempo: boolean): string {
-  const parts: string[] = [];
-  const safety = session.notes.find((n) => n.kind === 'safety');
-  if (safety) parts.push(safety.text);
   /**
-   * ⛔ *"At least this long — some recoveries carry no stated duration."* IS DELETED (2026-09-09,
-   * WORKORDER-kill-ours §B2). It described the ENGINE's own uncertainty about a total, not the
-   * session, and an athlete cannot act on it. `totals.isLowerBound` is unchanged and still travels
-   * for any reader that needs it.
+   * ⛔⛔ THE DESCRIPTION IS THE FAMILY LINE TODAY PRINTS (Michael, 2026-09-10). One source —
+   * `family-lines.ts` — read by both surfaces, so a session says the same sentence on Today and in
+   * the drawer. The steps list with its power or heart-rate targets follows it in the drawer exactly
+   * as before; that comes off `steps_preset` and `computed.steps`, not this string.
+   *
+   * ⛔ THE p107 DRIFT PARAGRAPH IS GONE FROM THE DESCRIPTION. *"End the session when heart rate has
+   * drifted 5%…"* is a mid-session rule the athlete applies with a watch, and it had already come
+   * off Today for that reason (§2 revised); the ride/run card reads drift against the same 5% line
+   * AFTER the session. ⚠️ THE NOTE ITSELF IS NOT DELETED — `CARDIAC_DRIFT_NOTE` still rides on the
+   * library session's `notes` for any reader that wants the rule; it is only no longer the row's
+   * sentence.
+   *
+   * ⚠️ TWO APPROVED LINES DROP OUT OF THE DRAWER WITH THIS: `run_mlss`'s *"Fatigue spread evenly
+   * across the rounds. Hills are fine, adjust pace to hold the effort."* and the easy and long runs'
+   * *"Go by heart rate. Pace varies with fatigue, hydration and weather."* The drawer's description
+   * is the family line and nothing else.
+   *
+   * ⚠️ THE RACE-TEMPO SENTENCE STAYS, after the family line, and only on a race-tempo row. That row
+   * is a different session from its family (p247: race pace, recoveries a quarter longer) and the
+   * sentence is the only place the difference is stated.
    */
+  const parts: string[] = [];
+  const line = familyLineFor(session.family);
+  if (line) parts.push(line);
   if (raceTempo) {
-    // ⛔ KEPT (§B2). p247, verbatim in substance: race pace with recoveries a quarter longer.
     parts.push('Run at race pace, with the recovery periods a quarter longer than usual.');
   }
-  if (session.family === 'run_mlss') {
-    /**
-     * ⛔ REWRITTEN 2026-09-09 (§B2, APPROVED — Michael's words off p231). The line said the same
-     * thing in more of them: *"Time above threshold with the fatigue spread evenly across the
-     * rounds. Hills are fine if the pace is adjusted to hold the effort."* The zone name is on the
-     * row already; what the athlete does with it is the two clauses that are left.
-     */
-    parts.push('Fatigue spread evenly across the rounds. Hills are fine, adjust pace to hold the effort.');
-  }
-  /**
-   * ⛔ THE PRESCRIPTION LINE (Michael, rulings 1 and 2 of 2026-09-02, rewritten 2026-09-09 §B2).
-   *
-   * ⛔ THE EASY AND LONG RUNS SAY WHAT TO STEER BY AND WHY THE PACE WILL NOT HOLD STILL (p235,
-   * APPROVED). *"Heart-rate zone; the pace shown is a reference"* named a mechanism; this names the
-   * instruction and the reason an athlete's pace moves under it.
-   * ⛔ AND THE NEAR-THRESHOLD RUN'S *"Effort 5–6 of 10."* IS DELETED (§B2). The step-level fields the
-   * materializer stamps (`stampRunPrescription`) carry the target; a second effort number on the row
-   * is the same claim twice, and the 5–6 was never on a page for this session.
-   */
-  if (session.family === 'run_vt1' || session.family === 'run_lsd') {
-    parts.push('Go by heart rate. Pace varies with fatigue, hydration and weather.');
-  }
-  // ⛔ NO EFFORT NUMBER ON ANY RUN ROW NOW. The MLSS one was OURS and came off 2026-09-05 ("whatever
-  // the book says"); the near-threshold 5–6 followed it on 2026-09-09.
   return parts.join(' ');
 }
 
