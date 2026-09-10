@@ -97,3 +97,35 @@ export function garminAttributionText(a: ProviderAttribution): string | null {
 export function isGarminSourced(w: unknown): boolean {
   return garminAttributionText(getProviderAttribution(w)) != null;
 }
+
+/**
+ * ⛔ THE WEEK'S DISTINCT GARMIN DEVICES, FOR ONE HEADER LINE (2026-09-09).
+ *
+ * Garmin API Brand Guidelines v6.30.2025 permit a GLOBAL attribution — "such as in a header or
+ * footer" — for a multi-entry display, as an alternative to attributing every entry. The Week tab is
+ * that display: seven rows of one-line sessions, where a per-row "Garmin Forerunner 965" after every
+ * set of numbers doubled the width of the line it sat on and left no room for the session's own name.
+ * One line above the rows names every device the week's data came off, which is the same claim made
+ * once instead of nine times.
+ *
+ * ⚠️ NO STRAVA MARK IN THIS LIST. It is a list of DEVICES; a Garmin watch whose data arrived through
+ * Strava is still that watch, and it contributes `Garmin [model]` here. Strava's own attribution
+ * belongs on the per-entry line that still exists on Today's done card, which is a summary card and
+ * not a multi-entry display.
+ *
+ * ⚠️ DISTINCT, AND IN THE ORDER THE WEEK MET THEM — a rider who used one head unit all week gets one
+ * name, not five copies of it.
+ */
+export function garminDevicesForWeek(rows: ReadonlyArray<unknown>): string[] {
+  const seen: string[] = [];
+  for (const row of rows ?? []) {
+    const a = getProviderAttribution(row);
+    const isGarminData = a.source === 'garmin' || (a.source === 'strava' && a.deviceIsGarmin);
+    if (!isGarminData) continue;
+    // "Garmin [device model]", or "Garmin" alone when the model never arrived — the guidelines'
+    // own fallback, and the same one `garminAttributionText` applies per row.
+    const label = a.deviceName ? `Garmin ${a.deviceName}` : 'Garmin';
+    if (!seen.includes(label)) seen.push(label);
+  }
+  return seen;
+}

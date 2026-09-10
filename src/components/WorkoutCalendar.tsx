@@ -17,7 +17,8 @@ import { useDeclaredPosture } from '@/hooks/useDeclaredPosture';
 import { useResolvedFtp } from '@/hooks/useResolvedFtp';
 import { resolveMovingSeconds } from '@/utils/resolveMovingSeconds';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
-import { ProviderAttributionLine } from '@/components/ProviderAttribution';
+import { GARMIN_BLUE } from '@/components/ProviderAttribution';
+import { garminDevicesForWeek } from '@/lib/provider-attribution';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { LogTypeMenuContent } from '@/components/LogFAB';
 import RescheduleValidationPopup from '@/components/RescheduleValidationPopup';
@@ -1117,6 +1118,14 @@ export default function WorkoutCalendar({
     };
   }, [weekDays, map, useImperial]);
 
+  /** The week's own devices, off the rows already on screen. Absent when none of them are Garmin. */
+  const garminDevices = useMemo(
+    () => garminDevicesForWeek(
+      weekDays.flatMap((day) => (map.get(toDateOnlyString(day)) ?? []).map((evt: any) => evt?._src).filter(Boolean)),
+    ),
+    [weekDays, map],
+  );
+
   const distanceUnitLabel = useImperial ? 'mi' : 'km';
 
   /**
@@ -1330,6 +1339,30 @@ export default function WorkoutCalendar({
       </div>
 
       {/**
+        * ⛔ WHERE THIS WEEK'S NUMBERS CAME OFF, ONCE (2026-09-09). Garmin API Brand Guidelines
+        * v6.30.2025 permit a global attribution — "such as in a header or footer" — for a
+        * multi-entry display, as an alternative to attributing every entry. Seven rows of one-line
+        * sessions are that display, and the per-row line it replaces is in this file's history two
+        * hunks up.
+        *
+        * ⛔ 12 px, AND NEVER IN A TOOLTIP OR A COLLAPSED SECTION — the same guidelines: "Never bury
+        * the Garmin attribution in tooltips, footnotes or expandable containers."
+        *
+        * ⚠️ NO STRAVA MARK. This is a list of DEVICES; Strava's own attribution stays on Today's
+        * done card, which is a summary card rather than a multi-entry display and keeps its
+        * per-entry line. ⚠️ ABSENT ON A WEEK WITH NO GARMIN DATA — an attribution to nothing is
+        * noise, not compliance.
+        */}
+      {garminDevices.length > 0 ? (
+        <div
+          className="px-1 pb-1.5 text-[12px] font-light truncate"
+          style={{ color: GARMIN_BLUE, position: 'relative', zIndex: 1 }}
+        >
+          {garminDevices.join(' · ')}
+        </div>
+      ) : null}
+
+      {/**
         * ═══ §3f — DONE OVER PLANNED, ONE BAR ════════════════════════════════════════════════════
         *
         * ⛔ IT REPLACES THE TWO-LINE Planned / Done TEXT (§3e.4 shipped that; the mockup replaces
@@ -1511,10 +1544,16 @@ export default function WorkoutCalendar({
                       draggable={planned && !!row?.id}
                       onDragStart={(e) => planned && row?.id && handleDragStart(e, row)}
                       onDragEnd={handleDragEnd}
-                      /* ⛔ TAP A SESSION → THAT DAY ON TODAY (§3f). The line is the door to the day;
-                         the space around it is the door to adding one. */
-                      onClick={(e) => { e.stopPropagation(); onOpenToday?.(key); }}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onOpenToday?.(key); } }}
+                      /**
+                       * ⛔ A DONE LINE OPENS THE SESSION, A PLANNED LINE OPENS THE DAY (2026-09-09).
+                       * Both used to go to Today, which on a finished session is a detour: the
+                       * athlete tapping a logged ride wants what it DID, and that is the Performance
+                       * tab — `onEditEffort` is the same door Today's own done card uses, and
+                       * `AppLayout` already routes a completed row there.
+                       * ⚠️ PLANNED IS UNCHANGED. Work still ahead belongs on the day it sits in.
+                       */
+                      onClick={(e) => { e.stopPropagation(); if (done) onEditEffort?.(row); else onOpenToday?.(key); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); if (done) onEditEffort?.(row); else onOpenToday?.(key); } }}
                       /* ⛔ PRESS AND HOLD TO MOVE IT (§3f). See `beginLongPress` — HTML5 drag never
                          fires on touch, so the finger gets its own path to the SAME move. */
                       onTouchStart={(e) => beginLongPress(e, row, key)}
@@ -1547,14 +1586,14 @@ export default function WorkoutCalendar({
                         className="text-[14px] tabular-nums flex-shrink-0 inline-flex items-baseline gap-1.5"
                         style={{ color: done ? 'rgba(242,240,236,0.36)' : 'rgba(242,240,236,0.62)' }}
                       >
+                        {/* ⛔ NO PER-ROW ATTRIBUTION HERE ANY MORE (2026-09-09). "Garmin Forerunner
+                            965" after every set of numbers doubled the width of a line whose whole
+                            job is a name and a length, and on a two-session day it pushed both off
+                            the row. Garmin API Brand Guidelines v6.30.2025 allow a GLOBAL
+                            attribution "such as in a header or footer" for a multi-entry display,
+                            which is exactly what seven rows of sessions are — see the device line
+                            under the week header. */}
                         {meta}
-                        {/* ⛔ WHERE A DONE ROW CAME FROM, AFTER ITS NUMBERS (docs/WORKORDER-garmin-strava-
-                            attribution-2026-09-09.md §2). Garmin API Brand Guidelines v6.30.2025: a
-                            multi-entry display of Garmin device-sourced data attributes "per entry",
-                            "Garmin [device model]", never in a tooltip. developers.strava.com/guidelines:
-                            the unaltered Powered by Strava mark for a Strava row. 12 px, never smaller
-                            than the 14 px numbers' own small text. */}
-                        {done ? <ProviderAttributionLine workout={row} /> : null}
                       </span>
                       {/* ⛔ ONE MARK, OR NOTHING: a check when it is done, the swap arrow when the
                           row no longer matches the plan. Never both — a swapped session that is done
