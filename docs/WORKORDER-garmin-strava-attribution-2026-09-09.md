@@ -76,3 +76,14 @@ nothing behind a tap.
 - Throwaway account with one Garmin-sourced workout and one Strava-from-Garmin workout: every surface in
   the table shows its line; a throwaway with no Garmin data shows no Garmin line anywhere.
 - No new athlete-facing words except the attribution strings above, which are Garmin's and Strava's.
+
+## 7. Weather source credit and the Garmin line's place (Michael, 2026-09-10)
+
+- The Garmin derived-data line on the Today header sits under the weather rows, so it reads as the
+  weather's source. Move it directly under the form line (right column), same 12 px, so it credits the
+  form number and the week totals, not the weather.
+- Weather is Open-Meteo. Its licence requires an on-screen credit for API use: add `Weather by
+  Open-Meteo` as the smallest text on the block (11 px, muted), right-aligned on the sunrise line after
+  the city, or as a final line under the week totals. Link to open-meteo.com not required on a phone.
+- Open-Meteo's free API is non-commercial. Before launch: subscribe to their commercial plan (API key,
+  same endpoints) or switch provider. Ledger this in docs/FOUNDATION-READINESS.md as a launch gate.
