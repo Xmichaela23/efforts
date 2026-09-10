@@ -7,10 +7,13 @@ import { Chip, trendColor, fmtBodyAsOf, type VisibleSignal } from './state-primi
  */
 export default function StateBodyBlock({
   visibleSignals,
+  windowLabel = null,
   readinessRpeDriver,
   onOpenAdjust,
 }: {
   visibleSignals: VisibleSignal[];
+  /** The coach's window for every number in the section ("last 7 days"). Printed once, here. */
+  windowLabel?: string | null;
   readinessRpeDriver: string | null;
   onOpenAdjust: () => void;
 }) {
@@ -18,7 +21,13 @@ export default function StateBodyBlock({
   return (
   <div className="px-3 py-3">
     <div className="flex items-start gap-3">
-      <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase pt-0.5 w-[72px] shrink-0">BODY</span>
+      <span className="readout-label text-[12px] font-semibold tracking-[0.12em] uppercase pt-0.5 w-[72px] shrink-0">
+        BODY
+        {/* ⛔ THE WINDOW, ONCE, IN THE SMALL GREY LABEL (Michael 2026-09-10) — the rows no longer repeat it. */}
+        {windowLabel && visibleSignals.length > 0 && (
+          <span className="block normal-case tracking-normal font-normal text-[11px] text-white/45 leading-tight mt-0.5">· {windowLabel}</span>
+        )}
+      </span>
       <div className="flex-1 space-y-1.5 tabular-nums">
         {/* overall_training_read "This week" fallback DELETED 2026-07-24 — the ~25-branch summary
             duplicated the load bar above (F8 / docs/COPY-VOICE.md). When BODY has no per-metric

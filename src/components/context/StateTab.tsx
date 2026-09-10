@@ -250,6 +250,8 @@ export default function StateTab({
   const load = wsv.load;
   const rm = ((data as any)?.response_model ?? (wsv as any)?.response_model) as {
     visible_signals: Array<VisibleSignal>;
+    /** coach payload v209 — the window BODY's numbers rest on ("last 7 days"), printed once in the header. */
+    body_window_label?: string | null;
     overall_training_read?: { summary: string; tone: 'positive' | 'warning' | 'neutral' | 'info' } | null;
     strength: { per_lift: Array<{ canonical_name: string; display_name: string; e1rm_trend: string; rir_current: number | null; sufficient: boolean; last_session_date?: string | null }> };
     endurance: unknown;
@@ -694,6 +696,7 @@ export default function StateTab({
             session RPE, soreness is Hooper's scale; the comparisons under them are OURS and say so in the ledger. */}
         <StateBodyBlock
           visibleSignals={visibleSignals}
+          windowLabel={rm?.body_window_label ?? null}
           readinessRpeDriver={readinessRpeDriver}
           onOpenAdjust={() => setStateLens('adjust')}
         />

@@ -10,7 +10,7 @@ export interface LoadBarData {
    * fitness = 42-day exponential average of daily workload (CTL), fatigue = 7-day (ATL), form = yesterday's
    * fitness − yesterday's fatigue (TSB). Server-computed (`_shared/fitness-fatigue.ts`) over the whole history.
    */
-  fitness_fatigue?: { fitness: number | null; fatigue: number | null; form: number | null; fitness_prior?: number | null; fatigue_prior?: number | null; week_ago?: { fitness: number | null; fatigue: number | null; form: number | null } | null } | null;
+  fitness_fatigue?: { fitness: number | null; fatigue: number | null; form: number | null; fitness_prior?: number | null; fatigue_prior?: number | null; week_ago?: { fitness: number | null; fatigue: number | null; form: number | null } | null; provenance?: { tau_fitness_days?: number | null; tau_fatigue_days?: number | null } | null } | null;
   /** Kept on the payload for the coach; NOT rendered here since 2026-09-04 (ACWR is Gabbett's — neither Garmin nor TrainingPeaks). */
   acwr?: number | null;
   acwr_provisional?: boolean;
@@ -76,8 +76,14 @@ function disciplineName(type: string): string {
   return DISPLAY_NAME[t] ?? (type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Other');
 }
 
+/**
+ * The separator BEFORE a LOAD reading. It sits in a fixed 12 px slot that the reading pulls into the gap
+ * before it (`-ml-3`), and the row clips its left edge — so on a line the row wraps onto, the first
+ * reading's separator is cut off instead of a separator dangling at the end of the line above (2026-09-10:
+ * the windows made the row wrap at 390 px).
+ */
 function Dot() {
-  return <span className="text-white/30 select-none">·</span>;
+  return <span aria-hidden className="inline-block w-3 text-center text-white/30 select-none">·</span>;
 }
 
 // ⛔ THE ZONE WORD'S COLOUR HAS ONE OWNER (2026-09-09) — `formZoneColor` in `context-utils`, shared
@@ -178,6 +184,17 @@ export default function LoadBar({ load, compact, garminDerived = false }: LoadBa
   };
   const wk = ff?.week_ago ?? null;
   const Delta = ({ v }: { v: string | null }) => v ? <span className="ml-0.5 text-[10.5px] text-white/45 tabular-nums">{v}</span> : null;
+  // ⛔ EACH NUMBER CARRIES ITS WINDOW, ONCE, IN THE GREY LABEL (Michael 2026-09-10). The windows are the
+  // server's own averaging constants (`provenance.tau_*_days`, 42 and 7 — TrainingPeaks' PMC, ledger row
+  // "Fitness (CTL, 42-day EWMA)"). Fitness prints in weeks, fatigue in days. Form has no window: it is the
+  // gap between the two. A cached payload without the constants prints no window rather than a guess.
+  const tauFit = ff?.provenance?.tau_fitness_days ?? null;
+  const tauFat = ff?.provenance?.tau_fatigue_days ?? null;
+  const fitWindow = tauFit != null && Number.isFinite(tauFit) && tauFit > 0 ? `${Math.round(tauFit / 7)} wk` : null;
+  const fatWindow = tauFat != null && Number.isFinite(tauFat) && tauFat > 0 ? `${Math.round(tauFat)} d` : null;
+  const Window = ({ w }: { w: string | null }) => w ? <span className="ml-1">· {w}</span> : null;
+  const formNum = fmt1(ff?.form);
+  const formSign = formNum == null || formNum === 0 ? '' : formNum > 0 ? '+' : '−';
 
   // Weekly COMPOSITION — the rolling seven days' load by discipline, as the coach summed it from
   // `daily_load_7d`. This is the primary load visual; the per-day rhythm lives in the calendar.
@@ -194,14 +211,12 @@ export default function LoadBar({ load, compact, garminDerived = false }: LoadBa
           <button type="button" onClick={() => setShowKey((o) => !o)} aria-label="What do fitness, fatigue and form mean?" aria-expanded={showKey} className="bg-transparent border-none p-0 cursor-pointer text-white/45 normal-case tracking-normal font-normal text-[12px] align-baseline">ⓘ</button>
         </span>
         {ff && fmt1(ff.fitness) != null ? (
-          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-[11px] text-white/45 leading-none [&>span]:whitespace-nowrap">
-            <span>fitness <span className="readout-num text-[13px] text-white/85">{fmt1(ff.fitness)}</span><Delta v={delta(ff.fitness, wk?.fitness)} /></span>
-            <Dot />
-            <span>fatigue <span className="readout-num text-[13px] text-white/85">{fmt1(ff.fatigue)}</span><Delta v={delta(ff.fatigue, wk?.fatigue)} /></span>
-            <Dot />
+          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 overflow-hidden py-0.5 -my-0.5 text-[11px] text-white/45 leading-none [&>span]:whitespace-nowrap [&>span]:-ml-3">
+            <span><Dot />fitness <span className="readout-num text-[13px] text-white/85">{fmt1(ff.fitness)}</span><Delta v={delta(ff.fitness, wk?.fitness)} /><Window w={fitWindow} /></span>
+            <span><Dot />fatigue <span className="readout-num text-[13px] text-white/85">{fmt1(ff.fatigue)}</span><Delta v={delta(ff.fatigue, wk?.fatigue)} /><Window w={fatWindow} /></span>
             <span>
-              form <span className="readout-num text-[13px] text-white/85">{(ff.form ?? 0) > 0 ? '+' : ''}{fmt1(ff.form)}</span>
-              {zone && <span className="ml-1" style={{ color: formZoneColor(zone) }}>{zone}</span>}
+              <Dot />form <span className="readout-num text-[13px] text-white/85">{formSign}{formNum == null ? null : Math.abs(formNum)}</span>
+              {zone && <><span className="ml-1">·</span><span className="ml-1" style={{ color: formZoneColor(zone) }}>{zone}</span></>}
             </span>
           </div>
         ) : (
