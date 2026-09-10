@@ -70,6 +70,8 @@ import {
   type NamedSessionPoint,
   type ReferenceSeries,
 } from "../_shared/state-trend/index.ts";
+// Audit 2026-09-10 (H-B07): the FTP line's fit, attached beside `ftpHistory`.
+import { fitTrend } from "../_shared/state-trend/trend-fit.ts";
 // Slice 6 — the pull-up progression's clean/assisted split. ⛔ Read from the RAW logged sets; the
 // `exercise_log` aggregate has no `resistance_level` and cannot answer this.
 import { countPullupWork, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS } from '../../../src/lib/pullup-progression.ts';
@@ -1198,6 +1200,8 @@ serve(async (req: Request) => {
          * omitted, and a point with no week is drawn without one.
          */
         let weekByDate: Record<string, number> | null = null;
+        /** Which block week `asOf` itself falls in, bounded exactly as `weekByDate` is. Null outside a block. */
+        let planWeekAsOf: number | null = null;
         let testWeekDates: string[] | null = null;
         // ⛔ THE PLAN'S WEEK START-DAY — the same resolver the coach cuts the planned-vs-actual bar
         // on. Handed to the assembler so the weekly lifting card is cut on the SAME week as that bar
@@ -1261,6 +1265,11 @@ serve(async (req: Request) => {
             }
             if (Object.keys(map).length) phaseByDate = map;
             if (Object.keys(weeks).length) weekByDate = weeks;
+            // ⛔ AND THE WEEK TODAY FALLS IN — the same resolver and the same bounding, so the since-block
+            // creep on the strength row (H-S19) opens and closes with the block.
+            if (blockStart && blockEndExclusive && asOf >= blockStart && asOf < blockEndExclusive) {
+              planWeekAsOf = resolvePlanWeekIndex(cfg, asOf, dur);
+            }
             /**
              * ⛔ WHICH DATES THE PLAN CALLS A TEST — resolved once, here, and handed to the spine.
              * The heavy band opens at 90% and the p215 pretest tops out at 86.25%, so a test week's
@@ -1945,7 +1954,7 @@ serve(async (req: Request) => {
           .flatMap((s) => s.points as Array<{ date: string; efficiency: number | null; countsTowardTrend?: boolean }>)
           .filter((p) => p.efficiency != null && Number.isFinite(Number(p.efficiency)) && p.countsTowardTrend !== false)
           .map((p) => ({ date: p.date, value: Number(p.efficiency) }));
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeEffHistory, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, testWeekDates, expectedByCanonical, namedSessions, enduranceSpine, blockDurationWeeks, measuredDates, allOutByLift, strengthEffortRead, pullupProgress, loggedSessions, weekStartDow });
+        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeEffHistory, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, planWeekAsOf, testWeekDates, expectedByCanonical, namedSessions, enduranceSpine, blockDurationWeeks, measuredDates, allOutByLift, strengthEffortRead, pullupProgress, loggedSessions, weekStartDow });
         // VDOT race projections (goal-free) — computed HERE, not in the shared assembler, because they need
         // learned_fitness + the VDOT engine and we keep that OFF the client-math fallback path (dumb client).
         // Threshold pace: learned first, then performance_numbers. Long-run distance is estimated inside
@@ -2049,6 +2058,10 @@ serve(async (req: Request) => {
           if (stateTrendsV1.display.bikeFitness) {
             const windowStart = isoMinus(STATE_TREND_WINDOWS.cadenceDays);
             stateTrendsV1.display.bikeFitness.ftpHistory = bikeFtpHistory.filter((p) => p.date >= windowStart && p.date <= asOf);
+            // The fitted line through the readings the card draws (H-B07). Fewer than three → `tooFew`.
+            stateTrendsV1.display.bikeFitness.ftpHistoryFit = fitTrend(
+              stateTrendsV1.display.bikeFitness.ftpHistory.filter((p) => !!p?.date && Number.isFinite(p.value)),
+            );
           }
         }
         // Carry the descent cause on the payload (JSONB, no schema change) so the coach's composer receives

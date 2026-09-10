@@ -43,6 +43,9 @@ import { composeCoachWeekInsight } from '../_shared/insights/coach-week-insights
 import { composeCoachEye } from '../_shared/insights/cross-training-read.ts';
 import { computePerDomainLoad, type SliceSession } from '../_shared/per-domain-load.ts';
 import { computeFitnessFatigue, formZone } from '../_shared/fitness-fatigue.ts';
+// Audit 2026-09-10 (item 17): the load plate's shares, zone table and headline, and the logged-sets split.
+import { loadComposition7d, formZoneRows, formHeadline, formKicker, recoveryKicker, isRecoveryIntent } from './load-composition.ts';
+import { buildStrengthLoggedSets } from './strength-logged-sets.ts';
 import { assessAbsorption, steadyGate } from '../_shared/absorption.ts';
 import { computeSafetyFloor, resolvePlanPrimary, computePrimaryAdherence, resolvePrimarySport } from '../_shared/load-status-reconcile.ts';
 // Slice 1: the readiness tree, extracted from this file so it can be fixtured and so it reads the one
@@ -143,7 +146,7 @@ const corsHeaders: Record<string, string> = {
  *  issue, and which the State row could not even build a sentence around because accessories carry
  *  no anchor. ⛔ COMPUTATION CHANGE, NOT DISPLAY: every cached per-lift row still holds the old
  *  command and must re-source, so this bump is load-bearing. Main lifts are untouched. */
-const COACH_PAYLOAD_VERSION = 205; // 205 (2026-09-08): empty-State subtitle names the plans.
+const COACH_PAYLOAD_VERSION = 206; // 206 (2026-09-10): audit item 17 — `load` gains form_headline, form_zones, total_7d, dominant, composition_7d; `weekly_state_v1.strength_logged_sets`. A cached row has none of them and the screens print nothing without them. // 205 (2026-09-08): empty-State subtitle names the plans.
 // 204 // 204 (2026-09-08): empty-State copy says focus, not goal.
 // 203 // 203 (2026-09-07): athlete_snapshot.coaching removed — no model writes anything in this payload (no-AI work order). // 202 (2026-09-05): fitness_fatigue carries fitness_prior / fatigue_prior so the (i) can print the subtraction that made form. // 201 (2026-09-05): load.fitness_fatigue.week_ago — the 7-day change beside fitness / fatigue / form on the LOAD line. // 200 (2026-09-04): the bike row draws FTP over time — `state_trends_v1.display.bikeFitness.ftpHistory` (every fitness_baselines bike/ftp reading in the 12-week window) replaces the 12-week min/max dot (`range`, deleted). A 199 row has no ftpHistory and still carries `range`. docs/SPEC-ftp-trend-line-2026-09-04.md // 199 (2026-09-04): run grader reads classified_type; easy/hard rows fall back to raw pace when a run has no elevation (flagged). Cached rows lack both. // 198 (2026-09-04): snapshot rebuilt after the last regrade (Aug 9 → hard); cached pools were built from the earlier snapshot. // 197 (2026-09-04): run facts regraded (untagged runs graded from the recording); cached easy/hard pools carry hard runs as easy. // 196 (2026-09-04): spine drift points — whole-session again includes the analyser's measured mixed-effort test; cached rows carry interval runs on the drift chart. // 195 (2026-09-04, one reference per metric): load.fitness_fatigue is computed over the WHOLE history (was 84 days) and is the State LOAD read; a 194 row carries an under-seeded fitness. // 194 (2026-09-04): bike efficiency trend counts every ride with 10 min in the aerobic band (type + 90%-FTP gates removed); cached spine points carry the old countsTowardTrend. // 193 (2026-09-04, SPEC-state-nothing-invented): every trend verdict is Garmin's 28/28 rule — `withheld` and `recentlyFlat` are gone, `recent` on chart points means the last 28 days, pctChange is recent-half vs prior-half. A cached 192 row carries the old verdicts. // 192 (2026-09-04, D-372): the 7-day run/ride `efficiency_label` verdicts ("HR drifted — build aerobic base", the 3/5/8% ride bands) are gone — null on every row; the numbers stay. Bump so cached rows drop the copy. // 191 (2026-09-04): spine points — `driftWholeSession` now means an interval session only, not the analyser's mixed-effort hedge; the State drift trend reads every steady run/ride. Bump so cached rows re-source. // 190 (2026-09-03): the bike/run spine points changed shape and source — `countsTowardTrend` on every ride, `driftBasis` gains 'power', the facts index is keyed by workout id (a run and a ride on one day no longer swap numbers), and the climb reads `workouts.elevation_gain ?? metrics.elevation_gain` instead of a run-only facts copy. A cached 189 row carries the crossed-over numbers and NO climb on a ride, and passes the `cachedVer >= COACH_PAYLOAD_VERSION` gate. 189 (2026-09-03): BODY is three signals (effort · soreness · logged), not one paragraph; a cached 188 row still serves the paragraph row. 188: // 188 (2026-09-03): runs feed ONE aerobic efficiency series (group 'aerobic'). 187: // 187 (2026-09-03): warm-up easy points back in, median headline on the card. 186: // 186 (2026-09-03): warm-ups back OUT of the easy efficiency series. 185: // 185 (2026-09-03): easy spine points from warm-ups (fromWarmup), one drift read (driftBasis/driftWholeSession), Workload naming. 184: // 184: display.loadByDiscipline gains `weeks` (five weekly bars) and spine points carry tempF/elevationGainM (2026-09-02). Cached 183 rows lack both. // 183: // 183: RUN LOAD THE STRAVA WAY (2026-09-02). `state_trends_v1.display.loadByDiscipline` carries this week's points per sport vs the athlete's typical week; a rated run's points now come from the rating (calculate-workload). ⛔ NEW FIELD + COMPUTATION CHANGE: a cached row has no loadByDiscipline and carries HR-scored run points; without this bump the State run card shows nothing and the old number. // 182: LOCKED ANCHORS + RUN VERDICT UNREAD (2026-09-02, D-459/D-460). per_lift.anchor_1rm now honours `user_baselines.locked_baselines`. The run efficiency verdict is still computed (`runFitness.efficiency`, now `withheld` with a named reason when heat moves with the calendar) but NO screen reads it any more — the run plate and the workout page show Efficiency Factor, decoupling and the chart, TrainingPeaks-style, no verdict. ⛔ COMPUTATION CHANGE: cached rows carry the pre-lock anchor and pass the cachedVer gate. // 181: AUTO/LOCKED strength authority (2026-09-02). per_lift.anchor_1rm now reads the RESOLVED capacity (locked > trusted-learned > typed seed) instead of typed only — reverses D-231 typed-wins in capacity-resolver.ts. ⛔ COMPUTATION CHANGE: a cached row carries the old typed anchor (e.g. deadlift 150 vs the learned 185) and passes the cachedVer gate; without this bump the coach keeps de-alarming against the stale number. // 180: REAL RUN PACE, PER GROUP (2026-09-01, Michael: "LLM slop got us those numbers"). `runFitness.efficiency.groups[]` now carries `recentPaceSecPerKm` + `recentHrAvg` — the MEDIAN of each group's last five runs' REAL recorded pace, so the card shows easy and hard on their own pools. The old top-level fallback back-derived pace from the efficiency index (`100000/(index×hr)`) and put 13:21/mi on screen whenever route pace was thin; that path is deleted — no real pace → null → the card shows the run count. ⛔ COMPUTATION CHANGE: a cached row serves the old groups with no per-group pace and passes the `cachedVer >= COACH_PAYLOAD_VERSION` gate; without this bump the real paces do not reach the card. // 179: THE LIFTING CARD READS THE PLAN'S WEEK (2026-09-01, approved by Michael — "is this a rolling week?"). `state_trends_v1.display.viadaWeek` is cut on `weekStartOf` + the plan's start-day — the SAME boundary as the planned-vs-actual bar — instead of a rolling as-of-minus-six; `since` is now the plan week's first day. `weekChange` gains `basis` / `from` / `to` and compares only CLOSED plan weeks (last week vs the week before while the week is open; this week vs last on its final day). ⛔ COMPUTATION CHANGE: a cached row carries rolling-window numbers under a "this week" label and passes the `cachedVer >= COACH_PAYLOAD_VERSION` gate — the trap v175–v178 each hit on this object. Without this bump the window does not move.
 // 178: OFF-PLAN WORK REACHES THE CARD (2026-09-01, approved by Michael). `state_trends_v1.display.viadaWeek` gains `offPlan` — the added-only lifting dose per muscle, classified per SESSION off the logger's `planned_name` marker (a session with no marked row is UNKNOWN and contributes nothing; `known: false` when no session in the window can be read). Resolved on the spine. ⛔ COMPUTATION CHANGE: a cached row serves a `display.viadaWeek` with no `offPlan` and passes the `cachedVer >= COACH_PAYLOAD_VERSION` gate — the trap v175/v176/v177 each hit on this same object. Without this bump the field lands nowhere.
@@ -2886,10 +2889,12 @@ Deno.serve(async (req) => {
         if (!formZoneWord) return 'On Track';
         return formZoneWord.charAt(0).toUpperCase() + formZoneWord.slice(1); // Fresh · Optimal · Grey zone · Transitional · High risk
       })();
+      // The two sentences live in `load-composition.ts` so State's glance headline (`load.form_headline`)
+      // prints the same words.
       const okKicker = (() => {
-        if (weekIntent === 'recovery' || weekIntent === 'taper') return `Recovery • ${intentLabel}`;
+        if (isRecoveryIntent(weekIntent)) return recoveryKicker(intentLabel);
         if (!formZoneWord || metrics.form == null) return kicker;
-        return `Form ${metrics.form > 0 ? '+' : ''}${Math.round(metrics.form)} — ${formZoneWord} (TrainingPeaks)`;
+        return formKicker(metrics.form, formZoneWord);
       })();
       return {
         code: 'strain_ok' as const,
@@ -4506,6 +4511,9 @@ Deno.serve(async (req) => {
         acwr_provisional: (athleteSnapshot?.body_response?.load_status as any)?.acwr_provisional ?? false, // thin-base ratio → render "· provisional"
         overload: overloadVerdict, // Slice 1: THE verdict + its receipt, so a surface can show WHY without re-deciding
         label: formZone(fitnessFatigue.form), // Friel's Form zone word — the same word the State LOAD line prints (2026-09-04); the ACWR bands are gone
+        // Audit 2026-09-10 (H-B08): State's glance headline and (H-T21) the zone table, off the same form number.
+        form_headline: formHeadline(fitnessFatigue.form, weekIntent, intentLabel),
+        form_zones: formZoneRows(fitnessFatigue.form),
         running_acwr: runningAcwr,
         cycling_acwr: cyclingAcwr,
         per_domain: perDomain, // D-263 bs3: strength/hard_cardio/easy_cardio slices (Q-140 input + Item-4 provenance)
@@ -4529,6 +4537,8 @@ Deno.serve(async (req) => {
           };
         }),
         daily_load_7d,
+        // H-T21: the load bar's total, dominant sport and shares, summed from `daily_load_7d` above.
+        ...loadComposition7d(daily_load_7d),
         hr_drift_series,
         // ⛔ `cross_training_signal` (the BODY 'Cross-training' row) IS DELETED (D-354, Michael
         // 2026-08-01). DO NOT REBUILD IT. BODY is now only what the athlete REPORTS — effort and
@@ -4547,6 +4557,11 @@ Deno.serve(async (req) => {
         // The upkeep FLOOR fact it absorbed (D-130/D-297) is not orphaned — it belongs to the
         // per-discipline posture read, which still renders in the RUN row's tap-down.
       },
+      // H-S20: the per-lift history the snapshot carries, split by this payload's own main-lift list.
+      strength_logged_sets: buildStrengthLoggedSets(
+        latestSnapshot?.state_trends_v1?.display?.strengthLoggedLifts,
+        weeklyResponseModel?.strength?.per_lift,
+      ),
       trends: {
         fitness_direction: fitnessDirection,
         // S2: the pre-assembled State DISPLAY contract (cards + per-discipline fitness reads), read from

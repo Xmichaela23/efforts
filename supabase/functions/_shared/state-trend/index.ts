@@ -110,13 +110,19 @@ export {
   type StateDisplayV1,
   type NamedSessionSeries,
   type EnduranceSpineSeries,
+  type EnduranceSpineTrends,
   type SpineSessionPoint,
   type NamedSessionPoint,
   type ReferenceSeries,
   DRIFT_LIMITS,
   type DisciplineTrendCache,
   type ExerciseLogLite,
+  sinceBlockDelta,
 } from './assemble.ts';
+// Audit 2026-09-10 (item 17): moved off the State screen.
+export { fitTrend, chartTrend, spineTrends, TREND_FIT_MIN_POINTS, TREND_FIT_MAX_WEEKS, type TrendFit, type ChartTrend } from './trend-fit.ts';
+export { buildLoggedLifts, LOGGED_SETS_WEEKS, LOGGED_SETS_MIN_SESSIONS, LOGGED_SETS_RECENT, type LoggedLift, type LoggedSetRow } from './logged-sets.ts';
+export { foldVariantSlots } from './fold-lift-slots.ts';
 export {
   deriveProvisionalBaselines,
   reconcileBaseline,

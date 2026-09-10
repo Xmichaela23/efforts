@@ -3,7 +3,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import type { CoachWeekContextV1 } from '@/hooks/useCoachWeekContext';
-import { useExerciseLog } from '@/hooks/useExerciseLog';
 import { formatLocalDate } from '@/lib/dateUtils';
 // [D-374 → Step 2] The SAME axis the server gates coaching language on, so the row that renders and
 // the verdict that fills it can never disagree about what a main lift is. `coached` is true on
@@ -13,7 +12,6 @@ import { formatLocalDate } from '@/lib/dateUtils';
 import { capabilitiesForExercise } from '@/lib/exercise-role';
 import LoadBar from '@/components/LoadBar';
 import { useGarminDataPresence } from '@/hooks/useGarminDataPresence';
-import { formZone } from '@shared/fitness-fatigue';
 import StateBodyBlock from './StateBodyBlock';
 import { supabase, getStoredUserId, invokeFunctionFormData, invokeFunction } from '@/lib/supabase';
 import { resolveEventTargetTimeSeconds } from '@/lib/goal-target-time';
@@ -66,7 +64,6 @@ export default function StateTab({
   const navigate = useNavigate();
   const { data, loading, error, refresh, revalidating } = coachData;
   const coachBusy = loading || Boolean(revalidating);
-  const { liftTrends } = useExerciseLog(8);
   const [narrativeOpen, setNarrativeOpen] = useState(false);
   const [expandedSignal, setExpandedSignal] = useState<string | null>(null); // D-232 BODY-row provenance tap
   const [stateLens, setStateLens] = useState<StateLens>(() => takePendingStateLens() ?? 'status'); // State-as-hub: Status / Adjust / Schedule (D-316)
@@ -669,10 +666,9 @@ export default function StateTab({
   // ⛔ THE GLANCE HEADLINE READS TRAININGPEAKS' FORM, NOT THE APP'S LOAD WORD (2026-09-04, one truth with the
   // LOAD line below it). It speaks only in Friel's "high risk" zone (form under −30); otherwise nothing.
   // `loadRead` / `buildLoadHeadline` (the reconciled status → "Load a bit high") are no longer called here.
-  const formNow = load?.fitness_fatigue?.form ?? null;
-  const loadHeadline = formZone(formNow) === 'high risk' && formNow != null
-    ? `Form ${Math.round(formNow)} — high risk (TrainingPeaks)`
-    : null;
+  // ⛔ THE WORDS ARE THE COACH'S (audit 2026-09-10, H-B08) — `load.form_headline`, built beside the week's own
+  // headline so a recovery or taper week gets the recovery wording. This screen ran `formZone` itself before.
+  const loadHeadline = load?.form_headline ?? null;
 
 
   // ── Cross-training signal (server-computed) ──────────────────────────────
@@ -712,35 +708,21 @@ export default function StateTab({
    * carried — which is the Hevy solution and is lighter than the gate. ⚠️ So this needs NONE of item
    * 4's "needs a recent max" problem, and works for an athlete with no maxes at all.
    *
-   * ⚠️ NO NEW QUERY AND NO SERVER CHANGE. `liftTrends` (`useExerciseLog`, already fetched above for
-   * the main lifts) covers EVERY logged canonical with two or more sessions — accessories included,
-   * plan or no plan. Trace before building: the data was already on the screen's own hook.
+   * ⛔ DECIDED ON THE SERVER SINCE 2026-09-10 (audit H-S20). This screen used to run its own
+   * `exercise_log` query and pick each lift's recent sets, the "best" tag, each accessory's heaviest set
+   * and which lifts are listed. `weekly_state_v1.strength_logged_sets` carries all of it now — the coach
+   * splits main from other off the same `per_lift` list `perLiftMain` reads, over the history
+   * `compute-snapshot` builds. The heaviest-set rule, the most-logged-first order and the cap of eight
+   * went with it. An older payload without the field prints no section.
    */
-  const mainCanonicals = new Set(perLiftMain.map((l: { canonical_name?: string | null }) => String(l?.canonical_name ?? '')));
-  const otherLifts = liftTrends
-    .filter((t) => !mainCanonicals.has(t.canonical))
-    .map((t) => {
-      // ⛔ THE RECORD IS THE HEAVIEST SET, decided on WEIGHT — not on the estimate. An estimate ranks
-      // by reps (D-417's whole lesson: a 105 × 35 read as a 225 "max"), and for a lift with no tested
-      // max the estimate has nothing honest to stand on anyway.
-      const best = t.entries.reduce(
-        (b, e) => (Number(e.best_weight) > Number(b?.best_weight ?? 0) ? e : b),
-        null as (typeof t.entries)[number] | null,
-      );
-      return { canonical: t.canonical, displayName: t.displayName, best, sessions: t.entries.length };
-    })
-    .filter((l) => l.best != null && Number(l.best!.best_weight) > 0)
-    // ⚠️ Most-trained first, so the lifts the athlete actually repeats lead. Capped: this is a folded
-    // detail list, not an inventory, and an uncapped one would BE the scrollable list just rejected.
-    .sort((a, b) => b.sessions - a.sessions)
-    .slice(0, 8);
+  const loggedSets = wsv.strength_logged_sets ?? null;
 
-  const strengthPerLiftDetail: React.ReactNode = (perLiftMain.length > 0 || otherLifts.length > 0) ? (
+  const strengthPerLiftDetail: React.ReactNode = loggedSets && (loggedSets.main.length > 0 || loggedSets.others.length > 0) ? (
     // ⛔ THE GATE STAYS HERE, NOT INSIDE THE COMPONENT (Round 0b, 2026-09-01).
     //    `StatePerformanceSection` tests this value for TRUTHINESS to decide whether to draw a
     //    standalone detail block. An element that renders null is still truthy, so the emptiness
     //    test cannot move inside <StrengthLoggedSets>.
-    <StrengthLoggedSets perLiftMain={perLiftMain} otherLifts={otherLifts} liftTrends={liftTrends} />
+    <StrengthLoggedSets sets={loggedSets} />
   ) : null;
 
   return (
@@ -788,9 +770,8 @@ export default function StateTab({
           Strong/Hevy set history Michael asked for on 2026-08-11 and it answers a different question
           (what did I lift, when). The same instruction the work order gives for the run row applies
           here: do not delete what exists to make room.
-          ⚠️ AND THAT SECTION READS `useExerciseLog` DIRECTLY — a client query, so it is already an
-          exception to smart-server/dumb-client. This work did not widen it: every number on these
-          cards is server-decided. Not fixed here. */}
+          ⚠️ THAT SECTION NO LONGER QUERIES `exercise_log` ITSELF (audit 2026-09-10, H-S20): it prints the
+          coach's `strength_logged_sets`. */}
 
       {/* Section clock label: LOAD + BODY are the FAST clock (how the last 7 days feel vs typical).
           Named once here; per-row specifics (WTD pts, RPE receipt) inherit it. */}

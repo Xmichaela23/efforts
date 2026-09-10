@@ -1,6 +1,5 @@
 import React from 'react';
 import { getDisciplineColor, getDisciplineColorRgb, formZoneColor } from '@/lib/context-utils';
-import { formZone } from '@shared/fitness-fatigue';
 import { GarminDerivedDataLine } from '@/components/ProviderAttribution';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -23,6 +22,14 @@ export interface LoadBarData {
     dominant_type: string;
     by_type?: Array<{ type: string; load: number }>;
   }>;
+  /** Friel's form zone word for today's form — the coach's (`formZone` on the server). */
+  label?: string | null;
+  /** The form-zone table the ⓘ prints, the current zone flagged (coach, audit 2026-09-10 H-T21). */
+  form_zones?: Array<{ range: string; word: string; meaning: string; current: boolean }>;
+  /** The rolling seven days' workload points, the sport that carried most, and each sport's printed share (coach, H-T21). */
+  total_7d?: number;
+  dominant?: string | null;
+  composition_7d?: Array<{ discipline: string; load: number; share_pct: number }>;
 }
 
 export interface LoadBarStatus {
@@ -81,6 +88,9 @@ function Dot() {
 // The load section: TrainingPeaks' fitness · fatigue · form on the first line (2026-09-04), then the weekly
 // composition (which discipline carried the load — our differentiator, and the same "TSS by sport" split
 // TrainingPeaks draws on its dashboard) as the primary visual. Per-day detail lives in the calendar.
+// ⛔ AUDIT 2026-09-10 (H-T21, H-B08): the zone word, the zone table, the seven-day total, the shares and
+// the dominant sport are the coach's (`load.label`, `load.form_zones`, `load.total_7d`,
+// `load.composition_7d`, `load.dominant`). This bar used to sum and round them itself.
 
 const keyFmt1 = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? null : Math.round(v));
 
@@ -103,8 +113,10 @@ export function LoadKeyWorkload() {
   );
 }
 
-export function LoadKeyForm({ ff }: { ff: NonNullable<LoadBarData['fitness_fatigue']> }) {
-  const zone = formZone(ff?.form);
+export function LoadKeyForm({ ff, zones }: { ff: NonNullable<LoadBarData['fitness_fatigue']>; zones?: LoadBarData['form_zones'] }) {
+  // ⛔ THE TABLE IS THE COACH'S (`load.form_zones`, H-T21) — ranges, words and the current zone. A payload
+  // without it prints no table rather than a copy kept here.
+  const rows = Array.isArray(zones) ? zones : [];
   return (
     <div className="text-[12px] text-white/65 leading-snug">
       {/**
@@ -123,27 +135,29 @@ export function LoadKeyForm({ ff }: { ff: NonNullable<LoadBarData['fitness_fatig
           ? ` Today: ${keyFmt1(ff.fitness_prior)} − ${keyFmt1(ff.fatigue_prior)} = ${(ff.form ?? 0) > 0 ? '+' : (ff.form ?? 0) < 0 ? '−' : ''}${Math.abs(keyFmt1(ff.form) ?? 0)}.`
           : ''}
       </p>
-      <table className="mt-1 text-[12px] tabular-nums">
-        <tbody>
-          {([['above +25', 'transitional', 'fitness fading'], ['+5 to +25', 'fresh', 'race shape'], ['−10 to +5', 'grey zone', 'not building, not sharp'], ['−30 to −10', 'optimal', 'building'], ['below −30', 'high risk', '']] as Array<[string, string, string]>).map(([range, word, meaning]) => (
-            <tr key={word} className={zone === word ? 'text-white/95' : 'text-white/55'}>
-              <td className="pr-3 py-0.5 whitespace-nowrap">{range}</td>
-              <td className="pr-3 py-0.5 whitespace-nowrap">{zone === word ? '▸ ' : ''}{word}</td>
-              <td className="py-0.5">{meaning}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {rows.length > 0 && (
+        <table className="mt-1 text-[12px] tabular-nums">
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.word} className={r.current ? 'text-white/95' : 'text-white/55'}>
+                <td className="pr-3 py-0.5 whitespace-nowrap">{r.range}</td>
+                <td className="pr-3 py-0.5 whitespace-nowrap">{r.current ? '▸ ' : ''}{r.word}</td>
+                <td className="py-0.5">{r.meaning}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
 
 /** State's ⓘ opens both halves at once, exactly as it always did. */
-export function LoadKey({ ff }: { ff: NonNullable<LoadBarData['fitness_fatigue']> }) {
+export function LoadKey({ ff, zones }: { ff: NonNullable<LoadBarData['fitness_fatigue']>; zones?: LoadBarData['form_zones'] }) {
   return (
     <div className="mt-1.5 max-w-[min(100%,360px)] space-y-1">
       <LoadKeyWorkload />
-      <LoadKeyForm ff={ff} />
+      <LoadKeyForm ff={ff} zones={zones} />
     </div>
   );
 }
@@ -155,7 +169,7 @@ export default function LoadBar({ load, compact, garminDerived = false }: LoadBa
   // WHAT THIS REPLACED: the reconciled load word ("balanced" — the app's own reconciler, D-260) and the
   // ACWR ratio (Gabbett). Neither is Garmin's or TrainingPeaks' rule; both stay on the payload for the coach.
   const ff = load.fitness_fatigue ?? null;
-  const zone = formZone(ff?.form);
+  const zone = load.label ?? null;
   const fmt1 = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? null : Math.round(v));
   // The week's change beside each number (intervals.icu's tile). Printed as a signed number, never an arrow.
   const delta = (now: number | null | undefined, then: number | null | undefined) => {
@@ -165,36 +179,11 @@ export default function LoadBar({ load, compact, garminDerived = false }: LoadBa
   const wk = ff?.week_ago ?? null;
   const Delta = ({ v }: { v: string | null }) => v ? <span className="ml-0.5 text-[10.5px] text-white/45 tabular-nums">{v}</span> : null;
 
-  // Weekly COMPOSITION — aggregate the 7-day load by discipline (from by_type; fall back to the
-  // day's dominant_type). This is the primary load visual; the per-day rhythm lives in the calendar.
-  const dailyLoad = load.daily_load_7d ?? [];
-  const byDiscipline = new Map<string, number>();
-  for (const d of dailyLoad) {
-    const segs = d.by_type && d.by_type.length > 0
-      ? d.by_type
-      : (d.load > 0 ? [{ type: d.dominant_type, load: d.load }] : []);
-    for (const s of segs) {
-      const t = (s.type || '').toLowerCase();
-      if (!t || t === 'none' || !(s.load > 0)) continue;
-      byDiscipline.set(t, (byDiscipline.get(t) ?? 0) + s.load);
-    }
-  }
-  const total = [...byDiscipline.values()].reduce((a, b) => a + b, 0);
-  const rawComp = [...byDiscipline.entries()]
-    .map(([type, l]) => ({ type, load: l, pct: total > 0 ? (l / total) * 100 : 0 }))
-    .sort((a, b) => b.load - a.load);
-  // Displayed integer percentages via LARGEST-REMAINDER rounding, so the labels sum to EXACTLY 100.
-  // Rounding each independently can total 99 or 101 (e.g. 42+24+21+12 = 99). The bar WIDTHS still use
-  // the raw fractional pct (flexGrow below), so the segments stay proportionally exact.
-  const targetSum = total > 0 ? 100 : 0;
-  const comp = rawComp.map((c) => ({ ...c, displayPct: Math.floor(c.pct) }));
-  let leftover = targetSum - comp.reduce((a, c) => a + c.displayPct, 0);
-  for (const c of [...comp].sort((a, b) => (b.pct % 1) - (a.pct % 1))) {
-    if (leftover <= 0) break;
-    c.displayPct += 1;
-    leftover -= 1;
-  }
-  const dominant = comp[0]?.type ?? null;
+  // Weekly COMPOSITION — the rolling seven days' load by discipline, as the coach summed it from
+  // `daily_load_7d`. This is the primary load visual; the per-day rhythm lives in the calendar.
+  const comp = Array.isArray(load.composition_7d) ? load.composition_7d : [];
+  const total = load.total_7d ?? 0;
+  const dominant = load.dominant ?? null;
 
   return (
     <div className="px-3 py-3">
@@ -219,7 +208,7 @@ export default function LoadBar({ load, compact, garminDerived = false }: LoadBa
           <span className="text-[11px] text-white/40 leading-none">no sessions logged yet</span>
         )}
       </div>
-      {showKey && ff && <LoadKey ff={ff} />}
+      {showKey && ff && <LoadKey ff={ff} zones={load.form_zones} />}
 
       {/* Composition strip — the primary load visual (full surface only). */}
       {!compact && comp.length > 0 && total > 0 && (
@@ -228,22 +217,23 @@ export default function LoadBar({ load, compact, garminDerived = false }: LoadBa
             <span className="readout-label text-[11px] uppercase tracking-[0.08em]">Where your load is going</span>
             {/* The composition below is the ROLLING last-7-days load (daily_load_7d). Show that same
                 window's total here — NOT wtd_actual_load (week-to-date), which is a different window and
-                mislabeled this number as WTD over a 7-day bar. `total` is the sum the bar itself represents. */}
+                mislabeled this number as WTD over a 7-day bar. `total_7d` is the sum the bar itself represents. */}
             <span className="readout-num text-[11px]">{Math.round(total)} pts · last 7 days</span>
           </div>
           <div className="flex h-6 rounded-md overflow-hidden gap-[2px]">
             {comp.map((c) => {
-              const isDom = c.type === dominant;
+              const isDom = c.discipline === dominant;
               return (
                 <div
-                  key={c.type}
+                  key={c.discipline}
                   className="flex items-center justify-center min-w-[6px]"
                   style={{
-                    flexGrow: c.pct, flexBasis: 0,
-                    backgroundColor: getDisciplineColor(c.type),
+                    // Segment width in proportion to its points; the printed share is the coach's `share_pct`.
+                    flexGrow: c.load, flexBasis: 0,
+                    backgroundColor: getDisciplineColor(c.discipline),
                     boxShadow: isDom ? 'inset 0 0 0 1.5px rgba(255,255,255,0.42)' : undefined,
                   }}
-                  title={`${disciplineName(c.type)} ${c.displayPct}%`}
+                  title={`${disciplineName(c.discipline)} ${c.share_pct}%`}
                 >
                   {/* ⛔ NO TEXT INSIDE THE BAR (FIXLIST 1e, 2026-09-01). Every percentage was printed
                       TWICE — once here and again in the legend two lines below, which already carries
@@ -264,13 +254,13 @@ export default function LoadBar({ load, compact, garminDerived = false }: LoadBa
               // colour rather than sitting flat white next to a colour swatch (2026-08-15). The
               // swatch stays — it ties the entry to its segment in the bar above.
               <span
-                key={c.type}
+                key={c.discipline}
                 className="inline-flex items-center gap-1.5 text-[12.5px] text-white/70"
-                style={{ ['--card-accent-rgb' as any]: getDisciplineColorRgb(c.type) }}
+                style={{ ['--card-accent-rgb' as any]: getDisciplineColorRgb(c.discipline) }}
               >
-                <span className="inline-block w-2 h-2 rounded-[2px]" style={{ backgroundColor: getDisciplineColor(c.type) }} />
-                <span className={c.type === dominant ? 'text-white font-semibold' : ''}>{disciplineName(c.type)}</span>
-                <span className="readout-num text-[11px]">{c.displayPct}%</span>
+                <span className="inline-block w-2 h-2 rounded-[2px]" style={{ backgroundColor: getDisciplineColor(c.discipline) }} />
+                <span className={c.discipline === dominant ? 'text-white font-semibold' : ''}>{disciplineName(c.discipline)}</span>
+                <span className="readout-num text-[11px]">{c.share_pct}%</span>
               </span>
             ))}
           </div>

@@ -181,6 +181,10 @@ export interface StrengthPerLift {
    *  ⚠️ BLOCK-SCOPED WHILE `series` IS NOT: the readings are the athlete's across blocks, but "where
    *  the programme says you should be" is a claim only the current programme can make. */
   expected?: Array<{ date: string; value: number }>;
+  /** ⛔ THE CREEP SINCE THE BLOCK OPENED, in lb — the "+5" on the collapsed strength row (audit
+   *  2026-09-10, H-S19). Null while the block is opening or when no reading carries a block week;
+   *  0 = flat. Decided by `sinceBlockDelta` (`assemble.ts`). */
+  sinceBlockDelta?: number | null;
 }
 
 /** Bridge the spine's per-lift e1RM `direction` (TrendVerdict) to the per-workout narrative's

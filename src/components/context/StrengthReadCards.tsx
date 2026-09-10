@@ -20,9 +20,8 @@
 
 import React from 'react';
 import { fmtDayShort, latestPoint } from '@/lib/sport-summary';
-import { fitTrend } from '@/lib/sport-summary';
 import { getDisciplineColor } from '@/lib/context-utils';
-import { DRIFT_LIMITS } from '@shared/state-trend';
+import { DRIFT_LIMITS, type EnduranceSpineTrends, type TrendFit } from '@shared/state-trend';
 // ⛔ THE ONE CHART LANGUAGE (Round 3 pass 2, 2026-09-01). The endurance cards used to draw their own
 // dates-only, non-expanding chart (DatedChart); they now draw the same sparkline as strength and
 // bike, so the screen has ONE caption format and ONE expand rule. DatedChart is kept as a thin
@@ -91,7 +90,7 @@ const GROUP_ORDER = ['aerobic', 'easy', 'long', 'quality', 'all'];
  *  the ride plate keeps it inline. Same words as before, copy unchanged. */
 
 export function EnduranceReadCards(
-  { sessions, spine, sport, asOf }: { sessions?: NamedSession[] | null; spine?: SpineSeries[] | null; sport?: 'run' | 'ride'; /** the server's as-of day; the last point's date when absent */ asOf?: string | null },
+  { sessions, spine, spineTrends, sport, asOf }: { sessions?: NamedSession[] | null; spine?: SpineSeries[] | null; /** each spine series' efficiency and drift chart with its fitted line (server, H-B07) */ spineTrends?: EnduranceSpineTrends[] | null; sport?: 'run' | 'ride'; /** the server's as-of day; the last point's date when absent */ asOf?: string | null },
 ) {
   // ⛔ ONE OWNER PER SPORT (Round 3 pass 1, 2026-09-01). `sport` filters this to a single discipline
   // so the ride cards can render under the bike plate and the run cards under the run block, each
@@ -120,7 +119,14 @@ export function EnduranceReadCards(
   // ⛔ THE CAUTION, ONCE FOR THE SPORT (Round 3 pass 2) — see SpineCard for why it moved here. Shown
   return (
     <>
-      {spineList.map((s) => <SpineCard key={`spine:${s.sport}:${s.group}`} series={s} asOf={asOf ?? null} />)}
+      {spineList.map((s) => (
+        <SpineCard
+          key={`spine:${s.sport}:${s.group}`}
+          series={s}
+          trends={(spineTrends ?? []).find((t) => t.sport === s.sport && t.group === s.group) ?? null}
+          asOf={asOf ?? null}
+        />
+      ))}
       {list.map((s) => <EnduranceCard key={`${s.sport}:${s.family}`} session={s} />)}
     </>
   );
@@ -134,7 +140,7 @@ export function EnduranceReadCards(
 const DECOUPLING_EXPLAIN = `Second-half heart rate against the first, same pace. The book's line is 5%.`; // 2026-09-03: Michael cut the paragraph
 
 
-function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string | null }) {
+function SpineCard({ series, trends, asOf: asOfIn }: { series: SpineSeries; trends: EnduranceSpineTrends | null; asOf: string | null }) {
   // ⛔ ONE TAP, NOT THREE (Michael 2026-09-03: "too many clicks … should be one click"). The row tap
   // opens the card; everything the card has is printed on it. The ⓘ toggles that hid the EF and
   // decoupling explanations behind a second tap are gone — NN/g's progressive-disclosure rule is one
@@ -149,11 +155,13 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
   // The server stamps each ride point with `countsTowardTrend` — `bikeEfficiencyRideEligible`, the same gate the
   // heart-rate-at-power read, the coach's bike drift row and the session screen already use. A hard ride's
   // watts-per-beat is real but is not an aerobic read; TrainingPeaks prints it per session and builds the trend
-  // from steady sessions only. So: the efficiency series, its headline and "based on" come from `trendPts`; the
-  // logged count and the latest ride's drift line come from every point. Undefined = counts (every run).
+  // from steady sessions only. So: the efficiency series, its headline and "based on" come from the steady
+  // sessions; the logged count comes from every point. Undefined = counts (every run).
+  // ⛔ THE CHART'S POINTS AND ITS LINE ARE THE SERVER'S (audit 2026-09-10, H-B07) — `trends.efficiencyTrend`,
+  // chosen by the same rule in `_shared/state-trend/trend-fit.ts`. Absent on an older snapshot: no chart.
   const trendPts = pts.filter((p) => p.countsTowardTrend !== false);
   const leftOut = pts.length - trendPts.length;
-  const eff = trendPts.map((p) => ({ date: p.date, value: p.efficiency })).filter((p) => p.value != null) as Array<{ date: string; value: number }>;
+  const eff = trends?.efficiencyTrend.points ?? [];
   // ⛔ THE HEADLINE IS TRAININGPEAKS', WHOLE (Michael 2026-09-04: one absolute reference per metric, never a
   // TrainingPeaks formula under a Garmin window). FIELD — TrainingPeaks: EF is a per-workout number in the
   // workout summary; the dashboard trends it one dot per workout over the date range. So the headline is
@@ -176,11 +184,9 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
    * (pace to heart rate on a run, power to heart rate on a ride). Heart-rate-alone drift ('hr') is one side
    * of that ratio; p107's line does not govern it, so it is not in this trend. Interval days (whole-session)
    * and withheld reads are not steady efforts and are left out for the same reason they were before.
+   * ⚠️ That selection and the fitted line are the server's now (`trends.driftTrend`, H-B07).
    */
-  const driftPts = trendPts
-    .filter((p) => p.driftPct != null && !p.fadeWithheld && !p.driftWholeSession
-      && (p.driftBasis === 'gap' || p.driftBasis === 'raw' || p.driftBasis === 'power'))
-    .map((p) => ({ date: p.date, value: p.driftPct as number }));
+  const driftPts = trends?.driftTrend.points ?? [];
   const driftLast = latestPoint(driftPts);
   const driftWhat = isRide ? 'power to heart rate' : 'pace to heart rate';
   const fmtDrift = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(1)}`;
@@ -194,13 +200,13 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
       </div>
 
       {/* which session the headline IS — directly under the number it names, not under the drift line (2026-09-04) */}
-      {eff.length >= 2 && (() => {
-        const f = fitTrend(eff);
+      {eff.length >= 2 && trends && (() => {
+        const f = trends.efficiencyTrend.fit;
         const noun = isRide ? 'ride' : 'run';
         const leftOutNote = leftOut > 0 ? ` · ${leftOut} ${leftOut === 1 ? noun : noun + 's'} under 10 min left out` : '';
         return (
-          <DatedChart points={eff} color={color} dotNoun={noun} fmtVal={(v) => fmtEff(v, isRide)} trendWord="efficiency"
-            label="Efficiency" headline={f ? fmtEff(f.end, isRide) : undefined} qualifier="higher is better"
+          <DatedChart points={eff} color={color} dotNoun={noun} fmtVal={(v) => fmtEff(v, isRide)} trendWord="efficiency" fit={f}
+            label="Efficiency" headline={f.tooFew === false ? fmtEff(f.end, isRide) : undefined} qualifier="higher is better"
             keyLine={`dots: one ${noun}, ${isRide ? 'power' : 'pace'} ÷ heart rate · dashed: the trend${leftOutNote}`} />
         );
       })()}
@@ -224,8 +230,8 @@ function SpineCard({ series, asOf: asOfIn }: { series: SpineSeries; asOf: string
           field's second run fact and is shown bare. Withheld sessions (pace changed by prescription)
           show nothing — a number for a non-steady effort is not the same number. */}
       {/* the drift trend — the number the field trends (Pa:Hr / Pw:Hr), as a line and the last-4-weeks average, no verdict */}
-      {driftPts.length >= 2 && (
-        <DatedChart points={driftPts} color={color} dotNoun={isRide ? 'steady ride' : 'run'} fmtVal={fmtDrift} unit="%" trendWord="drift" divider
+      {driftPts.length >= 2 && trends && (
+        <DatedChart points={driftPts} color={color} dotNoun={isRide ? 'steady ride' : 'run'} fmtVal={fmtDrift} unit="%" trendWord="drift" fit={trends.driftTrend.fit} divider
           label="Drift" qualifier={`${DRIFT_LIMITS.hybridPct}% line for multisport`}
           keyLine={`dots: one steady ${isRide ? 'ride' : 'run'}, first half vs second · dashed: the trend · ${DRIFT_LIMITS.hybridPct}% is the multisport limit`} />
       )}
@@ -338,9 +344,9 @@ function SessionChart({ points, color, valueOf }: {
  * exactly as before.
  */
 // The chart is one colour now (2026-09-04); `recent` is carried only because the series type asks for it.
-function DatedChart({ points, color, dotNoun = 'session', fmtVal, unit, trendWord, title, label, headline, qualifier, keyLine, divider }: { points: Array<{ date: string; value: number }>; color: string; dotNoun?: string; title?: string; label?: string; headline?: string; qualifier?: string; keyLine?: string; divider?: boolean; fmtVal?: (v: number) => string; unit?: string; trendWord?: string }) {
+function DatedChart({ points, color, dotNoun = 'session', fmtVal, unit, trendWord, fit, title, label, headline, qualifier, keyLine, divider }: { points: Array<{ date: string; value: number }>; color: string; dotNoun?: string; title?: string; label?: string; headline?: string; qualifier?: string; keyLine?: string; divider?: boolean; fmtVal?: (v: number) => string; unit?: string; trendWord?: string; /** the server's fitted line through `points` (H-B07); none → no line */ fit?: TrendFit | null }) {
   const series = points.map((p) => ({ date: p.date, value: p.value, recent: true }));
-  return <TrendSparkline series={series} color={color} dotNoun={dotNoun} {...(fmtVal ? { fmtVal } : {})} {...(unit ? { unit } : {})} trendline={!!trendWord} trendWord={trendWord} title={title} label={label} headline={headline} qualifier={qualifier} keyLine={keyLine} divider={divider} />;
+  return <TrendSparkline series={series} color={color} dotNoun={dotNoun} {...(fmtVal ? { fmtVal } : {})} {...(unit ? { unit } : {})} fit={fit ?? null} trendWord={trendWord} title={title} label={label} headline={headline} qualifier={qualifier} keyLine={keyLine} divider={divider} />;
 }
 
 export default EnduranceReadCards;

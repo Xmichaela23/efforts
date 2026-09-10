@@ -29,6 +29,11 @@ import { resolveDisciplineCard, perfFromTrend, type DisciplineCard, type PerfSum
 import { readPosture, postureSentence, disciplineWord, type PerDisciplinePosture } from './posture.ts';
 import { synthesizeHeadline, type Headline } from './headline.ts';
 import { canonicalDisplayName, canonicalize } from '../canonicalize.ts';
+// Audit 2026-09-10 (item 17): the slot fold, the chart trendlines and the logged-sets list, each moved
+// off the State screen — see each file's header.
+import { foldVariantSlots } from './fold-lift-slots.ts';
+import { spineTrends, type ChartTrend } from './trend-fit.ts';
+import { buildLoggedLifts, type LoggedLift } from './logged-sets.ts';
 // ⛔ VIADA'S TWO LIFTING DOSES, PERFORMED — the counting lives in `accessory-dosing`, which owns his
 // bands; this file supplies the window and the reference max. See `performed-ledger.ts`.
 import {
@@ -474,6 +479,28 @@ function isoWeekKey(iso: string): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * ⛔ THE CREEP SINCE THE BLOCK OPENED — the "+5" beside a lift on the collapsed strength row (audit
+ * 2026-09-10, H-S19). Moved from `strengthGlanceRows` (`src/lib/sport-summary.ts`); the rule is unchanged:
+ *   · null while the block is opening — plan week 1 or earlier, or no block — so the row prints the
+ *     number alone;
+ *   · otherwise the latest e1RM less the reading from the lowest block week on the lift's chart, each
+ *     rounded to the pound first. Null when no reading carries a block week.
+ * ⚠️ 0 is a real answer (flat); the row prints nothing beside the number for it.
+ * Runs AFTER the slot fold, so a folded deadlift is measured on its merged chart.
+ */
+export function sinceBlockDelta(
+  lift: { latestE1rm: number | null; series?: ReadonlyArray<{ value: number; week?: number }> },
+  planWeekAsOf: number | null | undefined,
+): number | null {
+  if (!(Number(planWeekAsOf) > 1)) return null;
+  if (lift.latestE1rm == null) return null;
+  const pts = (lift.series ?? []).filter((p) => typeof p.week === 'number');
+  if (!pts.length) return null;
+  const opening = pts.reduce((a, b) => ((a.week as number) <= (b.week as number) ? a : b));
+  return Math.round(lift.latestE1rm) - Math.round(opening.value);
+}
+
 export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[], ctx?: LiftSeriesContext): LiftSeries[] {
   const refMaxByCanonical = ctx?.refMaxByCanonical ?? null;
   const byCanonical = new Map<string, ExerciseLogLite[]>();
@@ -635,6 +662,9 @@ export interface StateTrendInputs {
    *  caller off `resolvePlanWeekIndex` and bounded to the block's own window, so a point from a
    *  previous block carries no week rather than a clamped "week 1". See `LiftSeriesContext`. */
   weekByDate?: Record<string, number> | null;
+  /** ⛔ Which week of the current block `asOf` itself falls in — the same bounded resolve as
+   *  `weekByDate`, done by the caller. Null outside a block. Gates the since-block creep (H-S19). */
+  planWeekAsOf?: number | null;
   /** ⛔ The repeated named sessions, one per sport, already gated and joined by the caller (see
    *  `compute-snapshot`). This module carries them to the display contract and does nothing else. */
   namedSessions?: NamedSessionSeries[] | null;
@@ -738,6 +768,10 @@ export interface StateTrendResult {
   blockDurationWeeks?: number | null;
   /** ⛔ Viada's two lifting doses over the last seven days, as performed. See {@link ViadaWeekPerformed}. */
   viadaWeek?: ViadaWeekPerformed | null;
+  /** "from your logged sets" — see {@link LoggedLift}. The coach splits it into main lifts and best sets. */
+  strengthLoggedLifts?: LoggedLift[] | null;
+  /** The spine's chart trends, one entry per spine series — see {@link EnduranceSpineTrends}. */
+  enduranceSpineTrends?: EnduranceSpineTrends[] | null;
 }
 
 /**
@@ -1318,7 +1352,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
             : {}),
         }))]),
   );
-  const strengthPerLift: StrengthPerLift[] = strength.lifts.map((l) => ({
+  const unfoldedPerLift: StrengthPerLift[] = strength.lifts.map((l) => ({
     canonical: l.canonical,
     displayName: l.displayName,
     isPrimary: l.isPrimary,
@@ -1364,6 +1398,11 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     // then draws the readings alone, which is still the read.
     expected: inp.expectedByCanonical?.[l.canonical],
   }));
+  // ⛔ ONE SLOT, ONE ROW (audit 2026-09-10, H-S18) — the trap bar folds into the deadlift HERE, before
+  // the rows are cached, so every reader of `perLift` / `per_lift` sees the merged slot. Was folded on
+  // the State screen only. Then the since-block creep (H-S19), measured on the folded chart.
+  const strengthPerLift: StrengthPerLift[] = foldVariantSlots(unfoldedPerLift)
+    .map((l) => ({ ...l, sinceBlockDelta: sinceBlockDelta(l, inp.planWeekAsOf) }));
   // State v3 DOT — strength = e1RM (what you CAN lift), not volume (what you DID). Volume keeps its
   // trend/verdict for OTHER consumers (coach), but the FITNESS DOT rides e1RM.
   const strengthE1rmBand = computeE1rmBand(liftSeries, inp.strengthBaselines);
@@ -1489,11 +1528,17 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     // ⛔ THE SPINE, likewise carried. It is the PRIMARY endurance read and `namedSessions` is the
     // overlay on top of it — see `EnduranceSpineSeries` for why that order is the whole design call.
     enduranceSpine: inp.enduranceSpine ?? null,
+    // ⛔ THE SPINE'S CHART TRENDS, BESIDE IT AND NOT ON IT (H-B07). The series stays exactly as the caller
+    // built it (`run-grouping-spine.test.ts` pins that); each series' efficiency and drift chart — the
+    // points drawn and the fitted line through exactly those points — rides here, keyed by sport + group.
+    enduranceSpineTrends: (inp.enduranceSpine ?? []).map((s) => ({ sport: s.sport, group: s.group, ...spineTrends(s.points ?? []) })),
     // ⛔ HIS TWO LIFTING DOSES, OVER WHAT WAS ACTUALLY LOGGED. Computed HERE and not at the caller
     // because the percentages need `refMaxByCanonical`, which is resolved a few lines up — the same
     // windowed max the derived heavy gate uses. A second resolution of "what is this lift's max"
     // is how two screens come to disagree about whether a set was heavy.
     viadaWeek: buildViadaWeekPerformed(inp.loggedSessions, asOf, refMaxByCanonical, inp.testWeekDates, inp.weekStartDow ?? 'mon'),
+    // "from your logged sets" — every lift's recent sessions with the best tag, and its heaviest set (H-S20).
+    strengthLoggedLifts: buildLoggedLifts(inp.exerciseRows ?? [], asOf),
   };
 }
 
@@ -1882,6 +1927,18 @@ export interface EnduranceSpineSeries {
   points: SpineSessionPoint[];
 }
 
+/**
+ * ⛔ ONE SPINE SERIES' TWO CHARTS (audit 2026-09-10, H-B07) — built by the assembly from that series'
+ * points (`trend-fit.ts spineTrends`). Keyed by the series' own sport + group. Absent on a snapshot
+ * written before 2026-09-10; the card then draws no efficiency or drift chart.
+ */
+export interface EnduranceSpineTrends {
+  sport: string;
+  group: string;
+  efficiencyTrend: ChartTrend;
+  driftTrend: ChartTrend;
+}
+
 export interface StateDisplayV1 {
   cards: DisciplineCard[];
   bikeFitness: BikeFitness;
@@ -1903,6 +1960,11 @@ export interface StateDisplayV1 {
   enduranceSpine?: EnduranceSpineSeries[] | null;
   /** ⛔ Viada's two lifting doses over the last seven days, as PERFORMED. See `ViadaWeekPerformed`. */
   viadaWeek?: ViadaWeekPerformed | null;
+  /** ⛔ "from your logged sets", per lift (H-S20) — see `logged-sets.ts`. Always an array on a snapshot
+   *  written since 2026-09-10; absent on an older one, and then the section prints nothing. */
+  strengthLoggedLifts?: LoggedLift[] | null;
+  /** ⛔ The efficiency and drift chart of each spine series, with its fitted line (H-B07). See `EnduranceSpineTrends`. */
+  enduranceSpineTrends?: EnduranceSpineTrends[] | null;
   /**
    * ⛔ THE ACTIVE BLOCK'S LENGTH IN WEEKS (`plans.duration_weeks`) — the recency window for the
    * derived heavy gate's reference max (ruled 2026-08-28). Absent → `defaultBlockWeeks`.
@@ -2161,9 +2223,14 @@ export function toStateTrendsV1(r: StateTrendResult, asOf: string): StateTrendsV
       // TIMES: this map rebuilds the display object field by field, so a field resolved upstream and
       // not named HERE reaches the client as nothing at all — no error, no warning.
       ...(r.enduranceSpine && r.enduranceSpine.length > 0 ? { enduranceSpine: r.enduranceSpine } : {}),
+      // ⛔ AND ITS CHART TRENDS (H-B07) — the same narrow point; sent whenever the spine is.
+      ...(r.enduranceSpine && r.enduranceSpine.length > 0 ? { enduranceSpineTrends: r.enduranceSpineTrends ?? [] } : {}),
       // ⛔ AND VIADA'S WEEK. Same narrow point, same rule: named here or it does not exist to the
       // client. Absent when nothing was lifted in the window — not an empty object.
       ...(r.viadaWeek ? { viadaWeek: r.viadaWeek } : {}),
+      // ⛔ AND THE LOGGED SETS — named here or they do not reach the client. An empty list is sent as
+      // itself: "nothing logged" and "a snapshot that predates the field" are different statements.
+      strengthLoggedLifts: r.strengthLoggedLifts ?? [],
     },
     strength: {
       ...disc('strength'),

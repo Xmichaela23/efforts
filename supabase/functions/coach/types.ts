@@ -547,7 +547,18 @@ export type CoachWeekContextResponseV1 = {
         extra_load: number;
         session_count: number;
       }>;
+      /** Audit 2026-09-10 (H-B08): State's glance headline — null unless form is in Friel's high-risk zone;
+       *  the coach's recovery wording on a recovery or taper week. See `load-composition.ts`. */
+      form_headline?: string | null;
+      /** H-T21: the form-zone table the load key prints, with the athlete's current zone flagged. */
+      form_zones?: Array<{ range: string; word: string; meaning: string; current: boolean }>;
+      /** H-T21: the rolling seven days' workload points, the sport that carried the most, and each sport's share. */
+      total_7d?: number;
+      dominant?: string | null;
+      composition_7d?: Array<{ discipline: string; load: number; share_pct: number }>;
     };
+    /** Audit 2026-09-10 (H-S20): "from your logged sets" + "your best sets". Null before the snapshot carries it. */
+    strength_logged_sets?: import('./strength-logged-sets.ts').StrengthLoggedSetsV1 | null;
     trends: {
       fitness_direction: 'improving' | 'stable' | 'declining' | 'mixed';
       readiness_state: 'fresh' | 'normal' | 'fatigued' | 'overreached' | 'detrained' | 'adapting';

@@ -1,7 +1,9 @@
 /**
  * THE TRAP-BAR FOLD (FIXLIST 2b, ruled by Michael 2026-09-01) — and the same-week bug found live.
  *
- *   deno test --allow-read src/lib/fold-lift-slots.test.ts --no-check
+ *   deno test --allow-read supabase/functions/_shared/state-trend/fold-lift-slots.test.ts --no-check
+ *
+ * Moved with the fold from `src/lib/` to the server (audit 2026-09-10, H-S18); the cases are unchanged.
  *
  * ⛔ WHAT THESE PIN. One slot, one card, no version line. The slot's readings are UNIONED and the
  * server's one-point-per-ISO-week-heaviest rule is applied to the union — so two readings in the

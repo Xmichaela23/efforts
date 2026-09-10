@@ -530,7 +530,20 @@ export type CoachWeekContextV1 = {
       daily_load_7d: Array<{ date: string; load: number; dominant_type: string; by_type?: Array<{ type: string; load: number }> }>;
       hr_drift_series: Array<{ date: string; drift_bpm: number }>;
       cross_training_signal?: { label: string; tone: 'positive' | 'warning' | 'info'; detail?: string | null; info?: string | null } | null;
+      /** Audit 2026-09-10 (H-B08): State's glance headline — null unless form is in the high-risk zone. */
+      form_headline?: string | null;
+      /** H-T21: the load key's form-zone table, the athlete's current zone flagged. */
+      form_zones?: Array<{ range: string; word: string; meaning: string; current: boolean }>;
+      /** H-T21: the rolling seven days' workload points, the sport that carried most, and each sport's printed share. */
+      total_7d?: number;
+      dominant?: string | null;
+      composition_7d?: Array<{ discipline: string; load: number; share_pct: number }>;
     };
+    /** Audit 2026-09-10 (H-S20): "from your logged sets" + "your best sets", decided by the coach. */
+    strength_logged_sets?: {
+      main: Array<{ canonical: string; display_name: string; sets: Array<{ date: string; weight: number; reps: number; e1rm: number | null; best: boolean }> }>;
+      others: Array<{ canonical: string; display_name: string; weight: number; reps: number; sessions: number }>;
+    } | null;
     trends: {
       fitness_direction: string;
       /** S2: the pre-assembled State display contract (cards + per-discipline fitness reads), built on

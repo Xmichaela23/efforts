@@ -19,7 +19,6 @@ import { useSwapSheet, useSportSwapIds, postSwap, type SwapSheetOption } from '@
 import { formatSwimPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout, displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore, formZoneColor } from '@/lib/context-utils';
-import { formZone } from '@shared/fitness-fatigue';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
@@ -1414,11 +1413,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
    * rather than a dash — the old card's "no sessions logged yet" was a sentence about the database.
    */
   const formLine = useMemo(() => {
-    const ff = (coachWeek.data?.weekly_state_v1?.load as { fitness_fatigue?: { form?: number | null } } | undefined)?.fitness_fatigue;
-    const raw = ff?.form;
+    const load = coachWeek.data?.weekly_state_v1?.load as { fitness_fatigue?: { form?: number | null }; label?: string | null } | undefined;
+    const raw = load?.fitness_fatigue?.form;
     if (raw == null || !Number.isFinite(Number(raw))) return null;
     const n = Math.round(Number(raw));
-    const zone = formZone(Number(raw));
+    // ⛔ THE ZONE WORD IS THE COACH'S `load.label` (audit 2026-09-10, H-B08) — the same word State's bar prints.
+    const zone = load?.label ?? null;
     // ⛔ A TYPOGRAPHIC MINUS, as the work order prints it (`form −21 · optimal`).
     const shown = n > 0 ? `+${n}` : n < 0 ? `\u2212${Math.abs(n)}` : '0';
     return (

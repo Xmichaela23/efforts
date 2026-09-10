@@ -1,5 +1,11 @@
 /**
- * ⛔⛔ THE FOUR SLOTS, NOT THE FIVE CANONICALS — a DISPLAY fold, ruled by Michael 2026-09-01 (FIXLIST 2b).
+ * ⛔⛔ THE FOUR SLOTS, NOT THE FIVE CANONICALS — ruled by Michael 2026-09-01 (FIXLIST 2b).
+ *
+ * ⛔ MOVED TO THE SERVER (audit 2026-09-10, H-S18). This was `src/lib/fold-lift-slots.ts`, run by the
+ * State screen over `display.strengthFitness.perLift`. `assembleStateTrends` now runs it over the
+ * per-lift rows before they are cached, so the State card, the collapsed strength row and every other
+ * reader of `per_lift` get ONE deadlift row. The merge rules below are unchanged, byte for byte; the
+ * phone copy and its call sites are deleted, not kept as a fallback.
  *
  * A trap bar deadlift and a conventional deadlift fill ONE slot and get ONE card. The screen was
  * drawing them as two lifts stacked on each other, with the trap bar's own e1RM and record sitting
@@ -28,9 +34,9 @@
  * used. For a prescribed-slot session it would print "Deadlift", which is precisely the wrong word
  * for a trap-bar puller. Silence beats a confident wrong label.
  *
- * ⚠️ DISPLAY ONLY. Nothing here rewrites stored history, canonical names, or any athlete's data, and
- * no server field changes. `latestE1rm` keeps its meaning exactly: the most recent ISO week's
- * heaviest set.
+ * ⚠️ NOTHING STORED IS REWRITTEN. `exercise_log` history, canonical names and the series the verdicts
+ * read are untouched; only the per-lift rows the snapshot carries are merged. `latestE1rm` keeps its
+ * meaning exactly: the most recent ISO week's heaviest set.
  *
  * ── ⛔⛔ MERGE THE SERIES, NOT THE CARDS (bug found live 2026-09-01, same day) ────────────────────
  * The first version of this fold picked a REPRESENTATIVE row by most-recent reading and took that
@@ -44,14 +50,14 @@
  * to the union. The headline, the chart, the count and the as-of all follow from the merged series.
  * `latestE1rm` does NOT change meaning — the bug was that the merge fed it half a week.
  *
- * ⚠️ WHAT THE CLIENT HAS TO MERGE WITH, STATED. The payload carries a chart `series` only for the
- * four tracked-max lifts (`isTrackedMaxLift`, `assemble.ts`); a variant row carries ONE reading —
+ * ⚠️ WHAT THE FOLD MERGES WITH, STATED. The per-lift rows carry a chart `series` only for the four
+ * tracked-max lifts (`isTrackedMaxLift`, `assemble.ts`); a variant row carries ONE reading —
  * `latestE1rm` at `newestAgeDays`. So the union is the slot's own series plus the variant's latest
  * reading, dated off the slot's own as-of (last series date + its `newestAgeDays`). Older variant
- * weeks are not on the payload and cannot be drawn here; that is a server change (merge per slot
- * inside `assemble.ts`, 27-function closure) and is filed, not done. When the slot's own canonical
- * has no series to anchor a date (a trap-bar-only athlete, or fewer than two deadlift weeks), the
- * fold falls back to the most-recent row and says nothing it cannot know.
+ * weeks are not unioned — the rows as the phone received them are what this merges, so the move
+ * changes no number. When the slot's own canonical has no series to anchor a date (a trap-bar-only
+ * athlete, or fewer than two deadlift weeks), the fold falls back to the most-recent row and says
+ * nothing it cannot know.
  *
  * ⚠️ A MERGED CARD CAN STILL READ LOWER THAN THE UNMERGED DEADLIFT DID, AND THAT IS ACCEPTED. If
  * the variant's latest is in a LATER ISO week than any deadlift point, that week's heaviest is the
@@ -66,9 +72,9 @@
 // ("a lift logged under many raw names always shows ONE clear label"), so the slot's label is read
 // from it rather than restated here. A second map beside the first is how this screen ended up
 // showing "Squat" and "Back Squat" for the same lift — see FIXLIST 1d.
-import { canonicalDisplayName } from '../../supabase/functions/_shared/canonicalize.ts';
-// ⛔ THE SLOT MAP LIVES IN ONE PLACE and the server reads the same file — see `lift-slots.ts`.
-import { VARIANT_SLOT_BY_CANONICAL } from './lift-slots.ts';
+import { canonicalDisplayName } from '../canonicalize.ts';
+// ⛔ THE SLOT MAP LIVES IN ONE PLACE and `strength.ts` reads the same file — see `lift-slots.ts`.
+import { VARIANT_SLOT_BY_CANONICAL } from '../../../../src/lib/lift-slots.ts';
 
 type SeriesPoint = { date: string; value: number; recent: boolean; week?: number };
 type AllOut = { date: string; weight: number; reps: number; isRepRecord: boolean } | null;
@@ -137,7 +143,13 @@ export function foldVariantSlots<T extends FoldableLift>(lifts: T[]): T[] {
     }
     out[at] = merge(out[at], asSlot(l, slot));
   }
-  return out;
+  // ⚠️ The private origin marker comes off before the rows are cached — on the phone it was never
+  // serialised; here the next stop is `athlete_snapshot`.
+  return out.map((l) => {
+    if (!isVariantRow(l)) return l;
+    const { __variantOf: _origin, ...row } = l as T & { __variantOf?: string };
+    return row as T;
+  });
 }
 
 function asSlot<T extends FoldableLift>(l: T, slot: string): T {
@@ -170,6 +182,8 @@ function merge<T extends FoldableLift>(a: T, b: T): T {
       newestAgeDays,
       lastAllOut,
       // The row whose reading became the slot's latest decided the flag; the merge may only withdraw it.
+      // OURS — the 0.5 lb here and below absorbs rounding between a stored estimate and the all-history
+      // read; it is the same slack `isPr` uses in `assemble.ts`, not a tolerance on what counts as a record.
       isPr: latestFrom.isPr === true && !(best != null && latest != null && best > latest + 0.5),
     };
   }

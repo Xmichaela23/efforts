@@ -14,7 +14,11 @@
  *   · STRENGTH is block-phase aware and NOT PR-based (Michael 2026-09-01: the program is form / bar
  *     speed / slow incremental gain under cross-training stress). One line per lift so every number
  *     shows; opening lists the working numbers, mid-block adds the creep since the block opened
- *     ("+5"). No PR flag; flat is fine. See `strengthGlance`.
+ *     ("+5"). No PR flag; flat is fine. See `strengthGlanceRows`.
+ *
+ * ⛔ AUDIT 2026-09-10 (item 17): the two calculations this file held are the server's now — the trendline
+ * fit (`fitTrend`, H-B07 → `_shared/state-trend/trend-fit.ts`) and the creep since the block opened
+ * (H-S19 → `sinceBlockDelta` on each per-lift row). What is left here is formatting.
  */
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -77,50 +81,18 @@ export function latestPoint<T extends { date: string; value: number }>(points: R
  * `strengthGlance`, split into columns. Same rules — block-phase aware, NOT PR-based, one row per
  * lift, flat is fine — only the packaging changes: the lift name is the `name`, its working number
  * the `value`, and the creep since the block opened the `note`.
+ * ⚠️ The creep is the server's `sinceBlockDelta` (null while the block is opening). Flat or absent
+ * prints the number alone — no "+0".
  */
 export function strengthGlanceRows(
-  lifts: ReadonlyArray<{ displayName: string; latestE1rm: number | null; series?: ReadonlyArray<{ value: number; week?: number }> }>,
-  planWeek: number | null | undefined,
+  lifts: ReadonlyArray<{ displayName: string; latestE1rm: number | null; sinceBlockDelta?: number | null }>,
 ): SportRow[] {
   const primary = lifts.filter((l) => l.latestE1rm != null).slice(0, 6);
-  if (!primary.length) return [];
-
-  const blockStartValue = (l: { series?: ReadonlyArray<{ value: number; week?: number }> }): number | null => {
-    const pts = (l.series ?? []).filter((p) => typeof p.week === 'number');
-    if (!pts.length) return null;
-    return pts.reduce((a, b) => ((a.week as number) <= (b.week as number) ? a : b)).value;
-  };
-
-  const opening = !(Number(planWeek) > 1);
   return primary.map((l) => {
     const n = Math.round(l.latestE1rm as number);
-    if (opening) return { name: l.displayName, value: String(n) };
-    const bs = blockStartValue(l);
-    const d = bs != null ? n - Math.round(bs) : 0;
-    // Flat shows the number alone — no "+0", and no marker for a week that did not move.
-    return d !== 0
+    const d = l.sinceBlockDelta;
+    return d != null && d !== 0
       ? { name: l.displayName, value: String(n), note: `${d > 0 ? '+' : '-'}${Math.abs(d)}` }
       : { name: l.displayName, value: String(n) };
   });
-}
-
-/**
- * ⛔ THE TRENDLINE — WKO5's fitted line through the dashboard dots (2026-09-04, Michael: "this line means
- * nothing; it needs something that says what it is"). Least squares of value on date. Returns the line's
- * start and end values and the span in weeks (capped at 12). Nothing about the last session, no verdict
- * word; the caption prints "1.650 → 1.498". One definition — the chart and the closed rows both read it.
- */
-export function fitTrend(points: ReadonlyArray<{ date: string; value: number }>): { start: number; end: number; weeks: number; n: number } | null {
-  const pts = [...points].filter((p) => Number.isFinite(p.value) && !!p.date).sort((a, b) => a.date.localeCompare(b.date));
-  if (pts.length < 3) return null;
-  const t0 = Date.parse(pts[0].date + 'T12:00:00Z');
-  const xs = pts.map((p) => (Date.parse(p.date + 'T12:00:00Z') - t0) / 86_400_000);
-  const ys = pts.map((p) => p.value);
-  const n = xs.length, mx = xs.reduce((a, b) => a + b, 0) / n, my = ys.reduce((a, b) => a + b, 0) / n;
-  let sxy = 0, sxx = 0;
-  for (let i = 0; i < n; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sxx += (xs[i] - mx) ** 2; }
-  if (sxx === 0) return null;
-  const slope = sxy / sxx, intercept = my - slope * mx;
-  const weeks = Math.min(12, Math.max(1, Math.ceil(xs[n - 1] / 7)));
-  return { start: intercept, end: intercept + slope * xs[n - 1], weeks, n };
 }

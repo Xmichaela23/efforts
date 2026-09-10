@@ -143,6 +143,9 @@ export interface BikeFitness {
    *  WKO5's sFTP history chart plot FTP as a line over time. Replaced the 12-week min/max dot
    *  (`range`, position-in-range, OURS) 2026-09-04 — docs/SPEC-ftp-trend-line-2026-09-04.md. */
   ftpHistory?: Array<{ date: string; value: number; status: string }> | null;
+  /** The fitted trendline through `ftpHistory` (WKO5 least squares, `trend-fit.ts`), attached beside it by
+   *  compute-snapshot (audit 2026-09-10, H-B07). The bike card prints its start, end and weeks. */
+  ftpHistoryFit?: import('./trend-fit.ts').TrendFit | null;
   /** ⛔ THE SERVER DECIDES THE LEAD, THE CLIENT RENDERS IT. Both screens used to re-derive this from
    *  `power.verdict !== 'needs_data'`, which silently became wrong the moment `withheld` existed — two
    *  copies of one rule is the divergence the spine exists to prevent. 'none' = neither can assert. */

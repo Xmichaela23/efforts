@@ -16,7 +16,6 @@ import { useStateTrends } from '@/hooks/useStateTrends';
 import { useAppContext } from '@/contexts/AppContext';
 import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/lib/trend-receipt';
-import { foldVariantSlots } from '@/lib/fold-lift-slots';
 import { formatPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { readoutPlateStyle } from '@/lib/readout-plate';
@@ -41,7 +40,7 @@ import EnduranceCheckpointSheet from '@/components/context/EnduranceCheckpointSh
 // and the next reader looking for what was removed will find nothing was.
 // ⛔ COLLAPSE TO ONE LINE PER SPORT (Round 3, 2026-09-01) — each sport shows a change-leading summary
 // and expands on tap. The summary wording is a set of pure functions so the confidence rule is pinned.
-import { fmtDayShort, latestPoint, strengthGlanceRows, type SportRow , fitTrend} from '@/lib/sport-summary';
+import { fmtDayShort, latestPoint, strengthGlanceRows, type SportRow } from '@/lib/sport-summary';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import TrendSparkline from '@/components/context/TrendSparkline';
 import { liftStatusLine } from '@/lib/strength-calibration-copy';
@@ -346,7 +345,7 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
               fmtVal={(v) => String(Math.round(v))}
               unit=" W"
               minSpanFraction={0.15}
-              trendline
+              fit={fitness.ftpHistoryFit ?? null}
               trendWord="FTP"
               buildingLabel={(w) => `${w} of 12 weeks`}
               label="FTP" headline={`${ftpNow ?? '—'} W`} qualifier={(() => { const d = String(anchor?.label ?? '').split(' · ').pop(); return d && /\w/.test(d) && d !== anchor?.label ? `estimated ${d}` : undefined; })()}
@@ -514,13 +513,13 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
    * ⛔ ONE SLOT, ONE CARD (FIXLIST 2b, ruled by Michael 2026-09-01). The trap bar deadlift is not a
    * fifth lift on this screen — it fills the deadlift slot, per the book's PRIMARY HINGE pattern, and
    * the app already prescribed its working weight off the deadlift training max
-   * (`CALIBRATION_REF_BY_CANONICAL` directly above maps it). The fold is DISPLAY-side: no stored
-   * history, canonical name or athlete data changes, and no server field moves.
-   * ⚠️ See `src/lib/fold-lift-slots.ts` for why there is no "which version" line on the card, and why
-   * a merged number reading lower than the unmerged deadlift did is the correct outcome rather than a
-   * regression — `showBest` below renders the record precisely when that happens.
+   * (`CALIBRATION_REF_BY_CANONICAL` directly above maps it). ⛔ The fold is the SERVER'S since
+   * 2026-09-10 (audit H-S18): `perLift` arrives with the slot already merged, so this row prints it.
+   * ⚠️ See `_shared/state-trend/fold-lift-slots.ts` for why there is no "which version" line on the card,
+   * and why a merged number reading lower than the unmerged deadlift did is the correct outcome rather
+   * than a regression — `showBest` below renders the record precisely when that happens.
    */
-  const lifts = foldVariantSlots(fitness.perLift.filter((l) => l.isPrimary && l.latestE1rm != null));
+  const lifts = fitness.perLift.filter((l) => l.isPrimary && l.latestE1rm != null);
   const blockLine = blockContextLine(planWeek, block);
   // ⛔ SLICE b — the ambient per-lift state, by `training_max` key. Absent for any lift the current
   // block does not prescribe (an accessory, or a lift on a plan that is not a strength block), and
@@ -1098,7 +1097,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
 
   // The change-leading summary for a sport's collapsed line — wording via the pure `sport-summary`
   // helpers (confidence rule pinned there). Leads with what MOVED; the level lives in the detail.
-  const summaryLifts = strengthFitness ? foldVariantSlots(strengthFitness.perLift.filter((l) => l.isPrimary && l.latestE1rm != null)) : [];
+  const summaryLifts = strengthFitness ? strengthFitness.perLift.filter((l) => l.isPrimary && l.latestE1rm != null) : [];
   // ⛔ THE COLLAPSED SPORT ROW — ONE GRAMMAR FOR ALL FOUR SPORTS (2026-09-03, DESIGN_GUIDELINES
   // "Layout Rules" §1). Every sport returns the same three slots — name · value · note — so the
   // renderer aligns names down one column and numbers down another (rule 2) and sizes the number
@@ -1111,10 +1110,8 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       // ⛔ NOT PR-BASED (Michael 2026-09-01: the program is form / bar speed / slow gain under
       // cross-training stress). One row per lift; opening lists the working numbers, mid-block puts
       // the creep since the block opened in the note. Flat is fine, no PR flag.
-      const rows = strengthGlanceRows(
-        summaryLifts as Array<{ displayName: string; latestE1rm: number | null; series?: Array<{ value: number; week?: number }> }>,
-        planWeek,
-      );
+      // The creep is the server's (`sinceBlockDelta`, audit 2026-09-10 H-S19).
+      const rows = strengthGlanceRows(summaryLifts);
       // 2026-09-04 (Michael: "strength needs e1RM"): the run and bike rows say what their number is
       // ("last 5 runs", "estimated"); the lift rows printed a bare number. It is the estimated one-rep
       // max from the last logged set — not a tested max — so the note says so, with the creep beside it.
@@ -1147,19 +1144,19 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       // window) and no ↑→↓ arrow (Garmin's three states) — both were the other product's rule on this
       // product's number. The chart on the open card is the trend; TrainingPeaks' instruction is to read
       // the line, not one run against the last.
-      const aero = ((stateDisplay as { enduranceSpine?: Array<{ sport?: string; group?: string; points?: Array<{ date?: string; efficiency?: number | null }> }> } | null | undefined)?.enduranceSpine)
-        ?.find((s) => s?.sport === 'run' && s?.group === 'aerobic');
-      const aeroPts = (aero?.points ?? []).filter((p): p is { date: string; efficiency: number } => p?.efficiency != null && !!p?.date).map((p) => ({ date: p.date, value: p.efficiency }));
+      // ⚠️ The chart's points and its fitted line are the server's (`enduranceSpineTrends`, audit 2026-09-10 H-B07).
+      const aero = stateDisplay?.enduranceSpineTrends?.find((s) => s?.sport === 'run' && s?.group === 'aerobic');
+      const aeroPts = aero?.efficiencyTrend.points ?? [];
       // The row reads the TREND LINE (WKO5's fitted line), start → end, never one run (2026-09-04, Michael).
-      const aeroFit = fitTrend(aeroPts);
+      const aeroFit = aero?.efficiencyTrend.fit ?? null;
       const aeroLast = latestPoint(aeroPts);
-      if (aeroFit != null) {
+      if (aeroFit && aeroFit.tooFew === false) {
         rows.unshift({
           name: 'aerobic efficiency',
           value: fmtEff(aeroFit.end, false),
           note: `${aeroFit.weeks}-week trend · from ${fmtEff(aeroFit.start, false)}`,
         });
-      } else if (aeroLast != null) {
+      } else if (aeroFit && aeroLast != null) {
         rows.unshift({ name: 'aerobic efficiency', value: fmtEff(aeroLast.value, false), note: `${fmtDayShort(aeroLast.date)} run · too few for a trend` });
       }
       // ⛔ THE WEEK'S RUN POINTS AGAINST THE ATHLETE'S TYPICAL (Michael 2026-09-02: run load scored Strava's
@@ -1196,9 +1193,8 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       // ⛔ ONE NUMBER, TWO SURFACES. The headline is the SAME number the open rides card prints — the last
       // steady ride's efficiency factor (TrainingPeaks: EF is per workout) — so the plate and the row
       // cannot disagree. Steady rides only: the same `countsTowardTrend` filter the open card applies.
-      const rideSpine = ((stateDisplay as { enduranceSpine?: Array<{ sport?: string; group?: string; points?: Array<{ date?: string; efficiency?: number | null; countsTowardTrend?: boolean }> }> } | null | undefined)?.enduranceSpine)
-        ?.find((s) => s?.sport === 'ride');
-      const efPts = (rideSpine?.points ?? []).filter((p): p is { date: string; efficiency: number; countsTowardTrend?: boolean } => p?.countsTowardTrend !== false && p?.efficiency != null && !!p?.date).map((p) => ({ date: p.date, value: p.efficiency }));
+      const rideTrends = stateDisplay?.enduranceSpineTrends?.find((s) => s?.sport === 'ride');
+      const efPts = rideTrends?.efficiencyTrend.points ?? [];
       const efLast = latestPoint(efPts);
       // ⛔ FTP LEADS, EFFICIENCY FACTOR FOLLOWS (2026-09-03, checked against the field, not recalled).
       // The rider's first number is FTP and their second is watts per kilo; efficiency factor barely
@@ -1212,15 +1208,15 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       const ftpBasis = bf?.efficiency?.basis === 'personal' ? 'tested'
         : bf?.efficiency?.basis === 'coggan_ftp' ? 'estimated' : null;
       if (ftp != null) rows.push({ name: 'FTP', value: `${ftp} W`, note: ftpBasis ?? undefined });
-      const efFit = fitTrend(efPts);
-      if (efFit != null) {
+      const efFit = rideTrends?.efficiencyTrend.fit ?? null;
+      if (efFit && efFit.tooFew === false) {
         // The row reads the TREND LINE (WKO5's fitted line), start → end, never one ride (2026-09-04, Michael).
         rows.push({
           name: 'efficiency factor',
           value: fmtEff(efFit.end, true),
           note: `${efFit.weeks}-week trend · from ${fmtEff(efFit.start, true)}`,
         });
-      } else if (efLast != null) {
+      } else if (efFit && efLast != null) {
         rows.push({ name: 'efficiency factor', value: fmtEff(efLast.value, true), note: `${fmtDayShort(efLast.date)} ride · too few for a trend` });
       }
       if (rows.length) return rows;
@@ -1329,6 +1325,8 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
   // no lifting), so the exact same cards appear as before, only relocated.
   const enduranceSessions = (stateDisplay as { namedSessions?: React.ComponentProps<typeof EnduranceReadCards>['sessions'] } | null | undefined)?.namedSessions ?? null;
   const enduranceSpine = (stateDisplay as { enduranceSpine?: React.ComponentProps<typeof EnduranceReadCards>['spine'] } | null | undefined)?.enduranceSpine ?? null;
+  // Each spine series' efficiency and drift chart with its fitted line — the server's (audit 2026-09-10, H-B07).
+  const enduranceSpineTrends = stateDisplay?.enduranceSpineTrends ?? null;
   const viadaWeek = (stateDisplay as { viadaWeek?: React.ComponentProps<typeof ViadaWeekCard>['week'] } | null | undefined)?.viadaWeek ?? null;
 
   // ⛔ RUN RE-ENTERS THE COMPOSITION (Round 3 pass 2, 2026-09-01) — one owner per sport, run included.
@@ -1390,7 +1388,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
                 {/* ⛔ NO CONDITIONS FOOTER ON THE BIKE (Michael 2026-09-03: "kill the hills and heat, kill
                     any run crossover"). "Hills and heat can have an impact. Trust your RPE" is written for
                     a runner reading pace; a ride is read on power, which heat and gradient do not inflate. */}
-                <EnduranceReadCards asOf={asOf ?? null} sessions={enduranceSessions} spine={enduranceSpine} sport="ride" />
+                <EnduranceReadCards asOf={asOf ?? null} sessions={enduranceSessions} spine={enduranceSpine} spineTrends={enduranceSpineTrends} sport="ride" />
               </>
             );
             // ⛔ RUN OWNS ITS PLATE (Round 3 pass 2) — the run efficiency cards, and ONLY those. No
@@ -1400,7 +1398,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
               <>
                 {/* 2026-09-03 (Michael): the reads first (efficiency, drift — how you responded), the workload chart
                     (how much, how hard) below them. */}
-                <EnduranceReadCards asOf={asOf ?? null} sessions={enduranceSessions} spine={enduranceSpine} sport="run" />
+                <EnduranceReadCards asOf={asOf ?? null} sessions={enduranceSessions} spine={enduranceSpine} spineTrends={enduranceSpineTrends} sport="run" />
               </>
             );
             // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
@@ -1425,7 +1423,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
             // verdict still owns its rides; strength with lifting but no e1RM trend still owns its
             // week. Each is gated by its own content, so nothing new appears.
             const row = <DisciplineRow card={card} restTrend={card.discipline === 'swim' ? swimRest : null} showAxis={showAxis} />;
-            if (card.discipline === 'bike') return <>{row}<EnduranceReadCards asOf={asOf ?? null} sessions={enduranceSessions} spine={enduranceSpine} sport="ride" /></>;
+            if (card.discipline === 'bike') return <>{row}<EnduranceReadCards asOf={asOf ?? null} sessions={enduranceSessions} spine={enduranceSpine} spineTrends={enduranceSpineTrends} sport="ride" /></>;
             if (card.discipline === 'strength') return <>{row}{strengthDetail}<ViadaWeekCard week={viadaWeek} hasPlan={hasActivePlan === true} /></>;
             return row;
           })();

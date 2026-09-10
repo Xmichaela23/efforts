@@ -1,5 +1,5 @@
-import { fitTrend } from '@/lib/sport-summary';
 import React from 'react';
+import type { TrendFit } from '@shared/state-trend';
 import { getDisciplineColor } from '@/lib/context-utils';
 
 /**
@@ -37,7 +37,7 @@ import { getDisciplineColor } from '@/lib/context-utils';
  * "1.24–1.90" means nothing to a reader — the shape is the message. Strength passes a lb unit and
  * keeps its range, where the numbers are self-explanatory.
  */
-export default function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, caption, title, label, headline, qualifier, keyLine, provenance, divider = false, buildingLabel = (w: number) => `building · ${w} of 12 weeks`, trendline = false, trendWord }: {
+export default function TrendSparkline({ series, color, dotNoun = 'steady run', fmtVal = (v: number) => v.toFixed(2), unit = '', minSpanFraction = 0, caption, title, label, headline, qualifier, keyLine, provenance, divider = false, buildingLabel = (w: number) => `building · ${w} of 12 weeks`, fit = null, trendWord }: {
   series?: Array<{ date: string; value: number; recent: boolean; tempF?: number | null }>;
   color?: string; dotNoun?: string; fmtVal?: (v: number) => string; unit?: string; minSpanFraction?: number;
   buildingLabel?: (spanWeeks: number) => string;
@@ -53,8 +53,9 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
   keyLine?: string;
   provenance?: string | null;
   divider?: boolean;
-  /** Draw a least-squares line through the dots and say where it starts and ends (WKO5's chart trendline). */
-  trendline?: boolean;
+  /** The server's fitted line through these dots (WKO5's chart trendline, `_shared/state-trend/trend-fit.ts`).
+   *  Drawn, with "start → end" under the chart, when it is present and not too few. Nothing is fitted here. */
+  fit?: TrendFit | null;
   /** The noun for the caption, e.g. 'efficiency' / 'drift'. */
   trendWord?: string;
 }) {
@@ -83,9 +84,9 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
   const building = spanWeeks < 11;
   // ⛔ THE TRENDLINE IS A FIT, NOT A VERDICT (2026-09-04, Michael: "this line means nothing; it needs something
   // that says what it is"). TrainingPeaks' dashboard chart of Pa:Hr / EF is bare dots; WKO5, its analysis tool,
-  // adds a fitted trendline. Least squares on (date, value); the caption prints the line's start and end
-  // values — "8.1% → 5.2%" — nothing about the last session, no improving/sliding word.
-  const fit = trendline ? fitTrend(pts) : null;
+  // adds a fitted trendline. The caption prints the line's start and end values — "8.1% → 5.2%" — nothing about
+  // the last session, no improving/sliding word. ⚠️ The fit is the server's (audit 2026-09-10, H-B07).
+  const line = fit && fit.tooFew === false ? fit : null;
   const rangeLabel = unit ? `${fmtVal(minV)}–${fmtVal(maxV)}${unit}` : null;
   return (
     <span className={`basis-full flex flex-col gap-0.5 ${divider ? 'mt-2 pt-2 border-t border-white/10' : 'mt-1'}`}>
@@ -94,7 +95,7 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
           <span className="flex flex-col gap-0.5 min-w-0">
             <span className="text-[11px] uppercase tracking-wider text-white/55">{label}</span>
             <span className="flex items-baseline gap-2 min-w-0">
-              <span className="readout-num text-[24px] leading-none text-white/95 tabular-nums">{headline ?? `${fmtVal(fit ? fit.end : last.value)}${unit}`}</span>
+              <span className="readout-num text-[24px] leading-none text-white/95 tabular-nums">{headline ?? `${fmtVal(line ? line.end : last.value)}${unit}`}</span>
               {qualifier && <span className="text-[12px] text-white/60 truncate">{qualifier}</span>}
             </span>
           </span>
@@ -114,11 +115,11 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
           <circle key={p.date + i} cx={x(i)} cy={y(p.value)} r={1.6} fill={runColor} fillOpacity={0.8} />
         ))}
         <circle cx={x(pts.length - 1)} cy={y(last.value)} r={2.5} fill={runColor} />
-        {fit && <line x1={x(0)} y1={y(fit.start)} x2={x(pts.length - 1)} y2={y(fit.end)} stroke="rgba(255,255,255,0.55)" strokeWidth={1} strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />}
+        {line && <line x1={x(0)} y1={y(line.start)} x2={x(pts.length - 1)} y2={y(line.end)} stroke="rgba(255,255,255,0.55)" strokeWidth={1} strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />}
       </svg>
-      {fit && (
+      {line && (
         <span className="text-[13px] text-white/85">
-          {trendWord && !title && !label ? `${trendWord} ` : ''}over {spanWeeks} {spanWeeks === 1 ? 'week' : 'weeks'}: <span className="tabular-nums">{fmtVal(fit.start)}{unit}</span> → <span className="tabular-nums">{fmtVal(fit.end)}{unit}</span>
+          {trendWord && !title && !label ? `${trendWord} ` : ''}over {line.weeks} {line.weeks === 1 ? 'week' : 'weeks'}: <span className="tabular-nums">{fmtVal(line.start)}{unit}</span> → <span className="tabular-nums">{fmtVal(line.end)}{unit}</span>
         </span>
       )}
       {(title || label) ? (
