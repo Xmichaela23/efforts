@@ -30,7 +30,6 @@ import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 // screen. This week's planned-versus-done is `weekTotals` below, counted off the rows on screen.
 import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 import { fetchWeekUnified } from '@/lib/fetchWeekUnified';
-import { formatPlannedSwimDistanceChip } from '@/utils/swimPlanTokens';
 import { orderDayWorkoutsByTimingThenDiscipline } from '@/lib/pairing-timing';
 import { useStrengthOrderingPreference } from '@/lib/use-strength-ordering-preference';
 
@@ -243,9 +242,9 @@ function derivePlannedCellLabel(w: any): string | null {
       return label;
     }
 
-    // SWIM — duration + yards/meters (pool_unit / units on planned row)
+    // SWIM — duration + the server's total and unit (2026-09-10, audit H-T20: materialize-plan writes it)
     if (type === 'swim') {
-      const dist = formatPlannedSwimDistanceChip(w);
+      const dist: string | null = w?.computed?.swim_distance?.label || null;
       const distPart = dist ? ` ${dist}` : '';
       // For optional swims, just show "OPT SM" with duration
       if (isOptional) {

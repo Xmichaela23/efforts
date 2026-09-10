@@ -16,6 +16,12 @@ import {
   resolveStrengthEquipmentTypeForPlan,
 } from '../_shared/strength-equipment-tier.ts';
 import { resolveSwimStepEquipment } from '../_shared/swim/swim-step-equipment.ts';
+import {
+  categorizeSwimTokensForDisplay,
+  formatSwimSubtitleFromBuckets,
+  plannedSwimDistance,
+  type SwimDistanceTally,
+} from '../_shared/swim/swim-plan-summary.ts';
 import { calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
 import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts';
 // ⚠️ The SERVER canonicalizer — `exercise_log.canonical_name` is its output, so the lookup key and
@@ -2387,7 +2393,7 @@ export function expandTokensForRow(
   // explicitly, mirroring the way calculatePlannedStrengthWorkload already receives it.
   // Default {} → no history, the ratio-derived suggestion stands, exactly as before 6f1996d3.
   lastWeightByMovement: Record<string, number> = {},
-): { steps: any[]; total_s: number; swim_equipment_suggested?: string[]; swim_equipment_optional_suggested?: string[] } {
+): { steps: any[]; total_s: number; swim_equipment_suggested?: string[]; swim_equipment_optional_suggested?: string[]; swim_tally?: SwimDistanceTally } {
   const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
   // Strength-PRIMARY rows (Get Strong arc) periodize their own peak + 1RM retest: lift the 0.85 clamp
   // to 1.05 so 97% singles / 100–102.5% test render at face value, and skip the auto working-load
@@ -2398,6 +2404,9 @@ export function expandTokensForRow(
   const discipline = String(row?.type||'').toLowerCase();
   const workoutDate = row?.date || new Date().toISOString().split('T')[0];
   const steps: any[] = [];
+  // ⛔ THE PLANNED SWIM'S DISTANCE, COUNTED AS THE STEPS ARE WRITTEN (2026-09-10, audit H-T20) — in
+  // the unit each token was authored in, so a 50 yd rep is never rounded through metres and back.
+  const swimTally: SwimDistanceTally = { yd: 0, m: 0 };
   const swimEquipPack =
     discipline === 'swim'
       ? inferSwimEquipmentPack(row)
@@ -3235,6 +3244,7 @@ export function expandTokensForRow(
       const ydToM = (yd:number)=> Math.round(yd*0.9144);
       const pushWUCD = (n:number, unit:string, warm:boolean) => {
         const distM = unit==='yd'? ydToM(n) : n;
+        swimTally[unit==='yd' ? 'yd' : 'm'] += n;
         steps.push({ id: uid(), kind: warm?'warmup':'cooldown', distance_m: distM, intensity: 'easy' });
       };
       let m: RegExpMatchArray | null = null;
@@ -3314,6 +3324,7 @@ export function expandTokensForRow(
         const name = swimDrillDisplayName(m[1]); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const equip=m[6]||inferEquipFromDrillName(m[1]);
         const distM = unit==='yd'? ydToM(dist) : dist;
         const drillLabel = drillLabelWithGear(s, name);
+        swimTally[unit==='yd' ? 'yd' : 'm'] += reps * dist;
         for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label: drillLabel, equipment: equip||undefined, intensity: swimIntensity, equipment_detail: resolveSwimStepEquipment(drillLabel, 'drill', swimIntensity) }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
         continue;
       }
@@ -3325,6 +3336,7 @@ export function expandTokensForRow(
         console.log(`  ✅ Matched drill (count first): name="${name}", reps=${reps}, dist=${dist}${unit}, rest=${rest}s, equip=${equip}`);
         const distM = unit==='yd'? ydToM(dist) : dist;
         const drillLabel = drillLabelWithGear(s, name);
+        swimTally[unit==='yd' ? 'yd' : 'm'] += reps * dist;
         for(let i=0;i<reps;i++) {
           steps.push({ id: uid(), kind:'drill', distance_m: distM, label: drillLabel, equipment: equip||undefined, intensity: swimIntensity, equipment_detail: resolveSwimStepEquipment(drillLabel, 'drill', swimIntensity) });
           // Only add rest BETWEEN reps, not after the last rep
@@ -3346,6 +3358,7 @@ export function expandTokensForRow(
         const rest = parseInt(m[4] || '0', 10);
         const distM = unit === 'yd' ? ydToM(dist) : dist;
         console.log(`  ✅ Matched aerobic-moderate: reps=${reps}, dist=${dist}${unit}, rest=${rest}s`);
+        swimTally[unit === 'yd' ? 'yd' : 'm'] += reps * dist;
         for (let i = 0; i < reps; i++) {
           steps.push({ id: uid(), kind: 'work', distance_m: distM, label: swimIntensity, intensity: swimIntensity });
           if (rest && i < reps - 1) {
@@ -3360,6 +3373,7 @@ export function expandTokensForRow(
       if (m) {
         const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const rest=parseInt(m[5]||'0',10); const distM = unit==='yd'? ydToM(dist) : dist;
         console.log(`  ✅ Matched aerobic: reps=${reps}, dist=${dist}${unit}, intensity="${swimIntensity}", rest=${rest}s`);
+        swimTally[unit==='yd' ? 'yd' : 'm'] += reps * dist;
         for(let i=0;i<reps;i++){
           steps.push({ id: uid(), kind:'work', distance_m: distM, label: swimIntensity, intensity: swimIntensity });
           // Only add rest BETWEEN reps, not after the last rep
@@ -3375,6 +3389,7 @@ export function expandTokensForRow(
       if (m) {
         const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const rest=parseInt(m[4]||'0',10); const distM = unit==='yd'? ydToM(dist) : dist;
         console.log(`  ✅ Matched threshold-hard: reps=${reps}, dist=${dist}${unit}, rest=${rest}s`);
+        swimTally[unit==='yd' ? 'yd' : 'm'] += reps * dist;
         for(let i=0;i<reps;i++){
           steps.push({ id: uid(), kind:'work', distance_m: distM, label: swimIntensity, intensity: swimIntensity });
           // Only add rest BETWEEN reps, not after the last rep
@@ -3396,6 +3411,7 @@ export function expandTokensForRow(
         const eq=m[6]|| (kind==='pull'?'buoy': (kind==='kick'?'board':null));
         const distM=unit==='yd'? ydToM(dist):dist;
         console.log(`  ✅ Matched ${kind}: reps=${reps}, dist=${dist}${unit}, intensity="${swimIntensity}", rest=${rest}s, equip=${eq}`);
+        swimTally[unit==='yd' ? 'yd' : 'm'] += reps * dist;
         for(let i=0;i<reps;i++){
           steps.push({ id: uid(), kind:'work', distance_m: distM, label: swimIntensity, equipment:eq||undefined, intensity: swimIntensity, equipment_detail: resolveSwimStepEquipment(null, 'work', swimIntensity) });
           // Only add rest BETWEEN reps, not after the last rep
@@ -3407,7 +3423,7 @@ export function expandTokensForRow(
         continue;
       }
       // Fallback distance/time
-      if (/\d+yd/.test(s)) { const mm=s.match(/(\d+)yd/); const yd=mm?parseInt(mm[1],10):0; const mtr=ydToM(yd); steps.push({ id: uid(), kind:'work', distance_m: mtr }); continue; }
+      if (/\d+yd/.test(s)) { const mm=s.match(/(\d+)yd/); const yd=mm?parseInt(mm[1],10):0; const mtr=ydToM(yd); swimTally.yd += yd; steps.push({ id: uid(), kind:'work', distance_m: mtr }); continue; }
       if (/\d+min/.test(s)) { const sec=minutesTokenToSeconds(s) ?? 600; steps.push({ id: uid(), kind:'work', duration_s: sec }); continue; }
       steps.push({ id: uid(), kind:'work', duration_s: 300 });
       continue;
@@ -3660,7 +3676,7 @@ export function expandTokensForRow(
     discipline === 'swim' && swimEquipPack.suggestedRequired.length ? swimEquipPack.suggestedRequired : undefined;
   const swim_equipment_optional_suggested =
     discipline === 'swim' && swimEquipPack.suggestedOptional.length ? swimEquipPack.suggestedOptional : undefined;
-  return { steps, total_s, swim_equipment_suggested, swim_equipment_optional_suggested };
+  return { steps, total_s, swim_equipment_suggested, swim_equipment_optional_suggested, ...(discipline === 'swim' ? { swim_tally: swimTally } : {}) };
 }
 
 Deno.env.get; // keep Deno type active
@@ -4242,7 +4258,7 @@ Deno.serve(async (req) => {
             : null;
         const rowPhaseForRir = resolvePlanPhase(rirPlanConfig, weekNum);
         const addsForRow = addInjectionsByRow.get(String(row.id)) || [];
-        const { steps, total_s, swim_equipment_suggested, swim_equipment_optional_suggested } = expandTokensForRow(row, baselines, adjustments, strengthIntent, weekNum, rirProtocolId, rowPhaseForRir, addsForRow, lastWeightByMovement);
+        const { steps, total_s, swim_equipment_suggested, swim_equipment_optional_suggested, swim_tally } = expandTokensForRow(row, baselines, adjustments, strengthIntent, weekNum, rirProtocolId, rowPhaseForRir, addsForRow, lastWeightByMovement);
         console.log(`  ✅ Generated ${steps.length} steps, total_s: ${total_s} (${Math.floor(total_s/60)}:${String(total_s%60).padStart(2,'0')})`);
         
         // Log error if materialization failed but tokens exist
@@ -4279,10 +4295,24 @@ Deno.serve(async (req) => {
               ...(Array.isArray(swim_equipment_optional_suggested) && swim_equipment_optional_suggested.length > 0
                 ? { swim_equipment_optional_suggested }
                 : {}),
+              // ⛔ THE SWIM'S TOTAL AND ITS UNIT (2026-09-10, audit H-T20). Every surface prints `label`.
+              ...(() => {
+                const swim_distance = plannedSwimDistance(swim_tally, (row as any)?.pool_unit, (row as any)?.units);
+                return swim_distance ? { swim_distance } : {};
+              })(),
             },
             total_duration_seconds: finalTotalSeconds,
             duration: Math.max(1, finalDuration),
           };
+          /**
+           * ⛔ THE SWIM'S SUBTITLE (2026-09-10, audit H-T18 / H-T20) — the bucket line the phone built from
+           * the same tokens on every render, now written once. Only a swim with a line gets one; no other
+           * row's `friendly_summary` is touched.
+           */
+          if (String(row?.type || '').toLowerCase() === 'swim' && tokens.length) {
+            const line = formatSwimSubtitleFromBuckets(categorizeSwimTokensForDisplay(tokens.map(String)), ' • ');
+            if (line) update.friendly_summary = line;
+          }
           
           // Update race day description to match actual pace used in computed steps
           const isRaceDay = (() => {

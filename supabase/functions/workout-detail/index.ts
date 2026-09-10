@@ -241,8 +241,11 @@ const STRENGTH_VOLUME_VERSION = 2;
  *   1 — planned_totals.duration_s / completed_totals.moving_s (2026-09-10)
  *   2 — classification.decoupling.line: the drift line the adherence chip prints (2026-09-10, audit
  *       H-D09). A copy stored at v1 has no line, and the chip under a real drift would print nothing.
+ *   3 — intervals[].executed.band / gap_band, intervals[].race_compare and pacing.variability (2026-09-10,
+ *       audit H-D11 / H-D12). A copy stored at v2 has none, and the interval table would print no
+ *       colours, no goal-race percent and no pacing mark.
  */
-const SESSION_TOTALS_VERSION = 2;
+const SESSION_TOTALS_VERSION = 3;
 
 type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_missing';
 

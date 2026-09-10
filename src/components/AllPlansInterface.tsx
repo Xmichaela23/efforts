@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { normalizePlannedSession, normalizeStructuredSession } from '@/services/plans/normalizer';
 import { supabase } from '@/lib/supabase';
-import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { resolveCurrent5kPace, formatFiveKPace } from '@/lib/resolve-current-5k-pace';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +20,6 @@ import { parseLocalDate, formatLocalDate } from '@/lib/dateUtils';
 // @ts-ignore
 import optionalUiSpec from '@/services/plans/optional-ui-spec.json';
 import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
-import { categorizeSwimTokensForDisplay } from '@/utils/swimPlanTokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 // ⛔ THE SERVER'S PLANNED LENGTH, READ (2026-09-10, audit H-T01). See `plannedDurationSecondsOf`.
 import { plannedDurationSecondsOf } from './PlannedSessionHeader';
@@ -183,15 +180,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const [adjustmentLimit] = useState(3);
   const [showPlanDesc, setShowPlanDesc] = useState(false);
 
-  // Load baselines for weekly summaries (pace/power/loads)
-  useEffect(() => {
-    (async () => {
-      try {
-        const b = await loadUserBaselines?.();
-        if (b) setBaselines(b);
-      } catch {}
-    })();
-  }, [loadUserBaselines]);
+  // ⛔ No mount-time baselines load (2026-09-10, audit H-T18): it fed the weekly summaries' structure normalizer, now deleted.
 
   // Handle header back button navigation from AppLayout
   useEffect(() => {
@@ -216,110 +205,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
   const buildWeeklySubtitle = (workout: any): string | undefined => {
     try {
-      const pn = (baselines as any)?.performanceNumbers || {};
-      // Swim: prefer a drill-aware summary using tokens or computed steps
-      try {
-        const disc = String((workout as any)?.type || (workout as any)?.discipline || '').toLowerCase();
-        if (disc === 'swim') {
-          const parts: string[] = [];
-          // 1) Try tokens (covers WU/CD/pull/kick/aerobic and named drills)
-          const stepsTok: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t)) : [];
-          if (stepsTok.length) {
-            let wu: string | null = null, cd: string | null = null;
-            const drills: string[] = []; const pulls: string[] = []; const kicks: string[] = []; const aerobics: string[] = [];
-            stepsTok.forEach((t)=>{
-              const s = String(t).toLowerCase();
-              let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i);
-              if (m) { const txt = `${parseInt(m[1],10)} ${m[2].toLowerCase()}`; if(/warmup/i.test(s)) wu = `WU ${txt}`; else cd = `CD ${txt}`; return; }
-              m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
-              if (m) { const name=m[1].replace(/_/g,' '); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const r=m[5]?` @ :${parseInt(m[5],10)}r`:''; drills.push(`${name} ${reps}x${dist}${r}`); return; }
-              m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i);
-              if (m) { const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const name=m[4].replace(/_/g,' '); drills.push(`${name} ${reps}x${dist}`); return; }
-              m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
-              if (m) { const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const r=m[5]?` @ :${parseInt(m[5],10)}r`:''; (m[1]==='pull'?pulls:kicks).push(`${reps}x${dist}${r}`); return; }
-              m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
-              if (m) { const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const r=m[4]?` @ :${parseInt(m[4],10)}r`:''; aerobics.push(`${reps}x${dist}${r}`); return; }
-            });
-            if (wu) parts.push(wu);
-            if (drills.length) parts.push(`Drills: ${Array.from(new Set(drills)).join(', ')}`);
-            if (pulls.length) parts.push(`Pull ${Array.from(new Set(pulls)).join(', ')}`);
-            if (kicks.length) parts.push(`Kick ${Array.from(new Set(kicks)).join(', ')}`);
-            if (aerobics.length) parts.push(`Aerobic ${Array.from(new Set(aerobics)).join(', ')}`);
-            if (cd) parts.push(cd);
-            if (parts.length) return parts.join(' • ');
-          }
-          // 2) Fallback to computed steps: summarize drills present even if tokens missing in this view model
-          const compSteps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
-          if (compSteps.length) {
-            const drillMap = new Map<string, { reps:number; eachYd?:number }>();
-            compSteps.forEach((st:any)=>{
-              const label = String((st?.label || st?.name || '')).trim();
-              const isDrill = String(st?.effortLabel||'').toLowerCase()==='drill' || String(st?.type||'').toLowerCase()==='drill';
-              if (!isDrill) return;
-              const yd = typeof st?.distanceMeters==='number' ? Math.round((st.distanceMeters||0)/0.9144) : undefined;
-              const key = label || 'drill';
-              const cur = drillMap.get(key) || { reps:0, eachYd: yd };
-              cur.reps += 1; if (yd && !cur.eachYd) cur.eachYd = yd; drillMap.set(key, cur);
-            });
-            if (drillMap.size) {
-              const drillParts = Array.from(drillMap.entries()).map(([name, v])=> name==='drill' ? `${v.reps}x${v.eachYd||''}` : `${name} ${v.reps}x${v.eachYd||''}`);
-              parts.push(`Drills: ${drillParts.join(', ')}`);
-              return parts.join(' • ');
-            }
-          }
-        }
-      } catch {}
-      const structured = (workout as any)?.workout_structure;
-      if (structured && typeof structured === 'object') {
-        try {
-          const res = normalizeStructuredSession(workout, { performanceNumbers: pn, learned_fitness: (baselines as any)?.learned_fitness });
-          if (res?.friendlySummary) return res.friendlySummary;
-        } catch {}
-      }
+      // ⛔ THE SERVER'S SUBTITLE, SWIMS INCLUDED (2026-09-10, audit H-T20). Two copies of the swim token
+      // parser and a drill count off the steps' metres stood here; materialize-plan writes a swim's line.
       const friendly = String((workout as any)?.friendly_summary || '').trim();
-      // If this is a swim with explicit drills in tokens, prefer token-derived subtitle over stored friendly text
-      try {
-        const discCheck = String((workout as any)?.type || (workout as any)?.discipline || '').toLowerCase();
-        const stepsCheck: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t).toLowerCase()) : [];
-        const hasDrills = discCheck==='swim' && stepsCheck.some(t=>/swim_drill[s]?_/i.test(t));
-        if (!hasDrills && friendly) return friendly;
-        // else fall through to drill-aware token summary below
-      } catch {}
-      if (friendly && !/swim/i.test(String((workout as any)?.type || (workout as any)?.discipline || ''))) return friendly;
+      if (friendly) return friendly;
       const desc = String((workout as any)?.description || '').trim();
-      // Swim drill-aware fallback from tokens when no friendly summary exists
-      try {
-        const disc = String((workout as any)?.type || (workout as any)?.discipline || '').toLowerCase();
-        const steps: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t)) : [];
-        if (disc === 'swim' && steps.length) {
-          const parts: string[] = [];
-          let wu: string | null = null, cd: string | null = null;
-          const drills: string[] = [];
-          const pulls: string[] = [];
-          const kicks: string[] = [];
-          const aerobics: string[] = [];
-          steps.forEach((t: string) => {
-            const s = t.toLowerCase();
-            let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i);
-            if (m) { const txt = `${parseInt(m[1],10)} ${m[2].toLowerCase()}`; if (/warmup/i.test(s)) wu = `WU ${txt}`; else cd = `CD ${txt}`; return; }
-            m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
-            if (m) { const name=m[1].replace(/_/g,' '); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const r = m[5]?` @ :${parseInt(m[5],10)}r`:''; drills.push(`${name} ${reps}x${dist}${r}`); return; }
-            m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i);
-            if (m) { const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const name=m[4].replace(/_/g,' '); drills.push(`${name} ${reps}x${dist}`); return; }
-            m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
-            if (m) { const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const r=m[5]?` @ :${parseInt(m[5],10)}r`:''; if(m[1]==='pull') pulls.push(`${reps}x${dist}${r}`); else kicks.push(`${reps}x${dist}${r}`); return; }
-            m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
-            if (m) { const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const r=m[4]?` @ :${parseInt(m[4],10)}r`:''; aerobics.push(`${reps}x${dist}${r}`); return; }
-          });
-          if (wu) parts.push(wu);
-          if (drills.length) parts.push(`Drills: ${Array.from(new Set(drills)).join(', ')}`);
-          if (pulls.length) parts.push(`Pull ${Array.from(new Set(pulls)).join(', ')}`);
-          if (kicks.length) parts.push(`Kick ${Array.from(new Set(kicks)).join(', ')}`);
-          if (aerobics.length) parts.push(`Aerobic ${Array.from(new Set(aerobics)).join(', ')}`);
-          if (cd) parts.push(cd);
-          if (parts.length) return parts.join(' • ');
-        }
-      } catch {}
       return desc || undefined;
     } catch { return undefined; }
   };
@@ -331,25 +221,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       const hints = (workout as any)?.export_hints || {};
       const lines = React.useMemo(() => {
         const out: string[] = [];
-        // Swim grouping from tokens
+        // ⛔ A swim's lines are the server's subtitle, one bucket per line (2026-09-10, audit H-T20).
         if (disc==='swim') {
-          try {
-            const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t)) : [];
-            if (toks.length) {
-              const b = categorizeSwimTokensForDisplay(toks);
-              if (b.wu) out.push(`1 × ${b.wu.replace(/^WU\s+/i, 'Warm‑up ')}`);
-              if (b.drills.length) out.push(`Drills ${Array.from(new Set(b.drills)).join(', ')}`);
-              if (b.pulls.length) out.push(`Pull ${Array.from(new Set(b.pulls)).join(', ')}`);
-              if (b.kicks.length) out.push(`Kick ${Array.from(new Set(b.kicks)).join(', ')}`);
-              if (b.aerobics.length) out.push(`Aerobic ${Array.from(new Set(b.aerobics)).join(', ')}`);
-              if (b.cd) out.push(`1 × ${b.cd.replace(/^CD\s+/i, 'Cool‑down ')}`);
-            }
-          } catch {}
+          const friendly = String((workout as any)?.friendly_summary || '').trim();
+          if (friendly) out.push(...friendly.split(' • ').filter(Boolean));
         }
         const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
         if (steps.length) {
-          const tolQual: number = (typeof hints?.pace_tolerance_quality==='number' ? hints.pace_tolerance_quality : 0.04);
-          const tolEasy: number = (typeof hints?.pace_tolerance_easy==='number' ? hints.pace_tolerance_easy : 0.06);
           const fmtTime = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
           // Use server-processed pace ranges instead of client-side calculations
           const paceStrWithRange = (paceTarget?: string, kind?: string, paceRange?: any) => {
@@ -530,60 +408,12 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         if (!e1 && Array.isArray(mat) && mat.length > 0) {
           const numToDay = { 1:'Monday',2:'Tuesday',3:'Wednesday',4:'Thursday',5:'Friday',6:'Saturday',7:'Sunday' } as Record<number,string>;
           const byWeek: Record<number, any[]> = {};
-          // Baseline helpers
-          const pn = bl?.performanceNumbers || {};
-          // ⛔ 5K PACE HAS ONE OWNER: `@/lib/resolve-current-5k-pace`. The chain here ended in `|| pn.fiveK`,
-          // which is the 5K race TIME — so an athlete whose row carries the time without the derived pace
-          // had "22:30" substituted into `{5k_pace}` and rendered as their interval pace. Rendered back in
-          // the athlete's own units, which is what the raw string used to carry.
-          const fiveK: string | null = formatFiveKPace(
-            resolveCurrent5kPace({ performance_numbers: pn as any }).sec_per_mi,
-            bl?.units === 'metric',
-          );
-          const easyPace: string | null = (pn.easyPace ? String(pn.easyPace) : null) as any;
-          // FTP fracture #2: resolver-first (learned when confident) so displayed watts match the baked watts.
-          const ftp: number | null = (resolveCurrentFtp({ learned_fitness: (bl as any)?.learned_fitness, performance_numbers: bl?.performanceNumbers } as any).value ?? null) as any;
-          const hints = (pd?.export_hints || {}) as any;
-          const paceTolQuality = typeof hints.pace_tolerance_quality === 'number' ? hints.pace_tolerance_quality : 0.04;
-          const paceTolEasy = typeof hints.pace_tolerance_easy === 'number' ? hints.pace_tolerance_easy : 0.06;
-          const pTolSS = typeof hints.power_tolerance_SS_thr === 'number' ? hints.power_tolerance_SS_thr : 0.05;
-          const pTolVO2 = typeof hints.power_tolerance_VO2 === 'number' ? hints.power_tolerance_VO2 : 0.10;
-          const paceToSec = (p: string) => { const m = p.match(/(\d+):(\d{2})\/(mi|km)/i); if (!m) return null as any; return { sec:Number(m[1])*60+Number(m[2]), unit:m[3].toLowerCase() }; };
-          const secToPace = (sec: number, unit: string) => { const s = Math.max(1, Math.round(sec)); const mm = Math.floor(s/60); const ss = s%60; return `${mm}:${String(ss).padStart(2,'0')}/${unit}`; };
-          const appendPaceRange = (txt: string) => {
-            const m = txt.match(/(\d+:\d{2}\/((?:mi|km)))/i);
-            if (!m) return txt;
-            const isEasy = /easy|warm\s*up|cool\s*down|cooldown|warmup|\{easy_pace\}/i.test(txt);
-            const isQuality = /tempo|interval|threshold|5k|10k|vo2|repeat/i.test(txt) && !isEasy;
-            const tol = isQuality ? paceTolQuality : paceTolEasy;
-            const ps = paceToSec(m[1]); if (!ps) return txt;
-            const lo = secToPace(ps.sec*(1 - tol), ps.unit); const hi = secToPace(ps.sec*(1 + tol), ps.unit);
-            if (txt.includes('(') && txt.includes('–')) return txt;
-            return txt.replace(m[1], `${m[1]} (${lo}–${hi})`);
-          };
-          const resolvePaces = (text: string) => {
-            let out = text || '';
-            if (fiveK) out = out.split('{5k_pace}').join(String(fiveK));
-            if (easyPace) out = out.split('{easy_pace}').join(String(easyPace));
-            // Compute offsets like 7:43/mi + 0:45/mi → 8:28/mi
-            out = out.replace(/(\d+:\d{2})\/(mi|km)\s*([+\-−])\s*(\d+:\d{2})\/(mi|km)/g, (m, base, u1, sign, t, u2) => {
-              if (u1 !== u2) return m;
-              const [bm, bs] = base.split(':').map(Number);
-              const [tm, ts] = t.split(':').map(Number);
-              const baseSec = bm * 60 + bs;
-              const offSec = tm * 60 + ts;
-              const newSec = sign === '-' || sign === '−' ? baseSec - offSec : baseSec + offSec;
-              const mm = Math.floor(newSec / 60);
-              const ss = newSec % 60;
-              return `${mm}:${String(ss).padStart(2, '0')}/${u1}`;
-            });
-            out = appendPaceRange(out);
-            return out;
-          };
-          const round = (w: number) => Math.round(w / 5) * 5;
-          // Client-side strength calculations removed - server handles all 1RM calculations
-          // Power ranges now provided by server - no client-side FTP calculation needed
-          const mapBike = (text: string) => text;
+          /**
+           * ⛔ NO PACE TEXT BUILT HERE (2026-09-10, audit H-T17 / H-T18). This substituted `{5k_pace}` /
+           * `{easy_pace}` from today's baselines and appended its own ±4% / ±6% range to a description,
+           * and ran only for a row with neither `rendered_description` nor `description` — so it never
+           * printed. A materialized row prints its own text; `computed.steps` carry the server's ranges.
+           */
 
           const parseMaybeJson = (v: any) => {
             if (v == null) return v;
@@ -626,7 +456,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               id: w.id,
               name: w.name || 'Session',
               type: (String((w as any).type).toLowerCase() === 'bike' ? 'ride' : (w as any).type) as any,
-              description: renderedDesc || mapBike(resolvePaces(w.description || '')),
+              description: renderedDesc,
               duration,
               planned_duration_seconds: plannedSecs,
               intensity: typeof w.intensity === 'string' ? w.intensity : undefined,
@@ -679,8 +509,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 bl?.units === 'metric',
               );
               const easyPace: string | null = (pn2.easyPace ? String(pn2.easyPace) : null) as any;
-              // FTP fracture #2: resolver-first (learned when confident) so displayed watts match the baked watts.
-          const ftp: number | null = (resolveCurrentFtp({ learned_fitness: (bl as any)?.learned_fitness, performance_numbers: bl?.performanceNumbers } as any).value ?? null) as any;
               const resolvePaces = (text: string) => {
                 let out = text || '';
                 if (fiveK) out = out.split('{5k_pace}').join(String(fiveK));
@@ -694,7 +522,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 });
                 return out;
               };
-              const round = (w: number) => Math.round(w / 5) * 5;
               // Client-side strength calculations removed - server handles all 1RM calculations
               // Power ranges now provided by server - no client-side FTP calculation needed
               const mapBike = (text: string) => text;
@@ -771,15 +598,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               // label-divergence entry.
               const name = deriveWorkoutTitle(s as any);
               const stepsSummary = summarizeSteps((s as any).steps_preset);
-              // Structured normalization (preferred) — for the summary line only.
-              const hasStructured = (s as any).workout_structure && typeof (s as any).workout_structure === 'object';
-              let structuredSummary: string | undefined;
-              try {
-                if (hasStructured) {
-                  const res = normalizeStructuredSession(s, bl || {} as any);
-                  structuredSummary = res.friendlySummary || undefined;
-                }
-              } catch {}
+              // ⛔ No phone normalizer for a `workout_structure` session (2026-09-10, audit H-T18): it prints its description.
               /**
                * ⛔ AN UNMATERIALIZED SESSION PRINTS ITS AUTHORED `duration` AND NOTHING ELSE (2026-09-10,
                * audit H-T01). The blob's minutes are what the plan builder wrote. The phone estimates that
@@ -793,7 +612,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 id: s.id || `${pd.id}-w${w}-${idx}`,
                 name,
                 type: mappedType || 'run',
-                description: [structuredSummary || description, (!structuredSummary && stepsSummary.length) ? `(${stepsSummary.join(' • ')})` : ''].filter(Boolean).join(' '),
+                description: [description, stepsSummary.length ? `(${stepsSummary.join(' • ')})` : ''].filter(Boolean).join(' '),
                 duration,
                 planned_duration_seconds: authoredMin != null ? Math.round(authoredMin * 60) : null,
                 intensity: typeof s.intensity === 'string' ? s.intensity : undefined,

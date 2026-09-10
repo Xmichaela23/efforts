@@ -359,27 +359,12 @@ export default function RescheduleValidationPopup({
               {severity === 'red' ? 'Issues preventing reschedule:' : 'Validation warnings:'}
             </p>
             {reasons.map((reason, idx) => {
-              // Generate actionable suggestions based on reason code
-              const getSuggestion = (code: string, data?: any) => {
-                switch (code) {
-                  case 'long_plus_strength':
-                    return 'Move the strength workout to another day, or move this long run to a day without strength';
-                  case 'workload_cap_exceeded':
-                    return `Move one of the existing workouts on ${formatDate(newDate)} to reduce daily workload below 120`;
-                  case 'hard_consecutive':
-                    return data?.adjacentDay ? `Move this workout to avoid consecutive hard days with ${formatDate(data.adjacentDay)}` : 'Move this workout to avoid consecutive hard days';
-                  case 'long_adjacent':
-                    return data?.adjacentDay ? `Move this long run to avoid being adjacent to another long session on ${formatDate(data.adjacentDay)}` : 'Move this long run to avoid being adjacent to another long session';
-                  case 'lower_strength_spacing':
-                    return 'Move this strength workout to allow at least 2 days between lower body sessions';
-                  case 'hard_within_2_days':
-                    return 'Move this workout to allow at least 2 days between hard workouts';
-                  default:
-                    return null;
-                }
-              };
-
-              const suggestion = getSuggestion(reason.code, reason.data);
+              // ⛔ THE ADVICE LINE IS THE SERVER'S `data.suggestion` (2026-09-10, audit H-T22). The phone wrote its
+              // own per code — "below 120" where peak weeks cap at 140, and a long-run line for a code the
+              // server never sends. A reason with no suggestion prints none.
+              const suggestion = typeof reason.data?.suggestion === 'string' && reason.data.suggestion.trim()
+                ? reason.data.suggestion
+                : null;
 
               return (
                 <div

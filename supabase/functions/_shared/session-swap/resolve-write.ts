@@ -203,7 +203,9 @@ async function resolveRevertToPlan(
   /**
    * ⛔ EVERY FIELD THE SWAP TOUCHED IS PUT BACK OR CLEARED, and the list is the swap's own: `type`,
    * `name`, `description`, `rendered_description`, `steps_preset`, `duration`,
-   * `total_duration_seconds`, `computed`, `workout_structure`, `intervals`, `tags`.
+   * `total_duration_seconds`, `computed`, `workout_structure`, `friendly_summary`, `intervals`, `tags`.
+   * (`friendly_summary` since 2026-09-10: materialize-plan rewrites it for a swim, so a run restored
+   * from a swapped swim must not keep the swim's line.)
    *
    * ⚠️ THE TOTAL GOES TO NULL RATHER THAN THE BLOB'S. The blob authors tokens, not a total; the
    * total is `materialize-plan`'s answer for this athlete, and writing a stale one would survive the
@@ -227,6 +229,7 @@ async function resolveRevertToPlan(
       rendered_description: null,
       steps_preset: Array.isArray(authored.steps_preset) ? authored.steps_preset : null,
       workout_structure: authored.workout_structure && typeof authored.workout_structure === 'object' ? authored.workout_structure : null,
+      friendly_summary: null,
       export_hints: authored.export_hints && typeof authored.export_hints === 'object' ? authored.export_hints : null,
       strength_exercises: Array.isArray(authored.strength_exercises) ? authored.strength_exercises : null,
       mobility_exercises: Array.isArray(authored.mobility_exercises) ? authored.mobility_exercises : null,

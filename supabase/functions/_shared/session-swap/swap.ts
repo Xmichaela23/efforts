@@ -643,6 +643,13 @@ export function getDisciplineSwaps(
            */
           rendered_description: null,
           /**
+           * ⛔ AND THE OLD SPORT'S SUBTITLE (2026-09-10, audit H-T20). materialize-plan writes a swim's
+           * line into `friendly_summary`; an easy swim swapped to a run wrote this shell raw and kept
+           * printing "WU 300 yd • …". It is words only — no duration rung reads it — so it clears here
+           * like `rendered_description`, unlike `computed` below.
+           */
+          friendly_summary: null,
+          /**
            * ⛔ THE TAG RECORDS WHAT THE PLAN ORIGINALLY ASKED FOR (2026-08-08), and that is load-bearing.
            *
            * `get-week` re-materialises planned rows from `plans.sessions_by_week` on every read and
@@ -741,6 +748,8 @@ export function sessionSwapExtras(
         type: 'walk',
         steps_preset: null,
         workout_structure: null,
+        // ⛔ The old session's subtitle goes with its structure (2026-09-10, audit H-T20).
+        friendly_summary: null,
         intervals: null,
         rendered_description: null,
         tags: swapOriginTags(session, from),
@@ -935,6 +944,9 @@ export function withLibrarySession(
     steps_preset: [...lib.steps_preset],
     computed: null,
     workout_structure: null,
+    // ⛔ The old sport's subtitle goes too (2026-09-10, audit H-T20): materialize-plan writes a swim's line
+    // and nothing clears it, so a swim swapped to a ride kept printing its warm-up and drills.
+    friendly_summary: null,
     intervals: null,
     /**
      * ⛔ THE NEW SESSION'S OWN CLASSIFICATION REPLACES THE OLD ONE. `family:`, `band:`, `sport:`,

@@ -5,6 +5,7 @@
 import { halvesSteady, notSteadyLine } from '../ride-halves-steady.ts';
 import type { SessionDetailV1, SegmentVerdictV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
 import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
+import { pacingVariability, stampIntervalCompare } from './interval-compare.ts';
 import { isIndoorSession } from '../indoor-session.ts';
 import type { VerdictDirection } from '../core-verdict.ts';
 import type { ArcPerformanceBridgeV1 } from './arc-performance-bridge.ts';
@@ -665,6 +666,15 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     }
   } catch { /* a missing not-done row is nothing lost */ }
 
+  // ⛔ AUDIT H-D11 / H-D12 (2026-09-10): each row's band against its planned range, or on a goal race its
+  // percent and word against the goal and the projection. The table used to decide both on the phone.
+  stampIntervalCompare(intervals, {
+    isRide: type === 'ride',
+    race: (sessionState as any).race && typeof (sessionState as any).race === 'object'
+      ? ((sessionState as any).race as SessionDetailV1['race'])
+      : null,
+  });
+
   let intervalDisplayMode = (() => {
     const m = String(intervalDisplay?.mode || '');
     if (m === 'interval_compare_ready' || m === 'overall_only' || m === 'awaiting_recompute') return m as any;
@@ -1201,6 +1211,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       pace_spread_s_per_mi: null,
       variability_index: ((sessionState as any)?.glance?.variability_index as number | null) ?? null,
       power_cv_pct: ((sessionState as any)?.glance?.power_cv_pct as number | null) ?? null,
+      variability: pacingVariability(pacingCV),
     },
 
     // TREND removed (2026-07-05): this block computed its OWN raw-pace / raw-power trend — a fork vs the

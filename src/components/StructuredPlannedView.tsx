@@ -12,8 +12,6 @@ import { buildFormGogglesSwimScript } from '@/utils/formGogglesSwimScript';
 import { isWorkoutKitAvailable, scheduleSwimOnWatch, buildSwimPayloadFromWorkout } from '@/services/workoutkit';
 import { Capacitor } from '@capacitor/core';
 import { stepEquipmentLabel } from '@shared/swim/swim-step-equipment';
-import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
-import { swimDrillDisplayName } from '@/lib/plan-tokens/swim-drill-tokens';
 
 type StructuredPlannedViewProps = {
   workout: any;
@@ -114,26 +112,15 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
 
   // Structured-only renderer
   const ws: any = structureAny || {};
-  const { loadUserBaselines, useImperial } = useAppContext?.() || ({} as any);
-  const [ctxPN, setCtxPN] = useState<any | null>(null);
+  // ⛔ No baselines load here any more (audit H-T19): they fed only the structure expansion that was deleted.
+  const { useImperial } = useAppContext?.() || ({} as any);
   const [savingPool, setSavingPool] = useState<boolean>(false);
   const [refresh, setRefresh] = useState<number>(0);
   const [autoDefaulted, setAutoDefaulted] = useState<boolean>(false);
   const [localPool, setLocalPool] = useState<{ unit: 'yd' | 'm' | null; lengthM: number | null } | null>(null);
   useEffect(() => {
-    (async () => {
-      try {
-        if (!((workout as any)?.baselines || (workout as any)?.performanceNumbers)) {
-          const b = await loadUserBaselines?.();
-          if (b && b.performanceNumbers) setCtxPN(b.performanceNumbers);
-        }
-      } catch {}
-    })();
-  }, [loadUserBaselines, workout]);
-  useEffect(() => {
     setLocalPool(null);
   }, [(workout as any)?.id, (workout as any)?.pool_unit, (workout as any)?.pool_length_m]);
-  const pn: any = (workout as any)?.baselines || (workout as any)?.performanceNumbers || ctxPN || {};
   const poolUnit: 'yd' | 'm' | null = ((localPool?.unit ?? (workout as any)?.pool_unit) ?? null) as any;
   const poolLenM: number | null = (() => {
     if (localPool && localPool.lengthM != null) return localPool.lengthM;
@@ -368,210 +355,12 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     }
   } catch {}
 
-  // No UI fabrication: rely on server-computed steps only
-
-  // No client-side materialization; rely on server activation
-  const toSec = (v?: string): number => { if (!v || typeof v !== 'string') return 0; const m1=v.match(/(\d+)\s*min/i); if (m1) return parseInt(m1[1],10)*60; const m2=v.match(/(\d+)\s*s/i); if (m2) return parseInt(m2[1],10); return 0; };
-  const parseEstimateToSeconds = (val: any): number => {
-    try {
-      if (val == null) return 0;
-      if (typeof val === 'number' && isFinite(val)) {
-        // Treat numeric as minutes
-        return Math.max(0, Math.round(val)) * 60;
-      }
-      const txt = String(val).trim();
-      if (!txt) return 0;
-      // hh:mm:ss or mm:ss
-      let m = txt.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-      if (m) {
-        const h = m[3] ? parseInt(m[1],10) : 0;
-        const mm = m[3] ? parseInt(m[2],10) : parseInt(m[1],10);
-        const ss = m[3] ? parseInt(m[3],10) : parseInt(m[2],10);
-        return h*3600 + mm*60 + ss;
-      }
-      // 0h 37 / 1h 05 / 1h05
-      m = txt.match(/^(\d+)\s*h\s*(\d{1,2})$/i);
-      if (m) {
-        const h = parseInt(m[1],10); const mm = parseInt(m[2],10);
-        return h*3600 + mm*60;
-      }
-      // 37 min, 37m
-      m = txt.match(/^(\d+)\s*(min|m)$/i);
-      if (m) return parseInt(m[1],10)*60;
-      // Fallback to existing min/sec tokens within string
-      const minToken = txt.match(/(\d+)\s*min/i); if (minToken) return parseInt(minToken[1],10)*60;
-      const secToken = txt.match(/(\d+)\s*s/i); if (secToken) return parseInt(secToken[1],10);
-    } catch {}
-    return 0;
-  };
-  const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
-  const easy = String(pn?.easyPace || '').trim() || undefined;
-  const hints: any = (workout as any)?.export_hints || {};
-  const tolQual: number = typeof hints?.pace_tolerance_quality === 'number' ? hints.pace_tolerance_quality : 0.04;
-  const tolEasy: number = typeof hints?.pace_tolerance_easy === 'number' ? hints.pace_tolerance_easy : 0.06;
-  const parsePace = (pTxt?: string): { sec: number|null, unit?: 'mi'|'km' } => {
-    if (!pTxt) return { sec: null } as any;
-    const m = String(pTxt).trim().match(/(\d+):(\d{2})\s*\/(mi|km)/i);
-    if (!m) return { sec: null } as any;
-    return { sec: parseInt(m[1],10)*60 + parseInt(m[2],10), unit: m[3].toLowerCase() as any };
-  };
-  const addModToPace = (baseTxt?: string, mod?: string): string | undefined => {
-    if (!baseTxt) return undefined;
-    if (!mod) return baseTxt;
-    const p = parsePace(baseTxt);
-    if (!p.sec || !p.unit) return baseTxt;
-    const m1 = String(mod).match(/\+(\d+):(\d{2})/);
-    const m2 = String(mod).match(/\+(\d+)s/i);
-    const add = m1 ? (parseInt(m1[1],10)*60 + parseInt(m1[2],10)) : (m2 ? parseInt(m2[1],10) : 0);
-    if (!add) return baseTxt;
-    const newSec = p.sec + add;
-    return `${Math.floor(newSec/60)}:${String(newSec%60).padStart(2,'0')}/${p.unit}`;
-  };
-  const resolvePaceRef = (ref: any): string | undefined => {
-    if (!ref) return undefined;
-    if (typeof ref === 'string') {
-      if (/^user\./i.test(ref)) { const key = ref.replace(/^user\./i,''); return pn?.[key]; }
-      return ref;
-    }
-    if (typeof ref === 'object' && typeof ref.baseline === 'string') {
-      const key = String(ref.baseline).replace(/^user\./i,'');
-      const base = pn?.[key];
-      return addModToPace(base, String(ref.modifier||'').trim() || undefined);
-    }
-    return undefined;
-  };
-  // Use server-processed pace ranges instead of client-side calculations
-  const buildPaceWithRange = (pTxt?: string, tol: number = tolQual, paceRange?: any): string => {
-    if (!pTxt) return '';
-    
-    // Priority 1: Use server-processed pace_range object
-    if (paceRange && typeof paceRange === 'object' && paceRange.lower && paceRange.upper) {
-      const formatPace = (sec: number) => {
-        const mins = Math.floor(sec / 60);
-        const secs = Math.round(sec % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-      };
-      return ` @ ${formatPace(paceRange.lower)}–${formatPace(paceRange.upper)}/mi`;
-    }
-    
-    // Priority 2: Use server-processed pace_range array
-    if (Array.isArray(paceRange) && paceRange.length === 2 && paceRange[0] && paceRange[1]) {
-      return ` @ ${paceRange[0]}–${paceRange[1]}`;
-    }
-    
-    // Priority 3: Fall back to single pace target (no range calculation)
-    return ` @ ${pTxt}`;
-  };
-  const type = String(ws?.type||'').toLowerCase();
-  const struct: any[] = Array.isArray(ws?.structure) ? ws.structure : [];
-  // parentDisc computed above for mobility rendering
-  const isStrengthContext = (type === 'strength_session') || (parentDisc === 'strength');
-
-  // Legacy swim fallback removed: rely on computed.v3 exclusively
-  let handledByComputed = lines.length > 0;
-  let totalYdFromStruct: number | undefined = undefined;
-  // Brick session: render stacked segments
-  if (!handledByComputed && type==='brick_session') {
-    let tIdx = 0;
-    for (const seg of struct) {
-      const k = String(seg?.type||'').toLowerCase();
-      if (k==='bike_segment') {
-        const s = toSec(String(seg?.duration||''));
-        lines.push(`Bike 1 × ${Math.floor(s/60)} min${seg?.target_power?.range?` @ ${seg.target_power.range}`:''}`);
-        continue;
-      }
-      if (k==='run_segment') {
-        const s = toSec(String(seg?.duration||''));
-        const pTxt = typeof seg?.target_pace==='string' && /^user\./i.test(seg.target_pace)
-          ? (pn[seg.target_pace.replace(/^user\./i,'')] || seg.target_pace)
-          : seg?.target_pace;
-        lines.push(`Run 1 × ${Math.floor(s/60)} min${pTxt?buildPaceWithRange(String(pTxt), tolQual, seg?.pace_range):''}`);
-        continue;
-      }
-      if (k==='transition') {
-        tIdx += 1; const s = toSec(String(seg?.duration||'')); lines.push(`T${tIdx} ${Math.floor(s/60)} min`); continue;
-      }
-      if (k==='swim_segment') { const s = toSec(String(seg?.duration||'')); lines.push(`Swim 1 × ${Math.floor(s/60)} min`); continue; }
-      if (k==='strength_segment') { const s = toSec(String(seg?.duration||'')); lines.push(`Strength 1 × ${Math.floor(s/60)} min`); continue; }
-    }
-  }
-  for (const seg of (handledByComputed?[]:struct)) {
-    const k = String(seg?.type||'').toLowerCase();
-    if (k==='warmup' || k==='cooldown') {
-      const dist = String(seg?.distance||'');
-      if (dist) {
-        const yd = /yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144);
-        if (parentDisc==='swim' && Number.isFinite(yd) && yd>0) totalYdFromStruct = (totalYdFromStruct||0) + yd;
-        const addPace = (!isStrengthContext && parentDisc==='run' && easy) ? buildPaceWithRange(easy, tolEasy, undefined) : '';
-        // Power ranges now provided by server - no client-side FTP calculation needed
-        lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} 1 × ${yd} yd${addPace ? addPace : ''}`);
-      }
-      const s = toSec(String(seg?.duration||''));
-      if (s>0) {
-        const addPace = (!isStrengthContext && parentDisc==='run' && easy) ? buildPaceWithRange(easy, tolEasy, undefined) : '';
-        // Power ranges now provided by server - no client-side FTP calculation needed
-        lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} ${Math.floor(s/60)} min${addPace ? addPace : ''}`);
-      }
-      continue;
-    }
-    if ((type==='interval_session') || (k==='main_set' && String(seg?.set_type||'').toLowerCase()==='intervals')) {
-      const reps = Number(seg?.repetitions)||0; const work = seg?.work_segment||{}; const rec = seg?.recovery_segment||{};
-      const distTxt = String(work?.distance||''); const restS = toSec(String(rec?.duration||''));
-      let paceTxt = work?.target_pace;
-      if (typeof paceTxt==='string' && /^user\./i.test(paceTxt)) { const key = paceTxt.replace(/^user\./i,''); paceTxt = pn[key] || paceTxt; }
-      const label = /mi\b/i.test(distTxt) ? `${parseFloat(distTxt)} mi` : /m\b/i.test(distTxt) ? `${distTxt}` : (work?.duration? `${Math.floor(toSec(String(work.duration))/60)} min` : 'interval');
-      for (let r=0;r<Math.max(1,reps);r+=1){
-        lines.push(`1 × ${label}${paceTxt?buildPaceWithRange(String(paceTxt), tolQual, work?.pace_range):''}`);
-        if (r<reps-1 && restS>0) lines.push(`Rest ${mmss(restS)}${easy?buildPaceWithRange(easy, tolEasy, undefined):''}`);
-      }
-      continue;
-    }
-    if (type==='tempo_session' && k==='main_set') {
-      const durS = toSec(String(seg?.work_segment?.duration||''));
-      const pTxt = resolvePaceRef(seg?.work_segment?.target_pace);
-      if (durS>0) lines.push(`1 × ${Math.floor(durS/60)} min${pTxt?buildPaceWithRange(String(pTxt), tolQual, seg?.work_segment?.pace_range):''}`);
-      continue;
-    }
-    if (type==='bike_intervals' && k==='main_set') {
-      const reps = Number(seg?.repetitions)||0; const wsS = toSec(String(seg?.work_segment?.duration||'')); const rsS = toSec(String(seg?.recovery_segment?.duration||''));
-      const rangeTxt = String(seg?.work_segment?.target_power?.range||'');
-      const powerLabel = (()=>{
-        // Server now provides processed power ranges - no client-side FTP calculation needed
-        return rangeTxt ? ` @ ${rangeTxt}` : '';
-      })();
-      for (let r=0;r<Math.max(1,reps);r+=1){
-        lines.push(`1 × ${Math.floor(wsS/60)} min${powerLabel}`);
-        if (r<reps-1 && rsS>0) {
-          // Power ranges now provided by server - no client-side FTP calculation needed
-          lines.push(`Rest ${Math.floor(rsS/60)} min`);
-        }
-      }
-      continue;
-    }
-    if (type==='endurance_session' && (k==='main_effort' || k==='main')) {
-      const sDur=toSec(String(seg?.duration||''));
-      const pTxt = parentDisc==='run' ? (easy || resolvePaceRef('user.easyPace')) : undefined;
-      if (sDur>0) lines.push(`1 × ${Math.floor(sDur/60)} min${pTxt?buildPaceWithRange(String(pTxt), tolEasy, undefined):''}`);
-      continue;
-    }
-    if (type==='swim_session') {
-      if (k==='drill_set') { const reps=Number(seg?.repetitions)||0; const dist=String(seg?.distance||''); const yd=/yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144); const drillLabel = swimDrillDisplayName(String(seg?.drill_type||'')); for(let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${yd} yd — Drill — ${drillLabel}`); if (Number.isFinite(yd) && yd>0) totalYdFromStruct = (totalYdFromStruct||0) + yd; if (r<reps-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`);} continue; }
-      if (k==='main_set' && String(seg?.set_type||'').toLowerCase().includes('aerobic')) { const reps=Number(seg?.repetitions)||0; const dist=String(seg?.distance||''); const yd=/yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144); for(let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${yd} yd aerobic`); if (Number.isFinite(yd) && yd>0) totalYdFromStruct = (totalYdFromStruct||0) + yd; if (r<reps-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`);} continue; }
-    }
-    if (type==='strength_session' && (k==='main_lift' || k==='accessory')) {
-      // Aggregate into a single line per exercise to avoid repeated lines per set
-      const name = String(seg?.exercise||'').replace(/_/g,' ').trim();
-      const sets = Math.max(1, Number(seg?.sets)||0);
-      const repsTxt = String(seg?.reps||'').toUpperCase();
-      const pct = Number(seg?.load?.percentage)||0;
-      const baseKey = String(seg?.load?.baseline||'').replace(/^user\./i,'');
-      const orm = pn[baseKey];
-      const load = (typeof orm==='number'&&pct>0)? `${Math.max(5, Math.round((orm*(pct/100))/5)*5)} lb` : (pct?`${pct}%`:undefined);
-      lines.push(`${name} ${sets}×${repsTxt}${load?` @ ${load}`:''}`);
-      continue;
-    }
-  }
-  // Removed all token fallback paths: structured JSON is the single source of truth
+  /**
+   * ⛔ NO PHONE EXPANSION OF `workout_structure` (2026-09-10, audit H-T19). A row without computed steps
+   * was expanded here from its structure: `user.*` paces from baselines, easy pace on warm-ups and rests,
+   * strength load as 1RM × % rounded to 5 lb with a 5 lb floor, and swim yards summed. materialize-plan
+   * writes `computed.steps`; a row it has not reached shows the empty state below.
+   */
 
   /**
    * ⛔ ONE LENGTH ON ONE SCREEN, AND IT IS THE SERVER'S (2026-09-10, audit H-T01). This screen printed
@@ -786,15 +575,11 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           description={displaySummary ?? null}
           action={headerAction}
           durationExtra={(() => {
-            // ⚠️ Same leak as the card: the chip and `totalYdFromStruct` both come from structure
-            // the swap did not clear.
+            // ⚠️ Same leak as the card: a swapped row's `computed` still holds the source sport's session.
+            // ⛔ The server's total and unit (2026-09-10, audit H-T20); a row without one prints nothing.
             if (parentDisc !== 'swim' || swapped) return null;
-            const chip = formatPlannedSwimDistanceChip(workout as any);
-            if (chip) return <span className="text-sm text-white/60">{chip}</span>;
-            if (typeof totalYdFromStruct === 'number' && totalYdFromStruct > 0) {
-              return <span className="text-sm text-white/60">{`${Math.round(totalYdFromStruct)} yd`}</span>;
-            }
-            return null;
+            const label = computedAny?.swim_distance?.label;
+            return typeof label === 'string' && label ? <span className="text-sm text-white/60">{label}</span> : null;
           })()}
         />
       )}

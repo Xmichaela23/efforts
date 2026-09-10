@@ -135,6 +135,8 @@ Deno.test('⚠️ THE PATCH STILL LEAVES THE SOURCE STRUCTURE ON THE ROW — pin
   const patch = opt!.patch;
   assertEquals(patch.steps_preset, null);
   assertEquals(patch.rendered_description, null);
+  // ⛔ The old sport's subtitle goes with the rendered copy — words only, no duration rung (audit H-T20).
+  assertEquals(patch.friendly_summary, null);
   assertEquals(patch.type, 'ride');
   // ⛔ The columns the patch does NOT touch — the whole reason the render-side guard exists.
   assert(!('computed' in patch), 'computed is still untouched by the patch');
@@ -181,6 +183,8 @@ Deno.test('⛔ HARD + FTP → a shell, because the SESSION is the library\'s (§
   assertEquals(patch.total_duration_seconds, lib.duration * 60);
   assertEquals(patch.computed, null);
   assertEquals(patch.workout_structure, null);
+  // ⛔ The old session's subtitle goes too — a swim's line must not survive onto the ride (audit H-T20).
+  assertEquals(patch.friendly_summary, null);
   assertEquals(patch.intervals, null);
   assertEquals(plannedDurationSeconds({ ...hill, ...patch } as never), lib.duration * 60);
 

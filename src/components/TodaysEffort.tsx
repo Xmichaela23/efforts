@@ -20,7 +20,6 @@ import { formatSwimPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout, displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore, formZoneColor } from '@/lib/context-utils';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
-import { formatPlannedSwimDistanceChip, plannedSwimSessionLabel } from '@/utils/swimPlanTokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 // ⛔ ONE SWAP PREDICATE, shared by all three surfaces.
 import { swappedStructureIsStale } from '@/lib/session-discipline-swap';
@@ -44,7 +43,6 @@ import { WorkoutExecutionContainer } from './workout-execution';
 import { mapUnifiedItemToCompleted } from '@/utils/workout-mappers';
 import { useToast } from '@/components/ui/use-toast';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter } from '@/components/ui/drawer';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { isWatchConnectivityAvailable } from '@/services/watchConnectivity';
 import { isWorkoutKitAvailable, scheduleSwimOnWatch, buildSwimPayloadFromWorkout } from '@/services/workoutkit';
 import SkipSessionReasonPanel from '@/components/planned/SkipSessionReasonPanel';
@@ -2119,11 +2117,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         description={null}
                         action={swapGlyph}
                         durationExtra={(() => {
-                          // ⚠️ NOT ON A SWAPPED ROW — the chip falls back to `computed.steps`
-                          // distances, which on a swap still hold the SOURCE sport's metres.
+                          // ⚠️ NOT ON A SWAPPED ROW — its `computed` still holds the SOURCE sport's session.
+                          // ⛔ The server's total and unit (2026-09-10, audit H-T20); a row without one prints nothing.
                           const swimChip = String(workout.type || '').toLowerCase() === 'swim'
                             && !swappedStructureIsStale(workout as never)
-                            ? formatPlannedSwimDistanceChip(workout as any)
+                            ? ((workout as any)?.computed?.swim_distance?.label || null)
                             : null;
                           return swimChip ? (
                             <span className="text-[11px] text-blue-200/95">
@@ -2355,31 +2353,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                      */
                     const desc = w?.rendered_description || w?.description || '';
                     if (!String(desc).trim()) return null;
-                    if (/strides/i.test(desc)) {
-                      const parts = desc.split(/(strides)/i);
-                      return (
-                        <span>
-                          {parts.map((part, idx) => {
-                            if (/^strides$/i.test(part)) {
-                              return (
-                                <TooltipProvider key={idx}>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="underline decoration-dotted cursor-help">{part}</span>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="max-w-xs text-sm p-3 bg-gray-800 text-white border border-gray-700 rounded-lg shadow-lg">
-                                      <p className="font-semibold mb-1">What are Strides?</p>
-                                      <p>Short, controlled accelerations (approx. 100m) designed to wake up your legs. Reach 95% of max speed while staying completely relaxed. This is not a sprint.</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              );
-                            }
-                            return <span key={idx}>{part}</span>;
-                          })}
-                        </span>
-                      );
-                    }
+                    // ⛔ NO STRIDES TOOLTIP (2026-09-10, audit H-T08). Its definition ("approx. 100m",
+                    // "95% of max speed") had no source; the description prints as written.
                     return desc;
                   })()}
                 />

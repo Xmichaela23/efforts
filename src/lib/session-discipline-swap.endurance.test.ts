@@ -35,6 +35,8 @@ Deno.test('the hike is a `walk` row, not a new type', () => {
   const hike = sessionSwapExtras(longRun).find((o) => o.kind === 'hike')!;
   assertEquals(hike.patch.type, 'walk');
   assert(String(JSON.stringify(hike.patch.tags)).includes('swapped_from:run'));
+  // ⛔ The old session's subtitle goes with its structure (audit H-T20).
+  assertEquals(hike.patch.friendly_summary, null);
 });
 
 Deno.test('⛔ HARD RIDE → HARD RUN IS OFF THE SHEET — p138 permits one direction only', () => {

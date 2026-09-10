@@ -416,6 +416,8 @@ export type SessionDetailV1 = {
     variability_index: number | null;
     /** Cycling: coefficient of variation on power samples (percent). */
     power_cv_pct: number | null;
+    /** 2026-09-10 (audit H-D12): the pacing word for `coefficient_of_variation`; null when CV is null. */
+    variability: { level: 'high' | 'moderate' | 'good' | 'excellent'; label: string } | null;
   };
 
   // ── Trend sparkline (Performance screen "Am I getting fitter?") ──────────
@@ -817,9 +819,26 @@ export type IntervalRow = {
     actual_pace_sec_per_mi: number | null;
     actual_gap_sec_per_mi: number | null;
     power_watts: number | null;
+    /**
+     * 2026-09-10 (audit H-D11): where the actual sits against the planned range — `below` (slower / fewer
+     * watts), `in`, `above` (faster / more). Null with no range, no measurement, or on a goal race.
+     * `gap_band` is the same read on grade-adjusted pace (raw when the segment has none).
+     * See `interval-compare.ts`.
+     */
+    band?: 'below' | 'in' | 'above' | null;
+    gap_band?: 'below' | 'in' | 'above' | null;
   };
   pace_adherence_pct: number | null;
   duration_adherence_pct: number | null;
+  /**
+   * 2026-09-10 (audit H-D12): goal race only — the row's percent and status word against the goal pace
+   * and against the fitness projection. Status: on / near / off against a percent band; ahead / even /
+   * behind against the projection. See `interval-compare.ts`.
+   */
+  race_compare?: {
+    goal: { pct: number | null; status: 'on' | 'near' | 'off' | 'ahead' | 'even' | 'behind' | null };
+    projection: { pct: number | null; status: 'on' | 'near' | 'off' | 'ahead' | 'even' | 'behind' | null };
+  } | null;
   /** 2026-09-03: the recording ended before this planned step (a session cut short). Executed fields are null. */
   not_done?: boolean;
 }

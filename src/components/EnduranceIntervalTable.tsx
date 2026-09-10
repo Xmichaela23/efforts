@@ -5,6 +5,8 @@ import {
 } from '@/utils/performance-format';
 import { formatSwimPace } from '@/utils/workoutFormatting';
 
+type RaceCompare = { pct: number | null; status: string | null };
+
 type IntervalRow = {
   id: string;
   interval_type: string;
@@ -22,7 +24,12 @@ type IntervalRow = {
     actual_pace_sec_per_mi: number | null;
     actual_gap_sec_per_mi?: number | null;
     power_watts?: number | null;
+    /** The server's read against the planned range (audit H-D11); `gap_band` on grade-adjusted pace. */
+    band?: 'below' | 'in' | 'above' | null;
+    gap_band?: 'below' | 'in' | 'above' | null;
   };
+  /** Goal race only: the server's percent and status word against the goal and the projection (audit H-D12). */
+  race_compare?: { goal: RaceCompare; projection: RaceCompare } | null;
   pace_adherence_pct: number | null;
   duration_adherence_pct: number | null;
   /** the recording ended before this planned step (a session cut short) */
@@ -74,7 +81,10 @@ type EnduranceIntervalTableProps = {
        * Used as a label-only signal for the 'Steady' override; NEVER a target. */
       workout_type?: string | null;
     };
-    pacing?: { coefficient_of_variation?: number | null };
+    pacing?: {
+      coefficient_of_variation?: number | null;
+      variability?: { level: 'high' | 'moderate' | 'good' | 'excellent'; label: string } | null;
+    };
     display?: { show_adherence_chips?: boolean; has_measured_execution?: boolean };
     plan_context?: { planned_id?: string | null };
     session_interpretation?: SessionInterpretationV1;
@@ -138,7 +148,7 @@ export default function EnduranceIntervalTable({
   const displayReason = sd?.intervals_display?.reason ?? null;
   const allIntervals: IntervalRow[] = Array.isArray(sd?.intervals) ? sd!.intervals as IntervalRow[] : [];
   const hasPlanned = !!sd?.plan_context?.planned_id;
-  const cv = sd?.pacing?.coefficient_of_variation ?? null;
+  const variability = sd?.pacing?.variability ?? null;
   const leftColHeader = hasPlanned ? 'Planned' : 'Segments';
 
   // useMemo MUST be called before any early returns (React hooks rules)
@@ -302,21 +312,11 @@ export default function EnduranceIntervalTable({
               : fmtPaceSec(paceCellSec);
             // Against the planned band, Garmin's colours (Michael 2026-09-03 read blue as slower, and Garmin
             // agrees): green in the target, blue BELOW it (slower / fewer watts), red ABOVE it (faster / more).
-            const bandClass = (() => {
-              if (iv.not_done || isGoalRace) return '';
-              if (isRide) {
-                const pr = iv.planned_power_range; const w = iv.executed.power_watts;
-                if (!pr || w == null || !(pr.lower_w > 0)) return '';
-                if (w < pr.lower_w * 0.97) return 'text-sky-300';
-                if (w > pr.upper_w * 1.05) return 'text-red-400';
-                return 'text-emerald-400';
-              }
-              const r = iv.planned_pace_range; const a = paceCellSec;
-              if (!r || a == null || !(r.lower_sec_per_mi > 0)) return '';
-              if (a > r.upper_sec_per_mi + 5) return 'text-sky-300';
-              if (a < r.lower_sec_per_mi - 5) return 'text-red-400';
-              return 'text-emerald-400';
-            })();
+            // ⛔ THE SERVER DECIDES WHERE THE ACTUAL SITS (2026-09-10, audit H-D11) — `executed.band`, or
+            // `gap_band` while the column shows grade-adjusted pace. The phone's watts ×0.97 / ×1.05 and
+            // pace ±5 s are gone; a row the server did not band (no range, a goal race) is uncoloured.
+            const band = showGapPace ? iv.executed.gap_band : iv.executed.band;
+            const bandClass = band === 'below' ? 'text-sky-300' : band === 'above' ? 'text-red-400' : band === 'in' ? 'text-emerald-400' : '';
             const distStr = fmtDist(iv.executed.distance_m, isSwim, useImperial);
             const durStr = iv.executed.duration_s != null && iv.executed.duration_s > 0
               ? fmtTime(iv.executed.duration_s) : '—';
@@ -334,23 +334,10 @@ export default function EnduranceIntervalTable({
               refMode === 'goal' &&
               race?.goal_avg_pace_s_per_mi != null &&
               !isRide;
-            const effPct = (() => {
-              if (!isGoalRace || isRide) return iv.pace_adherence_pct;
-              const a = iv.executed.actual_pace_sec_per_mi;
-              if (a == null || !Number.isFinite(a) || a <= 0) return iv.pace_adherence_pct;
-              if (useProj) {
-                const t = race?.fitness_projection_avg_pace_s_per_mi;
-                if (t == null) return null;
-                return Math.min(100, Math.round((100 * t) / a));
-              }
-              if (useGoalTarget) {
-                const t = race?.goal_avg_pace_s_per_mi;
-                if (t == null) return iv.pace_adherence_pct;
-                return Math.min(100, Math.round((100 * t) / a));
-              }
-              return iv.pace_adherence_pct;
-            })();
-            const pct = effPct;
+            // ⛔ THE GOAL-RACE PERCENT AND ITS WORD ARE THE SERVER'S (2026-09-10, audit H-D12) — `race_compare`,
+            // one for the goal and one for the projection. The toggle only picks which to show.
+            const cmp = iv.race_compare ? (refMode === 'projection' ? iv.race_compare.projection : iv.race_compare.goal) : null;
+            const pct = cmp?.pct ?? null;
             const subtitlePace = (() => {
               if (useProj) {
                 return fmtPaceSec(race?.fitness_projection_avg_pace_s_per_mi ?? null);
@@ -360,27 +347,7 @@ export default function EnduranceIntervalTable({
               }
               return iv.planned_pace_display;
             })();
-            const pctClass = (() => {
-              if (pct == null) return 'text-white/50';
-              if (isGoalRace) {
-                if (useProj) {
-                  const a = iv.executed.actual_pace_sec_per_mi;
-                  const t = race?.fitness_projection_avg_pace_s_per_mi;
-                  if (a != null && t != null) {
-                    if (a < t - 0.5) return 'text-emerald-400';
-                    if (a > t + 60) return 'text-amber-400/90';
-                  }
-                  return 'text-white/50';
-                }
-                if (useGoalTarget) {
-                  if (pct >= 90 && pct <= 110) return 'text-emerald-400/80';
-                  if (pct >= 80 && pct <= 120) return 'text-amber-400/80';
-                  return 'text-amber-500/80';
-                }
-                return pctColor(pct);
-              }
-              return pctColor(pct);
-            })();
+            const pctClass = (cmp?.status && RACE_STATUS_CLASS[cmp.status]) || 'text-white/50';
 
             const showRangeSubtitle = (() => {
               // D-040 Fix C: single-segment steady → no subtitle (the pace
@@ -394,11 +361,12 @@ export default function EnduranceIntervalTable({
               return curRange !== prevRange;
             })();
 
-            const cvIndicator = pct != null && cv != null ? (
-              cv > 10 ? <span className="text-[9px] text-red-500" title="High pacing variability">⚠️</span>
-              : cv > 7 ? <span className="text-[9px] text-orange-500" title="Moderate pacing variability">⚠️</span>
-              : cv > 3 ? <span className="text-[9px] text-yellow-500" title="Good pacing">✓</span>
-              : <span className="text-[9px] text-green-500" title="Excellent pacing">✓</span>
+            // ⛔ The pacing word and its label are the server's (audit H-D12, `pacing.variability`).
+            const cvIndicator = pct != null && variability ? (
+              variability.level === 'high' ? <span className="text-[9px] text-red-500" title={variability.label}>⚠️</span>
+              : variability.level === 'moderate' ? <span className="text-[9px] text-orange-500" title={variability.label}>⚠️</span>
+              : variability.level === 'good' ? <span className="text-[9px] text-yellow-500" title={variability.label}>✓</span>
+              : <span className="text-[9px] text-green-500" title={variability.label}>✓</span>
             ) : null;
 
             return (
@@ -698,8 +666,12 @@ function fmtDist(m: number | null | undefined, isSwim: boolean, useImperial: boo
   return `${mi.toFixed(mi < 1 ? 2 : 1)} mi`;
 }
 
-function pctColor(pct: number): string {
-  if (pct >= 90 && pct <= 110) return 'text-green-600';
-  if (pct >= 80 && pct <= 120) return 'text-yellow-600';
-  return 'text-red-600';
-}
+/** The server's goal-race status word → its colour (audit H-D12). */
+const RACE_STATUS_CLASS: Record<string, string> = {
+  on: 'text-emerald-400/80',
+  near: 'text-amber-400/80',
+  off: 'text-amber-500/80',
+  ahead: 'text-emerald-400',
+  even: 'text-white/50',
+  behind: 'text-amber-400/90',
+};

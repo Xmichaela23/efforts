@@ -806,6 +806,8 @@ Deno.serve(async (req)=>{
             export_hints: p?.export_hints ?? null,
             workout_structure: p?.workout_structure ?? null,
             friendly_summary: p?.friendly_summary ?? null,
+            // ⛔ The planned swim's total and unit, written by materialize-plan (2026-09-10, audit H-T20).
+            swim_distance: p?.computed?.swim_distance ?? null,
             rendered_description: p?.rendered_description ?? null,
             brick_group_id: (brickMetaByPlannedId.get(String(p.id)) || null)?.group_id || null,
             brick_order: (brickMetaByPlannedId.get(String(p.id)) || null)?.order || null,
@@ -1113,6 +1115,7 @@ Deno.serve(async (req)=>{
           export_hints: p?.export_hints ?? null,
           workout_structure: p?.workout_structure ?? null,
           friendly_summary: p?.friendly_summary ?? null,
+          swim_distance: p?.computed?.swim_distance ?? null,
           rendered_description: p?.rendered_description || null,
           brick_group_id: (brickMetaByPlannedId.get(String(p.id)) || null)?.group_id || null,
           brick_order: (brickMetaByPlannedId.get(String(p.id)) || null)?.order || null,
@@ -1194,6 +1197,7 @@ Deno.serve(async (req)=>{
           export_hints: p?.export_hints ?? null,
           workout_structure: p?.workout_structure ?? null,
           friendly_summary: p?.friendly_summary ?? null,
+          swim_distance: p?.computed?.swim_distance ?? null,
           rendered_description: p?.rendered_description || null,
           brick_group_id: (brickMetaByPlannedId.get(String(p.id)) || null)?.group_id || null,
           brick_order: (brickMetaByPlannedId.get(String(p.id)) || null)?.order || null,
@@ -1606,7 +1610,9 @@ Deno.serve(async (req)=>{
         workout_status: (item.status || p.workout_status || 'planned'),
         skip_reason: p.skip_reason ?? null,
         skip_note: p.skip_note ?? null,
-        computed: (Array.isArray(p.steps) && p.steps.length > 0) ? { steps: p.steps, total_duration_seconds: p.total_duration_seconds ?? null } : null,
+        // ⚠️ `swim_distance` rides inside `computed` so every planned surface reads one path,
+        // whether its row came from here or straight from `planned_workouts` (audit H-T20).
+        computed: (Array.isArray(p.steps) && p.steps.length > 0) ? { steps: p.steps, total_duration_seconds: p.total_duration_seconds ?? null, swim_distance: p.swim_distance ?? null } : null,
         steps_preset: p.steps_preset ?? null,
         total_duration_seconds: p.total_duration_seconds ?? null,
         // ⛔ STAGE 3 — `duration` (MINUTES) now travels on the server contract. It is the last

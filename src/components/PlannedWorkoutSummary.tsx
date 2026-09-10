@@ -1,6 +1,5 @@
 import React from 'react';
-import { normalizePlannedSession, Baselines as NormalizerBaselines, ExportHints } from '@/services/plans/normalizer';
-import { normalizeStructuredSession } from '@/services/plans/normalizer';
+import type { Baselines as NormalizerBaselines, ExportHints } from '@/services/plans/normalizer';
 // ⛔ THE SERVER'S PLANNED LENGTH, READ (2026-09-10, audit H-T01). See `plannedDurationSecondsOf`.
 import { plannedDurationSecondsOf } from './PlannedSessionHeader';
 
@@ -10,15 +9,8 @@ const plannedMinutesOf = (workout: unknown): number | null => {
   return secs == null ? null : Math.max(1, Math.round(secs / 60));
 };
 import { formatStrengthExercise, plainLiftList, formatStrengthExerciseLines } from '@/utils/strengthFormatter';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getDisciplinePhosphorCore } from '@/lib/context-utils';
 import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-tokens';
-import {
-  categorizeSwimTokensForDisplay,
-  formatSwimSubtitleFromBuckets,
-  stripTrailingSwimDistanceFromTitle,
-  sumSwimYardsFromStepsPresetTokens,
-} from '@/utils/swimPlanTokens';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 // ⛔ ONE SWAP PREDICATE + ONE CLEAN BLOCK, shared by all three surfaces.
 import { swappedSessionBlock, swappedStructureIsStale } from '@/lib/session-discipline-swap';
@@ -93,28 +85,15 @@ function parseComputed(workout: any): any | null {
  * shared reader. Its `baselines` / `exportHints` parameters were never read and are gone.
  */
 
-function computeSwimYards(workout: any): number | null {
-  const type = String((workout as any)?.type || '').toLowerCase();
-  if (type !== 'swim') return null;
-  // Prefer tokens (authoring unit is yd) — includes swim_aerobic_css_* main sets
-  try {
-    const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset : [];
-    if (toks.length) {
-      const sum = sumSwimYardsFromStepsPresetTokens(toks);
-      return sum > 0 ? sum : null;
-    }
-  } catch {}
-  // Fallback to computed distances
-  try {
-    const compC = parseComputed(workout);
-    const steps: any[] = Array.isArray(compC?.steps) ? compC.steps : [];
-    if (steps.length) {
-      const meters = steps.reduce((a: number, st: any) => a + (Number(st?.distanceMeters) || 0), 0);
-      const yd = Math.round(meters / 0.9144);
-      if (yd > 0) return yd;
-    }
-  } catch {}
-  return null;
+/**
+ * ⛔ THE SWIM'S TOTAL IS THE SERVER'S (2026-09-10, audit H-T20) — `computed.swim_distance.label`, written by
+ * materialize-plan in the athlete's pool unit. This summed yards out of the plan tokens, else the steps'
+ * metres, and printed yards whatever the pool. A row with no label prints nothing.
+ */
+function swimDistanceLabelOf(workout: any): string | null {
+  if (String((workout as any)?.type || '').toLowerCase() !== 'swim') return null;
+  const label = parseComputed(workout)?.swim_distance?.label;
+  return typeof label === 'string' && label.trim() ? label : null;
 }
 
 /**
@@ -125,7 +104,6 @@ function computeSwimYards(workout: any): number | null {
  */
 function buildWeeklySubtitle(workout: any, baselines?: Baselines, skipDescriptionFallback?: boolean): string | undefined {
   try {
-    const pn = (baselines as any)?.performanceNumbers || {};
     try {
       const disc = String((workout as any)?.type || (workout as any)?.discipline || '').toLowerCase();
       if (disc === 'pilates_yoga') {
@@ -196,21 +174,14 @@ function buildWeeklySubtitle(workout: any, baselines?: Baselines, skipDescriptio
         const desc = String((workout as any)?.rendered_description || (workout as any)?.description || '').trim();
         if (desc) return desc;
       }
-      if (disc === 'swim') {
-        const stepsTok: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t: any) => String(t)) : [];
-        if (stepsTok.length) {
-          const line = formatSwimSubtitleFromBuckets(categorizeSwimTokensForDisplay(stepsTok), ' • ');
-          if (line) return line;
-        }
-      }
     } catch {}
-    const structured = (workout as any)?.workout_structure;
-    if (structured && typeof structured === 'object') {
-      try {
-        const res = normalizeStructuredSession(workout, { performanceNumbers: pn, learned_fitness: (baselines as any)?.learned_fitness } as any);
-        if (res?.friendlySummary) return res.friendlySummary;
-      } catch {}
-    }
+    /**
+     * ⛔ THE SUBTITLE IS THE SERVER'S `friendly_summary` (2026-09-10, audit H-T18 / H-T20). Two phone builders
+     * stood ahead of it: a swim line parsed from `steps_preset`, and `normalizeStructuredSession`, which
+     * priced a `workout_structure` row off today's baselines with its own ±4% / ±6% pace ranges, 60–65% FTP
+     * warm-ups and 1RM × % rounded to 5 lb. materialize-plan writes the swim line; a structure row prints
+     * its description.
+     */
     const friendly = String((workout as any)?.friendly_summary || '').trim();
     if (friendly) return friendly;
     if (skipDescriptionFallback) return undefined;
@@ -222,7 +193,6 @@ function buildWeeklySubtitle(workout: any, baselines?: Baselines, skipDescriptio
 // Structured‑only variant: no coach notes fallback
 function buildStructuredSubtitleOnly(workout: any, baselines?: Baselines): string | undefined {
   try {
-    const pn = (baselines as any)?.performanceNumbers || {};
     const disc = String((workout as any)?.type || (workout as any)?.discipline || '').toLowerCase();
     if (disc === 'pilates_yoga') {
       // Extract session type details for pilates/yoga
@@ -287,21 +257,9 @@ function buildStructuredSubtitleOnly(workout: any, baselines?: Baselines): strin
       const desc = String((workout as any)?.rendered_description || (workout as any)?.description || '').trim();
       if (desc) return desc;
     }
-    if (disc === 'swim') {
-      const stepsTok: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t: any) => String(t)) : [];
-      if (stepsTok.length) {
-        const line = formatSwimSubtitleFromBuckets(categorizeSwimTokensForDisplay(stepsTok), ' • ');
-        if (line) return line;
-      }
-    }
-    const structured = (workout as any)?.workout_structure;
-    if (structured && typeof structured === 'object') {
-      try {
-        const res = normalizeStructuredSession(workout, { performanceNumbers: pn, learned_fitness: (baselines as any)?.learned_fitness } as any);
-        if (res?.friendlySummary) return res.friendlySummary;
-      } catch {}
-    }
-    return undefined;
+    // ⛔ The server's subtitle — see `buildWeeklySubtitle` (audit H-T18 / H-T20).
+    const friendly = String((workout as any)?.friendly_summary || '').trim();
+    return friendly || undefined;
   } catch { return undefined; }
 }
 
@@ -312,11 +270,11 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
     return plannedMinutesOf(workout);
   })();
   /**
-   * ⚠️ ALSO A SWAP LEAK. `computeSwimYards` falls back to `computed.steps[].distanceMeters`, so a
-   * session swapped TO swim would print the ORIGINAL run's metres as pool yardage — a fabricated
-   * distance under a swim's name. A swapped session has no distance; that is the point of it.
+   * ⚠️ ALSO A SWAP LEAK. A swapped row's `computed` still holds the ORIGINAL session, so a session
+   * swapped TO swim could print a distance that is not its own. A swapped session has no distance;
+   * that is the point of it.
    */
-  const yards = swappedStructureIsStale(workout as never) ? null : computeSwimYards(workout);
+  const swimDistanceLabel = swappedStructureIsStale(workout as never) ? null : swimDistanceLabelOf(workout);
   const title = getTitle(workout);
   /**
    * ⛔ THE FLAG IS PASSED DOWN, NOT COMPARED AFTERWARDS (corrected 2026-08-09). The first version
@@ -399,9 +357,6 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
       if (!(t==='run' || t==='ride' || t==='walk')) return [];
       const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
       if (!steps.length) return [];
-      const hints = (workout as any)?.export_hints || {};
-      const tolQual: number = (typeof hints?.pace_tolerance_quality==='number' ? hints.pace_tolerance_quality : 0.04);
-      const tolEasy: number = (typeof hints?.pace_tolerance_easy==='number' ? hints.pace_tolerance_easy : 0.06);
       const fmtTime = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
       const fmtDist = (meters:number)=>{
         const m = Math.max(1, Math.round(Number(meters)||0));
@@ -456,18 +411,10 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
             return `${paceRange[0]}–${paceRange[1]}`;
           }
           
-          // Priority 3: Fall back to client-side calculation from paceTarget
-          if (!paceTarget) return undefined;
-          const m = String(paceTarget).match(/(\d+):(\d{2})\/(mi|km)/i);
-          if (!m) return undefined;
-          const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
-          const unit = m[3].toLowerCase();
-          const ease = String(kind||'').toLowerCase();
-          const tol = (ease==='recovery' || ease==='warmup' || ease==='cooldown') ? tolEasy : tolQual;
-          const lo = Math.round(sec*(1 - tol));
-          const hi = Math.round(sec*(1 + tol));
-          const mmss = (n:number)=>{ const mm=Math.floor(n/60); const ss=n%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
-          return `${mmss(lo)}–${mmss(hi)}/${unit}`;
+          // ⛔ NO RANGE ON THE STEP, THE SINGLE TARGET PRINTS (2026-09-10, audit H-T17). This built its own
+          // ±4% / ±6% range. materialize-plan writes `pace_range` on every step with a pace (±2% on work,
+          // ±6% otherwise), so a step without one has no range to show.
+          return paceTarget || undefined;
         } catch { return undefined; }
       };
       /**
@@ -652,8 +599,8 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
             {(typeof minutes === 'number' && !hideHeader) ? (
               <span className="text-xs text-white font-light">{minutes}:00</span>
             ) : null}
-            {(typeof yards === 'number') ? (
-              <span className="text-xs text-blue-300">{yards} yd</span>
+            {swimDistanceLabel ? (
+              <span className="text-xs text-blue-300">{swimDistanceLabel}</span>
             ) : null}
             {(workout as any)?.workload_planned ? (
               <span
@@ -684,74 +631,15 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
           <div className="text-sm text-gray-200 font-light tracking-normal mt-1">
             {stacked.length > 1 ? (
               <span className="whitespace-pre-line">
-                {stacked.map((line, idx) => {
-                  // Add tooltip for strides mentions
-                  if (/strides/i.test(line)) {
-                    const parts = line.split(/(strides)/i);
-                    return (
-                      <React.Fragment key={idx}>
-                        {parts.map((part, pIdx) => {
-                          if (/^strides$/i.test(part)) {
-                            return (
-                              <TooltipProvider key={pIdx}>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="underline decoration-dotted cursor-help">{part}</span>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="max-w-xs">
-                                      <strong>What are Strides?</strong><br />
-                                      Short, controlled accelerations (approx. 100m) designed to wake up your legs. Reach 95% of max speed while staying completely relaxed. This is not a sprint.
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            );
-                          }
-                          return <span key={pIdx}>{part}</span>;
-                        })}
-                        {idx < stacked.length - 1 && '\n'}
-                      </React.Fragment>
-                    );
-                  }
-                  return <React.Fragment key={idx}>{line}{idx < stacked.length - 1 && '\n'}</React.Fragment>;
-                })}
+                {/* ⛔ NO STRIDES TOOLTIP (2026-09-10, audit H-T08). Any line containing "strides" carried a
+                    phone-written definition ("approx. 100m", "95% of max speed") with no source. */}
+                {stacked.map((line, idx) => (
+                  <React.Fragment key={idx}>{line}{idx < stacked.length - 1 && '\n'}</React.Fragment>
+                ))}
               </span>
             ) : (
-              (() => {
-                // ⚠️ `linesShown` throughout: when the caller already printed this exact description,
-                // the whole subtitle (including the strides tooltip) collapses rather than duplicating.
-                if (!linesShown) return null;
-                // Single line - check if it contains strides
-                if (/strides/i.test(linesShown)) {
-                  const parts = String(linesShown).split(/(strides)/i);
-                  return (
-                    <span>
-                      {parts.map((part, idx) => {
-                        if (/^strides$/i.test(part)) {
-                          return (
-                            <TooltipProvider key={idx}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="underline decoration-dotted cursor-help">{part}</span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="max-w-xs">
-                                    <strong>What are Strides?</strong><br />
-                                    Short, controlled accelerations (approx. 100m) designed to wake up your legs. Reach 95% of max speed while staying completely relaxed. This is not a sprint.
-                                  </p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          );
-                        }
-                        return <span key={idx}>{part}</span>;
-                      })}
-                    </span>
-                  );
-                }
-                return <span>{linesShown}</span>;
-              })()
+              // ⚠️ `linesShown`: when the caller already printed this exact description, the subtitle collapses.
+              linesShown ? <span>{linesShown}</span> : null
             )}
           </div>
         )}
