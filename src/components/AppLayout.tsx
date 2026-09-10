@@ -980,34 +980,34 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowImportPage(false);
   };
 
-  // Profile's "Retest or rebuild on Adjust" (2026-09-06): open State; the lens is pre-set via setPendingStateLens.
-  // ⛔ THE SAME STATE THE TAB BAR OPENS (2026-09-10). This set `showContext`, which renders State in a
-  // wrapper with no height — so State's own scroll box grew to its content and the page could not
-  // scroll (Today's status card tap). The tab bar renders it in the dashboard pane with `h-full`; the
-  // event now selects that pane exactly as the State tab does.
+  /**
+   * ⛔ ONE WAY INTO STATE (2026-09-10). The State tab, Today's status card and Profile's "Retest or
+   * rebuild on Adjust" (`open:state`, lens pre-set via setPendingStateLens) all call this, so they render
+   * the same State screen by construction. The card's event used to keep its own list of flags — first
+   * a `showContext` wrapper with no height (State could not scroll), then a copy of the tab's steps that
+   * skipped the tab's reset. `scripts/check-state-routes.mjs` renders both routes and compares the tree.
+   */
+  const openStateTab = () => {
+    if (
+      selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showSummary
+      || showImportPage || showTrainingBaselines || showAthleticRecord || showAccount || showConnections || showSupport
+      || showGear || showPilatesYogaLogger || showBuilder
+      || location.pathname === '/profile' || location.pathname === '/profile/athletic-record'
+    ) {
+      handleBackToDashboard();
+    }
+    setShowGoals(false);
+    setShowContext(false);
+    setActiveBottomNav('insights');
+  };
+  // The event listener is registered once; it must call this render's opener, not the first one.
+  const openStateTabRef = useRef(openStateTab);
+  openStateTabRef.current = openStateTab;
   useEffect(() => {
-    const h = () => {
-      setSelectedWorkout(null);
-      setShowStrengthLogger(false);
-      setShowPilatesYogaLogger(false);
-      setShowBuilder(false);
-      setShowGear(false);
-      setShowImportPage(false);
-      setShowAllPlans(false);
-      setShowStrengthPlans(false);
-      setShowAthleticRecord(false);
-      setShowTrainingBaselines(false);
-      setShowAccount(false);
-      setShowGoals(false);
-      setShowContext(false);
-      setActiveBottomNav('insights');
-      if (location.pathname === '/profile' || location.pathname === '/profile/athletic-record') {
-        try { navigate('/', { replace: true }); } catch (e) { console.warn('[AppLayout] navigate from profile failed:', e); }
-      }
-    };
+    const h = () => openStateTabRef.current();
     window.addEventListener('open:state', h);
     return () => window.removeEventListener('open:state', h);
-  }, [location.pathname, navigate]);
+  }, []);
 
   const handleOpenContext = (workoutId?: string) => {
     if (workoutId) {
@@ -1717,15 +1717,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   <span className={labelClass}>Home</span>
                 </Button>
                 <Button data-first-run="state"
-                  onClick={() => {
-                    // Close any open views and navigate to context
-                    if (selectedWorkout || showStrengthLogger || showAllPlans || showGoals || showStrengthPlans || showSummary || showImportPage || showTrainingBaselines || showAthleticRecord || showAccount || showConnections || showSupport) {
-                      handleBackToDashboard();
-                    }
-                    setShowGoals(false);
-                    setShowContext(false);
-                    setActiveBottomNav('insights');
-                  }}
+                  onClick={openStateTab}
                   className={`${tabBase} ${tabChrome} ${contextActive ? tabActive : ''}`}
                   style={tabStyle}
                 >
