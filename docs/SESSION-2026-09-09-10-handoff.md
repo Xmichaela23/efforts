@@ -36,7 +36,7 @@ sentence; State window labels; Planned/Done; the three home-route how-tos and th
 
 ## Pending Michael
 - Club-night and season-wizard sentences (never checked against a page).
-- Flip DRAFT on the concentration curl how-to (approved 2026-09-10 late).
+- (done) DRAFT marker on the home-route how-tos flipped after approval.
 - Device walk.
 
 ## Open / found, not fixed
