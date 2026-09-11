@@ -596,8 +596,11 @@ Deno.serve(async (req: Request) => {
     let computedRefreshed = false;
     if (written > 0 || enduranceWritten > 0) {
       try {
+        // ⛔ `skip_done`: a session already done keeps its steps and their ids, byte for byte — a logged run's
+        // intervals point at those ids. The rebuild never rewrites a done row's prescription, and now not its
+        // expansion either.
         const { error: matErr } = await supabase.functions.invoke('materialize-plan', {
-          body: { training_plan_id: plan.id },
+          body: { training_plan_id: plan.id, skip_done: true },
         });
         computedRefreshed = !matErr;
         if (matErr) console.warn(`[standing-restate] computed refresh failed: ${matErr.message}`);

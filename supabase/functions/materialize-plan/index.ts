@@ -4252,8 +4252,22 @@ Deno.serve(async (req) => {
       console.log('[materialize-plan] swim_intent:', swimIntentMat);
     }
 
+    /**
+     * ⛔ A DONE SESSION IS NEVER REWRITTEN WHEN THE CALLER SAYS SO (2026-09-10). Every step gets a fresh id on each
+     * expansion, and a logged run's analysis points at the planned row's step ids (`planned_step_id` in the
+     * workout's computed intervals, read back by analyze-running-workout and session_detail_v1's interval
+     * table). A plan-wide refresh after a rebuild re-expanded the done rows too: same content, new ids, and the
+     * link from the logged intervals to the plan's steps pointed at nothing. `skip_done: true` leaves a row that
+     * is completed, skipped or carries a completed workout exactly as it is. ⚠️ Opt-in, so every other caller
+     * behaves as before.
+     */
+    const skipDone = payload?.skip_done === true;
+    const isDoneRow = (r: any) => !!r?.completed_workout_id
+      || ['completed', 'skipped'].includes(String(r?.workout_status ?? '').toLowerCase());
+    if (skipDone) console.log(`[materialize-plan] skip_done: ${rows.filter(isDoneRow).length} done row(s) left as they are`);
     let count = 0;
     for (const row of rows) {
+      if (skipDone && isDoneRow(row)) continue;
       try {
         console.log(`📋 Materializing: ${row.type} - ${row.name} (${row.id})`);
         const tokens: string[] = Array.isArray(row?.steps_preset) ? row.steps_preset : [];
