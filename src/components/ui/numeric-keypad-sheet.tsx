@@ -89,8 +89,20 @@ export function NumericKeypadSheet({
   }, [onChange]);
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange} shouldScaleBackground={false}>
-      <DrawerContent className="bg-black/95 border-white/15">
+    /**
+     * NOT MODAL (2026-09-10, Michael: the chevron beside Swap took two taps on the phone). With the
+     * keypad open, the drawer's overlay ate the first tap on anything behind it — the tap closed the
+     * keypad and nothing else happened — so a collapse, a Swap, or the next set's cell all took two.
+     * Non-modal, Vaul draws no overlay and leaves the page's pointer events alone; the tap outside
+     * closes the keypad (Vaul hands the outside press to `onPointerDownOutside` and then stops its
+     * own close, so it is closed here) AND lands where the athlete aimed it. Strong's and Hevy's
+     * keypads behave the same way: tap another cell, the keypad follows.
+     */
+    <Drawer open={open} onOpenChange={onOpenChange} shouldScaleBackground={false} modal={false}>
+      <DrawerContent
+        className="bg-black/95 border-white/15"
+        onPointerDownOutside={() => onOpenChange(false)}
+      >
         <DrawerHeader className="pt-3 pb-2">
           <DrawerTitle className="text-white/90 font-light">{title}</DrawerTitle>
           {hint ? <div className="text-xs text-white/55 mt-1">{hint}</div> : null}
