@@ -585,8 +585,8 @@ const EXECUTION_NAME: Record<string, ByRoute<string>> = {
  */
 const EXECUTION_HOW_TO: Record<string, ByRoute<string>> = {
   /**
-   * ⚠️ THE FOUR ENTRIES BELOW ARE DRAFT WORDS (2026-09-10) — written with the three home routes from
-   * the workorder addendum and NOT yet approved by Michael. Every other line in this table is his.
+   * The four entries below (rear delt ×2, pullover, preacher curl → concentration curl) were drafted with
+   * the home routes on 2026-09-10 and APPROVED by Michael the same night. Every line in this table is his.
    */
   'rear delt machine': [
     { route: ['dumbbells', 'incline_bench'], value: 'Set a bench to about 45 degrees and sit facing it, chest against the pad, a dumbbell in each hand hanging below. With a slight bend in the elbows, raise both dumbbells out to the sides until they are level with your shoulders, pause, then lower. Keep your chest on the pad.' },
