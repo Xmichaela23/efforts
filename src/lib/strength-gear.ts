@@ -725,7 +725,11 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   'lever squat': [['machine']],
   'ground based deadlift machine': [['machine']],
   'pec deck': [['machine']],
-  'pullover machine': [['machine']],
+  // ⛔ THE FLAT-BENCH DUMBBELL PULLOVER IS THE HOME ROUTE (Michael, 2026-09-10 — the same addendum as
+  // the rear delt above): "a flat-bench dumbbell pullover for the pullover machine (same pattern as
+  // the incline dumbbell chest-supported row)". The station route stays; the execution name says
+  // which one the kit resolved to.
+  'pullover machine': [['dumbbells', 'bench'], ['machine']],
   'hip adduction machine': [['machine']],
 
   // ── the nine added on the second pass (2026-08-29) ─────────────────────────────────────────────
@@ -763,7 +767,14 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // THE INCLINE IS THE POSITION, NOT JUST A BENCH (corrected 2026-08-29). A flat-bench route was
   // written here and is wrong by the swap rule's own boundary: chest-supported on a FLAT bench is
   // PRONE, and his movement is SEATED. The incline bench is what keeps the position his.
-  'rear delt machine': [['dumbbells', 'incline_bench'], ['machine']],
+  // ⛔ AND A BENT-OVER DUMBBELL ROUTE (Michael, 2026-09-10 — `docs/WORKORDER-kill-ours-2026-09-09.md`
+  // addendum): "a bent-over dumbbell rear delt fly for the rear delt machine", so a dumbbell + flat
+  // bench kit fills the cell with his movement rather than losing it. The 2026-08-29 refusal above
+  // stands as the record of the swap boundary; this route is his ruling on top of it. The execution
+  // name says which version the kit resolved to (`strength-grid/grid.ts:EXECUTION_NAME`).
+  // ⚠️ ROUTE ORDER: the bare dumbbell route leads because `equipmentFitRank` scores by the FIRST route
+  // and it is the one most athletes have; the display name is chosen by the kit, not by this order.
+  'rear delt machine': [['dumbbells'], ['dumbbells', 'incline_bench'], ['machine']],
   'weighted knee raise': [['pull_up_bar'], ['dumbbells']],
   'machine hip thrust': [['machine']],
 

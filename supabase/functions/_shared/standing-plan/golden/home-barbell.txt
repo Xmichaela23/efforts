@@ -38,7 +38,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -90,7 +90,7 @@ WEEK 02  column=standard
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -140,7 +140,7 @@ WEEK 03  column=standard
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -190,7 +190,7 @@ WEEK 04  column=standard
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -240,7 +240,7 @@ WEEK 05  column=standard
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -290,7 +290,7 @@ WEEK 06  column=standard
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -340,7 +340,7 @@ WEEK 07  column=standard
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -389,7 +389,7 @@ WEEK 08  column=standard
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -438,7 +438,7 @@ WEEK 09  column=standard
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -487,7 +487,7 @@ WEEK 10  column=standard
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -536,7 +536,7 @@ WEEK 11  column=standard
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -585,7 +585,7 @@ WEEK 12  column=standard
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me

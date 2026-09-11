@@ -34,7 +34,7 @@ import {
   type ViadaPattern,
 } from './taxonomy.ts';
 import { foldExerciseName, resolveExerciseConfig } from '../../../../src/lib/exercise-config.ts';
-import { LAST_RESORT_RANK_FLOOR, ownsLoadingImplement, athleteEquipmentToKeys, gearRoutesFor } from '../../../../src/lib/strength-gear.ts';
+import { LAST_RESORT_RANK_FLOOR, ownsLoadingImplement, athleteEquipmentToKeys, gearRoutesFor, type GearKey } from '../../../../src/lib/strength-gear.ts';
 
 export type SlotNote = {
   kind: 'source' | 'inferred' | 'ours' | 'gap';
@@ -457,7 +457,21 @@ export function executionName(name: string, equipment: string[] | null | undefin
    */
   const keys = athleteEquipmentToKeys(equipment as string[]);
   const hasStation = gearRoutesFor(name).some((r) => r.includes('machine') && r.every((k) => keys.has(k)));
-  return hasStation ? name : free;
+  if (hasStation) return name;
+  return byRoute(free, keys, name);
+}
+
+/**
+ * ONE FREE-WEIGHT VERSION, OR ONE PER ROUTE (2026-09-10). A string is the name for every free route.
+ * A list is tried in order and the first route the kit reaches names the row — the rear delt work
+ * is chest-supported on an incline bench where there is one and bent-over where there is not, and
+ * the row has to say which. No entry the kit reaches leaves the name alone.
+ */
+type ByRoute<T> = T | { route: GearKey[]; value: T }[];
+function byRoute<T>(entry: ByRoute<T>, keys: Set<string>, fallback: T): T {
+  if (!Array.isArray(entry)) return entry;
+  const hit = entry.find((e) => e.route.every((k) => keys.has(k)));
+  return hit ? hit.value : fallback;
 }
 
 /**
@@ -476,7 +490,7 @@ export function executionName(name: string, equipment: string[] | null | undefin
  * an (i) beside the name. Same gate as the name: only when the free-weight route is the one that
  * resolved.
  */
-const EXECUTION_NAME: Record<string, string> = {
+const EXECUTION_NAME: Record<string, ByRoute<string>> = {
   /**
    * ⛔⛔ "BACK EXTENSION" IS NOT AN INSTRUCTION — Michael, 2026-08-30: *which version, and what does
    * a home athlete actually do?* There are four in common use — a 45-degree bench, a GHD, a flat
@@ -510,7 +524,20 @@ const EXECUTION_NAME: Record<string, string> = {
    * for**, and an athlete who does not know it looks it up. A name that finds the wrong video, or
    * none, has failed at the only job a display name has.
    */
-  'rear delt machine': 'Chest-Supported Rear Delt Fly',
+  /**
+   * ⛔ TWO HOME VERSIONS (Michael, 2026-09-10 — `docs/WORKORDER-kill-ours-2026-09-09.md` addendum):
+   * chest-supported on the incline bench where the kit has one, bent-over with dumbbells where it
+   * does not. The kit decides; the canonical name stays his.
+   */
+  'rear delt machine': [
+    { route: ['dumbbells', 'incline_bench'], value: 'Chest-Supported Rear Delt Fly' },
+    { route: ['dumbbells'], value: 'Bent-Over Dumbbell Rear Delt Fly' },
+  ],
+  /**
+   * ⛔ THE FLAT-BENCH DUMBBELL PULLOVER (Michael, 2026-09-10, same addendum): p222's pullover machine
+   * has a home route now, and the name says what the athlete will lie across.
+   */
+  'pullover machine': 'Flat-Bench Dumbbell Pullover',
   /**
    * ⛔⛔ THE CURL HAS A HOME EXECUTION AND THE NAME HAS TO SAY WHICH (2026-08-31). `leg curl` gained a
    * bench-and-dumbbell route so p223's hamstring curl is reachable without a stack — and it went on
@@ -533,10 +560,11 @@ const EXECUTION_NAME: Record<string, string> = {
   /**
    * ONE ENTRY, AND THE OTHER CANDIDATES WERE CHECKED AND LEFT OUT.
    * `seated calf raise` names no equipment - a home athlete reads it and does it with a dumbbell
-   * across the knees without being told. `machine hip thrust`, `pec deck`, `leg extension` and
-   * `pullover machine` have only a station route, so an athlete without one is never offered them
-   * and there is no wrong name to show. The defect was specifically a MACHINE in the name of a
-   * movement the athlete would do with free weights.
+   * across the knees without being told. `machine hip thrust`, `pec deck` and `leg extension` have
+   * only a station route, so an athlete without one is never offered them and there is no wrong
+   * name to show (`pullover machine` gained a home route on 2026-09-10 and an entry above with it).
+   * The defect was specifically a MACHINE in the name of a movement the athlete would do with free
+   * weights.
    */
 };
 
@@ -546,7 +574,16 @@ const EXECUTION_NAME: Record<string, string> = {
  * machine. Keyed like `EXECUTION_NAME`; shown to the athlete behind an (i) beside the row name.
  * A movement belongs here only when its name alone misleads a home athlete about the execution.
  */
-const EXECUTION_HOW_TO: Record<string, string> = {
+const EXECUTION_HOW_TO: Record<string, ByRoute<string>> = {
+  /**
+   * ⚠️ THE THREE ENTRIES BELOW ARE DRAFT WORDS (2026-09-10) — written with the two home routes from
+   * the workorder addendum and NOT yet approved by Michael. Every other line in this table is his.
+   */
+  'rear delt machine': [
+    { route: ['dumbbells', 'incline_bench'], value: 'Set a bench to about 45 degrees and sit facing it, chest against the pad, a dumbbell in each hand hanging below. With a slight bend in the elbows, raise both dumbbells out to the sides until they are level with your shoulders, pause, then lower. Keep your chest on the pad.' },
+    { route: ['dumbbells'], value: 'Stand with a dumbbell in each hand and hinge at the hips until your chest is close to parallel with the floor, arms hanging with a slight bend. Raise both dumbbells out to the sides until they are level with your shoulders, pause, then lower. Keep your back flat and your neck in line with your spine.' },
+  ],
+  'pullover machine': 'Lie on your back on a flat bench, feet on the floor, holding one dumbbell in both hands above your chest. With a slight bend in the elbows, lower the dumbbell in an arc behind your head until you feel a stretch, then pull it back over your chest. Keep your hips down on the bench.',
   'back extension': 'Lie face down on the floor with your feet hooked under a loaded barbell. Hands behind your head or across your chest. Raise your chest and shoulders off the floor as far as you can, pause, then lower. Keep your feet down and your neck in line with your back.',
   'leg curl': 'Lie face down on a flat bench with your knees just past the end and a dumbbell held between your feet. Hold the bench with your hands. Curl your heels toward your glutes, pause, then lower the dumbbell slowly until your legs are straight.',
   'leg curls': 'Lie face down on a flat bench with your knees just past the end and a dumbbell held between your feet. Hold the bench with your hands. Curl your heels toward your glutes, pause, then lower the dumbbell slowly until your legs are straight.',
@@ -567,14 +604,15 @@ const EXECUTION_HOW_TO: Record<string, string> = {
 export function executionHowTo(name: string, equipment: string[] | null | undefined): string | null {
   const text = EXECUTION_HOW_TO[foldExerciseName(name)];
   if (!text) return null;
+  const declared = Array.isArray(equipment) && equipment.some((c) => String(c || '').trim());
+  const keys = declared ? athleteEquipmentToKeys(equipment as string[]) : new Set<string>();
   // A movement with no machine version (the calf raise, 2026-09-08) reads the same on every kit.
   const hasMachineRoute = gearRoutesFor(name).some((r) => r.includes('machine'));
-  if (!hasMachineRoute) return text;
-  const declared = Array.isArray(equipment) && equipment.some((c) => String(c || '').trim());
+  if (!hasMachineRoute) return typeof text === 'string' ? text : byRoute(text, keys, null as unknown as string) ?? null;
   if (!declared) return null;
-  const keys = athleteEquipmentToKeys(equipment as string[]);
   const hasStation = gearRoutesFor(name).some((r) => r.includes('machine') && r.every((k) => keys.has(k)));
-  return hasStation ? null : text;
+  if (hasStation) return null;
+  return byRoute(text, keys, null as unknown as string) ?? null;
 }
 
 export function bandRouteName(name: string, equipment: string[] | null | undefined): string {
