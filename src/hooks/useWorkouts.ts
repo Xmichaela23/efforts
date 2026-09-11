@@ -3,6 +3,7 @@ import { supabase, getStoredUserId } from "@/lib/supabase";
 import { safeParseJSONB } from "@/utils/jsonb";
 // The one completed-set/exercise shape, shared with the server hydrators (2026-08-11).
 import { normalizeCompletedStrengthExercise } from "@/lib/normalize-strength-set";
+import { WORKOUT_LIST_JSON_SELECT, rebuildWorkoutListRow } from "../../supabase/functions/_shared/workout-list-select.ts";
 
 /** Fire-and-forget full pipeline for completed workouts (see `recompute-workout` edge). */
 function fireRecomputeWorkout(workoutId: string) {
@@ -229,7 +230,7 @@ export const useWorkouts = () => {
       const todayIso = new Date().toLocaleDateString('en-CA');
       const lookbackDate = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
       const lookbackIso = lookbackDate.toLocaleDateString('en-CA'); // last 45 days (reduce payload)
-      const { data: manualWorkouts, error: manualError } = await supabase
+      const { data: manualRaw, error: manualError } = await supabase
         .from("workouts")
         .select([
           'id','user_id','name','type','provider_sport','date','workout_status','duration',
@@ -237,8 +238,11 @@ export const useWorkouts = () => {
           'distance','avg_heart_rate','max_heart_rate','avg_power','max_power','normalized_power',
           'avg_speed','max_speed','avg_cadence','max_cadence','elevation_gain','elevation_loss','calories',
           'moving_time','elapsed_time','timestamp','start_position_lat','start_position_long',
-          // computed snapshot and metrics (small JSON); exclude gps_track/sensor_data/swim_data
-          'computed','metrics','workout_analysis',
+          // ⛔ NEVER the whole `computed` or `workout_analysis` (2026-09-10): `computed.analysis.series`
+          // is every sample of the session, and 150 rows of it timed the query out (57014) — the app
+          // showed "Loading…" then "No effort scheduled". The keys the screens read, by name
+          // (_shared/workout-list-select.ts), rebuilt into the same objects below.
+          'metrics', ...WORKOUT_LIST_JSON_SELECT,
           // strength and mobility exercise data (matches get-week selection)
           'strength_exercises','mobility_exercises',
           // workload data
@@ -258,6 +262,7 @@ export const useWorkouts = () => {
         .limit(150);
 
       if (manualError) { throw manualError; }
+      const manualWorkouts = (manualRaw || []).map((r: any) => rebuildWorkoutListRow(r));
 
       // Manual workouts found
 

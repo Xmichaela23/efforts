@@ -14,7 +14,7 @@ import { powerZoneBoundaries as powerZoneBoundariesFor } from '../_shared/endura
 import { runEasyZone3FloorBpm } from '../_shared/easy-hr.ts';
 import { paceToGAP } from '../_shared/gap.ts'; // ONE canonical Grade-Adjusted Pace (Minetti) — no inline copy
 import { isIndoorSession } from '../_shared/indoor-session.ts';
-import { buildDisplaySeries } from './display-series.ts';
+import { buildDisplaySeriesColumn } from './display-series.ts';
 // The bike FTP estimator's two per-ride substrates: the widened power-curve durations and the
 // heart-rate/power minute-blocks. Pure, shared with the learner (docs/SPEC-ftp-estimator-2026-09-04.md).
 import { POWER_CURVE_DURATIONS } from '../../../src/lib/bike-ftp-estimator.ts';
@@ -1498,16 +1498,19 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
   /**
    * ⛔ THE DETAILS MAP PLOTS THESE AND DERIVES NOTHING (2026-09-10, audit H-D02 / H-D03). Smoothing,
    * windows and the running climb live in display-series.ts, every number there marked. Computed on
-   * the full recording; workout-detail thins every array of this object together, so they stay aligned.
-   * The ten keys above them are unchanged: analyze-cycling-workout and workout-detail read those.
+   * the full recording, then thinned together to DISPLAY_SERIES_MAX_POINTS, and written to the row's
+   * own `display_series` column below — NOT into `computed.analysis.series`: the list reads (get-week,
+   * useWorkouts) select keys of `computed`, and the full-length lines there timed them out (57014).
+   * The ten `series` keys are unchanged: analyze-cycling-workout and workout-detail read those.
    */
   // The row's own recorded totals (the numbers the Details tab prints), or null.
   const recordedM = (v: unknown): number | null => (v == null || !Number.isFinite(Number(v)) ? null : Number(v));
   const displaySeries = hasRows
-    ? buildDisplaySeries({
+    ? buildDisplaySeriesColumn({
         time_s,
         distance_m,
         elevation_m: elevation_sm,
+        speed_mps: speed_sm,
         hr_bpm,
         cadence: isRide ? cadence_rpm : cadence_spm.map((v, i) => (v != null ? v : cadence_rpm[i])),
         power_w: power_watts,
@@ -1516,13 +1519,13 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
         total_gain_m: recordedM(w.elevation_gain ?? w.metrics?.elevation_gain),
         total_loss_m: recordedM(w.elevation_loss ?? w.metrics?.elevation_loss),
       })
-    : {};
+    : null;
 
   const analysis: any = {
       version: ANALYSIS_VERSION,
       computedAt: new Date().toISOString(),
       input,
-    // Always return consistent series structure with all 10 fields (even if empty), then the display series
+    // Always return consistent series structure with all 10 fields (even if empty)
     series: {
       time_s: hasRows ? time_s : [],
       distance_m: hasRows ? distance_m : [],
@@ -1534,7 +1537,6 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
       cadence_rpm: hasRows ? cadence_rpm : [],
       power_watts: hasRows ? power_watts : [],
       grade_percent: hasRows ? grade_sm : [],
-      ...displaySeries,
     },
       events: {
         laps: Array.isArray(laps) ? laps.slice(0, 50) : [],
@@ -2182,6 +2184,13 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
     }
     
     console.log('✅ UPDATE result: merged via RPC', rpcData);
+
+    // The chart lines, in their own column (migration 20260910120000). Until that migration is pasted
+    // PostgREST answers 42703 (undefined column): the analysis stands, the charts wait for the column.
+    {
+      const { error: dsErr } = await supabase.from('workouts').update({ display_series: displaySeries }).eq('id', workout_id);
+      if (dsErr) console.error('[compute-workout-analysis] display_series write failed:', dsErr.code, dsErr.message);
+    }
 
     // Assessment write-back: extract CSS / run-TT baseline if this is a linked assessment session
     await extractAssessmentBaseline(supabase, w, laps);

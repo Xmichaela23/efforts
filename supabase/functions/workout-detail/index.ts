@@ -1387,6 +1387,22 @@ function simplifyTrack(track: [number, number][]): [number, number][] {
   return douglasPeucker(track, tol);
 }
 
+/** Columns that arrive with a migration; a 42703 (undefined column) retry drops them from the select. */
+function withoutLateColumns(sel: string): string {
+  return sel.replace(',analysis_updated_at', '').replace(',display_series', '');
+}
+
+/** The stored chart lines (`workouts.display_series`), when the row has them. */
+function storedDisplaySeries(row: any): Record<string, unknown> | null {
+  let ds = row?.display_series;
+  if (typeof ds === 'string') {
+    try { ds = JSON.parse(ds); } catch { return null; }
+  }
+  if (!ds || typeof ds !== 'object') return null;
+  const t = (ds as any).time_s;
+  return Array.isArray(t) && t.length > 1 ? (ds as Record<string, unknown>) : null;
+}
+
 // --- Min/max series bucketing (preserves spikes, keeps arrays aligned) ---
 const MAX_SERIES_POINTS = 800;
 
@@ -1518,6 +1534,7 @@ Deno.serve(async (req) => {
     // Select minimal set plus optional blobs (shared column list)
     const baseSel = [
       'id','user_id','date','type','workout_status','planned_id','name','metrics','computed','workout_analysis',
+      'display_series', // the chart lines (compute-workout-analysis/display-series.ts), sent as display_metrics.series
       'completedmanually', // a receipt for is_executed (_shared/is-executed.ts)
       'analysis_status','analysis_error','analysis_updated_at', // "failed" on screen (plumbing work order §3)
       'avg_heart_rate','max_heart_rate','avg_power','max_power','avg_cadence','max_cadence',
@@ -1556,9 +1573,10 @@ Deno.serve(async (req) => {
       let qSd = supabase.from('workouts').select(selectSd).eq('id', id) as any;
       qSd = qSd.eq('user_id', userId);
       let sdRes = await qSd.maybeSingle();
-      // analysis_updated_at arrives with migration 20260907070000; before the paste PostgREST answers 42703 — retry without it.
+      // analysis_updated_at (migration 20260907070000) and display_series (20260910120000) arrive with their
+      // migrations; before the paste PostgREST answers 42703 — retry without them.
       if (sdRes?.error?.code === '42703') {
-        sdRes = await (supabase.from('workouts').select(selectSd.replace(',analysis_updated_at', '')).eq('id', id) as any).eq('user_id', userId).maybeSingle();
+        sdRes = await (supabase.from('workouts').select(withoutLateColumns(selectSd)).eq('id', id) as any).eq('user_id', userId).maybeSingle();
       }
       const { data: rowSd, error: errSd } = sdRes;
       if (errSd) throw errSd;
@@ -1623,9 +1641,10 @@ Deno.serve(async (req) => {
     let query = supabase.from('workouts').select(select).eq('id', id) as any;
     if (userId) query = query.eq('user_id', userId);
     let rowRes = await query.maybeSingle();
-    // analysis_updated_at arrives with migration 20260907070000; before the paste PostgREST answers 42703 — retry without it.
+    // analysis_updated_at (migration 20260907070000) and display_series (20260910120000) arrive with their
+    // migrations; before the paste PostgREST answers 42703 — retry without them.
     if (rowRes?.error?.code === '42703') {
-      let q2 = supabase.from('workouts').select(select.replace(',analysis_updated_at', '')).eq('id', id) as any;
+      let q2 = supabase.from('workouts').select(withoutLateColumns(select)).eq('id', id) as any;
       if (userId) q2 = q2.eq('user_id', userId);
       rowRes = await q2.maybeSingle();
     }
@@ -1852,8 +1871,11 @@ Deno.serve(async (req) => {
     const avg_swim_pace_per_100m = _scPer100m ?? (Number.isFinite(swimMetrics?.avg_pace_per_100m) ? Number(swimMetrics.avg_pace_per_100m) : null);
     const avg_swim_pace_per_100yd = _scPer100yd ?? (Number.isFinite(swimMetrics?.avg_pace_per_100yd) ? Number(swimMetrics.avg_pace_per_100yd) : null);
     const work_kj = Number.isFinite(d?.total_work) ? Number(d.total_work) : null;
+    // ⛔ THE CHART'S SERIES (2026-09-10): the row's `display_series` — the lines display-series.ts writes,
+    // already thinned to DISPLAY_SERIES_MAX_POINTS. A row analysed before that column existed falls back
+    // to the full recording, bucketed here, so its elevation and speed still draw until it is re-run.
     const rawSeries = d?.computed?.analysis?.series || null;
-    const series = rawSeries ? bucketSeries(rawSeries, MAX_SERIES_POINTS) : null;
+    const series = storedDisplaySeries(row) ?? (rawSeries ? bucketSeries(rawSeries, MAX_SERIES_POINTS) : null);
     // 2026-09-03: grade-adjusted pace rides along (the client's Details tile read nothing else once
     // display_metrics existed). A READ of computed.overall — never derived here.
     const _gapSecPerMi = Number(d?.computed?.overall?.avg_gap_s_per_mi ?? d?.computed?.overall?.gap_pace_s_per_mi);

@@ -5,11 +5,14 @@
  */
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
+  DISPLAY_SERIES_MAX_POINTS,
   buildDisplaySeries,
+  buildDisplaySeriesColumn,
   centredTimeMean,
   cumulativeClimb,
   gradeSeries,
   paceSeries,
+  thinSeries,
   vamSeries,
 } from './display-series.ts';
 
@@ -88,4 +91,53 @@ Deno.test('indoors: no grade and no VAM; a ride has no pace; a missing sensor st
   assertEquals(out.cadence_display, []);
   assertEquals(out.power_display_w.length, 120);
   assertEquals(out.hr_display_bpm[60], 140);
+});
+
+Deno.test('thinning: a long recording keeps at most 600 points, first and last, every line at one stride', () => {
+  const n = 14_000;
+  const t = secs(n);
+  const d = t.map((i) => i * 7);
+  const hr = t.map((i) => 120 + (i % 40));
+  const out = thinSeries({ time_s: t, distance_m: d, hr_display_bpm: hr, empty: [], note: 'x' });
+  assertEquals(out.time_s.length, DISPLAY_SERIES_MAX_POINTS);
+  assertEquals(out.distance_m.length, DISPLAY_SERIES_MAX_POINTS);
+  assertEquals(out.hr_display_bpm.length, DISPLAY_SERIES_MAX_POINTS);
+  assertEquals(out.time_s[0], 0);
+  assertEquals(out.time_s[out.time_s.length - 1], n - 1);
+  // The same sample index behind every line: hr at the kept time is the hr that was recorded there.
+  assertEquals(out.hr_display_bpm.every((v, i) => v === 120 + ((out.time_s[i] as number) % 40)), true);
+  assertEquals(out.distance_m[10], (out.time_s[10] as number) * 7);
+  assertEquals(out.empty, []);
+  assertEquals(out.note, 'x');
+});
+
+Deno.test('thinning: a short recording is left exactly as it is', () => {
+  const t = secs(500);
+  const out = thinSeries({ time_s: t, distance_m: t.map((i) => i * 3) });
+  assertEquals(out.time_s.length, 500);
+  assertEquals(out.distance_m[499], 1497);
+});
+
+Deno.test('the display_series column: axes, elevation, speed on a ride, raw power, and the display lines, thinned', () => {
+  const n = 3000;
+  const t = secs(n);
+  const d = t.map((i) => i * 8);
+  const e = t.map((i) => 50 + i * 0.1);
+  const out = buildDisplaySeriesColumn({
+    time_s: t, distance_m: d, elevation_m: e, speed_mps: t.map(() => 8), hr_bpm: t.map(() => 140),
+    cadence: t.map(() => 90), power_w: t.map(() => 200), isRide: true, indoor: false,
+  });
+  for (const k of ['time_s', 'distance_m', 'elevation_m', 'speed_mps', 'power_watts', 'hr_display_bpm', 'cadence_display', 'power_display_w', 'grade_display_pct', 'vam_m_per_h', 'elevation_gain_cum_m', 'elevation_loss_cum_m']) {
+    assertEquals(out[k].length, DISPLAY_SERIES_MAX_POINTS, k);
+  }
+  assertEquals(out.pace_display_s_per_km, []); // a ride plots speed
+  assertEquals(out.time_s[DISPLAY_SERIES_MAX_POINTS - 1], n - 1);
+  // A run stores no speed line.
+  const run = buildDisplaySeriesColumn({
+    time_s: t, distance_m: d, elevation_m: e, speed_mps: t.map(() => 4), hr_bpm: t.map(() => 140),
+    cadence: t.map(() => 170), power_w: t.map(() => null), isRide: false, indoor: false,
+  });
+  assertEquals(run.speed_mps, []);
+  assertEquals(run.power_watts, []);
+  assertEquals(run.pace_display_s_per_km.length, DISPLAY_SERIES_MAX_POINTS);
 });

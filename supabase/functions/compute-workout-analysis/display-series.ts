@@ -34,6 +34,13 @@ export const GRADE_MIN_SPAN_M = 20;
 export const CLIMB_STEP_M = 1.5;
 /** OURS — …over at least this distance. */
 export const CLIMB_MIN_DIST_M = 20;
+/**
+ * OURS — the most points a stored chart line keeps. The phone draws the chart about 390 px wide, so
+ * 600 points is more than one per pixel; the full recording (a 4-hour ride is ~14,000 samples, times
+ * thirteen lines) made the row megabytes and timed the week's list read out (2026-09-10, 57014).
+ * The lines are computed on the full recording first, then thinned, so the windows above are unchanged.
+ */
+export const DISPLAY_SERIES_MAX_POINTS = 600;
 
 type Num = number | null;
 
@@ -185,6 +192,8 @@ export type DisplaySeriesInput = {
   /** rpm on a ride, steps per minute otherwise. */
   cadence: Num[];
   power_w: Num[];
+  /** The server's smoothed speed (the `speed_mps` series) — a ride's chart plots it. Column builder only. */
+  speed_mps?: Num[];
   isRide: boolean;
   /** `isIndoorSession` — no grade and no VAM indoors (no real altitude on a trainer, a treadmill or Zwift). */
   indoor: boolean;
@@ -192,7 +201,7 @@ export type DisplaySeriesInput = {
   total_loss_m?: number | null;
 };
 
-/** The keys added to `computed.analysis.series`. Each is index-aligned with `time_s`, or empty. */
+/** The chart lines, on the full recording. Each is index-aligned with `time_s`, or empty. */
 export function buildDisplaySeries(inp: DisplaySeriesInput): Record<string, Num[]> {
   const { time_s, distance_m, elevation_m, isRide, indoor } = inp;
   const climb = cumulativeClimb(distance_m, elevation_m, { gain_m: inp.total_gain_m, loss_m: inp.total_loss_m });
@@ -207,4 +216,41 @@ export function buildDisplaySeries(inp: DisplaySeriesInput): Record<string, Num[
     elevation_gain_cum_m: climb.gain,
     elevation_loss_cum_m: climb.loss,
   };
+}
+
+/**
+ * Every array of the same length as `time_s`, thinned together at one uniform stride to at most
+ * `maxPts` points, first and last sample kept. Values are never changed, only left out. An empty array
+ * stays empty; an array of another length is left as it is.
+ */
+export function thinSeries<T extends Record<string, unknown>>(series: T, maxPts = DISPLAY_SERIES_MAX_POINTS): T {
+  const time = (series as Record<string, unknown>).time_s;
+  const n = Array.isArray(time) ? time.length : 0;
+  if (n <= maxPts || maxPts < 2) return series;
+  const idx: number[] = new Array(maxPts);
+  for (let i = 0; i < maxPts; i++) idx[i] = Math.round((i * (n - 1)) / (maxPts - 1));
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(series)) {
+    out[k] = Array.isArray(v) && v.length === n ? idx.map((i) => v[i]) : v;
+  }
+  return out as T;
+}
+
+/**
+ * ⛔ THE ONE OBJECT `workouts.display_series` HOLDS (2026-09-10): the axes the chart plots against
+ * (`time_s`, `distance_m`), the server's elevation, speed and raw power lines, and the display lines
+ * above — all at one stride, at most DISPLAY_SERIES_MAX_POINTS long. It is its own column so the list
+ * reads (get-week, useWorkouts) never touch it; workout-detail sends it as `display_metrics.series`.
+ * `computed.analysis.series` keeps the full recording for the analysers and is never read for a chart.
+ */
+export function buildDisplaySeriesColumn(inp: DisplaySeriesInput): Record<string, Num[]> {
+  const full: Record<string, Num[]> = {
+    time_s: inp.time_s,
+    distance_m: inp.distance_m,
+    elevation_m: orEmpty(inp.elevation_m),
+    speed_mps: inp.isRide ? orEmpty(inp.speed_mps ?? []) : [],
+    power_watts: orEmpty(inp.power_w),
+    ...buildDisplaySeries(inp),
+  };
+  return thinSeries(full);
 }

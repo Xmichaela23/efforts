@@ -24,6 +24,7 @@ import { buildExistsKeys, plannedKey } from './planned-exists-key.ts';
 // card is built from, so the calendar's phase word cannot disagree with State's (2026-08-15).
 import { resolveBlockIdentity } from '../_shared/block-identity.ts';
 import { weekLabelFor } from './week-label.ts';
+import { WORKOUT_LIST_JSON_SELECT, rebuildWorkoutListRow } from '../_shared/workout-list-select.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 // ⛔ THE ONE completed-set/exercise hydration shape (2026-08-11) — shared with workout-detail and the
 // client so a logged field (resistance_level band assist, amrap, duration_seconds) can't be dropped
@@ -416,7 +417,9 @@ Deno.serve(async (req)=>{
       'type',
       'workout_status',
       'planned_id',
-      'computed',
+      // ⛔ NEVER the whole `computed` — its `analysis.series` is every sample of the session, and a
+      // week of those timed the query out (57014). The keys the week reads, by name; rebuilt below.
+      ...WORKOUT_LIST_JSON_SELECT,
       // workload data (single source of truth from calculate-workload)
       'workload_actual',
       'intensity_factor',
@@ -445,7 +448,7 @@ Deno.serve(async (req)=>{
       'rpe',
       'gear_id',
       'workout_metadata',
-      'workout_analysis',
+      // `workout_analysis` — its list keys are in WORKOUT_LIST_JSON_SELECT above.
       // a manual "Mark as Complete" is a receipt for `is_executed` (_shared/is-executed.ts)
       'completedmanually',
       'name',
@@ -467,7 +470,8 @@ Deno.serve(async (req)=>{
       where: 'workouts',
       message: wkErr.message || String(wkErr)
     });
-    const workouts = Array.isArray(wkRaw) ? wkRaw : [];
+    // The aliased JSON keys back into `computed` / `workout_analysis`, so every reader below is unchanged.
+    const workouts = (Array.isArray(wkRaw) ? wkRaw : []).map((r) => rebuildWorkoutListRow(r));
     // Fetch user FTP for power range calculations
     let userFtp = null;
     // D-349 body weight, read through the one resolver, so a lift's pounds here are workout-detail's.
