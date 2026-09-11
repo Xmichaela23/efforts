@@ -1653,7 +1653,7 @@ function exerciseForSlot(
           })() ? 'per_side' : (movementIsTested ? 'awaiting_test' : null));
     return {
       exercise: {
-        name: rowDisplayName(movement, slot),
+        name: rowDisplayName(movement, slot, args.competitionLifts[pattern] ?? null),
         ...(byFeel ? { load_basis: byFeel } : {}),
         ...(rowExecutionName(movement, slot, args.equipment)
           ? { execution_name: rowExecutionName(movement, slot, args.equipment)! }
@@ -1795,7 +1795,7 @@ function exerciseForSlot(
 
   return {
     exercise: {
-      name: rowDisplayName(movement, slot),
+      name: rowDisplayName(movement, slot, args.competitionLifts[pattern] ?? null),
       ...(rowExecutionName(movement, slot, args.equipment)
         ? { execution_name: rowExecutionName(movement, slot, args.equipment)! }
         : {}),
@@ -2227,8 +2227,17 @@ export const ACCESSORY_FATIGUE_CUE =
  * an athlete's own word. His export shows the split cleanly: *"Bench Press"*, *"Back Squat"* and
  * *"Deadlift"* were already right, and every lower-case row in it was an accessory.
  */
-function rowDisplayName(movement: string, slot: StrengthSlot): string {
-  return slot.role === 'competition' ? movement : movementLabel(movement);
+function rowDisplayName(movement: string, slot: StrengthSlot, athleteNamed: string | null = null): string {
+  /**
+   * ⛔ 2026-09-10: ONLY THE ATHLETE'S OWN WORD IS KEPT AS TYPED. The All Rounder's day-4 heavy pull is a
+   * competition slot the athlete never names (`competitionLifts` carries push, squat and hinge), so the
+   * movement came off the catalogue and printed as "pull up" / "barbell row" beside "Bench Press". A
+   * competition row keeps its spelling only when it is the lift the athlete named; every other row reads
+   * the way the picker shows it.
+   */
+  const theirs = slot.role === 'competition' && athleteNamed != null
+    && canonicalize(athleteNamed) === canonicalize(movement);
+  return theirs ? movement : movementLabel(movement);
 }
 
 /**

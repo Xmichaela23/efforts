@@ -33,7 +33,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
   [Wednesday] run      Near-threshold Run — 46 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     pull up                        1x1-5        @ By feel       | no_tested_lift
+      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -85,7 +85,7 @@ WEEK 02  column=standard
   [Wednesday] run      Near-threshold Run — 56 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     pull up                        1x1-5        @ By feel       | no_tested_lift
+      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -135,7 +135,7 @@ WEEK 03  column=standard
   [Wednesday] run      Near-threshold Run — 49 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     pull up                        1x1-5        @ By feel       | no_tested_lift
+      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -185,7 +185,7 @@ WEEK 04  column=standard
   [Wednesday] run      Near-threshold Run — 47 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     pull up                        1x1-5        @ By feel       | no_tested_lift
+      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -235,7 +235,7 @@ WEEK 05  column=standard
   [Wednesday] run      Near-threshold Run — 59 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     pull up                        1x1-5        @ By feel       | no_tested_lift
+      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -285,7 +285,7 @@ WEEK 06  column=standard
   [Wednesday] run      Near-threshold Run — 61 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     pull up                        1x1-5        @ By feel       | no_tested_lift
+      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -335,7 +335,7 @@ WEEK 07  column=standard
   [Wednesday] run      Near-threshold Run — 51 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     pull up                        1x1-5        @ By feel       | no_tested_lift
+      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -384,7 +384,7 @@ WEEK 08  column=standard
   [Wednesday] run      Near-threshold Run — 46 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     pull up                        1x1-5        @ By feel       | no_tested_lift
+      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -433,7 +433,7 @@ WEEK 09  column=standard
   [Wednesday] run      Near-threshold Run — 56 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     pull up                        1x1-5        @ By feel       | no_tested_lift
+      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -482,7 +482,7 @@ WEEK 10  column=standard
   [Wednesday] run      Near-threshold Run — 49 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     pull up                        1x1-5        @ By feel       | no_tested_lift
+      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -531,7 +531,7 @@ WEEK 11  column=standard
   [Wednesday] run      Near-threshold Run — 47 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     pull up                        1x1-5        @ By feel       | no_tested_lift
+      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -580,7 +580,7 @@ WEEK 12  column=standard
   [Wednesday] run      Near-threshold Run — 59 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     pull up                        1x1-5        @ By feel       | no_tested_lift
+      ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
