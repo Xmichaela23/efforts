@@ -128,3 +128,13 @@ A lifting session with nothing left to say carries an empty description. Goldens
 - Logger on a throwaway account with a built plan: ME row shows only the p219 line; the set-word sheet
   shows the four approved lines; a DE row still shows its intent line.
 - Michael's own plan: the row notes change on his next rebuild, not before.
+
+## Addendum 2026-09-10 — the kit gate (Michael, home gym: adjustable dumbbells, flat bench, no incline, no preacher bench)
+
+The plan prescribed Preacher Curl and offered Spider Curl and an incline dumbbell row. Cause traced: the
+catalogue declares no equipment for several of the book's focused-pull movements, so the gate admits them
+on any kit. Fix (in progress, agent 2026-09-10 evening): every movement on the book's lists declares its
+need; the gate refuses what the kit lacks; undeclared + declared kit = refused; the swap list offers only what
+fits; an empty slot is left out and named ("Not placed this week"). Plus two kit routes so a dumbbell + flat
+bench kit fills every slot: a bent-over dumbbell rear delt fly for the rear delt machine, and a flat-bench
+dumbbell pullover for the pullover machine (same pattern as the incline dumbbell chest-supported row).
