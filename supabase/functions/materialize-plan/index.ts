@@ -2445,7 +2445,14 @@ export function expandTokensForRow(
           }
           
           // Apply equipment substitution with percentage for intelligent band guidance
-          const substituted = substituteExerciseForEquipment(originalName, userEquipment, percentRaw);
+          // ⛔ THE ATHLETE'S KIT ALREADY REACHES THIS MOVEMENT, SO NOTHING IS SWAPPED (2026-09-10). Where the grid
+          // has a home route for the row on this kit (`executionHowTo` — a lying dumbbell leg curl on a flat bench),
+          // the row's name, execution name and how-to already describe what the athlete will do. The legacy swap
+          // below renamed the step "Nordic Curls" while the row and its how-to still said Leg Curl, so the drawer
+          // printed a movement the row never named, and the bodyweight label came with it.
+          const substituted = executionHowTo(originalName, userEquipment) != null
+            ? { name: originalName }
+            : substituteExerciseForEquipment(originalName, userEquipment, percentRaw);
           let name = substituted.name;
           const equipmentNotes = substituted.notes;
           // Adapt-a-plan permanent swap: an active athlete swap renames this slot to the substitute,
@@ -2867,7 +2874,14 @@ export function expandTokensForRow(
           }
           
           // Apply equipment substitution with percentage for intelligent band guidance
-          const substituted = substituteExerciseForEquipment(originalName, userEquipment, percentRaw);
+          // ⛔ THE ATHLETE'S KIT ALREADY REACHES THIS MOVEMENT, SO NOTHING IS SWAPPED (2026-09-10). Where the grid
+          // has a home route for the row on this kit (`executionHowTo` — a lying dumbbell leg curl on a flat bench),
+          // the row's name, execution name and how-to already describe what the athlete will do. The legacy swap
+          // below renamed the step "Nordic Curls" while the row and its how-to still said Leg Curl, so the drawer
+          // printed a movement the row never named, and the bodyweight label came with it.
+          const substituted = executionHowTo(originalName, userEquipment) != null
+            ? { name: originalName }
+            : substituteExerciseForEquipment(originalName, userEquipment, percentRaw);
           let name = substituted.name;
           const equipmentNotes = substituted.notes;
           // Adapt-a-plan permanent swap: an active athlete swap renames this slot to the substitute,
