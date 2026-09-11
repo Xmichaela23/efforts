@@ -31,10 +31,13 @@ export type BaselineTestRow = {
 /** Threshold time trial, Viada p210, step for step. Sendable to Garmin. */
 export function runThresholdTestRow(date: string): BaselineTestRow {
   return {
-    name: 'Threshold Time Trial (Viada p210)',
+    // ⛔ NO "48 HOURS PRIOR" (Michael, 2026-09-11: by the book). p210 prints no rest rule before the
+    // trial; the sentence was ours and is gone. No page citation in the name or the text either —
+    // citations live in the ledger, not on screen.
+    name: 'Threshold Time Trial',
     type: 'run',
     date,
-    description: 'Threshold time trial (Viada p210). PREPARATION: no hard training 48 hours prior; flat route or track; heart rate strap on. WARM-UP: 6–8 min easy jog; 2 x 100 m strides, slow to near full tilt; 3 x 30 s at your fast (mile-PR) pace with 1 min easy walk/jog between; then 1 min rest. TRIAL: press lap and run 12 minutes (under 2 years of training), 10 minutes (2–4 years) or 8 minutes (4+ years) — start at 9.5 out of 10, finish at 10 out of 10, even the whole way; press lap at the end. COOL-DOWN: 8–10 min easy. RESULT: the app reads the trial lap, takes 88% of that speed as your threshold pace (the book\'s rule) and sets it.',
+    description: 'Threshold time trial. PREPARATION: flat route or track; heart rate strap on. WARM-UP: 6–8 min easy jog; 2 x 100 m strides, slow to near full tilt; 3 x 30 s at your fast (mile-PR) pace with 1 min easy walk/jog between; then 1 min rest. TRIAL: press lap and run 12 minutes (under 2 years of training), 10 minutes (2–4 years) or 8 minutes (4+ years) — start at 9.5 out of 10, finish at 10 out of 10, even the whole way; press lap at the end. COOL-DOWN: 8–10 min easy. RESULT: the app reads the trial lap, takes 88% of that speed as your threshold pace and sets it.',
     duration: 45,
     // p210, step for step: easy jog · 2 × 100 m strides · 3 × 30 s fast with 1 min easy · 1 min rest ·
     // the trial (12 min default; 10 / 8 by training age, see description) · cool-down.
@@ -47,10 +50,11 @@ export function runThresholdTestRow(date: string): BaselineTestRow {
 /** FTP test, the 20-minute protocol, Viada p212, step for step. The learner reads the 20-min lap × 0.95. */
 export function ftpTestRow(date: string): BaselineTestRow {
   return {
-    name: 'FTP Test — 20-Minute Protocol (Viada p212)',
+    // ⛔ NO "48 HOURS PRIOR" and no page citation — see the run test above.
+    name: 'FTP Test — 20-Minute Protocol',
     type: 'ride',
     date,
-    description: 'FTP test — the 20-minute protocol (Viada p212). PREPARATION: no hard training 48 hours prior; indoor trainer recommended; a power meter or smart trainer. WARM-UP: 5–10 min easy; 3 x 1 min at low resistance and high turnover with 1 min rest between; 3 min easy; 3 min at 9 out of 10; 6–8 min easy. TEST: press lap and ride 20 minutes at your best even effort; press lap at the end. COOL-DOWN: 5–10 min easy. RESULT: your FTP is the 20-minute average power x 0.95 (the book\'s rule); the app reads the lap and sets it.',
+    description: 'FTP test — the 20-minute protocol. PREPARATION: indoor trainer recommended; a power meter or smart trainer. WARM-UP: 5–10 min easy; 3 x 1 min at low resistance and high turnover with 1 min rest between; 3 min easy; 3 min at 9 out of 10; 6–8 min easy. TEST: press lap and ride 20 minutes at your best even effort; press lap at the end. COOL-DOWN: 5–10 min easy. RESULT: your FTP is the 20-minute average power x 0.95; the app reads the lap and sets it.',
     duration: 60,
     // p212, step for step (2026-09-02): easy · 3 × 1 min high turnover / 1 min rest · 3 min easy ·
     // 3 min at 9/10 · 6–8 min easy · 20 min best effort · easy.
@@ -79,10 +83,11 @@ export function ftpTestRow(date: string): BaselineTestRow {
  */
 export function ftp5MinTestRow(date: string): BaselineTestRow {
   return {
-    name: 'FTP Test — 5-Minute All-Out (Viada, Module 3)',
+    // ⛔ NO "48 HOURS PRIOR" and no source citation in the name — see the run test above.
+    name: 'FTP Test — 5-Minute All-Out',
     type: 'ride',
     date,
-    description: 'FTP test — the 5-minute all-out protocol. PREPARATION: no hard training 48 hours prior; indoor trainer recommended; a power meter or smart trainer is required. The test: start as hard as you can hold and hang on until five minutes are up. There is no pacing strategy, which is what makes it repeatable. Your 5-minute power feeds the power curve the FTP estimate is fitted from.',
+    description: 'FTP test — the 5-minute all-out protocol. PREPARATION: indoor trainer recommended; a power meter or smart trainer is required. The test: start as hard as you can hold and hang on until five minutes are up. There is no pacing strategy, which is what makes it repeatable. Your 5-minute power feeds the power curve the FTP estimate is fitted from.',
     duration: 40,
     steps_preset: [
       'warmup_bike_quality_8min_fastpedal',
@@ -98,8 +103,9 @@ export function ftp5MinTestRow(date: string): BaselineTestRow {
 
 /**
  * Where a week-one retest lands, counted from the block's first day (the server inserts these with the
- * plan: `create-goal-and-materialize-plan/week-one-tests.ts`). OURS — the book says only "no hard training 48 hours prior"
- * (p210, p212); the day inside week one is this app's choice: the run test on the third day of the
+ * plan: `create-goal-and-materialize-plan/week-one-tests.ts`). OURS — p210 and p212 say nothing about
+ * rest before a test (the "48 hours prior" this comment used to cite was never on the page; removed
+ * 2026-09-11); the day inside week one is this app's choice: the run test on the third day of the
  * block, the FTP test on the fifth, so neither sits on the first lifting day and they are two days
  * apart. Recorded in docs/STATE-SOURCES.md.
  */
