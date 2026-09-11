@@ -13,7 +13,7 @@ export function formatRirTarget(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return '—';
   if (n >= 5) return '5+';
   if (Number.isInteger(n)) return String(n);
-  return `${Math.floor(n)}-${Math.ceil(n)}`;
+  return `${Math.floor(n)} to ${Math.ceil(n)}`; // "1 to 2", the approved form (Michael, 2026-09-10), never "1-2"
 }
 
 /** Which integer pills count as "the suggested target" — the bracket for a half-step, one for a whole. */

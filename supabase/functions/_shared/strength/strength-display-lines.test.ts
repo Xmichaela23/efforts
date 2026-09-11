@@ -43,13 +43,15 @@ Deno.test('the book word, the reserve, the adjusted weight in the athlete\'s uni
   assertEquals(formatStrengthExercise({ name: 'Front Squat', sets: 3, reps: 5, baseline_missing: true }), 'Front Squat 3×5 @ [Setup Required]');
 });
 
-Deno.test('the load-basis sentences, and the reserve when the row carries no target', () => {
+Deno.test('no "your call" sentence; the reserve reads "1 to 2" (Michael, 2026-09-10)', () => {
   assertEquals(formatStrengthExercise({ name: 'Calf Raise', sets: 3, reps: 12, load_basis: 'auto_regulated' }),
-    'Calf Raise 3×12 — your call — pick a weight that leaves 1-2 in reserve');
+    'Calf Raise 3×12');
   assertEquals(formatStrengthExercise({ name: 'Calf Raise', sets: 3, reps: 12, load_basis: 'auto_regulated', target_rir: 1.5 }),
-    'Calf Raise 3×12 · 1-2 in reserve — your call — pick a weight that leaves 1-2 in reserve');
+    'Calf Raise 3×12 · 1 to 2 in reserve');
   assertEquals(formatStrengthExercise({ name: 'Split Squat', sets: 3, reps: 8, load_basis: 'per_side' }),
-    'Split Squat 3×8 — per side — your call, so one number cannot mislead you');
+    'Split Squat 3×8');
+  assertEquals(formatStrengthExercise({ name: 'Bench Press', sets: 3, reps: 5, load_basis: 'awaiting_test' }),
+    'Bench Press 3×5 — weights arrive once you log the test');
 });
 
 Deno.test('a superset pair is one line, its sentence first', () => {
@@ -59,7 +61,7 @@ Deno.test('a superset pair is one line, its sentence first', () => {
     { name: 'Row', sets: 3, reps: 8, weight_display: '100 lb' },
   ]), [
     'Superset: Tate Press with Drag Curl — one set of each, rest, then again.',
-    'HYP · Tate Press + Drag Curl · superset · 3×6-12 · 1 in reserve — your call — pick a weight that leaves 1 in reserve',
+    'HYP · Tate Press + Drag Curl · superset · 3×6-12 · 1 in reserve',
     'Row 3×8 @ 100 lb',
   ]);
 });

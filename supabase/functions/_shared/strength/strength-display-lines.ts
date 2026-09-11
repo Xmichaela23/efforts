@@ -18,7 +18,7 @@ export type WeightUnit = 'lb' | 'kg';
  * in reserve". The phone's number, moved as it was. ⚠️ It disagrees with materialize-plan's own
  * `fallbackUnresolvedPercentDisplay` ("with 2 in reserve", D-071) on a different kind of row.
  */
-const RESERVE_WHEN_NO_TARGET = '1-2';
+const RESERVE_WHEN_NO_TARGET = '1 to 2'; // matches the approved HYP cue "1 to 2 in reserve" (Michael, 2026-09-10)
 
 const BOOK_WORDS = new Set(['ME', 'DE', 'SKILL', 'HYP']);
 
@@ -26,7 +26,7 @@ function rirTextOf(exercise: any): string | null {
   const r = Number(exercise?.target_rir);
   if (exercise?.target_rir == null || !Number.isFinite(r) || r < 0) return null;
   const lo = Math.floor(r), hi = Math.ceil(r);
-  return lo === hi ? String(lo) : `${lo}-${hi}`;
+  return lo === hi ? String(lo) : `${lo} to ${hi}`; // "1 to 2", the approved form, never "1-2"
 }
 
 const nameOf = (x: any) => String(x?.execution_name || x?.name || '').replace(/_/g, ' ').trim();
@@ -59,10 +59,9 @@ export function formatStrengthExercise(exercise: any, unit: WeightUnit = 'lb'): 
 
   // A by-feel row says which kind of by-feel it is; nothing is said where a weight exists.
   if (!weightDisplay && !exercise?.baseline_missing) {
+    // 2026-09-10 (Michael): the "your call — pick a weight…" sentences are ours and were cut from the
+    // drawer list; the row already carries its reserve. Only the app-state note about the test stays.
     const why: Record<string, string> = {
-      auto_regulated: `your call — pick a weight that leaves ${rirText ?? RESERVE_WHEN_NO_TARGET} in reserve`,
-      no_tested_lift: 'no tested lift for this pattern, so it stays your call',
-      per_side: 'per side — your call, so one number cannot mislead you',
       awaiting_test: 'weights arrive once you log the test',
     };
     const line = why[String(exercise?.load_basis ?? '')];
@@ -105,8 +104,7 @@ export function formatStrengthExerciseLines(items: any[], unit: WeightUnit = 'lb
       const sets = Number(e?.sets) || 0;
       const reps = e?.reps;
       const rirText = rirTextOf(e);
-      const tail = (!e?.weight_display && String(e?.load_basis || '') === 'auto_regulated')
-        ? ` — your call — pick a weight that leaves ${rirText ?? RESERVE_WHEN_NO_TARGET} in reserve` : '';
+      const tail = ''; // the "your call" clause is gone (2026-09-10); the reserve is already on the line
       out.push(`${bookWord}${nameOf(e)} + ${nameOf(next)} · superset${sets > 0 && reps != null ? ` · ${sets}×${reps}` : ''}${rirText ? ` · ${rirText} in reserve` : ''}${tail}`);
       i += 1;
       continue;
