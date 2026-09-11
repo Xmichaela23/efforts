@@ -172,6 +172,13 @@ export type SwapOption = {
   needsMaterialize: boolean;
   /** Non-blocking. Empty when the swap creates no conflict with the rest of that day. */
   warnings: string[];
+  /**
+   * ⛔ THE OPTION'S SECOND LINE, WHERE THE OPTION ITSELF KNOWS IT (2026-09-11). A workout option
+   * carries the session's own work, priced for this athlete (`qualityWorkLine`) — built beside the
+   * patch, off the same composed session, so the sheet and the tap cannot disagree. Every other kind
+   * leaves it absent and `lineFor` resolves theirs the way it always did.
+   */
+  line?: string;
 };
 
 /**

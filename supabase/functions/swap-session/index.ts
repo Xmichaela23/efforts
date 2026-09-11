@@ -22,6 +22,15 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireUser, AuthError } from '../_shared/require-user.ts';
 import { sanitizePosture } from '../_shared/state-trend/posture.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
+/**
+ * ⛔ THE THRESHOLD PACE THE SESSION'S OWN STEPS ARE PRICED AT — `materialize-plan`'s §1b-threshold
+ * tier, the same resolver it calls (`_resolvedThresholdSecPerMi`). The sheet's workout lines read it
+ * so a pace on the sheet is the pace on the row after the tap.
+ * ⚠️ A PLAN WITH A SNAPSHOT PIN FREEZES ITS PACES and `materialize-plan` prefers that pin; this reads
+ * the live resolver. The two agree unless a pinned plan's athlete has since moved, which is the
+ * pre-existing pin behaviour rather than something the sheet introduces.
+ */
+import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { applySwap, describeSheet, hasSportSwap } from '../_shared/session-swap/sheet.ts';
 import { loadWorkoutMinutes } from '../_shared/session-swap/workout-choice.ts';
 
@@ -63,16 +72,24 @@ async function loadPosture(db, userId: string) {
  * typed — the read `useResolvedFtp` did. The row is what a chosen workout is built against, the same
  * columns `generate-strength-plan` hands the composer for its anchors.
  */
-async function loadBaselines(db, userId: string): Promise<{ ftp: number | null; baselines: Record<string, unknown> | null }> {
+async function loadBaselines(db, userId: string): Promise<{
+  ftp: number | null;
+  baselines: Record<string, unknown> | null;
+  pricing: { thresholdSecPerMi: number | null; ftp: number | null; units: 'imperial' | 'metric' | null };
+}> {
   try {
     const { data } = await db.from('user_baselines').select('performance_numbers, learned_fitness, units')
       .eq('user_id', userId).maybeSingle();
     const r = resolveCurrentFtp({ learned_fitness: data?.learned_fitness, performance_numbers: data?.performance_numbers });
     const ftp = (r.source === 'learned' || r.source === 'manual') && Number.isFinite(r.value) && r.value > 0 ? r.value : null;
-    return { ftp, baselines: data ?? null };
+    // ⚠️ NO THRESHOLD ON FILE IS NULL, and the workout lines then print the page's percentages —
+    // the same state the session's own steps reach (D-285: no number is invented from a 5K).
+    const thr = resolveCurrentRunThresholdPace(data ?? {}).sec_per_mi ?? null;
+    const units = String(data?.units ?? '').toLowerCase() === 'metric' ? 'metric' : 'imperial';
+    return { ftp, baselines: data ?? null, pricing: { thresholdSecPerMi: thr, ftp, units } };
   } catch {
     // No FTP, no hard ride; no baselines, the workouts build with no anchors, as the composer does.
-    return { ftp: null, baselines: null };
+    return { ftp: null, baselines: null, pricing: { thresholdSecPerMi: null, ftp: null, units: null } };
   }
 }
 
@@ -89,10 +106,10 @@ async function loadWeek(db, userId: string, monday: string) {
   return [...rows, ...extra];
 }
 
-async function contextFor(db, userId: string, session, cache: Map<string, unknown[]>, posture, ftp, baselines = null) {
+async function contextFor(db, userId: string, session, cache: Map<string, unknown[]>, posture, ftp, baselines = null, pricing = undefined) {
   const monday = mondayOf(String(session.date));
   if (!cache.has(monday)) cache.set(monday, await loadWeek(db, userId, monday));
-  return { session, week: cache.get(monday), posture, ftp, baselines };
+  return { session, week: cache.get(monday), posture, ftp, baselines, pricing };
 }
 
 Deno.serve(async (req) => {
@@ -104,7 +121,7 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const db = createClient(supabaseUrl, serviceKey);
-    const [posture, { ftp, baselines }] = await Promise.all([loadPosture(db, userId), loadBaselines(db, userId)]);
+    const [posture, { ftp, baselines, pricing }] = await Promise.all([loadPosture(db, userId), loadBaselines(db, userId)]);
     const weeks = new Map<string, unknown[]>();
 
     // ── The glyph: which of these sessions offer a sport swap ────────────────────────────────────
@@ -124,7 +141,7 @@ Deno.serve(async (req) => {
     const { data: session } = await db.from('planned_workouts').select('*').eq('id', plannedId).eq('user_id', userId).maybeSingle();
     if (!session) return json({ success: false, error: 'Planned session not found' }, 404);
     const ctx = {
-      ...(await contextFor(db, userId, session, weeks, posture, ftp, baselines)),
+      ...(await contextFor(db, userId, session, weeks, posture, ftp, baselines, pricing)),
       workoutMinutes: await loadWorkoutMinutes(db, userId, session),
     };
 

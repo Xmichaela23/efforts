@@ -34,6 +34,12 @@ import {
   type Level,
 } from '../endurance-library/index.ts';
 import { translateEnduranceSession, type TranslatedSession } from '../standing-plan/session-vocabulary.ts';
+/**
+ * ⛔ THE SAME PARSER `materialize-plan` EXPANDS THE SESSION'S STEPS WITH (2026-09-11). The option's
+ * second line is rendered off the tokens the patch writes, so the sheet cannot describe a session
+ * the tap does not build.
+ */
+import { parseQualityWork, qualityWorkLine, type QualityPricing } from '../plan-tokens/quality-work.ts';
 import { FRAMES } from '../standing-plan/frames.ts';
 import { DEFAULT_SIZE } from '../standing-plan/volume-bounds.ts';
 // ⛔ ONE PLANNED-DURATION READER — the one the card prints its length from.
@@ -196,6 +202,31 @@ export function workoutChoicePatch(session: SwappableSession, slot: HardSlot, ne
 }
 
 /**
+ * ⛔⛔ WHAT THE WORKOUT IS, IN ONE LINE (Michael, 2026-09-11). The option carried a name and its
+ * minutes; two shapes from the same family read identically under them.
+ *
+ * ⛔ IT IS BUILT FROM THE TOKENS THE PATCH WRITES — `next.steps_preset`, the session's own — and
+ * parsed by `parseQualityWork`, which is what `materialize-plan` expands those same tokens with. The
+ * line and the steps the tap produces are one derivation; there is no second prescription here.
+ * ⚠️ THE WORK ONLY. The warm-up and cool-down tokens carry no percentage and parse to null, so they
+ * drop out by construction rather than by a name filter.
+ * ⚠️ EMPTY IS LEGAL: a family whose token is not one of the quality shapes says nothing rather than
+ * guessing at its own structure, and the option keeps its name and minutes alone.
+ */
+export function workoutLine(session: TranslatedSession, sport: 'run' | 'ride', pricing: QualityPricing): string | undefined {
+  const lines: string[] = [];
+  for (const token of session.steps_preset ?? []) {
+    const work = parseQualityWork(token);
+    if (!work) continue;
+    const line = qualityWorkLine(work, sport, pricing);
+    if (line) lines.push(line);
+  }
+  // ⚠️ ONE LINE. A session with two work tokens joins them with the same semicolon the page uses
+  // between a round and its rest, rather than wrapping onto a second row the sheet does not draw.
+  return lines.length > 0 ? lines.join('; ') : undefined;
+}
+
+/**
  * The sheet's workout options for one row. Leaves out the workout the row already is, the plan's own
  * workout while Back to the plan is offered, and a workout another session of the same family holds
  * that week — the builder's rule that no week builds one shape twice (`variantsTakenBy`,
@@ -207,6 +238,8 @@ export function workoutChoiceOptions(
   baselines?: EnduranceBaselines | null,
   /** Minutes by archetype, off the athlete's own expanded rows — see `loadWorkoutMinutes`. */
   minutesByWorkout?: Record<string, number> | null,
+  /** The numbers the line is priced with — see `workoutLine`. Absent prints the page's percentages. */
+  pricing: QualityPricing = {},
 ): SwapOption[] {
   const slot = hardSlotOf(session);
   if (!slot) return [];
@@ -236,6 +269,7 @@ export function workoutChoiceOptions(
       archetype: w.id,
       to: slot.sport,
       label: `${w.label} · ${minutes} min`,
+      line: workoutLine(next, slot.sport, pricing),
       patch: workoutChoicePatch(session, slot, next),
       needsMaterialize: true,
       warnings: [],

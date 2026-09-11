@@ -13,8 +13,10 @@ import {
   hardSlotOf,
   workoutChoiceOptions,
   workoutChoicePatch,
+  workoutLine,
   workoutsForSlot,
 } from './workout-choice.ts';
+import { parseQualityWork, qualityWorkLine } from '../plan-tokens/quality-work.ts';
 import { applySwap, describeSheet, optionId, receiptFor, sheetOptions } from './sheet.ts';
 import { revertOptions, WORKOUT_FROM_PREFIX } from './swap.ts';
 import { resolveSwapWrite } from './resolve-write.ts';
@@ -80,7 +82,7 @@ function rowOf(args: Record<string, unknown>, family: string, level?: number): R
 const archetypeOf = (r: Row) => r.tags.find((t) => t.startsWith('archetype:'))!.slice('archetype:'.length);
 const noSports = { run: 'develop', bike: 'develop' } as never;
 
-Deno.test('a hard session lists the other workouts for its family at its level, name and minutes, no line', async () => {
+Deno.test('a hard session lists the other workouts for its family at its level, each with its own work', async () => {
   const row = rowOf(home, 'run_near_threshold', 2);
   const ctx = { session: row, week: [row], posture: noSports, ftp: null, baselines: NO_THRESHOLD as never };
   const options = sheetOptions(ctx);
@@ -88,12 +90,49 @@ Deno.test('a hard session lists the other workouts for its family at its level, 
   assertEquals(options.map(optionId), expected.map((a) => `workout:${a.id}`));
   const sheet = await describeSheet(null, 'u1', ctx);
   expected.forEach((a, i) => {
-    const minutes = composedHardSession({ family: 'run_near_threshold', level: 2, archetype: a.id, baselines: NO_THRESHOLD as never }).duration;
-    assertEquals(sheet.options[i].label, `${a.label} · ${minutes} min`);
-    assertEquals(sheet.options[i].line, null);
+    const built = composedHardSession({ family: 'run_near_threshold', level: 2, archetype: a.id, baselines: NO_THRESHOLD as never });
+    assertEquals(sheet.options[i].label, `${a.label} · ${built.duration} min`);
     assertEquals(sheet.options[i].sport, false);
     assertEquals(sheet.options[i].kind, 'workout');
+    /**
+     * ⛔ THE SECOND LINE IS THE WORKOUT ITSELF (Michael, 2026-09-11), off the same tokens the patch
+     * writes. ⚠️ NO PRICING WAS PASSED, so it prints the page's percentages — the honest state, and
+     * the one the session's own steps reach when there is no threshold on file.
+     */
+    assertEquals(sheet.options[i].line, workoutLine(built, 'run', {}));
+    assert(/^\d+ × .* at \d+%/.test(sheet.options[i].line ?? ''), sheet.options[i].line ?? 'no line');
   });
+});
+
+/**
+ * ⛔⛔ THE LINE AND THE STEPS THE TAP WRITES ARE ONE DERIVATION. The sheet says the work; the patch
+ * writes the tokens; `materialize-plan` expands those tokens with the parser this line was rendered
+ * from. Swept over every hard row both programmes build, priced and unpriced.
+ */
+Deno.test('every offered workout\'s line is the work its own patch writes, priced for the athlete', () => {
+  const pricing = { thresholdSecPerMi: 7 * 60 + 30, ftp: 210, units: 'imperial' as const };
+  let checked = 0;
+  for (const c of CASES) {
+    for (const { row } of hardRows(c.args, NO_THRESHOLD)) {
+      const slot = hardSlotOf(row)!;
+      const seat = { ...row, date: '2026-09-16', id: 'x1' } as Row;
+      for (const o of workoutChoiceOptions(seat, [seat], NO_THRESHOLD as never, null, pricing)) {
+        const built = composedHardSession({ ...slot, archetype: o.archetype!, baselines: NO_THRESHOLD as never });
+        // The steps the tap writes, and the line the sheet showed, off the same tokens.
+        assertEquals((o.patch as { steps_preset: string[] }).steps_preset, built.steps_preset);
+        const work = built.steps_preset.map(parseQualityWork).filter(Boolean);
+        assertEquals(o.line, work.map((w) => qualityWorkLine(w, slot.sport, pricing)).join('; '));
+        assert((o.line ?? '').length > 0, `${slot.family} ${o.archetype} has no line`);
+        // Priced: a run line names a pace, a ride line names watts. Never a percentage here.
+        assert(
+          slot.sport === 'run' ? /\d+:\d\d\/mi/.test(o.line!) : /\d+ W/.test(o.line!),
+          `${slot.sport} ${slot.family} ${o.archetype}: ${o.line}`,
+        );
+        checked += 1;
+      }
+    }
+  }
+  assert(checked > 40, `only ${checked} options swept`);
 });
 
 Deno.test('an option\'s minutes are the plan\'s own expanded row of that workout, the composer\'s otherwise', () => {

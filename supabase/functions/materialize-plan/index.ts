@@ -24,6 +24,17 @@ import {
 } from '../_shared/swim/swim-plan-summary.ts';
 import { formatStrengthExercise, formatStrengthExerciseLines, type WeightUnit } from '../_shared/strength/strength-display-lines.ts';
 import { mobilitySetsFrom } from '../_shared/mobility-sets.ts';
+/**
+ * ⛔ THE QUALITY SHAPES ARE PARSED AND PRICED IN ONE PLACE (2026-09-11) — `_shared/plan-tokens/
+ * quality-work.ts`. The four branches below hand the token over and stamp ids on what comes back.
+ * The Instead sheet asks the same parser what a workout IS before the athlete taps it, so the sheet
+ * and the session it writes read one grammar and one arithmetic. The ride's recovery band moved with them.
+ */
+import {
+  parseQualityWork,
+  qualityRideSteps,
+  qualityRunSteps,
+} from '../_shared/plan-tokens/quality-work.ts';
 import { liveCueFor } from '../_shared/live-cue.ts';
 import { plannedPoolFor } from '../_shared/swim/planned-pool.ts';
 import { calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
@@ -1791,49 +1802,14 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
    * ⚠️ ADDITIVE. No existing token changes shape or meaning.
    */
   {
-    const mRound = lower.match(/^round_(\d+)x_((?:r?\d+s(?:\d+|vt1|easy|racepace))(?:-r?\d+s(?:\d+|vt1|easy|racepace))*)(?:_r(\d+)s)?$/);
-    if (mRound) {
-      const rounds = parseInt(mRound[1], 10);
-      const segs = mRound[2].split('-');
-      const rest_s = mRound[3] ? parseInt(mRound[3], 10) : 0;
-      const thr = secPerMiFromBaseline(baselines, 'threshold') || undefined;
-      const easy = secPerMiFromBaseline(baselines, 'easy') || undefined;
-      for (let r = 0; r < rounds; r += 1) {
-        for (const seg of segs) {
-          // ⚠️ A LEADING `r` MARKS A RECOVERY the source named — see `compoundRoundToken`. Without
-          // it a 50% segment would arrive as a work step at half of threshold.
-          const m2 = seg.match(/^(r?)(\d+)s(\d+|vt1|easy|racepace)$/);
-          if (!m2) continue;
-          const isRec = m2[1] === 'r';
-          const secs = parseInt(m2[2], 10);
-          const at = m2[3];
-          /**
-           * ⛔ `racepace` IS PRESCRIBED WORK WITH NO PACE, and that is honest rather than lazy. The
-           * library says so itself: *"Race pace — set by the race being trained for, not by this
-           * library."* p235 states the finish and its duration; no page gives it a percentage. Same
-           * treatment the all-out strides already get — the step reaches the watch, the number does
-           * not, because there is no number.
-           */
-          if (at === 'racepace') {
-            out.push({ id: uid(), kind: 'work', duration_s: secs });
-          } else if (at === 'vt1' || at === 'easy' || isRec) {
-            const pct = at === 'vt1' || at === 'easy' ? 0 : parseInt(at, 10) / 100;
-            out.push({
-              id: uid(), kind: 'recovery', duration_s: secs,
-              pace_sec_per_mi: pct > 0 && thr ? Math.round(thr / pct) : easy,
-            });
-          } else {
-            const pct = parseInt(at, 10) / 100;
-            out.push({
-              id: uid(), kind: 'work', duration_s: secs,
-              pace_sec_per_mi: thr && pct > 0 ? Math.round(thr / pct) : undefined,
-            });
-          }
-        }
-        if (rest_s > 0 && r < rounds - 1) {
-          out.push({ id: uid(), kind: 'recovery', duration_s: rest_s, pace_sec_per_mi: easy });
-        }
-      }
+    // ⛔ ONE PARSER, ONE ARITHMETIC — `parseQualityWork` + `qualityRunSteps`. The branch's own
+    // reasoning is kept on those functions; what stays here is the id stamp.
+    const work = parseQualityWork(lower);
+    if (work && work.kind === 'round') {
+      for (const st of qualityRunSteps(work, {
+        thresholdSecPerMi: secPerMiFromBaseline(baselines, 'threshold'),
+        easySecPerMi: secPerMiFromBaseline(baselines, 'easy'),
+      })) out.push({ id: uid(), ...st });
       return out;
     }
   }
@@ -1852,25 +1828,13 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
    * ⚠️ ADDITIVE — no existing token changes shape or meaning.
    */
   {
-    const mPct = lower.match(/^interval_(\d+)x(\d+)s_(\d+)pct(?:_[rR](\d+)s)?$/);
-    if (mPct) {
-      const reps = parseInt(mPct[1], 10);
-      const work_s = parseInt(mPct[2], 10);
-      const pct = parseInt(mPct[3], 10) / 100;
-      const float_s = mPct[4] ? parseInt(mPct[4], 10) : 0;
-      const thr = secPerMiFromBaseline(baselines, 'threshold') || undefined;
-      const pace = thr && pct > 0 ? Math.round(thr / pct) : undefined;
-      for (let i = 0; i < reps; i += 1) {
-        out.push({ id: uid(), kind: 'work', duration_s: work_s, pace_sec_per_mi: pace });
-        if (float_s > 0 && i < reps - 1) {
-          out.push({
-            id: uid(),
-            kind: 'recovery',
-            duration_s: float_s,
-            pace_sec_per_mi: secPerMiFromBaseline(baselines, 'easy') || undefined,
-          });
-        }
-      }
+    // ⛔ ONE PARSER, ONE ARITHMETIC — see the round branch above.
+    const work = parseQualityWork(lower);
+    if (work && work.kind === 'interval') {
+      for (const st of qualityRunSteps(work, {
+        thresholdSecPerMi: secPerMiFromBaseline(baselines, 'threshold'),
+        easySecPerMi: secPerMiFromBaseline(baselines, 'easy'),
+      })) out.push({ id: uid(), ...st });
       return out;
     }
   }
@@ -2150,7 +2114,6 @@ export /**
  * to hold, so the athlete freewheels or guesses. 45–55% of FTP is OURS: Coggan's active-recovery zone
  * (Z1, under 55%) is where every ERG platform parks a recovery. Not a training dose — a held resistance.
  */
-const RIDE_RECOVERY_PCT = { lo: 0.45, hi: 0.55 } as const;
 
 function expandBikeToken(tok: string, baselines: Baselines): any[] {
   const out: any[] = []; const lower = String(tok ?? '').toLowerCase(); const ftp = typeof baselines.ftp==='number'? baselines.ftp: undefined;
@@ -2218,46 +2181,24 @@ function expandBikeToken(tok: string, baselines: Baselines): any[] {
    * preference for a power FLOOR over a target.
    */
   {
-    const mRound = lower.match(/^round_(\d+)x_((?:r?\d+s(?:\d+|vt1|easy|racepace))(?:-r?\d+s(?:\d+|vt1|easy|racepace))*)(?:_r(\d+)s)?$/);
-    if (mRound) {
-      const rounds = parseInt(mRound[1], 10);
-      const segs = mRound[2].split('-');
-      const rest_s = mRound[3] ? parseInt(mRound[3], 10) : 0;
-      for (let r = 0; r < rounds; r += 1) {
-        for (const seg of segs) {
-          const m2 = seg.match(/^(r?)(\d+)s(\d+|vt1|easy|racepace)$/);
-          if (!m2) continue;
-          const isRec = m2[1] === 'r';
-          const secs = parseInt(m2[2], 10);
-          const at = m2[3];
-          if (at === 'racepace') out.push({ id: uid(), kind: 'work', duration_s: secs });
-          else if (at === 'vt1' || at === 'easy') out.push({ id: uid(), kind: 'recovery', duration_s: secs, power_range: pctRange(RIDE_RECOVERY_PCT.lo, RIDE_RECOVERY_PCT.hi) });
-          else if (isRec) {
-            const pct = parseInt(at, 10) / 100;
-            out.push({ id: uid(), kind: 'recovery', duration_s: secs, power_range: pctRange(pct, pct) });
-          } else {
-            const pct = parseInt(at, 10) / 100;
-            out.push({ id: uid(), kind: 'work', duration_s: secs, power_range: pctRange(pct, pct) });
-          }
-        }
-        if (rest_s > 0 && r < rounds - 1) out.push({ id: uid(), kind: 'recovery', duration_s: rest_s, power_range: pctRange(RIDE_RECOVERY_PCT.lo, RIDE_RECOVERY_PCT.hi) });
-      }
+    // ⛔ ONE PARSER, ONE ARITHMETIC — `parseQualityWork` + `qualityRideSteps`.
+    const work = parseQualityWork(lower);
+    if (work && work.kind === 'round') {
+      for (const st of qualityRideSteps(work, ftp)) out.push({ id: uid(), ...st });
       return out;
     }
   }
-  // SS: bike_ss_3x12min_R4min
-  let m = lower.match(/bike_ss_(\d+)x(\d+)min_r(\d+)min/);
-  if (m) {
-    const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60;
-    for(let i=0;i<reps;i++){
-      out.push({ id: uid(), kind:'work', duration_s: work, power_range: pctRange(0.85,0.95) });
-      if(rest && i < reps - 1) out.push({ id: uid(), kind:'recovery', duration_s: rest, power_range: pctRange(RIDE_RECOVERY_PCT.lo, RIDE_RECOVERY_PCT.hi) });
+  // SS: bike_ss_3x12min_R4min · Threshold: bike_thr_4x8min_R5min
+  // ⛔ ONE PARSER, ONE ARITHMETIC — the two bands and their two rest treatments live on
+  // `parseQualityWork` (`BIKE_BANDS`, `restPowered`), which the Instead sheet reads too.
+  {
+    const work = parseQualityWork(lower);
+    if (work && work.kind === 'band') {
+      for (const st of qualityRideSteps(work, ftp)) out.push({ id: uid(), ...st });
+      return out;
     }
-    return out;
   }
-  // Threshold: bike_thr_4x8min_R5min
-  m = lower.match(/bike_thr_(\d+)x(\d+)min_r(\d+)min/);
-  if (m) { const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60; for(let i=0;i<reps;i++){ out.push({ id: uid(), kind:'work', duration_s: work, power_range: pctRange(0.95,1.05) }); if(rest && i < reps - 1) out.push({ id: uid(), kind:'recovery', duration_s: rest }); } return out; }
+  let m: RegExpMatchArray | null = null;
   // VO2: bike_vo2_5x4min_R4min
   m = lower.match(/bike_vo2_(\d+)x(\d+)min_r(\d+)min/);
   if (m) { const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60; for(let i=0;i<reps;i++){ out.push({ id: uid(), kind:'work', duration_s: work, power_range: pctRange(1.1,1.2) }); if(rest && i < reps - 1) out.push({ id: uid(), kind:'recovery', duration_s: rest }); } return out; }

@@ -34,6 +34,7 @@ import type { EnduranceBaselines } from '../endurance-library/index.ts';
 import { swapButtonLabel, swapLineFor, swapSessionLine, SWAP_BACK_TO_PLAN, SWAP_SHEET_HEADER } from './copy.ts';
 import { resolveSwapWrite } from './resolve-write.ts';
 import { workoutChoiceOptions } from './workout-choice.ts';
+import type { QualityPricing } from '../plan-tokens/quality-work.ts';
 
 // deno-lint-ignore no-explicit-any
 type Db = any;
@@ -63,6 +64,13 @@ export type SwapContext = {
   baselines?: EnduranceBaselines | null;
   /** Each workout's length on the athlete's own expanded rows (`loadWorkoutMinutes`). */
   workoutMinutes?: Record<string, number> | null;
+  /**
+   * ⛔ THE NUMBERS A WORKOUT'S LINE IS PRICED WITH — the athlete's threshold pace, their FTP and the
+   * units they read. Resolved once by `swap-session` with the resolvers `materialize-plan` uses, so
+   * a pace or a watt on the sheet is the one the row carries after the tap. Absent prints the page's
+   * own percentages, which is what the session's steps carry in that state too.
+   */
+  pricing?: QualityPricing | null;
 };
 
 /**
@@ -99,7 +107,7 @@ export function sheetOptions(ctx: SwapContext): SwapOption[] {
     ...revertOptions(session, session.training_plan_id ?? null),
     ...sessionSwapExtras(session, posture, week),
     ...getDisciplineSwaps(session, availableDisciplines(week), sameDayOthers(session, week), posture, ftp),
-    ...workoutChoiceOptions(session, week, ctx.baselines ?? null, ctx.workoutMinutes ?? null),
+    ...workoutChoiceOptions(session, week, ctx.baselines ?? null, ctx.workoutMinutes ?? null, ctx.pricing ?? {}),
   ];
 }
 
@@ -132,8 +140,12 @@ export type Sheet = { header: string; rest_of_plan: boolean; options: SheetOptio
 
 async function lineFor(db: Db, userId: string, session: SwapRow, option: SwapOption): Promise<string | null> {
   const kind = option.kind ?? 'discipline';
-  // ⛔ A WORKOUT CARRIES NO SECOND LINE (Michael, 2026-09-11): its name and minutes are the option.
-  if (kind === 'workout') return null;
+  /**
+   * ⛔ A WORKOUT'S LINE IS THE WORKOUT ITSELF (Michael, 2026-09-11) — the page's structure with the
+   * athlete's own paces or watts in it, built beside the patch off the same tokens the tap writes
+   * (`workoutLine`). The option arrives carrying it; nothing is composed here.
+   */
+  if (kind === 'workout') return option.line ?? null;
   if (kind !== 'discipline' && kind !== 'hike') return swapLineFor(option);
   const replacing = (disciplineOf(session?.type) ?? 'run') as 'ride' | 'run' | 'swim';
   const long = intensityOf(session) === 'long';
