@@ -17,6 +17,7 @@ import { useSwapSheet, useSportSwapIds, postSwap, type SwapSheetOption } from '@
 import { formatSwimPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout, displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore, formZoneColor } from '@/lib/context-utils';
+import { LoadKeyForm } from './LoadBar';
 import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 // ⛔ ONE SWAP PREDICATE, shared by all three surfaces.
@@ -1387,6 +1388,24 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
    * ⚠️ ABSENT UNTIL THERE IS A NUMBER. An account with nothing analysed yet gets no line at all
    * rather than a dash — the old card's "no sessions logged yet" was a sentence about the database.
    */
+  const [showFormKey, setShowFormKey] = useState(false);
+
+  /**
+   * ⛔ THE ⓘ OPENS STATE'S OWN KEY, NOT A COPY (Michael 2026-09-10). `LoadKeyForm` is the component
+   * State's LOAD ⓘ renders — the approved sentence and the coach's zone table — imported, not
+   * reworded here. Both halves read the SAME payload object this line's number comes from, so the
+   * "Today: 47 − 63 = −16" arithmetic in the key can never disagree with the number above it.
+   */
+  const formKey = useMemo(() => {
+    const load = coachWeek.data?.weekly_state_v1?.load as {
+      fitness_fatigue?: { fitness: number | null; fatigue: number | null; form: number | null; fitness_prior?: number | null; fatigue_prior?: number | null } | null;
+      form_zones?: Array<{ range: string; word: string; meaning: string; current: boolean }>;
+    } | undefined;
+    const ff = load?.fitness_fatigue ?? null;
+    if (!ff || ff.form == null || !Number.isFinite(Number(ff.form))) return null;
+    return { ff, zones: load?.form_zones };
+  }, [coachWeek.data]);
+
   const formLine = useMemo(() => {
     const load = coachWeek.data?.weekly_state_v1?.load as { fitness_fatigue?: { form?: number | null }; label?: string | null } | undefined;
     const raw = load?.fitness_fatigue?.form;
@@ -1398,17 +1417,36 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     const shown = n > 0 ? `+${n}` : n < 0 ? `\u2212${Math.abs(n)}` : '0';
     return (
       <span className="inline-flex items-baseline gap-1 tabular-nums whitespace-nowrap">
-        <span style={{ color: 'rgba(255,255,255,0.45)' }}>form</span>
-        <span style={{ color: 'rgba(255,255,255,0.92)' }}>{shown}</span>
+        {/* ⛔ THE NUMBER IS THE SESSION CARDS' BODY SIZE AND THE WORDS ARE ONE STEP DOWN (Michael
+            2026-09-10) — the card set every line at 13px under session cards whose bodies run 15px,
+            and read as a footnote to them. 15 / 13 / 12 is `SessionDeck`'s own scale (its body rows
+            are text-[15px], its meta 13, its smallest 12), so the card now wears the deck's type. */}
+        <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.45)' }}>form</span>
+        {/* ⛔ THE SAME ⓘ STATE'S LOAD LABEL CARRIES (LoadBar.tsx) — same glyph, same dim treatment, and
+            it opens the same component. It sits after the WORD, where State's sits after "LOAD", not
+            at the end of the reading. It never opens State: the tap is swallowed, or reading the key
+            would navigate away from it. */}
+        {formKey ? (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowFormKey((o) => !o); }}
+            aria-label="What does form mean?"
+            aria-expanded={showFormKey}
+            className="bg-transparent border-none p-0 cursor-pointer text-white/45 align-baseline text-[13px]"
+          >
+            ⓘ
+          </button>
+        ) : null}
+        <span className="text-[15px]" style={{ color: 'rgba(255,255,255,0.92)' }}>{shown}</span>
         {zone ? (
           <>
-            <span style={{ color: 'rgba(255,255,255,0.38)' }}>·</span>
-            <span style={{ color: formZoneColor(zone) }}>{zone}</span>
+            <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.38)' }}>·</span>
+            <span className="text-[13px]" style={{ color: formZoneColor(zone) }}>{zone}</span>
           </>
         ) : null}
       </span>
     );
-  }, [coachWeek.data]);
+  }, [coachWeek.data, formKey, showFormKey]);
 
   /**
    * The week's own totals, off the rows already loaded. ⚠️ THE SAME SOURCE THE WEEK TAB'S BAR IS
@@ -1423,11 +1461,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     const d = (weeklyStats as { distances?: { run_meters?: number; cycling_meters?: number } } | null)?.distances;
     const toDist = (m: number) => (useImperial ? m / 1609.34 : m / 1000);
     const unit = useImperial ? 'mi' : 'km';
-    const parts: string[] = [];
+    // ⛔ EACH TOTAL WEARS ITS SPORT'S COLOUR AS A DOT, NEVER AS TEXT (Michael 2026-09-10). Same
+    // construction as State's load rows and the week-mix legend: a colour chip carries the sport,
+    // the words and the number stay white. `getDisciplineColor` is the one owner of those colours
+    // (SPORT_COLORS — run yellow, ride green, strength orange); no hex is written here.
+    const parts: Array<{ sport: string; label: string | null; value: string }> = [];
     // ⛔ THE SPORT LEADS, THEN ITS NUMBER (approved 2026-09-09). "11.2 mi run" puts the unit before
     // the noun and reads backwards aloud; "run 11.2 mi" is what a person says.
-    if ((d?.run_meters ?? 0) > 0) parts.push(`run ${toDist(d!.run_meters!).toFixed(1)} ${unit}`);
-    if ((d?.cycling_meters ?? 0) > 0) parts.push(`ride ${toDist(d!.cycling_meters!).toFixed(1)} ${unit}`);
+    if ((d?.run_meters ?? 0) > 0) parts.push({ sport: 'run', label: 'run', value: `${toDist(d!.run_meters!).toFixed(1)} ${unit}` });
+    if ((d?.cycling_meters ?? 0) > 0) parts.push({ sport: 'ride', label: 'ride', value: `${toDist(d!.cycling_meters!).toFixed(1)} ${unit}` });
 
     /**
      * ⛔ THE WEEK'S WEIGHT MOVED IS `weekly_stats.strength_volume_lb` (2026-09-10, audit H-T05). The
@@ -1437,11 +1479,28 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     const volume = Number((weeklyStats as { strength_volume_lb?: unknown } | null)?.strength_volume_lb) || 0;
     if (volume > 0) {
       const shown = useImperial ? volume : volume * 0.453592;
-      parts.push(`${Math.round(shown).toLocaleString()} ${useImperial ? 'lb' : 'kg'}`);
+      // ⚠️ NO WORD IN FRONT OF THE WEIGHT — the orange dot is what says "lifting", exactly as it did
+      // when this entry was a bare number in the joined string.
+      parts.push({ sport: 'strength', label: null, value: `${Math.round(shown).toLocaleString()} ${useImperial ? 'lb' : 'kg'}` });
     }
 
     // ⚠️ NOTHING LOGGED IS NO LINE AT ALL, rather than a lone separator with an empty tail.
-    return parts.length > 0 ? parts.join(' · ') : null;
+    if (parts.length === 0) return null;
+    return (
+      <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        {parts.map((p) => (
+          <span key={p.sport} className="inline-flex items-baseline gap-1.5 whitespace-nowrap">
+            <span
+              aria-hidden
+              className="inline-block w-1.5 h-1.5 rounded-full shrink-0 translate-y-[-1px]"
+              style={{ backgroundColor: getDisciplineColor(p.sport) }}
+            />
+            {p.label ? <span className="text-[13px]" style={{ color: 'rgba(255,255,255,0.45)' }}>{p.label}</span> : null}
+            <span className="text-[15px]" style={{ color: 'rgba(255,255,255,0.92)' }}>{p.value}</span>
+          </span>
+        ))}
+      </span>
+    );
   }, [weeklyStats, allUnifiedItems, useImperial]);
 
   const leadSessionId = useMemo(() => {
@@ -2231,9 +2290,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           * ⚠️ NO NUMBERS, NO CARD — an account with nothing analysed or logged gets nothing here.
           */}
         {formLine || weekTotalsLine ? (
-          <button
-            type="button"
+          /**
+           * ⚠️ A DIV, NOT A BUTTON, SINCE THE ⓘ WENT IN (2026-09-10) — a button inside a button is
+           * invalid HTML and the inner one stops working. The card keeps the role, the label and the
+           * keyboard behaviour a button gave it; the ⓘ is the only real <button> inside it.
+           */
+          <div
+            role="button"
+            tabIndex={0}
             onClick={(e) => { e.stopPropagation(); try { window.dispatchEvent(new CustomEvent('open:state')); } catch { /* no window */ } }}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' && e.key !== ' ') return;
+              e.preventDefault(); e.stopPropagation();
+              try { window.dispatchEvent(new CustomEvent('open:state')); } catch { /* no window */ }
+            }}
             aria-label="Form and the week so far — open State"
             className="block w-full text-left cursor-pointer"
             style={{
@@ -2243,19 +2313,27 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               border: '1px solid rgba(255,255,255,0.08)',
             }}
           >
-            {formLine ? <span className="block text-[13px] font-light">{formLine}</span> : null}
+            {formLine ? <span className="block font-light">{formLine}</span> : null}
+            {showFormKey && formKey ? (
+              /* ⚠️ The card grows to fit it (Michael 2026-09-10) — the key is not scrolled or clipped. */
+              <div onClick={(e) => e.stopPropagation()} className="mt-1.5 max-w-[min(100%,360px)]">
+                <LoadKeyForm ff={formKey.ff} zones={formKey.zones} />
+              </div>
+            ) : null}
             {weekTotalsLine ? (
               <span
-                className="block text-[13px] font-light tabular-nums"
-                style={{ color: 'rgba(255,255,255,0.72)', marginTop: formLine ? 4 : 0 }}
+                className="block font-light tabular-nums"
+                style={{ color: 'rgba(255,255,255,0.72)', marginTop: formLine ? 6 : 0 }}
               >
                 {weekTotalsLine}
               </span>
             ) : null}
+            {/* ⚠️ THE SMALLEST TEXT ON THE CARD, AND IT STAYS AT 12px — Garmin's line is attribution,
+                not a reading. The lines above it grew; it did not, so it is still the smallest. */}
             {garminDerived && formLine ? (
               <GarminDerivedDataLine className="text-[12px]" style={{ marginTop: 6 }} />
             ) : null}
-          </button>
+          </div>
         ) : null}
         </div>
         </div>
