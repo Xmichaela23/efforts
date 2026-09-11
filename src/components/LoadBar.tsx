@@ -1,5 +1,5 @@
 import React from 'react';
-import { getDisciplineColor, getDisciplineColorRgb, formZoneColor } from '@/lib/context-utils';
+import { formZoneColor } from '@/lib/context-utils';
 import { GarminDerivedDataLine } from '@/components/ProviderAttribution';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -41,7 +41,7 @@ interface LoadBarProps {
   /** Kept for the callers' sake (State and Home pass it); NOT read since 2026-09-04 — the reconciled load word is off the bar. */
   loadStatus?: LoadBarStatus | null;
   weekIntent?: string | null;
-  /** compact variant (calendar) — the three numbers only, no composition strip. */
+  /** compact variant (calendar). ⚠️ No effect since the composition strip left the card (2026-09-10). */
   compact?: boolean;
   hasActivePlan?: boolean;
   plannedThisWeek?: number;
@@ -64,17 +64,6 @@ interface LoadBarProps {
 // programme-aware `loadRead` above, which carries its own colour.
 
 
-// One discipline vocabulary app-wide (Michael 2026-07-22): "bike" not "Ride" (swim-bike-run is the tri
-// canon), lowercase to match the calm secondary-label style everywhere else on the screen.
-const DISPLAY_NAME: Record<string, string> = {
-  run: 'run', running: 'run', bike: 'bike', ride: 'bike', cycling: 'bike',
-  swim: 'swim', swimming: 'swim', strength: 'strength', strength_training: 'strength',
-  weight: 'strength', weights: 'strength', mobility: 'mobility', pilates_yoga: 'mobility',
-};
-function disciplineName(type: string): string {
-  const t = (type || '').toLowerCase();
-  return DISPLAY_NAME[t] ?? (type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Other');
-}
 
 /**
  * The separator BEFORE a LOAD reading. It sits in a fixed 12 px slot that the reading pulls into the gap
@@ -168,7 +157,7 @@ export function LoadKey({ ff, zones }: { ff: NonNullable<LoadBarData['fitness_fa
   );
 }
 
-export default function LoadBar({ load, compact, garminDerived = false }: LoadBarProps) {
+export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
   const [showKey, setShowKey] = React.useState(false);
   // ⛔ THE LOAD READ IS TRAININGPEAKS' PMC, WHOLE (2026-09-04, Michael: "each metric has to have an absolute
   // reference point", never a hodgepodge). Fitness · Fatigue · Form, and Friel's Form zone word beside form.
@@ -196,11 +185,10 @@ export default function LoadBar({ load, compact, garminDerived = false }: LoadBa
   const formNum = fmt1(ff?.form);
   const formSign = formNum == null || formNum === 0 ? '' : formNum > 0 ? '+' : '−';
 
-  // Weekly COMPOSITION — the rolling seven days' load by discipline, as the coach summed it from
-  // `daily_load_7d`. This is the primary load visual; the per-day rhythm lives in the calendar.
-  const comp = Array.isArray(load.composition_7d) ? load.composition_7d : [];
-  const total = load.total_7d ?? 0;
-  const dominant = load.dominant ?? null;
+  // ⛔ THE LOAD-SHARE BAR LEFT THIS CARD (Michael, 2026-09-10). "Where your load is going", its bar and its
+  // legend are gone; the same `load.composition_7d` shares and `load.total_7d` now print once, as the legend
+  // line of THIS WEEK · SESSIONS PLANNED VS DONE (`WeekMixBar`). LOAD keeps fitness / fatigue / form and
+  // the Garmin line.
 
   return (
     <div className="px-3 py-3">
@@ -225,62 +213,6 @@ export default function LoadBar({ load, compact, garminDerived = false }: LoadBa
       </div>
       {showKey && ff && <LoadKey ff={ff} zones={load.form_zones} />}
 
-      {/* Composition strip — the primary load visual (full surface only). */}
-      {!compact && comp.length > 0 && total > 0 && (
-        <div className="mt-3">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="readout-label text-[11px] uppercase tracking-[0.08em]">Where your load is going</span>
-            {/* The composition below is the ROLLING last-7-days load (daily_load_7d). Show that same
-                window's total here — NOT wtd_actual_load (week-to-date), which is a different window and
-                mislabeled this number as WTD over a 7-day bar. `total_7d` is the sum the bar itself represents. */}
-            <span className="readout-num text-[11px]">{Math.round(total)} pts · last 7 days</span>
-          </div>
-          <div className="flex h-6 rounded-md overflow-hidden gap-[2px]">
-            {comp.map((c) => {
-              const isDom = c.discipline === dominant;
-              return (
-                <div
-                  key={c.discipline}
-                  className="flex items-center justify-center min-w-[6px]"
-                  style={{
-                    // Segment width in proportion to its points; the printed share is the coach's `share_pct`.
-                    flexGrow: c.load, flexBasis: 0,
-                    backgroundColor: getDisciplineColor(c.discipline),
-                    boxShadow: isDom ? 'inset 0 0 0 1.5px rgba(255,255,255,0.42)' : undefined,
-                  }}
-                  title={`${disciplineName(c.discipline)} ${c.share_pct}%`}
-                >
-                  {/* ⛔ NO TEXT INSIDE THE BAR (FIXLIST 1e, 2026-09-01). Every percentage was printed
-                      TWICE — once here and again in the legend two lines below, which already carries
-                      the swatch, the sport name and the share for EVERY segment in that sport's colour.
-                      ⚠️ AND THE IN-BAR LABEL WAS INCONSISTENT BY CONSTRUCTION: it was gated on
-                      `c.pct >= 26`, so on a typical split only the dominant segment cleared it. The bar
-                      read as one labelled block beside two anonymous ones, sitting over a legend that
-                      labelled all three. The segment's own colour plus the legend swatch is the tie,
-                      and the dominant segment keeps its inset ring above — a mark, not a second
-                      caption. The `title` tooltip keeps the per-segment read on hover. */}
-                </div>
-              );
-            })}
-          </div>
-          <div className="flex flex-wrap gap-x-3.5 gap-y-1 mt-2">
-            {comp.map((c) => (
-              // Each legend entry carries its OWN sport accent, so its share glows in that sport's
-              // colour rather than sitting flat white next to a colour swatch (2026-08-15). The
-              // swatch stays — it ties the entry to its segment in the bar above.
-              <span
-                key={c.discipline}
-                className="inline-flex items-center gap-1.5 text-[12.5px] text-white/70"
-                style={{ ['--card-accent-rgb' as any]: getDisciplineColorRgb(c.discipline) }}
-              >
-                <span className="inline-block w-2 h-2 rounded-[2px]" style={{ backgroundColor: getDisciplineColor(c.discipline) }} />
-                <span className={c.discipline === dominant ? 'text-white font-semibold' : ''}>{disciplineName(c.discipline)}</span>
-                <span className="readout-num text-[11px]">{c.share_pct}%</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
       {/* Garmin API Brand Guidelines v6.30.2025 — derived-data attribution, verbatim, as the plate's
           footer. Never in the ⓘ key above: "never bury the Garmin attribution in … expandable containers". */}
       {garminDerived ? <GarminDerivedDataLine className="mt-2.5" /> : null}

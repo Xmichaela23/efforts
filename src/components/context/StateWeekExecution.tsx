@@ -12,6 +12,9 @@ import { WeekMixBar, WeekAccentLine, daysSinceYmd } from './state-primitives';
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export default function StateWeekExecution({ wsv, week }: { wsv: any; week: any }) {
+  // The LOAD card's rolling-seven-day shares, printed in this block's legend (2026-09-10).
+  const comp = Array.isArray(wsv?.load?.composition_7d) ? wsv.load.composition_7d : [];
+  const loadShare = comp.length > 0 ? { rows: comp, totalPts: Number(wsv.load.total_7d) || 0 } : null;
   const we = (wsv as any).week_execution_v1 as {
     counts?: Array<{ discipline: string; planned: number; done: number }>;
     accent?: { sentence: string; trace?: { detail?: string } } | null;
@@ -33,7 +36,7 @@ export default function StateWeekExecution({ wsv, week }: { wsv: any; week: any 
       {/* Rule 4 (DESIGN_GUIDELINES "Layout Rules"): section labels are UPPERCASE, tracked — the same
           voice as BODY / STRENGTH, not a second lowercase system for the same job. */}
       <div className="px-4 pt-3 text-[12px] font-semibold tracking-[0.12em] uppercase text-white/55">{sectionLabel}</div>
-      {counts.length > 0 && <WeekMixBar counts={counts} hasPlan={hasPlan} partialWeek={partialWeek} />}
+      {counts.length > 0 && <WeekMixBar counts={counts} hasPlan={hasPlan} partialWeek={partialWeek} loadShare={loadShare} />}
       {accent?.sentence && <WeekAccentLine sentence={accent.sentence} detail={accent.trace?.detail ?? null} />}
     </>
   );
