@@ -1,52 +1,38 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-10 night, PM chat — the Today screen, kill-ours, and the client-decision audit; ALL PUSHED AND DEPLOYED)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-11 morning, PM chat — State order, the Today status card, the on-the-day workout chooser; ALL PUSHED AND DEPLOYED)
 
-> **Read `docs/SESSION-2026-09-09-10-handoff.md` first.** Two days, ~120 commits, every one on main, web from
-> the push, 47+42+35 edge-function deploys, iOS synced. Michael's own data was re-run through the app's own
-> pipeline (106 sessions twice, 45 lifts, six weekly summaries); nothing was hand-edited.
+> **Read `docs/SESSION-2026-09-11-handoff.md` first, then `docs/SESSION-2026-09-09-10-handoff.md`.** main =
+> `a4bdab0e` plus docs. Last deploy: swap-session and materialize-plan, 2026-09-11 17:15 UTC. iOS synced.
+> Nothing from 2026-09-09 to 2026-09-11 has been seen on a phone except State scrolling and the Today lift card.
 
 ### YOUR JOB
-1. **Device walk.** Nothing from these two days has been seen on a phone except State scrolling and the
-   Today lift card. Michael builds in Xcode and rebuilds his plan from Adjust; anything that looks wrong comes
-   back as a screenshot. Fix, do not redesign.
-2. **The readiness list** (docs/FOUNDATION-READINESS.md): monitoring (B4), the Open-Meteo commercial plan
-   (B14, launch gate), error handling on every call. That is what "commercial grade" still needs.
-3. **Copy still pending Michael's yes:** the club-night and season-wizard sentences (moved word for word,
-   never checked against a page); the concentration curl how-to (approved 2026-09-10 late, marked DRAFT in
-   `grid.ts` — flip the marker).
+1. **Device walk after Michael rebuilds his plan.** He deletes and rebuilds once the pending decisions below
+   land. Check: Today status card (form (i), sport dots); State order LOAD, THIS WEEK, BODY; the Standard
+   Focus builder's hard rows (one line, no shape list); on a planned hard run and hard ride, the Instead
+   sheet lists workouts with a paces-and-watts line; a picked workout's steps match its line. Also open one
+   planned run and one ride: materialize-plan's token arithmetic moved into a shared file on 2026-09-11.
+2. **Seven decisions waiting on Michael**, listed in the 2026-09-11 session doc: ride caps (120 easy, 210
+   long), deleting the 48-hour clause from the three test descriptions, the chooser's workout names, the
+   pick confirmation sentence and "Swap sport" label, text size, club-night and season-wizard sentences.
+   Print exact words and wait for a yes.
+3. **The readiness list** (docs/FOUNDATION-READINESS.md): B4 monitoring, B14 Open-Meteo commercial plan
+   (launch gate), error handling on every call.
 
-### THE RULES THAT CHANGED THESE TWO DAYS (memory files carry them; verify before citing)
-- **Never use ours** — no athlete-facing line or number that is not on a book page; an OURS marker is a flag
-  to remove, not a licence. (`feedback_never_use_ours_in_copy`)
-- **Smart server, dumb client, enforced**: docs/AUDIT-client-decisions-2026-09-10.md found 244 phone-side
-  decisions; the 31-item work order is BUILT through stage 4. New work orders name the server function that
-  decides before they name the screen.
-- **Never `git commit -a`** in this repo; terminals share the tree. (`feedback_never_commit_dash_a`)
-
-### WHAT SHIPPED (headline; the session doc has the commit table)
-- Today screen: Home = Today + Week tabs; cues per set from the book (ME/DE/SKILL/HYP, Michael's words);
-  spacing line with the chevron; ride/run family lines; done cards with the four tiles and the good-news
-  line; weather (live, Open-Meteo credit); status card (form, week totals, Garmin line); Week tab rebuilt
-  (rows fill the pane, sessions as lines, planned-vs-done bar, press-and-hold to move).
-- Kill-ours: every strength line traces to a page; DE row on an untested lift is By feel; test rows and
-  the blank-lift test reshaped; plan-card description lines cut to the approved ones.
-- Endurance swaps: trainer/treadmill, easy any sport, hard run→ride, long day (ride/run/hike), back to the
-  plan; a swapped session is the library's own session; swap-session edge function decides and writes.
-- Garmin/Strava attribution on every new surface; Open-Meteo credit; launch gate B14.
-- Audit stages 1–4: zones/paces/race results/resume/use-this-number/goal settings/imports/Mark as
-  Complete/saved max/test week (stage 1); one server value per fact (stage 2); 13 numbers-with-no-source items
-  (stage 3); day order, FIT import, phone recording, race "a time" (stage 4). Plus: kit gate strict
-  (preacher curl → concentration curl at home), bar picker and bar-in-ledger only on bar lifts, rebuild turns
-  derived rows to By feel, chart series in `workouts.display_series` (600 pts) after the list timeout.
+### THE RULES (memory files carry them; verify before citing)
+- **Never use ours**: no athlete-facing line or number that is not on a book page.
+- **All copy through Michael**: a feature go is not a copy go.
+- **Smart server, dumb client**: a new work order names the server function that decides before the screen.
+- **Never `git commit -a`** in this repo; terminals share the tree.
+- **Deploy every importer** of a changed `_shared` file (grep `supabase/functions --include='index.ts'`).
 
 ### UNVERIFIED (what would settle it)
-- Every screen on a real device (Michael's walk).
-- The heavy-set good-news line may be missing until a session's next recompute (ordering vs the ladder write).
-- On a day with several planned swims the session detail can compare against the wrong planned swim
-  (pre-existing).
-- `generate-combined-plan/week-builder.ts decideOrdering` still writes AM/PM at activation (second copy of
-  day order; not moved).
+- Every screen from 2026-09-09 on, on a real device (item 1).
+- The deployed swap-session with option lines has not been exercised on a live plan; the commit's live check
+  ran swap-session locally against the live database with the deployed materialize-plan.
+- A rebuild resets a workout chosen on the day (found, not fixed).
+- Carried: heavy-set good-news line ordering; multi-swim day compares the wrong planned swim;
+  `generate-combined-plan/week-builder.ts decideOrdering` is a second copy of day order.
 
 ## (older banner) THE TRAIN MENU THREAD — Run + Strength is true to p246 (written 2026-09-07 night, PM chat; all SHIPPED)
 

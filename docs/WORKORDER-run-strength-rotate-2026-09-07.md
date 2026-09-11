@@ -316,6 +316,11 @@ coming round again on its own period. Account deleted.
 
 ### 10b. ⛔ THE LINE'S SECOND HALF IS A PROMISE THE APP CANNOT KEEP TODAY — a finding, not a fix
 
+> **CLOSED 2026-09-11 by `a7e75fe3` and `a4bdab0e` (deployed).** A planned, not-done hard run or ride now
+> offers the other workouts for its family and level on the Instead sheet, each with a line in the athlete's
+> paces and watts (`_shared/session-swap/workout-choice.ts`, `_shared/plan-tokens/quality-work.ts`). A tap
+> rebuilds that one session, just today. Everything below is history.
+
 *"Choose the workout on the day"* has no path behind it, and this was searched for rather than
 assumed. `slotVariantOptions` has three callers and all three are the BUILDER (`HardSlotChoices`,
 `NonRaceBuilder`, its own lib); `applyVariantPicks` is called only from `sport-slots.ts` at compose

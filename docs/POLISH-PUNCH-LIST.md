@@ -14,6 +14,15 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — 2026-09-11 (State order, status card, on-the-day workout chooser — PUSHED, DEPLOYED, iOS synced, NOT device-checked)
+- Decide: ride caps (easy 120, long 210); delete the 48-hour clause from the three test descriptions; the
+  chooser's workout names; the pick confirmation sentence; "Swap sport" label; chooser text size.
+  Details in docs/SESSION-2026-09-11-handoff.md.
+- Then rebuild the plan. Look for: form (i) and sport dots on the Today status card; State reads LOAD, THIS
+  WEEK, BODY (as you logged); on a planned hard run or ride, Instead lists workouts with a line like
+  "4 × 6:30 at 7:09/mi, 4 min easy between"; a picked workout's steps match that line; one planned run and
+  one ride still show their usual steps.
+
 ## ⏳ AWAITING MICHAEL — 2026-09-10 (Today/Week screens, kill-ours, audit stages 1–4 — PUSHED, DEPLOYED, iOS synced, NOT device-checked)
 - Build in Xcode, rebuild the plan from Adjust once. Walk Today, Week, State, a session drawer, the logger,
   Profile, Connections. Send screenshots of anything off. See docs/SESSION-2026-09-09-10-handoff.md.
