@@ -66,12 +66,13 @@ interface LoadBarProps {
 
 
 /**
- * The separator BEFORE a LOAD reading. It sits in a fixed 12 px slot that the reading pulls into the gap
+ * The separator BEFORE a LOAD reading. Exported since 2026-09-10 so BODY's readings row draws with the
+ * same separator as this one (one construction, not a copy that drifts). It sits in a fixed 12 px slot that the reading pulls into the gap
  * before it (`-ml-3`), and the row clips its left edge — so on a line the row wraps onto, the first
  * reading's separator is cut off instead of a separator dangling at the end of the line above (2026-09-10:
  * the windows made the row wrap at 390 px).
  */
-function Dot() {
+export function Dot() {
   return <span aria-hidden className="inline-block w-3 text-center text-white/30 select-none">·</span>;
 }
 
