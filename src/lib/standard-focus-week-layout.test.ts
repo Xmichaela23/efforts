@@ -359,10 +359,9 @@ Deno.test('⛔ A QUALITY SLOT IGNORES A MINUTES KEY — the frame owns the page\
 
 Deno.test('⛔ THE PER-SESSION HEADER STATES WHAT IS ASKED AND WHAT THE PROGRAMME DECIDES', () => {
   const lines = perSessionIntroFor('all_rounder');
-  assertEquals(lines.length, 3, 'three peer lines, no opener');
-  assert(/written by the program, set by set/.test(lines[0]), lines[0]);
-  assert(/easy sessions and the long day/.test(lines[1]), lines[1]);
-  assert(/run club or ride club/.test(lines[2]) && /Your week card/.test(lines[2]), lines[2]);
+  // ⚠️ TWO LINES SINCE 2026-09-11 (Michael's words): the club line is cut until clubs are fleshed out.
+  assertEquals(lines, ['Hard sessions are set length.', 'Easy sessions you set based on your current volume.']);
+  assertEquals(/run club|Your week card/.test(lines.join(' ')), false, 'the club line is back before the feature is');
   assertEquals(/alongside the lifting/.test(lines.join(' ')), false, 'the empty opener is back');
   assertEquals(/conversation pace/.test(lines.join(' ')), false, 'the long day is the athlete\'s (p275), not "whatever you hold comfortably"');
   for (const line of [...lines, WEEKLY_VOLUME_IS_THE_SUM_LINE]) {

@@ -257,10 +257,14 @@ export function perSessionIntroFor(
    * Your week card, where a club is placed. ⚠️ THREE PEER LINES, no header line: the old opener
    * ("Standard Focus runs endurance alongside the lifting") was cut as saying nothing.
    */
+  /**
+   * ⛔ MICHAEL'S WORDS, 2026-09-11, VERBATIM. Two lines. The club line — *"A hard session or the long
+   * day can be your run club or ride club. You set that on the Your week card."* — is cut until the
+   * club feature is fleshed out (his ruling the same day: clubs are parked for their own session).
+   */
   return [
-    "The hard sessions are written by the program, set by set, so their length can't be changed.",
-    'The easy sessions and the long day are as long as your current volume allows.',
-    'A hard session or the long day can be your run club or ride club. You set that on the Your week card.',
+    'Hard sessions are set length.',
+    'Easy sessions you set based on your current volume.',
   ];
 }
 
