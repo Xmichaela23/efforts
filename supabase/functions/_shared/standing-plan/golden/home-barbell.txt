@@ -36,9 +36,9 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -65,9 +65,9 @@ WEEK 02  column=standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 45 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -88,9 +88,9 @@ WEEK 02  column=standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -115,9 +115,9 @@ WEEK 03  column=standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -138,9 +138,9 @@ WEEK 03  column=standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -165,9 +165,9 @@ WEEK 04  column=standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 43 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -188,9 +188,9 @@ WEEK 04  column=standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -215,9 +215,9 @@ WEEK 05  column=standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 45 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -238,9 +238,9 @@ WEEK 05  column=standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -265,9 +265,9 @@ WEEK 06  column=standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -288,9 +288,9 @@ WEEK 06  column=standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -315,9 +315,9 @@ WEEK 07  column=standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 43 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -338,9 +338,9 @@ WEEK 07  column=standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -364,9 +364,9 @@ WEEK 08  column=standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 45 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -387,9 +387,9 @@ WEEK 08  column=standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -413,9 +413,9 @@ WEEK 09  column=standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -436,9 +436,9 @@ WEEK 09  column=standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -462,9 +462,9 @@ WEEK 10  column=standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 43 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -485,9 +485,9 @@ WEEK 10  column=standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -511,9 +511,9 @@ WEEK 11  column=standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 45 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -534,9 +534,9 @@ WEEK 11  column=standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -560,9 +560,9 @@ WEEK 12  column=standard
       ME     Bench Press                    1x1-5        @ 135           | 90% · plan 45wx5 75wx5 100wx3 120wx2 135x
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
+      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -583,9 +583,9 @@ WEEK 12  column=standard
       ME     pull up                        1x1-5        @ By feel       | no_tested_lift
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Concentration Curl" · how-to
-      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Pullover Machine               3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Flat-Bench Dumbbell Pullover" · how-to
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me

@@ -49,6 +49,8 @@ import {
   pickOptions,
   VIADA_PICKS,
   type ViadaPickKey,
+  focusedArmFit,
+  frameHasArmsSuperset,
 } from './accessory-picks.ts';
 import {
   advancedTierSessions,
@@ -1362,8 +1364,15 @@ function exerciseForSlot(
        */
       const demoteBodyweight = ownsLoadingImplement(args.equipment ?? null);
 
+      /**
+       * ⛔ p274's ARMS CELLS (2026-09-10) — see `FOCUSED_ARMS_PICKS`. On a day the frame prints "(arms) superset",
+       * the pair takes the arm entries of p222's list and the row after it takes the rest.
+       */
+      const armsCell = frameHasArmsSuperset(slotKey, args.frame);
+      const inSuperset = /\(arms\)/i.test(String(slot.sourceText || ''));
       const rank = (name: string): number[] => [
         isTaken(name) ? 1 : 0,
+        armsCell ? focusedArmFit(pattern, inSuperset, name) : 0,
         his.has(canonicalize(name)) ? 0 : 1,
         demoteBodyweight && isBodyweightLoad(name) ? 1 : 0,
         dayReservesAsymmetry && isAsymmetrical(name) ? 1 : 0,

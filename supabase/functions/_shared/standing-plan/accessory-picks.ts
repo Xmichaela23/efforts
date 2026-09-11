@@ -861,6 +861,51 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
 export const CORE_PICK_KEYS = ['core', 'core_2', 'core_3'] as const;
 
 /**
+ * ⛔⛔ p274's "(arms)" — WHICH ENTRIES OF THE FOCUSED UPPER LISTS THE SUPERSET TAKES (2026-09-10).
+ *
+ * p274 prints, on day 1 and day 4 of the All Rounder, *"2 × HYP: focused push/pull (arms) superset"* and then
+ * *"1 × HYP: focused push"* (day 1) or *"1 × HYP: focused pull"* (day 4). The parenthetical names the pair: the
+ * arm movements of p222's two focused lists. So the push half of the superset is his triceps work — triceps
+ * pushdowns, Tate press, behind-the-neck DB triceps extensions, skull crushers — and the pull half his biceps
+ * work — preacher curls, spider curls, drag curls. The row printed after the pair takes the rest of the list:
+ * pec deck and lateral raises on day 1, the rear delt machine and the pullover machine on day 4.
+ *
+ * ⚠️ WHAT IT REPLACES: the grid's own order, which put the lateral raise (a shoulder move) in the push half on
+ * every upper day and left a triceps move alone after the pair.
+ * ⚠️ AN OPTION OFF HIS LIST COUNTS BY ITS PRIME MOVER — a banded pushdown is triceps work — so a kit that
+ * reaches none of his arm movements still fills the pair with arm work before anything else.
+ */
+export const FOCUSED_ARMS_PICKS: ReadonlySet<ViadaPickKey> = new Set<ViadaPickKey>(['iso_push', 'iso_pull_a', 'iso_pull_b']);
+
+const FOCUSED_ARMS: Record<'push_upper' | 'pull_upper', { list: string[]; muscle: string }> = {
+  push_upper: { list: ['triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher'], muscle: 'triceps' },
+  pull_upper: { list: ['preacher curl', 'spider curl', 'drag curl'], muscle: 'biceps' },
+};
+
+/** 0 when the movement belongs in this row of the arms cells (arm work in the pair, the rest after it), 1 when not. */
+export function focusedArmFit(pattern: string, inSuperset: boolean, name: string): number {
+  const cell = FOCUSED_ARMS[pattern as 'push_upper' | 'pull_upper'];
+  if (!cell) return 0;
+  const key = canonicalize(name);
+  const isArm = cell.list.some((n) => canonicalize(n) === key) || musclesWorkedBy(name)?.primary === cell.muscle;
+  return isArm === inSuperset ? 0 : 1;
+}
+
+/**
+ * Whether this frame prints the "(arms)" superset in the pick's cell — p274 does on days 1 and 4; p246's focused
+ * rows are not a superset, so the arms ordering never reaches that frame.
+ */
+export function frameHasArmsSuperset(key: ViadaPickKey, frame: FrameId): boolean {
+  if (!FOCUSED_ARMS_PICKS.has(key)) return false;
+  const slot = VIADA_PICKS[key]?.slot;
+  if (!slot) return false;
+  return Object.values(FRAMES[frame]?.columns ?? {}).some((days) => (days ?? []).some((day) =>
+    (slot.frameDay == null || day.day === slot.frameDay)
+    && day.strength.some((sl) => sl.category === slot.category && sl.pattern === slot.pattern
+      && /\(arms\)/i.test(String(sl.sourceText ?? '')))));
+}
+
+/**
  * ⛔ WHICH PICK OWNS A GIVEN FRAME SLOT — the composer's half of the table, so a slot and a pick can
  * never be matched by two different rules. Returns `null` for every slot the athlete does not own:
  * ME, DE, and any HYP cell no pick names.
@@ -1685,6 +1730,12 @@ export function defaultPickFor(
   if (wanted.size > 0) {
     const hit = opts.find((o) => o.muscle != null && wanted.has(o.muscle));
     if (hit) return hit.name;
+  }
+  // ⛔ p274's "(arms)" superset (2026-09-10): the pick answers the pair first, so its default is arm work.
+  const armsSlot = VIADA_PICKS[key].slot;
+  if (armsSlot?.pattern && frameHasArmsSuperset(key, frame)) {
+    const arm = opts.find((o) => focusedArmFit(String(armsSlot.pattern), true, o.name) === 0);
+    if (arm) return arm.name;
   }
   return opts[0].name;
 }
