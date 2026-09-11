@@ -29,7 +29,6 @@ import {
   equipmentFitRank,
   isGearTagged,
   movementsIn,
-  readsAsMachineBraced,
   type GridMovement,
   type ViadaCategory,
   type ViadaPattern,
@@ -188,41 +187,34 @@ function rank(movements: GridMovement[], equipment: string[] | null | undefined)
 }
 
 /**
- * ⛔ REACHABLE IS `canPerform`, PLUS ONE GUARD FOR THE UNTAGGED — and the version that stood here
- * before (tagged **and** performable) was a bug with a device report behind it.
+ * ⛔ REACHABLE IS `canPerform`, AND A TAG IS REQUIRED — the strict rule, back for the reason it was
+ * first written (2026-09-10).
  *
- * ⚠️ THE DEFECT, IN ONE LINE: **declaring MORE equipment bought a WORSE pick.** `ASSISTANCE_GEAR`
- * tags 52 of the ~316 catalogued movements, so requiring a tag emptied every cell of its untagged
- * rivals — `rear delt fly`, `chest fly`, most curls and extensions — and left whatever WAS tagged to
- * win by default. `lat pulldown` is tagged `[['cable'], ['bands']]`; a home-gym athlete with bands
- * and no cable stack therefore got a BAND-tier pulldown in a slot where a dumbbell movement was
- * sitting untagged and unconsidered (Michael, on device, 2026-08-24). With `equipment: null` the
- * same slot filled correctly, because the gate never ran.
+ * ⚠️ THE HISTORY, BECAUSE THIS LINE HAS FLIPPED TWICE. The strict rule (tagged AND performable) was
+ * relaxed on 2026-08-24 when `ASSISTANCE_GEAR` tagged 52 of ~316 movements: requiring a tag emptied
+ * every cell of its untagged rivals and a bands-owner was handed a band-tier pulldown while dumbbell
+ * movements sat untagged and unconsidered. The relaxed rule admitted an untagged movement unless its
+ * NAME read as machine-braced (`readsAsMachineBraced`) — a regex standing in for the tags that were
+ * missing. The 2026-08-26 pass tagged the wider catalogue and, measured 2026-09-10, EVERY movement
+ * the grid classifies now carries a tag (242 of 242; `standing-plan-home-kit.test.ts` pins it). The
+ * reason for the relaxed rule is gone, and what it cost is real: an untagged movement was admitted
+ * by default to an athlete who had declared a kit that could not do it.
  *
- * ⛔ STAGE 3 ALREADY SETTLED THIS ONE RUNG OVER, and this is the same ruling arriving on the slot
- * path: `accessory-dosing/ledger.ts:candidatesFor` gates on `canPerform` and ranks with
- * `equipmentFitRank`, after routing through the strict rule left CALVES unfillable for a
- * commercial-gym athlete (every calf movement is untagged). Its note — *"untagged movements pass
- * every real equipment gate"* — is the finding; the slot path had not been given it.
- *
- * ⚠️ AND THE ONE THING THE STRICT RULE WAS RIGHT ABOUT IS KEPT. Deleting the tag test outright
- * re-opens the case it existed for: an untagged `leg press` or `hack squat` prescribed to somebody
- * with a barbell in a garage, which the materialize backstop has a rule for only sometimes. So an
- * untagged movement is free UNLESS its NAME reads as machine-braced — {@link readsAsMachineBraced},
- * the taxonomy's own `BRACED_RE` asked a second question. Those stay ejected.
- *
- * ⚠️ A TAGGED MOVEMENT NEVER REACHES THE NAME TEST. A real gear tag is a better answer than a
- * regex, and `canPerform` is the one owner of reading it.
+ * ⛔ SO: a declared kit admits a movement only when the catalogue SAYS what it needs and the kit has
+ * it. An undeclared movement is refused, never admitted by default — the pin test is what keeps a
+ * new catalogue row from silently disappearing from every gated cell.
  *
  * ⚠️ UNDECLARED EQUIPMENT IS THE §0h CASE and short-circuits to true: unknown inventory means "we
  * have not asked", never "owns nothing".
+ *
+ * ⚠️ `readsAsMachineBraced` is no longer consulted here. It stays exported from the taxonomy for the
+ * tests that document the 2026-08-24 finding.
  */
 function reachable(name: string, equipment: string[] | null | undefined): boolean {
   const declared = Array.isArray(equipment) && equipment.some((c) => String(c || '').trim());
   if (!declared) return true;
-  if (!canPerform(name, equipment)) return false;
-  if (isGearTagged(name)) return true;
-  return !readsAsMachineBraced(name);
+  if (!isGearTagged(name)) return false;
+  return canPerform(name, equipment);
 }
 
 function poolFor(

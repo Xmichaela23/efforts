@@ -43,8 +43,14 @@ import { WEEKLY_SETS_SOLID, isRepPrescribable, musclesWorkedBy } from '../access
 import { allGridMovements } from '../strength-grid/index.ts';
 import { ATHLETE_ADDITIONS_ON } from './compose.ts';
 
-/** A commercial-gym athlete. ⚠️ Declared equipment is the case the grid gates on. */
-const EQUIPMENT = ['barbell', 'rack', 'bench', 'dumbbells', 'pullup_bar'];
+/**
+ * A commercial-gym athlete. ⚠️ Declared equipment is the case the grid gates on.
+ * ⚠️ WITH AN INCLINE BENCH (2026-09-10). The preacher curl needs a preacher bench and no longer
+ * reaches a flat one, so without the incline this kit reaches ONE of p222's five arm movements (the
+ * drag curl) and both pull picks default to it — the balance assertions below then have no subject.
+ * A gym has an adjustable bench; the fixture says so.
+ */
+const EQUIPMENT = ['barbell', 'rack', 'bench', 'incline bench', 'dumbbells', 'pullup_bar'];
 
 const BASE: Omit<ComposeArgs, 'week' | 'column'> = {
   frame: 'strength_5k',

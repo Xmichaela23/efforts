@@ -37,8 +37,8 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -67,7 +67,7 @@ WEEK 02  column=standard
       DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 38 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -90,8 +90,8 @@ WEEK 02  column=standard
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -118,7 +118,7 @@ WEEK 03  column=standard
       DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -141,8 +141,8 @@ WEEK 03  column=standard
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -169,7 +169,7 @@ WEEK 04  column=standard
       DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 37 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -192,8 +192,8 @@ WEEK 04  column=standard
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -220,7 +220,7 @@ WEEK 05  column=standard
       DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 38 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -243,8 +243,8 @@ WEEK 05  column=standard
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -271,7 +271,7 @@ WEEK 06  column=standard
       DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -294,8 +294,8 @@ WEEK 06  column=standard
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -322,7 +322,7 @@ WEEK 07  column=standard
       DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 37 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -345,8 +345,8 @@ WEEK 07  column=standard
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -373,7 +373,7 @@ WEEK 08  column=standard
       DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 38 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -396,8 +396,8 @@ WEEK 08  column=standard
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -424,7 +424,7 @@ WEEK 09  column=standard
       DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -447,8 +447,8 @@ WEEK 09  column=standard
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -475,7 +475,7 @@ WEEK 10  column=standard
       DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 37 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -498,8 +498,8 @@ WEEK 10  column=standard
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -526,7 +526,7 @@ WEEK 11  column=standard
       DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 38 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -549,8 +549,8 @@ WEEK 11  column=standard
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -577,7 +577,7 @@ WEEK 12  column=standard
       DE     Overhead Press                 4x2-4        @ By feel       | RIR 3.5
       HYP    Close Grip Bench Press         3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Plate Raise                    3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 30 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -600,8 +600,8 @@ WEEK 12  column=standard
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me

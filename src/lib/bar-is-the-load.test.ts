@@ -14,7 +14,7 @@ Deno.test('the six rows on the screen: only the Barbell Row is on a bar', () => 
   assertEquals(barIsTheLoad('Chest Supported Row', GYM), false, 'perHand format — dumbbells or the machine');
   assertEquals(barIsTheLoad('Tate Press', GYM), false, 'two dumbbells');
   assertEquals(barIsTheLoad('Drag Curl', GYM), false, 'bar or dumbbells, isolation — nothing asserted');
-  assertEquals(barIsTheLoad('Preacher Curl', GYM), false, 'bar, dumbbells or machine, isolation — nothing asserted');
+  assertEquals(barIsTheLoad('Preacher Curl', GYM), false, 'a preacher station — the implement on it is not known');
   assertEquals(barIsTheLoad('Pull Up', GYM), false, 'bodyweight');
 });
 
@@ -31,8 +31,11 @@ Deno.test('a compound with a bar and a dumbbell route defaults to the bar; an is
 });
 
 Deno.test('the kit decides where the routes are ambiguous', () => {
-  // A bar and a bench, no dumbbells: the preacher curl can only be loaded on the bar.
-  assertEquals(barIsTheLoad('Preacher Curl', ['barbell', 'bench']), true);
+  // A bar and no dumbbells: the drag curl can only be loaded on the bar.
+  assertEquals(barIsTheLoad('Drag Curl', ['barbell']), true);
+  // A preacher curl needs a preacher bench (2026-09-10) — a fixed station only the commercial-gym
+  // chip grants — so a bar and a flat bench do not reach it, and no bar is asserted.
+  assertEquals(barIsTheLoad('Preacher Curl', ['barbell', 'bench']), false);
   // Dumbbells only: no bar to speak of.
   assertEquals(barIsTheLoad('Romanian Deadlift', ['dumbbells']), false);
   // Unknown kit: every route counts, and the rule reads the same as a full gym.

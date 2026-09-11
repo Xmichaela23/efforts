@@ -37,8 +37,8 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -66,7 +66,7 @@ WEEK 02  column=standard
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 45 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -89,8 +89,8 @@ WEEK 02  column=standard
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -116,7 +116,7 @@ WEEK 03  column=standard
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -139,8 +139,8 @@ WEEK 03  column=standard
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -166,7 +166,7 @@ WEEK 04  column=standard
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 43 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -189,8 +189,8 @@ WEEK 04  column=standard
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -216,7 +216,7 @@ WEEK 05  column=standard
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 45 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -239,8 +239,8 @@ WEEK 05  column=standard
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -266,7 +266,7 @@ WEEK 06  column=standard
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -289,8 +289,8 @@ WEEK 06  column=standard
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -316,7 +316,7 @@ WEEK 07  column=standard
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 43 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -339,8 +339,8 @@ WEEK 07  column=standard
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -365,7 +365,7 @@ WEEK 08  column=standard
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 45 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -388,8 +388,8 @@ WEEK 08  column=standard
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -414,7 +414,7 @@ WEEK 09  column=standard
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -437,8 +437,8 @@ WEEK 09  column=standard
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -463,7 +463,7 @@ WEEK 10  column=standard
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 43 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -486,8 +486,8 @@ WEEK 10  column=standard
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -512,7 +512,7 @@ WEEK 11  column=standard
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 45 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -535,8 +535,8 @@ WEEK 11  column=standard
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 80 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me
@@ -561,7 +561,7 @@ WEEK 12  column=standard
       DE     Seated DB Press                4x2-4        @ By feel       | RIR 3.5 · per_side
       HYP    Dumbbell Bench Press           3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Monday] run      Hard Run — 39 min
   [Tuesday] STRENGTH Lower body: Hinge   (Viada pp274-275)
@@ -584,8 +584,8 @@ WEEK 12  column=standard
       DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Band Pull Down                 3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Lateral Raise                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
+      HYP    Rear Delt Fly                  3x6-12       @ By feel       | RIR 1 · auto_regulated
   [Thursday] ride     Ride — 85 min
   [Friday] STRENGTH Lower body: Push   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard, lower:me

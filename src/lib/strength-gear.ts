@@ -774,13 +774,21 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // ── focused arms: two ways into most of them ───────────────────────────────────────────────────
   'tate press': [['dumbbells', 'bench']],
   'skull crusher': [['barbell', 'bench'], ['dumbbells', 'bench']],
-  'preacher curl': [['barbell', 'bench'], ['dumbbells', 'bench']],
-  // An ADJUSTABLE BENCH IS AN INCLINE BENCH (2026-08-29). Gating the spider curl on the
-  // `incline_bench` key alone made it gym-only for an athlete whose bench adjusts, which is most of
-  // them - and it was the only one of his five focused-pull movements a home gym lost to a tag
-  // rather than to the movement itself.
-  // The incline is the position here too - a spider curl is chest-down on the incline. Now that an
-  // adjustable bench grants `incline_bench`, the loosened flat-bench route is no longer needed.
+  // ⛔ A PREACHER CURL NEEDS A PREACHER BENCH (2026-09-10, Michael's home-gym block prescribed one).
+  // The tag read `[['barbell', 'bench'], ['dumbbells', 'bench']]` — a FLAT bench — so every athlete
+  // who ticked "Bench (flat/adjustable)" reached it, and the composer led his day-4 arm cell with it.
+  // The pad that fixes the upper arm is a fixed station; no chip names one (Slice 7: gear people
+  // cannot name gets no key), so it is reached the way the other stations are — through the
+  // commercial-gym chip, the only thing that grants `machine`. A home athlete gets his spider curl
+  // (chest-down on the incline, the same fixed-arm curl) where the kit has an incline bench, and
+  // the drag curl where it does not.
+  'preacher curl': [['machine']],
+  // The incline is the position here - a spider curl is chest-down on the incline bench. ⚠️ THE
+  // "Incline bench" CHIP IS WHAT GRANTS `incline_bench`; "Bench (flat/adjustable)" grants `bench`
+  // only (the 2026-08-29 attempt to read "adjustable" as incline was reverted — see
+  // `athleteEquipmentToKeys`). An earlier note here said the opposite; the test in
+  // `strength-equipment-tier.test.ts` ("Bench (flat/adjustable)" IS NOT INCLINE CAPABILITY) is the
+  // law.
   'spider curl': [['dumbbells', 'incline_bench'], ['barbell', 'incline_bench']],
   'drag curl': [['barbell'], ['dumbbells']],
 
