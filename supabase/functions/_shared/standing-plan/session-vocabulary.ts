@@ -161,6 +161,27 @@ function compoundRoundToken(block: {
     + (rest != null && rest > 0 ? `_R${Math.round(rest)}s` : '');
 }
 
+/**
+ * ⛔ A ONE-STEP ROUND, FOR THE BIKE'S PLAIN REPEATS AT AN EXACT PERCENTAGE (2026-09-11). The same
+ * grammar as `compoundRoundToken`, without its two-steps guard: `round_4x_480s90_R240s` is four
+ * repeats of 8 min at 90% with 4 min easy between, which `parseQualityWork` already reads (one
+ * segment, `sets` = the repeats) and the sheet prints as "4 rounds: 8 min at 225 W, 4 min easy
+ * between". ⚠️ Only a work step at a stated percentage qualifies — anything else keeps its own token.
+ */
+function plainRoundToken(block: {
+  repeat: number;
+  steps: Array<{ role: string; seconds?: number | null; intensity?: { kind: string; hi?: number } | null }>;
+  restBetween?: { seconds?: number | null } | null;
+}): string | null {
+  const steps = block.steps.filter((st) => st.seconds != null && st.seconds > 0);
+  if (steps.length !== 1 || steps[0].role !== 'work') return null;
+  const i = steps[0].intensity;
+  if (!i || i.kind !== 'pct_threshold' || typeof i.hi !== 'number') return null;
+  const rest = block.restBetween?.seconds;
+  return `round_${Math.max(1, block.repeat)}x_${Math.round(steps[0].seconds as number)}s${Math.round(i.hi * 100)}`
+    + (rest != null && rest > 0 ? `_R${Math.round(rest)}s` : '');
+}
+
 
 /**
  * ⛔⛔ AN EMBEDDED BLOCK — a faster block inside an otherwise steady session (2026-08-30).
@@ -480,6 +501,17 @@ export function translateEnduranceSession(
        * ⚠️ THE `cruise_` PARSER STAYS in the materializer. Rows built before this keep it and still
        * read; a rebuild or a restate re-materializes them onto the new shape. Fix-forward.
        */
+      /**
+       * ⛔⛔ A ROUND WITH MORE THAN ONE STEP IN IT IS CARRIED WHOLE (2026-09-11, "by the book"). p233-234's
+       * surge shapes and its "1 min @ 105% / 1 min @ 90%" sets are several intensities inside one round,
+       * and `interval_` can only say "n reps at one pace" — so the surge and the 90% segment were dropped
+       * on the row. Same grammar the MLSS branch below has used since 2026-08-30.
+       */
+      {
+        const roundBlock = session.blocks.find((b) => compoundRoundToken(b as never) != null);
+        const roundTok = roundBlock ? compoundRoundToken(roundBlock as never) : null;
+        if (roundTok) { work = [roundTok]; break; }
+      }
       const { reps, repSeconds, restSeconds } = repShape(session);
       /**
        * ⛔ THE SOURCE'S OWN PERCENTAGE — the band's top, the same reading `compoundRoundToken` takes
@@ -559,6 +591,23 @@ export function translateEnduranceSession(
      * emitted by this plan — it is HARDER than any run slot it would replace.
      */
     case 'ride_sweet_spot': {
+      /**
+       * ⛔⛔ THE PAGE'S OWN PERCENTAGE, NOT A BAND (2026-09-11, "by the book"). `bike_ss_` means
+       * 85-95% and `bike_thr_` 95-105% — but p238-239 prints 80%, 90%, 95% and 100%, one number per
+       * session, and the surge-on-the-minute shape is two intensities inside one minute. The round
+       * grammar carries an exact percentage per segment (it is what the anaerobic ride already uses),
+       * so every sweet-spot session travels as a round: a compound one where the round has several
+       * steps, a one-segment one (`round_4x_480s90_R240s`) where it is a plain repeat. The band
+       * tokens below stay for any session the library builds without a printed level.
+       */
+      {
+        const roundBlock = session.blocks.find((b) => compoundRoundToken(b as never) != null);
+        const roundTok = roundBlock ? compoundRoundToken(roundBlock as never) : null;
+        if (roundTok) { work = [roundTok]; break; }
+        const plainBlock = session.blocks.find((b) => plainRoundToken(b as never) != null);
+        const plainTok = plainBlock ? plainRoundToken(plainBlock as never) : null;
+        if (plainTok) { work = [plainTok]; break; }
+      }
       const { reps, workMin, restMin } = repMinutes(session);
       // The archetype decides which side of threshold this sits on — `medium` is his 95-100% work.
       const atThreshold = session.archetype === 'medium';

@@ -47,7 +47,9 @@ Deno.test('⛔⛔ THE WRAPPER IS EASY MINUTES, NOT THRESHOLD MINUTES', () => {
    * ⚠️ ASSERTED AGAINST THE SESSION'S OWN STEPS, not a remembered number, so a band that moves on
    * the page moves this with it.
    */
-  const session = build('run_near_threshold', 3, { archetype: 'below_threshold' }) as {
+  // ⚠️ LEVEL 2 SINCE 2026-09-11 — `below_threshold` is p233-234's level-1 and level-2 line; level 3's
+  // is its own shape. The accounting under test does not depend on the level.
+  const session = build('run_near_threshold', 2, { archetype: 'below_threshold' }) as {
     warmup: { seconds: number | null }[];
     blocks: { repeat: number; steps: { seconds: number | null }[]; restBetween: { seconds: number | null } | null }[];
     cooldown: { seconds: number | null }[];

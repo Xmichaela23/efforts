@@ -42,6 +42,13 @@ export type SlotSpec = {
    * and nothing here builds from it.
    */
   rotation?: string[];
+  /**
+   * ⛔ THE SLOT'S JOB IN THE WEEK, as the frame states it (`EnduranceSlot.role`, or `isLongSlot` /
+   * `isHardSlot` over the frame row). Read by `ladderCeilingFor`: the easy ride and the long ride are
+   * ONE family with TWO ceilings (Michael, 2026-09-11), and the family alone cannot tell them apart.
+   * ⚠️ Absent means "not the easy ride" — a caller that forgets it gets the family's own ceiling.
+   */
+  role?: 'hard' | 'long' | 'easy';
 };
 
 /** What one slot delivers at the two ends of its own dial. */
@@ -69,6 +76,9 @@ export const isBaseFamily = (family: string): boolean => BASE_FAMILIES.includes(
 /**
  * ⛔ HOW FAR A BASE SESSION MAY CLIMB, IN MINUTES (Michael, 2026-08-26): *"easy run 25-30 → 45-60 →
  * 80-90 min (cap 90), long run to 2.5h; easy ride 60-100 → 2h10-3h30, ride caps per the bands."*
+ *
+ * ⛔ THE RIDE CAPS LANDED 2026-09-11: easy ride 120 (p108), long ride 210 (p239 level 2). Both were
+ * 300 before that — see `RIDE_EASY_CEILING_MIN` and the `ride_endurance` entry below.
  *
  * ⛔⛔ THE LONG RUN'S CEILING IS 100, NOT 150 — SUPERSEDED THE SAME DAY, AND BY THE BOOK
  * (Michael, 2026-08-26 evening: *"His page says ninety to a hundred minutes use that."*).
@@ -99,8 +109,28 @@ export const isBaseFamily = (family: string): boolean => BASE_FAMILIES.includes(
 export const LADDER_CEILING_MIN: Record<string, number> = {
   run_vt1: 90,
   run_lsd: 100,
-  ride_endurance: 300,
+  /**
+   * ⛔ THE LONG RIDE STOPS AT 3H30 (Michael, 2026-09-11) — the top of p239's level-2 easy ride
+   * ("2.5- to 3.5-hour easy ride below 75%"). It was 300, the top of level 3, which p275 tells this
+   * programme's athlete not to climb to ("resist the urge to add more difficulty or length").
+   */
+  ride_endurance: 210,
 };
+
+/**
+ * ⛔ THE EASY RIDE STOPS AT TWO HOURS (Michael, 2026-09-11) — p108: *"even for elite athletes, I
+ * rarely prescribe more than two hours of VT1 work in a single session."* Same family as the long
+ * ride, so it is keyed by the slot's ROLE, not its family — see `SlotSpec.role`.
+ * ⚠️ WHAT THE ATHLETE SEES IS 100, not 120: p239 prints no ride between 100 (top of level 1) and 130
+ * (floor of level 2's mixed ride), and `ladderOf` drops a rung whose floor is past the cap.
+ */
+export const RIDE_EASY_CEILING_MIN = 120;
+
+/** The ceiling this one slot's ladder is clipped to. */
+export function ladderCeilingFor(spec: Pick<SlotSpec, 'family' | 'role'>): number {
+  if (spec.family === 'ride_endurance' && spec.role === 'easy') return RIDE_EASY_CEILING_MIN;
+  return LADDER_CEILING_MIN[spec.family] ?? Infinity;
+}
 
 /** One rung: a level and the minutes it spans, already clipped to the family's ceiling. */
 export type Rung = {
@@ -215,7 +245,7 @@ export function slotSpans(specs: SlotSpec[], anchors: EnduranceAnchors): SlotSpa
  * about holding MORE hours, so a slot never drops below the dose the frame prescribed.
  */
 export function ladderOf(spec: SlotSpec, anchors: EnduranceAnchors): Rung[] {
-  const ceiling = LADDER_CEILING_MIN[spec.family] ?? Infinity;
+  const ceiling = ladderCeilingFor(spec);
   const top: Level = isBaseFamily(spec.family) ? 3 : spec.level;
   const out: Rung[] = [];
   for (let level = spec.level; level <= top; level++) {
@@ -663,7 +693,7 @@ export const REST_DAY_RUNG = 1;
  */
 export const EASY_FILL_SPEC: Record<'run' | 'ride', SlotSpec> = {
   run: { family: 'run_vt1', level: 1, sport: 'run' },
-  ride: { family: 'ride_endurance', level: 1, archetype: 'steady', sport: 'ride' },
+  ride: { family: 'ride_endurance', level: 1, archetype: 'steady', sport: 'ride', role: 'easy' },
 };
 
 /**

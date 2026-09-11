@@ -30,6 +30,7 @@ import { buildEnduranceSession, resolveEnduranceAnchors } from '../endurance-lib
 import { MATERIALIZER_RUN_PATTERNS, translateEnduranceSession } from './session-vocabulary.ts';
 import { FRAMES, type FrameId } from './frames.ts';
 import { archetypesFor } from '../endurance-library/index.ts';
+import { parseQualityWork } from '../plan-tokens/quality-work.ts';
 import { composeWeek } from './compose.ts';
 import { defaultCompetitionLifts } from './frame-resolver.ts';
 
@@ -64,6 +65,13 @@ function minutesOf(token: string): number {
     const rest = iv[4] ? Number(iv[4]) : 0;
     return (reps * work + Math.max(0, reps - 1) * rest) / 60;
   }
+  // ⛔ THE COMPOUND ROUND (2026-09-11) — the same sum `qualityRunSteps` produces: every segment of
+  // every set, the between-sets rest skipped after the last.
+  const round = parseQualityWork(token);
+  if (round && round.kind === 'round') {
+    const perSet = round.segments.reduce((t, s) => t + s.seconds, 0);
+    return (round.sets * perSet + Math.max(0, round.sets - 1) * round.restBetweenS) / 60;
+  }
   throw new Error(`this test cannot account for the token ${token}`);
 }
 
@@ -72,21 +80,20 @@ Deno.test('⛔⛔ EVERY NEAR-THRESHOLD VARIANT TRAVELS AS TIME, WITH ITS OWN REP
    * ⛔ THE FAMILY'S OWN SEVEN SHAPES, AT BOTH LEVELS THE TWO FRAMES USE. Before the fix all of them
    * emitted `N x 1mi` — a 75-second rep and a 13-minute rep arriving as the same instruction.
    */
-  const archetypes = [
-    'short_above', 'race_repeats', 'race_repeats_long', 'below_threshold',
-    'below_threshold_long', 'surge_embedded', 'surge_opener',
-  ];
-  // ⚠️ THE THREE p234 LINES ARE LEVEL 3 ONLY (`levels: [3]`), so they join the sweep at that level
-  // and are absent from level 2 — which is what keeps Standard Focus's day 3 unchanged.
-  const levelThreeOnly = ['sustained_5min_90', 'sustained_6min_88', 'sustained_8min30_85'];
+  /**
+   * ⚠️ THE FAMILY'S OWN SHAPES AT EACH LEVEL, READ OFF THE LIBRARY (2026-09-11) — the page prints
+   * each shape at the levels it prints it, and the library says which. A shape with several
+   * intensities in one round (the surge shapes, the 105/90 sets) travels as a compound round since
+   * 2026-09-11, with the same time grammar the MLSS slot has always used; a plain repeat is the
+   * interval token. Both are time, and both are checked against the session they came from.
+   */
   for (const level of [2, 3]) {
-    for (const archetype of [undefined, ...archetypes, ...(level === 3 ? levelThreeOnly : [])]) {
+    const offered = archetypesFor('run_near_threshold' as never, level as never).map((a) => a.id);
+    for (const archetype of [undefined, ...offered]) {
       const t = tokensFor('run_near_threshold', level, archetype);
       const work = t.steps_preset.find((x) => !/^(warmup|cooldown)_/.test(x))!;
       const label = `${archetype ?? 'rotation default'} @L${level}`;
       assert(!/cruise_/.test(work), `${label}: back on the distance token — ${work}`);
-      const m = work.match(/^interval_(\d+)x(\d+)s_(\d+)pct(?:_R(\d+)s)?$/);
-      assert(m, `${label}: not the time shape — ${work}`);
       /**
        * ⛔ THE NUMBERS ARE THE SESSION'S OWN, not the token's idea of them. This is what makes the
        * emitter a translation rather than a second prescription.
@@ -98,10 +105,26 @@ Deno.test('⛔⛔ EVERY NEAR-THRESHOLD VARIANT TRAVELS AS TIME, WITH ITS OWN REP
       };
       const block = s.blocks.find((b) => b.steps.some((st) => st.role === 'work'))!;
       const step = block.steps.find((st) => st.role === 'work')!;
-      assertEquals(Number(m![1]), block.repeat, `${label}: rep count does not match the session`);
-      assertEquals(Number(m![2]), Math.round(step.seconds as number), `${label}: rep length does not match`);
-      assertEquals(Number(m![3]), Math.round((step.intensity!.hi as number) * 100), `${label}: percentage does not match`);
-      assertEquals(Number(m![4] ?? 0), Math.round(block.restBetween?.seconds ?? 0), `${label}: the source's rest did not travel`);
+      const m = work.match(/^interval_(\d+)x(\d+)s_(\d+)pct(?:_R(\d+)s)?$/);
+      if (m) {
+        assertEquals(Number(m[1]), block.repeat, `${label}: rep count does not match the session`);
+        assertEquals(Number(m[2]), Math.round(step.seconds as number), `${label}: rep length does not match`);
+        assertEquals(Number(m[3]), Math.round((step.intensity!.hi as number) * 100), `${label}: percentage does not match`);
+        assertEquals(Number(m[4] ?? 0), Math.round(block.restBetween?.seconds ?? 0), `${label}: the source's rest did not travel`);
+        continue;
+      }
+      const round = parseQualityWork(work);
+      assert(round && round.kind === 'round', `${label}: not a time shape — ${work}`);
+      assertEquals(round.sets, block.repeat, `${label}: set count does not match the session`);
+      const timed = block.steps.filter((st) => st.seconds != null && st.seconds > 0);
+      assertEquals(round.segments.length, timed.length, `${label}: the round's steps do not match the session's`);
+      timed.forEach((st, i) => {
+        assertEquals(round.segments[i].seconds, Math.round(st.seconds as number), `${label}: step ${i} length does not match`);
+        if (st.intensity?.kind === 'pct_threshold') {
+          assertEquals(Math.round((round.segments[i].pct ?? 0) * 100), Math.round((st.intensity.hi as number) * 100), `${label}: step ${i} percentage does not match`);
+        }
+      });
+      assertEquals(round.restBetweenS, Math.round(block.restBetween?.seconds ?? 0), `${label}: the source's rest did not travel`);
     }
   }
 });
@@ -115,7 +138,9 @@ Deno.test('⛔⛔ THE ROW\'S OWN ARITHMETIC REACHES THE COMPOSER\'S DURATION —
    * never their count or their length.
    */
   for (const [frame, level, archetype, expected] of [
-    ['strength_5k', 3, 'below_threshold', 59],
+    // ⚠️ `sustained_6min_88` SINCE 2026-09-11 — `below_threshold` stops at level 2 now that level 3's
+    // page line is its own shape; the 59-minute session p246's day 3 rotates through is this one.
+    ['strength_5k', 3, 'sustained_6min_88', 59],
     ['all_rounder', 2, undefined, null],
   ] as [FrameId, number, string | undefined, number | null][]) {
     const t = tokensFor('run_near_threshold', level, archetype);
@@ -140,7 +165,8 @@ Deno.test('⛔ AND EVERY FRAME\'S NEAR-THRESHOLD SLOT IS COVERED — both column
           if (slot.family !== 'run_near_threshold') continue;
           const work = tokensFor(slot.family, slot.level, slot.archetype)
             .steps_preset.find((x) => !/^(warmup|cooldown)_/.test(x))!;
-          assert(/^interval_\d+x\d+s_\d+pct/.test(work),
+          // ⚠️ A ROUND IS TIME TOO (2026-09-11) — the compound shapes travel on the round grammar.
+          assert(/^(interval_\d+x\d+s_\d+pct|round_\d+x_)/.test(work),
             `${frame}/${column} day ${day.day}: ${work}`);
           checked += 1;
         }

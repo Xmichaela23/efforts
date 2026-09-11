@@ -119,8 +119,10 @@ Deno.test('⛔⛔ "up to X min" IS THE HARD SESSION, AND IT IS TRUE', () => {
          * rotates through them, so a chip measured on one week is a claim about a session the other
          * weeks do not build. ⚠️ And across the hours, because the ask moves the dial.
          */
+        // ⚠️ SIX WEEKS SINCE 2026-09-11 — the near-threshold family rotates six shapes at levels 1
+        // and 2 now, so a full rotation takes six weeks and the sweep has to see all of them.
         for (const hours of [1, 3, 6]) {
-          for (const wk of [2, 3, 4, 5]) {
+          for (const wk of [2, 3, 4, 5, 6, 7]) {
             for (const built of hardBuilt(week(slots, sport, chip.tier, hours, wk), sport)) {
               assert(built <= chip.longestMin + 1,
                 `${sport} ${chip.tier} @${hours}h wk${wk} on ${JSON.stringify(slots)}: chip says up `
@@ -132,7 +134,7 @@ Deno.test('⛔⛔ "up to X min" IS THE HARD SESSION, AND IT IS TRUE', () => {
          * ⛔⛔ AND IT IS NOT AN EMPTY CEILING. Without this a chip could claim any figure above the
          * truth and pass — some week of the block has to actually build the hard session at it.
          */
-        const across = [2, 3, 4, 5]
+        const across = [2, 3, 4, 5, 6, 7]
           .flatMap((wk) => hardBuilt(week(slots, sport, chip.tier, 3, wk), sport));
         assert(across.some((m) => Math.abs(m - chip.longestMin!) <= 1),
           `${sport} ${chip.tier} on ${JSON.stringify(slots)}: no week builds the ${chip.longestMin} `

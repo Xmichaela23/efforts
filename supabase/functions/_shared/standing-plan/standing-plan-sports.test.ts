@@ -234,10 +234,13 @@ Deno.test('⛔⛔ A BIKE-ONLY ATHLETE TAKES THE FRAME — the refusal is overrul
 });
 
 Deno.test('⛔ THE ALL-RIDE WEEK BUILDS WHOLE — four sessions, one long, and the plyo day stays', () => {
+  // ⚠️ 8h → 6h ON 2026-09-11: the easy ride stops at two hours (p108) and the long ride at 3h30 (p239
+  // level 2), so the four slots hold about 6h40 and an 8h ask now adds a fifth, easy ride. This test
+  // is about the four slots surviving the sport assignment, so it asks inside what they hold.
   const wk = composeWeek({
     ...BASE, week: 2, column: 'standard',
     sportMix: { runs: 0, rides: 4, swimDays: 0 },
-    targetRideHours: 8,
+    targetRideHours: 6,
   } as never);
   const endurance = wk.sessions.filter((s) => s.type === 'run' || s.type === 'ride');
   assertEquals(endurance.length, 4, endurance.map((s) => `${s.type}:${s.name}`).join(', '));

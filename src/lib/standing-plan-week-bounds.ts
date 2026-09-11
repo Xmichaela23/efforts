@@ -237,6 +237,8 @@ export function slotLengthOptions(
     level,
     archetype: eq.archetype ?? row.archetype,
     sport,
+    // ⛔ THE ROW'S ROLE — the easy ride's ceiling is not the long ride's (`ladderCeilingFor`).
+    role: row.role,
   } as SlotSpec, anchors);
   if (rungs.length === 0) return null;
   const band = slotMinutesBand(rungs);
@@ -302,7 +304,7 @@ export function slotFixedMinutes(
   const pinned = opts.archetype || eq.archetype || row.archetype || null;
   if (!pinned) return null;
   const rungs = ladderOf({
-    family: eq.family, level, archetype: pinned, sport,
+    family: eq.family, level, archetype: pinned, sport, role: row.role,
   } as SlotSpec, anchors);
   return rungs.length === 0 ? null : Math.round(rungs[0].hi);
 }
@@ -669,6 +671,8 @@ export function experienceChips(
        */
       archetype: opts.archetypes?.[key] ?? eq?.archetype ?? archetypeOf(key),
       sport: sp,
+      // ⛔ THE ROW'S ROLE — the easy ride's ceiling is not the long ride's (`ladderCeilingFor`).
+      role: frameSlots(frame).find((x) => x.key === key)?.role,
       // ⚠️ CARRIED, NOT APPLIED — only `longestFor` reads it, and only when nothing is pinned.
       ...(opts.archetypes?.[key] || eq?.archetype || archetypeOf(key)
         ? {}

@@ -362,6 +362,28 @@ export type PrintedRide = {
   sprintEverySeconds: number;
 };
 
+/**
+ * One segment of a printed round. `role` is the page's own reading: a percentage the family counts
+ * as work is `work`; a prescribed effort under the family's floor (MLSS's VT1 minute inside the
+ * round) is `float`; the page's "easy jog" / "easy spin" / "recovery" is `recovery`.
+ */
+export type PrintedSegment = { seconds: number; role: 'work' | 'float' | 'recovery'; intensity: Intensity; label?: string };
+
+/**
+ * An interval session as the page prints it: `sets` of `rounds` rounds of `round`, with the page's
+ * recovery between rounds and between sets where it states one. `sets: 1` is the page's plain
+ * "N rounds of"; `betweenRoundsSeconds` on a one-set session is its "3-minute rest" after each round.
+ */
+export type PrintedIntervals = {
+  sets: number;
+  rounds: number;
+  round: PrintedSegment[];
+  betweenRoundsSeconds?: number;
+  betweenRoundsIntensity?: Intensity;
+  betweenSetsSeconds?: number;
+  betweenSetsIntensity?: Intensity;
+};
+
 export type ArchetypeShape =
   /** Timed work reps, optionally with a second prescribed segment and optionally grouped into sets. */
   | 'intervals'
@@ -476,6 +498,21 @@ export type Archetype = {
   printedByLevel?: Partial<Record<Level, PrintedRide>>;
   /** Seconds of easy recovery between ladder rounds, where the source states one. */
   ladderRoundRest?: number;
+  /**
+   * ⛔⛔ THE INTERVAL SESSION AS PRINTED, PER LEVEL — and it OVERRIDES the shape builder (Michael,
+   * 2026-09-11: "workouts should be by the book"). `printedByLevel` above did this for the endurance
+   * ride; this is the same ruling for every hard shape. The band fields on the archetype stay for the
+   * ladder's bracket and for any level the table does not carry, but where a level is printed here
+   * the session is that, round for round — no lerp inside a band, no count derived from a dose.
+   * ⚠️ `levels` still says which levels the page offers the shape at; a level listed there and absent
+   * here falls back to the band builder.
+   */
+  printedIntervalsByLevel?: Partial<Record<Level, PrintedIntervals>>;
+  /**
+   * ⛔ THE REP'S SECONDS AT EACH LEVEL where the page prints one number per level rather than a band
+   * (p237's progressive repeats: 45 s / 1 min / 1:30). Read before `repBand` by the shape builder.
+   */
+  repSecondsByLevel?: Partial<Record<Level, number>>;
   /** Which levels the source offers this shape at. Absent = all three. */
   levels?: Level[];
   /** Repeats are grouped into sets with their own stated between-set recovery. */
@@ -492,6 +529,17 @@ export type Archetype = {
 
 const pct = (lo: number, hi = lo): Intensity => ({ kind: 'pct_threshold', lo, hi });
 const vt1: Intensity = { kind: 'vt1' };
+
+/**
+ * ⛔ THE PRINTED-ROUND SHORTHAND (2026-09-11). `W(45, 1.25)` is 45 s of work at 125%; `F(60, vt1)`
+ * is a prescribed minute the family does not count as work (MLSS's VT1 minute inside the round);
+ * `R(120)` is the page's easy recovery, `RV(90)` its "1:30 @ VT1" recovery. Seconds and percentages
+ * only — every number below is one the page prints, at the level it prints it.
+ */
+const W = (seconds: number, at: number, label?: string): PrintedSegment => ({ seconds, role: 'work', intensity: pct(at), ...(label ? { label } : {}) });
+const F = (seconds: number, at: Intensity, label?: string): PrintedSegment => ({ seconds, role: 'float', intensity: at, ...(label ? { label } : {}) });
+const R = (seconds: number): PrintedSegment => ({ seconds, role: 'recovery', intensity: easy });
+const RV = (seconds: number): PrintedSegment => ({ seconds, role: 'recovery', intensity: vt1 });
 
 export const FAMILIES: Record<FamilyId, {
   sport: Sport;
@@ -606,6 +654,17 @@ export const FAMILIES: Record<FamilyId, {
         id: 'surge_float',
         shape: 'intervals',
         /**
+         * ⛔ p231-232 AS PRINTED (read off the photos 2026-09-11):
+         *   L1  6 rounds of: 15 s @ 130% / 45 s @ 105% / 1 min @ VT1
+         *   L2  2 sets of 4 rounds of the same, 2-minute recovery walk/jog between sets
+         *   L3  3 sets of 4 rounds of the same, 2-minute recovery walk/jog between sets
+         */
+        printedIntervalsByLevel: {
+          1: { sets: 1, rounds: 6, round: [W(15, 1.30, 'Surge'), W(45, 1.05, 'Near-threshold float'), RV(60)] },
+          2: { sets: 2, rounds: 4, round: [W(15, 1.30, 'Surge'), W(45, 1.05, 'Near-threshold float'), RV(60)], betweenSetsSeconds: 120 },
+          3: { sets: 3, rounds: 4, round: [W(15, 1.30, 'Surge'), W(45, 1.05, 'Near-threshold float'), RV(60)], betweenSetsSeconds: 120 },
+        },
+        /**
          * ⛔ THE DISPLAY NAME IS THE FIELD'S, NOT THE BOOK'S (Michael, 2026-08-25). "Surge and
          * float" is Viada's phrasing, lifted verbatim; "over-unders" is what this session is called
          * everywhere an athlete would have met it — TrainerRoad, Fast Talk, any coach's plan.
@@ -654,6 +713,30 @@ export const FAMILIES: Record<FamilyId, {
       },
       {
         /**
+         * ⛔ p231-232's SECOND SHAPE, ADDED 2026-09-11 (Michael: "workouts should be by the book"):
+         *   L1  3 sets of 4 rounds of: 40 s @ 130% / 20 s @ 50%, 2-minute walk/recovery jog between sets
+         *   L2  5 sets of 4 rounds of the same
+         *   L3  "2 larger sets of 4 sets of 4 rounds" with two different recoveries — a nesting this
+         *       library cannot state, so the shape is not offered at level 3 rather than approximated.
+         * ⚠️ THE NAME IS OURS (the page prints only the numbers); the numbers are the page's.
+         */
+        id: 'forty_twenty',
+        shape: 'intervals',
+        label: 'Forty-twenty repeats',
+        repBand: { lo: 40, hi: 40 },
+        repsBand: { lo: 12, hi: 20 },
+        work: pct(1.30),
+        recovery: { kind: 'stated', band: { lo: 20, hi: 20 }, intensity: pct(0.50) },
+        set: { repeatsPerSet: { lo: 4, hi: 4 }, restBand: { lo: 120, hi: 120 }, intensity: easy },
+        levels: [1, 2],
+        printedIntervalsByLevel: {
+          1: { sets: 3, rounds: 4, round: [W(40, 1.30, 'Surge'), { seconds: 20, role: 'recovery', intensity: pct(0.50) }], betweenSetsSeconds: 120 },
+          2: { sets: 5, rounds: 4, round: [W(40, 1.30, 'Surge'), { seconds: 20, role: 'recovery', intensity: pct(0.50) }], betweenSetsSeconds: 120 },
+        },
+        cite: 'Viada pp231-232 — 2-minute walk/recovery jog between sets',
+      },
+      {
+        /**
          * ⛔ THE OTHER SURGE-AND-FLOAT SHAPE, SPLIT OUT (2026-08-31) — see `surge_float` above for
          * why one archetype could not carry both. A longer surge just above threshold with a
          * near-threshold float under it, and a third step at threshold before the recovery.
@@ -662,6 +745,17 @@ export const FAMILIES: Record<FamilyId, {
          */
         id: 'long_surge_float',
         shape: 'intervals',
+        /**
+         * ⛔ p231-232 AS PRINTED (read off the photos 2026-09-11):
+         *   L1  2 sets of 3 rounds of: 45 s @ 125% / 45 s @ 115% / 30 s @ 100% / 1:30 @ VT1, 2 min between sets
+         *   L2  2 sets of 4 rounds of the same
+         *   L3  3 sets of 4 rounds of: 45 s @ 125% / 1 min @ 115% / 1 min @ 100% / 1:30 @ VT1, 2 min between sets
+         */
+        printedIntervalsByLevel: {
+          1: { sets: 2, rounds: 3, round: [W(45, 1.25, 'Surge'), W(45, 1.15, 'Near-threshold float'), W(30, 1.00, 'At threshold'), RV(90)], betweenSetsSeconds: 120 },
+          2: { sets: 2, rounds: 4, round: [W(45, 1.25, 'Surge'), W(45, 1.15, 'Near-threshold float'), W(30, 1.00, 'At threshold'), RV(90)], betweenSetsSeconds: 120 },
+          3: { sets: 3, rounds: 4, round: [W(45, 1.25, 'Surge'), W(60, 1.15, 'Near-threshold float'), W(60, 1.00, 'At threshold'), RV(90)], betweenSetsSeconds: 120 },
+        },
         label: 'Long surge with a near-threshold float',
         repBand: { lo: 45, hi: 45 },
         repsBand: { lo: 6, hi: 12 },
@@ -717,6 +811,17 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'short_above',
         shape: 'intervals',
+        /**
+         * ⛔ p233-234 AS PRINTED (read off the photos 2026-09-11):
+         *   L1  2 sets of 4 rounds of: 1 min @ 105% / 1 min @ 90%, 3-minute recovery walk/jog between sets
+         *   L2  3 sets of 4 rounds of: 1 min @ 105% / 1:30 @ 90%, 3-minute recovery walk/jog between sets
+         *   L3  4 sets of 4 rounds of: 1 min @ 105% / 1:30 @ 90%, 3-minute recovery walk/jog between sets
+         */
+        printedIntervalsByLevel: {
+          1: { sets: 2, rounds: 4, round: [W(60, 1.05), W(60, 0.90, 'Float')], betweenSetsSeconds: 180 },
+          2: { sets: 3, rounds: 4, round: [W(60, 1.05), W(90, 0.90, 'Float')], betweenSetsSeconds: 180 },
+          3: { sets: 4, rounds: 4, round: [W(60, 1.05), W(90, 0.90, 'Float')], betweenSetsSeconds: 180 },
+        },
         label: 'Short above-threshold repeats',
         repBand: { lo: 60, hi: 90 },
         repsBand: { lo: 8, hi: 16 },
@@ -738,6 +843,19 @@ export const FAMILIES: Record<FamilyId, {
          */
         id: 'race_repeats',
         shape: 'intervals',
+        /**
+         * ⛔ p233-234's RACE-SPECIFIC NT SESSIONS, THE 5K LINE, AS PRINTED (2026-09-11). The page
+         * prints one line per race distance; this app's running programme is p246's Strength + 5K,
+         * so the 5K line is the one it builds. The 10K, half-marathon and marathon lines belong to
+         * no programme here and are not offered (the old `race_repeats_long` blended them).
+         *   L1  2 x 5-minute repeats @ 105%   L2  4 x 4-minute repeats @ 105%   L3  4 x 5-minute repeats @ 105%
+         *   3- to 5-minute recovery walk/jog between — the shortest the page states, 3 minutes.
+         */
+        printedIntervalsByLevel: {
+          1: { sets: 1, rounds: 2, round: [W(300, 1.05)], betweenRoundsSeconds: 180, betweenRoundsIntensity: vt1 },
+          2: { sets: 1, rounds: 4, round: [W(240, 1.05)], betweenRoundsSeconds: 180, betweenRoundsIntensity: vt1 },
+          3: { sets: 1, rounds: 4, round: [W(300, 1.05)], betweenRoundsSeconds: 180, betweenRoundsIntensity: vt1 },
+        },
         label: 'Race-specific repeats',
         // ⚠️ FIVE TO EIGHT MINUTES. The floor is the shortest repeat this shape reaches, and it sits
         // ABOVE the embedded-surge block's length deliberately: two shapes of equal length with
@@ -750,21 +868,10 @@ export const FAMILIES: Record<FamilyId, {
         recovery: { kind: 'stated', band: { lo: 180, hi: 300 }, intensity: vt1 },
         cite: 'Viada pp233-234 — 3- to 5-minute recovery walk/jog between sets',
       },
-      {
-        /** ⛔ THE SUSTAINED END OF THE SAME METHOD — longer repeats at a lower percentage. Split from
-         *  `race_repeats` so duration and intensity can no longer be sampled apart. */
-        id: 'race_repeats_long',
-        shape: 'intervals',
-        label: 'Sustained race-specific repeats',
-        // ⚠️ 12 TO 15 MINUTES. The band's top is the longest repeat this shape reaches at level 3;
-        // a wider top let level 3 build a twenty-minute repeat, which is a different level's dose.
-        repBand: { lo: 720, hi: 900 },
-        repsBand: { lo: 2, hi: 3 },
-        repsByLevel: { 1: { lo: 2, hi: 2 }, 2: { lo: 2, hi: 3 }, 3: { lo: 3, hi: 3 } },
-        work: pct(0.92, 0.95),
-        recovery: { kind: 'stated', band: { lo: 180, hi: 300 }, intensity: vt1 },
-        cite: 'Viada pp233-234 — 3- to 5-minute recovery walk/jog between sets',
-      },
+      // ⛔ `race_repeats_long` ("Sustained race-specific repeats") WAS DELETED HERE 2026-09-11. It
+      // blended the page's half-marathon and marathon lines into one band; this programme is the
+      // 5K one and builds the 5K line above. A stored row carrying that id keeps its steps; the
+      // chooser simply no longer offers it.
       {
         /**
          * ⛔⛔ UNBLENDED (2026-08-31). This ran 3:30-8:30 at 85-92% as one band, and **the source
@@ -782,6 +889,16 @@ export const FAMILIES: Record<FamilyId, {
         repsByLevel: { 1: { lo: 5, hi: 5 }, 2: { lo: 6, hi: 6 }, 3: { lo: 8, hi: 8 } },
         work: pct(0.90),
         recovery: { kind: 'stated', band: { lo: 60, hi: 90 }, intensity: vt1 },
+        /**
+         * ⛔ p233-234 AS PRINTED (2026-09-11): L1 5 rounds of 3:30 @ 90% / 1 min @ VT1; L2 6 rounds of
+         * 4 min @ 90% / 1 min @ VT1. Level 3's line (8 rounds of 5 min @ 90% / 1:30 @ VT1) is
+         * `sustained_5min_90`, so this shape stops at level 2 rather than printing the same session twice.
+         */
+        levels: [1, 2],
+        printedIntervalsByLevel: {
+          1: { sets: 1, rounds: 5, round: [W(210, 0.90)], betweenRoundsSeconds: 60, betweenRoundsIntensity: vt1 },
+          2: { sets: 1, rounds: 6, round: [W(240, 0.90)], betweenRoundsSeconds: 60, betweenRoundsIntensity: vt1 },
+        },
         cite: 'Viada pp233-234 — 1 to 1:30 at VT1 between',
       },
       /**
@@ -861,6 +978,16 @@ export const FAMILIES: Record<FamilyId, {
         repsByLevel: { 1: { lo: 3, hi: 3 }, 2: { lo: 5, hi: 5 }, 3: { lo: 4, hi: 6 } },
         work: pct(0.85, 0.88),
         recovery: { kind: 'stated', band: { lo: 60, hi: 90 }, intensity: vt1 },
+        /**
+         * ⛔ p233-234 AS PRINTED (2026-09-11): L1 3 rounds of 6 min @ 88% / 1 min @ VT1; L2 5 rounds of
+         * the same. Level 3's lines (6 x 6 @ 88%, 4 x 8:30 @ 85%) are `sustained_6min_88` and
+         * `sustained_8min30_85`, so this shape stops at level 2.
+         */
+        levels: [1, 2],
+        printedIntervalsByLevel: {
+          1: { sets: 1, rounds: 3, round: [W(360, 0.88)], betweenRoundsSeconds: 60, betweenRoundsIntensity: vt1 },
+          2: { sets: 1, rounds: 5, round: [W(360, 0.88)], betweenRoundsSeconds: 60, betweenRoundsIntensity: vt1 },
+        },
         cite: 'Viada pp233-234 — 1 minute at VT1 between',
       },
       {
@@ -873,6 +1000,18 @@ export const FAMILIES: Record<FamilyId, {
          */
         id: 'surge_embedded',
         shape: 'intervals',
+        /**
+         * ⛔ p233-234 AS PRINTED (read off the photos 2026-09-11):
+         *   L1  4 rounds of: 2 min @ 95% / 15 s @ 115% / 1:15 @ 95% / 2 min @ 90% / 1:30 to 2 min of VT1 recovery
+         *   L2  2 sets of 4 rounds of the same, additional 5-minute VT1 jog between sets
+         *   L3  3 sets of 4 rounds of the same, additional 5-minute VT1 jog between sets
+         * The VT1 recovery is the shortest the page states, 1:30.
+         */
+        printedIntervalsByLevel: {
+          1: { sets: 1, rounds: 4, round: [W(120, 0.95), W(15, 1.15, 'Surge'), W(75, 0.95), W(120, 0.90), RV(90)] },
+          2: { sets: 2, rounds: 4, round: [W(120, 0.95), W(15, 1.15, 'Surge'), W(75, 0.95), W(120, 0.90), RV(90)], betweenSetsSeconds: 300, betweenSetsIntensity: vt1 },
+          3: { sets: 3, rounds: 4, round: [W(120, 0.95), W(15, 1.15, 'Surge'), W(75, 0.95), W(120, 0.90), RV(90)], betweenSetsSeconds: 300, betweenSetsIntensity: vt1 },
+        },
         label: 'Threshold block with an embedded surge',
         repBand: { lo: 240, hi: 300 },
         repsBand: { lo: 4, hi: 12 },
@@ -887,6 +1026,17 @@ export const FAMILIES: Record<FamilyId, {
          *  `surge_embedded` so the sharp surge can no longer land inside the shorter block. */
         id: 'surge_opener',
         shape: 'intervals',
+        /**
+         * ⛔ p233-234 AS PRINTED (read off the photos 2026-09-11):
+         *   L1  5 rounds of: 20 s @ 140% / 4:40 @ 92% / 1-minute easy jog
+         *   L2  6 rounds of the same
+         *   L3  2 sets of 4 rounds of the same, 5-minute VT1 jog between sets
+         */
+        printedIntervalsByLevel: {
+          1: { sets: 1, rounds: 5, round: [W(20, 1.40, 'Opening surge'), W(280, 0.92), R(60)] },
+          2: { sets: 1, rounds: 6, round: [W(20, 1.40, 'Opening surge'), W(280, 0.92), R(60)] },
+          3: { sets: 2, rounds: 4, round: [W(20, 1.40, 'Opening surge'), W(280, 0.92), R(60)], betweenSetsSeconds: 300, betweenSetsIntensity: vt1 },
+        },
         label: 'Long steady effort opened by a sharp surge',
         // ⚠️ THE BLOCK IS THE SURGE PLUS THE STEADY EFFORT, and it sits BELOW the short race repeat's
         // length deliberately: two shapes of equal length with different counts trip the library's
@@ -1085,6 +1235,9 @@ export const FAMILIES: Record<FamilyId, {
         shape: 'intervals',
         label: 'Progressive repeats',
         repBand: { lo: 45, hi: 90 },
+        // ⛔ p237 PRINTS ONE LENGTH PER LEVEL — 45 seconds, 1 minute, 1:30 (2026-09-11). The band
+        // above stays as the bracket; the level's own number is what builds.
+        repSecondsByLevel: { 1: 45, 2: 60, 3: 90 },
         repsBand: { lo: 6, hi: 10 },
         repsByLevel: { 1: { lo: 6, hi: 10 }, 2: { lo: 6, hi: 10 }, 3: { lo: 6, hi: 10 } },
         progressive: true,
@@ -1095,6 +1248,17 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'one_to_one',
         shape: 'intervals',
+        /**
+         * ⛔ p237 AS PRINTED (read off the photo 2026-09-11):
+         *   L1  10 rounds of: 1 min @ 110% / 1 min @ 50%
+         *   L2  2 sets of 7 rounds of: 1 min @ 110% / 1 min @ 50%, 5-minute spin between sets
+         *   L3  2 sets of 8 rounds of: 1 min @ 120% / 1 min @ 50%, 5-minute spin between sets
+         */
+        printedIntervalsByLevel: {
+          1: { sets: 1, rounds: 10, round: [W(60, 1.10), { seconds: 60, role: 'recovery', intensity: pct(0.50) }] },
+          2: { sets: 2, rounds: 7, round: [W(60, 1.10), { seconds: 60, role: 'recovery', intensity: pct(0.50) }], betweenSetsSeconds: 300 },
+          3: { sets: 2, rounds: 8, round: [W(60, 1.20), { seconds: 60, role: 'recovery', intensity: pct(0.50) }], betweenSetsSeconds: 300 },
+        },
         label: 'One-to-one repeats',
         repBand: { lo: 60, hi: 60 },
         repsBand: { lo: 10, hi: 16 },
@@ -1106,6 +1270,18 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'sandwich',
         shape: 'intervals',
+        /**
+         * ⛔ p237 AS PRINTED (read off the photo 2026-09-11) — the surge is on BOTH sides:
+         *   L1  5 rounds of: 30 s @ 120% / 2:30 @ 90% / 30 s @ 120% / 4-minute easy spin
+         *   L2  6 rounds of: 30 s @ 120% / 4 min @ 90% / 30 s @ 120% / 4-minute easy spin
+         *   L3  2 sets of 4 rounds of: 30 s @ 120% / 5:30 @ 90% / 30 s @ 120% / 4-minute easy spin,
+         *       5-minute additional spin/recovery between sets
+         */
+        printedIntervalsByLevel: {
+          1: { sets: 1, rounds: 5, round: [W(30, 1.20, 'Surge'), W(150, 0.90, 'Sustained effort'), W(30, 1.20, 'Surge')], betweenRoundsSeconds: 240 },
+          2: { sets: 1, rounds: 6, round: [W(30, 1.20, 'Surge'), W(240, 0.90, 'Sustained effort'), W(30, 1.20, 'Surge')], betweenRoundsSeconds: 240 },
+          3: { sets: 2, rounds: 4, round: [W(30, 1.20, 'Surge'), W(330, 0.90, 'Sustained effort'), W(30, 1.20, 'Surge')], betweenRoundsSeconds: 240, betweenSetsSeconds: 300 },
+        },
         label: 'Surge, sustain, surge',
         repBand: { lo: 30, hi: 30 },
         repsBand: { lo: 5, hi: 8 },
@@ -1171,6 +1347,18 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'minute_surge',
         shape: 'intervals',
+        /**
+         * ⛔ p238-239 AS PRINTED (read off the photos 2026-09-11) — "6 minutes @ 90% with 10 seconds
+         * @ 105% every minute on the minute" is six minutes of (10 s @ 105% / 50 s @ 90%):
+         *   L1  3 sets of 6 minutes, 3-minute easy spin between
+         *   L2  4 sets of 6 minutes, 3-minute easy spin between
+         *   L3  4 sets of 8 minutes, 3-minute easy spin between
+         */
+        printedIntervalsByLevel: {
+          1: { sets: 3, rounds: 6, round: [W(10, 1.05, 'Surge, on the minute'), W(50, 0.90)], betweenSetsSeconds: 180 },
+          2: { sets: 4, rounds: 6, round: [W(10, 1.05, 'Surge, on the minute'), W(50, 0.90)], betweenSetsSeconds: 180 },
+          3: { sets: 4, rounds: 8, round: [W(10, 1.05, 'Surge, on the minute'), W(50, 0.90)], betweenSetsSeconds: 180 },
+        },
         label: 'Sweet-spot blocks with a surge on the minute',
         repBand: { lo: 360, hi: 480 },
         repsBand: { lo: 3, hi: 4 },
@@ -1182,6 +1370,15 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'medium',
         shape: 'intervals',
+        /**
+         * ⛔ p238-239 AS PRINTED (2026-09-11): L1 6 rounds of 4 min @ 95% / 2-minute easy spin;
+         * L2 8 rounds of the same; L3 8 rounds of 2 min @ 95% / 2 min @ 100% / 2-minute easy spin.
+         */
+        printedIntervalsByLevel: {
+          1: { sets: 1, rounds: 6, round: [W(240, 0.95)], betweenRoundsSeconds: 120 },
+          2: { sets: 1, rounds: 8, round: [W(240, 0.95)], betweenRoundsSeconds: 120 },
+          3: { sets: 1, rounds: 8, round: [W(120, 0.95), W(120, 1.00)], betweenRoundsSeconds: 120 },
+        },
         label: 'Medium sweet-spot repeats',
         repBand: { lo: 120, hi: 240 },
         repsBand: { lo: 6, hi: 8 },
@@ -1192,6 +1389,15 @@ export const FAMILIES: Record<FamilyId, {
       {
         id: 'long',
         shape: 'intervals',
+        /**
+         * ⛔ p238-239 AS PRINTED (2026-09-11): L1 3 rounds of 8 min @ 90% / 4-minute easy spin;
+         * L2 4 rounds of the same; L3 4 rounds of 10 min @ 90% / 4-minute easy spin.
+         */
+        printedIntervalsByLevel: {
+          1: { sets: 1, rounds: 3, round: [W(480, 0.90)], betweenRoundsSeconds: 240 },
+          2: { sets: 1, rounds: 4, round: [W(480, 0.90)], betweenRoundsSeconds: 240 },
+          3: { sets: 1, rounds: 4, round: [W(600, 0.90)], betweenRoundsSeconds: 240 },
+        },
         label: 'Long sweet-spot repeats',
         repBand: { lo: 480, hi: 600 },
         repsBand: { lo: 3, hi: 4 },
@@ -1207,6 +1413,17 @@ export const FAMILIES: Record<FamilyId, {
         repsBand: { lo: 3, hi: 3 },
         work: pct(0.80),
         recovery: { kind: 'stated', band: { lo: 300, hi: 300 }, intensity: easy },
+        /**
+         * ⛔ p238-239 AS PRINTED (2026-09-11): L1 3 rounds of 15 min @ 80% / 5-minute easy spin;
+         * L2 3 rounds of 20 min @ 80% / 5-minute easy spin. L3 adds "a 10-second all-out sprint every
+         * 4 minutes", and all-out is not a number this library can put on a step — so the shape is
+         * not offered at level 3 rather than printed without its sprints.
+         */
+        levels: [1, 2],
+        printedIntervalsByLevel: {
+          1: { sets: 1, rounds: 3, round: [W(900, 0.80)], betweenRoundsSeconds: 300 },
+          2: { sets: 1, rounds: 3, round: [W(1200, 0.80)], betweenRoundsSeconds: 300 },
+        },
         cite: 'Viada pp238-239 — 5-minute easy spin',
       },
     ],

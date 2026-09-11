@@ -234,22 +234,33 @@ Deno.test('the level moves the DOSE up, family by family', () => {
   // ⚠️ Sprint work is the stated exception in BOTH sports: it is neurally capped, so a higher level
   // buys more options and more complex starts rather than more metres. Its bands are not monotone on
   // the page either, which is recorded on `WORK_BANDS`.
+  /**
+   * ⚠️ PER SHAPE SINCE 2026-09-11, not per family. The hard shapes are the page's own sessions per
+   * level now, and the page's level 3 sweet-spot column has no 60-minute tempo session (its tempo
+   * line adds all-out sprints this library cannot state, so the shape stops at level 2) — so the
+   * family's biggest level-3 session is smaller than its biggest level-2 one. His ladder is a ladder
+   * WITHIN a shape: every shape offered at two levels carries at least as much work at the higher.
+   */
   const laddered = ALL_FAMILIES.filter((f) => f !== 'run_sprint_power' && f !== 'ride_sprints');
   for (const family of laddered) {
-    const at = (level: Level) => {
-      let best = 0;
-      for (const a of archetypesFor(family, level)) {
+    for (const a of archetypesFor(family)) {
+      const at = (level: Level) => {
+        if (!archetypesFor(family, level).some((x) => x.id === a.id)) return null;
         const t = buildEnduranceSession({ family, level, size: 1, archetype: a.id, baselines: REF }).totals;
-        best = Math.max(best, t.workSeconds + (t.meters ?? 0));
+        return t.workSeconds + (t.meters ?? 0);
+      };
+      const w = [at(1), at(2), at(3)];
+      const offered = w.filter((x): x is number => x != null);
+      for (let i = 1; i < offered.length; i++) {
+        assert(offered[i] >= offered[i - 1],
+          `${family}.${a.id}: a higher level carries less work (${offered.join(' / ')})`);
       }
-      return best;
-    };
-    assert(at(2) >= at(1), `${family}: level 2 carries less work than level 1 (${at(2)} < ${at(1)})`);
-    assert(at(3) >= at(2), `${family}: level 3 carries less work than level 2 (${at(3)} < ${at(2)})`);
-    // ⛔ AND THE FULL LADDER STEP IS STRICT. A `>=` chain passes when the level stops being read at
-    // all — every level comes out identical and every comparison is an equality. Mutation-testing
-    // caught exactly that: flattening the level dial left this test green.
-    assert(at(3) > at(1), `${family}: level 3 carries no more work than level 1 (${at(3)} = ${at(1)})`);
+      // ⛔ AND THE FULL LADDER STEP IS STRICT where a shape spans the ladder. A `>=` chain passes when
+      // the level stops being read at all — mutation-testing caught exactly that.
+      if (offered.length === 3) {
+        assert(offered[2] > offered[0], `${family}.${a.id}: level 3 carries no more work than level 1 (${offered.join(' / ')})`);
+      }
+    }
   }
 });
 
@@ -325,6 +336,8 @@ Deno.test("the threshold families rest by Ch.4's rule: work/4, clamped to 30s-2m
       for (const a of FAMILIES[family].archetypes) {
         if (a.recovery.kind !== 'threshold_ratio') continue;
         if (a.levels && !a.levels.includes(level)) continue;
+        // ⛔ A LEVEL THE PAGE PRINTS CARRIES THE PAGE'S OWN RECOVERY, not Ch.4's ratio (2026-09-11).
+        if (a.printedIntervalsByLevel?.[level]) continue;
         for (const size of SIZES) {
           const s = buildEnduranceSession({ family, level, size, archetype: a.id, baselines: REF });
           for (const b of s.blocks) {
@@ -350,7 +363,13 @@ Deno.test("the threshold families rest by Ch.4's rule: work/4, clamped to 30s-2m
       }
     }
   }
-  assert(checked > 0, 'no threshold-ratio recovery was checked — the rule has no subject any more');
+  /**
+   * ⚠️ THE RULE HAS NO SUBJECT SINCE 2026-09-11 — the one threshold-ratio shape (`short_above`) is
+   * printed at every level now, with p233-234's own "3-minute recovery walk/jog between sets". The
+   * rule stays in the code for any future shape the page leaves to Ch.4, and the constants are pinned
+   * in the test below; this sweep is recorded as empty rather than deleted.
+   */
+  assert(checked >= 0);
 });
 
 Deno.test('the 30-second rest floor is what governs his above-threshold repeats', () => {
@@ -360,11 +379,20 @@ Deno.test('the 30-second rest floor is what governs his above-threshold repeats'
   // ⛔ LITERAL 30, NOT THE CONSTANT. Asserting `=== THRESHOLD_REST_MIN_SECONDS` moves with the
   // constant and can never fail; mutation-testing proved it — the floor was changed to 45 and this
   // test stayed green.
-  for (const [level, repSeconds] of [[1, 60], [3, 90]] as const) {
+  /**
+   * ⛔ SUPERSEDED FOR THIS SHAPE 2026-09-11: p233-234 prints `short_above` as sets — "2 sets of 4
+   * rounds of 1 min @ 105% / 1 min @ 90%, 3-minute recovery walk/jog between sets" (3 sets at level
+   * 2, 4 at level 3, the 90% segment 1:30 from level 2) — so the page's own recovery is what the
+   * session carries, and the 30-second floor no longer has a subject. Pinned to the page instead.
+   */
+  for (const [level, sets, floatSeconds] of [[1, 2, 60], [2, 3, 90], [3, 4, 90]] as const) {
     const s = buildEnduranceSession({ family: 'run_near_threshold', level, archetype: 'short_above', baselines: REF });
     const b = s.blocks[0];
-    assertEquals(b.steps.find((st) => st.role === 'work')!.seconds, repSeconds);
-    assertEquals(b.restBetween!.seconds, 30);
+    assertEquals(b.repeat, sets);
+    assertEquals(b.steps.filter((st) => st.role === 'work').length, 8, 'four rounds of two work steps');
+    assertEquals(b.steps[0].seconds, 60);
+    assertEquals(b.steps[1].seconds, floatSeconds);
+    assertEquals(b.restBetween!.seconds, 180);
   }
   // The constants themselves are Ch.4's, and they are pinned here so a silent edit is a red test.
   assertEquals(THRESHOLD_WORK_TO_REST, 4);
@@ -509,7 +537,8 @@ Deno.test('the tempo crossover, tested directly', () => {
 Deno.test('a sub-threshold block past fifteen minutes survives, and says it is a tempo effort', () => {
   // The other half of the crossover. His 20-minute sweet-spot block at 80% is the case, and it must
   // reach the athlete at twenty minutes rather than clipped to fifteen.
-  const s = buildEnduranceSession({ family: 'ride_sweet_spot', level: 3, size: 1, archetype: 'tempo', baselines: REF });
+  // ⚠️ LEVEL 2 SINCE 2026-09-11 — level 3's tempo line adds all-out sprints and is not offered.
+  const s = buildEnduranceSession({ family: 'ride_sweet_spot', level: 2, size: 1, archetype: 'tempo', baselines: REF });
   const work = s.blocks[0].steps.find((st) => st.role === 'work')!;
   assertEquals(work.seconds, 1200);
   assert(s.notes.some((n) => n.text.includes('tempo effort')),
@@ -566,8 +595,8 @@ Deno.test('percentages point the right way — the direction bug that would look
   const rec = (s.blocks[0].restBetween ?? s.blocks[0].steps.find((st) => st.role === 'recovery'))!;
   assert(work.target.paceSecPerMi!.lo < rec.target.paceSecPerMi!.lo,
     'the work interval is not faster than the recovery');
-  // 100-105% of a 420 s/mi threshold is 400-420 s/mi.
-  assertEquals(work.target.paceSecPerMi!.hi, 420);
+  // 105% of a 420 s/mi threshold is 400 s/mi — the page's one number since 2026-09-11, not a band.
+  assertEquals(work.target.paceSecPerMi!.hi, 400);
   assertEquals(work.target.paceSecPerMi!.lo, 400);
 
   const ride = buildEnduranceSession({ family: 'ride_sweet_spot', level: 2, archetype: 'tempo', baselines: REF });
@@ -780,18 +809,16 @@ Deno.test('⛔⛔ A REPEAT COUNT COMES FROM THE WORK BAND, NOT FROM A SECOND DIA
    * the both-ends-at-once pairing this test exists to forbid, and the plan token takes a band's top.
    * The long end is its own shape now, so the fifteen-minute repeat is asserted where it lives.
    */
-  const race = shape('run_near_threshold', 3, 'race_repeats_long');
-  assertEquals(race.work, 900, 'the level-3 long race repeat is no longer fifteen minutes');
-  assertEquals(race.reps, 3, `p234 prints 3 x 15; built ${race.reps}`);
-  // ⛔ AND THE SHORT END STAYS SHORT — the split is only honest if neither half drifts.
-  const raceShort = shape('run_near_threshold', 3, 'race_repeats');
-  assert(raceShort.work <= 480, `the short race repeat grew to ${raceShort.work}s`);
-  assert(raceShort.reps >= race.reps, 'the shorter repeat comes in fewer numbers than the longer one');
-  // ⛔ AND THE 8:30 ROUNDS ARE NOT SEVEN. p234 prints four; the band allows five, never seven.
-  // ⚠️ THE LONG SUB-THRESHOLD REPEATS ARE THEIR OWN SHAPE SINCE 2026-08-31, for the same reason as
-  // the race repeats: duration and percentage are paired on the page and were sampled apart here.
-  const below = shape('run_near_threshold', 3, 'below_threshold_long');
-  assert(below.reps <= 6, `p234 prints 4 rounds of 8:30; built ${below.reps}`);
+  /**
+   * ⚠️ 2026-09-11: `race_repeats_long` (the blended half-marathon / marathon line) is gone and
+   * `race_repeats` is p234's 5K line as printed — 4 x 5 min @ 105% at level 3. The 8:30 rounds are
+   * `sustained_8min30_85`, the page's own level-3 line, four of them.
+   */
+  const race = shape('run_near_threshold', 3, 'race_repeats');
+  assertEquals(race.work, 300, 'the level-3 5K repeat is not five minutes');
+  assertEquals(race.reps, 4, `p234 prints 4 x 5; built ${race.reps}`);
+  const below = shape('run_near_threshold', 3, 'sustained_8min30_85');
+  assertEquals(below.reps, 4, `p234 prints 4 rounds of 8:30; built ${below.reps}`);
 
   /**
    * ⛔ THE PROPERTY, ACROSS EVERY FAMILY AND LEVEL: within one family and level, a longer repeat
@@ -812,6 +839,13 @@ Deno.test('⛔⛔ A REPEAT COUNT COMES FROM THE WORK BAND, NOT FROM A SECOND DIA
    */
   for (const family of ['run_near_threshold', 'run_mlss', 'ride_sweet_spot'] as const) {
     for (const a of archetypesFor(family as never, 1)) {
+      /**
+       * ⚠️ A PRINTED SHAPE IS THE PAGE'S OWN PAIRING AT EACH LEVEL (2026-09-11), and the page does
+       * not always keep this property — its 5K line goes 2 x 5 min, 4 x 4 min, 4 x 5 min. The
+       * property guards a band being sampled twice; a printed level is not sampled at all.
+       */
+      const def = FAMILIES[family].archetypes.find((x) => x.id === a.id);
+      if (def?.printedIntervalsByLevel) continue;
       const byLevel = ([1, 2, 3] as const)
         .filter((l) => archetypesFor(family as never, l).some((x) => x.id === a.id))
         .map((l) => ({ l, ...shape(family, l, a.id) }))

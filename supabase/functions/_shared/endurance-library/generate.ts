@@ -41,7 +41,7 @@ import {
   WRAPPERS,
   type Archetype,
 } from './source-rules.ts';
-import type { PrintedRide } from './source-rules.ts';
+import type { PrintedIntervals, PrintedRide } from './source-rules.ts';
 import { anchorFor, resolveEnduranceAnchors, UNKNOWN_ANCHORS, type EnduranceAnchors, type EnduranceBaselines } from './anchors.ts';
 import type {
   AnchorReport,
@@ -360,14 +360,72 @@ function repCount(a: Archetype, ctx: BuildContext, workPerRep: number): number {
   return Math.min(a.repsBand.hi, Math.max(a.repsBand.lo, derived));
 }
 
+/**
+ * ⛔⛔ THE SESSION AS THE PAGE PRINTS IT (Michael, 2026-09-11: "workouts should be by the book") —
+ * see `Archetype.printedIntervalsByLevel`. No band, no dose, no lerp: the rounds, the seconds and the
+ * percentages are the page's own for this level.
+ *
+ * ⚠️ THE BLOCK SHAPE IS THE ONE `buildIntervals` ALREADY EMITS, so nothing downstream learns a new
+ * form: a one-set session is a block repeated `rounds` times with the between-rounds recovery as
+ * `restBetween`; a multi-set session is a block repeated `sets` times whose steps are the rounds
+ * written out with the between-rounds recovery between them, and the between-sets recovery as
+ * `restBetween`. That is exactly the shape `compoundRoundToken` reads and the sheet prints as
+ * "2 sets of 4 rounds: …; 2 min easy between".
+ */
+function buildPrintedIntervals(ctx: BuildContext, p: PrintedIntervals): Block[] {
+  const { archetype: a, sport, anchor } = ctx;
+  const labelFor = (s: PrintedIntervals['round'][number]): string =>
+    s.label ?? (s.role === 'work' ? 'Work' : s.role === 'float' ? 'Float' : 'Recovery');
+  const roundSteps = (): Step[] => p.round.map((s) => step(s.role, labelFor(s), s.seconds, s.intensity, sport, anchor));
+  // ⛔ Ch.4's reclassification, same note `buildIntervals` gives: a sub-threshold block past fifteen
+  // minutes is a tempo effort, ridden as one block (p239's 20 min @ 80%).
+  if (p.round.some((s) => s.role === 'work' && s.seconds > TEMPO_CROSSOVER_SECONDS
+    && s.intensity.kind === 'pct_threshold' && s.intensity.hi <= 1.0)) {
+    ctx.notes.push({
+      kind: 'source',
+      text: 'Each effort here runs past fifteen minutes, so it is a tempo effort rather than an '
+        + 'interval — ridden as one sustained block, not as a repeat.',
+      cite: 'Viada p107 and p239',
+    });
+  }
+  const betweenRounds = p.betweenRoundsSeconds && p.betweenRoundsSeconds > 0
+    ? step('recovery', 'Recovery', p.betweenRoundsSeconds, p.betweenRoundsIntensity ?? { kind: 'easy' }, sport, anchor)
+    : null;
+  if (p.sets <= 1) {
+    return [{
+      repeat: Math.max(1, p.rounds),
+      label: `${p.rounds} x ${a.label.toLowerCase()}`,
+      steps: roundSteps(),
+      restBetween: betweenRounds,
+    }];
+  }
+  const inner: Step[] = [];
+  for (let i = 0; i < p.rounds; i++) {
+    inner.push(...roundSteps());
+    if (betweenRounds && i < p.rounds - 1) inner.push({ ...betweenRounds });
+  }
+  return [{
+    repeat: p.sets,
+    label: `${p.sets} x ${p.rounds} ${a.label.toLowerCase()}`,
+    steps: inner,
+    restBetween: p.betweenSetsSeconds && p.betweenSetsSeconds > 0
+      ? step('recovery', 'Between sets', p.betweenSetsSeconds, p.betweenSetsIntensity ?? { kind: 'easy' }, sport, anchor)
+      : null,
+  }];
+}
+
 function buildIntervals(ctx: BuildContext): Block[] {
   const { archetype: a, sport, anchor } = ctx;
+  // ⛔ THE PRINTED SESSION WINS WHERE THE ARCHETYPE CARRIES ONE FOR THIS LEVEL — see `buildPrintedIntervals`.
+  const printed = a.printedIntervalsByLevel?.[ctx.level];
+  if (printed) return buildPrintedIntervals(ctx, printed);
   const workFloor = FAMILIES[ctx.family].workFloorPct;
 
   // ⛔ THE LEVEL SETS THE REP LENGTH INSIDE THE FAMILY'S OWN BAND. That is the pattern his tables
   // move on — anaerobic 45s / 60s / 90s, VO2 3 / 4 / 5 minutes, sweet spot 6 / 6 / 8 minutes — so
   // the rule reproduces the shape of the progression without carrying the tables.
-  let repSeconds = Math.round(lerp(a.repBand, levelT(ctx.level)));
+  // ⛔ THE PAGE'S OWN SECONDS FOR THIS LEVEL, where it prints one number rather than a band.
+  let repSeconds = a.repSecondsByLevel?.[ctx.level] ?? Math.round(lerp(a.repBand, levelT(ctx.level)));
 
   const crossover = applyTempoCrossover(repSeconds, a.work);
   repSeconds = crossover.seconds;

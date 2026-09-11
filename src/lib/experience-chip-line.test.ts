@@ -68,7 +68,9 @@ Deno.test('⛔ THE NUMBER ITSELF IS UNCHANGED — the rotation logic was proved 
    * `experience-chips.test.ts` is the check that matters here: it builds the weeks and asserts the
    * chip's number is one of them.
    */
-  assertEquals(all.run!.newer.longestMin, 46);
+  // ⚠️ 46 → 48 ON 2026-09-11 (every hard workout is the page's own now): the longest level-1
+  // near-threshold session is p233's "5 rounds of 20 s @ 140% / 4:40 @ 92% / 1-minute easy jog".
+  assertEquals(all.run!.newer.longestMin, 48);
 });
 
 Deno.test('⛔ THE REST OF THE HOURS ARE ACCOUNTED FOR, WITHOUT A SECOND NUMBER', () => {

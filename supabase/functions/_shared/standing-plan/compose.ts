@@ -339,6 +339,11 @@ function anchorRoleOf(family: string, role?: 'hard' | 'long' | 'easy' | null): '
   return null;
 }
 
+/** The same reading with the third answer named: a slot that is neither long nor hard is easy. */
+function slotRoleOf(slot: { family: FamilyId; role?: string | null }): 'hard' | 'long' | 'easy' {
+  return isLongSlot(slot) ? 'long' : isHardSlot(slot) ? 'hard' : 'easy';
+}
+
 /**
  * ⛔ THE WEEKDAY THIS ENDURANCE SLOT LANDS ON — the athlete's pin if they set one, the frame's
  * rotation otherwise. See `endurancePins`.
@@ -2573,6 +2578,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
             ?? a.archetype
             ?? rotatedArchetype(a.family, levelForFamily(a.family, a.level), args.week),
           sport: a.sport,
+          // ⛔ THE FRAME'S ROLE, so the easy ride and the long ride get their own ceilings (`ladderCeilingFor`).
+          role: slotRoleOf(slot),
         });
       });
     }
@@ -2710,6 +2717,8 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
      * ⚠️ ABSENT ON EVERY CALL THAT PREDATES IT, and those take the dial exactly as they did.
      */
     minutesAsked?: number | null,
+    /** The slot's role — the easy ride's ceiling is not the long ride's (`ladderCeilingFor`). */
+    role?: 'hard' | 'long' | 'easy',
   ): { level: Level; size: number } => {
     const override = args.levelOverrides?.[family] as Level | undefined;
     if (override != null) return { level: override, size: dialForSport(sport) };
@@ -2727,7 +2736,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
      * ⚠️ CAUGHT BY THE SWEEP THAT PINS THE UNTARGETED WEEK: it read 7h55 where the frame builds 5h19.
      */
     const verdict = sport === 'run' ? volume.run.verdict : sport === 'ride' ? volume.ride.verdict : 'no_target';
-    const rungs = ladderOf({ family: family as never, level, archetype, sport }, anchors);
+    const rungs = ladderOf({ family: family as never, level, archetype, sport, role }, anchors);
     /**
      * ⛔⛔ THE ATHLETE'S OWN ANSWER FIRST, AND BEFORE THE `no_target` BRANCH. A screen that asks per
      * session sends no weekly hours at all, so the verdict there is always `no_target` — reading it
@@ -3072,6 +3081,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       const rung = rungForSlot(
         assigned.family, assigned.level, slotArchetype, assigned.sport,
         Number.isFinite(askedMinutes) ? askedMinutes : null,
+        slotRoleOf(slot),
       );
       const level = rung.level;
       /**
@@ -3279,7 +3289,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
          */
         const askedDay = i < dayFills[sport];
         const rung = askedDay
-          ? rungForSlot(spec.family, spec.level, spec.archetype, sport)
+          ? rungForSlot(spec.family, spec.level, spec.archetype, sport, null, spec.role)
           : { level: spec.level, size: 1 };
         const built = buildEnduranceSession({
           family: spec.family, level: rung.level, archetype: spec.archetype, anchors, size: rung.size,

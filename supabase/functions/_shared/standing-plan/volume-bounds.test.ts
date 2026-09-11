@@ -168,8 +168,12 @@ Deno.test('⛔ THE TYPED HOURS SIZE THE WEEK — and his 4h was under the floor 
   // ⚠️ 0.2 → 0.25 ON 2026-09-10, A RULING (Michael: "as printed, always"). The ride with work is now
   // p239's fixed length (L2 125 min), so the steady ride is the only one the dial still sizes and its
   // steps are wider: asked 5h builds ~4h48 (steady 100 min), asked 5.5h builds 5h30.
+  // ⚠️ 0.25 → THE NEARER STEP ON 2026-09-11, A RULING (Michael: easy ride capped at two hours, p108;
+  // long ride at 3h30, p239 level 2). The easy ride used to climb to five hours and smooth every ask;
+  // now it stops at 100 and the long ride steps 125 → 180 with nothing between, so "5h" lands on the
+  // nearer side of that riser: 5.38h (63 + 80 + 180), against 4.47h on the other side.
   const asked5 = hours(build(HIS_SLOTS, undefined, 5, EXPERIENCED));
-  assert(Math.abs(asked5 - 5) < 0.25, `asked 5h, built ${asked5.toFixed(2)}h`);
+  assert(Math.abs(asked5 - 5.38) < 0.1, `asked 5h, built ${asked5.toFixed(2)}h`);
   assert(asked5 > hours(asked4), 'asking for more did not get more');
 });
 
@@ -238,14 +242,28 @@ Deno.test('⛔ HOURS PAST THE FIXED SESSIONS BECOME EASY SESSIONS — the week G
    * that stated it was deleted the same night; what stands in its place is a week that actually
    * builds the hours.
    */
-  const atCap = build(ALL_RIDE, undefined, 6);
-  const asked9 = build(ALL_RIDE, undefined, 9);
+  /**
+   * ⚠️ 6h → 9h BECAME 6h → 7h → 9h ON 2026-09-11 (Michael: easy ride capped at two hours, p108; long
+   * ride at 3h30, p239 level 2). The four ride slots now hold about 6h40, so the growth-without-a-day
+   * half is measured under that, and the 9h ask is where a day IS added — which is the run model
+   * (`LADDER_CEILING_MIN`'s own note: the long session can no longer absorb the extra hours).
+   */
+  // ⚠️ 5h AND 6h: at 6h the long ride is already at its 3h ceiling, so the growth step is measured
+  // one hour lower, where both base rides still have room.
+  const atCap = build(ALL_RIDE, undefined, 5);
+  const asked9 = build(ALL_RIDE, undefined, 6);
+  const asked9over = build(ALL_RIDE, undefined, 9);
   const rideMin = (wk: ReturnType<typeof build>) =>
     wk.sessions.filter((x) => x.type === 'ride').reduce((t, x) => t + (Number(x.duration) || 0), 0);
   const rides = (wk: ReturnType<typeof build>) => wk.sessions.filter((x) => x.type === 'ride').length;
 
   assert(rideMin(asked9) > rideMin(atCap),
-    `asking for 9h did not build more than asking for 6h: ${rideMin(asked9)} vs ${rideMin(atCap)} min`);
+    `asking for 6h did not build more than asking for 5h: ${rideMin(asked9)} vs ${rideMin(atCap)} min`);
+  // ⛔ PAST THE FOUR SLOTS' CEILINGS, THE HOURS ARRIVE AS ANOTHER EASY RIDE, never a longer one.
+  assert(rides(asked9over) > rides(asked9),
+    `asking for 9h added no day past the slots' ceilings: ${rides(asked9over)} vs ${rides(asked9)} rides`);
+  assert(rideMin(asked9over) > rideMin(asked9),
+    `asking for 9h did not build more than asking for 6h: ${rideMin(asked9over)} vs ${rideMin(asked9)} min`);
   /**
    * ⛔⛔ THIS ASSERTED MORE SESSIONS AND NOW ASSERTS THE OPPOSITE, DELIBERATELY (Michael, 2026-08-26).
    * The ruling changed under it: **base sessions grow through the book's own sizes first, and extra
@@ -983,7 +1001,9 @@ Deno.test('⛔⛔ THE GATE IS A COMPARISON, NOT A THRESHOLD — and unknown take
    */
   const runSpecs = [
     { family: 'run_mlss', level: 2, sport: 'run' },
-    { family: 'run_near_threshold', level: 3, archetype: 'below_threshold', sport: 'run' },
+    // ⚠️ `sustained_5min_90` SINCE 2026-09-11 — `below_threshold` stops at level 2; the frame's
+    // Wednesday rotates the page's three level-3 lines, and this is the longest of them.
+    { family: 'run_near_threshold', level: 3, archetype: 'sustained_5min_90', sport: 'run' },
     { family: 'run_vt1', level: 1, sport: 'run' },
     { family: 'run_lsd', level: 2, archetype: 'long_with_inserts', sport: 'run' },
   ] as SlotSpec[];

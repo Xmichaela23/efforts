@@ -100,7 +100,8 @@ Deno.test('a hard session lists the other workouts for its family at its level, 
      * the one the session's own steps reach when there is no threshold on file.
      */
     assertEquals(sheet.options[i].line, workoutLine(built, 'run', {}));
-    assert(/^\d+ × .* at \d+%/.test(sheet.options[i].line ?? ''), sheet.options[i].line ?? 'no line');
+    // ⚠️ A plain repeat reads "4 × 4 min at 105%"; a compound round "2 sets of 4 rounds: … at 95%, …".
+    assert(/ at \d+%/.test(sheet.options[i].line ?? ''), sheet.options[i].line ?? 'no line');
   });
 });
 

@@ -410,7 +410,9 @@ Deno.test('the frame\'s two hard slots are distinct families, and the screen\'s 
    * ⚠️ WHAT IS ASSERTED IS THE SAME FACT: slot one is the anaerobic session, not a sweet-spot one.
    */
   assert(/bike_vo2_|(\d+s1[12]\d-.*\d+s130)/.test(slot1), `slot one is not the anaerobic session: ${slot1}`);
-  assert(/bike_ss_/.test(slot2), `slot two is not a sweet-spot session: ${slot2}`);
+  // ⚠️ A ROUND AT 90% SINCE 2026-09-11 — the sweet-spot session carries p239's own percentage on the
+  // round grammar (`round_4x_600s90_R240s`) rather than the 85-95% band token.
+  assert(/bike_ss_|round_\d+x_\d+s90/.test(slot2), `slot two is not a sweet-spot session: ${slot2}`);
   assert(slot1 !== slot2, 'the two hard slots built the same session');
 
   // ⛔ THE DEFAULTS THE SCREEN SHOWS, against those two.

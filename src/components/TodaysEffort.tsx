@@ -2564,10 +2564,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           onClick={() => handleApplyDisciplineSwap(w, opt, swapRestOfPlan && swapSheet?.rest_of_plan === true)}
                           className="w-full px-4 py-3 rounded-xl text-left text-white border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] transition-colors disabled:opacity-50"
                         >
-                          <div className="text-sm font-medium">{opt.label}</div>
+                          {/* ⛔ 15 / 13 px (Michael, 2026-09-11) — the Today card's own sizes. The paces line is
+                              what says what the workout is, and it was the smallest text on the sheet. */}
+                          <div className="text-[15px] font-medium">{opt.label}</div>
                           {/* ⛔ THE SESSION YOU GET, OR THE MACHINE'S / THE WAY BACK'S APPROVED LINE —
                               resolved by the server with the same resolver the tap writes with. */}
-                          {opt.line ? <div className="text-[12px] text-white/55 mt-1">{opt.line}</div> : null}
+                          {opt.line ? <div className="text-[13px] text-white/55 mt-1">{opt.line}</div> : null}
                           {/* ⛔ WARN, NEVER GATE — the button above still works. */}
                           {opt.warnings.map((warn) => (
                             <div key={warn} className="text-[12px] text-amber-200/80 mt-1">{warn}</div>
