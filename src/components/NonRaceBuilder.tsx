@@ -193,7 +193,7 @@ import {
 // ⛔ THE MILEAGE TABLES ARE READ ON THE SERVER (2026-09-10, audit H-P07). The race preview returns the
 // weeks, the floor, the tier note, the longest run and the tier seeds; only the tier's type is read here.
 import type { IntakeTier } from '@/lib/run-volume-tables';
-import type { PaceBenchmarkRow } from '@/lib/run-pace-calibration';
+import { parsePaceInput, saveCalibration, type PaceBenchmarkRow } from '@/lib/run-pace-calibration';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import WeekGrid from '@/components/WeekGrid';
 import { liftingCommitmentLine, liftingDaysForFrame } from '@/lib/lifting-commitment';
@@ -2418,8 +2418,31 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // phone copy of the pace tables; `save-baselines` derives paces from a typed 5K.
   const [calSaving, setCalSaving] = React.useState(false);
   const [calSaved, setCalSaved] = React.useState(false);
+  /** The server's refusal, printed as sent (save-baselines checks the two paces itself). */
+  const [calError, setCalError] = React.useState<string | null>(null);
   /** Speed needs numbers. Either they are on file, or they were just entered here. */
   const speedNeedsCalibration = state.raceIntent === 'speed' && builder != null && !paceOnFile && !calSaved;
+  /**
+   * ⛔ THE TWO NUMBERS THE SENTENCE PROMISES (2026-09-10, audit "found while reading" 2). The card said
+   * "Two numbers below" and drew nothing below, and `calSaved` was never set, so "A time" with no pace
+   * on file could not continue. The inputs are the Goals card's Quick Calibration, word for word; the
+   * phone sends the two typed paces and `save-baselines` derives and stores the rest.
+   */
+  const calEasySec = parsePaceInput(state.calEasy);
+  const calFiveKSec = parsePaceInput(state.calFiveK);
+  const calPacesUsable = !!calEasySec && !!calFiveKSec && calFiveKSec < calEasySec;
+  const handleCalibrationSave = React.useCallback(async () => {
+    if (!calPacesUsable || calSaving) return;
+    setCalSaving(true);
+    setCalError(null);
+    try {
+      const { error } = await saveCalibration(supabase, { easyPace: state.calEasy, fiveKPace: state.calFiveK, isMetric: unit === 'km' });
+      if (error) { setCalError(error); return; }
+      setCalSaved(true);
+    } finally {
+      setCalSaving(false);
+    }
+  }, [calPacesUsable, calSaving, state.calEasy, state.calFiveK, unit]);
 
   /**
    * ⛔ THE INTENT IS REQUIRED, AND SO IS A PACE IF THEY PICKED SPEED. Without the second half the
@@ -4683,10 +4706,53 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   )}
                 </div>
                 {speedNeedsCalibration && (
-                  <p className="text-white/60 text-xs leading-relaxed">
-                    A time goal is written against your paces, and there are none on file yet. Two
-                    numbers below and the plan can write real targets.
-                  </p>
+                  <>
+                    <p className="text-white/60 text-xs leading-relaxed">
+                      A time goal is written against your paces, and there are none on file yet. Two
+                      numbers below and the plan can write real targets.
+                    </p>
+                    {/* The Goals card's Quick Calibration inputs, word for word; the server derives. */}
+                    <div>
+                      <label className="text-sm text-white/50 block mb-1.5">
+                        Easy pace — conversational, could hold for an hour
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text" inputMode="numeric" placeholder={unit === 'km' ? '6:30' : '10:30'}
+                          value={state.calEasy}
+                          onChange={(e) => setState((st) => ({ ...st, calEasy: e.target.value }))}
+                          className="w-28 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/12 text-white text-sm text-center"
+                          style={{ fontSize: '16px' }}
+                        />
+                        <span className="text-white/60 text-sm">/{unit}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-sm text-white/50 block mb-1.5">
+                        5K pace — fastest you could sustain for ~25 minutes
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text" inputMode="numeric" placeholder={unit === 'km' ? '5:00' : '8:00'}
+                          value={state.calFiveK}
+                          onChange={(e) => setState((st) => ({ ...st, calFiveK: e.target.value }))}
+                          className="w-28 px-3 py-2 rounded-xl bg-white/[0.06] border border-white/12 text-white text-sm text-center"
+                          style={{ fontSize: '16px' }}
+                        />
+                        <span className="text-white/60 text-sm">/{unit}</span>
+                      </div>
+                    </div>
+                    {calEasySec && calFiveKSec && calFiveKSec >= calEasySec && (
+                      <p className="text-xs text-red-400/70">5K pace should be faster than easy pace</p>
+                    )}
+                    {calError && <p className="text-xs text-red-400/70">{calError}</p>}
+                    <button
+                      type="button"
+                      onClick={handleCalibrationSave}
+                      disabled={!calPacesUsable || calSaving}
+                      className="w-full rounded-xl bg-white/[0.15] py-2.5 text-sm font-medium text-white/90 hover:bg-white/[0.22] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                    >{calSaving ? 'Saving...' : 'Set Baseline'}</button>
+                  </>
                 )}
               </div>
             )}
