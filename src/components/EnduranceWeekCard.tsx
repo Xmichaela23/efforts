@@ -733,6 +733,15 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                 </div>
               ) : null}
 
+              {/* ⛔ THE HARD ROW'S LINE ON THE FACE (Michael, 2026-09-11: "maybe add choose session on
+                  the day"). The server's approved sentence for this row's sport — "… Choose the workout
+                  on the day." — was behind the chevron, so a closed row never said where the workout is
+                  chosen. It prints here, under the sport, in the row's own small grey; the chevron keeps
+                  only the club setting. Read off the row like every other reading (`hardLine`). */}
+              {isHard && hardLine ? (
+                <p data-testid={`slot-${key}-hard-line`} className="px-4 pb-3.5 -mt-1 text-white/55 text-xs leading-snug">{hardLine}</p>
+              ) : null}
+
               {/* ⛔ THE LENGTH ON THE FACE TOO, ON A ROW THAT OPENS (2026-09-11). The fixed easy row
                   already drew its picker on the face because it has no chevron; the long row hid its
                   behind one, and once the sport was answered on the face nothing said the row still
@@ -774,9 +783,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                       Server copy, printed as sent — see `hardLine`. It sits above the length picker
                       for the same reason the shape list did: it describes the session, and the
                       length is a different question. */}
-                  {hardLine ? (
-                    <p data-testid={`slot-${key}-hard-line`} className="text-white/55 text-xs leading-snug">{hardLine}</p>
-                  ) : null}
+                  {/* ⛔ THE HARD LINE LEFT THE BODY FOR THE FACE OF THE ROW (2026-09-11) — see above. */}
 
                   {/* ⛔ THE TAX LINE, AT THE MOMENT IT IS ABOUT (2026-08-24). His two sentences left
                       the preamble — where they were read before there was anything to apply them to —
