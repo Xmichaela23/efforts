@@ -229,6 +229,14 @@ height as the deck card was, that expands on tap:
 - Field basis: TrainingPeaks and Runna show a session as a list with notes inline; Strong and Hevy are
   lists. Nothing in that set swipes through exercises.
 
+## 3i. Superset on the lift card; kind word wrapping (Michael, 2026-09-10 evening)
+
+- Two rows that share a `superset_group` show on the Today lift card as ONE line: `Tate Press + Drag Curl`
+  with `superset` after the kind word, and the two cues under it (one cue when both rows are the same kind).
+  Same words the drawer uses. The drawer's banner line stays.
+- The kind word (`MAXIMAL EFFORT`, `HYPERTROPHY`) must not wrap: keep it on the name line, shrink to 11 px
+  or move it under the name at narrow widths, never split the two words.
+
 ## 4. Out of scope
 
 - WORKORDER-kill-ours and WORKORDER-de-row-by-feel (separate, may land first or after).
