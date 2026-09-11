@@ -730,6 +730,15 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                 </div>
               ) : null}
 
+              {/* ⛔ THE LENGTH ON THE FACE TOO, ON A ROW THAT OPENS (2026-09-11). The fixed easy row
+                  already drew its picker on the face because it has no chevron; the long row hid its
+                  behind one, and once the sport was answered on the face nothing said the row still
+                  had a question. A required answer is never behind the chevron. `lengths` is null on
+                  a quality row, so a hard row draws nothing here. */}
+              {expandable && lengths ? (
+                <div className="px-4 pb-3.5">{lengthPicker(key, lengths, picked, sport)}</div>
+              ) : null}
+
               {/* ⚠️ `expandable` IS RE-TESTED HERE AND NOT ONLY ON THE HEADER. `open` is a single key
                   of component state, so a row that stops being expandable while it is the open one —
                   a sport change on another row narrowing this one — would otherwise render an
@@ -793,7 +802,9 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                       exist: the ask-15-get-20 defect in a new place.
                       ⚠️ THE EMPTY OPTION STAYS FIRST, the same rule the hours box had: no number in an
                       untouched control, because a preselected value reads as a recommendation. */}
-                  {lengthPicker(key, lengths, picked, sport)}
+                  {/* ⛔ THE LENGTH PICKER LEFT THE BODY FOR THE FACE OF THE ROW (Michael, off the
+                      screen, 2026-09-11: "not getting length drop down from long"). Same rule as the
+                      sport chips: a required answer is never behind the chevron. See below the header. */}
 
                   {(isHard || key === 'long') && props.renderHardFlavor
                     ? props.renderHardFlavor(key, { close: () => setOpen(null) })
