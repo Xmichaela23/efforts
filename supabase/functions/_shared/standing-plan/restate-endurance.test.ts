@@ -38,3 +38,29 @@ Deno.test('⛔ WEEKS BEFORE THE CUT ARE LEFT ALONE', () => {
   const out = restateEndurance({ composed: COMPOSED as never, planned: PLANNED as never, afterWeek: 3 });
   assertEquals(out.rows, []);
 });
+
+Deno.test('⛔ SAME TOKENS, DIFFERENT MINUTES IS NOT A CHANGE — the stored length is the tokens expanded', () => {
+  // The calendar row was expanded by materialize-plan to 100 minutes; the composer's own figure for the
+  // same tokens is 92. Nothing is written and nothing is reported.
+  const composed = [{ week: 2, sessions: [
+    { day: 'Saturday', type: 'run', name: 'Long Run', description: 'long', duration: 92, steps_preset: ['longrun_91min_easypace', 'round_4x_135s115'], tags: ['standing_plan'] },
+  ] }];
+  const planned = [
+    { id: 'sat', week_number: 2, date: '2026-09-12', type: 'run', name: 'Long Run', description: 'long', duration: 100, steps_preset: ['longrun_91min_easypace', 'round_4x_135s115'], tags: ['standing_plan'], workout_status: 'planned' },
+  ];
+  const out = restateEndurance({ composed: composed as never, planned: planned as never, afterWeek: 1 });
+  assertEquals(out.rows, []);
+  assertEquals(out.changes, []);
+});
+
+Deno.test('⚠️ A WORDS-ONLY REWRITE KEEPS THE STORED LENGTH and reports no length change', () => {
+  const composed = [{ week: 2, sessions: [
+    { day: 'Saturday', type: 'run', name: 'Long Run', description: 'new words', duration: 92, steps_preset: ['run_easy_79min'], tags: ['standing_plan'] },
+  ] }];
+  const planned = [
+    { id: 'sat', week_number: 2, date: '2026-09-12', type: 'run', name: 'Long Run', description: 'old words', duration: 79, steps_preset: ['run_easy_79min'], tags: ['standing_plan'], workout_status: 'planned' },
+  ];
+  const out = restateEndurance({ composed: composed as never, planned: planned as never, afterWeek: 1 });
+  assertEquals(out.rows.map((r) => [r.id, r.duration, r.description]), [['sat', 79, 'new words']]);
+  assertEquals(out.changes, []);
+});

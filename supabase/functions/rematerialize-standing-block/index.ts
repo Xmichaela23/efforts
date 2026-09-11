@@ -609,6 +609,27 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    /**
+     * ⛔ THE LENGTHS REPORTED ARE THE LENGTHS STORED (2026-09-10). A run or ride's minutes are what
+     * materialize-plan expands its tokens to, and the refresh above has just done that; the composer's own
+     * figure for the same tokens can differ by several minutes. So an applied change reports the minutes the
+     * row now carries, read back, never the figure the composer proposed.
+     */
+    if (computedRefreshed && endurance.changes.length > 0) {
+      try {
+        const ids = endurance.rows.map((r) => r.id);
+        const { data: after } = await supabase.from('planned_workouts').select('id, duration').in('id', ids).eq('user_id', userId);
+        const byId = new Map((after ?? []).map((r: { id: string; duration: number | null }) => [String(r.id), Number(r.duration)]));
+        for (const c of endurance.changes) {
+          const row = endurance.rows.find((r) => r.week === c.week && r.day === c.day && r.type === c.type && r.name === c.name);
+          const stored = row ? byId.get(row.id) : undefined;
+          if (Number.isFinite(stored) && (stored as number) > 0) c.to_minutes = stored as number;
+        }
+      } catch (e) {
+        console.warn(`[standing-restate] stored lengths not read back: ${(e as Error)?.message ?? String(e)}`);
+      }
+    }
+
     console.log(
       `[standing-restate] plan=${plan.id} week=${currentWeek} lifts=${found.join(',')} `
       + `rows=${written}/${restated.rows.length} changes=${restated.changes.length} `

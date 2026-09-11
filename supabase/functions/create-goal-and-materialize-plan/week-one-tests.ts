@@ -115,6 +115,25 @@ export async function scheduleWeekOneTests(opts: {
         continue;
       }
       inserted += 1;
+      /**
+       * ⛔ EXPANDED AT INSERT, LIKE EVERY OTHER ROW OF THE PLAN (2026-09-10). The row body's minutes (45 for the
+       * time trial, 60 for the FTP test) are a round figure; the first materialize of the row sets them to
+       * what its steps add up to (36 and 55), and that first materialize used to be whichever came first — the
+       * calendar's missing-steps pass or a rebuild. The same session read 45 one day and 36 the next. Expanding
+       * it here stores the steps' own length from the start, and the planned load below reads that length.
+       */
+      let minutes = row.duration;
+      try {
+        await fetch(`${functionsBaseUrl}/materialize-plan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+          body: JSON.stringify({ planned_workout_id: saved.id }),
+        });
+        const { data: expanded } = await supabase.from('planned_workouts').select('duration').eq('id', saved.id).maybeSingle();
+        if (Number(expanded?.duration) > 0) minutes = Number(expanded.duration);
+      } catch (e) {
+        console.warn('[week-one-tests] expanding the test session failed:', e);
+      }
       try {
         await fetch(`${functionsBaseUrl}/calculate-workload`, {
           method: 'POST',
@@ -123,7 +142,7 @@ export async function scheduleWeekOneTests(opts: {
             workout_id: saved.id,
             workout_data: {
               type: row.type,
-              duration: row.duration,
+              duration: minutes,
               steps_preset: row.steps_preset,
               strength_exercises: [],
               mobility_exercises: [],

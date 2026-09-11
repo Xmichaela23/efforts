@@ -563,13 +563,23 @@ export function restateEndurance(args: {
       const shapeMoved = nextTokens.join(' ') !== curTokens.join(' ');
       const nameMoved = String(fresh.name ?? '') !== String(row.name ?? '');
       const descMoved = String(fresh.description ?? '') !== String(row.description ?? '');
-      if (!shapeMoved && !nameMoved && !descMoved && fromMin === toMin) return;
+      /**
+       * ⛔⛔ THE MINUTES ARE NOT A CHANGE OF THEIR OWN (2026-09-10). A stored row's `duration` is what
+       * materialize-plan expanded its tokens to — a long run of `longrun_91min_easypace` + `round_4x_135s115`
+       * is stored at 100 minutes, while the composer's own `duration` for it says 92. Compared minute for
+       * minute, every such row was reported as a length change on every rebuild (long runs 98/99/107 → 90,
+       * the anaerobic ride 66 → 65) and written, and the plan-wide refresh that follows set each one back to
+       * its token total. The report listed lengths that never reached a calendar. Same tokens is the same
+       * session, so the length moves only with the shape.
+       */
+      if (!shapeMoved && !nameMoved && !descMoved) return;
       rows.push({
         id: String(row.id), week, day, type: String(fresh.type),
         name: String(fresh.name ?? ''), description: String(fresh.description ?? ''),
-        duration: toMin, steps_preset: nextTokens, tags: tokensOf(fresh.tags),
+        // ⚠️ A words-only rewrite keeps the stored length — the tokens it was expanded from did not move.
+        duration: shapeMoved ? toMin : (fromMin ?? toMin), steps_preset: nextTokens, tags: tokensOf(fresh.tags),
       });
-      if (shapeMoved || fromMin !== toMin) {
+      if (shapeMoved) {
         changes.push({ week, day, type: String(fresh.type), name: String(fresh.name ?? ''), from_minutes: fromMin, to_minutes: toMin, shape_moved: shapeMoved });
       }
     });
