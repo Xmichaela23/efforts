@@ -1,3 +1,5 @@
+> **SHIPPED 2026-09-10** incl. §B2, §C and the kit-gate addenda. Pending: club-night and season-wizard sentences (Michael); DRAFT marker on the concentration curl how-to (approved late 2026-09-10).
+
 # Work order — Kill ours: every athlete-facing strength line traces to a page (2026-09-09)
 
 Michael, 2026-09-09: "never use ours" (the most important rule). Inventory of the strength screens the

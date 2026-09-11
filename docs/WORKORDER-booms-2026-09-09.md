@@ -1,3 +1,5 @@
+> **SHIPPED 2026-09-10** with the REVISED lines; computed at ingest by compute-session-boom (f1a00766).
+
 # Work order — One line of good news on a done session (2026-09-09)
 
 Michael: "a little achievement dopamine thingy … a ride or run or even a lift, just a little booms." Field

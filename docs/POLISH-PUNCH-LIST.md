@@ -14,6 +14,12 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — 2026-09-10 (Today/Week screens, kill-ours, audit stages 1–4 — PUSHED, DEPLOYED, iOS synced, NOT device-checked)
+- Build in Xcode, rebuild the plan from Adjust once. Walk Today, Week, State, a session drawer, the logger,
+  Profile, Connections. Send screenshots of anything off. See docs/SESSION-2026-09-09-10-handoff.md.
+- Expect: DE Barbell Row reads By feel after the rebuild; Preacher Curl becomes Concentration Curl; the
+  superset shows as one line on Today; pounds lifted no longer count a phantom bar.
+
 ## ⏳ AWAITING MICHAEL — 2026-09-07 (the plumbing: queue, alarm, "failed" on screen, connection health — DEPLOYED, migrations NOT pasted)
 
 - [ ] **Paste three migrations in order in the SQL editor:** `20260907070000_jobs_alarms_analysis_stamp.sql`, `20260907080000_connection_health.sql`,

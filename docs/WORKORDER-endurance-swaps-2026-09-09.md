@@ -1,3 +1,5 @@
+> **SHIPPED 2026-09-10** incl. §7–8; decisions and writes live in the swap-session edge function (9096bff0).
+
 # Work order — Endurance swaps the book blesses, on the session drawer (2026-09-09)
 
 Michael: "we swap strength in the logger; let's add these when appropriate here." The four swaps below

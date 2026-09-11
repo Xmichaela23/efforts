@@ -1,3 +1,5 @@
+> **SHIPPED 2026-09-10** incl. §7. Open-Meteo commercial plan = FOUNDATION-READINESS B14 (launch gate).
+
 # Work order — Garmin and Strava attribution on the new screens (2026-09-09)
 
 Michael: "make sure all Garmin and Strava rules are followed on our new screens; I need to send Garmin

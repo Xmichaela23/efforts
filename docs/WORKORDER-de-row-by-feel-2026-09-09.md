@@ -1,3 +1,5 @@
+> **SHIPPED 2026-09-09/10.** Rebuild fix for rows without the marker: 70b28aea.
+
 # Work order — No lift is priced off another lift; the DE row goes by feel (2026-09-09)
 
 Michael, 2026-09-09: "never use ours" — no athlete-facing line or number that is not on a book page. The

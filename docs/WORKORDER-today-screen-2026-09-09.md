@@ -1,3 +1,5 @@
+> **SHIPPED 2026-09-10** (§1–3i; deck replaced by the lift card §3h). Pushed, deployed, iOS synced; device walk pending. Record: docs/SESSION-2026-09-09-10-handoff.md.
+
 # Work order — The Today screen (2026-09-09)
 
 Decided 2026-09-09 (docs/SESSION-2026-09-06-07-handoff.md, "decided, not built: the Today screen"). Michael:
