@@ -303,36 +303,51 @@ export function restateFromTest(args: {
       }
       /**
        * ⛔⛔ A ROW THAT WAS PRICED OFF ANOTHER LIFT GOES BACK TO `By feel` (2026-09-09,
-       * WORKORDER-de-row-by-feel §4).
+       * WORKORDER-de-row-by-feel §4; widened 2026-09-10).
        *
        * The composer no longer prices a movement off a different lift's max, so a calendar row still
-       * carrying `derived_ratio` is a weight the engine would not author today — with a warm-up
+       * carrying such a number is a weight the engine would not author today — with a warm-up
        * ladder built from it and a note explaining a derivation that no longer happens. The diff
        * below cannot see it: `topWorkWeight(fresh)` is null on a by-feel row, so `weightMoves` is
        * false and the stale number survives every rebuild.
        *
-       * ⛔ GATED ON THE OLD ROW'S OWN MARKER, and deliberately nothing wider. `load_prescribed ===
-       * false` on the fresh row is true for a dozen ordinary reasons — a missing working number
-       * chief among them — and blanking on that would strip real weights the first time a test read
-       * came back empty. `derived_ratio` can only have been written by the deleted block.
+       * ⛔ THE 2026-09-09 GATE WAS THE OLD ROW'S `load_basis: 'derived_ratio'` MARKER, AND IT MISSED
+       * MICHAEL'S ROW (2026-09-10). A block built before the marker existed opened with the DE
+       * Barbell Row on `By feel`; a later rebuild priced it through the weight branch below, which
+       * spreads `...ex` and writes only `weight`, `percent_1rm`, `load_prescribed` and `set_plan` —
+       * never `load_basis`. So the row carried 85 lb, a ladder and `load_prescribed: true` with no
+       * marker at all, and the marker gate left it alone on every rebuild since.
+       *
+       * ⛔ THE GATE IS NOW THE COMPOSER'S OWN ANSWER: the calendar row carries a number, and the
+       * composer's row for the same movement, same week, same day is `By feel` for a STRUCTURAL
+       * reason — anything but `awaiting_test`. `awaiting_test` is the one basis that promises a
+       * number later (this row IS a tested lift whose test is not read), and blanking on it would
+       * strip real weights the first time a test read came back empty. Every other by-feel basis,
+       * and no basis at all, means no test will ever price this row: the number can only have come
+       * from the deleted ratio branch.
        *
        * ⚠️ NEVER A DELETE AND NEVER ON A DONE SESSION — `isDone` gates the whole loop above, and this
        * rewrites the row in place.
        * ⚠️ THE WARM-UP LADDER, THE PERCENTAGE AND THE NOTE GO WITH THE WEIGHT. Leaving the ramp would
-       * put prescribed warm-up weights under a row that says By feel.
+       * put prescribed warm-up weights under a row that says By feel. `load_basis` is the fresh
+       * row's, so the rebuilt row reads exactly as a new build of the same block would.
        */
-      if ((er as { load_basis?: string }).load_basis === 'derived_ratio'
-        && (fresh as { load_prescribed?: boolean }).load_prescribed === false) {
+      const exPriced = ex?.load_prescribed === true || topWorkWeight(ex) != null;
+      const freshByFeel = fresh.load_prescribed === false && /by feel/i.test(String(fresh.weight ?? ''));
+      if (exPriced && freshByFeel && fresh.load_basis !== 'awaiting_test') {
         touched = true;
         return {
           ...ex,
           ...shape,
+          sets: fresh.sets,
+          reps: fresh.reps,
           weight: 'By feel',
           load_prescribed: false,
-          load_basis: undefined,
+          load_basis: fresh.load_basis,
           notes: undefined,
           percent_1rm: undefined,
           set_plan: fresh.set_plan,
+          last_reps: (fresh as Record<string, unknown>).last_reps,
         };
       }
       const to = topWorkWeight(fresh);

@@ -42,6 +42,14 @@ only; docs/COPY-VOICE.md.
    stay for display format and swap logic only; nothing prices off them.
 4. `restate.ts` rebuild: a row that was `derived_ratio` in an existing plan is re-stated as `By feel`
    on the next rebuild. Never a delete, never a done session.
+   2026-09-10: the marker gate missed the live row. On a tested block every row opens `By feel`; the
+   first rebuild after the test priced the DE row through the weight branch, which writes the weight,
+   the percent, the ladder and `load_prescribed` and never `load_basis` — so the row carried 85 lb
+   with no marker, and the gate never fired. The gate is now the composer's own answer: the calendar
+   row carries a number and the composer's row for the same movement is `By feel` for any reason
+   but `awaiting_test`. Reproduced on a throwaway account against the deployed function
+   (`scripts/_burner-de-row-rebuild-2026-09-10.mjs`): the marked row was restated, the unmarked one kept
+   85 lb and its ladder. Test: `standing-plan-restate-by-feel.test.ts`.
 5. No change to `TestedLift`, the test week, Profile, or the intake. No pull-up test.
 
 ## Copy
