@@ -71,3 +71,13 @@ Deno.test('⛔ THE LOGGER NO LONGER INVENTS A 3 WHEN THE ROW STATES NOTHING', as
   assert(/if \(suggestedRir == null\)/.test(src),
     'the no-target branch is gone — a target-less row will log a reserve nobody stated');
 });
+
+Deno.test('⛔ A PLYOMETRIC DRILL GETS NO DERIVED TARGET — p227 doses a drill and gives no reserve', () => {
+  // The composer tags the drill day `plyo` and stamps no reserve on its rows; this seam must not add one.
+  for (const intent of [undefined, null, '', 'HYP']) {
+    assertEquals(stampsTargetRir(true, intent, ['standing_plan', 'plyo']), false, `a drill row under intent ${String(intent)} got a reserve`);
+  }
+  // ⚠️ The lifting days of the same block keep theirs.
+  assertEquals(stampsTargetRir(true, 'HYP', ['standing_plan', 'frame:all_rounder']), true);
+  assertEquals(stampsTargetRir(true, 'HYP', null), true);
+});

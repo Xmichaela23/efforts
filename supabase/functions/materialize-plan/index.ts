@@ -56,8 +56,15 @@ import { resolveProfile, getTargetRir, protocolUsesRir } from '../_shared/streng
  * it. ⚠️ ABSENT, NEVER ZERO — p219 defines 0 RIR as a real and specific instruction, so a zero here
  * would say something he did not say.
  */
-export function stampsTargetRir(protocolTracksRir: boolean, slotIntent: unknown): boolean {
+export function stampsTargetRir(protocolTracksRir: boolean, slotIntent: unknown, rowTags?: unknown): boolean {
   if (!protocolTracksRir) return false;
+  /**
+   * ⛔ A PLYOMETRIC DRILL HAS NO RESERVE EITHER (2026-09-10). p227 doses a drill by the movement — repeat it
+   * until it is optimised for the day, ample rest, stop on fatigue or poor form — and gives no reserve, and
+   * the composer stamps none on a drill row. This seam derived one off the RPE chart all the same, so the
+   * drill lines read "2 to 3 in reserve". The session's `plyo` tag is the composer's own mark for the day.
+   */
+  if (Array.isArray(rowTags) && rowTags.some((t) => String(t).toLowerCase() === 'plyo')) return false;
   return String(slotIntent ?? '').toUpperCase() !== 'ME';
 }
 
@@ -2653,7 +2660,7 @@ export function expandTokensForRow(
            * ⚠️ `compose.ts:684-687` RECORDED THIS AS A GAP for "the slice that touches the RIR seam".
            * This is that slice; that comment is now history.
            */
-          const tracksRir = stampsTargetRir(protocolUsesRir(strengthProfile), (ex as any)?.slot_intent);
+          const tracksRir = stampsTargetRir(protocolUsesRir(strengthProfile), (ex as any)?.slot_intent, (row as any)?.tags);
           const target_rir = !tracksRir ? undefined : getTargetRir(
             strengthProfile,
             String(name ?? ''),
@@ -3069,7 +3076,7 @@ export function expandTokensForRow(
            * ⚠️ `compose.ts:684-687` RECORDED THIS AS A GAP for "the slice that touches the RIR seam".
            * This is that slice; that comment is now history.
            */
-          const tracksRir = stampsTargetRir(protocolUsesRir(strengthProfile), (ex as any)?.slot_intent);
+          const tracksRir = stampsTargetRir(protocolUsesRir(strengthProfile), (ex as any)?.slot_intent, (row as any)?.tags);
           const target_rir = !tracksRir ? undefined : getTargetRir(
             strengthProfile,
             String(name ?? ''),
