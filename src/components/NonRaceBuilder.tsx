@@ -47,6 +47,7 @@ import {
   unansweredLengths,
   unansweredLengthLine,
   EXPERIENCE_WHEN_UNASKED,
+  HARD_SHAPE_IS_ENGINES,
 } from '@/lib/standing-plan-week-copy';
 import { CLUB_SESSION_CONTROL_VISIBLE, ENGINE_PICK_ROW_LABEL, hardSlotDefault, slotFamilyFact, slotVariantOptions, variantsTakenBy, type HardSlotKey } from '@/lib/hard-slot-choices';
 // ⛔ NOTHING FROM `standing-plan-week-bounds` IS IMPORTED HERE (2026-09-10, audit H-W05). The endurance
@@ -6085,6 +6086,16 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
               if (h?.ownership === 'club') return 'Club session';
               // ⛔ THE TITLE READS THE LIBRARY (2026-08-24): the chosen variant's label when one is
               // picked, the family's own label otherwise — never the old tables' copy.
+              /**
+               * ⛔⛔ A HARD ROW NAMES NO SESSION WHILE THE SHAPE IS THE ENGINE'S (Michael, 2026-09-11 —
+               * see `HARD_SHAPE_IS_ENGINES`). There is no pick to show, *"Engine's pick"* named a
+               * control that no longer exists, and the family word (*"Anaerobic"*) would be a second
+               * name for the thing the row's own line already states in his words. The row's answer
+               * is its SPORT; the line under the chips says what the session is.
+               * ⚠️ THE LOOKUP STAYS BEHIND THE SWITCH, not deleted: flipping it back restores the
+               * picked shape's own label on the closed row with it.
+               */
+              if (HARD_SHAPE_IS_ENGINES) return null;
               const variant = h?.archetype
                 ? slotVariantOptions(hk, sport, wizardFrame).find((v) => v.id === h.archetype)?.label
                 : null;
@@ -6216,6 +6227,21 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                * Reported, not smuggled. Gating it to one frame is a one-line test in this condition
                * if he wants that instead.
                */
+              /**
+               * ⛔⛔⛔ AND IT IS OFF AGAIN, ON STANDARD FOCUS TOO (Michael, 2026-09-11). This supersedes
+               * the restoration recorded directly above for the hard rows, and it is the same ruling
+               * Run + Strength shipped on 2026-09-07: **the engine rotates the page's shapes week to
+               * week (p112) and the builder sends no archetype.** What the athlete answers on a hard
+               * row is the sport; what the row then says is the server's one line
+               * (`HARD_ROW_LINE`), where this list used to be.
+               *
+               * ⛔ WHAT CAME OFF: the list itself, its *"Engine's pick — rotates week to week"* head,
+               * and every shape's description. ⚠️ NOTHING IS DELETED — `slotVariantOptions`,
+               * `VARIANT_BODY`, `variantsTakenBy` and `applyVariantPicks` are untouched and still
+               * under test, so restoring the control is flipping `HARD_SHAPE_IS_ENGINES` back.
+               * ⚠️ THE LONG ROW IS UNAFFECTED — its card above is the club control, not a shape.
+               */
+              if (HARD_SHAPE_IS_ENGINES) return null;
               const hk = key as HardSlotKey;
               // ⛔ EVERY OTHER HARD ROW, NOT "the other one" — see `variantsTakenBy`. p274 has three.
               const others = hardSlotKeysFor(wizardFrame)

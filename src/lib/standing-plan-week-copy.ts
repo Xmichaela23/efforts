@@ -305,6 +305,27 @@ export function sessionLengthLabel(minutes: number): string {
 export const SESSION_LENGTH_VARIES = 'length varies week to week';
 
 /**
+ * ⛔⛔ THE HARD SESSION'S SHAPE IS THE ENGINE'S ON EVERY PROGRAMME (Michael: 2026-09-07 for Run +
+ * Strength, `WORKORDER-run-strength-rotate-2026-09-07.md`; 2026-09-11 for Standard Focus).
+ *
+ * ⛔ THE RULE IT IMPLEMENTS IS p112 — hold the load and vary the work *"across slightly different set
+ * durations and intensities"* session to session. The engine rotates the page's own shapes week to
+ * week (`rotatedArchetype` / `frameRotatedArchetype`); the builder names none of them and sends no
+ * archetype, so the athlete answers the SPORT and nothing else on a hard row.
+ *
+ * ⛔ WHAT CAME OFF THE STANDARD FOCUS ROW WITH THIS: the shape list, the *"Engine's pick — rotates
+ * week to week"* option at the head of it, its short form on the closed row, and every shape's
+ * description. Run + Strength never drew them — its screen is `RunStrengthWeekCard` — so this makes
+ * the two programmes ask the same question of a hard row.
+ *
+ * ⚠️ A SWITCH RATHER THAN A DELETION, the same shape as `CLUB_SESSION_CONTROL_VISIBLE`: "maybe a
+ * more surgical option later" is his own standing note on the Run + Strength ruling, and the
+ * machinery behind the list (`slotVariantOptions`, `VARIANT_BODY`, `applyVariantPicks`) is untouched
+ * and still under test, so restoring the control is flipping this and nothing else.
+ */
+export const HARD_SHAPE_IS_ENGINES = true;
+
+/**
  * ⛔ THE LABEL OVER THE LENGTH PICKER. Fact-first and no imperative, same voice as every other label
  * on this screen: it names the quantity and stops.
  */

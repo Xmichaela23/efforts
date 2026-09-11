@@ -287,3 +287,43 @@ under-claiming any week that rotated onto a longer shape.
 - The comment table at the top of `session-vocabulary.ts` now states the page's answer: the 5-to-8
   is a REP LENGTH, and the library's `repsBand` of 5-8 is a different number that reads the same.
 
+
+---
+
+## 10. THE SAME RULING ON STANDARD FOCUS (2026-09-11)
+
+Michael applied §0's rotate-only rule to Standard Focus (frame `all_rounder`) on the builder's
+endurance step. `HARD_SHAPE_IS_ENGINES` (`standing-plan-week-copy.ts`) is the switch, and it now
+covers both programmes.
+
+- **Off the hard rows:** the shape list, its *"Engine's pick — rotates week to week"* head, that
+  phrase's short form on the closed row, and every shape's description. Each hard row keeps its
+  Ride / Run choice exactly as it had it — including p274's day 2, which offers Ride only because
+  `assignSports` still has no ride-to-run conversion (that measurement is unchanged).
+- **On them instead**, under the sport choice, one line the SERVER sends (`HARD_ROW_LINE` in
+  `intake-readout.ts`, printed verbatim by `EnduranceWeekCard`), approved 2026-09-11:
+  hard run — *"A series of near-threshold efforts. Choose the workout on the day."*;
+  hard ride — *"A series of efforts near or above threshold. Choose the workout on the day."*
+- The easy and long rows are untouched and keep their length pickers.
+
+### 10a. Verified live, throwaway account, deployed chain
+
+A Standard Focus block built with no picks — the payload carries no `endurance_slot_archetypes` and
+no archetype on any `hard_days` entry — **rotates all three hard slots across the twelve weeks**:
+day 1 through three `run_mlss` shapes, day 2 through three `ride_anaerobic` shapes, day 3 through
+all seven `run_near_threshold` shapes (16x75s, 4x390s, 2x810s, 6x225s, 5x435s, 8x270s, 6x280s), each
+coming round again on its own period. Account deleted.
+
+### 10b. ⛔ THE LINE'S SECOND HALF IS A PROMISE THE APP CANNOT KEEP TODAY — a finding, not a fix
+
+*"Choose the workout on the day"* has no path behind it, and this was searched for rather than
+assumed. `slotVariantOptions` has three callers and all three are the BUILDER (`HardSlotChoices`,
+`NonRaceBuilder`, its own lib); `applyVariantPicks` is called only from `sport-slots.ts` at compose
+time; no `.tsx` outside the two builder cards mentions `archetype`. On the deployed chain, the
+Instead sheet for a built Standard Focus hard run returned exactly two options — **Treadmill**
+(`kind: venue`) and **Ride instead** (`kind: discipline`) — and `swap-session`'s option kinds are
+`discipline`, `venue`, `hike` and `revert`. **Nothing changes a built session's SHAPE, on either
+frame.** §1's *"the pickers remain reachable on the built week afterwards"* is not true and appears
+never to have been.
+
+Not built here, per the order. It is the one piece of work the copy now depends on.

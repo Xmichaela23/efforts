@@ -4,7 +4,8 @@
  * The builder's endurance step prints what this returns and works none of it out:
  *
  *   rows               per row: the lengths it may be set to, the length it is fixed at, or that its
- *                      length varies week to week (`slotLengthOptions`, `slotFixedMinutes`).
+ *                      length varies week to week (`slotLengthOptions`, `slotFixedMinutes`), and on a
+ *                      hard row the sentence that stands where the shape list used to (`HARD_ROW_LINE`).
  *   experience_chips   the two chips per sport and every number on them (`experienceChips`).
  *   has_bounds         whether each sport's slots hold a week worth an hours dial, and whether a total
  *                      is a floor because some recoveries carry no stated length (`weekBounds`).
@@ -25,6 +26,7 @@ import {
 import {
   forcedSportFor,
   frameSlots,
+  HARD_SHAPE_IS_ENGINES,
   hardSlotKeysFor,
   weekIsDayOrdered,
   type SlotKey,
@@ -43,6 +45,30 @@ export type IntakeRow = {
   fixed_minutes: number | null;
   /** A quality row whose shape rotates, so no single length is true. */
   length_varies: boolean;
+  /**
+   * ⛔ WHAT A HARD ROW SAYS UNDER ITS SPORT — MICHAEL'S OWN SENTENCES, APPROVED 2026-09-11. It stands
+   * where the shape list used to (`HARD_SHAPE_IS_ENGINES`). Null on every other row, and on a hard
+   * row with no sport answered yet.
+   */
+  hard_line: string | null;
+};
+
+/**
+ * ⛔⛔ THE TWO SENTENCES, VERBATIM (Michael, 2026-09-11). The phone prints what is in this object and
+ * composes nothing — the row it sits on offers no shape to name, so the line is what tells the
+ * athlete what the session IS and that the workout itself is still theirs on the day.
+ *
+ * ⚠️ KEYED ON THE ROW'S ANSWERED SPORT, not on the frame's family: a hard row switched from a ride to
+ * a run must read the run's sentence, and the sport is the only thing the athlete answers there.
+ * ⚠️ BOTH PASS `voiceViolation` — measured, not assumed. "Choose" is not on its banned list; the four
+ * imperatives it bans are stay, keep, try and consider.
+ * ⚠️ AND THE SECOND HALF IS A PROMISE ABOUT A BUILT SESSION. See the work order note recorded with
+ * this change: the app has no path today that changes a built session's SHAPE — the Instead sheet
+ * offers the sport, the machine, the long day's hike and the way back, and nothing else.
+ */
+export const HARD_ROW_LINE: Record<SlotSport, string> = {
+  run: 'A series of near-threshold efforts. Choose the workout on the day.',
+  ride: 'A series of efforts near or above threshold. Choose the workout on the day.',
 };
 
 export type EnduranceIntakeReadout = {
@@ -105,12 +131,17 @@ export function enduranceIntakeReadout(args: {
     const fixed = dayOrdered
       ? slotFixedMinutes(s.key, slots, { baselines, frame, archetype: args.archetypes?.[s.key] ?? null })
       : null;
+    const rowSport = slots[s.key] ?? null;
     rows[s.key] = {
-      sport: slots[s.key] ?? null,
+      sport: rowSport,
       length_options: lengths?.options ?? null,
       fixed_minutes: fixed,
       length_varies: dayOrdered && hardKeys.includes(s.key) && lengths == null && fixed == null
-        && slots[s.key] != null,
+        && rowSport != null,
+      // ⛔ ONLY A HARD ROW WHOSE SHAPE THE ENGINE OWNS, and only once its sport is answered.
+      hard_line: HARD_SHAPE_IS_ENGINES && hardKeys.includes(s.key) && rowSport
+        ? HARD_ROW_LINE[rowSport]
+        : null,
     };
   }
 

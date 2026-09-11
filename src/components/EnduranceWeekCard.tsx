@@ -464,6 +464,17 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
           const fixed = dayOrdered && sameAnswers ? row?.fixed_minutes ?? null : null;
           const varies = dayOrdered && sameAnswers && !!row?.length_varies;
           /**
+           * ⛔⛔ WHAT A HARD ROW SAYS INSTEAD OF A SHAPE LIST (Michael, 2026-09-11) — the server's own
+           * sentence for this row's sport (`HARD_ROW_LINE`), printed verbatim under the sport choice.
+           * The shape list, its *"Engine's pick — rotates week to week"* head and every shape's
+           * description came off with it: the engine rotates the page's shapes week to week (p112)
+           * and the builder sends no archetype. See `HARD_SHAPE_IS_ENGINES`.
+           * ⚠️ READ OFF THE ROW LIKE EVERY OTHER READING, so it is only shown while the readout
+           * describes the sport now on screen — a row mid-change prints no line rather than the
+           * other sport's.
+           */
+          const hardLine = rowCurrent ? row?.hard_line ?? null : null;
+          /**
            * ⛔ THE ROW STATES ITS LENGTH, ANSWERED OR NOT. A quality row shows the dose it is fixed
            * at; an easy or long row shows what the athlete set. ⚠️ A row with a pick and no answer
            * yet shows nothing rather than a default — a number in an untouched control reads as a
@@ -723,6 +734,14 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                       actually the week's last run. */}
                   {optionsNow.reason ? (
                     <p className="text-white/45 text-xs leading-snug">{optionsNow.reason}</p>
+                  ) : null}
+
+                  {/* ⛔ THE HARD ROW'S ONE LINE, UNDER THE SPORT IT IS ABOUT (Michael, 2026-09-11).
+                      Server copy, printed as sent — see `hardLine`. It sits above the length picker
+                      for the same reason the shape list did: it describes the session, and the
+                      length is a different question. */}
+                  {hardLine ? (
+                    <p data-testid={`slot-${key}-hard-line`} className="text-white/55 text-xs leading-snug">{hardLine}</p>
                   ) : null}
 
                   {/* ⛔ THE TAX LINE, AT THE MOMENT IT IS ABOUT (2026-08-24). His two sentences left

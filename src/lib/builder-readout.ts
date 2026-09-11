@@ -53,6 +53,12 @@ export type IntakeRow = {
   length_options: number[] | null;
   fixed_minutes: number | null;
   length_varies: boolean;
+  /**
+   * ⛔ THE HARD ROW'S SENTENCE, WRITTEN ON THE SERVER (`HARD_ROW_LINE`, Michael 2026-09-11). It
+   * stands where the shape list used to. Null on every other row. ⚠️ The card prints it and composes
+   * nothing — a second copy of these words on the phone is how the two come to disagree.
+   */
+  hard_line: string | null;
 };
 
 export type EnduranceIntakeReadout = {

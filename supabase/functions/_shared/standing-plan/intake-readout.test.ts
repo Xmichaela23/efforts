@@ -3,7 +3,9 @@
  * on the same answers the screen shows.
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { enduranceIntakeReadout } from './intake-readout.ts';
+import { enduranceIntakeReadout, HARD_ROW_LINE } from './intake-readout.ts';
+import { voiceViolation } from '../state-trend/week-accent.ts';
+import { frameSlots, HARD_SHAPE_IS_ENGINES } from '../../../../src/lib/standing-plan-week-copy.ts';
 import { advancedTierSessions, FRAMES } from './frames.ts';
 import {
   experienceChips,
@@ -57,4 +59,57 @@ Deno.test('the history line counts the frame\'s own slots plus the advanced tier
     `Your history supports a ${5 + extra}-session endurance week — ${extra} extra easy run${extra === 1 ? '' : 's'} (the last five weeks).`,
   );
   assertEquals(enduranceIntakeReadout({ frame: 'strength_5k', answers: {}, demonstrated: { weeklyMiles: 10, source: 'x' } }).tier_line, null);
+});
+
+/**
+ * ⛔ THE HARD ROW'S LINE (Michael, 2026-09-11) — the sentence that stands where the shape list used
+ * to. Pinned character-exact in both sports, because the phone prints it verbatim and a drift here
+ * is a drift on the screen with nothing to catch it.
+ */
+Deno.test('a hard row carries its sport\'s approved line, and no other row carries one', () => {
+  const r = enduranceIntakeReadout({
+    frame: 'all_rounder',
+    answers: { hard1: 'run', hard2: 'run', hard3: 'run', easy: 'ride', long: 'ride' },
+    baselines: BASELINES,
+  });
+  assertEquals(r.rows.hard1!.hard_line, 'A series of near-threshold efforts. Choose the workout on the day.');
+  // p274's day 2 is a ride whatever was tapped, so it reads the ride's line.
+  assertEquals(r.rows.hard2!.hard_line, 'A series of efforts near or above threshold. Choose the workout on the day.');
+  assertEquals(r.rows.hard3!.hard_line, 'A series of near-threshold efforts. Choose the workout on the day.');
+  assertEquals(r.rows.easy!.hard_line, null);
+  assertEquals(r.rows.long!.hard_line, null);
+  // Every line is the object's own — nothing is composed per row.
+  for (const key of ['hard1', 'hard2', 'hard3'] as const) {
+    assert(Object.values(HARD_ROW_LINE).includes(r.rows[key]!.hard_line!));
+  }
+  // ⛔ AND BOTH PASS THE VOICE GATE. "Choose" is not one of the four imperatives it bans.
+  for (const line of Object.values(HARD_ROW_LINE)) assertEquals(voiceViolation(line), null);
+});
+
+Deno.test('an unanswered hard row carries no line — the sentence follows the sport', () => {
+  const r = enduranceIntakeReadout({
+    frame: 'all_rounder', answers: { hard1: null, easy: null, long: null }, baselines: BASELINES,
+  });
+  assertEquals(r.rows.hard1!.hard_line, null);
+  // The frame answers day 2 itself, so that row has a sport and therefore a line.
+  assertEquals(r.rows.hard2!.sport, 'ride');
+  assertEquals(r.rows.hard2!.hard_line, HARD_ROW_LINE.ride);
+});
+
+/**
+ * ⛔ THE SWITCH IS THE WHOLE RULING (`HARD_SHAPE_IS_ENGINES`). While it is on, the builder offers no
+ * shape on a hard row and sends no archetype, and the engine rotates the page's shapes week to week
+ * (p112). Flipping it back restores the list and this line comes off with it.
+ */
+Deno.test('the hard shape is the engine\'s on every frame', () => {
+  assertEquals(HARD_SHAPE_IS_ENGINES, true);
+  for (const frame of ['all_rounder', 'strength_5k'] as const) {
+    const r = enduranceIntakeReadout({
+      frame, answers: { hard1: 'run', hard2: 'run', hard3: 'run', easy: 'run', long: 'run' }, baselines: BASELINES,
+    });
+    for (const s of frameSlots(frame)) {
+      if (s.role !== 'hard') continue;
+      assert(r.rows[s.key]!.hard_line, `${frame} ${s.key} has a line`);
+    }
+  }
 });
