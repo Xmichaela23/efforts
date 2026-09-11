@@ -18,40 +18,30 @@ export default function StateBodyBlock({
   visibleSignals,
   windowLabel = null,
   readinessRpeDriver,
-  onOpenAdjust,
 }: {
   visibleSignals: VisibleSignal[];
   /** The coach's window for every number in the section ("last 7 days"). Printed once, here. */
   windowLabel?: string | null;
   readinessRpeDriver: string | null;
-  onOpenAdjust: () => void;
 }) {
   // ⛔ NO TAP-TO-REVEAL (Michael 2026-09-03: one click). Provenance prints under its row.
-  // The persistence line's door moved to the heading (below); it is still the only thing that opens Adjust.
   const sorenessFlag = visibleSignals.find((s) => s.soreness_flag)?.soreness_flag ?? null;
   return (
   <div className="px-3 py-3">
-    {/* Heading line — the section name and its window on the left, the door on the right. */}
-    <div className="flex items-baseline justify-between gap-x-3">
+    {/* Heading line — the section name, what it is made of, and the window it rests on.
+        ⛔ NO LINK HERE (Michael 2026-09-10). The Adjust TAB at the top of the screen is the way in;
+        a second door inside the block was a second route to the same place. */}
+    <div className="flex items-baseline gap-x-3">
       <span className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase">
-        BODY
+        BODY{' '}
+        {/* ⛔ THE BLOCK SAYS WHERE ITS NUMBERS COME FROM (Michael 2026-09-10) — every row here is what the
+            athlete typed after a session, not something measured. Same words as the D-354 ruling. */}
+        <span className="normal-case tracking-normal font-normal text-[11px] text-white/45">(as you logged)</span>
         {/* ⛔ THE WINDOW, ONCE, IN THE SMALL GREY LABEL (Michael 2026-09-10) — the rows no longer repeat it. */}
         {windowLabel && visibleSignals.length > 0 && (
           <span className="normal-case tracking-normal font-normal text-[11px] text-white/45 ml-1">· {windowLabel}</span>
         )}
       </span>
-      {/* ⛔ THE DOOR ONLY EXISTS WHEN SOMETHING POINTS AT IT (D-354). It appears with the persistence
-          sentence below and does the same thing it always did — open Adjust. No new control on a
-          screen that did not have one. */}
-      {sorenessFlag && (
-        <button
-          type="button"
-          onClick={onOpenAdjust}
-          className="bg-transparent border-none p-0 cursor-pointer text-[12px] text-white/40 shrink-0"
-        >
-          Adjust ›
-        </button>
-      )}
     </div>
 
     {/* The readings — LoadBar's row construction verbatim: a fixed 12 px separator slot pulled into the
@@ -86,12 +76,11 @@ export default function StateBodyBlock({
       <p className="mt-1.5 text-[12px] text-white/65 leading-snug">{readinessRpeDriver}</p>
     )}
 
-    {/* ⛔ THE PERSISTENCE LINE POINTS AT A DOOR, IT DOES NOT OPEN ONE ITSELF (D-354).
-        Soreness above this athlete's OWN normal for 4 of the last 6 sessions. It states the fact and
-        offers the Adjust tab (in the heading above); nothing changes unless the athlete goes and
-        changes it. ⚠️ Adjust is still a scaffold for endurance — strength steers work (in the logger),
-        ease/push does not exist yet. Sending someone there is honest because that tab says so itself;
-        it is not honest to pretend the line acts.
+    {/* ⛔ THE PERSISTENCE LINE STATES A FACT AND DOES NOT ACT ON IT (D-354).
+        Soreness above this athlete's OWN normal for 4 of the last 6 sessions. Nothing changes unless
+        the athlete goes to the Adjust tab and changes it. ⚠️ Adjust is still a scaffold for endurance —
+        strength steers work (in the logger), ease/push does not exist yet. It is not honest to pretend
+        the line acts.
         ⛔ FULL WIDTH (2026-09-10) — it used to sit in a 116 px-indented column and wrapped to four lines. */}
     {sorenessFlag && (
       <p className="mt-1.5 text-[12px] text-white/60 leading-snug">{sorenessFlag}</p>

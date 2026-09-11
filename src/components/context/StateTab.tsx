@@ -692,13 +692,23 @@ export default function StateTab({
 
         {showAmberRecordBar && <StateRaceDayBar />}
 
+        {/* "How your sessions went · last 7 days" — REBUILT (docs/STATE-WEEK-EXECUTION.md). Neutral
+            per-discipline planned-vs-done COUNTS + at most ONE composed accent. No fitness verdicts here
+            (that is PERFORMANCE, below); interval/execution % lives in session detail. Server owns the
+            accent; this renders it (Law 4). Three states: counts+accent / counts-only / nothing.
+            ⛔ SECOND ON THE PLATE (2026-09-10) — it sits with LOAD, which it shares a clock with, and
+            above BODY. */}
+        <StateWeekExecution wsv={wsv} week={week} />
+
         {/* BODY — restored 2026-09-04 (Michael: "you got rid of body, I didn't ask for that"). Effort is Foster's
-            session RPE, soreness is Hooper's scale; the comparisons under them are OURS and say so in the ledger. */}
+            session RPE, soreness is Hooper's scale; the comparisons under them are OURS and say so in the ledger.
+            ⛔ LAST ON THE PLATE (2026-09-10, Michael). The order is what the training did, then what the
+            athlete did, then how it felt: LOAD · THIS WEEK · BODY. BODY is the only reported block, so it
+            reads after the two measured ones rather than between them. */}
         <StateBodyBlock
           visibleSignals={visibleSignals}
           windowLabel={rm?.body_window_label ?? null}
           readinessRpeDriver={readinessRpeDriver}
-          onOpenAdjust={() => setStateLens('adjust')}
         />
 
         {/* READINESS — athlete-reported energy/soreness/sleep (Q-049 Phase 1, D-144).
@@ -707,12 +717,6 @@ export default function StateTab({
             judgement encoded. Trend arrow per signal (newest vs oldest in window)
             when ≥3 check-ins. */}
         {checkinReadiness?.latest && <StateReadinessRow checkinReadiness={checkinReadiness} />}
-
-        {/* "How your sessions went · last 7 days" — REBUILT (docs/STATE-WEEK-EXECUTION.md). Neutral
-            per-discipline planned-vs-done COUNTS + at most ONE composed accent. No fitness verdicts here
-            (that is PERFORMANCE, below); interval/execution % lives in session detail. Server owns the
-            accent; this renders it (Law 4). Three states: counts+accent / counts-only / nothing. */}
-        <StateWeekExecution wsv={wsv} week={week} />
 
         {/* ⛔ THE WEEKLY LIFTING CARD MOVED TO THE STRENGTH PLATE (Round 3 pass 1, 2026-09-01) — one
             owner per sport. It was here in the LOAD section (moved from the trends plate 2026-08-29);

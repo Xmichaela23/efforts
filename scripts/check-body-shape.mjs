@@ -6,8 +6,9 @@
  *   OUT_DIR=/tmp/shots node scripts/check-body-shape.mjs
  *
  * Opens State (Status tab) at 390x844 with a stub coach payload that carries the three BODY rows and
- * the persistence sentence, then measures the LOAD block and the BODY block on the shared plate.
- * Passes when BODY is no taller than ~2.3x LOAD and the sentence spans the plate's full text width.
+ * the persistence sentence, then measures the blocks on the shared plate. Passes when the order is
+ * LOAD · THIS WEEK · BODY, BODY is no taller than ~2.3x LOAD, its heading reads "BODY (as you logged)
+ * · last 7 days" with no link on it, and the sentence spans the plate's full text width.
  *
  * ⚠️ NO NETWORK LEAVES THE MACHINE. Stub session in localStorage; every Supabase request answered here.
  */
@@ -63,6 +64,20 @@ const coachPayload = {
         provenance: { tau_fitness_days: 42, tau_fatigue_days: 7 },
       },
       label: 'optimal',
+      total_7d: 427,
+      composition_7d: [
+        { discipline: 'strength', share_pct: 45 },
+        { discipline: 'run', share_pct: 10 },
+        { discipline: 'ride', share_pct: 45 },
+      ],
+    },
+    week_execution_v1: {
+      counts: [
+        { discipline: 'strength', planned: 3, done: 3 },
+        { discipline: 'run', planned: 3, done: 2 },
+        { discipline: 'ride', planned: 2, done: 2 },
+      ],
+      accent: null,
     },
     trends: { fitness_direction: 'stable', readiness_state: 'normal', readiness_label: null, signals: [], readiness_rpe_driver: 'Effort is up on your last three rides.' },
     coach: { narrative: null },
@@ -126,10 +141,14 @@ const info = await page.evaluate(() => {
     bodyText: body ? body.innerText.replace(/\n/g, ' | ') : null,
     sentence: rect(sentence),
     sentenceLines: sentence ? Math.round(sentence.getBoundingClientRect().height / parseFloat(getComputedStyle(sentence).lineHeight)) : null,
-    adjust: (() => { const b = body ? [...body.querySelectorAll('button')].find((x) => /Adjust/.test(x.textContent || '')) : null; return b ? rect(b) : null; })(),
-    headingTop: (() => {
+    adjustInBody: (() => { const b = body ? [...body.querySelectorAll('button,a')].find((x) => /Adjust/.test(x.textContent || '')) : null; return b ? rect(b) : null; })(),
+    heading: (() => {
       const s = body ? [...body.querySelectorAll('span')].find((x) => /^BODY/.test((x.innerText || '').trim())) : null;
-      return s ? rect(s) : null;
+      return s ? { ...rect(s), text: s.innerText.replace(/\s+/g, ' ').trim() } : null;
+    })(),
+    weekBlock: (() => {
+      const w = [...document.querySelectorAll('div')].find((d) => d.children.length === 0 && /^this week/i.test((d.innerText || '').trim()));
+      return w ? { ...rect(w), text: (w.innerText || '').trim() } : null;
     })(),
   };
 });
@@ -137,7 +156,8 @@ const info = await page.evaluate(() => {
 console.log('LOAD  :', JSON.stringify(info.load), info.loadText);
 console.log('BODY  :', JSON.stringify(info.body), info.bodyText);
 console.log('sentence:', JSON.stringify(info.sentence), 'lines:', info.sentenceLines);
-console.log('Adjust :', JSON.stringify(info.adjust), '| BODY heading:', JSON.stringify(info.headingTop));
+console.log('WEEK  :', JSON.stringify(info.weekBlock));
+console.log('heading:', JSON.stringify(info.heading), '| Adjust inside BODY:', JSON.stringify(info.adjustInBody));
 
 await page.screenshot({ path: `${OUT}/state-body-390.png` });
 if (info.body) {
@@ -152,7 +172,9 @@ const checks = [
   ['BODY height within 2.3x LOAD (was 3.6x)', !!info.body && !!info.load && info.body.h <= info.load.h * 2.3],
   ['BODY readings cost no more than LOAD\'s row', !!info.body && !!info.load && !!info.sentence && (info.sentence.top - info.body.top) <= info.load.h * 1.7],
   ['soreness sentence is full width (>=300px)', !!info.sentence && info.sentence.w >= 300],
-  ['Adjust on the heading line', !!info.adjust && !!info.headingTop && Math.abs(info.adjust.top - info.headingTop.top) <= 6],
+  ['order is LOAD, THIS WEEK, BODY', !!info.load && !!info.weekBlock && !!info.body && info.load.top < info.weekBlock.top && info.weekBlock.top < info.body.top],
+  ['heading reads "BODY (as you logged) · last 7 days"', !!info.heading && info.heading.text.replace(/\s*·\s*/g, ' · ') === 'BODY (as you logged) · last 7 days'],
+  ['no Adjust link inside BODY', !info.adjustInBody],
 ];
 for (const [name, ok] of checks) console.log(`CHECK ${name}: ${ok ? 'PASS' : 'FAIL'}`);
 await browser.close();
