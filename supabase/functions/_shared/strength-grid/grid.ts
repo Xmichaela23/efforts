@@ -539,6 +539,15 @@ const EXECUTION_NAME: Record<string, ByRoute<string>> = {
    */
   'pullover machine': 'Flat-Bench Dumbbell Pullover',
   /**
+   * ⛔ THE CONCENTRATION CURL (Michael, 2026-09-10 — the third home route in the same addendum:
+   * "a bench, a rack and dumbbells is a pretty standard home gym"). The preacher curl's station
+   * fixes the upper arm on a pad; at home the inner knee fixes it, seated on the bench, one arm at
+   * a time. Same braced-arm biceps intent. Viada p275 permits the implement change (variety of
+   * implements); the substitution itself is field-standard, not a page. The station route keeps
+   * his name, because a gym member walks over to the preacher bench.
+   */
+  'preacher curl': 'Concentration Curl',
+  /**
    * ⛔⛔ THE CURL HAS A HOME EXECUTION AND THE NAME HAS TO SAY WHICH (2026-08-31). `leg curl` gained a
    * bench-and-dumbbell route so p223's hamstring curl is reachable without a stack — and it went on
    * showing as a bare *"Leg Curl"*, which to an athlete with no machine names a station they do not
@@ -576,7 +585,7 @@ const EXECUTION_NAME: Record<string, ByRoute<string>> = {
  */
 const EXECUTION_HOW_TO: Record<string, ByRoute<string>> = {
   /**
-   * ⚠️ THE THREE ENTRIES BELOW ARE DRAFT WORDS (2026-09-10) — written with the two home routes from
+   * ⚠️ THE FOUR ENTRIES BELOW ARE DRAFT WORDS (2026-09-10) — written with the three home routes from
    * the workorder addendum and NOT yet approved by Michael. Every other line in this table is his.
    */
   'rear delt machine': [
@@ -584,6 +593,7 @@ const EXECUTION_HOW_TO: Record<string, ByRoute<string>> = {
     { route: ['dumbbells'], value: 'Stand with a dumbbell in each hand and hinge at the hips until your chest is close to parallel with the floor, arms hanging with a slight bend. Raise both dumbbells out to the sides until they are level with your shoulders, pause, then lower. Keep your back flat and your neck in line with your spine.' },
   ],
   'pullover machine': 'Lie on your back on a flat bench, feet on the floor, holding one dumbbell in both hands above your chest. With a slight bend in the elbows, lower the dumbbell in an arc behind your head until you feel a stretch, then pull it back over your chest. Keep your hips down on the bench.',
+  'preacher curl': 'Sit on the end of a flat bench with your feet wide and a dumbbell in one hand, arm hanging between your legs. Brace the back of that upper arm against the inside of the same-side knee. Curl the dumbbell up toward your shoulder, pause, then lower until your arm is straight. Keep the upper arm on the knee. Do all reps on one arm, then the other.',
   'back extension': 'Lie face down on the floor with your feet hooked under a loaded barbell. Hands behind your head or across your chest. Raise your chest and shoulders off the floor as far as you can, pause, then lower. Keep your feet down and your neck in line with your back.',
   'leg curl': 'Lie face down on a flat bench with your knees just past the end and a dumbbell held between your feet. Hold the bench with your hands. Curl your heels toward your glutes, pause, then lower the dumbbell slowly until your legs are straight.',
   'leg curls': 'Lie face down on a flat bench with your knees just past the end and a dumbbell held between your feet. Hold the bench with your hands. Curl your heels toward your glutes, pause, then lower the dumbbell slowly until your legs are straight.',

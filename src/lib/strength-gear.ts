@@ -793,7 +793,17 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
   // commercial-gym chip, the only thing that grants `machine`. A home athlete gets his spider curl
   // (chest-down on the incline, the same fixed-arm curl) where the kit has an incline bench, and
   // the drag curl where it does not.
-  'preacher curl': [['machine']],
+  // ⛔ AND A HOME ROUTE (Michael, 2026-09-10 — `docs/WORKORDER-kill-ours-2026-09-09.md` third home
+  // route: "a bench, a rack and dumbbells is a pretty standard home gym"): the preacher curl's home
+  // version is the CONCENTRATION CURL — seated on the bench (flat is enough), upper arm braced
+  // against the inner knee, one arm at a time. Same braced-arm biceps intent: the pad fixes the
+  // upper arm on the station, the knee fixes it at home. Viada p275 permits the implement change
+  // (variety of implements); the substitution itself is field-standard, not a page. The station
+  // route stays; the execution name says which one the kit resolved to
+  // (`strength-grid/grid.ts:EXECUTION_NAME`).
+  // ⚠️ ROUTE ORDER: the dumbbell route leads because `equipmentFitRank` scores by the FIRST route
+  // and it is the one most athletes have; the display name is chosen by the kit, not by this order.
+  'preacher curl': [['dumbbells', 'bench'], ['machine']],
   // The incline is the position here - a spider curl is chest-down on the incline bench. ⚠️ THE
   // "Incline bench" CHIP IS WHAT GRANTS `incline_bench`; "Bench (flat/adjustable)" grants `bench`
   // only (the 2026-08-29 attempt to read "adjustable" as incline was reverted — see

@@ -49,12 +49,17 @@ const namesIn = (w: ReturnType<typeof week>) => rowsIn(w).map((r) => r.name.toLo
 /** What the athlete reads: the execution name where the server wrote one, else the name. */
 const shownIn = (w: ReturnType<typeof week>) => rowsIn(w).map((r) => String(r.execution_name ?? r.name).toLowerCase());
 
-/** The movements the screen showed, by canonical name. */
-const CANNOT_ON_A_FLAT_BENCH = /preacher|spider|incline|chest[- ]supported row/;
+/**
+ * The movements the screen showed, by canonical name. ⚠️ THE PREACHER CURL LEFT THIS LIST on
+ * 2026-09-10 (third home route): with dumbbells and a bench it is reachable as the concentration
+ * curl, so the canonical name may be prescribed — what may not happen is the row SAYING "preacher"
+ * to that kit, which the second regex still pins.
+ */
+const CANNOT_ON_A_FLAT_BENCH = /spider|incline|chest[- ]supported row/;
 /** And what a row may never SAY to an athlete with no station and no incline. */
 const NAMES_A_STATION_OR_INCLINE = /machine|incline|preacher|spider|chest[- ]supported/;
 
-Deno.test('⛔ THE DEVICE FINDING: dumbbells and a flat bench are not handed a preacher curl, a spider curl or an incline movement', () => {
+Deno.test('⛔ THE DEVICE FINDING: dumbbells and a flat bench are not handed a spider curl or an incline movement, and never read "preacher"', () => {
   for (const wk of [1, 2, 3, 4]) {
     const w = week(FLAT, wk);
     const hits = namesIn(w).filter((n) => CANNOT_ON_A_FLAT_BENCH.test(n));
@@ -92,22 +97,54 @@ Deno.test('⛔ THE TWO HOME ROUTES (workorder addendum, 2026-09-10): his rear de
   assertEquals(gym?.display, 'Rear Delt Machine');
 });
 
-Deno.test('with the incline chip the spider curl is allowed; the preacher curl still is not', () => {
-  const offered = pickOptions('iso_pull_b', INCLINE, null, null).map((o) => o.name.toLowerCase());
-  assert(offered.includes('spider curl'), `spider curl missing from ${offered.join(', ')}`);
-  assert(!offered.includes('preacher curl'), 'the preacher curl came back with an incline bench');
+Deno.test('with the incline chip the spider curl is allowed, and the preacher curl is still the concentration curl', () => {
+  const offered = pickOptions('iso_pull_b', INCLINE, null, null);
+  const names = offered.map((o) => o.name.toLowerCase());
+  assert(names.includes('spider curl'), `spider curl missing from ${names.join(', ')}`);
   assert(namesIn(week(INCLINE)).includes('spider curl'), 'the composed week never reaches the spider curl');
-  assert(!namesIn(week(INCLINE)).includes('preacher curl'), 'the composed week prescribed a preacher curl');
+  // An incline bench is not a preacher bench: the name is still the home one.
+  assertEquals(offered.find((o) => o.name.toLowerCase() === 'preacher curl')?.display, 'Concentration Curl');
 });
 
-Deno.test('the preacher curl is a station: the commercial-gym chip reaches it, nothing home does', () => {
+Deno.test('⛔ THE THIRD HOME ROUTE (workorder addendum, 2026-09-10): the preacher curl reaches a dumbbell + bench kit as the concentration curl', () => {
+  // Reach: dumbbells and a bench, or the station. A bar and a bench alone do not curl one arm on a knee.
   assertEquals(canPerform('Preacher Curl', ['Commercial gym']), true);
-  assertEquals(canPerform('Preacher Curl', FLAT), false);
-  assertEquals(canPerform('Preacher Curl', INCLINE), false);
+  assertEquals(canPerform('Preacher Curl', FLAT), true);
+  assertEquals(canPerform('Preacher Curl', INCLINE), true);
   assertEquals(canPerform('Preacher Curl', ['Barbell + plates', 'Bench (flat/adjustable)']), false);
+  assertEquals(canPerform('Preacher Curl', ['Dumbbells']), false);
   // §0h: nobody asked, so nothing is refused.
   assertEquals(canPerform('Preacher Curl', []), true);
   assertEquals(canPerform('Preacher Curl', null), true);
+
+  // The swap list for BOTH arm cells offers it, under the home name, with his name as the key.
+  for (const key of ['iso_pull_a', 'iso_pull_b'] as const) {
+    const o = pickOptions(key, FLAT, null, null).find((x) => x.name.toLowerCase() === 'preacher curl');
+    assert(o, `${key}: the preacher curl is missing from the flat-bench swap list`);
+    assertEquals(o!.display, 'Concentration Curl');
+  }
+  // A gym member sees his name, because that is what they will walk over to.
+  const gym = pickOptions('iso_pull_b', ['Commercial gym'], null, null).find((o) => o.name.toLowerCase() === 'preacher curl');
+  assertEquals(gym?.display, 'Preacher Curl');
+
+  // The composed week for that kit prescribes it under his name, shows the home name, and carries
+  // the how-to — one arm at a time, upper arm on the inner knee.
+  const rows = [1, 2, 3, 4].flatMap((wk) => rowsIn(week(FLAT, wk)));
+  const curls = rows.filter((r) => r.name.toLowerCase() === 'preacher curl');
+  assert(curls.length > 0, 'no week on dumbbells + flat bench reached the preacher curl');
+  for (const r of curls) {
+    assertEquals(r.execution_name, 'Concentration Curl');
+    const howTo = String((r as { how_to?: string }).how_to ?? '');
+    assert(/one arm/i.test(howTo) && /knee/i.test(howTo), `how-to missing or wrong: "${howTo}"`);
+    assert((r as { swap_options?: { name: string; display: string }[] }).swap_options?.some((o) => o.display === 'Concentration Curl'),
+      'the row\'s own swap list does not carry the concentration curl');
+  }
+  // With the station, the row is his and carries no how-to.
+  const gymRows = [1, 2, 3, 4].flatMap((wk) => rowsIn(week(['Commercial gym'], wk))).filter((r) => r.name.toLowerCase() === 'preacher curl');
+  for (const r of gymRows) {
+    assertEquals(r.execution_name, undefined);
+    assertEquals((r as { how_to?: string }).how_to, undefined);
+  }
 });
 
 Deno.test('⛔ THE COVERAGE PIN: every movement the grid classifies carries a gear tag', () => {
