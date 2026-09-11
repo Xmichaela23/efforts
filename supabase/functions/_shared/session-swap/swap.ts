@@ -92,7 +92,12 @@ export type SwappableSession = {
  *                    the sheet, because the athlete looking at a session they already changed is
  *                    more often looking for the way back than for a third option.
  */
-export type SwapKind = 'discipline' | 'hike' | 'venue' | 'revert';
+/**
+ *   · `workout`    — the same session type, another of the book's workouts for it (2026-09-11). Same
+ *                    sport, same family, same level; only the workout changes, for this one day.
+ *                    Built in `workout-choice.ts`.
+ */
+export type SwapKind = 'discipline' | 'hike' | 'venue' | 'revert' | 'workout';
 
 /** The machines p275 blesses, per sport. ⛔ THE LABELS ARE PENDING MICHAEL'S WORDS — see `venueKey`. */
 /**
@@ -148,6 +153,8 @@ export type SwapOption = {
   kind?: SwapKind;
   /** The machine, when `kind` is `venue`. */
   venue?: Venue;
+  /** The library's archetype id, when `kind` is `workout`. */
+  archetype?: string;
   /**
    * ⛔ A PLACEHOLDER KEY, NOT A SENTENCE (work order: *every athlete-facing line waits for Michael's
    * words*). The sheet renders the key until the copy lands; `label` carries the same key today so a
@@ -224,6 +231,26 @@ export function originalNameOf(s: SwappableSession): string | null {
     if (!raw.startsWith(SWAPPED_NAME_PREFIX)) continue;
     const name = raw.slice(SWAPPED_NAME_PREFIX.length).trim();
     if (name) return name;
+  }
+  return null;
+}
+
+/**
+ * ⛔ THE PLAN'S OWN WORKOUT, ON A ROW WHOSE WORKOUT WAS CHOSEN ON THE DAY (2026-09-11) — see
+ * `workout-choice.ts`. It marks the row as changed (so Back to the plan is offered) and names the
+ * archetype the plan built, which the sheet keeps off the list while Back to the plan stands for it.
+ * ⚠️ THE EARLIEST WINS, as with `swapped_from:` and `swapped_name:`: choosing twice still names the
+ * plan's workout, not the first choice.
+ */
+export const WORKOUT_FROM_PREFIX = 'workout_from:';
+
+/** The archetype the plan built for this row, when its workout was chosen on the day. Null otherwise. */
+export function workoutFromOf(s: SwappableSession | null | undefined): string | null {
+  for (const t of s?.tags ?? []) {
+    const raw = String(t);
+    if (!raw.startsWith(WORKOUT_FROM_PREFIX)) continue;
+    const id = raw.slice(WORKOUT_FROM_PREFIX.length).trim();
+    if (id) return id;
   }
   return null;
 }
@@ -799,6 +826,21 @@ export function revertOptions(session: SwappableSession, planId?: string | null)
       copyKey: 'swap.back_to_plan',
       // ⚠️ EMPTY ON PURPOSE. The restore is a database read (`resolveSwapWrite`), the same place the
       // swap's own library session is resolved. A pure library cannot build this patch.
+      patch: {},
+      needsMaterialize: true,
+      warnings: [],
+    });
+  } else if (workoutFromOf(session) && planId && from && String(session.name ?? '').trim()) {
+    /**
+     * ⛔ A CHOSEN WORKOUT GOES BACK THE SAME WAY (2026-09-11): the row the plan authored for that
+     * week, read out of `sessions_by_week` at write time by `resolveSwapWrite`. Choosing a workout
+     * never renames the session, so the row's own name is the plan's.
+     */
+    out.push({
+      kind: 'revert',
+      to: from,
+      label: String(session.name).trim(),
+      copyKey: 'swap.back_to_plan',
       patch: {},
       needsMaterialize: true,
       warnings: [],

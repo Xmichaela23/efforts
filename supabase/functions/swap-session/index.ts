@@ -3,7 +3,8 @@
  * swap-session — the Instead sheet's options and the write behind a tap (2026-09-10, audit H-T15).
  *
  * ⛔ THE PHONE RENDERS WHAT THIS SENDS AND POSTS THE TAP. Which swaps a planned session offers (the
- * machine, another sport, the long day, back to the plan), the words on each, and the row or rows a
+ * machine, another sport, the long day, back to the plan, and on a hard session the book's other
+ * workouts for it — `_shared/session-swap/workout-choice.ts`), the words on each, and the row or rows a
  * tap writes were all decided on the phone, in `src/lib/session-discipline-swap.ts` and
  * `src/lib/swap-write.ts`, by three screens feeding them their own copies of the week. The same code
  * now lives in `_shared/session-swap/` and runs here, against the stored rows.
@@ -22,6 +23,7 @@ import { requireUser, AuthError } from '../_shared/require-user.ts';
 import { sanitizePosture } from '../_shared/state-trend/posture.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import { applySwap, describeSheet, hasSportSwap } from '../_shared/session-swap/sheet.ts';
+import { loadWorkoutMinutes } from '../_shared/session-swap/workout-choice.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -56,16 +58,21 @@ async function loadPosture(db, userId: string) {
   }
 }
 
-/** Usable FTP: learned (medium or high confidence) or typed — the read `useResolvedFtp` did. */
-async function loadFtp(db, userId: string): Promise<number | null> {
+/**
+ * The athlete's baselines row, and the usable FTP off it: learned (medium or high confidence) or
+ * typed — the read `useResolvedFtp` did. The row is what a chosen workout is built against, the same
+ * columns `generate-strength-plan` hands the composer for its anchors.
+ */
+async function loadBaselines(db, userId: string): Promise<{ ftp: number | null; baselines: Record<string, unknown> | null }> {
   try {
-    const { data } = await db.from('user_baselines').select('performance_numbers, learned_fitness')
+    const { data } = await db.from('user_baselines').select('performance_numbers, learned_fitness, units')
       .eq('user_id', userId).maybeSingle();
     const r = resolveCurrentFtp({ learned_fitness: data?.learned_fitness, performance_numbers: data?.performance_numbers });
-    return (r.source === 'learned' || r.source === 'manual') && Number.isFinite(r.value) && r.value > 0 ? r.value : null;
+    const ftp = (r.source === 'learned' || r.source === 'manual') && Number.isFinite(r.value) && r.value > 0 ? r.value : null;
+    return { ftp, baselines: data ?? null };
   } catch {
-    // No FTP, no hard ride.
-    return null;
+    // No FTP, no hard ride; no baselines, the workouts build with no anchors, as the composer does.
+    return { ftp: null, baselines: null };
   }
 }
 
@@ -82,10 +89,10 @@ async function loadWeek(db, userId: string, monday: string) {
   return [...rows, ...extra];
 }
 
-async function contextFor(db, userId: string, session, cache: Map<string, unknown[]>, posture, ftp) {
+async function contextFor(db, userId: string, session, cache: Map<string, unknown[]>, posture, ftp, baselines = null) {
   const monday = mondayOf(String(session.date));
   if (!cache.has(monday)) cache.set(monday, await loadWeek(db, userId, monday));
-  return { session, week: cache.get(monday), posture, ftp };
+  return { session, week: cache.get(monday), posture, ftp, baselines };
 }
 
 Deno.serve(async (req) => {
@@ -97,7 +104,7 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const db = createClient(supabaseUrl, serviceKey);
-    const [posture, ftp] = await Promise.all([loadPosture(db, userId), loadFtp(db, userId)]);
+    const [posture, { ftp, baselines }] = await Promise.all([loadPosture(db, userId), loadBaselines(db, userId)]);
     const weeks = new Map<string, unknown[]>();
 
     // ── The glyph: which of these sessions offer a sport swap ────────────────────────────────────
@@ -116,7 +123,10 @@ Deno.serve(async (req) => {
     if (!plannedId) return json({ success: false, error: 'planned_id or planned_ids required' }, 400);
     const { data: session } = await db.from('planned_workouts').select('*').eq('id', plannedId).eq('user_id', userId).maybeSingle();
     if (!session) return json({ success: false, error: 'Planned session not found' }, 404);
-    const ctx = await contextFor(db, userId, session, weeks, posture, ftp);
+    const ctx = {
+      ...(await contextFor(db, userId, session, weeks, posture, ftp, baselines)),
+      workoutMinutes: await loadWorkoutMinutes(db, userId, session),
+    };
 
     // ── The sheet ────────────────────────────────────────────────────────────────────────────────
     if (!body?.option_id) {

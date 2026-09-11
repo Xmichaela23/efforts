@@ -92,6 +92,8 @@ export function swapButtonLabel(opt: { kind?: string; venue?: string; to: string
   if (opt.kind === 'revert') return opt.venue ? VENUE_OUTDOORS : (opt.label ?? '');
   if (opt.kind === 'venue') return VENUE_LABEL[opt.venue ?? ''] ?? '';
   if (opt.kind === 'hike') return 'Hike';
+  // ⛔ A WORKOUT'S BUTTON IS ITS OWN NAME AND MINUTES, which `workout-choice.ts` puts on the option.
+  if (opt.kind === 'workout') return opt.label ?? '';
   return opt.to === 'ride' ? 'Ride instead' : opt.to === 'swim' ? 'Swim instead' : 'Run instead';
 }
 

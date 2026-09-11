@@ -16,6 +16,7 @@ import {
   intensityOf,
   originOf,
   withLibrarySession,
+  workoutFromOf,
   type SwapOption,
   type SwappableSession,
 } from './swap.ts';
@@ -162,7 +163,8 @@ async function resolveRevertToPlan(
   const week = Number(row?.week_number);
   if (!planId || !Number.isFinite(week) || week < 1) return fail;
 
-  const want = originOf(row);
+  // ⚠️ A CHOSEN WORKOUT NEVER CHANGED THE SPORT, so the authored session is the row's own type.
+  const want = originOf(row) ?? (workoutFromOf(row) ? disciplineOf(row?.type) : null);
   if (!want) return fail;
 
   let blob: Record<string, unknown> | null = null;

@@ -30,8 +30,10 @@ import {
 } from './swap.ts';
 import type { MatrixSessionKind } from '../schedule-session-constraints.ts';
 import type { PerDisciplinePosture } from '../state-trend/posture.ts';
+import type { EnduranceBaselines } from '../endurance-library/index.ts';
 import { swapButtonLabel, swapLineFor, swapSessionLine, SWAP_BACK_TO_PLAN, SWAP_SHEET_HEADER } from './copy.ts';
 import { resolveSwapWrite } from './resolve-write.ts';
+import { workoutChoiceOptions } from './workout-choice.ts';
 
 // deno-lint-ignore no-explicit-any
 type Db = any;
@@ -54,10 +56,21 @@ export type SwapContext = {
   posture: PerDisciplinePosture | null;
   /** Usable FTP (learned or typed), or null — gates the hard ride only. */
   ftp: number | null;
+  /**
+   * The athlete's `user_baselines` row (learned fitness, performance numbers, units) — the anchors a
+   * chosen workout is built against, the same row `generate-strength-plan` hands the composer.
+   */
+  baselines?: EnduranceBaselines | null;
+  /** Each workout's length on the athlete's own expanded rows (`loadWorkoutMinutes`). */
+  workoutMinutes?: Record<string, number> | null;
 };
 
-/** The option's id on the wire: its kind and its target, the key the sheet already keyed its buttons on. */
-export function optionId(o: Pick<SwapOption, 'kind' | 'venue' | 'to'>): string {
+/**
+ * The option's id on the wire: its kind and its target, the key the sheet already keyed its buttons on.
+ * A workout is keyed by its archetype — every workout option shares one sport.
+ */
+export function optionId(o: Pick<SwapOption, 'kind' | 'venue' | 'to' | 'archetype'>): string {
+  if (o.kind === 'workout') return `workout:${o.archetype ?? ''}`;
   return `${o.kind ?? 'discipline'}:${o.venue ?? o.to}`;
 }
 
@@ -76,13 +89,17 @@ export function sameDayOthers(session: SwapRow, week: ReadonlyArray<SwapRow>): A
   return out;
 }
 
-/** Every option, in the sheet's order: the way back, then the machine and the hike, then the sports. */
+/**
+ * Every option, in the sheet's order: the way back, then the machine and the hike, then the sports,
+ * then the book's other workouts for a hard session (`workout-choice.ts`).
+ */
 export function sheetOptions(ctx: SwapContext): SwapOption[] {
   const { session, week, posture, ftp } = ctx;
   return [
     ...revertOptions(session, session.training_plan_id ?? null),
     ...sessionSwapExtras(session, posture, week),
     ...getDisciplineSwaps(session, availableDisciplines(week), sameDayOthers(session, week), posture, ftp),
+    ...workoutChoiceOptions(session, week, ctx.baselines ?? null, ctx.workoutMinutes ?? null),
   ];
 }
 
@@ -115,6 +132,8 @@ export type Sheet = { header: string; rest_of_plan: boolean; options: SheetOptio
 
 async function lineFor(db: Db, userId: string, session: SwapRow, option: SwapOption): Promise<string | null> {
   const kind = option.kind ?? 'discipline';
+  // ⛔ A WORKOUT CARRIES NO SECOND LINE (Michael, 2026-09-11): its name and minutes are the option.
+  if (kind === 'workout') return null;
   if (kind !== 'discipline' && kind !== 'hike') return swapLineFor(option);
   const replacing = (disciplineOf(session?.type) ?? 'run') as 'ride' | 'run' | 'swim';
   const long = intensityOf(session) === 'long';
@@ -157,7 +176,12 @@ export async function describeSheet(db: Db, userId: string, ctx: SwapContext): P
  * approved `Back to the plan.` and gave no separate confirmation for it.
  * ⛔ SAY HOW MANY, NOT "rest of plan": what the athlete gets is the sessions the plan actually held.
  */
-export function receiptFor(option: Pick<SwapOption, 'kind' | 'venue' | 'to'>, alsoWritten: number): string {
+export function receiptFor(option: Pick<SwapOption, 'kind' | 'venue' | 'to' | 'label'>, alsoWritten: number): string {
+  /**
+   * ⚠️ A WORKOUT'S TOAST IS ITS OPTION'S OWN NAME — no confirmation sentence is approved for it yet
+   * (PENDING Michael's words, 2026-09-11), and a name is data rather than a sentence.
+   */
+  if (option.kind === 'workout') return String(option.label ?? '');
   const what = option.kind === 'revert'
     ? SWAP_BACK_TO_PLAN
     : option.kind === 'venue'
@@ -209,7 +233,8 @@ export async function applySwap(args: {
 
   const ids = [String(session.id)];
   let alsoWritten = 0;
-  if (args.restOfPlan && restOfPlanOffered(session)) {
+  // ⛔ A WORKOUT IS JUST TODAY (Michael, 2026-09-11): later weeks keep the engine's rotation.
+  if (args.restOfPlan && restOfPlanOffered(session) && option.kind !== 'workout') {
     try {
       let q = db
         .from('planned_workouts')
