@@ -34,7 +34,7 @@
  * one answer the other's question.
  */
 
-import { foldExerciseName } from './exercise-config.ts';
+import { foldExerciseName, resolveExerciseConfig } from './exercise-config.ts';
 
 /**
  * ⛔ THE EQUIPMENT VOCABULARY. Every key here must be produceable by {@link athleteEquipmentToKeys}
@@ -898,6 +898,59 @@ export function hasLoadableFit(
 ): boolean {
   const r = equipmentFitRank(exerciseName, athleteEquipment);
   return r != null && r < LAST_RESORT_RANK_FLOOR;
+}
+
+/**
+ * ⛔ IS THE BAR THE LOAD ON THIS ROW, FOR THIS ATHLETE'S KIT — the question the logger's plate math
+ * and "45 lb bar" chip ask (2026-09-10, Michael on the logger: the picker sat under a Chest-Supported
+ * Row and a Tate Press).
+ *
+ * ⛔ WHAT IT REPLACES. The logger gated the picker on `equipmentForExercise(name) === 'barbell'` — a
+ * name regex whose DEFAULT is barbell, so every movement its dozen patterns did not name was drawn a
+ * bar: chest-supported rows, Tate presses, preacher curls, leg presses, Smith presses. The two
+ * halves of the answer already existed and neither reached the logger: the config's coarse half
+ * (`displayFormat: 'total'` — one number, `equipmentOf` in exercise-alternatives reads it as barbell)
+ * and the gear map's specific half (which implements the movement can be done on). Same two halves
+ * the swap sheet already combines; this asks them one question.
+ *
+ * THE RULE, in the order it is asked:
+ *   1. the name must be KNOWN — an exact or folded config entry AND a gear tag. Anything else
+ *      returns `null`, and the caller keeps its own answer for a name typed by hand. Asserting a bar
+ *      off a fuzzy match is how a Farmers Carry was once priced as one loaded bar (Q-180).
+ *   2. the config must say one total load — `perHand`, `bodyweight`, `band`, `perLeg` are not a bar.
+ *   3. the loadable routes this kit reaches (every route when the kit is unknown; bands never count,
+ *      see `isLastResortRoute`): none on a bar → false; ALL on a bar → true (a Barbell Row, a Good
+ *      Morning, a Barbell Curl — the bar is the only way to load it).
+ *   4. a bar AND another implement both reach it: the picker asserts the bar only where the bar is
+ *      the movement's default — its first route — AND the config prices it as a compound off a
+ *      competition lift (`primaryRef`). A Romanian Deadlift in a commercial gym is a bar lift; a
+ *      Preacher Curl or a Drag Curl there is an EZ bar, dumbbells or a machine and the app does not
+ *      know which, so it asserts nothing. Strong and Hevy carry the implement in the exercise NAME
+ *      ("Preacher Curl (Barbell)" / "(Dumbbell)" / "(Machine)"); this catalogue carries one movement
+ *      with routes, so the ambiguity is real and the honest answer under it is no bar.
+ *
+ * ⚠️ `_shared/workload.ts` (`barLbForExercise`) still asks the OLD question through the name regex
+ * for the bar's own pounds in the load ledger. Same fork, other consumer; not moved here.
+ */
+export function barIsTheLoad(
+  exerciseName: string,
+  athleteEquipment: string[] | null | undefined,
+): boolean | null {
+  const res = resolveExerciseConfig(exerciseName);
+  if (!res.config || (res.via !== 'exact' && res.via !== 'folded')) return null;
+  if (res.config.displayFormat !== 'total') return false;
+  const routes = ASSISTANCE_GEAR[foldExerciseName(String(exerciseName ?? ''))];
+  if (!routes) return null;
+  const chips = Array.isArray(athleteEquipment) ? athleteEquipment.filter((c) => String(c || '').trim()) : [];
+  const owned = chips.length > 0 ? athleteEquipmentToKeys(chips) : null;
+  const loadable = routes.filter((r) => !isLastResortRoute(r));
+  const reachable = owned ? loadable.filter((r) => r.every((k) => owned.has(k))) : loadable;
+  const pool = reachable.length > 0 ? reachable : loadable;
+  if (pool.length === 0) return false;
+  const onBar = pool.filter((r) => r.includes('barbell'));
+  if (onBar.length === 0) return false;
+  if (onBar.length === pool.length) return true;
+  return res.config.primaryRef != null && pool[0].includes('barbell');
 }
 
 /**

@@ -72,6 +72,7 @@ import { roleForExercise, isMainBarbellLift } from '@/lib/exercise-role';
 // table. `isDurationLogged` reads the table (`loggedAs`); `equipmentForExercise` is the transcribed
 // EQUIPMENT axis the table does not carry — see the module header for why it is not derived.
 import { equipmentForExercise, isBodyweightLogged, isDurationLogged } from '@/lib/strength-logging-mode';
+import { barIsTheLoad } from '@/lib/strength-gear';
 // [Step 5] The one gate for "does a band mean help on this movement" — shared with the server pricer.
 import { isBandAssistedMovement } from '@/lib/band-assistance';
 // ⛔ THE PRETEST STEP WEIGHTS ARE THE SERVER'S FUNCTION (2026-09-10, audit H-S02) — the anchor fill in handleSetComplete.
@@ -5253,6 +5254,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                      The grid is declared ONCE here and shared by the label header and every row,
                      so a column cannot drift between the two. */
                   const exEquip = equipmentForExercise(exercise.name);
+                  /**
+                   * ⛔ THE PLATE MATH AND THE BAR CHIP FOLLOW THE BAR, NOT THE NAME REGEX (2026-09-10,
+                   * Michael: "plates" and "45 lb bar" under a Chest-Supported Row and a Tate Press).
+                   * `equipmentForExercise` DEFAULTS to barbell, so every catalogue movement its patterns
+                   * do not name was drawn a bar. `barIsTheLoad` reads the config's format and the gear
+                   * routes this athlete's kit reaches — the same two halves the swap sheet gates on. A
+                   * name the catalogue does not know (typed by hand) keeps the old answer.
+                   */
+                  const exBarLoaded = (() => {
+                    const known = barIsTheLoad(exercise.name, strengthEquipment);
+                    return known == null ? exEquip === 'barbell' : known;
+                  })();
                   const exIsAssistCapable = isAssistCapableMove(exercise.name);
                   const exIsBodyweight = isBodyweightMove(exercise.name);
                   const exIsPlyo = exEquip === 'plyo' || isPlyometric(exercise.name);
@@ -5889,7 +5902,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                             : (exercise.target_reps ? `target ${String(exercise.target_reps).replace(/\+$/, '')}` : null));
                         const targetHint = exIsPlyo ? null : ([repHint, set.amrap ? null : rirHint].filter(Boolean).join(' · ') || null);
                         const cue = barSpeedCueFor(exercise, set);
-                        const platesOpen = !isDurationBased && !exIsBodyweight && exEquip === 'barbell'
+                        const platesOpen = !isDurationBased && !exIsBodyweight && exBarLoaded
                           && expandedPlates[`${exercise.id}-${setIndex}`];
 
                         return (
@@ -5997,14 +6010,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 directly under the LB cell (Michael 2026-08-11). Accessory rep-total
                                 target on the left; plates centered under the weight; timed-work control
                                 under weight/reps. AMRAP's own instruction renders ABOVE the row. */}
-                            {((targetHint && !set.amrap && exercise.rir_tracked !== false) || (!isDurationBased && !exIsBodyweight && exEquip === 'barbell') || isDurationBased) && (
+                            {((targetHint && !set.amrap && exercise.rir_tracked !== false) || (!isDurationBased && !exIsBodyweight && exBarLoaded) || isDurationBased) && (
                               <div style={gridStyle} className="pt-1.5 pb-0.5">
                                 {targetHint && !set.amrap && exercise.rir_tracked !== false && (
                                   <span style={{ gridColumn: '1 / 4' }} className="text-[12px] font-medium text-white/70 leading-snug">
                                     {targetHint}
                                   </span>
                                 )}
-                                {!isDurationBased && !exIsBodyweight && exEquip === 'barbell' && (
+                                {!isDurationBased && !exIsBodyweight && exBarLoaded && (
                                   <div style={{ gridColumn: '3 / 5', justifySelf: 'center' }} className="flex items-center gap-1.5">
                                     <button
                                       type="button"

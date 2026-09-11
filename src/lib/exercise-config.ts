@@ -3197,7 +3197,10 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
   'ground-based deadlift machine':{ pattern: 'hip_dominant',   primaryRef: 'deadlift', ratio: 0.85, displayFormat: 'total', isUnilateral: false },
 
   // ── FOCUSED PUSH / ARMS (p222) ──────────────────────────────────────────────────────────────────
-  'tate press':     { pattern: 'horizontal_push', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
+  // ⚠️ `perHand`, NOT `total` (2026-09-10): a Tate press is two dumbbells over the chest, elbows out —
+  // its gear route is `[['dumbbells', 'bench']]` and the athlete logs a per-hand weight. `total` had it
+  // reading as one loaded bar, and the logger drew plate math and a 45 lb bar under it.
+  'tate press':     { pattern: 'horizontal_push', primaryRef: null, ratio: 0.0, displayFormat: 'perHand', isUnilateral: false },
   'skull crusher':  { pattern: 'horizontal_push', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
   'pec deck':       { pattern: 'horizontal_push', primaryRef: null, ratio: 0.0, displayFormat: 'total', isUnilateral: false },
 
