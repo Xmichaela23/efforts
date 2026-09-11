@@ -11,6 +11,7 @@ import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.t
 import {
   spacingLineFor,
   liftLinesFor,
+  liftCardLinesFor,
   enduranceLinesFor,
   bandOf,
   familyOf,
@@ -153,6 +154,45 @@ Deno.test('⛔ THE PLYO DAY AND THE TEST DAY SPEAK IN THEIR OWN NOTE, NOT IN AN 
 Deno.test('the movement shows the execution the athlete’s kit reaches', () => {
   const row = liftLinesFor(lift([{ name: 'rear delt machine', execution_name: 'incline rear delt fly', slot_intent: 'HYP' }]), bar)[0];
   assertEquals(row.movement, 'incline rear delt fly');
+});
+
+// ── the lift card's lines (§3i) ─────────────────────────────────────────────────────────────────
+
+Deno.test('⛔ A SUPERSET PAIR IS ONE LINE — names joined, the kind word once, "superset", one cue', () => {
+  const lines = liftCardLinesFor(lift([
+    { slot_intent: 'ME', name: 'barbell bench press' },
+    { slot_intent: 'HYP', name: 'tate press', superset_group: 'w3:arms' },
+    { slot_intent: 'HYP', name: 'drag curl', superset_group: 'w3:arms' },
+    { slot_intent: 'HYP', name: 'lateral raise' },
+  ]), bar);
+  assertEquals(lines.map((l) => l.movement), ['barbell bench press', 'tate press + drag curl', 'lateral raise']);
+  assertEquals(lines[1].kind, 'Hypertrophy superset');
+  assertEquals(lines[1].cues, ['8 to 12 reps, 1 to 2 in reserve. Reps slow as the set goes.']);
+  assertEquals(lines[1].rows, [1, 2]);
+  assertEquals(lines[0].rows, [0]);
+  assertEquals(lines[2].rows, [3]);
+});
+
+Deno.test('a pair of two kinds names both kinds and carries both cues', () => {
+  const [line] = liftCardLinesFor(lift([
+    { slot_intent: 'DE', name: 'barbell bench press', superset_group: 'g' },
+    { slot_intent: 'HYP', name: 'drag curl', superset_group: 'g' },
+  ]), bar);
+  assertEquals(line.kind, 'Dynamic effort + Hypertrophy superset');
+  assertEquals(line.cues, [
+    'As fast as possible on every rep. Bar slows, set is over.',
+    '8 to 12 reps, 1 to 2 in reserve. Reps slow as the set goes.',
+  ]);
+});
+
+Deno.test('⛔ ONLY ADJACENT ROWS PAIR — a mark with something between is two lines; rows without one are untouched', () => {
+  const lines = liftCardLinesFor(lift([
+    { slot_intent: 'HYP', name: 'tate press', superset_group: 'g' },
+    { slot_intent: 'HYP', name: 'lateral raise' },
+    { slot_intent: 'HYP', name: 'drag curl', superset_group: 'g' },
+  ]), bar);
+  assertEquals(lines.map((l) => l.movement), ['tate press', 'lateral raise', 'drag curl']);
+  for (const l of lines) assertEquals(l.kind, 'Hypertrophy');
 });
 
 // ── the endurance session ───────────────────────────────────────────────────────────────────────

@@ -23,6 +23,8 @@ export type TodayStrengthRow = {
   execution_name?: string | null;
   slot_intent?: string | null;
   notes?: string | null;
+  /** Rows of one printed superset (p274) share this mark; the composer stamps it. */
+  superset_group?: string | null;
 };
 
 /** A planned or completed row as `get-week` hands it over. Only the fields this file reads. */
@@ -221,6 +223,62 @@ export function liftLinesFor(
 
     return { key, movement, kind: KIND_WORD[intent], cue };
   });
+}
+
+/**
+ * ⛔ A SUPERSET IS ONE LINE ON THE LIFT CARD (work order §3i, Michael, 2026-09-10 evening). Two rows
+ * that share a `superset_group` read as `Tate Press + Drag Curl`, the kind word once — both kinds
+ * when they differ — then `superset`, and the cue under it once when both rows carry the same cue.
+ * The word is the drawer's own (`StrengthLogger`'s banner: "Superset · A with B"), spelled the way
+ * the kind words are, so the card's kind line can set it in the same case.
+ *
+ * ⚠️ CONSECUTIVE ROWS ONLY. The composer writes a pair side by side; a mark on two rows with
+ * something between them is not a pair the athlete can do as one station, and is left as two lines.
+ */
+const SUPERSET_WORD = 'superset';
+
+export type LiftCardLine = {
+  key: string;
+  movement: string;
+  kind: string | null;
+  /** One cue per distinct sentence, in row order — a same-kind pair prints its cue once. */
+  cues: string[];
+  /** The indexes into `strength_exercises` this line stands for: one, or the two of a pair. */
+  rows: number[];
+};
+
+export function liftCardLinesFor(
+  session: TodayRow,
+  barLoaded: (movement: string) => boolean,
+): LiftCardLine[] {
+  const rows = rowsOf(session);
+  const lines = liftLinesFor(session, barLoaded);
+  const groupOf = (i: number): string | null => {
+    const g = rows[i]?.superset_group;
+    return typeof g === 'string' && g.trim() ? g.trim() : null;
+  };
+  const out: LiftCardLine[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const g = groupOf(i);
+    const next = lines[i + 1];
+    if (g && next && groupOf(i + 1) === g && line.movement && next.movement) {
+      const kinds = [line.kind, next.kind].filter((k): k is string => !!k);
+      const uniqueKinds = kinds.filter((k, at) => kinds.indexOf(k) === at);
+      const cues = [line.cue, next.cue].filter((c): c is string => !!c);
+      out.push({
+        key: `${line.key}+${next.key}`,
+        movement: `${line.movement} + ${next.movement}`,
+        kind: uniqueKinds.length > 0 ? `${uniqueKinds.join(' + ')} ${SUPERSET_WORD}` : SUPERSET_WORD,
+        cues: cues.filter((c, at) => cues.indexOf(c) === at),
+        rows: [i, i + 1],
+      });
+      i += 1;
+      continue;
+    }
+    out.push({ key: line.key, movement: line.movement, kind: line.kind, cues: line.cue ? [line.cue] : [], rows: [i] });
+  }
+  return out;
 }
 
 // ── 3. THE ENDURANCE SESSION ────────────────────────────────────────────────────────────────────

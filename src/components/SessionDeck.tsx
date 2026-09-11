@@ -14,6 +14,7 @@ import { venueOf } from '@/lib/session-discipline-swap';
 import { formatSessionDuration } from './PlannedSessionHeader';
 import {
   liftLinesFor,
+  liftCardLinesFor,
   enduranceLinesFor,
   spacingLineFor,
   isStrengthRow,
@@ -65,6 +66,35 @@ function weightLabelFor(ex: Record<string, unknown> | undefined): string | null 
 }
 
 export type DeckCard = { key: string; name: string; kind: string | null; cue: string | null; meta: string | null };
+
+/** One line of the lift card: a row, or a superset pair read as one (§3i). */
+export type LiftCardRow = { key: string; name: string; kind: string | null; cues: string[]; meta: string | null; rows: number };
+
+/**
+ * The lines the lift card draws, in session order, a superset pair folded into one (§3i). The
+ * weight column shows the pair's weight once when both rows carry the same one — `By feel` on a
+ * pair the composer left by feel — and both, joined, when they differ.
+ */
+export function liftCardRowsFor(session: TodayRow, useImperial: boolean): LiftCardRow[] {
+  void useImperial;
+  const rows = Array.isArray((session as { strength_exercises?: unknown }).strength_exercises)
+    ? ((session as { strength_exercises: Record<string, unknown>[] }).strength_exercises)
+    : [];
+  return liftCardLinesFor(session, barLoaded)
+    .map((line) => {
+      const metas = line.rows.map((i) => weightLabelFor(rows[i])).filter((m): m is string => !!m);
+      const unique = metas.filter((m, at) => metas.indexOf(m) === at);
+      return {
+        key: line.key,
+        name: line.movement,
+        kind: line.kind,
+        cues: line.cues,
+        meta: unique.length > 0 ? unique.join(' · ') : null,
+        rows: line.rows.length,
+      };
+    })
+    .filter((c) => c.name);
+}
 
 /** The rows a lift or plyo session becomes, in the row's order. */
 export function deckCardsFor(session: TodayRow, useImperial: boolean): DeckCard[] {
@@ -232,6 +262,10 @@ export const SessionDeck: React.FC<{
  * ⛔ NOTHING ABOUT THE WORDS CHANGES. Every cue is the approved one from `@/lib/today-lines`
  * (`liftLinesFor`), the plyo day's is its own note, and the only text this adds is data — the weight —
  * plus `By feel` and `N more`.
+ *
+ * ⛔ §3i — A SUPERSET PAIR IS ONE LINE: names joined with " + ", the kind word once (both when they
+ * differ) then `superset`, the weight once, the cue once when the rows share it. `liftCardLinesFor`
+ * folds the pair and owns the word; the drawer's own banner line is untouched.
  */
 const reducedMotion = (): boolean => {
   try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
@@ -248,7 +282,7 @@ export const LiftSessionCard: React.FC<{
   const rgb = getDisciplineColorRgb(sport);
   const title = deriveWorkoutTitle(session as never);
   const meta = formatSessionDuration(session);
-  const cards = deckCardsFor(session, useImperial);
+  const cards = liftCardRowsFor(session, useImperial);
 
   const [open, setOpen] = React.useState(false);
   const reduced = React.useMemo(reducedMotion, []);
@@ -278,7 +312,8 @@ export const LiftSessionCard: React.FC<{
   }, [cards.length]);
 
   if (cards.length === 0) return null;
-  const more = Math.max(0, cards.length - 2);
+  // `N more` counts EXERCISES (§3h), so a superset line past the fold counts both of its rows.
+  const more = cards.slice(2).reduce((n, c) => n + c.rows, 0);
 
   return (
     <div
@@ -322,19 +357,24 @@ export const LiftSessionCard: React.FC<{
         {cards.map((c, i) => (
           <div key={c.key} ref={(el) => { rowRefs.current[i] = el; }} style={{ paddingTop: i === 0 ? 10 : 12 }}>
             <div className="flex items-baseline justify-between gap-3">
-              <div className="min-w-0">
+              {/* ⛔ THE KIND WORD NEVER WRAPS (§3i). It sits on the name line at 12 px; when the name and
+                  the kind word cannot share the line at 390 px, the wrapping flex moves the kind word
+                  WHOLE to its own line under the name — `white-space: nowrap` is what keeps "MAXIMAL
+                  EFFORT" from splitting into two lines of one word each. */}
+              <div className="min-w-0 flex flex-wrap items-baseline gap-x-2">
                 <span className="text-[16px] font-medium" style={{ color: 'rgba(255,255,255,0.95)' }}>{c.name}</span>
                 {c.kind ? (
-                  <span className="text-[11px] uppercase tracking-[0.08em] ml-2" style={{ color: colour }}>{c.kind}</span>
+                  <span className="text-[12px] uppercase tracking-[0.08em]" style={{ color: colour, whiteSpace: 'nowrap' }}>{c.kind}</span>
                 ) : null}
               </div>
               <span className="text-[13px] tabular-nums flex-shrink-0" style={{ color: 'rgba(255,255,255,0.62)' }}>
                 {c.meta ?? 'By feel'}
               </span>
             </div>
-            {c.cue ? (
-              <div className="text-[14px]" style={{ lineHeight: 1.35, marginTop: 3, color: 'rgba(255,255,255,0.72)' }}>{c.cue}</div>
-            ) : null}
+            {/* A superset pair prints its cue once when both rows share it, both when they differ (§3i). */}
+            {c.cues.map((cue) => (
+              <div key={cue} className="text-[14px]" style={{ lineHeight: 1.35, marginTop: 3, color: 'rgba(255,255,255,0.72)' }}>{cue}</div>
+            ))}
           </div>
         ))}
       </div>
