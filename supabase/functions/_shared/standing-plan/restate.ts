@@ -290,6 +290,9 @@ export function restateFromTest(args: {
       if (typeof fr.superset_group === 'string' && fr.superset_group !== er.superset_group) shape.superset_group = fr.superset_group;
       if (typeof fr.slot_intent === 'string' && er.slot_intent == null) shape.slot_intent = fr.slot_intent;
       if (typeof fr.target_rir === 'number' && er.target_rir == null) shape.target_rir = fr.target_rir;
+      // The capitalised name (2026-09-10): the same words in a new case reach a calendar built before it. The
+      // match above is case-blind, so no logged set comes unmatched.
+      if (typeof fr.name === 'string' && fr.name !== er.name && fr.name.toLowerCase() === String(er.name ?? '').toLowerCase()) shape.name = fr.name;
       // The display name and the how-to are shape too (2026-09-08): a row built before the setup
       // moved out of the name still said "Back Extension (feet under a loaded bar)" after a rebuild.
       // Written as an absence as well, so a name the composer stopped relabelling goes back to plain.

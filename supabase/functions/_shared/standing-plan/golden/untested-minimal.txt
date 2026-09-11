@@ -33,7 +33,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
   [Wednesday] run      Near-threshold Run — 42 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     barbell row                    1x1-5        @ By feel       | no_tested_lift
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -86,7 +86,7 @@ WEEK 02  column=standard
   [Wednesday] run      Near-threshold Run — 32 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     barbell row                    1x1-5        @ By feel       | no_tested_lift
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -137,7 +137,7 @@ WEEK 03  column=standard
   [Wednesday] run      Near-threshold Run — 46 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     barbell row                    1x1-5        @ By feel       | no_tested_lift
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -188,7 +188,7 @@ WEEK 04  column=standard
   [Wednesday] run      Near-threshold Run — 41 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     barbell row                    1x1-5        @ By feel       | no_tested_lift
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -239,7 +239,7 @@ WEEK 05  column=standard
   [Wednesday] run      Near-threshold Run — 39 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     barbell row                    1x1-5        @ By feel       | no_tested_lift
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -290,7 +290,7 @@ WEEK 06  column=standard
   [Wednesday] run      Near-threshold Run — 37 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     barbell row                    1x1-5        @ By feel       | no_tested_lift
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -341,7 +341,7 @@ WEEK 07  column=standard
   [Wednesday] run      Near-threshold Run — 45 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     barbell row                    1x1-5        @ By feel       | no_tested_lift
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -392,7 +392,7 @@ WEEK 08  column=standard
   [Wednesday] run      Near-threshold Run — 42 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     barbell row                    1x1-5        @ By feel       | no_tested_lift
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -443,7 +443,7 @@ WEEK 09  column=standard
   [Wednesday] run      Near-threshold Run — 32 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     barbell row                    1x1-5        @ By feel       | no_tested_lift
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -494,7 +494,7 @@ WEEK 10  column=standard
   [Wednesday] run      Near-threshold Run — 46 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     barbell row                    1x1-5        @ By feel       | no_tested_lift
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -545,7 +545,7 @@ WEEK 11  column=standard
   [Wednesday] run      Near-threshold Run — 41 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     barbell row                    1x1-5        @ By feel       | no_tested_lift
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -596,7 +596,7 @@ WEEK 12  column=standard
   [Wednesday] run      Near-threshold Run — 39 min
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
-      ME     barbell row                    1x1-5        @ By feel       | no_tested_lift
+      ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
       DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
