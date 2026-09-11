@@ -1,3 +1,15 @@
+> **STATUS 2026-09-10, evening.** Items 1–28 of the work order are BUILT, pushed and deployed (47 edge
+> functions redeployed; Michael's 106 sessions re-run through the pipeline; six weekly summaries rebuilt).
+> Commits: 1–4 `60721f2c`; "use this number" `374b84c2`; 5–9 `1781fbb8`; swaps (28) `9096bff0`; 10–14
+> `3c091534`; 15 `9258c40b`; 16 `b0d14aa3`; 17 `ab40b9d2` + `fa92456c`; 18 `7b228f36` (then `6a0a06a8`:
+> the chart series moved to `workouts.display_series`, 600 points, after the list queries timed out);
+> 19 `aaf43f36`; 20 `9be46477`; 21 `568b0bf5`; 22 `2cda7eb6`; 23 `51faa600`; 24 `1b166cf9` + `3ae9cd7e`;
+> 25 `8e17c1e6`; 26 `43ac4b39`; 27 `f1a00766`. Migrations pasted: `goals.completed_at`,
+> `workouts.display_series`. Stage 4 (29–31) and the two bugs outside the audit are in progress.
+> Open wording: a strength row with no reserve target reads "1-2 in reserve" in one path and "with 2 in
+> reserve" in another; the club-night and season-wizard sentences moved word for word, never checked
+> against a page. Everything below is the audit as written on the night of 2026-09-10.
+
 # AUDIT — where the phone decides instead of printing (2026-09-10)
 
 **The rule.** Smart server, dumb client: the server decides, the phone prints (`docs/TARGET-ARCHITECTURE.md` principle 2, `docs/CONSTITUTION.md` Law 4). This audit lists every place under `src/` where phone code makes a training decision itself. That covers a verdict, a sentence or cue picked by rule, which options to offer, gating or filtering sessions, weekly totals, a derived training number, or a copy of something an edge function already computes.
