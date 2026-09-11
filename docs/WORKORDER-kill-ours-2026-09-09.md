@@ -138,3 +138,8 @@ need; the gate refuses what the kit lacks; undeclared + declared kit = refused; 
 fits; an empty slot is left out and named ("Not placed this week"). Plus two kit routes so a dumbbell + flat
 bench kit fills every slot: a bent-over dumbbell rear delt fly for the rear delt machine, and a flat-bench
 dumbbell pullover for the pullover machine (same pattern as the incline dumbbell chest-supported row).
+Third home route (Michael, 2026-09-10: "a bench, a rack and dumbbells is a pretty standard home gym"): the
+preacher curl's home version is the concentration curl (seated on the bench, upper arm braced against the
+inner knee, one arm), same braced-arm biceps intent; field-standard substitute, p275 permits the implement
+change. Route: preacher bench → Preacher Curl; home kit with bench + dumbbells → Concentration Curl. Its
+how-to line needs Michael's words.
