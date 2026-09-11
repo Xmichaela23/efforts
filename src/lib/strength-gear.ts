@@ -937,8 +937,9 @@ export function hasLoadableFit(
  *      ("Preacher Curl (Barbell)" / "(Dumbbell)" / "(Machine)"); this catalogue carries one movement
  *      with routes, so the ambiguity is real and the honest answer under it is no bar.
  *
- * ⚠️ `_shared/workload.ts` (`barLbForExercise`) still asks the OLD question through the name regex
- * for the bar's own pounds in the load ledger. Same fork, other consumer; not moved here.
+ * `_shared/workload.ts` (`barLbForExercise`) asks this same question for the bar's own pounds in
+ * the volume ledger (2026-09-10) — one seam, two consumers, so the logger's chip and the stored
+ * tonnage cannot disagree about whether a row had a bar.
  */
 export function barIsTheLoad(
   exerciseName: string,

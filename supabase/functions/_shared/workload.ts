@@ -23,6 +23,7 @@ import { equipmentForExercise } from '../../../src/lib/strength-logging-mode.ts'
 import { barWeightForType, DEFAULT_BAR_LB } from '../../../src/lib/bar-types.ts';
 import { canonicalize } from './canonicalize.ts';
 import { getExerciseConfig } from '../../../src/lib/exercise-config.ts';
+import { barIsTheLoad } from '../../../src/lib/strength-gear.ts';
 
 /** ⛔ The fallback bar for a barbell movement whose set never named one — `BAR_TYPES.standard`, the
  *  same 45 the plan writer floors warm-ups at and the same default Strong and Hevy ship. */
@@ -793,11 +794,22 @@ export function classifyWorkloadMethod(args: {
  * Michael: *"a barbell curl would have the weight of the barbell."* Physical, and the field agrees:
  * Strong and Hevy default barbell exercises to the 45 lb / 20 kg Olympic bar.
  *
- * ⚠️ TWO GATES, AND BOTH ARE LOAD-BEARING:
- *   1. `getExerciseConfig` must know the name. `equipmentForExercise` DEFAULTS to 'barbell', so an
- *      unmapped movement would otherwise be handed a bar it never touched.
- *   2. The equipment axis must actually say 'barbell'. A dumbbell curl, a cable row and a machine
- *      press have no bar, and a blank box on those is still no number.
+ * ⛔ IT ASKS `barIsTheLoad` (2026-09-10), THE SAME SEAM THE LOGGER'S PLATE PICKER ASKS. The first cut
+ * asked `equipmentForExercise`, a name regex whose DEFAULT is barbell, so every catalogue movement
+ * its patterns did not name was priced with a 45 lb bar it never had: a Chest-Supported Row, a Tate
+ * Press, a Preacher Curl, a Leg Press, a Lat Pulldown, a Kettlebell Swing — on any set logged with a
+ * blank weight box. `barIsTheLoad` reads the config's format and the movement's gear routes: a bar
+ * only where the bar is the only way to load it, or the movement's default way and it is a compound.
+ * Asked kit-blind (`null`), the same way the rest of this function is: which bar was in the athlete's
+ * hands is not knowable from a logged set.
+ *
+ * ⚠️ THREE GATES, IN ORDER:
+ *   1. `getExerciseConfig` must know the name, as before.
+ *   2. `barIsTheLoad` on the name as logged, then on its canonical key, then on its singular (a
+ *      plural or a variant spelling folds onto the tagged movement — "hip thrusts" is "hip thrust",
+ *      "kettlebell swings" is "kettlebell swing").
+ *   3. Only a name the gear map does not know at all keeps the old regex answer — the same rule the
+ *      logger follows for a name typed by hand.
  * ⚠️ 45, NOT 35. `BAR_LB_LIGHT` is the plan writer's floor for an athlete not yet lifting above an
  * empty men's bar; which bar is in an athlete's hands is not knowable from a logged set, and 45 is
  * both the app's own default and the field's.
@@ -806,5 +818,11 @@ export function barLbForExercise(name: string): number | null {
   const raw = String(name ?? '').trim();
   if (!raw) return null;
   if (!getExerciseConfig(raw)) return null;
+  // The plural fold is the taxonomy's own (`strength-grid/taxonomy.ts:dedupeKey`): "kettlebell
+  // swings" is the tagged "kettlebell swing". Not imported — that module is the grid, and this is
+  // the ingest chain.
+  const singular = raw.toLowerCase().replace(/(\w)s\b/g, '$1');
+  const known = barIsTheLoad(raw, null) ?? barIsTheLoad(canonicalize(raw), null) ?? barIsTheLoad(singular, null);
+  if (known != null) return known ? OLYMPIC_BAR_LB : null;
   return equipmentForExercise(raw) === 'barbell' ? OLYMPIC_BAR_LB : null;
 }
