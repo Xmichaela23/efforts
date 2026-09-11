@@ -282,10 +282,27 @@ export function percentWord(lo: number, hi: number): string {
 export function repeatingUnit(segments: QualitySegment[]): { unit: QualitySegment[]; rounds: number } {
   const same = (a: QualitySegment, b: QualitySegment) =>
     a.role === b.role && a.seconds === b.seconds && a.pct === b.pct && a.at === b.at;
+  const repeats = (k: number): boolean => {
+    for (let i = k; i < segments.length; i += 1) if (!same(segments[i], segments[i % k])) return false;
+    return true;
+  };
+  /**
+   * ⛔ A WHOLE NUMBER OF REPETITIONS FIRST (2026-09-11). p237's sandwich is `30 s @ 120% / 2:30 @
+   * 90% / 30 s @ 120%` — a round that ends the way it starts — and the short-last-repetition rule
+   * below read it as two rounds of (30 s, 2:30) with the closing surge as a stub, so the sheet said
+   * "5 sets of 2 rounds" for five rounds of three steps. A unit that divides the list exactly is
+   * the page's own structure; the stub reading is only for a list nothing divides.
+   */
   for (let k = 1; k < segments.length; k += 1) {
-    let ok = true;
-    for (let i = k; i < segments.length && ok; i += 1) if (!same(segments[i], segments[i % k])) ok = false;
-    if (ok) return { unit: segments.slice(0, k), rounds: Math.ceil(segments.length / k) };
+    if (segments.length % k === 0 && repeats(k)) return { unit: segments.slice(0, k), rounds: segments.length / k };
+  }
+  // ⚠️ THE STUB READING, ONLY WHERE THE MISSING TAIL IS RECOVERY — the composer's own habit of
+  // dropping the float after the last round. A missing WORK step is not a stub; it is a different
+  // round (the sandwich's closing surge), and the list is then one round as written.
+  for (let k = 1; k < segments.length; k += 1) {
+    if (!repeats(k)) continue;
+    const dropped = segments.slice(0, k).slice(segments.length % k);
+    if (dropped.every((s) => s.role === 'recovery')) return { unit: segments.slice(0, k), rounds: Math.ceil(segments.length / k) };
   }
   return { unit: segments, rounds: 1 };
 }
