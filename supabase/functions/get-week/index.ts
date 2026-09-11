@@ -40,6 +40,7 @@ import { resolveBodyweightLb } from '../_shared/workload.ts';
 // ⛔ ONE "WAS IT DONE" AND THE WEEK BAR'S TOTALS (2026-09-10, audit H-T10 / H-T03).
 import { isExecutedWorkout } from '../_shared/is-executed.ts';
 import { weekBarTotals } from './week-totals.ts';
+import { dayOrderFor } from '../_shared/day-order.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -1257,6 +1258,35 @@ Deno.serve(async (req)=>{
         items.push(it);
       }
     } catch  {}
+    /**
+     * ⛔ WHICH SESSION IS LISTED FIRST ON A DAY (2026-09-10, audit H-T16): `day_order`, 1-based within
+     * the date, by `_shared/day-order.ts`. The phone sorted each day itself with a rule that disagreed
+     * with the plan builder's; every screen now sorts by this number. The items also leave here in
+     * that order, so a reader that never sorts prints the same list.
+     */
+    try {
+      const order = dayOrderFor(
+        items,
+        (it) => (it?.date ? String(it.date).slice(0, 10) : null),
+        (it) => ({
+          type: it?.type ?? null,
+          name: it?.planned?.name ?? it?.name ?? it?.executed?.name ?? null,
+          tags: it?.planned?.tags ?? null,
+          workout_metadata: it?.planned?.workout_metadata ?? it?.workout_metadata ?? null,
+        }),
+      );
+      for (const it of items) it.day_order = order.get(it) ?? null;
+      const withIndex = items.map((it, idx) => ({ it, idx }));
+      withIndex.sort((a, b) => {
+        const ad = String(a.it?.date || ''), bd = String(b.it?.date || '');
+        if (ad !== bd) return ad.localeCompare(bd);
+        const ao = Number(a.it?.day_order), bo = Number(b.it?.day_order);
+        if (Number.isFinite(ao) && Number.isFinite(bo) && ao !== bo) return ao - bo;
+        return a.idx - b.idx;
+      });
+      items.length = 0;
+      for (const x of withIndex) items.push(x.it);
+    } catch {}
     // Items are ready as-is (no AI generation in get-week)
     const itemsWithAI = items;
     // Calculate weekly stats for the merged cell
@@ -1632,6 +1662,8 @@ Deno.serve(async (req)=>{
         strength_exercises: p.strength_exercises ?? null,
         mobility_exercises: p.mobility_exercises ?? null,
         tags: Array.isArray(p.tags) ? p.tags : [],
+        // The day's listing order (H-T16); the same number sits on the item and on completed_workout.
+        day_order: item.day_order ?? null,
         export_hints: p.export_hints ?? null,
         workout_structure: p.workout_structure ?? null,
         friendly_summary: p.friendly_summary ?? null,
@@ -1674,6 +1706,7 @@ Deno.serve(async (req)=>{
         strength_volume_lb: item.strength_volume_lb ?? null,
         strength_sets_completed: item.strength_sets_completed ?? null,
         is_executed: item.is_executed === true,
+        day_order: item.day_order ?? null,
       };
     };
     const itemsWithPlannedWorkout = itemsWithAI.map((it) => {

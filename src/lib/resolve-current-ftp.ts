@@ -47,9 +47,8 @@
  * plan materialization) opt out of low-confidence values while permissive consumers
  * (display, workload computation, device sync) accept the best-available value.
  *
- * Same shape as `src/lib/use-strength-ordering-preference.ts` — pure shared logic in
- * `src/lib/`, importable from both the React client and Deno edge functions per the
- * `src/lib/session-frequency-defaults.ts` precedent.
+ * Pure shared logic in `src/lib/`, importable from both the React client and Deno edge
+ * functions per the `src/lib/session-frequency-defaults.ts` precedent.
  *
  * No I/O. Pure function. Caller passes already-loaded baselines.
  */

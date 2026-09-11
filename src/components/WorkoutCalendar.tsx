@@ -30,8 +30,6 @@ import { useCoachWeekContext } from '@/hooks/useCoachWeekContext';
 // screen. This week's planned-versus-done is `weekTotals` below, counted off the rows on screen.
 import { invalidateWorkoutScreens } from '@/utils/invalidateWorkoutScreens';
 import { fetchWeekUnified } from '@/lib/fetchWeekUnified';
-import { orderDayWorkoutsByTimingThenDiscipline } from '@/lib/pairing-timing';
-import { useStrengthOrderingPreference } from '@/lib/use-strength-ordering-preference';
 
 export type CalendarEvent = {
   date: string | Date;
@@ -1002,16 +1000,12 @@ export default function WorkoutCalendar({
   const swappableIds = useSportSwapIds(eventRowIds);
 
 
-  // Day-stacked ordering (Bug: calendar cells ignored strength_ordering_preference —
-  // 4th consumer the May-13 consolidation never wired up). One week-level dominant
-  // planId (single-plan weeks are the overwhelmingly common case; same first-found
-  // approximation TodaysEffort accepts per-day). Pref drives the shared
-  // orderDayWorkoutsByTimingThenDiscipline helper applied per day-cell below.
-  const weekPlanId = useMemo<string | null>(() => {
-    const found = events.find((e: any) => e?._src?.training_plan_id)?._src?.training_plan_id;
-    return typeof found === 'string' && found ? found : null;
-  }, [events]);
-  const { value: weekOrderingPref } = useStrengthOrderingPreference(weekPlanId);
+  // ⛔ THE DAY'S ORDER IS THE SERVER'S (2026-09-10, audit H-T16): each row carries get-week's
+  // `day_order`; a cell lists its rows by it and holds no rule of its own.
+  const byDayOrder = (rows: any[]): any[] => {
+    const rank = (e: any): number => (Number.isFinite(Number(e?._src?.day_order)) ? Number(e._src.day_order) : Number.MAX_SAFE_INTEGER);
+    return rows.map((e, i) => ({ e, i })).sort((a, b) => (rank(a.e) - rank(b.e)) || (a.i - b.i)).map((x) => x.e);
+  };
 
   const handleDayClick = useCallback((day: Date) => {
     const dateStr = toDateOnlyString(day);
@@ -1392,11 +1386,7 @@ export default function WorkoutCalendar({
           const key = toDateOnlyString(d);
           /** One reading of "today" per row — a miss is a day that has GONE, so today is never one. */
           const todayKey = toDateOnlyString(new Date());
-          const items = orderDayWorkoutsByTimingThenDiscipline(
-            map.get(key) ?? [],
-            weekOrderingPref,
-            (e: any) => e?._src,
-          );
+          const items = byDayOrder(map.get(key) ?? []);
           const isToday = todayKey === key;
           const isPast = key < todayKey;
 

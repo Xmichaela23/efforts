@@ -75,6 +75,8 @@ export interface PlannedWorkout {
    * don't participate in a same-day pairing.
    */
   timing?: 'AM' | 'PM' | null;
+  /** The day's listing order, 1-based within the date; stamped by get-week (`_shared/day-order.ts`, audit H-T16). */
+  day_order?: number | null;
   /** Full pairing metadata payload — same shape as `PlannedSession.pairing` server-side. */
   pairing?: {
     same_day_with: string;

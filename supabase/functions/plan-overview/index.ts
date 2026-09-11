@@ -15,6 +15,7 @@
  */
 import { requireUser, AuthError } from '../_shared/require-user.ts';
 import { buildPlanOverview, planListFields } from '../_shared/plan-overview.ts';
+import { dayOrderFor } from '../_shared/day-order.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -46,14 +47,25 @@ Deno.serve(async (req) => {
     if (!plan) return json({ success: false, error: 'Plan not found' }, 404);
     const { data: rows, error: rowsErr } = await supabase
       .from('planned_workouts')
-      .select('week_number,type,name,tags,duration,total_duration_seconds,computed,intervals')
+      .select('id,week_number,day_number,date,type,name,tags,workout_metadata,duration,total_duration_seconds,computed,intervals')
       .eq('training_plan_id', planId)
       .eq('user_id', userId);
     if (rowsErr) return json({ success: false, error: rowsErr.message }, 500);
+    /**
+     * `day_order` per planned row id (audit H-T16): the plan screen lists a day's sessions by it and
+     * holds no rule of its own. A day is the row's date, else its week and day number.
+     */
+    const order = dayOrderFor(
+      rows ?? [],
+      (r) => (r?.date ? String(r.date).slice(0, 10) : (r?.week_number != null && r?.day_number != null ? `w${r.week_number}d${r.day_number}` : null)),
+      (r) => ({ type: r?.type ?? null, name: r?.name ?? null, tags: r?.tags ?? null, workout_metadata: r?.workout_metadata ?? null }),
+    );
+    const day_order: Record<string, number> = {};
+    for (const r of rows ?? []) { const n = order.get(r); if (r?.id && n != null) day_order[String(r.id)] = n; }
     return json({
       success: true,
       plan: { ...plan, ...planListFields(plan, asOf) },
-      overview: buildPlanOverview({ plan, rows: rows ?? [], asOfIso: asOf }),
+      overview: { ...buildPlanOverview({ plan, rows: rows ?? [], asOfIso: asOf }), day_order },
     });
   } catch (e) {
     if (e instanceof AuthError) return json({ success: false, error: e.message }, e.status);

@@ -27,7 +27,7 @@
 // Relative import (not `@/`) so the Deno-test runner can resolve the helper —
 // Vite's alias is config-resolved at app build, the deno-test runner doesn't
 // see it. Other client-side `src/lib/*.ts` files that have deno-test coverage
-// follow the same convention (see `pairing-timing.ts`).
+// follow the same convention.
 import { plannedSwimSessionLabel } from '../utils/swimPlanTokens.ts';
 import { plainIntent } from './plain-intent';
 

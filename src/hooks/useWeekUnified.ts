@@ -19,6 +19,8 @@ export type UnifiedItem = {
   status: 'planned' | 'completed' | 'skipped' | string | null;
   planned: any | null;
   executed: any | null;
+  /** The day's listing order, 1-based within the date, decided by get-week (audit H-T16). */
+  day_order?: number | null;
 };
 
 export function useWeekUnified(fromISO: string, toISO: string) {

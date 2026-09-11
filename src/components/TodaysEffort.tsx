@@ -4,8 +4,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { analysisNeedsAttention, analysisFailureLine } from '@/lib/analysis-state';
-import { computeDayTimings } from '@/lib/pairing-timing';
-import { useStrengthOrderingPreference } from '@/lib/use-strength-ordering-preference';
 import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
 import { useWeekUnified } from '@/hooks/useWeekUnified';
@@ -829,37 +827,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       .filter(Boolean);
   }, [unifiedItems]);
 
-  // §6.5 strength_ordering_preference resolution. Extract a primitive planId from the day's
-  // workouts so the hook below depends on a stable string, not an object that re-refs every
-  // render. Prior to consolidation, the fetch lived inline with `[dateWorkoutsMemo, detailedPlans]`
-  // as deps — both object refs that churned every render. The cleanup cancelled the in-flight
-  // fetch each time. DevTools Network tab showed 813 pending requests, fetch never landed,
-  // orderingPref stuck at 'endurance_first', strength_first athletes saw Run-above-Lower on
-  // stacked Thursdays. The shared hook centralizes the fetch + caches per planId.
-  const activePlanId = useMemo<string | null>(() => {
-    const found = dateWorkoutsMemo.find((w: any) => w?.training_plan_id)?.training_plan_id;
-    return typeof found === 'string' && found ? found : null;
-  }, [dateWorkoutsMemo]);
-  const { value: orderingPref } = useStrengthOrderingPreference(activePlanId);
-
   // FIXED: React to selectedDate prop changes properly - use a stable dependency
   useEffect(() => {
     // Split into activated (no 'optional') and optional
     const activated = dateWorkoutsMemo.filter((w:any)=> !(Array.isArray(w?.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional')));
     const optionals = dateWorkoutsMemo.filter((w:any)=> Array.isArray(w?.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional'));
-    // STRENGTH-PROTOCOL.md §6.5 / Task H: AM before PM for paired sessions. Server no longer
-    // persists `timing` (the prior pipeline was broken end-to-end — column never existed on
-    // planned_workouts). Compute at render time from the day's sessions + athlete's
-    // `strength_ordering_preference`, then apply the same AM<PM stable sort.
-    const timings = computeDayTimings(dateWorkoutsMemo, orderingPref);
-    const rank = (w: any): number => {
-      const t = timings.get(w) ?? w?.timing;
-      if (t === 'AM') return 0;
-      if (t === 'PM') return 2;
-      return 1;
-    };
-    const sortByTiming = (arr: any[]): any[] => [...arr].sort((a, b) => rank(a) - rank(b));
-    const next = [...sortByTiming(activated), ...sortByTiming(optionals)];
+    // ⛔ THE DAY'S ORDER IS THE SERVER'S (2026-09-10, audit H-T16): get-week stamps `day_order` on
+    // every row (`_shared/day-order.ts`). The phone sorted each day itself until now; that rule is gone.
+    const rank = (w: any): number => (Number.isFinite(Number(w?.day_order)) ? Number(w.day_order) : Number.MAX_SAFE_INTEGER);
+    const sortByDayOrder = (arr: any[]): any[] => [...arr].sort((a, b) => rank(a) - rank(b));
+    const next = [...sortByDayOrder(activated), ...sortByDayOrder(optionals)];
     // ⛔ ONLY WRITE WHEN THE ORDER ACTUALLY CHANGED. This used to call setDisplayWorkouts
     // unconditionally with a fresh array, so EVERY run of this effect set state → rerender → and if
     // any dep re-reffed (they are memos over objects), the effect ran again. Forever.
@@ -878,7 +855,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       }
       return next;
     });
-  }, [dateWorkoutsMemo, activeDate, orderingPref]);
+  }, [dateWorkoutsMemo, activeDate]);
   // Helper to clean authored codes from text (mirrors PlannedWorkoutView)
   const stripCodes = (text?: string) => String(text || '')
     .replace(/\[(?:cat|plan):[^\]]+\]\s*/gi, '')

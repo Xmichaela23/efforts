@@ -24,12 +24,7 @@ import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 // ⛔ THE SERVER'S PLANNED LENGTH, READ (2026-09-10, audit H-T01). See `plannedDurationSecondsOf`.
 import { plannedDurationSecondsOf } from './PlannedSessionHeader';
 import { formatWizardPrefsMarkdownLines, formatPlanConfigPrefsMarkdownLines } from '@/lib/format-wizard-prefs-export';
-import { computeDayTimings, orderDayWorkoutsByTimingThenDiscipline, type StrengthOrderingPreference } from '@/lib/pairing-timing';
 import { plainIntent } from '@/lib/plain-intent';
-import {
-  fetchStrengthOrderingPreference,
-  useStrengthOrderingPreference,
-} from '@/lib/use-strength-ordering-preference';
 
 // Helpers for normalizing minimal JSON sessions into legacy view expectations
 function cleanSessionDescription(text: string): string {
@@ -124,7 +119,7 @@ interface AllPlansInterfaceProps {
   showCompleted?: boolean;
 }
 
-// `orderDayWorkoutsByTimingThenDiscipline` moved to `@/lib/pairing-timing`
+// The day's listing order is the server's `day_order` (plan-overview, `_shared/day-order.ts`).
 // (single source of truth — now also consumed by WorkoutCalendar; was a private
 // copy here that other day-stacked surfaces silently diverged from). Imported above.
 
@@ -150,12 +145,20 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const [baselines, setBaselines] = useState<any>(null);
   const [currentView, setCurrentView] = useState<'list' | 'detail' | 'day'>(focusPlanId ? 'detail' : 'list');
   const [selectedPlanDetail, setSelectedPlanDetail] = useState<any>(null);
-  // Drives `orderDayWorkoutsByTimingThenDiscipline` for the rendered weekly view below.
-  // Hook depends only on the planId string, so dep churn from `selectedPlanDetail` object
-  // refs (which re-ref on every weekly refetch) cannot cancel the in-flight fetch.
-  const { value: weekViewOrderingPref } = useStrengthOrderingPreference(
-    selectedPlanDetail?.id ?? null,
-  );
+  /**
+   * ⛔ THE DAY'S ORDER IS THE SERVER'S (2026-09-10, audit H-T16). `plan-overview` sends `day_order`
+   * per planned row id (`_shared/day-order.ts`); a day's rows are listed by it, in the weekly view
+   * and the markdown export alike. The phone's own rule and the preference fetch behind it are gone.
+   * A row the server did not order (a `sessions_by_week` row with no id) keeps its place.
+   */
+  const dayOrderOf = (plan: any): Record<string, number> => {
+    const m = plan?.overview?.day_order;
+    return m && typeof m === 'object' ? m : {};
+  };
+  const listByDayOrder = (rows: any[], order: Record<string, number>): any[] => {
+    const rank = (w: any): number => { const n = Number(order[String(w?.id ?? '')]); return Number.isFinite(n) ? n : Number.MAX_SAFE_INTEGER; };
+    return rows.map((w, i) => ({ w, i })).sort((a, b) => (rank(a.w) - rank(b.w)) || (a.i - b.i)).map((x) => x.w);
+  };
 
   // DEBUG: Log every render and track selectedPlanDetail changes
   const renderCountRef = useRef(0);
@@ -1274,49 +1277,12 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   // ⛔ NO WEEKLY VOLUME IS ADDED UP HERE (2026-09-10, audit H-P02). The optional / race-day rules this
   // summed with moved to `_shared/plan-overview.ts`, which sums every week of the plan.
 
-  /**
-   * Same-day ordering for markdown export. Honors §6.2 / §6.5 AM/PM pairing metadata first
-   * (AM card above PM card, matching Today's Efforts) so a strength_first-preference athlete
-   * sees Lower Strength above Run Intervals on Thursdays. Falls back to discipline rank
-   * (swim → bike → run → strength) for sessions without pairing metadata so bricks still
-   * read bike→run.
-   */
-  const markdownExportSessionOrder = (a: any, b: any): number => {
-    const timingRank = (w: any): number => {
-      const t = w?.timing
-        ?? (w?.workout_metadata && typeof w.workout_metadata === 'object' ? w.workout_metadata.timing : null);
-      if (t === 'AM') return 0;
-      if (t === 'PM') return 2;
-      return 1;
-    };
-    const tDelta = timingRank(a) - timingRank(b);
-    if (tDelta !== 0) return tDelta;
-    const rank = (w: any): number => {
-      const t = String(w?.type || w?.discipline || '').toLowerCase();
-      const n = String(w?.name || '').toLowerCase();
-      if (t === 'swim' || /\bswim\b/.test(n)) return 0;
-      if (t === 'bike' || t === 'ride' || /\bbrick\b.*\b(bike|ride)\b/.test(n) || /\b(bike|ride)\b.*\bbrick\b/.test(n)) {
-        return 1;
-      }
-      if (t === 'run' || /\bbrick\b.*\brun\b/.test(n) || /\brun\b.*\bbrick\b/.test(n)) return 2;
-      if (t === 'strength') return 3;
-      return 4;
-    };
-    const d = rank(a) - rank(b);
-    if (d !== 0) return d;
-    return String(a?.name || '').localeCompare(String(b?.name || ''));
-  };
-
   // Export selected plan to Markdown (all weeks); includes Arc wizard prefs from linked goal when present.
   const exportPlanToMarkdown = async (plan: any) => {
     if (!plan) return;
 
     let wizardMdLines: string[] = [];
-    // §6.5 ordering preference resolution via the shared fetcher. Same cache the
-    // `useStrengthOrderingPreference` hook (TodaysEffort) reads from, so this export and the
-    // top-cards display can't disagree. Resolves to 'endurance_first' on any failure path —
-    // matches the server's default when the field is missing.
-    const orderingPref = await fetchStrengthOrderingPreference(plan?.id ?? null);
+    const exportDayOrder = dayOrderOf(plan);
     try {
       const gid = plan.goal_id;
       if (gid && typeof gid === 'string') {
@@ -1392,11 +1358,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       const orderedDays = dayOrder.filter(d => groups[d]).concat(Object.keys(groups).filter(k => !dayOrder.includes(k)));
       for (const d of orderedDays) {
         lines.push(`### ${d}`);
-        // §6.5 render-time AM/PM ordering. `orderDayWorkoutsByTimingThenDiscipline`
-        // is the same helper the rendered weekly view below uses, so the markdown
-        // export and the on-screen plan-detail view cannot diverge on which session
-        // sorts first within a day.
-        const dayWorkouts = orderDayWorkoutsByTimingThenDiscipline(groups[d] as any[], orderingPref);
+        // The server's `day_order`, the same number the weekly view lists by.
+        const dayWorkouts = listByDayOrder(groups[d] as any[], exportDayOrder);
         // Bricks emit as two session rows (bike leg + run leg) from session-factory; the export
         // merges them into one combined bullet ("Brick — Bike Xhr + Run Ymi") so a brick week
         // doesn't read as two unrelated easy sessions. Parse miles/hours from each leg's name
@@ -1998,14 +1961,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                       });
                       const keys = dayOrder.filter(d => groups[d]).concat(Object.keys(groups).filter(k => !dayOrder.includes(k)));
                       return keys.map(day => {
-                        // Sort each day's workouts by AM/PM timing then discipline so a
-                        // strength_first athlete sees Lower above Run on stacked days.
-                        // Without this, `groups[day]` was rendered in `currentWeekData.workouts`
-                        // insertion order and Thursday rendered Run-above-Lower.
-                        const dayWorkouts = orderDayWorkoutsByTimingThenDiscipline(
-                          groups[day],
-                          weekViewOrderingPref,
-                        );
+                        // The server's `day_order` (plan-overview) lists the day.
+                        const dayWorkouts = listByDayOrder(groups[day], dayOrderOf(selectedPlanDetail));
                         const firstWorkout = dayWorkouts[0];
                         const dateStr = firstWorkout?.date;
                         const formattedDate = dateStr ? (() => {
