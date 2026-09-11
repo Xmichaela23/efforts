@@ -944,27 +944,19 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     }
   };
 
-  // 🔧 ENHANCED: Complete FIT data extraction - pass through ALL fields that FitFileImporter extracts
-  const handleWorkoutsImported = (importedWorkouts: any[]) => {
-    importedWorkouts.forEach(async (workout) => {
+  // ⛔ THE ROWS ARRIVE SAVED (2026-09-10, audit H-D05): `import-fit-file` parsed each file and saved it
+  // through `save-imported-workout`, which runs `recompute-workout`. Nothing is parsed or saved here;
+  // nothing else is asked for either (H-D06).
+  const handleWorkoutsImported = (results: Array<{ workout: any; imported: any }>) => {
+    results.forEach(({ workout, imported }) => {
       try {
-        const { data, error } = await supabase.functions.invoke('save-imported-workout', {
-          body: { workout },
-        });
-        if (error) throw error;
-        const savedWorkout = data?.workout;
+        const savedWorkout = workout;
         if (!savedWorkout?.id) throw new Error('Save failed');
-
-        // ⛔ NOTHING ELSE IS ASKED FOR (2026-09-10, audit H-D06). This used to call auto-attach-planned
-        // and then calculate-workload with a `workout_data` object built here — and calculate-workload
-        // uses the caller's data whenever it is sent. `save-imported-workout` already runs
-        // `recompute-workout`, which attaches and computes the workload once, from the saved row.
-
-        if (isFeedbackType(workout.type) && savedWorkout.id) {
+        if (isFeedbackType(imported?.type) && savedWorkout.id) {
           setFeedbackWorkout({
             id: savedWorkout.id,
-            type: workout.type as 'run' | 'ride' | 'swim',
-            name: workout.name || savedWorkout.name || `${workout.type} workout`,
+            type: imported.type as 'run' | 'ride' | 'swim',
+            name: imported.name || savedWorkout.name || `${imported.type} workout`,
           });
         }
         try {
@@ -974,7 +966,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           console.warn('[AppLayout] import invalidate dispatch failed:', e);
         }
       } catch (e) {
-        console.warn('[AppLayout] save-imported-workout pipeline failed:', e);
+        console.warn('[AppLayout] import result handling failed:', e);
       }
     });
     setShowImportPage(false);

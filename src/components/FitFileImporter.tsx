@@ -1,9 +1,21 @@
+/**
+ * ⛔ THE PHONE NO LONGER PARSES THE FILE (2026-09-10, audit H-D05). It used to load a parser from a
+ * CDN at run time, build the workout summary itself (sport defaulted to ride, elevation loss stored
+ * 1,000x too small, intensity factor as 50 where the analysis stores 0.50) and send no samples. Each
+ * file now goes up as it is to `import-fit-file`, which parses it, saves the row through
+ * `save-imported-workout` (which runs recompute-workout) and answers with the saved row and the summary
+ * this screen prints. Nothing about the file is worked out here.
+ */
 import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Upload, File, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import { Upload, File, CheckCircle, AlertCircle } from 'lucide-react';
+import { invokeFunctionFormData } from '@/lib/supabase';
+
+/** What `import-fit-file` answers per file: the saved row and the summary the card prints. */
+export type FitImportResult = { workout: any; imported: ImportedWorkout };
 
 interface FitFileImporterProps {
-  onWorkoutsImported: (workouts: any[]) => void;
+  onWorkoutsImported: (results: FitImportResult[]) => void;
 }
 
 interface ImportedWorkout {
@@ -87,369 +99,46 @@ interface ImportedWorkout {
   };
 }
 
-// Load the fit-file-parser library dynamically
-const loadFitParser = async () => {
-  if (window.FitParser) {
-    return window.FitParser;
-  }
-
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://cdn.skypack.dev/fit-file-parser';
-    script.type = 'module';
-    script.onload = () => {
-      // The library exports as default, but we need to access it properly
-      import('https://cdn.skypack.dev/fit-file-parser')
-        .then(module => {
-          window.FitParser = module.default;
-          resolve(module.default);
-        })
-        .catch(reject);
-    };
-    script.onerror = () => reject(new Error('Failed to load FIT parser library'));
-    document.head.appendChild(script);
-  });
-};
-
-// Sport type mapping from FIT to our app types
-const mapFitSportToAppType = (sport: string): string => {
-  if (!sport) return 'ride'; // Default to ride for cycling files
-  
-  const sportLower = sport.toLowerCase();
-  
-  if (sportLower.includes('cycling') || sportLower.includes('biking') || sport === 'cycling') {
-    return 'ride';
-  } else if (sportLower.includes('running') || sport === 'running') {
-    return 'run';
-  } else if (sportLower.includes('swimming') || sport === 'swimming') {
-    return 'swim';
-  } else if (sportLower.includes('strength') || sportLower.includes('training') || sportLower.includes('fitness')) {
-    return 'strength';
-  } else {
-    return 'ride';
-  }
-};
-
 const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedFiles, setProcessedFiles] = useState<ImportedWorkout[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
-  const [parserLoaded, setParserLoaded] = useState(false);
 
-  // Initialize the FIT parser
-  React.useEffect(() => {
-    loadFitParser()
-      .then(() => {
-        setParserLoaded(true);
-      })
-      .catch(() => {
-        setErrors(['Failed to load FIT file parser. Please refresh the page and try again.']);
-      });
-  }, []);
-
-  const parseFitFile = async (file: File): Promise<ImportedWorkout> => {
-    if (!window.FitParser) {
-      throw new Error('FIT parser not loaded');
+  /** One file up, one answer back. The server's error text is what the list prints. */
+  const importFitFile = async (file: File): Promise<FitImportResult> => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const { data, error } = await invokeFunctionFormData<FitImportResult>('import-fit-file', fd);
+    if (error || !data?.workout?.id || !data?.imported) {
+      throw new Error(error?.message || 'Import failed');
     }
+    return data;
+  };
 
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      
-      reader.onload = (e) => {
-        try {
-          const arrayBuffer = e.target?.result as ArrayBuffer;
-          
-          // Create FitParser instance with optimal settings
-          const fitParser = new window.FitParser({
-            force: true,
-            speedUnit: 'km/h',
-            lengthUnit: 'km',
-            temperatureUnit: 'celsius',
-            pressureUnit: 'bar',
-            elapsedRecordField: true,
-            mode: 'both', // Use 'both' mode like the examples show
-          });
-
-          fitParser.parse(arrayBuffer, (error: any, data: any) => {
-            if (error) {
-              reject(new Error(`Failed to parse FIT file: ${error.message || error}`));
-              return;
-            }
-
-            try {
-              // 🔧 FIXED: Extract date from the correct location - prioritize local_timestamp
-              let workoutDate = new Date().toISOString().split('T')[0]; // fallback to today
-              let workoutTimestamp = null;
-              
-              if (data.local_timestamp) {
-                const dateObj = new Date(data.local_timestamp);
-                workoutDate = dateObj.getFullYear() + '-' + 
-                  String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + 
-                  String(dateObj.getDate()).padStart(2, '0');
-                workoutTimestamp = data.local_timestamp;
-              } else if (data.timestamp) {
-                const dateObj = new Date(data.timestamp);
-                workoutDate = dateObj.getFullYear() + '-' + 
-                  String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + 
-                  String(dateObj.getDate()).padStart(2, '0');
-                workoutTimestamp = data.timestamp;
-              } else if (data.sessions && data.sessions[0] && data.sessions[0].start_time) {
-                const dateObj = new Date(data.sessions[0].start_time);
-                workoutDate = dateObj.getFullYear() + '-' + 
-                  String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + 
-                  String(dateObj.getDate()).padStart(2, '0');
-                workoutTimestamp = data.sessions[0].start_time;
-              }
-
-              // 🔧 FIXED: Extract session data from the correct location
-              let session = null;
-              if (data.sessions && Array.isArray(data.sessions) && data.sessions.length > 0) {
-                session = data.sessions[0];
-              } else {
-                if (data.activity) {
-                  session = data.activity;
-                } else if (data.session) {
-                  session = data.session;
-                } else {
-                  session = {};
-                }
-              }
-
-              // 🔧 FIXED: Extract sport from the correct location
-              let sport = 'cycling'; // default
-              if (data.sports && Array.isArray(data.sports) && data.sports[0] && data.sports[0].sport) {
-                sport = data.sports[0].sport;
-              } else if (session.sport) {
-                sport = session.sport;
-              }
-              
-              const workoutType = mapFitSportToAppType(sport);
-
-              // 🔧 FIXED: Extract duration from session and ensure it's a valid number
-              const duration = session.total_elapsed_time ? Math.round(Number(session.total_elapsed_time)) : 
-                              session.total_timer_time ? Math.round(Number(session.total_timer_time)) : 
-                              0;
-
-              // 🔧 FIXED: Extract distance from session and ensure it's a valid number or null
-              const distance = session.total_distance ? 
-                Math.round(Number(session.total_distance) * 100) / 100 : 
-                null;
-
-              // 🆕 NEW: Extract location data for title generation
-              const startPositionLat = session.start_position_lat ? Number(session.start_position_lat) : null;
-              const startPositionLong = session.start_position_long ? Number(session.start_position_long) : null;
-
-              // 🆕 NEW: Extract device friendly name (from user_profile)
-              const friendlyName = data.user_profile?.friendly_name || 
-                                 data.device_info?.friendly_name || 
-                                 data.file_creator?.friendly_name || 
-                                 data.file_id?.friendly_name ||
-                                 null;
-
-              // 🔧 CRITICAL FIX: Check multiple possible elevation field names
-              let elevationGain = null;
-              let elevationLoss = null;
-              
-              if (session.total_ascent) {
-                // 🔧 CRITICAL FIX: total_ascent is in kilometers, convert to meters
-                elevationGain = Math.round(Number(session.total_ascent) * 1000);
-              } else if (session.elevation_gain) {
-                elevationGain = Math.round(Number(session.elevation_gain));
-              } else if (session.ascent) {
-                elevationGain = Math.round(Number(session.ascent));
-              } else if (session.total_elevation_gain) {
-                elevationGain = Math.round(Number(session.total_elevation_gain));
-              } else if (session.enhanced_ascent) {
-                elevationGain = Math.round(Number(session.enhanced_ascent));
-              }
-
-              // 🆕 NEW: Extract elevation loss/descent
-              if (session.total_descent) {
-                elevationLoss = Math.round(Number(session.total_descent));
-              }
-
-              // 🆕 NEW: Extract zones data
-              const zonesData = data.zones_target || {};
-
-              // 🆕 NEW: Extract user profile data
-              const userProfile = data.user_profile || {};
-
-              // 🔧 FIXED: Extract all metrics directly from session object and sanitize for database
-              const metrics = {
-                // EXISTING Heart Rate - ensure numbers or null
-                avg_heart_rate: session.avg_heart_rate ? Number(session.avg_heart_rate) : null,
-                max_heart_rate: session.max_heart_rate ? Number(session.max_heart_rate) : null,
-                
-                // EXISTING Power (cycling) - ensure numbers or null
-                avg_power: session.avg_power ? Number(session.avg_power) : null,
-                max_power: session.max_power ? Number(session.max_power) : null,
-                normalized_power: session.normalized_power ? Number(session.normalized_power) : null,
-                
-                // EXISTING Calories & Energy - ensure numbers or null
-                calories: session.total_calories ? Number(session.total_calories) : null,
-                
-                // 🔧 FIXED: Use the elevation value we found from multiple possible fields
-                elevation_gain: elevationGain,
-                
-                // EXISTING Speed - ensure numbers or null
-                avg_speed: session.enhanced_avg_speed ? Number(session.enhanced_avg_speed) : 
-                          session.avg_speed ? Number(session.avg_speed) : null,
-                max_speed: session.enhanced_max_speed ? Number(session.enhanced_max_speed) : 
-                          session.max_speed ? Number(session.max_speed) : null,
-                
-                // EXISTING Cadence - ensure numbers or null
-                avg_cadence: session.avg_cadence ? Number(session.avg_cadence) : null,
-                max_cadence: session.max_cadence ? Number(session.max_cadence) : null,
-                
-                // EXISTING Advanced Training Metrics - ensure numbers or null
-                training_stress_score: session.training_stress_score ? Number(session.training_stress_score) : null,
-                // 🔧 CRITICAL FIX: Convert intensity_factor from decimal to percentage (0.498 → 50)
-                intensity_factor: session.intensity_factor ? Math.round(Number(session.intensity_factor) * 100) : null,
-                
-                // EXISTING Temperature - ensure numbers or null
-                avg_temperature: session.avg_temperature ? Number(session.avg_temperature) : null,
-                max_temperature: session.max_temperature ? Number(session.max_temperature) : null,
-
-                // 🆕 NEW TIME DATA
-                total_timer_time: session.total_timer_time ? Number(session.total_timer_time) : null,
-                total_elapsed_time: session.total_elapsed_time ? Number(session.total_elapsed_time) : null,
-
-                // 🆕 NEW WORK/ENERGY
-                total_work: session.total_work ? Number(session.total_work) : null,
-
-                // 🆕 NEW ELEVATION
-                total_descent: elevationLoss,
-
-                // 🆕 NEW PERFORMANCE
-                avg_vam: session.avg_vam ? Number(session.avg_vam) : null,
-                total_training_effect: session.total_training_effect ? Number(session.total_training_effect) : null,
-                total_anaerobic_effect: session.total_anaerobic_effect ? Number(session.total_anaerobic_effect) : null,
-
-                // 🆕 NEW ZONES DATA (from zones_target object)
-                functional_threshold_power: zonesData.functional_threshold_power ? Number(zonesData.functional_threshold_power) : null,
-                threshold_heart_rate: zonesData.threshold_heart_rate ? Number(zonesData.threshold_heart_rate) : null,
-                hr_calc_type: zonesData.hr_calc_type || null,
-                pwr_calc_type: zonesData.pwr_calc_type || null,
-
-                // 🆕 NEW USER PROFILE DATA (from user_profile object)
-                age: userProfile.age ? Number(userProfile.age) : null,
-                weight: userProfile.weight ? Number(userProfile.weight) : null,
-                height: userProfile.height ? Number(userProfile.height) : null,
-                gender: userProfile.gender || null,
-                default_max_heart_rate: userProfile.default_max_heart_rate ? Number(userProfile.default_max_heart_rate) : null,
-                resting_heart_rate: userProfile.resting_heart_rate ? Number(userProfile.resting_heart_rate) : null,
-                dist_setting: userProfile.dist_setting || null,
-                weight_setting: userProfile.weight_setting || null,
-
-                // 🆕 NEW CYCLING DETAILS DATA (from session object)
-                avg_fractional_cadence: session.avg_fractional_cadence ? Number(session.avg_fractional_cadence) : null,
-                avg_left_pedal_smoothness: session.avg_left_pedal_smoothness ? Number(session.avg_left_pedal_smoothness) : null,
-                avg_left_torque_effectiveness: session.avg_left_torque_effectiveness ? Number(session.avg_left_torque_effectiveness) : null,
-                max_fractional_cadence: session.max_fractional_cadence ? Number(session.max_fractional_cadence) : null,
-                left_right_balance: session.left_right_balance ? Number(session.left_right_balance) : null,
-                threshold_power: session.threshold_power ? Number(session.threshold_power) : null,
-                total_cycles: session.total_cycles ? Number(session.total_cycles) : null,
-              };
-
-              // Create the workout object with proper data types for database
-              const workout: ImportedWorkout = {
-                id: `fit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                name: file.name.replace('.fit', '').replace(/[_-]/g, ' '),
-                type: workoutType,
-                date: workoutDate,
-                duration: duration,
-                distance: distance,
-                
-                // 🆕 NEW TOP-LEVEL FIELDS
-                timestamp: workoutTimestamp,
-                start_position_lat: startPositionLat,
-                start_position_long: startPositionLong,
-                friendly_name: friendlyName,
-                moving_time: metrics.total_timer_time, // moving time is typically total_timer_time
-                elapsed_time: metrics.total_elapsed_time,
-                
-                // ALL METRICS (existing + new)
-                metrics: {
-                  // EXISTING FIELDS
-                  avg_heart_rate: metrics.avg_heart_rate,
-                  max_heart_rate: metrics.max_heart_rate,
-                  avg_power: metrics.avg_power,
-                  max_power: metrics.max_power,
-                  normalized_power: metrics.normalized_power,
-                  calories: metrics.calories,
-                  elevation_gain: metrics.elevation_gain,
-                  avg_speed: metrics.avg_speed,
-                  max_speed: metrics.max_speed,
-                  avg_cadence: metrics.avg_cadence,
-                  max_cadence: metrics.max_cadence,
-                  training_stress_score: metrics.training_stress_score,
-                  intensity_factor: metrics.intensity_factor,
-                  avg_temperature: metrics.avg_temperature,
-                  max_temperature: metrics.max_temperature,
-                  
-                  // 🆕 NEW FIELDS
-                  total_timer_time: metrics.total_timer_time,
-                  total_elapsed_time: metrics.total_elapsed_time,
-                  total_work: metrics.total_work,
-                  total_descent: metrics.total_descent,
-                  avg_vam: metrics.avg_vam,
-                  total_training_effect: metrics.total_training_effect,
-                  total_anaerobic_effect: metrics.total_anaerobic_effect,
-                  functional_threshold_power: metrics.functional_threshold_power,
-                  threshold_heart_rate: metrics.threshold_heart_rate,
-                  hr_calc_type: metrics.hr_calc_type,
-                  pwr_calc_type: metrics.pwr_calc_type,
-                  age: metrics.age,
-                  weight: metrics.weight,
-                  height: metrics.height,
-                  gender: metrics.gender,
-                  default_max_heart_rate: metrics.default_max_heart_rate,
-                  resting_heart_rate: metrics.resting_heart_rate,
-                  dist_setting: metrics.dist_setting,
-                  weight_setting: metrics.weight_setting,
-                  avg_fractional_cadence: metrics.avg_fractional_cadence,
-                  avg_left_pedal_smoothness: metrics.avg_left_pedal_smoothness,
-                  avg_left_torque_effectiveness: metrics.avg_left_torque_effectiveness,
-                  max_fractional_cadence: metrics.max_fractional_cadence,
-                  left_right_balance: metrics.left_right_balance,
-                  threshold_power: metrics.threshold_power,
-                  total_cycles: metrics.total_cycles,
-                },
-                deviceInfo: {
-                  manufacturer: data.file_id?.manufacturer || data.file_creator?.software_version || 'Unknown',
-                  product: data.file_id?.product || 'FIT Device'
-                }
-              };
-
-              resolve(workout);
-              
-            } catch (processingError) {
-              reject(new Error(`Error processing workout data: ${processingError.message}`));
-            }
-          });
-          
-        } catch (parseError) {
-          reject(new Error(`Error reading file: ${parseError.message}`));
-        }
-      };
-      
-      reader.onerror = () => {
-        reject(new Error('Failed to read file'));
-      };
-      
-      reader.readAsArrayBuffer(file);
-    });
+  const importFiles = async (files: File[]) => {
+    setIsProcessing(true);
+    setErrors([]);
+    const results: FitImportResult[] = [];
+    const processingErrors: string[] = [];
+    for (const file of files) {
+      try {
+        results.push(await importFitFile(file));
+      } catch (error) {
+        processingErrors.push(`${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+    setProcessedFiles(results.map((r) => r.imported));
+    setErrors(processingErrors);
+    setIsProcessing(false);
+    if (results.length > 0) {
+      onWorkoutsImported(results);
+    }
   };
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
-    
-    if (!parserLoaded) {
-      setErrors(['FIT parser is still loading. Please wait a moment and try again.']);
-      return;
-    }
     
     const files = Array.from(e.dataTransfer.files);
     const fitFiles = files.filter(file => 
@@ -461,28 +150,8 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
       return;
     }
     
-    setIsProcessing(true);
-    setErrors([]);
-    const processedWorkouts: ImportedWorkout[] = [];
-    const processingErrors: string[] = [];
-    
-    for (const file of fitFiles) {
-      try {
-        const workout = await parseFitFile(file);
-        processedWorkouts.push(workout);
-      } catch (error) {
-        processingErrors.push(`${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    }
-    
-    setProcessedFiles(processedWorkouts);
-    setErrors(processingErrors);
-    setIsProcessing(false);
-    
-    if (processedWorkouts.length > 0) {
-      onWorkoutsImported(processedWorkouts);
-    }
-  }, [onWorkoutsImported, parserLoaded]);
+    await importFiles(fitFiles);
+  }, [onWorkoutsImported]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -495,11 +164,6 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
   }, []);
 
   const handleFileInput = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!parserLoaded) {
-      setErrors(['FIT parser is still loading. Please wait a moment and try again.']);
-      return;
-    }
-    
     const files = Array.from(e.target.files || []);
     const fitFiles = files.filter(file => 
       file.name.toLowerCase().endsWith('.fit')
@@ -510,28 +174,8 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
       return;
     }
     
-    setIsProcessing(true);
-    setErrors([]);
-    const processedWorkouts: ImportedWorkout[] = [];
-    const processingErrors: string[] = [];
-    
-    for (const file of fitFiles) {
-      try {
-        const workout = await parseFitFile(file);
-        processedWorkouts.push(workout);
-      } catch (error) {
-        processingErrors.push(`${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      }
-    }
-    
-    setProcessedFiles(processedWorkouts);
-    setErrors(processingErrors);
-    setIsProcessing(false);
-    
-    if (processedWorkouts.length > 0) {
-      onWorkoutsImported(processedWorkouts);
-    }
-  }, [onWorkoutsImported, parserLoaded]);
+    await importFiles(fitFiles);
+  }, [onWorkoutsImported]);
 
   return (
     <div className="w-full max-w-2xl mx-auto p-6">
@@ -543,34 +187,18 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
         </p>
       </div>
 
-      {/* Parser Status */}
-      {!parserLoaded && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center">
-          <Info className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
-          <span className="text-blue-700">Loading FIT file parser...</span>
-        </div>
-      )}
-
       {/* Drop Zone */}
       <div
         className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
           isDragOver 
             ? 'border-blue-500 bg-blue-50' 
-            : parserLoaded 
-              ? 'border-gray-300 hover:border-gray-400'
-              : 'border-gray-200 bg-gray-50'
+            : 'border-gray-300 hover:border-gray-400'
         }`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
       >
-        <Upload className={`mx-auto h-12 w-12 mb-4 ${
-          isDragOver 
-            ? 'text-blue-500' 
-            : parserLoaded 
-              ? 'text-gray-400'
-              : 'text-gray-300'
-        }`} />
+        <Upload className={`mx-auto h-12 w-12 mb-4 ${isDragOver ? 'text-blue-500' : 'text-gray-400'}`} />
         
         {isProcessing ? (
           <div>
@@ -580,9 +208,7 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
         ) : (
           <div>
             <p className="text-lg font-medium mb-2">
-              {parserLoaded 
-                ? 'Drop .fit files here or click to select' 
-                : 'Loading FIT parser...'}
+              Drop .fit files here or click to select
             </p>
             <p className="text-sm text-gray-500 mb-4">
               Automatically extracts sport type, power, heart rate, elevation, location, zones, user profile, and all training metrics
@@ -594,10 +220,9 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
               onChange={handleFileInput}
               className="hidden"
               id="file-input"
-              disabled={!parserLoaded}
             />
             <label htmlFor="file-input">
-              <Button className="cursor-pointer" disabled={!parserLoaded}>
+              <Button className="cursor-pointer">
                 <File className="h-4 w-4 mr-2" />
                 Select FIT Files
               </Button>
@@ -607,7 +232,7 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
       </div>
 
       {/* Supported Metrics Info */}
-      {parserLoaded && (
+      {(
         <div className="mt-4 p-4 bg-gray-50 rounded-lg">
           <h4 className="font-medium mb-2">Automatically Extracted Metrics:</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm text-gray-600">
@@ -704,12 +329,5 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
     </div>
   );
 };
-
-// Extend window object for TypeScript
-declare global {
-  interface Window {
-    FitParser: any;
-  }
-}
 
 export default FitFileImporter;
