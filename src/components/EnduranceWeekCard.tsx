@@ -569,6 +569,15 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                         * easy row has none; neither is a workout choice, so neither is coloured.
                         */}
                       {slotSummary(key, sport)}
+                      {/* ⛔ AN UNANSWERED ROW NAMES ITS CHOICE ON THE ROW (Michael, 2026-09-11: "Hard
+                          session 3 · Ride or Run"), in the warning colour the Continue line used. The
+                          question is on the row it is about — inline validation, the field standard —
+                          and the bottom line no longer repeats it. */}
+                      {!forced && !sport ? (
+                        <span data-testid={`slot-${key}-unanswered`} className="text-amber-200/80">
+                          {` · ${optionsNow.options.filter((o) => allowed(o.value)).map((o) => o.label).join(' or ')}`}
+                        </span>
+                      ) : null}
                       {session ? (
                         /**
                          * ⛔⛔ COLOURED ONLY WHEN IT IS THE ATHLETE'S OWN PICK (2026-08-31). The card's
@@ -686,6 +695,41 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                 )}
               </div>
 
+              {/* ⛔⛔ THE SPORT IS CHOSEN ON THE FACE OF THE ROW, NEVER BEHIND THE CHEVRON (Michael,
+                  2026-09-11: "it's a little confusing to know you need to open to pick"). A required
+                  two-way choice sits on the row as a segmented control — the field standard (Apple's
+                  guidelines; Strava, TrainerRoad, Runna settings rows) — so the answer, or its empty
+                  state, is visible closed or open. The chevron now opens only what describes the
+                  session: the hard row's line, the length, the club session.
+                  ⚠️ NOT ON A FIXED ROW — see `forcedSportFor`: a lone chip that cannot change anything
+                  is the thing Michael called out on the live screen. Selected carries the sport
+                  colour; unselected neutral — colouring both would read as two chosen answers. */}
+              {!forced ? (
+                <div className="px-4 pb-3.5 -mt-1 flex items-center gap-2">
+                  {optionsNow.options.filter((opt) => allowed(opt.value)).map((opt) => {
+                    const on = sport === opt.value;
+                    const c = getDisciplineColor(SPORT_DISCIPLINE[opt.value]);
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        aria-pressed={on}
+                        data-testid={`slot-${key}-${opt.value}`}
+                        onClick={() => props.onSlotChange(key, opt.value)}
+                        className="flex-1 px-3 py-2 rounded-xl text-sm border whitespace-nowrap"
+                        style={on
+                          ? { borderColor: c, backgroundColor: `${c}29`, color: '#fff' }
+                          : {
+                              borderColor: 'rgba(255,255,255,0.12)',
+                              backgroundColor: 'rgba(255,255,255,0.03)',
+                              color: 'rgba(255,255,255,0.70)',
+                            }}
+                      >{opt.label}</button>
+                    );
+                  })}
+                </div>
+              ) : null}
+
               {/* ⚠️ `expandable` IS RE-TESTED HERE AND NOT ONLY ON THE HEADER. `open` is a single key
                   of component state, so a row that stops being expandable while it is the open one —
                   a sport change on another row narrowing this one — would otherwise render an
@@ -699,33 +743,11 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
                       selected": a lone button that cannot change anything is the exact thing Michael
                       called out on the live screen. The sport is stated in the header and the reason
                       is stated below, where the chips were. */}
+                  {/* ⛔ THE CHIPS LEFT THE BODY FOR THE FACE OF THE ROW (2026-09-11) — see above. A
+                      fixed row still states its reason here, where the chips used to be. */}
                   {forced ? (
                     <p className="text-white/45 text-xs leading-snug">{FIXED_SPORT_LINE[forced]}</p>
-                  ) : (
-                  <div className="flex items-center gap-2">
-                    {optionsNow.options.filter((opt) => allowed(opt.value)).map((opt) => {
-                      const on = sport === opt.value;
-                      const c = getDisciplineColor(SPORT_DISCIPLINE[opt.value]);
-                      return (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          aria-pressed={on}
-                          data-testid={`slot-${key}-${opt.value}`}
-                          onClick={() => props.onSlotChange(key, opt.value)}
-                          className="flex-1 px-3 py-2 rounded-xl text-sm border whitespace-nowrap"
-                          style={on
-                            ? { borderColor: c, backgroundColor: `${c}29`, color: '#fff' }
-                            : {
-                                borderColor: 'rgba(255,255,255,0.12)',
-                                backgroundColor: 'rgba(255,255,255,0.03)',
-                                color: 'rgba(255,255,255,0.70)',
-                              }}
-                        >{opt.label}</button>
-                      );
-                    })}
-                  </div>
-                  )}
+                  ) : null}
 
                   {/* ⛔⛔ WHY THE OTHER CHIP IS NOT THERE — the impact floor (p275, enforcement OURS;
                       see `IMPACT_FLOOR_IS_OURS`). A control that is simply absent reads as a bug or

@@ -34,7 +34,7 @@ import {
   slotKeysFor,
   hardSlotKeysFor,
   frameSlots,
-  unansweredLine,
+
   forcedSportFor,
   type SlotKey,
   type SlotSelection,
@@ -5975,9 +5975,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             && experienceUnanswered.length === 0
             && (!weekIsDayOrdered(wizardFrame)
               || unansweredLengths(slotSportsNow, state.slotMinutes, wizardFrame).length === 0)}
+          /**
+           * ⛔ THE UNANSWERED-SPORT LINE LEFT THE BOTTOM FOR THE ROW IT IS ABOUT (Michael,
+           * 2026-09-11): each unanswered row now reads "… · Ride or Run" in this colour, and the
+           * sport chips sit on the row's face. `unansweredLine` stays exported for its tests and
+           * for the gate above, which is unchanged.
+           */
           blockedReason={tintedReason(
-            unansweredLine(slotSportsNow, wizardFrame)
-            ?? experienceUnansweredLine(experienceUnanswered)
+            experienceUnansweredLine(experienceUnanswered)
             ?? (weekIsDayOrdered(wizardFrame)
               ? unansweredLengthLine(slotSportsNow, state.slotMinutes, wizardFrame)
               : null)
