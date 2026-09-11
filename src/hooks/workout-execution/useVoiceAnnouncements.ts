@@ -9,7 +9,7 @@
  */
 
 import { useCallback, useRef, useEffect } from 'react';
-import type { AnnouncementType, VoiceAnnouncement, StepKind } from '@/types/workoutExecution';
+import type { AnnouncementType, VoiceAnnouncement, StepKind, LiveCue } from '@/types/workoutExecution';
 
 // ============================================================================
 // Types
@@ -216,17 +216,13 @@ export function useVoiceAnnouncements(options: UseVoiceAnnouncementsOptions = {}
     }
   }, [speak]);
   
+  // The words come with the step (`live_cue.voice`, stamped by materialize-plan); none here.
   const announceZoneWarning = useCallback((
-    status: 'too_slow' | 'too_fast' | 'way_too_slow' | 'way_too_fast'
+    status: 'too_slow' | 'too_fast' | 'way_too_slow' | 'way_too_fast',
+    voice: LiveCue['voice'] | undefined
   ) => {
-    const messages: Record<string, string> = {
-      too_slow: 'Pick it up',
-      too_fast: 'Ease off',
-      way_too_slow: 'Speed up',
-      way_too_fast: 'Slow down',
-    };
-    
-    speak(messages[status] || '', 'normal');
+    const text = voice?.[status];
+    if (text) speak(text, 'normal');
   }, [speak]);
   
   const announceWorkoutStart = useCallback((_workoutName?: string) => {

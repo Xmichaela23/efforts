@@ -10,6 +10,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildPhoneWorkoutSummary, type PhoneWorkoutSummary } from "./summary.ts";
 
 // ============================================================================
 // Types
@@ -304,12 +305,37 @@ serve(async (req) => {
       console.warn('[ingest-phone-workout] Failed to trigger recompute-workout orchestrator:', e);
     }
 
+    // The post-run screen's numbers, read back from the scored row (H-D15).
+    let summary: PhoneWorkoutSummary = { execution_score: null, avg_hr: metrics.avg_hr ?? null, intervals: [] };
+    try {
+      const { data: scored } = await supabase
+        .from('workouts')
+        .select('computed, avg_heart_rate')
+        .eq('id', workout.id)
+        .maybeSingle();
+      let plannedSteps: any[] = [];
+      if (planned_workout_id) {
+        const { data: planned } = await supabase
+          .from('planned_workouts')
+          .select('computed')
+          .eq('id', planned_workout_id)
+          .maybeSingle();
+        const pc = typeof planned?.computed === 'string' ? JSON.parse(planned.computed) : planned?.computed;
+        plannedSteps = Array.isArray(pc?.steps) ? pc.steps : [];
+      }
+      const computed = typeof scored?.computed === 'string' ? JSON.parse(scored.computed) : scored?.computed;
+      summary = buildPhoneWorkoutSummary(computed, plannedSteps, scored?.avg_heart_rate ?? metrics.avg_hr ?? null);
+    } catch (e) {
+      console.warn('[ingest-phone-workout] Failed to read the scored row for the summary:', e);
+    }
+
     // Return success
     return new Response(
       JSON.stringify({
         success: true,
         workout_id: workout.id,
         message: 'Workout saved successfully',
+        summary,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

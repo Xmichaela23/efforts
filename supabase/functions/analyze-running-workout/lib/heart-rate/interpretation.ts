@@ -15,6 +15,7 @@ import {
   TrendAnalysis,
   HRAnalysisContext
 } from './types.ts';
+import { PACE_CUE_FAST_PCT, PACE_CUE_SLOW_PCT } from '../../../_shared/live-cue.ts';
 
 interface InterpretationInput {
   workoutType: WorkoutType;
@@ -763,13 +764,14 @@ function classifyRepExecution(
   // Classify based on % thresholds
   let status: IntervalExecution['status'];
   
-  if (deviationPct <= -5) {
+  // The 5 and 7 also set the live cue's outer band on the recording screen (`_shared/live-cue.ts`).
+  if (deviationPct <= -PACE_CUE_FAST_PCT) {
     // >5% faster than target
     status = 'too_fast';
   } else if (deviationPct >= 15) {
     // >15% slower = blown
     status = 'blown';
-  } else if (deviationPct >= 7) {
+  } else if (deviationPct >= PACE_CUE_SLOW_PCT) {
     // >7% slower = too slow
     status = 'too_slow';
   } else {

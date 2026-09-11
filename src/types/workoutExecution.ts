@@ -29,14 +29,33 @@ export type ZoneStatus = 'in_zone' | 'too_slow' | 'too_fast' | 'way_too_slow' | 
 // Planned Workout Structure (from planned_workouts.computed.steps)
 // ============================================================================
 
+/**
+ * The step exactly as materialize-plan writes it into `computed.steps` (`toV3Step`): `seconds` and
+ * `distanceMeters`, never `duration_s` / `distance_m`. The phone read the latter until 2026-09-10 and
+ * no step ever ended on its own (audit, "the phone recording flow is broken twice").
+ *
+ * Which one ends the step is the server's call too: `distanceDerived` marks a distance the server
+ * worked out from the time and the pace, so the step is a time prescription. Indoors every step ends
+ * on its stored `seconds` (H-D17).
+ */
+export type LiveCueTier = 'in_zone' | 'too_slow' | 'way_too_slow' | 'too_fast' | 'way_too_fast';
+
+/** Stamped by materialize-plan (`_shared/live-cue.ts`): the outer bands and the words the screen prints. */
+export interface LiveCue {
+  pace_outer?: { lower: number; upper: number };
+  hr_outer?: { lower: number; upper: number };
+  words: Record<LiveCueTier, string>;
+  voice: Record<Exclude<LiveCueTier, 'in_zone'>, string>;
+}
+
 export interface PlannedStep {
   id: string;
   planned_index: number;
   kind: StepKind;
-  duration_s?: number;       // Time-based step
-  distance_m?: number;       // Distance-based step (normalized)
-  distanceMeters?: number;   // Distance-based step (from v3 computed)
-  seconds?: number;          // Estimated duration (even for distance steps)
+  distanceMeters?: number;   // Metres; a prescription unless distanceDerived
+  distanceDerived?: boolean; // The server derived the distance from time × pace: the step is timed
+  seconds?: number;          // Seconds; the server stores one for every step it can price
+  live_cue?: LiveCue;
   pace_range?: {
     lower: number;           // Slowest acceptable pace (s/mi)
     upper: number;           // Fastest acceptable pace (s/mi)
@@ -58,6 +77,13 @@ export interface PlannedWorkoutStructure {
   steps: PlannedStep[];
   total_duration_seconds: number;
   normalization_version?: string;
+}
+
+/** What ingest-phone-workout returns after the row is scored; the post-run screen prints it (H-D15). */
+export interface PhoneWorkoutSummary {
+  execution_score: number | null;
+  avg_hr: number | null;
+  intervals: Array<{ planned_step_id: string | null; avg_pace_s_per_mi: number | null; band: 'below' | 'in' | 'above' | null }>;
 }
 
 // ============================================================================

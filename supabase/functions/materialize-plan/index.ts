@@ -24,6 +24,7 @@ import {
 } from '../_shared/swim/swim-plan-summary.ts';
 import { formatStrengthExercise, formatStrengthExerciseLines, type WeightUnit } from '../_shared/strength/strength-display-lines.ts';
 import { mobilitySetsFrom } from '../_shared/mobility-sets.ts';
+import { liveCueFor } from '../_shared/live-cue.ts';
 import { plannedPoolFor } from '../_shared/swim/planned-pool.ts';
 import { calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
 import { fetchLastWeightByMovement } from '../_shared/last-weight-by-movement.ts';
@@ -3853,6 +3854,9 @@ export function toV3Step(st: any, row?: any): any {
   if (st?.target_rpe && typeof st.target_rpe.lo === 'number' && typeof st.target_rpe.hi === 'number') {
     out.target_rpe = { lo: st.target_rpe.lo, hi: st.target_rpe.hi };
   }
+  // The phone recording screen's cue: the outer band and the words, decided here (H-D16, 2026-09-10).
+  const liveCue = liveCueFor(out);
+  if (liveCue) out.live_cue = liveCue;
   return out;
 }
 

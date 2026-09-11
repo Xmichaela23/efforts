@@ -52,58 +52,40 @@ const initialState: WorkoutExecutionState = {
 // ============================================================================
 
 /**
- * Calculate zone status based on current pace vs target range
+ * The step's bands and words are the server's (`step.pace_range`, `step.live_cue`, stamped by
+ * materialize-plan). The phone only reads a live sample against them. A step with no `live_cue`
+ * gets no verdict: there is no phone-side band to fall back on (audit H-D16).
  */
 function calculateZoneStatus(
   current_pace: number | undefined,
-  pace_range: PlannedStep['pace_range'] | undefined,
-  step_kind: PlannedStep['kind']
+  step: PlannedStep
 ): ZoneStatus {
-  if (!current_pace || !pace_range) return 'unknown';
-  
-  const { lower, upper } = pace_range;
+  const range = step.pace_range;
+  const outer = step.live_cue?.pace_outer;
+  if (!current_pace || !range || !outer) return 'unknown';
   
   // Note: lower pace = faster (fewer seconds per mile)
-  if (current_pace >= lower && current_pace <= upper) {
-    return 'in_zone';
-  }
-  
-  // For work intervals: being slow is worse
-  // For recovery: being fast is worse
-  if (current_pace > upper) {
-    // Too slow (pace is higher = slower)
-    const deviation = (current_pace - upper) / upper;
-    if (deviation > 0.10) return 'way_too_slow';
-    return 'too_slow';
-  }
-  
-  if (current_pace < lower) {
-    // Too fast (pace is lower = faster)
-    const deviation = (lower - current_pace) / lower;
-    if (deviation > 0.10) return 'way_too_fast';
-    return 'too_fast';
-  }
-  
-  return 'unknown';
+  if (current_pace >= range.lower && current_pace <= range.upper) return 'in_zone';
+  if (current_pace > range.upper) return current_pace > outer.upper ? 'way_too_slow' : 'too_slow';
+  return current_pace < outer.lower ? 'way_too_fast' : 'too_fast';
+}
+
+function hrZoneStatus(bpm: number, step: PlannedStep): ZoneStatus {
+  const range = step.hr_range;
+  const outer = step.live_cue?.hr_outer;
+  if (!range || !outer) return 'unknown';
+  if (bpm >= range.lower && bpm <= range.upper) return 'in_zone';
+  if (bpm < range.lower) return bpm < outer.lower ? 'way_too_slow' : 'too_slow';
+  return bpm > outer.upper ? 'way_too_fast' : 'too_fast';
 }
 
 /**
- * Estimate distance covered for indoor workouts based on elapsed time and target pace
+ * Whether the step ends on GPS distance. The server marks a distance it derived from time × pace
+ * (`distanceDerived`), so that step is a time prescription. Indoors there is no distance to measure
+ * and every step ends on its stored seconds (H-D17).
  */
-function estimateDistanceFromTime(
-  elapsed_s: number,
-  step: PlannedStep
-): number {
-  if (!step.pace_range) {
-    // No pace range, can't estimate
-    return 0;
-  }
-  
-  // Use middle of pace range
-  const avg_pace_s_per_mi = (step.pace_range.lower + step.pace_range.upper) / 2;
-  const meters_per_second = 1609.34 / avg_pace_s_per_mi;
-  
-  return elapsed_s * meters_per_second;
+function stepEndsOnDistance(step: PlannedStep, environment: WorkoutEnvironment | null): boolean {
+  return environment === 'outdoor' && (step.distanceMeters ?? 0) > 0 && step.distanceDerived !== true;
 }
 
 /**
@@ -115,44 +97,27 @@ function calculateStepProgress(
   distance_in_step_m: number,
   environment: WorkoutEnvironment | null
 ): Partial<CurrentStepState> {
-  const isTimeBasedStep = !!step.duration_s;
-  const isDistanceBasedStep = !!step.distance_m;
-  
-  if (isTimeBasedStep) {
-    const remaining_s = Math.max(0, step.duration_s! - step_elapsed_s);
-    const progress_pct = step.duration_s! > 0 
-      ? Math.min(100, (step_elapsed_s / step.duration_s!) * 100)
-      : 0;
-    
+  if (stepEndsOnDistance(step, environment)) {
+    const target = step.distanceMeters!;
+    const remaining_m = Math.max(0, target - distance_in_step_m);
     return {
       elapsed_s: step_elapsed_s,
-      remaining_s,
-      progress_pct,
-    };
-  }
-  
-  if (isDistanceBasedStep) {
-    let effective_distance = distance_in_step_m;
-    
-    // For indoor, estimate from time if no real distance
-    if (environment === 'indoor' && distance_in_step_m === 0) {
-      effective_distance = estimateDistanceFromTime(step_elapsed_s, step);
-    }
-    
-    const remaining_m = Math.max(0, step.distance_m! - effective_distance);
-    const progress_pct = step.distance_m! > 0
-      ? Math.min(100, (effective_distance / step.distance_m!) * 100)
-      : 0;
-    
-    return {
-      elapsed_s: step_elapsed_s,
-      distance_covered_m: effective_distance,
+      distance_covered_m: distance_in_step_m,
       distance_remaining_m: remaining_m,
-      progress_pct,
+      progress_pct: Math.min(100, (distance_in_step_m / target) * 100),
     };
   }
   
-  // Fallback
+  const seconds = step.seconds ?? 0;
+  if (seconds > 0) {
+    return {
+      elapsed_s: step_elapsed_s,
+      remaining_s: Math.max(0, seconds - step_elapsed_s),
+      progress_pct: Math.min(100, (step_elapsed_s / seconds) * 100),
+    };
+  }
+  
+  // A step the server priced neither way: it ends on skip
   return {
     elapsed_s: step_elapsed_s,
     progress_pct: 0,
@@ -168,20 +133,11 @@ function isStepComplete(
   distance_in_step_m: number,
   environment: WorkoutEnvironment | null
 ): boolean {
-  if (step.duration_s) {
-    return step_elapsed_s >= step.duration_s;
+  if (stepEndsOnDistance(step, environment)) {
+    return distance_in_step_m >= step.distanceMeters!;
   }
-  
-  if (step.distance_m) {
-    if (environment === 'indoor') {
-      // For indoor, complete based on estimated time
-      const estimated = estimateDistanceFromTime(step_elapsed_s, step);
-      return estimated >= step.distance_m;
-    }
-    return distance_in_step_m >= step.distance_m;
-  }
-  
-  return false;
+  const seconds = step.seconds ?? 0;
+  return seconds > 0 && step_elapsed_s >= seconds;
 }
 
 /**
@@ -354,11 +310,10 @@ function executionReducer(
           index: nextIndex,
           step: nextStep,
           elapsed_s: 0,
-          distance_covered_m: 0,
-          distance_remaining_m: nextStep.distance_m,
           progress_pct: 0,
           zone_status: 'unknown',
           ...intervalInfo,
+          ...calculateStepProgress(nextStep, 0, 0, state.environment),
         },
       };
     }
@@ -405,11 +360,7 @@ function executionReducer(
     case 'GPS_UPDATE': {
       if (state.status !== 'running' || !state.current_step) return state;
       
-      const zoneStatus = calculateZoneStatus(
-        action.pace_s_per_mi,
-        state.current_step.step.pace_range,
-        state.current_step.step.kind
-      );
+      const zoneStatus = calculateZoneStatus(action.pace_s_per_mi, state.current_step.step);
       
       // Calculate distance within current step
       // This requires tracking step start distance
@@ -451,25 +402,15 @@ function executionReducer(
     case 'HR_UPDATE': {
       if (!state.current_step) return state;
       
-      // If we have HR zones, check zone status
-      let zoneStatus = state.current_step.zone_status;
-      if (state.current_step.step.hr_range) {
-        const { lower, upper } = state.current_step.step.hr_range;
-        if (action.bpm >= lower && action.bpm <= upper) {
-          zoneStatus = 'in_zone';
-        } else if (action.bpm < lower) {
-          zoneStatus = action.bpm < lower - 10 ? 'way_too_slow' : 'too_slow';
-        } else {
-          zoneStatus = action.bpm > upper + 10 ? 'way_too_fast' : 'too_fast';
-        }
-      }
+      // A step set by heart rate reads the beat against the server's bands; any other keeps its pace verdict
+      const byHr = state.current_step.step.hr_range && state.current_step.step.live_cue?.hr_outer;
       
       return {
         ...state,
         current_step: {
           ...state.current_step,
           current_hr_bpm: action.bpm,
-          zone_status: state.current_step.step.hr_range ? zoneStatus : state.current_step.zone_status,
+          zone_status: byHr ? hrZoneStatus(action.bpm, state.current_step.step) : state.current_step.zone_status,
         },
       };
     }

@@ -20,6 +20,7 @@ export const EnvironmentSelector: React.FC<EnvironmentSelectorProps> = ({
   onSelect,
   onBack,
 }) => {
+  const isRun = workoutType === 'run';
   // Discipline colors - using centralized color system
   const rgb = getDisciplineColorRgb(workoutType);
   const accentClasses = {

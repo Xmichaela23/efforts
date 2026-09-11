@@ -40,6 +40,7 @@ import type {
   WorkoutEnvironment, 
   WorkoutEquipment,
   ExecutionContext,
+  PhoneWorkoutSummary,
 } from '@/types/workoutExecution';
 
 // ============================================================================
@@ -78,6 +79,8 @@ export const WorkoutExecutionContainer: React.FC<WorkoutExecutionContainerProps>
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedWorkoutId, setSavedWorkoutId] = useState<string | null>(null);
+  // What ingest-phone-workout returns once the row is scored; the post-run screen prints it (H-D15)
+  const [summary, setSummary] = useState<PhoneWorkoutSummary | null>(null);
   
   // -------------------------------------------------------------------------
   // Hooks
@@ -118,11 +121,7 @@ export const WorkoutExecutionContainer: React.FC<WorkoutExecutionContainerProps>
   
   const targetDistanceM = useMemo(() => {
     if (!plannedWorkoutStructure?.steps) return 0;
-    return plannedWorkoutStructure.steps.reduce((total, step) => {
-      // Check both distance_m (normalized) and distanceMeters (v3 computed)
-      const stepDistance = step.distance_m || step.distanceMeters || 0;
-      return total + stepDistance;
-    }, 0);
+    return plannedWorkoutStructure.steps.reduce((total, step) => total + (step.distanceMeters || 0), 0);
   }, [plannedWorkoutStructure]);
   
   // -------------------------------------------------------------------------
@@ -208,8 +207,8 @@ export const WorkoutExecutionContainer: React.FC<WorkoutExecutionContainerProps>
       step.kind,
       interval_number,
       total_intervals,
-      step.duration_s,
-      step.distance_m,
+      step.seconds,
+      step.distanceMeters,
       step.paceTarget
     );
     
@@ -230,8 +229,8 @@ export const WorkoutExecutionContainer: React.FC<WorkoutExecutionContainerProps>
     
     const { remaining_s, distance_remaining_m, elapsed_s, step } = execution.state.current_step;
     
-    // Halfway announcement
-    if (step.duration_s && elapsed_s === Math.floor(step.duration_s / 2)) {
+    // Halfway announcement, on a step that ends on its stored seconds
+    if (remaining_s !== undefined && step.seconds && elapsed_s === Math.floor(step.seconds / 2)) {
       voice.announceHalfway();
     }
     
@@ -271,7 +270,7 @@ export const WorkoutExecutionContainer: React.FC<WorkoutExecutionContainerProps>
     
     if (zone_status === 'too_slow' || zone_status === 'too_fast' || 
         zone_status === 'way_too_slow' || zone_status === 'way_too_fast') {
-      voice.announceZoneWarning(zone_status);
+      voice.announceZoneWarning(zone_status, step.live_cue?.voice);
       vibration.vibrateZoneWarning();
       lastZoneWarningRef.current = now;
     }
@@ -334,6 +333,7 @@ export const WorkoutExecutionContainer: React.FC<WorkoutExecutionContainerProps>
       
       const workoutId = data?.workout_id;
       setSavedWorkoutId(workoutId);
+      setSummary(data?.summary ?? null);
       
       // Mark session as synced and clean up
       await executionStorage.markSessionSynced(sessionId);
@@ -439,54 +439,6 @@ export const WorkoutExecutionContainer: React.FC<WorkoutExecutionContainerProps>
   }, [execution]);
   
   // -------------------------------------------------------------------------
-  // Calculate interval results for summary
-  // -------------------------------------------------------------------------
-  
-  const getIntervalResults = useCallback(() => {
-    if (!plannedWorkoutStructure?.steps) return [];
-    
-    // Group samples by step_index and calculate averages
-    const stepSamples = new Map<number, typeof execution.state.samples>();
-    
-    for (const sample of execution.state.samples) {
-      if (!stepSamples.has(sample.step_index)) {
-        stepSamples.set(sample.step_index, []);
-      }
-      stepSamples.get(sample.step_index)!.push(sample);
-    }
-    
-    return plannedWorkoutStructure.steps.map((step, idx) => {
-      const samples = stepSamples.get(idx) || [];
-      
-      const avgPace = samples.length > 0
-        ? samples.reduce((sum, s) => sum + (s.pace_s_per_mi || 0), 0) / samples.filter(s => s.pace_s_per_mi).length
-        : undefined;
-      
-      const avgHR = samples.length > 0
-        ? Math.round(samples.reduce((sum, s) => sum + (s.hr_bpm || 0), 0) / samples.filter(s => s.hr_bpm).length)
-        : undefined;
-      
-      const duration_s = samples.length > 0
-        ? samples[samples.length - 1].elapsed_s - samples[0].elapsed_s
-        : step.duration_s || 0;
-      
-      // Check if in zone
-      let inZone = true;
-      if (step.pace_range && avgPace) {
-        inZone = avgPace >= step.pace_range.lower && avgPace <= step.pace_range.upper;
-      }
-      
-      return {
-        step,
-        avgPace,
-        avgHR,
-        duration_s,
-        inZone,
-      };
-    });
-  }, [plannedWorkoutStructure, execution.state.samples]);
-  
-  // -------------------------------------------------------------------------
   // Render
   // -------------------------------------------------------------------------
   
@@ -546,15 +498,7 @@ export const WorkoutExecutionContainer: React.FC<WorkoutExecutionContainerProps>
           workoutDescription={workoutDescription}
           totalDistanceM={execution.state.total_distance_m}
           totalDurationS={execution.state.total_elapsed_s}
-          avgHR={
-            execution.state.samples.length > 0
-              ? Math.round(
-                  execution.state.samples.reduce((sum, s) => sum + (s.hr_bpm || 0), 0) /
-                  execution.state.samples.filter(s => s.hr_bpm).length
-                )
-              : undefined
-          }
-          intervals={getIntervalResults()}
+          summary={summary}
           isSaving={isSaving}
           saveError={saveError ?? undefined}
           onViewDetails={handleViewDetails}

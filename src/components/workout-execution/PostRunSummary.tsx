@@ -9,22 +9,18 @@
 
 import React from 'react';
 import { Check, ChevronRight, Loader2 } from 'lucide-react';
-import type { ExecutionSample, PlannedStep } from '@/types/workoutExecution';
-
-interface IntervalResult {
-  step: PlannedStep;
-  avgPace?: number;
-  avgHR?: number;
-  duration_s: number;
-  inZone: boolean;
-}
+import type { PhoneWorkoutSummary } from '@/types/workoutExecution';
 
 interface PostRunSummaryProps {
   workoutDescription?: string;
   totalDistanceM: number;
   totalDurationS: number;
-  avgHR?: number;
-  intervals: IntervalResult[];
+  /**
+   * The server's grading of the saved row (ingest-phone-workout, after recompute-workout): average
+   * heart rate, each work step's pace and band, and the execution score. Nothing here is averaged or
+   * scored on the phone (audit H-D15). Null until the save returns.
+   */
+  summary: PhoneWorkoutSummary | null;
   isSaving: boolean;
   saveError?: string;
   onViewDetails: () => void;
@@ -62,22 +58,16 @@ export const PostRunSummary: React.FC<PostRunSummaryProps> = ({
   workoutDescription,
   totalDistanceM,
   totalDurationS,
-  avgHR,
-  intervals,
+  summary,
   isSaving,
   saveError,
   onViewDetails,
   onDone,
   onDiscard,
 }) => {
-  // Filter to just work intervals for display
-  const workIntervals = intervals.filter(i => i.step.kind === 'work');
-  
-  // Calculate execution score (simple version - % of intervals in zone)
-  const inZoneCount = workIntervals.filter(i => i.inZone).length;
-  const executionScore = workIntervals.length > 0 
-    ? Math.round((inZoneCount / workIntervals.length) * 100)
-    : null;
+  const avgHR = summary?.avg_hr ?? null;
+  const workIntervals = summary?.intervals ?? [];
+  const executionScore = summary?.execution_score ?? null;
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-800 via-zinc-900 to-black flex flex-col">
@@ -132,32 +122,33 @@ export const PostRunSummary: React.FC<PostRunSummaryProps> = ({
         <div className="p-4 flex-1 overflow-auto">
           <div className="text-gray-400 text-sm font-light mb-3">INTERVALS</div>
           <div className="grid grid-cols-3 gap-2">
-            {workIntervals.map((interval, idx) => (
-              <div 
-                key={idx}
-                className={`p-3 rounded-xl text-center 
-                          ${interval.inZone 
-                            ? 'bg-green-500/10 border border-green-500/30' 
-                            : 'bg-amber-500/10 border border-amber-500/30'
-                          }`}
-              >
-                <div className={`text-lg font-light ${interval.inZone ? 'text-green-300' : 'text-amber-300'}`}>
-                  {formatPace(interval.avgPace)}
+            {workIntervals.map((interval, idx) => {
+              const inZone = interval.band === 'in';
+              return (
+                <div 
+                  key={interval.planned_step_id ?? idx}
+                  className={`p-3 rounded-xl text-center 
+                            ${inZone 
+                              ? 'bg-green-500/10 border border-green-500/30' 
+                              : 'bg-amber-500/10 border border-amber-500/30'
+                            }`}
+                >
+                  <div className={`text-lg font-light ${inZone ? 'text-green-300' : 'text-amber-300'}`}>
+                    {formatPace(interval.avg_pace_s_per_mi ?? undefined)}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {inZone ? '✅' : '⚠️'}
+                  </div>
                 </div>
-                <div className="text-xs text-gray-500">
-                  {interval.inZone ? '✅' : '⚠️'}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           
-          {/* Execution Score */}
+          {/* Execution Score — the server's number; the 80 / 60 colour steps had no source and are gone */}
           {executionScore !== null && (
             <div className="mt-4 text-center">
               <span className="text-gray-400 text-sm">Execution: </span>
-              <span className={`text-lg font-light
-                            ${executionScore >= 80 ? 'text-green-400' : 
-                              executionScore >= 60 ? 'text-amber-400' : 'text-red-400'}`}>
+              <span className="text-lg font-light text-white">
                 {executionScore}%
               </span>
             </div>

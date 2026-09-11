@@ -78,21 +78,10 @@ function getZoneColor(status: ZoneStatus): string {
   }
 }
 
-function getZoneIndicator(status: ZoneStatus): string {
-  switch (status) {
-    case 'in_zone':
-      return '✅ IN ZONE';
-    case 'too_slow':
-      return '⬆️ PICK IT UP';
-    case 'way_too_slow':
-      return '⬆️⬆️ SPEED UP';
-    case 'too_fast':
-      return '⬇️ EASE OFF';
-    case 'way_too_fast':
-      return '⬇️⬇️ SLOW DOWN';
-    default:
-      return '';
-  }
+/** The word for the tier comes with the step, stamped by materialize-plan; the phone holds none. */
+function getZoneIndicator(status: ZoneStatus, step: CurrentStepState['step']): string {
+  if (status === 'unknown') return '';
+  return step.live_cue?.words?.[status] ?? '';
 }
 
 function getStepKindColor(kind: string): string {
@@ -142,27 +131,20 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
   const { step, elapsed_s, remaining_s, distance_remaining_m, progress_pct, zone_status, current_hr_bpm, current_pace_s_per_mi, interval_number, total_intervals } = currentStep;
   
   // Determine what to show as the primary metric
-  // Check both distance_m (normalized) and distanceMeters (v3 computed)
-  const stepDistanceM = step.distance_m || (step as any).distanceMeters || 0;
-  const isStepDistanceBased = stepDistanceM > 0;
   const isWorkoutDistanceBased = !!targetDistanceM && targetDistanceM > 0;
   const isIndoor = environment === 'indoor';
   
   // Primary display logic:
-  // 1. Step has distance_m -> show step distance remaining
+  // 1. The step ends on distance (the engine set distance_remaining_m) -> show step distance remaining
   // 2. Workout has target distance -> show workout distance remaining  
-  // 3. Step has duration_s -> show time remaining
+  // 3. The step ends on its stored seconds -> show time remaining
   // 4. Fallback -> show elapsed time
   let primaryValue: string;
   let primaryLabel: string;
   
-  if (isStepDistanceBased && distance_remaining_m !== undefined) {
+  if (distance_remaining_m !== undefined) {
     // Step-level distance remaining
-    if (isIndoor) {
-      primaryValue = `~${Math.round(distance_remaining_m)}m`;
-    } else {
-      primaryValue = formatDistance(distance_remaining_m);
-    }
+    primaryValue = formatDistance(distance_remaining_m);
     primaryLabel = 'to go';
   } else if (isWorkoutDistanceBased && !isIndoor) {
     // Workout-level distance remaining (for easy runs like "12 miles")
@@ -233,7 +215,7 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
               <span className="text-gray-400 text-sm">bpm</span>
             </div>
             <div className={`text-sm font-light ${getZoneColor(zone_status)}`}>
-              {getZoneIndicator(zone_status)}
+              {getZoneIndicator(zone_status, step)}
             </div>
           </div>
         )}
