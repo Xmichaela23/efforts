@@ -20,6 +20,7 @@ import {
   experienceChips,
   slotFixedMinutes,
   slotLengthOptions,
+  slotLengthRange,
   weekBounds,
   type ExperienceChoice,
 } from '../../../../src/lib/standing-plan-week-bounds.ts';
@@ -45,6 +46,12 @@ export type IntakeRow = {
   fixed_minutes: number | null;
   /** A quality row whose shape rotates, so no single length is true. */
   length_varies: boolean;
+  /**
+   * The shortest and longest that rotating row will be, in minutes — the ends of the shapes it rotates
+   * through, each at the length the block builds it (`slotLengthRange`). Null wherever `length_varies`
+   * is false.
+   */
+  length_range: { min: number; max: number } | null;
   /**
    * ⛔ WHAT A HARD ROW SAYS UNDER ITS SPORT — MICHAEL'S OWN SENTENCES, APPROVED 2026-09-11. It stands
    * where the shape list used to (`HARD_SHAPE_IS_ENGINES`). Null on every other row, and on a hard
@@ -138,6 +145,9 @@ export function enduranceIntakeReadout(args: {
       fixed_minutes: fixed,
       length_varies: dayOrdered && hardKeys.includes(s.key) && lengths == null && fixed == null
         && rowSport != null,
+      length_range: dayOrdered && hardKeys.includes(s.key) && lengths == null && fixed == null && rowSport != null
+        ? slotLengthRange(s.key, slots, { baselines, frame, archetype: args.archetypes?.[s.key] ?? null })
+        : null,
       // ⛔ ONLY A HARD ROW WHOSE SHAPE THE ENGINE OWNS, and only once its sport is answered.
       hard_line: HARD_SHAPE_IS_ENGINES && hardKeys.includes(s.key) && rowSport
         ? HARD_ROW_LINE[rowSport]

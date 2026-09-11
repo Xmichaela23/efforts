@@ -53,6 +53,8 @@ export type IntakeRow = {
   length_options: number[] | null;
   fixed_minutes: number | null;
   length_varies: boolean;
+  /** The shortest and longest a rotating hard row will be — see the server's `slotLengthRange`. */
+  length_range?: { min: number; max: number } | null;
   /**
    * ⛔ THE HARD ROW'S SENTENCE, WRITTEN ON THE SERVER (`HARD_ROW_LINE`, Michael 2026-09-11). It
    * stands where the shape list used to. Null on every other row. ⚠️ The card prints it and composes

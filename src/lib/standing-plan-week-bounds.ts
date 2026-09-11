@@ -329,6 +329,46 @@ export function slotLengthVaries(
 }
 
 /**
+ * ⛔ THE SHORTEST AND LONGEST A ROTATING HARD ROW WILL BE (Michael, 2026-09-11: "maybe a range for
+ * runs and rides" where the row read "length varies week to week"). The shapes are exactly the ones
+ * the block rotates through — the frame's own list where it names one (p246's Wednesday), the
+ * family's list at this level otherwise — and each shape's length is the same `ladderOf` rung the
+ * composer builds it at, so the two ends are two sessions the athlete will actually get. Null when
+ * the row is pinned (its length is `slotFixedMinutes`), unanswered, or not a hard row.
+ */
+export function slotLengthRange(
+  key: SlotKey,
+  rawSlots: SlotSelection,
+  opts: { baselines?: EnduranceBaselines; frame?: FrameId; tier?: ExperienceTier; archetype?: string | null },
+): { min: number; max: number } | null {
+  const frame = opts.frame ?? 'strength_5k';
+  const row = frameSlots(frame).find((x) => x.key === key);
+  if (!row || row.role !== 'hard') return null;
+  if (slotFixedMinutes(key, rawSlots, opts) != null) return null;
+  const slots = inFrameOrder(rawSlots, frame);
+  const sport = slots[key];
+  if (!sport) return null;
+  const base = familyMapFor(frame)[key];
+  if (!base) return null;
+  const eq = builtFamily(base, sport);
+  if (!eq) return null;
+  const anchors = resolveEnduranceAnchors((opts.baselines ?? {}) as never);
+  const tierLevels = (opts.tier === 'newer' ? lowVolumeLevels([sport]) : {}) as Record<string, Level>;
+  const level = clampRideLevel(eq.family, (tierLevels[eq.family] ?? base.level) as Level);
+  const offered = archetypesFor(eq.family, level).map((a) => a.id);
+  // ⚠️ THE FRAME'S ROTATION, FILTERED TO THE LEVEL — the same rule `workoutsForSlot` applies.
+  const named = row.archetypes?.filter((id) => offered.includes(id)) ?? [];
+  const shapes = named.length > 0 ? named : offered;
+  const minutes: number[] = [];
+  for (const archetype of shapes) {
+    const rungs = ladderOf({ family: eq.family, level, archetype, sport, role: row.role } as SlotSpec, anchors);
+    if (rungs.length > 0) minutes.push(Math.round(rungs[0].hi));
+  }
+  if (minutes.length === 0) return null;
+  return { min: Math.min(...minutes), max: Math.max(...minutes) };
+}
+
+/**
  * ⛔⛔⛔ A LENGTH THE NEW SPORT CANNOT BUILD IS DROPPED WHEN THE SPORT CHANGES — found on the
  * rendered page, 2026-08-30, and it is the ask-15-get-20 defect in its newest disguise.
  *

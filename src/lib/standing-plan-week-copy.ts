@@ -305,6 +305,18 @@ export function sessionLengthLabel(minutes: number): string {
 export const SESSION_LENGTH_VARIES = 'length varies week to week';
 
 /**
+ * ⛔ THE RANGE A ROTATING HARD ROW PRINTS INSTEAD (Michael, 2026-09-11) — "36–48 min", or "43 min–1h19"
+ * once an end passes the hour, both ends off `sessionLengthLabel`. An en dash, as the page sets ranges.
+ * `SESSION_LENGTH_VARIES` stays for a row the server sent no range for.
+ */
+export function sessionLengthRangeLabel(range: { min: number; max: number } | null | undefined): string | null {
+  if (!range || !Number.isFinite(range.min) || !Number.isFinite(range.max) || range.max <= 0) return null;
+  if (range.min === range.max) return sessionLengthLabel(range.max);
+  if (range.max < 60) return `${Math.round(range.min)}–${Math.round(range.max)} min`;
+  return `${sessionLengthLabel(range.min)}–${sessionLengthLabel(range.max)}`;
+}
+
+/**
  * ⛔⛔ THE HARD SESSION'S SHAPE IS THE ENGINE'S ON EVERY PROGRAMME (Michael: 2026-09-07 for Run +
  * Strength, `WORKORDER-run-strength-rotate-2026-09-07.md`; 2026-09-11 for Standard Focus).
  *

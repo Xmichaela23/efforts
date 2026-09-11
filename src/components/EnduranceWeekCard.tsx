@@ -74,6 +74,7 @@ import {
   sessionLengthLabel,
   SESSION_LENGTH_LABEL,
   SESSION_LENGTH_VARIES,
+  sessionLengthRangeLabel,
   hardSlotKeysFor,
   frameSlots,
   type SlotKey,
@@ -463,6 +464,8 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
            */
           const fixed = dayOrdered && sameAnswers ? row?.fixed_minutes ?? null : null;
           const varies = dayOrdered && sameAnswers && !!row?.length_varies;
+          // ⛔ THE RANGE THE SERVER SENT FOR A ROTATING ROW (2026-09-11), printed before the sentence.
+          const rangeLabel = varies ? sessionLengthRangeLabel(row?.length_range) : null;
           /**
            * ⛔⛔ WHAT A HARD ROW SAYS INSTEAD OF A SHAPE LIST (Michael, 2026-09-11) — the server's own
            * sentence for this row's sport (`HARD_ROW_LINE`), printed verbatim under the sport choice.
@@ -494,7 +497,7 @@ export default function EnduranceWeekCard(props: EnduranceWeekCardProps) {
             : null;
           const lengthNow = fixed != null
             ? sessionLengthLabel(fixed)
-            : (picked != null ? sessionLengthLabel(picked) : (varies ? SESSION_LENGTH_VARIES : null));
+            : (picked != null ? sessionLengthLabel(picked) : (varies ? (rangeLabel ?? SESSION_LENGTH_VARIES) : null));
           // ⛔ THE FRAME OWNS THE DAY — see `slotFrameDay`. `null` on a column with no such slot
           // (the taper carries three, not four), which renders no prefix rather than a wrong one.
           const dayNumber = slotFrameDay(key, 'standard', frame);
