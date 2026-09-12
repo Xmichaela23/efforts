@@ -122,7 +122,7 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
     // the count and the all-out set first, then one section per lift (StrengthCompareTable), then
     // the totals — each padded the same, divided by State's hairline.
     <div>
-      <div className="px-3 py-3 space-y-3">
+      <div className="px-3 pt-3 pb-2 space-y-2">
       {/* THE BLOCK THIS SESSION BELONGED TO used to be one quiet line here. It is the header's second
           row now (2026-09-12, Michael: "run and ride are fine, follow the same formula"): a ride's
           header says where the ride came from, and a lift came from its plan. `strengthBlockLine`. */}
@@ -160,17 +160,11 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
           )}
         </div>
       )}
-      {/* ── THE ALL-OUT SET (2026-07-30) — server-computed, rendered verbatim. ⚠️ When the panel is
-          empty it SAYS SO. */}
-      {Array.isArray(allOut) && allOut.length === 0 && allOutReason && (
-        <div className="text-[12px] text-white/40">
-          {allOutReason === 'session_had_no_all_out_set'
-            ? 'No all-out set on this session.'
-            : allOutReason === 'no_reps_on_all_out_set'
-              ? 'The all-out set has no reps logged.'
-              : 'No planned session to read the all-out set from.'}
-        </div>
-      )}
+      {/* ── THE ALL-OUT SET (2026-07-30) — server-computed, rendered verbatim.
+          ⛔ NOTHING WHEN THERE IS NONE (2026-09-12, Michael: "no all-out set — necessary?"). The
+          2026-07-30 "when the panel is empty it SAYS SO" line is gone: every other screen treats
+          absence as silence, and the card appears whenever there is a set. `allOutReason` stays on
+          the contract for anything that still reads it. */}
       {Array.isArray(allOut) && allOut.length > 0 && (
         <div className="galaxy-card mt-3 mb-1 rounded-xl border border-strength/25 p-3" style={{ ['--card-accent-a' as any]: '0.20' }}>
           <div className="readout-label text-[11px] uppercase tracking-wider mb-2">All-out set</div>
