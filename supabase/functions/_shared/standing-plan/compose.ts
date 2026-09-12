@@ -55,6 +55,7 @@ import {
 import {
   advancedTierSessions,
   FRAMES,
+  SECONDARY_BY_PATTERN,
   EXPERIENCE_IS_THE_ATHLETES_ANSWER,
   frameAsksWeeklyHours,
   experienceLevels,
@@ -1449,7 +1450,15 @@ function exerciseForSlot(
       ? options.find((o) => !isTaken(o.name)
         && focusMuscles.has(musclesWorkedBy(o.name)?.primary ?? ''))
       : undefined;
-    let fresh = focused ?? options.find((o) => !isTaken(o.name));
+    /**
+     * ⛔ THE FRAME'S OWN PREFERENCE FOR THIS SLOT (`StrengthSlot.prefer`, 2026-09-11): the first
+     * named movement the cell offers, the kit reaches, and the day has not used. Behind the athlete's
+     * pick and the focus chip, ahead of the equipment ranking. Never widens the cell.
+     */
+    const preferred = (slot.prefer ?? [])
+      .map((n) => options.find((o) => canonicalize(o.name) === canonicalize(n) && !isTaken(o.name)))
+      .find((o) => o != null);
+    let fresh = focused ?? preferred ?? options.find((o) => !isTaken(o.name));
 
     /**
      * ⛔ IF THE CELL IS EXHAUSTED, WIDEN THE CATEGORY — NOT THE PATTERN.
@@ -2318,6 +2327,22 @@ function rowSwapOptions(
   slot: StrengthSlot,
   equipment: string[] | null | undefined,
 ): { swap_options?: { name: string; display: string }[] } {
+  /**
+   * ⛔ THE ME ROW'S SWAP IS p220's OWN LIST (Michael, 2026-09-11) — see `StrengthSlot.swapSecondaries`.
+   * The page's secondaries for the pattern, in his order, the ones the kit reaches (the same grid
+   * gate every cell uses), and the competition lift itself so the athlete can come back to it.
+   */
+  if (!slotKey && slot.swapSecondaries && slot.role === 'competition') {
+    const reachable = new Set(
+      resolveSlot({ category: 'secondary', pattern: slot.pattern, intent: slot.intent, equipment: equipment ?? null })
+        .options.map((o) => canonicalize(o.name)),
+    );
+    const opts = SECONDARY_BY_PATTERN[slot.pattern]
+      .filter((n) => reachable.has(canonicalize(n)))
+      .map((n) => ({ name: n, display: movementLabel(n) }));
+    if (opts.length === 0) return {};
+    return { swap_options: [...opts, { name: movement, display: movementLabel(movement) }] };
+  }
   if (!slotKey) return {};
   // The whole list, the row's own movement included: after a swap the athlete may want it back
   // (Michael, 2026-09-08). The logger hides whichever one the row currently is.

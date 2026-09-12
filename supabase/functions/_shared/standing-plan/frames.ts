@@ -185,8 +185,37 @@ export type StrengthSlot = {
    * here rather than being left to a muscle filter that would reject it.
    */
   alsoAdmits?: string[];
+  /**
+   * ⛔ THE MOVEMENT THIS SLOT OPENS ON, IN ORDER, WHERE THE PAGE'S OWN LIST GIVES ONE (2026-09-11
+   * audit). Read by the composer's grid path before its equipment ranking: the first the kit reaches
+   * and the day has not used. It never widens the cell — a name not in the slot's own pool is
+   * skipped — so the preference is a choice among the page's movements, not an addition to them.
+   * Absent leaves the ranking exactly as it was.
+   */
+  prefer?: string[];
+  /**
+   * ⛔ THE SWAP SHEET ON THIS ROW OFFERS THE PAGE'S SECONDARY LIFTS (Michael, 2026-09-11: "keep the
+   * compounds for now, add the secondaries in swap in the logger"). p274 prints the ME rows as
+   * `secondary push / hinge / pull / push`; the row opens on the competition lift (p275 allows it)
+   * and the logger's swap lists p220's own movements for the pattern, kit-gated, with the competition
+   * lift kept so the athlete can come back. Set on the All Rounder's ME rows only — p246's ME rows
+   * print "Primary", and a swap list there would be adding to that page.
+   */
+  swapSecondaries?: boolean;
   /** What the page prints, kept verbatim so a reader can find the row. */
   sourceText: string;
+};
+
+/**
+ * ⛔ p220 SECONDARY, BY PATTERN, IN HIS PRINTED ORDER — the swap list for a `swapSecondaries` row.
+ * "Bench reverse hyper" is the catalogue's `weighted reverse hyper`; "forward or reverse lunge" is
+ * the two lunges; "DB pullovers" is `dumbbell pullover`.
+ */
+export const SECONDARY_BY_PATTERN: Record<ViadaPattern, string[]> = {
+  push_upper: ['larsen press', 'incline bench press', 'close grip bench press', 'jm press', 'seated db press', 'arnold press'],
+  pull_upper: ['kroc row', 't bar row', 'meadows row', 'gorilla row', 'dumbbell pullover'],
+  hinge_lower: ['romanian deadlift', 'stiff-legged deadlift', 'weighted reverse hyper', 'good morning', 'kb swing', 'sandbag throw'],
+  press_lower: ['split squat', 'zercher squat', 'freestanding barbell calf raise', 'walking lunge', 'reverse lunge'],
 };
 
 export type EnduranceSlot = {
@@ -568,7 +597,17 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
     label: 'Upper body: Push',
     themeTag: 'push day (upper)',
     strength: [
-      S('ME', 'competition', 'primary', 'push_upper', '1 x ME: secondary push'),
+      /**
+       * ⛔⛔ THE ME ROWS KEEP THE COMPETITION LIFTS (Michael, 2026-09-11, after the audit). p274
+       * prints `1 × ME: secondary push / hinge / pull / push` and p275's reason — "break the
+       * attachment you may have to the big three" — is written to a lifter who has plateaued on
+       * them. Our customer is a runner or rider new to the bar, for whom the tested, priced
+       * competition lift is the fastest strength; p275 allows it in as many words. The page's
+       * secondaries (Larsen press, Romanian deadlift, Kroc row, split squat) are offered as the
+       * SWAP on the row in the logger, not as the default. Considered and reverted the same day:
+       * opening on the secondaries, by feel.
+       */
+      S('ME', 'competition', 'primary', 'push_upper', '1 x ME: secondary push', { swapSecondaries: true }),
       /**
        * ⛔⛔ THIS CELL IS THE DAY'S OVERHEAD PRESS, AND THE MUSCLE IS WHAT MAKES IT ONE (Michael,
        * 2026-09-01: *"there's really no overhead press work in that plan"*).
@@ -650,7 +689,7 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
     // leg day at all, which is why `lowerDaysOf` had to return lists.
     lowerRole: 'me',
     strength: [
-      S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: secondary hinge'),
+      S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: secondary hinge', { swapSecondaries: true }),
       // ⚠️ THE BRACED SUPERSET — same region, opposite patterns, which is p275's own rule 2b for what
       // may be paired: *"similar muscle groups but dramatically different specific patterns and loads."*
       // ⚠️ p221 braced hinge lower — reverse hyper, GHD, machine back extension — is posterior chain.
@@ -665,7 +704,9 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
         muscle: 'hamstrings',
         alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust', 'barbell hip thrust'],
       }),
-      S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: braced push (asymmetrical)', { asymmetrical: true }),
+      // ⛔ p275: the braced asymmetrical rotates with a secondary asymmetrical. Day 2 opens on the
+      // Bulgarian split squat, day 5 on the reverse lunge, so a home kit's week is not three lunges.
+      S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: braced push (asymmetrical)', { asymmetrical: true, prefer: ['bulgarian split squat', 'reverse lunge'] }),
     ],
     endurance: [E('ride_anaerobic', 1, 'Cyc AnA (level 1)', { role: 'hard' })],
   },
@@ -682,8 +723,15 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
     label: 'Upper body: Pull',
     themeTag: 'pull day (upper)',
     strength: [
-      S('ME', 'competition', 'primary', 'pull_upper', '1 x ME: secondary pull'),
-      S('DE', 'accessory', 'secondary', 'pull_upper', '1 x DE: secondary pull'),
+      S('ME', 'competition', 'primary', 'pull_upper', '1 x ME: secondary pull', { swapSecondaries: true }),
+      /**
+       * ⛔ THE DE PULL IS ONE OF p220's TOO (2026-09-11 audit). The grid ranked the barbell row first,
+       * and the barbell row is p219's PRIMARY pull; p220's secondary pulls are the Kroc, T-bar,
+       * Meadows and gorilla rows and the dumbbell pullover. Ordered so the day's two pulls differ.
+       */
+      S('DE', 'accessory', 'secondary', 'pull_upper', '1 x DE: secondary pull', {
+        prefer: ['kroc row', 'gorilla row', 'meadows row', 't bar row', 'dumbbell pullover'],
+      }),
       // ⚠️ p221 braced pull upper is *chest-supported row · lat pulldown · cable upright row* — the
       // rows and the pulldown are lats and they are what the row is for. See `StrengthSlot.muscle`.
       S('HYP', 'accessory', 'braced', 'pull_upper', '1 x HYP: braced pull', { muscle: 'lats' }),
@@ -699,13 +747,13 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
     themeTag: 'legs',
     lowerRole: 'me',
     strength: [
-      S('ME', 'competition', 'primary', 'press_lower', '1 x ME: secondary push'),
+      S('ME', 'competition', 'primary', 'press_lower', '1 x ME: secondary push', { swapSecondaries: true }),
       // ⚠️ p221 braced hinge lower — reverse hyper, GHD, machine back extension — is posterior chain.
       S('HYP', 'accessory', 'braced', 'hinge_lower', '2 x HYP: braced hinge / braced lower push superset', { muscle: 'hamstrings', alsoAdmits: ['reverse hyperextension', 'reverse hyper', 'weighted reverse hyper'] }),
       // ⚠️ p221 braced push lower — hack squat, leg press, lever squat — is quadriceps.
       S('HYP', 'accessory', 'braced', 'press_lower', '2 x HYP: braced hinge / braced lower push superset', { muscle: 'quadriceps' }),
       S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: focused quadriceps', { muscle: 'quadriceps' }),
-      S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: braced push (asymmetrical)', { asymmetrical: true }),
+      S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: braced push (asymmetrical)', { asymmetrical: true, prefer: ['reverse lunge', 'walking lunge', 'bulgarian split squat'] }),
     ],
     endurance: [],
   },
@@ -766,7 +814,9 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
         muscle: 'hamstrings',
         alsoAdmits: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust', 'barbell hip thrust'],
       }),
-      S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: braced push (asymmetrical)', { asymmetrical: true }),
+      // ⛔ p275: the braced asymmetrical rotates with a secondary asymmetrical. Day 2 opens on the
+      // Bulgarian split squat, day 5 on the reverse lunge, so a home kit's week is not three lunges.
+      S('DE', 'accessory', 'braced', 'press_lower', '1 x DE: braced push (asymmetrical)', { asymmetrical: true, prefer: ['bulgarian split squat', 'reverse lunge'] }),
     ],
     endurance: [],
   },
@@ -801,7 +851,7 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
     strength: [
       S('DE', 'competition', 'primary', 'press_lower', '1 x DE: secondary push'),
       S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: focused quadriceps', { muscle: 'quadriceps' }),
-      S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: braced push (asymmetrical)', { asymmetrical: true }),
+      S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: braced push (asymmetrical)', { asymmetrical: true, prefer: ['reverse lunge', 'walking lunge', 'bulgarian split squat'] }),
     ],
     endurance: [],
   },

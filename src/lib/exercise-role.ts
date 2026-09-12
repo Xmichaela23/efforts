@@ -673,6 +673,7 @@ const TYPE_TABLE: Record<string, ExerciseType> = {
   'band row': 'band',
   'resistance band row': 'band',
   'band pull down': 'band',
+  'banded leg extension': 'band',
   'band overhead press': 'band',
   'band lateral raise': 'band',
   'band face pull': 'band',

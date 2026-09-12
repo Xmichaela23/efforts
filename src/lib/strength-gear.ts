@@ -334,6 +334,7 @@ export const ASSISTANCE_GEAR: Record<string, GearRoutes> = {
    * are read by the Get Stronger picker as well as by this grid, and closing them is its own change.
    */
   'band pull down': [['bands']],
+  'banded leg extension': [['bands']],
   'band tricep pushdown': [['bands']],
   'band triceps pushdown': [['bands']],
   'bent over reverse flyes': [['dumbbells']],

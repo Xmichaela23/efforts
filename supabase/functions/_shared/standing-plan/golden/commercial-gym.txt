@@ -34,7 +34,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -46,7 +46,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 90 min
   NOTES
       [source  ] The first week is the test. Two guided sessions set the numbers the rest of the block is built on, and the weights fill in as soon as those two are logged. Testing before a programme is the source's own advice.  (Viada p215, p247)
@@ -86,7 +86,7 @@ WEEK 02  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -98,7 +98,7 @@ WEEK 02  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 91 min
   NOTES
       [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
@@ -136,7 +136,7 @@ WEEK 03  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -148,7 +148,7 @@ WEEK 03  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 85 min
   NOTES
       [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
@@ -186,7 +186,7 @@ WEEK 04  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -198,7 +198,7 @@ WEEK 04  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 89 min
   NOTES
       [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
@@ -236,7 +236,7 @@ WEEK 05  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -248,7 +248,7 @@ WEEK 05  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 68 min
   NOTES
       [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
@@ -286,7 +286,7 @@ WEEK 06  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -298,7 +298,7 @@ WEEK 06  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 80 min
   NOTES
       [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
@@ -336,7 +336,7 @@ WEEK 07  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -348,7 +348,7 @@ WEEK 07  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 78 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -385,7 +385,7 @@ WEEK 08  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -397,7 +397,7 @@ WEEK 08  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 98 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -434,7 +434,7 @@ WEEK 09  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -446,7 +446,7 @@ WEEK 09  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 97 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -483,7 +483,7 @@ WEEK 10  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -495,7 +495,7 @@ WEEK 10  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 82 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -532,7 +532,7 @@ WEEK 11  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -544,7 +544,7 @@ WEEK 11  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 68 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -581,7 +581,7 @@ WEEK 12  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Pull Up                        1x1-5        @ By feel       | no_tested_lift
-      DE     Barbell Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      DE     Kroc Row                       4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
       HYP    Chest Supported Row            3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Tate Press                     3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Preacher Curl                  3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -593,7 +593,7 @@ WEEK 12  column=standard
       HYP    Ground-based Deadlift Machine  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Press                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Leg Extension                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Bulgarian Split Squat          3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 87 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.

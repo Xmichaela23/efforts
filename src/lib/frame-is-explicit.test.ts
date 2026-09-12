@@ -461,7 +461,9 @@ Deno.test('⛔ AND EVERY OPTION THE PICKER OFFERS IS THAT MUSCLE, SUBSTITUTES IN
         assertEquals(o.muscle, muscle,
           `⛔ ${kitName} ${VIADA_PICKS[key].label} offers "${o.name}" <${o.muscle}> for a ${muscle} row`);
       }
-      const his = new Set((VIADA_PICKS[key].hisList ?? []).map((n) => n.toLowerCase()));
+      // ⚠️ `alsoHis` (2026-09-11): a movement the page prints for the pattern on another page —
+      // p220's bench reverse hyper on the braced hinge row — is his, not a substitute.
+      const his = new Set([...(VIADA_PICKS[key].hisList ?? []), ...(VIADA_PICKS[key].alsoHis ?? [])].map((n) => n.toLowerCase()));
       for (const o of options) {
         if (!his.has(o.name.toLowerCase())) {
           assert(o.ours === true || o.substituted === true,

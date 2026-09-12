@@ -1851,6 +1851,15 @@ export const EXERCISE_CONFIG: Record<string, ExerciseConfig> = {
     displayFormat: 'band',
     isUnilateral: false,
   },
+  // ⛔ THE LEG EXTENSION'S HOME EXECUTION (2026-09-11): knee extension against a band, seated on a
+  // bench. p223's focused-quadriceps row for a kit with no machine.
+  'banded leg extension': {
+    pattern: 'knee_dominant',
+    primaryRef: null,
+    ratio: 0.0,
+    displayFormat: 'band',
+    isUnilateral: false,
+  },
   'band overhead press': {
     pattern: 'vertical_push',
     primaryRef: null,

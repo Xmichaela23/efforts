@@ -34,8 +34,8 @@ WEEK 01  column=standard  ⟵ TEST WEEK
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -46,7 +46,7 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 53 min
   NOTES
       [source  ] The first week is the test. Two guided sessions set the numbers the rest of the block is built on, and the weights fill in as soon as those two are logged. Testing before a programme is the source's own advice.  (Viada p215, p247)
@@ -87,8 +87,8 @@ WEEK 02  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -99,7 +99,7 @@ WEEK 02  column=standard
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 55 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -138,8 +138,8 @@ WEEK 03  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -150,7 +150,7 @@ WEEK 03  column=standard
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 40 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -189,8 +189,8 @@ WEEK 04  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -201,7 +201,7 @@ WEEK 04  column=standard
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 52 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -240,8 +240,8 @@ WEEK 05  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -252,7 +252,7 @@ WEEK 05  column=standard
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 44 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -291,8 +291,8 @@ WEEK 06  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -303,7 +303,7 @@ WEEK 06  column=standard
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 38 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -342,8 +342,8 @@ WEEK 07  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -354,7 +354,7 @@ WEEK 07  column=standard
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 42 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -393,8 +393,8 @@ WEEK 08  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -405,7 +405,7 @@ WEEK 08  column=standard
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 59 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -444,8 +444,8 @@ WEEK 09  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -456,7 +456,7 @@ WEEK 09  column=standard
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 51 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -495,8 +495,8 @@ WEEK 10  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -507,7 +507,7 @@ WEEK 10  column=standard
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 48 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -546,8 +546,8 @@ WEEK 11  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -558,7 +558,7 @@ WEEK 11  column=standard
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 35 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
@@ -597,8 +597,8 @@ WEEK 12  column=standard
   [Thursday] STRENGTH Upper body: Pull   (Viada pp274-275)
       tags: standing_plan, frame:all_rounder, column:standard
       ME     Barbell Row                    1x1-5        @ By feel       | no_tested_lift
-      DE     T-bar Row                      4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
-      HYP    Meadows Row                    3x6-12       @ By feel       | RIR 1 · auto_regulated
+      DE     Meadows Row                    4x2-4        @ By feel       | RIR 3.5 · no_tested_lift
+      HYP    T-bar Row                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Skull Crusher                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Drag Curl                      3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    YTW Raises                     3x6-12       @ By feel       | RIR 1 · auto_regulated
@@ -609,7 +609,7 @@ WEEK 12  column=standard
       HYP    Reverse Hyper                  3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
       HYP    Bulgarian Split Squat          3x6-12       @ By feel       | RIR 1 · auto_regulated
-      SKILL  Walking Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
+      SKILL  Reverse Lunge                  3x3-5        @ By feel       | RIR 3.5 · per_side
   [Saturday] run      Long Run — 42 min
   NOTES
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.

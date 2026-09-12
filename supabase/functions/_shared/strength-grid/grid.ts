@@ -518,6 +518,7 @@ const EXECUTION_NAME: Record<string, ByRoute<string>> = {
   // ⚠️ THE LOADED ONE SAYS BENCH TOO — without it an athlete reads "Weighted Reverse Hyper" and
   // pictures the machine with plates on it.
   'weighted reverse hyper': 'Weighted Reverse Hyper',
+  'banded leg extension': 'Banded Leg Extension',
   // Seated, chest against the pad, arms sweeping back - on an incline bench with dumbbells.
   /**
    * ⚠️ "FLY", NOT "RAISE" (2026-09-01). Both name the movement; **fly is the word lifters search

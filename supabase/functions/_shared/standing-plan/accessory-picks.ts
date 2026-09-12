@@ -325,6 +325,19 @@ export type ViadaPickSpec = {
    */
   leadWith: string[];
   leadCite: string;
+  /**
+   * ⛔ THE ORDER THE SUBSTITUTES READ IN WHEN THE KIT REACHES NONE OF HIS (2026-09-11 audit). Step
+   * 2 of the ranking ties most substitutes, and the catalogue's key order then decided the row's
+   * default — which is how a leg-press row opened on a Bulgarian split squat while a Zercher squat,
+   * printed on p220, sat eleventh. Named here, with its reason, so the default is a choice.
+   */
+  subLeadWith?: string[];
+  /**
+   * ⛔ PRINTED ON ANOTHER PAGE FOR THIS PATTERN (2026-09-11). Counts as his for the row's line — the
+   * row does not say "reaches none of the printed movements" when the kit reaches one of these —
+   * and ranks behind `leadWith`, ahead of every substitute. Not read by the composer's his-first sort.
+   */
+  alsoHis?: string[];
   /** Which Dial chips this pick can be re-pointed by. Empty = the chip cannot reach it. */
   servesChips: DialChip[];
   /**
@@ -642,6 +655,15 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     hisList: ['leg extension', 'hip adduction machine', 'weighted knee raise', 'seated calf raise'],
     leadWith: ['leg extension', 'hip adduction machine', 'seated calf raise', 'weighted knee raise'],
     leadCite: 'Viada p223 — focused push lower / quads',
+    /**
+     * ⛔ SINGLE-JOINT QUAD WORK WITHOUT THE MACHINE (2026-09-11 audit). The row is `focused
+     * quadriceps` and the substitutes were all lunges — compound, and the shape two other rows on
+     * the same day already carry. The banded leg extension is the field's like-for-like (knee
+     * extension only, the band for load — Sweat, Fitbod, PowerliftingTechnique) and reaches any
+     * athlete with bands. The note above that "true single-joint quad work does not exist without a
+     * machine" was written before the band route existed and is superseded by this line.
+     */
+    subLeadWith: ['banded leg extension'],
     servesChips: [],
   },
   /**
@@ -707,8 +729,16 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
      * ⚠️ THE COMPOSER IS UNAFFECTED — it builds from the grid pool and the frame's muscle, never from
      * this list. Only the dropdown changes.
      */
+    /**
+     * ⛔ THE BENCH REVERSE HYPER IS HIS TOO (2026-09-11 audit): p220 prints "bench reverse hyper"
+     * under secondary hinge lower. `alsoHis` (not `hisList`): it counts as printed for the row's
+     * line and ranks behind his four machines in the picker, but it is not added to the composer's
+     * "his" set — doing that made a commercial-gym week drop his machine for it, because that set
+     * ranks membership, not page order.
+     */
     hisList: ['reverse hyperextension', 'ghd back extension', 'machine back extension', 'ground-based deadlift machine'],
     leadWith: ['reverse hyperextension', 'ghd back extension', 'machine back extension'],
+    alsoHis: ['weighted reverse hyper'],
     /**
      * ⚠️⚠️ THE `excludes: ['reverse hyper']` THAT STOOD HERE IS GONE, AND ITS PREMISE WAS WRONG.
      * It read *"one movement, one option — two `EXERCISE_CONFIG` entries for the same exercise"*, and
@@ -745,6 +775,14 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // ⛔ HIS ORDER, so the zero-touch default is the movement he prints first.
     leadWith: ['leg press', 'hack squat', 'lever squat'],
     leadCite: 'Viada p221 — braced push lower',
+    /**
+     * ⛔ THE HOME SUBSTITUTE IS A TWO-LEG, LOADED QUAD MOVEMENT (2026-09-11 audit). p221's three are
+     * machines; the row's job is bilateral quad-and-glute volume after the day's main lift. The
+     * book's own nearest is the Zercher squat (p220, secondary press lower); the field's are the
+     * front and goblet squat (Outlift, Hevy). A lunge is the asymmetrical row's shape, not this one's,
+     * which is how the same week came to carry three lunges.
+     */
+    subLeadWith: ['zercher squat', 'goblet squat'],
     pairedWith: 'braced_hinge',
     superset: 'superset with the back extension',
     servesChips: ['glutes'],
@@ -1501,13 +1539,21 @@ export function pickOptions(
     const supported = printed.filter((x) => x === 'supported').length;
     return supported * 2 >= printed.length ? 'supported' : 'free';
   })();
+  const alsoKeys = (spec.alsoHis ?? []).map((n) => canonicalize(n));
+  const subKeys = (spec.subLeadWith ?? []).map((n) => canonicalize(n));
   const rank = (m: GridMovement): number => {
     const i = leadKeys.indexOf(canonicalize(m.name));
     // ⛔ STEP 1 — his printed movements, in his order, always first.
     if (i !== -1) return i;
+    // ⛔ STEP 1a — printed on another page for this pattern (`alsoHis`), behind his own list.
+    const a = alsoKeys.indexOf(canonicalize(m.name));
+    if (a !== -1) return leadKeys.length + a;
+    // ⛔ STEP 1b — the named substitute order for this cell (`subLeadWith`), behind every one of his.
+    const j = subKeys.indexOf(canonicalize(m.name));
+    if (j !== -1) return leadKeys.length + alsoKeys.length + j;
     // ⛔ STEP 2 — then the like-for-light tests, most held first. The base keeps every one of his
     // ahead of every substitute, whatever the substitute holds.
-    let penalty = leadKeys.length;
+    let penalty = leadKeys.length + alsoKeys.length + subKeys.length;
     if (cellPattern && (m as { pattern?: string }).pattern && (m as { pattern?: string }).pattern !== cellPattern) penalty += 2;
     if (cellStability && stabilityOf(m.name) !== cellStability) penalty += 1;
     return penalty;
@@ -1696,7 +1742,9 @@ export function pickOptions(
        * his and `barbell hip thrust` reads as the stand-in. **Marking the whole list would have
        * called his own printed movement a substitute.**
        */
-      ...((narrowed.substituted || (admitted.has(canonicalize(m.name)) && !his.has(canonicalize(m.name))))
+      // ⛔ A MOVEMENT PRINTED ON ANOTHER PAGE FOR THIS PATTERN (`alsoHis`) IS NOT A SUBSTITUTE.
+      ...(((narrowed.substituted && !alsoKeys.includes(canonicalize(m.name)))
+        || (admitted.has(canonicalize(m.name)) && !his.has(canonicalize(m.name)) && !alsoKeys.includes(canonicalize(m.name))))
         ? { substituted: true as const } : {}),
     }));
 }
