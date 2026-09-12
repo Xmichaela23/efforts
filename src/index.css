@@ -560,21 +560,21 @@
     overscroll-behavior: none;
     /* Bridge the header → first panel with a shared glow field */
     background:
-      radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.0) 58%),
-      radial-gradient(ellipse at 14% 0%, rgba(255, 215, 0, 0.07) 0%, rgba(255, 215, 0, 0.0) 62%),
-      radial-gradient(ellipse at 50% 0%, rgba(183, 148, 246, 0.08) 0%, rgba(183, 148, 246, 0.0) 62%),
-      radial-gradient(ellipse at 86% 0%, rgba(74, 158, 255, 0.09) 0%, rgba(74, 158, 255, 0.0) 62%),
-      radial-gradient(ellipse at 78% 18%, rgba(80, 200, 120, 0.05) 0%, rgba(80, 200, 120, 0.0) 66%),
+      radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.13) 0%, rgba(0,0,0,0.0) 60%),
+      radial-gradient(ellipse at 14% 0%, rgba(255, 215, 0, 0.15) 0%, rgba(255, 215, 0, 0.0) 64%),
+      radial-gradient(ellipse at 50% 0%, rgba(183, 148, 246, 0.16) 0%, rgba(183, 148, 246, 0.0) 64%),
+      radial-gradient(ellipse at 86% 0%, rgba(74, 158, 255, 0.17) 0%, rgba(74, 158, 255, 0.0) 64%),
+      radial-gradient(ellipse at 78% 18%, rgba(80, 200, 120, 0.11) 0%, rgba(80, 200, 120, 0.0) 68%),
       /* ⛔ THE NOVA IS THE SAME BRIDGE, MIRRORED (2026-08-24, Michael: "it should just be the
          mirror of the top" + "fill under the load box, leave the load box clear"). The bottom
          glow lives HERE on the screen chrome — the exact five layers above, y flipped, same
          alphas — NOT painted inside the LOAD card. The card stays a dark clear instrument on
          top of it, the way the Today card sits on the header's spill. */
-      radial-gradient(ellipse at 50% 100%, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.0) 58%),
-      radial-gradient(ellipse at 14% 100%, rgba(255, 215, 0, 0.07) 0%, rgba(255, 215, 0, 0.0) 62%),
-      radial-gradient(ellipse at 50% 100%, rgba(183, 148, 246, 0.08) 0%, rgba(183, 148, 246, 0.0) 62%),
-      radial-gradient(ellipse at 86% 100%, rgba(74, 158, 255, 0.09) 0%, rgba(74, 158, 255, 0.0) 62%),
-      radial-gradient(ellipse at 78% 82%, rgba(80, 200, 120, 0.05) 0%, rgba(80, 200, 120, 0.0) 66%),
+      radial-gradient(ellipse at 50% 100%, rgba(255,255,255,0.13) 0%, rgba(0,0,0,0.0) 60%),
+      radial-gradient(ellipse at 14% 100%, rgba(255, 215, 0, 0.15) 0%, rgba(255, 215, 0, 0.0) 64%),
+      radial-gradient(ellipse at 50% 100%, rgba(183, 148, 246, 0.16) 0%, rgba(183, 148, 246, 0.0) 64%),
+      radial-gradient(ellipse at 86% 100%, rgba(74, 158, 255, 0.17) 0%, rgba(74, 158, 255, 0.0) 64%),
+      radial-gradient(ellipse at 78% 82%, rgba(80, 200, 120, 0.11) 0%, rgba(80, 200, 120, 0.0) 68%),
       #000000;
   }
   
@@ -1148,11 +1148,11 @@ body.wizard-active { --tabbar-h: 0px; }
 }
 .readout-texture--spectral::after {
   background-image:
-    radial-gradient(ellipse at 12% 18%, rgba(255, 215, 0, 0.18) 0%, transparent 60%),
-    radial-gradient(ellipse at 50% 10%, rgba(183, 148, 246, 0.10) 0%, transparent 62%),
-    radial-gradient(ellipse at 86% 18%, rgba(74, 158, 255, 0.12) 0%, transparent 62%),
-    radial-gradient(ellipse at 78% 34%, rgba(80, 200, 120, 0.16) 0%, transparent 64%),
-    radial-gradient(ellipse at 30% 40%, rgba(255, 140, 66, 0.16) 0%, transparent 64%),
+    radial-gradient(ellipse at 12% 18%, rgba(255, 215, 0, 0.30) 0%, transparent 62%),
+    radial-gradient(ellipse at 50% 10%, rgba(183, 148, 246, 0.19) 0%, transparent 64%),
+    radial-gradient(ellipse at 86% 18%, rgba(74, 158, 255, 0.22) 0%, transparent 64%),
+    radial-gradient(ellipse at 78% 34%, rgba(80, 200, 120, 0.28) 0%, transparent 66%),
+    radial-gradient(ellipse at 30% 40%, rgba(255, 140, 66, 0.28) 0%, transparent 66%),
     radial-gradient(circle, rgba(255,255,255,0.050) 0.8px, transparent 1.55px),
     repeating-linear-gradient(0deg, rgba(255,255,255,0.064) 0px, rgba(255,255,255,0.064) 1px, transparent 1px, transparent 9px),
     repeating-linear-gradient(90deg, rgba(255,255,255,0.054) 0px, rgba(255,255,255,0.054) 1px, transparent 1px, transparent 9px),
@@ -1162,6 +1162,60 @@ body.wizard-active { --tabbar-h: 0px; }
   background-blend-mode: screen, screen, screen, screen, screen, soft-light, soft-light, soft-light, soft-light, soft-light;
   opacity: 0.94;
   filter: blur(0.16px) saturate(1.10) contrast(1.02);
+}
+
+/* SPORT — Home's session cards (2026-09-12, Michael: "make the cards more like state", then "the
+   cards they are too heavy"). The base galaxy bed is near-black, and what makes STATE's cards read as
+   lit rather than as slabs is SPECTRAL's wash sitting on top of it. A session card could not just take
+   spectral: that wash is five hues, and spectral's own note says one sport's colour would be a lie on a
+   card spanning every discipline — which inverts here, where the card IS one session of one sport.
+   So this is spectral's structure with ONE hue, the card's own `--card-accent-rgb`, and a bed lifted a
+   couple of stops so the grid and the stars sit in light instead of in tar. */
+/* HOME — one neutral instrument bed for every card on Today (2026-09-12, Michael: "this is a mess,
+   UI UX specialist, fix this").
+   ⛔ THE MISTAKE THIS REPLACES, NAMED SO IT IS NOT REPEATED: the first pass tinted each card's BED with
+   its own sport hue while the screen behind them was already a strong gold wash. Two coloured systems
+   over one another turned every card muddy — olive under the run, brown under the lift — and the load
+   card drifted lavender, so three cards in a column read as three different materials.
+   ⛔ THE RULE, which is the app's own visual language: THE GROUND CARRIES THE LIGHT, THE CARD IS A DARK
+   NEUTRAL INSTRUMENT SITTING IN IT, and the SPORT is carried by the title, the border and the glow —
+   never by the surface. One channel per job. So this bed has no hue in it anywhere: graphite, lifted
+   well off black, one soft key light from the top-left, stars, and the console grid.
+   ⚠️ Every card on Home wears this one — sessions and the load card — so the column reads as a stack of
+   the same instrument rather than a set of unrelated tiles. */
+.readout-texture--home.galaxy-card::before {
+  /* ⛔ GLASS, NOT A LID (Michael, 2026-09-12: "why do you not make the cards more translucent with a
+     grid"). The bed is TINTED glass rather than an opaque slab: dark enough that white text holds its
+     contrast over the brightest part of the nova, clear enough that the light behind is the card's own
+     colour. The earlier failure was clear glass with no tint, which let the glow sit directly behind the
+     numbers and washed them out — the tint is what makes translucency survivable here. */
+  /* ⛔ NEUTRAL, NOT VIOLET (2026-09-12). A warm gold ground under cool violet cards puts two opposite
+     temperatures on one screen, and the eye reads them as unrelated systems — the same mud problem in
+     different clothes. Graphite with only a hint of blue left in it reads as glass on a warm floor, and
+     it gives the sport colours in the titles back their loudness for free. */
+  background-color: rgba(30,31,37,0.84);
+  background-image:
+    radial-gradient(120% 88% at 26% -6%, rgba(255,255,255,0.20) 0%, transparent 62%),
+    radial-gradient(1.2px 1.2px at calc(18% + var(--card-star-x, 0%)) 22%, rgba(255,255,255,0.50), transparent),
+    radial-gradient(1px 1px at calc(78% - var(--card-star-x, 0%)) 58%, rgba(255,240,210,0.38), transparent),
+    radial-gradient(1px 1px at calc(60% + var(--card-star-x, 0%)) 34%, rgba(210,225,255,0.42), transparent),
+    radial-gradient(1px 1px at calc(33% - var(--card-star-x, 0%)) 74%, rgba(255,255,255,0.34), transparent),
+    linear-gradient(180deg, rgba(60,62,72,0.52) 0%, rgba(20,21,26,0.74) 100%);
+}
+.readout-texture--home::after {
+  /* The grid is ETCHED ON THE GLASS, so it is a step stronger than the base texture — on a translucent
+     pane a whisper of a grid reads as dirt rather than as an instrument. */
+  background-image:
+    radial-gradient(ellipse at 28% 8%, rgba(255,255,255,0.10) 0%, transparent 62%),
+    radial-gradient(circle, rgba(255,255,255,0.048) 0.8px, transparent 1.55px),
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.058) 0px, rgba(255,255,255,0.058) 1px, transparent 1px, transparent 9px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.050) 0px, rgba(255,255,255,0.050) 1px, transparent 1px, transparent 9px),
+    linear-gradient(45deg, rgba(255,255,255,0.18) 1px, transparent 1px),
+    linear-gradient(-45deg, rgba(255,255,255,0.14) 1px, transparent 1px);
+  background-size: cover, 14px 14px, 9px 9px, 9px 9px, 22px 22px, 22px 22px;
+  background-blend-mode: screen, soft-light, soft-light, soft-light, soft-light, soft-light;
+  opacity: 0.96;
+  filter: blur(0.16px) saturate(1.06) contrast(1.02);
 }
 
 /* FORGE — the Adjust plate (2026-09-05, Michael: "cool texture and lighting like these but different").

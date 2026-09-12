@@ -1579,18 +1579,60 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           inset: 0,
           zIndex: 0,
           pointerEvents: 'none',
-          opacity: 0.28,
+          opacity: 0.30,
           mixBlendMode: 'soft-light',
-          backgroundColor: 'rgba(0,0,0,0.25)',
           backgroundImage: `
             linear-gradient(45deg, rgba(255,255,255,0.22) 1px, transparent 1px),
             linear-gradient(-45deg, rgba(255,255,255,0.18) 1px, transparent 1px),
             linear-gradient(45deg, rgba(255,255,255,0.10) 1px, transparent 1px),
             linear-gradient(-45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
-            radial-gradient(ellipse at center, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.55) 100%)
+            radial-gradient(ellipse at center, rgba(0,0,0,0.00) 0%, rgba(0,0,0,0.05) 100%)
           `,
           backgroundSize: '26px 26px, 26px 26px, 52px 52px, 52px 52px, cover',
           backgroundPosition: `center ${-parallax}px, center ${-parallax}px, center ${-parallax}px, center ${-parallax}px, center`,
+        }}
+      />
+      {/**
+        * ⛔ THE NOVA — HOME'S OWN LIGHT SOURCE (Michael, 2026-09-12: "a lot of black… more of a deep
+        * yellow super nova emanating from the center, somewhat shapeless, but to really read daylight").
+        * The five-hue bleed is painted ONCE for the whole app on the screen chrome, and Home was the one
+        * screen that sealed it under a black panel. A wash from the TOP was the first attempt and left
+        * the body of the screen black, because the empty space below the cards is most of the screen.
+        * ⛔ SO THE SOURCE IS THE CENTRE, NOT THE TOP, and it is deliberately SHAPELESS: four ellipses of
+        * different sizes and warmths, offset off-centre from one another, then blurred as one layer so
+        * no edge of any single one can be found. A round gradient reads as a spotlight; this reads as
+        * light in the room.
+        * ⚠️ IT OVERHANGS THE PANEL (`inset: -80px`) so the blur fades out past the edges rather than
+        * ending on a visible seam.
+        * ⚠️ IT SITS BELOW THE DAY-COLOURED HALO, so the sport colour still leads at the top and this is
+        * the daylight behind it. `screen` blend, so it lifts what is there and never greys a card.
+        */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: '-80px',
+          zIndex: 0,
+          pointerEvents: 'none',
+          mixBlendMode: 'screen',
+          filter: 'blur(44px)',
+          transform: 'translateZ(0)',
+          backgroundImage: `
+            /* ⛔ DAYLIGHT IS WHITE (Michael, 2026-09-12: "they are too heavy and poop brown"). The first
+               nova was amber the whole way through, and amber shining up through a dark translucent card
+               makes brown — which is what the cards had become. Sunlight is near-white with warmth only
+               at its edge, so the core is white now and the gold survives as the outer halo. */
+            /* ⛔ CALMER UNDER THE CARDS (Michael, 2026-09-12: the cards feel heavy). The weight was never
+               really the cards — it was the VALUE GAP. A blazing floor next to a dark bed makes the bed
+               read as a block dropped on light, and every attempt to fix it by lightening the bed cost
+               legibility. So the other side of the gap moves: the peak is roughly halved and the whole
+               field is spread wider, which keeps the daylight in the margins and the gaps and takes it
+               off the back of the text. */
+            radial-gradient(52% 40% at 50% 40%, rgba(255,252,246,0.26) 0%, rgba(255,252,246,0.00) 74%),
+            radial-gradient(78% 58% at 50% 46%, rgba(248,246,240,0.22) 0%, rgba(248,246,240,0.00) 76%),
+            radial-gradient(96% 72% at 40% 56%, rgba(255,238,202,0.18) 0%, rgba(255,238,202,0.00) 78%),
+            radial-gradient(130% 96% at 52% 64%, rgba(255,216,154,0.12) 0%, rgba(255,216,154,0.00) 82%)
+          `,
         }}
       />
       {/**
@@ -1623,7 +1665,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               left: '-16px',
               right: '-16px',
               top: '-24px',
-              height: '220px',
+              height: '300px',
               zIndex: 0,
               pointerEvents: 'none',
               mixBlendMode: 'screen',
@@ -1639,8 +1681,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             radial-gradient(200px 120px at 82% 40%, rgba(74, 158, 255, 0.18) 0%, rgba(74, 158, 255, 0.0) 72%),
             radial-gradient(260px 170px at 50% 72%, rgba(239, 68, 68, 0.14) 0%, rgba(239, 68, 68, 0.0) 76%)
           `,
-              opacity: 0.60,
-              filter: 'blur(24px) saturate(1.12)',
+              opacity: 0.85,
+              filter: 'blur(26px) saturate(1.15)',
               transform: 'translateZ(0)',
               transition: 'background-image 300ms ease',
             }}
@@ -1691,8 +1733,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             position: 'sticky',
             top: 0,
             zIndex: 20,
-            // Opaque base + Omni texture so scroll content doesn't show through
-            backgroundColor: '#000000',
+            // ⛔ TRANSLUCENT, NOT OPAQUE (2026-09-12). This was solid black so scrolled rows could not
+            // show through it, and that lid is what kept the screen's own light off the top of Home.
+            // The blur does the same job: rows passing under it are smeared rather than read, and the
+            // light behind the panel comes up through it.
+            backgroundColor: 'rgba(9,10,14,0.58)',
+            backdropFilter: 'blur(18px)',
+            WebkitBackdropFilter: 'blur(18px)',
             // Option 1 lighting: keep texture, but bias glow to a top-left “key light” (white)
             backgroundImage: `
               radial-gradient(ellipse at 18% 0%, rgba(255, 255, 255, 0.18) 0%, transparent 60%),
@@ -1788,26 +1835,38 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <span
-                className="text-[0.82rem] font-light tracking-wide truncate"
-                style={{
-                  color: 'rgba(255, 255, 255, 1.0)',
-                  textShadow: '0 0 3px rgba(255, 240, 200, 0.25), 0 0 6px rgba(255, 240, 200, 0.15), 0 0 2px rgba(255, 255, 255, 0.2)',
-                  lineHeight: 1.05,
-                }}
-              >
-                {formatDisplayDate(activeDate)}
-                {trainingPlanContext?.currentWeek ? (
-                  <span style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.72 }}>
-                    {' · '}Week {trainingPlanContext.currentWeek}
-                  </span>
-                ) : null}
-                {/* ⛔ THE WORDS AFTER THE WEEK ARE THE SERVER'S (2026-09-10): a standing plan's name,
+              {/**
+                * ⛔ TWO LINES (Michael, 2026-09-12: "stan… maybe raise date and week 3, make standard
+                * focus underneath"). All three facts shared one line and the plan's NAME was the one
+                * that lost — it sits last, so it truncated to "Stan…" on every day of the block. The day
+                * and the week are short and fixed in length; the name is the variable one, so it gets
+                * the line to itself and the other two stop competing with it.
+                */}
+              <span className="min-w-0 flex flex-col items-center">
+                <span
+                  className="text-[0.82rem] font-light tracking-wide truncate max-w-full"
+                  style={{
+                    color: 'rgba(255, 255, 255, 1.0)',
+                    textShadow: '0 0 3px rgba(255, 240, 200, 0.25), 0 0 6px rgba(255, 240, 200, 0.15), 0 0 2px rgba(255, 255, 255, 0.2)',
+                    lineHeight: 1.05,
+                  }}
+                >
+                  {formatDisplayDate(activeDate)}
+                  {trainingPlanContext?.currentWeek ? (
+                    <span style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.72 }}>
+                      {' · '}Week {trainingPlanContext.currentWeek}
+                    </span>
+                  ) : null}
+                </span>
+                {/* ⛔ THE WORDS UNDER THE DATE ARE THE SERVER'S (2026-09-10): a standing plan's name,
                     "Test" or "Light week"; a race plan's phase. `focus` only for a get-week that
                     predates `weekLabel`. */}
                 {(trainingPlanContext?.weekLabel !== undefined ? trainingPlanContext?.weekLabel : trainingPlanContext?.focus) ? (
-                  <span style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.72 }}>
-                    {' · '}{trainingPlanContext?.weekLabel !== undefined ? trainingPlanContext.weekLabel : trainingPlanContext.focus}
+                  <span
+                    className="text-[0.72rem] font-light tracking-wide truncate max-w-full"
+                    style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.72, lineHeight: 1.2, marginTop: 1 }}
+                  >
+                    {trainingPlanContext?.weekLabel !== undefined ? trainingPlanContext.weekLabel : trainingPlanContext.focus}
                   </span>
                 ) : null}
               </span>
@@ -1920,7 +1979,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         {/* Content area
             Option C: slightly wider rail + Today blocks get a small bleed.
             Calendar/week strip spacing is untouched (handled in `WorkoutCalendar`). */}
-        <div className="px-2 overflow-x-hidden" style={{ paddingBottom: hasExpandedWorkout ? 120 : 56 }}>
+        <div className="px-3 overflow-x-hidden" style={{ paddingBottom: hasExpandedWorkout ? 120 : 56 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state - show "Rest" if there's an active plan, otherwise "No effort"
           <div className="px-4 py-10">
@@ -2069,48 +2128,52 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   <button
                     key={workout.id}
                     type="button"
-                    className={`w-full text-left transition-all relative ${!isCompleted ? 'backdrop-blur-md' : ''} ${phosphorPill.className}`}
+                    className={`w-full text-left transition-all relative galaxy-card readout-texture readout-texture--home ${phosphorPill.className}`}
                     style={{
                       ...phosphorPill.style,
                       borderRadius: '10px',
                       padding: '0.52rem 0.78rem',
                       opacity: isSkipped ? 0.72 : 1,
-                      // Filled (completed) should read like backlit phosphor glass, not fog:
-                      // reduce blur radius ~30% on filled state only.
-                      ...(isCompleted
-                        ? {
-                            backdropFilter: 'blur(11.2px)',
-                            WebkitBackdropFilter: 'blur(11.2px)',
-                          }
-                        : null),
-                      // Dimensional / “special” feel (gloss + bevel + subtle depth)
-                      backgroundImage: isCompleted
-                        ? `
-                          radial-gradient(120% 120% at 26% 18%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.00) 52%),
-                          radial-gradient(120% 140% at 86% 110%, rgba(0,0,0,0.40) 0%, rgba(0,0,0,0.00) 58%),
-                          linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 55%, rgba(0,0,0,0.22) 100%)
-                        `
-                        : `
-                          radial-gradient(120% 120% at 26% 18%, rgba(255,255,255,0.26) 0%, rgba(255,255,255,0.00) 52%),
-                          radial-gradient(120% 140% at 86% 110%, rgba(0,0,0,0.40) 0%, rgba(0,0,0,0.00) 58%),
-                          linear-gradient(180deg, rgba(${pillRgb},0.14) 0%, rgba(${pillRgb},0.06) 55%, rgba(0,0,0,0.22) 100%)
-                        `,
-                      backgroundBlendMode: 'screen, multiply, normal',
-                      backgroundClip: 'padding-box',
+                      /**
+                       * ⛔ ONE NEUTRAL INSTRUMENT BED, AND THE SPORT IS NOT ON IT (Michael, 2026-09-12:
+                       * "make the cards more like state", then "this is a mess — UI UX specialist, fix
+                       * this"). Two passes got this wrong in the same way and the second is worth naming:
+                       * the card's BED was tinted with its own sport hue while the screen behind it was
+                       * already a strong gold wash, so every card went muddy — olive under the run, brown
+                       * under the lift — and a column of them read as unrelated materials.
+                       * ⛔ THE RULE NOW, one channel per job: the GROUND carries the light, the CARD is a
+                       * neutral instrument sitting in it, and the SPORT is carried by the title, the
+                       * border and the glow, which `phosphorPill` already owns. Nothing tints the surface.
+                       * ⚠️ DONE-VERSUS-PLANNED therefore rides entirely on the pill again (neutral border
+                       * and fill when complete, sport border when not), which is where it was designed to
+                       * live and where it reads before you have read anything.
+                       * ⚠️ THE STARS SHIFT PER ROW, or a stack of cards visibly tiles the same five.
+                       */
+                      ['--card-star-x' as string]: `${(sessionIdx % 5) * 7}%`,
+                      /**
+                       * ⛔ THE SAME NEUTRAL HAIRLINE AS EVERY CARD (Michael, 2026-09-12, from a past day:
+                       * the row still wore a bold orange edge while the cards beside it had none). This row
+                       * is the FALLBACK — a planned session on a day already gone, or a skipped one — and it
+                       * takes its border colour from the discipline pill, which is right for a pill and
+                       * wrong now that it sits in a stack of outline-less cards.
+                       * ⚠️ `phosphorPill` ITSELF IS UNTOUCHED: it is the shared discipline style and other
+                       * surfaces still want the sport edge. This overrides it here only.
+                       */
+                      border: 'none',
                       // Inset stroke so it feels “mounted”
-                      boxShadow: phosphorPill.style.boxShadow
-                        ? `${phosphorPill.style.boxShadow},
-                           0 2px 8px rgba(0,0,0,0.45),
-                           0 14px 26px rgba(0,0,0,0.16),
-                           inset 0 1px 0 rgba(255,255,255,0.22),
-                           inset 0 -1px 0 rgba(0,0,0,0.40),
-                           inset 0 0 0 0.5px rgba(255,255,255,0.08)`
-                        : `0 2px 8px rgba(0,0,0,0.45),
-                           0 14px 26px rgba(0,0,0,0.16),
-                           inset 0 1px 0 rgba(255,255,255,0.22),
-                           inset 0 -1px 0 rgba(0,0,0,0.40),
-                           inset 0 0 0 0.5px rgba(255,255,255,0.08)`,
-                      borderWidth: '0.5px',
+                      /**
+                       * ⛔ THE PILL'S OWN SPORT GLOW COMES OFF (2026-09-12). `phosphorPill` throws three
+                       * tight rings of the discipline colour, and THAT is the orange rim on a past day's
+                       * row — it was never a border, which is why neutralising the border above did not
+                       * touch it. The cards beside it carry one soft wide glow or none at all, so a row
+                       * ringed in orange is the only lit-up object left on the screen.
+                       * ⚠️ The sport is still on the row: the title keeps the discipline colour.
+                       */
+                      boxShadow: `0 1px 3px rgba(0,0,0,0.12),
+                                  inset 0 1px 0 rgba(255,255,255,0.22),
+                                  inset 0 0 0 0.5px rgba(255,255,255,0.08)`,
+                      backdropFilter: 'blur(12px) saturate(1.05)',
+                      WebkitBackdropFilter: 'blur(12px) saturate(1.05)',
                       // ⛔ ONE STEP QUIETER WHEN IT IS NOT THE DAY'S FIRST SESSION (§3e.2). This is
                       // the fallback row — a skipped session, or one this file still draws itself —
                       // and it follows the same rule the card object does.
@@ -2324,12 +2387,32 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               try { window.dispatchEvent(new CustomEvent('open:state')); } catch { /* no window */ }
             }}
             aria-label="Form and the week so far — open State"
-            className="block w-full text-left cursor-pointer"
+            className="block w-full text-left cursor-pointer galaxy-card readout-texture readout-texture--home"
             style={{
               borderRadius: 14,
               padding: '10px 14px',
-              background: 'linear-gradient(180deg, rgba(19,21,27,0.72), rgba(11,12,16,0.84))',
-              border: '1px solid rgba(255,255,255,0.08)',
+              /**
+               * ⛔ THE INSTRUMENT SITS IN THE LIGHT, IT IS NOT MADE OF IT (Michael, 2026-09-12: "load
+               * card should be more readable", one pass after asking for a translucent feel). Real
+               * glass over the nova put the glow BEHIND the numbers and they stopped reading.
+               * ⛔ AND THE APP HAD ALREADY SETTLED THIS. `.readout-texture--nova` exists for exactly
+               * this card in exactly this situation, and its own note records the 2026-08-24 ruling
+               * after two failed passes: *"fill under the load box, leave the load box clear for the
+               * numbers"* — dark bed and stars under the text, console grid over it, and the glow
+               * stays outside on the panel that this card floats in. So it takes the shared treatment
+               * rather than a third hand-rolled surface.
+               */
+              border: 'none',
+              backdropFilter: 'blur(12px) saturate(1.05)',
+              WebkitBackdropFilter: 'blur(12px) saturate(1.05)',
+              /**
+               * ⛔ THE SAME BED AS THE SESSION CARDS ABOVE IT (Michael, 2026-09-12). It wore `nova`, which
+               * is the darkest card in the app by design — built for STATE, where it sits inside the glow
+               * the screen chrome paints around it. On a lit Home it was the blackest thing on screen.
+               * ⚠️ It takes the same neutral Home bed as every other card here, so the column reads as one
+               * stack of instruments. No hue on it: this card carries every discipline's numbers, and a
+               * surface tint would be picking one of them.
+               */
             }}
           >
             {formLine ? <span className="block font-light">{formLine}</span> : null}
@@ -2342,7 +2425,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             {weekTotalsLine ? (
               <span
                 className="block font-light tabular-nums"
-                style={{ color: 'rgba(255,255,255,0.72)', marginTop: formLine ? 6 : 0 }}
+                style={{ color: 'rgba(255,255,255,0.84)', marginTop: formLine ? 6 : 0 }}
               >
                 {weekTotalsLine}
               </span>

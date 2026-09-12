@@ -297,7 +297,7 @@ export const CardDeck: React.FC<{
             ref={(el) => { cardRefs.current[i] = el; }}
             role={onCardTap ? 'button' : undefined}
             tabIndex={onCardTap ? 0 : undefined}
-            className="absolute text-left w-full"
+            className="absolute text-left w-full galaxy-card readout-texture readout-texture--home"
             style={{
               ...deckGlass(rgb, emphasis),
               top: 0, left: 0, right: 0,
@@ -361,7 +361,19 @@ export const CardDeck: React.FC<{
  */
 export const deckGlass = (rgb: string, emphasis: CardEmphasis = 'lead'): React.CSSProperties => ({
   borderRadius: 18,
-  background: 'linear-gradient(180deg, rgba(19,21,27,0.90), rgba(11,12,16,0.96))',
+  /**
+   * ⛔ THE BED MOVED TO THE CARD CLASSES (2026-09-12, Michael: "all cards should have the same
+   * texture light and feel — you're just touching load"). This painted
+   * `linear-gradient(180deg, rgba(19,21,27,0.90), rgba(11,12,16,0.96))` — effectively opaque black —
+   * which is why every session card stayed a black slab through a whole afternoon of lighting work:
+   * the light was being applied to the Today screen and this style was covering it, and the load card
+   * was the only card on the screen that did NOT come through here.
+   * ⛔ SO THE SURFACE IS NOW `galaxy-card readout-texture readout-texture--home`, the same treatment
+   * the load card wears, applied at each call site below. One bed, one grid, one light, by
+   * construction rather than by two numbers kept in step by hand.
+   * ⚠️ EVERY CALLER MUST CARRY THOSE CLASSES. Without them a card has no bed at all and renders
+   * fully transparent — there are three call sites and all three were changed with this.
+   */
   /**
    * ⛔ THE FIRST SESSION IS THE BIG THING (§3e.2). Everything after it is the same object one step
    * quieter — a thinner edge and no glow — so the eye lands on the session the athlete is about to
@@ -369,12 +381,27 @@ export const deckGlass = (rgb: string, emphasis: CardEmphasis = 'lead'): React.C
    * ⚠️ THE EDGE STILL CARRIES THE SPORT COLOUR at `quiet`. Draining it to grey would make a second
    * ride read as disabled; it is not disabled, it is second.
    */
-  border: `1px solid rgba(${rgb},${emphasis === 'lead' ? 0.45 : 0.22})`,
+  /**
+   * ⛔ NO SPORT OUTLINE (Michael, 2026-09-12: "maybe the outline is too bold, maybe it's no outline
+   * like state"). A drawn line in the sport colour makes the card read as a tagged badge; STATE's cards
+   * carry no outline at all and are defined by their BED against the ground. The colour does not go
+   * away, it moves: the title holds it and the glow below throws it onto the floor, which is the part
+   * he said was working. A hairline of neutral white is kept only so the edge stays crisp where the
+   * daylight behind is brightest.
+   */
+  border: 'none',
   boxShadow: emphasis === 'lead'
     ? `0 0 0 1px rgba(255,255,255,0.03) inset, 0 18px 50px rgba(0,0,0,0.55), 0 0 40px rgba(${rgb},0.18)`
     : `0 0 0 1px rgba(255,255,255,0.02) inset, 0 12px 34px rgba(0,0,0,0.5)`,
-  backdropFilter: 'blur(6px)',
-  WebkitBackdropFilter: 'blur(6px)',
+  backdropFilter: 'blur(12px) saturate(1.05)',
+  WebkitBackdropFilter: 'blur(12px) saturate(1.05)',
+  /**
+   * ⛔ §3e.2's HIERARCHY, WHICH THE SHARED BED HAD FLATTENED (2026-09-12). A thinner edge and no glow
+   * stopped being enough once every card wore the same surface: a long lift card simply has more rows
+   * than a run card, so the SECOND session was pulling the eye first. A step down in level restores the
+   * order without changing a single word or size.
+   */
+  opacity: emphasis === 'lead' ? 1 : 0.9,
 });
 
 export default CardDeck;

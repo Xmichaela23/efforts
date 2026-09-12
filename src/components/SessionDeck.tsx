@@ -322,8 +322,8 @@ export const LiftSessionCard: React.FC<{
       aria-expanded={open}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (more > 0) setOpen((o) => !o); }}
       onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && more > 0) { e.preventDefault(); setOpen((o) => !o); } }}
-      className="w-full text-left"
-      style={{ ...deckGlass(rgb, emphasis), padding: '14px 16px', margin: '0 0 14px', cursor: more > 0 ? 'pointer' : 'default' }}
+      className="w-full text-left galaxy-card readout-texture readout-texture--home"
+      style={{ ...deckGlass(rgb, emphasis), padding: '14px 16px', margin: '0 0 20px', cursor: more > 0 ? 'pointer' : 'default' }}
     >
       <div className="flex items-baseline justify-between gap-3">
         {/* ⛔ THE ONE DOOR TO THE DRAWER. It stops the card's toggle so the two taps stay separate. */}
@@ -332,7 +332,7 @@ export const LiftSessionCard: React.FC<{
           tabIndex={0}
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpen?.(); }}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onOpen?.(); } }}
-          className={`${emphasis === 'lead' ? 'text-[20px]' : 'text-[17px]'} font-semibold leading-tight min-w-0 truncate`}
+          className={`${emphasis === 'lead' ? 'text-[20px]' : 'text-[17px]'} font-semibold leading-tight min-w-0`}
           style={{ color: colour, opacity: emphasis === 'lead' ? 1 : 0.86, cursor: 'pointer' }}
         >
           {title}
@@ -355,7 +355,11 @@ export const LiftSessionCard: React.FC<{
         }}
       >
         {cards.map((c, i) => (
-          <div key={c.key} ref={(el) => { rowRefs.current[i] = el; }} style={{ paddingTop: i === 0 ? 10 : 12 }}>
+          <div key={c.key} ref={(el) => { rowRefs.current[i] = el; }} /* ⛔ TIGHTER ROWS (Michael, 2026-09-12, fix 3 of 3 on card weight). A lift day is the heaviest
+                 card on the screen because it holds five or six of these, so the mass is leading, not
+                 type size. The SIZES are untouched — only the leading and the gaps come in, which takes
+                 height off the card without taking anything off legibility. */
+              style={{ paddingTop: i === 0 ? 8 : 9 }}>
             <div className="flex items-baseline justify-between gap-3">
               {/* ⛔ THE KIND WORD NEVER WRAPS (§3i). It sits on the name line at 12 px; when the name and
                   the kind word cannot share the line at 390 px, the wrapping flex moves the kind word
@@ -373,7 +377,7 @@ export const LiftSessionCard: React.FC<{
             </div>
             {/* A superset pair prints its cue once when both rows share it, both when they differ (§3i). */}
             {c.cues.map((cue) => (
-              <div key={cue} className="text-[14px]" style={{ lineHeight: 1.35, marginTop: 3, color: 'rgba(255,255,255,0.72)' }}>{cue}</div>
+              <div key={cue} className="text-[14px]" style={{ lineHeight: 1.28, marginTop: 2, color: 'rgba(255,255,255,0.72)' }}>{cue}</div>
             ))}
           </div>
         ))}
@@ -404,10 +408,10 @@ export const SessionCard: React.FC<{
   return (
     <button
       type="button"
-      className="w-full text-left"
+      className="w-full text-left galaxy-card readout-texture readout-texture--home"
       /* ⚠️ SAME PADDING AND TYPE AS A DECK CARD, and no fixed height — the card is as tall as its
          family line and stop rule, nothing more. */
-      style={{ ...deckGlass(rgb, emphasis), padding: '14px 16px', margin: '0 0 14px', cursor: 'pointer' }}
+      style={{ ...deckGlass(rgb, emphasis), padding: '14px 16px', margin: '0 0 20px', cursor: 'pointer' }}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpen?.(); }}
     >
       {/* ⛔ THE TIME SITS ON THE NAME LINE, RIGHT — the same rule the deck card follows. */}
@@ -466,12 +470,24 @@ export const SessionCard: React.FC<{
  */
 const doneGlass = (rgb: string, emphasis: CardEmphasis = 'lead'): React.CSSProperties => ({
   borderRadius: 18,
-  background: 'linear-gradient(180deg, rgba(16,17,21,0.90), rgba(10,11,14,0.96))',
+  /**
+   * ⛔ THE BED IS THE CARD CLASSES' NOW, LIKE EVERY OTHER CARD ON THE SCREEN (2026-09-12, Michael:
+   * "all cards should have the same texture light and feel"). This painted its own near-opaque black,
+   * so once the planned cards moved onto the shared bed a COMPLETED session was the only card left
+   * without the grid — verified on screen, Sep 10, two done cards reading as a different material
+   * from the load card directly beneath them.
+   * ⚠️ DONE STILL READS AS DONE, and it does NOT do it with a different surface: the edge is thinner
+   * and unglowed, the title sits at low alpha, and the row carries a checkmark. Same material, quieter.
+   */
   // ⛔ THINNER EDGE, NO GLOW, WHEN IT IS NOT THE FIRST SESSION (§3e.2).
-  border: `1px solid rgba(${rgb},${emphasis === 'lead' ? 0.18 : 0.10})`,
+  // ⛔ NO OUTLINE HERE EITHER — see `deckGlass`. A done card was already the quietest edge on the
+  // screen; the checkmark and the low-alpha title are what say done, not a line.
+  border: 'none',
   boxShadow: emphasis === 'lead'
     ? `0 0 0 1px rgba(255,255,255,0.02) inset, 0 14px 40px rgba(0,0,0,0.5), 0 0 24px rgba(${rgb},0.06)`
     : `0 0 0 1px rgba(255,255,255,0.02) inset, 0 10px 28px rgba(0,0,0,0.45)`,
+  backdropFilter: 'blur(12px) saturate(1.05)',
+  WebkitBackdropFilter: 'blur(12px) saturate(1.05)',
 });
 
 /** `5.0 mi · 48:00` for a run or ride; `3,725 lb · 3 lifts` for a lift session. */
@@ -550,8 +566,8 @@ export const CompletedSessionCard: React.FC<{
   return (
     <button
       type="button"
-      className="w-full text-left"
-      style={{ ...doneGlass(rgb, emphasis), padding: '14px 16px', margin: '0 0 14px', cursor: 'pointer' }}
+      className="w-full text-left galaxy-card readout-texture readout-texture--home"
+      style={{ ...doneGlass(rgb, emphasis), padding: '14px 16px', margin: '0 0 20px', cursor: 'pointer' }}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpen?.(); }}
     >
       <div className="flex items-baseline justify-between gap-3">
@@ -559,7 +575,7 @@ export const CompletedSessionCard: React.FC<{
             sport this was, which is the one thing the row still has to say at a glance. */}
         {/* ⛔ ONE STEP SMALLER WHEN IT IS NOT THE FIRST SESSION (§3e.2). */}
         <div
-          className={`${emphasis === 'lead' ? 'text-[20px]' : 'text-[17px]'} font-semibold leading-tight min-w-0 truncate`}
+          className={`${emphasis === 'lead' ? 'text-[20px]' : 'text-[17px]'} font-semibold leading-tight min-w-0`}
           style={{ color: `${colour}${emphasis === 'lead' ? '8C' : '6E'}` }}
         >
           {deriveWorkoutTitle(workout as never)}
