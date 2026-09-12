@@ -17,6 +17,7 @@ import { useToast } from './ui/use-toast';
 import { useAppContext } from '@/contexts/AppContext';
 import { getDisciplineColorRgb } from '@/lib/context-utils';
 import { readoutPlateStyle } from '@/lib/readout-plate';
+import EffortScale from '@/components/ui/effort-scale';
 
 export type ManualEntryType = 'run' | 'ride' | 'swim';
 
@@ -49,6 +50,11 @@ export default function ManualEntry({ type, date, onClose, onSaved }: {
   const [secs, setSecs] = useState<string>('');
   const [pool, setPool] = useState<string | null>(null);
   const [when, setWhen] = useState<string>(today);
+  // ⛔ EFFORT ON THE FORM, OPTIONAL (Michael, 2026-09-12: "integrate"). The app's one effort scale,
+  // the same face the post-workout popup wears. Set, it writes `workouts.rpe` with the row and the
+  // popup has nothing to ask (its rule is rpe null). Left blank, the popup's rules apply as today.
+  // TrainingPeaks and Strava both carry RPE on a manual entry.
+  const [rpe, setRpe] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const rgb = getDisciplineColorRgb(type);
   const words = WORDS[type];
@@ -82,6 +88,7 @@ export default function ManualEntry({ type, date, onClose, onSaved }: {
         elapsed_time: movingMin, // typed in: no rest data, so elapsed = moving
         duration: movingMin,
       };
+      if (rpe != null) row.rpe = rpe;
       if (isSwim) {
         const p = POOL_OPTIONS.find((o) => o.value === pool);
         if (p) {
@@ -182,7 +189,11 @@ export default function ManualEntry({ type, date, onClose, onSaved }: {
 
         <label className={labelCls}>Date</label>
         <input type="date" value={when} onChange={(e) => setWhen(e.target.value)}
-          className={`${inputCls} mb-5 [color-scheme:dark] focus:ring-1`} style={inputFocus} />
+          className={`${inputCls} mb-4 [color-scheme:dark] focus:ring-1`} style={inputFocus} />
+
+        <div className="mb-5">
+          <EffortScale sport={type === 'ride' ? 'bike' : type} value={rpe} onChange={setRpe} />
+        </div>
 
         <button
           type="button"
