@@ -114,7 +114,7 @@ import {
   dialRowOptions,
   DIAL_ROW_DAY_IS_THE_COMPOSERS,
   chipHasFrameSlot,
-  dayLabelForPick,
+  frameDaysForPick,
   picksForFrame,
   frameMuscleForPick,
   frameAdmitsForPick,
@@ -5381,7 +5381,26 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   a pick is drawn when the frame carries an HYP accessory cell it can fill. See its
                   note for why p274 has none for four of them and none at all for Core.
                   ⚠️ D-457: no frame argument may default on a shared surface. */}
-              {((drawn: ViadaPickKey[]) => drawn.map((key) => {
+              {/* ⛔ GROUPED BY LIFTING DAY (Michael, 2026-09-11: "organize by days"). The rows read
+                  by row type — Machine press, Push isolation, … — with the day as a tag on the right,
+                  and he could not tell what a day was. Each group opens with the day's own line from
+                  the frame (`Day 1 · push day (upper)`, the same words the endurance step prints); a
+                  row that serves a second day says "also day 5" on the right. The rows and their
+                  order are unchanged; only the headings are new. */}
+              {((drawn: ViadaPickKey[]) => {
+                const firstDayOf = (k: ViadaPickKey): number | null => {
+                  const d = frameDaysForPick(k, wizardFrame);
+                  return d.length > 0 ? Math.min(...d) : null;
+                };
+                const themeOf = (d: number): string | null =>
+                  (FRAMES[wizardFrame]?.columns?.standard ?? []).find((x) => x.day === d)?.themeTag ?? null;
+                const groups = new Map<number | null, ViadaPickKey[]>();
+                for (const k of drawn) {
+                  const d = firstDayOf(k);
+                  if (!groups.has(d)) groups.set(d, []);
+                  groups.get(d)!.push(k);
+                }
+                const renderRow = (key: ViadaPickKey) => {
                 const spec = VIADA_PICKS[key];
                 /**
                  * ⛔⛔ THE SUPERSET IS NAMED ONLY WHEN ITS PARTNER IS ON THE SCREEN (caught on the
@@ -5440,8 +5459,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       <span className="text-white/45 text-xs">
                         {/* ⛔ THE FRAME'S OWN DAYS. Unpassed, this read p246's: it printed "day 1"
                             for Push isolation where p274 carries that cell on day 1 AND day 4, and
-                            "day 4" for a pick p274 resolves to no day at all. */}
-                        {dayLabelForPick(key, wizardFrame) ?? 'fills the week\u2019s core minimum'}
+                            "day 4" for a pick p274 resolves to no day at all.
+                            ⚠️ THE FIRST DAY IS THE GROUP'S HEADING NOW; only a second day is said here. */}
+                        {(() => {
+                          const days = frameDaysForPick(key, wizardFrame);
+                          if (days.length === 0) return 'fills the week\u2019s core minimum';
+                          const first = Math.min(...days);
+                          const rest = days.filter((d) => d !== first);
+                          return rest.length > 0 ? `also ${rest.map((d) => `day ${d}`).join(' · ')}` : null;
+                        })()}
                       </span>
                     </div>
                     <select
@@ -5465,7 +5491,21 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     ) : null}
                   </div>
                 );
-              }))(picksForFrame(wizardFrame, strengthEquipment).filter((k) => !String(k).startsWith('core')))}
+                };
+                return [...groups.entries()].map(([d, keys]) => (
+                  <div key={String(d)} className="space-y-3">
+                    <div className="text-white/45 text-xs pt-1">
+                      {d != null ? (
+                        <>
+                          <span className="tabular-nums">{`Day ${d}`}</span>
+                          {themeOf(d) ? <span className="text-white/35">{` · ${themeOf(d)}`}</span> : null}
+                        </>
+                      ) : 'Core'}
+                    </div>
+                    {keys.map(renderRow)}
+                  </div>
+                ));
+              })(picksForFrame(wizardFrame, strengthEquipment).filter((k) => !String(k).startsWith('core')))}
               {/* ⛔ ONE LINE, UNDER THE FIELD IT IS ABOUT. What stood here named the source, the
                   missing core slot and "the four movement patterns" — sourcing talk and engine
                   vocabulary, under a dropdown.
