@@ -322,7 +322,7 @@ export const LiftSessionCard: React.FC<{
       aria-expanded={open}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); if (more > 0) setOpen((o) => !o); }}
       onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && more > 0) { e.preventDefault(); setOpen((o) => !o); } }}
-      className="w-full text-left galaxy-card readout-texture readout-texture--home"
+      className="w-full text-left galaxy-card readout-texture readout-texture--spectral"
       style={{ ...deckGlass(rgb, emphasis), padding: '14px 16px', margin: '0 0 20px', cursor: more > 0 ? 'pointer' : 'default' }}
     >
       <div className="flex items-baseline justify-between gap-3">
@@ -408,7 +408,7 @@ export const SessionCard: React.FC<{
   return (
     <button
       type="button"
-      className="w-full text-left galaxy-card readout-texture readout-texture--home"
+      className="w-full text-left galaxy-card readout-texture readout-texture--spectral"
       /* ⚠️ SAME PADDING AND TYPE AS A DECK CARD, and no fixed height — the card is as tall as its
          family line and stop rule, nothing more. */
       style={{ ...deckGlass(rgb, emphasis), padding: '14px 16px', margin: '0 0 20px', cursor: 'pointer' }}
@@ -566,7 +566,7 @@ export const CompletedSessionCard: React.FC<{
   return (
     <button
       type="button"
-      className="w-full text-left galaxy-card readout-texture readout-texture--home"
+      className="w-full text-left galaxy-card readout-texture readout-texture--spectral"
       style={{ ...doneGlass(rgb, emphasis), padding: '14px 16px', margin: '0 0 20px', cursor: 'pointer' }}
       onClick={(e) => { e.preventDefault(); e.stopPropagation(); onOpen?.(); }}
     >

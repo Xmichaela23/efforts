@@ -1,5 +1,6 @@
 import FirstRunOverlay from '@/components/FirstRunOverlay';
 import FirstRunCard from '@/components/FirstRunCard';
+import { readoutPlateStyle } from '@/lib/readout-plate';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, getStoredUserId } from '@/lib/supabase';
@@ -1607,7 +1608,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         * a short blur to soften the core's edge and nothing more, placed ABOVE the card column behind
         * the date header — which is a dark pill, so it occludes the core and catches the rim, an
         * object in front of the sun. Below the first card the panel is the app's own dark again.
-        * The cards' bed paints the matching rim on their top edge (`.readout-texture--home`).
+        * The cards' bed paints the matching rim on their top edge (`.readout-texture--spectral`).
         *
         * ⚠️ IT SITS BELOW THE DAY-COLOURED HALO, so the sport colour is the cast in the sunlight and
         * still leads at the top.
@@ -2127,7 +2128,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   <button
                     key={workout.id}
                     type="button"
-                    className={`w-full text-left transition-all relative galaxy-card readout-texture readout-texture--home ${phosphorPill.className}`}
+                    className={`w-full text-left transition-all relative galaxy-card readout-texture readout-texture--spectral ${phosphorPill.className}`}
                     style={{
                       ...phosphorPill.style,
                       borderRadius: '10px',
@@ -2386,7 +2387,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               try { window.dispatchEvent(new CustomEvent('open:state')); } catch { /* no window */ }
             }}
             aria-label="Form and the week so far — open State"
-            className="block w-full text-left cursor-pointer galaxy-card readout-texture readout-texture--home"
+            className="block w-full text-left cursor-pointer galaxy-card readout-texture readout-texture--spectral"
             style={{
               borderRadius: 14,
               padding: '10px 14px',
@@ -2401,17 +2402,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                * stays outside on the panel that this card floats in. So it takes the shared treatment
                * rather than a third hand-rolled surface.
                */
-              border: 'none',
-              backdropFilter: 'blur(12px) saturate(1.05)',
-              WebkitBackdropFilter: 'blur(12px) saturate(1.05)',
               /**
-               * ⛔ THE SAME BED AS THE SESSION CARDS ABOVE IT (Michael, 2026-09-12). It wore `nova`, which
-               * is the darkest card in the app by design — built for STATE, where it sits inside the glow
-               * the screen chrome paints around it. On a lit Home it was the blackest thing on screen.
-               * ⚠️ It takes the same neutral Home bed as every other card here, so the column reads as one
-               * stack of instruments. No hue on it: this card carries every discipline's numbers, and a
-               * surface tint would be picking one of them.
+               * ⛔ STATE'S LOAD CARD, LITERALLY (Michael, 2026-09-12: "I just really like how the cards
+               * look in the state screen"). This is the same plate style and the same spectral bed the
+               * LOAD card on State carries — this card IS that card's short form, so it wears its clothes.
+               * The session cards above take the same through `deckGlass`, so the column is one stack.
                */
+              ...readoutPlateStyle(undefined, { galaxy: true }),
+              borderRadius: 14,
             }}
           >
             {formLine ? <span className="block font-light">{formLine}</span> : null}

@@ -1164,62 +1164,9 @@ body.wizard-active { --tabbar-h: 0px; }
   filter: blur(0.16px) saturate(1.10) contrast(1.02);
 }
 
-/* SPORT — Home's session cards (2026-09-12, Michael: "make the cards more like state", then "the
-   cards they are too heavy"). The base galaxy bed is near-black, and what makes STATE's cards read as
-   lit rather than as slabs is SPECTRAL's wash sitting on top of it. A session card could not just take
-   spectral: that wash is five hues, and spectral's own note says one sport's colour would be a lie on a
-   card spanning every discipline — which inverts here, where the card IS one session of one sport.
-   So this is spectral's structure with ONE hue, the card's own `--card-accent-rgb`, and a bed lifted a
-   couple of stops so the grid and the stars sit in light instead of in tar. */
-/* HOME — one neutral instrument bed for every card on Today (2026-09-12, Michael: "this is a mess,
-   UI UX specialist, fix this").
-   ⛔ THE MISTAKE THIS REPLACES, NAMED SO IT IS NOT REPEATED: the first pass tinted each card's BED with
-   its own sport hue while the screen behind them was already a strong gold wash. Two coloured systems
-   over one another turned every card muddy — olive under the run, brown under the lift — and the load
-   card drifted lavender, so three cards in a column read as three different materials.
-   ⛔ THE RULE, which is the app's own visual language: THE GROUND CARRIES THE LIGHT, THE CARD IS A DARK
-   NEUTRAL INSTRUMENT SITTING IN IT, and the SPORT is carried by the title, the border and the glow —
-   never by the surface. One channel per job. So this bed has no hue in it anywhere: graphite, lifted
-   well off black, one soft key light from the top-left, stars, and the console grid.
-   ⚠️ Every card on Home wears this one — sessions and the load card — so the column reads as a stack of
-   the same instrument rather than a set of unrelated tiles. */
-.readout-texture--home.galaxy-card::before {
-  /* ⛔ OPAQUE, STATE'S BED (2026-09-12, Michael: "the whole thing got a little washed out"). The
-     translucent glass this replaces (graphite at 84%, over a white-cored wash screen-blended across
-     the whole panel) let the wash through every card, and grey glass on a lifted-grey floor is what
-     "washed out" was: no true black anywhere on the screen. State's cards read as lit because their
-     bed is opaque and near-black and the light is painted ON the surface. Same rule here now.
-     ⛔ NEUTRAL, NOT VIOLET (unchanged from the glass): the sport lives in the title and the floor glow;
-     the bed is graphite with a hint of blue, so the sport colours keep their loudness.
-     ⛔ THE SUN LANDS ON THE TOP EDGE. The one light on Home is a hard source above the card column
-     (`TodaysEffort.tsx`, the sun layer); a card in that light shows it as a rim on its top edge and
-     nothing below. That rim is what stops an opaque dark card reading as a slab — the answer D-475
-     reached for by lightening the bed and calming the floor, which cost the blacks. */
-  background-color: #101117;
-  background-image:
-    radial-gradient(118% 62% at 50% -14%, rgba(255,250,240,0.17) 0%, rgba(255,250,240,0.05) 38%, transparent 62%),
-    linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.00) 18%),
-    radial-gradient(1.2px 1.2px at calc(18% + var(--card-star-x, 0%)) 22%, rgba(255,255,255,0.50), transparent),
-    radial-gradient(1px 1px at calc(78% - var(--card-star-x, 0%)) 58%, rgba(255,240,210,0.38), transparent),
-    radial-gradient(1px 1px at calc(60% + var(--card-star-x, 0%)) 34%, rgba(210,225,255,0.42), transparent),
-    radial-gradient(1px 1px at calc(33% - var(--card-star-x, 0%)) 74%, rgba(255,255,255,0.34), transparent),
-    linear-gradient(180deg, #14151c 0%, #0e0f15 55%, #0a0b10 100%);
-}
-.readout-texture--home::after {
-  /* The grid is ETCHED ON THE GLASS, so it is a step stronger than the base texture — on a translucent
-     pane a whisper of a grid reads as dirt rather than as an instrument. */
-  background-image:
-    radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.07) 0%, transparent 55%),
-    radial-gradient(circle, rgba(255,255,255,0.048) 0.8px, transparent 1.55px),
-    repeating-linear-gradient(0deg, rgba(255,255,255,0.058) 0px, rgba(255,255,255,0.058) 1px, transparent 1px, transparent 9px),
-    repeating-linear-gradient(90deg, rgba(255,255,255,0.050) 0px, rgba(255,255,255,0.050) 1px, transparent 1px, transparent 9px),
-    linear-gradient(45deg, rgba(255,255,255,0.18) 1px, transparent 1px),
-    linear-gradient(-45deg, rgba(255,255,255,0.14) 1px, transparent 1px);
-  background-size: cover, 14px 14px, 9px 9px, 9px 9px, 22px 22px, 22px 22px;
-  background-blend-mode: screen, soft-light, soft-light, soft-light, soft-light, soft-light;
-  opacity: 0.96;
-  filter: blur(0.16px) saturate(1.06) contrast(1.02);
-}
+/* HOME's cards wear SPECTRAL, State's own bed (2026-09-12, Michael: "I just really like how the cards
+   look in the state screen"). The `--home` graphite bed and the `--sport` one-hue bed that preceded it
+   are gone; see `deckGlass` in CardDeck.tsx for the record of why. */
 
 /* FORGE — the Adjust plate (2026-09-05, Michael: "cool texture and lighting like these but different").
    Same nebula ground, stars and grain as every galaxy card, but lit from the LEFT edge instead of
