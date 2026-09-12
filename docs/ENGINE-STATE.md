@@ -1,6 +1,49 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-11 morning, PM chat — State order, the Today status card, the on-the-day workout chooser; ALL PUSHED AND DEPLOYED)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-12, PM chat — the book's own hard sessions, the accessory rows, where a build lands, and Home lit; ALL PUSHED AND DEPLOYED)
+
+> **Read `docs/SESSION-2026-09-11-12-handoff.md` first**, then the older banners below for the threads
+> behind them. main = `10192932`. Last deploys (UTC): plan-overview 03:39, then coach /
+> materialize-plan / generate-strength-plan / rematerialize-standing-block / endurance-checkpoint /
+> compute-session-boom at 03:08. iOS synced; the Xcode build is Michael's.
+> **New decisions from this stretch: D-471 → D-476, in `docs/DECISIONS-LOG-4.md` (part 3 froze at D-470).**
+
+### YOUR JOB
+1. **The device walk, and it is now overdue.** NOTHING from 2026-09-09 onward has been seen on a phone.
+   Michael rebuilds his plan and walks it. Check, in this order: the two-line date header (date and week
+   above, plan name beneath — a plan name used to truncate to "Stan…"); Today's cards, which all share one
+   bed now; a plan built for a future Monday showing "Your plan starts <weekday, month day>."; the triceps
+   pushdown appearing on the arms rows of a bands kit; and a HARD day drawing **no** chevron under the
+   spacing line, where an easy day still opens onto "Lift first and keep the ride easy."
+2. **Three open questions from this stretch, none blocking:** Q-299 (an orange rim on a past-day row that
+   no border in the card path explains), Q-300 (the swipe-deck card never seen with the shared bed),
+   Q-301 (a completed ride card's metric labels overlap — pre-existing).
+3. **The readiness list** (`docs/FOUNDATION-READINESS.md`): B4 monitoring, B14 Open-Meteo commercial plan
+   (launch gate), error handling on every call.
+
+### ⛔ THE ONE THING THAT COST THE MOST THIS STRETCH — read before touching Today's cards
+**The session cards on Today are NOT drawn by `TodaysEffort.tsx`.** They come from `TodaySession` in
+`SessionDeck.tsx`, styled by `deckGlass` in `CardDeck.tsx`. The block in `TodaysEffort.tsx` that looks like
+a session card is the **fallback row** for a past-day or skipped session. An afternoon of visual changes
+landed on the wrong element before a minimal reproduction proved the CSS was fine and the element was not.
+See D-475.
+
+### THE RULES (memory files carry them; verify before citing)
+- **Never use ours**: no athlete-facing line or number that is not on a book page.
+- **All copy through Michael**: a feature go is not a copy go.
+- **Smart server, dumb client**: a new work order names the server function that decides before the screen.
+- **Never `git commit -a`** in this repo; terminals share the tree.
+- **Deploy every importer** of a changed `_shared` file (grep `supabase/functions --include='index.ts'`).
+
+### UNVERIFIED (what would settle it)
+- Everything above, on a real device (item 1). The visual work was checked in a 375×812 preview against a
+  real account across a ride day, a two-session lift day and a past day with completed sessions — which is
+  a browser, not a phone.
+- Carried: a rebuild resets a workout chosen on the day; the deployed swap-session with option lines has
+  not been exercised on a live plan; heavy-set good-news line ordering; multi-swim day compares the wrong
+  planned swim; `generate-combined-plan/week-builder.ts decideOrdering` is a second copy of day order.
+
+## (older banner) STATE ORDER, THE TODAY STATUS CARD, THE ON-THE-DAY CHOOSER (written 2026-09-11 morning, PM chat — ALL PUSHED AND DEPLOYED)
 
 > **Read `docs/SESSION-2026-09-11-handoff.md` first, then `docs/SESSION-2026-09-09-10-handoff.md`.** main =
 > `a4bdab0e` plus docs. Last deploy: swap-session and materialize-plan, 2026-09-11 17:15 UTC. iOS synced.

@@ -14,6 +14,21 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — 2026-09-12 (the book's hard sessions, accessory rows, where a build lands, Home lit — PUSHED, DEPLOYED, iOS synced, NOT device-checked)
+
+Detail in `docs/SESSION-2026-09-11-12-handoff.md`; decisions in `DECISIONS-LOG-4.md` D-471 → D-476.
+
+- [ ] **Rebuild the plan and walk it on the phone.** Nothing from 2026-09-09 onward has been seen on a
+      device. In order: the two-line date header; Today's cards (all one bed now, no outlines); a plan
+      built for a future Monday showing "Your plan starts <weekday, month day>."; the triceps pushdown on
+      the arms rows of a bands kit; a hard day drawing no chevron under the spacing line while an easy day
+      still opens onto "Lift first and keep the ride easy."
+- [ ] **Does the daylight need to come back up?** It was deliberately halved at the end to kill the
+      heaviness in the cards. If it now reads too quiet, the fix is brightness in the margins, not across
+      the field (D-475).
+- [ ] Q-299 orange rim on a past-day row · Q-300 swipe-deck card unseen · Q-301 completed ride card's
+      metric labels overlap (pre-existing). None blocking.
+
 ## ⏳ AWAITING MICHAEL — 2026-09-11 (State order, status card, on-the-day workout chooser — PUSHED, DEPLOYED, iOS synced, NOT device-checked)
 - Decide: ride caps (easy 120, long 210); delete the 48-hour clause from the three test descriptions; the
   chooser's workout names; the pick confirmation sentence; "Swap sport" label; chooser text size.

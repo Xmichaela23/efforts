@@ -1423,3 +1423,44 @@ Tagged **unverified / deferred**, in that order.
 
 Also filed here so it is not rediscovered: `strengthSessionRpe` and `calculatePlannedStrengthWorkload` test
 `typeof` on RIR, because `Number(null)` is 0 and 0 RIR is RPE 10 — the same trap the drift reads hit.
+
+---
+
+## Q-299 — An orange-rimmed row on a past day, and no border in the card path explains it (2026-09-12)
+
+Tagged **unverified**. On a day already gone, a planned session drops to the fallback pill row on Today
+(`rendersAsSessionCard` returns false). After D-475 every card surface on that screen has
+`border: 'none'`, the fallback row included, and the row's pill glow was removed as well — and the orange
+rim is still on screen at `Yesterday, Sep 11`.
+
+**What was ruled out, by reading the rendered page rather than the source:** no element on the page has a
+border in the strength orange, and walking the ancestors of the row's own text found only neutral white
+borders. A DOM sweep for the colour returned one unrelated red button.
+
+**What would close it:** open that day with the element inspector on the row itself and read what paints
+it — most likely an ancestor wrapper or a pseudo-element neither the source grep nor the colour sweep
+reached. Cosmetic; it does not block.
+
+---
+
+## Q-300 — The swipe-deck card has never been seen with the shared bed (2026-09-12)
+
+Tagged **unverified**. `CardDeck.tsx:302` carries `galaxy-card readout-texture readout-texture--home`, and
+a guard confirms every `deckGlass` call site does, so it cannot render with no bed at all. But the deck
+path (a lift rendered as a swipeable stack rather than an expandable card) was never put on screen during
+D-475's work — the lift days checked all rendered as cards.
+
+**What would close it:** find a session that renders as a deck and look at it. If the 3-D transform stack
+interacts badly with the pseudo-element bed or the backdrop blur, this is where it shows.
+
+---
+
+## Q-301 — The completed ride card's metric labels overlap each other (2026-09-12)
+
+Tagged **cosmetic / pre-existing**. On a completed ride (seen on Thu Sep 10), the four metric columns
+print their values and their labels on top of one another: "53 90%60 of 85 min 5.4%" over
+"WORKLOAD EXECUTION DURATION DRIFT", with the explanatory line colliding underneath.
+
+It predates the 2026-09-12 visual work — it is visible in screenshots taken before any of it landed — and
+it was noticed while checking something else, so it has not been traced. Its own change, not a fold-in.
+
