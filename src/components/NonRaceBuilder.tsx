@@ -5492,6 +5492,24 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   </div>
                 );
                 };
+                /**
+                 * ⛔ A DAY SAYS WHAT IT CARRIES FROM ANOTHER DAY (Michael, 2026-09-11: "let's clarify").
+                 * The superset pair is listed once, under day 2, so day 5 showed one row where the page
+                 * prints three. One line under the heading names the rows that serve it from elsewhere:
+                 * "Plus the back extension and leg press superset from day 2." (his yes, verbatim shape).
+                 */
+                const carriedLine = (d: number): string | null => {
+                  const carried = drawn.filter((k) => {
+                    const days = frameDaysForPick(k, wizardFrame);
+                    return days.includes(d) && Math.min(...days) !== d;
+                  });
+                  if (carried.length === 0) return null;
+                  const from = Math.min(...frameDaysForPick(carried[0], wizardFrame));
+                  const names = carried.map((k) => VIADA_PICKS[k].label.toLowerCase());
+                  const paired = carried.length === 2 && VIADA_PICKS[carried[0]].pairedWith === carried[1];
+                  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+                  return `Plus the ${list}${paired ? ' superset' : ''} from day ${from}.`;
+                };
                 return [...groups.entries()].map(([d, keys]) => (
                   <div key={String(d)} className="space-y-3">
                     <div className="text-white/45 text-xs pt-1">
@@ -5503,6 +5521,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       ) : 'Core'}
                     </div>
                     {keys.map(renderRow)}
+                    {d != null && carriedLine(d) ? (
+                      <p className="text-white/40 text-xs leading-snug">{carriedLine(d)}</p>
+                    ) : null}
                   </div>
                 ));
               })(picksForFrame(wizardFrame, strengthEquipment).filter((k) => !String(k).startsWith('core')))}
