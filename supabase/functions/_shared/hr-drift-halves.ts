@@ -10,8 +10,9 @@
  *   - Halves are split by TIME, not by sample count, so a recording with gaps still splits at the midpoint.
  *   - At least 6 minutes of usable samples, or null.
  *
- * On an interval session the number covers the whole session, intervals included; the reader says so
- * (`whole_session` in session-detail). It is never withheld.
+ * On an interval session the number is computed but NOT shown on the session screen (2026-09-12, p107:
+ * drift is a steady-session read); `session-detail/build.ts decouplingV1` gates it. State's trend
+ * excludes interval sessions on its own rule.
  */
 import { sampleOffsetSeconds } from './run-warmup-easy.ts';
 

@@ -161,16 +161,15 @@ Deno.test('a raw-basis drift on a variable-pace session is shown against the 5% 
   assertEquals(rows.filter((r) => r.label === 'Heart rate').length, 1);
 });
 
-Deno.test('interval session: the whole-session number is shown and labelled as such', () => {
+Deno.test('interval session: NO heart-rate line — drift is a steady-session read (p107, 2026-09-12)', () => {
   const p = VARIABLE_PACE_PACKET(5);
   (p as any).derived.interval_execution = { total_steps: 12 };
+  (p as any).derived.hr_drift_bpm = 6;
   const rows = buildAnalysisDetailRows(
     p, [], false, null, false, [], 'run', null, null, { pct: 4.5, basis: 'hr' as const, assessment: null, whole_session: true },
   );
   const hr = rows.find((r) => r.label === 'Heart rate');
-  assertStringIncludes(hr!.value, '4.5%');
-  assertStringIncludes(hr!.value, 'line 5%');
-  assertStringIncludes(hr!.value, 'intervals included');
+  assertEquals(hr, undefined);
 });
 
 Deno.test('no drift measured at all → no row, not an apology', () => {

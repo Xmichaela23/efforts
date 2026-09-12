@@ -869,6 +869,16 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const decouplingV1 = (() => {
     const hrs = (wa as any)?.heart_rate_summary;
     const wholeSession = shouldSuppressSessionHrDrift(factPacket, intervals);
+    // ⛔ DRIFT IS READ ON STEADY SESSIONS ONLY (2026-09-12, Michael: "drift should really only be
+    // mentioned in steady state rides and runs — I would confirm that with the book"; confirmed, p107:
+    // cardiac drift is "a general guideline when assessing the maximum recommended dose of easy/VT1
+    // work in a given session" — a given pace or output at a given heart rate). An interval session
+    // has no such pace or output, so it gets no drift: no tile, no line. Silence, not a substitute.
+    // State's drift trend has taken steady sessions only all along; this brings the session screen
+    // to the same page.
+    // > Reverses the 2026-09-03 ruling "never withheld — interval days print the number and say
+    // > whole session, intervals included" (DECISIONS-LOG-3, the Drift entry of D-466's stretch).
+    if (wholeSession && (type === 'run' || type === 'ride')) return null;
     const hasHrs = !!hrs && typeof hrs === 'object';
     const pct = hasHrs ? (hrs as any)?.decouplingPct : null;
     const basis = hasHrs ? ((hrs as any)?.decouplingBasis ?? null) : null;
@@ -2050,21 +2060,22 @@ export function buildAnalysisDetailRows(
       // drift number to mean anything" describes what the athlete did; "too few samples to read"
       // would be the app announcing its own failure, which is the thing D-359 §3 forbids. And it only
       // speaks when there IS a measurement being withheld — no drift data, no row, no padding.
-      const withheldForPaceSpread = !decouplingShown && sport !== 'swim'
+      // ⛔ AN INTERVAL SESSION PRINTS NO HEART-RATE LINE AT ALL (2026-09-12, p107 — see `decouplingV1`).
+      // The 2026-09-03 "whole session, intervals included" line is gone with the number it labelled,
+      // and the "not read — no usable heart-rate data" line must not take its place: that sentence
+      // names a missing recording, and an interval session's recording is not missing. Silence.
+      const intervalSession = sport !== 'swim' && (decoupling?.whole_session === true || shouldSuppressSessionHrDrift(factPacket, intervals));
+      const withheldForPaceSpread = !decouplingShown && sport !== 'swim' && !intervalSession
         && signal != null && Math.abs(signal) >= 3;
-      // 2026-09-03: the number is never withheld. On an interval session it is heart rate alone across the
-      // whole session, intervals included — said plainly so it is not read as a steady-run drift.
       const pctAny = typeof decoupling?.pct === 'number' && Number.isFinite(decoupling.pct) ? decoupling.pct : null;
-      if (!decouplingShown && pctAny != null) {
+      if (!decouplingShown && pctAny != null && !intervalSession) {
         // ⛔ THE ONE DRIFT LINE (audit H-D09) — the same words the Drift chip prints.
         const room = driftLineFor(pctAny);
         // ⛔ "hills mixed in" IS NOT SAID INDOORS. The `raw` basis means terrain was not adjusted
         // for; on a trainer or a treadmill there was no terrain, so the suffix would be inventing a
         // cause. The percentage stands as measured.
-        const scope = decoupling?.whole_session
-          ? ` — whole session, intervals included, so not a steady-${sport === 'ride' ? 'ride' : 'run'} read`
-          : (decoupling?.basis === 'hr' ? ' — heart rate alone, second half against first'
-            : (decoupling?.basis === 'raw' && !indoors ? ' — hills mixed in' : ''));
+        const scope = decoupling?.basis === 'hr' ? ' — heart rate alone, second half against first'
+          : (decoupling?.basis === 'raw' && !indoors ? ' — hills mixed in' : '');
         rows.push({ label: 'Heart rate', value: `Drift ${pctAny.toFixed(1)}% (${room})${scope}` });
       } else if (withheldForPaceSpread) {
         rows.push({
