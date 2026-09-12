@@ -16,13 +16,18 @@ interface LogFABProps {
  * add" — and the floating + is gone. The items and their look live here so the two openers cannot
  * drift into two different menus.
  */
+/**
+ * ⛔ HIDDEN, NOT DELETED (Michael, 2026-09-12: "hide upload course for now, hide log mobility"). The
+ * handlers behind them in `handleAddEffort` stay wired; the rows do not render on either opener.
+ * Flip `hidden` off to bring one back.
+ */
 export const LOG_WORKOUT_TYPES = [
   { type: 'log-strength', label: 'Log Strength', icon: Dumbbell },
   { type: 'log-run', label: 'Log Run', icon: Activity },
   { type: 'log-ride', label: 'Log Ride', icon: Bike },
   { type: 'log-swim', label: 'Log Swim', icon: Waves },
-  { type: 'upload-course', label: 'Upload Course', icon: MapPin },
-  { type: 'log-mobility', label: 'Log Mobility', icon: Move },
+  { type: 'upload-course', label: 'Upload Course', icon: MapPin, hidden: true },
+  { type: 'log-mobility', label: 'Log Mobility', icon: Move, hidden: true },
   { type: 'log-pilates-yoga', label: 'Log Pilates/Yoga', icon: CircleDot },
 ] as const;
 
@@ -49,7 +54,7 @@ export const LogTypeMenuContent: React.FC<{
       style={{ minWidth: '220px' }}
       onOpenAutoFocus={(e) => e.preventDefault()}
     >
-      {LOG_WORKOUT_TYPES.map((item) => {
+      {LOG_WORKOUT_TYPES.filter((item) => !('hidden' in item && item.hidden)).map((item) => {
         const Icon = item.icon;
         return (
           <button
