@@ -180,6 +180,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
             result={(sd as any).test_result}
             onRecompute={recomputeAnalysis}
             recomputing={recomputing}
+            failureText={recomputeError || analysisFailure}
           />
           {(sd as any)?.next_session && <NextUp session={(sd as any).next_session} />}
         </div>

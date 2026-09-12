@@ -49,10 +49,13 @@ export function StrengthTestResult({
   result,
   onRecompute,
   recomputing,
+  failureText = null,
 }: {
   result: { headline?: string; lifts?: Lift[] } | null | undefined;
   onRecompute?: () => void;
   recomputing?: boolean;
+  /** The stored analysis's failure line, or the last tap's error. Only then is "Try again" offered. */
+  failureText?: string | null;
 }) {
   const lifts = Array.isArray(result?.lifts) ? (result!.lifts as Lift[]) : [];
   return (
@@ -91,15 +94,23 @@ export function StrengthTestResult({
         </div>
       )}
 
-      {onRecompute && (
-        <button
-          onClick={onRecompute}
-          disabled={recomputing}
-          className="w-full h-9 text-xs rounded-xl bg-white/[0.06] border-2 border-white/20 text-white/70 hover:bg-white/[0.1] hover:border-white/30 transition-all disabled:opacity-50"
-          style={{ fontFamily: 'Inter, sans-serif' }}
-        >
-          {recomputing ? 'Recomputing…' : 'Recompute analysis'}
-        </button>
+      {/* ⛔ NO STANDING RECOMPUTE BUTTON (2026-09-12, Michael: "helpful for dev, not sure it's
+          necessary for users"). A failed analysis is offered "Try again" by the caller. */}
+      {failureText && (
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-rose-300/90 m-0">{failureText}</p>
+          {onRecompute && (
+            <button
+              onClick={onRecompute}
+              disabled={recomputing}
+              className="shrink-0 h-8 px-3 text-xs rounded-xl bg-white/[0.06] border border-white/20 text-white/70 hover:bg-white/[0.1] transition-all disabled:opacity-50"
+              style={{ fontFamily: 'Inter, sans-serif' }}
+              title="Run the analysis again"
+            >
+              {recomputing ? 'Trying…' : 'Try again'}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

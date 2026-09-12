@@ -151,6 +151,28 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const [sharedUrl, setSharedUrl] = useState<string | null>(
     /^\d+$/.test(priorShareId) ? `https://www.strava.com/activities/${priorShareId}` : null,
   );
+  // ⛔ THE STRAVA LINK HIDES WHEN THE ATHLETE TURNED AUTO-SHARE ON (2026-09-12, Michael: "doesn't it
+  // save to strava automatically?"). It does, when `users.preferences.strava_auto_share_strength` is
+  // on (Connections; the logger posts on save and the server re-checks the switch). With that on, the
+  // athlete never has to press anything, so the header carries only the receipt ("Posted to Strava")
+  // once a post landed, and nothing before. With it off, the link is the one way a lift goes out.
+  // `null` = not read yet; the link waits rather than flashing.
+  const [autoShareLifts, setAutoShareLifts] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!isCompleted) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser?.id) { if (!cancelled) setAutoShareLifts(false); return; }
+        const { data: userData } = await supabase.from('users').select('preferences').eq('id', authUser.id).single();
+        if (!cancelled) setAutoShareLifts((userData?.preferences as Record<string, unknown> | null)?.strava_auto_share_strength === true);
+      } catch {
+        if (!cancelled) setAutoShareLifts(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isCompleted]);
   const recomputeGuardRef = useRef<Set<string>>(new Set());
   // Suppress auto re-link fallback briefly after an explicit Unattach
   const suppressRelinkUntil = useRef<number>(0);
@@ -975,98 +997,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </div>
         ) : null}
 
-        {/**
-          * ⛔ SHARE A LIFT TO STRAVA — THE ATHLETE PRESSES IT, NOTHING ELSE DOES (2026-09-03, Michael:
-          * "can we work both ways on strava, upload lifts").
-          *
-          * ⚠️ STRENGTH ONLY, AND THAT IS NOT AN OVERSIGHT: runs and rides arrive FROM Strava, so
-          * posting one back would put the same session in the feed twice.
-          * ⚠️ WHAT LANDS THERE is a manual Weight Training entry — the session name, its duration, and
-          * the lifts as text. Strava has no structured lifting fields on the endpoint that creates an
-          * activity, and its muscle map is drawn from data only its named strength partners can send.
-          * ⛔ It publishes to a feed other people read, so it is a button and never automatic, and the
-          * confirm names that before anything is posted.
-          */}
-        {/* ONE ROW FOR THE SHARE CONTROLS (2026-09-12). Share to Strava and Share each had a
-            right-aligned row of their own with `mt-2`, so a lift's header stacked three button rows
-            under the title. Both now sit in one row; the Strava button still renders only for a lift. */}
-        {isCompleted && (
-          <div className="flex items-center justify-end gap-2 mt-2">
-          {isStrengthFamily && (
-            <button
-              type="button"
-              disabled={sharing}
-              onClick={async () => {
-                const wid = String((workout as Record<string, unknown> | null)?.id ?? '');
-                if (!wid || sharing) return;
-                if (sharedUrl && !window.confirm('This session is already on Strava. Post it again?')) return;
-                if (!sharedUrl && !window.confirm('Post this session to your Strava feed?')) return;
-                setSharing(true);
-                setShareError(null);
-                try {
-                  const { data, error } = await supabase.functions.invoke('share-strength-to-strava', {
-                    body: { workoutId: wid },
-                  });
-                  let payload = (data ?? {}) as { url?: string | null; error?: string };
-                  // A non-2xx answer arrives as `error` with an empty `data`; the server's reason is in
-                  // the response body on the error's context (2026-09-07: every failure read as the
-                  // generic line, so nobody could tell a dead token from a missing scope).
-                  if (error && !payload?.error) {
-                    try {
-                      const ctx = (error as { context?: Response }).context;
-                      const body = ctx ? await ctx.clone().json().catch(() => null) : null;
-                      if (body && typeof body.error === 'string') payload = { ...payload, error: body.error };
-                    } catch { /* keep the generic line */ }
-                  }
-                  if (error || payload?.error) {
-                    setShareError(payload?.error || 'Could not post to Strava.');
-                  } else if (payload?.url) {
-                    setSharedUrl(payload.url);
-                  }
-                } catch (e) {
-                  setShareError(e instanceof Error ? e.message : 'Could not post to Strava.');
-                } finally {
-                  setSharing(false);
-                }
-              }}
-              className="px-3 py-1 rounded-xl bg-white/[0.06] border border-white/20 text-white/80 font-light text-xs hover:bg-white/[0.10] hover:text-white transition-all duration-300 disabled:opacity-50"
-            >
-              {sharing ? 'Posting…' : sharedUrl ? 'Posted to Strava' : 'Share to Strava'}
-            </button>
-          )}
-          {/* Share with a friend (2026-09-07): the session as text through the phone's share sheet, with
-              the site at the bottom. Any completed session, runs and rides included. No picture. */}
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  const w = workout as Record<string, unknown> | null;
-                  const text = shareSessionText(w, Boolean(shareUseImperial));
-                  const how = await shareSession(text, String(w?.name || 'Session'));
-                  setShareNote(how === 'copied' ? 'Copied. Paste it anywhere.' : null);
-                  if (how === 'copied') setTimeout(() => setShareNote(null), 2500);
-                } catch {
-                  setShareNote('Could not open the share sheet.');
-                  setTimeout(() => setShareNote(null), 2500);
-                }
-              }}
-              className="px-3 py-1 rounded-xl bg-white/[0.06] border border-white/20 text-white/80 font-light text-xs hover:bg-white/[0.10]"
-            >
-              {shareNote ?? 'Share'}
-            </button>
-          </div>
-        )}
-        {shareError && (
-          <p className="text-xs text-red-400 text-right mt-1">{shareError}</p>
-        )}
-        {sharedUrl && !shareError && (
-          <p className="text-xs text-right mt-1">
-            <a href={sharedUrl} target="_blank" rel="noopener noreferrer" className="text-[#FC5200] underline underline-offset-2">
-              View on Strava
-            </a>
-          </p>
-        )}
-
         {/* Row 2: Source attribution + View link */}
         {(() => {
           /* ⛔ ONE READER (docs/WORKORDER-garmin-strava-attribution-2026-09-09.md): the same
@@ -1164,9 +1094,25 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           return null;
         })()}
         
-        {/* Row 3: Date */}
-        <div>
-            <p className="text-sm text-gray-300 font-light tracking-normal leading-snug [font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1] flex items-baseline">
+        {/* Row 3: Date, with the share links on its right.
+            ⛔ TEXT LINKS, NOT BUTTONS, AND ON THE DATE'S ROW (2026-09-12, Michael: "that whole top area
+            is a mess"). Share and Strava were two bordered buttons on their own row (three rows of
+            buttons on a lift before that), which made the header taller than the numbers it fronted.
+            A share is a secondary act; it reads as a link.
+
+            ⛔ SHARE A LIFT TO STRAVA — THE ATHLETE PRESSES IT, NOTHING ELSE DOES (2026-09-03, Michael:
+            "can we work both ways on strava, upload lifts"), unless they turned auto-share on in
+            Connections (see `autoShareLifts`). ⚠️ STRENGTH ONLY, AND THAT IS NOT AN OVERSIGHT: runs and
+            rides arrive FROM Strava, so posting one back would put the same session in the feed twice.
+            ⚠️ WHAT LANDS THERE is a manual Weight Training entry — the session name, its duration, and
+            the lifts as text. Strava has no structured lifting fields on the endpoint that creates an
+            activity. ⛔ It publishes to a feed other people read, so the confirm names that before
+            anything is posted. Once posted, the link IS the receipt: "Posted to Strava" opens it.
+
+            Share (2026-09-07): the session as text through the phone's share sheet, with the site at
+            the bottom. Any completed session, runs and rides included. No picture. */}
+        <div className="flex items-baseline justify-between gap-3">
+            <p className="text-sm text-gray-300 font-light tracking-normal leading-snug [font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1] flex items-baseline min-w-0">
               {(() => {
                 try {
                   // For completed workouts, use the date field for date and timestamp for time
@@ -1213,7 +1159,78 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 return 'Planned';
               })()}
             </p>
+            {isCompleted && (
+              <span className="flex items-baseline gap-3 shrink-0 text-xs font-light">
+                <button
+                  type="button"
+                  className="text-white/60 hover:text-white/90 transition-colors"
+                  onClick={async () => {
+                  try {
+                    const w = workout as Record<string, unknown> | null;
+                    const text = shareSessionText(w, Boolean(shareUseImperial));
+                    const how = await shareSession(text, String(w?.name || 'Session'));
+                    setShareNote(how === 'copied' ? 'Copied. Paste it anywhere.' : null);
+                    if (how === 'copied') setTimeout(() => setShareNote(null), 2500);
+                  } catch {
+                    setShareNote('Could not open the share sheet.');
+                    setTimeout(() => setShareNote(null), 2500);
+                  }
+                }}
+                >
+                  {shareNote ?? 'Share'}
+                </button>
+                {isStrengthFamily && sharedUrl && !sharing ? (
+                  <a href={sharedUrl} target="_blank" rel="noopener noreferrer" className="text-[#FC5200]/90 hover:text-[#FC5200] transition-colors">
+                    Posted to Strava
+                  </a>
+                ) : isStrengthFamily && autoShareLifts === false ? (
+                  <button
+                    type="button"
+                    disabled={sharing}
+                    className="text-[#FC5200]/90 hover:text-[#FC5200] transition-colors disabled:opacity-50"
+                    onClick={async () => {
+                  const wid = String((workout as Record<string, unknown> | null)?.id ?? '');
+                  if (!wid || sharing) return;
+                  if (sharedUrl && !window.confirm('This session is already on Strava. Post it again?')) return;
+                  if (!sharedUrl && !window.confirm('Post this session to your Strava feed?')) return;
+                  setSharing(true);
+                  setShareError(null);
+                  try {
+                    const { data, error } = await supabase.functions.invoke('share-strength-to-strava', {
+                      body: { workoutId: wid },
+                    });
+                    let payload = (data ?? {}) as { url?: string | null; error?: string };
+                    // A non-2xx answer arrives as `error` with an empty `data`; the server's reason is in
+                    // the response body on the error's context (2026-09-07: every failure read as the
+                    // generic line, so nobody could tell a dead token from a missing scope).
+                    if (error && !payload?.error) {
+                      try {
+                        const ctx = (error as { context?: Response }).context;
+                        const body = ctx ? await ctx.clone().json().catch(() => null) : null;
+                        if (body && typeof body.error === 'string') payload = { ...payload, error: body.error };
+                      } catch { /* keep the generic line */ }
+                    }
+                    if (error || payload?.error) {
+                      setShareError(payload?.error || 'Could not post to Strava.');
+                    } else if (payload?.url) {
+                      setSharedUrl(payload.url);
+                    }
+                  } catch (e) {
+                    setShareError(e instanceof Error ? e.message : 'Could not post to Strava.');
+                  } finally {
+                    setSharing(false);
+                  }
+                }}
+                  >
+                    {sharing ? 'Posting…' : 'Strava'}
+                  </button>
+                ) : null}
+              </span>
+            )}
           </div>
+        {shareError && (
+          <p className="text-xs text-red-400 text-right mt-1">{shareError}</p>
+        )}
         {assocOpen && (
           <AssociatePlannedDialog
             workout={workout}

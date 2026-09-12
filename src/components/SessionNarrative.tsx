@@ -353,27 +353,13 @@ export default function SessionNarrative({
             : `${m}:${String(s).padStart(2, '0')}`);
         }
         if (tDisplay) parts.push(tDisplay);
-        const recomputeBtn = (
-          <GalaxyButton
-            variant="secondary"
-            size="sm"
-            onClick={onRecompute}
-            disabled={recomputing || recomputeDisabled}
-            className="shrink-0 text-xs"
-            title="Re-run analysis for this workout"
-          >
-            {recomputing ? 'Recomputing…' : 'Recompute analysis'}
-          </GalaxyButton>
-        );
+        // ⛔ NO STANDING RECOMPUTE BUTTON (2026-09-12, Michael: "helpful for dev, not sure it's
+        // necessary for users"). `failureBlock` still carries "Try again" when the stored analysis
+        // failed, and the empty state above still offers it when there is no analysis at all. A
+        // session whose analysis is fine shows nothing to press.
         return parts.length > 0
-          ? (
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-medium text-gray-300">{parts.join(' · ')}</div>
-              {recomputeBtn}
-            </div>
-          )
-          // No stat line to share with (thin session) — the control still needs a home, right-aligned.
-          : <div className="flex justify-end">{recomputeBtn}</div>;
+          ? <div className="text-sm font-medium text-gray-300">{parts.join(' · ')}</div>
+          : null;
       })()}
       {hasRaceDebrief && (
         <div className="space-y-4">

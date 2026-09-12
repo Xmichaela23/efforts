@@ -141,44 +141,26 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
       {/* ═══ D-338 — NO EXECUTION PERCENTAGE ON A STRENGTH SESSION. What replaces it is a FACT: how many
           of the plan's slots were filled. ⛔ AND NOTHING AT ALL WHEN THERE IS NO PLAN (D-035) —
           `strength_counts` is null then. */}
-      {/* ⛔ RECOMPUTE LIVES AT THE TOP — a control the athlete reaches for when the screen looks wrong
-          cannot be the last thing on the screen. It shares the count's row (2026-09-12): on its own
-          right-aligned row it left a band of nothing between the count and the all-out line. */}
-      {(() => {
-        const hasCounts = !!(counts && counts.exercises_planned > 0);
-        const recomputeBtn = onRecompute ? (
-          <GalaxyButton
-            variant="secondary"
-            size="sm"
-            onClick={onRecompute}
-            disabled={recomputing}
-            className="text-xs shrink-0"
-          >
-            {recomputing ? 'Recomputing…' : 'Recompute analysis'}
-          </GalaxyButton>
-        ) : null;
-        if (!hasCounts) {
-          return recomputeBtn ? <div className="flex justify-end">{recomputeBtn}</div> : null;
-        }
-        return (
-          <div>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-baseline gap-2 min-w-0">
-                <span className="readout-label text-xs font-medium uppercase tracking-wide">Completed</span>
-                <span className="text-lg font-semibold text-white">
-                  {counts.exercises_completed} of {counts.exercises_planned}
-                </span>
-                <span className="text-xs text-gray-400">· {counts.exercises_planned === 1 ? 'exercise' : 'exercises'}</span>
-              </div>
-              {recomputeBtn}
-            </div>
-            {/* Q-181 — THE SWAP RECEIPT, deterministic and server-written. An IN-SLOT swap renders nothing. */}
-            {execSubstitutionNotes.map((note, i) => (
-              <p key={i} className="text-sm text-white/80 mt-1.5 leading-snug">{note}</p>
-            ))}
+      {/* ⛔ NO RECOMPUTE BUTTON UNLESS THE ANALYSIS FAILED (2026-09-12, Michael: "Recompute has been
+          helpful for dev, not sure it's necessary for users"). It sat at the top of every lift as a
+          standing control. A stored analysis that is fine has nothing to recompute; one that failed
+          says so in the block below, with "Try again" — that is the athlete's path. The dev path is
+          the calendar's re-analyze. `onRecompute` stays wired for that block. */}
+      {counts && counts.exercises_planned > 0 && (
+        <div>
+          <div className="flex items-baseline gap-2">
+            <span className="readout-label text-xs font-medium uppercase tracking-wide">Completed</span>
+            <span className="text-lg font-semibold text-white">
+              {counts.exercises_completed} of {counts.exercises_planned}
+            </span>
+            <span className="text-xs text-gray-400">· {counts.exercises_planned === 1 ? 'exercise' : 'exercises'}</span>
           </div>
-        );
-      })()}
+          {/* Q-181 — THE SWAP RECEIPT, deterministic and server-written. An IN-SLOT swap renders nothing. */}
+          {execSubstitutionNotes.map((note, i) => (
+            <p key={i} className="text-sm text-white/80 mt-1.5 leading-snug">{note}</p>
+          ))}
+        </div>
+      )}
       {/* "Failed" on screen (plumbing §3): the tap's own error outranks the stored line while fresh. */}
       {(recomputeError || analysisFailure) && (
         <div className="flex items-center justify-between gap-3 mb-2">
