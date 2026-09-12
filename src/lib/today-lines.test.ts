@@ -50,11 +50,21 @@ Deno.test('two sessions, a lift and a ride: two lines, and the preferred order w
   });
 });
 
-Deno.test('⛔ THE BAND NO LONGER PICKS A BRANCH — a hard ride reads the same lines', () => {
-  const day = [lift([{ slot_intent: 'SKILL', name: 'back squat' }]), ride('ride_anaerobic', 'above')];
+Deno.test('⛔ A SESSION THAT IS NOT VT1 DROPS "keep it easy" — p144 rule 5 (2026-09-11)', () => {
+  /**
+   * ⛔ SUPERSEDES "the band no longer picks a branch" (2026-09-10) FOR THE FIRST SENTENCE. Michael,
+   * from the phone: Monday told him to keep the run easy over a run the plan had just prescribed
+   * hard. Rule 5 covers VT1-intensity endurance by name; above, near and below threshold have no
+   * page behind the clause. The ORDER sentence is unaffected on every band — that is rule 6 and p77,
+   * about the lift's own freshness.
+   */
   assertEquals(
-    spacingLineFor(day)?.closer,
-    'Lift first and keep the ride easy. Riding first costs the lift its skill and speed sets.',
+    spacingLineFor([lift([{ slot_intent: 'SKILL', name: 'back squat' }]), ride('ride_anaerobic', 'above')])?.closer,
+    'Lift first. Riding first costs the lift its skill and speed sets.',
+  );
+  assertEquals(
+    spacingLineFor([lift([{ slot_intent: 'SKILL', name: 'back squat' }]), run('run_near_threshold', 'near')])?.closer,
+    'Lift first. Running first costs the lift its skill and speed sets.',
   );
 });
 
@@ -62,7 +72,7 @@ Deno.test('a speed row alone keeps the second sentence', () => {
   const day = [lift([{ slot_intent: 'DE', name: 'barbell bench press' }]), ride('ride_anaerobic', 'above')];
   assertEquals(
     spacingLineFor(day)?.closer,
-    'Lift first and keep the ride easy. Riding first costs the lift its skill and speed sets.',
+    'Lift first. Riding first costs the lift its skill and speed sets.',
   );
 });
 
@@ -81,8 +91,27 @@ Deno.test('a row with no band still gets both lines', () => {
 });
 
 Deno.test('⛔ A LIFT WITH NO SKILL AND NO SPEED SETS: THE SECOND SENTENCE DROPS', () => {
-  const day = [lift([{ slot_intent: 'HYP', name: 'dumbbell curl' }]), ride('ride_anaerobic', 'above')];
+  const day = [lift([{ slot_intent: 'HYP', name: 'dumbbell curl' }]), ride('ride_endurance', 'vt1_or_easier')];
   assertEquals(spacingLineFor(day)?.closer, 'Lift first and keep the ride easy.');
+});
+
+Deno.test('⛔ BOTH HALVES GONE: THE CHEVRON DOES NOT DRAW (2026-09-11)', () => {
+  /**
+   * ⛔ THE UPPER-BODY DAY BESIDE A HARD RUN — the day Michael was looking at. Going second costs the
+   * bench nothing (p131: fresh in the systems the session uses; the run takes the legs), and a run
+   * the plan prescribed hard is not the one to keep easy. Both halves are unearned, so only the
+   * spacing line prints and the chevron is not drawn.
+   */
+  const upper = lift(
+    [{ slot_intent: 'ME', name: 'barbell bench press' }],
+    ['standing_plan', 'frame:all_rounder', 'column:standard'],
+  );
+  assertEquals(spacingLineFor([upper, run('run_mlss', 'above')]), { lead: LEAD });
+  // And a hypertrophy-only lift beside a hard ride: the same two absences, on a row with no frame tag.
+  assertEquals(
+    spacingLineFor([lift([{ slot_intent: 'HYP', name: 'dumbbell curl' }]), ride('ride_anaerobic', 'above')]),
+    { lead: LEAD },
+  );
 });
 
 Deno.test('⛔ TWO SESSIONS THAT ARE NOT A LIFT AND A RIDE GET NO LINE', () => {

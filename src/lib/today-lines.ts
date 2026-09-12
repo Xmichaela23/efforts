@@ -126,8 +126,21 @@ export function spacingLineFor(rows: readonly TodayRow[]): SpacingLine | null {
   if (sport !== 'run' && sport !== 'ride') return { lead };
 
   const closerLabel = 'If they have to be closer';
-  // p144, p145.
-  const first = `Lift first and keep the ${sport} easy.`;
+  /**
+   * ⛔ "KEEP IT EASY" IS p144 RULE 5, AND THAT RULE IS ABOUT VT1 (Michael, 2026-09-11, off the screen:
+   * Monday read *"keep the run easy"* over a run the same screen had just prescribed hard at 48
+   * minutes). Rule 5 is the work-that-benefits-from-pre-fatigue rule and he names VT1-intensity
+   * endurance as that work — *"you could cut your VT1 run volume by a third or so after a hard leg
+   * workout"*. Above, near or below threshold, there is no page behind the clause, so it comes off
+   * rather than being softened.
+   * ⚠️ AN UNKNOWN BAND COUNTS AS NOT EASY: the claim needs the page, not the absence of a tag.
+   * ⛔ THIS REVERSES 2026-09-10's "the band no longer picks a branch" FOR THE FIRST SENTENCE ONLY.
+   * The ORDER still reads the same on every band, because p145 rule 6 and p77 are about the lift's
+   * own freshness and say nothing about what the other session is.
+   */
+  const easy = bandOf(endurance) === 'vt1_or_easier';
+  // p144 rule 5 (the easy clause), p145 rule 6 (the order).
+  const first = easy ? `Lift first and keep the ${sport} easy.` : 'Lift first.';
   // p145, p77. ⛔ ONLY WHEN THE LIFT HAS SOMETHING THAT NEEDS TO BE FRESH.
   const intents = rowsOf(lift).map(intentOf);
   /**
@@ -142,6 +155,13 @@ export function spacingLineFor(rows: readonly TodayRow[]): SpacingLine | null {
   const upperDay = tagValue(lift, 'frame') != null && tagValue(lift, 'lower') == null;
   const costs = !upperDay && (intents.includes('SKILL') || intents.includes('DE'));
   const cost = `${sport === 'run' ? 'Running' : 'Riding'} first costs the lift its skill and speed sets.`;
+  /**
+   * ⛔ NOTHING TO LOSE AND NOTHING TO KEEP EASY, SO NOTHING IS SAID (2026-09-11). A lift with no skill
+   * and no speed sets, beside a session that is not VT1, has lost both halves of the line: going
+   * second costs it nothing, and the other session is not the one to keep easy. The chevron does not
+   * draw — the same silence a swim day already gets, and the standing rule in this file.
+   */
+  if (!easy && !costs) return { lead };
   return { lead, closerLabel, closer: costs ? `${first} ${cost}` : first };
 }
 
