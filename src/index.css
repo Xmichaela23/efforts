@@ -1173,7 +1173,7 @@ body.wizard-active { --tabbar-h: 0px; }
    etched grid reads through the type as a faint instrument face; the session panels carry tables and
    readings with bare bed between them, and the same grid at the same strength read harder there. Same
    layers, same hues, same stars — only the overlay's opacity comes down. */
-.readout-texture--quiet::after { opacity: 0.55; }
+.readout-texture--quiet::after { opacity: 0.35; }
 
 /* FORGE — the Adjust plate (2026-09-05, Michael: "cool texture and lighting like these but different").
    Same nebula ground, stars and grain as every galaxy card, but lit from the LEFT edge instead of
