@@ -799,16 +799,19 @@ the deliberate exception**: neither page prints a core row, and it is offered an
 - `quad_iso` — Leg isolation
 - `core` — Core  ⚠️ names no printed cell (opt-in addition)
 
-**`all_rounder`** — 12 cells
+**`all_rounder`** — 15 cells
 
 - `braced_push` — Machine press
-- `iso_push` — Push isolation
-- `iso_pull_a` — Pull isolation
+- `ar_arms_push_1` — Arms superset · push
+- `ar_arms_pull_1` — Arms superset · pull
+- `ar_push_iso_1` — Push isolation
 - `braced_hinge` — Back extension
 - `braced_leg` — Leg press
 - `ham_iso` — Hamstring isolation
 - `braced_pull` — Machine pull
-- `iso_pull_b` — Pull isolation
+- `ar_arms_push_4` — Arms superset · push
+- `ar_arms_pull_4` — Arms superset · pull
+- `ar_pull_iso_4` — Pull isolation
 - `quad_iso` — Leg isolation
 - `core` — Core  ⚠️ names no printed cell (opt-in addition)
 - `core_2` — Core 2  ⚠️ names no printed cell (opt-in addition)

@@ -197,9 +197,10 @@ Deno.test('⛔⛔ THE SUBTITLE STATES HIS RULE, AND STOPS BORROWING HIS WORD', (
    * the main lifts; barbell curls and calf raises do not. The line sits over all seven rows and has
    * to be true of all seven.
    */
+  // ⚠️ MICHAEL'S WORDS SINCE 2026-09-11, verbatim.
   assertEquals(
     ACCESSORY_SUBTITLE,
-    'Every lifting day opens on a competition lift. These fill in the muscle work around it.',
+    'These are your hypertrophy lifts and super sets based on the equipment you have. You can swap on the day or adjust now for the plan.',
   );
   assertEquals(/compound/i.test(ACCESSORY_SUBTITLE), false, 'the understated version is back');
   assertEquals(/fine.?tune/i.test(ACCESSORY_SUBTITLE), false, 'the misuse of "accessory" is back');

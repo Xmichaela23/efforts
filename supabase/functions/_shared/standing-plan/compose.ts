@@ -1255,7 +1255,7 @@ function exerciseForSlot(
     // ⛔⛔ THE FRAME'S OWN PICK TABLE (D-457, 2026-08-30). p274's accessory cells are BRACED and
     // FOCUSED; p246's are SECONDARY. Matched against the wrong table a cell finds no pick and the
     // athlete's answer is discarded in silence — which is what happened to five controls.
-    ? pickKeyForSlot(slot.category, pattern, frameDay ?? undefined, args.frame)
+    ? pickKeyForSlot(slot.category, pattern, frameDay ?? undefined, args.frame, /\(arms\)/i.test(String(slot.sourceText ?? '')))
     : null;
   /**
    * ⛔⛔ "ALREADY USED TODAY" HAS TO ASK THE NAME THE ATHLETE WILL READ (2026-08-30). `bandRouteName`
@@ -1374,7 +1374,9 @@ function exerciseForSlot(
        * ⛔ p274's ARMS CELLS (2026-09-10) — see `FOCUSED_ARMS_PICKS`. On a day the frame prints "(arms) superset",
        * the pair takes the arm entries of p222's list and the row after it takes the rest.
        */
-      const armsCell = frameHasArmsSuperset(slotKey, args.frame);
+      // ⛔ A KEY THAT NAMES ITS HALF OF THE DAY (`slot.arms`, 2026-09-11) is an arms-day cell either
+      // way: the superset half ranks arm work first, the solo half ranks it last (`inSuperset`).
+      const armsCell = frameHasArmsSuperset(slotKey, args.frame) || VIADA_PICKS[slotKey].slot?.arms != null;
       const inSuperset = /\(arms\)/i.test(String(slot.sourceText || ''));
       const rank = (name: string): number[] => [
         isTaken(name) ? 1 : 0,

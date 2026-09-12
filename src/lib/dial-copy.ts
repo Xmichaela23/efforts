@@ -78,8 +78,13 @@ import { WEEKDAYS } from '../../supabase/functions/_shared/standing-plan/day-map
  * ⚠️ THE SCREEN'S TITLE ("Accessory work") CARRIES THE SAME MISUSE AND IS DELIBERATELY UNTOUCHED —
  * not overlooked. Michael has not ruled on it.
  */
+/**
+ * ⛔ MICHAEL'S WORDS, 2026-09-11, VERBATIM. They replace "Every lifting day opens on a competition
+ * lift. These fill in the muscle work around it." — the step is now grouped by day and names its
+ * supersets, so the line says what the rows are and what can be done with them.
+ */
 export const ACCESSORY_SUBTITLE =
-  'Every lifting day opens on a competition lift. These fill in the muscle work around it.';
+  'These are your hypertrophy lifts and super sets based on the equipment you have. You can swap on the day or adjust now for the plan.';
 
 /**
  * ⛔ THE DIAL'S SUB-LINE. Michael's wording, verbatim; trips the voice lint on `focus` by design.

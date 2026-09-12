@@ -103,7 +103,8 @@ Deno.test('with the incline chip the spider curl is allowed, and the preacher cu
   assert(names.includes('spider curl'), `spider curl missing from ${names.join(', ')}`);
   // ⛔ 2026-09-10: the day-4 pull pair is p274's "(arms)" superset, and an athlete who picks the spider curl
   // for it gets it. (With no pick the pair opens on the first arm movement the kit reaches.)
-  const picked = composeWeek({ ...BASE, week: 2, column: 'standard', equipment: INCLINE, slotPicks: { iso_pull_b: 'spider curl' } } as never);
+  // ⚠️ `ar_arms_pull_4` SINCE 2026-09-11 — p274's day-4 arms pull has its own key on this frame.
+  const picked = composeWeek({ ...BASE, week: 2, column: 'standard', equipment: INCLINE, slotPicks: { ar_arms_pull_4: 'spider curl' } } as never);
   assert(namesIn(picked).includes('spider curl'), 'the composed week never reaches the spider curl when it is picked');
   // An incline bench is not a preacher bench: the name is still the home one.
   assertEquals(offered.find((o) => o.name.toLowerCase() === 'preacher curl')?.display, 'Concentration Curl');

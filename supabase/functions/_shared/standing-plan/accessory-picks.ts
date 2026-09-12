@@ -49,6 +49,19 @@ export type ViadaPickKey =
   | 'iso_push'
   | 'iso_pull_a'
   | 'iso_pull_b'
+  /**
+   * ⛔ p274's SIX FOCUSED UPPER CELLS, ONE KEY EACH (Michael, 2026-09-11: "clarify supersets",
+   * and the two rows with no picker). Day 1 prints the arms superset (push + pull) and a focused
+   * push; day 4 the arms superset and a focused pull. One `iso_push` answering both days' push
+   * halves and no key at all for the two solo cells left two HYP rows to the engine and the pair
+   * unnamed on the screen. Each cell has its own key, day and `arms` marker now.
+   */
+  | 'ar_arms_push_1'
+  | 'ar_arms_pull_1'
+  | 'ar_push_iso_1'
+  | 'ar_arms_push_4'
+  | 'ar_arms_pull_4'
+  | 'ar_pull_iso_4'
   | 'single_leg_a'
   | 'single_leg_b'
   | 'hinge_lower'
@@ -119,8 +132,10 @@ export const VIADA_PICK_KEYS: ViadaPickKey[] = [
  * distinction the page does not make.
  */
 export const ALL_ROUNDER_PICK_KEYS: ViadaPickKey[] = [
-  'braced_push', 'iso_push', 'iso_pull_a', 'braced_hinge', 'braced_leg', 'ham_iso',
-  'braced_pull', 'iso_pull_b', 'quad_iso',
+  'braced_push', 'ar_arms_push_1', 'ar_arms_pull_1', 'ar_push_iso_1',
+  'braced_hinge', 'braced_leg', 'ham_iso',
+  'braced_pull', 'ar_arms_push_4', 'ar_arms_pull_4', 'ar_pull_iso_4',
+  'quad_iso',
   /**
    * ⛔⛔ CORE IS OFFERED HERE AND NOWHERE ELSE IN THIS FRAME (Michael, 2026-08-31: *"make abs an
    * option in the picker"*).
@@ -269,7 +284,16 @@ export type ViadaPickSpec = {
    * ⚠️ It is a FRAME day number (`FrameDay.day`), never a weekday: the weekday rotates with the
    * athlete's pinned days and the frame day does not.
    */
-  slot: { category: ViadaCategory; pattern: ViadaPattern | null; frameDay?: number } | null;
+  slot: {
+    category: ViadaCategory;
+    pattern: ViadaPattern | null;
+    frameDay?: number;
+    /**
+     * ⛔ WHICH OF TWO SAME-CATEGORY CELLS ON ONE DAY THIS KEY ANSWERS (2026-09-11): `true` the cell
+     * the page prints "(arms) superset" on, `false` the solo focused cell. Absent matches either.
+     */
+    arms?: boolean;
+  } | null;
   /**
    * ⛔ THE OTHER HALF OF A SUPERSET THE PAGE PRINTS AS ONE ROW. p274 pairs `braced hinge` with
    * `braced lower push` on both lower days: *"2 × HYP: braced hinge / braced lower push superset"*.
@@ -583,6 +607,79 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     leadWith: ['romanian deadlift', 'stiff-legged deadlift', 'reverse hyper', 'good morning', 'kb swing', 'sandbag throw'],
     leadCite: 'Viada p220 - secondary hinge lower',
     servesChips: [],
+  },
+  /**
+   * ⛔ p274's FOCUSED UPPER CELLS, ONE KEY EACH (2026-09-11) — see the `ViadaPickKey` note. Lists
+   * are p222's, as `iso_push` / `iso_pull_*` carry them; only the day, the `arms` marker and the
+   * opening order differ. The arms halves open on arm work (the superset is "(arms)"); the two solo
+   * cells open on the non-arm movements of the same lists — the shoulder and chest isolation on
+   * day 1, the rear delt and pullover on day 4 — so a day does not stack three triceps or three
+   * biceps movements. Day 4's arms pair opens on different movements from day 1's (p275: variety of
+   * implement and plane keeps progress coming; the page prints the pair on both days and names
+   * neither). The opening orders are OURS within his lists.
+   */
+  ar_arms_push_1: {
+    key: 'ar_arms_push_1',
+    label: 'Arms superset · push',
+    slot: { category: 'focused', pattern: 'push_upper', frameDay: 1, arms: true },
+    hisList: ['triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
+    leadWith: ['triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
+    leadCite: 'Viada pp222-223 — focused push / arms',
+    pairedWith: 'ar_arms_pull_1',
+    servesChips: ['arms'],
+  },
+  ar_arms_pull_1: {
+    key: 'ar_arms_pull_1',
+    label: 'Arms superset · pull',
+    slot: { category: 'focused', pattern: 'pull_upper', frameDay: 1, arms: true },
+    hisList: ['preacher curl', 'spider curl', 'rear delt machine', 'drag curl', 'pullover machine'],
+    leadWith: ['preacher curl', 'spider curl', 'drag curl', 'rear delt machine', 'pullover machine'],
+    leadCite: 'Viada pp222-223 — focused pull, arms',
+    pairedWith: 'ar_arms_push_1',
+    servesChips: ['arms'],
+  },
+  ar_push_iso_1: {
+    key: 'ar_push_iso_1',
+    label: 'Push isolation',
+    slot: { category: 'focused', pattern: 'push_upper', frameDay: 1, arms: false },
+    hisList: ['triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
+    oursList: [{
+      name: 'chest fly',
+      because: 'His only chest isolation is the pec deck (p222) and it needs the station, so a home '
+        + 'gym gets none of his. Ours, not a substitute for his movement.',
+    }],
+    leadWith: ['lateral raise', 'pec deck', 'triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher'],
+    leadCite: 'Viada pp222-223 — focused push',
+    servesChips: ['chest', 'shoulders'],
+  },
+  ar_arms_push_4: {
+    key: 'ar_arms_push_4',
+    label: 'Arms superset · push',
+    slot: { category: 'focused', pattern: 'push_upper', frameDay: 4, arms: true },
+    hisList: ['triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
+    leadWith: ['skull crusher', 'behind the neck db triceps extension', 'tate press', 'triceps pushdown', 'pec deck', 'lateral raise'],
+    leadCite: 'Viada pp222-223 — focused push / arms',
+    pairedWith: 'ar_arms_pull_4',
+    servesChips: ['arms'],
+  },
+  ar_arms_pull_4: {
+    key: 'ar_arms_pull_4',
+    label: 'Arms superset · pull',
+    slot: { category: 'focused', pattern: 'pull_upper', frameDay: 4, arms: true },
+    hisList: ['preacher curl', 'spider curl', 'rear delt machine', 'drag curl', 'pullover machine'],
+    leadWith: ['drag curl', 'spider curl', 'preacher curl', 'rear delt machine', 'pullover machine'],
+    leadCite: 'Viada pp222-223 — focused pull, arms',
+    pairedWith: 'ar_arms_push_4',
+    servesChips: ['arms'],
+  },
+  ar_pull_iso_4: {
+    key: 'ar_pull_iso_4',
+    label: 'Pull isolation',
+    slot: { category: 'focused', pattern: 'pull_upper', frameDay: 4, arms: false },
+    hisList: ['preacher curl', 'spider curl', 'rear delt machine', 'drag curl', 'pullover machine'],
+    leadWith: ['rear delt machine', 'pullover machine', 'preacher curl', 'spider curl', 'drag curl'],
+    leadCite: 'Viada pp222-223 — focused pull, rear delt / upper back',
+    servesChips: ['shoulders'],
   },
   single_leg_a: {
     key: 'single_leg_a',
@@ -913,7 +1010,9 @@ export const CORE_PICK_KEYS = ['core', 'core_2', 'core_3'] as const;
  * ⚠️ AN OPTION OFF HIS LIST COUNTS BY ITS PRIME MOVER — a banded pushdown is triceps work — so a kit that
  * reaches none of his arm movements still fills the pair with arm work before anything else.
  */
-export const FOCUSED_ARMS_PICKS: ReadonlySet<ViadaPickKey> = new Set<ViadaPickKey>(['iso_push', 'iso_pull_a', 'iso_pull_b']);
+export const FOCUSED_ARMS_PICKS: ReadonlySet<ViadaPickKey> = new Set<ViadaPickKey>([
+  'iso_push', 'iso_pull_a', 'iso_pull_b', 'ar_arms_push_1', 'ar_arms_pull_1', 'ar_arms_push_4', 'ar_arms_pull_4',
+]);
 
 const FOCUSED_ARMS: Record<'push_upper' | 'pull_upper', { list: string[]; muscle: string }> = {
   push_upper: { list: ['triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher'], muscle: 'triceps' },
@@ -937,6 +1036,8 @@ export function frameHasArmsSuperset(key: ViadaPickKey, frame: FrameId): boolean
   if (!FOCUSED_ARMS_PICKS.has(key)) return false;
   const slot = VIADA_PICKS[key]?.slot;
   if (!slot) return false;
+  // ⛔ A KEY THAT NAMES ITS CELL ANSWERS FROM THE MARKER, not from a scan of the day.
+  if (slot.arms != null) return slot.arms;
   return Object.values(FRAMES[frame]?.columns ?? {}).some((days) => (days ?? []).some((day) =>
     (slot.frameDay == null || day.day === slot.frameDay)
     && day.strength.some((sl) => sl.category === slot.category && sl.pattern === slot.pattern
@@ -966,11 +1067,14 @@ export function pickKeyForSlot(
    * ⚠️ Absent keeps `strength_5k`, which is every caller that predates the second table.
    */
   frame: FrameId = 'strength_5k',
+  /** Whether the cell is the page's "(arms) superset" one — see `slot.arms`. */
+  arms?: boolean,
 ): ViadaPickKey | null {
   let fallback: ViadaPickKey | null = null;
   for (const key of (PICK_KEYS_BY_FRAME[frame] ?? VIADA_PICK_KEYS)) {
     const slot = VIADA_PICKS[key].slot;
     if (!slot || slot.category !== category || slot.pattern !== pattern) continue;
+    if (slot.arms != null && arms != null && slot.arms !== arms) continue;
     if (slot.frameDay == null) {
       // Day-agnostic: one movement across every day the cell falls on. Kept as the fallback so a
       // day-scoped sibling always wins on its own day.
@@ -1008,7 +1112,8 @@ export function frameDaysForPick(
     if (spec.slot.frameDay != null && day.day !== spec.slot.frameDay) continue;
     const hit = day.strength.some((s) =>
       s.intent === 'HYP' && s.role === 'accessory'
-      && s.category === spec.slot!.category && s.pattern === spec.slot!.pattern);
+      && s.category === spec.slot!.category && s.pattern === spec.slot!.pattern
+      && (spec.slot!.arms == null || /\(arms\)/i.test(String(s.sourceText ?? '')) === spec.slot!.arms));
     if (hit) out.push(day.day);
   }
   /**

@@ -199,7 +199,8 @@ Deno.test('⛔ THE BUILD FOCUS SCREEN DRAWS ONLY PICKS THE CHOSEN FRAME CAN HONO
     'the Build focus screen no longer asks the chosen frame — and its kit — which picks it can draw');
   assert(!/pickKeysInDayOrder\(\s*\)/.test(src),
     '⛔ the unfiltered, frame-less pick list is back on the screen');
-  assert(/dayLabelForPick\(key,\s*wizardFrame\)/.test(src),
+  // ⚠️ `frameDaysForPick` SINCE 2026-09-11 — the screen groups by day and prints only a second day.
+  assert(/frameDaysForPick\(key,\s*wizardFrame\)/.test(src),
     'the day tags no longer come from the chosen frame');
 });
 
@@ -341,9 +342,11 @@ Deno.test('⛔ THE SUPERSET p274 PRINTS AS ONE ROW IS NAMED ON BOTH ITS HALVES',
   }
   // ⚠️ AND NOTHING ELSE CLAIMS A PAIR. p274 prints only two supersets and the arms one is already
   // three separate picks across two days — a `pairedWith` there would assert a 1:1 link it has not.
+  // ⚠️ THE ARMS PAIRS CLAIM THEIRS TOO SINCE 2026-09-11: p274's "(arms) superset" is one key per
+  // half per day now, and each half names the other.
   const paired = VIADA_PICK_KEYS.concat(picksForFrame('all_rounder'))
     .filter((k) => VIADA_PICKS[k].pairedWith != null);
-  assertEquals([...new Set(paired)].sort(), ['braced_hinge', 'braced_leg']);
+  assertEquals([...new Set(paired)].sort(), ['ar_arms_pull_1', 'ar_arms_pull_4', 'ar_arms_push_1', 'ar_arms_push_4', 'braced_hinge', 'braced_leg']);
 });
 
 Deno.test('⛔ THE SUPERSET SENTENCE IS GATED ON ITS PARTNER BEING DRAWN', async () => {
