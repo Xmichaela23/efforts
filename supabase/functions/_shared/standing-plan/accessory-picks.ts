@@ -879,7 +879,14 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
      * front and goblet squat (Outlift, Hevy). A lunge is the asymmetrical row's shape, not this one's,
      * which is how the same week came to carry three lunges.
      */
-    subLeadWith: ['zercher squat', 'goblet squat'],
+    subLeadWith: ['front squat', 'goblet squat', 'zercher squat'],
+    /**
+     * ⛔ OFF THIS ROW (Michael, 2026-09-11, reviewing the dropdown): the explosive step-up is a
+     * power drill, not volume work; the lateral lunge is sideways, adductor work. The single-leg
+     * movements stay as fallbacks behind the three two-leg squats — they are the asymmetrical row's
+     * shape, and that row already carries one each lower day.
+     */
+    excludes: ['explosive step up', 'lateral lunge'],
     pairedWith: 'braced_hinge',
     superset: 'superset with the back extension',
     servesChips: ['glutes'],
@@ -1796,6 +1803,17 @@ export function pickOptions(
             intent: 'HYP',
             equipment: equipment ?? null,
           }).options);
+        }
+        /**
+         * ⛔ A NAMED SUBSTITUTE MAY BE ONE OF HIS PRIMARY LIFTS (2026-09-11): the front squat is the
+         * closest stand-in for a leg press and is filed under p219's primaries, which the stepped
+         * pools above never reach. Only a movement `subLeadWith` names is drawn from there — the
+         * primary pool is never opened to a cell wholesale.
+         */
+        if (subKeys.length > 0) {
+          for (const m of resolveSlot({ category: 'primary', pattern: spec.slot?.pattern ?? null, intent: 'HYP', equipment: equipment ?? null }).options) {
+            if (subKeys.includes(canonicalize(m.name))) pooled.push(m);
+          }
         }
         const subs = refine(dedupeByCanonical([...pooled, ...admittedPool])
           .filter((m) => !excluded.has(canonicalize(m.name)))

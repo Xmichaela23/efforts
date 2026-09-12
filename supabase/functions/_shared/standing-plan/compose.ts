@@ -1398,10 +1398,24 @@ function exerciseForSlot(
   }
 
   const named = slotKey ? String(args.slotPicks?.[slotKey] ?? '').trim() : '';
+  /**
+   * ⛔ A PICK THE PICKER DREW FROM THE PRIMARY POOL IS HONOURED HERE TOO (2026-09-11): the front
+   * squat on the leg-press row. The cell's own options never hold a primary lift, so the named pick
+   * is looked up there when it is one the pick's `subLeadWith` names — the same gate the picker uses.
+   */
+  const namedFromPrimary = (): { name: string } | undefined => {
+    if (!slotKey || named === '') return undefined;
+    const allowed = (VIADA_PICKS[slotKey].subLeadWith ?? []).map((n) => canonicalize(n));
+    if (!allowed.includes(canonicalize(named))) return undefined;
+    return resolveSlot({ category: 'primary', pattern, intent: slot.intent, equipment: args.equipment ?? null })
+      .options.find((o) => canonicalize(o.name) === canonicalize(named)
+        && !isTaken(o.name)
+        && (!competition || canonicalize(o.name) !== canonicalize(competition)));
+  };
   const fromSlotPick = named !== ''
-    ? resolved.options.find((o) => canonicalize(o.name) === canonicalize(named)
+    ? (resolved.options.find((o) => canonicalize(o.name) === canonicalize(named)
       && !isTaken(o.name)
-      && (!competition || canonicalize(o.name) !== canonicalize(competition)))
+      && (!competition || canonicalize(o.name) !== canonicalize(competition))) ?? namedFromPrimary())
     : undefined;
 
   const fromPick = fromSlotPick ?? (slot.intent === 'HYP' && slot.role === 'accessory'
