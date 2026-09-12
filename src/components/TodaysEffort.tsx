@@ -1618,7 +1618,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           position: 'absolute',
           left: '-16px',
           right: '-16px',
-          top: '-70px',
+          /* The core sits BEHIND the date pill, well inside the panel's clip. At -70px it straddled the
+             clip edge and rendered as a hard bright bar along the top, a tube light, not a sun. */
+          top: '-16px',
           height: '320px',
           zIndex: 0,
           pointerEvents: 'none',
@@ -1626,9 +1628,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           filter: 'blur(10px)',
           transform: 'translateZ(0)',
           backgroundImage: `
-            radial-gradient(150px 84px at 50% 22%, rgba(255,253,248,0.62) 0%, rgba(255,253,248,0.18) 46%, rgba(255,253,248,0.00) 100%),
-            radial-gradient(360px 200px at 50% 24%, rgba(255,242,214,0.26) 0%, rgba(255,242,214,0.00) 100%),
-            radial-gradient(640px 330px at 50% 26%, rgba(255,214,150,0.12) 0%, rgba(255,214,150,0.00) 100%)
+            radial-gradient(170px 96px at 50% 20%, rgba(255,253,248,0.60) 0%, rgba(255,253,248,0.18) 46%, rgba(255,253,248,0.00) 100%),
+            radial-gradient(380px 210px at 50% 22%, rgba(255,242,214,0.24) 0%, rgba(255,242,214,0.00) 100%),
+            radial-gradient(660px 340px at 50% 24%, rgba(255,214,150,0.11) 0%, rgba(255,214,150,0.00) 100%)
           `,
         }}
       />
