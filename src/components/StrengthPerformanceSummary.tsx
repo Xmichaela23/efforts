@@ -128,7 +128,9 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
   };
 
   return (
-    <div className="space-y-4">
+    // space-y-3, not 4 (2026-09-12, Michael: "a lot of dead space up top"). The block line, the
+    // count row and the all-out line each stood a full 16 px apart before the table began.
+    <div className="space-y-3">
       {/* THE BLOCK THIS SESSION BELONGED TO — one quiet line above the numbers it frames, so a light
           week reads as a light week instead of as an under-performed one. */}
       {blockLine && (
@@ -139,36 +141,44 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
       {/* ═══ D-338 — NO EXECUTION PERCENTAGE ON A STRENGTH SESSION. What replaces it is a FACT: how many
           of the plan's slots were filled. ⛔ AND NOTHING AT ALL WHEN THERE IS NO PLAN (D-035) —
           `strength_counts` is null then. */}
-      {counts && counts.exercises_planned > 0 && (
-        <div>
-          <div className="flex items-baseline gap-2">
-            <span className="readout-label text-xs font-medium uppercase tracking-wide">Completed</span>
-            <span className="text-lg font-semibold text-white">
-              {counts.exercises_completed} of {counts.exercises_planned}
-            </span>
-            <span className="text-xs text-gray-400">· {counts.exercises_planned === 1 ? 'exercise' : 'exercises'}</span>
-          </div>
-          {/* Q-181 — THE SWAP RECEIPT, deterministic and server-written. An IN-SLOT swap renders nothing. */}
-          {execSubstitutionNotes.map((note, i) => (
-            <p key={i} className="text-sm text-white/80 mt-1.5 leading-snug">{note}</p>
-          ))}
-        </div>
-      )}
       {/* ⛔ RECOMPUTE LIVES AT THE TOP — a control the athlete reaches for when the screen looks wrong
-          cannot be the last thing on the screen. */}
-      {onRecompute && (
-        <div className="flex justify-end -mt-1 mb-2">
+          cannot be the last thing on the screen. It shares the count's row (2026-09-12): on its own
+          right-aligned row it left a band of nothing between the count and the all-out line. */}
+      {(() => {
+        const hasCounts = !!(counts && counts.exercises_planned > 0);
+        const recomputeBtn = onRecompute ? (
           <GalaxyButton
             variant="secondary"
             size="sm"
             onClick={onRecompute}
             disabled={recomputing}
-            className="text-xs"
+            className="text-xs shrink-0"
           >
             {recomputing ? 'Recomputing…' : 'Recompute analysis'}
           </GalaxyButton>
-        </div>
-      )}
+        ) : null;
+        if (!hasCounts) {
+          return recomputeBtn ? <div className="flex justify-end">{recomputeBtn}</div> : null;
+        }
+        return (
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-baseline gap-2 min-w-0">
+                <span className="readout-label text-xs font-medium uppercase tracking-wide">Completed</span>
+                <span className="text-lg font-semibold text-white">
+                  {counts.exercises_completed} of {counts.exercises_planned}
+                </span>
+                <span className="text-xs text-gray-400">· {counts.exercises_planned === 1 ? 'exercise' : 'exercises'}</span>
+              </div>
+              {recomputeBtn}
+            </div>
+            {/* Q-181 — THE SWAP RECEIPT, deterministic and server-written. An IN-SLOT swap renders nothing. */}
+            {execSubstitutionNotes.map((note, i) => (
+              <p key={i} className="text-sm text-white/80 mt-1.5 leading-snug">{note}</p>
+            ))}
+          </div>
+        );
+      })()}
       {/* "Failed" on screen (plumbing §3): the tap's own error outranks the stored line while fresh. */}
       {(recomputeError || analysisFailure) && (
         <div className="flex items-center justify-between gap-3 mb-2">
@@ -183,7 +193,7 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
       {/* ── THE ALL-OUT SET (2026-07-30) — server-computed, rendered verbatim. ⚠️ When the panel is
           empty it SAYS SO. */}
       {Array.isArray(allOut) && allOut.length === 0 && allOutReason && (
-        <div className="mt-3 mb-1 text-[12px] text-white/40">
+        <div className="text-[12px] text-white/40">
           {allOutReason === 'session_had_no_all_out_set'
             ? 'No all-out set on this session.'
             : allOutReason === 'no_reps_on_all_out_set'

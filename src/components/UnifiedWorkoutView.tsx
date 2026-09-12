@@ -987,8 +987,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           * ⛔ It publishes to a feed other people read, so it is a button and never automatic, and the
           * confirm names that before anything is posted.
           */}
-        {isCompleted && isStrengthFamily && (
-          <div className="flex items-center justify-end mt-2">
+        {/* ONE ROW FOR THE SHARE CONTROLS (2026-09-12). Share to Strava and Share each had a
+            right-aligned row of their own with `mt-2`, so a lift's header stacked three button rows
+            under the title. Both now sit in one row; the Strava button still renders only for a lift. */}
+        {isCompleted && (
+          <div className="flex items-center justify-end gap-2 mt-2">
+          {isStrengthFamily && (
             <button
               type="button"
               disabled={sharing}
@@ -1029,12 +1033,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             >
               {sharing ? 'Posting…' : sharedUrl ? 'Posted to Strava' : 'Share to Strava'}
             </button>
-          </div>
-        )}
-        {/* Share with a friend (2026-09-07): the session as text through the phone's share sheet, with
-            the site at the bottom. Any completed session, runs and rides included. No picture. */}
-        {isCompleted && (
-          <div className="flex items-center justify-end mt-2">
+          )}
+          {/* Share with a friend (2026-09-07): the session as text through the phone's share sheet, with
+              the site at the bottom. Any completed session, runs and rides included. No picture. */}
             <button
               type="button"
               onClick={async () => {
@@ -1272,9 +1273,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           )}
         </TabsList>
 
-        <div className="pt-3">
+        {/* ⛔ NO GAP UNDER THE TAB BAR (2026-09-12, Michael: "a lot of dead space up top", every
+            sport). `ui/tabs.tsx` gives every TabsContent a default `mt-8`, and this screen never
+            overrode it — so the first card sat 32 px of margin + 12 px of this wrapper + 8 px of the
+            content's own padding below the tabs, on run, ride and lift alike. `mt-0` on each content
+            wins through twMerge; the wrapper keeps 4 px so the card's border does not touch the bar. */}
+        <div className="pt-1">
           {/* Planned Tab */}
-          <TabsContent value="planned" className="flex-1 p-2">
+          <TabsContent value="planned" className="flex-1 p-2 mt-0">
             <div className={cardClass} style={cardStyle}>
               <div className={hasCardStyle ? 'p-4' : ''}>
                 {(() => {
@@ -1516,7 +1522,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Performance Tab - execution (linked) or analysis (unplanned) */}
-          <TabsContent value="summary" className="flex-1 p-2">
+          <TabsContent value="summary" className="flex-1 p-2 mt-0">
             <div className={cardClass} style={cardStyle}>
               <div className={hasCardStyle ? 'p-4' : ''}>
                 {/* Inline Strength Logger editor */}
@@ -1550,7 +1556,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Completed Tab */}
-          <TabsContent value="completed" className="flex-1 px-1 py-2">
+          <TabsContent value="completed" className="flex-1 px-1 py-2 mt-0">
             <div className={cardClass} style={cardStyle}>
               <div className={hasCardStyle ? 'px-2 py-4' : ''}>
                 {isCompleted ? (
