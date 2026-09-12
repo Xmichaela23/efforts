@@ -9,6 +9,7 @@ import CompletedTab from './CompletedTab';
 import StrengthLogger from './StrengthLogger';
 import AssociatePlannedDialog from './AssociatePlannedDialog';
 import MobileSummary from './MobileSummary';
+import { strengthBlockLine } from '@/lib/strength-block-line';
 import WorkoutDetail from './WorkoutDetail';
 import StrengthCompletedView from './StrengthCompletedView';
 import StructuredPlannedView from './StructuredPlannedView';
@@ -997,7 +998,22 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </div>
         ) : null}
 
-        {/* Row 2: Source attribution + View link */}
+        {/* Row 2: where it came from.
+            ⛔ ONE FORMULA FOR EVERY SPORT (2026-09-12, Michael: "run and ride are fine, follow the same
+            formula, it just needs continuity"). A ride's header is three rows: title, source, date. A
+            lift had two, because nothing sourced it, and the header read as thrown together for want
+            of that middle row. A lift's source is its plan, so the block line the card used to open
+            with ("Standard Focus · week 2 of 12") prints here, same slot, same size. A lift off any
+            plan has no line, as a manual ride has no device. Words unchanged. */}
+        {isCompleted && isStrengthFamily && (() => {
+          const line = strengthBlockLine(sessionDetailV1 as Parameters<typeof strengthBlockLine>[0]);
+          return line ? (
+            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              <span className="text-gray-400 text-sm">{line}</span>
+            </div>
+          ) : null;
+        })()}
+        {/* Row 2 (endurance): Source attribution + View link */}
         {(() => {
           /* ⛔ ONE READER (docs/WORKORDER-garmin-strava-attribution-2026-09-09.md): the same
              `getProviderAttribution` Today's done card and the Week tab ask, so the drawer can never

@@ -66,21 +66,11 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
   const allOut = sessionDetail?.strength_all_out ?? null;
   const allOutReason = sessionDetail?.strength_all_out_reason ?? null;
   const block = sessionDetail?.block ?? null;
+  // The line itself now prints in the header (`strengthBlockLine`, below the title, in the slot a
+  // ride's "via Garmin Edge 1040" occupies). `block` stays for the measurement-week sentence.
   // ── WHAT BLOCK THIS SESSION BELONGED TO (Q-230 / D-339, wired 2026-08-01) ─────────────────────
   // ⚠️ Every piece is optional: no plan link → no card → nothing renders. A week that the plan does
   // not place prints "week 3 of 12" with no word, and a card with no block length prints "week 3".
-  const blockLine = (() => {
-    if (!block) return null;
-    const week = block.week_index ?? null;
-    if (week == null) return null;
-    const weeks = block.block_weeks ?? null;
-    /**
-     * ⛔ THE PHASE WORD IS STRIPPED HERE TOO (2026-08-29) — same removal as the State row, same
-     * reason: `PHASE_NAME`'s vocabulary is the previous program's block shape, and none of those words
-     * is Viada's. "week 1 of 12" is a position and stays.
-     */
-    return weeks != null && weeks > 0 ? `week ${week} of ${weeks}` : `week ${week}`;
-  })();
   const workoutId = sessionDetail?.workout_id ?? (completed as any)?.id ?? null;
   // D-095: per-exercise prior-session lookup populated by workout-detail, keyed by `canonicalize`;
   // each row carries its own `previous_key`.
@@ -131,13 +121,9 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
     // space-y-3, not 4 (2026-09-12, Michael: "a lot of dead space up top"). The block line, the
     // count row and the all-out line each stood a full 16 px apart before the table began.
     <div className="space-y-3">
-      {/* THE BLOCK THIS SESSION BELONGED TO — one quiet line above the numbers it frames, so a light
-          week reads as a light week instead of as an under-performed one. */}
-      {blockLine && (
-        <div className="text-[11px] text-white/40">
-          {block?.plan_name ? `${block.plan_name} · ${blockLine}` : blockLine}
-        </div>
-      )}
+      {/* THE BLOCK THIS SESSION BELONGED TO used to be one quiet line here. It is the header's second
+          row now (2026-09-12, Michael: "run and ride are fine, follow the same formula"): a ride's
+          header says where the ride came from, and a lift came from its plan. `strengthBlockLine`. */}
       {/* ═══ D-338 — NO EXECUTION PERCENTAGE ON A STRENGTH SESSION. What replaces it is a FACT: how many
           of the plan's slots were filled. ⛔ AND NOTHING AT ALL WHEN THERE IS NO PLAN (D-035) —
           `strength_counts` is null then. */}
