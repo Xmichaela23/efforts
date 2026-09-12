@@ -1980,13 +1980,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         {/**
           * ═══ THE STATUS CARD, AT THE TOP OF TODAY, UNDER THE DATE (Michael, 2026-09-12) ═══════════
           *
-          * ⛔ LOCKED ABOVE THE SESSIONS, A STEP NARROWER (Michael, 2026-09-12: "can the load screen be
-          * kind of locked on top and maybe made a little narrower, it just jumps around so much when
-          * you're flipping between days"). It sat under the session list, so its position was whatever
+          * ⛔ LOCKED ABOVE THE SESSIONS, AND SHORT (Michael, 2026-09-12: "can the load screen be kind
+          * of locked on top and maybe made a little narrower, it just jumps around so much when you're
+          * flipping between days" — then "I meant shorter"). It sat under the session list, so its position was whatever
           * the day's sessions added up to — a one-card day put it mid-screen, a two-lift day under the
           * fold, and flipping days made it hop. Under the date pill it is in the same place on every
-          * day. Narrower than the session cards, so it reads as the instrument the day sits under
-          * rather than as a third session.
+          * day. Full width, and as short as its three lines allow, so it costs the sessions below
+          * as little of the screen as possible.
           *
           * (2026-09-10, when it was at the bottom:)
           * ⛔ ONE BLOCK PER SUBJECT. The header is the day and its weather; this card is where the
@@ -2016,10 +2016,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             className="block w-full text-left cursor-pointer galaxy-card readout-texture readout-texture--spectral"
             style={{
               borderRadius: 14,
-              padding: '10px 14px',
-              marginLeft: 12,
-              marginRight: 12,
-              marginBottom: 12,
+              /* ⛔ SHORTER, NOT NARROWER (Michael, 2026-09-12: "I meant shorter so it does not occupy
+                 so much space"). Full width like the session cards; the height is what comes down —
+                 tighter vertical padding and the three lines closed up. Nothing is dropped: the
+                 Garmin line is attribution and stays. */
+              padding: '6px 14px 7px',
+              marginBottom: 10,
               /**
                * ⛔ THE INSTRUMENT SITS IN THE LIGHT, IT IS NOT MADE OF IT (Michael, 2026-09-12: "load
                * card should be more readable", one pass after asking for a translucent feel). Real
@@ -2051,7 +2053,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             {weekTotalsLine ? (
               <span
                 className="block font-light tabular-nums"
-                style={{ color: 'rgba(255,255,255,0.84)', marginTop: formLine ? 6 : 0 }}
+                style={{ color: 'rgba(255,255,255,0.84)', marginTop: formLine ? 2 : 0 }}
               >
                 {weekTotalsLine}
               </span>
@@ -2059,7 +2061,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             {/* ⚠️ THE SMALLEST TEXT ON THE CARD, AND IT STAYS AT 12px — Garmin's line is attribution,
                 not a reading. The lines above it grew; it did not, so it is still the smallest. */}
             {garminDerived && formLine ? (
-              <GarminDerivedDataLine className="text-[12px]" style={{ marginTop: 6 }} />
+              <GarminDerivedDataLine className="text-[12px]" style={{ marginTop: 2 }} />
             ) : null}
           </div>
         ) : null}
