@@ -2518,9 +2518,21 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         * ⚠️ The bottom tab bar's own "+" is Focus, where a plan gets built. This one logs a session.
         * ⚠️ It logs to the day on screen, not to today: flip to yesterday, tap +, and the lift lands
         * on yesterday. `handleAddEffort(type, date)` sets the selected date before opening.
-        * It sits in the panel root, outside the scroll container, so it never scrolls or slides.
+        * ⛔ PINNED TO THE VIEWPORT, ABOVE THE TAB BAR — not to the panel (2026-09-12, Michael: "it's
+        * not showing"). Absolute-in-the-panel put it at the panel's bottom edge, and the panel's own
+        * height is the sum of the day's content inside a clipped column, so "bottom: 12" landed below
+        * the fold. Fixed to the screen it is always in the same place. Safe to fix: every other screen
+        * (State, a session, the logger) replaces the dashboard in the tree rather than covering it, and
+        * the Week tab hides Today with display:none, which hides a fixed child too.
         */}
-      <div style={{ position: 'absolute', right: 12, bottom: 12, zIndex: 30 }}>
+      <div
+        style={{
+          position: 'fixed',
+          right: 16,
+          bottom: 'calc(var(--tabbar-h, 64px) + env(safe-area-inset-bottom, 0px) + var(--tabbar-extra, 0px) + 12px)',
+          zIndex: 40,
+        }}
+      >
         <LogFAB onSelectType={(type) => onAddEffort(type, activeDate)} />
       </div>
 
