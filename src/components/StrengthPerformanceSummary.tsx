@@ -118,9 +118,11 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
   };
 
   return (
-    // space-y-3, not 4 (2026-09-12, Michael: "a lot of dead space up top"). The block line, the
-    // count row and the all-out line each stood a full 16 px apart before the table began.
-    <div className="space-y-3">
+    // ⛔ SECTIONED LIKE STATE'S CARDS (2026-09-12, Michael: "get it in line with state and today"):
+    // the count and the all-out set first, then one section per lift (StrengthCompareTable), then
+    // the totals — each padded the same, divided by State's hairline.
+    <div>
+      <div className="px-3 py-3 space-y-3">
       {/* THE BLOCK THIS SESSION BELONGED TO used to be one quiet line here. It is the header's second
           row now (2026-09-12, Michael: "run and ride are fine, follow the same formula"): a ride's
           header says where the ride came from, and a lift came from its plan. `strengthBlockLine`. */}
@@ -204,6 +206,7 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
           />
         </div>
       )}
+      </div>
       <StrengthCompareTable
         slots={slots}
         completedWorkoutRaw={completed}
@@ -216,7 +219,7 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
       />
       {totals && (totals.sets_completed > 0 || totals.volume_lb > 0) && (
         <>
-        <div className="grid grid-cols-4 gap-2 pt-3 mt-1 border-t border-white/10 text-center">
+        <div className="grid grid-cols-4 gap-2 px-3 py-3 border-t border-white/[0.055] text-center">
           <div>
             <div className="text-lg font-semibold text-white">{totals.sets_completed}</div>
             <div className="text-[11px] text-white/50">Total Sets</div>
@@ -267,17 +270,17 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
           </div>
         </div>
         {durationError && (
-          <div className="text-[11px] text-amber-300/90 text-right">{durationError}</div>
+          <div className="text-[11px] text-amber-300/90 text-right px-3 pb-2">{durationError}</div>
         )}
         </>
       )}
       {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (
-        <div className="text-sm text-gray-700">
-          <div className="font-medium mb-1">Add‑ons</div>
+        <div className="px-3 py-3 border-t border-white/[0.055] text-[13px] text-white/85">
+          <div className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase mb-1">Add‑ons</div>
           {completed.addons.map((a:any, idx:number)=> (
-            <div key={idx} className="flex items-center justify-between border-t border-gray-100 py-1">
+            <div key={idx} className="flex items-center justify-between py-0.5">
               <span>{a.token?.split('.')[0]?.replace(/_/g,' ') || a.name || 'Addon'}</span>
-              <span className="text-gray-600">{a.completed? '✓ ' : ''}{a.duration_min||0}m</span>
+              <span className="text-white/55">{a.completed? '✓ ' : ''}{a.duration_min||0}m</span>
             </div>
           ))}
         </div>

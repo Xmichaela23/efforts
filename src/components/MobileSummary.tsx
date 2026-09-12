@@ -172,7 +172,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
     // NOT the training table + execution/volume. It's measurement, not a session.
     if ((sd as any)?.is_test && (sd as any)?.test_result) {
       return (
-        <div className="w-full space-y-2">
+        <div className="w-full space-y-2 p-3">
           {sessionDetailLoading && !sd && (
             <div className="text-xs text-white/50 px-0.5" aria-live="polite">Loading test result…</div>
           )}
@@ -194,11 +194,11 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       // index.css. One variable, no prop threading, and the Performance tab therefore cannot
       // disagree with the Details tab's plate about what colour this workout is.
       <div
-        className="w-full space-y-2"
+        className="w-full"
         style={{ ['--card-accent-rgb' as any]: getDisciplineColorRgb(normalizeDiscipline(type) || String(type || '')) }}
       >
         {sessionDetailLoading && !sd && (
-          <div className="text-xs text-white/50 px-0.5" aria-live="polite">
+          <div className="text-xs text-white/50 px-3 pt-3" aria-live="polite">
             Loading performance analysis…
           </div>
         )}
@@ -258,7 +258,9 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         />
         {/* NEXT moved to the bottom of the strength Performance tab (below the compare table) — the
             up-next session is context to glance at after reviewing the work, not above it. */}
-        {(sd as any)?.next_session && <NextUp session={(sd as any).next_session} />}
+        {(sd as any)?.next_session && (
+          <div className="px-3 py-3 border-t border-white/[0.055]"><NextUp session={(sd as any).next_session} /></div>
+        )}
       </div>
     );
   }
@@ -266,6 +268,9 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
   // Endurance (run/ride/swim) — all data comes from sd (session_detail_v1)
 
   return (
+    // ⛔ SECTIONED LIKE STATE'S CARDS (2026-09-12, Michael: "get it in line with state and today").
+    // Section 1: the tiles and the Garmin line. Section 2: the session's readings (SessionNarrative),
+    // divided by the same hairline LOAD, THIS WEEK and BODY use. Each section pads itself.
     <div className="w-full">
       {sessionDetailLoading && !hasSessionDetail && (
         <div className="flex justify-center py-8" aria-busy="true" aria-label="Loading performance data">
@@ -309,6 +314,7 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
           </div>
         );
       })()}
+      <div className="pt-2 pb-1">
       {/* D-166 refinement: swims drop the top adherence header — it duplicated the green-dot
           Distance/Duration pills now inside the swim card (113% Duration was showing twice). */}
       <AdherenceChips
@@ -319,7 +325,8 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       />
       {/* Garmin API Brand Guidelines v6.30.2025 — derived-data attribution, verbatim, under the tiles.
           Not inside a tooltip or a collapsed section. */}
-      {garminDerived ? <GarminDerivedDataLine className="px-1 pt-1 pb-2" /> : null}
+      {garminDerived ? <GarminDerivedDataLine className="px-3 pb-1" /> : null}
+      </div>
 
       {/* Macro discipline trend removed from Performance (lives on State). Swim's in-card trend is a
           separate placement, deferred. */}

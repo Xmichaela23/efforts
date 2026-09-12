@@ -1,3 +1,4 @@
+import { kindWordFromSlot } from '@/lib/today-lines';
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { SessionDetailV1 } from '@shared/session-detail/types.ts';
@@ -153,7 +154,7 @@ export default function StrengthCompareTable({ slots, completedWorkoutRaw, previ
   const rows = Array.isArray(slots) ? slots : [];
 
   return (
-    <div className="space-y-3">
+    <div>
       {/* ⛔ THE EDIT HINT IS GONE (2026-07-30, Michael). It sat above every strength session, in
           amber, permanently — instructions for a control that is already visible on every row. */}
 
@@ -178,21 +179,26 @@ export default function StrengthCompareTable({ slots, completedWorkoutRaw, previ
         }));
 
         return (
-          <div key={i} className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-white">{r.name}</span>
+          // ⛔ ONE SECTION PER LIFT (2026-09-12): State's hairline and padding, so the lifts read as
+          // LOAD / THIS WEEK / BODY do — one instrument, sectioned — instead of blocks that ran together.
+          <div key={i} className="px-3 py-3 border-t border-white/[0.055] space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <span className="text-[13px] font-medium text-white">{r.name}</span>
                 {/* ⛔ THE SUBSTITUTE IS TITLE TEXT, NOT AN ANNOTATION (2026-08-02, Michael). */}
                 {r.status === 'swapped' && r.executed_name && (
-                  <span className="text-sm font-medium text-white">
+                  <span className="text-[13px] font-medium text-white">
                     <span className="text-white/40">→ </span>{r.executed_name}
                   </span>
                 )}
                 {r.status === 'not_logged' && r.status_label && (
                   <span className="text-[11px] text-white/45 uppercase tracking-wide">{r.status_label}</span>
                 )}
+                {/* ⛔ THE BOOK'S WORD FOR THE SLOT — Maximal effort / Dynamic effort / Hypertrophy / Skill
+                    (Michael, 2026-09-12), the same words Today's cards print. `kindWordFromSlot` reads a
+                    row analysed before the server switched. */}
                 {r.intent_word && (
-                  <span className="text-[11px] text-white/45 uppercase tracking-wide">{r.intent_word}</span>
+                  <span className="text-[11px] text-white/45 uppercase tracking-wide">{kindWordFromSlot(r.intent_word)}</span>
                 )}
                 {r.status === 'unplanned' && r.status_label && (
                   <span className="text-[11px] text-white/45 uppercase tracking-wide">{r.status_label}</span>
@@ -200,8 +206,8 @@ export default function StrengthCompareTable({ slots, completedWorkoutRaw, previ
                 {/* THE PRESCRIPTION, ON THE ROW IT BELONGS TO — a rep total or a band, "by feel". It says
                     "Planned", because nothing else on this row does (2026-08-02, Michael). */}
                 {r.target_label && (
-                  <span className="text-sm text-white/80">
-                    <span className="text-white/50">Planned </span>{r.target_label}
+                  <span className="text-[12px] text-white/70">
+                    <span className="text-white/45">Planned </span>{r.target_label}
                   </span>
                 )}
               </div>
@@ -211,7 +217,7 @@ export default function StrengthCompareTable({ slots, completedWorkoutRaw, previ
               )}
               {/* RIR — the analyzer's average against the target, when both exist. */}
               {r.target_rir != null && r.avg_rir != null && (
-                <div className={`flex items-center gap-1 px-2.5 py-1 rounded text-sm ${
+                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[13px] shrink-0 ${
                   r.rir_concern ? 'bg-amber-500/20' : 'bg-white/5'
                 }`}>
                   <span className={`font-semibold ${r.rir_concern ? 'text-amber-400' : 'text-white'}`}>
@@ -231,7 +237,8 @@ export default function StrengthCompareTable({ slots, completedWorkoutRaw, previ
             {/* ⛔ NO ROWS, NO COLUMN HEADERS. A lift that was never logged used to draw
                 "Set · Planned · Completed" over empty space. */}
             {pairs.length > 0 && (
-            <div className="grid grid-cols-12 text-xs font-medium text-white/70 border-b border-white/20 pb-1">
+            // Column heads in State's label voice: 11 px, uppercase, tracked, muted.
+            <div className="grid grid-cols-12 text-[11px] uppercase tracking-wide text-white/45 border-b border-white/10 pb-1">
               <div className="col-span-2">Set</div>
               {totalRow ? (
                 hasPrevious ? (
@@ -361,7 +368,7 @@ export default function StrengthCompareTable({ slots, completedWorkoutRaw, previ
                         </div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-12 text-sm group">
+                      <div className="grid grid-cols-12 text-[13px] group">
                         <div className="col-span-2 text-white/60">{idx+1}</div>
                         {totalRow ? (
                           hasPrevious ? (
@@ -408,7 +415,7 @@ export default function StrengthCompareTable({ slots, completedWorkoutRaw, previ
             {/* ⛔ THE ONE COMPARISON A REP-TOTAL ROW CAN HONESTLY MAKE: reps against the total. A COUNT,
                 not a grade — no colour, no percentage, no verdict. */}
             {r.reps_line && (
-              <div className="text-sm text-white/80 border-t border-white/10 pt-1 flex items-center justify-end gap-1.5">
+              <div className="text-[12px] text-white/80 border-t border-white/10 pt-1 flex items-center justify-end gap-1.5">
                 <span>{r.reps_line}</span>
               </div>
             )}
@@ -416,7 +423,7 @@ export default function StrengthCompareTable({ slots, completedWorkoutRaw, previ
                 volume line shows whenever either side has volume; the delta only against a plan that
                 priced load. */}
             {(r.planned_volume_lb > 0 || r.volume_lb > 0) && (
-              <div className="text-xs border-t border-white/10 pt-1 flex items-center justify-end gap-2">
+              <div className="text-[12px] border-t border-white/10 pt-1 flex items-center justify-end gap-2">
                 <span className="text-white/50">Vol:</span>
                 {r.volume_delta_lb != null ? (
                   <>

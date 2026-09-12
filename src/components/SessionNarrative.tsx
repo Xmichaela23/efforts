@@ -124,6 +124,20 @@ interface SessionNarrativeProps {
   accentRgb?: string;
 }
 
+/**
+ * One reading in State's row grammar (StateBodyBlock): the label in the muted 11 px lowercase voice,
+ * the value at 13 px beside it. A fixed label column so the sentences align; long ones wrap under
+ * themselves, never under the label.
+ */
+function Reading({ label, text }: { label: string; text: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-x-2.5">
+      <span className="shrink-0 w-[92px] text-[11px] text-white/45 lowercase tracking-wide leading-snug">{label}</span>
+      <span className="min-w-0 flex-1 text-[13px] text-white/85 leading-snug">{text}</span>
+    </div>
+  );
+}
+
 export function NextUp({ session }: { session: NextSession }) {
   const dayName = session.date ? (() => {
     try {
@@ -136,16 +150,18 @@ export function NextUp({ session }: { session: NextSession }) {
     // Label ABOVE the text, matching the other labeled blocks on this screen. Beside-the-paragraph
     // (flex) left the "NEXT" label orphaned at the top-left of a multi-line prescription and read as
     // off-centered (Michael 2026-08-11).
-    <div>
-      <span className="readout-label text-xs font-medium uppercase tracking-wide">Next</span>
-      <p className="text-sm text-gray-300 mt-1 leading-snug">
-        {dayName && <span className="text-gray-400">{dayName} </span>}
-        {session.name}
-        {session.prescription && (
-          <span className="text-gray-500"> — {session.prescription}</span>
-        )}
-      </p>
-    </div>
+    <Reading
+      label="Next"
+      text={(
+        <>
+          {dayName && <span className="text-white/55">{dayName} </span>}
+          {session.name}
+          {session.prescription && (
+            <span className="text-white/55"> — {session.prescription}</span>
+          )}
+        </>
+      )}
+    />
   );
 }
 
@@ -320,7 +336,7 @@ export default function SessionNarrative({
     // from the tiles above by the same hairline State uses. The accent variable stays, for the
     // section labels' tint.
     <div
-      className="mt-3 px-3 pt-4 pb-1 space-y-3 border-t border-white/[0.055]"
+      className="px-3 py-3 space-y-2 border-t border-white/[0.055]"
       style={{
         ...(accentRgb ? { ['--card-accent-rgb' as any]: accentRgb } : {}),
         ['--card-accent-a' as any]: '0.22',
@@ -362,28 +378,20 @@ export default function SessionNarrative({
         // necessary for users"). `failureBlock` still carries "Try again" when the stored analysis
         // failed, and the empty state above still offers it when there is no analysis at all. A
         // session whose analysis is fine shows nothing to press.
+        // The section's header, in State's voice (BODY / THIS WEEK): 11 px, uppercase, tracked, the
+        // sport's colour. It used to be a 14 px grey stat line with no relation to the screen next door.
         return parts.length > 0
-          ? <div className="text-sm font-medium text-gray-300">{parts.join(' · ')}</div>
+          ? <div className="readout-label text-[11px] font-semibold tracking-[0.12em] uppercase">{parts.join(' · ')}</div>
           : null;
       })()}
       {hasRaceDebrief && (
-        <div className="space-y-4">
+        <div className="space-y-1.5">
           {raceDebriefSections ? (
             raceDebriefSections.map(({ label, text }) => (
-              <div key={label}>
-                <span className="readout-label text-xs font-medium uppercase tracking-wide">
-                  {label}
-                </span>
-                <p className="text-sm text-gray-300 leading-relaxed mt-1">{text}</p>
-              </div>
+              <Reading key={label} label={label} text={text} />
             ))
           ) : (
-            <div>
-              <span className="readout-label text-xs font-medium uppercase tracking-wide">
-                Race debrief
-              </span>
-              <p className="text-sm text-gray-300 leading-relaxed mt-1">{raceDebriefText}</p>
-            </div>
+            <Reading label="Race debrief" text={raceDebriefText} />
           )}
         </div>
       )}
@@ -461,13 +469,14 @@ export default function SessionNarrative({
         }
         const rank = (l: string) => ORDER[l.toUpperCase()] ?? 50;
         const ordered = rows.map((r, i) => ({ r, i })).sort((a, b) => rank(a.r.label) - rank(b.r.label) || a.i - b.i).map((x) => x.r);
+        // ⛔ ONE ROW PER READING, STATE'S GRAMMAR (2026-09-12): the label in BODY's muted lowercase
+        // voice on the left, the sentence at 13 px beside it, wrapping under itself when long. It was a
+        // label on its own line over a paragraph, six times — twice the height for the same words.
+        // ⚠️ Words unchanged; only the label's case is the label style's, as State's rows are.
         return ordered.length > 0 ? (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {ordered.map((r, i) => (
-              <div key={`${r.label}-${i}`}>
-                <span className="readout-label text-xs font-medium uppercase tracking-wide">{r.label}</span>
-                <p className="text-sm text-gray-300 leading-relaxed mt-0.5">{r.value}</p>
-              </div>
+              <Reading key={`${r.label}-${i}`} label={r.label} text={r.value} />
             ))}
           </div>
         ) : null;

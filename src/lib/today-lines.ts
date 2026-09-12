@@ -175,6 +175,19 @@ export const KIND_WORD: Record<'ME' | 'DE' | 'SKILL' | 'HYP', string> = {
   HYP: 'Hypertrophy',
 };
 
+/**
+ * The slot word a stored analysis carries (`strength_slots[].intent_word`), read as the book's word.
+ * The server sends `KIND_WORD`'s words since 2026-09-12; a row analysed before that carries the old
+ * "heavy" / "speed" / "skill" / "hypertrophy" and is read through the same table rather than
+ * printed as a second vocabulary. Anything else passes through untouched.
+ */
+export function kindWordFromSlot(word: string | null | undefined): string | null {
+  if (!word) return null;
+  const legacy: Record<string, keyof typeof KIND_WORD> = { heavy: 'ME', speed: 'DE', skill: 'SKILL', hypertrophy: 'HYP' };
+  const k = legacy[String(word).trim().toLowerCase()];
+  return k ? KIND_WORD[k] : word;
+}
+
 /** p218, p219. */
 const ME_CUE = '1 to 5 reps, stop short of failure.';
 

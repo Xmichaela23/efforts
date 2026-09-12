@@ -1554,10 +1554,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           {/* Performance Tab - execution (linked) or analysis (unplanned) */}
           <TabsContent value="summary" className="flex-1 p-2 mt-0">
             <div className={cardClass} style={cardStyle}>
-              <div className={hasCardStyle ? 'p-4' : ''}>
+              {/* No padding here (2026-09-12): the panel is sectioned like State's cards — each
+                  section pads itself and a hairline divides them (MobileSummary and below). */}
+              <div>
                 {/* Inline Strength Logger editor */}
                 {editingInline && String((workout as any)?.type||'').toLowerCase()==='strength' && (
-                  <div className="mb-4 border border-white/20 rounded-md">
+                  <div className="m-3 border border-white/20 rounded-md">
                     <StrengthLogger
                       onClose={()=> setEditingInline(false)}
                       scheduledWorkout={(isCompleted ? workout : (linkedPlanned || workout))}

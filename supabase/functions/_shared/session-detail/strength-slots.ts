@@ -37,7 +37,12 @@ type Slot = NonNullable<SessionDetailV1['strength_slots']>[number];
 type PlannedSet = Slot['planned_sets'][number];
 type RirVerdict = 'too_easy' | 'on_target' | 'too_hard';
 
-const SLOT_INTENT_WORD: Record<string, string> = { ME: 'heavy', DE: 'speed', SKILL: 'skill', HYP: 'hypertrophy' };
+// ⛔ THE BOOK'S OWN WORDS FOR THE SLOT (Michael, 2026-09-12: "lifts should have their focus —
+// hypertrophy, dynamic, maximal effort"). Today's cards print p218's intent table through
+// `KIND_WORD` (src/lib/today-lines.ts); this sent "heavy" / "speed" for the same slots, so the
+// Performance tab named a lift's focus in a second vocabulary. One vocabulary now; the client's
+// `kindWordFromSlot` still understands the old words from a row analysed before this deployed.
+const SLOT_INTENT_WORD: Record<string, string> = { ME: 'Maximal effort', DE: 'Dynamic effort', SKILL: 'Skill', HYP: 'Hypertrophy' };
 
 const RIR_LINE: Record<RirVerdict, string> = {
   too_hard: 'Going too hard — reduce weight or add reps in reserve',
