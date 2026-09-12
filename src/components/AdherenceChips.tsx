@@ -157,7 +157,7 @@ export default function AdherenceChips({
     const isSwim = /swim/i.test(sportType);
     const isPoolSwim = !!sd.classification?.is_pool_swim;
 
-    const decoupling = (sd.classification as any)?.decoupling as { pct: number | null; basis: 'gap' | 'raw' | 'hr' | null; whole_session?: boolean; line?: string | null } | null | undefined;
+    const decoupling = (sd.classification as any)?.decoupling as { pct: number | null; basis: 'gap' | 'raw' | 'hr' | 'power' | null; whole_session?: boolean; line?: string | null } | null | undefined;
     const driftPct = decoupling?.pct ?? null;
     const driftValue = driftPct != null ? `${driftPct.toFixed(1)}%` : null;
     /**

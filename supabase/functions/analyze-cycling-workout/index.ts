@@ -1,4 +1,3 @@
-import { halvesSteady, notSteadyLine } from '../_shared/ride-halves-steady.ts';
 import { withAlarm } from '../_shared/alarm.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { hrDriftHalvesPct, warmupSkipSeconds } from '../_shared/hr-drift-halves.ts';
@@ -287,32 +286,13 @@ export function generateCyclingAdherenceSummary(opts: {
     value: `${hits} of ${workIntervals.length} work intervals on target (within ±15% of prescribed power).`,
   });
 
-  // HR drift interpretation. Cycling stores drift_bpm + early/late HR; convert to %
-  // for the interpretation thresholds (which mirror running's drift bands).
-  // The drift is always READ (Michael, 2026-09-07: "cardiac drift should be read"). When the two halves were
-  // not ridden at the same power, the number is still shown and the note beside it says why it may mislead.
-  const halvesOk = halvesSteady(opts.powerHalves?.first_w, opts.powerHalves?.second_w);
-  const halvesNote = halvesOk === false ? ` ${notSteadyLine(Number(opts.powerHalves!.first_w), Number(opts.powerHalves!.second_w))}` : '';
-  if (typeof opts.hrDriftPct === 'number' && Number.isFinite(opts.hrDriftPct)) {
-    const drift = opts.hrDriftPct;
-    if (Math.abs(drift) < 3) {
-      technical_insights.push({
-        label: 'Cardiac drift',
-        value: halvesNote ? `Heart rate ${drift > 0 ? '+' : ''}${drift.toFixed(1)}% drift.${halvesNote}` : `Heart rate stable (${drift > 0 ? '+' : ''}${drift.toFixed(1)}% drift). Aerobic system held steady throughout the ride.`,
-      });
-    } else if (drift >= 3 && drift < 8) {
-      technical_insights.push({
-        label: 'Cardiac drift',
-        value: `Moderate HR drift (+${drift.toFixed(1)}%) — power held but HR climbed in the second half. Heat, hydration, or accumulated fatigue worth checking.`,
-      });
-    } else if (drift >= 8) {
-      technical_insights.push({
-        label: 'Cardiac drift',
-        value: `Significant HR drift (+${drift.toFixed(1)}%). Indicates aerobic strain compounding through the ride; recovery may take longer than usual.`,
-      });
-    }
-  }
-
+  // ⛔ NO "Cardiac drift" INSIGHT (2026-09-12, Michael: "not a single source of truth"). This wrote a
+  // third drift sentence for the ride — heart rate alone, with its own 3 / 8 % bands (ours) and a
+  // "heat, hydration, or accumulated fatigue worth checking" clause that was speculation dressed as a
+  // read — beside the session builder's drift line, which it could contradict ("power held" under a
+  // pacing row that said power fell). The ride's drift is ONE number now: the power-to-heart-rate
+  // decoupling, read by the Drift tile and State alike (`session-detail/build.ts decouplingV1`,
+  // `compute-snapshot driftReadForPoint`). `hrDriftPct` stays on the options for the paragraph.
   const facts = opts.factPacket?.facts;
   if (facts && typeof facts.normalized_power_w === 'number' && typeof facts.intensity_factor === 'number') {
     const ct = facts.classified_type ? String(facts.classified_type).replace(/_/g, ' ') : 'training stimulus';

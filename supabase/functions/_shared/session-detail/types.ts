@@ -394,7 +394,7 @@ export type SessionDetailV1 = {
       /** 'gap' / 'raw' = pace-to-heart-rate decoupling (TrainingPeaks' Pa:Hr); 'hr' = heart rate alone,
        *  second half against first (the book's own drift, p107) — the fallback so the number is NEVER
        *  withheld (Michael 2026-09-03: "drift is going to be important"). */
-      basis: 'gap' | 'raw' | 'hr' | null;
+      basis: 'gap' | 'raw' | 'hr' | 'power' | null;
       assessment: 'excellent' | 'good' | 'moderate' | 'high' | null;
       /** true when the session had intervals: the number covers the whole session, intervals included,
        *  so it is not the same read as a steady run. Stated on the screen, never hidden. */

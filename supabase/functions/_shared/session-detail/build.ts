@@ -2,7 +2,6 @@
 // SESSION_DETAIL_V1 — Build from snapshot slice + workout_analysis
 // =============================================================================
 
-import { halvesSteady, notSteadyLine } from '../ride-halves-steady.ts';
 import type { SessionDetailV1, SegmentVerdictV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
 import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
 import { pacingVariability, stampIntervalCompare } from './interval-compare.ts';
@@ -887,6 +886,22 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         whole_session: wholeSession,
         line: driftLineFor(Math.round(pct * 10) / 10),
       };
+    }
+    // ⛔ A RIDE'S DRIFT IS POWER TO HEART RATE, THE SAME NUMBER STATE READS (2026-09-12, Michael: "not a
+    // single source of truth — make sure State is sourcing from the same"). The cycling analyser never
+    // writes `heart_rate_summary.decouplingPct`, so every ride fell through to heart rate alone below,
+    // and the Drift tile said 5.4% while State's bike drift — which reads the ratio first, per the
+    // 2026-09-03 ruling in compute-snapshot (`driftReadForPoint`): p107's two arms are ratios of output
+    // to heart rate, and heart rate alone is one side of one — said 10% for the same ride. Same
+    // precedence here now: the ratio (`analysis.efficiency.aerobic_decoupling_pct`, written by
+    // `_shared/cycling-v1/ride-physiology.ts`), basis 'power'; heart rate alone only when there is no
+    // power. The separate "Power to heart rate fell" row is gone — this IS that number, once.
+    if (type === 'ride') {
+      const pdec = Number((comp?.analysis?.efficiency as any)?.aerobic_decoupling_pct);
+      if (Number.isFinite(pdec)) {
+        const p = Math.round(pdec * 10) / 10;
+        return { pct: p, basis: 'power' as const, assessment: null, confounded: false, whole_session: wholeSession, line: driftLineFor(p) };
+      }
     }
     // ⛔ NEVER WITHHELD (Michael 2026-09-03: "drift is going to be important"). When the pace-to-heart-rate
     // read was not computed (intervals, short session, a ride), fall back to heart rate alone: second half
@@ -1849,30 +1864,12 @@ export function buildAnalysisDetailRows(
   //
   // ⚠️ SILENCE, NOT A SUBSTITUTE. On a hard ride this row does not appear. It does not swap in a
   // different number wearing the same label — that is the fault this whole day has been closing.
-  try {
-    if (sport === 'ride') {
-      const ct = String((factPacket?.facts as any)?.classified_type || '').toLowerCase();
-      const isAerobicRide = /endurance|recovery|long|aerobic|base|z2|easy/.test(ct);
-      const dec = Number((comp?.analysis?.efficiency as any)?.aerobic_decoupling_pct);
-      const ph = (factPacket as any)?.derived?.power_halves;
-      const steady = halvesSteady(ph?.first_w, ph?.second_w);
-      const halvesNote = steady === false ? ` ${notSteadyLine(Number(ph.first_w), Number(ph.second_w))}` : '';
-      if (isAerobicRide && Number.isFinite(dec)) {
-        const d = Math.round(dec * 10) / 10;
-        // ⛔ NAMED FOR WHAT IT MEASURES (2026-09-03, WORKORDER-bike-state-audit §2). This number is POWER
-        // AGAINST HEART RATE — the first-half power-to-heart-rate ratio against the second — and a positive
-        // value means that ratio fell. "Moderate drift over the ride" read as heart rate climbing; on the Sep 3
-        // ride heart rate FELL (139 → 129) and power fell faster (155 → 136 W), so the ratio still fell 7.4%.
-        // The sentence now says which ratio moved and which way; the bare number stays as the receipt.
-        // Sign-aware (2026-09-07): a large NEGATIVE number is not "held steady" — the ratio rose.
-        const desc = d <= -5 ? 'Power to heart rate rose over the ride'
-          : d < 5 ? 'Power to heart rate held steady'
-          : d <= 10 ? 'Power to heart rate fell over the ride'
-          : 'Power to heart rate fell hard over the ride';
-        rows.push({ label: 'Heart rate', value: `${desc} (${d}%).${halvesNote}` });
-      }
-    }
-  } catch { /* */ }
+  // ⛔ THE RIDE'S "Power to heart rate fell (d%)" ROW IS GONE (2026-09-12). That number — the
+  // power-to-heart-rate decoupling, `analysis.efficiency.aerobic_decoupling_pct` — is now the ride's
+  // drift read itself: the Drift tile and the one drift line (`decouplingV1`, above) carry it, with the
+  // same precedence State's bike drift uses. Printing it here as well was a third drift sentence on one
+  // screen, beside a heart-rate-alone figure that disagreed with it. The 2026-09-03 sign-aware wording
+  // ("rose" / "held steady" / "fell" / "fell hard") lives on in that entry's history.
 
   // Efficiency (cycling): HR-at-power EF from computed.analysis.efficiency.
   try {
@@ -2065,7 +2062,7 @@ export function buildAnalysisDetailRows(
         // for; on a trainer or a treadmill there was no terrain, so the suffix would be inventing a
         // cause. The percentage stands as measured.
         const scope = decoupling?.whole_session
-          ? ' — whole session, intervals included, so not a steady-run read'
+          ? ` — whole session, intervals included, so not a steady-${sport === 'ride' ? 'ride' : 'run'} read`
           : (decoupling?.basis === 'hr' ? ' — heart rate alone, second half against first'
             : (decoupling?.basis === 'raw' && !indoors ? ' — hills mixed in' : ''));
         rows.push({ label: 'Heart rate', value: `Drift ${pctAny.toFixed(1)}% (${room})${scope}` });

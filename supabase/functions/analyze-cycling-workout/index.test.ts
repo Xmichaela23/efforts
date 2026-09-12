@@ -121,50 +121,19 @@ Deno.test('generateCyclingAdherenceSummary: power_adherence insight when present
   assertEquals(insight?.value, '87% of work-interval time within the prescribed power range.');
 });
 
-// ── §4 HR drift bands — mirror running's interpretation ───────────────────
+// ── §4 no "Cardiac drift" insight — the ride's drift is one number, read by the session builder ────
 
-Deno.test('generateCyclingAdherenceSummary: HR drift stable when |drift| < 3%', () => {
-  const r = generateCyclingAdherenceSummary({
-    performance: { execution_score: 85 },
-    intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 90 }],
-    factPacket: null,
-    hrDriftPct: 1.5,
-  });
-  const insight = r?.technical_insights.find((i) => i.label === 'Cardiac drift');
-  assert(insight?.value.startsWith('Heart rate stable'));
-});
-
-Deno.test('generateCyclingAdherenceSummary: HR drift moderate at 3-7%', () => {
-  const r = generateCyclingAdherenceSummary({
-    performance: { execution_score: 85 },
-    intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 90 }],
-    factPacket: null,
-    hrDriftPct: 5.5,
-  });
-  const insight = r?.technical_insights.find((i) => i.label === 'Cardiac drift');
-  assert(insight?.value.startsWith('Moderate HR drift'));
-});
-
-Deno.test('generateCyclingAdherenceSummary: HR drift significant at >= 8%', () => {
-  const r = generateCyclingAdherenceSummary({
-    performance: { execution_score: 85 },
-    intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 90 }],
-    factPacket: null,
-    hrDriftPct: 12,
-  });
-  const insight = r?.technical_insights.find((i) => i.label === 'Cardiac drift');
-  assert(insight?.value.startsWith('Significant HR drift'));
-});
-
-Deno.test('generateCyclingAdherenceSummary: omits Cardiac drift insight when hrDriftPct is null', () => {
-  const r = generateCyclingAdherenceSummary({
-    performance: { execution_score: 85 },
-    intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 90 }],
-    factPacket: null,
-    hrDriftPct: null,
-  });
-  const insight = r?.technical_insights.find((i) => i.label === 'Cardiac drift');
-  assertEquals(insight, undefined);
+Deno.test('generateCyclingAdherenceSummary: never emits a Cardiac drift insight (2026-09-12)', () => {
+  for (const hrDriftPct of [1.5, 5.5, 12, null]) {
+    const r = generateCyclingAdherenceSummary({
+      performance: { execution_score: 85 },
+      intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 90 }],
+      factPacket: null,
+      hrDriftPct,
+    });
+    const insight = r?.technical_insights.find((i) => i.label === 'Cardiac drift');
+    assertEquals(insight, undefined);
+  }
 });
 
 // ── §5 intensity insight from fact packet ─────────────────────────────────
