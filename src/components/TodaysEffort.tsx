@@ -347,11 +347,56 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   };
 
   /**
-   * ⛔ THE SWIPE IS THE DATE LINE'S AND STOPS THERE. The decks below run their own pointer handlers,
-   * so a gesture that starts here must not travel — `stopPropagation` on every phase, and
-   * `touchAction: 'pan-y'` so a vertical scroll still scrolls rather than being eaten.
+   * ⛔ THE WHOLE DAY SLIDES (Michael, 2026-09-12: "can we just make it slide? the intuition is to
+   * slide between today and tomorrow or yesterday"). The swipe used to live on the date line alone,
+   * with no motion: a 60 px drag on that one row swapped the day in place. It is now the panel's own
+   * gesture — start anywhere on Today, drag sideways, and the day follows the finger, leaves the way
+   * it was pushed, and the next day slides in from the other side under the same light.
+   *
+   * ⚠️ ONE MECHANIC, THE DECK'S. Axis lock at 8 px decided once, capture only once it is a drag, a
+   * 60 px commit or a flick — the same numbers `CardDeck.tsx` uses, so one gesture grammar governs the
+   * screen. A gesture that starts INSIDE a deck (`[data-deck]`) is the deck's, and the panel never
+   * sees it as a day swipe; a vertical drag is the scroll's, and `touchAction: 'pan-y'` keeps it so.
+   * The chevrons stay for anyone who prefers a tap; they read `movedAny` so a drag ending on one is
+   * not also a tap.
    */
-  const dateSwipe = useRef<{ x: number; moved: number } | null>(null);
+  const daySwipe = useRef<{
+    active: boolean; startX: number; startY: number; lastX: number; lastT: number;
+    vx: number; dx: number; axis: 'x' | 'y' | null; movedAny: number;
+  }>({ active: false, startX: 0, startY: 0, lastX: 0, lastT: 0, vx: 0, dx: 0, axis: null, movedAny: 0 });
+  /** Where the day's content sits, in px. Follows the finger while dragging; animates otherwise. */
+  const [daySlideX, setDaySlideX] = useState(0);
+  /** True while the content should move WITHOUT a transition (finger down, or the off-screen reset). */
+  const [daySlideRaw, setDaySlideRaw] = useState(false);
+  /** Set when a swipe commits, read when the new date lands, so the entry comes from the right side. */
+  const pendingDayDir = useRef<'prev' | 'next' | null>(null);
+  const DAY_SWIPE_COMMIT_PX = 60;
+  const DAY_SWIPE_FLICK_V = 0.5;   // px per ms — CardDeck's FLICK_VELOCITY
+  const DAY_SWIPE_AXIS_PX = 8;     // CardDeck's AXIS_LOCK_PX
+  const DAY_SLIDE_MS = 190;
+
+  const commitDaySwipe = (dir: 'prev' | 'next') => {
+    const w = scrollRef.current?.clientWidth || 360;
+    pendingDayDir.current = dir;
+    setDaySlideRaw(false);
+    // Leave the way it was pushed: next = content exits to the left.
+    setDaySlideX(dir === 'next' ? -w : w);
+    window.setTimeout(() => handleDayNav(dir), DAY_SLIDE_MS - 20);
+  };
+  // The new day lands: place it just off the far side with no transition, then let it slide home.
+  useEffect(() => {
+    const dir = pendingDayDir.current;
+    if (!dir) return;
+    pendingDayDir.current = null;
+    const w = scrollRef.current?.clientWidth || 360;
+    setDaySlideRaw(true);
+    setDaySlideX(dir === 'next' ? w : -w);
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => { setDaySlideRaw(false); setDaySlideX(0); });
+    });
+    return () => { cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
+  }, [activeDate]);
 
   const handleWeekNav = (direction: 'prev' | 'next') => {
     const newDate = direction === 'prev' 
@@ -1723,6 +1768,57 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           WebkitOverflowScrolling: 'touch',
           position: 'relative',
           zIndex: 1,
+          touchAction: 'pan-y',
+          transform: `translateX(${daySlideX}px)`,
+          transition: daySlideRaw ? 'none' : `transform ${DAY_SLIDE_MS}ms cubic-bezier(0.2, 0.7, 0.3, 1)`,
+          willChange: 'transform',
+        }}
+        onPointerDown={(e) => {
+          // A gesture that starts inside a deck is the deck's.
+          if ((e.target as Element | null)?.closest?.('[data-deck]')) return;
+          daySwipe.current = {
+            active: true, startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastT: e.timeStamp,
+            vx: 0, dx: 0, axis: null, movedAny: 0,
+          };
+        }}
+        onPointerMove={(e) => {
+          const g = daySwipe.current;
+          if (!g.active) return;
+          const dx = e.clientX - g.startX;
+          const dy = e.clientY - g.startY;
+          g.movedAny = Math.max(g.movedAny, Math.abs(dx), Math.abs(dy));
+          if (g.axis == null) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) < DAY_SWIPE_AXIS_PX) return;
+            g.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+            if (g.axis === 'x') {
+              setDaySlideRaw(true);
+              try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* older webviews */ }
+            } else {
+              return; // the scroll's
+            }
+          }
+          if (g.axis !== 'x') return;
+          const dt = Math.max(1, e.timeStamp - g.lastT);
+          const instant = (e.clientX - g.lastX) / dt;
+          g.vx = g.vx === 0 ? instant : g.vx * 0.3 + instant * 0.7;
+          g.lastX = e.clientX; g.lastT = e.timeStamp;
+          g.dx = dx;
+          setDaySlideX(dx * 0.85);
+        }}
+        onPointerUp={() => {
+          const g = daySwipe.current;
+          if (!g.active) return;
+          g.active = false;
+          if (g.axis !== 'x') return;
+          const flick = Math.abs(g.vx) > DAY_SWIPE_FLICK_V && Math.abs(g.dx) > 10;
+          if (g.dx < -DAY_SWIPE_COMMIT_PX || (flick && g.dx < 0)) commitDaySwipe('next');
+          else if (g.dx > DAY_SWIPE_COMMIT_PX || (flick && g.dx > 0)) commitDaySwipe('prev');
+          else { setDaySlideRaw(false); setDaySlideX(0); }
+        }}
+        onPointerCancel={() => {
+          const g = daySwipe.current;
+          g.active = false;
+          if (g.axis === 'x') { setDaySlideRaw(false); setDaySlideX(0); }
         }}
       >
         {/* Today Panel Header - Live instrument cockpit (sticky, raised, glowing) */}
@@ -1791,46 +1887,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               */}
             <div
               className="flex items-baseline justify-between gap-2"
-              style={{ touchAction: 'pan-y' }}
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                dateSwipe.current = { x: e.clientX, moved: 0 };
-              }}
-              onPointerMove={(e) => {
-                if (!dateSwipe.current) return;
-                e.stopPropagation();
-                dateSwipe.current.moved = e.clientX - dateSwipe.current.x;
-                /**
-                 * ⛔ CAPTURE ONLY ONCE IT IS A DRAG, NOT ON EVERY TOUCH. Two failures, one each way:
-                 *   · WITHOUT capture, the pointerup landed on whichever chevron the swipe had
-                 *     travelled over, so that button's click fired `prev` while the swipe fired
-                 *     `next` and the date did not move.
-                 *   · CAPTURING ON pointerdown retargets the pointer events to this row, so the
-                 *     browser dispatches the following `click` here rather than on the button — and
-                 *     the chevrons stopped working entirely.
-                 * Capturing at the 8 px mark separates them: a tap never captures and reaches its
-                 * button; a drag captures and finishes here.
-                 */
-                if (Math.abs(dateSwipe.current.moved) > 8) {
-                  try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* older webviews */ }
-                }
-              }}
-              onPointerUp={(e) => {
-                const g = dateSwipe.current;
-                dateSwipe.current = null;
-                if (!g) return;
-                e.stopPropagation();
-                // Same 60 px the decks use, so one gesture threshold governs the screen.
-                if (g.moved < -60) handleDayNav('next');
-                else if (g.moved > 60) handleDayNav('prev');
-              }}
-              onPointerCancel={(e) => { e.stopPropagation(); dateSwipe.current = null; }}
+              /* The swipe that lived on this row is the whole panel's now — see `daySwipe`. */
             >
               <button
                 type="button"
                 aria-label="Previous day"
                 /* ⚠️ A DRAG IS NOT A TAP — the same rule the decks keep. */
-                onClick={(e) => { e.stopPropagation(); if (Math.abs(dateSwipe.current?.moved ?? 0) > 8) return; handleDayNav('prev'); }}
+                onClick={(e) => { e.stopPropagation(); if (daySwipe.current.movedAny > 8) return; handleDayNav('prev'); }}
                 className="p-0.5 -ml-1 rounded-xl flex-shrink-0 self-center text-white/40 hover:text-white/85 transition-colors"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -1882,7 +1945,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               <button
                 type="button"
                 aria-label="Next day"
-                onClick={(e) => { e.stopPropagation(); if (Math.abs(dateSwipe.current?.moved ?? 0) > 8) return; handleDayNav('next'); }}
+                onClick={(e) => { e.stopPropagation(); if (daySwipe.current.movedAny > 8) return; handleDayNav('next'); }}
                 className="p-0.5 -mr-1 rounded-xl flex-shrink-0 self-center text-white/40 hover:text-white/85 transition-colors"
               >
                 <ChevronRight className="h-4 w-4" />
