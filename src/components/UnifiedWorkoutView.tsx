@@ -805,7 +805,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
    * Performance tab read as a different material from State.
    */
   const getCardStyle = (): React.CSSProperties => readoutPlateStyle(undefined, { galaxy: true });
-  const getCardClass = () => 'galaxy-card readout-texture readout-texture--spectral rounded-2xl mx-1';
+  const getCardClass = () => 'galaxy-card readout-texture readout-texture--spectral readout-texture--quiet rounded-2xl mx-1';
   const cardStyle = getCardStyle();
   const cardClass = getCardClass();
   const hasCardStyle = isMobility || isStrength;

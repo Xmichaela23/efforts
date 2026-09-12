@@ -1168,6 +1168,13 @@ body.wizard-active { --tabbar-h: 0px; }
    look in the state screen"). The `--home` graphite bed and the `--sport` one-hue bed that preceded it
    are gone; see `deckGlass` in CardDeck.tsx for the record of why. */
 
+/* QUIET — the same spectral bed, the grid at half strength (2026-09-12, Michael, on the Performance
+   tab: "maybe soften the texture a bit to match state"). State's cards are dense with text, so the
+   etched grid reads through the type as a faint instrument face; the session panels carry tables and
+   readings with bare bed between them, and the same grid at the same strength read harder there. Same
+   layers, same hues, same stars — only the overlay's opacity comes down. */
+.readout-texture--quiet::after { opacity: 0.55; }
+
 /* FORGE — the Adjust plate (2026-09-05, Michael: "cool texture and lighting like these but different").
    Same nebula ground, stars and grain as every galaxy card, but lit from the LEFT edge instead of
    the top, washed in the app's own violet and magenta (never a sport hue — this plate holds every
