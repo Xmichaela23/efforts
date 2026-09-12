@@ -3,6 +3,7 @@
 // =============================================================================
 
 import type { SessionDetailV1, SegmentVerdictV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
+import { isIntervalSession, resolveSessionDrift } from './drift-pct.ts';
 import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
 import { pacingVariability, stampIntervalCompare } from './interval-compare.ts';
 import { planShare } from './swim-plan-share.ts';
@@ -70,33 +71,9 @@ function buildRouteReadout(history: unknown): RouteReadout | null {
 }
 
 /** Match fact-packet ai-summary: session HR drift is not meaningful for structured interval sessions. */
-function shouldSuppressSessionHrDrift(factPacket: any, intervals?: IntervalRow[]): boolean {
-  const derived = factPacket?.derived;
-  const ie = derived?.interval_execution;
-  if (typeof ie?.total_steps === 'number' && ie.total_steps > 2) return true;
-  const facts = factPacket?.facts;
-  const segments = Array.isArray(facts?.segments) ? facts.segments : [];
-  const paces = segments
-    .map((s: any) => {
-      const n = Number(s?.pace_sec_per_mi);
-      return Number.isFinite(n) && n > 120 && n < 2400 ? n : null;
-    })
-    .filter((n): n is number => n != null);
-  if (paces.length >= 5) {
-    const spread = Math.max(...paces) - Math.min(...paces);
-    if (spread >= 75) return true;
-  }
-  // Stale fact packets may omit interval_execution; use rendered interval rows (easy + strides + recoveries).
-  if (intervals && intervals.length >= 4) {
-    const rec = intervals.filter((iv) => String(iv.interval_type).toLowerCase() === 'recovery').length;
-    const workish = intervals.filter((iv) => {
-      const t = String(iv.interval_type).toLowerCase();
-      return t === 'work' || t === 'warmup';
-    }).length;
-    if (rec >= 1 && workish >= 2) return true;
-  }
-  return false;
-}
+// The interval test lives in `drift-pct.ts` now (`isIntervalSession`), beside the drift rule it gates,
+// so the boom line asks the same question. The name below is kept for the rows that call it.
+const shouldSuppressSessionHrDrift = (factPacket: any, intervals?: IntervalRow[]): boolean => isIntervalSession(factPacket, intervals);
 
 export function humanizePlannedSegmentLabel(
   raw: string,
@@ -867,64 +844,20 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   // block below and the Performance "Aerobic decoupling" row both read this — they
   // cannot diverge. { pct, basis, assessment } from the analyzer's heart_rate_summary.
   const decouplingV1 = (() => {
-    const hrs = (wa as any)?.heart_rate_summary;
-    const wholeSession = shouldSuppressSessionHrDrift(factPacket, intervals);
-    // ⛔ DRIFT IS READ ON STEADY SESSIONS ONLY (2026-09-12, Michael: "drift should really only be
-    // mentioned in steady state rides and runs — I would confirm that with the book"; confirmed, p107:
-    // cardiac drift is "a general guideline when assessing the maximum recommended dose of easy/VT1
-    // work in a given session" — a given pace or output at a given heart rate). An interval session
-    // has no such pace or output, so it gets no drift: no tile, no line. Silence, not a substitute.
-    // State's drift trend has taken steady sessions only all along; this brings the session screen
-    // to the same page.
-    // > Reverses the 2026-09-03 ruling "never withheld — interval days print the number and say
-    // > whole session, intervals included" (DECISIONS-LOG-3, the Drift entry of D-466's stretch).
-    if (wholeSession && (type === 'run' || type === 'ride')) return null;
-    const hasHrs = !!hrs && typeof hrs === 'object';
-    const pct = hasHrs ? (hrs as any)?.decouplingPct : null;
-    const basis = hasHrs ? ((hrs as any)?.decouplingBasis ?? null) : null;
-    const assessment = hasHrs ? ((hrs as any)?.decouplingAssessment ?? null) : null;
-    // Heat/effort-confounded flag — the SAME one State reads to EXCLUDE a run from the durability
-    // verdict. Threaded here so the per-workout row can't scold "aerobic base needs work" off a
-    // number the app itself flagged unreliable (a hot run's decoupling). audit 2026-07-17.
-    const confounded = hasHrs && (hrs as any)?.decouplingConfounded === true;
-    if (typeof pct === 'number' && Number.isFinite(pct)) {
-      return {
-        pct: Math.round(pct * 10) / 10,
-        basis: (basis === 'gap' || basis === 'raw') ? basis : null,
-        assessment: (['good','needs_work'] as const).includes(assessment as any) ? assessment : null,
-        confounded,
-        whole_session: wholeSession,
-        line: driftLineFor(Math.round(pct * 10) / 10),
-      };
-    }
-    // ⛔ A RIDE'S DRIFT IS POWER TO HEART RATE, THE SAME NUMBER STATE READS (2026-09-12, Michael: "not a
-    // single source of truth — make sure State is sourcing from the same"). The cycling analyser never
-    // writes `heart_rate_summary.decouplingPct`, so every ride fell through to heart rate alone below,
-    // and the Drift tile said 5.4% while State's bike drift — which reads the ratio first, per the
-    // 2026-09-03 ruling in compute-snapshot (`driftReadForPoint`): p107's two arms are ratios of output
-    // to heart rate, and heart rate alone is one side of one — said 10% for the same ride. Same
-    // precedence here now: the ratio (`analysis.efficiency.aerobic_decoupling_pct`, written by
-    // `_shared/cycling-v1/ride-physiology.ts`), basis 'power'; heart rate alone only when there is no
-    // power. The separate "Power to heart rate fell" row is gone — this IS that number, once.
-    if (type === 'ride') {
-      const pdec = Number((comp?.analysis?.efficiency as any)?.aerobic_decoupling_pct);
-      if (Number.isFinite(pdec)) {
-        const p = Math.round(pdec * 10) / 10;
-        return { pct: p, basis: 'power' as const, assessment: null, confounded: false, whole_session: wholeSession, line: driftLineFor(p) };
-      }
-    }
-    // ⛔ NEVER WITHHELD (Michael 2026-09-03: "drift is going to be important"). When the pace-to-heart-rate
-    // read was not computed (intervals, short session, a ride), fall back to heart rate alone: second half
-    // against first, as a percentage — the book's own measure (p107, the 5% line).
-    // `hr_drift_v1` is written by BOTH analysers from `_shared/hr-drift-halves.ts` (halves by time, first
-    // 3 min skipped) — one definition for runs and rides.
-    const rideDrift = (wa as any)?.hr_drift_v1;
-    if (rideDrift && typeof rideDrift.pct === 'number' && Number.isFinite(rideDrift.pct)) {
-      const hrPct = Math.round(rideDrift.pct * 10) / 10;
-      return { pct: hrPct, basis: 'hr' as const, assessment: null, confounded: false, whole_session: wholeSession, line: driftLineFor(hrPct) };
-    }
-    if (pct == null && basis == null && assessment == null) return null;
-    return { pct: null, basis: (basis === 'gap' || basis === 'raw') ? basis : null, assessment: null, confounded, whole_session: wholeSession, line: null };
+    // ⛔ ONE RULE (2026-09-12, Michael: "we need consistent rules across all screens"): `resolveSessionDrift`
+    // in `drift-pct.ts` — steady sessions only (p107), the run analyser's decoupling, a ride's
+    // power-to-heart-rate ratio, heart rate alone as the fallback. The boom line on Today reads the same
+    // function, and State's spine keeps the same precedence. This block used to be its own copy.
+    const d = resolveSessionDrift({ workoutAnalysis: wa, computed: comp, sport: type, factPacket, intervals });
+    if (!d) return null;
+    return {
+      pct: d.pct,
+      basis: d.basis,
+      assessment: (['good', 'needs_work'] as const).includes(d.assessment as any) ? (d.assessment as 'good' | 'needs_work') : null,
+      confounded: d.confounded,
+      whole_session: false,
+      line: driftLineFor(d.pct),
+    };
   })();
 
   /**

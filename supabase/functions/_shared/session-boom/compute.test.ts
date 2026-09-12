@@ -47,6 +47,13 @@ Deno.test('⛔ the stored line read back from jsonb, keys reordered, is the same
   assertEquals(sameBoom(boom, null), false);
 });
 
+Deno.test('the drift the tile prints: an interval session has none (p107, 2026-09-12); a ride reads its ratio before heart rate alone', () => {
+  assertEquals(sessionDriftPct({ hr_drift_v1: { pct: 3 }, fact_packet_v1: { derived: { interval_execution: { total_steps: 12 } } } }, null, 'ride'), null);
+  assertEquals(sessionDriftPct({ hr_drift_v1: { pct: 3 }, fact_packet_v1: { derived: { interval_execution: { total_steps: 12 } } } }, null, 'run'), null);
+  assertEquals(sessionDriftPct({ hr_drift_v1: { pct: 5.4 } }, { analysis: { efficiency: { aerobic_decoupling_pct: 10.04 } } }, 'ride'), 10);
+  assertEquals(sessionDriftPct({ hr_drift_v1: { pct: 5.4 } }, null, 'ride'), 5.4);
+});
+
 Deno.test('the drift the tile prints: decoupling first, heart-rate halves second, one decimal', () => {
   assertEquals(sessionDriftPct({ heart_rate_summary: { decouplingPct: 4.96 }, hr_drift_v1: { pct: 1 } }), 5);
   assertEquals(sessionDriftPct({ heart_rate_summary: { decouplingPct: null }, hr_drift_v1: { pct: 2.44 } }), 2.4);

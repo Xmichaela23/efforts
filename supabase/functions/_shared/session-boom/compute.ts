@@ -63,6 +63,9 @@ const PRIOR_SELECT = [
   'counts_toward_trend:workout_analysis->bike_fitness_v1->counts_toward_trend',
   'decoupling_pct:workout_analysis->heart_rate_summary->decouplingPct',
   'hr_drift_pct:workout_analysis->hr_drift_v1->pct',
+  // The two fields the drift rule needs beyond those (2026-09-12): the steady test and the ride's ratio.
+  'total_steps:workout_analysis->fact_packet_v1->derived->interval_execution->total_steps',
+  'aerobic_decoupling_pct:computed->analysis->efficiency->aerobic_decoupling_pct',
 ].join(',');
 
 /** A narrow prior row back into the shape `line.ts` reads. Exported for its test. */
@@ -78,11 +81,13 @@ export function priorFromRow(r: Record<string, unknown>): BoomWorkout {
     computed: {
       ...(r.power_curve != null ? { power_curve: r.power_curve } : {}),
       ...(r.duration_s_moving != null ? { overall: { duration_s_moving: r.duration_s_moving } } : {}),
+      ...(r.aerobic_decoupling_pct != null ? { analysis: { efficiency: { aerobic_decoupling_pct: r.aerobic_decoupling_pct } } } : {}),
     },
     workout_analysis: {
       ...(bf ? { bike_fitness_v1: bf } : {}),
       ...(r.decoupling_pct != null ? { heart_rate_summary: { decouplingPct: r.decoupling_pct } } : {}),
       ...(r.hr_drift_pct != null ? { hr_drift_v1: { pct: r.hr_drift_pct } } : {}),
+      ...(r.total_steps != null ? { fact_packet_v1: { derived: { interval_execution: { total_steps: r.total_steps } } } } : {}),
     },
   };
 }

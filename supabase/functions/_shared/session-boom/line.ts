@@ -145,7 +145,8 @@ function hrAtEasyPower(w: BoomWorkout): number | null {
  * `sessionDriftPct` is the rule that copy is built with.
  */
 function driftPct(w: BoomWorkout): number | null {
-  return sessionDriftPct(parseAnalysis(w));
+  // Same rule as the Drift tile, whole: steady sessions only, the ride's ratio before heart rate alone.
+  return sessionDriftPct(parseAnalysis(w), w.computed ?? null, w.type ?? null);
 }
 
 /**
