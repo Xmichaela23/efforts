@@ -1,6 +1,5 @@
 import FirstRunOverlay from '@/components/FirstRunOverlay';
 import FirstRunCard from '@/components/FirstRunCard';
-import { readoutPlateStyle } from '@/lib/readout-plate';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase, getStoredUserId } from '@/lib/supabase';
@@ -1972,9 +1971,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               * ⚠️ TODAY ONLY. There is no historical weather to show for another day.
               */}
             {/**
-              * ⛔ THE HEADER IS THE DATE AND THE WEATHER, NOTHING ELSE (Michael, 2026-09-10). The form
-              * line, the week's totals and the Garmin line moved to the status card at the bottom of
-              * Today — one block per subject.
+              * ⛔ THE HEADER WAS "THE DATE AND THE WEATHER, NOTHING ELSE" (Michael, 2026-09-10) — and
+              * on 2026-09-12 the status rows came back into it as its last section, on his call.
+              * See the block below the weather.
               * ⚠️ TODAY ONLY. There is no historical weather to show for another day.
               */}
             {weather && isTodayDate ? (
@@ -1982,6 +1981,88 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 <TodayWeather weather={weather} city={cityName} />
               </div>
             ) : null}
+        {/**
+          * ═══ THE STATUS ROWS, THE LAST SECTION OF THE HEADER CARD (Michael, 2026-09-12) ═════════════
+          *
+          * ⛔ ONE CARD WITH THE DATE AND THE WEATHER (Michael, 2026-09-12: "why don't we integrate the
+          * load into the same card as weather?"). It was its own card under the header for an hour;
+          * before that it sat under the sessions ("locked on top… it just jumps around so much when
+          * you're flipping between days"). In the header it is sticky with the date, under the
+          * weather, split from it by State's hairline — three rows, no second card.
+          * > Reverses the 2026-09-10 ruling "the header is the date and the weather, nothing else":
+          * > it is the date, the weather, and where the athlete stands. It sat under the session list, so its position was whatever
+          * the day's sessions added up to — a one-card day put it mid-screen, a two-lift day under the
+          * fold, and flipping days made it hop. Under the date pill it is in the same place on every
+          * day. Full width, and as short as its three lines allow, so it costs the sessions below
+          * as little of the screen as possible.
+          *
+          * (2026-09-10, when it was at the bottom:)
+          * ⛔ ONE BLOCK PER SUBJECT. The header is the day and its weather; this card is where the
+          * athlete stands: form, the week's totals, and Garmin's derived-data line last. The three
+          * lines are the ones the header carried, off the same readers — nothing is recomputed.
+          * ⛔ THE CARD IS THE DOOR TO STATE, through `open:state`, the event `TrainingBaselines`
+          * already fires. ⚠️ No sport colour: it belongs to no session.
+          * ⚠️ THE GARMIN LINE KEEPS ITS RULE: a Garmin connection or row, and a form number to credit.
+          * ⚠️ NO NUMBERS, NO CARD — an account with nothing analysed or logged gets nothing here.
+          */}
+        {formLine || weekTotalsLine ? (
+          /**
+           * ⚠️ A DIV, NOT A BUTTON, SINCE THE ⓘ WENT IN (2026-09-10) — a button inside a button is
+           * invalid HTML and the inner one stops working. The card keeps the role, the label and the
+           * keyboard behaviour a button gave it; the ⓘ is the only real <button> inside it.
+           */
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); try { window.dispatchEvent(new CustomEvent('open:state')); } catch { /* no window */ } }}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' && e.key !== ' ') return;
+              e.preventDefault(); e.stopPropagation();
+              try { window.dispatchEvent(new CustomEvent('open:state')); } catch { /* no window */ }
+            }}
+            aria-label="Form and the week so far — open State"
+            className="block w-full text-left cursor-pointer border-t border-white/[0.055]"
+            style={{
+              /* A section of the header card, not a card: the hairline above is State's divider, and
+                 the three lines sit closed up under it. Nothing is dropped: the Garmin line is
+                 attribution and stays. */
+              marginTop: 8,
+              paddingTop: 8,
+              /**
+               * ⛔ THE INSTRUMENT SITS IN THE LIGHT, IT IS NOT MADE OF IT (Michael, 2026-09-12: "load
+               * card should be more readable", one pass after asking for a translucent feel). Real
+               * glass over the nova put the glow BEHIND the numbers and they stopped reading.
+               * ⛔ AND THE APP HAD ALREADY SETTLED THIS. `.readout-texture--nova` exists for exactly
+               * this card in exactly this situation, and its own note records the 2026-08-24 ruling
+               * after two failed passes: *"fill under the load box, leave the load box clear for the
+               * numbers"* — dark bed and stars under the text, console grid over it, and the glow
+               * stays outside on the panel that this card floats in. So it takes the shared treatment
+               * rather than a third hand-rolled surface.
+               */
+            }}
+          >
+            {formLine ? <span className="block font-light">{formLine}</span> : null}
+            {showFormKey && formKey ? (
+              /* ⚠️ The card grows to fit it (Michael 2026-09-10) — the key is not scrolled or clipped. */
+              <div onClick={(e) => e.stopPropagation()} className="mt-1.5 max-w-[min(100%,360px)]">
+                <LoadKeyForm ff={formKey.ff} zones={formKey.zones} />
+              </div>
+            ) : null}
+            {weekTotalsLine ? (
+              <span
+                className="block font-light tabular-nums"
+                style={{ color: 'rgba(255,255,255,0.84)', marginTop: formLine ? 2 : 0 }}
+              >
+                {weekTotalsLine}
+              </span>
+            ) : null}
+            {/* ⚠️ THE SMALLEST TEXT ON THE CARD, AND IT STAYS AT 12px — Garmin's line is attribution,
+                not a reading. The lines above it grew; it did not, so it is still the smallest. */}
+            {garminDerived && formLine ? (
+              <GarminDerivedDataLine className="text-[12px]" style={{ marginTop: 2 }} />
+            ) : null}
+          </div>
+        ) : null}
           </div>
         </div>
 
@@ -2039,96 +2120,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         ) : null}
 
 
-        <div className="px-3">
-        {/**
-          * ═══ THE STATUS CARD, AT THE TOP OF TODAY, UNDER THE DATE (Michael, 2026-09-12) ═══════════
-          *
-          * ⛔ LOCKED ABOVE THE SESSIONS, AND SHORT (Michael, 2026-09-12: "can the load screen be kind
-          * of locked on top and maybe made a little narrower, it just jumps around so much when you're
-          * flipping between days" — then "I meant shorter"). It sat under the session list, so its position was whatever
-          * the day's sessions added up to — a one-card day put it mid-screen, a two-lift day under the
-          * fold, and flipping days made it hop. Under the date pill it is in the same place on every
-          * day. Full width, and as short as its three lines allow, so it costs the sessions below
-          * as little of the screen as possible.
-          *
-          * (2026-09-10, when it was at the bottom:)
-          * ⛔ ONE BLOCK PER SUBJECT. The header is the day and its weather; this card is where the
-          * athlete stands: form, the week's totals, and Garmin's derived-data line last. The three
-          * lines are the ones the header carried, off the same readers — nothing is recomputed.
-          * ⛔ THE CARD IS THE DOOR TO STATE, through `open:state`, the event `TrainingBaselines`
-          * already fires. ⚠️ No sport colour: it belongs to no session.
-          * ⚠️ THE GARMIN LINE KEEPS ITS RULE: a Garmin connection or row, and a form number to credit.
-          * ⚠️ NO NUMBERS, NO CARD — an account with nothing analysed or logged gets nothing here.
-          */}
-        {formLine || weekTotalsLine ? (
-          /**
-           * ⚠️ A DIV, NOT A BUTTON, SINCE THE ⓘ WENT IN (2026-09-10) — a button inside a button is
-           * invalid HTML and the inner one stops working. The card keeps the role, the label and the
-           * keyboard behaviour a button gave it; the ⓘ is the only real <button> inside it.
-           */
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={(e) => { e.stopPropagation(); try { window.dispatchEvent(new CustomEvent('open:state')); } catch { /* no window */ } }}
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter' && e.key !== ' ') return;
-              e.preventDefault(); e.stopPropagation();
-              try { window.dispatchEvent(new CustomEvent('open:state')); } catch { /* no window */ }
-            }}
-            aria-label="Form and the week so far — open State"
-            className="block w-full text-left cursor-pointer galaxy-card readout-texture readout-texture--spectral"
-            style={{
-              borderRadius: 14,
-              /* ⛔ SHORTER, NOT NARROWER (Michael, 2026-09-12: "I meant shorter so it does not occupy
-                 so much space"). Full width like the session cards; the height is what comes down —
-                 tighter vertical padding and the three lines closed up. Nothing is dropped: the
-                 Garmin line is attribution and stays. */
-              padding: '6px 14px 7px',
-              marginBottom: 10,
-              /**
-               * ⛔ THE INSTRUMENT SITS IN THE LIGHT, IT IS NOT MADE OF IT (Michael, 2026-09-12: "load
-               * card should be more readable", one pass after asking for a translucent feel). Real
-               * glass over the nova put the glow BEHIND the numbers and they stopped reading.
-               * ⛔ AND THE APP HAD ALREADY SETTLED THIS. `.readout-texture--nova` exists for exactly
-               * this card in exactly this situation, and its own note records the 2026-08-24 ruling
-               * after two failed passes: *"fill under the load box, leave the load box clear for the
-               * numbers"* — dark bed and stars under the text, console grid over it, and the glow
-               * stays outside on the panel that this card floats in. So it takes the shared treatment
-               * rather than a third hand-rolled surface.
-               */
-              /**
-               * ⛔ STATE'S LOAD CARD, LITERALLY (Michael, 2026-09-12: "I just really like how the cards
-               * look in the state screen"). This is the same plate style and the same spectral bed the
-               * LOAD card on State carries — this card IS that card's short form, so it wears its clothes.
-               * The session cards above take the same through `deckGlass`, so the column is one stack.
-               */
-              ...readoutPlateStyle(undefined, { galaxy: true }),
-              borderRadius: 14,
-            }}
-          >
-            {formLine ? <span className="block font-light">{formLine}</span> : null}
-            {showFormKey && formKey ? (
-              /* ⚠️ The card grows to fit it (Michael 2026-09-10) — the key is not scrolled or clipped. */
-              <div onClick={(e) => e.stopPropagation()} className="mt-1.5 max-w-[min(100%,360px)]">
-                <LoadKeyForm ff={formKey.ff} zones={formKey.zones} />
-              </div>
-            ) : null}
-            {weekTotalsLine ? (
-              <span
-                className="block font-light tabular-nums"
-                style={{ color: 'rgba(255,255,255,0.84)', marginTop: formLine ? 2 : 0 }}
-              >
-                {weekTotalsLine}
-              </span>
-            ) : null}
-            {/* ⚠️ THE SMALLEST TEXT ON THE CARD, AND IT STAYS AT 12px — Garmin's line is attribution,
-                not a reading. The lines above it grew; it did not, so it is still the smallest. */}
-            {garminDerived && formLine ? (
-              <GarminDerivedDataLine className="text-[12px]" style={{ marginTop: 2 }} />
-            ) : null}
-          </div>
-        ) : null}
-        </div>
         {/* Content area
             Option C: slightly wider rail + Today blocks get a small bleed.
             Calendar/week strip spacing is untouched (handled in `WorkoutCalendar`). */}
