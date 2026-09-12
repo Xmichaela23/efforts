@@ -1543,6 +1543,13 @@ Deno.serve(async (req) => {
       'strength_exercises','mobility_exercises','refined_type',
       // Source tracking for display
       'source','is_strava_imported','strava_activity_id','garmin_activity_id','device_info',
+      // ⛔ THE INDOOR STATEMENTS (2026-09-12, Michael: "can we clarify when rides are done on a trainer?").
+      // `isIndoorSession` was handed `provider_sport` and `strava_data` off this row since 2026-09-09
+      // — and neither was in this SELECT, so the predicate saw undefined, said "not loaded, say
+      // nothing", and no session ever read indoor through this function. Starved, not absent.
+      // ⚠️ `gps_track` stays out: the heaviest column on the row, and the predicate's last-resort
+      // guess; Garmin's sport type and Strava's trainer flag are the statements.
+      'provider_sport','strava_data',
       // Achievements (PRs, segments)
       'achievements',
       // Workload data (single source of truth from calculate-workload)
