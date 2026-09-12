@@ -1,5 +1,6 @@
 import type { FactPacketV1, FlagV1, WeatherV1 } from './types.ts';
 import { coerceNumber, estimatedHeatPaceImpact, secondsToPaceString } from './utils.ts';
+import { isIntervalSession } from '../session-detail/drift-pct.ts';
 
 function push(flags: FlagV1[], f: FlagV1) {
   if (!f.message) return;
@@ -66,6 +67,11 @@ export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
   // HR drift: use pace-normalized drift as the physiological signal.
   // Pace-driven HR increases (negative splits) are not drift and should not flag.
   try {
+    // ⛔ NO DRIFT FLAG ON AN INTERVAL SESSION (2026-09-12, p107 — drift is a steady-session read, the
+    // same rule the Drift tile, the heart-rate line and Today's boom line keep: `drift-pct.ts`). This
+    // block was a fourth writer, and on an interval run it printed "HR drift 15 bpm vs typical ~6 bpm —
+    // elevated" under a screen that had just, correctly, withheld the drift number.
+    if (isIntervalSession(packet)) throw new Error('skip: interval session');
     const driftExplanation = (packet.derived as any).drift_explanation;
     const paceNorm = coerceNumber((packet.derived as any).pace_normalized_drift_bpm);
     const rawDrift = coerceNumber(packet.derived.hr_drift_bpm);

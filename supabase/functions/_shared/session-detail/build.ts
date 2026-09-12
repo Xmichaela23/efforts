@@ -2115,8 +2115,12 @@ export function buildAnalysisDetailRows(
     // divergence the spine exists to prevent, and the session page is the one with no context to
     // qualify it. Filtered by CATEGORY (`_shared/cycling-v1/flags.ts` sets category 'Fatigue'), not by
     // message text, so rewording the flag cannot smuggle it back in.
+    // A run analysed before 2026-09-12 still carries an HR-drift flag on an interval session; the rule
+    // is one rule, so it is dropped here too until the run is analysed again.
+    const intervalHere = sport !== 'swim' && shouldSuppressSessionHrDrift(factPacket, intervals);
     const concerns = flagsV1
       .filter((f: any) => String(f?.category || '').toLowerCase() !== 'fatigue')
+      .filter((f: any) => !(intervalHere && String(f?.category || '').toLowerCase() === 'hr'))
       .filter((f: any) => f && f.type === 'concern' && typeof f.message === 'string' && f.message.length > 0 && Number(f.priority || 99) <= 2)
       .sort((a: any, b: any) => Number(a.priority || 99) - Number(b.priority || 99))
       .slice(0, 2);
