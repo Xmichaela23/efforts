@@ -323,71 +323,16 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
       {/* Macro discipline trend removed from Performance (lives on State). Swim's in-card trend is a
           separate placement, deferred. */}
 
-      {/* Bike session-detail ← spine. The per-ride HR-at-power datapoint (bike_fitness_v1.hr_at_band)
-          is the EXACT value the STATE efficiency trend is built from — surfacing it here connects the
-          single ride to the same spine signal the dashboard reads (no re-derivation, one source). Only
-          renders when the analyzer found ≥120s in the reference band; band source carries the honesty
-          label (est(FTP) vs personal). Run/swim/strength already show their per-session substance
-          (GAP pace, pace/100, e1RM); this brings bike to parity. */}
-      {(() => {
-        // ⛔ ONE VOCABULARY (stage 4) — was a private substring ladder. See `src/lib/discipline.ts`.
-        const isRide = normalizeDiscipline(type) === 'ride';
-        if (!isRide) return null;
-        let wa: any = (completed as any)?.workout_analysis;
-        if (typeof wa === 'string') { try { wa = JSON.parse(wa); } catch { wa = null; } }
-        const bf = wa?.bike_fitness_v1;
-        if (!bf || !(Number(bf.hr_at_band) > 0)) return null;
-        // ⛔ DO NOT SHOW A READING THE ENGINE THREW AWAY (2026-08-02, Michael: "why would you say 146 is
-        // heart rate at easy power?"). On a hard ride it ISN'T. The in-band time is incidental — warmup,
-        // descents, the sag between efforts — and heart rate there is dragged up by the work around it.
-        // The STATE trend has always excluded such rides (`bikeEfficiencyRideEligible`); this card did
-        // not know, so it printed the number under a label claiming it was measured at easy power AND
-        // told the athlete it fed a read that had discarded it. Two lies in three lines.
-        // The server decides (`counts_toward_trend`); undefined = a row analysed before the field
-        // existed, and those keep rendering rather than vanishing from old sessions.
-        if (bf.counts_toward_trend === false) return null;
-        const src = bf.band_source === 'personal' ? 'personal'
-          : bf.band_source === 'coggan_ftp' ? 'est (FTP)' : null;
-        const band = (Number(bf.band_lo) > 0 && Number(bf.band_hi) > 0)
-          ? `${Math.round(bf.band_lo)}–${Math.round(bf.band_hi)} W` : null;
-        return (
-          <div className="w-full pt-1 pb-3">
-            {/* ⛔ SAME WORDS AS THE STATE BIKE ROW (2026-08-01). State's aerobic read says "138 bpm at
-                easy power" and this is the single ride that feeds it — when the two screens named the
-                same number differently ("Aerobic efficiency" here, "efficiency" there), a rider had no
-                way to know they were looking at one measurement seen twice. The heading is now the
-                plain sentence State uses; the band and its source stay, because THIS screen is where
-                the per-ride provenance belongs. */}
-            <div className="mb-1 text-center text-xs text-gray-400 uppercase tracking-widest">
-              Heart rate at easy power
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="text-sm font-semibold text-gray-100">{bf.hr_at_band} bpm</div>
-              {/* ⛔ "at Z2 power" READ AS A VERDICT ON THE RIDE (2026-08-02, Michael: "it should say the
-                  zone the user was in — it says at zone 2"). It never meant that. It is the SAMPLING
-                  WINDOW: this heart rate is measured only across the portions of the ride spent in the
-                  aerobic power band. On a ride the engine classified THRESHOLD, a screen whose most
-                  prominent label says "Z2" is telling the athlete the opposite of the truth. The band
-                  stays — it is what makes the number comparable ride to ride — but it now reads as a
-                  window, and the ride's real zone is named in Insights. */}
-              <div className="text-[11px] text-gray-400 mt-0.5">
-                measured{band ? ` in your ${band} range` : ' in your aerobic range'}{src ? ` · ${src}` : ''}
-              </div>
-              {/* ⛔ ONE IDEA PER LINE, AND NO SECOND "EASY" (2026-08-02, Michael: "this is confusing").
-                  This block briefly carried "Above your easy ceiling of 131 bpm" as well — and "easy
-                  POWER" (a watts band) sitting two lines from "easy CEILING" (a heart-rate limit) is the
-                  same word meaning two different things on one card. The ceiling belongs to the Easy
-                  CHIP, which is where the ride is judged; this block is not a judgement at all. It is one
-                  reading, tracked over time: the heart rate it costs you to ride the same watts. Lower
-                  is fitter. Say that, and stop. */}
-              <div className="text-[11px] text-gray-500 mt-0.5">
-                Lower over time means fitter — this feeds your bike read on State
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
+      {/* ⛔ "HEART RATE AT EASY POWER" IS GONE FROM THE RIDE PERFORMANCE TAB (2026-09-12, Michael: "too
+          much emphasis unless per the book or per anything it should take priority" — nothing gives it
+          that). The book gives the bike no heart-rate read: p172 makes power the intensity control and
+          FTP the number; the 5% drift line (p107) is written for running. The field reads bike aerobic
+          fitness as efficiency factor (TrainingPeaks: normalized power ÷ HR) and Pw:Hr decoupling, and
+          the Drift tile above already carries the latter. State dropped the same bpm as its bike
+          headline on 2026-09-03 (`StatePerformanceSection.tsx`, the deleted `AerobicSignal`), so this
+          block's "feeds your bike read on State" had become a claim about a link State no longer leads
+          with. ⚠️ `bike_fitness_v1.hr_at_band` is NOT removed: `bike-fitness.ts` still reads it for the
+          secondary efficiency verdict behind the power lead. Only the display went. */}
 
       {/* D-167: pool-swim narrative RE-ENABLED. The swim analyzer now emits clean plain prose with the
           authoritative pace (verified on real data — no markdown title, 2:00/100yd, 50 m pool), so swims
