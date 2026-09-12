@@ -28,6 +28,7 @@ import PlannedSessionHeader, { plannedDurationSecondsOf } from './PlannedSession
 // it is. Every athlete-facing word lives in `@/lib/today-lines`; nothing new is spelled out here.
 // ⛔ §3d — a lift and the plyo day swipe as a deck, a ride or run is one glass card.
 import TodaySession, { rendersAsSessionCard, TodaySpacingLine } from './SessionDeck';
+import LogFAB from './LogFAB';
 import { getProviderAttribution } from '@/lib/provider-attribution';
 import { GarminDerivedDataLine, ProviderAttributionLine } from './ProviderAttribution';
 import { useGarminDataPresence } from '@/hooks/useGarminDataPresence';
@@ -2506,6 +2507,22 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         )}
         </div>
         </div>
+
+      {/**
+        * ⛔ THE FLOATING + IS BACK, ON TODAY, BOTTOM RIGHT (Michael, 2026-09-12: "can we add a + for
+        * log workout bottom right?"). It is `LogFAB` — the button and the menu that already existed
+        * (Log Strength / Run / Ride / Swim / Upload Course / Mobility / Pilates-Yoga), and
+        * `handleAddEffort` in AppLayout, which already takes the day. Nothing new was built.
+        * > Reverses work order 2026-09-09 §3 "the floating + goes" — for Today only. The Week tab keeps
+        * > its opener (tap an empty area of a day row), and both open the ONE menu `LogFAB.tsx` owns.
+        * ⚠️ The bottom tab bar's own "+" is Focus, where a plan gets built. This one logs a session.
+        * ⚠️ It logs to the day on screen, not to today: flip to yesterday, tap +, and the lift lands
+        * on yesterday. `handleAddEffort(type, date)` sets the selected date before opening.
+        * It sits in the panel root, outside the scroll container, so it never scrolls or slides.
+        */}
+      <div style={{ position: 'absolute', right: 12, bottom: 12, zIndex: 30 }}>
+        <LogFAB onSelectType={(type) => onAddEffort(type, activeDate)} />
+      </div>
 
       {/* Planned Workout Bottom Sheet */}
       <Drawer
