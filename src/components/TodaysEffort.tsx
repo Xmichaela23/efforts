@@ -1593,45 +1593,42 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         }}
       />
       {/**
-        * ⛔ THE NOVA — HOME'S OWN LIGHT SOURCE (Michael, 2026-09-12: "a lot of black… more of a deep
-        * yellow super nova emanating from the center, somewhat shapeless, but to really read daylight").
-        * The five-hue bleed is painted ONCE for the whole app on the screen chrome, and Home was the one
-        * screen that sealed it under a black panel. A wash from the TOP was the first attempt and left
-        * the body of the screen black, because the empty space below the cards is most of the screen.
-        * ⛔ SO THE SOURCE IS THE CENTRE, NOT THE TOP, and it is deliberately SHAPELESS: four ellipses of
-        * different sizes and warmths, offset off-centre from one another, then blurred as one layer so
-        * no edge of any single one can be found. A round gradient reads as a spotlight; this reads as
-        * light in the room.
-        * ⚠️ IT OVERHANGS THE PANEL (`inset: -80px`) so the blur fades out past the edges rather than
-        * ending on a visible seam.
-        * ⚠️ IT SITS BELOW THE DAY-COLOURED HALO, so the sport colour still leads at the top and this is
-        * the daylight behind it. `screen` blend, so it lifts what is there and never greys a card.
+        * ⛔ THE SUN — HOME'S ONE LIGHT, A SOURCE AND NOT A FIELD (Michael, 2026-09-12: "a sense of
+        * daylight, but what would be coming from outer space… the whole thing got a little washed out").
+        *
+        * WHAT THIS REPLACES: the nova — four ellipses of near-white and gold spread across the whole
+        * panel, blurred 44 px as one layer, screen-blended. That is scatter: light with no direction
+        * and no shadow, and screen-blending it over the full field lifted every black on the screen
+        * to grey. With translucent cards on top there was no true black left anywhere. Fog, not sun.
+        *
+        * SUNLIGHT IN SPACE HAS NO ATMOSPHERE. A small hard source, a fast fall-off, black sky around
+        * it, and it shows itself as a rim on the top edge of whatever it hits. So: one near-white core
+        * with a warm halo, sized to the top of the panel only (not `inset: -80px` of the whole thing),
+        * a short blur to soften the core's edge and nothing more, placed ABOVE the card column behind
+        * the date header — which is a dark pill, so it occludes the core and catches the rim, an
+        * object in front of the sun. Below the first card the panel is the app's own dark again.
+        * The cards' bed paints the matching rim on their top edge (`.readout-texture--home`).
+        *
+        * ⚠️ IT SITS BELOW THE DAY-COLOURED HALO, so the sport colour is the cast in the sunlight and
+        * still leads at the top.
         */}
       <div
         aria-hidden="true"
         style={{
           position: 'absolute',
-          inset: '-80px',
+          left: '-16px',
+          right: '-16px',
+          top: '-70px',
+          height: '320px',
           zIndex: 0,
           pointerEvents: 'none',
           mixBlendMode: 'screen',
-          filter: 'blur(44px)',
+          filter: 'blur(10px)',
           transform: 'translateZ(0)',
           backgroundImage: `
-            /* ⛔ DAYLIGHT IS WHITE (Michael, 2026-09-12: "they are too heavy and poop brown"). The first
-               nova was amber the whole way through, and amber shining up through a dark translucent card
-               makes brown — which is what the cards had become. Sunlight is near-white with warmth only
-               at its edge, so the core is white now and the gold survives as the outer halo. */
-            /* ⛔ CALMER UNDER THE CARDS (Michael, 2026-09-12: the cards feel heavy). The weight was never
-               really the cards — it was the VALUE GAP. A blazing floor next to a dark bed makes the bed
-               read as a block dropped on light, and every attempt to fix it by lightening the bed cost
-               legibility. So the other side of the gap moves: the peak is roughly halved and the whole
-               field is spread wider, which keeps the daylight in the margins and the gaps and takes it
-               off the back of the text. */
-            radial-gradient(52% 40% at 50% 40%, rgba(255,252,246,0.26) 0%, rgba(255,252,246,0.00) 74%),
-            radial-gradient(78% 58% at 50% 46%, rgba(248,246,240,0.22) 0%, rgba(248,246,240,0.00) 76%),
-            radial-gradient(96% 72% at 40% 56%, rgba(255,238,202,0.18) 0%, rgba(255,238,202,0.00) 78%),
-            radial-gradient(130% 96% at 52% 64%, rgba(255,216,154,0.12) 0%, rgba(255,216,154,0.00) 82%)
+            radial-gradient(150px 84px at 50% 22%, rgba(255,253,248,0.62) 0%, rgba(255,253,248,0.18) 46%, rgba(255,253,248,0.00) 100%),
+            radial-gradient(360px 200px at 50% 24%, rgba(255,242,214,0.26) 0%, rgba(255,242,214,0.00) 100%),
+            radial-gradient(640px 330px at 50% 26%, rgba(255,214,150,0.12) 0%, rgba(255,214,150,0.00) 100%)
           `,
         }}
       />

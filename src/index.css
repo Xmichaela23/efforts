@@ -1184,29 +1184,32 @@ body.wizard-active { --tabbar-h: 0px; }
    ⚠️ Every card on Home wears this one — sessions and the load card — so the column reads as a stack of
    the same instrument rather than a set of unrelated tiles. */
 .readout-texture--home.galaxy-card::before {
-  /* ⛔ GLASS, NOT A LID (Michael, 2026-09-12: "why do you not make the cards more translucent with a
-     grid"). The bed is TINTED glass rather than an opaque slab: dark enough that white text holds its
-     contrast over the brightest part of the nova, clear enough that the light behind is the card's own
-     colour. The earlier failure was clear glass with no tint, which let the glow sit directly behind the
-     numbers and washed them out — the tint is what makes translucency survivable here. */
-  /* ⛔ NEUTRAL, NOT VIOLET (2026-09-12). A warm gold ground under cool violet cards puts two opposite
-     temperatures on one screen, and the eye reads them as unrelated systems — the same mud problem in
-     different clothes. Graphite with only a hint of blue left in it reads as glass on a warm floor, and
-     it gives the sport colours in the titles back their loudness for free. */
-  background-color: rgba(30,31,37,0.84);
+  /* ⛔ OPAQUE, STATE'S BED (2026-09-12, Michael: "the whole thing got a little washed out"). The
+     translucent glass this replaces (graphite at 84%, over a white-cored wash screen-blended across
+     the whole panel) let the wash through every card, and grey glass on a lifted-grey floor is what
+     "washed out" was: no true black anywhere on the screen. State's cards read as lit because their
+     bed is opaque and near-black and the light is painted ON the surface. Same rule here now.
+     ⛔ NEUTRAL, NOT VIOLET (unchanged from the glass): the sport lives in the title and the floor glow;
+     the bed is graphite with a hint of blue, so the sport colours keep their loudness.
+     ⛔ THE SUN LANDS ON THE TOP EDGE. The one light on Home is a hard source above the card column
+     (`TodaysEffort.tsx`, the sun layer); a card in that light shows it as a rim on its top edge and
+     nothing below. That rim is what stops an opaque dark card reading as a slab — the answer D-475
+     reached for by lightening the bed and calming the floor, which cost the blacks. */
+  background-color: #101117;
   background-image:
-    radial-gradient(120% 88% at 26% -6%, rgba(255,255,255,0.20) 0%, transparent 62%),
+    radial-gradient(118% 62% at 50% -14%, rgba(255,250,240,0.17) 0%, rgba(255,250,240,0.05) 38%, transparent 62%),
+    linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.00) 18%),
     radial-gradient(1.2px 1.2px at calc(18% + var(--card-star-x, 0%)) 22%, rgba(255,255,255,0.50), transparent),
     radial-gradient(1px 1px at calc(78% - var(--card-star-x, 0%)) 58%, rgba(255,240,210,0.38), transparent),
     radial-gradient(1px 1px at calc(60% + var(--card-star-x, 0%)) 34%, rgba(210,225,255,0.42), transparent),
     radial-gradient(1px 1px at calc(33% - var(--card-star-x, 0%)) 74%, rgba(255,255,255,0.34), transparent),
-    linear-gradient(180deg, rgba(60,62,72,0.52) 0%, rgba(20,21,26,0.74) 100%);
+    linear-gradient(180deg, #14151c 0%, #0e0f15 55%, #0a0b10 100%);
 }
 .readout-texture--home::after {
   /* The grid is ETCHED ON THE GLASS, so it is a step stronger than the base texture — on a translucent
      pane a whisper of a grid reads as dirt rather than as an instrument. */
   background-image:
-    radial-gradient(ellipse at 28% 8%, rgba(255,255,255,0.10) 0%, transparent 62%),
+    radial-gradient(ellipse at 50% 0%, rgba(255,255,255,0.07) 0%, transparent 55%),
     radial-gradient(circle, rgba(255,255,255,0.048) 0.8px, transparent 1.55px),
     repeating-linear-gradient(0deg, rgba(255,255,255,0.058) 0px, rgba(255,255,255,0.058) 1px, transparent 1px, transparent 9px),
     repeating-linear-gradient(90deg, rgba(255,255,255,0.050) 0px, rgba(255,255,255,0.050) 1px, transparent 1px, transparent 9px),
