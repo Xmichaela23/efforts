@@ -74,7 +74,7 @@ WEEK 02  column=standard
       ME     Deadlift                       1x1-5        @ 190           | 90% · plan 45wx5 105wx5 145wx3 170wx2 190x
       HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
   [Tuesday] ride     Anaerobic Ride — 33 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
@@ -124,7 +124,7 @@ WEEK 03  column=standard
       ME     Deadlift                       1x1-5        @ 190           | 90% · plan 45wx5 105wx5 145wx3 170wx2 190x
       HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
   [Tuesday] ride     Anaerobic Ride — 46 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
@@ -174,7 +174,7 @@ WEEK 04  column=standard
       ME     Deadlift                       1x1-5        @ 195           | 90% · plan 45wx5 105wx5 145wx3 175wx2 195x
       HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
@@ -224,7 +224,7 @@ WEEK 05  column=standard
       ME     Deadlift                       1x1-5        @ 195           | 90% · plan 45wx5 105wx5 145wx3 175wx2 195x
       HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
   [Tuesday] ride     Anaerobic Ride — 33 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
@@ -274,7 +274,7 @@ WEEK 06  column=standard
       ME     Deadlift                       1x1-5        @ 195           | 90% · plan 45wx5 105wx5 145wx3 175wx2 195x
       HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
   [Tuesday] ride     Anaerobic Ride — 46 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
@@ -324,7 +324,7 @@ WEEK 07  column=standard
       ME     Deadlift                       1x1-5        @ 200           | 90% · plan 45wx5 110wx5 150wx3 180wx2 200x
       HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
@@ -373,7 +373,7 @@ WEEK 08  column=standard
       ME     Deadlift                       1x1-5        @ 200           | 90% · plan 45wx5 110wx5 150wx3 180wx2 200x
       HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
   [Tuesday] ride     Anaerobic Ride — 33 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
@@ -422,7 +422,7 @@ WEEK 09  column=standard
       ME     Deadlift                       1x1-5        @ 200           | 90% · plan 45wx5 110wx5 150wx3 180wx2 200x
       HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
   [Tuesday] ride     Anaerobic Ride — 46 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
@@ -471,7 +471,7 @@ WEEK 10  column=standard
       ME     Deadlift                       1x1-5        @ 200           | 90% · plan 45wx5 110wx5 150wx3 180wx2 200x
       HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
   [Tuesday] ride     Anaerobic Ride — 65 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
@@ -520,7 +520,7 @@ WEEK 11  column=standard
       ME     Deadlift                       1x1-5        @ 200           | 90% · plan 45wx5 110wx5 150wx3 180wx2 200x
       HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
   [Tuesday] ride     Anaerobic Ride — 33 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)
@@ -569,7 +569,7 @@ WEEK 12  column=standard
       ME     Deadlift                       1x1-5        @ 200           | 90% · plan 45wx5 110wx5 150wx3 180wx2 200x
       HYP    Weighted Reverse Hyper         3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Weighted Reverse Hyper" · how-to
       HYP    Zercher Squat                  3x6-12       @ By feel       | RIR 1 · auto_regulated
-      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Leg Curl" · how-to
+      HYP    Leg Curl                       3x6-12       @ By feel       | RIR 1 · auto_regulated · shown as "Dumbbell Leg Curl" · how-to
       DE     Bulgarian Split Squat          4x2-4        @ By feel       | RIR 3.5 · per_side
   [Tuesday] ride     Anaerobic Ride — 46 min
   [Wednesday] STRENGTH Plyometrics   (Viada p227)

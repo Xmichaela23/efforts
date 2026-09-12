@@ -563,10 +563,14 @@ const EXECUTION_NAME: Record<string, ByRoute<string>> = {
    * plain name, because that is what they will walk over to.
    */
   'chest supported row': 'Chest-Supported Row',
-  'leg curl': 'Leg Curl',
-  'leg curls': 'Leg Curl',
-  'lying leg curl': 'Leg Curl',
-  'hamstring curl': 'Leg Curl',
+  // ⛔ "Dumbbell Leg Curl" (Michael, 2026-09-11: "shouldn't these be called dumbbell leg curl for
+  // this kit?"). The free route is the prone curl with a dumbbell between the feet (the how-to
+  // below); the name says so, as the pullover and the concentration curl do. A kit with the machine
+  // still sees "Leg Curl" — `executionName` keeps his name where the station is owned.
+  'leg curl': 'Dumbbell Leg Curl',
+  'leg curls': 'Dumbbell Leg Curl',
+  'lying leg curl': 'Dumbbell Leg Curl',
+  'hamstring curl': 'Dumbbell Leg Curl',
   /**
    * ONE ENTRY, AND THE OTHER CANDIDATES WERE CHECKED AND LEFT OUT.
    * `seated calf raise` names no equipment - a home athlete reads it and does it with a dumbbell
