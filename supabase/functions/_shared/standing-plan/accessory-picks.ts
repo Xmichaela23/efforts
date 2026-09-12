@@ -487,7 +487,10 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // Tate press were absent from the head entirely.
     // p222 FOCUSED PUSH/ARMS, his six. Skull crushers and the Tate press are FOCUSED and belong here
     // rather than in the press slot. `chest fly` and every push-up variant are not his.
-    hisList: ['triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
+    // Both spellings of the pushdown (2026-09-11): the page prints "triceps pushdowns", the catalogue
+    // key is `tricep pushdown`, and canonicalize keeps them apart — the strict cut in pickOptions dropped
+    // his first-listed movement from every push row on every kit, band route included.
+    hisList: ['triceps pushdown', 'tricep pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
     /**
      * THE ONE ADDITION IN THE APP, AND IT FILLS A REAL HOLE. Of his six focused push/arms movements
      * the pec deck is the only chest mover, and it needs the station - so at Michael's equipment
@@ -507,7 +510,7 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
       because: 'His only chest isolation is the pec deck (p222) and it needs the station, so a home '
         + 'gym gets none of his. Ours, not a substitute for his movement.',
     }],
-    leadWith: ['triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
+    leadWith: ['triceps pushdown', 'tricep pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
     leadCite: 'Viada pp222-223 — focused push / arms',
     servesChips: ['chest', 'shoulders', 'arms'],
   },
@@ -622,8 +625,8 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     key: 'ar_arms_push_1',
     label: 'Arms superset · push',
     slot: { category: 'focused', pattern: 'push_upper', frameDay: 1, arms: true },
-    hisList: ['triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
-    leadWith: ['triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
+    hisList: ['triceps pushdown', 'tricep pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
+    leadWith: ['triceps pushdown', 'tricep pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
     leadCite: 'Viada pp222-223 — focused push / arms',
     pairedWith: 'ar_arms_pull_1',
     servesChips: ['arms'],
@@ -642,13 +645,13 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     key: 'ar_push_iso_1',
     label: 'Push isolation',
     slot: { category: 'focused', pattern: 'push_upper', frameDay: 1, arms: false },
-    hisList: ['triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
+    hisList: ['triceps pushdown', 'tricep pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
     oursList: [{
       name: 'chest fly',
       because: 'His only chest isolation is the pec deck (p222) and it needs the station, so a home '
         + 'gym gets none of his. Ours, not a substitute for his movement.',
     }],
-    leadWith: ['lateral raise', 'pec deck', 'triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher'],
+    leadWith: ['lateral raise', 'pec deck', 'triceps pushdown', 'tricep pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher'],
     leadCite: 'Viada pp222-223 — focused push',
     servesChips: ['chest', 'shoulders'],
   },
@@ -656,8 +659,8 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     key: 'ar_arms_push_4',
     label: 'Arms superset · push',
     slot: { category: 'focused', pattern: 'push_upper', frameDay: 4, arms: true },
-    hisList: ['triceps pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
-    leadWith: ['skull crusher', 'behind the neck db triceps extension', 'tate press', 'triceps pushdown', 'pec deck', 'lateral raise'],
+    hisList: ['triceps pushdown', 'tricep pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
+    leadWith: ['skull crusher', 'behind the neck db triceps extension', 'tate press', 'triceps pushdown', 'tricep pushdown', 'pec deck', 'lateral raise'],
     leadCite: 'Viada pp222-223 — focused push / arms',
     pairedWith: 'ar_arms_pull_4',
     servesChips: ['arms'],
@@ -780,6 +783,9 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     label: 'Machine press',
     slot: { category: 'braced', pattern: 'push_upper' },
     hisList: ['smith machine press', 'machine chest press', 'dip machine'],
+    // One incline press, not two spellings (2026-09-11): the catalogue holds `db incline press` and
+    // `dumbbell incline press` as separate keys and canonicalize does not fold the pair. The full-word key stays.
+    excludes: ['db incline press'],
     // ⛔ HIS ORDER, so the zero-touch default is the movement he prints first.
     leadWith: ['smith machine press', 'machine chest press', 'dip machine'],
     leadCite: 'Viada p221 — braced push upper',

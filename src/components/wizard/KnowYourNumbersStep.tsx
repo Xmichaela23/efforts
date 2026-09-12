@@ -132,14 +132,15 @@ export function KnowYourNumbersStep({
   const set = (k: NumbersChoiceKey, v: 'use' | 'test') => onChoice({ ...choice, [k]: v });
 
   const rowShell = (title: string, body: React.ReactNode, right: React.ReactNode) => (
+    // The two buttons sit UNDER the text, not beside it (Michael, 2026-09-11, phone screenshot): side
+    // by side, "Use current" + "Retest in week one" took the row's width and the title and numbers
+    // wrapped one syllable per line.
     <div className="rounded-xl border border-white/12 bg-white/[0.03] p-4 flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-white text-[15px]">{title}</div>
-          <div className="text-white/60 text-[13px] mt-0.5">{body}</div>
-        </div>
-        {right}
+      <div className="min-w-0">
+        <div className="text-white text-[15px]">{title}</div>
+        <div className="text-white/60 text-[13px] mt-0.5">{body}</div>
       </div>
+      {right}
     </div>
   );
 

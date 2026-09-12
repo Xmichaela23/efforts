@@ -55,7 +55,6 @@ WEEK 01  column=standard  ⟵ TEST WEEK
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
       [source  ] The other lifting days run by feel this week — the numbers arrive once the test is done.  (Viada p215)
       [source  ] The hard run lands the day before the heavy leg session, so the lower-body weights start about three and a half per cent under where the test put them. That comes back over the first nine weeks.  (Viada p247)
-      [warning ] Tuesday: hard ride and heavy legs. Lifts in the first session, 6 to 8 hours before the ride.  (Viada p130, p131)
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
 WEEK 02  column=standard
@@ -105,7 +104,6 @@ WEEK 02  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Tuesday: hard ride and heavy legs. Lifts in the first session, 6 to 8 hours before the ride.  (Viada p130, p131)
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
 WEEK 03  column=standard
@@ -155,7 +153,6 @@ WEEK 03  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Tuesday: hard ride and heavy legs. Lifts in the first session, 6 to 8 hours before the ride.  (Viada p130, p131)
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
 WEEK 04  column=standard
@@ -205,7 +202,6 @@ WEEK 04  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Tuesday: hard ride and heavy legs. Lifts in the first session, 6 to 8 hours before the ride.  (Viada p130, p131)
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
 WEEK 05  column=standard
@@ -255,7 +251,6 @@ WEEK 05  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Tuesday: hard ride and heavy legs. Lifts in the first session, 6 to 8 hours before the ride.  (Viada p130, p131)
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
 WEEK 06  column=standard
@@ -305,7 +300,6 @@ WEEK 06  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Tuesday: hard ride and heavy legs. Lifts in the first session, 6 to 8 hours before the ride.  (Viada p130, p131)
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
 WEEK 07  column=standard
@@ -354,7 +348,6 @@ WEEK 07  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Tuesday: hard ride and heavy legs. Lifts in the first session, 6 to 8 hours before the ride.  (Viada p130, p131)
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
 WEEK 08  column=standard
@@ -403,7 +396,6 @@ WEEK 08  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Tuesday: hard ride and heavy legs. Lifts in the first session, 6 to 8 hours before the ride.  (Viada p130, p131)
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
 WEEK 09  column=standard
@@ -452,7 +444,6 @@ WEEK 09  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Tuesday: hard ride and heavy legs. Lifts in the first session, 6 to 8 hours before the ride.  (Viada p130, p131)
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
 WEEK 10  column=standard
@@ -501,7 +492,6 @@ WEEK 10  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Tuesday: hard ride and heavy legs. Lifts in the first session, 6 to 8 hours before the ride.  (Viada p130, p131)
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
 WEEK 11  column=standard
@@ -550,7 +540,6 @@ WEEK 11  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Tuesday: hard ride and heavy legs. Lifts in the first session, 6 to 8 hours before the ride.  (Viada p130, p131)
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)
 
 WEEK 12  column=standard
@@ -599,5 +588,4 @@ WEEK 12  column=standard
       [ours    ] The source says each drill is performed "multiple times with ample rest" and gives no number. Three to four efforts is ours, from field practice for low-amplitude plyometrics — a range, not a target.
       [source  ] Stop each drill when the movement is optimised for the day and it feels confident — not on a rep count. Fatigue, poor form and imprecise movements are the signal to move on.  (Viada p227)
       [ours    ] The plyometric day takes one drill from each of the three families the source names. He caps a day at three or four drills and puts the warm-up at one to three skills; taking one from each bucket is ours, and it is the only arrangement that touches all three.
-      [warning ] Tuesday: hard ride and heavy legs. Lifts in the first session, 6 to 8 hours before the ride.  (Viada p130, p131)
       [warning ] Friday heavy legs, Saturday long run. The run is on legs that have not recovered.  (Viada p130, p131)

@@ -84,6 +84,21 @@ Deno.test('⛔ A CLEAN WEEK SAYS NOTHING — the frame untouched raises no confl
   assertEquals(week.conflicts, []);
 });
 
+Deno.test('⛔ THE ALL ROUNDER UNTOUCHED SAYS NOTHING — p274 prints the hard ride on the hinge day', () => {
+  /**
+   * The frame's own pairing (Michael, 2026-09-11: *"it's our program note for note"*). p274 puts the
+   * anaerobic ride on the heavy hinge day, so a same-day hard-with-heavy-legs line here would be the
+   * program warning about its own page. Silent on the untouched frame, whatever sport the mix assigns.
+   */
+  for (const mix of [{ runs: 2, rides: 2 }, { runs: 4, rides: 0 }]) {
+    const week = composeWeek({
+      ...BASE, frame: 'all_rounder', week: 2, column: 'standard', dayOffset: 0,
+      sportMix: mix, unavailableDays: [],
+    } as never);
+    assertEquals(week.conflicts.filter((c) => c.rule === 'hard_with_heavy_legs'), [], JSON.stringify(week.conflicts));
+  }
+});
+
 Deno.test('a hard session on the heavy leg day is named — the ride gets an order, the run gets p77', () => {
   /**
    * ⛔⛔ BOTH ARMS ARE MICHAEL'S OWN SENTENCES (2026-09-09, kill-ours §A.3 and §B.6), and they are

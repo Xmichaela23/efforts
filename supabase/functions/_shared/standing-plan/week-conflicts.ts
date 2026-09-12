@@ -269,6 +269,30 @@ const isEnduranceBlocker = (t: TypedSession): boolean =>
   t.load === 'hard_cardio' || t.load === 'long_run' || t.load === 'long_ride';
 
 /**
+ * ⛔ THE FRAME'S OWN PAIRING IS NOT A CONFLICT (Michael, 2026-09-11: *"this warning shouldn't be there,
+ * it's our program note for note"*). p274 prints the anaerobic ride on the hinge day — a hard session
+ * and heavy legs on ONE day, by the page. An untouched All Rounder week raised `hard_with_heavy_legs`
+ * on every week of every golden for it, which made the program warn about its own layout and trained
+ * the athlete to ignore the line. The sentence is for a pairing the athlete's pins created, so a
+ * same-day pairing that the column itself prints — a heavy lower day carrying a hard endurance slot —
+ * is silent. ⚠️ Whatever sport the mix assigned: the frame prints a hard session there either way.
+ * ⚠️ `dayOffset` is the block's rotation, so the weekday is turned back into the frame day first.
+ */
+function framePrintsHardOnHeavyDay(
+  frame: FrameId,
+  column: ColumnKind,
+  day: Weekday,
+  dayOffset: number,
+): boolean {
+  const o = ((Math.round(dayOffset) % 7) + 7) % 7;
+  const frameDay = (((WEEKDAYS.indexOf(day) - o) % 7) + 7) % 7 + 1;
+  const d = FRAMES[frame].columns[column].find((x) => x.day === frameDay);
+  if (!d) return false;
+  const heavy = lowerDaysOf(frame, column).me.includes(d.day);
+  return heavy && d.endurance.some((slot) => isHardSlot(slot));
+}
+
+/**
  * ⛔ HIS TWO SENTENCES, WORD FOR WORD (Michael, 2026-09-09, WORKORDER-kill-ours §B.6). The day and
  * the session name are the athlete's own picks; nothing else in them is substitutable.
  *
@@ -381,6 +405,9 @@ export function weekConflicts(args: {
        * His template names a run or a ride; "heavy legs after heavy leg session" is not a sentence he
        * wrote, and the break is real but unworded.
        */
+      if (apart === 'same' && framePrintsHardOnHeavyDay(args.frame, args.column, sDay, args.dayOffset)) {
+        continue;
+      }
       if (apart === 'same' && blocker.s.type === 'ride') {
         push({
           kind: 'cost',
