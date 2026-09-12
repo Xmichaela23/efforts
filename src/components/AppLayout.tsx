@@ -16,7 +16,7 @@ import AllPlansInterface from './AllPlansInterface';
 import StrengthPlansView from './StrengthPlansView';
 import WorkoutSummary from './WorkoutSummary';
 import ContextTabs from './ContextTabs';
-import ManualSwimEntry from './ManualSwimEntry';
+import ManualEntry, { type ManualEntryType } from './ManualEntry';
 import GoalsScreen from './GoalsScreen';
 import UnifiedWorkoutView from './UnifiedWorkoutView';
 import ScreenErrorBoundary from './ScreenErrorBoundary';
@@ -95,7 +95,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   // plannedWorkouts removed; unified get-week feeds views
 
   const [showBuilder, setShowBuilder] = useState(false);
-  const [showManualSwim, setShowManualSwim] = useState(false); // D-174 dead-simple manual swim entry
+  // One typed-in entry for run, ride and swim (2026-09-12); `null` = closed. Replaced the swim-only flag.
+  const [manualEntry, setManualEntry] = useState<ManualEntryType | null>(null);
 
   // D-109: separate "session data exists in localStorage" from "user wants
   // logger open." D-108 conflated the two — any unfinished session in
@@ -1212,6 +1213,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           setShowStrengthLogger(true);
         }
       })();
+    } else if (type === 'log-swim' || type === 'log-run' || type === 'log-ride') {
+      // ⛔ LOG MEANS LOG (2026-09-12). Run and ride opened `WorkoutBuilder` here, which saves a PLANNED
+      // session and never logged anything — and from the Today +, so did swim, since this handler had
+      // no swim branch at all. All three take the typed-in entry now (D-174's swim form, made one
+      // form): distance, time, date, then the full analysis.
+      setManualEntry(type === 'log-swim' ? 'swim' : type === 'log-run' ? 'run' : 'ride');
     } else {
       setShowBuilder(true);
     }
@@ -1274,9 +1281,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     } else if (type === 'upload-course') {
       setGoalsCourseUploadNonce((n) => n + 1);
       setShowGoals(true);
-    } else if (type === 'log-swim') {
-      // D-174: swim gets the dead-simple completed-swim form, not the full planned builder.
-      setShowManualSwim(true);
+    } else if (type === 'log-swim' || type === 'log-run' || type === 'log-ride') {
+      // ⛔ LOG MEANS LOG (2026-09-12). Run and ride opened `WorkoutBuilder` here, which saves a PLANNED
+      // session and never logged anything — and from the Today +, so did swim, since this handler had
+      // no swim branch at all. All three take the typed-in entry now (D-174's swim form, made one
+      // form): distance, time, date, then the full analysis.
+      setManualEntry(type === 'log-swim' ? 'swim' : type === 'log-run' ? 'run' : 'ride');
     } else {
       setShowBuilder(true);
     }
@@ -1753,10 +1763,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       )}
       
       {/* Post-Workout Feedback Popup */}
-      {showManualSwim && (
-        <ManualSwimEntry
+      {manualEntry && (
+        <ManualEntry
+          type={manualEntry}
           date={selectedDate}
-          onClose={() => setShowManualSwim(false)}
+          onClose={() => setManualEntry(null)}
         />
       )}
 
