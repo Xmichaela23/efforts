@@ -1655,14 +1655,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </div>
       ) : null}
       <FirstRunOverlay active={noPlanYet} />
-      {/* The plan is built and has not opened yet: the day it starts, above the panel (2026-09-11). */}
-      {!noPlanYet && upcomingPlanLine ? (
-        <div className="flex-shrink-0 px-2 pt-2 pb-1" style={{ position: 'relative', zIndex: 1 }}>
-          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
-            <p className="text-white/85 text-sm">{upcomingPlanLine}</p>
-          </div>
-        </div>
-      ) : null}
       {/* No plan yet: the one door, above the panel (2026-09-08). */}
       {noPlanYet ? (
           <div className="flex-shrink-0 px-2 pt-2 pb-1" style={{ position: 'relative', zIndex: 1 }}>
@@ -1937,7 +1929,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 ? 'Rest'
                 : isPastDate
                   ? 'No effort logged'
-                  : 'No effort scheduled'
+                  // The plan is built and has not opened yet: the day it starts, in the slot the session
+                  // would take (Michael, 2026-09-11: "put the your plan starts note where today's efforts says").
+                  : (upcomingPlan?.starts_on && activeDate < String(upcomingPlan.starts_on) && upcomingPlanLine)
+                    ? upcomingPlanLine
+                    : 'No effort scheduled'
               }
             </p>
           </div>
