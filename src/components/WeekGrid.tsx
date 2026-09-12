@@ -126,8 +126,10 @@ export default function WeekGrid({
           );
           const accessories = [...new Set(
             (lift?.strength_exercises ?? [])
-              .map((e) => e.name)
-              .filter((n) => !mainNames.has(n) && n !== 'Box Jump'),
+              // The kit's name where the composer sent one (Michael, 2026-09-11: the week said "Leg Curl"
+              // while the logger said "Dumbbell Leg Curl"). The main-lift test keeps the plain name.
+              .filter((e) => !mainNames.has(e.name) && e.name !== 'Box Jump')
+              .map((e) => (typeof e.execution_name === 'string' && e.execution_name.trim()) ? e.execution_name.trim() : e.name),
           )];
           /**
            * ⛔ THE EM-DASH WAS THE LIFT SLOT, AND ON A RUN PLAN IT WAS EVERY ROW (2026-08-06).

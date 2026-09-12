@@ -142,7 +142,22 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   onEditEffort 
 }) => {
   const navigate = useNavigate();
-  const { useImperial, workouts, loading, loadUserBaselines, detailedPlans } = useAppContext();
+  const { useImperial, workouts, loading, loadUserBaselines, detailedPlans, currentPlans } = useAppContext();
+  /**
+   * The active plan that has not opened yet (Michael, 2026-09-11): a build lands here, and until its
+   * first week arrives this screen has no session to show, so it says when the plan starts. The
+   * server answers both fields (`plan-overview`); this reads them.
+   */
+  const upcomingPlan = useMemo(() => {
+    const list = Array.isArray(currentPlans) ? currentPlans : [];
+    return list.find((p: any) => p?.status === 'active' && p?.has_started === false && typeof p?.starts_on === 'string') ?? null;
+  }, [currentPlans]);
+  const upcomingPlanLine = useMemo(() => {
+    if (!upcomingPlan?.starts_on) return null;
+    const [y, m, d] = String(upcomingPlan.starts_on).split('-').map((x) => parseInt(x, 10));
+    const when = new Date(y, (m || 1) - 1, d || 1).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    return `Your plan starts ${when}.`;
+  }, [upcomingPlan]);
 
   /**
    * Connection health (docs/WORKORDER-plumbing-2026-09-07.md §4): the providers whose stored token
@@ -1640,6 +1655,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </div>
       ) : null}
       <FirstRunOverlay active={noPlanYet} />
+      {/* The plan is built and has not opened yet: the day it starts, above the panel (2026-09-11). */}
+      {!noPlanYet && upcomingPlanLine ? (
+        <div className="flex-shrink-0 px-2 pt-2 pb-1" style={{ position: 'relative', zIndex: 1 }}>
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
+            <p className="text-white/85 text-sm">{upcomingPlanLine}</p>
+          </div>
+        </div>
+      ) : null}
       {/* No plan yet: the one door, above the panel (2026-09-08). */}
       {noPlanYet ? (
           <div className="flex-shrink-0 px-2 pt-2 pb-1" style={{ position: 'relative', zIndex: 1 }}>

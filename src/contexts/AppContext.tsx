@@ -51,6 +51,9 @@ interface Plan {
   user_id?: string;
   paused_at?: string;
   config?: any;
+  /** From plan-overview: the day week one opens, and whether today has reached it. */
+  starts_on?: string | null;
+  has_started?: boolean;
 }
 
 interface BaselineData {

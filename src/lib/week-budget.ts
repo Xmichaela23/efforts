@@ -16,7 +16,9 @@ export type WeekSession = {
   type?: string;
   duration?: number;
   /** The session's rows. The grid shows the accessory names so the swaps are visible at intake. */
-  strength_exercises?: Array<{ name: string }>;
+  /** `execution_name` is the kit's own name for the row ("Dumbbell Leg Curl" where there is no machine) — the
+   *  sample week prints it where the composer sent one, as the logger does, so the two agree. */
+  strength_exercises?: Array<{ name: string; execution_name?: string }>;
   /**
    * ⛔ THE COMPOSER'S OWN TAGS, carried so a reader can tell two `type: 'strength'` sessions apart.
    * ⚠️ THE CASE THAT FORCED IT: the plyo day is emitted as `type: 'strength'` with `tags: ['plyo']`

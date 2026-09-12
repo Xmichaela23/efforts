@@ -491,8 +491,11 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
           // The intake (Strong Focus etc.) lands on the new plan's weekly planner at week 1, not the
           // Home calendar. The load-bearing bookkeeping above (signals persisted, plans/goals
           // refreshed, builder closed) has already run; this only changes the destination.
-          if (st.builtPlanId) onOpenBuiltPlan?.(String(st.builtPlanId));
-          else onGoToSchedule?.();
+          // ⛔ TODAY, NOT THE PLANNER (Michael, 2026-09-11: "when your plan lands it puts you on the
+          // weekly planner, maybe it should land on today with a note that says your plan starts when
+          // it starts"). Today carries that note off `starts_on` / `has_started` from plan-overview.
+          // `onOpenBuiltPlan` stays wired for the planner deep link; a build no longer takes it.
+          onGoToSchedule?.();
         }
       } else if (st.fromArcSetup) {
         void refreshGoals();

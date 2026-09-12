@@ -40,7 +40,14 @@ Deno.test('the phase is the plan\'s own word', () => {
 });
 
 Deno.test('list fields: week, phase, length and progress', () => {
-  assertEquals(planListFields(racePlan, '2026-09-21'), { current_week_index: 3, current_phase: 'Build', total_weeks: 4, progress_pct: 75 });
+  assertEquals(planListFields(racePlan, '2026-09-21'), {
+    current_week_index: 3, current_phase: 'Build', total_weeks: 4, progress_pct: 75,
+    starts_on: '2026-09-07', has_started: true,
+  });
+  // A plan built for a later week: week 1 by the clamp, but not started — Today's "your plan starts" note.
+  assertEquals(planListFields(racePlan, '2026-09-01').has_started, false);
+  assertEquals(planListFields(racePlan, '2026-09-01').current_week_index, 1);
+  assertEquals(planListFields({ config: {} }, '2026-09-01').starts_on, null);
 });
 
 Deno.test('totals are over every week, not the weeks opened', () => {

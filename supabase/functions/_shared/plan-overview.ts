@@ -26,7 +26,7 @@
  *
  * ⛔ SHARED = DEPLOY TRAP: grep -rln "plan-overview" supabase/functions
  */
-import { resolvePlanWeekIndex } from './plan-week.ts';
+import { planHasStarted, resolvePlanWeekIndex, resolveWeekStartDowFromPlanConfig, weekStartOf } from './plan-week.ts';
 import { resolvePlanPhase } from './plan-phase.ts';
 import { resolvePlannedDurationSeconds } from './planned-duration.ts';
 
@@ -138,6 +138,20 @@ export function planProgressPct(week: number | null, totalWeeks: number | null):
   return Math.min(100, Math.round((week / totalWeeks) * 100));
 }
 
+/**
+ * The day the plan's first week opens (the configured start moved to the plan's week start), and
+ * whether `asOfIso` has reached it. `resolvePlanWeekIndex` clamps a pre-start date to week 1, so a
+ * plan built for next Monday reads as "week 1" today; Today needs the honest answer to say the plan
+ * has not started yet (Michael, 2026-09-11: land on Today with a note that the plan starts when it
+ * starts). Null when the plan carries no start date.
+ */
+export function planStartsOn(plan: PlanRowLike | null | undefined): string | null {
+  const cfg = plan?.config ?? {};
+  const start = String(cfg?.user_selected_start_date || cfg?.start_date || '');
+  if (!/^\d{4}-\d{2}-\d{2}/.test(start)) return null;
+  return weekStartOf(start.slice(0, 10), resolveWeekStartDowFromPlanConfig(cfg));
+}
+
 /** The fields every plan in a list carries. */
 export function planListFields(plan: PlanRowLike, asOfIso: string) {
   const current = planCurrentWeekIndex(plan, asOfIso);
@@ -147,6 +161,8 @@ export function planListFields(plan: PlanRowLike, asOfIso: string) {
     current_phase: planPhaseWord(plan, current),
     total_weeks: total,
     progress_pct: planProgressPct(current, total),
+    starts_on: planStartsOn(plan),
+    has_started: planHasStarted(plan?.config ?? {}, asOfIso),
   };
 }
 

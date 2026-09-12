@@ -5505,7 +5505,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                   });
                   if (carried.length === 0) return null;
                   const from = Math.min(...frameDaysForPick(carried[0], wizardFrame));
-                  const names = carried.map((k) => VIADA_PICKS[k].label.toLowerCase());
+                  // ⛔ THE MOVEMENTS THE PLAN BUILT, NOT THE PAGE'S ROW NAMES (Michael, 2026-09-11: the line said
+                  // "back extension and leg press" while his week built the weighted reverse hyper and the front
+                  // squat). Same resolution as the row's own dropdown: the athlete's pick, else the first option.
+                  const names = carried.map((k) => {
+                    const rowOpts = pickOptions(
+                      k, strengthEquipment,
+                      frameMuscleForPick(k, wizardFrame), frameAdmitsForPick(k, wizardFrame),
+                    );
+                    const chosen = viadaPrefs?.picks?.[k] ?? rowOpts[0]?.name ?? '';
+                    const display = rowOpts.find((o) => o.name === chosen)?.display ?? chosen;
+                    return (display || VIADA_PICKS[k].label).toLowerCase();
+                  });
                   const paired = carried.length === 2 && VIADA_PICKS[carried[0]].pairedWith === carried[1];
                   const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
                   return `Plus the ${list}${paired ? ' superset' : ''} from day ${from}.`;
@@ -5522,7 +5533,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     </div>
                     {keys.map(renderRow)}
                     {d != null && carriedLine(d) ? (
-                      <p className="text-white/40 text-xs leading-snug">{carriedLine(d)}</p>
+                      <p className="text-white/85 text-[13px] leading-snug">{carriedLine(d)}</p>
                     ) : null}
                   </div>
                 ));
