@@ -1134,6 +1134,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     weather: (typeof weatherTempF === 'number' && Number.isFinite(weatherTempF))
       ? { temperature_f: Math.round(weatherTempF), display: formatSessionTemp(factPacket?.facts?.weather) ?? `${Math.round(weatherTempF)}°F` }
       : null,
+    // The same answer that took the weather and the hills off this session (2026-09-09), now said.
+    indoor: indoorVenue,
 
     analysis_details: { rows: analysisDetailRows },
     load: loadContext ?? null,

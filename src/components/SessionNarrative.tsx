@@ -77,6 +77,8 @@ interface SessionNarrativeProps {
     summary?: { title?: string; bullets?: string[] };
     completed_totals?: { duration_s?: number | null; distance_m?: number | null };
     weather?: { temperature_f?: number | null; display?: string | null } | null;
+    /** Trainer, treadmill, virtual — the server's one indoor predicate. */
+    indoor?: boolean;
     analysis_details?: { rows?: Array<{ label: string; value: string }> };
     adherence?: {
       technical_insights?: Array<{ label: string; value: string }>;
@@ -374,6 +376,11 @@ export default function SessionNarrative({
             : `${m}:${String(s).padStart(2, '0')}`);
         }
         if (tDisplay) parts.push(tDisplay);
+        // ⛔ "INDOOR" ON THE HEADER LINE (2026-09-12, Michael: "can we clarify when rides are done on a
+        // trainer? assuming I will see terrain and temp on an outdoor ride"). Garmin's and Strava's own
+        // word. The server decided it on 2026-09-09 and took the weather and hills off; it just never
+        // said so here. An outdoor session shows its temperature in this slot instead.
+        if (sd?.indoor === true) parts.push('Indoor');
         // ⛔ NO STANDING RECOMPUTE BUTTON (2026-09-12, Michael: "helpful for dev, not sure it's
         // necessary for users"). `failureBlock` still carries "Try again" when the stored analysis
         // failed, and the empty state above still offers it when there is no analysis at all. A

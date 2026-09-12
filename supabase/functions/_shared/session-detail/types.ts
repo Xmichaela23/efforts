@@ -308,6 +308,10 @@ export type SessionDetailV1 = {
     typical_high: number | null;
     sample_count: number;
   } | null;
+  /** The session was indoors — trainer, treadmill, virtual, or a track that never moved — by the one
+   *  predicate every surface asks (`_shared/indoor-session.ts`). The Performance header prints the
+   *  word (2026-09-12, Michael: "can we clarify when rides are done on a trainer?"). */
+  indoor?: boolean;
   weather: {
     temperature_f: number | null;
     /** What the screen shows: "74 → 78°F" when it moved, "76°F" when it did not. Composed ONCE by
