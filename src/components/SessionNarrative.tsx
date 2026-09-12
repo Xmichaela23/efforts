@@ -313,12 +313,17 @@ export default function SessionNarrative({
     // (2026-08-15, Michael: "apply to the performance screens using each discipline's colour"), the
     // same variable the State plates and the logger cards read. Section labels then tint to the
     // sport with no prop threading. Falls back to the app's off-white when the caller sends none.
+    // ⛔ A SECTION, NOT A CARD IN A CARD (2026-09-12). The Performance panel now wears State's bed
+    // (UnifiedWorkoutView `getCardClass`), and State builds its sections with a hairline divider,
+    // never a second card nested inside the first. This block used to be its own galaxy card with a
+    // sport-coloured border sitting inside the panel; it is now the panel's next section, divided
+    // from the tiles above by the same hairline State uses. The accent variable stays, for the
+    // section labels' tint.
     <div
-      className="galaxy-card mt-4 mx-1 px-3 py-4 rounded-2xl space-y-3"
+      className="mt-3 px-3 pt-4 pb-1 space-y-3 border-t border-white/[0.055]"
       style={{
         ...(accentRgb ? { ['--card-accent-rgb' as any]: accentRgb } : {}),
         ['--card-accent-a' as any]: '0.22',
-        border: `1px solid rgba(${accentRgb || '236, 233, 227'}, 0.18)`,
       }}
     >
       {noPlannedCompare && (

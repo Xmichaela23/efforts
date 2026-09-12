@@ -9,6 +9,7 @@ import CompletedTab from './CompletedTab';
 import StrengthLogger from './StrengthLogger';
 import AssociatePlannedDialog from './AssociatePlannedDialog';
 import MobileSummary from './MobileSummary';
+import { readoutPlateStyle } from '@/lib/readout-plate';
 import { strengthBlockLine } from '@/lib/strength-block-line';
 import WorkoutDetail from './WorkoutDetail';
 import StrengthCompletedView from './StrengthCompletedView';
@@ -793,22 +794,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   // component — the tab-routing effects depend on isStrengthFamily at render time, so it can't
   // live this far down without hitting the temporal dead zone. D-207.)
 
-  // Phosphor glow for mobility and strength cards
-  const getCardStyle = () => {
-    if (isMobility) {
-      const glowStyle = getDisciplineGlowStyle('mobility', 'idle');
-      return { ...glowStyle, background: 'radial-gradient(ellipse at center top, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.1) 100%)' };
-    }
-    if (isStrength) {
-      const glowStyle = getDisciplineGlowStyle('strength', 'idle');
-      return { ...glowStyle, background: 'radial-gradient(ellipse at center top, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.1) 100%)' };
-    }
-    return {};
-  };
-  const getCardClass = () => {
-    // Dark steel panel: neutral border, subtle inner stroke via shadow
-    return 'backdrop-blur-xl border border-white/10 rounded-2xl mx-1 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]';
-  };
+  /**
+   * ⛔ STATE'S CARD, LITERALLY (2026-09-12, Michael: "I just really like how the cards look in the
+   * state screen… they feel more premium, subtle depth, texture"). The three tab panels — Planned,
+   * Performance, Details — sit on the same classes and the same plate style as the LOAD and trends
+   * cards on State and every card on Today: near-black nebula ground, the five-hue spectral wash,
+   * stars, grid, neutral hairline. One definition shared by three screens, so they cannot drift.
+   * WHAT THIS REPLACES: a blurred panel with a white hairline, plus a hand-rolled radial and a
+   * discipline glow for lifts and mobility only — a fourth surface in the app, and the reason the
+   * Performance tab read as a different material from State.
+   */
+  const getCardStyle = (): React.CSSProperties => readoutPlateStyle(undefined, { galaxy: true });
+  const getCardClass = () => 'galaxy-card readout-texture readout-texture--spectral rounded-2xl mx-1';
   const cardStyle = getCardStyle();
   const cardClass = getCardClass();
   const hasCardStyle = isMobility || isStrength;
