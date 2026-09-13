@@ -5,6 +5,7 @@
 import type { SessionDetailV1, SegmentVerdictV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
 import { resolveSessionDrift } from './drift-pct.ts';
 import { sessionSteadiness } from './session-steadiness.ts';
+import { vt1WindowDrift } from './vt1-window-drift.ts';
 import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
 import { pacingVariability, stampIntervalCompare } from './interval-compare.ts';
 import { planShare } from './swim-plan-share.ts';
@@ -852,12 +853,37 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     // in `drift-pct.ts` — steady sessions only (p107), the run analyser's decoupling, a ride's
     // power-to-heart-rate ratio, heart rate alone as the fallback. Today's boom line and State's
     // drift chart read the same function. This block used to be its own copy.
+    /**
+     * ⛔ A LONG SESSION WITH SETS IS READ OVER ITS VT1 PORTIONS (p107 / p235, 2026-09-12). The book
+     * builds LSD with sets in it, and a whole-file number on that session reports a durability
+     * failure every week on an athlete following the page exactly. `vt1WindowDrift` removes the sets
+     * and their recoveries and splits what is left; a plain long session has nothing to remove and
+     * says `not_applicable`, so it keeps the ordinary read below. See that file for why the test is
+     * p107's bout length rather than the step's prescribed intensity.
+     */
+    const win = vt1WindowDrift({ intervals, sport: type });
+    if (win.kind === 'too_short') {
+      return {
+        pct: null, basis: null, assessment: null, confounded: false, whole_session: false,
+        // Approved words (2026-09-12). No number, no mention of the sets, no minutes.
+        line: /^(ride|bike|cycling)$/.test(String(type ?? '').toLowerCase())
+          ? 'Not enough easy riding to read'
+          : 'Not enough easy running to read',
+      };
+    }
     const d = resolveSessionDrift({
       workoutAnalysis: wa, computed: comp, sport: type,
       // The materials, not a verdict — `session-steadiness.ts` decides. `plannedRowRaw` carries the
       // plan's family tag, `completedRow` the provider's word and the device's lap markings.
       steadiness: { factPacket, intervals, plannedRow: plannedRowRaw as any, workoutRow: completedRow },
     });
+    if (win.kind === 'read') {
+      // The windowed number replaces the whole-file one; everything else about the row is unchanged.
+      return {
+        pct: win.pct, basis: win.basis, assessment: null, confounded: d?.confounded ?? false,
+        whole_session: false, line: driftLineFor(win.pct),
+      };
+    }
     if (!d) return null;
     return {
       pct: d.pct,

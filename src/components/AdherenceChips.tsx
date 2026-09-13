@@ -172,6 +172,13 @@ export default function AdherenceChips({
      * the chip keeps its label, and with a percentage but no line it says nothing under the number.
      */
     const driftSubtitle = driftPct == null ? 'Heart-rate drift' : (decoupling?.line ?? '');
+    /**
+     * ⛔ WORDS WHERE THERE IS NO NUMBER (2026-09-12). `classification.decoupling` arrives with a null
+     * percentage and a `line` when a long session's VT1 portions are too short to read over — the
+     * server's approved sentence, printed verbatim. An ordinary session with no drift at all carries
+     * no line and the chip stays away, exactly as before.
+     */
+    const driftNote = driftPct == null ? (decoupling?.line ?? null) : null;
     // 2026-09-03 (Michael: "we add an execution score, right? Drift?"): the header is Workload · Execution ·
     // Duration · Drift on every planned run and ride. The pace/GAP percentage that sat here was the blended
     // interval pace score and read as a mystery number; it lives per row in the interval table. Easy and
@@ -208,6 +215,13 @@ export default function AdherenceChips({
     // rows, which reads as a different number. Three chips share a phone width, so wrapping is normal
     // and fine; wrapping THROUGH a value is not. `text-center` centres what does wrap, and the value
     // line is nowrap so a range, a bpm figure or a "64 of 108 min" can never be cut in half.
+    /** The same chip with no number — a label and the server's sentence. See the Drift chip below. */
+    const chipNote = (label: string, text: string) => (
+      <div className="flex flex-col items-center px-1 min-w-0">
+        <div className={labelCls}>{label}</div>
+        <div className={subCls}>{text}</div>
+      </div>
+    );
     const chipText = (label: string, value: string | null, text: string) => {
       if (!value) return null;
       return (
@@ -353,7 +367,13 @@ export default function AdherenceChips({
                   performance screens for running and riding"). Power / Easy reads live in Insights. */}
               {executionScore != null && chip('Execution', executionScore, 'efforts & time')}
               {chipText('Duration', durationValue, 'of plan')}
-              {driftValue != null && chipText('Drift', driftValue, driftSubtitle)}
+              {/* ⛔ THE CHIP RENDERS WITHOUT A NUMBER WHEN THE SERVER SENT WORDS INSTEAD (2026-09-12).
+                  A long session whose VT1 portions are under p107's bout floor gets no percentage and
+                  a sentence saying why; gating the whole chip on a value hid it. `chipNote` keeps the
+                  Drift label with the words under it and nothing where the number would be. */}
+              {driftValue != null
+                ? chipText('Drift', driftValue, driftSubtitle)
+                : (driftNote ? chipNote('Drift', driftNote) : null)}
             </div>
           </div>
         </div>

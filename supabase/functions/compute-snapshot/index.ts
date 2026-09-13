@@ -1559,6 +1559,18 @@ serve(async (req: Request) => {
              * and gets a fade number; a Viada standing-block long run usually is not and does not.
              * Same athlete, same distance, different number. **That is the design — the surface must
              * say so rather than letting it read as missing data.**
+             *
+             * ⛔⛔ SUPERSEDED FOR DRIFT (2026-09-12, ruled by Michael). Everything above still governs
+             * THE FADE SWITCH, which is what it was written about. It does NOT govern the drift read,
+             * and the long run is no longer withheld from one: p107 makes drift the dose guide for
+             * *"easy/VT1 work in a given session"* and p235's LSD is *"primarily below VT1"*, so a
+             * long session ALWAYS gets a reading. The sets this note is really describing are handled
+             * by taking the reading over the VT1 portions only — `_shared/session-detail/
+             * vt1-window-drift.ts` — rather than by refusing the session a number. A plain long
+             * session keeps its whole-session read.
+             * ⚠️ DO NOT READ THE PARAGRAPH ABOVE AS A REASON TO PUT `run_lsd` OUTSIDE THE DRIFT-READ
+             * BAND in `session-steadiness.ts`. That was considered and is wrong: it would blank the
+             * session the drift chart most wants.
              */
             bySport.set(sport, bySport.get(sport) ?? new Map());
             const groups = bySport.get(sport)!;
