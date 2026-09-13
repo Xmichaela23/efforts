@@ -99,11 +99,56 @@ function outputOf(r: Row, isRide: boolean): { value: number; basis: 'gap' | 'raw
   return raw == null ? null : { value: 1 / raw, basis: 'raw' };
 }
 
+/**
+ * ⛔ THE ANALYSER'S BREAKDOWN, IN THE SHAPE THIS FILE READS (2026-09-12, found on the throwaway
+ * account). `session-detail/build.ts` renders its interval rows from
+ * `workout_analysis.granular_analysis.interval_breakdown.intervals`, and only the Performance screen
+ * runs that builder — so State, which has the same analysis on the row, had no rows to hand over and
+ * fell back to the whole-file number. The same session then printed 4.8% on Performance and 12.9% on
+ * State's chart, which is the second source this whole stage exists to remove.
+ *
+ * ⚠️ THIS IS NOT A SECOND RENDERER. It reads the same four facts the rendered row carries — the
+ * role, the executed length, the heart rate, and the output with its planned band — off the same
+ * breakdown the builder reads, so both callers compute one number from one source.
+ */
+export function rowsFromAnalysis(workoutAnalysis: unknown): Row[] {
+  let wa = workoutAnalysis;
+  if (typeof wa === 'string') { try { wa = JSON.parse(wa); } catch { return []; } }
+  const list = (wa as { granular_analysis?: { interval_breakdown?: { intervals?: unknown } } } | null)
+    ?.granular_analysis?.interval_breakdown?.intervals;
+  if (!Array.isArray(list)) return [];
+  return (list as Array<Record<string, unknown>>).map((iv) => {
+    const paceMin = Number(iv?.actual_pace_min_per_mi);
+    const pwLo = iv?.planned_power_range_lower ?? (iv?.planned_power_range as { lower?: unknown })?.lower;
+    const pwHi = iv?.planned_power_range_upper ?? (iv?.planned_power_range as { upper?: unknown })?.upper;
+    const pcLo = iv?.planned_pace_range_lower ?? (iv?.planned_pace_range as { lower?: unknown })?.lower;
+    const pcHi = iv?.planned_pace_range_upper ?? (iv?.planned_pace_range as { upper?: unknown })?.upper;
+    return {
+      interval_type: iv?.interval_type ?? iv?.kind,
+      ...(Number.isFinite(Number(pcLo)) && Number.isFinite(Number(pcHi))
+        ? { planned_pace_range: { lower_sec_per_mi: Number(pcLo), upper_sec_per_mi: Number(pcHi) } } : {}),
+      ...(Number.isFinite(Number(pwHi))
+        ? { planned_power_range: { lower_w: Number(pwLo ?? 0), upper_w: Number(pwHi) } } : {}),
+      executed: {
+        duration_s: Number(iv?.actual_duration_s),
+        avg_hr: Number(iv?.avg_heart_rate_bpm),
+        actual_pace_sec_per_mi: Number.isFinite(paceMin) ? Math.round(paceMin * 60) : null,
+        actual_gap_sec_per_mi: null,
+        power_watts: Number(iv?.avg_power_watts),
+      },
+    };
+  });
+}
+
 export function vt1WindowDrift(input: {
+  /** The rendered rows when the caller has them (Performance), else none. */
   intervals?: Row[] | null;
+  /** The analysis, for a caller that has no rendered rows (State). Read only when `intervals` is empty. */
+  workoutAnalysis?: unknown;
   sport?: string | null;
 }): Vt1WindowDrift {
-  const rows = Array.isArray(input.intervals) ? input.intervals : [];
+  const given = Array.isArray(input.intervals) ? input.intervals : [];
+  const rows = given.length > 0 ? given : rowsFromAnalysis(input.workoutAnalysis);
   if (rows.length === 0) return { kind: 'not_applicable' };
   const sport = String(input.sport ?? '').toLowerCase();
   const isRide = /^(ride|bike|cycling)$/.test(sport);

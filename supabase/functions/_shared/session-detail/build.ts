@@ -521,10 +521,23 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         Number.isFinite(upper) &&
         Number(lower) > 0 &&
         Number(upper) > 0;
+      /**
+       * ⛔ A BAND THAT STARTS AT ZERO WATTS IS A REAL PRESCRIPTION (2026-09-12, found on the
+       * throwaway account). This required `pwLower > 0` alongside the "0,0 from strides" guard, and
+       * the library writes an easy ride as exactly `{lo: 0, hi: 0.75 × FTP}` — "below 75%", p239's
+       * own shape (`endurance-library/generate.ts:156`). So every VT1 row on a Viada endurance ride
+       * arrived with NO planned band at all, and the drift window could not tell those rows from
+       * the sets inside the same session.
+       * ⚠️ THE ORIGINAL GUARD'S INTENT SURVIVES: a band of 0–0 is still not a range. Only the upper
+       * has to be positive; the lower may be zero, and a negative one is still refused.
+       * ⚠️ NO WORDS CHANGE. `powerBand` in `interval-compare.ts` keeps its own `lower_w > 0` test,
+       * so a zero-lower band still colours nothing, and nothing on the phone renders the watts as
+       * text — the field is read by the comparison and by the drift window.
+       */
       const hasPowerRange =
         Number.isFinite(pwLower) &&
         Number.isFinite(pwUpper) &&
-        Number(pwLower) > 0 &&
+        Number(pwLower) >= 0 &&
         Number(pwUpper) > 0;
       const ivType = normIntervalType(iv?.interval_type || iv?.kind);
       intervals.push({
@@ -869,7 +882,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
      * says `not_applicable`, so it keeps the ordinary read below. See that file for why the test is
      * p107's bout length rather than the step's prescribed intensity.
      */
-    const win = vt1WindowDrift({ intervals, sport: type });
+    const win = vt1WindowDrift({ intervals, workoutAnalysis: wa, sport: type });
     if (win.kind === 'too_short') {
       return {
         pct: null, basis: null, assessment: null, confounded: false, whole_session: false,

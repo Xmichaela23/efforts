@@ -49,6 +49,7 @@ import { indexEnduranceFactsByWorkout } from "./endurance-facts.ts";
 // This file kept its own copies of both and they disagreed; see the note on `driftReadForPoint`.
 import { resolveSessionDrift } from "../_shared/session-detail/drift-pct.ts";
 import { sessionSteadiness } from "../_shared/session-detail/session-steadiness.ts";
+import { vt1WindowDrift } from "../_shared/session-detail/vt1-window-drift.ts";
 import { fetchAthleteTimezone, resolveAthleteTimezone } from "../_shared/athlete-timezone.ts";
 import {
   assembleStateTrends,
@@ -152,6 +153,15 @@ function driftReadForPoint(input: {
     workoutRow: input.workoutRow ?? null,
   };
   const steady = sessionSteadiness(steadiness).steady;
+  /**
+   * ⛔ THE SAME WINDOW THE PERFORMANCE SCREEN APPLIES (2026-09-12). A long session with sets is read
+   * over its VT1 portions, and without this State printed the whole-file number beside Performance's
+   * windowed one — 12.9% against 4.8% on the same run. State has no rendered interval rows, so the
+   * window reads the analyser's breakdown off the row this function was already handed.
+   */
+  const win = vt1WindowDrift({ workoutAnalysis: wa, sport: input.sport ?? null });
+  if (win.kind === 'too_short') return { driftPct: null, driftBasis: null, driftWholeSession: !steady, fadeWithheld: true };
+  if (win.kind === 'read') return { driftPct: win.pct, driftBasis: win.basis, driftWholeSession: !steady, fadeWithheld: false };
   const d = resolveSessionDrift({
     workoutAnalysis: wa,
     computed: input.computed ?? null,

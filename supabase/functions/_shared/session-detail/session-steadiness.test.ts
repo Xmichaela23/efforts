@@ -52,9 +52,32 @@ Deno.test('rung 1, second form — a race plan has no family tag, so its words d
   );
 });
 
-Deno.test('rung 2 — planned steps, when the plan named no type', () => {
+Deno.test('rung 2 — planned steps, and it only ever says "not steady"', () => {
   assertEquals(sessionSteadiness({ factPacket: packetSteps(12) }), { steady: false, decidedBy: 'planned_steps' });
-  assertEquals(sessionSteadiness({ factPacket: packetSteps(2) }), { steady: true, decidedBy: 'planned_steps' });
+  /**
+   * ⛔ A LOW STEP COUNT ANSWERS NOTHING (fixed 2026-09-12, caught on the throwaway account). This
+   * used to return `{steady: true, decidedBy: 'planned_steps'}`, and an UNLINKED session carries
+   * `total_steps: 1` as noise — so every unplanned session was declared steady here and rungs 4, 5
+   * and 6 never got to speak.
+   */
+  assertEquals(sessionSteadiness({ factPacket: packetSteps(2) }).decidedBy, 'nothing_said');
+  assertEquals(sessionSteadiness({ factPacket: packetSteps(1) }).decidedBy, 'nothing_said');
+});
+
+Deno.test('⛔ AN UNPLANNED INTERVAL SESSION IS NOT SAVED BY ITS STEP COUNT', () => {
+  // The session that diverged: no plan link, one noise step, and Strava's own "workout" label.
+  assertEquals(
+    sessionSteadiness({
+      factPacket: packetSteps(1),
+      workoutRow: { strava_data: { original_activity: { workout_type: 12 } } },
+    }),
+    { steady: false, decidedBy: 'provider_workout_type' },
+  );
+  // And the graded interval run with no plan link: the pace swing gets to answer.
+  assertEquals(
+    sessionSteadiness({ factPacket: { ...packetSteps(1), ...packetPaces([420, 610, 425, 605, 430]) } }),
+    { steady: false, decidedBy: 'pace_swing' },
+  );
 });
 
 Deno.test('rung 3 — the athlete tag has its slot and is null today', () => {

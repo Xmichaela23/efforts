@@ -116,12 +116,24 @@ function planWordsSteady(plannedRow: SteadinessInput['plannedRow']): boolean | n
   return null;
 }
 
-/** ⛔ RUNG 2. More than two prescribed steps is a structured session. */
+/**
+ * ⛔ RUNG 2. More than two prescribed steps is a structured session.
+ *
+ * ⚠️ IT ONLY EVER ANSWERS "NOT STEADY" (fixed 2026-09-12, caught by the throwaway-account run). It
+ * returned `steps <= 2` as a positive verdict of steadiness, and that is not what the rule says: the
+ * rule is "more than two planned steps = intervals", which is silent about a low count. The cost was
+ * not academic — an UNLINKED session carries `total_steps: 1` as noise from a fact packet built with
+ * no plan to read, so rung 2 declared every unplanned session steady and rungs 4, 5 and 6 never ran.
+ * An unplanned interval ride that Strava itself labelled a workout came back with a drift number,
+ * which is the exact divergence this whole stage exists to close.
+ * ⚠️ THE SAME SHAPE AS RUNG 7: evidence of structure is evidence; its absence is not evidence of
+ * steadiness. Only rungs 1 and 3 — the plan's own word and the athlete's — may assert steady.
+ */
 function plannedStepsSteady(factPacket: unknown): boolean | null {
   const fp = (factPacket ?? null) as { derived?: { interval_execution?: { total_steps?: unknown } } } | null;
   const steps = fp?.derived?.interval_execution?.total_steps;
   if (typeof steps !== 'number' || !Number.isFinite(steps)) return null;
-  return steps <= 2;
+  return steps > 2 ? false : null;
 }
 
 /**
