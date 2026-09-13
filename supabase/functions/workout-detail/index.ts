@@ -208,8 +208,13 @@ function stripResponseOnlySessionDetailFields(sd: Record<string, unknown> | null
  *   3 — phase_word: the plain phase word the screen prints, so no surface translates 'Anchor' for
  *       itself (2026-08-01). Every session stored at v2 carries a card with no word; without this
  *       bump the block line on Performance would stay silent on them forever.
+ *   4 — line: the plan line itself ("Standard Focus · week 2 of 12"), composed here so no screen
+ *       composes it (2026-09-12, commit 59e05054). The field shipped without this bump, which is
+ *       the exact trap the note above describes: every session already stored carries a card with
+ *       no line, the cache fast path serves those copies untouched, and the lift header printed
+ *       nothing while the run and ride tiles fell back to the fact packet's different wording.
  */
-const BLOCK_CARD_VERSION = 3;
+const BLOCK_CARD_VERSION = 4;
 
 /**
  * ⛔ THE VOLUME FIELD NEEDS ITS OWN STALENESS RULE, AND IT IS NOT THE BLOCK CARD'S (D-349, 2026-08-01).
