@@ -1,6 +1,69 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-12, PM chat — the book's own hard sessions, the accessory rows, where a build lands, and Home lit; ALL PUSHED AND DEPLOYED)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-12, engineer session — one truth for drift, the plan line and the indoor name; PUSHED, DEPLOY PENDING)
+
+> **Read `docs/SESSION-2026-09-12-handoff.md` first**, then the older banners below. main = `1123a9fc`
+> (rebased onto `a99f7b25`, the calendar-sync work another terminal pushed mid-session — no file
+> overlap). **NOT DEPLOYED YET**: the nine functions below are pushed and still running the old code
+> in production. iOS not rebuilt.
+
+### YOUR JOB
+1. **Deploy the nine functions** (this session was blocked from doing it):
+   `workout-detail compute-snapshot compute-session-boom analyze-running-workout coach get-week
+   endurance-checkpoint ingest-phone-workout detach-planned`
+   The first eight come from the transitive import graph of the changed `_shared` files;
+   `detach-planned` is the deploy owed from the 2026-09-11/12 session. Then Michael rebuilds in Xcode.
+2. **The device walk, still overdue.** Nothing since 2026-09-09 has been seen on a phone. After the
+   deploy, check: a long run and a long ride now show a drift number (they showed none); the drift
+   figure on Performance matches the one on State's chart for the same session; the plan line reads
+   "Standard Focus · week 2 of 12" on the lift header, the run/ride tiles, the swim card and State,
+   and "week 2 of 12" after the date on Today; a trainer ride says "Indoor Ride".
+   ⚠️ A stored session picks up the new drift number on first open (BLOCK_CARD_VERSION is 4 now).
+3. **The readiness list** (`docs/FOUNDATION-READINESS.md`): B4 monitoring, B14 Open-Meteo commercial
+   plan (launch gate), error handling on every call.
+
+### WHAT CHANGED, IN ONE LINE EACH
+- **Drift has one steadiness ladder** (`_shared/session-detail/session-steadiness.ts`), asked by import
+  from Performance, Today's good-news line, State's chart and the fact-packet flags. The order is
+  Michael's, 2026-09-12: the plan's own session type, planned steps, an athlete tag (a slot, null
+  today), Strava's `workout_type`, the device's lap markings, then the per-mile pace swing (OURS,
+  ledgered). `compute-snapshot`'s own test and its `workout_facts.drift` fallback are deleted.
+- **A long session always gets a drift reading** (p107 + p235). When it carries the book's sets, the
+  reading is taken over the VT1 portions only — `vt1-window-drift.ts`. A set is told from VT1 by the
+  session's own easiest work step, NOT by a bout length (that was tried and overruled the same day).
+- **The plan line has one composer** (`_shared/plan-line.ts`). `buildWeekLabel` is deleted;
+  `plan_context.week_label` now carries the goal-race line only.
+- **The session name has one ladder** (`src/lib/session-display-name.ts`) over the one indoor
+  predicate. A ride can be indoors now; it never could before.
+
+### ⛔ WHAT THE FIXTURES DID NOT CATCH — READ BEFORE TRUSTING A GREEN SUITE
+Every unit test was green while **three live defects** sat in the code. A throwaway account driving
+the real functions found all three: an unplanned session was declared steady by its own noise step
+count; an easy ride's planned watts band was thrown away because it starts at zero (p239's "below
+75%" shape); and State was not applying the VT1 window at all, so the same long run read 4.8% on
+Performance and 12.9% on State. See the handoff for each.
+
+### THE RULES (memory files carry them; verify before citing)
+- **Never use ours**: no athlete-facing line or number that is not on a book page.
+- **All copy through Michael**: a feature go is not a copy go. This stage's words are in
+  `docs/COPY-APPROVAL-2026-09-12.md`, all five approved.
+- **Smart server, dumb client**: a new work order names the server function that decides.
+- **Never `git commit -a`** in this repo; terminals share the tree.
+- **Deploy every importer** of a changed `_shared` file, by transitive import graph, not grep.
+
+### UNVERIFIED (what would settle it)
+- Everything above on a real device, after the deploy (item 2).
+- The eight-session run used SEEDED analysis payloads on a throwaway account. It exercised the real
+  functions against the live database, three fresh seeds, all green — but no real recording has been
+  through the new drift path yet.
+- Rung 5 of the ladder (the device's lap intensity markings) is **inert and unconfirmed**: the row
+  keeps whatever the provider sent, Strava sends no such field, and whether Garmin's Activity API
+  passes the FIT file's ACTIVE/REST/WARMUP/COOLDOWN through is not settled by anything in the repo.
+- Carried: a rebuild resets a workout chosen on the day; heavy-set good-news line ordering;
+  multi-swim day compares the wrong planned swim; `generate-combined-plan/week-builder.ts
+  decideOrdering` is a second copy of day order.
+
+## (older banner) THE BOOK'S OWN HARD SESSIONS, THE ACCESSORY ROWS, HOME LIT (written 2026-09-12, PM chat — the book's own hard sessions, the accessory rows, where a build lands, and Home lit; ALL PUSHED AND DEPLOYED)
 
 > **Read `docs/SESSION-2026-09-11-12-handoff.md` first**, then the older banners below for the threads
 > behind them. main = `10192932`. Last deploys (UTC): plan-overview 03:39, then coach /
