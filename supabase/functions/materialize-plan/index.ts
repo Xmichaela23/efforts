@@ -4131,6 +4131,14 @@ Deno.serve(async (req) => {
         console.warn('[materialize-plan] athlete-snapshot read failed; using merged baselines:', e);
       }
 
+      // ⛔ THE SAVED FTP IS THE FTP THE WATTS WERE PRICED OFF (2026-09-13). `_anchors.ftp_w` was captured
+      // above, before resolveCurrentFtp and the snapshot pin set `baselines.ftp`, so it recorded the typed-in
+      // number (176 W) on rows whose watts came from the pinned 168 W. Anything dividing watts by it (the
+      // Intervals.icu serializer) sent every ride ~5% low. Written again here, after the last FTP write.
+      if ((baselines as any)._anchors) {
+        (baselines as any)._anchors.ftp_w = typeof (baselines as any).ftp === 'number' ? (baselines as any).ftp : null;
+      }
+
       console.log('[materialize-plan] strength 1RM (post-snapshot, manual > learned > default):', {
         squat: (baselines as any).squat,
         bench: (baselines as any).bench,

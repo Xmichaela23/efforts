@@ -14,6 +14,8 @@ import { convertWorkoutToGarmin } from '../garmin/convert-workout.ts';
 import { applyGarminBaselines } from '../garmin/prepare.ts';
 import { ensureValidGarminAccessToken, sendToGarmin, scheduleWorkoutOnDate, deleteGarminSchedule, deleteGarminWorkout } from '../garmin/training-api.ts';
 import { decryptToken } from '../token-crypto.ts';
+// The title every Efforts screen shows ("Ride — Long Ride"); the saved name is often just "Ride".
+import { deriveWorkoutTitle } from '../../../../src/lib/derive-workout-title.ts';
 import { recordProviderResult } from '../connection-health.ts';
 import { fetchAthleteTimezone } from '../athlete-timezone.ts';
 import { localDateInTz } from '../local-date.ts';
@@ -90,11 +92,13 @@ export async function runCalendarSync(supabase: any, userId: string, now = new D
     if (!provider) continue;
     try {
       let payload: any;
+      const title = deriveWorkoutTitle(row);
       if (provider === 'intervals_icu') {
         if (String(row.type).toLowerCase() !== 'ride') throw new Error(`Intervals.icu sending covers rides only so far; this is a ${row.type}`);
-        payload = serializeRide(row);
+        payload = serializeRide({ ...row, name: title });
       } else {
         const copy = structuredClone(row);
+        copy.name = title;
         applyGarminBaselines(copy, baselines);
         payload = convertWorkoutToGarmin(copy);
       }

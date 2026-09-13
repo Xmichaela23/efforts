@@ -29,7 +29,7 @@
 // see it. Other client-side `src/lib/*.ts` files that have deno-test coverage
 // follow the same convention.
 import { plannedSwimSessionLabel } from '../utils/swimPlanTokens.ts';
-import { plainIntent } from './plain-intent';
+import { plainIntent } from './plain-intent.ts';
 
 export type WorkoutLike = {
   name?: string | null;
