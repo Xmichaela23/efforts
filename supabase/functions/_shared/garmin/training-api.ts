@@ -152,8 +152,16 @@ export async function scheduleWorkoutOnDate(params: { garminWorkoutId: string; d
       { attempts: 5, baseMs: 500, maxMs: 8000 }
     )
     if (!ok) return { success: false, error: `Schedule API ${status}: ${text}` }
-    const json = await (response as Response).json()
-    return { success: true, scheduleId: json?.workoutScheduleId ?? json?.id }
+    // Training API V2 §3.3.1–3.3.2 names the field `scheduleId` ({"scheduleId":123,"workoutId":123,"date":"2019-01-31"}).
+    // This read `workoutScheduleId ?? id` and so never found it (2026-09-13: every calendar-sync create failed with
+    // "Garmin returned no schedule id"). A bare number body is accepted too.
+    let parsed: any = null
+    try { parsed = JSON.parse(text) } catch { parsed = text }
+    const raw = typeof parsed === 'number' || (typeof parsed === 'string' && /^\d+$/.test(parsed.trim()))
+      ? parsed
+      : (parsed?.scheduleId ?? parsed?.workoutScheduleId ?? parsed?.id)
+    if (raw == null || raw === '') return { success: false, error: `Schedule API ${status}: no scheduleId in ${String(text).slice(0, 200)}` }
+    return { success: true, scheduleId: String(raw).trim() }
   } catch (e: any) {
     return { success: false, error: e?.message ?? String(e) }
   }
