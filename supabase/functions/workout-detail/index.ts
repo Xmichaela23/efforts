@@ -1201,6 +1201,15 @@ async function runSessionDetailPipelineAndPersist(
           ? blockForSession.goal.focus : null,
         week_index: blockForSession.weekIndex,
         block_weeks: blockForSession.blockWeeks,
+        // The line the lift header and the run and ride tile rows print, composed once here. The
+        // phone used to build it from the fields above in two places (2026-09-12); it renders now.
+        line: (() => {
+          const week = blockForSession.weekIndex;
+          if (week == null) return null;
+          const weeks = blockForSession.blockWeeks;
+          const pos = weeks != null && weeks > 0 ? `week ${week} of ${weeks}` : `week ${week}`;
+          return blockForSession.planName ? `${blockForSession.planName} · ${pos}` : pos;
+        })(),
         phase: blockForSession.phase,
         // The plain word for the week — the screen prints this one. `phase` above is the plan's own
         // name and on a the previous program block that is 'Leader' / 'Anchor', which is the previous program's word, not the

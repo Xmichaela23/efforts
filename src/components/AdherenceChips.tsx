@@ -2,7 +2,6 @@ import React from 'react';
 import {
   type SessionInterpretationV1,
 } from '@/utils/performance-format';
-import { strengthBlockLine } from '@/lib/strength-block-line';
 
 interface AdherenceChipsProps {
   sessionDetail: {
@@ -153,12 +152,11 @@ export default function AdherenceChips({
     if (!anyVal) return null;
 
     // ⛔ ONE LINE FOR EVERY SPORT (2026-09-13, Michael: "will they all get Standard Focus · week?").
-    // The lift header prints the plan block workout-detail stamps on every attached session —
-    // "Standard Focus · week 2 of 12" — through `strengthBlockLine`. This tile row read the fact
-    // packet's plan facts instead, which a ride does not carry at all and a run carried with a
-    // default phase word. Same helper, same string, on the run and the ride; the packet label is the
-    // fallback for a session with no block.
-    const weekLabel = strengthBlockLine(sd as Parameters<typeof strengthBlockLine>[0]) ?? sd.plan_context?.week_label ?? null;
+    // `block.line` is composed by workout-detail on every attached session — "Standard Focus ·
+    // week 2 of 12" — and the lift header prints the same string. This tile row used to read the
+    // fact packet's plan facts, which a ride does not carry and a run carried with a default phase
+    // word. The packet label is the fallback for a session with no block. The phone renders.
+    const weekLabel = (sd as { block?: { line?: string | null } | null }).block?.line ?? sd.plan_context?.week_label ?? null;
     const sportType = String(sd.type || '').toLowerCase();
     const isRide = /ride|bike|cycling/i.test(sportType);
     const isSwim = /swim/i.test(sportType);

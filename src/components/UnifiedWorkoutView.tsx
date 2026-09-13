@@ -10,7 +10,6 @@ import StrengthLogger from './StrengthLogger';
 import AssociatePlannedDialog from './AssociatePlannedDialog';
 import MobileSummary from './MobileSummary';
 import { readoutPlateStyle } from '@/lib/readout-plate';
-import { strengthBlockLine } from '@/lib/strength-block-line';
 import WorkoutDetail from './WorkoutDetail';
 import StrengthCompletedView from './StrengthCompletedView';
 import StructuredPlannedView from './StructuredPlannedView';
@@ -1003,7 +1002,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             with ("Standard Focus · week 2 of 12") prints here, same slot, same size. A lift off any
             plan has no line, as a manual ride has no device. Words unchanged. */}
         {isCompleted && isStrengthFamily && (() => {
-          const line = strengthBlockLine(sessionDetailV1 as Parameters<typeof strengthBlockLine>[0]);
+          // The server's line, verbatim (`block.line`, workout-detail). Keep this client dumb.
+          const line = (sessionDetailV1 as { block?: { line?: string | null } | null } | null)?.block?.line ?? null;
           return line ? (
             <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
               <span className="text-gray-400 text-sm">{line}</span>

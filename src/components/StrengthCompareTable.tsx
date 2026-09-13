@@ -1,4 +1,3 @@
-import { kindWordFromSlot } from '@/lib/today-lines';
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { SessionDetailV1 } from '@shared/session-detail/types.ts';
@@ -195,10 +194,10 @@ export default function StrengthCompareTable({ slots, completedWorkoutRaw, previ
                   <span className="text-[11px] text-white/45 uppercase tracking-wide">{r.status_label}</span>
                 )}
                 {/* ⛔ THE BOOK'S WORD FOR THE SLOT — Maximal effort / Dynamic effort / Hypertrophy / Skill
-                    (Michael, 2026-09-12), the same words Today's cards print. `kindWordFromSlot` reads a
-                    row analysed before the server switched. */}
+                    (Michael, 2026-09-12), the same words Today's cards print. Composed by
+                    `session-detail/strength-slots.ts` at read time; the phone prints it. */}
                 {r.intent_word && (
-                  <span className="text-[11px] text-white/45 uppercase tracking-wide">{kindWordFromSlot(r.intent_word)}</span>
+                  <span className="text-[11px] text-white/45 uppercase tracking-wide">{r.intent_word}</span>
                 )}
                 {r.status === 'unplanned' && r.status_label && (
                   <span className="text-[11px] text-white/45 uppercase tracking-wide">{r.status_label}</span>

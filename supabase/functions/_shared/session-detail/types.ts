@@ -118,6 +118,10 @@ export type SessionDetailV1 = {
     goal_focus: string | null;
     week_index: number | null;
     block_weeks: number | null;
+    /** "Standard Focus · week 2 of 12" — the one line every screen prints for the block, composed
+     *  HERE (2026-09-13, Michael: "keep this client dumb"). No phase word: the plan's own phase names
+     *  are internal vocabulary (2026-08-29). Null when the plan did not place this week. */
+    line: string | null;
     phase: string | null;
     /**
      * ⛔ THE PHASE WORD A SCREEN MAY PRINT — 'base' | 'build' | 'peak' | 'taper' | 'recovery'.
