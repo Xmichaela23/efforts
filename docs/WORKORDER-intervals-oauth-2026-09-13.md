@@ -45,8 +45,21 @@ Michael's real account: 7 rides on Intervals → Zwift with titles; 4 runs creat
 from both. **Not verified:** Garmin update path on a real changed workout; Zwift picking up edits promptly (Intervals →
 Zwift timing is not documented and lagged >1 h tonight).
 
-**Michael's account right now:** Intervals connected by API key (`auth: 'api_key'`, athlete `i711093`); destinations
-ride → intervals_icu, run → garmin. No active plan at close.
+**Michael's account right now:** ~~Intervals connected by API key~~ — superseded 2026-09-13 afternoon: key disconnected
+by Michael (old deployed function), then connected by **sign-in (OAuth)** on the Mac; destinations ride → intervals_icu,
+run → garmin. New plan built after connecting.
+
+> **STATUS 2026-09-13 close (sign-in job):** PUSHED `b75370b2` (sign-in) + `713f4f2b` (Zwift FTP line). DEPLOYED
+> `intervals-oauth`, `intervals-connect-key` (17:49 UTC). Website live. **VERIFIED by Michael on the Mac:** consent page
+> showed calendar / activities / settings; card connected; 3 rides of the new plan in Zwift's Intervals.icu folder, the
+> two stale key-era workouts gone; Zwift FTP = Efforts FTP = 168 W. Server secrets fixed during the test:
+> `INTERVALS_CLIENT_ID` had been saved as "OAuthClientID954" (now 954); the redirect URL was not registered on the app
+> page (now added). **NOT VERIFIED:** runs of the new plan on Garmin; Wahoo; iPhone (app not rebuilt; sign-in ends in
+> Safari); the FTP line seen on a device. **Next, in order:** Wahoo check (when Michael has one); Anaerobic Ride sent
+> as identical sets with 202 W spikes where the plan says floor / no ceiling / each set harder — trace how
+> `_shared/intervals/serialize.ts` sends a floor-only target; finished Zwift/Wahoo rides back (webhook → fit-file →
+> existing import path, with the strava-webhook date+type check); one-step setup (connections read + upload toggles);
+> the source/destination selection on Connections; iPhone sign-in.
 
 ---
 
@@ -241,6 +254,9 @@ exchange end-to-end on Michael's account only with his go, after a throwaway-acc
    connect." (start / switch / reconnect failure) or "Intervals.icu did not disconnect." (disconnect failure), each with
    a "Try again" button that repeats the action; never server or library text. The callback page keeps "Back to
    Connections".
+   **Also approved 2026-09-13:** "Zwift FTP should match your FTP so the watts are right." — on the Intervals.icu card,
+   under the "Sends your rides…" line, shown only when connected. Source: Intervals.icu developer, forum t/81764 #1
+   ("make sure your FTP on Zwift matches"); Zwift applies its own FTP to the percentages sent.
 5. **What Intervals.icu is for (Michael, 2026-09-13):** Zwift and Wahoo only — rides out to them, finished rides back
    from them. Zwift stays inside Intervals.icu (workouts out and finished rides back through it) to avoid confusion.
    Not COROS / Suunto / Huawei / Amazfit; no runs through Intervals.icu. Not a Strava route: the Intervals API returns
@@ -262,6 +278,12 @@ exchange end-to-end on Michael's account only with his go, after a throwaway-acc
    t/98908, 2025): Garmin stopped passing on third-party files, and Zwift rides that reach Garmin or Wahoo will not appear
    in Intervals.icu — the athlete must link Zwift directly inside Intervals.icu. Hand-uploaded files are shared by Garmin
    (Garmin FAQ wording; not tested). Nothing in `garmin-webhook-activities` filters by device, so this is Garmin's rule.
+   **Zwift ↔ Intervals.icu facts** (Intervals.icu developer, forum t/81764): uploads a rolling next 7 days of planned
+   workouts to Zwift's "Intervals.icu" custom folder and deletes old ones it uploaded daily; the Zwift app sometimes
+   needs a restart to show changes; completed Zwift rides come into Intervals.icu directly and replace Strava copies
+   there. **For the return-path job:** `strava-webhook` with `source_preference='garmin'` still ingests a Strava ride when
+   no Garmin workout exists that date+type (`strava-webhook/index.ts` ~:200-223), so a Zwift ride would arrive from both
+   Strava and Intervals.icu unless the Intervals.icu path runs the same date+type check.
    **Scope change done 2026-09-13 (not committed, not deployed):**
    - Format checked against Step 0 (thread post #1): comma-separated `SCOPE:READ|WRITE`, WRITE implies READ. The three
      names are all in that list.

@@ -1,6 +1,40 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-12, engineer session — one truth for drift, the plan line and the indoor name; PUSHED, DEPLOY PENDING)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-13, PM chat — Intervals.icu sign-in; PUSHED, DEPLOYED, VERIFIED ON THE MAC)
+
+> **Read `docs/WORKORDER-intervals-oauth-2026-09-13.md` first** — its STATUS block (under section 1) and section 3
+> item 5 carry the decisions. main = `713f4f2b`.
+
+### WHAT SHIPPED
+- **Intervals.icu sign-in (OAuth)** replaces the API key box: `intervals-oauth` (start / exchange / disconnect),
+  `/auth/intervals/callback`, `_shared/intervals/oauth.ts` + `connection.ts`. One approval asks
+  `CALENDAR:WRITE,ACTIVITY:READ,SETTINGS:WRITE`. No expiry, no refresh (Intervals issues neither). Pushed `b75370b2`,
+  deployed 17:49 UTC with `intervals-connect-key`.
+- **Zwift FTP line** on the connected card (`713f4f2b`, website only).
+- **Verified by Michael on the Mac:** connect, three permissions shown, new plan's rides in Zwift, stale workouts gone.
+
+### DECISIONS (Michael, 2026-09-13 — in the workorder)
+- Intervals.icu is for **Zwift and Wahoo only**: rides out, finished rides back. Zwift stays inside Intervals.icu.
+- **Garmin does not pass Zwift rides to other apps** (Garmin support "No Data Forwarding"; sources in the workorder).
+- Intervals.icu is **not** a Strava route (API returns empty stubs for Strava activities). Strava: 10-athlete cap
+  pending production approval.
+
+### NEXT JOBS, IN ORDER
+1. Wahoo check when Michael has a device.
+2. Anaerobic Ride reaches Zwift as identical sets with 202 W spikes; the plan says floor, no ceiling, each set
+   harder. Trace how `_shared/intervals/serialize.ts` sends a floor-only target before changing anything.
+3. Finished Zwift/Wahoo rides back into Efforts: ACTIVITY webhook → `/activity/{id}/fit-file` → existing
+   `import-fit-file` / `save-imported-workout`. Must run the same date+type check `strava-webhook` uses, or a Zwift ride
+   arrives twice.
+4. One-step setup: read Zwift/Wahoo link (`GET /athlete/{id}/connections`), turn on uploads (`PUT /athlete/{id}`).
+5. One selection on Connections (activities come from / rides and runs go to), replacing Activity Source Preference.
+6. iPhone sign-in (today it ends in Safari).
+
+### UNVERIFIED
+- The new plan's runs on Garmin; anything on Wahoo; the iPhone (not rebuilt); the FTP line on a device.
+- Whether the 2026-09-12 banner's nine-function deploy (below) was ever done — not checked this session.
+
+## (older banner) ONE TRUTH FOR DRIFT, THE PLAN LINE AND THE INDOOR NAME (written 2026-09-12, engineer session; PUSHED, DEPLOY PENDING)
 
 > **Read `docs/SESSION-2026-09-12-handoff.md` first**, then the older banners below. main = `1123a9fc`
 > (rebased onto `a99f7b25`, the calendar-sync work another terminal pushed mid-session — no file
