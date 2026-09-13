@@ -629,8 +629,10 @@ Deno.test('a quality session never reaches the watch cold', () => {
 Deno.test('an untranslatable family fails loudly rather than emitting a dropped token', async () => {
   const { translateEnduranceSession } = await import('./session-vocabulary.ts');
   const { buildEnduranceSession } = await import('../endurance-library/index.ts');
-  const ride = buildEnduranceSession({ family: 'ride_vo2', level: 2, baselines: BASELINES });
-  assertThrows(() => translateEnduranceSession(ride), Error, 'no session-vocabulary translation');
+  // ⚠️ `ride_vo2` WAS THE EXAMPLE UNTIL 2026-09-13, when p278 made it reachable on purpose. The swim
+  // speed set is still never prescribed by this plan, so it is the tripwire's example now.
+  const swim = buildEnduranceSession({ family: 'swim_speed', level: 1, baselines: BASELINES });
+  assertThrows(() => translateEnduranceSession(swim), Error, 'no session-vocabulary translation');
 });
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════

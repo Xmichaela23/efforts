@@ -88,6 +88,8 @@ export function plainLiftList(items: any[], _units: 'imperial' | 'metric' = 'imp
     return sets > 0 && reps != null && String(reps).trim() ? `${sets} × ${reps}` : null;
   };
   const weightOf = (x: any) => {
+    // ⛔ A ROW PRESCRIBED IN WORDS (p226 carry, 2026-09-13): the words stand where the weight would.
+    if (typeof x?.prescription_words === 'string' && x.prescription_words.trim()) return x.prescription_words.trim();
     const d = typeof x?.weight_display === 'string' ? x.weight_display.trim() : '';
     if (d) return d;
     if (typeof x?.weight === 'string' && x.weight.trim()) return x.weight.trim();

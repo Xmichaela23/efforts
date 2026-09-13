@@ -34,6 +34,8 @@ import {
 } from '../_shared/planning-context.ts';
 import { normalizeGoalDistanceKey, projectRaceSplits } from '../_shared/race-projections.ts';
 import { LIFT_LABEL, liftsBelowEntryMinimum, missingBarbellLifts, readBarbellMaxesResolved, STRENGTH_ENTRY_MIN_1RM_LB, type BarbellLift } from '../shared/strength-system/barbell-maxes.ts';
+import { FRAMES } from '../_shared/standing-plan/frames.ts';
+import { resolveFrame } from '../_shared/standing-plan/frame-resolver.ts';
 import { resolveCurrentRunEasyPace, resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 // ⛔ THE INTAKE'S OWN SEED TABLE, read here to tell an ANSWER from a PREFILL. See the precedence
 // note on `current_weekly_miles` below. Same file the run generator's tables live in, so the two
@@ -2580,14 +2582,25 @@ Deno.serve(async (req: Request) => {
             // Under 65, even the 35 lb women's bar cannot carry the program's lightest set —
             // that athlete needs a beginner program, not a lighter the previous program. The 65-84 band is
             // ADMITTED: those lifts floor at 35 and the plan copy names the women's-bar sets.
-            const gsLow = liftsBelowEntryMinimum(gsMaxes).filter((l) => gsMaxes[l as BarbellLift] > 0).map((l) => `${LIFT_LABEL[l]} (${gsMaxes[l as BarbellLift]} lb)`);
+            // ⛔⛔ ONLY THE LIFTS THE FRAME'S WEEK LOADS (Michael, 2026-09-13) — `Frame.testedLifts`, the
+            // same rule `generate-strength-plan` applies; keep the two together. No frame → all four.
+            const gsEntryFrame = resolveFrame({
+              enduranceSport: gsPosture?.run === 'maintain' ? 'run' : gsPosture?.bike === 'maintain' ? 'bike' : null,
+              focus: gsTp.focus === 'standard' || gsTp.focus === 'ride' ? gsTp.focus : 'run',
+            }).frame;
+            const gsEntryLifts: string[] = gsEntryFrame ? FRAMES[gsEntryFrame].testedLifts : ['squat', 'bench', 'deadlift', 'overheadPress'];
+            const gsLow = liftsBelowEntryMinimum(gsMaxes)
+              .filter((l) => gsMaxes[l as BarbellLift] > 0 && gsEntryLifts.includes(l))
+              .map((l) => `${LIFT_LABEL[l]} (${gsMaxes[l as BarbellLift]} lb)`);
             if (gsLow.length > 0) {
               const list = gsLow.length === 1
                 ? gsLow[0]
                 : `${gsLow.slice(0, -1).join(', ')} and ${gsLow[gsLow.length - 1]}`;
+              // ⚠️ THE THREE-LIFT WORDING IS NOT YET APPROVED (2026-09-13). Four-lift frames read as before.
+              const gsCountWord = gsEntryLifts.length === 3 ? 'three' : 'four';
               throw new AppError(
                 'strength_below_minimum',
-                `This plan needs a 1RM of at least ${STRENGTH_ENTRY_MIN_1RM_LB} lb on each of the four lifts — below that, even a 35 lb bar can't carry its lightest sets. Your ${list} ${gsLow.length > 1 ? 'are' : 'is'} under that line.`,
+                `This plan needs a 1RM of at least ${STRENGTH_ENTRY_MIN_1RM_LB} lb on each of the ${gsCountWord} lifts — below that, even a 35 lb bar can't carry its lightest sets. Your ${list} ${gsLow.length > 1 ? 'are' : 'is'} under that line.`,
                 409,
               );
             }
@@ -3096,7 +3109,8 @@ Deno.serve(async (req: Request) => {
                * ⚠️ ALLOWLISTED TO THE TWO KNOWN VALUES. Anything else is dropped rather than passed
                * through, so a stale or malformed client cannot name a frame that does not exist.
                */
-              ...(gsTp.focus === 'standard' || gsTp.focus === 'run' ? { focus: gsTp.focus } : {}),
+              // ⚠️ `'ride'` ADDED 2026-09-13 — Ride Focus builds Cycling: Base (p278).
+              ...(gsTp.focus === 'standard' || gsTp.focus === 'run' || gsTp.focus === 'ride' ? { focus: gsTp.focus } : {}),
               /** ⛔ The variant picks (endurance_slot_archetypes) — string map, validated. */
               ...(() => {
                 const raw = (gsTp as Record<string, unknown>).endurance_slot_archetypes;

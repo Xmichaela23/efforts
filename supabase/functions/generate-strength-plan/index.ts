@@ -116,6 +116,17 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+
+/**
+ * ⛔ WHICH FOCUS, READ OFF THE BODY AND VALIDATED. Standard Focus → the All Rounder, Ride Focus →
+ * Cycling: Base, anything else (including absent) → Strength + 5K, which is what every caller before
+ * the focus cards existed already gets.
+ */
+function focusFromBody(body: unknown): 'standard' | 'run' | 'ride' {
+  const raw = (body as Record<string, unknown> | null)?.focus;
+  return raw === 'standard' ? 'standard' : raw === 'ride' ? 'ride' : 'run';
+}
+
 function json(obj: unknown, status: number): Response {
   return new Response(JSON.stringify(obj), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 }
@@ -275,13 +286,28 @@ Deno.serve(async (req: Request) => {
     // `create-goal-and-materialize-plan` because this function is also invoked directly — same
     // shared reader and threshold (`barbell-maxes.ts`), so the two cannot drift apart. Under 65,
     // even the 35 lb women's bar cannot carry the lightest set; 65-84 is admitted and flagged.
-    const low = liftsBelowEntryMinimum(maxes).filter((l) => maxes[l] > 0).map((l) => `${LIFT_LABEL[l]} (${maxes[l]} lb)`);
+    /**
+     * ⛔⛔ ONLY THE LIFTS THE FRAME'S WEEK LOADS (Michael, 2026-09-13: *"you're using what the app tests
+     * against what the plan requires and creating an unnecessary gate"*). Read off `Frame.testedLifts`,
+     * never the frame's id. The frame is resolved here from the same two answers the fork below reads;
+     * a position no frame serves keeps all four, exactly as before.
+     */
+    const entryFrame = resolveFrame({
+      enduranceSport: endurance_sport === 'bike' || endurance_sport === 'run' ? endurance_sport : null,
+      focus: focusFromBody(body),
+    }).frame;
+    const entryLifts: string[] = entryFrame ? FRAMES[entryFrame].testedLifts : ['squat', 'bench', 'deadlift', 'overheadPress'];
+    const low = liftsBelowEntryMinimum(maxes)
+      .filter((l) => maxes[l] > 0 && entryLifts.includes(l))
+      .map((l) => `${LIFT_LABEL[l]} (${maxes[l]} lb)`);
     if (low.length > 0) {
       const named = low.length === 1 ? low[0] : `${low.slice(0, -1).join(', ')} and ${low[low.length - 1]}`;
       console.error(`[strength-plan] refused: below entry minimum — ${named}`);
+      // ⚠️ "four" IS NOW THE FRAME'S OWN COUNT. The three-lift wording is NOT YET APPROVED (2026-09-13).
+      const countWord = entryLifts.length === 3 ? 'three' : 'four';
       return json({
         success: false,
-        error: `This plan needs a 1RM of at least ${STRENGTH_ENTRY_MIN_1RM_LB} lb on each of the four lifts — below that, even a 35 lb bar can't carry its lightest sets. Your ${named} ${low.length > 1 ? 'are' : 'is'} under that line.`,
+        error: `This plan needs a 1RM of at least ${STRENGTH_ENTRY_MIN_1RM_LB} lb on each of the ${countWord} lifts — below that, even a 35 lb bar can't carry its lightest sets. Your ${named} ${low.length > 1 ? 'are' : 'is'} under that line.`,
       }, 409);
     }
 
@@ -363,8 +389,8 @@ Deno.serve(async (req: Request) => {
      * card existed already gets — so the default path is untouched by construction rather than by a
      * rule somebody has to remember.
      */
-    const focusRaw = (body as Record<string, unknown>).focus;
-    const focus = focusRaw === 'standard' ? 'standard' as const : 'run' as const;
+    // ⛔ `'ride'` → Ride Focus → Cycling: Base (p278, 2026-09-13). See `focusFromBody`.
+    const focus = focusFromBody(body);
     const framePosition = { enduranceSport: sport, focus };
     const frameResolution = resolveFrame(framePosition);
 
@@ -505,6 +531,14 @@ Deno.serve(async (req: Request) => {
         rides: rideDaysAsked ?? enduranceDaysBySport?.ride
           ?? (bike && typeof bike === 'object' ? RIDE_DAYS_DEFAULT : 0),
         swimDays: normalizeSwimDays(swim_days) ?? 0,
+        /**
+         * ⛔ THE RIDE COUNT (p278's 4-or-5, 2026-09-13) — validated to a whole number; only a frame that
+         * declares `fewerRidesDropsSlot` reads it.
+         */
+        rideCount: (() => {
+          const n = Number((body as Record<string, unknown>).ride_count);
+          return Number.isInteger(n) && n > 0 ? n : null;
+        })(),
         /**
          * ⛔ THE ATHLETE'S OWN PER-SLOT ANSWER, when the wizard collected one. Counts alone do not
          * say WHICH slot is which — see `SportMix.slots`. ⚠️ Validated here rather than trusted, the

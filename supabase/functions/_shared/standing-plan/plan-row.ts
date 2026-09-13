@@ -141,6 +141,8 @@ export type StandingPlanConfig = {
      *  calendar than the one that exists. */
     slots?: Record<string, string> | null;
     archetypes?: Record<string, string> | null;
+    /** ⛔ The ride count rides along too (p278's 4-ride week) — dropped here, the restate rebuilds 5 rides. */
+    rideCount?: number | null;
     /**
      * ⛔⛔ THE PER-SESSION LENGTHS RIDE ALONG TOO (Michael, 2026-08-30) — see `SportMix.minutes`.
      * **THIS OBJECT IS REBUILT FIELD BY FIELD BELOW, so a field not named here is DROPPED**, and
@@ -358,6 +360,7 @@ export function buildStandingPlanRow(args: {
             archetypes: args.compose.sportMix.archetypes ?? null,
             // ⛔ SEE THE FIELD'S NOTE ABOVE — omitted here, the restate rebuilds a different week.
             minutes: args.compose.sportMix.minutes ?? null,
+            ...(args.compose.sportMix.rideCount != null ? { rideCount: args.compose.sportMix.rideCount } : {}),
           }
         : null,
       swim_easy_sessions: Math.min(2, Math.max(0, Math.round(Number(args.compose.swimEasySessions) || 0))) || null,

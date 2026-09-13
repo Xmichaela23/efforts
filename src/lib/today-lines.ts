@@ -23,6 +23,8 @@ export type TodayStrengthRow = {
   execution_name?: string | null;
   slot_intent?: string | null;
   notes?: string | null;
+  /** A row prescribed in words (p226 carry, 2026-09-13) — no kind word, no cue. */
+  prescription_words?: string | null;
   /** Rows of one printed superset (p274) share this mark; the composer stamps it. */
   superset_group?: string | null;
 };
@@ -234,7 +236,10 @@ export function liftLinesFor(
     }
 
     const intent = intentOf(ex);
-    if (!intent) return { key, movement, kind: null, cue: null };
+    // ⛔ A ROW PRESCRIBED IN WORDS (p226 carry, 2026-09-13): no kind word and no cue; its words are in the corner.
+    if (!intent || (typeof ex?.prescription_words === 'string' && ex.prescription_words.trim())) {
+      return { key, movement, kind: null, cue: null };
+    }
 
     const cue =
       intent === 'ME' ? ME_CUE
@@ -349,7 +354,9 @@ export function enduranceLinesFor(session: TodayRow): string[] {
  * The spelled-out kind word for a row, or null. ⛔ ONE OWNER — Today's card and the planned lift
  * drawer both print it, so both read it here (2026-09-10).
  */
-export function kindWordFor(ex: { slot_intent?: unknown } | null | undefined): string | null {
+export function kindWordFor(ex: { slot_intent?: unknown; prescription_words?: unknown } | null | undefined): string | null {
+  // ⛔ A ROW PRESCRIBED IN WORDS (p226 carry, 2026-09-13) reads exactly `name · words` — no kind word.
+  if (typeof ex?.prescription_words === 'string' && ex.prescription_words.trim()) return null;
   const v = String(ex?.slot_intent ?? '').toUpperCase();
   return v === 'ME' || v === 'DE' || v === 'SKILL' || v === 'HYP' ? KIND_WORD[v] : null;
 }

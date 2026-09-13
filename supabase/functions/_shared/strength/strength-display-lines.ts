@@ -39,6 +39,10 @@ export function formatStrengthExercise(exercise: any, unit: WeightUnit = 'lb'): 
   const reps = exercise?.reps;
 
   // The book's word for the set leads (ME / DE / SKILL / HYP, p218), and the reserve the row carries is printed.
+  // ⛔ A ROW PRESCRIBED IN WORDS prints `name · words` and nothing else (p226 carry, 2026-09-13).
+  if (typeof exercise?.prescription_words === 'string' && exercise.prescription_words.trim()) {
+    return `${name} · ${exercise.prescription_words.trim()}`;
+  }
   const intent = String(exercise?.slot_intent || '').toUpperCase();
   const bookWord = BOOK_WORDS.has(intent) ? intent : null;
   const rirText = rirTextOf(exercise);

@@ -22,7 +22,7 @@ import {
   type Level,
 } from '../endurance-library/index.ts';
 import { bandRouteName, executionHowTo, executionName, isAsymmetrical, isBodyweightLoad, prescribe, resolveSlot,
-  type ViadaPattern } from '../strength-grid/index.ts';
+  type ViadaIntent, type ViadaPattern } from '../strength-grid/index.ts';
 import { gearRoutesFor, ownsLoadingImplement } from '../../../../src/lib/strength-gear.ts';
 import {
   HOLD_PRESCRIPTION,
@@ -258,6 +258,11 @@ export type StrengthExercise = {
   /** How to do the home version of a machine movement, in Michael's words (2026-09-08). Display only,
    *  behind an (i) beside the name. Absent when the athlete has the station or the name alone is enough. */
   how_to?: string;
+  /**
+   * ⛔ A ROW PRESCRIBED IN WORDS, NOT SETS AND REPS (p226 carries, Michael 2026-09-13). Every surface
+   * prints `name · words` and no dose; the row carries no `sets` and blank `reps`.
+   */
+  prescription_words?: string;
   /** The slot's own pick list, for the logger's Swap sheet (2026-09-08). Absent on rows that are not
    *  a frame accessory cell. `name` is the catalogue spelling, `display` what the athlete reads. */
   swap_options?: { name: string; display: string }[];
@@ -1046,6 +1051,11 @@ function focusMuscleSet(focus: string[] | null | undefined): Set<string> {
   return out;
 }
 
+/** ⛔ THE CARRY ROW'S WORDS, PER INTENT — p226, and only the wording Michael approved (2026-09-13). */
+export const CARRY_ROW_WORDS: Partial<Record<ViadaIntent, string>> = {
+  SKILL: 'medium weight, no fatigue, full rest',
+};
+
 function exerciseForSlot(
   slot: StrengthSlot,
   args: ComposeArgs,
@@ -1581,6 +1591,34 @@ function exerciseForSlot(
   const setPosition = Number.isFinite(earnedMe)
     ? setPositionForCount(earnedMe, ME_SETS_BAND)
     : (dialSlot ? 1 : undefined);
+  /**
+   * ⛔⛔ A CARRY IS PRESCRIBED IN WORDS (p226: *"no reps and no percentage"*). Approved row, Michael
+   * 2026-09-13: `Farmers Carry · medium weight, no fatigue, full rest` — no sets, no reps. Only the
+   * SKILL wording is approved, and it is the only carry any frame prints (p278 day 4).
+   * ⚠️ `sets: 1` IS RETURNED FOR THE WEEK'S OWN COUNTING ONLY (the ledger rounds it); the row has none.
+   */
+  if (slot.category === 'carry') {
+    const words = CARRY_ROW_WORDS[slot.intent];
+    if (!words) throw new Error(`no approved row wording for a ${slot.intent} carry`);
+    return {
+      exercise: {
+        name: rowDisplayName(movement, slot, null),
+        ...(rowExecutionName(movement, slot, args.equipment)
+          ? { execution_name: rowExecutionName(movement, slot, args.equipment)! } : {}),
+        reps: '',
+        weight: 'By feel',
+        load_prescribed: false,
+        prescription_words: words,
+        // ⚠️ THE PAGE'S CELL, KEPT AS DATA — the week's own checks count printed cells by it. Every
+        // surface returns `name · words` before reading it, so no kind word or cue prints.
+        slot_intent: slot.intent,
+        source_row: noteForWeek(slot, args.week),
+      },
+      movement,
+      sets: 1,
+      pattern,
+    };
+  }
   const p = prescribe(slot.intent, 'barbell', setPosition);
   const sets = p.kind === 'barbell' ? p.sets : 1;
   const reps = p.kind === 'barbell' ? `${p.reps.lo}-${p.reps.hi}` : '';
@@ -1888,8 +1926,12 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], 
    * have numbers and tests ONLY the missing lift — its own session on its test day, beside the priced
    * one. `only` names those lifts; absent, this is the full test day of a full test week.
    */
-  const dayLifts = TEST_DAY_LIFTS[day.day];
-  if (!dayLifts) return null;
+  /**
+   * ⛔ ONLY THE LIFTS THIS FRAME'S WEEK LOADS (Michael, 2026-09-13) — `Frame.testedLifts`. p278 names
+   * no overhead press, so its day 1 tests the bench alone. Every frame before it declares all four.
+   */
+  const dayLifts = (TEST_DAY_LIFTS[day.day] ?? []).filter((l) => FRAMES[args.frame].testedLifts.includes(l));
+  if (dayLifts.length === 0) return null;
   const lifts = only ? dayLifts.filter((l) => only.includes(l)) : dayLifts;
   if (lifts.length === 0) return null;
   const partial = only != null && lifts.length < dayLifts.length;
@@ -2376,6 +2418,27 @@ function testRegionOf(name: string): 'upper' | 'lower' | null {
 export function composeWeek(args: ComposeArgs): ComposedWeek {
   const frame = FRAMES[args.frame];
   if (!frame) throw new Error(`unknown frame: ${args.frame}`);
+  /**
+   * ⛔⛔ A FRAME THAT BUILDS ITS PRINTED WEEK AND NOTHING ELSE (p278, 2026-09-13) — `Frame.printedWeekOnly`.
+   * Every input that can add a session or climb a level is removed ONCE, here, so no reader below
+   * can act on it: hours asks and per-session minutes (they climb the ladder), a stated day count
+   * (it adds easy fills), the advanced tier (it adds runs) and the swim add-on. The week is the
+   * page's sessions at the page's levels. ⚠️ Every other frame is untouched by construction.
+   */
+  if (frame.printedWeekOnly) {
+    args = {
+      ...args,
+      targetWeeklyMiles: undefined,
+      targetWeeklyRideHours: undefined,
+      targetRunHours: undefined,
+      targetRideHours: undefined,
+      enduranceDaysBySport: undefined,
+      demonstratedWeeklyMiles: null,
+      swimEasySessions: 0,
+      levelOverrides: undefined,
+      sportMix: args.sportMix ? { ...args.sportMix, minutes: null } : args.sportMix,
+    };
+  }
   const days = frame.columns[args.column];
   /**
    * ⛔ EACH HARD SLOT'S POSITION IN THE FRAME'S ORDER, so a pin can be matched to the slot it was
@@ -2422,7 +2485,9 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   const testWeek = isTestWeek(args.week) && !skipping;
   // ⛔ A SKIP WITH SOME NUMBERS MISSING (2026-09-04): those lifts are tested in week one, each in its own
   // session on its test day; everything else prices off the numbers on file. Never a full test week.
-  const partialTests: TestedLift[] = skipping ? TESTED_LIFTS.filter((l) => !args.workingNumbers?.[l]) : [];
+  const partialTests: TestedLift[] = skipping
+    ? FRAMES[args.frame].testedLifts.filter((l) => !args.workingNumbers?.[l])
+    : [];
   const anchors = resolveEnduranceAnchors(args.baselines);
 
   /**
@@ -2501,6 +2566,10 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    */
   const droppedSlots: Set<string> = (() => {
     const drop = new Set<string>();
+    // ⛔ THE SHORTER WEEK THE FRAME DECLARES — `Frame.fewerRidesDropsSlot`. Both columns: the athlete's
+    // ride count is a fact about their week, deload or not.
+    const fewer = frame.fewerRidesDropsSlot;
+    if (fewer && Number(args.sportMix?.rideCount) === fewer.rideCount) drop.add(`${fewer.day}:${fewer.index}`);
     if (args.column !== 'standard') return drop;
     for (const sport of ['run', 'ride'] as const) {
       const raw = args.enduranceDaysBySport?.[sport];

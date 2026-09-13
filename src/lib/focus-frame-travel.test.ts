@@ -46,10 +46,13 @@ Deno.test('⛔ HOP 2 — create-goal forwards it, allowlisted', () => {
 });
 
 Deno.test('⛔ HOP 3 — the builder reads it and hands it to the resolver', () => {
-  assert(/\(body as Record<string, unknown>\)\.focus/.test(GENERATE),
+  // ⚠️ ONE READER SINCE 2026-09-13 (`focusFromBody`), because the entry check resolves the frame too.
+  assert(/\(body as Record<string, unknown> \| null\)\?\.focus/.test(GENERATE),
     'generate-strength-plan no longer reads the focus off its body');
   assert(/enduranceSport: sport, focus/.test(GENERATE),
     'the focus never reaches resolveFrame — every athlete gets the 5K frame');
+  assert(/raw === 'ride' \? 'ride' : 'run'/.test(GENERATE),
+    'an unrecognised focus no longer falls back to the 5K frame');
 });
 
 Deno.test('⛔ THE RESOLVER STILL DEFAULTS TO THE 5K FRAME', () => {
@@ -58,8 +61,9 @@ Deno.test('⛔ THE RESOLVER STILL DEFAULTS TO THE 5K FRAME', () => {
    * every caller written before the card exists sends no focus at all, and a default of
    * `all_rounder` would move every one of them onto a different programme mid-flight.
    */
-  assert(/focus\?: 'standard' \| 'run';/.test(RESOLVER),
+  // ⚠️ `'ride'` JOINED 2026-09-13 (Ride Focus → Cycling: Base, p278). Absent still means the 5K frame.
+  assert(/focus\?: 'standard' \| 'run' \| 'ride';/.test(RESOLVER),
     'the resolver no longer takes an optional focus');
-  assert(/position\.focus === 'standard' \? 'all_rounder' : 'strength_5k'/.test(RESOLVER),
+  assert(/position\.focus === 'ride' \? 'cycling_base' : 'strength_5k'/.test(RESOLVER),
     'the resolver default is no longer the 5K frame');
 });

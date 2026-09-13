@@ -1456,6 +1456,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             lines.push(`  - **Exercises:**`);
             for (const ex of strengthExercises) {
               const name = ex?.name || 'Exercise';
+              // ⛔ A ROW PRESCRIBED IN WORDS (p226 carry, 2026-09-13): `name · words`, no dose.
+              if (typeof ex?.prescription_words === 'string' && ex.prescription_words.trim()) {
+                lines.push(`    - ${name} · ${ex.prescription_words.trim()}`);
+                continue;
+              }
               const sets = ex?.sets || 0;
               const reps = ex?.reps || 0;
               const weightDisplay = ex?.weight_display;

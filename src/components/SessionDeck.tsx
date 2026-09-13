@@ -58,6 +58,9 @@ const barLoaded = (movement: string): boolean =>
  * "lb" or "kg" from the phone's units with no conversion; materialize-plan stamps the label on the row.
  */
 function weightLabelFor(ex: Record<string, unknown> | undefined): string | null {
+  // ⛔ A ROW PRESCRIBED IN WORDS (p226 carry, 2026-09-13) shows its words here.
+  const words = ex?.prescription_words;
+  if (typeof words === 'string' && words.trim()) return words.trim();
   const display = ex?.weight_display;
   if (typeof display === 'string' && display.trim()) return display.trim();
   const raw = ex?.weight;

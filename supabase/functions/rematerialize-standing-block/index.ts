@@ -26,6 +26,7 @@ import { resolvePlanWeekIndex } from '../_shared/plan-week.ts';
 import {
   composeBlock,
   earnedMeSets,
+  FRAMES,
   pretestSession,
   readTestWeek,
   restateEndurance,
@@ -101,7 +102,9 @@ Deno.serve(async (req: Request) => {
      */
     const retestGroup = p?.schedule_retest === 'lower' ? 2 : p?.schedule_retest === 'upper' ? 1 : null;
     if (retestGroup != null) {
-      const lifts = TEST_DAY_LIFTS[retestGroup] ?? [];
+      // ⛔ ONLY THE LIFTS THE FRAME'S WEEK LOADS (2026-09-13) — `Frame.testedLifts`. No press retest on p278.
+      const lifts = (TEST_DAY_LIFTS[retestGroup] ?? []).filter((l) =>
+        (FRAMES[sp.frame as keyof typeof FRAMES]?.testedLifts ?? ['bench', 'squat', 'deadlift', 'overheadPress']).includes(l));
       const names = testWeekLiftNames(sp.competition_lifts ?? {});
       const stored = (sp.working_numbers ?? null) as Record<string, Record<string, unknown>> | null;
       const seeds = (sp.seed_one_rep_maxes ?? {}) as Record<string, unknown>;

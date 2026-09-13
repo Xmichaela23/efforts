@@ -540,6 +540,8 @@ const W = (seconds: number, at: number, label?: string): PrintedSegment => ({ se
 const F = (seconds: number, at: Intensity, label?: string): PrintedSegment => ({ seconds, role: 'float', intensity: at, ...(label ? { label } : {}) });
 const R = (seconds: number): PrintedSegment => ({ seconds, role: 'recovery', intensity: easy });
 const RV = (seconds: number): PrintedSegment => ({ seconds, role: 'recovery', intensity: vt1 });
+/** An all-out effort the page prints with no percentage (p236 "max effort"). */
+const AO = (seconds: number, label?: string): PrintedSegment => ({ seconds, role: 'work', intensity: { kind: 'all_out' }, ...(label ? { label } : {}) });
 
 export const FAMILIES: Record<FamilyId, {
   sport: Sport;
@@ -1174,6 +1176,8 @@ export const FAMILIES: Record<FamilyId, {
         label: 'Maximal sprints',
         repBand: { lo: 120, hi: 180 },
         repsBand: { lo: 3, hi: 6 },
+        // ⛔ p236 PRINTS THE COUNT PER LEVEL — 3 / 5 / 6 (checked off `p236.jpg` 2026-09-13).
+        repsByLevel: { 1: { lo: 3, hi: 3 }, 2: { lo: 5, hi: 5 }, 3: { lo: 6, hi: 6 } },
         work: { kind: 'all_out' },
         recovery: { kind: 'stated', band: { lo: 300, hi: 360 }, intensity: easy },
         cite: 'Viada p236 — 5 to 6 minutes of recovery between',
@@ -1187,6 +1191,20 @@ export const FAMILIES: Record<FamilyId, {
         work: { kind: 'all_out' },
         recovery: { kind: 'stated', band: { lo: 120, hi: 180 }, intensity: easy },
         set: { repeatsPerSet: { lo: 5, hi: 6 }, restBand: { lo: 120, hi: 180 }, intensity: easy },
+        /**
+         * ⛔⛔ THE PAGE'S SESSIONS, PER LEVEL (checked off `p236.jpg` 2026-09-13). The band builder
+         * made level 1 three sets of four 15-second surges; p236 level 1 is *"8 rounds of flying
+         * 30-second surges to max effort, with 2 to 3 minutes recovery between"*. Level 2 is 2 sets of
+         * 5, level 3 (this option) 2 sets of 6, all 30 seconds.
+         * ⚠️ THE RECOVERY IS OURS WITHIN HIS RANGE: 150 s, the middle of *"2 to 3 minutes"* — the same
+         * middle the band builder takes for every stated recovery range. p236 gives no separate
+         * between-sets figure, so the same 150 s is used there.
+         */
+        printedIntervalsByLevel: {
+          1: { sets: 1, rounds: 8, round: [AO(30, 'Surge')], betweenRoundsSeconds: 150 },
+          2: { sets: 2, rounds: 5, round: [AO(30, 'Surge')], betweenRoundsSeconds: 150, betweenSetsSeconds: 150 },
+          3: { sets: 2, rounds: 6, round: [AO(30, 'Surge')], betweenRoundsSeconds: 150, betweenSetsSeconds: 150 },
+        },
         cite: 'Viada p236',
       },
       {
@@ -1331,6 +1349,17 @@ export const FAMILIES: Record<FamilyId, {
         work: pct(1.25),
         recovery: { kind: 'stated', band: { lo: 20, hi: 30 }, intensity: pct(0.85) },
         set: { repeatsPerSet: { lo: 5, hi: 8 }, restBand: { lo: 300, hi: 300 }, intensity: easy },
+        /**
+         * ⛔⛔ THE PAGE'S SESSIONS, PER LEVEL (checked off `p238.jpg` 2026-09-13). The band builder
+         * made level 1 six sets with 25-second recoveries; p238 level 1 is *"4 sets of 5 rounds of
+         * 30 seconds @ 125% / 30 seconds @ 85%, 5-minute rest between sets"*. Level 2 is 4 sets of 8
+         * of the same; level 3 is 4 sets of 8 of 40 s @ 125% / 20 s @ 85%.
+         */
+        printedIntervalsByLevel: {
+          1: { sets: 4, rounds: 5, round: [W(30, 1.25), { seconds: 30, role: 'recovery', intensity: pct(0.85) }], betweenSetsSeconds: 300 },
+          2: { sets: 4, rounds: 8, round: [W(30, 1.25), { seconds: 30, role: 'recovery', intensity: pct(0.85) }], betweenSetsSeconds: 300 },
+          3: { sets: 4, rounds: 8, round: [W(40, 1.25), { seconds: 20, role: 'recovery', intensity: pct(0.85) }], betweenSetsSeconds: 300 },
+        },
         cite: 'Viada p238',
       },
     ],

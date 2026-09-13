@@ -164,6 +164,12 @@ export const ALL_ROUNDER_PICK_KEYS: ViadaPickKey[] = [
 export const PICK_KEYS_BY_FRAME: Record<FrameId, ViadaPickKey[]> = {
   strength_5k: VIADA_PICK_KEYS,
   all_rounder: ALL_ROUNDER_PICK_KEYS,
+  /**
+   * ⛔ p278 PRINTS THE SAME THREE HYP ACCESSORY CELLS AS p246's DAYS 1 AND 2 (focused pull, focused
+   * push, accessory lower), so it takes p246's keys — and the filter in `picksForFrame` keeps only the
+   * ones that reach a p278 cell. ⚠️ NO CORE: p278 prints no core row and nothing is added to it.
+   */
+  cycling_base: VIADA_PICK_KEYS.filter((k) => k !== 'core'),
 };
 
 /**

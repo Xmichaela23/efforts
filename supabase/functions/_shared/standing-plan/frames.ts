@@ -13,13 +13,14 @@
 
 import type { ViadaCategory, ViadaIntent, ViadaPattern } from '../strength-grid/index.ts';
 import type { FamilyId, Level } from '../endurance-library/index.ts';
+import type { TestedLift } from './working-number.ts';
 
 /**
  * ⛔ TWO FRAMES ON A DIAL, NOT A REPLACEMENT (DESIGN-standard-focus-all-rounder-2026-08-30 §2).
  * `strength_5k` is FROZEN AS A DESIGN — stop shaping new work around its quirks — and still fully
  * guarded by its tests, because both frames share the composer, the materializer and the progression.
  */
-export type FrameId = 'strength_5k' | 'all_rounder';
+export type FrameId = 'strength_5k' | 'all_rounder' | 'cycling_base';
 
 /**
  * ⛔⛔⛔ WHETHER THIS FRAME ASKS FOR A WEEKLY HOURS TOTAL AT ALL — Michael, 2026-08-31:
@@ -42,7 +43,8 @@ export type FrameId = 'strength_5k' | 'all_rounder';
  * and this note is the pointer between them.**
  */
 export function frameAsksWeeklyHours(frame: FrameId): boolean {
-  return frame !== 'all_rounder';
+  // ⚠️ READ OFF THE FRAME'S DECLARATION (2026-09-13, the third frame) — see `Frame.laysOutWeekByDay`.
+  return !FRAMES[frame].laysOutWeekByDay;
 }
 
 export type ColumnKind = 'standard' | 'taper';
@@ -378,6 +380,46 @@ export type Frame = {
   columns: Record<ColumnKind, FrameDay[]>;
   /** His rate anchor for THIS frame — see `RATE_ANCHOR`. */
   workingNumberRatePerWeek: number;
+  /**
+   * ⛔⛔ THE BARBELL LIFTS THIS FRAME'S WEEK LOADS (Michael, 2026-09-13: *"you're using what the app
+   * tests against what the plan requires and creating an unnecessary gate"*). The 65 lb entry check
+   * and the week-one test ask about THESE lifts and no others. Read the declaration, never the id.
+   * ⚠️ `strength_5k` and `all_rounder` declare all four, so both behave exactly as before.
+   */
+  testedLifts: TestedLift[];
+  /**
+   * ⛔ THE FRAME LAYS ITS WEEK OUT DAY BY DAY AND ASKS PER SESSION, NOT FOR A WEEKLY HOURS TOTAL —
+   * the declaration behind `frameAsksWeeklyHours` (engine) and `weekIsDayOrdered` (screen), which
+   * both tested `=== 'all_rounder'` until a third frame arrived.
+   */
+  laysOutWeekByDay: boolean;
+  /**
+   * ⛔ THE ENDURANCE SPORTS THIS FRAME'S WEEK MAY CARRY. A sport not listed here is fenced off the mix
+   * and the day counts (`fenceMixToFrame`), so a rides-only week can never gain filler runs. `swim`
+   * means the easy-swim add-on is allowed.
+   * ⚠️ Whether a RUN row may be ridden is a separate question — `RIDE_SUBSTITUTION_FRAMES`.
+   */
+  enduranceSports: Array<'run' | 'ride' | 'swim'>;
+  /**
+   * ⛔ THE FRAME'S HARD SESSIONS ARE NOT OPT-IN. Absent, a hard slot answered `'none'` converts to the
+   * easy session (`declineHardSlot`, the Run + Strength and All Rounder ruling). p278's quality rides
+   * are the week (p109: at least one speed and one sub-threshold session; p119: no kind of session
+   * disappears), so on that frame a `'none'` answer is fenced off.
+   */
+  hardSessionsFixed?: boolean;
+  /**
+   * ⛔ THE WEEK IS THE PAGE'S SESSIONS AT THE PAGE'S LEVELS, AND NOTHING THE ATHLETE TYPES ADDS OR
+   * CLIMBS ONE (p278, Michael 2026-09-13: nothing is added to a week that p278 does not print; rides do
+   * not get longer week to week). Read once at the top of `composeWeek`.
+   */
+  printedWeekOnly?: boolean;
+  /**
+   * ⛔ THE ONE RIDE A SHORTER WEEK LEAVES OUT, AND HOW MANY RIDES TRIGGER IT (p278, Michael
+   * 2026-09-13: the Day 2 easy ride comes out of the 4-ride week). p119: no kind of session
+   * disappears; p109: at least one speed and one sub-threshold session stay; p134: easy volume is cut
+   * before quality. Read by `composeWeek` against `SportMix.rideCount`, in both columns.
+   */
+  fewerRidesDropsSlot?: { rideCount: number; day: number; index: number };
 };
 
 // ── the slot vocabulary, spelled once ───────────────────────────────────────────────────────────
@@ -868,6 +910,137 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
 ];
 
 /**
+ * ⛔⛔ CYCLING: BASE (p278, notes p280 and p281) — the Ride + Strength week. Transcribed from the page
+ * image, `SOURCE-viada-hybrid-athlete.md` Part E2 (2026-09-13). Work order:
+ * `WORKORDER-ride-strength-2026-09-13.md` §3.
+ *
+ * Three lifting days (1 heavy upper, 2 heavy lower, 4 full-body speed), a plyo warm-up on day 3, rides
+ * on days 1, 2, 3, 5 and 6, day 7 full rest. **Every lifting row p278 prints and nothing else.**
+ *
+ * ⛔⛔ THE STANDARD WEEK TAKES p278's STANDARD LIFTING AND p278's DELOAD RIDES, IN ONE WEEK. p251
+ * prints a week that takes one column's lifting and the other column's endurance, which is the basis.
+ * The work order's rides are the Deload column's five, all at level 1 (sweet spot, easy, VO2, sprint,
+ * easy) — not the Standard column's seven. Written INTO the column rather than mixed at compose time,
+ * so every reader of `columns` (placement, conflicts, copy, the sport assignment) sees one week.
+ * ⚠️ So `taper` here is p278's Deload column on BOTH sides, and it is what the Adjust deload gives.
+ * ⚠️ Rides do not get longer week to week (Michael, 2026-09-13). Each prints its level 1 session.
+ *
+ * ⚠️ NO RUN SLOT AND NO SWIM (`enduranceSports: ['ride']`).
+ * ⚠️ NO OVERHEAD PRESS IS NAMED — p278's push rows are categories. `testedLifts` is bench, squat and
+ * deadlift, so the entry check and the week-one test never ask for a press.
+ */
+const CYCLING_BASE_STANDARD: FrameDay[] = [
+  {
+    day: 1,
+    label: 'ME Upper',
+    strength: [
+      S('ME', 'competition', 'primary', 'push_upper', '1 x ME: Primary push'),
+      S('ME', 'accessory', 'primary', 'pull_upper', '1 x ME: Accessory: primary pull'),
+      /**
+       * ⚠️ THE SAME CELL AS p246's DAY 1, and the same pick inside it: the muscle is ours, the movement
+       * list is his (p220's seated DB press and Arnold press first, the barbell presses p275 permits
+       * behind them). See `STRENGTH_5K_STANDARD` day 1. It is a choice among the row's own movements,
+       * not a row added.
+       */
+      S('DE', 'accessory', 'secondary', 'push_upper', '1 x DE: Accessory: secondary push', {
+        muscle: 'deltoids',
+        alsoAdmits: [
+          'seated db press', 'arnold press',
+          'overhead press', 'military press', 'standing barbell overhead press', 'push press',
+        ],
+      }),
+      S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),
+      S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: Accessory: focused pull, focused push'),
+    ],
+    endurance: [E('ride_sweet_spot', 1, 'Cyc sweet spot (level 1) — p278 Deload column', { role: 'hard' })],
+  },
+  {
+    day: 2,
+    label: 'ME Lower',
+    lowerRole: 'me',
+    strength: [
+      S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: Primary hinge lower (rotate with primary push)', { rotatesWith: 'press_lower' }),
+      S('ME', 'accessory', 'primary', 'press_lower', '1 x ME: Accessory: primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),
+      S('DE', 'accessory', 'secondary', 'hinge_lower', '1 x DE: Accessory: secondary hinge lower'),
+      S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Accessory: accessory lower', {
+        ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
+      }),
+    ],
+    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1) — p278 Deload column', { role: 'easy' })],
+  },
+  { day: 3, label: null, strength: [], endurance: [E('ride_vo2', 1, 'Cyc VO2 (level 1) — p278 Deload column', { role: 'hard' })], plyo: true },
+  {
+    day: 4,
+    label: 'DE: Full',
+    // ⚠️ THE WEEK'S SPEED LEG DAY — its lower rows are DE (`FrameDay.lowerRole`).
+    lowerRole: 'de',
+    strength: [
+      S('DE', 'competition', 'primary', 'push_upper', '1 x DE: Primary push'),
+      S('DE', 'competition', 'primary', 'press_lower', '1 x DE: Primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),
+      S('DE', 'accessory', 'primary', 'pull_upper', '1 x DE: Accessory: primary pull'),
+      S('DE', 'accessory', 'primary', 'hinge_lower', '1 x DE: Accessory: primary hinge lower (rotate with primary push lower)', { rotatesWith: 'press_lower' }),
+      /**
+       * ⚠️ A CARRY HAS NO PATTERN IN HIS KEY (p226; `resolveSlot` ignores the pattern for `carry`). The
+       * field is required by the slot type, so it carries `hinge_lower` — p226: carries *"also qualify
+       * as a hinge, pull or press during the pick"*. Nothing prices off it: a carry is never a
+       * competition lift.
+       */
+      S('SKILL', 'accessory', 'carry', 'hinge_lower', '1 x SKILL: Carry'),
+    ],
+    endurance: [],
+  },
+  /**
+   * ⚠️ TWO OF p236's THREE LEVEL 1 SPRINT SESSIONS, ROTATED BY WEEK. The standing start is left out
+   * (2026-09-13): its effort has no printed length — an acceleration up to speed — and no step on a
+   * watch file can carry a work step with no clock. Open for Michael.
+   */
+  { day: 5, label: null, strength: [], endurance: [E('ride_sprints', 1, 'Cyc sprint (level 1) — p278 Deload column', { role: 'hard', archetypes: ['max_effort', 'flying_surge'] })] },
+  /**
+   * ⚠️ p281 CALLS THIS "THE SATURDAY LONG RIDE", so the frame states `long`. It is still level 1
+   * endurance, the Deload column's cell, and it does not lengthen week to week.
+   */
+  { day: 6, label: null, strength: [], endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1) — p278 Deload column', { role: 'long' })] },
+  { day: 7, label: null, strength: [], endurance: [], rest: true },
+];
+
+/**
+ * ⛔ p278's DELOAD COLUMN, BOTH SIDES. The lifting is a CUT, not a substitution: day 1 is unchanged,
+ * day 2 loses the DE secondary hinge, day 4 loses the DE primary hinge and the carry. The rides are
+ * the same five as the standard week above.
+ */
+const CYCLING_BASE_TAPER: FrameDay[] = [
+  { ...CYCLING_BASE_STANDARD[0] },
+  {
+    day: 2,
+    label: 'ME Lower',
+    lowerRole: 'me',
+    strength: [
+      S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: Primary hinge lower (rotate with primary push)', { rotatesWith: 'press_lower' }),
+      S('ME', 'accessory', 'primary', 'press_lower', '1 x ME: Accessory: primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),
+      S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Accessory: accessory lower', {
+        ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
+      }),
+    ],
+    endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy' })],
+  },
+  { ...CYCLING_BASE_STANDARD[2] },
+  {
+    day: 4,
+    label: 'DE: Full',
+    lowerRole: 'de',
+    strength: [
+      S('DE', 'competition', 'primary', 'push_upper', '1 x DE: Primary push'),
+      S('DE', 'competition', 'primary', 'press_lower', '1 x DE: Primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),
+      S('DE', 'accessory', 'primary', 'pull_upper', '1 x DE: Accessory: primary pull'),
+    ],
+    endurance: [],
+  },
+  { ...CYCLING_BASE_STANDARD[4] },
+  { ...CYCLING_BASE_STANDARD[5] },
+  { ...CYCLING_BASE_STANDARD[6] },
+];
+
+/**
  * ⛔ HIS RATE ANCHOR, AND IT IS PER-FRAME RATHER THAN PER-ATHLETE (corrected 2026-08-23).
  *
  * p247, for Strength + 5K: *"slow gradual increases in the calculated 1RM taking place every 3 to 4
@@ -928,6 +1101,12 @@ export const RATE_ANCHOR: Record<FrameId, { perWeek: number; cite: string }> = {
     cite: 'OURS — Michael, 2026-08-30: progression is earned or it does not happen. p275 states no '
       + 'rate for this program, and the double progression owns the number.',
   },
+  /** ⚠️ THE SAME RULING AS `all_rounder`: p280 states no rate for Base, and lifts move when earned. */
+  cycling_base: {
+    perWeek: 0,
+    cite: 'OURS — the all_rounder ruling (2026-08-30) applied: p280 states no rate for Cycling: Base, '
+      + 'and the double progression owns the number.',
+  },
 };
 
 export const FRAMES: Record<FrameId, Frame> = {
@@ -940,6 +1119,9 @@ export const FRAMES: Record<FrameId, Frame> = {
     runStrengthWeek: { easyRunMinutes: 30, longRunChipCeilingMinutes: 90, longRunDefaultMinutes: 75 },
     columns: { standard: STRENGTH_5K_STANDARD, taper: STRENGTH_5K_TAPER },
     workingNumberRatePerWeek: RATE_ANCHOR.strength_5k.perWeek,
+    testedLifts: ['bench', 'squat', 'deadlift', 'overheadPress'],
+    laysOutWeekByDay: false,
+    enduranceSports: ['run', 'swim'],
   },
   all_rounder: {
     id: 'all_rounder',
@@ -949,6 +1131,25 @@ export const FRAMES: Record<FrameId, Frame> = {
     liftingDays: 4,
     columns: { standard: ALL_ROUNDER_STANDARD, taper: ALL_ROUNDER_TAPER },
     workingNumberRatePerWeek: RATE_ANCHOR.all_rounder.perWeek,
+    testedLifts: ['bench', 'squat', 'deadlift', 'overheadPress'],
+    laysOutWeekByDay: true,
+    enduranceSports: ['run', 'ride', 'swim'],
+  },
+  cycling_base: {
+    id: 'cycling_base',
+    sourceName: 'Cycling: Base',
+    // ⚠️ THE CARD'S EXISTING LABEL. §0.1 of the work order: the card copy is not approved yet.
+    displayName: 'Ride + Strength',
+    cite: 'Viada pp278, 280-281',
+    liftingDays: 3,
+    columns: { standard: CYCLING_BASE_STANDARD, taper: CYCLING_BASE_TAPER },
+    workingNumberRatePerWeek: RATE_ANCHOR.cycling_base.perWeek,
+    testedLifts: ['bench', 'squat', 'deadlift'],
+    laysOutWeekByDay: true,
+    enduranceSports: ['ride'],
+    hardSessionsFixed: true,
+    printedWeekOnly: true,
+    fewerRidesDropsSlot: { rideCount: 4, day: 2, index: 0 },
   },
 };
 
@@ -1072,12 +1273,16 @@ export const LOW_VOLUME_TIER_LEVELS: Record<string, Level> = {
  * an athlete who put a ride on that slot was handed `ride_sweet_spot` level 3 — a dose the book
  * prescribes to nobody.
  *
- * ⛔ p278, HIS OWN CYCLING BASE STANDARD WEEK, read off the page image: day 1 `Cyc sweet spot
- * (level 1-2)`, day 3 `Cyc VO2 (level 1)` + `Cyc sweet spot (level 1)`, day 5 `Cyc sprint
- * (level 1)`, day 7 `Cyc endurance (level 2)`. **Level 2 is the ceiling anywhere in his cycling
- * programs, and it appears on one session.** Level 3 sweet spot exists in the session library
- * (p239) and he prescribes it in no program — so offering it on a Wednesday ride hands a hybrid
- * athlete a harder dose than the book gives a dedicated cyclist.
+ * ⛔ p278, HIS OWN CYCLING BASE STANDARD WEEK, read off the page image (full table: SOURCE Part E2):
+ * day 1 `Cyc sweet spot (level 1-2)`, day 2 `Cyc endurance (level 1)`, day 3 `Cyc VO2 (level 1)` +
+ * `Cyc sweet spot (level 1)`, day 5 `Cyc endurance (level 1)` + `Cyc sprint (level 1)`, day 6
+ * `Cyc endurance (level 2)`, day 7 rest. ⚠️ Corrected 2026-09-13: this listed the level 2 ride on
+ * day 7 and left out both day 2 and day 5 endurance rides. **Level 2 is the ceiling on p278, and it
+ * appears on two sessions.** ⚠️ p279 prints `Cyc sweet spot (level 2 to 3)` and `Cyc endurance
+ * (level 3)/LSR`, so "level 2 anywhere in his cycling programs" does not hold past p278.
+ * Level 3 sweet spot exists in the session library
+ * (p239); of the three cycling tables (p278, p279, p281) only p279 prints it, on day 1, so offering it on a
+ * Wednesday ride in these frames hands a hybrid athlete a harder dose than p278 gives a cyclist.
  *
  * ⚠️ THE RUN SIDE IS UNTOUCHED. The Wednesday RUN stays at level 3, which is exactly what p246
  * prints for it and what p247 calls *"the hardest session of the week."*

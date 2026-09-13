@@ -143,8 +143,8 @@ function compoundRoundToken(block: {
     const i = st.intensity;
     // ⚠️ `hi` is the band's top and is what the session prescribes at; `vt1`/`easy` carry no number.
     const at = i && i.kind === 'pct_threshold' && typeof i.hi === 'number'
-      ? String(Math.round(i.hi * 100))
-      : (i?.kind === 'race_pace' ? 'racepace' : i?.kind === 'vt1' ? 'vt1' : 'easy');
+      ? pctWord(i as { lo?: number; hi: number })
+      : (i?.kind === 'race_pace' ? 'racepace' : i?.kind === 'vt1' ? 'vt1' : i?.kind === 'all_out' ? 'allout' : 'easy');
     /**
      * ⛔ THE ROLE TRAVELS, and it is not inferable from the number. p237's one-to-one is *"1 min @
      * 110% / 1 min @ 50%"* — the 50% half is a RECOVERY the source names, and emitting it as work
@@ -170,16 +170,32 @@ function compoundRoundToken(block: {
  */
 function plainRoundToken(block: {
   repeat: number;
-  steps: Array<{ role: string; seconds?: number | null; intensity?: { kind: string; hi?: number } | null }>;
+  steps: Array<{ role: string; seconds?: number | null; intensity?: { kind: string; lo?: number; hi?: number } | null }>;
   restBetween?: { seconds?: number | null } | null;
 }): string | null {
   const steps = block.steps.filter((st) => st.seconds != null && st.seconds > 0);
   if (steps.length !== 1 || steps[0].role !== 'work') return null;
   const i = steps[0].intensity;
-  if (!i || i.kind !== 'pct_threshold' || typeof i.hi !== 'number') return null;
+  // ⛔ AN ALL-OUT REPEAT QUALIFIES TOO (2026-09-13, p236 sprints) — work with no power target.
+  const at = i?.kind === 'all_out'
+    ? 'allout'
+    : (i && i.kind === 'pct_threshold' && typeof i.hi === 'number' ? pctWord(i as { lo?: number; hi: number }) : null);
+  if (at == null) return null;
   const rest = block.restBetween?.seconds;
-  return `round_${Math.max(1, block.repeat)}x_${Math.round(steps[0].seconds as number)}s${Math.round(i.hi * 100)}`
+  return `round_${Math.max(1, block.repeat)}x_${Math.round(steps[0].seconds as number)}s${at}`
     + (rest != null && rest > 0 ? `_R${Math.round(rest)}s` : '');
+}
+
+/**
+ * ⛔ A PRINTED RANGE TRAVELS AS A RANGE — `110to120` (2026-09-13, p238 VO2: *"3 minutes @ 110 to
+ * 120%"*). A single number stays a single number, so every token emitted before reads the same.
+ * ⚠️ ONLY THE RIDE FAMILIES BELOW EMIT ONE: `rangeTokens` is off for every other caller.
+ */
+let rangeTokens = false;
+function pctWord(i: { lo?: number; hi: number }): string {
+  const hi = Math.round(i.hi * 100);
+  const lo = typeof i.lo === 'number' ? Math.round(i.lo * 100) : hi;
+  return rangeTokens && lo < hi ? `${lo}to${hi}` : String(hi);
 }
 
 
@@ -395,6 +411,12 @@ export const FAMILY_LABEL: Partial<Record<FamilyId, string>> = {
    * name for a session.
    */
   ride_anaerobic: 'Anaerobic Ride',
+  /**
+   * ⚠️ PROPOSED, NOT APPROVED (2026-09-13) — the names for p278's two new rides, each p236/p238's own
+   * heading word. Without them both fell through to "Ride", the easy ride's name. Held for Michael.
+   */
+  ride_vo2: 'VO2 Ride',
+  ride_sprints: 'Sprint Ride',
   ride_endurance: 'Ride',
   swim_endurance: 'Easy Swim',
 };
@@ -649,6 +671,28 @@ export function translateEnduranceSession(
       break;
     }
 
+    /**
+     * ⛔⛔ p278's VO2 AND SPRINT RIDES (2026-09-13) — reachable on purpose now, from the Cycling: Base
+     * frame. Both travel as round tokens: VO2 at the page's own percentage (a printed range stays a
+     * range), sprints as all-out work with no power target (p236 "max effort", unresolved per p229).
+     */
+    case 'ride_vo2':
+    case 'ride_sprints': {
+      rangeTokens = true;
+      try {
+        const tokens: string[] = [];
+        for (const b of session.blocks) {
+          const tok = compoundRoundToken(b as never) ?? plainRoundToken(b as never);
+          if (!tok) throw new Error(`no round token for a ${session.family} block (${session.archetype})`);
+          tokens.push(tok);
+        }
+        work = tokens;
+      } finally {
+        rangeTokens = false;
+      }
+      break;
+    }
+
     case 'ride_endurance': {
       /**
        * ⛔⛔ THE PRINTED RIDE WITH WORK TRANSLATES IN ITS OWN ORDER (2026-09-10) — the opening spin,
@@ -702,8 +746,8 @@ export function translateEnduranceSession(
 
     default:
       // ⛔ ANY FAMILY THIS EDGE HAS NOT BEEN TAUGHT FAILS LOUDLY rather than emitting a token the
-      // materializer will silently drop. ⚠️ That deliberately includes `ride_vo2`, `ride_sprints`,
-      // `swim_speed` and `swim_open_water`: none of them is reachable from this plan's assignment,
+      // materializer will silently drop. ⚠️ That deliberately includes `swim_speed` and
+      // `swim_open_water` (`ride_vo2` and `ride_sprints` left the list 2026-09-13 with cases above): none of them is reachable from this plan's assignment,
       // and a throw here is the tripwire if one ever becomes reachable by accident.
       // ⚠️ `ride_anaerobic` LEFT THAT LIST ON 2026-08-30 — it is now reachable ON PURPOSE and has a
       // case above. The tripwire worked exactly as written: it fired the moment the mapping changed.

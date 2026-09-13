@@ -17,7 +17,7 @@
 
 import { archetypesFor, FAMILIES } from '../endurance-library/index.ts';
 import type { FamilyId, Level } from '../endurance-library/index.ts';
-import { clampRideLevel } from './frames.ts';
+import { clampRideLevel, FRAMES } from './frames.ts';
 import type { EnduranceSlot, FrameDay, FrameId } from './frames.ts';
 
 export type SportMix = {
@@ -92,6 +92,12 @@ export type SportMix = {
    * keeps the screen from offering a length in that gap.
    */
   minutes?: Record<string, number> | null;
+  /**
+   * ⛔ HOW MANY RIDES A WEEK, ON A FRAME THAT DECLARES A RIDE THE ATHLETE MAY LEAVE OUT
+   * (`Frame.fewerRidesDropsSlot`, p278, 2026-09-13). The only count the athlete owns on that frame.
+   * Absent is the frame as printed.
+   */
+  rideCount?: number | null;
 };
 
 export type AssignedSlot = {
@@ -270,6 +276,18 @@ export function frameAllowsRideSubstitution(frame: FrameId): boolean {
  * family does not offer it.
  */
 export function fenceMixToFrame<T extends SportMix>(frame: FrameId, mix: T): T {
+  /**
+   * ⛔ A FRAME WRITTEN IN RIDES ONLY (p278, 2026-09-13) — read off `Frame.enduranceSports`, never the
+   * id. Its slots are rides as prescribed: no run count, no swim add-on, and no per-slot answer (the
+   * sport is the page's and `hardSessionsFixed` makes the quality rides non-optional).
+   */
+  const sports = FRAMES[frame]?.enduranceSports ?? ['run', 'ride', 'swim'];
+  if (!sports.includes('run')) {
+    const keep = FRAMES[frame]?.hardSessionsFixed
+      ? undefined
+      : (mix.slots ? Object.fromEntries(Object.entries(mix.slots).filter(([, v]) => v !== 'run')) : mix.slots);
+    return { ...mix, runs: 0, ...(sports.includes('swim') ? {} : { swimDays: 0 }), slots: keep } as T;
+  }
   if (frameAllowsRideSubstitution(frame)) return mix;
   const slots = mix.slots
     ? Object.fromEntries(Object.entries(mix.slots).map(([k, v]) => [k, v === 'ride' ? 'run' : v]))
@@ -282,7 +300,12 @@ export function fenceEnduranceDaysToFrame<T extends { run?: number | null; ride?
   frame: FrameId,
   days: T,
 ): T {
-  if (frameAllowsRideSubstitution(frame) || days == null) return days;
+  if (days == null) return days;
+  // ⛔ A RIDES-ONLY FRAME TAKES NO RUN DAYS — see `fenceMixToFrame`.
+  if (!(FRAMES[frame]?.enduranceSports ?? ['run']).includes('run')) {
+    return (days.run == null || days.run === 0) ? days : ({ ...days, run: 0 } as T);
+  }
+  if (frameAllowsRideSubstitution(frame)) return days;
   if (days.ride == null || days.ride === 0) return days;
   return { ...days, ride: 0 } as T;
 }

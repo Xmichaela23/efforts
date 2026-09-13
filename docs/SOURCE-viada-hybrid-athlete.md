@@ -1079,7 +1079,8 @@ zipper/fingertip drag. *(A full drill catalogue is out of the book's scope.)*
 STANDARD and TAPER/DELOAD columns, seven days, a strength column and an endurance column — followed
 by a **notes page** (prose, then Strength Notes and Running/Conditioning/Cycling Notes).
 
-⛔ **Two are transcribed below — the All Rounder (Part E) and Strength + 5K (Part E1).** The other
+⛔ **Three are transcribed below — the All Rounder (Part E), Strength + 5K (Part E1) and Cycling:
+Base (Part E2, 2026-09-13).** The other
 sixteen stay as images deliberately: transcribing eighteen dense tables invites exactly the errors
 this file's changelog records. **Transcribe one when it is being built, from the page.**
 ⚠️ Strength + 5K was transcribed 2026-08-23 because stage 4 builds it; its notes page had never been
@@ -1101,8 +1102,8 @@ read and carried four things nothing else here records — see Part E1.
 | Strength + Ironman Tri | p270 | pp.271–272 | |
 | ⭐ **The All Rounder** | p274 | p275 | **the year-round home base** — transcribed below |
 | The Speed Solution: Pivot | p276 | p277 | obligate pivot, 4–6 weeks; slow runner → explosive |
-| Cycling: Base | p278 | p280 | cycling proficiency — **run this 4 weeks before the other two** |
-| Cycling: Fondo/MTB/Gravel | p279 | p280 | steady output, longer mixed-terrain racing |
+| Cycling: Base | p278 | p280 (+ Base notes on p281) | cycling proficiency — **run this 4 weeks before the other two**. **Transcribed in Part E2.** |
+| Cycling: [p279 program]/MTB/Gravel | p279 | p280 | steady output, longer mixed-terrain racing |
 | Cycling: Crit/CX/XCO | p281 | p280 | punchier racing; strength is **DE secondary movements only** |
 | Weightlifting and Running | p282 | pp.283–284 | Olympic lifting — the **only** program using the OLY vocabulary (Part A3) |
 
@@ -1326,6 +1327,137 @@ of most skill levels. The lifting component is perfectly acceptable for competit
 while the running program can be of use for even advanced intermediate runners."* Strength here
 **assumes task-specific strength** — powerlifting or specific barbell strength is the goal, and there
 are several specific movements the athlete wants to improve.
+
+---
+
+# PART E2 — CYCLING: BASE (Chapter 10, pp.278 and 280)
+
+**Transcribed 2026-09-13 from `p278.jpg` and `p280.jpg`, both read directly.** This is the frame the
+Ride Focus card **Ride + Strength** builds (`WORKORDER-ride-strength-2026-09-13.md`).
+⛔ **Naming rule:** the book's name for the p279 program is never written in this repo. Where p280
+uses it, this Part writes **[p279 program]** in square brackets. Every other word is the page's.
+
+## E2a. The week (p278) — verified against the image
+
+⚠️ **The photograph is angled and the page curves at Days 5-7, and by eye the rows are ambiguous.**
+Row placement was settled by measuring the row shading (the table alternates light and shaded rows)
+down a pixel column inside each of the four columns of `p278.jpg`, then placing each text line in the
+band it sits in. Standard endurance column: Day 5 band y1216-1320, Day 6 band y1328-1368, Day 7 band
+y1376-1424, page below. Deload endurance column: Day 5 y1232-1328, Day 6 y1336-1376, Day 7 y1384-1432.
+- ⛔ **The level 2 endurance ride (Standard) and the level 1 endurance ride (Deload) are on DAY 6, and
+  DAY 7 is a full REST day in both columns** (the "REST" text sits in the Day 7 band and is centred
+  across strength and endurance). An earlier reading (Day 6 empty, the ride on Day 7) was wrong.
+- Two things on other pages agree, read directly: **p279 and p281 both print Day 7 as a full-width
+  REST row**, and **p281's Cycling Notes call Base's long ride "the Saturday long ride"** (Day 6 when
+  Day 1 is Monday; p281's own note puts the Crit program's "Monday and Wednesday interval workouts" on
+  its Day 1 and Day 3, which is how Day 1 = Monday is read — an inference from that match, not a
+  printed day map).
+
+| Day | STANDARD strength | STANDARD endurance | DELOAD strength | DELOAD endurance |
+|---|---|---|---|---|
+| **1** | **ME Upper** — 1 x ME: Primary push · 1 x ME: Accessory: primary pull · 1 x DE: Accessory: secondary push · 1 x HYP: Accessory: focused pull, focused push | Cyc sweet spot (level 1-2) | **ME Upper** — 1 x ME: Primary push · 1 x ME: Accessory: primary pull · 1 x DE: Accessory: secondary push · 1 x HYP: Accessory: focused pull, focused push | Cyc sweet spot (level 1) |
+| **2** | **ME Lower** — 1 x ME: Primary hinge lower *(rotate with primary push)* · 1 x ME: Accessory: primary push lower *(rotate with primary hinge)* · 1 x DE: Accessory: secondary hinge lower · 1 x HYP: Accessory: accessory lower | Cyc endurance (level 1) | **ME Lower** — 1 x ME: Primary hinge lower *(rotate with primary push)* · 1 x ME: Accessory: primary push lower *(rotate with primary hinge)* · 1 x HYP: Accessory: accessory lower | Cyc endurance (level 1) |
+| **3** | Plyo warm-up | Cyc VO2 (level 1) · Cyc sweet spot (level 1) | Plyo warm-up | Cyc VO2 (level 1) |
+| **4** | **DE: Full** — 1 x DE: Primary push · 1 x DE: Primary push lower *(rotate with primary hinge)* · 1 x DE: Accessory: primary pull · 1 x DE: Accessory: primary hinge lower *(rotate with primary push lower)* · 1 x SKILL: Carry | *(none)* | **DE: Full** — 1 x DE: Primary push · 1 x DE: Primary push lower *(rotate with primary hinge)* · 1 x DE: Accessory: primary pull | *(none)* |
+| **5** | *(none)* | Cyc endurance (level 1) · Cyc sprint (level 1) | *(none)* | Cyc sprint (level 1) |
+| **6** | *(none)* | Cyc endurance (level 2) | *(none)* | Cyc endurance (level 1) |
+| **7** | **REST** | | **REST** | |
+
+**What the table shows (read off the page, nothing inferred):**
+
+- **Three lifting days** (1, 2, 4) and a **plyo warm-up on Day 3**. Two ME days, one DE full-body day.
+  Days 5 and 6 are ride-only. Day 7 is a full rest day.
+- **Seven rides in Standard:** sweet spot (1-2), endurance (1), VO2 (1), sweet spot (1), endurance (1),
+  sprint (1), endurance (2). Day 3 and Day 5 each print two rides.
+- **Five rides in Deload:** sweet spot (1), endurance (1), VO2 (1), sprint (1), endurance (1). One ride
+  a day on Days 1, 2, 3, 5 and 6. The Deload column drops Day 3's sweet spot and Day 5's endurance
+  ride, and moves every level to 1.
+- **Deload strength is a cut, not a substitution.** Day 1 is unchanged. Day 2 loses the DE secondary
+  hinge row. Day 4 loses the DE primary hinge row and the carry. No ME row becomes SKILL or DE (the
+  All Rounder's deload does that; this one does not).
+- **No overhead press is named.** The push rows are categories: "Primary push" (Days 1 and 4),
+  "Accessory: secondary push" (Day 1), "focused push" (Day 1).
+- **Day 2's ME lower rows and Day 4's DE lower rows carry the same rotate notes as p246.** p280 does
+  not restate a rotation cadence; p247's (ME squat with DE deadlift one week, the reverse the next,
+  Part E1c) is the only cadence the book writes, and it is on the 5K program's page.
+- "Accessory:" is the role prefix recorded in Part E1b and J7.
+
+## E2b. Who it is for (p280, main text)
+
+> *"These programs are included as training options for intermediate to advanced cyclists, as well as
+> "pivot" programs for runners/hybrid athletes who want to complete in triathlons or similar events
+> but aren't familiar enough with the sport of cycling (or what it takes to be a good cyclist) to
+> truly excel."*
+
+> *"The three programs track three general emphases: basic cycling proficiency (strength and cycling
+> base), steady output or longer effort mixed terrain racing ([p279 program]/MTB/gravel), and faster,
+> punchier races (crit/CX/XCO). If you're an experienced cyclist, you may know which fits best, but if
+> you have less experience, I encourage you to run the Base program for at least 4 weeks before
+> attempting the others."*
+
+- The page gives **"at least 4 weeks"** for Base and **no end.** No other length is printed on p280.
+- After Base: the p279 program for steady output, climbing and longer distance (events where terrain
+  dictates the race more than the competitors; muscular endurance and durability for multiple longer
+  efforts close to threshold); the p281 program for power, acceleration, explosiveness and performance
+  over threshold.
+
+> *"On the strength training side, all three programs can be used to develop strength beyond what is
+> "needed" for cycling performance. In other words, these are true "hybrid" programs and can be used
+> by experienced strength athletes who are looking for progression and not just maintenance."*
+
+> *"Note that cycling can be surprisingly taxing on the central nervous system—surprising in that the
+> lack of impact may allow for fatigue accumulation that is not "felt" the same way as it can be on
+> similar running programs. As such, you'd do well to recognize that fatigue will mask fitness quite
+> thoroughly in these programs, and you should expect somewhat lowered performance on the lower body
+> days. You can still make progress, but you may want to proactively lower your working max by a few
+> more percentage points than usual to account for this."* (Also recorded in Part J2. **No number is
+> given; "a few more percentage points" is the page's wording.**)
+
+> *"Cycling also rewards more consistent fueling than many new cyclists may expect. Because running
+> punishes longer sessions with diminishing returns far sooner, the average productive run session may
+> not require additional fluids or fuel. However, some of these cycling workouts may easily run 50
+> percent longer than a comparable running session. As such, you'd do well to get comfortable using
+> bike bottles or hydration systems."*
+
+## E2c. Strength notes (p280)
+
+- *"For powerlifters, the Base and [p279 program] programs offer the best framework for competitive
+  lift training. If properly constructed, the program can allow for the big three to be trained one or
+  two times per week, both dynamically and through max effort lifting, with enough volume allocated
+  overall to ensure you can continue to develop proficiency."*
+- *"The Crit program deviates from this somewhat. Because this program is intended to develop maximum
+  power on the bike, your max effort "resources" are allocated toward the rides. Because of this, the
+  strength training consists of DE secondary movements. While you can still choose lifts that will
+  help you develop strength, you won't have sufficient exposure to competitive lifts for powerlifting.
+  If you want to peak your strength coming off this program, I encourage you to switch to Cycling +
+  Base for 4 to 6 weeks and then run the taper/deload variant of the Base program for 2 or 3 weeks
+  prior to any powerlifting meet."*
+- *"Plyometrics are important for cycling here not because they may directly benefit riders but
+  because this is one area of athleticism (rebound strength and agility) that cyclists may find
+  themselves underdeveloped in. While loss of bone mineral density is common in obligate cyclists, the
+  weight training should help prevent this. The plyometrics further protect you from any physical
+  shortcomings caused by focusing on a non-weight-bearing activity!"*
+
+## E2d. Cycling notes for Base (p281, under the Crit table) — read off `p281.jpg`
+
+The Cycling Notes for all three programs are printed on p281, below the Crit table. The two Base
+bullets, verbatim:
+
+- *"For the base program, if this is being used as an "early season" training plan, then the
+  endurance portion is a higher priority over the intensity. The intensity is there to build toward
+  higher intensities later during more specific blocks."*
+- *"Also for the base program, use the Endurance workouts to gradually increase volume over two to
+  three by 1-month cycles. Over a 1-month cycle, the Tuesday and Friday endurance rides should be the
+  same duration, but each cycle can increase the overall duration. The Saturday long ride can likewise
+  progress, increasing the volume gradually over the entire base season every 1 to 2 weeks."*
+
+What these two bullets settle, read off the page:
+- **Ride duration is the thing that progresses in Base,** on the endurance rides only: the Tuesday and
+  Friday endurance rides (Days 2 and 5) hold one duration for a 1-month cycle and step up between
+  cycles, over two to three cycles; the Saturday long ride (Day 6) steps up every 1 to 2 weeks across
+  the base season. **No amount of increase is printed.**
+- "Two to three by 1-month cycles" reads as two to three 1-month cycles (the page's wording is kept).
+- The page gives no length for "the entire base season".
 
 ---
 
@@ -2110,6 +2242,13 @@ gloss will be wrong on three of the four programs that define it.
   which is what Part G gap #2 has been calling an inference. **Each needs its page re-read before use.**
 
 ---
+- **2026-09-13 — PART E2, CYCLING: BASE (p278, p280, and the Base notes on p281).** Table read off
+  `p278.jpg`; Days 5-7 placed by measuring row shading, because the photo's angle makes them ambiguous
+  by eye. ⛔ **The last endurance ride is on Day 6 and Day 7 is full rest** — the reading passed along
+  before the transcription (ride on Day 7, Day 6 empty) was wrong; p279, p281's table and p281's
+  "Saturday long ride" note agree with the measured reading. p281's Base notes add a ride-duration
+  progression (endurance rides in 1-month cycles, long ride every 1-2 weeks) that nothing else here
+  recorded.
 - **2026-09-03 — pp.190–191 THERMOREGULATION READ OFF THE PAGE (Part K1).** Gap #9's "190 thermoregulation" entry closes as read. No temperature, heart-rate or pace rule for heat exists in the book; the rule is hydration and recovery between exposures, per kilogram. p197 hydration still unread.
 
 ## ⚠️ B4c. RELAYED FINDINGS — pp.108–151, read off photographs 2026-08-26 by a session that died before transcribing

@@ -42,7 +42,7 @@ export type FramePosition = {
    * mid-block. **The frame is reachable; which one is the default is Michael's call and needs the
    * screen that asks.** §11 still has it open.
    */
-  focus?: 'standard' | 'run';
+  focus?: 'standard' | 'run' | 'ride';
 };
 
 export type FrameResolution =
@@ -89,7 +89,10 @@ export function resolveFrame(position: FramePosition): FrameResolution {
   // not this file's — see the note above for what a bike-only athlete is actually handed. What this
   // file answers now is WHICH PROGRAM the week is cut from, and that is `focus`.
   if (position.enduranceSport === 'run' || position.enduranceSport === 'bike') {
-    const frame: FrameId = position.focus === 'standard' ? 'all_rounder' : 'strength_5k';
+    // ⛔ `'ride'` → Ride Focus, which houses Cycling: Base (p278, 2026-09-13).
+    const frame: FrameId = position.focus === 'standard'
+      ? 'all_rounder'
+      : position.focus === 'ride' ? 'cycling_base' : 'strength_5k';
     return { frame, cite: FRAMES[frame].cite };
   }
   return { frame: null, reason: 'no endurance sport is being held, and every frame is a hybrid week' };

@@ -266,6 +266,8 @@ interface LoggedExercise {
   /** How to do the home version of a machine movement (2026-09-08). Shown behind the (i) beside
    *  the name; dropped with `execution_name` the moment the athlete types a different exercise. */
   how_to?: string;
+  /** A row prescribed in words, not sets and reps (p226 carry, 2026-09-13). Printed as the row's target line. */
+  prescription_words?: string;
   /** The slot's own pick list for the Swap sheet, stamped by the server on frame accessory rows. */
   swap_options?: { name: string; display: string }[];
   load_prescribed?: boolean;
@@ -2203,6 +2205,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               ? s.execution_name.trim()
               : undefined,
             how_to: typeof s?.how_to === 'string' && s.how_to.trim() ? s.how_to.trim() : undefined,
+            prescription_words: typeof s?.prescription_words === 'string' && s.prescription_words.trim()
+              ? s.prescription_words.trim() : undefined,
             swap_options: Array.isArray(s?.swap_options) && s.swap_options.length > 0 ? s.swap_options : undefined,
             // ⛔ CARRIED, NOT APPLIED (D-406). This only makes the number available to the weight
             // box as a greyed starting point; it does not become the row's `weight`, and nothing
@@ -2254,6 +2258,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             // Blank, deliberately: the athlete logs each chunk (15 / 15 / 12 / 8). `reps` is left
             // undefined rather than 0 so the cell reads empty and the countdown still shows the
             // whole total owed — `completedReps` ignores both, but 0 would render as a logged zero.
+          } else if (typeof s?.prescription_words === 'string' && s.prescription_words.trim()) {
+            // Blank: a row prescribed in words (p226 carry) has no rep count, and 0 would read as a logged zero.
           } else if (isMeSlotRow && !setAmrap && p?.reps == null) {
             // Blank for the same reason as the band row below, one slot along: a heavy set with no
             // last-time number at this weight. ⚠️ Tested on `p?.reps`, never on `setReps` — the
@@ -5900,7 +5906,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           : (exHasRepTotal
                             ? null
                             : (exercise.target_reps ? `target ${String(exercise.target_reps).replace(/\+$/, '')}` : null));
-                        const targetHint = exIsPlyo ? null : ([repHint, set.amrap ? null : rirHint].filter(Boolean).join(' · ') || null);
+                        // ⛔ A ROW PRESCRIBED IN WORDS (p226 carry, 2026-09-13) — its words are the target line.
+                        const targetHint = exIsPlyo ? null : (exercise.prescription_words
+                          ?? ([repHint, set.amrap ? null : rirHint].filter(Boolean).join(' · ') || null));
                         const cue = barSpeedCueFor(exercise, set);
                         const platesOpen = !isDurationBased && !exIsBodyweight && exBarLoaded
                           && expandedPlates[`${exercise.id}-${setIndex}`];

@@ -2694,6 +2694,10 @@ export function expandTokensForRow(
             // The swap list belongs to the SLOT, not the movement, so it survives a swap: that is how
             // the athlete gets back to the original (Michael, 2026-09-08).
             swap_options: (ex as any)?.swap_options ?? undefined,
+            // ⛔ A ROW PRESCRIBED IN WORDS (p226 carry, 2026-09-13) — every surface prints `name · words`
+            // and no dose. Belongs to the slot, like the swap list, so it survives a swap to another carry.
+            ...(typeof (ex as any)?.prescription_words === 'string' && (ex as any).prescription_words.trim()
+              ? { prescription_words: (ex as any).prescription_words.trim() } : {}),
             /**
              * ⛔ HOW THE WEIGHT WAS ARRIVED AT, OR WHY THERE ISN'T ONE — carried (2026-09-01). This
              * object is a WHITELIST and `load_basis` was never on it, so the composer's marker died
@@ -3107,6 +3111,10 @@ export function expandTokensForRow(
             // The swap list belongs to the SLOT, not the movement, so it survives a swap: that is how
             // the athlete gets back to the original (Michael, 2026-09-08).
             swap_options: (ex as any)?.swap_options ?? undefined,
+            // ⛔ A ROW PRESCRIBED IN WORDS (p226 carry, 2026-09-13) — every surface prints `name · words`
+            // and no dose. Belongs to the slot, like the swap list, so it survives a swap to another carry.
+            ...(typeof (ex as any)?.prescription_words === 'string' && (ex as any).prescription_words.trim()
+              ? { prescription_words: (ex as any).prescription_words.trim() } : {}),
             /**
              * ⛔ HOW THE WEIGHT WAS ARRIVED AT, OR WHY THERE ISN'T ONE — carried (2026-09-01). This
              * object is a WHITELIST and `load_basis` was never on it, so the composer's marker died

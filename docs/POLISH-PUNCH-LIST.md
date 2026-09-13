@@ -1432,3 +1432,22 @@ numbers. Split by purpose:
   (today an edit implies "my number" and cannot flip back to auto from Adjust).
 - **Baselines → profile**: heart-rate zones, max and resting heart rate, equipment, units, swim numbers.
   Stops showing the lifts, FTP and threshold. The Focus screen's link reads as a profile page.
+
+---
+
+## Ride + Strength: the standing-start sprint workout is left out (2026-09-13)
+
+p236 prints three level-1 sprint workouts. Ride + Strength's Sprint Ride rotates two of them (3 all-out
+2-3 min sprints; 8 flying 30 s surges). The third, standing starts (6 rounds from a near-stop in a heavy
+gear, up to speed, 6-10 min easy between), prints no effort length: the sprint ends on reaching speed,
+and a watch step needs a time or a lap press. Michael, 2026-09-13: leave it out for now, figure it out
+later. One option on the table: a step that ends on the lap button.
+
+---
+
+## Train menu: "Standard Focus" becomes "Multisport Focus" with its own program list (agreed 2026-09-13, not built)
+
+Three sections work the same way: pick a focus, then a program. Multisport Focus opens a list with one
+card, "Run + Ride + Strength" (the All Rounder, p274), which carries the description and requirements
+line. Names need Michael's yes on the final screen. Later, not now: programs at varying levels in each
+section, plus speed and hypertrophy options.

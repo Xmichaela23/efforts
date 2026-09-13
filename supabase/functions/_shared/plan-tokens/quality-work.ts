@@ -32,8 +32,16 @@ export type QualitySegment = {
   seconds: number;
   /** Percent of threshold speed / of FTP, as the page prints it. Null on an untargeted step. */
   pct: number | null;
-  /** An untargeted step's own word — the page's `VT1`, its easy spin, or its unresolved race pace. */
-  at: 'vt1' | 'easy' | 'racepace' | null;
+  /**
+   * ⛔ THE TOP OF A PRINTED RANGE, where the page prints one (p238 VO2: *"3 minutes @ 110 to 120%"*) —
+   * token `180s110to120`. Absent on every single-number segment, which keeps its meaning exactly.
+   */
+  pctHi?: number | null;
+  /**
+   * An untargeted step's own word — the page's `VT1`, its easy spin, its unresolved race pace, or an
+   * ALL-OUT effort (p236 sprints: *"max effort"*), which is prescribed work with no power target.
+   */
+  at: 'vt1' | 'easy' | 'racepace' | 'allout' | null;
 };
 
 export type QualityWork =
@@ -64,8 +72,10 @@ export const BIKE_BANDS = {
 /** The recovery spin either side of a bike interval — `RIDE_RECOVERY_PCT`, unchanged. */
 export const RIDE_RECOVERY_PCT = { lo: 0.45, hi: 0.55 } as const;
 
-const SEGMENT = /^(r?)(\d+)s(\d+|vt1|easy|racepace)$/;
-const ROUND = /^round_(\d+)x_((?:r?\d+s(?:\d+|vt1|easy|racepace))(?:-r?\d+s(?:\d+|vt1|easy|racepace))*)(?:_[rR](\d+)s)?$/;
+// ⚠️ `allout` AND `{lo}to{hi}` ADDED 2026-09-13 for p278's VO2 and sprint rides. Additive: every token
+// that parsed before parses to the same thing.
+const SEGMENT = /^(r?)(\d+)s(\d+to\d+|\d+|vt1|easy|racepace|allout)$/;
+const ROUND = /^round_(\d+)x_((?:r?\d+s(?:\d+to\d+|\d+|vt1|easy|racepace|allout))(?:-r?\d+s(?:\d+to\d+|\d+|vt1|easy|racepace|allout))*)(?:_[rR](\d+)s)?$/;
 const INTERVAL = /^interval_(\d+)x(\d+)s_(\d+)pct(?:_[rR](\d+)s)?$/;
 const BIKE_BAND = /^bike_(ss|thr)_(\d+)x(\d+)min_[rR](\d+)min$/;
 
@@ -80,14 +90,16 @@ export function parseQualityWork(token: string | null | undefined): QualityWork 
       const m = seg.match(SEGMENT);
       if (!m) continue;
       const at = m[3];
-      const named = at === 'vt1' || at === 'easy' || at === 'racepace';
+      const named = at === 'vt1' || at === 'easy' || at === 'racepace' || at === 'allout';
+      const range = named ? null : at.match(/^(\d+)to(\d+)$/);
       segments.push({
         // ⚠️ THE LEADING `r` IS THE SOURCE'S OWN WORD — see `compoundRoundToken`. A 50% segment
         // without it is prescribed work; with it, it is the recovery the page names.
-        role: m[1] === 'r' || (named && at !== 'racepace') ? 'recovery' : 'work',
+        role: m[1] === 'r' || (named && at !== 'racepace' && at !== 'allout') ? 'recovery' : 'work',
         seconds: parseInt(m[2], 10),
-        pct: named ? null : parseInt(at, 10) / 100,
-        at: named ? (at as 'vt1' | 'easy' | 'racepace') : null,
+        pct: named ? null : parseInt(range ? range[1] : at, 10) / 100,
+        ...(range ? { pctHi: parseInt(range[2], 10) / 100 } : {}),
+        at: named ? (at as 'vt1' | 'easy' | 'racepace' | 'allout') : null,
       });
     }
     if (segments.length === 0) return null;
@@ -161,7 +173,7 @@ export function qualityRunSteps(
   if (work.kind === 'round') {
     for (let r = 0; r < work.sets; r += 1) {
       for (const seg of work.segments) {
-        if (seg.at === 'racepace') {
+        if (seg.at === 'racepace' || seg.at === 'allout') {
           // ⛔ PRESCRIBED WORK WITH NO PACE, and the library says so itself: race pace is set by the
           // race, not by this library. The step reaches the watch; the number does not, because
           // there is no number.
@@ -199,10 +211,11 @@ export function qualityRideSteps(work: QualityWork, ftp: number | null | undefin
   if (work.kind === 'round') {
     for (let r = 0; r < work.sets; r += 1) {
       for (const seg of work.segments) {
-        if (seg.at === 'racepace') out.push({ kind: 'work', duration_s: seg.seconds });
+        // ⛔ AN ALL-OUT STEP IS WORK WITH NO POWER TARGET — p236's "max effort", unresolved on purpose (p229).
+        if (seg.at === 'racepace' || seg.at === 'allout') out.push({ kind: 'work', duration_s: seg.seconds });
         else if (seg.at) out.push({ kind: 'recovery', duration_s: seg.seconds, ...(recovery ? { power_range: recovery } : {}) });
         else {
-          const w = wattsAt(seg.pct ?? 0, seg.pct ?? 0, ftp);
+          const w = wattsAt(seg.pct ?? 0, seg.pctHi ?? seg.pct ?? 0, ftp);
           out.push({ kind: seg.role, duration_s: seg.seconds, ...(w ? { power_range: w } : {}) });
         }
       }
@@ -281,7 +294,7 @@ export function percentWord(lo: number, hi: number): string {
  */
 export function repeatingUnit(segments: QualitySegment[]): { unit: QualitySegment[]; rounds: number } {
   const same = (a: QualitySegment, b: QualitySegment) =>
-    a.role === b.role && a.seconds === b.seconds && a.pct === b.pct && a.at === b.at;
+    a.role === b.role && a.seconds === b.seconds && a.pct === b.pct && (a.pctHi ?? null) === (b.pctHi ?? null) && a.at === b.at;
   const repeats = (k: number): boolean => {
     for (let i = k; i < segments.length; i += 1) if (!same(segments[i], segments[i % k])) return false;
     return true;
@@ -318,10 +331,16 @@ function runSegmentWord(seg: QualitySegment, p: QualityPricing): string {
 function rideSegmentWord(seg: QualitySegment, p: QualityPricing): string {
   const dur = durationWord(seg.seconds);
   if (seg.at === 'vt1' || seg.at === 'easy') return `${dur} easy`;
+  // ⚠️ COPY NOT YET APPROVED (2026-09-13): the word for an all-out effort on the line. Held for Michael.
+  if (seg.at === 'allout') return `${dur} ${ALL_OUT_WORD}`;
   if (seg.at === 'racepace' || seg.pct == null) return dur;
-  const w = wattsAt(seg.pct, seg.pct, p.ftp);
-  return `${dur} at ${w ? wattWord(w) : percentWord(seg.pct, seg.pct)}`;
+  const hi = seg.pctHi ?? seg.pct;
+  const w = wattsAt(seg.pct, hi, p.ftp);
+  return `${dur} at ${w ? wattWord(w) : percentWord(seg.pct, hi)}`;
 }
+
+/** ⚠️ PROPOSED, NOT APPROVED — every athlete-facing word goes through Michael before it ships. */
+export const ALL_OUT_WORD = 'all out';
 
 /** One line: the work, in the page's structure, priced for this athlete. Empty for an unknown token. */
 export function qualityWorkLine(work: QualityWork | null, sport: 'run' | 'ride', p: QualityPricing): string {
