@@ -6,14 +6,23 @@ import { assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import { vt1WindowDrift } from './vt1-window-drift.ts';
 import { VT1_MIN_BOUT_S } from './vt1-bout.ts';
 
-const vt1 = (duration_s: number, avg_hr: number, pace: number) =>
-  ({ interval_type: 'work', executed: { duration_s, avg_hr, actual_pace_sec_per_mi: pace, actual_gap_sec_per_mi: null, power_watts: null } });
+// A VT1 row: the plan asked for one easy pace (the library resolves `vt1` to a single value).
+const vt1 = (duration_s: number, avg_hr: number, pace: number, target = 600) =>
+  ({ interval_type: 'work', planned_pace_range: { lower_sec_per_mi: target, upper_sec_per_mi: target },
+     executed: { duration_s, avg_hr, actual_pace_sec_per_mi: pace, actual_gap_sec_per_mi: null, power_watts: null } });
+// A set: a genuine band, and faster than the easy target above.
 const set = (duration_s: number, avg_hr: number, pace: number) =>
-  ({ interval_type: 'work', executed: { duration_s, avg_hr, actual_pace_sec_per_mi: pace, actual_gap_sec_per_mi: null, power_watts: null } });
+  ({ interval_type: 'work', planned_pace_range: { lower_sec_per_mi: 360, upper_sec_per_mi: 420 },
+     executed: { duration_s, avg_hr, actual_pace_sec_per_mi: pace, actual_gap_sec_per_mi: null, power_watts: null } });
 const rec = (duration_s: number) =>
   ({ interval_type: 'recovery', executed: { duration_s, avg_hr: 150, actual_pace_sec_per_mi: 700, actual_gap_sec_per_mi: null, power_watts: null } });
-const ride = (duration_s: number, avg_hr: number, power_watts: number, interval_type = 'work') =>
-  ({ interval_type, executed: { duration_s, avg_hr, power_watts, actual_pace_sec_per_mi: null, actual_gap_sec_per_mi: null } });
+// A ride row: `below_pct` resolves to a band starting at zero, a set to a real band.
+const ride = (duration_s: number, avg_hr: number, power_watts: number, interval_type = 'work', upper_w = 150) =>
+  ({ interval_type, planned_power_range: { lower_w: 0, upper_w },
+     executed: { duration_s, avg_hr, power_watts, actual_pace_sec_per_mi: null, actual_gap_sec_per_mi: null } });
+const rideSet = (duration_s: number, avg_hr: number, power_watts: number) =>
+  ({ interval_type: 'work', planned_power_range: { lower_w: 250, upper_w: 290 },
+     executed: { duration_s, avg_hr, power_watts, actual_pace_sec_per_mi: null, actual_gap_sec_per_mi: null } });
 
 Deno.test('a plain long run has no sets, so it keeps its whole-session read', () => {
   assertEquals(vt1WindowDrift({ intervals: [vt1(3600, 140, 600)], sport: 'run' }), { kind: 'not_applicable' });
@@ -42,22 +51,28 @@ Deno.test('an LSD with sets reads over the VT1 portions only', () => {
   }
 });
 
-Deno.test('the sets cannot drag the number — the same session without them reads the same', () => {
-  const withSets = vt1WindowDrift({
-    intervals: [vt1(1800, 140, 600), set(90, 178, 380), rec(30), set(90, 180, 375), rec(30), vt1(1800, 147, 600)],
+Deno.test('the sets cannot drag the number — more of them changes nothing', () => {
+  const one = vt1WindowDrift({
+    intervals: [vt1(1800, 140, 600), set(90, 178, 380), rec(30), vt1(1800, 147, 600)],
     sport: 'run',
   });
-  const without = vt1WindowDrift({
-    intervals: [vt1(1800, 140, 600), rec(30), vt1(1800, 147, 600)],
+  const four = vt1WindowDrift({
+    intervals: [
+      vt1(1800, 140, 600),
+      set(90, 178, 380), rec(30), set(90, 180, 375), rec(30),
+      set(90, 182, 372), rec(30), set(90, 184, 370), rec(30),
+      vt1(1800, 147, 600),
+    ],
     sport: 'run',
   });
-  assertEquals(withSets.kind === 'read' && withSets.pct, 4.8);
-  assertEquals(without.kind === 'read' && without.pct, 4.8);
+  assertEquals(one.kind === 'read' && one.pct, 4.8);
+  assertEquals(four.kind === 'read' && four.pct, 4.8);
+  assertEquals(four.kind === 'read' && four.seconds, 3600);
 });
 
 Deno.test('a long ride with sets reads on power, Friel\'s sign', () => {
   const r = vt1WindowDrift({
-    intervals: [ride(1800, 130, 160), ride(240, 168, 300), ride(60, 140, 90, 'recovery'), ride(1800, 130, 152)],
+    intervals: [ride(1800, 130, 160), rideSet(240, 168, 300), ride(60, 140, 90, 'recovery'), ride(1800, 130, 152)],
     sport: 'ride',
   });
   assertEquals(r.kind, 'read');
@@ -68,16 +83,38 @@ Deno.test('a long ride with sets reads on power, Friel\'s sign', () => {
   }
 });
 
-Deno.test('under p107\'s bout floor the session says so instead of printing a number', () => {
-  // A 9-minute easy portion is BELOW the bout floor, so it is not a VT1 bout — nothing qualifies and
-  // no VT1 time is left. ⚠️ With a row-wise read these are one question, not two: a row is a bout or
-  // it is not, so `seconds` here is always 0. The floor is the same p107 number on both sides.
+Deno.test('under p107\'s floor the session says so instead of printing a number', () => {
+  // Two easy segments of four minutes each: they ARE VT1 (the plan asked for the easy pace) and they
+  // stay in, but eight minutes is under the floor, so there is not enough easy running to read over.
   const r = vt1WindowDrift({
-    intervals: [vt1(540, 140, 600), set(90, 178, 380), rec(30), set(90, 180, 375)],
+    intervals: [vt1(240, 140, 600), set(90, 178, 380), rec(30), vt1(240, 145, 600)],
     sport: 'run',
   });
-  assertEquals(r, { kind: 'too_short', seconds: 0 });
+  assertEquals(r, { kind: 'too_short', seconds: 480 });
   assertEquals(VT1_MIN_BOUT_S, 600);
+});
+
+Deno.test('⛔ AN EASY 8-MINUTE SEGMENT STAYS IN THE READING — it is not a set', () => {
+  // The overruled rule called any row under ten minutes a set. This one is at the session's own easy
+  // target, so it is VT1 work however short it is, and it counts toward the reading.
+  const r = vt1WindowDrift({
+    intervals: [vt1(1800, 140, 600), set(90, 178, 380), rec(30), vt1(480, 146, 600), vt1(1320, 147, 600)],
+    sport: 'run',
+  });
+  assertEquals(r.kind, 'read');
+  assertEquals(r.kind === 'read' && r.seconds, 3600);   // 1800 + 480 + 1320, the set and rec out
+});
+
+Deno.test('a row with no target cannot be called a set', () => {
+  const untargeted = { interval_type: 'work', executed: { duration_s: 600, avg_hr: 142, actual_pace_sec_per_mi: 610, actual_gap_sec_per_mi: null, power_watts: null } };
+  const r = vt1WindowDrift({ intervals: [vt1(1800, 140, 600), set(90, 178, 380), rec(30), untargeted, vt1(1200, 147, 600)], sport: 'run' });
+  assertEquals(r.kind === 'read' && r.seconds, 3600);   // the untargeted row is in the reading
+});
+
+Deno.test('no targets anywhere means no window — the whole-session read stands', () => {
+  const bare = (duration_s: number, avg_hr: number) =>
+    ({ interval_type: 'work', executed: { duration_s, avg_hr, actual_pace_sec_per_mi: 600, actual_gap_sec_per_mi: null, power_watts: null } });
+  assertEquals(vt1WindowDrift({ intervals: [bare(1800, 140), rec(30), bare(1800, 147)], sport: 'run' }), { kind: 'not_applicable' });
 });
 
 Deno.test('the warm-up is out, the way every other drift read drops it', () => {
@@ -101,10 +138,11 @@ Deno.test('one VT1 row cannot be halved, so the session falls back rather than i
 
 Deno.test('graded pace is preferred, and never mixed with raw across the halves', () => {
   const g = (duration_s: number, avg_hr: number, gap: number) =>
-    ({ interval_type: 'work', executed: { duration_s, avg_hr, actual_pace_sec_per_mi: gap + 20, actual_gap_sec_per_mi: gap, power_watts: null } });
-  const all = vt1WindowDrift({ intervals: [g(1800, 140, 600), rec(30), g(1800, 147, 600)], sport: 'run' });
+    ({ interval_type: 'work', planned_pace_range: { lower_sec_per_mi: 600, upper_sec_per_mi: 600 },
+       executed: { duration_s, avg_hr, actual_pace_sec_per_mi: gap + 20, actual_gap_sec_per_mi: gap, power_watts: null } });
+  const all = vt1WindowDrift({ intervals: [g(1800, 140, 600), set(90, 178, 380), rec(30), g(1800, 147, 600)], sport: 'run' });
   assertEquals(all.kind === 'read' && all.basis, 'gap');
   // one row without graded pace drops the whole read to raw
-  const mixed = vt1WindowDrift({ intervals: [g(1800, 140, 600), rec(30), vt1(1800, 147, 620)], sport: 'run' });
+  const mixed = vt1WindowDrift({ intervals: [g(1800, 140, 600), set(90, 178, 380), rec(30), vt1(1800, 147, 620)], sport: 'run' });
   assertEquals(mixed.kind === 'read' && mixed.basis, 'raw');
 });
