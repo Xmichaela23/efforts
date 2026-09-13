@@ -8,6 +8,7 @@ import { requireUser, AuthError } from '../_shared/require-user.ts';
 import { getAthlete, IntervalsApiError } from '../_shared/intervals/client.ts';
 import { encryptToken } from '../_shared/token-crypto.ts';
 import { healthyOnConnect } from '../_shared/connection-health.ts';
+import { setDefaultDestinationsIfAbsent } from '../_shared/intervals/connection.ts';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -52,14 +53,10 @@ Deno.serve(async (req) => {
     const { error: upErr } = await supabase.from('user_connections').upsert(row, { onConflict: 'user_id,provider' });
     if (upErr) return json({ ok: false, error: `saving the connection failed: ${upErr.message}` }, 500);
 
-    const { data: userRow, error: prefErr } = await supabase.from('users').select('preferences').eq('id', userId).maybeSingle();
-    if (prefErr) return json({ ok: false, error: prefErr.message }, 500);
-    const prefs = userRow?.preferences ?? {};
-    if (!prefs.workout_destinations || typeof prefs.workout_destinations !== 'object') {
-      const { data: garmin } = await supabase.from('user_connections').select('id').eq('user_id', userId).eq('provider', 'garmin').maybeSingle();
-      const workout_destinations = { ride: 'intervals_icu', run: garmin ? 'garmin' : 'none', swim: 'none', strength: 'none' };
-      const { error } = await supabase.from('users').update({ preferences: { ...prefs, workout_destinations } }).eq('id', userId);
-      if (error) return json({ ok: false, error: `saving where workouts go failed: ${error.message}` }, 500);
+    try {
+      await setDefaultDestinationsIfAbsent(supabase, userId);
+    } catch (e) {
+      return json({ ok: false, error: (e as Error).message }, 500);
     }
     return json({ ok: true, connected: true, athlete: { id: athlete.id, name: athlete.name } });
   } catch (e) {

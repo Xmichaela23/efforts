@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import LogFAB from './LogFAB';
 import { useToast } from './ui/use-toast';
+import { ToastAction } from './ui/toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '../lib/supabase';
 import { Capacitor } from '@capacitor/core';
@@ -61,8 +62,8 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
       syncStatus: 'idle'
     }
   ]);
-  // Intervals.icu connects with the athlete's personal API key until the OAuth app is approved (2026-09-13).
-  const [intervalsKey, setIntervalsKey] = useState('');
+  // Set while the athlete is away at the Intervals.icu sign-in (see connectIntervalsOAuth).
+  const intervalsSignInPending = useRef(false);
   
   const [loading, setLoading] = useState(false);
   const [importProgress, setImportProgress] = useState<{ importing: boolean; progress: number; total: number }>({
@@ -985,34 +986,76 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
     }
   };
 
-  // The server checks the key with Intervals.icu, stores it encrypted, and from then on keeps the athlete's
-  // rides on their Intervals.icu calendar (intervals-connect-key → calendar-sync). Errors are the server's words.
-  const connectIntervals = async () => {
-    const apiKey = intervalsKey.trim();
-    if (!apiKey) return;
+  // Intervals.icu sign-in: the server signs the state for this athlete and returns the authorize address; Intervals.icu
+  // sends the athlete back to /auth/intervals/callback (IntervalsCallback), which finishes the connection.
+  // A failure on this card shows only the approved line and "Try again" (workorder section 3, item 4); what went wrong
+  // stays in the console, never on screen.
+  const intervalsFailed = (line: string, retry: () => void, detail: unknown) => {
+    console.warn('[Connections] Intervals.icu:', line, detail);
+    toast({
+      title: line,
+      variant: 'destructive',
+      action: <ToastAction altText="Try again" onClick={retry}>Try again</ToastAction>,
+    });
+  };
+
+  const connectIntervalsOAuth = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('intervals-connect-key', { body: { api_key: apiKey } });
-      if (error || !data?.ok) {
-        toast({ title: 'Intervals.icu', description: data?.error ?? error?.message ?? 'Connection failed', variant: 'destructive' });
+      const { data, error } = await supabase.functions.invoke('intervals-oauth', { body: { action: 'start' } });
+      if (error || !data?.ok || !data?.url) {
+        intervalsFailed('Intervals.icu did not connect.', () => void connectIntervalsOAuth(), { reason: data?.reason, error: data?.error ?? error?.message });
+        setLoading(false);
         return;
       }
-      setIntervalsKey('');
-      setConnections((prev) => prev.map((c) => (c.provider === 'intervals_icu' ? { ...c, connected: true, health: 'ok', connectionData: { name: data.athlete?.name ?? null } } : c)));
-    } finally {
+      // In the iPhone app the address opens in Safari and this page never leaves, so loading would stay on and every
+      // button here would stay disabled. The page being shown again clears it (effect below).
+      intervalsSignInPending.current = true;
+      window.location.href = data.url;
+    } catch (e) {
+      intervalsFailed('Intervals.icu did not connect.', () => void connectIntervalsOAuth(), e);
       setLoading(false);
     }
   };
 
+  // Back from the Intervals.icu sign-in without it finishing here (Safari on the phone, or the browser's back button):
+  // clear loading and re-read the Intervals.icu row, since the sign-in may have finished in the other browser.
+  useEffect(() => {
+    const onShown = async () => {
+      if (document.hidden || !intervalsSignInPending.current) return;
+      intervalsSignInPending.current = false;
+      setLoading(false);
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser?.id) return;
+      const { data: row } = await supabase.from('user_connections').select('health, last_error, connection_data')
+        .eq('user_id', authUser.id).eq('provider', 'intervals_icu').maybeSingle();
+      setConnections((prev) => prev.map((c) => (c.provider === 'intervals_icu'
+        ? { ...c, connected: !!row, health: row?.health === 'needs_reauth' || row?.health === 'error' ? row.health : 'ok', lastError: row?.last_error ?? null, connectionData: row?.connection_data ?? null }
+        : c)));
+    };
+    const onPageShow = () => { void onShown(); };
+    document.addEventListener('visibilitychange', onPageShow);
+    window.addEventListener('pageshow', onPageShow);
+    window.addEventListener('focus', onPageShow);
+    return () => {
+      document.removeEventListener('visibilitychange', onPageShow);
+      window.removeEventListener('pageshow', onPageShow);
+      window.removeEventListener('focus', onPageShow);
+    };
+  }, []);
+
+  // Disconnect for both kinds of connection; a sign-in is revoked with Intervals.icu first (intervals-oauth).
   const disconnectIntervals = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('intervals-connect-key', { body: { disconnect: true } });
+      const { data, error } = await supabase.functions.invoke('intervals-oauth', { body: { action: 'disconnect' } });
       if (error || !data?.ok) {
-        toast({ title: 'Intervals.icu', description: data?.error ?? error?.message ?? 'Disconnect failed', variant: 'destructive' });
+        intervalsFailed('Intervals.icu did not disconnect.', () => void disconnectIntervals(), { reason: data?.reason, error: data?.error ?? error?.message });
         return;
       }
       setConnections((prev) => prev.map((c) => (c.provider === 'intervals_icu' ? { ...c, connected: false, health: 'ok', connectionData: null } : c)));
+    } catch (e) {
+      intervalsFailed('Intervals.icu did not disconnect.', () => void disconnectIntervals(), e);
     } finally {
       setLoading(false);
     }
@@ -1073,7 +1116,7 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
                         <GalaxyButton
                           shape="chip"
                           variant="primary"
-                          onClick={() => (connection.provider === 'garmin' ? connectGarmin() : connection.provider === 'intervals_icu' ? disconnectIntervals() : connectStrava())}
+                          onClick={() => (connection.provider === 'garmin' ? connectGarmin() : connection.provider === 'intervals_icu' ? (connection.connectionData?.auth === 'oauth' ? connectIntervalsOAuth() : disconnectIntervals()) : connectStrava())}
                           className="shrink-0"
                           aria-label={`Reconnect ${getProviderName(connection.provider)}`}
                         >
@@ -1099,6 +1142,19 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
                       <p className="m-0 mt-1.5 text-[12px] text-white/60">New activities arrive on their own. The buttons below pull in past ones.</p>
                     )}
                   </div>
+                  )}
+
+                  {/* A key connection switches to the sign-in from here, while the key is still saved: the server needs the
+                      key to remove the rides it sent, or Intervals.icu would show each one twice. */}
+                  {connection.provider === 'intervals_icu' && connection.connectionData?.auth === 'api_key' && connection.health !== 'needs_reauth' && (
+                    <Button
+                      onClick={() => void connectIntervalsOAuth()}
+                      disabled={loading}
+                      className="w-full rounded-full bg-blue-600 hover:bg-blue-700 text-white border-none"
+                    >
+                      <Link2 className="h-4 w-4 mr-2" />
+                      Switch to Intervals.icu sign-in
+                    </Button>
                   )}
 
                   {/* Last Sync - only show for Strava */}
@@ -1309,29 +1365,16 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
                       />
                     </button>
                   ) : connection.provider === 'intervals_icu' ? (
-                    <form
-                      className="flex flex-col gap-2 text-left"
-                      onSubmit={(e) => { e.preventDefault(); void connectIntervals(); }}
+                    // Sign-in only (2026-09-13): athletes do not paste an API key. intervals-connect-key stays on the server
+                    // for the throwaway-account script; key connections made before keep Disconnect, Reconnect and Switch.
+                    <Button
+                      onClick={() => void connectIntervalsOAuth()}
+                      disabled={loading}
+                      className="w-full rounded-full bg-blue-600 hover:bg-blue-700 text-white border-none"
                     >
-                      <label htmlFor="intervals-api-key" className="text-sm text-white/80">API key</label>
-                      <input
-                        id="intervals-api-key"
-                        type="password"
-                        autoComplete="off"
-                        value={intervalsKey}
-                        onChange={(e) => setIntervalsKey(e.target.value)}
-                        className="px-3 py-2 bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-md text-white/90 focus:outline-none focus:border-white/40 text-sm"
-                      />
-                      <p className="m-0 text-[12px] text-white/60">Found in Intervals.icu under Settings, in Developer Settings.</p>
-                      <Button
-                        type="submit"
-                        disabled={loading || !intervalsKey.trim()}
-                        className="w-full rounded-full bg-blue-600 hover:bg-blue-700 text-white border-none"
-                      >
-                        <Link2 className="h-4 w-4 mr-2" />
-                        Connect
-                      </Button>
-                    </form>
+                      <Link2 className="h-4 w-4 mr-2" />
+                      Connect Intervals.icu
+                    </Button>
                   ) : (
                     <Button
                       onClick={() => {

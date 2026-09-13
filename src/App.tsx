@@ -13,6 +13,7 @@ import Support from "./pages/Support";
 import WelcomePage from "./pages/WelcomePage";
 import StravaCallback from "./components/StravaCallback"; // ✅ UNCOMMENTED
 import GarminCallback from "./components/GarminCallback";
+import IntervalsCallback from "./components/IntervalsCallback";
 import Connections from "./components/Connections";
 import PlansAdminImport from "./pages/PlansAdminImport";
 import OnboardingProfilePage from "./pages/OnboardingProfilePage";
@@ -42,6 +43,7 @@ const App = () => (
 <Route path="/reset-password" element={<ResetPassword />} /> {/* opened from the reset email; no session needed */}
 <Route path="/strava/callback" element={<StravaCallback />} /> {/* ✅ UNCOMMENTED */}
 <Route path="/auth/garmin/callback" element={<GarminCallback />} />
+<Route path="/auth/intervals/callback" element={<IntervalsCallback />} /> {/* the redirect address registered with Intervals.icu */}
 <Route path="/connections" element={<Index />} /> {/* inside the app shell; see AppLayout showConnections */}
 <Route path="/onboarding/profile" element={<OnboardingProfilePage />} />
 <Route path="/plans/admin" element={<PlansAdminImport />} />
