@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { sessionDisplayName } from '@/lib/session-display-name';
 import { supabase, getStoredUserId } from "@/lib/supabase";
 import { safeParseJSONB } from "@/utils/jsonb";
 // The one completed-set/exercise shape, shared with the server hydrators (2026-08-11).
@@ -350,40 +351,16 @@ export const useWorkouts = () => {
                 const numberOfLengths = activity.number_of_active_lengths;
                 const hasGps = activity.starting_latitude && activity.starting_longitude;
                 
-                let friendlySport = '';
-                if (workoutType === 'swim') {
-                  if (/open\s*water|ocean|ow\b|open_water/.test(rawType)) {
-                    friendlySport = 'Open Water Swim';
-                  } else if (/lap|pool|indoor/.test(rawType) || poolLength || numberOfLengths) {
-                    friendlySport = 'Lap Swim';
-                  } else if (hasGps) {
-                    friendlySport = 'Open Water Swim';
-                  } else {
-                    friendlySport = 'Lap Swim';
-                  }
-                } else if (workoutType === 'run') {
-                  if (/trail/.test(rawType)) {
-                    friendlySport = 'Trail Run';
-                  } else {
-                    friendlySport = 'Run';
-                  }
-                } else if (workoutType === 'ride') {
-                  if (/gravel/.test(rawType)) {
-                    friendlySport = 'Gravel Ride';
-                  } else if (/mountain|mtb/.test(rawType)) {
-                    friendlySport = 'Mountain Bike';
-                  } else if (/road/.test(rawType)) {
-                    friendlySport = 'Road Ride';
-                  } else {
-                    friendlySport = 'Ride';
-                  }
-                } else if (workoutType === 'walk') {
-                  friendlySport = /hike|hiking/.test(rawType) ? 'Hike' : 'Walk';
-                } else if (workoutType === 'strength') {
-                  friendlySport = 'Strength';
-                } else {
-                  friendlySport = workoutType.charAt(0).toUpperCase() + workoutType.slice(1);
-                }
+                /**
+                 * ⛔ ONE LADDER (`src/lib/session-display-name.ts`, 2026-09-12). Two copies of this
+                 * block lived in this file and NEITHER had an indoor branch at all, so a treadmill
+                 * run imported from a provider was named "Run" at import time and stayed that way.
+                 */
+                const friendlySport = sessionDisplayName({
+                  type: workoutType,
+                  provider_sport: rawType,
+                  name: activity.activity_name,
+                });
                 
                 // TODO: Add location name when reverse geocoding is available
                 // For now, return just the sport type
@@ -563,41 +540,15 @@ export const useWorkouts = () => {
               const rawType = (a.sport_type || a.type || '').toLowerCase();
               const hasGps = startLatLng && startLatLng[0] && startLatLng[1];
               
-              let friendlySport = '';
-              if (type === 'swim') {
-                if (/open\s*water|ocean|ow\b/.test(rawType)) {
-                  friendlySport = 'Open Water Swim';
-                } else if (/pool|indoor/.test(rawType)) {
-                  friendlySport = 'Lap Swim';
-                } else if (hasGps) {
-                  friendlySport = 'Open Water Swim';
-                } else {
-                  friendlySport = 'Lap Swim';
-                }
-              } else if (type === 'run') {
-                if (/trail/.test(rawType)) {
-                  friendlySport = 'Trail Run';
-                } else {
-                  friendlySport = 'Run';
-                }
-              } else if (type === 'ride') {
-                if (/gravel/.test(rawType)) {
-                  friendlySport = 'Gravel Ride';
-                } else if (/mountain|mtb/.test(rawType)) {
-                  friendlySport = 'Mountain Bike';
-                } else if (/road/.test(rawType)) {
-                  friendlySport = 'Road Ride';
-                } else {
-                  friendlySport = 'Ride';
-                }
-              } else if (type === 'walk') {
-                friendlySport = /hike/.test(rawType) ? 'Hike' : 'Walk';
-              } else if (type === 'strength') {
-                friendlySport = 'Strength';
-              } else {
-                friendlySport = type.charAt(0).toUpperCase() + type.slice(1);
-              }
-              
+              /**
+               * ⛔ ONE LADDER (`src/lib/session-display-name.ts`, 2026-09-12) — the second of two
+               * copies in this file, and like the first it had no indoor branch, so a trainer ride
+               * or a treadmill run was named for the outdoor version of itself at import time.
+               * ⚠️ THE WHOLE ACTIVITY GOES IN, not just the sport word: this path holds the row, so
+               * `isIndoorSession` can read Strava's `trainer` and `virtual` flags off it.
+               */
+              const friendlySport = sessionDisplayName({ ...(a as any), type, provider_sport: rawType });
+
               // TODO: Add location name when reverse geocoding is available
               // For now, return just the sport type
               return friendlySport;

@@ -1,4 +1,5 @@
 import { isIndoorSession } from '@shared/indoor-session';
+import { sessionDisplayName } from '@/lib/session-display-name';
 
 /**
  * Generate a nice, human-readable workout name
@@ -32,36 +33,14 @@ export function isVirtualActivity(workout: any): boolean {
  * Only called when isVirtualActivity() returns true
  */
 export function getVirtualWorkoutLabel(workout: any): string {
-  const providerSport = (workout?.provider_sport || '').toLowerCase();
-  const name = (workout?.name || '').toLowerCase();
-  const type = (workout?.type || '').toLowerCase();
-  
-  // Zwift detection
-  if (name.includes('zwift') || providerSport.includes('virtual')) {
-    return 'Zwift';
-  }
-  
-  // Indoor cycling
-  if (providerSport === 'indoorcycling' || providerSport.includes('trainer')) {
-    return 'Indoor Trainer';
-  }
-  
-  // Treadmill (explicit flag or provider sport)
-  const isTrainer = workout?.strava_data?.original_activity?.trainer === true;
-  if (providerSport.includes('treadmill') || (type === 'run' && isTrainer)) {
-    return 'Treadmill';
-  }
-  
-  // For runs/walks that are confirmed indoor (via isVirtualActivity)
-  if (type === 'run') {
-    return isTrainer ? 'Treadmill' : 'Indoor Run';
-  }
-  
-  if (type === 'walk') {
-    return 'Indoor Walk';
-  }
-  
-  return 'Virtual Ride';
+  /**
+   * ⛔ ONE LADDER NOW (`src/lib/session-display-name.ts`, 2026-09-12). This was the third indoor
+   * naming ladder in the app — its own provider-word list, its own Zwift test, its own `trainer`
+   * read — and it disagreed with the two on the cards: it could say "Indoor Trainer" where they said
+   * "Ride". ⚠️ THE NAME AND THE SIGNATURE STAY: the map placeholder calls it and its meaning has not
+   * changed, only which file decides the word.
+   */
+  return sessionDisplayName(workout);
 }
 
 export interface WorkoutNameOptions {
@@ -108,32 +87,19 @@ function getFriendlySportType(
     return 'Lap Swim';
   }
 
-  // Run type detection
-  if (normalizedType === 'run') {
-    if (/trail|trailrun/.test(rawType)) {
-      return 'Trail Run';
-    }
-    if (/treadmill|indoor/.test(rawType)) {
-      return 'Treadmill Run';
-    }
-    return 'Run';
-  }
-
-  // Ride type detection
-  if (normalizedType === 'ride') {
-    if (/gravel|gravelride/.test(rawType)) {
-      return 'Gravel Ride';
-    }
-    if (/mountain|mtb|mountainbike/.test(rawType)) {
-      return 'Mountain Bike';
-    }
-    if (/road|roadbike|road_cycling/.test(rawType)) {
-      return 'Road Ride';
-    }
-    if (/indoor|virtual|trainer/.test(rawType)) {
-      return 'Indoor Ride';
-    }
-    return 'Ride';
+  /**
+   * ⛔ RUN, RIDE AND WALK COME FROM THE ONE LADDER (2026-09-12). These three branches carried a
+   * fifth copy of the indoor words, keyed off a raw provider string — "Treadmill Run" and "Indoor
+   * Ride", which no other screen ever said. The ladder decides; the swim branch above stays, because
+   * it reads pool length and lengths counted, which the ladder does not see.
+   */
+  {
+    // ⚠️ ONLY THE PROVIDER WORD REACHES THE PREDICATE HERE — this function is handed strings, not a
+    // row, so `isIndoorSession`'s Strava flags, `venue:` tag and track test have nothing to read.
+    // A provider that names the machine ("treadmill_running", "virtual_ride") still lands correctly;
+    // a row that needs the other four ways to know is named by the callers that hold the row.
+    const named = sessionDisplayName({ type: normalizedType, provider_sport: rawType });
+    if (named && named !== 'Session') return named;
   }
 
   // Other types

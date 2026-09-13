@@ -1,4 +1,5 @@
 import { useAppContext } from '@/contexts/AppContext';
+import { sessionDisplayName } from '@/lib/session-display-name';
 import { shareSession, shareSessionText } from '@/lib/share-session-text';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getProviderAttribution } from '@/lib/provider-attribution';
@@ -687,46 +688,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     const rawProvider = String((workout as any)?.provider_sport || (workout as any)?.activity_type || '').toLowerCase();
     const humanize = (s: string) => s.replace(/_/g,' ').replace(/\s+/g,' ').trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
     
-    // Check for indoor/treadmill indicators - must be STABLE to avoid UI flicker
-    const isTrainer = (workout as any)?.strava_data?.original_activity?.trainer === true;
-    // Check GPS data - handle both array and JSON string formats
-    const gpsTrack = (workout as any)?.gps_track;
-    const hasGpsTrack = (Array.isArray(gpsTrack) && gpsTrack.length > 0) || 
-                        (typeof gpsTrack === 'string' && gpsTrack.length > 10);
-    // Check start position as fallback indicator
-    const hasStartPosition = Number.isFinite((workout as any)?.start_position_lat) && 
-                             (workout as any)?.start_position_lat !== 0;
-    // Only classify as indoor if we're sure: trainer flag OR (gps_track explicitly empty AND no start position)
-    const isConfirmedIndoor = isTrainer || 
-                              (Array.isArray(gpsTrack) && gpsTrack.length === 0 && !hasStartPosition);
-    const isIndoorRun = (activityType === 'run' || activityType === 'walk') && isConfirmedIndoor;
-    
-    const friendlySport = () => {
-      if (activityType === 'swim') {
-        if (/open\s*water|ocean|ow\b/.test(rawProvider)) return 'Open Water Swim';
-        if (/lap|pool/.test(rawProvider)) return 'Pool Swim';
-        return 'Swim';
-      }
-      if (activityType === 'run') {
-        if (/trail/.test(rawProvider)) return 'Trail Run';
-        // Indoor/treadmill detection
-        if (isIndoorRun) return isTrainer ? 'Treadmill' : 'Indoor Run';
-        return 'Run';
-      }
-      if (activityType === 'ride') {
-        if (/gravel/.test(rawProvider)) return 'Gravel Ride';
-        if (/mountain|mtb/.test(rawProvider)) return 'Mountain Bike';
-        if (/road/.test(rawProvider)) return 'Road Ride';
-        return 'Ride';
-      }
-      if (activityType === 'walk') {
-        if (isIndoorRun) return 'Indoor Walk';
-        return 'Walk';
-      }
-      if (activityType === 'strength') return 'Strength Training';
-      return humanize(rawProvider || activityType);
-    };
-    
+    /**
+     * ⛔ ONE LADDER (`src/lib/session-display-name.ts`, 2026-09-12). What was here was a
+     * character-identical copy of `TodaysEffort.tsx`'s indoor test plus its own sport-word list, and
+     * the two could drift apart on the same session with nothing to catch it. Both call one function
+     * now, which asks `_shared/indoor-session.ts` — the predicate the map and the metric strip use.
+     */
+    const friendlySport = () => sessionDisplayName({ ...(workout as any), type: activityType });
+
     // Get location from coordinates if available
     const lat = workout.starting_latitude || workout.start_position_lat;
     const lng = workout.starting_longitude || workout.start_position_long;

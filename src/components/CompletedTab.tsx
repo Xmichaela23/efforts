@@ -1921,37 +1921,34 @@ const formatMovingTime = () => {
         // with its own elevation smoothing, grade and VAM; the chart plots the server's display series.
         // Check if this is an indoor/treadmill workout (EffortsViewerMapbox will show placeholder)
         const workout = hydrated || workoutData;
+        /**
+         * ⛔ ONE PREDICATE (2026-09-12). What was here was a seventh indoor test — a series-without-
+         * track heuristic, a provider-word check and a `trainer` read, ORed together — deciding
+         * whether to show the map placeholder. A session could be indoors to this block and outdoors
+         * to the card beside it. `isVirtualActivity` delegates to `_shared/indoor-session.ts`, the
+         * one answer the card, the header, the map and the metric strip all read.
+         * ⚠️ THE HYDRATION GUARD STAYS AND IS NOT PART OF THE QUESTION. Until the row has loaded
+         * there is nothing to judge, and the predicate's own rule is to say nothing rather than flip
+         * a real outdoor ride to indoors for a frame.
+         */
         const isVirtual = isVirtualActivity(workout);
-        
-        // Additional check: if we have series data (sensor data) but no GPS track, it's likely a treadmill
-        const hasValidSeries = finalSeries && 
-          Array.isArray(finalSeries?.distance_m) && 
-          finalSeries.distance_m.length > 1;
-        const hasValidTrack = finalTrack && 
-          Array.isArray(finalTrack) && 
-          finalTrack.length > 1;
-        
-        // Strong indicator of treadmill: has sensor data (series) but no GPS track
-        const isLikelyTreadmill = hasValidSeries && !hasValidTrack && 
-          (workoutData.type === 'run' || workoutData.type === 'walk');
-        
-        // Check for explicit treadmill indicators
-        const isTrainer = (workout as any)?.strava_data?.original_activity?.trainer === true;
-        const providerSport = String((workout as any)?.provider_sport || (workout as any)?.activity_type || '').toLowerCase();
-        const hasTreadmillIndicator = providerSport.includes('treadmill') || isTrainer;
-        const hasStartPosition = Number.isFinite((workout as any)?.start_position_lat) && 
-                                 (workout as any)?.start_position_lat !== 0;
+        const shouldShowPlaceholder = !isHydrating && isVirtual;
 
-        // Outdoor Strava-style activities: show map immediately while track streams in (avoids "indoor/outdoor" spinner flash)
-        const showMapWhileTrackLoads =
-          hasValidSeries &&
-          hasStartPosition &&
-          !hasTreadmillIndicator &&
-          !isTrainer;
-        
-        // Consider it virtual if: explicit indicators OR (likely treadmill AND no start position)
-        // BUT: don't show placeholder if we're still loading GPS data (prevents flash)
-        const shouldShowPlaceholder = !isHydrating && (isVirtual || hasTreadmillIndicator || (isLikelyTreadmill && !hasStartPosition));
+        // ⚠️ WHAT FOLLOWS IS DATA AVAILABILITY, NOT AN INDOOR TEST, and it stays. Whether the row has
+        // a series and a track to draw is a different question from whether the session happened
+        // indoors, and only the second one moved to the shared predicate.
+        const hasValidSeries = finalSeries &&
+          Array.isArray(finalSeries?.distance_m) &&
+          finalSeries.distance_m.length > 1;
+        const hasValidTrack = finalTrack &&
+          Array.isArray(finalTrack) &&
+          finalTrack.length > 1;
+        const hasStartPosition = Number.isFinite((workout as any)?.start_position_lat) &&
+                                 (workout as any)?.start_position_lat !== 0;
+        // Outdoor activities: show the map while the track streams in, so an outdoor session does not
+        // flash the indoor spinner. ⛔ The indoor half of this condition is `isVirtual` now, where it
+        // used to be a `trainer` read and a provider-word check of its own.
+        const showMapWhileTrackLoads = hasValidSeries && hasStartPosition && !isVirtual;
         
         // Hydration spinner only when we might still be indoor/unknown — not when GPS start is already known
         if (isHydrating && !hasValidTrack && !showMapWhileTrackLoads) {
