@@ -42,7 +42,7 @@ These are the patterns almost every screen inherits. If a screen seems to "just 
 - **`EffortsViewerMapbox.tsx`** — reads ← **props only** (route simplification moved server-side into `workout-detail`). writes → none. Pure MapLibre renderer.
 - **`AssociatePlannedDialog.tsx`** — reads ← `planned_workouts` (7-day window) + `workouts`. writes → `auto-attach-planned` (`:187`).
 - **`PostWorkoutFeedback.tsx`** — reads ← `workouts`/`planned_workouts`/`gear`. writes → `workouts` (RPE/feeling/gear). Triggered by AppLayout's `check-feedback-needed`; allowed direct-query surface.
-- **`ManualSwimEntry.tsx`** — writes → `workouts.insert` (`:62`) → `recompute-workout` (`:70`). dep: `recompute-workout`.
+- **`ManualEntry.tsx`** (run, ride, swim; replaced `ManualSwimEntry.tsx` 2026-09-12) — writes → `workouts.insert` → `recompute-workout` (`:109`). dep: `recompute-workout`.
 - **`WorkoutBuilder.tsx`** — no direct invoke/from; all through `usePlannedWorkouts` (`planned_workouts` + `calculate-workload`). dep: `usePlannedWorkouts`.
 - **`FitFileImporter.tsx`** — reads ← client-side FIT parse (CDN `fit-file-parser`). writes → none directly; emits via `onWorkoutsImported` → AppLayout's `save-imported-workout` sink.
 - **Live execution (`workout-execution/`)** — `EnvironmentSelector`/`PreRunScreen`/`ExecutionScreen`/`PostRunSummary` are **presentational** (device sensors via hooks, no Supabase). The only networked node is **`WorkoutExecutionContainer.tsx`**: writes → `ingest-phone-workout` (`:315`, the phone-side ingest entry) + direct `workouts.delete` on discard. dep: `ingest-phone-workout`.

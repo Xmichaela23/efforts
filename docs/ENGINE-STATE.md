@@ -1,6 +1,54 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-12, PM chat — the book's own hard sessions, the accessory rows, where a build lands, and Home lit; ALL PUSHED AND DEPLOYED)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-13 — the Performance screen tightened and sectioned, Today on State's bed, ONE drift rule, the typed-in log, Indoor; PUSHED, two deploys OWED)
+
+> **Read `docs/SESSION-2026-09-12-13-handoff.md` first.** main = `59e0505`. Decisions **D-477 → D-483** in
+> `docs/DECISIONS-LOG-4.md`. Michael deploys from another terminal; a chat with no Supabase token cannot.
+> Most of this stretch WAS seen on his phone (the handoff lists what); the two deploys below were not.
+
+### YOUR JOB
+1. **Confirm the two owed deploys landed, then look.**
+   `supabase functions deploy workout-detail detach-planned --project-ref yyriamwvtvzlkumqrvpm`
+   On the phone: the attached ride's tile row reads "Standard Focus · week 2 of 12" and "12 of 14", with
+   intervals 13 and 14 not done and interval 12 keeping its 4:16 (`compute-workout-summary/index.ts:1789`
+   `walkEndIdx` — deployed, not yet seen); the trainer ride's header reads "… · Indoor" with no temperature
+   (`_shared/session-detail/build.ts:1142`, weather nulled when `indoorVenue`); Unattach leaves no plan line,
+   tiles or plan context (`detach-planned/index.ts:17 fireRecompute`).
+2. **Drift is ONE function now — do not add a second reader with its own rule.**
+   `_shared/session-detail/drift-pct.ts resolveSessionDrift`: steady runs and rides only (p107), the run
+   analyser's decoupling, else a ride's power-to-heart-rate ratio, else heart rate alone. Readers:
+   `session-detail/build.ts:851`, `session-boom/line.ts:149`, `fact-packet/flags.ts:74`. A change there
+   redeploys `analyze-running-workout`, `compute-session-boom`, `workout-detail` (transitive import graph,
+   2026-09-13 — the cycling analyser does NOT reach this file; it has its own `cycling-v1/flags.ts`, which
+   emits no drift flag at all, so there is nothing to gate on a ride). `compute-snapshot driftReadForPoint` keeps the same precedence BY HAND —
+   it does not import the file; that is a hypothesis of sameness, not a fact.
+3. **The plan line is server-composed** (`session_detail_v1.block.line`, `workout-detail/index.ts:1206`)
+   and the lift slot words too (`strength-slots.ts:45`). The client prints them. A default week intent
+   ("Build") never reaches a label again — `buildWeekLabel` (`build.ts:1349`) uses the plan's name.
+4. Carried: the readiness list (`docs/FOUNDATION-READINESS.md`), Q-299 / Q-300 / Q-301, and **Q-302** (one
+   ride is 59:55 on the header and 60 min elsewhere — two stored duration fields, untraced).
+
+### THE RULES (memory files carry them; verify before citing)
+- **Never use ours**: no athlete-facing line or number that is not on a book page.
+- **All copy through Michael**: a feature go is not a copy go.
+- **Smart server, dumb client** ("keep this client dumb", 2026-09-13): a screen prints a contract field, never
+  composes one.
+- **Never `git commit -a`** in this repo; terminals share the tree.
+- **Deploy every importer** of a changed `_shared` file — by a transitive import graph, not by grep of the
+  file name (a grep matched comments and named the wrong set on 2026-09-12).
+- **`npm run build > log; B=$?`** — never pipe the build into `tail` before `&& git commit`; that shipped a
+  broken main once (`768e5b2`).
+
+### UNVERIFIED (what would settle it)
+- Item 1 entirely: two functions undeployed, then one device look at the attached ride, the indoor ride, and
+  an Unattach.
+- The 12 of 14 walk end has been seen in no screenshot. Recompute the attached ride after the deploy and read
+  the interval table.
+- Carried: a rebuild resets a workout chosen on the day; swap-session with option lines never exercised on
+  a live plan; heavy-set good-news line ordering; multi-swim day compares the wrong planned swim;
+  `generate-combined-plan/week-builder.ts decideOrdering` is a second copy of day order.
+
+## (older banner) THE BOOK'S HARD SESSIONS, THE ACCESSORY ROWS, WHERE A BUILD LANDS, HOME LIT (written 2026-09-12, PM chat — ALL PUSHED AND DEPLOYED)
 
 > **Read `docs/SESSION-2026-09-11-12-handoff.md` first**, then the older banners below for the threads
 > behind them. main = `10192932`. Last deploys (UTC): plan-overview 03:39, then coach /

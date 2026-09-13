@@ -184,7 +184,6 @@ no-deploy.**
 | `resolve-goal-target-time.ts` | `coach` · `course-detail` · `course-strategy` |
 | `resolve-server-predicted-finish.ts` | `coach` · `course-detail` · `course-strategy` |
 | `ride-easy-hr.ts` | `analyze-cycling-workout` |
-| `ride-halves-steady.ts` | `analyze-cycling-workout` · `workout-detail` |
 | `riegel.ts` | `analyze-running-workout` · `workout-detail` |
 | `route-intelligence.ts` | `backfill-routes` · `compute-facts` |
 | `route-match.ts` | `backfill-routes` · `compute-facts` |
@@ -461,7 +460,7 @@ no-deploy.**
 |---|---|
 | `arc-performance-bridge.ts` | `ingest-phone-workout` · `workout-detail` |
 | `build.ts` | `workout-detail` |
-| `drift-pct.ts` | `compute-session-boom` |
+| `drift-pct.ts` | `analyze-running-workout` · `compute-session-boom` · `workout-detail` |
 | `forward-context.ts` | `workout-detail` |
 | `index.ts` | — nothing bundles it |
 | `interval-compare.ts` | `ingest-phone-workout` · `workout-detail` |

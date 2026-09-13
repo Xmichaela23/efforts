@@ -96,7 +96,7 @@
 ## Cross-cutting risks (read before touching a fact)
 
 - **The plan pin only half-exists.** `_shared/athlete-snapshot.ts:158` (`buildAthleteSnapshot`) freezes targets at generation — but **5 of its 8 categories are hardcoded `null`** (`:178-182`): swim, equipment, intent, capacity, bio. Those re-resolve **live** on every materialize, so a mid-plan baseline edit silently moves them. Its only reader is `materialize-plan:3246` (`readAthleteSnapshotOrLive`). ⟨A31⟩ And **`generate-strength-plan` never calls it** → Get Stronger / Hyrox plans have **no pin at all**.
-- **Both former bypass paths now reach the spine (fixed 2026-07-17).** `ingest-phone-workout:297` and `save-imported-workout:206` both fire `recompute-workout`, the single ordered orchestrator (auto-attach → summary → analysis → workload → facts → analyze → snapshot). `ManualSwimEntry.tsx:70` does the same. No known ingest path skips `compute-facts` today. ⟨A31⟩
+- **Both former bypass paths now reach the spine (fixed 2026-07-17).** `ingest-phone-workout:297` and `save-imported-workout:206` both fire `recompute-workout`, the single ordered orchestrator (auto-attach → summary → analysis → workload → facts → analyze → snapshot). `ManualEntry.tsx:109` (run, ride and swim, since 2026-09-12) does the same. No known ingest path skips `compute-facts` today. ⟨A31⟩
 - **`workouts.workload_actual` (the ACWR substrate) is written by ONE job** (`calculate-workload`) called from **two places**. Anything ingested another way contributes **zero to ACWR** while still counting toward `workload_total` — the same snapshot row can contradict itself.
 - **The fan-out race was FIXED 2026-07-17.** `ingest-activity:1499` now fires ONE ordered orchestrator (`recompute-workout`), which awaits summary/analysis before facts. See the block comment at `ingest-activity:1485-1496` and `docs/AUDIT-fanout-ordering-2026-07-17.md`. ⟨A31⟩
 - **The client is a second State engine.** `useStateTrends.ts:54-233` re-runs the server's `assembleStateTrends` in-browser (9 direct queries, hand-copied row filters, browser clock) whenever the server display contract is absent.
@@ -104,8 +104,15 @@
 
 ---
 
+### Added 2026-09-13 — one drift rule, Indoor, the typed-in log, the plan line on the contract
+- **Session drift, ONE rule** — `_shared/session-detail/drift-pct.ts` `resolveSessionDrift` / `sessionDriftPct` / `isIntervalSession`: steady runs and rides only (p107); run decoupling → ride power-to-heart-rate ratio → `hr_drift_v1`. Readers: `session-detail/build.ts:851`, `session-boom/line.ts:149`, `fact-packet/flags.ts:74`. `compute-snapshot driftReadForPoint` matches by hand, not by import. D-479.
+- **Indoor predicate, fed** — `_shared/indoor-session.ts isIndoorSession` receives `provider_sport` and `strava_data` from `workout-detail`'s by-id select (`:1561`); `session_detail_v1.indoor`; no weather or conditions row on an indoor session. D-480.
+- **Typed-in log, all three sports** — `src/components/ManualEntry.tsx` (replaces `ManualSwimEntry.tsx`): distance, time, date, effort → `workouts` insert → `recompute-workout` (`:109`). `LogFAB.tsx` hides upload-course and log-mobility. D-481.
+- **Plan line on the contract** — `session_detail_v1.block.line` ("Standard Focus · week 2 of 12"), stamped `workout-detail/index.ts:1206`; the client prints it, never composes it. Lift slot words `strength-slots.ts:45`. D-482.
+- **Step walk ends at movement end** — `compute-workout-summary/index.ts:1789 walkEndIdx`. **Unattach recomputes** — `detach-planned/index.ts:17`. D-483.
+
 ### Added 2026-09-03 — the Performance screen, drift, the book's tests
-- **Heart-rate drift, one definition** — `_shared/hr-drift-halves.ts` → `workout_analysis.hr_drift_v1` (both analysers); read by session-detail (`decouplingV1`) and compute-snapshot (`driftReadForPoint`). Never withheld; interval days labelled whole-session. D-465.
+- **Heart-rate drift, one definition** — `_shared/hr-drift-halves.ts` → `workout_analysis.hr_drift_v1` (both analysers). ⚠️ Since 2026-09-12 it is the LAST fallback of the one rule in `session-detail/drift-pct.ts` (see 2026-09-13 above), and interval sessions print no drift. D-465 → D-479.
 - **Cut-short session layout** — compute-workout-summary emits `not_done` rows; `steps_not_done` on computed; session-detail appends them to the table. D-465.
 - **Execution score in the header** — `AdherenceChips.tsx` (`execution_score` existed in `performance.execution_adherence` all along). D-465.
 - **Book's endurance tests, Garmin-sendable** — `materialize-plan` `buildAssessmentSteps` (p210 run trial, p212 FTP); reader `compute-workout-analysis` run_test (÷0.88). D-463.

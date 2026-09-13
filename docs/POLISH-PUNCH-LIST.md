@@ -14,6 +14,20 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — 2026-09-13 (Performance tightened and sectioned, Today on State's bed, one drift rule, the typed-in log, Indoor — PUSHED; `workout-detail` and `detach-planned` NOT yet redeployed)
+
+Detail in `docs/SESSION-2026-09-12-13-handoff.md`; decisions `DECISIONS-LOG-4.md` D-477 → D-483. Most of
+this stretch was seen on Michael's phone already; the items below were not.
+
+- [ ] **Deploy** `supabase functions deploy workout-detail detach-planned --project-ref yyriamwvtvzlkumqrvpm`.
+- [ ] **Then look at the attached ride:** the tile row reads "Standard Focus · week 2 of 12" and "12 of 14";
+      intervals 13 and 14 read not done and interval 12 keeps its 4:16.
+- [ ] **The trainer ride:** header reads "… · Indoor" with no temperature and no conditions row.
+- [ ] **Unattach a ride:** no plan line, no tiles, no plan context left on it.
+- [ ] **Any lift:** the compare table reads Maximal effort / Dynamic effort / Hypertrophy / Skill. **Any hard
+      run or ride:** no Drift number and no heart-rate line; a steady one prints both.
+- [ ] Q-302 — one ride is 59:55 on the header and 60 min elsewhere.
+
 ## ⏳ AWAITING MICHAEL — 2026-09-12 (the book's hard sessions, accessory rows, where a build lands, Home lit — PUSHED, DEPLOYED, iOS synced, NOT device-checked)
 
 Detail in `docs/SESSION-2026-09-11-12-handoff.md`; decisions in `DECISIONS-LOG-4.md` D-471 → D-476.

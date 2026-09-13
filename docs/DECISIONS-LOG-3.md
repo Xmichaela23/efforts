@@ -1670,6 +1670,13 @@ rather than its tag (heaviest in `compose.ts` and `accessory-picks.ts`); only th
 
 ## D-465 — The Performance screen follows the field: Execution + Drift in the header, no per-row scores, one drift, one word (2026-09-03)
 
+> **2026-09-12 — the drift paragraph below is REVERSED by D-479 (`DECISIONS-LOG-4.md`).** Drift is no longer
+> "never withheld": an interval run or ride prints no drift at all (p107 — the guideline is for the dose of
+> steady easy/VT1 work), and the rule lives in one function, `_shared/session-detail/drift-pct.ts
+> resolveSessionDrift` (a ride's power-to-heart-rate ratio before heart rate alone). The ME / DE / SKILL / HYP
+> abbreviations in the last paragraph are spelled out on screen since D-478. The cut-short layout is finished
+> by D-483 (the walk ends where movement ended). Everything below is history on those points.
+
 **Header (runs and rides): Workload · Execution · Duration · Drift.** Execution = the work intervals'
 pace-or-power score blended, averaged with moving time ÷ planned time (existing analyser numbers, never
 shown before). The pace/GAP percentage that sat in the header is gone. **No per-row percentages** on a

@@ -1464,3 +1464,10 @@ print their values and their labels on top of one another: "53 90%60 of 85 min 5
 It predates the 2026-09-12 visual work — it is visible in screenshots taken before any of it landed — and
 it was noticed while checking something else, so it has not been traced. Its own change, not a fold-in.
 
+## Q-302 — One ride is 59:55 on the Performance header and 60 min elsewhere (2026-09-13)
+
+Tagged **unverified / cosmetic**. Michael's trainer ride prints `59:55` on the header line and 60 minutes
+on another surface. The row stores duration more than one way (`workouts.duration` in minutes alongside the
+seconds-carrying metrics that D-465 made the header read), and I did not trace which surface reads which
+column. Not touched this session. Settle it by reading that one row's duration columns and grepping each
+surface for the field it prints; the fix, if any, is one reader moving to the seconds field.

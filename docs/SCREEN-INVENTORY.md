@@ -63,7 +63,7 @@ D-207: the strength family folds **Details into Performance** — strength never
 | **Efforts Viewer (Map)** | inside Completed Tab | MapLibre mini-map + charts + weather | `EffortsViewerMapbox.tsx` |
 | **Associate Planned Dialog** | Details tab, unlinked completed | Link a completed activity to a planned session (7-day window) | `AssociatePlannedDialog.tsx` |
 | **Post-Workout Feedback** | auto-popup after completed run/ride/swim | Gear/RPE/feeling (pool for swims) | `PostWorkoutFeedback.tsx` |
-| **Manual Swim Entry** | LogFAB → Log Swim | Simple completed-swim form | `ManualSwimEntry.tsx` |
+| **Manual Entry** (run, ride, swim) | LogFAB → Log Run / Log Ride / Log Swim | Typed-in completed session: distance, time, date, effort; then `recompute-workout` | `ManualEntry.tsx` (replaced `ManualSwimEntry.tsx` 2026-09-12) |
 | **Workout Builder** | LogFAB / calendar add | Plan a custom run/ride/swim/strength/mobility | `WorkoutBuilder.tsx` |
 | **FIT File Importer** | header menu → Import | Import from `.fit` | `FitFileImporter.tsx` |
 
