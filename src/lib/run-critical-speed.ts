@@ -445,6 +445,81 @@ export function buildRunPaceCurve(
   return Object.keys(curve).length > 0 ? curve : null;
 }
 
+/**
+ * ⛔ THE HEART-RATE CURVE — the HIGHEST average heart rate a run held for 20 and 60 minutes (2026-09-13).
+ *
+ * The pace curve above answers "fastest 20 minutes"; its `avgHr` is the heart rate during THAT window, which on an
+ * easy-but-fast stretch is nowhere near threshold (Michael, 2026-04-02: fastest 20 min at 152 bpm, Garmin-measured
+ * threshold 172). TrainingPeaks reads threshold heart rate off the highest-HEART-RATE windows instead: "your best
+ * 60-minute average heart rate, or 95% of your best 20-minute average heart rate, whichever is higher"
+ * (trainingpeaks.com/blog/are-you-using-threshold-improvement-notifications). Intervals.icu does the same off 20/60 min
+ * (forum.intervals.icu/t/threshold-heart-rate-achievements/1459). This records those two windows; the learner picks.
+ *
+ * Time-weighted: each sample's heart rate counts for the seconds until the next sample, so an uneven trace does not
+ * over-weight the dense stretch. A window with heart rate on less than 80% of its time is skipped.
+ * OURS — 80%: a strap that drops out for a fifth of a window is not a 20-minute reading.
+ */
+export const HR_CURVE_TARGETS_S = [1200, 3600] as const;
+export type RunHrCurve = Record<string, { avgHr: number; timeS: number }>;
+
+export function buildRunHrCurve(timeS: number[], hrBpm: (number | null)[]): RunHrCurve | null {
+  const n = Math.min(timeS?.length ?? 0, hrBpm?.length ?? 0);
+  if (n < 10) return null;
+  // Per-sample duration: seconds until the next sample. The last sample carries none.
+  const dur: number[] = new Array(n).fill(0);
+  for (let i = 0; i < n - 1; i++) {
+    const d = timeS[i + 1] - timeS[i];
+    dur[i] = Number.isFinite(d) && d > 0 ? d : 0;
+  }
+  const curve: RunHrCurve = {};
+  for (const target of HR_CURVE_TARGETS_S) {
+    if (timeS[n - 1] - timeS[0] < target) continue;
+    let best: number | null = null;
+    let start = 0;
+    let secs = 0, hrSecs = 0, hrSum = 0;
+    for (let end = 0; end < n; end++) {
+      const h = hrBpm[end];
+      secs += dur[end];
+      if (h != null && Number.isFinite(h) && h > 0) { hrSecs += dur[end]; hrSum += h * dur[end]; }
+      // Shrink from the left while the window without its first sample still covers the target.
+      while (start < end && secs - dur[start] >= target) {
+        const hs = hrBpm[start];
+        secs -= dur[start];
+        if (hs != null && Number.isFinite(hs) && hs > 0) { hrSecs -= dur[start]; hrSum -= hs * dur[start]; }
+        start++;
+      }
+      if (secs < target || hrSecs < 0.8 * secs) continue;
+      const avg = hrSum / hrSecs;
+      if (best == null || avg > best) best = avg;
+    }
+    if (best != null) curve[String(target)] = { avgHr: Math.round(best), timeS: target };
+  }
+  return Object.keys(curve).length > 0 ? curve : null;
+}
+
+/**
+ * Threshold heart rate from stored heart-rate curves across many runs, by TrainingPeaks' rule: the higher of the best
+ * 60-minute average and 95% of the best 20-minute average. Returns the run the winning window came from.
+ */
+export function thresholdHrFromHrCurves(
+  runs: Array<{ date: string; hrCurve: RunHrCurve | null | undefined }>,
+): { value: number; date: string; basis: '20' | '60'; windowAvgHr: number } | null {
+  let best: { value: number; date: string; basis: '20' | '60'; windowAvgHr: number } | null = null;
+  for (const r of runs) {
+    const c = r.hrCurve;
+    if (!c || typeof c !== 'object') continue;
+    const w20 = Number(c['1200']?.avgHr);
+    const w60 = Number(c['3600']?.avgHr);
+    const candidates: Array<{ value: number; basis: '20' | '60'; windowAvgHr: number }> = [];
+    if (Number.isFinite(w20) && w20 > 60 && w20 < 230) candidates.push({ value: Math.round(w20 * 0.95), basis: '20', windowAvgHr: w20 });
+    if (Number.isFinite(w60) && w60 > 60 && w60 < 230) candidates.push({ value: Math.round(w60), basis: '60', windowAvgHr: w60 });
+    for (const cnd of candidates) {
+      if (!best || cnd.value > best.value) best = { ...cnd, date: String(r.date ?? '').slice(0, 10) };
+    }
+  }
+  return best;
+}
+
 /** A stored curve → the fit's input shape. One place that knows the storage keys. */
 export function paceCurveToEfforts(curve: RunPaceCurve | null | undefined, date: string): RunEffort[] {
   if (!curve || typeof curve !== 'object') return [];

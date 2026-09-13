@@ -28,7 +28,9 @@ import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import {
   fitRunCriticalSpeed,
   paceCurveToEfforts,
+  thresholdHrFromHrCurves,
   type RunPaceCurve,
+  type RunHrCurve,
 } from '../../../src/lib/run-critical-speed.ts';
 import {
   inferAthleteIdentityV1,
@@ -1074,18 +1076,45 @@ export function analyzeRuns(runs: WorkoutRecord[], allRunCurves: WorkoutRecord[]
       console.log(`  📊 Threshold: the time trial stands (${priorPace.value}s/km, ${priorPace.as_of})`);
     } else if (best && priorIsBest20 && Number(priorPace.value) < best.paceSecPerKm) {
       threshold_pace = priorPace as LearnedMetric;            // only up: the earlier best still stands
-      if (priorHr && /best 20-minute|time trial/.test(String(priorHr.source ?? ''))) { threshold_hr = priorHr as LearnedMetric; thresholdHRValue = Number(priorHr.value) || thresholdHRValue; }
       console.log(`  📊 Threshold: prior best 20-minute effort stands (${priorPace.value}s/km, ${priorPace.as_of})`);
     } else if (best) {
       const hard = observedMaxHR != null && best.avgHr != null && best.avgHr >= observedMaxHR * 0.85;
       const paceMi = Math.round(best.paceSecPerKm * 1.60934);
       const label = `best 20-minute effort on ${best.date} (${Math.floor(paceMi / 60)}:${String(paceMi % 60).padStart(2, '0')}/mi${best.avgHr != null ? ` at ${best.avgHr} bpm` : ''})`;
       threshold_pace = { value: Math.round(best.paceSecPerKm), confidence: hard ? 'high' : 'medium', source: label, sample_count: 1, as_of: best.date };
-      if (best.avgHr != null) {
-        threshold_hr = { value: best.avgHr, confidence: hard ? 'high' : 'medium', source: label, sample_count: 1, as_of: best.date };
-        thresholdHRValue = best.avgHr;
-      }
-      console.log(`  📊 Threshold: ${label}${hard ? '' : ' — under 85% of observed max, medium'}`);
+      console.log(`  📊 Threshold pace: ${label}${hard ? '' : ' — under 85% of observed max, medium'}`);
+    }
+  }
+
+  // ⛔ THRESHOLD HEART RATE IS READ OFF THE HIGHEST-HEART-RATE WINDOWS, NOT THE FASTEST ONE (2026-09-13).
+  // The block above used to write threshold_hr = the heart rate during the FASTEST 20 minutes. On an easy-but-quick
+  // stretch that is far below threshold (Michael: 152 bpm from 2026-04-02 against a Garmin-measured 172, which set every
+  // easy-day heart-rate range 17 bpm low). TrainingPeaks: "your best 60-minute average heart rate, or 95% of your best
+  // 20-minute average heart rate, whichever is higher" (trainingpeaks.com/blog/are-you-using-threshold-improvement-notifications);
+  // Intervals.icu reads the same windows (forum.intervals.icu/t/threshold-heart-rate-achievements/1459).
+  // A time-trial threshold heart rate still stands over this (a test beats an inference, p210). Only up: a prior value
+  // written by this rule stays while it is higher. No heart-rate curves on file → the earlier steps' answer stands.
+  {
+    const priorHr = priorLearned?.run_threshold_hr;
+    const trialStands = priorHr && /time trial/.test(String(priorHr.source ?? '')) && Number(priorHr.value) > 0;
+    const fromCurves = thresholdHrFromHrCurves(allRunCurves.map((r) => ({
+      date: String(r.date ?? ''),
+      hrCurve: (r.computed as { hr_curve?: RunHrCurve } | null)?.hr_curve,
+    })));
+    const priorFromCurves = priorHr && /heart-rate window|heart rate window/.test(String(priorHr.source ?? '')) && Number(priorHr.value) > 0;
+    if (trialStands) {
+      threshold_hr = priorHr as LearnedMetric;
+      thresholdHRValue = Number(priorHr.value);
+    } else if (fromCurves && priorFromCurves && Number(priorHr.value) >= fromCurves.value) {
+      threshold_hr = priorHr as LearnedMetric;               // only up
+      thresholdHRValue = Number(priorHr.value);
+    } else if (fromCurves) {
+      const label = fromCurves.basis === '60'
+        ? `best 60-minute heart-rate window on ${fromCurves.date} (${fromCurves.windowAvgHr} bpm)`
+        : `95% of the best 20-minute heart-rate window on ${fromCurves.date} (${fromCurves.windowAvgHr} bpm)`;
+      threshold_hr = { value: fromCurves.value, confidence: 'high', source: label, sample_count: 1, as_of: fromCurves.date };
+      thresholdHRValue = fromCurves.value;
+      console.log(`  📊 Threshold HR: ${fromCurves.value} bpm — ${label}`);
     }
   }
 

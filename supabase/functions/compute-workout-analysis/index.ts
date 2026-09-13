@@ -2,7 +2,7 @@
 // @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { withAlarm } from '../_shared/alarm.ts';
-import { buildRunPaceCurve, type RunPaceCurve } from '../../../src/lib/run-critical-speed.ts';
+import { buildRunPaceCurve, buildRunHrCurve, type RunPaceCurve, type RunHrCurve } from '../../../src/lib/run-critical-speed.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { normalizeSamples } from '../../lib/analysis/sensor-data/extractor.ts';
 import { parseRunningTokens } from '../_shared/token-parser.ts';
@@ -2094,6 +2094,7 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
     let powerCurve: PowerCurve | null = null;
     let bestEfforts: BestEfforts | null = null;
     let paceCurve: RunPaceCurve | null = null;
+    let hrCurve: RunHrCurve | null = null;
     
     if (w.type === 'ride' || w.type === 'cycling' || w.type === 'bike') {
       // Calculate power curve for bikes
@@ -2126,6 +2127,10 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
       if (paceCurve) {
         console.log(`🏃 Pace curve: ${Object.keys(paceCurve).join(', ')}s windows`);
       }
+      // The highest 20- and 60-minute average heart rate — what threshold heart rate is read from
+      // (src/lib/run-critical-speed.ts buildRunHrCurve, TrainingPeaks' rule). The pace curve's avgHr is the
+      // heart rate of the FASTEST window, which is not the same thing.
+      hrCurve = buildRunHrCurve(time_s, hr_bpm);
     }
 
     // Build partial computed data (only what this function writes)
@@ -2137,6 +2142,7 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
       power_curve: powerCurve,
       best_efforts: bestEfforts,
       pace_curve: paceCurve,
+      hr_curve: hrCurve,
     };
 
     console.log('📝 About to UPDATE:', {
