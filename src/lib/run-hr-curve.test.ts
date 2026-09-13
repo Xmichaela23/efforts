@@ -43,3 +43,12 @@ Deno.test("threshold: TrainingPeaks' rule — higher of best 60-minute average a
   assertEquals(sixty.basis, '60');
   assertEquals(thresholdHrFromHrCurves([{ date: 'x', hrCurve: null }]), null);
 });
+
+import { buildRunPaceCurve } from './run-critical-speed.ts';
+
+Deno.test('the pace curve carries a 45-minute window, and only for a run that long', () => {
+  const t = secs(3000), d = t.map((s) => s * 3), hr = t.map(() => 150);
+  assert(buildRunPaceCurve(d, t, hr)!['2700'] != null);
+  const t32 = secs(1920), d32 = t32.map((s) => s * 3.4);
+  assertEquals(buildRunPaceCurve(d32, t32, t32.map(() => 129))!['2700'], undefined); // the 2025-12-26 case: 32 minutes
+});

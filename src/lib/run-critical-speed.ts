@@ -363,8 +363,14 @@ export function fitRunCriticalSpeed(
  * fit is what refuses it.
  */
 
-/** The durations sampled. Each is the lower edge of one of the fit's buckets, so each lands in its own. */
-export const PACE_CURVE_TARGETS_S = [180, 360, 720, 1200, 2100] as const;
+/**
+ * The durations sampled. 180–2100 are the lower edges of the fit's buckets, so each lands in its own.
+ * 2700 (45 minutes, added 2026-09-13) is the window threshold PACE is read from — TrainingPeaks: "We suggest a threshold if
+ * your Peak 45 Min Average Pace is faster than the currently set threshold"
+ * (trainingpeaks.com/blog/are-you-using-threshold-improvement-notifications). It shares the 2100–3600 bucket with the
+ * 35-minute window; the fit keeps the faster of the two per bucket, so it can only ever add a real point there.
+ */
+export const PACE_CURVE_TARGETS_S = [180, 360, 720, 1200, 2100, 2700] as const;
 
 export type PaceCurvePoint = {
   distanceM: number;
