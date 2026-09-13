@@ -896,11 +896,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         intervals,
         type,
         (wa as any)?.vs_similar_v1 ?? null,
-        (typeof weatherTempF === 'number' && Number.isFinite(weatherTempF)) ? Math.round(weatherTempF) : null,
+        (!indoorVenue && typeof weatherTempF === 'number' && Number.isFinite(weatherTempF)) ? Math.round(weatherTempF) : null,
         decouplingV1,
         providerElevationGainM ?? null,
-        weatherTempStartF ?? null,
-        weatherTempEndF ?? null,
+        indoorVenue ? null : (weatherTempStartF ?? null),
+        indoorVenue ? null : (weatherTempEndF ?? null),
         indoorVenue,
       );
 
@@ -1131,7 +1131,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     planned_totals: plannedTotals,
     // ⛔ THE HEADER AND THE TERRAIN ROW READ ONE STRING. `temperature_f` stays for older clients;
     // `display` is what the screen shows, and it is the SAME call the Conditions row makes.
-    weather: (typeof weatherTempF === 'number' && Number.isFinite(weatherTempF))
+    // ⛔ NO WEATHER INDOORS, ON THE HEADER TOO (2026-09-13). The 2026-09-09 rule took the heat and hills
+    // lines off an indoor session; the header's temperature was never gated, and once the indoor
+    // predicate was actually fed (2026-09-12) a re-analysed trainer ride read "85°F · INDOOR" — a
+    // forecast for a garage. Same answer, one more reader.
+    weather: (!indoorVenue && typeof weatherTempF === 'number' && Number.isFinite(weatherTempF))
       ? { temperature_f: Math.round(weatherTempF), display: formatSessionTemp(factPacket?.facts?.weather) ?? `${Math.round(weatherTempF)}°F` }
       : null,
     // The same answer that took the weather and the hills off this session (2026-09-09), now said.
@@ -1920,7 +1924,7 @@ export function buildAnalysisDetailRows(
           comp?.overall?.elevation_gain ??
           lap0?.total_elevation_gain,
       );
-      if (Number.isFinite(elevM) && elevM > 15) {
+      if (!indoors && Number.isFinite(elevM) && elevM > 15) {
         const tempStr = formatSessionTemp({
           temperature_f: weatherTempF,
           temp_start_f: weatherTempStartF,
