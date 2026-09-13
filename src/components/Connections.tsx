@@ -1097,6 +1097,11 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
                   <CardDescription className="mt-1 text-white/60">
                     {getProviderDescription(connection.provider)}
                   </CardDescription>
+                  {connection.provider === 'intervals_icu' && connection.connected && (
+                    <CardDescription className="mt-1 text-white/60">
+                      Zwift FTP should match your FTP so the watts are right.
+                    </CardDescription>
+                  )}
                 </div>
               </div>
             </CardHeader>
