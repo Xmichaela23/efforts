@@ -54,8 +54,15 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
       provider: 'strava',
       connected: false,
       syncStatus: 'idle'
+    },
+    {
+      provider: 'intervals_icu',
+      connected: false,
+      syncStatus: 'idle'
     }
   ]);
+  // Intervals.icu connects with the athlete's personal API key until the OAuth app is approved (2026-09-13).
+  const [intervalsKey, setIntervalsKey] = useState('');
   
   const [loading, setLoading] = useState(false);
   const [importProgress, setImportProgress] = useState<{ importing: boolean; progress: number; total: number }>({
@@ -769,6 +776,8 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
     switch (provider) {
       case 'strava':
         return 'Strava';
+      case 'intervals_icu':
+        return 'Intervals.icu';
       // ⛔ THE FULL APP NAME, NEVER ABBREVIATED (Garmin API brand guidelines v 6.30.2025: "do not
       // abbreviate, truncate or stylize the Garmin app name"). This read "Garmin"; the app is
       // "Garmin Connect", which is also what every other surface in this app already calls it.
@@ -964,6 +973,8 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
     switch (provider) {
       case 'strava':
         return 'Connect Strava and new activities arrive on their own after each workout.';
+      case 'intervals_icu':
+        return 'Sends your rides to Zwift, Wahoo and other apps linked in Intervals.icu.';
       case 'garmin':
         // ⛔ THE FULL APP NAME HERE TOO (docs/WORKORDER-garmin-strava-attribution-2026-09-09.md §4).
         // Garmin API Brand Guidelines v6.30.2025: when presenting the connection, "use the full app
@@ -971,6 +982,39 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
         return 'Connect to Garmin Connect and new activities arrive on their own after each workout.';
       default:
         return `Connect your ${provider} account to sync data.`;
+    }
+  };
+
+  // The server checks the key with Intervals.icu, stores it encrypted, and from then on keeps the athlete's
+  // rides on their Intervals.icu calendar (intervals-connect-key → calendar-sync). Errors are the server's words.
+  const connectIntervals = async () => {
+    const apiKey = intervalsKey.trim();
+    if (!apiKey) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('intervals-connect-key', { body: { api_key: apiKey } });
+      if (error || !data?.ok) {
+        toast({ title: 'Intervals.icu', description: data?.error ?? error?.message ?? 'Connection failed', variant: 'destructive' });
+        return;
+      }
+      setIntervalsKey('');
+      setConnections((prev) => prev.map((c) => (c.provider === 'intervals_icu' ? { ...c, connected: true, health: 'ok', connectionData: { name: data.athlete?.name ?? null } } : c)));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const disconnectIntervals = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('intervals-connect-key', { body: { disconnect: true } });
+      if (error || !data?.ok) {
+        toast({ title: 'Intervals.icu', description: data?.error ?? error?.message ?? 'Disconnect failed', variant: 'destructive' });
+        return;
+      }
+      setConnections((prev) => prev.map((c) => (c.provider === 'intervals_icu' ? { ...c, connected: false, health: 'ok', connectionData: null } : c)));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1029,7 +1073,7 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
                         <GalaxyButton
                           shape="chip"
                           variant="primary"
-                          onClick={() => (connection.provider === 'garmin' ? connectGarmin() : connectStrava())}
+                          onClick={() => (connection.provider === 'garmin' ? connectGarmin() : connection.provider === 'intervals_icu' ? disconnectIntervals() : connectStrava())}
                           className="shrink-0"
                           aria-label={`Reconnect ${getProviderName(connection.provider)}`}
                         >
@@ -1051,7 +1095,9 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
                         ✓ Connected to {getProviderName(connection.provider)}
                       </span>
                     </div>
-                    <p className="m-0 mt-1.5 text-[12px] text-white/60">New activities arrive on their own. The buttons below pull in past ones.</p>
+                    {connection.provider !== 'intervals_icu' && (
+                      <p className="m-0 mt-1.5 text-[12px] text-white/60">New activities arrive on their own. The buttons below pull in past ones.</p>
+                    )}
                   </div>
                   )}
 
@@ -1212,6 +1258,8 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
                           disconnectStrava();
                         } else if (connection.provider === 'garmin') {
                           disconnectGarmin();
+                        } else if (connection.provider === 'intervals_icu') {
+                          void disconnectIntervals();
                         }
                       }}
                       disabled={loading}
@@ -1260,6 +1308,30 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
                         className="h-12"
                       />
                     </button>
+                  ) : connection.provider === 'intervals_icu' ? (
+                    <form
+                      className="flex flex-col gap-2 text-left"
+                      onSubmit={(e) => { e.preventDefault(); void connectIntervals(); }}
+                    >
+                      <label htmlFor="intervals-api-key" className="text-sm text-white/80">API key</label>
+                      <input
+                        id="intervals-api-key"
+                        type="password"
+                        autoComplete="off"
+                        value={intervalsKey}
+                        onChange={(e) => setIntervalsKey(e.target.value)}
+                        className="px-3 py-2 bg-white/[0.08] backdrop-blur-lg border border-white/25 rounded-md text-white/90 focus:outline-none focus:border-white/40 text-sm"
+                      />
+                      <p className="m-0 text-[12px] text-white/60">Found in Intervals.icu under Settings, in Developer Settings.</p>
+                      <Button
+                        type="submit"
+                        disabled={loading || !intervalsKey.trim()}
+                        className="w-full rounded-full bg-blue-600 hover:bg-blue-700 text-white border-none"
+                      >
+                        <Link2 className="h-4 w-4 mr-2" />
+                        Connect
+                      </Button>
+                    </form>
                   ) : (
                     <Button
                       onClick={() => {
