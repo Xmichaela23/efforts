@@ -6,6 +6,7 @@
 // - No AI here; AI language should be layered on top of these facts.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { planLine } from '../_shared/plan-line.ts';
 import { COACH_PAYLOAD_VERSION } from '../_shared/coach-payload-version.ts';
 import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import type {
@@ -4741,6 +4742,14 @@ Deno.serve(async (req) => {
           goal_kind: blockIdentity.goal.kind,
           goal_focus: blockIdentity.goal.kind === 'non_race' && blockIdentity.goal.known ? blockIdentity.goal.focus : null,
           block_weeks: blockIdentity.blockWeeks,
+          // ⛔ THE PLAN LINE, STAMPED HERE (2026-09-12). `StatePerformanceSection` composed its own
+          // on the phone — "week 2 of 12", with no plan name — while Performance printed the full
+          // string off `session_detail_v1.block.line`. One composer now, `_shared/plan-line.ts`.
+          line: planLine({
+            planName: blockIdentity.planName,
+            weekIndex: blockIdentity.weekIndex,
+            blockWeeks: blockIdentity.blockWeeks,
+          }),
           phase: blockIdentity.phase,
           // The plain word for the week. `phase` is the plan's own name and is often internal
           // ('Leader'/'Anchor'); the card translates ONCE so no screen keeps its own table.

@@ -118,6 +118,12 @@ export type CoachWeekContextV1 = {
       goal_kind: 'race' | 'non_race' | 'unknown';
       goal_focus: string | null;
       block_weeks: number | null;
+      /**
+       * ⛔ THE PLAN LINE, READY TO PRINT — "Standard Focus · week 2 of 12", composed by
+       * `_shared/plan-line.ts` and stamped by `coach`. State printed a line it built itself from the
+       * fields around this one; it prints this string now, and the same one Performance shows.
+       */
+      line: string | null;
       /** The plan's OWN phase name — internal ('Leader' / 'Anchor'). Do not print this one. */
       phase: string | null;
       /** ⛔ THE WORD TO PRINT: 'base' | 'build' | 'peak' | 'taper' | 'recovery'. Null → say nothing. */

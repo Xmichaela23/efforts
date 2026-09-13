@@ -1,4 +1,5 @@
 import FirstRunOverlay from '@/components/FirstRunOverlay';
+import { sessionDisplayName } from '@/lib/session-display-name';
 import FirstRunCard from '@/components/FirstRunCard';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -1239,46 +1240,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     } catch {}
   };
 
-  // Get discipline name
-  // Display label: prefer provider sport when present (e.g., Hike, Gravel Ride)
-  // Also detect indoor/treadmill runs from trainer flag or missing GPS
+  /**
+   * The name on the card. ⛔ ONE LADDER (`src/lib/session-display-name.ts`, 2026-09-12). This held a
+   * copy of the indoor test — Strava's `trainer` flag, then an empty `gps_track` with no start fix —
+   * character-identical to the one in `UnifiedWorkoutView.tsx`, and like every other copy it asked
+   * the question only of runs and walks, so a trainer ride read "Ride" here.
+   */
   const getDisplaySport = (workout: any): string => {
     // A 1RM/baseline test is measurement, not training — surface it as a test on Today (Q-097/Q-102).
     if (isBaselineTestWorkout(workout)) return '1RM Test';
-    const type = String(workout?.type || '').toLowerCase();
-    const provider = workout?.strava_data?.original_activity?.sport_type
-      || workout?.provider_sport
-      || '';
-    
-    // Check for indoor/treadmill indicators - must be STABLE to avoid UI flicker
-    const isTrainer = workout?.strava_data?.original_activity?.trainer === true;
-    // Check GPS data - handle both array and JSON string formats
-    const gpsTrack = workout?.gps_track;
-    const hasGpsTrack = (Array.isArray(gpsTrack) && gpsTrack.length > 0) || 
-                        (typeof gpsTrack === 'string' && gpsTrack.length > 10);
-    // Check start position as fallback indicator
-    const hasStartPosition = Number.isFinite(workout?.start_position_lat) && 
-                             workout?.start_position_lat !== 0;
-    // Only classify as indoor if we're sure: trainer flag OR (gps_track explicitly empty AND no start position)
-    const isConfirmedIndoor = isTrainer || 
-                              (Array.isArray(gpsTrack) && gpsTrack.length === 0 && !hasStartPosition);
-    const isIndoorRun = (type === 'run' || type === 'walk') && isConfirmedIndoor;
-
-    // For indoor runs, return "Indoor Run" or "Treadmill"
-    if (isIndoorRun && type === 'run') {
-      return isTrainer ? 'Treadmill' : 'Indoor Run';
-    }
-    if (isIndoorRun && type === 'walk') {
-      return 'Indoor Walk';
-    }
-
-    if (typeof provider === 'string' && provider.trim().length > 0) {
-      // Title case
-      const label = provider.replace(/_/g, ' ');
-      return label.charAt(0).toUpperCase() + label.slice(1);
-    }
-
-    return getDisciplineName(workout?.type);
+    return sessionDisplayName(workout);
   };
 
   const getDisciplineName = (type: string): string => {
@@ -1915,9 +1886,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   }}
                 >
                   {formatDisplayDate(activeDate)}
-                  {trainingPlanContext?.currentWeek ? (
+                  {/* ⛔ THE SERVER'S WORDS (2026-09-12) — `weekPosition`, from `_shared/plan-line.ts`,
+                      the same composer Performance and State read. This built "· Week {n}" here from
+                      the raw number, which is why Today was the one surface saying "Week 3" with a
+                      capital and no length. The date beside it is the only thing this screen adds. */}
+                  {trainingPlanContext?.weekPosition ? (
                     <span style={{ color: getDisciplinePhosphorCore('run'), opacity: 0.72 }}>
-                      {' · '}Week {trainingPlanContext.currentWeek}
+                      {' · '}{trainingPlanContext.weekPosition}
                     </span>
                   ) : null}
                 </span>

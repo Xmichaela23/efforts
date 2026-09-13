@@ -135,24 +135,17 @@ function verdictSignedPct(verdict: string, pct: number | null | undefined, dp = 
 // not the previous program renders through the identical path, and a plan that does not place the week says only
 // "week 3 of 12". Null anywhere here means the plan did not say — so the line shortens, never guesses.
 type BlockCard = NonNullable<CoachWeekContextV1['plan']['block']>;
-function blockContextLine(planWeek: number | null | undefined, block: BlockCard | null | undefined): string | null {
-  // No week number = no plan running (the server nulls it before a plan starts and after it ends).
-  // There is nothing honest to say about position, so the row says nothing rather than "week 1".
-  if (planWeek == null) return null;
-  const weeks = block?.block_weeks ?? null;
-  const where = weeks != null && weeks > 0 ? `week ${planWeek} of ${weeks}` : `week ${planWeek}`;
-  /**
-   * ⛔ THE PHASE WORD IS STRIPPED (2026-08-29, Michael: *"the previous program is a ghost in the machine"* →
-   * *"remove it"*). `phase_word` resolves from `PHASE_NAME` in `strength-primary-plan.ts`, whose
-   * vocabulary is the previous program's block shape — Leader, Anchor, TM Test, Deload. None of those words is
-   * Viada's, and the screen was printing them as though they described the athlete's programme.
-   * ⚠️ THE POSITION SURVIVES: "week 1 of 12" is a fact about where the athlete is and belongs to no
-   * author. Only the phase name comes off.
-   * ⚠️ THIS IS DISPLAY ONLY. The block still RUNS on that shape — stages 2-5 of
-   * `docs/WORKORDER-viada-owns-the-engine-2026-08-29.md`. Removing the word does not remove the
-   * programme, and nothing here should be read as though it had.
-   */
-  return where;
+/**
+ * ⛔ THE LINE IS THE SERVER'S NOW (2026-09-12) — `block.line`, composed by `_shared/plan-line.ts`
+ * and stamped by `coach`. This function built its own on the phone and printed "week 2 of 12" with
+ * no plan name, while Performance printed "Standard Focus · week 2 of 12" off the same block for the
+ * same week. One string, three screens.
+ * ⚠️ WHAT IT USED TO DECIDE, AND WHO DECIDES IT NOW. Null week → no line at all rather than "week 1"
+ * (the composer's rule, unchanged). The phase word stripped, per 2026-08-29 — the composer takes no
+ * phase input, so no screen can print one.
+ */
+function blockContextLine(block: BlockCard | null | undefined): string | null {
+  return block?.line ?? null;
 }
 
 // ⛔ THE AEROBIC READ'S HEART-RATE WORDS AND ITS SIGNAL ARE DELETED (2026-09-03, Michael: "lose the
@@ -520,7 +513,7 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
    * than a regression — `showBest` below renders the record precisely when that happens.
    */
   const lifts = fitness.perLift.filter((l) => l.isPrimary && l.latestE1rm != null);
-  const blockLine = blockContextLine(planWeek, block);
+  const blockLine = blockContextLine(block);
   // ⛔ SLICE b — the ambient per-lift state, by `training_max` key. Absent for any lift the current
   // block does not prescribe (an accessory, or a lift on a plan that is not a strength block), and
   // absent renders nothing rather than guessing at a status.

@@ -161,6 +161,12 @@ export type SessionDetailV1 = {
       summary: string;
     } | null;
     /** Pre-formatted week label for display, e.g. "Week 3 • Build". */
+    /**
+     * ⛔ THE GOAL-RACE LINE ONLY, SINCE 2026-09-12 — "Goal race • London Marathon". It used to carry
+     * a second grammar of the plan line ("Standard Focus · week 2 · Build") and every screen that
+     * read it showed different words from every screen that read `block.line`. The plan line has one
+     * composer now (`_shared/plan-line.ts`); null here on any session that is not a goal race.
+     */
     week_label: string | null;
   };
 

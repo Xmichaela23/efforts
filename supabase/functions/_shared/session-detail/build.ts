@@ -834,16 +834,24 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     };
   }
 
-  // ── Week label ─────────────────────────────────────────────────────────────
-  const weekLabel = (() => {
-    if (isGoalRaceSession) {
-      const verdict = String(adherenceSummary?.verdict || '');
-      const m = verdict.match(/Congratulations on finishing\s+(.+?)(?:\s*$|[.!])/i);
-      if (m?.[1]) return `Goal race • ${m[1].trim()}`;
-      return 'Goal race';
-    }
-    return buildWeekLabel(factPacket);
-  })();
+  /**
+   * ── Week label ────────────────────────────────────────────────────────────
+   * ⛔ THE PLAN HALF OF THIS IS DELETED (2026-09-12). `buildWeekLabel` read the fact packet's plan
+   * facts and built "Standard Focus · week 2 · Build" — a second grammar for the plan line, and its
+   * qualifier was `weekIntent`, initialised to 'build' before any evidence and printed as though the
+   * plan had said it. Michael read it as a marathon carry-over on a Standard Focus run. The one
+   * composer is `_shared/plan-line.ts`, stamped by workout-detail onto `block.line`; every screen
+   * reads that. Nothing falls back here any more, because a fallback in another grammar is the bug.
+   * ⚠️ THE GOAL-RACE LINE SURVIVES. It is not a plan line — it names the race just finished, it has
+   * no week in it, and no other surface composes one.
+   */
+  const weekLabel = isGoalRaceSession
+    ? (() => {
+        const verdict = String(adherenceSummary?.verdict || '');
+        const m = verdict.match(/Congratulations on finishing\s+(.+?)(?:\s*$|[.!])/i);
+        return m?.[1] ? `Goal race • ${m[1].trim()}` : 'Goal race';
+      })()
+    : null;
 
   // D-036 aerobic decoupling, resolved ONCE (single source): the classification
   // block below and the Performance "Aerobic decoupling" row both read this — they
@@ -1381,32 +1389,6 @@ function fmtPace(secPerMi: number): string {
   const m = Math.floor(secPerMi / 60);
   const s = Math.round(secPerMi % 60);
   return `${m}:${String(s).padStart(2, '0')}/mi`;
-}
-
-function buildWeekLabel(factPacket: any): string | null {
-  try {
-    const plan = factPacket?.facts?.plan;
-    if (!plan) return null;
-    const weekNum = typeof plan?.week_number === 'number' ? plan.week_number : null;
-    // ⛔ THE PLAN'S OWN NAME, AND NEVER THE DEFAULT INTENT (2026-09-13, Michael: "says BUILD — should be
-    // true to plan"). This printed "Week 2 • Build" on a Standard Focus run. Standard Focus has no focus
-    // label; its phases are stored as a list where `plan-context.ts` expects a map, so no phase name
-    // comes back; and `weekIntent` there is initialised to 'build' before any evidence — a default,
-    // printed as if it were the plan's word. Michael read it as a marathon carry-over. The lift header
-    // never had it because it reads the block (`strengthBlockLine`: "Standard Focus · week 2 of 12").
-    // Same grammar here: the name, the week, and a focus label or a REAL phase only when the plan has
-    // one. The intent word is a plan-context input, not a label.
-    const rawName = typeof plan?.name === 'string' ? plan.name.trim() : '';
-    const name = rawName && rawName !== 'Plan' ? rawName : null; // 'Plan' is the fact packet's placeholder
-    const focusLabel = typeof plan?.week_focus_label === 'string' && plan.week_focus_label ? plan.week_focus_label : null;
-    const phase = typeof plan?.phase === 'string' && plan.phase ? plan.phase : null;
-    const qualifier = focusLabel || phase;
-    const parts: string[] = [];
-    if (name) parts.push(name);
-    if (weekNum != null) parts.push(`week ${weekNum}`);
-    if (qualifier) parts.push(qualifier);
-    return parts.length ? parts.join(' · ') : null;
-  } catch { return null; }
 }
 
 function buildPlannedTotals(

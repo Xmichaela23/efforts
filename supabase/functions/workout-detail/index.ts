@@ -3,6 +3,7 @@
 // Behavior: Return canonical completed workout details by id with optional heavy fields
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { planLine } from '../_shared/plan-line.ts';
 import { weekStartOf } from '../_shared/plan-week.ts';
 import { buildDailyLedger, buildPlannedSession } from '../_shared/athlete-snapshot/daily-ledger.ts';
 import { buildBodyResponse } from '../_shared/athlete-snapshot/body-response.ts';
@@ -1210,15 +1211,14 @@ async function runSessionDetailPipelineAndPersist(
           ? blockForSession.goal.focus : null,
         week_index: blockForSession.weekIndex,
         block_weeks: blockForSession.blockWeeks,
-        // The line the lift header and the run and ride tile rows print, composed once here. The
-        // phone used to build it from the fields above in two places (2026-09-12); it renders now.
-        line: (() => {
-          const week = blockForSession.weekIndex;
-          if (week == null) return null;
-          const weeks = blockForSession.blockWeeks;
-          const pos = weeks != null && weeks > 0 ? `week ${week} of ${weeks}` : `week ${week}`;
-          return blockForSession.planName ? `${blockForSession.planName} · ${pos}` : pos;
-        })(),
+        // ⛔ THE PLAN LINE, FROM THE ONE COMPOSER (`_shared/plan-line.ts`, 2026-09-12). This was an
+        // inline copy here; State and Today had two more, in two more grammars. The lift header and
+        // the run, ride and swim cards all print this string verbatim.
+        line: planLine({
+          planName: blockForSession.planName,
+          weekIndex: blockForSession.weekIndex,
+          blockWeeks: blockForSession.blockWeeks,
+        }),
         phase: blockForSession.phase,
         // The plain word for the week — the screen prints this one. `phase` above is the plan's own
         // name and on a the previous program block that is 'Leader' / 'Anchor', which is the previous program's word, not the

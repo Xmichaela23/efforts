@@ -543,9 +543,15 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
   if (ct.pool_display) metrics.push([ct.pool_display, 'Pool']);
   if (lengths != null) metrics.push([String(lengths), 'Lengths']);
 
-  // D-166 refinement: week/phase context ("Week 5 · Build") rides at the top of the card — it lived in
-  // the top adherence header that swims now drop, and that context matters for every discipline.
-  const weekLabel = (sd as any)?.plan_context?.week_label as string | null | undefined;
+  /**
+   * D-166 refinement: the plan line rides at the top of the card — it lived in the top adherence
+   * header that swims now drop, and that context matters for every discipline.
+   * ⛔ THE SERVER'S LINE, VERBATIM (2026-09-12). This read `plan_context.week_label`, built from the
+   * fact packet as "Standard Focus · week 2 · Build" — and 'Build' was an intent word defaulted
+   * before any evidence, printed as if the plan had said it. `block.line` is the one composed
+   * string (`_shared/plan-line.ts`) that the lift header, the run and ride tiles and State all show.
+   */
+  const weekLabel = (sd as { block?: { line?: string | null } | null })?.block?.line ?? null;
 
   // D-166 refinement: render the discipline trend INSIDE the card (was orphaned between header + card).
   const dt = (sd as any)?.discipline_trend;

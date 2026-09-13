@@ -190,6 +190,12 @@ export type CoachWeekContextResponseV1 = {
       /** Only set when the focus is one this build knows. */
       goal_focus: string | null;
       block_weeks: number | null;
+      /**
+       * ⛔ THE PLAN LINE, READY TO PRINT — "Standard Focus · week 2 of 12", from
+       * `_shared/plan-line.ts`. Null when the plan states no week. The screen prints it verbatim and
+       * composes nothing; the same string Performance shows on its own cards.
+       */
+      line: string | null;
       phase: string | null;
       /**
        * ⛔ THE PHASE WORD A SCREEN MAY PRINT — 'base' | 'build' | 'peak' | 'taper' | 'recovery'.

@@ -24,6 +24,7 @@ import { buildExistsKeys, plannedKey } from './planned-exists-key.ts';
 // card is built from, so the calendar's phase word cannot disagree with State's (2026-08-15).
 import { resolveBlockIdentity } from '../_shared/block-identity.ts';
 import { weekLabelFor } from './week-label.ts';
+import { weekPosition } from '../_shared/plan-line.ts';
 import { WORKOUT_LIST_JSON_SELECT, rebuildWorkoutListRow } from '../_shared/workout-list-select.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 // ⛔ THE ONE completed-set/exercise hydration shape (2026-08-11) — shared with workout-detail and the
@@ -1539,6 +1540,15 @@ Deno.serve(async (req)=>{
             focus: focus,
             weekLabel: weekLabel.label,
             standingPlan: weekLabel.standingPlan,
+            /**
+             * ⛔ THE POSITION HALF OF THE PLAN LINE (2026-09-12) — "week 3 of 12", from
+             * `_shared/plan-line.ts`, the same composer Performance and State read. Today's header
+             * built "· Week {n}" on the phone from the raw number beside it, which is why it was the
+             * one surface saying "Week 3" with a capital and no length.
+             * ⚠️ THE DATE IS STILL THE PHONE'S and is the only thing it adds — it owns the active
+             * day and its formatting. The words here are composed nowhere else.
+             */
+            weekPosition: weekPosition(currentWeek, durationWeeks),
             notes: notes,
             keyWorkouts: weekSummary.key_workouts || [],
             // Race info from config

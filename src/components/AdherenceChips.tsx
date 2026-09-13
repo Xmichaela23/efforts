@@ -24,7 +24,6 @@ interface AdherenceChipsProps {
       gap_adjusted?: boolean;
     };
     display?: { show_adherence_chips?: boolean };
-    plan_context?: { week_label?: string | null };
     completed_totals?: {
       duration_s?: number | null;
       distance_m?: number | null;
@@ -151,12 +150,14 @@ export default function AdherenceChips({
       powerAdherence != null || durationAdherence != null || intensityAdherence != null;
     if (!anyVal) return null;
 
-    // ⛔ ONE LINE FOR EVERY SPORT (2026-09-13, Michael: "will they all get Standard Focus · week?").
-    // `block.line` is composed by workout-detail on every attached session — "Standard Focus ·
-    // week 2 of 12" — and the lift header prints the same string. This tile row used to read the
-    // fact packet's plan facts, which a ride does not carry and a run carried with a default phase
-    // word. The packet label is the fallback for a session with no block. The phone renders.
-    const weekLabel = (sd as { block?: { line?: string | null } | null }).block?.line ?? sd.plan_context?.week_label ?? null;
+    // ⛔ ONE LINE FOR EVERY SPORT, AND NO FALLBACK (2026-09-12). `block.line` is composed by
+    // `_shared/plan-line.ts` and stamped by workout-detail on every attached session; the lift
+    // header, the swim card and State print the identical string.
+    // ⚠️ THE `week_label` FALLBACK IS GONE ON PURPOSE. It came from the fact packet in a different
+    // grammar ("Standard Focus · week 2 · Build", where 'Build' was a default intent word the plan
+    // never said), so a session that fell back printed a line no other screen would show. A session
+    // with no block now shows no line, which is the honest answer.
+    const weekLabel = (sd as { block?: { line?: string | null } | null }).block?.line ?? null;
     const sportType = String(sd.type || '').toLowerCase();
     const isRide = /ride|bike|cycling/i.test(sportType);
     const isSwim = /swim/i.test(sportType);
