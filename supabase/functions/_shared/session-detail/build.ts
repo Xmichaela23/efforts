@@ -1347,12 +1347,24 @@ function buildWeekLabel(factPacket: any): string | null {
     const plan = factPacket?.facts?.plan;
     if (!plan) return null;
     const weekNum = typeof plan?.week_number === 'number' ? plan.week_number : null;
+    // ⛔ THE PLAN'S OWN NAME, AND NEVER THE DEFAULT INTENT (2026-09-13, Michael: "says BUILD — should be
+    // true to plan"). This printed "Week 2 • Build" on a Standard Focus run. Standard Focus has no focus
+    // label; its phases are stored as a list where `plan-context.ts` expects a map, so no phase name
+    // comes back; and `weekIntent` there is initialised to 'build' before any evidence — a default,
+    // printed as if it were the plan's word. Michael read it as a marathon carry-over. The lift header
+    // never had it because it reads the block (`strengthBlockLine`: "Standard Focus · week 2 of 12").
+    // Same grammar here: the name, the week, and a focus label or a REAL phase only when the plan has
+    // one. The intent word is a plan-context input, not a label.
+    const rawName = typeof plan?.name === 'string' ? plan.name.trim() : '';
+    const name = rawName && rawName !== 'Plan' ? rawName : null; // 'Plan' is the fact packet's placeholder
     const focusLabel = typeof plan?.week_focus_label === 'string' && plan.week_focus_label ? plan.week_focus_label : null;
     const phase = typeof plan?.phase === 'string' && plan.phase ? plan.phase : null;
-    const weekIntent = typeof plan?.week_intent === 'string' && plan.week_intent && plan.week_intent !== 'unknown' ? plan.week_intent : null;
-    const humanLabel = focusLabel || phase || (weekIntent ? weekIntent.charAt(0).toUpperCase() + weekIntent.slice(1) : null);
-    if (!humanLabel) return null;
-    return weekNum != null ? `Week ${weekNum} • ${humanLabel}` : humanLabel;
+    const qualifier = focusLabel || phase;
+    const parts: string[] = [];
+    if (name) parts.push(name);
+    if (weekNum != null) parts.push(`week ${weekNum}`);
+    if (qualifier) parts.push(qualifier);
+    return parts.length ? parts.join(' · ') : null;
   } catch { return null; }
 }
 

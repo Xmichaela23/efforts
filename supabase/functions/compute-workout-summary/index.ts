@@ -1775,6 +1775,23 @@ Deno.serve(async (req) => {
     // Detect pool swims: check if rows have distance progression
     const hasDistanceProgression = rows.length > 1 && rows.some(r => (r.d || 0) > 1);
     const isPoolSwim = sport === 'swim' && !hasDistanceProgression;
+    /**
+     * ⛔ THE WALK ENDS WHERE THE ATHLETE STOPPED MOVING, NOT WHERE THE RECORDING ENDS (2026-09-13,
+     * Michael: "it says 14 of 14 intervals — I missed some"). His Sept 10 ride: 60 minutes moving, and
+     * the head unit kept taking power samples for another 17 with no distance and no heart rate. The
+     * walk laid intervals 13 and 14 over that stretch, the analyser graded them in range, and only the
+     * steps after them were marked not done. The Duration tile already trusts the device's MOVING time;
+     * the step walk now does too: the last sample where distance still grew is the end of the session,
+     * and every step at or past it is `not_done`. FIELD — Garmin's moving time is "time with speed",
+     * and it is the number the tile prints. ⚠️ OURS — "distance grew" as the moving test on the samples;
+     * a pool swim (no distance progression) keeps the full recording.
+     */
+    const walkEndIdx = (() => {
+      if (!hasDistanceProgression) return rows.length - 1;
+      let last = 0;
+      for (let j = 1; j < rows.length; j += 1) if ((rows[j].d || 0) > (rows[j - 1].d || 0) + 0.5) last = j;
+      return Math.max(0, last);
+    })();
 
     type Info = { st:any; startIdx:number; endIdx:number|null; measured:boolean; role:'warmup'|'cooldown'|'recovery'|'work'|'pre_extra'|'post_extra'; notDone?: boolean };
     const infos: Info[] = [];
@@ -1808,8 +1825,8 @@ Deno.serve(async (req) => {
       // Anaerobic Ride: 42 of 66 min, five of ten efforts done, and the screen showed nothing). A step whose
       // planned start lies at or beyond the end of the recording is emitted as `not_done`; it is never
       // measured, never walked into the rows, and never redistributed as a recovery share.
-      const lastRowT = rows.length ? Number(rows[rows.length - 1].t || 0) : 0;
-      if (rows.length && idx >= rows.length - 1 && startT >= lastRowT - 1
+      const lastRowT = rows.length ? Number(rows[walkEndIdx].t || 0) : 0;
+      if (rows.length && idx >= walkEndIdx && startT >= lastRowT - 1
           && ((targetMeters && targetMeters > 0) || (targetSeconds && targetSeconds > 0))) {
         infos.push({ st, startIdx: rows.length - 1, endIdx: rows.length - 1, measured: true, role, notDone: true });
         continue;
@@ -1826,15 +1843,15 @@ Deno.serve(async (req) => {
         // For pool swims, ALWAYS use time-based slicing (distance progression not available)
         if (isPoolSwim && targetSeconds && targetSeconds > 0) {
           const goalT = startT + targetSeconds;
-          while (idx < rows.length && (rows[idx].t || 0) < goalT) idx += 1;
+          while (idx < walkEndIdx && (rows[idx].t || 0) < goalT) idx += 1;
         } else if (targetMeters && targetMeters > 0 && hasDistanceProgression) {
           const goalD = startD + targetMeters;
-          while (idx < rows.length && (rows[idx].d || 0) < goalD) idx += 1;
+          while (idx < walkEndIdx && (rows[idx].d || 0) < goalD) idx += 1;
         } else if (targetSeconds && targetSeconds > 0) {
           const goalT = startT + targetSeconds;
-          while (idx < rows.length && (rows[idx].t || 0) < goalT) idx += 1;
+          while (idx < walkEndIdx && (rows[idx].t || 0) < goalT) idx += 1;
         }
-        if (idx >= rows.length) idx = rows.length - 1;
+        if (idx > walkEndIdx) idx = walkEndIdx;
         cursorT = rows[idx].t;
         cursorD = rows[idx].d || cursorD;
         infos.push({ st, startIdx: startIdxThis, endIdx: idx, measured: true, role });
