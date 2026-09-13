@@ -4,6 +4,32 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser } from '../_shared/require-user.ts';
 
+/**
+ * ⛔ UNATTACH RE-RUNS THE CHAIN, AS ATTACH DOES (2026-09-13, Michael, on a ride he had just unattached
+ * that still read "Standard Focus · week 2 of 12", plan tiles, "14 of 14 on target": "it looks a little
+ * baked in"). It was: this function cleared `planned_id` and nothing else, so the stored summary and
+ * analysis kept every plan-derived fact. `auto-attach-planned` fires summary → analysis → analyser
+ * when a link is made; the link coming off is the same event in reverse. `recompute-workout` is the
+ * one ordered orchestrator (summary included), called through its service door with the owner's id,
+ * fire-and-forget. The analysers null every adherence field on an unlinked session (D-035), so the
+ * tiles, the plan line and the plan-context row leave on the next open.
+ */
+function fireRecompute(workoutId: string, userId: string): void {
+  try {
+    const baseUrl = Deno.env.get('SUPABASE_URL');
+    const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!baseUrl || !key) return;
+    fetch(`${baseUrl}/functions/v1/recompute-workout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key },
+      body: JSON.stringify({ workout_id: workoutId, user_id: userId, include_summary: true }),
+    }).catch((e) => console.error('[detach-planned] recompute-workout trigger error:', e));
+  } catch (e) {
+    console.error('[detach-planned] recompute-workout trigger error:', e);
+  }
+}
+
+
 Deno.serve(async (req) => {
   const cors = {
     'Access-Control-Allow-Origin': '*',
@@ -90,6 +116,7 @@ Deno.serve(async (req) => {
     //   · row EXISTS but belongs to someone else → still a hard 404. Unchanged.
     if (!p) {
       await supabase.from('workouts').update({ planned_id: null }).eq('id', w.id).eq('user_id', w.user_id);
+      fireRecompute(String(w.id), String(w.user_id));
       return new Response(JSON.stringify({
         success: true,
         detached: true,
@@ -127,6 +154,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    fireRecompute(String(w.id), String(w.user_id));
     return new Response(JSON.stringify({ success: true, detached: true, workout_id: String(w.id), planned_id: pid }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
