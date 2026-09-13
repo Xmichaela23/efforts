@@ -168,12 +168,21 @@ Deno.serve(async (req: Request) => {
     const ids = hardRows.map((r: any) => String(r.completed_workout_id));
     let sessions: HardSession[] = [];
     if (ids.length > 0) {
-      const [{ data: ws }, { data: facts }] = await Promise.all([
-        supabase.from('workouts').select('id, date, type, avg_heart_rate, avg_pace, avg_power, normalized_power, rpe, workout_metadata').in('id', ids),
-        supabase.from('workout_facts').select('workout_id, run_facts').in('workout_id', ids),
-      ]);
-      const driftById = new Map<string, number | null>();
-      for (const f of facts ?? []) driftById.set(String(f.workout_id), Number.isFinite(Number(f?.run_facts?.hr_drift_pct)) ? Number(f.run_facts.hr_drift_pct) : null);
+      // ⚠️ THE `workout_facts` READ IS GONE WITH THE FIELD — see the note below. Nothing else on this
+      // sheet came out of that table, so the query went with it rather than being left fetching a
+      // column no line prints.
+      const { data: ws } = await supabase
+        .from('workouts')
+        .select('id, date, type, avg_heart_rate, avg_pace, avg_power, normalized_power, rpe, workout_metadata')
+        .in('id', ids);
+      /**
+       * ⛔ NO DRIFT READ ON THIS SHEET (2026-09-12). This was the app's fifth answer to "what is this
+       * session's drift": `run_facts.hr_drift_pct` straight off the facts row — heart rate alone,
+       * with no steadiness test and none of the ratio precedence `_shared/session-detail/drift-pct.ts`
+       * applies everywhere else — and the sheet printed it as "decoupling". The rows here are the
+       * block's HARD families, which is exactly the work p107's rule does not govern. The field is
+       * gone rather than wired to the shared rule, which would have blanked it on nearly every row.
+       */
       sessions = (ws ?? []).map((w: any) => {
         const sport: 'run' | 'ride' = String(w.type).toLowerCase() === 'run' ? 'run' : 'ride';
         const rpe = Number(w?.workout_metadata?.session_rpe ?? w?.rpe);
@@ -183,7 +192,7 @@ Deno.serve(async (req: Request) => {
           avg_hr: Number.isFinite(Number(w.avg_heart_rate)) && Number(w.avg_heart_rate) > 0 ? Number(w.avg_heart_rate) : null,
           work: Number.isFinite(work) && work > 0 ? work : null,
           rpe: Number.isFinite(rpe) && rpe > 0 ? rpe : null,
-          drift_pct: driftById.get(String(w.id)) ?? null,
+          drift_pct: null,
         };
       });
     }

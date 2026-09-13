@@ -3,7 +3,8 @@
 // =============================================================================
 
 import type { SessionDetailV1, SegmentVerdictV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
-import { isIntervalSession, resolveSessionDrift } from './drift-pct.ts';
+import { resolveSessionDrift } from './drift-pct.ts';
+import { sessionSteadiness } from './session-steadiness.ts';
 import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
 import { pacingVariability, stampIntervalCompare } from './interval-compare.ts';
 import { planShare } from './swim-plan-share.ts';
@@ -71,9 +72,11 @@ function buildRouteReadout(history: unknown): RouteReadout | null {
 }
 
 /** Match fact-packet ai-summary: session HR drift is not meaningful for structured interval sessions. */
-// The interval test lives in `drift-pct.ts` now (`isIntervalSession`), beside the drift rule it gates,
-// so the boom line asks the same question. The name below is kept for the rows that call it.
-const shouldSuppressSessionHrDrift = (factPacket: any, intervals?: IntervalRow[]): boolean => isIntervalSession(factPacket, intervals);
+// ⛔ ONE LADDER (`session-steadiness.ts`), the same one the drift rule, State's chart and Today's
+// boom line ask. The rows call it through this name; it takes the materials this builder has.
+const shouldSuppressSessionHrDrift = (
+  factPacket: any, intervals?: IntervalRow[], plannedRow?: unknown, completedRow?: unknown,
+): boolean => !sessionSteadiness({ factPacket, intervals, plannedRow: plannedRow as any, workoutRow: completedRow }).steady;
 
 export function humanizePlannedSegmentLabel(
   raw: string,
@@ -197,12 +200,13 @@ export type SessionDetailInput = {
    *  (for `venue:` — the session the athlete moved indoors). */
   plannedRowRaw?: { strength_exercises?: any[]; computed?: any; tags?: string[] | null } | null;
   /**
-   * The completed `workouts` row's own indoor evidence — `provider_sport`, `strava_data`, `gps_track`,
-   * `start_position_lat`, `name`, `type`. ⚠️ THE BUILDER ONLY READS IT (Law 4); `workout-detail` is
-   * the DB reader that passes it. Absent falls back to the planned row's `venue:` tag alone, which is
-   * what this decided on before.
+   * The completed `workouts` row, for the rules that read the recording itself rather than the plan:
+   * indoor evidence (`provider_sport`, `strava_data`, `gps_track`, `start_position_lat`, `name`,
+   * `type`) and, since 2026-09-12, the steadiness ladder's rungs 4 and 5 (`strava_data.original_
+   * activity.workout_type`, `laps`). ⚠️ THE BUILDER ONLY READS IT (Law 4); `workout-detail` is the
+   * DB reader that passes it. Renamed from `completedRowForIndoor` when the second reader arrived.
    */
-  completedRowForIndoor?: Record<string, unknown> | null;
+  completedRow?: Record<string, unknown> | null;
   /** Completed workout strength_exercises (for strength weight deviation) */
   completedStrengthExercises?: any[] | null;
   /**
@@ -364,7 +368,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     match,
     plannedSession,
     plannedRowRaw,
-    completedRowForIndoor,
+    completedRow,
     completedStrengthExercises,
     bodyweightLb,
     observations,
@@ -846,9 +850,14 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
   const decouplingV1 = (() => {
     // ⛔ ONE RULE (2026-09-12, Michael: "we need consistent rules across all screens"): `resolveSessionDrift`
     // in `drift-pct.ts` — steady sessions only (p107), the run analyser's decoupling, a ride's
-    // power-to-heart-rate ratio, heart rate alone as the fallback. The boom line on Today reads the same
-    // function, and State's spine keeps the same precedence. This block used to be its own copy.
-    const d = resolveSessionDrift({ workoutAnalysis: wa, computed: comp, sport: type, factPacket, intervals });
+    // power-to-heart-rate ratio, heart rate alone as the fallback. Today's boom line and State's
+    // drift chart read the same function. This block used to be its own copy.
+    const d = resolveSessionDrift({
+      workoutAnalysis: wa, computed: comp, sport: type,
+      // The materials, not a verdict — `session-steadiness.ts` decides. `plannedRowRaw` carries the
+      // plan's family tag, `completedRow` the provider's word and the device's lap markings.
+      steadiness: { factPacket, intervals, plannedRow: plannedRowRaw as any, workoutRow: completedRow },
+    });
     if (!d) return null;
     return {
       pct: d.pct,
@@ -880,7 +889,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
      * "the heat drove it" off an outdoor forecast and "hills mixed in" off a fictional altitude.
      * `isIndoorSession` is the one predicate the card, the map and the metric strip also read.
      */
-    return isIndoorSession(completedRowForIndoor ?? null);
+    return isIndoorSession(completedRow ?? null);
   })();
 
   // ── Analysis detail rows ───────────────────────────────────────────────────
@@ -902,6 +911,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         indoorVenue ? null : (weatherTempStartF ?? null),
         indoorVenue ? null : (weatherTempEndF ?? null),
         indoorVenue,
+        plannedRowRaw ?? null,
+        completedRow ?? null,
       );
 
   /**
@@ -1656,6 +1667,12 @@ export function buildAnalysisDetailRows(
    *  facts about a place the session did not happen in, so the heat and hills lines come off — the
    *  drift number itself is unchanged. Defaults false: an unflagged session behaves exactly as before. */
   indoors: boolean = false,
+  /** ⛔ THE STEADINESS LADDER'S TOP AND MIDDLE RUNGS (2026-09-12). The three rows below that ask
+   *  "was this an interval session" used to see only the fact packet and the rendered rows, so a
+   *  tempo ride prescribed as one continuous block read as steady here while the Drift tile on the
+   *  same screen said nothing. Both default null: a caller that passes neither behaves as before. */
+  plannedRowForSteadiness: unknown = null,
+  completedRowForSteadiness: unknown = null,
 ): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = [];
   if (!factPacket) return rows;
@@ -1995,7 +2012,7 @@ export function buildAnalysisDetailRows(
       rows.push({ label: 'Heart rate', value: `${desc} (drift ${p}%)` });
     }
 
-    if (decouplingShown || sport === 'swim' || shouldSuppressSessionHrDrift(factPacket, intervals)) {
+    if (decouplingShown || sport === 'swim' || shouldSuppressSessionHrDrift(factPacket, intervals, plannedRowForSteadiness, completedRowForSteadiness)) {
       // Decoupling % owns it (above), OR swims get no land HR-drift row (terrain/grade/pace
       // framing is land-only), OR interval/variable-pace runs where "HR rose" is meaningless.
       //
@@ -2015,7 +2032,7 @@ export function buildAnalysisDetailRows(
       // The 2026-09-03 "whole session, intervals included" line is gone with the number it labelled,
       // and the "not read — no usable heart-rate data" line must not take its place: that sentence
       // names a missing recording, and an interval session's recording is not missing. Silence.
-      const intervalSession = sport !== 'swim' && (decoupling?.whole_session === true || shouldSuppressSessionHrDrift(factPacket, intervals));
+      const intervalSession = sport !== 'swim' && (decoupling?.whole_session === true || shouldSuppressSessionHrDrift(factPacket, intervals, plannedRowForSteadiness, completedRowForSteadiness));
       const withheldForPaceSpread = !decouplingShown && sport !== 'swim' && !intervalSession
         && signal != null && Math.abs(signal) >= 3;
       const pctAny = typeof decoupling?.pct === 'number' && Number.isFinite(decoupling.pct) ? decoupling.pct : null;
@@ -2135,7 +2152,7 @@ export function buildAnalysisDetailRows(
     // message text, so rewording the flag cannot smuggle it back in.
     // A run analysed before 2026-09-12 still carries an HR-drift flag on an interval session; the rule
     // is one rule, so it is dropped here too until the run is analysed again.
-    const intervalHere = sport !== 'swim' && shouldSuppressSessionHrDrift(factPacket, intervals);
+    const intervalHere = sport !== 'swim' && shouldSuppressSessionHrDrift(factPacket, intervals, plannedRowForSteadiness, completedRowForSteadiness);
     const concerns = flagsV1
       .filter((f: any) => String(f?.category || '').toLowerCase() !== 'fatigue')
       .filter((f: any) => !(intervalHere && String(f?.category || '').toLowerCase() === 'hr'))

@@ -1,6 +1,6 @@
 import type { FactPacketV1, FlagV1, WeatherV1 } from './types.ts';
 import { coerceNumber, estimatedHeatPaceImpact, secondsToPaceString } from './utils.ts';
-import { isIntervalSession } from '../session-detail/drift-pct.ts';
+import { sessionSteadiness } from '../session-detail/session-steadiness.ts';
 
 function push(flags: FlagV1[], f: FlagV1) {
   if (!f.message) return;
@@ -71,7 +71,10 @@ export function generateFlagsV1(packet: FactPacketV1): FlagV1[] {
     // same rule the Drift tile, the heart-rate line and Today's boom line keep: `drift-pct.ts`). This
     // block was a fourth writer, and on an interval run it printed "HR drift 15 bpm vs typical ~6 bpm —
     // elevated" under a screen that had just, correctly, withheld the drift number.
-    if (isIntervalSession(packet)) throw new Error('skip: interval session');
+    // ⚠️ THE PACKET IS ALL THIS FILE HAS — rungs 2 and 6 of the ladder. The plan's own session type
+    // (rung 1) is not in scope here; the packet builder has no planned row. A session this misses is
+    // one the Drift tile and Today's line, which do see the plan, still refuse.
+    if (!sessionSteadiness({ factPacket: packet }).steady) throw new Error('skip: interval session');
     const driftExplanation = (packet.derived as any).drift_explanation;
     const paceNorm = coerceNumber((packet.derived as any).pace_normalized_drift_bpm);
     const rawDrift = coerceNumber(packet.derived.hr_drift_bpm);

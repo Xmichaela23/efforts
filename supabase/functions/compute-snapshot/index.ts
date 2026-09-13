@@ -45,6 +45,10 @@ import { RATE_ANCHOR } from "../_shared/standing-plan/frames.ts";
 import { isTestWeek } from "../_shared/standing-plan/working-number.ts";
 import { resolveAcwrAsOf } from "./acwr-as-of.ts";
 import { indexEnduranceFactsByWorkout } from "./endurance-facts.ts";
+// ⛔ THE DRIFT RULE AND ITS STEADINESS TEST ARE THE PERFORMANCE SCREEN'S, BY IMPORT (2026-09-12).
+// This file kept its own copies of both and they disagreed; see the note on `driftReadForPoint`.
+import { resolveSessionDrift } from "../_shared/session-detail/drift-pct.ts";
+import { sessionSteadiness } from "../_shared/session-detail/session-steadiness.ts";
 import { fetchAthleteTimezone, resolveAthleteTimezone } from "../_shared/athlete-timezone.ts";
 import {
   assembleStateTrends,
@@ -113,54 +117,49 @@ function elevGainM(r: any): number | null {
 }
 
 /**
- * ONE drift read for every State point (2026-09-03) — the same precedence session-detail uses for the
- * Performance screen: the analyser's pace-to-heart-rate decoupling when it computed one, else
- * `hr_drift_v1` (heart rate second half vs first, by time, after the warm-up), else the facts' whole-session
- * drift on a steady day. Never withheld; an interval day is labelled whole-session instead of hidden.
- * ⚠️ `Number(null)` is 0 — the checks are on typeof, never on Number.isFinite alone.
+ * ⛔ ONE DRIFT READ FOR EVERY STATE POINT, AND IT IS NOT THIS FILE'S (rewritten 2026-09-12).
  *
- * ⛔ THE BIKE'S RATIO READ (2026-09-03, WORKORDER-bike-state-audit §2/§3). The cycling analyser never writes
- * `heart_rate_summary.decouplingPct`, so every ride fell through to `hr_drift_v1` — heart rate ALONE — and
- * the card printed p107's 5% line beside it. p107's two arms are both ratios of output to heart rate; heart
- * rate alone is one side of the ratio and the rule does not govern it. The ride's power-to-heart-rate
- * decoupling DOES exist — `computed.analysis.efficiency.aerobic_decoupling_pct`, written by
- * `_shared/cycling-v1/ride-physiology.ts`, the number the Performance screen prints — so it is read here
- * FIRST for a ride, with the same precedence the run gives its pace-to-heart-rate number. Basis `'power'`.
- * The Sep 3 ride is the case that makes the two disagree in sign: power fell 155 → 136 W while heart rate
- * fell 139 → 129, so heart-rate-alone is −7.2% and power-to-heart-rate is +7.4%. Both true; the card now
- * names which one it is printing.
+ * ⚠️ WHAT WAS HERE, AND WHY IT WAS WRONG. This function carried its own copy of the whole rule: its
+ * own steadiness test (planned steps, plus a runs-only graded-interval flag), its own precedence,
+ * and a FOURTH fallback — `workout_facts.drift` — that no other screen could reach. The header said
+ * it kept "the same precedence session-detail uses for the Performance screen". It did not, and the
+ * gap was not academic: a ride could never be called an interval session here (the graded arm was
+ * runs-only and the pace-spread arm did not exist), so an unplanned interval ride was plotted as a
+ * dot on a chart captioned "one steady ride" while the Performance screen, correctly, showed it no
+ * drift at all. The second call site passed no interval flag whatsoever.
+ *
+ * ⛔ SO THE QUESTION IS ASKED BY IMPORT NOW. `resolveSessionDrift` (`_shared/session-detail/
+ * drift-pct.ts`) is the rule and `sessionSteadiness` is the test inside it; this function hands over
+ * the MATERIALS — the planned row, the fact packet, the workout row — and reads back what the
+ * Performance screen reads. There is no fifth fallback: `f.drift` is gone, because a number State
+ * could show and no other screen could was the second source in its purest form.
+ *
+ * ⚠️ `driftWholeSession` AND `fadeWithheld` SURVIVE, both meaning "not steady", because the spine
+ * card and `spineTrends` already read them to keep a non-steady session off the trend while leaving
+ * it on the card. They are now the ladder's verdict rather than a second opinion about it.
  */
-function driftReadForPoint(hrs: any, wa: any, factDrift: number | null | undefined, powerDecouplingPct?: number | null, gradedInterval = false): { driftPct: number | null; driftBasis: 'gap' | 'raw' | 'power' | 'hr' | null; driftWholeSession: boolean; fadeWithheld: boolean } {
-  // "whole session" = an interval session (more than two planned steps). ⛔ NOT the analyser's mixed-effort
-  // flag (2026-09-04, Michael: "why only 2 runs?"). That flag is a pace-variance stamp the snapshot itself
-  // files as "a confidence hedge — NOT a filter" (decoupling_mixed_effort, below), yet passing it in here
-  // marked 19 of 22 easy and steady runs whole-session and the State drift trend drew a line through the
-  // 3 that were left. TrainingPeaks prints Pa:Hr on every run; Friel reads it on steady efforts, and the
-  // run's TYPE says whether it was steady — a 45-minute easy run with stops and hills is still an easy run.
-  const steps = Number(wa?.fact_packet_v1?.derived?.interval_execution?.total_steps);
-  // ⛔ A DRIFT READ NEEDS A STEADY EFFORT — Friel's condition on Pa:Hr / Pw:Hr, and the analyser already
-  // tests for it: `decouplingMixedEffort` is its pace-variance verdict that this session was NOT a steady
-  // effort (an unlinked interval run the classifier called "steady_state" — 2026-08-28, 16 × 0.1 mi cruise
-  // intervals from the plan, imported without its link — carries it). Earlier on 2026-09-04 that flag was
-  // taken out of this decision as "a hedge, not a filter"; that was wrong: it is the steady-effort test
-  // itself, and without it the interval run's 18.6% headlined the drift chart. Michael: "it didn't fall
-  // apart — it was intervals, programmed, part of the plan." Both signals decide: planned steps, or the
-  // measured variance.
-  // ⛔ D-372 item 3, RESTORED (2026-09-04, Michael: "this has been discussed"): the analyser's mixed-effort stamp
-  // (pace varied) is a confidence hedge, NOT a filter — it marked 19 of 22 easy runs "whole-session" and the drift
-  // line was drawn through the 3 left. It was put back as a filter at 15:29 (a0ca339a) after the Aug 28 screenshot
-  // and the run drift line went blank again. A run is whole-session only when it WAS an interval session:
-  // >2 planned steps, or the grader's verdict (`run_facts.workout_type === 'interval'`: plan tag → detected
-  // type → Friel Z3) — which is what labels the unlinked Aug 28 run interval without the pace-variance stamp.
-  const steady = !(Number.isFinite(steps) && steps > 2) && !gradedInterval;
-  const dec = typeof hrs?.decouplingPct === 'number' && Number.isFinite(hrs.decouplingPct) ? hrs.decouplingPct : null;
-  const pdec = typeof powerDecouplingPct === 'number' && Number.isFinite(powerDecouplingPct) ? powerDecouplingPct : null;
-  const v1 = typeof wa?.hr_drift_v1?.pct === 'number' && Number.isFinite(wa.hr_drift_v1.pct) ? wa.hr_drift_v1.pct : null;
-  if (dec != null) return { driftPct: Math.round(dec * 10) / 10, driftBasis: hrs?.decouplingBasis === 'raw' ? 'raw' : 'gap', driftWholeSession: !steady, fadeWithheld: false };
-  if (pdec != null) return { driftPct: Math.round(pdec * 10) / 10, driftBasis: 'power', driftWholeSession: !steady, fadeWithheld: false };
-  if (v1 != null) return { driftPct: Math.round(v1 * 10) / 10, driftBasis: 'hr', driftWholeSession: !steady, fadeWithheld: false };
-  if (steady && typeof factDrift === 'number' && Number.isFinite(factDrift)) return { driftPct: factDrift, driftBasis: 'hr', driftWholeSession: false, fadeWithheld: false };
-  return { driftPct: null, driftBasis: null, driftWholeSession: !steady, fadeWithheld: !steady };
+function driftReadForPoint(input: {
+  workoutAnalysis: unknown;
+  computed?: unknown;
+  sport?: string | null;
+  plannedRow?: { tags?: unknown; name?: unknown; description?: unknown } | null;
+  workoutRow?: unknown;
+}): { driftPct: number | null; driftBasis: 'gap' | 'raw' | 'power' | 'hr' | null; driftWholeSession: boolean; fadeWithheld: boolean } {
+  const wa = input.workoutAnalysis as any;
+  const steadiness = {
+    factPacket: wa?.fact_packet_v1 ?? null,
+    plannedRow: input.plannedRow ?? null,
+    workoutRow: input.workoutRow ?? null,
+  };
+  const steady = sessionSteadiness(steadiness).steady;
+  const d = resolveSessionDrift({
+    workoutAnalysis: wa,
+    computed: input.computed ?? null,
+    sport: input.sport ?? null,
+    steadiness,
+  });
+  if (!d) return { driftPct: null, driftBasis: null, driftWholeSession: !steady, fadeWithheld: !steady };
+  return { driftPct: d.pct, driftBasis: d.basis, driftWholeSession: !steady, fadeWithheld: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -1480,10 +1479,32 @@ serve(async (req: Request) => {
             // and does NOT copy it for rides — so reading the copy gave runs a climb and rides nothing,
             // and before the workout-id key it gave a ride the RUN's climb. The temperature two lines
             // below was already read straight off this row; the climb now reads the same way.
-            .from("workouts").select("id,date,type,workout_analysis,computed,weather_data,elevation_gain,metrics")
+            // ⛔ `planned_id`, `strava_data` and `laps` ARE THE STEADINESS LADDER'S (2026-09-12) —
+            // rungs 1, 4 and 5. This function used to answer "was it steady" from the fact packet's
+            // step count alone, which is why a ride could never be called an interval session here.
+            .from("workouts").select("id,date,type,workout_analysis,computed,weather_data,elevation_gain,metrics,planned_id,strava_data,laps")
             .eq("user_id", userId).in("type", ["run", "running", "ride", "bike", "cycling"])
             .eq("workout_status", "completed")
             .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", asOf);
+          /**
+           * ⛔ RUNG 1 OF THE STEADINESS LADDER — the plan's own session type, in ONE query for the
+           * whole window (2026-09-12). Keyed by `planned_id` and never by date: a day with a run and
+           * a ride on it would otherwise hand one session the other's prescription, which is the
+           * by-date bug §1 of this file already records for the facts index.
+           */
+          const spinePlannedIds = Array.from(new Set(
+            (Array.isArray(spineRows) ? spineRows : []).map((r: any) => r?.planned_id)
+              .filter((v: unknown): v is string => typeof v === "string" && v.length > 0),
+          ));
+          const spinePlannedById = new Map<string, { tags?: unknown; name?: unknown; description?: unknown }>();
+          if (spinePlannedIds.length > 0) {
+            const { data: spw } = await supabase
+              .from("planned_workouts").select("id,tags,name,description")
+              .eq("user_id", userId).in("id", spinePlannedIds);
+            for (const pw of (Array.isArray(spw) ? spw : []) as any[]) {
+              spinePlannedById.set(String(pw.id), { tags: pw.tags, name: pw.name, description: pw.description });
+            }
+          }
           const bySport = new Map<string, Map<string, SpineSessionPoint[]>>();
           // 2026-09-04: a hard run's warm-up no longer joins this series as an easy point (that stand-in was OURS).
           // TrainingPeaks' EF is one number per workout; the aerobic series is easy and long days, whole.
@@ -1498,8 +1519,10 @@ serve(async (req: Request) => {
             // measured nothing on; inventing a zero would draw a crash.
             if (!f || (f.hr == null && f.efficiency == null)) continue;
             const hrs = r?.workout_analysis?.heart_rate_summary ?? null;
-            // the ride's power-to-heart-rate decoupling, as the Performance screen reads it (null on a run)
-            const powerDec = sport === "ride" ? (r?.computed?.analysis?.efficiency?.aerobic_decoupling_pct ?? null) : null;
+            // ⚠️ THE RIDE'S POWER-TO-HEART-RATE DECOUPLING IS NO LONGER LIFTED OUT HERE. It was the
+            // second argument to a local resolver; `resolveSessionDrift` reads it off `computed`
+            // itself, in the precedence the Performance screen uses, so a copy here would be a second
+            // opinion about which number a ride's drift is.
             // does this ride feed the efficiency TREND — the analyser's stamp, else the same predicate on the same fields
             const bfv = r?.workout_analysis?.bike_fitness_v1 ?? null;
             // Evaluated LIVE from the stored fields, never read off the analyser's stamp: the rule changed on
@@ -1551,7 +1574,16 @@ serve(async (req: Request) => {
               // decoupling when the analyser computed it, else `hr_drift_v1` (heart rate second half vs first,
               // by time, after the warm-up — `_shared/hr-drift-halves.ts`). Never withheld; an interval day is
               // labelled whole-session on the card instead of hidden. `f.drift` is the last resort.
-              ...driftReadForPoint(hrs, r?.workout_analysis, f.drift, powerDec, sport === "run" && runTypeByDate.get(date) === "interval"),
+              // ⛔ THE SAME FUNCTION THE PERFORMANCE SCREEN READS, given the same materials. The
+              // `f.drift` fourth fallback and the runs-only graded-interval flag are both gone; the
+              // ladder in `session-steadiness.ts` answers for every sport.
+              ...driftReadForPoint({
+                workoutAnalysis: r?.workout_analysis,
+                computed: r?.computed ?? null,
+                sport,
+                plannedRow: typeof r?.planned_id === "string" ? spinePlannedById.get(r.planned_id) ?? null : null,
+                workoutRow: r,
+              }),
               keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
               // conditions, shown never corrected: the day's temperature and the climb
               tempF: (() => { const t = Number(r?.weather_data?.temperature); return Number.isFinite(t) ? Math.round(t) : null; })(),
@@ -1630,7 +1662,9 @@ serve(async (req: Request) => {
              */
             for (const fam of FAMILIES) {
               const { data: linkRows } = await supabase
-                .from("workouts").select("id,date,planned_id,workout_analysis,computed")
+                // The same ladder materials as the spine above — the named-session card's points are
+                // judged by the same rule, not by a call site that happened to pass fewer arguments.
+                .from("workouts").select("id,date,planned_id,workout_analysis,computed,strava_data,laps")
                 .eq("user_id", userId).in("type", fam.types).eq("workout_status", "completed")
                 .gte("date", isoMinus(STATE_TREND_WINDOWS.cadenceDays)).lte("date", asOf);
               const linked = (Array.isArray(linkRows) ? linkRows : [])
@@ -1639,7 +1673,7 @@ serve(async (req: Request) => {
               if (plannedIds.length === 0) continue;
               const { data: plannedRows2 } = await supabase
                 .from("planned_workouts").select("id,name,tags,duration").in("id", plannedIds);
-              const byId = new Map<string, { label: string; durationMin: number | null }>();
+              const byId = new Map<string, { label: string; durationMin: number | null; plannedRow: { tags?: unknown; name?: unknown } }>();
               for (const p2 of (Array.isArray(plannedRows2) ? plannedRows2 : []) as any[]) {
                 const tags = (Array.isArray(p2?.tags) ? p2.tags : []).map((t: any) => String(t).toLowerCase());
                 if (!tags.includes(fam.family)) continue;
@@ -1647,6 +1681,8 @@ serve(async (req: Request) => {
                 byId.set(String(p2.id), {
                   label: String(p2?.name || fam.fallbackLabel),
                   durationMin: Number.isFinite(dur) && dur > 0 ? Math.round(dur) : null,
+                  // The row itself, for the steadiness ladder's rung 1. Already fetched; not re-queried.
+                  plannedRow: { tags: p2?.tags, name: p2?.name },
                 });
               }
               const points: NamedSessionPoint[] = [];
@@ -1673,7 +1709,16 @@ serve(async (req: Request) => {
                   durationMin: hit.durationMin,
                   efficiency: f?.efficiency ?? null,
                   // 2026-09-03: the same drift read as every other State point and the Performance screen.
-                  ...driftReadForPoint((r as any)?.workout_analysis?.heart_rate_summary ?? null, (r as any)?.workout_analysis, f?.drift ?? null, (r as any)?.computed?.analysis?.efficiency?.aerobic_decoupling_pct ?? null),
+                  // ⛔ THE SAME INPUTS AS THE SPINE (2026-09-12). This call site passed no interval
+                  // flag at all, so a named interval session was judged steady here and not there.
+                  // `byId` above already holds this session's planned row — rung 1, no extra query.
+                  ...driftReadForPoint({
+                    workoutAnalysis: (r as any)?.workout_analysis,
+                    computed: (r as any)?.computed ?? null,
+                    sport: fam.sport,
+                    plannedRow: byId.get(String(r.planned_id))?.plannedRow ?? null,
+                    workoutRow: r,
+                  }),
                   keySessionWithin24h: keyDates.has(addDaysIso(date, 1)),
                 });
               }

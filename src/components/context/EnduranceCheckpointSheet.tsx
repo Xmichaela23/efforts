@@ -28,7 +28,14 @@ function evidenceLine(e: CheckpointEvidence | null): string | null {
       : `power ${Math.round(e.early.avg_work)} → ${Math.round(e.late.avg_work)} W`);
   }
   if (e.early.avg_rpe != null && e.late.avg_rpe != null) parts.push(`effort ${e.early.avg_rpe} → ${e.late.avg_rpe}`);
-  if (e.early.avg_drift_pct != null && e.late.avg_drift_pct != null) parts.push(`decoupling ${e.early.avg_drift_pct}% → ${e.late.avg_drift_pct}%`);
+  /**
+   * ⛔ NO DECOUPLING CLAUSE (2026-09-12, approved copy). It read `run_facts.hr_drift_pct` raw —
+   * heart rate alone, no steadiness test, no ratio precedence — and printed it under the word
+   * "decoupling" beside numbers that had one. This sheet reads HARD sessions only (`HARD_FAMILIES`
+   * on the server), and p107's drift rule is written for steady work, so running these through the
+   * steadiness ladder would blank the clause on nearly every session and the sentence would lose a
+   * number some weeks and not others. Dropped rather than made intermittent.
+   */
   if (parts.length === 0) return `${noun}: ${e.sessions} sessions, nothing measured on them yet.`;
   return `${noun}: ${parts.join(', ')} over ${e.sessions} sessions, first half to second half.`;
 }

@@ -957,9 +957,10 @@ async function runSessionDetailPipelineAndPersist(
        * Strava-trainer or Zwift or treadmill session — which carries no tag, because the athlete
        * never swapped anything — got both explanations off weather it was never in.
        * ⚠️ THIS FUNCTION IS THE DB READER (Law 4). It hands the row over; `isIndoorSession` in
-       * `_shared` is the one rule, shared with the card, the map and the metric strip.
+       * `_shared` is the one rule, shared with the card, the map and the metric strip. The
+       * steadiness ladder reads the same row for the provider's word and the device's laps.
        */
-      completedRowForIndoor: row ? {
+      completedRow: row ? {
         type: (row as any)?.type,
         name: (row as any)?.name,
         provider_sport: (row as any)?.provider_sport,
@@ -967,6 +968,9 @@ async function runSessionDetailPipelineAndPersist(
         strava_data: (row as any)?.strava_data,
         gps_track: (row as any)?.gps_track,
         start_position_lat: (row as any)?.start_position_lat,
+        // ⛔ THE DEVICE'S LAP MARKINGS (2026-09-12), rung 5 of the steadiness ladder. The column
+        // holds the provider's lap objects as sent, so a marking that arrived is already here.
+        laps: (row as any)?.laps,
       } : null,
       completedStrengthExercises: Array.isArray(compStrengthArr) ? compStrengthArr : null,
       // ⛔ The moving seconds get-week stamps for this session (audit H-D10) — this function reads the row.
@@ -1564,6 +1568,10 @@ Deno.serve(async (req) => {
       // ⚠️ `gps_track` stays out: the heaviest column on the row, and the predicate's last-resort
       // guess; Garmin's sport type and Strava's trainer flag are the statements.
       'provider_sport','strava_data',
+      // ⛔ RUNG 5 OF THE STEADINESS LADDER (2026-09-12) — the device's own lap intensity markings,
+      // stored as the provider sent them. Same starvation risk as the two columns above: the ladder
+      // reads `laps[].intensity`, and a column left out of this SELECT reads as "no markings".
+      'laps',
       // Achievements (PRs, segments)
       'achievements',
       // Workload data (single source of truth from calculate-workload)

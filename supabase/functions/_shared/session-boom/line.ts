@@ -59,6 +59,16 @@ export type BoomWorkout = {
   workout_analysis?: unknown;
   strength_exercises?: unknown;
   executed?: { strength_exercises?: unknown } | null;
+  /**
+   * ⛔ THE STEADINESS LADDER'S MATERIALS (2026-09-12). The drift line asked `sessionDriftPct` without
+   * them, so every rung but the planned step count was blind here while the Drift tile on the same
+   * session read all of them — a streak could count an interval ride the tile had already refused.
+   * `planned_row` is rung 1, `strava_data` rung 4, `laps` rung 5. The fact packet for rungs 2 and 6
+   * is read off `workout_analysis`, which this row already carries.
+   */
+  planned_row?: { tags?: unknown; name?: unknown; description?: unknown } | null;
+  strava_data?: unknown;
+  laps?: unknown;
 };
 
 export type MeHistoryEntry = {
@@ -145,8 +155,17 @@ function hrAtEasyPower(w: BoomWorkout): number | null {
  * `sessionDriftPct` is the rule that copy is built with.
  */
 function driftPct(w: BoomWorkout): number | null {
-  // Same rule as the Drift tile, whole: steady sessions only, the ride's ratio before heart rate alone.
-  return sessionDriftPct(parseAnalysis(w), w.computed ?? null, w.type ?? null);
+  // Same rule as the Drift tile, whole: steady sessions only, the ride's ratio before heart rate
+  // alone. ⛔ THE MATERIALS GO WITH IT (2026-09-12). ⚠️ THE RENDERED INTERVAL ROWS CANNOT: rung 7
+  // reads `session_detail_v1.intervals`, which the session-detail builder produces DOWNSTREAM of
+  // this file — the boom line runs at the end of the analysis chain, before any detail copy exists,
+  // and reading the stored copy is the cache trap this function was rewritten to escape (see above).
+  // Rungs 1, 2, 4, 5 and 6 all answer before it, so the gap only shows on an unplanned session whose
+  // structure nothing else caught.
+  return sessionDriftPct(parseAnalysis(w), w.computed ?? null, w.type ?? null, {
+    plannedRow: w.planned_row ?? null,
+    workoutRow: { strava_data: w.strava_data, laps: w.laps },
+  });
 }
 
 /**

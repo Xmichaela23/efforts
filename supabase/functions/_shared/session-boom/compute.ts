@@ -66,10 +66,29 @@ const PRIOR_SELECT = [
   // The two fields the drift rule needs beyond those (2026-09-12): the steady test and the ride's ratio.
   'total_steps:workout_analysis->fact_packet_v1->derived->interval_execution->total_steps',
   'aerobic_decoupling_pct:computed->analysis->efficiency->aerobic_decoupling_pct',
+  /**
+   * ⛔ THE STEADINESS LADDER ON AN EARLIER SESSION (2026-09-12). A streak counts priors, so a prior
+   * has to be judged by the same ladder as the session that just finished or the streak is a
+   * different question from the number beside it.
+   *   rung 1 → `planned_id`, joined to the planned rows' tags below in ONE query.
+   *   rung 2 → `total_steps`, already above.
+   *   rung 4 → the scalar below.
+   *   rung 6 → the per-mile segments below.
+   * ⚠️ RUNG 5 IS NOT HERE. `laps` is the provider's whole lap array and this SELECT exists to keep a
+   * year of sessions narrow. It is also the rung no recording has yet been confirmed to carry, so
+   * pulling the heaviest column for it would buy nothing today. A prior therefore skips rung 5 and
+   * falls to rung 6, which is the arm that catches an unplanned interval session anyway.
+   */
+  'planned_id',
+  'strava_workout_type:strava_data->original_activity->workout_type',
+  'segments:workout_analysis->fact_packet_v1->facts->segments',
 ].join(',');
 
-/** A narrow prior row back into the shape `line.ts` reads. Exported for its test. */
-export function priorFromRow(r: Record<string, unknown>): BoomWorkout {
+/**
+ * A narrow prior row back into the shape `line.ts` reads. Exported for its test.
+ * `plannedRow` is the prior's planned row when the batched join below found one — rung 1.
+ */
+export function priorFromRow(r: Record<string, unknown>, plannedRow?: { tags?: unknown; name?: unknown; description?: unknown } | null): BoomWorkout {
   const bf = r.hr_at_band != null || r.counts_toward_trend != null
     ? { hr_at_band: r.hr_at_band, ...(r.counts_toward_trend != null ? { counts_toward_trend: r.counts_toward_trend } : {}) }
     : undefined;
@@ -87,8 +106,17 @@ export function priorFromRow(r: Record<string, unknown>): BoomWorkout {
       ...(bf ? { bike_fitness_v1: bf } : {}),
       ...(r.decoupling_pct != null ? { heart_rate_summary: { decouplingPct: r.decoupling_pct } } : {}),
       ...(r.hr_drift_pct != null ? { hr_drift_v1: { pct: r.hr_drift_pct } } : {}),
-      ...(r.total_steps != null ? { fact_packet_v1: { derived: { interval_execution: { total_steps: r.total_steps } } } } : {}),
+      ...(r.total_steps != null || r.segments != null
+        ? { fact_packet_v1: {
+            ...(r.total_steps != null ? { derived: { interval_execution: { total_steps: r.total_steps } } } : {}),
+            ...(r.segments != null ? { facts: { segments: r.segments } } : {}),
+          } }
+        : {}),
     },
+    planned_row: plannedRow ?? null,
+    ...(r.strava_workout_type != null
+      ? { strava_data: { original_activity: { workout_type: r.strava_workout_type } } }
+      : {}),
   };
 }
 
@@ -127,7 +155,9 @@ export type ComputeSessionBoomResult = { boom: SessionBoomV1 | null; written: bo
 export async function computeSessionBoom(supabase: Db, workoutId: string, userId: string): Promise<ComputeSessionBoomResult> {
   const { data: row, error: rowErr } = await supabase
     .from('workouts')
-    .select('id,user_id,date,type,workout_status,planned_id,computed,workout_analysis,metrics,strength_exercises,moving_time,elapsed_time,duration,distance,avg_heart_rate')
+    // `strava_data` and `laps` are rungs 4 and 5 of the steadiness ladder (2026-09-12); the drift
+    // line refused to read them before because they were never fetched.
+    .select('id,user_id,date,type,workout_status,planned_id,computed,workout_analysis,metrics,strength_exercises,moving_time,elapsed_time,duration,distance,avg_heart_rate,strava_data,laps')
     .eq('id', workoutId)
     .eq('user_id', userId)
     .maybeSingle();
@@ -145,16 +175,20 @@ export async function computeSessionBoom(supabase: Db, workoutId: string, userId
     // The planned row: its week (the ladder keys a heavy session by week and weekday) and its plan.
     let weekNumber: number | null = null;
     let planId: string | null = null;
+    // ⛔ AND THE PLAN'S OWN SESSION TYPE — rung 1, the top of the steadiness ladder. The same row
+    // this query already fetches carries it; only the column list had to grow.
+    let plannedRowForSteadiness: { tags?: unknown; name?: unknown; description?: unknown } | null = null;
     if (row.planned_id) {
       const { data: pw, error: pwErr } = await supabase
         .from('planned_workouts')
-        .select('week_number,training_plan_id')
+        .select('week_number,training_plan_id,tags,name,description')
         .eq('id', row.planned_id)
         .eq('user_id', userId)
         .maybeSingle();
       if (pwErr) throw pwErr;
       weekNumber = Number.isFinite(Number(pw?.week_number)) && pw?.week_number != null ? Number(pw.week_number) : null;
       planId = pw?.training_plan_id ? String(pw.training_plan_id) : null;
+      if (pw) plannedRowForSteadiness = { tags: pw.tags, name: pw.name, description: pw.description };
     }
     let plan: { config?: unknown } | null = null;
     {
@@ -177,6 +211,10 @@ export async function computeSessionBoom(supabase: Db, workoutId: string, userId
       computed: parseJson(row.computed) as Record<string, unknown> | null,
       workout_analysis: parseJson(row.workout_analysis),
       strength_exercises: parseJson(row.strength_exercises),
+      // The steadiness ladder's rungs 1, 4 and 5. Rungs 2 and 6 read the fact packet on the analysis.
+      planned_row: plannedRowForSteadiness,
+      strava_data: parseJson(row.strava_data),
+      laps: parseJson(row.laps),
     };
 
     const prior: BoomWorkout[] = [];
@@ -213,7 +251,27 @@ export async function computeSessionBoom(supabase: Db, workoutId: string, userId
           .range(offset, offset + PAGE - 1);
         if (pageErr) throw pageErr;
         const rows = Array.isArray(page) ? page : [];
-        for (const r of rows) prior.push(priorFromRow(r as Record<string, unknown>));
+        // ⛔ RUNG 1 FOR THE PRIORS, IN ONE QUERY PER PAGE. Not one per session: a year of rides would
+        // be a query each. A prior with no plan link simply has no row and falls to the next rung.
+        const plannedIds = Array.from(new Set(
+          rows.map((r: any) => r?.planned_id).filter((v: unknown): v is string => typeof v === 'string' && v.length > 0),
+        ));
+        const plannedById = new Map<string, { tags?: unknown; name?: unknown; description?: unknown }>();
+        if (plannedIds.length > 0) {
+          const { data: pws, error: pwsErr } = await supabase
+            .from('planned_workouts')
+            .select('id,tags,name,description')
+            .eq('user_id', userId)
+            .in('id', plannedIds);
+          if (pwsErr) throw pwsErr;
+          for (const pw of (Array.isArray(pws) ? pws : []) as any[]) {
+            plannedById.set(String(pw.id), { tags: pw.tags, name: pw.name, description: pw.description });
+          }
+        }
+        for (const r of rows) {
+          const pid = (r as any)?.planned_id;
+          prior.push(priorFromRow(r as Record<string, unknown>, typeof pid === 'string' ? plannedById.get(pid) ?? null : null));
+        }
         if (rows.length < PAGE) break;
       }
     }

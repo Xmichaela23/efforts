@@ -2,19 +2,26 @@
  * ═══ THE DRIFT A SESSION PRINTS — ONE RULE, EVERY READER ═══════════════════════════════════════════
  *
  * The number behind `session_detail_v1.classification.decoupling.pct` (the Drift tile and the
- * heart-rate line on Performance) and behind the good-news line on Today ("Drift under 5 percent,
- * N rides in a row"). Both read THIS function (2026-09-12, Michael: "we need consistent rules across
- * all screens"). It used to be two copies — `build.ts` carried its own inline resolver and this file
- * warned "a change to one must be made to the other" — and on 2026-09-12 the two changed twice in one
- * day without each other. State's spine (`compute-snapshot driftReadForPoint`) keeps the same
- * precedence for its trend.
+ * heart-rate line on Performance), behind the good-news line on Today ("Drift under 5 percent,
+ * N rides in a row"), and behind State's drift chart. All three read THIS function (2026-09-12,
+ * Michael: "we need consistent rules across all screens"). It used to be two copies — `build.ts`
+ * carried its own inline resolver and this file warned "a change to one must be made to the other"
+ * — and on 2026-09-12 the two changed twice in one day without each other.
+ *
+ * ⛔ AND STATE WAS A THIRD. `compute-snapshot driftReadForPoint` kept its own steadiness test and
+ * its own fourth fallback, so a ride it called steady was a ride Performance called intervals. It
+ * imports this function now; the comment that said it "keeps the same precedence" was describing an
+ * intention rather than the code.
  *
  * THE RULE:
- *   0. ⛔ STEADY SESSIONS ONLY, RUN AND RIDE (p107, confirmed 2026-09-12): cardiac drift is "a general
- *      guideline when assessing the maximum recommended dose of easy/VT1 work in a given session" —
- *      a given pace or output at a given heart rate. An interval session has no such pace or output,
- *      so it has no drift: null, not a labelled number. `isIntervalSession` is the test, the same one
- *      the session builder has used for its rows since 2026-08.
+ *   0. ⛔ STEADY SESSIONS ONLY, RUN AND RIDE (p107): cardiac drift is "a general guideline when
+ *      assessing the maximum recommended dose of easy/VT1 work in a given session" — a given pace or
+ *      output at a given heart rate. An interval session has no such pace or output, so it has no
+ *      drift: null, not a labelled number. ⛔ THE TEST IS NOT HERE AND IS NOT A BOOLEAN A CALLER MAY
+ *      PASS IN — it is `sessionSteadiness` in `./session-steadiness.ts`, and a caller hands over the
+ *      MATERIALS it has (the planned row, the fact packet, the workout row, the rendered rows) so
+ *      that no screen can answer the question for itself. A caller with nothing to hand over gets
+ *      the ladder's own "nothing said" verdict, which is steady.
  *   1. The analyser's pace-to-heart-rate decoupling, `heart_rate_summary.decouplingPct` (D-036),
  *      basis 'gap' or 'raw', when it computed one (runs).
  *   2. A ride's power-to-heart-rate decoupling, `computed.analysis.efficiency.aerobic_decoupling_pct`
@@ -23,9 +30,14 @@
  *   3. Heart rate alone, second half against first — `hr_drift_v1.pct`, written by both analysers
  *      from `_shared/hr-drift-halves.ts` — basis 'hr'. The fallback when there is no output to
  *      ratio against.
- *   4. Else no read.
+ *   4. Else no read. ⚠️ THERE IS NO FIFTH. State carried one (`workout_facts.drift`) and it was the
+ *      only place a drift number could appear that Performance had no way to show.
  * Rounded to one decimal, as the tile prints it — a reader comparing against 5 must see 4.96 as 5.0.
  */
+import { sessionSteadiness, type SteadinessInput } from './session-steadiness.ts';
+
+export type { SteadinessInput };
+
 export type DriftBasis = 'gap' | 'raw' | 'hr' | 'power';
 export type SessionDrift = {
   pct: number;
@@ -36,34 +48,6 @@ export type SessionDrift = {
   confounded: boolean;
 };
 
-type IntervalRowLike = { interval_type?: unknown };
-
-/**
- * Was this an interval session? More than two planned steps, a wide pace spread across the per-mile
- * segments, or rendered rows that carry recoveries between work. Moved here from `build.ts`
- * (`shouldSuppressSessionHrDrift`, 2026-08) so the boom line and the builder ask one function.
- */
-export function isIntervalSession(factPacket: unknown, intervals?: IntervalRowLike[]): boolean {
-  const fp = (factPacket ?? null) as { derived?: { interval_execution?: { total_steps?: unknown } }; facts?: { segments?: unknown } } | null;
-  const steps = fp?.derived?.interval_execution?.total_steps;
-  if (typeof steps === 'number' && steps > 2) return true;
-  const segments = Array.isArray(fp?.facts?.segments) ? (fp!.facts!.segments as Array<{ pace_sec_per_mi?: unknown }>) : [];
-  const paces = segments
-    .map((s) => { const n = Number(s?.pace_sec_per_mi); return Number.isFinite(n) && n > 120 && n < 2400 ? n : null; })
-    .filter((n): n is number => n != null);
-  if (paces.length >= 5) {
-    const spread = Math.max(...paces) - Math.min(...paces);
-    if (spread >= 75) return true;
-  }
-  // Stale fact packets may omit interval_execution; use rendered interval rows (easy + strides + recoveries).
-  if (intervals && intervals.length >= 4) {
-    const rec = intervals.filter((iv) => String(iv.interval_type).toLowerCase() === 'recovery').length;
-    const workish = intervals.filter((iv) => { const t = String(iv.interval_type).toLowerCase(); return t === 'work' || t === 'warmup'; }).length;
-    if (rec >= 1 && workish >= 2) return true;
-  }
-  return false;
-}
-
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const RIDE = /^(ride|bike|cycling)$/;
 
@@ -71,9 +55,11 @@ export function resolveSessionDrift(input: {
   workoutAnalysis: unknown;
   computed?: unknown;
   sport?: string | null;
-  /** The builder's fact packet when it has one from another source; else read off the analysis. */
-  factPacket?: unknown;
-  intervals?: IntervalRowLike[];
+  /**
+   * ⛔ THE MATERIALS THE STEADINESS LADDER READS, NOT A VERDICT. Hand over what this caller has;
+   * a rung with nothing to read is skipped. `factPacket` defaults to the one on the analysis.
+   */
+  steadiness?: SteadinessInput;
 }): SessionDrift | null {
   let wa = input.workoutAnalysis;
   if (typeof wa === 'string') { try { wa = JSON.parse(wa); } catch { return null; } }
@@ -82,9 +68,10 @@ export function resolveSessionDrift(input: {
   const isRide = RIDE.test(sport);
   const isRun = sport === 'run';
 
-  // 0. steady sessions only
-  const fp = input.factPacket ?? a.fact_packet_v1 ?? null;
-  if ((isRun || isRide) && isIntervalSession(fp, input.intervals)) return null;
+  // 0. steady sessions only — the ladder decides, never this file and never the caller.
+  const st = input.steadiness ?? {};
+  const fp = st.factPacket ?? a.fact_packet_v1 ?? null;
+  if ((isRun || isRide) && !sessionSteadiness({ ...st, factPacket: fp }).steady) return null;
 
   // 1. the analyser's decoupling
   const hrs = a.heart_rate_summary && typeof a.heart_rate_summary === 'object' ? a.heart_rate_summary : null;
@@ -111,7 +98,18 @@ export function resolveSessionDrift(input: {
   return null;
 }
 
-/** The percentage alone — what the boom line compares against 5. */
-export function sessionDriftPct(workoutAnalysis: unknown, computed?: unknown, sport?: string | null): number | null {
-  return resolveSessionDrift({ workoutAnalysis, computed, sport })?.pct ?? null;
+/**
+ * The percentage alone — what the boom line compares against 5.
+ * ⚠️ `steadiness` IS NOT OPTIONAL IN PRACTICE. Omitting it leaves every rung with nothing to read,
+ * so the ladder says "nothing said" and the session counts as steady. That is the right default for
+ * a session the app knows nothing about and the wrong one for a caller that simply did not pass what
+ * it had — which is exactly how Today's boom line read an interval ride as steady.
+ */
+export function sessionDriftPct(
+  workoutAnalysis: unknown,
+  computed?: unknown,
+  sport?: string | null,
+  steadiness?: SteadinessInput,
+): number | null {
+  return resolveSessionDrift({ workoutAnalysis, computed, sport, steadiness })?.pct ?? null;
 }
