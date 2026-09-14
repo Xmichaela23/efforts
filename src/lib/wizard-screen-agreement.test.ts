@@ -134,7 +134,8 @@ Deno.test('⛔ STANDARD FOCUS DRAWS ITS OWN FIVE, AND SAYS SO', () => {
     'Three hard sessions',
   ]);
   assertEquals(s.payloadKeys, ['1:0', '2:0', '3:0', '4:0', '6:0']);
-  assertEquals(s.programmeName, 'Standard Focus');
+  // ⚠️ RENAMED 2026-09-13 (Michael): the All Rounder reads "Run + Ride + Strength".
+  assertEquals(s.programmeName, 'Run + Ride + Strength');
   // ⛔ AND THE BLOCKED SENTENCE NAMES ALL FIVE, in the order they are drawn.
   assert(/hard session 3/.test(s.blockedLine), `the blocked line lost a row: ${s.blockedLine}`);
 });

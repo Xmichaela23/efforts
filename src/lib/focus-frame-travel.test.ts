@@ -79,3 +79,12 @@ Deno.test('⛔ RIDE + STRENGTH — the focus and the ride count survive every ho
   // Hop 3: the builder reads the count off its body.
   assert(/\(body as Record<string, unknown>\)\.ride_count/.test(GENERATE), 'generate-strength-plan no longer reads the ride count');
 });
+
+Deno.test('⛔ MULTISPORT FOCUS — the Run + Ride + Strength card opens today\'s Standard Focus setup (2026-09-13)', () => {
+  // The same goal and focus the Standard Focus Train card set, so the setup and the payload are unchanged.
+  assert(/run_ride_strength: \{[\s\S]*?goal: 'get_stronger', focus: 'standard',/.test(WIZARD),
+    'the Run + Ride + Strength card no longer seeds the Standard Focus goal and focus');
+  assert(/standard: \['run_ride_strength'\], run: \['run_strength'\], ride: \['ride_strength'\]/.test(WIZARD),
+    'the program lists changed');
+  assert(/standard: 'programs', run: 'programs', ride: 'programs'/.test(WIZARD), 'a section no longer opens its list');
+});

@@ -1447,6 +1447,10 @@ later. One option on the table: a step that ends on the lap button.
 
 ## Train menu: "Standard Focus" becomes "Multisport Focus" with its own program list (agreed 2026-09-13, not built)
 
+> **BUILT 2026-09-13.** Multisport Focus ("Running, riding and lifting in one plan.") opens a list with one card,
+> "Run + Ride + Strength", which opens the All Rounder setup. The plan name, calendar line and Build this plan? read
+> "Run + Ride + Strength"; plans built before keep "Standard Focus".
+
 Three sections work the same way: pick a focus, then a program. Multisport Focus opens a list with one
 card, "Run + Ride + Strength" (the All Rounder, p274), which carries the description and requirements
 line. Names need Michael's yes on the final screen. Later, not now: programs at varying levels in each
@@ -1455,6 +1459,9 @@ section, plus speed and hypertrophy options.
 ---
 
 ## Focus areas return as movement choice only, no added sets (agreed 2026-09-13, not built, no go yet)
+
+> **CLOSED 2026-09-13, NOT BUILT (Michael).** The look-first default picks (WORKORDER-look-first-default-picks-2026-09-13)
+> plus the Build focus screen on every plan cover what the focus buttons were for. The buttons stay hidden.
 
 The hidden focus buttons (Chest, Shoulders, Arms, Glutes, Core; `DIAL_CONTROL_VISIBLE = false` in
 src/lib/dial-copy.ts) raised weekly sets and, for Glutes, created a row. Michael 2026-09-13: "yeah no

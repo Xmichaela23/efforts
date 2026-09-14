@@ -247,10 +247,12 @@ Deno.test('⛔ AN ADDITION IS MARKED, AND THE MECHANISM MARKS ANY FUTURE ONE', (
       }
     }
   }
-  assert(marked > 0, 'no addition was offered anywhere — this test is vacuous');
+  // ⚠️ REBASED 2026-09-13: the chest fly, the only addition, was removed (Michael). No row offers one now, so the
+  // mechanism is held with a stand-in option: an addition made later is still marked.
+  assertEquals(marked, 0, 'an addition is offered again — it needs Michael\'s yes');
   // ⚠️ NO EMOJI, and nothing that reads as an apology or a disclaimer (Michael's copy rules).
-  const fly = pickOptions('iso_push', HOME).find((o) => o.ours === true)!;
-  const label = pickOptionLabel(fly);
+  const label = pickOptionLabel({ name: 'chest fly', display: 'Chest Fly', muscle: 'chest', ours: true } as never);
+  assert(/added/.test(label), `the mark does not say what it means: ${label}`);
   assertEquals(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(label), false, 'the mark carries an emoji');
   assertEquals(/sorry|unfortunate|note that|please/i.test(label), false, 'the mark apologises');
 });

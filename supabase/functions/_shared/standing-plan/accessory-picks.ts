@@ -519,11 +519,8 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
      *
      * So it is offered as OURS, marked, rather than smuggled in as his.
      */
-    oursList: [{
-      name: 'chest fly',
-      because: 'His only chest isolation is the pec deck (p222) and it needs the station, so a home '
-        + 'gym gets none of his. Ours, not a substitute for his movement.',
-    }],
+    // ⛔ THE CHEST FLY ADDITION IS REMOVED (Michael, 2026-09-13): push rows offer p222's movements only, on every
+    // plan and kit. The note above records why it was added.
     // ⛔ LATERAL RAISE FIRST (WORKORDER-look-first-default-picks-2026-09-13): side shoulders, from his own
     // p222 list. The order is ours within his list.
     leadWith: ['lateral raise', 'triceps pushdown', 'tricep pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck'],
@@ -666,11 +663,8 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     label: 'Push isolation',
     slot: { category: 'focused', pattern: 'push_upper', frameDay: 1, arms: false },
     hisList: ['triceps pushdown', 'tricep pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
-    oursList: [{
-      name: 'chest fly',
-      because: 'His only chest isolation is the pec deck (p222) and it needs the station, so a home '
-        + 'gym gets none of his. Ours, not a substitute for his movement.',
-    }],
+    // ⛔ THE CHEST FLY ADDITION IS REMOVED (Michael, 2026-09-13): push rows offer p222's movements only, on every
+    // plan and kit. The note above records why it was added.
     leadWith: ['lateral raise', 'pec deck', 'triceps pushdown', 'tricep pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher'],
     leadCite: 'Viada pp222-223 — focused push',
     servesChips: ['chest', 'shoulders'],

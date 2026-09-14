@@ -340,7 +340,9 @@ export function getSteps(state: StepRouterState): StepKey[] {
    * athlete is on that screen with no goal yet and Back / Next have to walk it. On Ride Focus the
    * flow ends there for now (its one card is dimmed), and the screen hides the count.
    */
-  const asksProgram = state.entry === 'train' && (state.trainCard === 'run' || state.trainCard === 'ride');
+  // ⛔ MULTISPORT FOCUS (`standard`) OPENS ITS LIST TOO (punch list 2026-09-13).
+  const asksProgram = state.entry === 'train'
+    && (state.trainCard === 'standard' || state.trainCard === 'run' || state.trainCard === 'ride');
   if (asksProgram) door.push('program');
   /**
    * ⛔ NO TIER SCREEN ON ANY PATH (WORKORDER-train-menu-reshape-2026-09-07). It sat here between the

@@ -518,10 +518,12 @@ Deno.test('⛔ AN EQUIPMENT SUBSTITUTE IS NOT LABELLED "added"', () => {
     assert(pickOptionLabel(o).endsWith('- for your gear'), `"${pickOptionLabel(o)}" does not name the reason`);
   }
   // ⚠️ AND A GENUINE ADDITION STILL READS AS ONE — the two marks must not collapse into each other.
+  // ⚠️ REBASED 2026-09-13: the chest fly addition is removed (Michael), so no push row offers it; the mark itself is
+  // held with a stand-in option.
   const push = pickOptions('iso_push', ['Commercial gym'], null);
-  const fly = push.find((o) => o.name.toLowerCase() === 'chest fly');
-  assert(fly?.ours === true && pickOptionLabel(fly).endsWith('- added'),
-    'the dumbbell-fly addition lost its own mark');
+  assert(!push.some((o) => o.name.toLowerCase() === 'chest fly'), 'the chest fly is offered again');
+  assert(pickOptionLabel({ name: 'x', display: 'X', muscle: null, ours: true } as never).endsWith('- added'),
+    'an addition lost its own mark');
 });
 
 Deno.test('⛔⛔ THE PAGE\'S OWN LIST BEATS A PRIME-MOVER TAG, AND ONLY WHERE IT IS NAMED', () => {

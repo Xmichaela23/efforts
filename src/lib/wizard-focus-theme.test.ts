@@ -84,8 +84,11 @@ Deno.test('⛔ AND ONLY THE STEPS HE NAMED CHANGED', () => {
   }
   // ⛔ AND THE PROGRAM LIST UNDER RUN FOCUS / RIDE FOCUS CARRIES IT TOO (Michael, 2026-09-07): the
   // screen is titled by the grouping's discipline word, under the same eye as Train.
-  assert(WIZARD.includes("title={eyeTitle(state.trainCard === 'ride' ? 'Ride' : 'Run')}"),
-    'the program list lost the eye, or its title stopped being the discipline word');
+  // ⚠️ REBASED 2026-09-13: the title reads the section's word from one table (Multisport / Run / Ride).
+  assert(WIZARD.includes('title={eyeTitle(PROGRAM_SCREEN_TITLE[state.trainCard])}'),
+    'the program list lost the eye, or its title stopped being the section word');
+  assert(/PROGRAM_SCREEN_TITLE: Record<TrainCardId, string> = \{ standard: 'Multisport', run: 'Run', ride: 'Ride' \}/.test(WIZARD),
+    'the program list titles changed');
 });
 
 // ════════════════════════════════════════════════════════════════════════════════════════════════

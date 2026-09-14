@@ -369,6 +369,11 @@ export type Frame = {
    * ⚠️ A plan built before this keeps the name it stored.
    */
   displayName?: string;
+  /**
+   * ⛔ THE BUILD THIS PLAN? DESCRIPTION, IN MICHAEL'S APPROVED WORDS (2026-09-13). A frame that declares one
+   * reads "<name>, N weeks." over it; a frame without one keeps the older two lines. Weeks are the block's.
+   */
+  confirmLine?: (weeks: number) => string;
   cite: string;
   /** ⛔ THE PROGRAM OWNS THIS (pivot §6). Not an athlete dial. */
   liftingDays: number;
@@ -1166,7 +1171,11 @@ export const FRAMES: Record<FrameId, Frame> = {
   all_rounder: {
     id: 'all_rounder',
     sourceName: 'The All Rounder',
-    displayName: 'Standard Focus',
+    // ⛔ RENAMED (Michael, 2026-09-13): the card under Multisport Focus, the plan name, the calendar line and
+    // Build this plan? all read "Run + Ride + Strength". A plan built before keeps the name it stored.
+    displayName: 'Run + Ride + Strength',
+    confirmLine: (weeks: number) =>
+      `A ${weeks}-week plan to get stronger and faster on the run and the bike. The weights go up as you adapt to the training.`,
     cite: 'Viada pp274-275',
     liftingDays: 4,
     columns: { standard: ALL_ROUNDER_STANDARD, taper: ALL_ROUNDER_TAPER },
@@ -1180,6 +1189,8 @@ export const FRAMES: Record<FrameId, Frame> = {
     sourceName: 'Cycling: Base',
     // ⚠️ THE CARD'S EXISTING LABEL. §0.1 of the work order: the card copy is not approved yet.
     displayName: 'Ride + Strength',
+    confirmLine: (weeks: number) =>
+      `A ${weeks}-week plan to get faster and stronger. The weights go up as you adapt to the training.`,
     cite: 'Viada pp278, 280-281',
     liftingDays: 3,
     columns: { standard: CYCLING_BASE_STANDARD, taper: CYCLING_BASE_TAPER },

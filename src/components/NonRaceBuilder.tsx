@@ -337,7 +337,10 @@ type CardIcon = React.ComponentType<{ className?: string; style?: React.CSSPrope
  */
 const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string; Icon: CardIcon; color: string }> = {
   standard: {
-    label: 'Standard Focus',
+    // ⛔ MULTISPORT FOCUS (Michael, 2026-09-13, both lines approved): a grouping like Run Focus and Ride Focus,
+    // opening a program list. The All Rounder's own blurb moved to its program card (`PROGRAM_COPY.run_ride_strength`).
+    label: 'Multisport Focus',
+    blurb: 'Running, riding and lifting in one plan.',
     // ⛔ HIS CLAIMS, ALL OF THEM ON p274-275: an "all-year" programme, for an athlete interested in
     // multiple sports, that pivots to a race programme about a month out. Nothing here is ours.
     // ⚠️ VIADA IS NOT NAMED ON ANY CARD. The old Strength Focus card named him, and two programmes
@@ -345,7 +348,6 @@ const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string; Icon: Card
     // ⚠️ THE TWO SPORTS ARE NAMED (Michael, off the live screen, 2026-08-30). "Both endurance
     // sports" read as ambiguous and he asked whether it covered swimming — it does not, and no
     // frame prescribes one.
-    blurb: 'Strength, running and riding run together, year-round, with a pivot to a race or a single sport when one comes up.',
     Icon: Shuffle,
     color: getDisciplineColor('strength'),
   },
@@ -382,7 +384,8 @@ const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string; Icon: Card
  * treats as the default.
  */
 const TRAIN_GOAL: Record<TrainCardId, NonRaceGoalId | null> = {
-  standard: 'get_stronger', run: null, ride: null,
+  // ⚠️ NONE SEEDS A GOAL NOW (2026-09-13): all three sections open a program list, and the program card seeds it.
+  standard: null, run: null, ride: null,
 };
 /**
  * ⛔ WHAT EACH TRAIN CARD OPENS (Michael, 2026-09-07). Standard Focus is one programme and opens the
@@ -392,7 +395,8 @@ const TRAIN_GOAL: Record<TrainCardId, NonRaceGoalId | null> = {
  * with its cards dimmed, so the screen says what is coming rather than refusing the tap.
  */
 const TRAIN_OPENS: Record<TrainCardId, 'wizard' | 'programs'> = {
-  standard: 'wizard', run: 'programs', ride: 'programs',
+  // ⛔ MULTISPORT FOCUS OPENS ITS LIST TOO (punch list 2026-09-13): three sections, one shape.
+  standard: 'programs', run: 'programs', ride: 'programs',
 };
 
 /**
@@ -421,9 +425,9 @@ const RIDE_STRENGTH_REQUIREMENT_LINE =
 /** ⛔ APPROVED (Michael, 2026-09-13) — the Ride + Strength numbers step, beside FTP. p137: the rider coming back. */
 const RIDE_BREAK_FTP_LINE = "If you're coming back from a riding break, make sure your FTP is current.";
 
-type ProgramId = 'run_strength' | 'ride_strength';
+type ProgramId = 'run_ride_strength' | 'run_strength' | 'ride_strength';
 const PROGRAMS_BY_CARD: Record<TrainCardId, ProgramId[]> = {
-  standard: [], run: ['run_strength'], ride: ['ride_strength'],
+  standard: ['run_ride_strength'], run: ['run_strength'], ride: ['ride_strength'],
 };
 const PROGRAM_COPY: Record<ProgramId, {
   label: string; blurb: string; Icon: CardIcon; color: string;
@@ -440,6 +444,16 @@ const PROGRAM_COPY: Record<ProgramId, {
   /** The line under the blurb: what the block needs. Shown on a live card only. */
   requirement?: string;
 }> = {
+  run_ride_strength: {
+    // ⛔ THE ALL ROUNDER (p274), under Multisport Focus (Michael, 2026-09-13, name approved). The blurb is the
+    // one the Standard Focus Train card carried, unchanged (p274-275's claims).
+    label: 'Run + Ride + Strength',
+    blurb: 'Strength, running and riding run together, year-round, with a pivot to a race or a single sport when one comes up.',
+    Icon: Shuffle, color: getDisciplineColor('strength'),
+    // ⛔ OPENS TODAY'S STANDARD FOCUS SETUP UNCHANGED: the same goal and the same focus the Train card set.
+    goal: 'get_stronger', focus: 'standard',
+    // The requirements line under it is `STANDARD_FOCUS_REQUIREMENT`, unchanged (chosen at render below).
+  },
   run_strength: {
     label: 'Run + Strength',
     // p247 only: the lifts are the goal; running holds at the athlete's mileage; the long run tops
@@ -463,7 +477,7 @@ const PROGRAM_COPY: Record<ProgramId, {
   },
 };
 /** The program screen's title, per grouping — the discipline word, under the eye like Train. */
-const PROGRAM_SCREEN_TITLE: Record<TrainCardId, string> = { standard: 'Standard', run: 'Run', ride: 'Ride' };
+const PROGRAM_SCREEN_TITLE: Record<TrainCardId, string> = { standard: 'Multisport', run: 'Run', ride: 'Ride' };
 
 /** ⚠️ SMALL COUNTS ARE WORDS, not digits — the register every other sentence on these screens uses. */
 const COUNT_WORD: Record<number, string> = { 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five' };
@@ -4296,11 +4310,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                       </span>
                       {/* ⛔ WHAT IT REQUIRES, AT THE DOOR — see `STANDARD_FOCUS_REQUIREMENT`. One
                           line, under each card whose block refuses at the gate without it. */}
-                      {t === 'standard' ? (
-                        <span className="block text-xs mt-1.5 leading-relaxed text-white/45">
-                          {STANDARD_FOCUS_REQUIREMENT}
-                        </span>
-                      ) : null}
+                      {/* ⛔ THE REQUIREMENTS LINE MOVED TO THE PROGRAM CARD (2026-09-13), where Run + Strength and
+                          Ride + Strength already carry theirs. No section card carries one. */}
                       {/* ⛔ THE PRECONDITION PARAGRAPH IS GONE (Michael, 2026-08-05: *"lose this"*).
                           It listed what the block needs — barbell, rack, bench, four maxes on file —
                           and it made one card three times the height of its three neighbours, which
@@ -4323,7 +4334,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       {currentStep === 'program' && state.trainCard != null && (
         <StepLayout
           step={stepNo('program')} totalSteps={steps.length}
-          title={eyeTitle(state.trainCard === 'ride' ? 'Ride' : 'Run')}
+          // ⛔ THE SECTION'S OWN WORD, from the table above (it was a Run/Ride ternary until Multisport joined).
+          title={eyeTitle(PROGRAM_SCREEN_TITLE[state.trainCard])}
           subtitle="Pick a program."
           onBack={back} onContinue={next} canContinue={state.program != null}
           hideContinue hideProgress
@@ -7668,8 +7680,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             ? `${state.raceDistance} — ${state.raceDate}${planWeeks !== null ? `, about ${planWeeks} weeks` : ''}.`
             /* ⛔ "of the previous program" DELETED (2026-08-24): his trademark on the final commit
                screen, and no longer true — the block is the Standing Plan engine, not the previous program. */
-            // ⛔ RIDE + STRENGTH'S OWN LINE (Michael, 2026-09-13; COPY-ride-strength-setup). Every other plan unchanged.
-            : printedRideWeekPath(state)
+            // ⛔ A PLAN THAT DECLARES ITS OWN DESCRIPTION (`Frame.confirmLine`: Ride + Strength, Run + Ride + Strength,
+            // Michael 2026-09-13) reads "<name>, N weeks."; Run + Strength keeps its two older lines.
+            : (isStrengthFocus && FRAMES[wizardFrame]?.confirmLine)
               ? `${programmeName(state)}, ${state.targetWeeks} weeks.`
               : `${programmeName(state)} — ${state.targetWeeks} weeks. Strength leads; your endurance holds.`}
           onBack={back} onContinue={handleConfirm} canContinue={!saving}
@@ -7835,10 +7848,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     on a close race. "About" is doing real work in this sentence. */
                 <>Running leads to {state.raceDistance.toLowerCase()} day, about {planWeeks ?? '—'} weeks
                 out, with a taper into the race. Everything you kept is held underneath it.</>
-              ) : printedRideWeekPath(state) ? (
-                /* ⛔ APPROVED, MICHAEL'S WORDS (2026-09-13), Ride + Strength only. Lifts move when earned
-                   (work order §3); the old three-cycle sentence below is not this plan. */
-                <>A {state.targetWeeks}-week plan to get faster and stronger. The weights go up as you adapt to the training.</>
+              ) : (isStrengthFocus && FRAMES[wizardFrame]?.confirmLine) ? (
+                /* ⛔ THE PLAN'S OWN APPROVED DESCRIPTION — `Frame.confirmLine`. */
+                <>{FRAMES[wizardFrame].confirmLine!(state.targetWeeks)}</>
               ) : isStrengthFocus ? (
                 /* ⛔ "every third week" was false — the open set exists ONLY in the anchor cycle
                    (`wendler-531.ts:61`: amrap = anchor && !deload && last set), so weeks 9-11 of

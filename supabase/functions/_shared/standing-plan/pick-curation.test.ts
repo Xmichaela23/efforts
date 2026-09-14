@@ -86,11 +86,11 @@ Deno.test('⛔ THE MARK GOES ON THE ROW WHEN IT IS TRUE OF EVERY OPTION', () => 
     assert(!pickOptionLabelInRow(o, true).includes('for your gear'),
       'the per-option suffix is still printed on a row that carries the mark itself');
   }
-  // ⛔ THE MIXED ROW IS UNTOUCHED — `iso_push` holds his four plus one of ours.
+  // ⛔ A ROW OF HIS OWN IS NOT MARKED. ⚠️ REBASED 2026-09-13: `iso_push` held one of ours (the chest fly) and it is
+  // removed (Michael), so the row is his movements only and nothing on it reads "added".
   const mixed = opts('iso_push', HOME);
   assertEquals(allSubstituted(mixed), false, 'a row of his own movements read as all-substitutes');
-  assert(mixed.some((o) => pickOptionLabelInRow(o, false).includes('- added')),
-    'the addition lost its mark on a mixed row');
+  assert(!mixed.some((o) => pickOptionLabelInRow(o, false).includes('- added')), 'an addition is offered again');
 });
 
 Deno.test('⛔ AND THE ROWS ARE READABLE — no wall of options', () => {
@@ -128,9 +128,10 @@ Deno.test('⛔ THE ORDER IS THE REFERENCE DOC\'S, AND IT IS NOT MODALITY-BASED',
    * ⛔ HIS PRINTED MOVEMENTS LEAD, on a row where the kit reaches them. `iso_push` is his four plus
    * one of ours, and the addition must not outrank the four.
    */
+  // ⚠️ REBASED 2026-09-13: the chest fly addition is removed, so every option on the row is his.
   const iso = opts('iso_push', HOME);
   assertEquals(iso[0].ours, undefined, 'an added movement leads a row of his own');
-  assert(iso[iso.length - 1].ours === true, 'the addition is no longer last');
+  assert(iso.every((o) => o.ours !== true), 'an addition is offered again');
 
   /**
    * ⚠️ AND A GYM ROW IS NOT PENALISED FOR BEING MACHINES. `braced_push` at a commercial gym is three

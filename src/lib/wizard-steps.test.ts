@@ -47,8 +47,12 @@ Deno.test('⛔⛔ STANDARD FOCUS DOES NOT LAND ON THE 5K PATH\'S TIER SCREEN', (
    * further along. What it still asserts is that a Standard Focus tap opens a screen that HAS an
    * answer for this programme.
    */
-  assertEquals(landsOn(strengthPath('standard')), 'endurance',
-    'Standard Focus lands somewhere other than the endurance week');
+  // ⚠️ REBASED 2026-09-13: Multisport Focus opens its program list first, and the program card opens the
+  // endurance week — still never a tier screen.
+  assertEquals(landsOn(strengthPath('standard')), 'program', 'Multisport Focus does not open its program list');
+  const std = getSteps(strengthPath('standard'));
+  assertEquals(std[std.indexOf('program') + 1], 'endurance',
+    'the Run + Ride + Strength card lands somewhere other than the endurance week');
   // ⛔ THE TIER SCREEN NO LONGER EXISTS ON ANY PATH (2026-09-07) — see the Run Focus test below.
   assert(!(getSteps(strengthPath('standard')) as string[]).includes('tier'),
     'the tier screen is back in the Standard Focus flow');
@@ -147,7 +151,8 @@ Deno.test('⛔⛔ RIDE + STRENGTH — the exact step list (WORKORDER-ride-streng
   assertEquals(getSteps({ ...st, posture: { ...st.posture, ...RIDE_STRENGTH_POSTURE } }), getSteps(st));
   // ⛔ One guard for the other two: their lists are unchanged.
   assertEquals(getSteps(strengthPath('run')), ['goal', 'train', 'program', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm']);
-  assertEquals(getSteps(strengthPath('standard')), ['goal', 'train', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm']);
+  // ⚠️ Multisport Focus gained its program list (2026-09-13); nothing else in its list moved.
+  assertEquals(getSteps(strengthPath('standard')), ['goal', 'train', 'program', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm']);
 });
 
 Deno.test('⚠️ A DRAFT FROM BEFORE THE TRAIN CARD EXISTED SEES NO PROGRAM SCREEN', () => {
@@ -209,8 +214,9 @@ Deno.test('⛔ THE FLOW IS COMPLETE WITHOUT A STANDARD-ONLY SCREEN', () => {
   // ⚠️ ONE SCREEN APART SINCE 2026-09-07 — the tier screen is gone from both.
   // ⚠️ TWO SCREENS APART SINCE 2026-09-07 — the program list and the sport-scope card, and both
   // are screens the Standard programme has no use for.
-  assertEquals(standard, run.filter((k) => k !== 'posture' && k !== 'program'),
-    'the two flows differ by more than the program and sport-scope screens');
+  // ⚠️ AND SINCE 2026-09-13 NOT APART AT ALL: Multisport Focus has its program list too, and neither has the
+  // sport-scope card. The flows are the same screens.
+  assertEquals(standard, run, 'the two flows differ');
   for (const required of ['endurance', 'schedule', 'numbers', 'confirm'] as const) {
     assert(standard.includes(required), `Standard Focus never asks for ${required}`);
   }
@@ -221,5 +227,5 @@ Deno.test('⚠️ A GOAL REACHED OUTSIDE THE TRAIN DRILL-DOWN TAKES THE SAME ROU
   assertEquals(getSteps({ ...strengthPath('run'), entry: 'build' }),
     getSteps(strengthPath('run')).filter((k) => k !== 'train' && k !== 'program'));
   assertEquals(getSteps({ ...strengthPath('standard'), entry: 'build' }),
-    getSteps(strengthPath('standard')).filter((k) => k !== 'train'));
+    getSteps(strengthPath('standard')).filter((k) => k !== 'train' && k !== 'program'));
 });
