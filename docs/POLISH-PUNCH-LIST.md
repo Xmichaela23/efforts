@@ -14,6 +14,25 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — 2026-09-13 (Ride + Strength, look-first picks, Multisport Focus, setup from the server — PUSHED, DEPLOYED, iOS synced)
+
+main = `628392fa`. Server functions deployed 06:15 UTC. iOS synced from `628392fa`.
+
+- **Run + Ride + Strength setup: CHECKED on Michael's phone 2026-09-13** (home kit): Know your numbers? comes before
+  Your week; with Use current both sample weeks show normal lifting, no test days; his changed pick carried through.
+- **Run + Strength setup: NOT phone-checked.** Walk Train → Run Focus → Run + Strength to Build this plan?: Know your
+  numbers? before Your week; Use current shows no test days; Build focus opens on lateral raise (Day 1 push), KB swing or
+  Romanian deadlift (Day 2 hinge variation, and a changed pick holds), hip thrust (Day 2 accessory lower), Arnold press
+  (Day 4); dose line reads "Accessory sets are 8 to 10 reps, stopping one or two reps short of failure."; no Chest Fly.
+- **Ride + Strength setup: NOT phone-checked.** Walk Train → Ride Focus → Ride + Strength to a built plan: card is live
+  with its approved description and requirements line; 4 or 5 rides (4 drops the Day 2 easy ride); Build focus subtitle
+  has no "super sets"; Hinge variation row present; Your week and Build this plan? show 3 lifting days, rides all level 1,
+  Sunday rest; Build this plan? reads "Ride + Strength, 12 weeks." and "A 12-week plan to get faster and stronger. The
+  weights go up as you adapt to the training."; FTP line on the numbers step. Then open the built plan: carry row reads
+  "Farmers Carry · medium weight, no fatigue, full rest".
+
+---
+
 ## ⏳ AWAITING MICHAEL — 2026-09-12 (the book's hard sessions, accessory rows, where a build lands, Home lit — PUSHED, DEPLOYED, iOS synced, NOT device-checked)
 
 Detail in `docs/SESSION-2026-09-11-12-handoff.md`; decisions in `DECISIONS-LOG-4.md` D-471 → D-476.
@@ -1474,7 +1493,12 @@ and his yes on every word.
 
 ---
 
-## Default picks and per-plan wording move to the server (decided 2026-09-13, not built, no go yet)
+## Default picks and per-plan wording move to the server (decided 2026-09-13)
+
+> **BUILT 2026-09-13 (`628392fa`, deployed 06:15 UTC).** The setup-open response carries each plan's Build focus rows,
+> defaults, options and per-plan wording (rides and runs screens included); the phone renders it and sends only changed
+> picks. No copy stays in the app; shared labels (Build focus, Your week, Start the week of, Pick a program) stay. 50
+> throwaway checks matched the previous words and defaults.
 
 Michael: "they should be on the server." Two things the phone decides today:
 1. **Default picks.** The Build focus screen works out each row's default movement (shared pick file via

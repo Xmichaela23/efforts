@@ -1,6 +1,35 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-13, PM chat — Intervals.icu sign-in; PUSHED, DEPLOYED, VERIFIED ON THE MAC)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-13, late — Ride + Strength, look-first picks, Multisport Focus, setup from the server; PUSHED, DEPLOYED, iOS SYNCED, partly phone-checked)
+
+> main = `628392fa`. Server functions deployed 06:15 UTC. Read `docs/WORKORDER-ride-strength-2026-09-13.md`,
+> `docs/COPY-ride-strength-setup-2026-09-13.md` and `docs/WORKORDER-look-first-default-picks-2026-09-13.md`.
+> The Intervals.icu banner below is from earlier the same day; its job list still stands.
+
+### WHAT SHIPPED
+- **Ride + Strength = Viada p278** (cycling Base week): p278 Standard lifting (3 days), p278 Deload rides all level 1
+  (sweet spot, easy, VO2, sprints, long easy ride; Sunday rest); 4 or 5 rides (4 drops the Day 2 easy ride); 12 weeks;
+  week-one test covers only the lifts the week loads (bench, squat, deadlift); carry row has no sets/reps. Standing-start
+  sprints left out (punch list). Setup: rides → Know your numbers? → Build focus (with Hinge variation) → Your week → Build.
+- **Look-first default picks on all three plans**, only from each row's printed list; Chest Fly removed everywhere.
+- **Train menu:** Multisport Focus → "Run + Ride + Strength" (the All Rounder); new plans carry that name.
+- **Setup fixes:** Know your numbers? before Your week; both sample weeks follow the answer.
+- **Default picks and per-plan wording come from the server** (setup-open response); the phone renders and sends only
+  changed picks.
+
+### VERIFIED
+- Throwaway builds through the live server for every change above (accounts deleted).
+- **Michael's phone:** Run + Ride + Strength setup (home kit), numbers-before-week order, Use current preview, pick carried.
+
+### UNVERIFIED — NEXT JOB
+1. **Phone check Run + Strength and Ride + Strength setups** — exact checklist in POLISH-PUNCH-LIST.md, AWAITING MICHAEL 2026-09-13.
+2. Netlify deploy of `628392fa` not confirmed finished.
+
+### DECIDED, NOT BUILT
+- p279 card name proposed "Long Ride + Strength". Never use "Fondo".
+- Future: programs at varying levels per section, speed and hypertrophy options; swims in Multisport "at some point".
+
+## (older banner, same day) (written 2026-09-13, PM chat — Intervals.icu sign-in; PUSHED, DEPLOYED, VERIFIED ON THE MAC)
 
 > **Read `docs/WORKORDER-intervals-oauth-2026-09-13.md` first** — its STATUS block (under section 1) and section 3
 > item 5 carry the decisions. main = `713f4f2b`.

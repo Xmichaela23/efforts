@@ -4,6 +4,9 @@
 > `COPY-ride-strength-setup-2026-09-13.md`. Eight throwaway builds through the live server (4 and 5 rides,
 > with and without FTP, lifts on file and tested in week one) matched p278 in all 12 weeks; accounts
 > deleted. §3b is not built (ruled). §0.5's dumbbell-fill idea is not decided and not built.
+> Later the same night: Build focus screen with Hinge variation (`06a66725`), step order and sample-week fix
+> (`6670a2dd`), wording and default picks served by the server (`628392fa`). **Not phone-checked** (see the
+> AWAITING MICHAEL 2026-09-13 block in POLISH-PUNCH-LIST.md).
 
 The Ride Focus card **Ride + Strength** is a dimmed placeholder today (`NonRaceBuilder.tsx`,
 `ride_strength`, `goal: null`). It goes live built on **p278** (Viada's cycling Base week, notes

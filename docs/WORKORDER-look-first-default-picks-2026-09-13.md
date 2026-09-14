@@ -1,7 +1,11 @@
 # Work order — default muscle-building picks aim at a visible, athletic look (2026-09-13)
 
-> **STATUS: NOT STARTED.** Michael agreed to write this up ("yeah … make them strong and hot"). §1 is a
-> trace and report only. No code before Michael's go on the §1 report.
+> **STATUS: BUILT 2026-09-13** (`06a66725`, then moved to the server in `628392fa`). Defaults per Michael's answers,
+> checked against the page photos p220-223, p246, p247, p274, p278: Day 1 focused push lateral raise (p246, p278);
+> Day 2 accessory lower hip thrust (p246, p278, under p247's accessory gloss); Day 2 DE secondary hinge back on p220's
+> list, KB swing or Romanian deadlift, and the Hinge variation pick is honoured; p274 Day 2 focused hamstring hip thrust
+> (home: barbell hip thrust stand-in); p274 Day 4 braced pull lat pulldown; p246 Day 4 secondary push Arnold press.
+> Chest Fly removed from every plan (`7b6c270b`). Rows, sets and reps unchanged.
 
 ## The change
 
