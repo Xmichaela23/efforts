@@ -4,6 +4,7 @@
 //
 // ⚠️ Thresholds are PROVISIONAL (not signed off) — see thresholds.ts.
 
+import { driftReachesLine } from '../run-pace.ts';
 import type { TrendPoint, TrendResult, TrendVerdict } from './types.ts';
 import type { RangePosition } from './position-in-range.ts';
 import { classifyTrend } from './classify.ts';
@@ -193,7 +194,7 @@ export function computeRunEfficiencyState(series: TrendPoint[], asOf: string, se
 // a RISING pct reads sliding (durability declining). This is the opposite of efficiency_index.
 export type DecouplingBand = 'sound' | 'needs_work';
 export function frielBand(pct: number): DecouplingBand {
-  return pct < 5 ? 'sound' : 'needs_work'; // ≤5% (incl. negatives) = base sound; >5% = build more base
+  return !driftReachesLine(pct) ? 'sound' : 'needs_work'; // under 5% (incl. negatives) = base sound; 5% and over (p107 "reaches") = build more base
 }
 
 // D-239 reconcile: the coaching label for a decoupling %, derived from the SAME frielBand the RUN row

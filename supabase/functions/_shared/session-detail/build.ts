@@ -9,6 +9,7 @@ import { sessionSteadiness } from './session-steadiness.ts';
 import { vt1WindowDrift } from './vt1-window-drift.ts';
 import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
 import { pacingVariability, stampIntervalCompare } from './interval-compare.ts';
+import { driftReachesLine } from '../run-pace.ts';
 import { planShare } from './swim-plan-share.ts';
 import { poolLabel } from '../swim/pool-label.ts';
 import { isIndoorSession } from '../indoor-session.ts';
@@ -570,9 +571,9 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
           distance_m: fin(iv?.actual_distance_m) ?? fin(sr?.executed?.distance_m),
           avg_hr: fin(iv?.avg_heart_rate_bpm) ?? fin(sr?.executed?.avg_hr),
           actual_pace_sec_per_mi: paceSec,
-          // ⛔ THE SEGMENT'S ADJUSTED PACE, CARRIED (2026-08-29). This was hard-null since the field
-          // existed: the analyzer had no per-segment number to give it. It does now
-          // (`interval-gap.ts`), so the table can offer the Strava swap between raw and adjusted.
+          // ⛔ THE SEGMENT'S ADJUSTED PACE, CARRIED (2026-08-29). Worked out once by the summary step on the
+          // segment's moving seconds (`_shared/run-pace.ts`, 2026-09-14), so the table can offer the Strava
+          // swap between raw and adjusted.
           actual_gap_sec_per_mi: fin(iv?.gap_pace_s_per_mi) ?? fin(sr?.executed?.gap_pace_s_per_mi) ?? null,
           power_watts: fin(iv?.avg_power_watts) ?? null,
         },
@@ -2030,7 +2031,7 @@ export function buildAnalysisDetailRows(
       // there was most to say. The label is now stable; the plain sentence leads and the number is the
       // receipt behind it.
       const p = decoupling!.pct as number;
-      const desc = p < 5 ? 'Held steady with pace'
+      const desc = !driftReachesLine(p) ? 'Held steady with pace'
         : p <= 10 ? 'Moderate drift over the run'
         : 'Notable drift late in the run';
       rows.push({ label: 'Heart rate', value: `${desc} (drift ${p}%)` });

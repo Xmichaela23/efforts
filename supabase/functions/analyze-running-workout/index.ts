@@ -1785,9 +1785,19 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         const workIntervalBreakdown = intervalBreakdown.filter(i => 
           String(i.interval_type || '').toLowerCase() === 'work'
         );
+        // ⛔ A FAILED REP COUNTS (2026-09-14). This dropped every 0, so reps of 100/100/100/0 averaged 100.
+        // A 0 from a rep that had a pace target and a measured pace is a miss and stays in; a 0 from a rep
+        // with no target or no pace (strides, a dropped recording) is not a score and stays out.
         const allPaceAdherences = workIntervalBreakdown
-          .map(i => i.pace_adherence_percent)
-          .filter(p => typeof p === 'number' && p > 0);
+          .filter(i => {
+            const p = i.pace_adherence_percent;
+            if (typeof p !== 'number' || !Number.isFinite(p)) return false;
+            if (p > 0) return true;
+            const hasTarget = Number(i.planned_pace_range_lower) > 0 || Number(i.planned_pace_min_per_mi) > 0;
+            const hasPace = Number(i.actual_pace_min_per_mi) > 0;
+            return hasTarget && hasPace;
+          })
+          .map(i => i.pace_adherence_percent);
         
         if (allPaceAdherences.length > 0) {
           const avgPaceAdherence = Math.round(allPaceAdherences.reduce((sum, p) => sum + p, 0) / allPaceAdherences.length);

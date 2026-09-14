@@ -1,4 +1,14 @@
-import { calculateIntervalGapPace } from '../analysis/interval-gap.ts';
+/**
+ * ⛔ A SEGMENT'S TIME, PACE AND GRADE-ADJUSTED PACE ARE THE SUMMARY STEP'S (2026-09-14, `_shared/run-pace.ts`).
+ * compute-workout-summary counts each segment's moving seconds (stops out) and its grade-adjusted pace on
+ * the same seconds. This file used to time reps first-to-last sample, stops included, and work out its own
+ * grade-adjusted pace from a second copy of the samples.
+ */
+const segmentSeconds = (iv: any): number => Number(iv?.executed?.moving_s ?? iv?.executed?.duration_s) || 0;
+const segmentGap = (iv: any): number | null => {
+  const g = Number(iv?.executed?.gap_pace_s_per_mi);
+  return Number.isFinite(g) && g > 0 ? Math.round(g) : null;
+};
 import { calculatePaceRangeAdherence } from '../adherence/pace-adherence.ts';
 import { calculateIntervalHeartRate } from '../analysis/heart-rate.ts';
 import { calculateIntervalElevation } from '../analysis/elevation.ts';
@@ -66,7 +76,7 @@ export function generateIntervalBreakdown(
     const plannedPace = interval.planned?.target_pace_s_per_mi || 0;
     
     // Extract actual values from executed object only (no planned fallbacks)
-    const actualDuration = interval.executed?.duration_s || 0;
+    const actualDuration = segmentSeconds(interval);
     
     // ✅ Use moving time for overall row so Time and Pace match Readouts (Duration vs Moving Time difference)
     // -------------------------------------------------------------------------
@@ -86,9 +96,13 @@ export function generateIntervalBreakdown(
       // For overall row: use workout-level moving_time and distance (most reliable)
       const workoutMovingTimeMin = rawWorkoutData?.moving_time;
       const workoutDistanceKm = rawWorkoutData?.distance;
+      // The whole run's moving seconds from the summary step (`_shared/run-pace.ts`), not the minute column.
+      const computedMovingS = Number((typeof rawWorkoutData?.computed === 'string'
+        ? (() => { try { return JSON.parse(rawWorkoutData.computed); } catch { return null; } })()
+        : rawWorkoutData?.computed)?.overall?.duration_s_moving);
       
-      if (workoutMovingTimeMin && workoutDistanceKm) {
-        const movingTimeS = Number(workoutMovingTimeMin) * 60;
+      if ((computedMovingS > 0 || workoutMovingTimeMin) && workoutDistanceKm) {
+        const movingTimeS = computedMovingS > 0 ? computedMovingS : Number(workoutMovingTimeMin) * 60;
         const distanceM = Number(workoutDistanceKm) * 1000;
         if (movingTimeS > 0 && distanceM > 0) {
           displayDurationS = movingTimeS;
@@ -355,7 +369,7 @@ export function generateIntervalBreakdown(
       // ⛔ THE SEGMENT'S GRADE-ADJUSTED PACE (2026-08-29) — Strava prints it on every split of a
       // hilly run and lets the athlete swap the column. `null` on a flat or too-short segment, and
       // the row keeps raw pace: never a raw number wearing the adjusted label.
-      gap_pace_s_per_mi: calculateIntervalGapPace(sensorData || [], interval.sample_idx_start, interval.sample_idx_end),
+      gap_pace_s_per_mi: segmentGap(interval),
       // Canonical pace fields for frontend (no math required)
       pace_s_per_mi: paceValid ? Math.round(actualPace) : null,
       pace_display: paceValid ? formatPaceDisplay(actualPace) : '—',
@@ -647,7 +661,7 @@ export function generateIntervalBreakdown(
         // ✅ SINGLE SOURCE OF TRUTH: Use executed.avg_pace_s_per_mi from compute-workout-summary
         const warmupActualPace = warmupInterval.executed?.avg_pace_s_per_mi || 0;
         const warmupPlannedDuration = warmupInterval.planned?.duration_s || 0;
-        const warmupActualDuration = warmupInterval.executed?.duration_s || 0;
+        const warmupActualDuration = segmentSeconds(warmupInterval);
         
         // Calculate pace adherence for range (not single target)
         const warmupPaceAdherence = warmupRangeLower > 0 && warmupRangeUpper > 0 && warmupActualPace > 0
@@ -687,7 +701,7 @@ export function generateIntervalBreakdown(
             ? null // Use range instead
             : (warmupInterval.planned?.target_pace_s_per_mi || 0) / 60,
           actual_pace_min_per_mi: warmupActualPace > 0 ? Math.round(warmupActualPace / 60 * 100) / 100 : 0,
-          gap_pace_s_per_mi: calculateIntervalGapPace(sensorData || [], warmupInterval.sample_idx_start, warmupInterval.sample_idx_end),
+          gap_pace_s_per_mi: segmentGap(warmupInterval),
           pace_adherence_percent: Math.round(warmupPaceAdherence),
           performance_score: Math.round(warmupPerformanceScore),
           avg_heart_rate_bpm: warmupHR.avg_heart_rate_bpm,
@@ -743,7 +757,7 @@ export function generateIntervalBreakdown(
         const recRangeLower = recPaceRange?.lower || 0;
         const recRangeUpper = recPaceRange?.upper || 0;
         const recPlannedDuration = recoveryInterval.planned?.duration_s || 0;
-        const recActualDuration = recoveryInterval.executed?.duration_s || 0;
+        const recActualDuration = segmentSeconds(recoveryInterval);
         const recActualDist = Number(recoveryInterval.executed?.distance_m ?? 0);
         let recActualPace = Number(recoveryInterval.executed?.avg_pace_s_per_mi ?? 0);
         recActualPace = reconcilePaceFromDurationDistance(recActualPace, recActualDuration, recActualDist);
@@ -786,7 +800,7 @@ export function generateIntervalBreakdown(
                      ? null // Use range instead
                      : (recoveryInterval.planned?.target_pace_s_per_mi || 0) / 60,
                    actual_pace_min_per_mi: recActualPace > 0 ? Math.round(recActualPace / 60 * 100) / 100 : 0,
-                   gap_pace_s_per_mi: calculateIntervalGapPace(sensorData || [], recoveryInterval.sample_idx_start, recoveryInterval.sample_idx_end),
+                   gap_pace_s_per_mi: segmentGap(recoveryInterval),
                    pace_adherence_percent: Math.round(recPaceAdherence),
                    performance_score: Math.round(recPerformanceScore),
                    avg_heart_rate_bpm: recHR.avg_heart_rate_bpm,
@@ -816,7 +830,7 @@ export function generateIntervalBreakdown(
         // ✅ USE SAME SOURCE AS SUMMARY SCREEN - executed.avg_pace_s_per_mi (single source of truth)
         const cooldownActualPace = cooldownInterval.executed?.avg_pace_s_per_mi || 0;
       const cooldownPlannedDuration = cooldownInterval.planned?.duration_s || 0;
-      const cooldownActualDuration = cooldownInterval.executed?.duration_s || 0;
+      const cooldownActualDuration = segmentSeconds(cooldownInterval);
       
       // Calculate pace adherence for range
       const cooldownPaceAdherence = cooldownRangeLower > 0 && cooldownRangeUpper > 0 && cooldownActualPace > 0
@@ -855,7 +869,7 @@ export function generateIntervalBreakdown(
                      ? null // Use range instead
                      : (cooldownInterval.planned?.target_pace_s_per_mi || 0) / 60,
                    actual_pace_min_per_mi: cooldownActualPace > 0 ? Math.round(cooldownActualPace / 60 * 100) / 100 : 0,
-                   gap_pace_s_per_mi: calculateIntervalGapPace(sensorData || [], cooldownInterval.sample_idx_start, cooldownInterval.sample_idx_end),
+                   gap_pace_s_per_mi: segmentGap(cooldownInterval),
                    pace_adherence_percent: Math.round(cooldownPaceAdherence),
                    performance_score: Math.round(cooldownPerformanceScore),
                    avg_heart_rate_bpm: cooldownHR.avg_heart_rate_bpm,
@@ -1123,23 +1137,10 @@ export function generateIntervalBreakdown(
         }
         const warmupRangeLower = warmupPaceRange?.lower || 0;
         const warmupRangeUpper = warmupPaceRange?.upper || 0;
-        // ✅ CALCULATE FROM SENSOR DATA (same as Summary screen) - not from executed.avg_pace_s_per_mi
-        let warmupActualPace = 0;
-        if (sensorData && warmupInterval.sample_idx_start !== undefined && warmupInterval.sample_idx_end !== undefined) {
-          const warmupSamples = sensorData.slice(warmupInterval.sample_idx_start, warmupInterval.sample_idx_end + 1);
-          const validPaceSamples = warmupSamples
-            .map(s => s.pace_s_per_mi || (s.speedMetersPerSecond ? (1609.34 / s.speedMetersPerSecond) : null))
-            .filter(p => p != null && p > 0 && Number.isFinite(p));
-          if (validPaceSamples.length > 0) {
-            warmupActualPace = validPaceSamples.reduce((sum, p) => sum + p, 0) / validPaceSamples.length;
-          }
-        }
-        // Fallback to executed if sensor data not available
-        if (warmupActualPace === 0) {
-          warmupActualPace = warmupInterval.executed?.avg_pace_s_per_mi || 0;
-        }
+        // The summary step's segment pace (`_shared/run-pace.ts`) — not a mean of per-sample paces.
+        const warmupActualPace = warmupInterval.executed?.avg_pace_s_per_mi || 0;
         const warmupPlannedDuration = warmupInterval.planned?.duration_s || 0;
-        const warmupActualDuration = warmupInterval.executed?.duration_s || 0;
+        const warmupActualDuration = segmentSeconds(warmupInterval);
         
         const warmupPaceAdherence = warmupRangeLower > 0 && warmupRangeUpper > 0 && warmupActualPace > 0
           ? calculatePaceRangeAdherence(warmupActualPace, warmupRangeLower, warmupRangeUpper, 'warmup')

@@ -8,31 +8,24 @@
  *
  * ⚠️ WATTS NOW USE THE ANALYZER'S RULE, NOT THE TABLE'S. `analyze-cycling-workout` scores a rep 100 only
  * inside its planned range (`index.ts`, the `actualPower >= plannedPowerLower && <= plannedPowerUpper`
- * test); the table's 3% / 5% grace had no source. Pace keeps 5 s, which is the analyzer's own number.
+ * test); the table's 3% / 5% grace had no source. Pace has no allowance either (2026-09-14, below).
  */
 import type { IntervalRow, SessionDetailV1 } from './types.ts';
+import { paceRangeBand } from '../run-pace.ts';
 
 export type IntervalBand = 'below' | 'in' | 'above';
 
 /**
- * Pace allowance either side of the planned range. The running analyzer's number: a work rep within
- * 5 s of its range scores 100, commented "within GPS noise"
- * (`analyze-running-workout/lib/adherence/pace-adherence.ts`). OURS — neither the analyzer nor the
- * table it replaces cites a source for 5.
+ * ⛔ A WORK REP AGAINST ITS RANGE, NO ALLOWANCE (2026-09-14, `_shared/run-pace.ts`). This allowed 5 s either
+ * side of every segment (OURS, no source) while the badge beside it allowed 10 s slow on easy segments and any
+ * amount slow on recoveries. Slower than the range reads `below` (less than asked), faster reads `above`.
  */
-export const PACE_BAND_ALLOWANCE_S = 5;
-
-/** Slower than the range reads `below` (less than asked), faster reads `above`. */
 export function paceBand(
   paceSecPerMi: number | null | undefined,
   range: IntervalRow['planned_pace_range'] | null | undefined,
 ): IntervalBand | null {
-  if (!range || !(Number(range.lower_sec_per_mi) > 0)) return null;
-  const a = Number(paceSecPerMi);
-  if (paceSecPerMi == null || !Number.isFinite(a) || a <= 0) return null;
-  if (a > Number(range.upper_sec_per_mi) + PACE_BAND_ALLOWANCE_S) return 'below';
-  if (a < Number(range.lower_sec_per_mi) - PACE_BAND_ALLOWANCE_S) return 'above';
-  return 'in';
+  if (!range) return null;
+  return paceRangeBand(paceSecPerMi, range.lower_sec_per_mi, range.upper_sec_per_mi);
 }
 
 /** Fewer watts than the range reads `below`, more reads `above`. The analyzer's rule: the range itself. */
@@ -138,9 +131,11 @@ export function stampIntervalCompare(
     if (ctx.isRide) {
       iv.executed.band = powerBand(iv.executed.power_watts, iv.planned_power_range);
     } else {
-      iv.executed.band = paceBand(pace, iv.planned_pace_range);
-      // The pace column swaps to grade-adjusted; a segment with no adjusted number keeps its raw one.
-      iv.executed.gap_band = paceBand(iv.executed.actual_gap_sec_per_mi ?? pace, iv.planned_pace_range);
+      // Runs: only a work rep is judged, on its real pace. Warm-up, cool-down and recovery are prescribed as an
+      // easy jog or a walk (Viada p231–235), not a pace to hit. The grade-adjusted column shows the adjusted
+      // number but keeps the colour the real pace earned.
+      iv.executed.band = iv.interval_type === 'work' ? paceBand(pace, iv.planned_pace_range) : null;
+      iv.executed.gap_band = iv.executed.band;
     }
   }
 }

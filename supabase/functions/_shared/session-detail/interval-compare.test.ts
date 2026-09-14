@@ -9,11 +9,11 @@ import { buildSessionDetailV1 } from './build.ts';
 
 const paceRange = { lower_sec_per_mi: 600, upper_sec_per_mi: 630 };
 
-Deno.test('pace: 5 s either side of the range still reads in', () => {
-  assertEquals(paceBand(635, paceRange), 'in');
-  assertEquals(paceBand(636, paceRange), 'below');
-  assertEquals(paceBand(595, paceRange), 'in');
-  assertEquals(paceBand(594, paceRange), 'above');
+Deno.test('pace: the range itself — the 5 s allowance is gone (2026-09-14)', () => {
+  assertEquals(paceBand(630, paceRange), 'in');
+  assertEquals(paceBand(631, paceRange), 'below'); // 5 s used to read this as in
+  assertEquals(paceBand(600, paceRange), 'in');
+  assertEquals(paceBand(599, paceRange), 'above');
   assertEquals(paceBand(null, paceRange), null);
   assertEquals(paceBand(610, undefined), null);
 });
@@ -75,13 +75,23 @@ const runRep = {
   actual_pace_min_per_mi: 10.9, gap_pace_s_per_mi: 620, pace_adherence_percent: 60,
 };
 
-Deno.test('the build stamps a planned run rep: raw slower than range, adjusted inside it', () => {
+Deno.test('a run rep is coloured on its real pace, in both columns', () => {
   const sd: any = build('run', runRep);
   assertEquals(sd.intervals[0].executed.actual_pace_sec_per_mi, 654);
+  assertEquals(sd.intervals[0].executed.actual_gap_sec_per_mi, 620);
   assertEquals(sd.intervals[0].executed.band, 'below');
-  assertEquals(sd.intervals[0].executed.gap_band, 'in');
+  // The adjusted column shows 620 (inside the range) but keeps the colour the real pace earned.
+  assertEquals(sd.intervals[0].executed.gap_band, 'below');
   assertEquals(sd.intervals[0].race_compare, undefined);
   assertEquals(sd.pacing.variability, { level: 'moderate', label: 'Moderate pacing variability' });
+});
+
+Deno.test('a run recovery, warm-up or cool-down is not coloured', () => {
+  for (const kind of ['recovery', 'warmup', 'cooldown']) {
+    const sd: any = build('run', { ...runRep, interval_type: kind, actual_pace_min_per_mi: 12 });
+    assertEquals(sd.intervals[0].executed.band, null, kind);
+    assertEquals(sd.intervals[0].executed.gap_band, null, kind);
+  }
 });
 
 Deno.test('a goal race gets percents and words, and no band', () => {

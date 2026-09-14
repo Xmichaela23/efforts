@@ -5,7 +5,7 @@
 //           Also normalizes pace units and tags records with normalization_version='v1'.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { resolvePoolLength } from '../_shared/swim/resolve-pool-length.ts';
-import { metabolicCostPerMeter } from '../_shared/gap.ts'; // ONE canonical Minetti cost — no inline copy
+import { gapSecPerMiBetween, movingSecondsBetween, runGrades, runMovingSeconds } from '../_shared/run-pace.ts';
 import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
 import { averagePowerW, judgedPowerW, normalizedPowerW, powerStreamW, readPowerW } from '../_shared/ride-power.ts';
 
@@ -372,61 +372,21 @@ const COMPUTED_VERSION = 'v1.0.4';
 // Database column `computed_version` is an integer; keep JSON as string, column as int
 const COMPUTED_VERSION_INT = 1003;
 
-// ---------- GAP (Minetti model with elevation smoothing) ----------
-function gapSecPerMi(rows:any[], sIdx:number, eIdx:number) {
+// ---------- Run pace and grade-adjusted pace: `_shared/run-pace.ts` ----------
+// ⛔ ONE SET OF RUN PACE RULES (2026-09-14). This file had its own grade-adjusted pace (its own elevation
+// smoothing, a ±30% grade cap, stopped seconds counted) and timed every rep first-to-last sample, stops
+// included. Both now read the shared rules: stops come out, one grade-adjusted pace.
+const _runGradesCache = new WeakMap<any[], number[] | null>();
+function gradesFor(rows:any[]): number[] | null {
+  if (!Array.isArray(rows)) return null;
+  if (!_runGradesCache.has(rows)) _runGradesCache.set(rows, runGrades(rows));
+  return _runGradesCache.get(rows) ?? null;
+}
+/** Grade-adjusted pace for rows sIdx..eIdx, against the pace shown for that stretch. */
+function gapSecPerMi(rows:any[], sIdx:number, eIdx:number, paceSecPerMi:number|null) {
   try {
-    if (!Array.isArray(rows)) return null;
-    const n = rows.length;
-    if (n < 2) return null;
-    let s = Math.max(0, Math.min(n - 2, Math.floor(sIdx)));
-    let e = Math.max(s + 1, Math.min(n - 1, Math.floor(eIdx)));
-    if (e <= s) return null;
-    let adjMeters = 0; let timeSec = 0;
-    const alpha = 0.1; // EMA smoothing (~10-15s at ~1 Hz)
-    // ONE SOURCE (2026-07-21): the Minetti cost was hardcoded here — a third copy of _shared/gap.ts.
-    // Now the canonical metabolicCostPerMeter (gap.ts clamps ±0.45 vs the old inline ±0.30; a wider,
-    // harmless bound). Change the model in gap.ts and this follows, instead of silently diverging.
-    const minettiCost = metabolicCostPerMeter;
-    let ema:number|null = null;
-    for (let i=s+1;i<=e;i+=1) {
-      const a:any = rows[i-1] || {};
-      const b:any = rows[i] || {};
-      const at = Number(a?.t ?? 0);
-      const bt = Number(b?.t ?? 0);
-      const dt = Math.min(60, Math.max(0, bt - at));
-      if (!dt) continue; timeSec += dt;
-      // distance for segment
-      const dMeters = (() => {
-        const hasD = (typeof a?.d === 'number') && (typeof b?.d === 'number');
-        if (hasD) {
-          const dm = Math.max(0, (Number(b.d) - Number(a.d)));
-          if (dm > 0) return dm;
-        }
-        const v = (typeof b?.v === 'number' && b.v > 0) ? b.v : ((typeof a?.v === 'number' && a.v > 0) ? a.v : 0);
-        return v > 0 ? v * dt : 0;
-      })();
-      if (dMeters <= 0) continue;
-      // smoothed elevation delta
-      const elevRawB = (typeof b?.elev === 'number') ? b.elev : (typeof a?.elev === 'number' ? a.elev : null);
-      if (elevRawB != null) ema = (ema == null) ? elevRawB : (alpha * elevRawB + (1 - alpha) * ema);
-      const prevEma = ema;
-      // lookahead one more point when possible
-      let delev = 0;
-      if (i+1 <= e) {
-        const nb:any = rows[i+1] || {};
-        const nextElevRaw = (typeof nb?.elev === 'number') ? nb.elev : elevRawB;
-        const nextEma = (nextElevRaw != null) ? (alpha * nextElevRaw + (1 - alpha) * (ema ?? nextElevRaw)) : (ema ?? 0);
-        delev = nextEma - (prevEma ?? nextEma);
-        ema = nextEma;
-      } else {
-        delev = 0;
-      }
-      const g = dMeters > 0 ? Math.max(-0.30, Math.min(0.30, delev / dMeters)) : 0;
-      const ratio = minettiCost(g) / 3.6; // cost relative to flat
-      const safeRatio = Math.max(0.7, Math.min(2.5, ratio));
-      adjMeters += dMeters * safeRatio;
-    }
-    return paceSecPerMiFromMetersSeconds(adjMeters, timeSec);
+    if (!Array.isArray(rows) || rows.length < 2) return null;
+    return gapSecPerMiBetween(rows, gradesFor(rows), Math.max(0, Math.floor(sIdx)), Math.floor(eIdx), paceSecPerMi);
   } catch (err:any) {
     try { console.error('Exact error location: gapSecPerMi', { error: err?.message }); } catch {}
     return null;
@@ -655,7 +615,7 @@ Deno.serve(async (req) => {
     // Load workout + planned link
     const { data: w, error: workoutError } = await supabase
       .from('workouts')
-      .select('id,user_id,planned_id,computed,metrics,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,user_corrected_pool_length_m,environment,pool_length,number_of_active_lengths,distance,moving_time,avg_power,avg_temperature,weather_data,elevation_gain')
+      .select('id,user_id,planned_id,computed,metrics,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,user_corrected_pool_length_m,environment,pool_length,number_of_active_lengths,distance,moving_time,avg_speed,avg_pace,avg_power,avg_temperature,weather_data,elevation_gain')
       .eq('id', workout_id)
       .maybeSingle();
     try { 
@@ -680,6 +640,21 @@ Deno.serve(async (req) => {
     // Treat mobility like strength for compute purposes (no interval alignment/tolerances).
     const sportRaw = String((w as any)?.type || 'run').toLowerCase();
     const sport: Sport = (sportRaw === 'mobility' ? 'strength' : sportRaw) as Sport;
+
+    // ⛔ A RUN'S MOVING SECONDS (2026-09-14, `_shared/run-pace.ts`): the provider's own seconds, else its
+    // average moving speed over the distance, else the seconds counted from the samples — never the
+    // `moving_time` minute column, and never a minute-rounded figure kept from an earlier run of this step.
+    const runOverallMovingSec = (rowsIn:any[], meters:number): number | null => {
+      if (!(sport === 'run' || sport === 'walk')) return null;
+      const kph = Number((w as any)?.avg_speed);
+      const secPerKm = Number((w as any)?.avg_pace);
+      const distM = meters > 0 ? meters : (Number((w as any)?.distance) > 0 ? Number((w as any).distance) * 1000 : null);
+      return runMovingSeconds({
+        movingSeconds: Number((w as any)?.metrics?.moving_time_seconds) || null,
+        avgSpeedMps: kph > 0 ? kph / 3.6 : (secPerKm > 0 ? 1000 / secPerKm : null),
+        distanceM: distM,
+      }, Array.isArray(rowsIn) ? rowsIn : []);
+    };
 
     let planned: any = null;
     if (w.planned_id) {
@@ -994,6 +969,7 @@ Deno.serve(async (req) => {
         } else {
           const km = Number((w as any)?.distance); if (Number.isFinite(km) && km > 0) overallMeters = Math.round(km * 1000);
           const mv = Number((w as any)?.moving_time); if (Number.isFinite(mv) && mv > 0) overallSec = Math.round(mv < 1000 ? mv * 60 : mv);
+          const runSec = runOverallMovingSec(rows, overallMeters); if (runSec != null) overallSec = runSec;
         }
       } catch {}
 
@@ -1158,8 +1134,10 @@ Deno.serve(async (req) => {
       const endD   = rows[eIdx]?.d ?? startD, endT = rows[eIdx]?.t ?? (startT + 1);
       const segMeters = Math.max(0, endD - startD);
       const segSec = Math.max(1, endT - startT);
-      const pace = paceSecPerMiFromMetersSeconds(segMeters, segSec);
-      const gap  = gapSecPerMi(rows, sIdx, eIdx);
+      // Runs: pace on the seconds spent moving (`_shared/run-pace.ts`); other sports unchanged.
+      const segMovingSec = (sport === 'run' || sport === 'walk') ? movingSecondsBetween(rows, sIdx, eIdx) : null;
+      const pace = paceSecPerMiFromMetersSeconds(segMeters, segMovingSec ?? segSec);
+      const gap  = gapSecPerMi(rows, sIdx, eIdx, pace);
       const role = stepRole(st);
       const hrVals:number[] = [], cadVals:number[] = [], pVals:number[] = [];
       for (let j=sIdx;j<=eIdx;j++) {
@@ -1204,6 +1182,7 @@ Deno.serve(async (req) => {
         },
         executed: {
           duration_s: Math.round(segSec),
+          moving_s: segMovingSec != null ? Math.round(segMovingSec) : null,
           distance_m: Math.round(segMeters),
           avg_pace_s_per_mi: pace != null ? Math.round(pace) : null,
           gap_pace_s_per_mi: gap  != null ? Math.round(gap)  : null,
@@ -1294,8 +1273,9 @@ Deno.serve(async (req) => {
       const endD   = rows[eIdx]?.d ?? startD, endT = rows[eIdx]?.t ?? (startT + 1);
       const dist_m = Math.max(0, endD - startD);
       const dur_s  = Math.max(1, endT - startT);
-      const pace   = paceSecPerMiFromMetersSeconds(dist_m, dur_s);
-      const gap    = gapSecPerMi(rows, sIdx, eIdx);
+      const moving_s = (sport === 'run' || sport === 'walk') ? movingSecondsBetween(rows, sIdx, eIdx) : null;
+      const pace   = paceSecPerMiFromMetersSeconds(dist_m, moving_s ?? dur_s);
+      const gap    = gapSecPerMi(rows, sIdx, eIdx, pace);
       const hrVals:number[] = [], cadVals:number[] = [], pVals:number[] = [];
       for (let j=sIdx;j<=eIdx;j++) { const h = rows[j].hr; if (typeof h==='number' && h>=50 && h<=220) hrVals.push(h); const c = rows[j].cad; if (typeof c==='number') cadVals.push(c); }
       for (let j=sIdx;j<=eIdx;j++) { const p = rows[j].p; if (typeof p==='number' && p>=0 && p<2000) pVals.push(p); }
@@ -1311,6 +1291,7 @@ Deno.serve(async (req) => {
         planned: { duration_s: null, distance_m: null },
         executed: {
           duration_s: Math.round(dur_s),
+          moving_s: moving_s != null ? Math.round(moving_s) : null,
           distance_m: Math.round(dist_m),
           avg_pace_s_per_mi: pace != null ? Math.round(pace) : null,
           gap_pace_s_per_mi: gap  != null ? Math.round(gap)  : null,
@@ -1464,7 +1445,8 @@ Deno.serve(async (req) => {
       }
     } catch {}
 
-      const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1));
+      { const runSec = runOverallMovingSec(rows, overallMeters); if (runSec != null) overallSec = runSec; }
+      const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1), paceSecPerMiFromMetersSeconds(overallMeters, overallSec));
       // Execution score: aerobic decoupling (Pa:HR) for runs, null for other sports
       const avgTempC = typeof (w as any).avg_temperature === 'number' ? (w as any).avg_temperature : null;
       const { score: overallExecutionScore, hot_conditions } = sport === 'run'
@@ -1606,7 +1588,8 @@ Deno.serve(async (req) => {
           }
         }
       } catch {}
-      const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1));
+      { const runSec = runOverallMovingSec(rows, overallMeters); if (runSec != null) overallSec = runSec; }
+      const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1), paceSecPerMiFromMetersSeconds(overallMeters, overallSec));
       
       // Execution score: aerobic decoupling (Pa:HR) for runs, null for other sports
       const avgTempC2 = typeof (w as any).avg_temperature === 'number' ? (w as any).avg_temperature : null;
@@ -1723,8 +1706,7 @@ Deno.serve(async (req) => {
       // Build overall-only from full sensor window
       const totalM = rows.length >= 2 ? Math.max(0, (rows[rows.length - 1].d || 0) - (rows[0].d || 0)) : 0;
       const totalSFromRows = rows.length >= 2 ? Math.max(1, (rows[rows.length - 1].t || 0) - (rows[0].t || 0)) : 0;
-      const pace = paceSecPerMiFromMetersSeconds(totalM, totalSFromRows);
-      const gap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1));
+      // pace and grade-adjusted pace are set below, once the moving seconds are known
       const hrVals: number[] = []; const cadVals: number[] = [];
       for (let j = 0; j < rows.length; j++) {
         const h = rows[j].hr; if (typeof h === 'number' && h >= 50 && h <= 220) hrVals.push(h);
@@ -1742,6 +1724,11 @@ Deno.serve(async (req) => {
           if (Number.isFinite(mvMin) && mvMin > 0) overallSec = Math.round(mvMin < 1000 ? mvMin * 60 : mvMin);
         }
       } catch {}
+      { const runSec = runOverallMovingSec(rows, totalM); if (runSec != null) overallSec = runSec; }
+      const pace = (sport === 'run' || sport === 'walk')
+        ? paceSecPerMiFromMetersSeconds(totalM, overallSec)
+        : paceSecPerMiFromMetersSeconds(totalM, totalSFromRows);
+      const gap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1), pace);
 
       // Preserve raw laps so the client can optionally show "here's what your watch recorded"
       const rawLaps = laps.length > 0 ? laps.map((L, i) => {
@@ -2072,8 +2059,9 @@ Deno.serve(async (req) => {
       let paceMeters = segMetersMeasured;
       if (paceMeters < 30 && segSec != null) { const plannedM = deriveMetersFromPlannedStep(st); if (plannedM && plannedM > 0) paceMeters = plannedM; }
 
-      const segPace = segSec != null ? paceSecPerMiFromMetersSeconds(paceMeters, segSec) : null;
-      const segGap = segSec != null ? gapSecPerMi(rows, sIdx, eIdx) : null;
+      const segMovingSec = (segSec != null && (sport === 'run' || sport === 'walk')) ? movingSecondsBetween(rows, sIdx, eIdx) : null;
+      const segPace = segSec != null ? paceSecPerMiFromMetersSeconds(paceMeters, segMovingSec || segSec) : null;
+      const segGap = segSec != null ? gapSecPerMi(rows, sIdx, eIdx, segPace) : null;
 
       // HR smoothing 60–210 bpm; if warmup, drop first 5s of segment
       let hrVals: number[] = []; const t0 = Number(rows[sIdx]?.t || 0);
@@ -2092,6 +2080,7 @@ Deno.serve(async (req) => {
       // Calculate adherence percentage
       const executedData = {
         duration_s: segSec != null ? Math.round(segSec) : null,
+        moving_s: segMovingSec != null ? Math.round(segMovingSec) : null,
         distance_m: segSec != null ? Math.round(segMetersMeasured) : null,
         avg_pace_s_per_mi: segPace != null ? Math.round(segPace) : null,
         avg_hr: segHr,
@@ -2241,7 +2230,8 @@ Deno.serve(async (req) => {
       }
     } catch {}
 
-    const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1));
+    { const runSec = runOverallMovingSec(rows, overallMeters); if (runSec != null) overallSec = runSec; }
+    const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1), paceSecPerMiFromMetersSeconds(overallMeters, overallSec));
     
     // Execution score: aerobic decoupling (Pa:HR) for runs, null for other sports
     const avgTempC3 = typeof (w as any).avg_temperature === 'number' ? (w as any).avg_temperature : null;

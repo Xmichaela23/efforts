@@ -5,7 +5,7 @@
 // Body: { userId: string, provider: 'strava'|'garmin', activity: any }
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { invalidateUserTrainingCache } from '../_shared/invalidate-user-training-cache.ts';
-import { metabolicCostPerMeter } from '../_shared/gap.ts'; // ONE canonical Minetti cost — no inline copy
+import { gapSecPerMiBetween, metersBetween as runMetersBetween, movingSecondsBetween as runMovingSecondsBetween, paceSecPerMi as runPaceSecPerMi, runGrades } from '../_shared/run-pace.ts';
 import { enqueueJob } from '../_shared/jobs.ts';
 const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY'));
 const cors = {
@@ -568,44 +568,17 @@ function mapStravaToWorkout(activity, userId) {
     created_at: new Date().toISOString()
   };
 }
-// ---- GAP helper (smoothed elev, moving-only, Minetti) ----
+// ---- GAP helper: `_shared/run-pace.ts` (2026-09-14) ----
+// This had its own elevation smoothing, stop line (0.5 m/s) and grade cap. It now reads the one set of run
+// pace rules: the run's moving pace, adjusted with per-sample grade. compute-workout-summary writes the same
+// figure again once the workout is summarised.
 function computeGAPSecPerMi(normalized) {
   if (!normalized?.length) return null;
-  // EMA smoothing for elevation (~10–15s at 1Hz)
-  let ema = null;
-  const alpha = 0.1;
-  const elevSm = new Array(normalized.length);
-  for(let i = 0; i < normalized.length; i++){
-    const e = typeof normalized[i].elev === 'number' && Number.isFinite(normalized[i].elev) ? normalized[i].elev : ema;
-    ema = e == null ? ema : ema == null ? e : alpha * e + (1 - alpha) * ema;
-    elevSm[i] = ema ?? 0;
-  }
-  // ONE SOURCE (2026-07-21): Minetti cost was a third inline copy of _shared/gap.ts. Now canonical
-  // (gap.ts clamps ±0.45 vs the old ±0.30 — a wider, harmless bound); no silent divergence.
-  const minetti = metabolicCostPerMeter;
-  let eqMeters = 0, moveSec = 0;
-  for(let i = 1; i < normalized.length; i++){
-    const a = normalized[i - 1], b = normalized[i];
-    const dt = Math.min(60, Math.max(0, Number(b.ts ?? b.t) - Number(a.ts ?? a.t)));
-    if (!dt) continue;
-    // speed: prefer direct v; else fallback to distance delta
-    let v = Number.isFinite(b.v) ? b.v : NaN;
-    if (!Number.isFinite(v) && Number.isFinite(a.d) && Number.isFinite(b.d)) {
-      const dd = b.d - a.d;
-      v = dd > 0 ? dd / dt : NaN;
-    }
-    if (!Number.isFinite(v) || v < 0.5) continue; // moving-only
-    moveSec += dt;
-    const de = elevSm[i] - elevSm[i - 1] || 0;
-    const dd = v * dt;
-    const g = dd > 0 ? de / dd : 0;
-    // Equivalent flat speed using Minetti cost ratio
-    const v_eq = v * (minetti(g) / 3.6); // 3.6 = flat cost C(0)
-    eqMeters += v_eq * dt;
-  }
-  if (!(eqMeters > 0) || !(moveSec > 0)) return null;
-  const miles = eqMeters / 1609.344;
-  return miles > 0 ? Math.round(moveSec / miles) : null; // sec/mi
+  const view = normalized.map((x)=>({ t: Number(x.ts ?? x.t), d: x.d, v: x.v, elev: x.elev }));
+  const last = view.length - 1;
+  const pace = runPaceSecPerMi(runMetersBetween(view, 0, last), runMovingSecondsBetween(view, 0, last));
+  const gap = gapSecPerMiBetween(view, runGrades(view), 0, last, pace);
+  return gap != null ? Math.round(gap) : null; // sec/mi
 }
 // Compute executed intervals and overall metrics suitable for UI consumption
 function computeComputedFromActivity(activity) {

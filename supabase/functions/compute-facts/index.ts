@@ -17,6 +17,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { extractWarmupEasy } from "../_shared/run-warmup-easy.ts";
+import { paceToGAP } from "../_shared/gap.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   calculateStrengthWorkload,
@@ -694,7 +695,8 @@ async function upsertTerrainIntelligence(
     const segDistM = Math.max(1, seg.distance_m);
     const estMovingTimeS = Math.max(1, Math.round((durationMinutes(w) * 60) * (segDistM / Math.max(1, distM))));
     const segPaceSecPerKm = avgPaceSecPerKm != null ? Number((avgPaceSecPerKm * (1 + (seg.avg_grade_pct / 100) * 0.12)).toFixed(1)) : null;
-    const gradeAdjusted = segPaceSecPerKm != null ? Number((segPaceSecPerKm * (1 - Math.min(0.2, seg.avg_grade_pct / 1000))).toFixed(1)) : null;
+    // Grade-adjusted with the one Minetti model (`_shared/gap.ts`, 2026-09-14) — it was its own `1 − grade/1000` factor.
+    const gradeAdjusted = segPaceSecPerKm != null ? Number(paceToGAP(segPaceSecPerKm, Number(seg.avg_grade_pct) || 0).toFixed(1)) : null;
     const vam = seg.elev_gain_m > 0 ? Math.round((seg.elev_gain_m / Math.max(1, estMovingTimeS)) * 3600) : null;
     const effortScore = (() => {
       // estimate-ok: segment effort-score heuristic (0–100 display sort key), not a load/verdict

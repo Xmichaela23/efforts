@@ -13,7 +13,7 @@ import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
 import { powerZoneBoundaries as powerZoneBoundariesFor } from '../_shared/endurance/display-zones.ts';
 import { runEasyZone3FloorBpm } from '../_shared/easy-hr.ts';
-import { paceToGAP } from '../_shared/gap.ts'; // ONE canonical Grade-Adjusted Pace (Minetti) — no inline copy
+import { gapSecPerMiBetween, movingSecondsBetween, runGrades, runMovingSeconds } from '../_shared/run-pace.ts';
 import { isIndoorSession } from '../_shared/indoor-session.ts';
 import { buildDisplaySeriesColumn } from './display-series.ts';
 // The bike FTP estimator's two per-ride substrates: the widened power-curve durations and the
@@ -978,7 +978,7 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
       .from('workouts')
       // name, provider_sport, strava_data, start_position_lat: the indoor rule (no grade or VAM series indoors).
       // elevation_gain, elevation_loss, metrics: the recorded totals the running climb ends on (audit H-D03).
-      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed, date, timestamp, swim_data, pool_length, number_of_active_lengths, distance, moving_time, planned_id, threshold_heart_rate, default_max_heart_rate, name, provider_sport, strava_data, start_position_lat, elevation_gain, elevation_loss, metrics')
+      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed, date, timestamp, swim_data, pool_length, number_of_active_lengths, distance, moving_time, avg_speed, avg_pace, planned_id, threshold_heart_rate, default_max_heart_rate, name, provider_sport, strava_data, start_position_lat, elevation_gain, elevation_loss, metrics')
       .eq('id', workout_id)
       .maybeSingle();
     if (wErr) throw wErr;
@@ -1259,6 +1259,13 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
     const hasRows = rows.length >= 2;
     const d0 = hasRows ? (rows[0].d || 0) : 0;
     const t0 = hasRows ? (rows[0].t || 0) : 0;
+    // ⛔ ONE SET OF RUN PACE RULES (2026-09-14, `_shared/run-pace.ts`): a run's splits, its whole-run
+    // moving seconds and its grade-adjusted pace all read the shared rules — stops out, one grade model.
+    const isRunSport = /run|walk/i.test(sport);
+    const runView = isRunSport && hasRows
+      ? rows.map((r: any) => ({ t: r.t, d: r.d, v: typeof r.v_mps === 'number' ? r.v_mps : (typeof r.speed_mps === 'number' ? r.speed_mps : null), elev: typeof r.elev === 'number' ? r.elev : null }))
+      : null;
+    const runGr = runView ? runGrades(runView) : null;
 
     /**
      * ⛔ ON A BIKE, A MISSING POWER SAMPLE IS A COASTING SECOND (2026-09-03). D-112 fixed the
@@ -1416,7 +1423,8 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
         if ((rows[i].d||0) >= nextTarget) {
           const s = rows[startIdx]; const e = rows[i];
           const dist_m = Math.max(0, (e.d||0) - (s.d||0));
-          const dur_s = Math.max(1, (e.t||0) - (s.t||0));
+          // Runs: the split's moving seconds; other sports keep clock time.
+          const dur_s = runView ? Math.max(1, movingSecondsBetween(runView, startIdx, i)) : Math.max(1, (e.t||0) - (s.t||0));
           const pace = dist_m>0 ? dur_s/(dist_m/1000) : null;
           let hrVals:number[]=[]; let cadVals:number[]=[];
           for (let k=startIdx;k<=i;k+=1) { const h=rows[k].hr; if (typeof h==='number') hrVals.push(h); const c=rows[k].cad; if (typeof c==='number') cadVals.push(c); }
@@ -1429,13 +1437,13 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
           const avgGradePct = sElev != null && eElev != null && dist_m > 0
             ? Math.round(((eElev - sElev) / dist_m) * 1000) / 10
             : null;
-          // ONE SOURCE (2026-07-21): the Minetti coefficients were hardcoded here, a silent duplicate of
-          // _shared/gap.ts. Change the model there and this copy would diverge (the exact "one fact, two
-          // engines" fork). Now the canonical paceToGAP; null unless the grade is significant enough to
-          // adjust (paceToGAP returns raw pace for <0.3%, so guard here to keep the "no adjustment → null").
-          const gapPace: number | null = (pace != null && avgGradePct != null && Math.abs(avgGradePct) >= 0.3)
-            ? Math.round(paceToGAP(pace, avgGradePct))
-            : null;
+          // Grade-adjusted pace for the split from the shared rules (per-sample grade, same moving seconds as
+          // the pace). It used the split's start-to-end grade only. Null when the run has no usable elevation.
+          const gapPace: number | null = (() => {
+            if (!runView || pace == null) return null;
+            const g = gapSecPerMiBetween(runView, runGr, startIdx, i, pace);
+            return g != null ? Math.round(g) : null;
+          })();
           out.push({
             n: out.length+1,
             t0: Math.max(0,(s.t||0)-t0),
@@ -1909,6 +1917,21 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
             } catch {}
           }
           
+          // ⛔ RUNS (2026-09-14, `_shared/run-pace.ts`): the provider's own moving seconds (Garmin's sample
+          // above, or the import's kept seconds), else its average moving speed over the distance, else the
+          // seconds counted from the samples. The `moving_time` minute column divided Strava runs by whole
+          // minutes, so Avg Pace disagreed with the Moving Time printed beside it.
+          if (runView) {
+            const kph = Number((w as any)?.avg_speed);
+            const secPerKm = Number((w as any)?.avg_pace);
+            const runSec = runMovingSeconds({
+              movingSeconds: dur || Number(parseJson((w as any)?.metrics)?.moving_time_seconds) || null,
+              avgSpeedMps: kph > 0 ? kph / 3.6 : (secPerKm > 0 ? 1000 / secPerKm : null),
+              distanceM: dist,
+            }, runView);
+            if (runSec != null) dur = runSec;
+          }
+
           // Second: use stored moving_time field (convention: minutes, but some legacy rows store seconds)
           if (!dur) {
             const mv = Number((w as any)?.moving_time);
@@ -1966,77 +1989,25 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
       return prevOverall || {};
     })();
 
-    // Compute overall GAP from per-sample GAP (more accurate on rolling terrain than per-mile-split)
+    // ⛔ ONE GRADE-ADJUSTED PACE (2026-09-14, `_shared/run-pace.ts`): per-sample grade, the same moving
+    // seconds as the pace, and on flat ground exactly the pace. The per-mile-split fallback is gone — it was a
+    // second model, and with no usable elevation the honest answer is no adjusted pace.
     if (sport.includes('run') || sport.includes('walk')) {
       try {
-        const { computeSampleGrades, hasUsableElevation, aggregateGapPace } = await import('../_shared/gap.ts'); // paceToGAP is the static import (one source)
-        // Rows from normalizeSamples use v_mps (not speed_mps). GAP does not need HR — filtering
-        // by HR breaks the 1 Hz assumption in computeSampleGrades unless distance_m is supplied.
-        const gapSamples = rows.map((r: any) => {
-          const spd =
-            typeof r.v_mps === 'number' && Number.isFinite(r.v_mps)
-              ? r.v_mps
-              : typeof r.speed_mps === 'number' && Number.isFinite(r.speed_mps)
-                ? r.speed_mps
-                : null;
-          return {
-            elevation_m: typeof r.elev === 'number' ? r.elev : null,
-            pace_s_per_mi: spd != null && spd > 0.2 ? 1609.34 / spd : null,
-            distance_m: Number.isFinite(r.d) ? Math.max(0, (r.d || 0) - d0) : null,
-          };
-        });
-
-        if (hasUsableElevation(gapSamples) && gapSamples.length > 60) {
-          const grades = computeSampleGrades(gapSamples);
-          const nonZeroGrades = grades.filter((g) => Math.abs(g) >= 0.3);
-          const meanGrade = nonZeroGrades.length
-            ? nonZeroGrades.reduce((a, b) => a + b, 0) / nonZeroGrades.length
-            : 0;
-          console.log('[GAP_DIAG]', JSON.stringify({
-            sampleCount: gapSamples.length,
-            meanGrade: +meanGrade.toFixed(2),
-            posCount: nonZeroGrades.filter((g) => g > 0).length,
-            negCount: nonZeroGrades.filter((g) => g < 0).length,
-            firstFewGrades: grades.slice(0, 10).map((g) => +g.toFixed(2)),
-            elevRange: [
-              +(Math.min(...gapSamples.map((s) => s.elevation_m ?? 0))).toFixed(1),
-              +(Math.max(...gapSamples.map((s) => s.elevation_m ?? 0))).toFixed(1),
-            ],
-            firstFewElev: gapSamples.slice(0, 10).map((s) => +(s.elevation_m ?? 0).toFixed(1)),
-          }));
-          // Q-130: distance-weighted (total_time/total_dist), NOT an arithmetic mean of per-sample
-          // pace. The old `gapSum/gapCount` over-weighted slow samples (AM ≥ HM), inflating GAP
-          // ~15s/mi vs raw on any pace-varying run → false "net downhill" on flat routes.
-          const avgGapPerMi = aggregateGapPace(gapSamples.map((s: any) => s.pace_s_per_mi), grades, 60);
-          if (avgGapPerMi != null) {
-            const avgActualPerMi = overall?.avg_pace_s_per_mi != null ? Math.round(Number(overall.avg_pace_s_per_mi)) : null;
-            console.log(`[GAP] per-sample (distance-weighted): avgGAP=${avgGapPerMi}s/mi (${Math.floor(avgGapPerMi/60)}:${String(avgGapPerMi%60).padStart(2,'0')}), actual=${avgActualPerMi}s/mi`);
-            (overall as any).avg_gap_s_per_mi = avgGapPerMi;
-            (overall as any).has_gap = true;
-          }
+        const avgPace = Number(overall?.avg_pace_s_per_mi);
+        const avgGapPerMi = runView && Number.isFinite(avgPace) && avgPace > 0
+          ? gapSecPerMiBetween(runView, runGr, 0, runView.length - 1, avgPace)
+          : null;
+        if (avgGapPerMi != null) {
+          (overall as any).avg_gap_s_per_mi = Math.round(avgGapPerMi);
+          (overall as any).has_gap = true;
+        } else if (runView && overall && typeof overall === 'object') {
+          // A figure kept from an earlier run of this step under the old models is not carried forward.
+          delete (overall as any).avg_gap_s_per_mi;
+          delete (overall as any).has_gap;
         }
       } catch (gapErr: any) {
-        console.warn('[GAP] per-sample computation failed:', gapErr?.message);
-      }
-
-      // Fallback: per-mile-split GAP if per-sample didn't work
-      if (!(overall as any)?.has_gap) {
-        const miSplits = computeSplits(1609.34);
-        let gapWeightedSum = 0;
-        let gapTimeSum = 0;
-        for (const sp of miSplits) {
-          if (sp.avgGapPace_s_per_km != null && sp.t0 != null && sp.t1 != null) {
-            const dur = sp.t1 - sp.t0;
-            if (dur > 0) { gapWeightedSum += sp.avgGapPace_s_per_km * dur; gapTimeSum += dur; }
-          }
-        }
-        if (gapTimeSum > 0 && overall?.avg_pace_s_per_mi != null) {
-          const avgGapPerKm = gapWeightedSum / gapTimeSum;
-          const avgGapPerMi = Math.round(avgGapPerKm * 1.60934);
-          console.log(`[GAP] per-split fallback: avgGAP=${avgGapPerMi}s/mi, actual=${Math.round(Number(overall.avg_pace_s_per_mi))}s/mi`);
-          (overall as any).avg_gap_s_per_mi = avgGapPerMi;
-          (overall as any).has_gap = true;
-        }
+        console.warn('[GAP] computation failed:', gapErr?.message);
       }
     }
 

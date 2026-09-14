@@ -13,6 +13,7 @@
 // not a coach who encourages; conditional consequences, mechanisms named; no imperatives; no banned
 // words; SILENCE IS LEGAL — where there is no real read, we say less, never pad.
 
+import { driftReachesLine } from '../run-pace.ts';
 export type RunType = 'steady' | 'easy' | 'long' | 'interval' | 'tempo' | 'hills' | 'track' | 'vo2' | 'threshold' | 'fartlek' | 'surge' | 'race' | 'other';
 
 // Three families, because the honest read differs by structure:
@@ -71,7 +72,7 @@ export interface RunInsightInput {
 //    this, so the paragraph and the row can never disagree. Extracted from build.ts (2026-07-19). ────────
 export interface PacingVerdict {
   pattern: Exclude<PacingPattern, null>;
-  hrHeld: boolean;          // decoupling ≤5% (Friel) — HR held, so a pace swing is terrain, not a fade
+  hrHeld: boolean;          // decoupling under 5% (p107) — HR held, so a pace swing is terrain, not a fade
   absDiffSec: number;       // half-vs-half magnitude (s/mi)
   fastestMile: number | null;
   fastestPaceSec: number | null;
@@ -89,7 +90,9 @@ export function pacingVerdict(splitsMi: any[] | null | undefined, decouplingPct:
   const avg = (a: typeof series) => a.reduce((x, y) => x + y.pace, 0) / a.length;
   const diff = avg(series.slice(0, mid)) - avg(series.slice(mid)); // + = 2nd half faster
   const absDiffSec = Math.abs(Math.round(diff));
-  const hrHeld = decouplingPct != null && Number(decouplingPct) <= 5;
+  // Viada p107: drift that REACHES 5% has not held (`_shared/run-pace.ts`). This read ≤5, so 5.0% was
+  // "held" here while the Heart rate row and State called it over.
+  const hrHeld = decouplingPct != null && Number.isFinite(Number(decouplingPct)) && !driftReachesLine(Number(decouplingPct));
   const pattern: PacingVerdict['pattern'] =
     (absDiffSec <= 15 || (hrHeld && diff < 0)) ? (hasGap ? 'even_effort' : 'even_pace')
     : diff > 0 ? 'negative_split'
