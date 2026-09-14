@@ -27,9 +27,10 @@ export const FAMILY_LINE: Readonly<Record<string, string>> = {
   // p239, p211. REVISED 2026-09-10 (approved): lead with what the ride is. The plain version; the
   // with-work version is `rideWithWorkLine`, chosen by archetype in `familyLineFor`.
   ride_endurance: 'Easy ride, under 75 percent of FTP the whole way. You should be able to talk in full sentences.',
-  // p233, p110 — the hard run, both family ids.
-  run_mlss: 'Stay near threshold as long as you can without falling apart.',
-  run_near_threshold: 'Stay near threshold as long as you can without falling apart.',
+  // p233 ("Maximise time near threshold … while controlling fatigue") — the hard run, both family ids.
+  // REVISED 2026-09-14 (approved): the idiom "without falling apart" is gone.
+  run_mlss: 'Spend as much time near threshold as you can while controlling fatigue.',
+  run_near_threshold: 'Spend as much time near threshold as you can while controlling fatigue.',
   // p235, p211 — the long run.
   run_lsd: 'Easy the whole way. Stopping for a bit is fine. Be able to speak long sentences easily the whole time.',
   // p235, p211. ⛔ NEVER THE WORD VT1 ON SCREEN.

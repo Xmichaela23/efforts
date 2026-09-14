@@ -239,7 +239,7 @@ Deno.test('each named family gets its line, and only that line', () => {
 });
 
 Deno.test('⛔ THE HARD RUN IS BOTH FAMILY IDS — the composer stamps `run_near_threshold`', () => {
-  const line = 'Stay near threshold as long as you can without falling apart.';
+  const line = 'Spend as much time near threshold as you can while controlling fatigue.';
   assertEquals(enduranceLinesFor(run('run_mlss', 'above'))[0], line);
   assertEquals(enduranceLinesFor(run('run_near_threshold', 'near'))[0], line);
 });
