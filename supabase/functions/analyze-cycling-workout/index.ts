@@ -251,43 +251,29 @@ export function generateCyclingAdherenceSummary(opts: {
 
   const technical_insights: { label: string; value: string }[] = [];
 
-  if (typeof powerAdh === 'number') {
-    technical_insights.push({
-      label: 'Power adherence',
-      value: `${Math.round(powerAdh)}% of work-interval time within the prescribed power range.`,
-    });
+  // ⛔ ONE POWER LINE, IN WATTS (2026-09-14, copy approved by Michael). The "Power adherence" and "Interval
+  // execution" sentences said "% of work-interval time" (it was a closeness score, not time) and "within ±15%"
+  // (a leeway rule that no longer exists). One line now states the judged number against the range, or, with
+  // several work intervals, how many sat inside theirs. Judged number and rule: `_shared/ride-power.ts`.
+  {
+    const judged = workIntervals
+      .map((i: any) => {
+        const w = Number(i?.actual_power_w ?? i?.executed?.judged_power_w ?? i?.executed?.avg_power_w);
+        const lo = Number(i?.planned_power_range_lower ?? i?.planned?.power_range?.lower);
+        const hi = Number(i?.planned_power_range_upper ?? i?.planned?.power_range?.upper);
+        const band = powerRangeBand(w, lo, hi);
+        return band ? { w: Math.round(w), lo: Math.round(lo), hi: Math.round(hi), band } : null;
+      })
+      .filter(Boolean) as Array<{ w: number; lo: number; hi: number; band: 'below' | 'in' | 'above' }>;
+    if (judged.length === 1 && workIntervals.length === 1) {
+      const { w, lo, hi, band } = judged[0];
+      const tail = band === 'above' ? `, ${w - hi} W over the top` : band === 'below' ? `, ${lo - w} W under the bottom` : '';
+      technical_insights.push({ label: 'Power', value: `${w} W against ${lo}–${hi} W${tail}.` });
+    } else if (judged.length > 1) {
+      const inside = judged.filter((j) => j.band === 'in').length;
+      technical_insights.push({ label: 'Power', value: `${inside} of ${judged.length} work intervals inside their range.` });
+    }
   }
-
-  // Per-interval hit rate. Same hit-window [85, 115] as running (analyze-running-workout
-  // uses the same threshold) and as compute-facts/buildRideFacts (intervals_hit logic).
-  // ⛔ JUDGE POWER, NOT TIME (2026-09-07). The stored interval's `executed.adherence_percentage` is the share
-  // of the PLANNED DURATION ridden (Michael's 87-min ride: 59% of a 165-min steady block), and this read it
-  // as a power ratio, so "0 of 1 on target" sat two lines under "100% of time within the prescribed power
-  // range". A work interval is on target when its average power sits inside the prescribed range, or within
-  // ±15% of the range's midpoint when there is no range. The time share falls back only when no power exists.
-  const hits = workIntervals.filter((i: any) => {
-    // Rows come from generateIntervalBreakdown (actual_power_w, planned_power_range_*, planned_power_w) or,
-    // from older callers, the stored interval shape (executed / planned). Read both.
-    // ⛔ ONE RULE (2026-09-14): on target = the judged number inside the range, the same `in` the segment
-    // row's colour shows. The score-≥85 and ±15%-of-midpoint allowances are gone — they called a red row
-    // "on target".
-    if (i?.power_band === 'in' || i?.power_band === 'below' || i?.power_band === 'above') return i.power_band === 'in';
-    const avg = Number(i?.actual_power_w ?? i?.executed?.judged_power_w ?? i?.executed?.avg_power_w ?? i?.executed?.avg_power ?? i?.avg_power);
-    const lo = Number(i?.planned_power_range_lower ?? i?.planned?.power_range?.lower), hi = Number(i?.planned_power_range_upper ?? i?.planned?.power_range?.upper);
-    if (Number.isFinite(avg) && avg > 0 && Number.isFinite(lo) && Number.isFinite(hi) && hi > 0) {
-      return powerRangeBand(avg, lo, hi) === 'in';
-    }
-    const target = Number(i?.planned_power_w ?? i?.planned?.power_watts ?? i?.planned?.power ?? i?.target_power);
-    if (Number.isFinite(avg) && avg > 0 && Number.isFinite(target) && target > 0) {
-      return avg >= target * 0.85 && avg <= target * 1.15;
-    }
-    const adh = i.adherence_percentage ?? i.adherence ?? 100;
-    return adh >= 85 && adh <= 115;
-  }).length;
-  technical_insights.push({
-    label: 'Interval execution',
-    value: `${hits} of ${workIntervals.length} work intervals on target (within ±15% of prescribed power).`,
-  });
 
   // ⛔ NO "Cardiac drift" INSIGHT (2026-09-12, Michael: "not a single source of truth"). This wrote a
   // third drift sentence for the ride — heart rate alone, with its own 3 / 8 % bands (ours) and a

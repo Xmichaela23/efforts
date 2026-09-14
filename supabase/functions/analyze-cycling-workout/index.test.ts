@@ -94,31 +94,29 @@ Deno.test('generateCyclingAdherenceSummary: verdict — Below target at <65', ()
 
 // ── §3 technical insights — interval execution count ──────────────────────
 
-Deno.test('generateCyclingAdherenceSummary: counts interval hits in [85, 115] adherence window', () => {
+Deno.test('generateCyclingAdherenceSummary: one work interval — the judged watts against the range', () => {
   const r = generateCyclingAdherenceSummary({
-    performance: { execution_score: 80, power_adherence: 88 },
+    performance: { execution_score: 96, power_adherence: 98 },
     intervalBreakdown: [
-      { interval_type: 'work', adherence_percentage: 95 }, // hit
-      { interval_type: 'work', adherence_percentage: 110 }, // hit (within +15%)
-      { interval_type: 'work', adherence_percentage: 80 }, // miss (below 85)
-      { interval_type: 'work', adherence_percentage: 120 }, // miss (above 115)
+      { interval_type: 'work', actual_power_w: 128, planned_power_range_lower: 109, planned_power_range_upper: 126 },
     ],
     factPacket: null,
     hrDriftPct: null,
   });
-  const intervalInsight = r?.technical_insights.find((i) => i.label === 'Interval execution');
-  assertEquals(intervalInsight?.value, '2 of 4 work intervals on target (within ±15% of prescribed power).');
+  assertEquals(r?.technical_insights.find((i) => i.label === 'Power')?.value, '128 W against 109–126 W, 2 W over the top.');
+  assertEquals(r?.technical_insights.find((i) => i.label === 'Power adherence'), undefined);
+  assertEquals(r?.technical_insights.find((i) => i.label === 'Interval execution'), undefined);
 });
 
-Deno.test('generateCyclingAdherenceSummary: power_adherence insight when present', () => {
+Deno.test('generateCyclingAdherenceSummary: several work intervals — how many sat inside their range', () => {
+  const iv = (w: number) => ({ interval_type: 'work', actual_power_w: w, planned_power_range_lower: 200, planned_power_range_upper: 220 });
   const r = generateCyclingAdherenceSummary({
-    performance: { execution_score: 80, power_adherence: 87 },
-    intervalBreakdown: [{ interval_type: 'work', adherence_percentage: 90 }],
+    performance: { execution_score: 80, power_adherence: 88 },
+    intervalBreakdown: [iv(210), iv(215), iv(225), iv(198)],
     factPacket: null,
     hrDriftPct: null,
   });
-  const insight = r?.technical_insights.find((i) => i.label === 'Power adherence');
-  assertEquals(insight?.value, '87% of work-interval time within the prescribed power range.');
+  assertEquals(r?.technical_insights.find((i) => i.label === 'Power')?.value, '2 of 4 work intervals inside their range.');
 });
 
 // ── §4 no "Cardiac drift" insight — the ride's drift is one number, read by the session builder ────
