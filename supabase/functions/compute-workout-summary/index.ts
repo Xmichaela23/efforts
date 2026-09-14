@@ -2083,6 +2083,8 @@ Deno.serve(async (req) => {
         moving_s: segMovingSec != null ? Math.round(segMovingSec) : null,
         distance_m: segSec != null ? Math.round(segMetersMeasured) : null,
         avg_pace_s_per_mi: segPace != null ? Math.round(segPace) : null,
+        // The segment's grade-adjusted pace (`_shared/run-pace.ts`) — the analyzer reads it from here.
+        gap_pace_s_per_mi: segGap != null ? Math.round(segGap) : null,
         avg_hr: segHr,
         avg_cadence_spm: segCad,
         ...(segSec != null ? segmentPower(sIdx, eIdx, segSec) : { avg_power_w: segPwr })
