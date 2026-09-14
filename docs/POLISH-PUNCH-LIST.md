@@ -1451,3 +1451,16 @@ Three sections work the same way: pick a focus, then a program. Multisport Focus
 card, "Run + Ride + Strength" (the All Rounder, p274), which carries the description and requirements
 line. Names need Michael's yes on the final screen. Later, not now: programs at varying levels in each
 section, plus speed and hypertrophy options.
+
+---
+
+## Focus areas return as movement choice only, no added sets (agreed 2026-09-13, not built, no go yet)
+
+The hidden focus buttons (Chest, Shoulders, Arms, Glutes, Core; `DIAL_CONTROL_VISIBLE = false` in
+src/lib/dial-copy.ts) raised weekly sets and, for Glutes, created a row. Michael 2026-09-13: "yeah no
+added sets." The agreed shape: a focus area only chooses which of p222-223's movements fill the rows the
+plan's page already prints (p275 encourages the athlete's own movement choice). Rows, sets and reps stay
+as printed. Examples on p278: Glutes → hip thrust or kickbacks on the Day 2 lower-body row (the page does
+not say push or hinge for "accessory lower"); Arms/Shoulders → the Day 1 superset; Chest → pec deck on
+the Day 1 push row. Core has no printed row on p278, so it has no button there. Build needs Michael's go
+and his yes on every word.
