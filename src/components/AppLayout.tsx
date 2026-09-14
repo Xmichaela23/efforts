@@ -715,6 +715,46 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setSelectedWorkout(workout);
   };
 
+  /**
+   * The workout done just before or after the open one, by date — every sport, completed only (Michael,
+   * 2026-09-14). Two sessions on one day go in the order they were done. Returns false when there is none,
+   * so the swipe springs back.
+   */
+  const handleStepWorkout = async (dir: 'prev' | 'next'): Promise<boolean> => {
+    const cur = selectedWorkout as any;
+    const userId = getStoredUserId();
+    if (!cur?.id || !cur?.date || !userId) return false;
+    const day = String(cur.date).slice(0, 10);
+    const shift = (d: string, n: number) => {
+      const t = new Date(`${d}T12:00:00Z`); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10);
+    };
+    try {
+      const { data } = await supabase
+        .from('workouts')
+        .select('id, date, timestamp, created_at')
+        .eq('user_id', userId)
+        .eq('workout_status', 'completed')
+        .gte('date', shift(day, -120))
+        .lte('date', shift(day, 120))
+        .order('date', { ascending: true })
+        .limit(1000);
+      const key = (r: any) => `${String(r.date).slice(0, 10)}|${String(r.timestamp ?? r.created_at ?? '')}|${r.id}`;
+      const list = (data ?? []).slice().sort((a: any, b: any) => key(a).localeCompare(key(b)));
+      const i = list.findIndex((r: any) => String(r.id) === String(cur.id));
+      if (i < 0) return false;
+      const target = list[dir === 'prev' ? i - 1 : i + 1];
+      if (!target) return false;
+      const { data: row } = await supabase.from('workouts').select('*').eq('id', String(target.id)).maybeSingle();
+      if (!row) return false;
+      setActiveTab('summary');
+      setSelectedWorkout(row);
+      return true;
+    } catch (e) {
+      console.warn('[AppLayout] step to neighbouring workout failed:', e);
+      return false;
+    }
+  };
+
   // Listen for workout updates and refresh selectedWorkout if it's still selected
   useEffect(() => {
     const refreshSelectedWorkout = async () => {
@@ -1404,11 +1444,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       {selectedWorkout && !showStrengthPlans && !showAllPlans && !showStrengthLogger && !showTrainingBaselines && !showAthleticRecord && !showGear && !showImportPage && !showContext && !showPilatesYogaLogger && (
         <ScreenErrorBoundary label="Workout details" onClose={handleBackToDashboard}>
           <UnifiedWorkoutView
+            // A new workout is a new screen: swiping to the next workout must not carry this one's state.
+            key={String(selectedWorkout?.id ?? '')}
             workout={selectedWorkout}
             onUpdateWorkout={handleUpdateWorkout}
             onClose={handleBackToDashboard}
             onDelete={handleDeleteWorkout}
             onAddGear={() => setShowGear(true)}
+            onStepWorkout={handleStepWorkout}
             origin="today"
             initialTab={activeTab as any}
           />

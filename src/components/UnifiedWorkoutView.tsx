@@ -66,6 +66,8 @@ interface UnifiedWorkoutViewProps {
   onUpdateWorkout?: (workoutId: string, updates: any) => void;
   onDelete?: (workoutId: string) => void;
   onAddGear?: () => void; // Callback to open gear management
+  /** Open the workout done just before ('prev') or after ('next') this one, by date. Performance tab only. */
+  onStepWorkout?: (dir: 'prev' | 'next') => Promise<boolean>;
   initialTab?: 'planned' | 'summary' | 'completed';
   origin?: 'today' | 'weekly' | 'other';
 }
@@ -76,6 +78,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   onUpdateWorkout,
   onDelete,
   onAddGear,
+  onStepWorkout,
   initialTab,
   origin = 'other'
 }) => {
@@ -139,6 +142,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   // Strength-family workouts (strength/mobility/pilates) have no Details tab — folded into Performance (D-207).
   const isStrengthFamily = isStrength || isMobility || workoutType === 'pilates_yoga';
   const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted ? 'summary' : 'planned'));
+  /**
+   * ⛔ SWIPE BETWEEN WORKOUTS, BY DATE, ON PERFORMANCE ONLY (2026-09-14, Michael). Right = the workout
+   * before this one, left = the one after, every sport, completed only. Details is left alone: its charts
+   * and interval table own sideways drags. Same feel as Today's day swipe (axis lock 8px, commit 60px or a
+   * flick). A swipe with nothing on that side springs back.
+   */
+  const [stepX, setStepX] = useState(0);
+  const [stepRaw, setStepRaw] = useState(false);
+  const stepSwipe = useRef({ active: false, startX: 0, startY: 0, lastX: 0, lastT: 0, vx: 0, dx: 0, axis: null as null | 'x' | 'y' });
   const [editingInline, setEditingInline] = useState(false);
   const [assocOpen, setAssocOpen] = useState(false);
   const [undoing, setUndoing] = useState(false);
@@ -1521,7 +1533,59 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Performance Tab - execution (linked) or analysis (unplanned) */}
-          <TabsContent value="summary" className="flex-1 p-2 mt-0">
+          <TabsContent
+            value="summary"
+            className="flex-1 p-2 mt-0"
+            style={{
+              touchAction: 'pan-y',
+              transform: `translateX(${stepX}px)`,
+              transition: stepRaw ? 'none' : 'transform 190ms cubic-bezier(0.2, 0.7, 0.3, 1)',
+            }}
+            onPointerDown={(e) => {
+              if (!onStepWorkout || editingInline) return;
+              stepSwipe.current = { active: true, startX: e.clientX, startY: e.clientY, lastX: e.clientX, lastT: e.timeStamp, vx: 0, dx: 0, axis: null };
+            }}
+            onPointerMove={(e) => {
+              const g = stepSwipe.current;
+              if (!g.active) return;
+              const dx = e.clientX - g.startX;
+              const dy = e.clientY - g.startY;
+              if (g.axis == null) {
+                if (Math.max(Math.abs(dx), Math.abs(dy)) < 8) return;
+                g.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+                if (g.axis === 'x') {
+                  setStepRaw(true);
+                  try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* older webviews */ }
+                }
+              }
+              if (g.axis !== 'x') return;
+              const dt = Math.max(1, e.timeStamp - g.lastT);
+              const instant = (e.clientX - g.lastX) / dt;
+              g.vx = g.vx === 0 ? instant : g.vx * 0.3 + instant * 0.7;
+              g.lastX = e.clientX; g.lastT = e.timeStamp; g.dx = dx;
+              setStepX(dx * 0.85);
+            }}
+            onPointerUp={async (e) => {
+              const g = stepSwipe.current;
+              if (!g.active) return;
+              g.active = false;
+              if (g.axis !== 'x') return;
+              const flick = Math.abs(g.vx) > 0.5 && Math.abs(g.dx) > 10;
+              const dir: 'prev' | 'next' | null =
+                g.dx > 60 || (flick && g.dx > 0) ? 'prev' : g.dx < -60 || (flick && g.dx < 0) ? 'next' : null;
+              setStepRaw(false);
+              if (!dir || !onStepWorkout) { setStepX(0); return; }
+              const w = (e.currentTarget as HTMLElement).clientWidth || 360;
+              setStepX(dir === 'prev' ? w : -w);
+              const moved = await onStepWorkout(dir);
+              if (!moved) setStepX(0);
+            }}
+            onPointerCancel={() => {
+              const g = stepSwipe.current;
+              g.active = false;
+              if (g.axis === 'x') { setStepRaw(false); setStepX(0); }
+            }}
+          >
             <div className={cardClass} style={cardStyle}>
               {/* No padding here (2026-09-12): the panel is sectioned like State's cards — each
                   section pads itself and a hairline divides them (MobileSummary and below). */}
