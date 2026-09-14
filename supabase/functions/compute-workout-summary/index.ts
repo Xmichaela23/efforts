@@ -7,6 +7,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { resolvePoolLength } from '../_shared/swim/resolve-pool-length.ts';
 import { metabolicCostPerMeter } from '../_shared/gap.ts'; // ONE canonical Minetti cost — no inline copy
 import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
+import { averagePowerW, judgedPowerW, normalizedPowerW, powerStreamW, readPowerW } from '../_shared/ride-power.ts';
 
 // ---------- small helpers ----------
 const ydToM = (yd:number)=> yd * 0.9144;
@@ -99,13 +100,10 @@ function avg(nums: number[]) {
                 undefined;
 
     // power (watts) – accept common fields from providers
-    const p = (typeof s.powerInWatts === 'number' && s.powerInWatts) ||
-              (typeof s.power_in_watts === 'number' && s.power_in_watts) ||
-              (typeof s.power_watts === 'number' && s.power_watts) ||
-              (typeof s.instantaneousPower === 'number' && s.instantaneousPower) ||
-              (typeof s.inst_power === 'number' && s.inst_power) ||
-              (typeof s.power === 'number' && s.power) ||
-              undefined;
+    // ⛔ ZERO IS A READING (2026-09-14). `(typeof x === 'number' && x)` turned a 0 W second into `false`, so
+    // every coasting second vanished and the segment row averaged pedalling only (130 W on a ride whose
+    // Details said 99 with coasting, 128 normalized). `readPowerW` keeps it.
+    const p = readPowerW(s);
 
     out.push({ ts: Number.isFinite(ts) ? ts : i, t: Number.isFinite(t) ? t : i, v, d, hr, elev, cad, p });
   }
@@ -1015,6 +1013,25 @@ Deno.serve(async (req) => {
     }
 
     // normalize laps JSON to Lap[]
+    /**
+     * ⛔ ONE SET OF POWER RULES PER SEGMENT (2026-09-14, `_shared/ride-power.ts`). Coasting counts as 0 W;
+     * `judged_power_w` is normalized power for a stretch of 20 minutes or longer, average power below
+     * that. The segment row, its colour and the adherence lines read `judged_power_w`; nothing downstream
+     * averages again. `avg_power_w` is the plain average, zeros included.
+     */
+    let _rideStream: number[] | null = null;
+    function segmentPower(sIdx:number, eIdx:number, durS:number): { avg_power_w: number|null; normalized_power_w: number|null; judged_power_w: number|null; judged_power_basis: 'normalized'|'average'|null } {
+      if (sport !== 'ride') return { avg_power_w: null, normalized_power_w: null, judged_power_w: null, judged_power_basis: null };
+      if (_rideStream == null || _rideStream.length !== rows.length) _rideStream = powerStreamW(rows.map((r:any) => r?.p));
+      if (!_rideStream.length) return { avg_power_w: null, normalized_power_w: null, judged_power_w: null, judged_power_basis: null };
+      const seg = _rideStream.slice(Math.max(0, sIdx), Math.max(sIdx, eIdx) + 1);
+      const avgW = averagePowerW(seg);
+      const npW = normalizedPowerW(seg);
+      const judged = judgedPowerW(seg, durS);
+      const r = (v: number|null) => (v != null ? Math.round(v) : null);
+      return { avg_power_w: r(avgW), normalized_power_w: r(npW), judged_power_w: r(judged.watts), judged_power_basis: judged.basis };
+    }
+
     type Lap = { start_ts:number; end_ts:number; time_s:number; dist_m:number; start_idx?:number; end_idx?:number };
     function normalizeLaps(raw:any): Lap[] {
       if (!raw) return [];
@@ -1192,7 +1209,7 @@ Deno.serve(async (req) => {
           gap_pace_s_per_mi: gap  != null ? Math.round(gap)  : null,
           avg_hr: hrVals.length ? Math.round(avg(hrVals)!) : null,
           avg_cadence_spm: cadVals.length ? Math.round(avg(cadVals)!) : null,
-          avg_power_w: (sport==='ride' && pVals.length) ? Math.round(avg(pVals)!) : null,
+          ...segmentPower(sIdx, eIdx, segSec),
           provenance: 'lap',
           pct_moving: pctMoving,
           pace_uses_planned_distance: false
@@ -1299,7 +1316,7 @@ Deno.serve(async (req) => {
           gap_pace_s_per_mi: gap  != null ? Math.round(gap)  : null,
           avg_hr: hrVals.length ? Math.round(avg(hrVals)!) : null,
           avg_cadence_spm: cadVals.length ? Math.round(avg(cadVals)!) : null,
-          avg_power_w: (sport==='ride' && pVals.length) ? Math.round(avg(pVals)!) : null,
+          ...segmentPower(sIdx, eIdx, dur_s),
           provenance,
           pct_moving: pctMoving,
           pace_uses_planned_distance: false
@@ -2079,7 +2096,7 @@ Deno.serve(async (req) => {
         avg_pace_s_per_mi: segPace != null ? Math.round(segPace) : null,
         avg_hr: segHr,
         avg_cadence_spm: segCad,
-        avg_power_w: segPwr
+        ...(segSec != null ? segmentPower(sIdx, eIdx, segSec) : { avg_power_w: segPwr })
       };
 
       const plannedData = {

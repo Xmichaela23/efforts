@@ -2,6 +2,7 @@
 // @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { withAlarm } from '../_shared/alarm.ts';
+import { normalizedPowerW, pedalingAveragePowerW, powerStreamW } from '../_shared/ride-power.ts';
 import { buildRunPaceCurve, buildRunHrCurve, type RunPaceCurve, type RunHrCurve } from '../../../src/lib/run-critical-speed.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { normalizeSamples } from '../../lib/analysis/sensor-data/extractor.ts';
@@ -1366,27 +1367,12 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
     
     try {
       if (isRide && hasRows && power_watts.some(p => p !== null)) {
-        const windowSize = 30; // 30 seconds rolling window
-        const rollingAvgs: number[] = [];
-        
-        for (let i = 0; i < rows.length; i++) {
-          const windowStart = Math.max(0, i - windowSize + 1);
-          const windowPowers = rows.slice(windowStart, i + 1)
-            .map(r => r.power_w)
-            .filter((p): p is number => p !== null && !isNaN(p));
-          
-          if (windowPowers.length > 0) {
-            const avgPower = windowPowers.reduce((a, b) => a + b, 0) / windowPowers.length;
-            rollingAvgs.push(Math.pow(avgPower, 4));
-          }
-        }
-        
-        // Coggan: drop the first 30s (incomplete rolling windows) before the 4th-root mean.
-        const trimmed = rollingAvgs.slice(windowSize - 1);
-        if (trimmed.length > 0) {
-          const avgOfFourthPowers = trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
-          normalizedPower = Math.pow(avgOfFourthPowers, 0.25);
-          
+        // ⛔ ONE NORMALIZED POWER (2026-09-14): `_shared/ride-power.ts`, the same function the segment rows
+        // use. Same maths as before (30-sample window, first 29 dropped, zeros included).
+        const np = normalizedPowerW(powerStreamW(rows.map((r) => r.power_w)));
+        if (np != null) {
+          normalizedPower = np;
+
           // Variability Index: NP / Avg Power
           const powerValues = power_watts.filter((p): p is number => p !== null);
           if (powerValues.length > 0) {
@@ -1395,7 +1381,7 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
               variabilityIndex = normalizedPower / avgPower;
             }
           }
-          
+
           // Intensity Factor: NP / FTP (if user has FTP)
           if (userFtp && userFtp > 0) {
             intensityFactor = normalizedPower / userFtp;
@@ -1407,26 +1393,14 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
     }
 
     // Avg power while pedaling (> threshold W) and % of clock time pedaling — same stream as NP
-    const PEDALING_POWER_THRESHOLD_W = 25;
     let avgPowerPedalingW: number | null = null;
     let pctTimePedaling: number | null = null;
     try {
       if (isRide && hasRows && rows.some((r) => typeof r.power_w === 'number' && Number.isFinite(r.power_w as number))) {
-        let pedalingSec = 0;
-        let weightedPower = 0;
-        let clockSec = 0;
-        for (let i = 1; i < rows.length; i++) {
-          const dt = Math.max(0, (rows[i].t || 0) - (rows[i - 1].t || 0));
-          if (dt <= 0 || dt > 300) continue;
-          clockSec += dt;
-          const p = typeof rows[i].power_w === 'number' && Number.isFinite(rows[i].power_w) ? rows[i].power_w : 0;
-          if (p > PEDALING_POWER_THRESHOLD_W) {
-            pedalingSec += dt;
-            weightedPower += p * dt;
-          }
-        }
-        if (pedalingSec > 0) avgPowerPedalingW = Math.round(weightedPower / pedalingSec);
-        if (clockSec > 0) pctTimePedaling = Math.min(100, Math.round((100 * pedalingSec) / clockSec));
+        // ⛔ ONE PEDALLING AVERAGE (2026-09-14): `_shared/ride-power.ts`, also read by the pacing halves.
+        const ped = pedalingAveragePowerW(rows.map((r) => Number(r.t) || 0), powerStreamW(rows.map((r) => r.power_w)));
+        if (ped.avg_w != null) avgPowerPedalingW = Math.round(ped.avg_w);
+        if (ped.clock_s > 0) pctTimePedaling = Math.min(100, Math.round((100 * ped.pedaling_s) / ped.clock_s));
       }
     } catch {
       /* optional */

@@ -1,4 +1,5 @@
 import { withAlarm } from '../_shared/alarm.ts';
+import { normalizedPowerW, pedalingAveragePowerW, powerRangeBand, powerStreamW } from '../_shared/ride-power.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { hrDriftHalvesPct, warmupSkipSeconds } from '../_shared/hr-drift-halves.ts';
 import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
@@ -267,12 +268,14 @@ export function generateCyclingAdherenceSummary(opts: {
   const hits = workIntervals.filter((i: any) => {
     // Rows come from generateIntervalBreakdown (actual_power_w, planned_power_range_*, planned_power_w) or,
     // from older callers, the stored interval shape (executed / planned). Read both.
-    if (typeof i?.power_adherence_percent === 'number') return i.power_adherence_percent >= 85;
-    const avg = Number(i?.actual_power_w ?? i?.executed?.avg_power_w ?? i?.executed?.avg_power ?? i?.avg_power);
+    // ⛔ ONE RULE (2026-09-14): on target = the judged number inside the range, the same `in` the segment
+    // row's colour shows. The score-≥85 and ±15%-of-midpoint allowances are gone — they called a red row
+    // "on target".
+    if (i?.power_band === 'in' || i?.power_band === 'below' || i?.power_band === 'above') return i.power_band === 'in';
+    const avg = Number(i?.actual_power_w ?? i?.executed?.judged_power_w ?? i?.executed?.avg_power_w ?? i?.executed?.avg_power ?? i?.avg_power);
     const lo = Number(i?.planned_power_range_lower ?? i?.planned?.power_range?.lower), hi = Number(i?.planned_power_range_upper ?? i?.planned?.power_range?.upper);
     if (Number.isFinite(avg) && avg > 0 && Number.isFinite(lo) && Number.isFinite(hi) && hi > 0) {
-      const mid = (lo + hi) / 2;
-      return (avg >= lo && avg <= hi) || (avg >= mid * 0.85 && avg <= mid * 1.15);
+      return powerRangeBand(avg, lo, hi) === 'in';
     }
     const target = Number(i?.planned_power_w ?? i?.planned?.power_watts ?? i?.planned?.power ?? i?.target_power);
     if (Number.isFinite(avg) && avg > 0 && Number.isFinite(target) && target > 0) {
@@ -934,8 +937,11 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
     // Extract actual values from executed object
     // Note: compute-workout-summary outputs avg_power_w (with _w suffix) and avg_hr (not avg_heart_rate)
     const actualDuration = interval.executed?.duration_s || interval.duration_s || 0;
-    const actualPower = interval.executed?.avg_power_w || interval.executed?.avg_power || interval.granular_metrics?.avg_power || 0;
-    const normalizedPower = interval.granular_metrics?.normalized_power || actualPower;
+    // ⛔ THE JUDGED NUMBER (2026-09-14, `_shared/ride-power.ts`): normalized power for 20 minutes or longer,
+    // average power (coasting as 0 W) below that — written once by compute-workout-summary. The row, its
+    // colour, power adherence, "on target" and Execution all read this one value.
+    const actualPower = interval.executed?.judged_power_w ?? interval.executed?.avg_power_w ?? interval.executed?.avg_power ?? interval.granular_metrics?.avg_power ?? 0;
+    const normalizedPower = interval.executed?.normalized_power_w ?? interval.granular_metrics?.normalized_power ?? actualPower;
     const actualDistance = interval.executed?.distance_m || 0;
     
     // Heart rate from interval
@@ -1009,6 +1015,8 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
       // actual_power_w stays for in-analyzer consumers; the alias keeps the
       // session_detail builder sport-agnostic without a cycling branch.
       avg_power_watts: Math.round(actualPower),
+      power_basis: interval.executed?.judged_power_basis ?? null,
+      power_band: isRecovery ? null : powerRangeBand(actualPower, plannedPowerLower, plannedPowerUpper),
       normalized_power_w: Math.round(normalizedPower),
       power_adherence_percent: isRecovery ? null : Math.round(powerAdherence),
       // Combined adherence (0-1 scale for compatibility with client getEnhancedAdherence)
@@ -1763,7 +1771,8 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
         (workout as any)?.weighted_average_watts
       );
       if (Number.isFinite(v) && v >= 0) return Math.round(v);
-      return calculateNormalizedPower(powerSamples);
+      const np = normalizedPowerW(powerStreamW(powerSamples));
+      return np != null ? Math.round(np) : 0;
     })();
 
     // Canonical VI/IF from computed.analysis.power.* — passed straight through to
@@ -1852,7 +1861,14 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
     // (coasting, descending) are excluded from both halves alike — otherwise a descent-heavy second
     // half reads as a fade that never happened.
     try {
-      const pw = (powerSamples as number[]).filter((w) => Number.isFinite(w) && w > 0);
+      // ⛔ THE DETAILS TILE'S PEDALLING AVERAGE, PER HALF (2026-09-14, `_shared/ride-power.ts`): seconds above
+      // 25 W, time-weighted — the same rule as "Avg Power (pedaling)", split at the middle of the clock.
+      const tAll = sensorData.map((sm: any, i: number) => Number(sm?.t ?? sm?.timestamp ?? i) || i);
+      const stream = powerStreamW(sensorData.map((sm: any) => {
+        const v = Number(sm?.power ?? sm?.watts ?? sm?.power_w ?? sm?.powerWatts);
+        return Number.isFinite(v) ? v : null;
+      }));
+      const pw = stream.filter((w) => w > 25);
       // ⛔ THE FLOOR IS THE REPO'S OWN, AND THE FIRST ONE'S ARITHMETIC WAS WRONG (corrected 2026-08-02).
       //
       // It read `>= 120` with the comment "~2 min of pedalling per half at 1 Hz". 120 samples split in
@@ -1865,10 +1881,11 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
       // enough for a mean to mean something, and it is not a fresh opinion.
       const MIN_PEDALLING_S = 600;
       if (pw.length >= MIN_PEDALLING_S) {
-        const mid = Math.floor(pw.length / 2);
-        const mean = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
-        const first = Math.round(mean(pw.slice(0, mid)));
-        const second = Math.round(mean(pw.slice(mid)));
+        const midIdx = Math.floor(stream.length / 2);
+        const h1 = pedalingAveragePowerW(tAll.slice(0, midIdx), stream.slice(0, midIdx)).avg_w;
+        const h2 = pedalingAveragePowerW(tAll.slice(midIdx), stream.slice(midIdx)).avg_w;
+        const first = h1 != null ? Math.round(h1) : 0;
+        const second = h2 != null ? Math.round(h2) : 0;
         if (first > 0 && second > 0 && (cyclingFactPacketV1 as any)?.derived) {
           (cyclingFactPacketV1 as any).derived.power_halves = { first_w: first, second_w: second };
         }
