@@ -624,8 +624,21 @@ async function runSessionDetailPipelineAndPersist(
             workout_id: id,
             endurance_quality: isStrength ? null : 'followed',
             strength_quality: isStrength ? 'followed' : null,
+            // Whole sentences only (2026-09-14, Michael: "sentence doesn't finish in plan context"). A hard
+            // 120-character cut stopped mid-word ("Spend a f"). Keep every sentence that fits in 120; the
+            // first sentence always shows, however long.
             summary: plannedSession?.prescription
-              ? `Linked to plan — ${String(plannedSession.prescription).slice(0, 120)}`
+              ? `Linked to plan — ${(() => {
+                  const text = String(plannedSession.prescription).trim();
+                  const sentences = text.match(/[^.!?]+[.!?]+(\s|$)|[^.!?]+$/g) ?? [text];
+                  let out = '';
+                  for (const s of sentences) {
+                    const next = (out + s).trim();
+                    if (out && next.length > 120) break;
+                    out = next + ' ';
+                  }
+                  return out.trim();
+                })()}`
               : 'Linked to planned session',
           };
         }
