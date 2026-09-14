@@ -5,6 +5,10 @@
 > main = `628392fa`. Server functions deployed 06:15 UTC. Read `docs/WORKORDER-ride-strength-2026-09-13.md`,
 > `docs/COPY-ride-strength-setup-2026-09-13.md` and `docs/WORKORDER-look-first-default-picks-2026-09-13.md`.
 > The Intervals.icu banner below is from earlier the same day; its job list still stands.
+>
+> **2026-09-14 look pass (client only, no engine change):** sunrise light on Home, space background on Focus,
+> Connections, weekly planned and sign-in, Home's texture on the workout screen. main = `ce546cd8`, iOS synced, not
+> phone-checked — checklist in POLISH-PUNCH-LIST.md, AWAITING MICHAEL 2026-09-14. The job list below is unchanged.
 
 ### WHAT SHIPPED
 - **Ride + Strength = Viada p278** (cycling Base week): p278 Standard lifting (3 days), p278 Deload rides all level 1

@@ -36,6 +36,32 @@ Strong Focus is the **Train → Strength branch of `NonRaceBuilder`** — same b
 
 ---
 
+## Screens in the same room (2026-09-14)
+
+`.wizard-galaxy` is now the background for four screens outside the wizard, each with its light moved so they are told
+apart. Same nebula, stars and grain; only the position and weight of the hues change. Variants live in `src/index.css`
+next to `.wizard-galaxy`.
+
+| screen | where the class goes | variant | light |
+|---|---|---|---|
+| Focus | `GoalsScreen.tsx` main-screen wrapper | none | the wizard's own (gold top left) |
+| Connections | `AppLayout.tsx`, wrapper around `<Connections embedded />` | `--connections` | blue top right, gold low left |
+| Weekly planned | `AppLayout.tsx`, wrapper around `<AllPlansInterface>` | `--plans` | gold and violet rising from the bottom |
+| Sign-in (and register, reset, pending) | `AuthScreenLayout.tsx` | none, plus Home's sun and texture | warm sun above the card |
+
+- **Cards on these screens take the Train option card's look** (`optBtn` in `NonRaceBuilder.tsx`): `rounded-xl border
+  border-white/12 bg-white/[0.03]`, no blur, no shadow. Nested cards one step fainter.
+- **Sign-in card:** `galaxy-card galaxy-card--auth` (nebula, three small novas in violet / green / gold, a denser star
+  field), accent `255,196,120` at 0.24.
+- **Home's texture** (the diagonal lines at 26px and 52px under the Today panel) replaced the square grid on the
+  workout screen: the full-screen overlay in `UnifiedWorkoutView.tsx` and `.readout-texture--quiet::after`.
+- **Home's light is a sunrise** (`TodaysEffort.tsx`, "THE SUN"): pale-yellow core, coral ring, violet and blue above.
+  Dim orange or gold over the dark panel reads as brown — that is why the rest-day field lost its red and orange, the
+  date card lost its gold/orange/red halo, and the session-in-view colour is held to the top edge. The date card is lit
+  from below (warm wash and rim on its bottom edge).
+
+---
+
 ## Do / Don't
 - **Do** reuse `StepLayout`'s `accent` + the CSS var — never restyle a CTA inline per screen.
 - **Do** pull colour from `SPORT_COLORS` via `getDisciplineColorRgb`.

@@ -14,6 +14,20 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## ⏳ AWAITING MICHAEL — 2026-09-14 (look pass: sunrise on Home, space background on four screens — PUSHED, iOS synced, NOT device-checked)
+
+main = `ce546cd8`. No server functions touched. iOS synced from `ce546cd8`. Seen in the local browser only.
+Recipe: `docs/REFERENCE-wizard-visual-language.md` → "Screens in the same room".
+
+- [ ] **Home:** light at the top reads as sunrise (pale yellow, coral, violet), not white and not brown; the date card
+      is lit from its bottom edge; no brown behind the sessions on a run day or a rest day.
+- [ ] **Focus, Connections, weekly planned:** deep-space background, flat cards; Connections lit from the top right,
+      weekly planned from the bottom.
+- [ ] **Workout screen, Performance and Details:** fine diagonal texture, no square grid.
+- [ ] **Sign-in:** space card with novas and stars, warm light on the wordmark. Register, reset and pending share the
+      background.
+- Not decided: the gold of "week 3 of 12" and the plan name on Home blends into the light.
+
 ## ⏳ AWAITING MICHAEL — 2026-09-13 (Ride + Strength, look-first picks, Multisport Focus, setup from the server — PUSHED, DEPLOYED, iOS synced)
 
 main = `628392fa`. Server functions deployed 06:15 UTC. iOS synced from `628392fa`.
