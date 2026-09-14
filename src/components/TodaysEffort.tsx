@@ -841,6 +841,29 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   // Check if any workout is expanded
   const hasExpandedWorkout = Object.values(expanded).some(Boolean);
+  /**
+   * ⛔ THE DAY HOLDS STILL WHEN IT FITS (2026-09-14, Michael: "the workouts should be locked in place unless a
+   * third or large card makes you need to scroll; they are too easy to move up and down"). The list's bottom
+   * room (clear of the + button) is only added when the day is already taller than the panel — that room was
+   * what made a two-card day scroll by itself.
+   */
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const [dayOverflows, setDayOverflows] = useState(false);
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    const list = listRef.current;
+    if (!scroller || !list || typeof ResizeObserver === 'undefined') return;
+    const measure = () => {
+      const pad = parseFloat(getComputedStyle(list).paddingBottom) || 0;
+      setDayOverflows(scroller.scrollHeight - pad > scroller.clientHeight + 1);
+    };
+    const ro = new ResizeObserver(measure);
+    ro.observe(scroller);
+    ro.observe(list);
+    if (headerRef.current) ro.observe(headerRef.current); // the weather rows arrive late and grow the header
+    measure();
+    return () => ro.disconnect();
+  }, []);
 
 
   const dateWorkoutsMemo = useMemo(() => {
@@ -1745,6 +1768,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           position: 'relative',
           zIndex: 1,
           touchAction: 'pan-y',
+          // No bounce when the day fits (see `dayOverflows`).
+          overscrollBehaviorY: 'none',
           transform: `translateX(${daySlideX}px)`,
           transition: daySlideRaw ? 'none' : `transform ${DAY_SLIDE_MS}ms cubic-bezier(0.2, 0.7, 0.3, 1)`,
           willChange: 'transform',
@@ -2105,7 +2130,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         {/* Content area
             Option C: slightly wider rail + Today blocks get a small bleed.
             Calendar/week strip spacing is untouched (handled in `WorkoutCalendar`). */}
-        <div className="px-3 overflow-x-hidden" style={{ paddingBottom: hasExpandedWorkout ? 120 : 56 }}>
+        {/* `overflow-x: clip`, not hidden: hidden made this list a second scroller inside the panel's. */}
+        <div ref={listRef} className="px-3" style={{ overflowX: 'clip', paddingBottom: hasExpandedWorkout ? 120 : dayOverflows ? 56 : 0 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state - show "Rest" if there's an active plan, otherwise "No effort"
           <div className="px-4 py-10">
