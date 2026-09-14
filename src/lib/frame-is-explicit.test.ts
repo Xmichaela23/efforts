@@ -194,14 +194,14 @@ Deno.test('⛔ THE BUILD FOCUS SCREEN DRAWS ONLY PICKS THE CHOSEN FRAME CAN HONO
    * reachability rule — a pick is drawn when the frame carries an HYP accessory cell it can fill —
    * and reverting to the unfiltered list is what puts five dead controls back on Standard Focus.
    */
+  // ⚠️ REBASED 2026-09-13: the rows come from the server (`setup-readout.ts`), which asks the frame and the kit;
+  // the screen renders the chosen frame's block.
   const src = await read('../components/NonRaceBuilder.tsx');
-  assert(/picksForFrame\(wizardFrame,\s*strengthEquipment\)/.test(src),
-    'the Build focus screen no longer asks the chosen frame — and its kit — which picks it can draw');
-  assert(!/pickKeysInDayOrder\(\s*\)/.test(src),
-    '⛔ the unfiltered, frame-less pick list is back on the screen');
-  // ⚠️ `frameDaysForPick` SINCE 2026-09-11 — the screen groups by day and prints only a second day.
-  assert(/frameDaysForPick\(key,\s*wizardFrame\)/.test(src),
-    'the day tags no longer come from the chosen frame');
+  assert(/builder\?\.setup\?\.build_focus\?\.\[wizardFrame\]/.test(src),
+    'the Build focus screen no longer renders the chosen frame\'s rows');
+  const server = await read('../../supabase/functions/_shared/standing-plan/setup-readout.ts');
+  assert(/picksForFrame\(frame, equipment\)/.test(server), 'the server rows no longer ask the frame and the kit');
+  assert(/frameDaysForPick\(k, frame\)/.test(server), 'the day headings no longer come from the chosen frame');
 });
 
 Deno.test('⛔⛔ PASSING THE FRAME CHANGED NOTHING FOR `strength_5k` — the identity, asserted', () => {
@@ -359,11 +359,10 @@ Deno.test('⛔ THE SUPERSET SENTENCE IS GATED ON ITS PARTNER BEING DRAWN', async
    * ⚠️ THE WEEK STILL SUPERSETS; the composer fills that cell by substitution. What the athlete has
    * no say over, the screen does not talk about.
    */
-  const src = await read('../components/NonRaceBuilder.tsx');
-  assert(/spec\.superset && pairDrawn/.test(src),
+  // ⚠️ REBASED 2026-09-13: the gate lives with the rows, on the server (`setup-readout.ts`).
+  const src = await read('../../supabase/functions/_shared/standing-plan/setup-readout.ts');
+  assert(/spec\.superset && spec\.pairedWith && drawn\.includes\(spec\.pairedWith\)/.test(src),
     '⛔ the superset sentence is no longer gated on its partner being drawn');
-  assert(/drawn\.includes\(spec\.pairedWith\)/.test(src),
-    'the pair test no longer reads the list the screen actually drew');
 
   /**
    * ⚠️⚠️ THE STATE IT GUARDS IS NO LONGER REACHABLE, and that is the amendment working rather than

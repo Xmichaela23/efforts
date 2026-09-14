@@ -825,10 +825,21 @@ Deno.serve(async (req: Request) => {
        * default, which this screen leaves untouched precisely because it does not ask about it.
        */
       const viadaPrefs = normalizeViadaPrefs(
-        (body as Record<string, unknown>).assistance_picks
-          && typeof (body as Record<string, unknown>).assistance_picks === 'object'
-          ? ((body as Record<string, unknown>).assistance_picks as Record<string, unknown>).viada
-          : null,
+        (() => {
+          const ap = (body as Record<string, unknown>).assistance_picks;
+          const raw = ap && typeof ap === 'object' ? (ap as Record<string, unknown>).viada : null;
+          if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return raw ?? null;
+          /**
+           * ⛔ THE SETUP SENDS ONLY THE ROWS THE ATHLETE CHANGED (2026-09-13, punch list "Default picks and per-plan
+           * wording move to the server"). Every other row takes the same default the Build focus screen showed
+           * (`defaultViadaPicks`, same-day duplicates moved), before the per-row check below.
+           */
+          const sent = (raw as Record<string, unknown>).picks;
+          return {
+            ...(raw as Record<string, unknown>),
+            picks: { ...defaultViadaPicks(equipmentStrength, [], frameId), ...(sent && typeof sent === 'object' ? sent as Record<string, unknown> : {}) },
+          };
+        })(),
         equipmentStrength,
         // ⛔ THE FRAME — without it this reads p246's key list whatever programme is being built,
         // and returns that table's defaults in place of the athlete's answers. See its own note.

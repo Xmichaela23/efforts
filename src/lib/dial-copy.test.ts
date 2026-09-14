@@ -12,9 +12,11 @@
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { voiceViolation } from '../../supabase/functions/_shared/state-trend/week-accent.ts';
+import { BUILD_FOCUS_COPY } from '../../supabase/functions/_shared/standing-plan/setup-copy.ts';
+// ⚠️ The Build focus subtitle and dose line moved to the server's wording file (2026-09-13); the gate still reads them.
+const ACCESSORY_SUBTITLE = BUILD_FOCUS_COPY.subtitle;
+const ACCESSORY_DOSE_LINE = BUILD_FOCUS_COPY.dose_line;
 import {
-  ACCESSORY_DOSE_LINE,
-  ACCESSORY_SUBTITLE,
   CORE_PICK_NOTE,
   DIAL_CAP_NOTE,
   DIAL_CONTROL_VISIBLE,

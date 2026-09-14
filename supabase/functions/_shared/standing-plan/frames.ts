@@ -354,26 +354,7 @@ export type Frame = {
   id: FrameId;
   /** ⛔ NEVER SHOWN TO AN ATHLETE (pivot §1). Internal only. */
   sourceName: string;
-  /**
-   * ⛔⛔ WHAT THE ATHLETE CALLS THIS, WHICH IS NEVER WHAT THE BOOK CALLS IT (Michael, 2026-08-30).
-   * The naming is Focus-branded, so the All Rounder is **Standard Focus** on every screen. This is
-   * the same id-versus-display split `non-race-goal-seeds.ts` already uses, where the goal id
-   * `get_stronger` displays as "Strong Focus" — and the comment there records what happens when the
-   * two are conflated: the athlete picked one name and was handed a plan called another.
-   *
-   * ⛔ `strength_5k` IS **Run + Strength** (WORKORDER-train-menu-reshape-2026-09-07). It sat without a
-   * name until the Run Focus grouping that houses it existed on the Train screen; that grouping
-   * exists now (Standard Focus / Run Focus / Ride Focus), and the frame is what every wizard step
-   * title and the built plan's own name read — `programmeName` prefers this field. The goal label
-   * in `non-race-goal-seeds.ts` carries the same words for the readers that only have a goal id.
-   * ⚠️ A plan built before this keeps the name it stored.
-   */
-  displayName?: string;
-  /**
-   * ⛔ THE BUILD THIS PLAN? DESCRIPTION, IN MICHAEL'S APPROVED WORDS (2026-09-13). A frame that declares one
-   * reads "<name>, N weeks." over it; a frame without one keeps the older two lines. Weeks are the block's.
-   */
-  confirmLine?: (weeks: number) => string;
+  // ⛔ THE ATHLETE-FACING NAME MOVED TO THE SERVER'S SETUP WORDING (2026-09-13): `setup-copy.ts`, `PLAN_COPY`.
   cite: string;
   /** ⛔ THE PROGRAM OWNS THIS (pivot §6). Not an athlete dial. */
   liftingDays: number;
@@ -1158,7 +1139,6 @@ export const FRAMES: Record<FrameId, Frame> = {
   strength_5k: {
     id: 'strength_5k',
     sourceName: 'Strength + 5K',
-    displayName: 'Run + Strength',
     cite: 'Viada pp246-247',
     liftingDays: 4,
     runStrengthWeek: { easyRunMinutes: 30, longRunChipCeilingMinutes: 90, longRunDefaultMinutes: 75 },
@@ -1171,11 +1151,6 @@ export const FRAMES: Record<FrameId, Frame> = {
   all_rounder: {
     id: 'all_rounder',
     sourceName: 'The All Rounder',
-    // ⛔ RENAMED (Michael, 2026-09-13): the card under Multisport Focus, the plan name, the calendar line and
-    // Build this plan? all read "Run + Ride + Strength". A plan built before keeps the name it stored.
-    displayName: 'Run + Ride + Strength',
-    confirmLine: (weeks: number) =>
-      `A ${weeks}-week plan to get stronger and faster on the run and the bike. The weights go up as you adapt to the training.`,
     cite: 'Viada pp274-275',
     liftingDays: 4,
     columns: { standard: ALL_ROUNDER_STANDARD, taper: ALL_ROUNDER_TAPER },
@@ -1188,9 +1163,6 @@ export const FRAMES: Record<FrameId, Frame> = {
     id: 'cycling_base',
     sourceName: 'Cycling: Base',
     // ⚠️ THE CARD'S EXISTING LABEL. §0.1 of the work order: the card copy is not approved yet.
-    displayName: 'Ride + Strength',
-    confirmLine: (weeks: number) =>
-      `A ${weeks}-week plan to get faster and stronger. The weights go up as you adapt to the training.`,
     cite: 'Viada pp278, 280-281',
     liftingDays: 3,
     columns: { standard: CYCLING_BASE_STANDARD, taper: CYCLING_BASE_TAPER },

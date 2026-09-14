@@ -78,13 +78,8 @@ import { WEEKDAYS } from '../../supabase/functions/_shared/standing-plan/day-map
  * ⚠️ THE SCREEN'S TITLE ("Accessory work") CARRIES THE SAME MISUSE AND IS DELIBERATELY UNTOUCHED —
  * not overlooked. Michael has not ruled on it.
  */
-/**
- * ⛔ MICHAEL'S WORDS, 2026-09-11, VERBATIM. They replace "Every lifting day opens on a competition
- * lift. These fill in the muscle work around it." — the step is now grouped by day and names its
- * supersets, so the line says what the rows are and what can be done with them.
- */
-export const ACCESSORY_SUBTITLE =
-  'These are your hypertrophy lifts and super sets based on the equipment you have. You can swap on the day or adjust now for the plan.';
+// ⛔ `ACCESSORY_SUBTITLE` MOVED TO THE SERVER (2026-09-13): `supabase/functions/_shared/standing-plan/setup-copy.ts`, `BUILD_FOCUS_COPY`.
+
 
 /**
  * ⛔ THE DIAL'S SUB-LINE. Michael's wording, verbatim; trips the voice lint on `focus` by design.
@@ -137,20 +132,8 @@ export const DIAL_CONTROL_VISIBLE = false;
  */
 export const CORE_PICK_NOTE = 'This pick is the movement your weekly core work uses.';
 
-/**
- * ⛔ THE DOSE LINE, RECONCILED (Michael, 2026-08-24). It said *"sets of 6-12"* while the rows on the
- * same screen said *"3 x 8-10"* — two dose claims one scroll apart, and the rows were the right one.
- * p086's accessory prescription is 3 x 8-10 at 1-2 RIR.
- *
- * ⚠️ IT IS KEPT RATHER THAN DELETED, and that is a judgement call worth stating: the rows print
- * "3 x 8-10" only for the Glutes and Core extra rows, so this is the ONLY place the seven picks'
- * own dose is stated. Deleting it would have removed the RIR instruction from the screen entirely,
- * and "how close to failure" is the part of an accessory prescription an athlete actually gets
- * wrong. Reversible if Michael reads it as still half-repeating the rows.
- */
-export const ACCESSORY_DOSE_LINE =
-  'Accessory sets are 8 to 10 reps with a rep or two left in the tank. Going to failure costs the '
-  + 'next main lift.';
+// ⛔ `ACCESSORY_DOSE_LINE` MOVED TO THE SERVER (2026-09-13): `supabase/functions/_shared/standing-plan/setup-copy.ts`, `BUILD_FOCUS_COPY`.
+
 
 /**
  * ⛔ ONE LINE PER ACTIVE CHIP. ONE. (Michael, 2026-08-24.)

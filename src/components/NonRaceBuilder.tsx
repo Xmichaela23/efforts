@@ -107,39 +107,7 @@ import {
  * ⚠️ `assistance-catalog` IS STILL IMPORTED ABOVE AND STILL USED — by the Get Stronger branch, which
  * is untouched. The two screens sit in one file and read two different tables on purpose.
  */
-import {
-  DIAL_CAP,
-  DIAL_CHIPS,
-  DIAL_LABEL,
-  DIAL_OWNERSHIP,
-  dialRowKey,
-  dialRowOptions,
-  DIAL_ROW_DAY_IS_THE_COMPOSERS,
-  chipHasFrameSlot,
-  frameDaysForPick,
-  picksForFrame,
-  frameMuscleForPick,
-  frameAdmitsForPick,
-  defaultViadaPicks,
-  pickOptions,
-  pickOptionLabel,
-  pickOptionLabelInRow,
-  allSubstituted,
-  ROW_IS_ALL_SUBSTITUTES,
-  VIADA_PICKS,
-  type DialChip,
-  type ViadaAccessoryPrefs,
-  type ViadaPickKey,
-} from '@shared/standing-plan/accessory-picks.ts';
-import {
-  ACCESSORY_DOSE_LINE,
-  ACCESSORY_SUBTITLE,
-  CORE_PICK_NOTE,
-  DIAL_CAP_NOTE,
-  DIAL_CONTROL_VISIBLE,
-  DIAL_SUBLINE,
-  dialChipLine,
-} from '@/lib/dial-copy';
+import type { ViadaAccessoryPrefs, ViadaPickKey } from '@shared/standing-plan/accessory-picks.ts';
 // Slice 6 — the tracked pull-up progression. A performance GOAL, a different axis from the chips.
 import {
   PULLUP_TEST_PROMPT, pullupDoseNote, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS, weeklyVolumeFor,
@@ -335,12 +303,9 @@ type CardIcon = React.ComponentType<{ className?: string; style?: React.CSSPrope
  * hand-pick a hex. Athletic has no single discipline, so it takes the palette's unclaimed colour
  * rather than borrowing one of the four and implying a default.
  */
-const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string; Icon: CardIcon; color: string }> = {
+// ⛔ THE SECTIONS' WORDS ARE THE SERVER'S (2026-09-13) — `builder.setup.sections`; only the icon and colour live here.
+const TRAIN_COPY: Record<TrainCardId, { Icon: CardIcon; color: string }> = {
   standard: {
-    // ⛔ MULTISPORT FOCUS (Michael, 2026-09-13, both lines approved): a grouping like Run Focus and Ride Focus,
-    // opening a program list. The All Rounder's own blurb moved to its program card (`PROGRAM_COPY.run_ride_strength`).
-    label: 'Multisport Focus',
-    blurb: 'Running, riding and lifting in one plan.',
     // ⛔ HIS CLAIMS, ALL OF THEM ON p274-275: an "all-year" programme, for an athlete interested in
     // multiple sports, that pivots to a race programme about a month out. Nothing here is ours.
     // ⚠️ VIADA IS NOT NAMED ON ANY CARD. The old Strength Focus card named him, and two programmes
@@ -352,22 +317,16 @@ const TRAIN_COPY: Record<TrainCardId, { label: string; blurb: string; Icon: Card
     color: getDisciplineColor('strength'),
   },
   run: {
-    label: 'Run Focus',
     // ⛔ THE ONE PROGRAMME BEHIND THIS CARD TODAY IS RUN + STRENGTH (pp246-247): a run week with the
     // lifting cut around it. Who it's for, no number, no protocol name — the gate (barbell-maxes.ts)
     // still refuses true beginners with its own copy. The requirement line under it is the same one
-    // Standard Focus shows (`STANDARD_FOCUS_REQUIREMENT`): the block needs the same kit and tests.
-    blurb: 'Your running, with the lifting cut around it.',
+    // Standard Focus shows: the block needs the same kit and tests.
     // ⛔ THE APP'S OWN RUN ICON (Michael, 2026-09-07) — the one `DISCIPLINE_ICONS` draws for run
     // everywhere else, not a second glyph for the same discipline.
     Icon: DISCIPLINE_ICONS.run,
     color: getDisciplineColor('run'),
   },
   ride: {
-    label: 'Ride Focus',
-    // ⚠️ DIMMED UNTIL RIDE + STRENGTH (p279, notes p280) SHIPS. Same sentence shape as Run Focus so
-    // the two read as the pair they are.
-    blurb: 'Your riding, with the lifting cut around it.',
     Icon: Bike,
     color: getDisciplineColor('ride'),
   },
@@ -411,26 +370,13 @@ const TRAIN_OPENS: Record<TrainCardId, 'wizard' | 'programs'> = {
  * ⚠️ NO PROTOCOL NAMES, NO AUTHOR ON A CARD. The numbers on the blurbs are the frame's own counts
  * (p246: four lifting days, four runs; twelve weeks is the block length this path builds).
  */
-/**
- * ⛔ THE RIDE + STRENGTH REQUIREMENTS LINE — MICHAEL'S WORDS, APPROVED 2026-09-13. What p278 needs:
- * barbell and rack (its heavy and speed rows are barbell lifts), bench, dumbbells (the secondary push
- * options), something to carry (p226), a bike; watts need a power meter or smart trainer. The 65 lb
- * minimum covers the three lifts the week loads (`Frame.testedLifts`).
- * ⚠️ DECLARED ABOVE `PROGRAM_COPY`, which reads it at module load.
- */
-const RIDE_STRENGTH_REQUIREMENT_LINE =
-  'Requirements: a barbell and rack, a bench, dumbbells, something to carry, and a bike. Watts need a '
-  + 'power meter or smart trainer. Bench, squat and deadlift each need a 1RM of at least 65 lb.';
-
-/** ⛔ APPROVED (Michael, 2026-09-13) — the Ride + Strength numbers step, beside FTP. p137: the rider coming back. */
-const RIDE_BREAK_FTP_LINE = "If you're coming back from a riding break, make sure your FTP is current.";
-
 type ProgramId = 'run_ride_strength' | 'run_strength' | 'ride_strength';
 const PROGRAMS_BY_CARD: Record<TrainCardId, ProgramId[]> = {
   standard: ['run_ride_strength'], run: ['run_strength'], ride: ['ride_strength'],
 };
+// ⛔ THE CARDS' WORDS ARE THE SERVER'S (2026-09-13) — `builder.setup.programs`: name, description, requirements line.
 const PROGRAM_COPY: Record<ProgramId, {
-  label: string; blurb: string; Icon: CardIcon; color: string;
+  Icon: CardIcon; color: string;
   /** The goal the card seeds; `null` = not built, the card is dimmed and does not navigate. */
   goal: NonRaceGoalId | null;
   /** Which frame the wizard opens on — see `FOCUS_FRAME`. */
@@ -441,44 +387,22 @@ const PROGRAM_COPY: Record<ProgramId, {
    * Absent = live whenever `goal` is set.
    */
   held?: boolean;
-  /** The line under the blurb: what the block needs. Shown on a live card only. */
-  requirement?: string;
 }> = {
   run_ride_strength: {
-    // ⛔ THE ALL ROUNDER (p274), under Multisport Focus (Michael, 2026-09-13, name approved). The blurb is the
-    // one the Standard Focus Train card carried, unchanged (p274-275's claims).
-    label: 'Run + Ride + Strength',
-    blurb: 'Strength, running and riding run together, year-round, with a pivot to a race or a single sport when one comes up.',
+    // ⛔ THE ALL ROUNDER (p274), under Multisport Focus.
     Icon: Shuffle, color: getDisciplineColor('strength'),
     // ⛔ OPENS TODAY'S STANDARD FOCUS SETUP UNCHANGED: the same goal and the same focus the Train card set.
     goal: 'get_stronger', focus: 'standard',
-    // The requirements line under it is `STANDARD_FOCUS_REQUIREMENT`, unchanged (chosen at render below).
   },
   run_strength: {
-    label: 'Run + Strength',
-    // p247 only: the lifts are the goal; running holds at the athlete's mileage; the long run tops
-    // out at 90 to 100 minutes. The 25 mi/wk tier threshold is OURS and stays off the card (Michael,
-    // 2026-09-07: the card carries the book's facts, not ours).
-    blurb: 'You get stronger. Your speed and mileage hold. Twelve weeks: four lifting days, four runs. '
-      + 'The long run stays under 100 minutes.',
     Icon: DISCIPLINE_ICONS.run, color: getDisciplineColor('run'),
     goal: 'get_stronger', focus: 'run',
   },
   ride_strength: {
-    label: 'Ride + Strength',
-    // ⛔ APPROVED (Michael, 2026-09-13). p280: Base is for less experienced riders; p137: the rider
-    // coming back. p278: five rides (four with the Day 2 easy ride out), three lifting days.
-    blurb: 'For newer riders and riders coming back. Cycling and strength progress together. '
-      + 'Four or five rides, three lifting days.',
     Icon: Bike, color: getDisciplineColor('ride'),
     goal: 'get_stronger', focus: 'ride',
-    // ⛔ LIVE (Michael, 2026-09-13): every line on the path approved — docs/COPY-ride-strength-setup-2026-09-13.md.
-    requirement: RIDE_STRENGTH_REQUIREMENT_LINE,
   },
 };
-/** The program screen's title, per grouping — the discipline word, under the eye like Train. */
-const PROGRAM_SCREEN_TITLE: Record<TrainCardId, string> = { standard: 'Multisport', run: 'Run', ride: 'Ride' };
-
 /** ⚠️ SMALL COUNTS ARE WORDS, not digits — the register every other sentence on these screens uses. */
 const COUNT_WORD: Record<number, string> = { 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five' };
 
@@ -522,57 +446,6 @@ const printedRideWeekPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standar
  */
 const rotateOnlyRunPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' }): boolean =>
   st.goal === 'get_stronger' && frameOf(st) === 'strength_5k';
-
-/**
- * ⛔⛔ WHAT THE ATHLETE CALLS THE PROGRAMME THEY PICKED — ONE SOURCE (2026-08-30).
- *
- * ⛔ WHY IT EXISTS. `GOAL_LABELS[goal]` was the one source, and it was right while one card seeded
- * `get_stronger`. Two cards seed it now, so every screen and the plan's own NAME read "Strong Focus"
- * for a Standard Focus build — the wizard telling the athlete they picked something else, on the
- * step right after they picked it.
- *
- * ⚠️ THE FRAME OWNS THE NAME (`Frame.displayName`) — both frames carry one since 2026-09-07
- * (`Standard Focus`, `Run + Strength`), so the goal label is the fallback for a goal with no frame.
- * That is the same id-versus-display split `non-race-goal-seeds.ts` records, and its comment records
- * what happens when the two are conflated: the athlete picked one name and was handed a plan called
- * another.
- */
-const programmeName = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' }): string =>
-  FRAMES[frameOf(st)]?.displayName ?? (st.goal ? GOAL_LABELS[st.goal] : 'Goal');
-
-/**
- * ⛔⛔ WHAT THE BLOCK ACTUALLY REQUIRES, AT THE DOOR (Michael, 2026-08-30).
- *
- * ⛔ THE 2026-07-25 RULE IS BACK, AND SHORTER. A precondition paragraph used to sit under the old
- * Strength Focus card and was cut for height, with a note saying the requirement had gone UNSAID and
- * that finding out on step three is worse than knowing before you start. This is one line instead of
- * five. ⛔ IT RENDERS UNDER BOTH LIVE CARDS (2026-09-07): Standard Focus and Run Focus build from the
- * same tested lifts and the same kit.
- *
- * ⛔ EVERY CLAUSE IS ENFORCED OR PRESCRIBED, NOT ASPIRATIONAL:
- *   · the four numbers — `missingBarbellLifts` / `liftsBelowEntryMinimum` refuse entry without them.
- *   · the barbell, rack and bench — those four lifts are what the block prescribes as its
- *     day-opening movements REGARDLESS of declared equipment, and `strength-gear.ts` states their
- *     kit: back squat needs barbell + rack, bench press needs barbell + bench.
- * ⚠️ DUMBBELLS ARE DELIBERATELY ABSENT. Measured 2026-08-30: every day of both columns fills on
- * barbell + rack + bench with no dumbbells at all, so naming them would state a requirement the app
- * does not have.
- * ⚠️ AND NO NUMBER. The entry minimum is not on the card — the refusal names the athlete's own lift
- * and their own figure when it fires, and a second copy here is one more place for it to go stale.
- */
-const STANDARD_FOCUS_REQUIREMENT =
-  'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in '
-  + 'week one.';
-/**
- * The Run + Strength card's door line (Michael, 2026-09-07). The running figures are p246's own
- * session lengths added up: MLSS+ level 2, NT level 3, VT1 level 1, LSD level 2 come to 180 to 255
- * minutes, and the long run is an hour at level 2. The lifting hours are OURS: the book gives no
- * session times for the lifting days; four days of four slots at 60 to 75 minutes is the estimate.
- */
-const RUN_STRENGTH_REQUIREMENT =
-  'Needs a barbell and plates, a rack and a bench. You should be comfortable running a full hour; '
-  + 'the week holds about three hours of running and seven to nine hours of training in all. '
-  + 'A lift you have not tested gets a test session in week one.';
 
 // ⛔ THE STRONG / HEAVY TIER SCREEN IS GONE (WORKORDER-train-menu-reshape-2026-09-07). Strong was a
 // no-op routing into `get_stronger`; Heavy was dark; nothing in the payload read the tier. The
@@ -1375,6 +1248,8 @@ function assemblePayload(
    * "nothing tapped": seeded days then stay home, which is the safe direction.
    */
   touchedUnits?: Record<string, boolean>,
+  /** ⛔ THE PLAN'S NAME, AS THE SERVER SENT IT (`builder.setup.plans`, 2026-09-13); the goal's label off the strength path. */
+  planName?: string,
 ): ArcSetupPayload {
   const goal = state.goal!;
   const shape = derivePlanShape(state.posture, state.strengthProtocol, equipmentTier);
@@ -1424,12 +1299,12 @@ function assemblePayload(
       ? `${GOAL_LABELS[goal]} — ${state.raceDate}`
       // ⛔ THE PROGRAMME'S OWN NAME — see `programmeName`. `GOAL_LABELS[goal]` named the goal, and
       // two focuses share one goal, so a Standard Focus build was named "Strong Focus block".
-      : `${state.targetWeeks}-week ${programmeName(state)} block`,
+      : `${state.targetWeeks}-week ${planName ?? GOAL_LABELS[goal]} block`,
     goals: [
       {
         // ⛔ THE RACE'S OWN NAME WHEN THERE IS ONE. Every marathon goal used to be called
         // "Marathon" because this fell through to the card's label.
-        name: isRace && state.raceName.trim() ? state.raceName.trim() : programmeName(state),
+        name: isRace && state.raceName.trim() ? state.raceName.trim() : (planName ?? GOAL_LABELS[goal]),
         goal_type: isRace ? 'event' : shape.goal_type,
         target_date: isRace ? state.raceDate : null,
         ...(isRace ? {} : { target_weeks: state.targetWeeks }),
@@ -1774,7 +1649,8 @@ function assemblePayload(
           // ⛔ RIDE + STRENGTH (2026-09-13): the focus, and the ride count on a printed ride week. Both
           // omitted on every other path, so those payloads are byte-identical.
           ...(isStrengthFocusPath && state.focus === 'ride' ? { focus: 'ride' } : {}),
-          ...(printedRideWeekPath(state) ? { ride_count: state.rideCount ?? 5 } : {}),
+          // ⚠️ ONLY WHEN THE ATHLETE PICKED (2026-09-13): the build keeps the page's own count otherwise.
+          ...(printedRideWeekPath(state) && state.rideCount != null ? { ride_count: state.rideCount } : {}),
           // "Know your numbers?" — Use current on strength = no test week; the block prices off the numbers on
           // file (`generate-strength-plan` reads `skip_test_week`; create-goal forwards it). Retest = the default
           // test week. The endurance answers travel as data; create-goal inserts the week-one tests with the plan.
@@ -1923,7 +1799,16 @@ function assemblePayload(
           // render (the balanced default), so an emptiness test would never fire — and the composer
           // needs the week either way, since `normalizeAssistancePrefs` produces the same default
           // from nothing. Sending it makes the goal a record of what was actually built.
-          ...(state.posture?.strength === 'develop' ? { assistance_picks: state.assistancePicks } : {}),
+          // ⛔ THE STRENGTH PLANS ALWAYS SEND THEIR PICK BLOCK, EMPTY WHEN NOTHING WAS CHANGED (2026-09-13): the server fills
+          // every unchanged row with the Build focus default. Without the block the server would read the older
+          // by-day shape this field also carries and build different movements.
+          ...(state.posture?.strength === 'develop'
+            ? {
+              assistance_picks: isStrengthFocusPath
+                ? { ...state.assistancePicks, viada: state.assistancePicks.viada ?? { version: 1, picks: {}, dial: [], dial_rows: {} } }
+                : state.assistancePicks,
+            }
+            : {}),
           /**
            * ⛔ THE TEST-WEEK SKIP (Standing Plan, slice 3). Forwarded ONLY when the athlete took the
            * offer, and the offer only appears when the preview said the evidence is there.
@@ -2060,6 +1945,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   // gate's answer and the lifts on file. The builder prints these and works none of them out; null until
   // the arc arrives.
   const builder = (arc as { builder?: IntakeReadout } | null)?.builder ?? null;
+  /** ⛔ THE SETUP'S WORDS FOR THE THREE PLANS, FROM THE SERVER (2026-09-13). No copy is kept on the phone. */
+  const setupCopy = builder?.setup ?? null;
   const equipmentTier = builder?.equipment_tier;
   const unit = (arc as { units?: string } | null)?.units === 'metric' ? 'km' : 'mi'; // display unit for typed mileage; store canonical miles
   // Inline maintenance cap (shown live as the athlete types) = 180 min/wk ÷ their easy pace [Wilson 2012, D-222].
@@ -2294,6 +2181,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   const isStrengthFocus = state.goal === 'get_stronger';
   // ⛔ THE FRAME EVERY SLOT QUESTION ON THIS SCREEN READS — see `frameOf`.
   const wizardFrame: FrameId = frameOf(state);
+  /** ⛔ THIS PLAN'S NAME, BUILD THIS PLAN? LINES AND FTP LINE — the server's (`builder.setup.plans`, 2026-09-13). */
+  const planCopy = state.goal === 'get_stronger' ? setupCopy?.plans[wizardFrame] ?? null : null;
   /**
    * ⛔⛔⛔ THE POSTURE THE SKIPPED SCREEN WOULD HAVE WRITTEN — and this is a BLOCKER FIX, not tidiness
    * (Michael, 2026-08-30). See `skipsSportScope` for the ruling and `STANDARD_FOCUS_POSTURE` for the
@@ -2332,103 +2221,17 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   }, [state.goal, state.focus, state.posture.run, state.posture.bike]);
   // ── THE STANDING PLAN'S ACCESSORY ANSWERS ────────────────────────────────────────────────────
   //
-  // ⛔ SEEDED PRE-FILLED, AND THAT IS THE POINT OF THE SCREEN (Michael, 2026-08-24): the picks open
-  // on the grid's own defaults and a zero-touch Continue builds a complete week. An empty shape here
-  // would make "did they answer?" the composer's problem again, which is the A1 defect's shape.
-  //
-  // ⚠️ THE EFFECT ONLY EVER SEEDS. It never re-runs over an athlete's own answers — equipment can
-  // change under it (they edit the Arc mid-wizard) and re-deriving would silently discard the picks.
-  // A pick the kit no longer reaches is caught by `normalizeViadaPrefs` at the wire, per slot.
-  const viadaPrefs = state.assistancePicks.viada ?? null;
-  useEffect(() => {
-    if (!isStrengthFocus || viadaPrefs) return;
-    setState((st) => (st.assistancePicks.viada ? st : {
+  // ⛔ ONLY WHAT THE ATHLETE CHANGED (2026-09-13, punch list "Default picks and per-plan wording move to the
+  // server"). The rows, options and defaults come from the server (`builder.setup.build_focus`); the build fills
+  // every row not changed here with the same default. Nothing is seeded on the phone.
+  const changedPicks: Partial<Record<ViadaPickKey, string>> = state.assistancePicks.viada?.picks ?? {};
+  const buildFocus = isStrengthFocus ? builder?.setup?.build_focus?.[wizardFrame] ?? null : null;
+  const setViadaPick = (key: ViadaPickKey, name: string) => setState((st) => {
+    const cur = st.assistancePicks.viada ?? { version: 1 as const, picks: {}, dial: [], dial_rows: {} };
+    return {
       ...st,
-      assistancePicks: {
-        ...st.assistancePicks,
-        viada: {
-          version: 1,
-          picks: defaultViadaPicks(strengthEquipment, [], wizardFrame),
-          dial: [],
-          dial_rows: {},
-        } as ViadaAccessoryPrefs,
-      },
-    }));
-    // ⚠️ `wizardFrame` IS A DEPENDENCY NOW (2026-08-30). The seed is drawn from the FRAME's own pick
-    // table and narrowed by the muscles that frame states, so a seed computed under one frame is the
-    // wrong week's answers — the same staleness `strengthEquipment` is here for.
-  }, [isStrengthFocus, viadaPrefs, strengthEquipment, wizardFrame]);
-  /**
-   * ⛔ THE EXTRA-ROW PICKERS — ONE PER CHIP THAT REACHES NO FRAME SLOT (Glutes, Core).
-   *
-   * For those two the extra rows are not a bonus, they ARE the mechanism: no cell in `strength_5k`
-   * offers a glute- or core-prime movement, which is exactly why the old focus chips for them could
-   * never fire. Chest, Shoulders and Arms need no picker — their re-pointing is visible in the
-   * picks below.
-   *
-   * ⚠️ NO DAY TAG, AND THAT IS A DECISION — see `DIAL_ROW_DAY_IS_THE_COMPOSERS`. Two
-   * projections of the day were built and both were wrong the moment two chips competed for the
-   * same room; reproducing the composer's placement means running the composer, which this file
-   * already rules out for the hard-day roles one screen over.
-   *
-   * ⚠️ ONE PICKER, NOT ONE PER ROW. How MANY rows a chip buys is the composer's answer too — it
-   * depends on what the muscle already gets — so the athlete names the movement and the engine uses
-   * it for the first row it places (`fillMuscleFloor`'s `prefer`), exactly as the core pick works.
-   */
-  /**
-   * ⛔ AND `core` IS EXCLUDED, THOUGH IT REACHES NO FRAME SLOT EITHER (Michael, 2026-08-24, from a
-   * device screenshot). It already has a control on this very screen — the "Core movement" pick —
-   * and a second core dropdown produced exactly what you would expect: the pick said one movement,
-   * the Dial row defaulted to another, and the built week carried BOTH. **A third core movement the
-   * athlete never asked for.**
-   *
-   * ⛔ SO THE CORE CHIP EXTENDS THE CORE PICK instead of naming its own movement. The pick already
-   * travels to `fillMuscleFloor`'s `prefer` through `flattenViadaPicks`, so the added rows open on
-   * it by construction; where the target needs a second row, `alreadyPrescribed` blocks a repeat and
-   * the next rep-based movement in the pool becomes the complement. One control, one muscle.
-   */
-  const dialRowChips = useMemo(
-    () => (viadaPrefs?.dial ?? []).filter((c) => !chipHasFrameSlot(c) && c !== 'core'),
-    [viadaPrefs],
-  );
-
-  /**
-   * ⛔ THE THREE WRITERS FOR THE STANDING PLAN'S BLOCK. Every one of them writes the WHOLE block,
-   * because a partially-updated `viada` is a shape the wire has to guess about.
-   */
-  const patchViada = (patch: Partial<ViadaAccessoryPrefs>) => setState((st) => {
-    const cur = st.assistancePicks.viada ?? {
-      version: 1 as const,
-      picks: defaultViadaPicks(strengthEquipment, [], wizardFrame),
-      dial: [] as DialChip[],
-      dial_rows: {},
+      assistancePicks: { ...st.assistancePicks, viada: { ...cur, picks: { ...(cur.picks ?? {}), [key]: name } } as ViadaAccessoryPrefs },
     };
-    return { ...st, assistancePicks: { ...st.assistancePicks, viada: { ...cur, ...patch } } };
-  });
-  /**
-   * ⛔ CHANGING THE CHIPS REBUILDS EVERY PICK, and it is the same ruling the Get Stronger screen
-   * already carries: the alternative needs a per-slot "did they choose this" flag, and a
-   * half-applied dial is worse than an honest one — the athlete taps Chest and reads picks that
-   * are mostly not chest.
-   * ⚠️ AND ROWS FOR A DROPPED CHIP ARE DROPPED WITH IT. A stored `glutes:1` under no glutes chip is
-   * a movement nothing will ever place.
-   */
-  const setViadaDial = (next: DialChip[]) => {
-    const rows = Object.fromEntries(
-      Object.entries(viadaPrefs?.dial_rows ?? {})
-        .filter(([k]) => next.some((c) => k.startsWith(`${c}:`))),
-    );
-    patchViada({
-      dial: next,
-      picks: defaultViadaPicks(strengthEquipment, next, wizardFrame),
-      dial_rows: rows,
-    });
-  };
-  const setViadaPick = (key: ViadaPickKey, name: string) => patchViada({
-    picks: { ...(viadaPrefs?.picks ?? defaultViadaPicks(strengthEquipment, viadaPrefs?.dial ?? [], wizardFrame)), [key]: name },
-  });
-  const setViadaRow = (key: string, name: string) => patchViada({
-    dial_rows: { ...(viadaPrefs?.dial_rows ?? {}), [key]: name },
   });
   const isRaceGoal = state.goal === 'marathon';
   /** The discipline the race develops. Everything else is held or parked (Michael, 2026-08-04). */
@@ -3968,7 +3771,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       : undefined;
     return assemblePayload(
       state, equipmentTier, canonMiles, canonLongRun, paceMinPerMile, canonElevM, unavailableDays,
-      touchedUnits,
+      touchedUnits, planCopy?.name,
     );
   };
 
@@ -4316,9 +4119,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                         should still say which discipline it is. */}
                     <Icon className="h-6 w-6 shrink-0 mt-0.5" style={{ color, opacity: live ? 1 : 0.4 }} />
                     <span className="min-w-0 block">
-                      <span className="block text-base">{TRAIN_COPY[t].label}</span>
+                      <span className="block text-base">{setupCopy?.sections[t].label}</span>
                       <span className={`block text-sm mt-1 leading-relaxed ${live ? 'text-white/70' : 'text-white/40'}`}>
-                        {TRAIN_COPY[t].blurb}
+                        {setupCopy?.sections[t].blurb}
                       </span>
                       {/* ⛔ WHAT IT REQUIRES, AT THE DOOR — see `STANDARD_FOCUS_REQUIREMENT`. One
                           line, under each card whose block refuses at the gate without it. */}
@@ -4347,14 +4150,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         <StepLayout
           step={stepNo('program')} totalSteps={steps.length}
           // ⛔ THE SECTION'S OWN WORD, from the table above (it was a Run/Ride ternary until Multisport joined).
-          title={eyeTitle(PROGRAM_SCREEN_TITLE[state.trainCard])}
+          title={eyeTitle(setupCopy?.sections[state.trainCard].list_title ?? '')}
           subtitle="Pick a program."
           onBack={back} onContinue={next} canContinue={state.program != null}
           hideContinue hideProgress
         >
           <div className="space-y-2">
             {PROGRAMS_BY_CARD[state.trainCard].map((p) => {
-              const { label, blurb, Icon, color, goal, focus, held, requirement } = PROGRAM_COPY[p];
+              const { Icon, color, goal, focus, held } = PROGRAM_COPY[p];
+              const words = setupCopy?.programs[p];
+              const label = words?.label;
+              const blurb = words?.blurb;
+              const requirement = words?.requirement;
               const live = goal != null && !held;
               return (
                 <button
@@ -4381,7 +4188,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                           carries; this block refuses at the gate without it. */}
                       {live ? (
                         <span className="block text-xs mt-1.5 leading-relaxed text-white/45">
-                          {requirement ?? (p === 'run_strength' ? RUN_STRENGTH_REQUIREMENT : STANDARD_FOCUS_REQUIREMENT)}
+                          {requirement}
                         </span>
                       ) : null}
                     </span>
@@ -5278,358 +5085,71 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       {currentStep === 'accessory' && isStrengthFocus && (
         <StepLayout
           step={stepNo('accessory')} totalSteps={steps.length} title={eyeTitle('Build focus')}
-          // ⛔ MICHAEL'S WORDING, VERBATIM (2026-08-24). It replaced "The programme owns the slots.
-          // You pick what fills them." — true, and it taught the athlete a word out of the engine's
-          // vocabulary in the first sentence of the screen. ⛔ THE WORD "SLOT" IS NOT TO APPEAR
-          // ANYWHERE ATHLETE-FACING ON THIS SCREEN; `dial-copy.ts` carries the rule and the reason.
-          subtitle={ACCESSORY_SUBTITLE}
+          // ⛔ THE SCREEN'S WORDS, ROWS, OPTIONS AND DEFAULTS ARE THE SERVER'S (2026-09-13, punch list "Default picks and
+          // per-plan wording move to the server") — `builder.setup.build_focus`, for this plan and the athlete's kit.
+          subtitle={buildFocus?.subtitle}
           onBack={back} onContinue={next} canContinue
         >
-          <div className="space-y-4">
-            {/* ── DIAL ─────────────────────────────────────────────────────────────────────
-                ⛔ THE WORD IS THE DECISION, AND IT IS NOT "FOCUS" (Michael, 2026-08-24). It was
-                built as "Aesthetics" and renamed before the first commit — working title only, no
-                row ever persisted, so `dial` is the only spelling in storage. What these chips do is
-                not what a focus chip did: a focus chip re-pointed which movement filled a cell, this
-                moves VOLUME. One word, one idea.
-                ⚠️ THE SUPPORTING LINE IS MICHAEL'S WORDING, VERBATIM, AND IT TRIPS THE VOICE LINT ON
-                `focus` — shipped anyway on the same standing override already on record for "Speed
-                focus" / "VO2 max focus". It is pinned in `strength-focus-copy.voice.test.ts` as an
-                EXPECTED violation, so a future edit of it fails the gate rather than sliding through.
-                ⛔ Do not reword it to satisfy the lint. The collision the rename fixed is with the
-                endurance screens' focus CONTROL; a verb in a supporting line is not that control.
-                ⛔ CAP TWO, AND THE SCREEN SAYS WHY IN ITS OWN LINE. The upper days already carry
-                seven to nine counted work sets and p086's ceiling is the binding constraint. */}
-            {/* ⛔⛔ THE DIAL IS OFF THE SCREEN — HIDDEN, NOT DELETED (Michael, 2026-08-26: "pills go
-                away", and earlier "I think we couch the pills FOR NOW, get the plan closest to his
-                working"). "For now" is his word, so `DIAL_CONTROL_VISIBLE` is a one-line switch and
-                the engine below it stays wired and tested.
-
-                ⛔ WHY IT WAS NOT EARNING ITS PLACE, so it is not re-derived. Every chip raises a
-                WEEKLY SET TARGET for a muscle. Chest, Shoulders and Arms already have rows on this
-                screen, so their extra sets land on an existing row and nothing visibly happens;
-                Glutes had no row, so filling its target CREATED one. Same mechanism, two different
-                screens — which read as "glutes works, core is broken" when both were doing exactly
-                the same thing. Michael's call is to take the CONTROL off rather than fix the
-                display for now.
-
-                ⚠️ NOTHING ELSE HAD TO CHANGE, and that is measured rather than assumed: the wizard
-                opens with `dial: []` (see `patchViada`'s default), so with no control the value
-                stays empty and the composer's dial paths are simply never entered. The chip-row
-                block below self-hides on `dialRowChips.length > 0`, which is false on an empty dial.
-                There is no stored dial from a previous block to strand. */}
-            {DIAL_CONTROL_VISIBLE && (
-            <div>
-              {/* ⛔ SECTION-TITLE WEIGHT, NOT LABEL WEIGHT (Michael, from device screenshots
-                  2026-08-24). At `text-sm` it read as a field label sitting above some chips rather
-                  than as the screen's second section, and the chip row below it looked orphaned.
-                  It sits one step under `StepLayout`'s own `text-[1.3rem]` title, and its sub-line
-                  takes the same treatment StepLayout gives a subtitle — so "Dial" reads as a
-                  section WITH a subtitle, which is what it is. */}
-              <div className="flex items-baseline justify-between gap-2">
-                <h3 className="text-white text-[17px] font-semibold leading-snug tracking-tight">Dial</h3>
-                <span className="text-white/50 text-xs shrink-0">
-                  {(viadaPrefs?.dial ?? []).length}/{DIAL_CAP}
-                </span>
-              </div>
-              <p className="mt-1 mb-3 text-[15px] text-white/55 leading-relaxed">
-                {DIAL_SUBLINE}
-              </p>
-              {/* Same 3-column grid as the Get Stronger chips, and for the measured reason recorded
-                  there: five chips in a flex-wrap orphan the fifth on its own line. */}
-              <div className="grid grid-cols-3 gap-2">
-                <GalaxyButton
-                  shape="chip"
-                  variant={(viadaPrefs?.dial ?? []).length === 0 ? 'primary' : 'secondary'}
-                  onClick={() => setViadaDial([])}
-                >Balanced</GalaxyButton>
-                {DIAL_CHIPS.map((chip) => {
-                  const on = (viadaPrefs?.dial ?? []).includes(chip);
-                  const atCap = !on && (viadaPrefs?.dial ?? []).length >= DIAL_CAP;
-                  return (
-                    <GalaxyButton
-                      key={chip}
-                      shape="chip"
-                      variant={on ? 'primary' : 'secondary'}
-                      disabled={atCap}
-                      onClick={() => setViadaDial(on
-                        ? (viadaPrefs?.dial ?? []).filter((c) => c !== chip)
-                        : [...(viadaPrefs?.dial ?? []), chip].slice(0, DIAL_CAP))}
-                    >{DIAL_LABEL[chip]}</GalaxyButton>
-                  );
-                })}
-              </div>
-              {/* ⛔ ONE LINE PER ACTIVE CHIP. TWO CHIPS = TWO ONE-LINERS, NEVER TWO PARAGRAPHS
-                  (Michael, from device screenshots 2026-08-24). The shape is fixed in `dialChipLine`
-                  so every chip reads the same; the copy rule that governs it — one line inline, any
-                  deeper explanation behind an (i) that is NOT built yet — is on `dial-copy.ts`.
-                  ⚠️ The named movement is the athlete's own pick from the row below, so the line
-                  says "extra Hip Thrust sets" rather than "extra sets". */}
-              {(viadaPrefs?.dial ?? []).map((chip) => (
-                <p key={chip} className="text-white/65 text-[13px] mt-2 leading-relaxed">
-                  {dialChipLine(chip, {
-                    equipment: strengthEquipment,
-                    // ⛔ CORE READS THE "Core movement" PICK, not a row of its own — it has no row
-                    // picker any more, and the line must name what the athlete actually chose.
-                    movement: chip === 'core'
-                      ? (viadaPrefs?.picks?.core ?? null)
-                      : (viadaPrefs?.dial_rows?.[dialRowKey(chip, 0)] ?? null),
-                  })}
-                </p>
-              ))}
-              {(viadaPrefs?.dial ?? []).length >= DIAL_CAP && (
-                <p className="text-white/45 text-[13px] mt-2 leading-relaxed">{DIAL_CAP_NOTE}</p>
-              )}
-            </div>
-            )}
-
-            {/* ── THE ROWS A CHIP ADDS ───────────────────────────────────────────────────────────
-                ⛔ ONLY FOR THE CHIPS THAT REACH NO SLOT — Glutes and Core. For those two the extra
-                rows are not a bonus, they ARE the mechanism, so the athlete names the movement
-                rather than being handed one. Chest, Shoulders and Arms are already visible in the
-                picks below, which is where their re-pointing shows up. */}
-            {dialRowChips.length > 0 && (
+          {buildFocus ? (
+            <div className="space-y-4">
               <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 space-y-3">
-                {dialRowChips.map((chip) => {
-                  const opts = dialRowOptions(chip, strengthEquipment);
-                  const key = dialRowKey(chip, 0);
-                  const value = viadaPrefs?.dial_rows?.[key] ?? opts[0]?.name ?? '';
+                {buildFocus.groups.map((g) => {
+                  const chosenDisplay = (key: ViadaPickKey): string => {
+                    const row = buildFocus.groups.flatMap((x) => x.rows).find((r) => r.key === key);
+                    const name = changedPicks[key] ?? row?.default ?? '';
+                    return (row?.options.find((o) => o.name === name)?.display ?? name).toLowerCase();
+                  };
+                  const carried = g.carried
+                    ? (() => {
+                      const names = g.carried.keys.map(chosenDisplay);
+                      const list = names.length === 1
+                        ? names[0]
+                        : `${names.slice(0, -1).join(buildFocus.list_join)}${buildFocus.list_last_join}${names[names.length - 1]}`;
+                      return buildFocus.carried_line
+                        .replace('{movements}', list)
+                        .replace('{superset}', g.carried.superset ? buildFocus.superset_word : '')
+                        .replace('{from}', String(g.carried.from));
+                    })()
+                    : null;
                   return (
-                    <div key={key}>
-                      <div className="flex items-baseline justify-between gap-2 mb-1">
-                        <span className="text-white/85 text-sm">
-                          {DIAL_OWNERSHIP[chip]} focus
-                        </span>
-                        <span className="text-white/45 text-xs">3 &times; 8&ndash;10, by feel</span>
+                    <div key={g.heading} className="space-y-3">
+                      <div className="text-white/45 text-xs pt-1">
+                        <span className="tabular-nums">{g.heading}</span>
+                        {g.theme ? <span className="text-white/35">{` · ${g.theme}`}</span> : null}
                       </div>
-                      <select
-                        value={value}
-                        onChange={(e) => setViadaRow(key, e.target.value)}
-                        className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
-                        style={{ fontSize: '16px' }}
-                        aria-label={`${DIAL_OWNERSHIP[chip]} focus movement`}
-                      >
-                        {opts.map((o) => (
-                          <option key={o.name} value={o.name} className="bg-neutral-900">{pickOptionLabel(o)}</option>
-                        ))}
-                      </select>
+                      {g.rows.map((row) => (
+                        <div key={row.key}>
+                          <div className="flex items-baseline justify-between gap-2 mb-1">
+                            <span className="text-white/85 text-sm">
+                              {row.label}
+                              {row.superset ? <span className="text-white/40"> · {row.superset}</span> : null}
+                            </span>
+                            <span className="text-white/45 text-xs">{row.also}</span>
+                          </div>
+                          <select
+                            value={changedPicks[row.key] ?? row.default}
+                            onChange={(e) => setViadaPick(row.key, e.target.value)}
+                            className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
+                            style={{ fontSize: '16px' }}
+                            aria-label={`${row.label} movement`}
+                          >
+                            {row.options.map((o) => (
+                              <option key={o.name} value={o.name} className="bg-neutral-900">{o.label}</option>
+                            ))}
+                          </select>
+                          {row.row_note ? (
+                            <p className="text-white/40 text-xs mt-1 leading-snug">{row.row_note}</p>
+                          ) : null}
+                        </div>
+                      ))}
+                      {carried ? <p className="text-white/85 text-[13px] leading-snug">{carried}</p> : null}
                     </div>
                   );
                 })}
-                {/* ⛔ THE DAY IS THE COMPOSER'S ANSWER, NOT THIS SCREEN'S. Said once, under the rows
-                    it is about, rather than guessed at per row. */}
-                <p className="text-white/45 text-xs leading-relaxed">
-                  {DIAL_ROW_DAY_IS_THE_COMPOSERS}
-                </p>
               </div>
-            )}
-
-            {/* ── THE SEVEN ──────────────────────────────────────────────────────────────────────
-                ⛔⛔ THE TAGS ARE HIS DAY NUMBERS, NOT WEEKDAYS (Michael, 2026-08-26: "1-2 4 and 5
-                and put them in order"). They read monday / tuesday / thursday / friday until then,
-                and that was the screen stating something it does not know: the athlete has not
-                chosen days at this point and the plan places them one screen later. `daysForPick`
-                still exists and is still right for a surface that HAS the calendar.
-                ⚠️ AND THE NUMBERS ARE HIS, OFF p246 — the lifting days sit at 1, 2, 4 and 5 of a
-                seven-day week, with day 3 and the weekend endurance-only. Renumbering them 1-4 would
-                be ours and would break the correspondence with his own table.
-                ⛔ THE ROWS ARE SORTED INTO THAT ORDER, AND ON THE RESOLVED DAY. `VIADA_PICK_KEYS` is
-                TABLE order, which groups the two pull rows and the two leg rows together and so
-                interleaves the days (4, 1, 1, 4, 2, 5, 5). ⚠️ Only four picks declare a `frameDay`;
-                the other three take whatever day their cell falls on, so `pickKeysInDayOrder` reads
-                the FRAME rather than the spec field — sorting on the field would leave those three
-                unsorted at the front.
-                ⚠️ ISOLATION PULL AND LEG ACCESSORY EACH RENDER TWICE — two rows apiece, one per day.
-                The frame carries both cells twice and each occurrence has its own pick, so the two
-                rows share a label and are told apart by the day tag beside them. This list is driven
-                off the same key table, so a table split shows up here with no change to this file. */}
-            <div className="rounded-xl border border-white/12 bg-white/[0.03] p-3 space-y-3">
-              {/* ⛔⛔⛔ THE FRAME IS PASSED, AND BEFORE THIS IT WAS NOT (Michael, 2026-08-30). Both
-                  calls here defaulted to `strength_5k`, so **p246's nine controls rendered over a
-                  p274 week and five of them were dead** — Hinge variation, both Leg variations,
-                  Press variation and Core. Every option on each was swept through `composeWeek` and
-                  none landed. §7 trap one, on a shipped screen: one frame's answer indexed by
-                  another frame's rows.
-                  ⛔ `picksForFrame` IS THE COMPOSER'S OWN REACHABILITY RULE, not a hand-kept list —
-                  a pick is drawn when the frame carries an HYP accessory cell it can fill. See its
-                  note for why p274 has none for four of them and none at all for Core.
-                  ⚠️ D-457: no frame argument may default on a shared surface. */}
-              {/* ⛔ GROUPED BY LIFTING DAY (Michael, 2026-09-11: "organize by days"). The rows read
-                  by row type — Machine press, Push isolation, … — with the day as a tag on the right,
-                  and he could not tell what a day was. Each group opens with the day's own line from
-                  the frame (`Day 1 · push day (upper)`, the same words the endurance step prints); a
-                  row that serves a second day says "also day 5" on the right. The rows and their
-                  order are unchanged; only the headings are new. */}
-              {((drawn: ViadaPickKey[]) => {
-                const firstDayOf = (k: ViadaPickKey): number | null => {
-                  const d = frameDaysForPick(k, wizardFrame);
-                  return d.length > 0 ? Math.min(...d) : null;
-                };
-                const themeOf = (d: number): string | null =>
-                  (FRAMES[wizardFrame]?.columns?.standard ?? []).find((x) => x.day === d)?.themeTag ?? null;
-                const groups = new Map<number | null, ViadaPickKey[]>();
-                for (const k of drawn) {
-                  const d = firstDayOf(k);
-                  if (!groups.has(d)) groups.set(d, []);
-                  groups.get(d)!.push(k);
-                }
-                const renderRow = (key: ViadaPickKey) => {
-                const spec = VIADA_PICKS[key];
-                /**
-                 * ⛔⛔ THE SUPERSET IS NAMED ONLY WHEN ITS PARTNER IS ON THE SCREEN (caught on the
-                 * rendered page, 2026-08-30). p274 prints the braced pair as one row, but the leg
-                 * press half is machine work (p221) and an athlete without machines does not get a
-                 * control for it — so *"Back extension · superset with the leg press"* rendered over
-                 * a leg press picker that was not there. **The same defect as the orphaned core note,
-                 * one screen later: copy outliving the control it describes.**
-                 * ⚠️ THE SESSION STILL SUPERSETS — the composer fills that cell by substitution. What
-                 * the athlete has no say over, the screen does not talk about.
-                 */
-                const pairDrawn = spec.pairedWith != null && drawn.includes(spec.pairedWith);
-                /**
-                 * ⛔ THE FRAME'S OWN MUSCLE FOR THIS CELL — see `StrengthSlot.muscle`. p274 names
-                 * `focused quadriceps` where p246 names the category, and p223's list for that
-                 * category spans quads, glutes, calves and hip flexors. Without this the quadriceps
-                 * dropdown offered a seated calf raise and defaulted to it on any kit without a
-                 * leg-extension machine, which is what reached Michael's screen.
-                 * ⚠️ THE COMPOSER NARROWS ON THE SAME FIELD, so the dropdown and the built week
-                 * cannot disagree about what the row is for.
-                 */
-                /**
-                 * ⛔⛔ THE ADMITTED MOVEMENTS TRAVEL TOO — FOUND 2026-08-31, AND IT WAS ALWAYS BROKEN
-                 * HERE. `frameAdmitsForPick` is p223's named exception: the source files the hip
-                 * thrust under its hamstring heading, so a hamstring cell admits it even though the
-                 * app attributes it to the glutes. The COMPOSER has honoured that since the exception
-                 * was written; **this screen never passed the argument at all**, so the picker
-                 * narrowed the cell by muscle and then dropped every movement the exception exists to
-                 * let back in.
-                 * ⚠️ IT SURFACED WHEN THE REVERSE HYPER WAS RETAGGED TO THE GLUTES: that cell fell to
-                 * a single option, which is the shape of a control that cannot be wrong. The retag is
-                 * correct and it did not cause this — it removed the movement that was hiding it.
-                 */
-                const opts = pickOptions(
-                  key, strengthEquipment,
-                  frameMuscleForPick(key, wizardFrame), frameAdmitsForPick(key, wizardFrame),
-                );
-                const value = viadaPrefs?.picks?.[key] ?? opts[0]?.name ?? '';
-                // ⛔ ONE QUESTION ASKED ONCE PER ROW, so half a row cannot end up marked.
-                const rowAllSubs = allSubstituted(opts);
-                return (
-                  <div key={key}>
-                    <div className="flex items-baseline justify-between gap-2 mb-1">
-                      <span className="text-white/85 text-sm">
-                        {spec.label}
-                        {/* ⛔⛔ THE SUPERSET THE PAGE PRINTS, NAMED ON BOTH HALVES (p274, 2026-08-30).
-                            The week's lower days carry *"2 × HYP: braced hinge / braced lower push
-                            superset"* — ONE printed row, two movements. Nothing in the app pairs
-                            exercises yet (`frames.ts`, DESIGN §5), so without this the athlete meets
-                            two unrelated dropdowns for a row the book writes as a pair.
-                            ⚠️ It is the SPEC's sentence, not the screen's — `superset` on the pick. */}
-                        {spec.superset && pairDrawn ? (
-                          <span className="text-white/40"> · {spec.superset}</span>
-                        ) : null}
-                      </span>
-                      <span className="text-white/45 text-xs">
-                        {/* ⛔ THE FRAME'S OWN DAYS. Unpassed, this read p246's: it printed "day 1"
-                            for Push isolation where p274 carries that cell on day 1 AND day 4, and
-                            "day 4" for a pick p274 resolves to no day at all.
-                            ⚠️ THE FIRST DAY IS THE GROUP'S HEADING NOW; only a second day is said here. */}
-                        {(() => {
-                          const days = frameDaysForPick(key, wizardFrame);
-                          if (days.length === 0) return 'fills the week\u2019s core minimum';
-                          const first = Math.min(...days);
-                          const rest = days.filter((d) => d !== first);
-                          return rest.length > 0 ? `also ${rest.map((d) => `day ${d}`).join(' · ')}` : null;
-                        })()}
-                      </span>
-                    </div>
-                    <select
-                      value={value}
-                      onChange={(e) => setViadaPick(key, e.target.value)}
-                      className="w-full py-2 px-3 rounded-xl text-sm bg-white/[0.06] border border-white/12 text-white appearance-none"
-                      style={{ fontSize: '16px' }}
-                      aria-label={`${spec.label} movement`}
-                    >
-                      {opts.map((o) => (
-                        <option key={o.name} value={o.name} className="bg-neutral-900">
-                          {pickOptionLabelInRow(o, rowAllSubs)}
-                        </option>
-                      ))}
-                    </select>
-                    {/* ⛔ THE REASON, ONCE, UNDER THE ROW IT IS ABOUT — see `allSubstituted`. Nine
-                        options each ending "- for your gear" is the same sentence nine times, and a
-                        mark that is on everything marks nothing. */}
-                    {rowAllSubs ? (
-                      <p className="text-white/40 text-xs mt-1 leading-snug">{ROW_IS_ALL_SUBSTITUTES}</p>
-                    ) : null}
-                  </div>
-                );
-                };
-                /**
-                 * ⛔ A DAY SAYS WHAT IT CARRIES FROM ANOTHER DAY (Michael, 2026-09-11: "let's clarify").
-                 * The superset pair is listed once, under day 2, so day 5 showed one row where the page
-                 * prints three. One line under the heading names the rows that serve it from elsewhere:
-                 * "Plus the back extension and leg press superset from day 2." (his yes, verbatim shape).
-                 */
-                const carriedLine = (d: number): string | null => {
-                  const carried = drawn.filter((k) => {
-                    const days = frameDaysForPick(k, wizardFrame);
-                    return days.includes(d) && Math.min(...days) !== d;
-                  });
-                  if (carried.length === 0) return null;
-                  const from = Math.min(...frameDaysForPick(carried[0], wizardFrame));
-                  // ⛔ THE MOVEMENTS THE PLAN BUILT, NOT THE PAGE'S ROW NAMES (Michael, 2026-09-11: the line said
-                  // "back extension and leg press" while his week built the weighted reverse hyper and the front
-                  // squat). Same resolution as the row's own dropdown: the athlete's pick, else the first option.
-                  const names = carried.map((k) => {
-                    const rowOpts = pickOptions(
-                      k, strengthEquipment,
-                      frameMuscleForPick(k, wizardFrame), frameAdmitsForPick(k, wizardFrame),
-                    );
-                    const chosen = viadaPrefs?.picks?.[k] ?? rowOpts[0]?.name ?? '';
-                    const display = rowOpts.find((o) => o.name === chosen)?.display ?? chosen;
-                    return (display || VIADA_PICKS[k].label).toLowerCase();
-                  });
-                  const paired = carried.length === 2 && VIADA_PICKS[carried[0]].pairedWith === carried[1];
-                  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-                  return `Plus the ${list}${paired ? ' superset' : ''} from day ${from}.`;
-                };
-                return [...groups.entries()].map(([d, keys]) => (
-                  <div key={String(d)} className="space-y-3">
-                    <div className="text-white/45 text-xs pt-1">
-                      {d != null ? (
-                        <>
-                          <span className="tabular-nums">{`Day ${d}`}</span>
-                          {themeOf(d) ? <span className="text-white/35">{` · ${themeOf(d)}`}</span> : null}
-                        </>
-                      ) : 'Core'}
-                    </div>
-                    {keys.map(renderRow)}
-                    {d != null && carriedLine(d) ? (
-                      <p className="text-white/85 text-[13px] leading-snug">{carriedLine(d)}</p>
-                    ) : null}
-                  </div>
-                ));
-              })(picksForFrame(wizardFrame, strengthEquipment).filter((k) => !String(k).startsWith('core')))}
-              {/* ⛔ ONE LINE, UNDER THE FIELD IT IS ABOUT. What stood here named the source, the
-                  missing core slot and "the four movement patterns" — sourcing talk and engine
-                  vocabulary, under a dropdown.
-                  ⚠️⚠️ AND IT GOES WHERE THE FIELD GOES (2026-08-30, caught on the rendered page). The
-                  Core picker is not drawn on a frame that cannot honour it, and this line was left
-                  behind explaining a control that is no longer there — *"This pick is the movement
-                  your weekly core work uses"* under four pickers, none of them core. **A note is not
-                  a note when its subject is gone; it is a claim about a control the athlete cannot
-                  find.** It reads the same list the pickers do, so the two cannot come apart. */}
-              {/* 2026-09-08: the plan places no core picks (the page prints none), so the pickers and this note are gone. */}
+              <p className="text-white/70 text-sm leading-relaxed">{buildFocus.dose_line}</p>
             </div>
-
-            {/* ⛔ IT SAID "sets of 6-12" WHILE THE ROWS ON THIS SAME SCREEN SAID "3 x 8-10"
-                (Michael, from device screenshots 2026-08-24). Two dose claims one scroll apart, and
-                the rows were the right one — p086 prescribes 3 x 8-10 at 1-2 RIR. Kept rather than
-                deleted because the rows print their dose only for the Glutes and Core extra rows,
-                so this is the only place the seven picks' own dose is stated. */}
-            <p className="text-white/70 text-sm leading-relaxed">{ACCESSORY_DOSE_LINE}</p>
-          </div>
+          ) : null}
         </StepLayout>
       )}
 
@@ -6075,7 +5595,6 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           blockedReason={tintedReason(longRunAnswered ? undefined : 'The long run has no length yet.')}
         >
           <RunStrengthWeekCard
-            frame={wizardFrame}
             readout={runStrengthWeek}
             slotMinutes={state.slotMinutes}
             onSlotMinutes={(key, minutes) => setState((st) => ({
@@ -6096,8 +5615,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           canContinue
         >
           <RideStrengthWeekCard
-            frame={wizardFrame}
-            rideCount={state.rideCount ?? 5}
+            readout={intakeFresh?.ride_strength_week ?? readout?.intake?.ride_strength_week ?? null}
+            rideCount={state.rideCount ?? (intakeFresh?.ride_strength_week ?? readout?.intake?.ride_strength_week)?.default_count ?? 0}
             onRideCount={(n) => setState((st) => ({ ...st, rideCount: n }))}
           />
         </StepLayout>
@@ -7674,8 +7193,8 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             ? FRAMES[wizardFrame].testedLifts : undefined}
           /* ⛔ APPROVED (Michael, 2026-09-13), on the step where FTP is confirmed, for a plan whose
              endurance is rides only (`Frame.enduranceSports`). */
-          ftpNote={isStrengthFocus && FRAMES[wizardFrame]?.enduranceSports.every((sp) => sp === 'ride')
-            ? RIDE_BREAK_FTP_LINE : null}
+          ftpNote={isStrengthFocus ? planCopy?.ftp_note ?? null : null}
+          copy={setupCopy?.numbers ?? null}
           choice={state.numbersChoice ?? {}}
           onChoice={(next) => setState((st) => ({ ...st, numbersChoice: next }))}
           onBack={back}
@@ -7694,9 +7213,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                screen, and no longer true — the block is the Standing Plan engine, not the previous program. */
             // ⛔ A PLAN THAT DECLARES ITS OWN DESCRIPTION (`Frame.confirmLine`: Ride + Strength, Run + Ride + Strength,
             // Michael 2026-09-13) reads "<name>, N weeks."; Run + Strength keeps its two older lines.
-            : (isStrengthFocus && FRAMES[wizardFrame]?.confirmLine)
-              ? `${programmeName(state)}, ${state.targetWeeks} weeks.`
-              : `${programmeName(state)} — ${state.targetWeeks} weeks. Strength leads; your endurance holds.`}
+            // ⛔ THE STRENGTH PLANS' LINES ARE THE SERVER'S (`builder.setup.plans`, 2026-09-13).
+            : isStrengthFocus
+              ? (planCopy ? planCopy.confirm_title.replace('{name}', planCopy.name).replace('{weeks}', String(state.targetWeeks)) : undefined)
+              : `${GOAL_LABELS[state.goal!]} — ${state.targetWeeks} weeks. Strength leads; your endurance holds.`}
           onBack={back} onContinue={handleConfirm} canContinue={!saving}
           continueLabel={saving ? 'Building…' : 'Build plan'} saving={saving}
         >
@@ -7860,16 +7380,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     on a close race. "About" is doing real work in this sentence. */
                 <>Running leads to {state.raceDistance.toLowerCase()} day, about {planWeeks ?? '—'} weeks
                 out, with a taper into the race. Everything you kept is held underneath it.</>
-              ) : (isStrengthFocus && FRAMES[wizardFrame]?.confirmLine) ? (
-                /* ⛔ THE PLAN'S OWN APPROVED DESCRIPTION — `Frame.confirmLine`. */
-                <>{FRAMES[wizardFrame].confirmLine!(state.targetWeeks)}</>
               ) : isStrengthFocus ? (
-                /* ⛔ "every third week" was false — the open set exists ONLY in the anchor cycle
-                   (`wendler-531.ts:61`: amrap = anchor && !deload && last set), so weeks 9-11 of
-                   twelve. Weeks 1-8 are plain fives with nothing to measure. Same correction as
-                   `strengthFocusBufferLine`; the two must not drift, because the athlete reads both. */
-                <>A {state.targetWeeks}-week block. Two cycles build, the third measures — the last
-                set of that cycle is the test, so there is no separate retest week.</>
+                /* ⛔ THE PLAN'S OWN DESCRIPTION — the server's (`builder.setup.plans`, 2026-09-13). */
+                <>{planCopy?.confirm_line.replace(/\{weeks\}/g, String(state.targetWeeks))}</>
               ) : (
                 <>{state.targetWeeks === 8 || state.targetWeeks === 11 || state.targetWeeks === 18 ? 'An' : 'A'} {state.targetWeeks}-week
                 block from your current fitness (≈ {hoursForTier(state.commitment)} h/wk),

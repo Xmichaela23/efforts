@@ -37,6 +37,9 @@ import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { resolveCurrentRunThresholdPace } from '@/lib/resolve-current-run-pace';
 import type { IntakeReadout } from '@/lib/intake-readout-types';
 
+/** ⛔ THE SCREEN'S WORDS, FROM THE SERVER (`builder.setup.numbers`, 2026-09-13). None are kept here. */
+export type NumbersCopy = IntakeReadout['setup']['numbers'];
+
 export type NumbersChoiceKey = 'strength' | 'ftp' | 'run';
 export type NumbersChoice = Partial<Record<NumbersChoiceKey, 'use' | 'test'>>;
 
@@ -47,13 +50,13 @@ export type BaselinesRowLike = {
   units?: string | null;
 } | null;
 
-/** Same rows, same keys, same order as Training Baselines' 1RM block. */
+/** Same rows, same keys, same order as Training Baselines' 1RM block. The labels are the server's (`copy.lift_labels`). */
 export const LIFT_FIELDS = [
-  { key: 'squat', label: 'Squat', reps: false },
-  { key: 'bench', label: 'Bench', reps: false },
-  { key: 'deadlift', label: 'Deadlift', reps: false },
-  { key: 'overheadPress1RM', label: 'OHP', reps: false },
-  { key: 'pullupMaxReps', label: 'Pull-ups', reps: true },
+  { key: 'squat', reps: false },
+  { key: 'bench', reps: false },
+  { key: 'deadlift', reps: false },
+  { key: 'overheadPress1RM', reps: false },
+  { key: 'pullupMaxReps', reps: true },
 ] as const;
 export type LiftKey = (typeof LIFT_FIELDS)[number]['key'];
 
@@ -69,27 +72,27 @@ export type NumbersInclude = { strength: boolean; run: boolean; bike: boolean; s
 
 /** Hoisted out of the step so React keeps the same element between renders — an inline component would
  *  remount on every keystroke and drop focus after one character. */
-function Toggle({ k, value, canUse, onSet, useLabel = 'Use current', testLabel = 'Retest in week one' }: {
-  k: NumbersChoiceKey; value: 'use' | 'test'; canUse: boolean; onSet: (k: NumbersChoiceKey, v: 'use' | 'test') => void; useLabel?: string; testLabel?: string;
+function Toggle({ k, value, canUse, onSet, copy }: {
+  k: NumbersChoiceKey; value: 'use' | 'test'; canUse: boolean; onSet: (k: NumbersChoiceKey, v: 'use' | 'test') => void; copy: NumbersCopy;
 }) {
   return (
     <div className="flex gap-2 shrink-0" role="group">
       {canUse && (
         <button type="button" onClick={() => onSet(k, 'use')}
           className={`px-3 py-1.5 rounded-lg border text-[13px] ${value === 'use' ? 'border-white/70 bg-white/[0.10] text-white' : 'border-white/15 text-white/60'}`}>
-          {useLabel}
+          {copy.use_current}
         </button>
       )}
       <button type="button" onClick={() => onSet(k, 'test')}
         className={`px-3 py-1.5 rounded-lg border text-[13px] ${value === 'test' ? 'border-white/70 bg-white/[0.10] text-white' : 'border-white/15 text-white/60'}`}>
-        {canUse ? testLabel : 'Test in week one'}
+        {canUse ? copy.retest : copy.test}
       </button>
     </div>
   );
 }
 
 export function KnowYourNumbersStep({
-  step, totalSteps, row, strength, include, choice, onChoice, onBack, onContinue, testedLifts, ftpNote,
+  step, totalSteps, row, strength, include, choice, onChoice, onBack, onContinue, testedLifts, ftpNote, copy,
 }: {
   step: number; totalSteps: number;
   row: BaselinesRowLike;
@@ -108,6 +111,8 @@ export function KnowYourNumbersStep({
   testedLifts?: string[];
   /** One line under the FTP row, for the plan that asks for it. Null or absent = none. */
   ftpNote?: string | null;
+  /** The screen's words (`builder.setup.numbers`). Until they arrive the screen shows no rows. */
+  copy: NumbersCopy | null;
 }) {
   const metric = String(row?.units ?? '').toLowerCase() === 'metric';
   const pn = (row?.performance_numbers ?? {}) as Record<string, unknown>;
@@ -164,53 +169,58 @@ export function KnowYourNumbersStep({
     </div>
   );
 
+  if (!copy) {
+    return <StepLayout step={step} totalSteps={totalSteps} title="" onBack={onBack} onContinue={onContinue} canContinue>{null}</StepLayout>;
+  }
+  const fillIn = (t: string, v: Record<string, string | number>) => t.replace(/\{(\w+)\}/g, (_, key) => String(v[key] ?? ''));
+  const untested = barbell.filter((l) => !l.onFile).map((l) => copy.lift_labels[l.f.key]);
   return (
-    <StepLayout step={step} totalSteps={totalSteps} title="Know your numbers?" onBack={onBack} onContinue={onContinue} canContinue continueLabel="Continue">
+    <StepLayout step={step} totalSteps={totalSteps} title={copy.title} onBack={onBack} onContinue={onContinue} canContinue continueLabel={copy.continue}>
       <p className="text-white/70 text-sm mb-4">
-        Optional. Keep what is on file or test in week one. Numbers are typed on Profile, not here.
+        {copy.intro}
       </p>
       <div className="flex flex-col gap-3">
         {include.strength && strength && rowShell(
-          'Strength',
+          copy.strength_title,
           strengthAny
             ? (
               <>
-                {lifts.filter((l) => l.onFile).map((l) => `${l.f.label} ${l.onFile!.value}${l.f.reps ? ' reps' : ''}`).join(' · ')}
-                {' '}<span className="text-white/40">· {lifts.some((l) => l.onFile?.source === 'learned') ? 'from your logged sets' : 'typed in Baselines'}</span>
-                {strengthChoice === 'use' && strengthComplete && <div className="text-white/50 mt-1">The block uses these; no test week.</div>}
-                {strengthChoice === 'use' && !strengthComplete && <div className="text-white/50 mt-1">The block uses these; {barbell.filter((l) => !l.onFile).map((l) => l.f.label).join(' and ')} {barbell.filter((l) => !l.onFile).length === 1 ? 'is' : 'are'} tested in week one.</div>}
-                {strengthChoice === 'test' && <div className="text-white/50 mt-1">Week one is the test week (p215). The number on file stays until the test replaces it.</div>}
+                {lifts.filter((l) => l.onFile).map((l) => `${copy.lift_labels[l.f.key]} ${l.onFile!.value}${l.f.reps ? copy.reps_suffix : ''}`).join(' · ')}
+                {' '}<span className="text-white/40">· {lifts.some((l) => l.onFile?.source === 'learned') ? copy.source_learned_lifts : copy.source_typed}</span>
+                {strengthChoice === 'use' && strengthComplete && <div className="text-white/50 mt-1">{copy.strength_use_complete}</div>}
+                {strengthChoice === 'use' && !strengthComplete && <div className="text-white/50 mt-1">{fillIn(copy.strength_use_partial, { lifts: untested.join(copy.lift_list_join), verb: untested.length === 1 ? copy.verb_one : copy.verb_many })}</div>}
+                {strengthChoice === 'test' && <div className="text-white/50 mt-1">{copy.strength_test}</div>}
               </>
             )
-            : 'Nothing on file. Every lift is tested in week one (p215). Numbers can be typed on Profile.',
-          <Toggle k="strength" value={strengthChoice} canUse={strengthAny} onSet={set} />,
+            : copy.strength_none,
+          <Toggle k="strength" value={strengthChoice} canUse={strengthAny} onSet={set} copy={copy} />,
         )}
         {include.bike && rowShell(
-          'FTP',
+          copy.ftp_title,
           <>
             {ftp.value != null
-              ? <>{Math.round(ftp.value)} W <span className="text-white/40">· {ftp.source === 'manual' ? 'typed in Baselines' : ftp.source === 'learned' ? 'estimated from your rides' : 'estimated, low confidence'}</span>
-                  {ftpChoice === 'test' && <div className="text-white/50 mt-1">The 20-minute FTP test (p212) is scheduled into week one.</div>}</>
-              : <>Nothing on file. The 20-minute FTP test (p212) is scheduled into week one.</>}
+              ? <>{fillIn(copy.watts, { watts: Math.round(ftp.value) })} <span className="text-white/40">· {ftp.source === 'manual' ? copy.source_ftp_manual : ftp.source === 'learned' ? copy.source_ftp_learned : copy.source_ftp_low}</span>
+                  {ftpChoice === 'test' && <div className="text-white/50 mt-1">{copy.ftp_test}</div>}</>
+              : <>{copy.ftp_none}</>}
             {ftpNote ? <div className="text-white/70 mt-1">{ftpNote}</div> : null}
           </>,
-          <Toggle k="ftp" value={ftpChoice} canUse={ftp.value != null} onSet={set} />,
+          <Toggle k="ftp" value={ftpChoice} canUse={ftp.value != null} onSet={set} copy={copy} />,
         )}
 
         {include.run && rowShell(
-          'Run threshold',
+          copy.run_title,
           thr.sec_per_mi != null
-            ? <>{formatSecPerMi(thr.sec_per_mi, metric)} <span className="text-white/40">· {thr.source === 'manual' || thr.source === 'manual-chosen' ? 'typed in Baselines' : 'from your runs'}</span>
-                {runChoice === 'test' && <div className="text-white/50 mt-1">The threshold time trial (p210) is scheduled into week one.</div>}</>
-            : <>Nothing on file. The threshold time trial (p210) is scheduled into week one.</>,
-          <Toggle k="run" value={runChoice} canUse={thr.sec_per_mi != null} onSet={set} />,
+            ? <>{formatSecPerMi(thr.sec_per_mi, metric)} <span className="text-white/40">· {thr.source === 'manual' || thr.source === 'manual-chosen' ? copy.source_run_typed : copy.source_run_learned}</span>
+                {runChoice === 'test' && <div className="text-white/50 mt-1">{copy.run_test}</div>}</>
+            : <>{copy.run_none}</>,
+          <Toggle k="run" value={runChoice} canUse={thr.sec_per_mi != null} onSet={set} copy={copy} />,
         )}
 
         {include.swim && rowShell(
-          'Swim pace (per 100)',
+          copy.swim_title,
           swimOnFile
-            ? <>{swimOnFile} <span className="text-white/40">· on file</span></>
-            : <>Nothing on file — there is no swim test to schedule; the number is typed on Profile.</>,
+            ? <>{swimOnFile} <span className="text-white/40">· {copy.source_swim}</span></>
+            : <>{copy.swim_none}</>,
           null,
         )}
       </div>

@@ -76,6 +76,17 @@ export type EnduranceIntakeReadout = {
     easy_run_minutes: number;
     long_run_options: number[];
     long_run_default: number | null;
+    commitment_line: string | null;
+    sub_line: string;
+    length_label: string;
+    long_option_labels: Record<string, string>;
+    rows: Array<{ key: SlotKey; title: string; session: string; length: string | null; is_long: boolean }>;
+  } | null;
+  ride_strength_week: {
+    count_label: string;
+    counts: Array<{ count: number; label: string; rows: Array<{ key: SlotKey; line: string }> }>;
+    default_count: number;
+    easy_line: string;
   } | null;
   tier_line: string | null;
 };

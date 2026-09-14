@@ -36,6 +36,9 @@ import {
 } from '../../../../src/lib/standing-plan-week-copy.ts';
 import type { EnduranceBaselines } from '../endurance-library/index.ts';
 import { advancedTierSessions, FRAMES, type EnduranceExperience, type FrameId } from './frames.ts';
+import { FAMILIES } from '../endurance-library/index.ts';
+import { FAMILY_LABEL } from './session-vocabulary.ts';
+import { fill, lengthWords, RIDES_COPY, RUNS_COPY, runsCommitmentLine } from './setup-copy.ts';
 
 export type IntakeRow = {
   /** The sport these numbers were worked out for — the phone uses a row only while it still matches. */
@@ -91,6 +94,20 @@ export type EnduranceIntakeReadout = {
     easy_run_minutes: number;
     long_run_options: number[];
     long_run_default: number | null;
+    /** ⛔ THE RUNS SCREEN'S WORDS AND ROWS (2026-09-13) — the phone prints these and holds none of them. */
+    commitment_line: string | null;
+    sub_line: string;
+    length_label: string;
+    long_option_labels: Record<string, string>;
+    rows: Array<{ key: SlotKey; title: string; session: string; length: string | null; is_long: boolean }>;
+  } | null;
+  /** ⛔ RIDE + STRENGTH'S RIDES SCREEN (2026-09-13): the question, its answers and the rides each count holds. */
+  ride_strength_week: {
+    count_label: string;
+    counts: Array<{ count: number; label: string; rows: Array<{ key: SlotKey; line: string }> }>;
+    /** The page's own count, shown selected until the athlete picks. */
+    default_count: number;
+    easy_line: string;
   } | null;
   tier_line: string | null;
 };
@@ -171,7 +188,57 @@ export function enduranceIntakeReadout(args: {
       : options.includes(rsw.longRunDefaultMinutes)
         ? rsw.longRunDefaultMinutes
         : options[Math.floor((options.length - 1) / 2)];
-    return { easy_run_minutes: rsw.easyRunMinutes, long_run_options: options, long_run_default: def };
+    const sessionName = (family: string, archetype: string | null | undefined): string => {
+      const fam = (FAMILIES as Record<string, { label?: string; archetypes?: { id: string; label?: string }[] }>)[family];
+      if (!fam) return '';
+      if (archetype) {
+        const a = (fam.archetypes ?? []).find((x) => x.id === archetype);
+        if (a?.label) return a.label;
+      }
+      return fam.label ?? '';
+    };
+    const seen: Record<string, number> = { hard: 0, easy: 0, long: 0 };
+    const rows = frameSlots(frame).map((row) => {
+      seen[row.role] += 1;
+      const n = seen[row.role];
+      const label = row.role === 'long' ? RUNS_COPY.row_label.long
+        : row.role === 'easy' ? (n > 1 ? fill(RUNS_COPY.row_label.easy_n, { n }) : RUNS_COPY.row_label.easy)
+          : fill(RUNS_COPY.row_label.hard_n, { n });
+      return {
+        key: row.key,
+        title: fill(RUNS_COPY.row, { day: row.frameDay, label }),
+        session: sessionName(row.family, row.archetype ?? null),
+        length: row.role === 'long' ? null : row.role === 'easy' ? lengthWords(rsw.easyRunMinutes) : RUNS_COPY.length_varies,
+        is_long: row.role === 'long',
+      };
+    });
+    return {
+      easy_run_minutes: rsw.easyRunMinutes, long_run_options: options, long_run_default: def,
+      commitment_line: runsCommitmentLine(frame),
+      sub_line: fill(RUNS_COPY.sub, { minutes: rsw.easyRunMinutes }),
+      length_label: RUNS_COPY.length_label,
+      long_option_labels: Object.fromEntries(options.map((m) => [String(m), lengthWords(m)])),
+      rows,
+    };
+  })();
+
+  const rideStrengthWeek = (() => {
+    const f = FRAMES[frame];
+    const fewer = f?.fewerRidesDropsSlot;
+    if (!f?.printedWeekOnly || !fewer) return null;
+    const all = frameSlots(frame);
+    const forCount = (count: number) => all
+      .filter((row) => !(count === fewer.rideCount && row.frameKey === `${fewer.day}:${fewer.index}`))
+      .map((row) => ({
+        key: row.key,
+        line: fill(RIDES_COPY.row, { day: row.frameDay, name: (FAMILY_LABEL as Record<string, string>)[row.family] ?? '' }),
+      }));
+    return {
+      count_label: RIDES_COPY.count_label,
+      counts: [fewer.rideCount, all.length].map((count) => ({ count, label: RIDES_COPY.count_chip[count] ?? String(count), rows: forCount(count) })),
+      default_count: all.length,
+      easy_line: RIDES_COPY.easy_line,
+    };
   })();
 
   const tierLine = (() => {
@@ -195,6 +262,7 @@ export function enduranceIntakeReadout(args: {
     has_bounds: { run: !!bounds.runMilesInput, ride: !!bounds.rideHours },
     is_lower_bound: bounds.isLowerBound,
     run_strength_week: runStrengthWeek,
+    ride_strength_week: rideStrengthWeek,
     tier_line: tierLine,
   };
 }

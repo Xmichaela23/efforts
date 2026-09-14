@@ -1,46 +1,42 @@
 /**
  * ⛔ THE RIDE + STRENGTH WEEK — THE PAGE'S RIDES, ONE QUESTION (WORKORDER-ride-strength-2026-09-13 §3, §4).
  *
- * p278 fixes the week: sweet spot, endurance, VO2, sprint and endurance rides, every one at level 1,
- * and nothing the athlete types adds a ride or climbs a level (`Frame.printedWeekOnly`). The one
- * answer left open is four rides or five; the four-ride week leaves out the ride the frame declares
- * (`Frame.fewerRidesDropsSlot`, the Day 2 easy ride).
- *
- * ⚠️ A SEPARATE CARD FROM `RunStrengthWeekCard` AND `EnduranceWeekCard`, so neither of those screens
- * changes. Nothing here re-derives a fact: the rows are `frameSlots`, the names are the plan's own
- * session names (`FAMILY_LABEL`), and which row a four-ride week leaves out is the frame's declaration.
+ * p278 fixes the week and the one answer left open is four rides or five. ⛔ EVERYTHING ON THIS CARD IS THE
+ * SERVER'S (2026-09-13, punch list "Default picks and per-plan wording move to the server"): the question, its
+ * answers, the rides each answer holds and the easy-ride line come in the intake readout
+ * (`ride_strength_week`). The card renders them and holds no words of its own.
  */
 import React from 'react';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { GalaxyButton } from '@/components/ui/galaxy-button';
-import { EASY_RIDE_LONGER_LINE, RIDE_COUNT_CHIP, RIDE_COUNT_LABEL, rideCountOptions, rideRowLine, ridesForCount } from '@/lib/ride-strength-week';
-import type { FrameId } from '../../supabase/functions/_shared/standing-plan/frames.ts';
+import type { EnduranceIntakeReadout } from '@/lib/builder-readout';
 
 type Props = {
-  frame: FrameId;
-  rideCount: 4 | 5;
+  readout: EnduranceIntakeReadout['ride_strength_week'];
+  rideCount: number;
   onRideCount: (n: 4 | 5) => void;
 };
 
 export default function RideStrengthWeekCard(props: Props) {
   const rideColor = getDisciplineColor('ride');
-  const rows = ridesForCount(props.frame, props.rideCount);
-  const counts = rideCountOptions(props.frame);
+  const week = props.readout;
+  if (!week) return null;
+  const rows = week.counts.find((c) => c.count === props.rideCount)?.rows ?? [];
 
   return (
     <div className="space-y-3">
       <div>
-        <p className="text-white/80 text-[13px] mb-2">{RIDE_COUNT_LABEL}</p>
+        <p className="text-white/80 text-[13px] mb-2">{week.count_label}</p>
         <div className="flex gap-1.5">
-          {counts.map((n) => (
+          {week.counts.map((c) => (
             <GalaxyButton
-              key={n}
+              key={c.count}
               shape="chip"
-              variant={props.rideCount === n ? 'primary' : 'secondary'}
-              data-testid={`ride-count-${n}`}
-              onClick={() => props.onRideCount(n)}
+              variant={props.rideCount === c.count ? 'primary' : 'secondary'}
+              data-testid={`ride-count-${c.count}`}
+              onClick={() => props.onRideCount(c.count as 4 | 5)}
             >
-              {RIDE_COUNT_CHIP[n]}
+              {c.label}
             </GalaxyButton>
           ))}
         </div>
@@ -53,13 +49,11 @@ export default function RideStrengthWeekCard(props: Props) {
             className="rounded-xl border border-white/12 bg-white/[0.02] p-3 border-l-2"
             style={{ borderLeftColor: rideColor }}
           >
-            <p className="text-white text-[15px]">
-              {rideRowLine(row)}
-            </p>
+            <p className="text-white text-[15px]">{row.line}</p>
           </div>
         ))}
       </div>
-      <p className="text-white/55 text-sm leading-relaxed">{EASY_RIDE_LONGER_LINE}</p>
+      <p className="text-white/55 text-sm leading-relaxed">{week.easy_line}</p>
     </div>
   );
 }

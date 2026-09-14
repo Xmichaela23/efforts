@@ -72,7 +72,7 @@ Deno.test('⛔ RIDE + STRENGTH — the focus and the ride count survive every ho
   // Hop 1: the programme card carries `ride`, and the payload sends it and the ride count.
   assert(/goal: 'get_stronger', focus: 'ride'/.test(WIZARD), 'the Ride + Strength card no longer seeds its focus');
   assert(/state\.focus === 'ride' \? \{ focus: 'ride' \} : \{\}/.test(WIZARD), 'the payload no longer sends the ride focus');
-  assert(/printedRideWeekPath\(state\) \? \{ ride_count:/.test(WIZARD), 'the payload no longer sends the ride count');
+  assert(/printedRideWeekPath\(state\) && state\.rideCount != null \? \{ ride_count:/.test(WIZARD), 'the payload no longer sends the ride count');
   // Hop 2: create-goal forwards both through its allowlist.
   assert(/gsTp\.focus === 'ride'/.test(CREATE_GOAL), 'create-goal no longer forwards the ride focus');
   assert(/\{ ride_count: n \}/.test(CREATE_GOAL), 'create-goal drops the ride count — a four-ride answer builds five');

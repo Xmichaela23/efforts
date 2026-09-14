@@ -1,3 +1,4 @@
+import type { SetupBlock } from '../../supabase/functions/_shared/standing-plan/setup-readout.ts';
 /**
  * `arc.builder` from get-arc-context — the intake readout, built on the server by
  * `supabase/functions/get-arc-context/intake-readout.ts` with the functions the plan build uses.
@@ -18,4 +19,6 @@ export type IntakeReadout = {
   strength_default: 'use' | 'test';
   /** Present only when the request sent `session_frequency`. Keyed by the hours option value. */
   session_frequency_by_tier?: Record<string, { swims: number; bikes: number; runs: number }>;
+  /** The three plans' setup rows, defaults, options and wording (`setup-readout.ts`, 2026-09-13). */
+  setup: SetupBlock;
 };

@@ -18,6 +18,7 @@
  *                             `computeSessionFrequencyDefaults` with the inputs the combined plan's
  *                             reconciler hands it (`resolveSessionFrequencyDefaults`).
  */
+import { setupBlock, type SetupBlock } from '../_shared/standing-plan/setup-readout.ts';
 import { resolveCurrentFtp } from '../../../src/lib/resolve-current-ftp.ts';
 import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import {
@@ -57,6 +58,11 @@ export type IntakeReadout = {
   barbell_lifts_on_file: 'all' | 'some' | 'none';
   strength_default: 'use' | 'test';
   session_frequency_by_tier?: Record<string, { swims: number; bikes: number; runs: number }>;
+  /**
+   * ⛔ THE SETUP'S ROWS, DEFAULTS, OPTIONS AND WORDING FOR THE THREE PLANS (2026-09-13, punch list "Default picks
+   * and per-plan wording move to the server"). See `_shared/standing-plan/setup-readout.ts`.
+   */
+  setup: SetupBlock;
 };
 
 type ArcSlice = Pick<
@@ -124,6 +130,7 @@ export function buildIntakeReadout(args: {
     lifts,
     barbell_lifts_on_file,
     strength_default: onFile > 0 ? 'use' : 'test',
+    setup: setupBlock(Array.isArray(chips) ? chips.map((c) => String(c)) : []),
   };
 
   const ask = args.sessionFrequency;

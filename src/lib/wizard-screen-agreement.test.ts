@@ -13,6 +13,7 @@
  * screens walk. If a screen ever reads a constant instead of the frame again, the numbers here stop
  * agreeing with each other.
  */
+import { PLAN_COPY } from '../../supabase/functions/_shared/standing-plan/setup-copy.ts';
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   allSlotsChosen,
@@ -60,7 +61,8 @@ function screenFor(focus: 'standard' | 'run') {
       Object.fromEntries(slotKeysFor(frame).map((k) => [k, 'run'])) as never,
       frame,
     )),
-    programmeName: FRAMES[frame].displayName ?? null,
+    // ⚠️ The plan's name is the server's setup wording since 2026-09-13 (`setup-copy.ts`).
+    programmeName: PLAN_COPY[frame].name,
   };
 }
 

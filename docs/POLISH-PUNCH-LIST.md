@@ -1471,3 +1471,18 @@ as printed. Examples on p278: Glutes → hip thrust or kickbacks on the Day 2 lo
 not say push or hinge for "accessory lower"); Arms/Shoulders → the Day 1 superset; Chest → pec deck on
 the Day 1 push row. Core has no printed row on p278, so it has no button there. Build needs Michael's go
 and his yes on every word.
+
+---
+
+## Default picks and per-plan wording move to the server (decided 2026-09-13, not built, no go yet)
+
+Michael: "they should be on the server." Two things the phone decides today:
+1. **Default picks.** The Build focus screen works out each row's default movement (shared pick file via
+   the client alias) and sends it; the server's own defaults fire only when no picks are sent. Target:
+   the server sends each plan's rows with their defaults and options; the screen renders and sends back
+   only what the athlete changed.
+2. **Per-plan wording.** Program card descriptions, requirements lines and the Build this plan? lines are
+   typed per plan in `src/components/NonRaceBuilder.tsx` (`PROGRAM_COPY` and the build-screen lines).
+   Target: the server returns them with the plan declaration, so a wording change needs no App Store update.
+Approved words move unchanged. Start with a trace and report before code; commit, push and deploy each
+need Michael's yes.
