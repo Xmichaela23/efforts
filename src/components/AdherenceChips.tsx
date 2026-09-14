@@ -83,6 +83,19 @@ export default function AdherenceChips({
   const rowCls = dense
     ? 'flex items-start justify-between w-full px-0 gap-1'
     : 'flex items-start justify-between w-full px-3';
+  /**
+   * ⛔ FOUR READOUTS GO TWO BY TWO (2026-09-14, Michael, on a ride: "top row is a mess — jumbled").
+   * Four nowrap tiles in one row need more than a phone's width: "WORKLOAD EXECUTION" ran together and
+   * "usual 40–66" printed over "efforts & time". Two per row keeps every number, label and subtitle at
+   * its size and whole. Three or fewer stay on one row. ⚠️ NO WORDS OR SIZES CHANGE.
+   */
+  const rowOf = (nodes: React.ReactNode[]) => {
+    const shown = nodes.filter(Boolean);
+    if (!dense && shown.length >= 4) {
+      return <div className="grid grid-cols-2 gap-x-3 gap-y-4 w-full px-3">{shown}</div>;
+    }
+    return <div className={rowCls}>{shown}</div>;
+  };
   const outerCls = dense
     ? 'flex items-center justify-center gap-2 text-center mb-1'
     : 'flex items-center justify-center gap-6 text-center mb-3';
@@ -362,20 +375,19 @@ export default function AdherenceChips({
         <div className="w-full pt-1 pb-2">
           {weekLabel && <div className="readout-label mb-2 text-center text-[11px] uppercase">{weekLabel}</div>}
           <div className={outerCls}>
-            <div className={rowCls}>
-              {chipText('Workload', loadValue, loadSubtitle)}
-              {/* 2026-09-03: Execution and Drift on rides too (Michael: "drift really important on the
-                  performance screens for running and riding"). Power / Easy reads live in Insights. */}
-              {executionScore != null && chip('Execution', executionScore, 'efforts & time')}
-              {chipText('Duration', durationValue, 'of plan')}
-              {/* ⛔ THE CHIP RENDERS WITHOUT A NUMBER WHEN THE SERVER SENT WORDS INSTEAD (2026-09-12).
-                  A long session whose VT1 portions are under p107's bout floor gets no percentage and
-                  a sentence saying why; gating the whole chip on a value hid it. `chipNote` keeps the
-                  Drift label with the words under it and nothing where the number would be. */}
-              {driftValue != null
-                ? chipText('Drift', driftValue, driftSubtitle)
-                : (driftNote ? chipNote('Drift', driftNote) : null)}
-            </div>
+            {/* 2026-09-03: Execution and Drift on rides too (Michael: "drift really important on the
+                performance screens for running and riding"). Power / Easy reads live in Insights.
+                ⛔ THE DRIFT CHIP RENDERS WITHOUT A NUMBER WHEN THE SERVER SENT WORDS INSTEAD (2026-09-12).
+                A long session whose VT1 portions are under p107's bout floor gets no percentage and a
+                sentence saying why; `chipNote` keeps the Drift label with the words under it. */}
+            {rowOf([
+              loadValue ? <React.Fragment key="w">{chipText('Workload', loadValue, loadSubtitle)}</React.Fragment> : null,
+              executionScore != null ? <React.Fragment key="e">{chip('Execution', executionScore, 'efforts & time')}</React.Fragment> : null,
+              durationValue ? <React.Fragment key="du">{chipText('Duration', durationValue, 'of plan')}</React.Fragment> : null,
+              driftValue != null
+                ? <React.Fragment key="dr">{chipText('Drift', driftValue, driftSubtitle)}</React.Fragment>
+                : (driftNote ? <React.Fragment key="dr">{chipNote('Drift', driftNote)}</React.Fragment> : null),
+            ])}
           </div>
         </div>
       );
@@ -397,12 +409,12 @@ export default function AdherenceChips({
       <div className="w-full pt-1 pb-2">
         {weekLabel && <div className="readout-label mb-2 text-center text-[11px] uppercase">{weekLabel}</div>}
         <div className={outerCls}>
-          <div className={rowCls}>
-            {chipText('Workload', loadValue, loadSubtitle)}
-            {executionScore != null && chip('Execution', executionScore, executionSubtitle)}
-            {chipText('Duration', durationValue, 'of plan')}
-            {driftValue != null && chipText('Drift', driftValue, driftSubtitle)}
-          </div>
+          {rowOf([
+            loadValue ? <React.Fragment key="w">{chipText('Workload', loadValue, loadSubtitle)}</React.Fragment> : null,
+            executionScore != null ? <React.Fragment key="e">{chip('Execution', executionScore, executionSubtitle)}</React.Fragment> : null,
+            durationValue ? <React.Fragment key="du">{chipText('Duration', durationValue, 'of plan')}</React.Fragment> : null,
+            driftValue != null ? <React.Fragment key="dr">{chipText('Drift', driftValue, driftSubtitle)}</React.Fragment> : null,
+          ])}
         </div>
       </div>
     );

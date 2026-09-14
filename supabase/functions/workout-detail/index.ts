@@ -215,7 +215,8 @@ function stripResponseOnlySessionDetailFields(sd: Record<string, unknown> | null
  *       no line, the cache fast path serves those copies untouched, and the lift header printed
  *       nothing while the run and ride tiles fell back to the fact packet's different wording.
  */
-const BLOCK_CARD_VERSION = 4;
+// 5 (2026-09-14): the plan context line now ends on a whole sentence; saved copies refresh once to pick it up.
+const BLOCK_CARD_VERSION = 5;
 
 /**
  * ⛔ THE VOLUME FIELD NEEDS ITS OWN STALENESS RULE, AND IT IS NOT THE BLOCK CARD'S (D-349, 2026-08-01).
