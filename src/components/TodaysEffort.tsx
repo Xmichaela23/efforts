@@ -1691,8 +1691,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               mixBlendMode: 'screen',
               backgroundImage: rgb
                 ? `
-            radial-gradient(320px 150px at 22% 42%, rgba(${rgb}, 0.26) 0%, rgba(${rgb}, 0.0) 74%),
-            radial-gradient(300px 160px at 78% 52%, rgba(${rgb}, 0.14) 0%, rgba(${rgb}, 0.0) 74%)
+            /* Held to the top edge and lighter (2026-09-14, Michael: "still a little brown in the two
+               sessions area"). Gold or orange spread at low strength behind the session cards reads as
+               brown; kept high, the colour still says which sport and the cards sit on dark. */
+            radial-gradient(320px 110px at 22% 10%, rgba(${rgb}, 0.20) 0%, rgba(${rgb}, 0.0) 74%),
+            radial-gradient(300px 110px at 78% 14%, rgba(${rgb}, 0.10) 0%, rgba(${rgb}, 0.0) 74%)
           `
                 : `
             radial-gradient(200px 120px at 18% 40%, rgba(255, 215, 0, 0.28) 0%, rgba(255, 215, 0, 0.0) 72%),
@@ -1810,7 +1813,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             backdropFilter: 'blur(18px)',
             WebkitBackdropFilter: 'blur(18px)',
             // Option 1 lighting: keep texture, but bias glow to a top-left “key light” (white)
+            // ⛔ LIT FROM BELOW (2026-09-14, Michael: "a light source coming up from the Hard Run card,
+            // like slight billboard lighting for the date/load card"). A warm wash rising from the
+            // bottom edge, and a warm rim on that edge — the sessions under it are the lamp.
             backgroundImage: `
+              linear-gradient(to top, rgba(255,236,204,0.14) 0%, rgba(255,236,204,0.04) 30%, rgba(255,236,204,0) 55%),
               radial-gradient(ellipse at 18% 0%, rgba(255, 255, 255, 0.08) 0%, transparent 60%),
               radial-gradient(ellipse at 70% 45%, rgba(255, 255, 255, 0.03) 0%, transparent 62%),
               linear-gradient(45deg, rgba(255,255,255,0.18) 1px, transparent 1px),
@@ -1818,9 +1825,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               linear-gradient(45deg, rgba(255,255,255,0.08) 1px, transparent 1px),
               linear-gradient(-45deg, rgba(255,255,255,0.06) 1px, transparent 1px)
             `,
-            backgroundSize: 'cover, cover, 26px 26px, 26px 26px, 52px 52px, 52px 52px',
-            backgroundPosition: 'center, center, center, center, center, center',
-            backgroundBlendMode: 'screen, screen, soft-light, soft-light, soft-light, soft-light',
+            backgroundSize: 'cover, cover, cover, 26px 26px, 26px 26px, 52px 52px, 52px 52px',
+            backgroundPosition: 'center, center, center, center, center, center, center',
+            backgroundBlendMode: 'screen, screen, screen, soft-light, soft-light, soft-light, soft-light',
             overflow: 'hidden',
             // Omni-inspired illuminated border that blends
             border: '0.5px solid rgba(255, 255, 255, 0.08)',
@@ -1832,15 +1839,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             boxShadow: `
               0 0 0 1px rgba(255,255,255,0.05) inset,
               inset 0 1px 0 rgba(255,255,255,0.20),
-              inset 0 -1px 0 rgba(0,0,0,0.45),
+              inset 0 -1px 0 rgba(255,236,204,0.30),
               0 10px 22px rgba(0,0,0,0.55),
-              /* subtle spectrum halo so “Today” reads as active */
-              0 0 18px rgba(255,255,255,0.05),
-              0 0 26px rgba(255,215,0,0.10),
-              0 0 34px rgba(255,140,66,0.08),
+              /* The gold, orange and red halo that sat here spilled onto the sessions below as brown
+                 (2026-09-14). Only the cool pair stays. */
               0 0 30px rgba(183,148,246,0.06),
-              0 0 30px rgba(74,158,255,0.06),
-              0 0 40px rgba(239, 68, 68, 0.05)
+              0 0 30px rgba(74,158,255,0.06)
             `,
             // Keep aligned to the instrument panel surface (no “floating” offsets)
             marginLeft: 0,
