@@ -2,6 +2,7 @@
 // SESSION_DETAIL_V1 — Build from snapshot slice + workout_analysis
 // =============================================================================
 
+import { talkTestAppliesToTags } from '../effort-words.ts';
 import type { SessionDetailV1, SegmentVerdictV1, IntervalRow, SessionInterpretation, DeviationDimension, DeviationDirection } from './types.ts';
 import { resolveSessionDrift } from './drift-pct.ts';
 import { sessionSteadiness } from './session-steadiness.ts';
@@ -1115,6 +1116,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     date: workoutDate,
     type,
     name: workoutName || workoutType || 'Workout',
+
+    talk_test_applies: talkTestAppliesToTags((plannedRowRaw as any)?.tags),
 
     plan_context: {
       planned_id: match?.planned_id ?? null,

@@ -26,13 +26,15 @@ export const FAMILY_LINE: Readonly<Record<string, string>> = {
   ride_anaerobic: 'Go by feel. Stay above the floor. No ceiling. Each set harder than the last.',
   // p239, p211. REVISED 2026-09-10 (approved): lead with what the ride is. The plain version; the
   // with-work version is `rideWithWorkLine`, chosen by archetype in `familyLineFor`.
-  ride_endurance: 'Easy ride, under 75 percent of FTP the whole way. You should be able to talk in full sentences.',
+  // REVISED 2026-09-14 (approved): the talk test sentence came off — p239 prescribes rides in power only.
+  ride_endurance: 'Easy ride, under 75 percent of FTP the whole way.',
   // p233 ("Maximise time near threshold … while controlling fatigue") — the hard run, both family ids.
   // REVISED 2026-09-14 (approved): the idiom "without falling apart" is gone.
   run_mlss: 'Spend as much time near threshold as you can while controlling fatigue.',
   run_near_threshold: 'Spend as much time near threshold as you can while controlling fatigue.',
   // p235, p211 — the long run.
-  run_lsd: 'Easy the whole way. Stopping for a bit is fine. Be able to speak long sentences easily the whole time.',
+  // REVISED 2026-09-14 (approved): "long sentences" was not the book's words; the talk test is asked after the run.
+  run_lsd: 'Easy the whole way. Stopping for a bit is fine.',
   // p235, p211. ⛔ NEVER THE WORD VT1 ON SCREEN.
   run_vt1: 'Easy. Talk test twice, at 5 minutes and at 20.',
   // p238.

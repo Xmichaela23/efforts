@@ -143,6 +143,13 @@ export type SessionDetailV1 = {
   type: 'run' | 'ride' | 'swim' | 'strength' | 'mobility';
   name: string;
 
+  /** True when the linked planned session is judged by the talk test (easy or long run). `_shared/effort-words.ts`. */
+  talk_test_applies?: boolean;
+  /** Response-only (workout-detail enrich): "RPE 4, somewhat hard". Never persisted. */
+  effort_row?: string | null;
+  /** Response-only (workout-detail enrich): the talk test answer against what was planned. Never persisted. */
+  talk_test_row?: string | null;
+
   plan_context: {
     planned_id: string | null;
     planned: {

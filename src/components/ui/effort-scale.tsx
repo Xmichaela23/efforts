@@ -13,6 +13,7 @@
 // Buttons are rounded-xl per docs/DESIGN-button-shape.md; the chosen one wears the sport colour.
 import React from 'react';
 import { getDisciplineColor } from '@/lib/context-utils';
+import { FOSTER_LEGEND, fosterEffortWord } from '@shared/effort-words';
 
 export type EffortSport = 'run' | 'bike' | 'swim' | 'strength';
 
@@ -25,8 +26,15 @@ const REPS_LEFT: Record<number, string> = {
   6: 'Four reps left', 7: 'Three reps left', 8: 'Two reps left', 9: 'One rep left', 10: 'Nothing left',
 };
 
+/**
+ * ⛔ RUNS AND RIDES USE FOSTER'S SESSION-RPE WORDS (2026-09-14, approved). The talk test words were the app's
+ * own translation of an effort number; the book's talk test is its own yes/no question, asked in the popup
+ * for easy and long runs only (`@shared/effort-words`). Swims keep their words, unchanged by that decision.
+ */
 export function effortWords(sport: EffortSport, value: number): string {
-  return (sport === 'strength' ? REPS_LEFT : TALK_TEST)[value] ?? '';
+  if (sport === 'strength') return REPS_LEFT[value] ?? '';
+  if (sport === 'swim') return TALK_TEST[value] ?? '';
+  return fosterEffortWord(value);
 }
 
 export default function EffortScale({ sport, value, onChange, label = 'How hard?', optional = true }: {
@@ -39,7 +47,9 @@ export default function EffortScale({ sport, value, onChange, label = 'How hard?
   const colour = getDisciplineColor(sport);
   const legend = sport === 'strength'
     ? ['1 warm-up', '5 five left', '8 two left', '10 nothing left']
-    : ['1–2 could sing', '3 full sentences', '5–6 a few words', '10 max'];
+    : sport === 'swim'
+      ? ['1–2 could sing', '3 full sentences', '5–6 a few words', '10 max']
+      : [...FOSTER_LEGEND];
   return (
     <div>
       <label className="text-sm font-light text-white/70 mb-2 block">

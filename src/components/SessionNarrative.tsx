@@ -131,7 +131,7 @@ interface SessionNarrativeProps {
  * the value at 13 px beside it. A fixed label column so the sentences align; long ones wrap under
  * themselves, never under the label.
  */
-function Reading({ label, text }: { label: string; text: React.ReactNode }) {
+export function Reading({ label, text }: { label: string; text: React.ReactNode }) {
   return (
     <div className="flex items-baseline gap-x-2.5">
       <span className="shrink-0 w-[92px] text-[11px] text-white/45 lowercase tracking-wide leading-snug">{label}</span>

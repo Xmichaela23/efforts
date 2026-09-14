@@ -224,6 +224,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     name: string;
     existingGearId?: string | null;
     existingRpe?: number | null;
+    /** The server's answer: ask the talk test (planned easy or long run). */
+    talkTest?: boolean;
   } | null>(null);
   // D-162: post-workout feedback now covers swims (feel/RPE + pool length + equipment), not just run/ride.
   const isFeedbackType = (t: unknown) => ['run', 'ride', 'swim'].includes(String(t || '').toLowerCase());
@@ -431,6 +433,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           name: workout.name || `${workout.type} workout`,
           existingGearId: workout.existing_gear_id || null,
           existingRpe: workout.existing_rpe || null,
+          talkTest: data?.talk_test === true,
         });
       }
     } catch (e) {
@@ -484,6 +487,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         name: w.name || `${w.type} workout`,
         existingGearId: w.existing_gear_id || null,
         existingRpe: w.existing_rpe || null,
+        talkTest: data?.talk_test === true,
       });
     } catch (e) {
       console.warn('[AppLayout] check-feedback-needed for one workout failed:', e);
@@ -1827,6 +1831,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             workoutName={feedbackWorkout.name}
             existingGearId={feedbackWorkout.existingGearId}
             existingRpe={feedbackWorkout.existingRpe}
+            talkTest={feedbackWorkout.talkTest === true}
             mode="popup"
           onAddGear={() => {
             // Open gear management, temporarily hide feedback popup

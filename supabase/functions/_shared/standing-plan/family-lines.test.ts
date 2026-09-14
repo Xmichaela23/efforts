@@ -26,7 +26,7 @@ for (const [level, every] of [[1, 9], [2, 8], [3, 9]] as const) {
 Deno.test('the plain endurance ride keeps its one line', () => {
   assertEquals(
     familyLineFor('ride_endurance', 'steady'),
-    'Easy ride, under 75 percent of FTP the whole way. You should be able to talk in full sentences.',
+    'Easy ride, under 75 percent of FTP the whole way.',
   );
 });
 

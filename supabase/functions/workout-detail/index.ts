@@ -2,6 +2,7 @@
 // Function: workout-detail
 // Behavior: Return canonical completed workout details by id with optional heavy fields
 
+import { effortRowText, talkTestRowText } from '../_shared/effort-words.ts';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { planLine } from '../_shared/plan-line.ts';
 import { weekStartOf } from '../_shared/plan-week.ts';
@@ -199,7 +200,7 @@ function isSessionDetailStale(workoutRow: { updated_at?: string | null; planned_
 /** Strip response-only keys; they must never appear in persisted workout_analysis.session_detail_v1. */
 function stripResponseOnlySessionDetailFields(sd: Record<string, unknown> | null | undefined): Record<string, unknown> {
   if (!sd || typeof sd !== 'object') return (sd ?? {}) as Record<string, unknown>;
-  const { stale: _s, stale_reason: _r, ...rest } = sd as Record<string, unknown>;
+  const { stale: _s, stale_reason: _r, effort_row: _e, talk_test_row: _t, ...rest } = sd as Record<string, unknown>;
   return rest as Record<string, unknown>;
 }
 
@@ -225,7 +226,8 @@ const BLOCK_CARD_VERSION = 5;
  * its plan through the attach path with that column empty (Sunday's ride did), so the block card's gate
  * served it the old cut copy. Every saved copy below this version refreshes once, then serves from cache.
  */
-const PLAN_CONTEXT_VERSION = 1;
+// 2 (2026-09-14): `talk_test_applies` joins the contract; a copy without it refreshes once.
+const PLAN_CONTEXT_VERSION = 2;
 
 /**
  * ⛔ THE VOLUME FIELD NEEDS ITS OWN STALENESS RULE, AND IT IS NOT THE BLOCK CARD'S (D-349, 2026-08-01).
@@ -286,6 +288,15 @@ function enrichSessionDetailForResponse(
     return { stale: true, stale_reason: 'analysis_missing', boom };
   }
   const base = stripResponseOnlySessionDetailFields(sessionDetailV1 as Record<string, unknown>) as any;
+  // ⛔ EFFORT AND TALK TEST ROWS, ON EVERY ANSWER (2026-09-14, `_shared/effort-words.ts`). The RPE and the
+  // talk test answer are logged after the copy is cached, so they are read from the row here, like the boom.
+  try {
+    const sportWord = String(base?.type || rowSd?.type || '').toLowerCase();
+    if (/run|ride|bike|cycl/.test(sportWord)) base.effort_row = effortRowText(rowSd?.rpe);
+    let rowMeta: any = rowSd?.workout_metadata;
+    if (typeof rowMeta === 'string') { try { rowMeta = JSON.parse(rowMeta); } catch { rowMeta = null; } }
+    base.talk_test_row = base?.talk_test_applies === true ? talkTestRowText(rowMeta?.talk_test) : null;
+  } catch { /* rows are optional */ }
   const rowPlanned = rowSd?.planned_id != null && String(rowSd.planned_id).trim() !== '' ? String(rowSd.planned_id) : '';
   const sdPlanned = base?.plan_context?.planned_id != null && String(base.plan_context.planned_id).trim() !== ''
     ? String(base.plan_context.planned_id)

@@ -7,7 +7,7 @@ import { normalizeDiscipline } from '@/lib/discipline';
 import { getDisciplineColorRgb } from '@/lib/context-utils';
 import { supabase, ensureFreshSession } from '../lib/supabase';
 import StrengthPerformanceSummary from './StrengthPerformanceSummary';
-import SessionNarrative, { NextUp } from './SessionNarrative';
+import SessionNarrative, { NextUp, Reading } from './SessionNarrative';
 import { StrengthTestResult } from './StrengthTestResult';
 import EnduranceIntervalTable from './EnduranceIntervalTable';
 import AdherenceChips from './AdherenceChips';
@@ -383,6 +383,14 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
             return { poolLengthM: Number(c.pool_length) || null, lengths: Number(c.number_of_active_lengths) || null, finsUsed };
           })() : null}
         />
+      )}
+      {/* EFFORT AND TALK TEST (2026-09-14): the server's two rows, printed as sent. Talk test only on easy and
+          long runs; effort on every run and ride with an RPE logged. */}
+      {((sd as any)?.talk_test_row || (sd as any)?.effort_row) && (
+        <div className="space-y-1.5 px-3 py-3 border-t border-white/[0.055]">
+          {(sd as any)?.talk_test_row && <Reading label="Talk test" text={(sd as any).talk_test_row} />}
+          {(sd as any)?.effort_row && <Reading label="Effort" text={(sd as any).effort_row} />}
+        </div>
       )}
       {/* NEXT sits last, after the interval table (Michael, 2026-09-07). */}
       {(sd as any)?.next_session && <NextUp session={(sd as any).next_session} />}

@@ -234,7 +234,7 @@ Deno.test('each named family gets its line, and only that line', () => {
   assertEquals(enduranceLinesFor(run('run_vt1', 'vt1_or_easier'))[0], 'Easy. Talk test twice, at 5 minutes and at 20.');
   assertEquals(
     enduranceLinesFor(run('run_lsd', 'vt1_or_easier'))[0],
-    'Easy the whole way. Stopping for a bit is fine. Be able to speak long sentences easily the whole time.',
+    'Easy the whole way. Stopping for a bit is fine.',
   );
 });
 

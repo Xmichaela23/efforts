@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { talkTestAppliesToTags } from '../_shared/effort-words.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -54,7 +55,7 @@ Deno.serve(async (req) => {
     // D-162: swims now get the popup too (feel/RPE + pool length + equipment confirmation).
     let q = supabase
       .from('workouts')
-      .select('id, type, name, gear_id, rpe, date, feedback_dismissed_at')
+      .select('id, type, name, gear_id, rpe, date, planned_id, feedback_dismissed_at')
       .eq('user_id', user.id);
     if (workoutId) q = q.eq('id', workoutId);
     const { data: workouts, error } = await q
@@ -81,6 +82,28 @@ Deno.serve(async (req) => {
     // Return workout if found, null if none
     if (workouts && workouts.length > 0) {
       const workout = workouts[0];
+      /**
+       * ⛔ DOES THE POPUP ASK THE TALK TEST (2026-09-14, `_shared/effort-words.ts`). Only a run whose planned
+       * session is an easy or long run. Answered NOW, not after processing: the linked planned row when the
+       * link is in, otherwise that day's planned run when there is exactly one. Two planned runs that day and
+       * no link yet, or none: no talk test. Rides never.
+       */
+      let talkTest = false;
+      if (workout.type === 'run') {
+        try {
+          let tags: unknown = null;
+          if (workout.planned_id) {
+            const { data: pr } = await supabase.from('planned_workouts').select('tags').eq('id', workout.planned_id).eq('user_id', user.id).maybeSingle();
+            tags = pr?.tags ?? null;
+          } else if (workout.date) {
+            const { data: prs } = await supabase.from('planned_workouts').select('tags').eq('user_id', user.id).eq('date', workout.date).eq('type', 'run').limit(3);
+            if (Array.isArray(prs) && prs.length === 1) tags = prs[0]?.tags ?? null;
+          }
+          talkTest = talkTestAppliesToTags(tags);
+        } catch (e) {
+          console.warn('[check-feedback-needed] talk-test lookup failed:', e);
+        }
+      }
       return new Response(
         JSON.stringify({
           needs_feedback: true,
@@ -90,7 +113,8 @@ Deno.serve(async (req) => {
             name: workout.name || `${workout.type} workout`,
             existing_gear_id: workout.gear_id || null,
             existing_rpe: workout.rpe || null,
-          }
+          },
+          talk_test: talkTest,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

@@ -1,3 +1,4 @@
+import { TALK_TEST_QUESTION } from '@shared/effort-words';
 import React, { useState, useEffect } from 'react';
 import { X, Activity, Bike, Plus, Waves } from 'lucide-react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
@@ -62,6 +63,8 @@ interface PostWorkoutFeedbackProps {
   existingGearId?: string | null;
   existingRpe?: number | null;
   existingFeeling?: string | null;
+  /** Ask the book's talk test (the server's answer: a planned easy or long run). */
+  talkTest?: boolean;
   // Callbacks
   onSave?: (data: { gear_id?: string; rpe?: number; feeling?: string }) => void;
   onClose?: () => void;
@@ -86,6 +89,7 @@ export default function PostWorkoutFeedback({
   workoutName,
   existingGearId,
   existingRpe,
+  talkTest = false,
   existingFeeling,
   onSave,
   onClose,
@@ -167,6 +171,7 @@ export default function PostWorkoutFeedback({
   // Form state - pre-select default gear if no existing gear_id
   const [selectedGearId, setSelectedGearId] = useState<string | null>(existingGearId || null);
   const [selectedRpe, setSelectedRpe] = useState<number | null>(existingRpe || null);
+  const [talkTestAnswer, setTalkTestAnswer] = useState<boolean | null>(null);
   const [selectedFeeling, setSelectedFeeling] = useState<string | null>(existingFeeling || null);
   // Post-completion soreness (D-234/D-235, Hooper 1–7). NO DEFAULT — null until an explicit tap; a skipped
   // control writes nothing (readinessSorenessPatch returns null on null).
@@ -434,6 +439,15 @@ export default function PostWorkoutFeedback({
         if (patched) updateData.workout_metadata = patched;
       }
 
+      // The talk test answer (easy and long runs). Merges into workout_metadata like soreness does.
+      if (talkTest && talkTestAnswer !== null) {
+        const existingMeta = updateData.workout_metadata
+          ?? (typeof workoutData?.workout_metadata === 'string'
+            ? (() => { try { return JSON.parse(workoutData.workout_metadata); } catch { return {}; } })()
+            : (workoutData?.workout_metadata || {}));
+        updateData.workout_metadata = { ...existingMeta, talk_test: talkTestAnswer };
+      }
+
       // Only update if something was selected
       if (Object.keys(updateData).length > 0) {
         const { error } = await supabase
@@ -654,6 +668,29 @@ export default function PostWorkoutFeedback({
 
       {/* The one effort scale (src/components/ui/effort-scale.tsx); talk-test words for endurance. */}
       <EffortScale sport={isSwim ? 'swim' : workoutType === 'run' ? 'run' : 'bike'} value={selectedRpe} onChange={setSelectedRpe} />
+
+      {/* The book's talk test (p211, p235) — only when the server says the planned session is an easy or long run. */}
+      {talkTest && (
+        <div>
+          <label className="text-sm font-light text-white/70 mb-2 block">{TALK_TEST_QUESTION}</label>
+          <div className="flex gap-2">
+            {([['Yes', true], ['No', false]] as const).map(([word, val]) => {
+              const on = talkTestAnswer === val;
+              return (
+                <button
+                  key={word}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setTalkTestAnswer(on ? null : val)}
+                  className={`flex-1 py-2.5 text-sm font-light rounded-xl border backdrop-blur-md transition-colors ${on ? 'text-white bg-white/[0.14] border-white/40' : 'bg-white/[0.06] border-white/15 text-white/70'}`}
+                >
+                  {word}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Muscle soreness (D-234/D-235) — optional, no default, all disciplines */}
       <div>
