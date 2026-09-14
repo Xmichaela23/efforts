@@ -1127,6 +1127,28 @@ function exerciseForSlot(
    * ⚠️ `strength_5k` CARRIES NO `muscle` ON ANY SLOT — its rows name categories, not muscles — so
    * this is a no-op on that frame and its output is byte-identical.
    */
+  /**
+   * ⛔ A ROW THAT NAMES NO MUSCLE BUT ADMITS MOVEMENTS BY NAME (2026-09-13): p246/p278 Day 2's hinge row
+   * (p220's KB swing and bench reverse hyper, filed in other categories) and its "accessory lower" row (the
+   * hip thrust, filed under the hinge pattern). The picker runs the same search (`pickOptions`). Inert on
+   * every muscle-less row that admits nothing, which was every one before.
+   */
+  if (!slot.muscle && (slot.alsoAdmits ?? []).length > 0) {
+    const admittedNoMuscle = new Set((slot.alsoAdmits ?? []).map((n) => canonicalize(n)));
+    const have = new Set(resolved.options.map((o) => canonicalize(o.name)));
+    for (const pat of [pattern, ...(['push_upper', 'pull_upper', 'press_lower', 'hinge_lower'] as const).filter((p) => p !== pattern)]) {
+      for (const cat of ['secondary', 'braced', 'focused'] as typeof slot.category[]) {
+        if (pat === pattern && cat === slot.category) continue;
+        for (const o of resolveSlot({
+          category: cat, pattern: pat as typeof pattern, intent: slot.intent,
+          equipment: args.equipment ?? null, asymmetrical: slot.asymmetrical,
+        }).options) {
+          const c = canonicalize(o.name);
+          if (admittedNoMuscle.has(c) && !have.has(c)) { resolved.options.push(o); have.add(c); }
+        }
+      }
+    }
+  }
   if (slot.muscle) {
     const want = String(slot.muscle);
     /**
@@ -1261,11 +1283,13 @@ function exerciseForSlot(
    * cell — the picker built its dropdown from that same call — so honouring it can never widen the
    * equipment gate or put a movement in a slot the frame did not ask for.
    */
-  const slotKey = slot.intent === 'HYP' && slot.role === 'accessory'
+  const slotKey = (slot.intent === 'HYP' || slot.intent === 'DE') && slot.role === 'accessory'
     // ⛔⛔ THE FRAME'S OWN PICK TABLE (D-457, 2026-08-30). p274's accessory cells are BRACED and
     // FOCUSED; p246's are SECONDARY. Matched against the wrong table a cell finds no pick and the
     // athlete's answer is discarded in silence — which is what happened to five controls.
-    ? pickKeyForSlot(slot.category, pattern, frameDay ?? undefined, args.frame, /\(arms\)/i.test(String(slot.sourceText ?? '')))
+    // ⚠️ A DE CELL IS ASKED TOO (2026-09-13), and only a pick declared for a DE cell answers it — today the
+    // p246/p278 Day 2 hinge row. Every other DE cell finds no key and is unchanged.
+    ? pickKeyForSlot(slot.category, pattern, frameDay ?? undefined, args.frame, /\(arms\)/i.test(String(slot.sourceText ?? '')), slot.intent as 'HYP' | 'DE')
     : null;
   /**
    * ⛔⛔ "ALREADY USED TODAY" HAS TO ASK THE NAME THE ATHLETE WILL READ (2026-08-30). `bandRouteName`

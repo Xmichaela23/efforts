@@ -90,4 +90,34 @@ Ride + Strength get the Build focus screen too?
 - Rides screen new lines: APPROVED ("Rides a week", "Four rides", "Five rides", "Day 1 · Hard Ride", "Day 2 · Ride", "Day 3 · VO2 Ride", "Day 5 · Sprint Ride", "Day 6 · Ride").
 - Build this plan?, Ride + Strength only, both conflicting lines replaced. Top line: `Ride + Strength, 12 weeks.` Description, APPROVED (Michael's words): `A 12-week plan to get faster and stronger. The weights go up as you adapt to the training.` The proposed "earn it" line is rejected.
 - The two em-dash lines shared by every plan: leave as they are.
-- No "Build focus" (extra-lift picking) screen on Ride + Strength. The p278 extra-lift rows fill from the default picks for the athlete's equipment; swaps on the day.
+- ⛔ SUPERSEDED same night (Michael "yes"): Ride + Strength GETS the "Build focus" picking screen, reused from Run + Strength, for p278's own muscle-building rows (Day 1 superset, Day 2 lower-body lift). These are plan rows, never "extra lifts". Was: No "Build focus" screen on Ride + Strength. The p278 extra-lift rows fill from the default picks for the athlete's equipment; swaps on the day.
+
+## Build focus screen on Ride + Strength (reused from Run + Strength), as it reads
+
+Rendered from the plan's declared pick rows (`picksForFrame('cycling_base')`) with a full kit (barbell,
+dumbbells, rack, bench, pull-up bar). Options depend on the athlete's equipment. Status for every line:
+existing (Run + Strength's screen, unchanged); none has Michael's yes for Ride + Strength yet.
+
+| Screen | Exact words | Status |
+|---|---|---|
+| Build focus | Build focus | existing |
+| Build focus | These are your hypertrophy lifts and super sets based on the equipment you have. You can swap on the day or adjust now for the plan. | existing (says "hypertrophy" and "super sets") |
+| Build focus | Day 1 | existing (group heading; p278 day 1 has no theme word, so nothing follows it) |
+| Build focus | Push isolation | existing (row label) |
+| Build focus | Tate Press / Behind The Neck DB Triceps Extension / Skull Crusher / Lateral Raise / Chest Fly - added | existing (dropdown options) |
+| Build focus | Pull isolation | existing (row label) |
+| Build focus | Bent-Over Dumbbell Rear Delt Fly / Concentration Curl / Drag Curl / Flat-Bench Dumbbell Pullover | existing (dropdown options) |
+| Build focus | Day 2 | existing (group heading) |
+| Build focus | Leg variation | existing (row label) |
+| Build focus | Split Squat / Zercher Squat / Reverse Lunge / Walking Lunge / Freestanding Barbell Calf Raise | existing (dropdown options) |
+| Build focus | Accessory sets are 8 to 10 reps with a rep or two left in the tank. Going to failure costs the next main lift. | existing (says "Accessory sets") |
+| Build focus | Continue | existing |
+
+This screen does not label the two Day 1 rows as a superset.
+
+## Build focus screen — Michael's answers (2026-09-13, "yes" to all four)
+
+1. Ride + Strength only, subtitle: `These are your hypertrophy lifts, based on the equipment you have. You can swap on the day or adjust now for the plan.` (p278 prints no superset.)
+2. Dose line, every plan that shows it: `Accessory sets are 8 to 10 reps, stopping one or two reps short of failure.` (p086.)
+3. Chest Fly comes off the push options on every plan (not on p222's focused push list).
+4. Commit and push the Build focus screen: approved.

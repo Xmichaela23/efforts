@@ -126,12 +126,6 @@ function scheduleSteps(state: StepRouterState, isStrengthFocus: boolean, isRaceG
   // ⚠️ ON THE STRENGTH PATH THIS MOVED DOWN, to after the volume — see the block below. Every other
   // goal keeps it here: there is no endurance tier deciding its numbers.
   if (strengthDevelop && !isStrengthFocus) out.push('accessory');
-  /**
-   * ⛔ RIDE + STRENGTH HAS NO ACCESSORY SCREEN (Michael's path, 2026-09-13: Train → Ride → Ride +
-   * Strength → rides → schedule → numbers → confirm). The accessory cells p278 prints build on the
-   * picks' defaults. Keyed on the focus, like `skipsSportScope`.
-   */
-  const asksAccessory = strengthDevelop && (state.focus ?? 'run') !== 'ride';
   // ⛔ ONE SCHEDULER ON THE STRENGTH PATH. Every other goal keeps the per-discipline cards, because
   // there the endurance IS the plan and there is no lifting frequency to fit it around.
   /**
@@ -164,7 +158,10 @@ function scheduleSteps(state: StepRouterState, isStrengthFocus: boolean, isRaceG
     // — moved into the endurance screen's slot cards, where each sits inside the session it is
     // about. The accessory card's data dependency is unchanged: it still runs after the endurance
     // answer, which is now one step instead of two.
-    if (asksAccessory) out.push('accessory');
+    // ⛔ EVERY STRENGTH PATH ASKS IT, RIDE + STRENGTH INCLUDED (Michael, 2026-09-13, superseding the same
+    // day's "no screen"). The screen draws whatever pick rows the plan declares (`picksForFrame`);
+    // on p278 that is the Day 1 focused pull + focused push and the Day 2 accessory lower lift.
+    if (strengthDevelop) out.push('accessory');
     out.push('schedule');
   } else {
     if (kept('run')) out.push('run');

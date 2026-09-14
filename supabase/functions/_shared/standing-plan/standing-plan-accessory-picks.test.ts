@@ -305,8 +305,13 @@ Deno.test('the core pick reaches the week through the floor, and the row says wh
 Deno.test('a chip re-points the picks it can reach and leaves the rest alone', () => {
   const plain = defaultViadaPicks(EQUIPMENT, []);
   const shoulders = defaultViadaPicks(EQUIPMENT, ['shoulders']);
-  assert(shoulders.db_press !== plain.db_press, 'the dumbbell press did not follow the shoulders chip');
-  assert(shoulders.iso_push !== plain.iso_push, 'the isolation push did not follow the shoulders chip');
+  // ⚠️ REBASED 2026-09-13 (WORKORDER-look-first-default-picks): both rows now DEFAULT to a shoulder movement
+  // (Arnold press, lateral raise), so the chip has nothing to move them to. What stands is that under the
+  // chip they are shoulder movements.
+  const deltoids = (key: 'db_press' | 'iso_push', name: string | undefined) =>
+    pickOptions(key, EQUIPMENT).find((o) => o.name === name)?.muscle === 'deltoids';
+  assert(deltoids('db_press', shoulders.db_press), 'the press row is not a shoulder movement under the shoulders chip');
+  assert(deltoids('iso_push', shoulders.iso_push), 'the isolation push is not a shoulder movement under the shoulders chip');
   // ⛔ AND A CHIP NEVER REACHES A PICK IT DOES NOT SERVE. Both single-leg rows and `quad_iso` serve
   // none — the lower split is a layout decision, so no chip may move either half of it.
   assertEquals(shoulders.single_leg_a, plain.single_leg_a);
@@ -831,7 +836,8 @@ Deno.test('⛔⛔ EVERY LABEL IS HIS PRINTED HEADING — no invented tier names'
   // THE DAY SPLIT STANDS; the heads now open on HIS OWN NAMES after the strict cut (2026-08-29).
   // p220 prints "Split squat" and "Forward or reverse lunge" - the Bulgarian and walking versions are
   // the same movements under a setup modification (p218), not separate entries.
-  assertEquals(VIADA_PICKS.single_leg_a.leadWith[0], 'split squat');
+  // ⚠️ REBASED 2026-09-13 (Michael): the Day 2 "accessory lower" row opens on the hip thrust (p247).
+  assertEquals(VIADA_PICKS.single_leg_a.leadWith[0], 'hip thrust');
   assertEquals(VIADA_PICKS.single_leg_b.leadWith[0], 'walking lunge');
 });
 

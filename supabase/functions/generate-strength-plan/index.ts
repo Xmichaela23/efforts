@@ -60,6 +60,7 @@ import {
   PATTERN_FOR_TESTED_LIFT,
   flattenViadaPicks,
   normalizeViadaPrefs,
+  defaultViadaPicks,
   workingNumberFromFile,
   TESTED_LIFTS,
   type WorkingNumber,
@@ -913,6 +914,13 @@ Deno.serve(async (req: Request) => {
           ...(accessoryPicks ? { accessoryPicks } : {}),
           ...(focusChips ? { focus: focusChips } : {}),
           ...(viadaPrefs ? { slotPicks: viadaPrefs.picks } : {}),
+          /**
+           * ⛔ A BUILD THAT SENT NO PICKS GETS THE PICKING SCREEN'S OWN DEFAULTS (WORKORDER-look-first-default-
+           * picks-2026-09-13, Michael: set both default sources). Without this the composer chose its own
+           * movements for those rows, which were not the screen's. ⚠️ Only when no picks of either shape
+           * arrived; a legacy `by_day` answer keeps its own route.
+           */
+          ...(!viadaPrefs && !accessoryPicks ? { slotPicks: defaultViadaPicks(equipmentStrength, [], frameId) } : {}),
           ...(viadaPrefs && viadaPrefs.dial.length > 0
             ? { dial: viadaPrefs.dial } : {}),
           // ⛔ THE ATHLETE HAS NOT BEEN ASKED YET (stage 5). Seeded from the four lifts the entry

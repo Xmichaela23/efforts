@@ -483,8 +483,22 @@ const STRENGTH_5K_STANDARD: FrameDay[] = [
     strength: [
       S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: Primary hinge lower (rotate with primary push)', { rotatesWith: 'press_lower' }),
       S('ME', 'accessory', 'primary', 'press_lower', '1 x ME: Accessory: primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),
-      S('DE', 'accessory', 'secondary', 'hinge_lower', '1 x DE: Accessory: secondary hinge lower'),
+      S('DE', 'accessory', 'secondary', 'hinge_lower', '1 x DE: Accessory: secondary hinge lower', {
+        /**
+         * ⛔ p220's SECONDARY HINGE LOWER LIST, WHOLE (Michael, 2026-09-13, off the page photo): Romanian
+         * deadlift · stiff-legged deadlift · bench reverse hyper · good morning · KB swing · sandbag throw.
+         * The swing and the bench reverse hyper are filed in other categories of the catalogue, so they
+         * are named here to be fetched. This row built a hip thrust, which p220 does not print for it.
+         */
+        alsoAdmits: ['kettlebell swing', 'kb swing', 'weighted reverse hyper'],
+      }),
       S('HYP', 'accessory', 'secondary', 'press_lower', '1 X HYP: Accessory: accessory lower', {
+        /**
+         * ⛔ THE HIP THRUST IS THIS ROW'S DEFAULT (Michael, 2026-09-13, off the page photos). The page prints
+         * no list for "accessory lower"; p247 defines an accessory as a non-competition lift in a similar
+         * movement pattern. The catalogue files the hip thrust under the hinge pattern, so it is named here.
+         */
+        alsoAdmits: ['hip thrust'],
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],
@@ -558,6 +572,12 @@ const STRENGTH_5K_TAPER: FrameDay[] = [
       S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: Primary hinge lower (rotate)', { rotatesWith: 'press_lower' }),
       S('DE', 'accessory', 'primary', 'press_lower', '1 x DE: Accessory: primary push lower'),
       S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Accessory: accessory lower', {
+        /**
+         * ⛔ THE HIP THRUST IS THIS ROW'S DEFAULT (Michael, 2026-09-13, off the page photos). The page prints
+         * no list for "accessory lower"; p247 defines an accessory as a non-competition lift in a similar
+         * movement pattern. The catalogue files the hip thrust under the hinge pattern, so it is named here.
+         */
+        alsoAdmits: ['hip thrust'],
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],
@@ -961,8 +981,22 @@ const CYCLING_BASE_STANDARD: FrameDay[] = [
     strength: [
       S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: Primary hinge lower (rotate with primary push)', { rotatesWith: 'press_lower' }),
       S('ME', 'accessory', 'primary', 'press_lower', '1 x ME: Accessory: primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),
-      S('DE', 'accessory', 'secondary', 'hinge_lower', '1 x DE: Accessory: secondary hinge lower'),
+      S('DE', 'accessory', 'secondary', 'hinge_lower', '1 x DE: Accessory: secondary hinge lower', {
+        /**
+         * ⛔ p220's SECONDARY HINGE LOWER LIST, WHOLE (Michael, 2026-09-13, off the page photo): Romanian
+         * deadlift · stiff-legged deadlift · bench reverse hyper · good morning · KB swing · sandbag throw.
+         * The swing and the bench reverse hyper are filed in other categories of the catalogue, so they
+         * are named here to be fetched. This row built a hip thrust, which p220 does not print for it.
+         */
+        alsoAdmits: ['kettlebell swing', 'kb swing', 'weighted reverse hyper'],
+      }),
       S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Accessory: accessory lower', {
+        /**
+         * ⛔ THE HIP THRUST IS THIS ROW'S DEFAULT (Michael, 2026-09-13, off the page photos). The page prints
+         * no list for "accessory lower"; p247 defines an accessory as a non-competition lift in a similar
+         * movement pattern. The catalogue files the hip thrust under the hinge pattern, so it is named here.
+         */
+        alsoAdmits: ['hip thrust'],
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],
@@ -1018,6 +1052,12 @@ const CYCLING_BASE_TAPER: FrameDay[] = [
       S('ME', 'competition', 'primary', 'hinge_lower', '1 x ME: Primary hinge lower (rotate with primary push)', { rotatesWith: 'press_lower' }),
       S('ME', 'accessory', 'primary', 'press_lower', '1 x ME: Accessory: primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),
       S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Accessory: accessory lower', {
+        /**
+         * ⛔ THE HIP THRUST IS THIS ROW'S DEFAULT (Michael, 2026-09-13, off the page photos). The page prints
+         * no list for "accessory lower"; p247 defines an accessory as a non-competition lift in a similar
+         * movement pattern. The catalogue files the hip thrust under the hinge pattern, so it is named here.
+         */
+        alsoAdmits: ['hip thrust'],
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],

@@ -299,6 +299,12 @@ export type ViadaPickSpec = {
      * the page prints "(arms) superset" on, `false` the solo focused cell. Absent matches either.
      */
     arms?: boolean;
+    /**
+     * ⛔ THE INTENT OF THE CELL THIS PICK ANSWERS. Absent is `HYP`, every muscle-building row. `DE` is the
+     * p246/p278 Day 2 speed row `DE: Accessory: secondary hinge lower` (Michael, 2026-09-13: the "Hinge
+     * variation" pick is honoured there, from p220's list). A pick only ever matches cells of its own intent.
+     */
+    intent?: 'HYP' | 'DE';
   } | null;
   /**
    * ⛔ THE OTHER HALF OF A SUPERSET THE PAGE PRINTS AS ONE ROW. p274 pairs `braced hinge` with
@@ -480,7 +486,9 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // NOT in his book anywhere - cut on Michael's call. His nearest are the seated DB press and the
     // Arnold press, both shoulder movements, so the flat dumbbell press simply goes.
     hisList: ['larsen press', 'incline bench press', 'close grip bench press', 'jm press', 'seated db press', 'arnold press'],
-    leadWith: ['larsen press', 'incline bench press', 'close grip bench press', 'jm press', 'seated db press', 'arnold press'],
+    // ⛔ ARNOLD PRESS FIRST (Michael, 2026-09-13), seated DB press behind it — both on his p220 list. Day 1's
+    // speed row already builds the seated DB press. The rest in his printed order.
+    leadWith: ['arnold press', 'seated db press', 'larsen press', 'incline bench press', 'close grip bench press', 'jm press'],
     leadCite: 'Viada p220 — secondary push upper',
     servesChips: ['chest', 'shoulders'],
   },
@@ -516,7 +524,9 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
       because: 'His only chest isolation is the pec deck (p222) and it needs the station, so a home '
         + 'gym gets none of his. Ours, not a substitute for his movement.',
     }],
-    leadWith: ['triceps pushdown', 'tricep pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck', 'lateral raise'],
+    // ⛔ LATERAL RAISE FIRST (WORKORDER-look-first-default-picks-2026-09-13): side shoulders, from his own
+    // p222 list. The order is ours within his list.
+    leadWith: ['lateral raise', 'triceps pushdown', 'tricep pushdown', 'tate press', 'behind the neck db triceps extension', 'skull crusher', 'pec deck'],
     leadCite: 'Viada pp222-223 — focused push / arms',
     servesChips: ['chest', 'shoulders', 'arms'],
   },
@@ -610,10 +620,14 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
   hinge_lower: {
     key: 'hinge_lower',
     label: 'Hinge variation',
-    slot: { category: 'secondary', pattern: 'hinge_lower', frameDay: 2 },
-    // p220 SECONDARY HINGE LOWER, his six, in his printed order.
-    hisList: ['romanian deadlift', 'stiff-legged deadlift', 'reverse hyper', 'good morning', 'kb swing', 'sandbag throw'],
-    leadWith: ['romanian deadlift', 'stiff-legged deadlift', 'reverse hyper', 'good morning', 'kb swing', 'sandbag throw'],
+    slot: { category: 'secondary', pattern: 'hinge_lower', frameDay: 2, intent: 'DE' },
+    // p220 SECONDARY HINGE LOWER, his six, in the catalogue's spellings: the bench reverse hyper is
+    // `weighted reverse hyper`, the KB swing is `kettlebell swing` (2026-09-13: neither spelling reached
+    // the row before, and the row built an off-list hip thrust while this pick was ignored).
+    hisList: ['romanian deadlift', 'stiff-legged deadlift', 'weighted reverse hyper', 'reverse hyper', 'good morning', 'kettlebell swing', 'kb swing', 'sandbag throw'],
+    // ⛔ DEFAULT KB SWING, ROMANIAN DEADLIFT WHEN THERE IS NO KETTLEBELL (Michael, 2026-09-13). The rest
+    // follow in his printed order.
+    leadWith: ['kettlebell swing', 'kb swing', 'romanian deadlift', 'stiff-legged deadlift', 'weighted reverse hyper', 'reverse hyper', 'good morning', 'sandbag throw'],
     leadCite: 'Viada p220 - secondary hinge lower',
     servesChips: [],
   },
@@ -702,9 +716,12 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     // to setup", so elevating the rear foot is a setup change and a walking lunge is his forward lunge
     // performed travelling. The two lunge entries are his two DIRECTIONS, not two variants.
     // Step-ups, goblet squats and lateral lunges are not his and are cut.
-    hisList: ['split squat', 'zercher squat', 'freestanding barbell calf raise', 'walking lunge', 'reverse lunge'],
-    leadWith: ['split squat', 'zercher squat', 'reverse lunge', 'walking lunge'],
-    leadCite: 'Viada p220 — secondary press lower (ME lower day)',
+    // ⛔ THE HIP THRUST LEADS (Michael, 2026-09-13, off the page photos): p246/p278 print no list for this
+    // row's "accessory lower", and p247 defines an accessory as a non-competition lift in a similar movement
+    // pattern. The frame cell names it (`alsoAdmits`). p220's press-lower movements follow.
+    hisList: ['hip thrust', 'split squat', 'zercher squat', 'freestanding barbell calf raise', 'walking lunge', 'reverse lunge'],
+    leadWith: ['hip thrust', 'split squat', 'zercher squat', 'reverse lunge', 'walking lunge'],
+    leadCite: 'Viada p247 — accessory lower (non-competition, similar pattern); p220 — secondary press lower',
     servesChips: [],
     requiresLoad: true,
     excludes: EXPLOSIVE_STEP_UP_IS_THE_WRONG_INTENT,
@@ -806,8 +823,8 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
     label: 'Machine pull',
     slot: { category: 'braced', pattern: 'pull_upper' },
     hisList: ['chest supported row', 'lat pulldown', 'cable upright row'],
-    // ⛔ HIS ORDER, so the zero-touch default is the movement he prints first.
-    leadWith: ['chest supported row', 'lat pulldown', 'cable upright row'],
+    // ⛔ LAT PULLDOWN FIRST (Michael, 2026-09-13): back width, from his own p221 list.
+    leadWith: ['lat pulldown', 'chest supported row', 'cable upright row'],
     leadCite: 'Viada p221 — braced pull upper',
     servesChips: ['shoulders'],
   },
@@ -948,7 +965,10 @@ export const VIADA_PICKS: Record<ViadaPickKey, ViadaPickSpec> = {
      * curls are reachable there. Ordering cannot fix that — it is the consequence of admitting a
      * glutes movement to a hamstring row, it is flagged to Michael, and it is his call.
      */
-    leadWith: ['leg curl', 'hamstring curl', 'seated leg curl', 'lying leg curl', 'machine hip thrust', 'cable kickback'],
+    // ⛔⛔ SUPERSEDED 2026-09-13 (Michael): the HIP THRUST is the default now. p223 prints the machine and Smith
+    // versions first on this row; a kit without them gets the barbell hip thrust, marked as a stand-in like
+    // every other. The note above is history.
+    leadWith: ['machine hip thrust', 'smith machine hip thrust', 'hip thrust', 'barbell hip thrust', 'leg curl', 'hamstring curl', 'seated leg curl', 'lying leg curl', 'cable kickback'],
     leadCite: 'Viada p223 — focused hamstrings',
     servesChips: ['glutes'],
   },
@@ -1088,11 +1108,14 @@ export function pickKeyForSlot(
   frame: FrameId = 'strength_5k',
   /** Whether the cell is the page's "(arms) superset" one — see `slot.arms`. */
   arms?: boolean,
+  /** The cell's intent. A pick answers only cells of its own (`slot.intent`, absent = HYP). */
+  intent: 'HYP' | 'DE' = 'HYP',
 ): ViadaPickKey | null {
   let fallback: ViadaPickKey | null = null;
   for (const key of (PICK_KEYS_BY_FRAME[frame] ?? VIADA_PICK_KEYS)) {
     const slot = VIADA_PICKS[key].slot;
     if (!slot || slot.category !== category || slot.pattern !== pattern) continue;
+    if ((slot.intent ?? 'HYP') !== intent) continue;
     if (slot.arms != null && arms != null && slot.arms !== arms) continue;
     if (slot.frameDay == null) {
       // Day-agnostic: one movement across every day the cell falls on. Kept as the fallback so a
@@ -1240,7 +1263,7 @@ export function pickReachesFrame(
   return days.some((day) => {
     if (spec.slot!.frameDay != null && day.day !== spec.slot!.frameDay) return false;
     return day.strength.some((sl) =>
-      sl.intent === 'HYP' && sl.role === 'accessory'
+      sl.intent === (spec.slot!.intent ?? 'HYP') && sl.role === 'accessory'
       && sl.category === spec.slot!.category && sl.pattern === spec.slot!.pattern);
   });
 }
@@ -1269,7 +1292,7 @@ export function frameAdmitsForPick(
   for (const day of FRAMES[frame]?.columns[column] ?? []) {
     if (spec.slot.frameDay != null && day.day !== spec.slot.frameDay) continue;
     for (const sl of day.strength) {
-      if (sl.intent !== 'HYP' || sl.role !== 'accessory') continue;
+      if (sl.intent !== (spec.slot.intent ?? 'HYP') || sl.role !== 'accessory') continue;
       if (sl.category !== spec.slot.category || sl.pattern !== spec.slot.pattern) continue;
       if (sl.alsoAdmits) return sl.alsoAdmits;
     }
@@ -1287,7 +1310,7 @@ export function frameMuscleForPick(
   for (const day of FRAMES[frame]?.columns[column] ?? []) {
     if (spec.slot.frameDay != null && day.day !== spec.slot.frameDay) continue;
     for (const sl of day.strength) {
-      if (sl.intent !== 'HYP' || sl.role !== 'accessory') continue;
+      if (sl.intent !== (spec.slot.intent ?? 'HYP') || sl.role !== 'accessory') continue;
       if (sl.category !== spec.slot.category || sl.pattern !== spec.slot.pattern) continue;
       if (sl.muscle) return String(sl.muscle);
     }
@@ -1340,6 +1363,8 @@ export function picksForFrame(
    * the screen inventing a slot; core names an ADDITION, opt-in, placed by the composer after the
    * frame is built and absent entirely when the athlete leaves it alone.
    */
+  // ⚠️ Ride + Strength's Day 2 speed hinge row is drawn too (Michael, 2026-09-13): the Hinge variation row,
+  // the same one Run + Strength shows, with p220's list. It reaches the frame through its DE intent.
   const reachable = frame === 'strength_5k'
     ? ordered
     : ordered.filter((k) => (CORE_PICK_KEYS as readonly string[]).includes(k) || pickReachesFrame(k, frame, column));
@@ -1583,10 +1608,11 @@ export function pickOptions(
   alsoAdmits?: string[] | null,
 ): PickOption[] {
   const spec = VIADA_PICKS[key];
+  const cellIntent = spec.slot?.intent ?? 'HYP';
   const resolved = resolveSlot({
     category: spec.slot?.category ?? 'core',
     pattern: spec.slot?.pattern ?? null,
-    intent: 'HYP',
+    intent: cellIntent,
     equipment: equipment ?? null,
   });
   /**
@@ -1749,10 +1775,25 @@ export function pickOptions(
       for (const m of resolveSlot({
         category: cat,
         pattern: spec.slot?.pattern ?? null,
-        intent: 'HYP',
+        intent: cellIntent,
         equipment: equipment ?? null,
       }).options) {
         if (admitted.has(canonicalize(m.name))) found.push(m);
+      }
+    }
+    /**
+     * ⛔ A NAMED MOVEMENT FILED UNDER ANOTHER PATTERN (2026-09-13): the hip thrust on p246/p278's "accessory
+     * lower" row is a hinge in the catalogue. Only a name the row admits and not already found above is
+     * looked for there; nothing else crosses the pattern. The composer runs the same search.
+     */
+    const have = new Set([...resolved.options, ...found].map((m) => canonicalize(m.name)));
+    for (const pat of ['push_upper', 'pull_upper', 'press_lower', 'hinge_lower'] as ViadaPattern[]) {
+      if (pat === spec.slot?.pattern) continue;
+      for (const cat of ['secondary', 'braced', 'focused'] as ViadaCategory[]) {
+        for (const m of resolveSlot({ category: cat, pattern: pat, intent: cellIntent, equipment: equipment ?? null }).options) {
+          const c = canonicalize(m.name);
+          if (admitted.has(c) && !have.has(c)) { found.push(m); have.add(c); }
+        }
       }
     }
     return found;
@@ -1834,7 +1875,9 @@ export function pickOptions(
       }
       return { list: [], substituted: true };
     })()
-    : { list: refine(pool), substituted: false };
+    // ⚠️ A ROW THAT NAMES NO MUSCLE STILL TAKES THE MOVEMENTS IT ADMITS BY NAME (2026-09-13). Inert on every
+    // row that admits nothing, which was every muscle-less row before.
+    : { list: refine(dedupeByCanonical([...pool, ...admittedPool.filter((m) => !excluded.has(canonicalize(m.name)))])), substituted: false };
 
   return narrowed.list
     .map((m, i) => ({ m, i, r: rank(m) }))

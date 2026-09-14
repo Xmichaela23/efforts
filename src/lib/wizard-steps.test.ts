@@ -134,11 +134,12 @@ Deno.test('⛔⛔ RIDE + STRENGTH — the exact step list (WORKORDER-ride-streng
   /**
    * Michael, 2026-09-13: Train → Ride → Ride + Strength → rides (4 or 5) → schedule → numbers →
    * confirm. The rides screen is `endurance`. No sport-scope card (p278 holds rides only), no
-   * accessory screen, no lifting question (§3b is not built).
+   * lifting question (§3b is not built). ⚠️ THE BUILD FOCUS SCREEN IS IN (Michael, same night): after the
+   * rides screen, before Your week, exactly where Run + Strength has it.
    */
   const st = strengthPath('ride');
   assertEquals(landsOn(st), 'program');
-  assertEquals(getSteps(st), ['goal', 'train', 'program', 'endurance', 'schedule', 'numbers', 'confirm']);
+  assertEquals(getSteps(st), ['goal', 'train', 'program', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm']);
   assertEquals(fixedSportScope(st), RIDE_STRENGTH_POSTURE);
   assertEquals(RIDE_STRENGTH_POSTURE.run, 'out');
   assertEquals(RIDE_STRENGTH_POSTURE.bike, 'maintain');
