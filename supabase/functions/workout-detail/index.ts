@@ -166,6 +166,9 @@ function isSessionDetailStale(workoutRow: { updated_at?: string | null; planned_
     if (!Number.isFinite(svv) || svv < STRENGTH_VOLUME_VERSION) return true;
   }
 
+  const pcv = Number((sessionDetail as any)?.plan_context_v);
+  if (!Number.isFinite(pcv) || pcv < PLAN_CONTEXT_VERSION) return true;
+
   // 2026-09-10 — the totals' one planned length and one moving time; see SESSION_TOTALS_VERSION.
   const tv = Number((sessionDetail as any)?.totals_v);
   if (!Number.isFinite(tv) || tv < SESSION_TOTALS_VERSION) return true;
@@ -215,8 +218,14 @@ function stripResponseOnlySessionDetailFields(sd: Record<string, unknown> | null
  *       no line, the cache fast path serves those copies untouched, and the lift header printed
  *       nothing while the run and ride tiles fell back to the fact packet's different wording.
  */
-// 5 (2026-09-14): the plan context line now ends on a whole sentence; saved copies refresh once to pick it up.
 const BLOCK_CARD_VERSION = 5;
+
+/**
+ * 2026-09-14 — the plan context line ends on a whole sentence. NOT gated on `planned_id`: a ride can reach
+ * its plan through the attach path with that column empty (Sunday's ride did), so the block card's gate
+ * served it the old cut copy. Every saved copy below this version refreshes once, then serves from cache.
+ */
+const PLAN_CONTEXT_VERSION = 1;
 
 /**
  * ⛔ THE VOLUME FIELD NEEDS ITS OWN STALENESS RULE, AND IT IS NOT THE BLOCK CARD'S (D-349, 2026-08-01).
@@ -1206,6 +1215,7 @@ async function runSessionDetailPipelineAndPersist(
     if (sessionDetailV1) {
       // Stamped whether or not a card resolved — see the staleness note above.
       (sessionDetailV1 as Record<string, unknown>).block_v = BLOCK_CARD_VERSION;
+      (sessionDetailV1 as Record<string, unknown>).plan_context_v = PLAN_CONTEXT_VERSION;
       // D-349 — stamped whether or not volume resolved, for the same reason: an unstamped copy is
       // indistinguishable from a pre-D-349 one, so a session that legitimately has no volume would
       // refresh on every open forever.
