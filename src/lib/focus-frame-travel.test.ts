@@ -67,3 +67,15 @@ Deno.test('⛔ THE RESOLVER STILL DEFAULTS TO THE 5K FRAME', () => {
   assert(/position\.focus === 'ride' \? 'cycling_base' : 'strength_5k'/.test(RESOLVER),
     'the resolver default is no longer the 5K frame');
 });
+
+Deno.test('⛔ RIDE + STRENGTH — the focus and the ride count survive every hop (2026-09-13)', () => {
+  // Hop 1: the programme card carries `ride`, and the payload sends it and the ride count.
+  assert(/goal: 'get_stronger', focus: 'ride'/.test(WIZARD), 'the Ride + Strength card no longer seeds its focus');
+  assert(/state\.focus === 'ride' \? \{ focus: 'ride' \} : \{\}/.test(WIZARD), 'the payload no longer sends the ride focus');
+  assert(/printedRideWeekPath\(state\) \? \{ ride_count:/.test(WIZARD), 'the payload no longer sends the ride count');
+  // Hop 2: create-goal forwards both through its allowlist.
+  assert(/gsTp\.focus === 'ride'/.test(CREATE_GOAL), 'create-goal no longer forwards the ride focus');
+  assert(/\{ ride_count: n \}/.test(CREATE_GOAL), 'create-goal drops the ride count — a four-ride answer builds five');
+  // Hop 3: the builder reads the count off its body.
+  assert(/\(body as Record<string, unknown>\)\.ride_count/.test(GENERATE), 'generate-strength-plan no longer reads the ride count');
+});

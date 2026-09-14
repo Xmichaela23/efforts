@@ -1,7 +1,9 @@
 # Work order — Ride + Strength on p278 (2026-09-13)
 
-> **STATUS: NOT STARTED.** Go from Michael 2026-09-13 ("build 1", then "lets build it" with §3b
-> added). §0 items 1-4 are his to answer before §4 ships; §1, §2, §3 and §3b can start now.
+> **STATUS 2026-09-13: §1, §3 and §4 BUILT; the card is live.** Setup path, copy and Michael's answers:
+> `COPY-ride-strength-setup-2026-09-13.md`. Eight throwaway builds through the live server (4 and 5 rides,
+> with and without FTP, lifts on file and tested in week one) matched p278 in all 12 weeks; accounts
+> deleted. §3b is not built (ruled). §0.5's dumbbell-fill idea is not decided and not built.
 
 The Ride Focus card **Ride + Strength** is a dimmed placeholder today (`NonRaceBuilder.tsx`,
 `ride_strength`, `goal: null`). It goes live built on **p278** (Viada's cycling Base week, notes
@@ -14,14 +16,14 @@ p137 names the rider who knows the sport but is currently undertrained in it (co
 
 ## 0. Open — Michael answers before §4 ships
 
-1. **Card copy.** Proposed, not approved:
+1. ✅ **Card copy APPROVED 2026-09-13 (Michael "yes"):**
    label `Ride + Strength` · blurb `For newer riders and riders coming back. Cycling and strength
    progress together. Four or five rides, three lifting days.` The current blurb ("Twelve weeks…")
    comes off either way.
 2. ✅ **DECIDED 2026-09-13 (Michael): the Day 2 easy ride comes out of the 4-ride week.** The p278
    deload column keeps easy rides on Day 2 and Day 6 (Day 7 is full rest).
    ✅ **Copy approved (Michael):** ride names `VO2 Ride` and `Sprint Ride`; sprint effort `2 min all out`.
-3. **Length.** p280 gives "at least 4 weeks" and no end; lifts move every 3-4 weeks (p245, p247,
+3. ✅ **DECIDED 2026-09-13 (Michael): twelve weeks.** Athletes who want a harder plan switch to another plan. (Superseded analysis follows.) **Length.** p280 gives "at least 4 weeks" and no end; lifts move every 3-4 weeks (p245, p247,
    p251); p123 says retesting is rarely needed. The book supports no fixed end. Today's builder
    makes twelve-week blocks. §2 traces what "no fixed end" costs before anyone picks.
 4. **The lifting question's wording** (§3b). Nothing is shipped without his exact words.
@@ -108,8 +110,7 @@ endurance L1 (5 rides). Watts from the saved FTP.
   own judgement to go longer"):** the plan does NOT lengthen rides week to week (p281's growth is
   not built). Easy rides print their level 1 length; the athlete may ride them longer on their own
   judgement when the ride stays conversational. Basis: p137 and p275 (extra easy work allowed while
-  recovery holds), p211 talk test for VT1 (doc-only), p107 drift stop. Copy on the easy ride, exact
-  words to be confirmed by Michael before ship: `If easy rides are kept conversational, use your own
+  recovery holds), p211 talk test for VT1 (doc-only), p107 drift stop. Copy on the easy ride, APPROVED by Michael 2026-09-13: `If easy rides are kept conversational, use your own
   judgement to go longer.`
 
 **Deload week** (existing Adjust toggle, next week only): p278 Deload column for both sides.

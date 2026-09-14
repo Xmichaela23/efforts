@@ -2450,7 +2450,13 @@ Deno.serve(async (req: Request) => {
     const sport = String(resolvedGoal.sport || '').toLowerCase();
     const isTri = sport === 'triathlon' || sport === 'tri';
 
-    if (!['run', 'triathlon', 'tri'].includes(sport)) {
+    /**
+     * ⛔ A RIDES-ONLY NON-RACE GOAL GOES ON TO THE STRENGTH-PRIMARY BRANCH (Ride + Strength, 2026-09-13).
+     * The wizard sends `sport: 'bike'` for it (`sportFromPosture`: run out, bike held), and this gate
+     * refused it before the non-race branch below, which already serves cyclists. A `bike` goal that
+     * is not built there is still refused, just past that branch — see the second check.
+     */
+    if (!['run', 'triathlon', 'tri'].includes(sport) && !(sport === 'bike' && resolvedIsNonRace)) {
       throw new AppError('unsupported_sport', `Auto-build is not yet supported for "${sport}" goals. Supported: run, triathlon.`);
     }
 
@@ -3111,6 +3117,15 @@ Deno.serve(async (req: Request) => {
                */
               // ⚠️ `'ride'` ADDED 2026-09-13 — Ride Focus builds Cycling: Base (p278).
               ...(gsTp.focus === 'standard' || gsTp.focus === 'run' || gsTp.focus === 'ride' ? { focus: gsTp.focus } : {}),
+              /**
+               * ⛔ THE RIDE COUNT (Ride + Strength, p278's 4 or 5, 2026-09-13). Same allowlist, same
+               * failure: `generate-strength-plan` reads `ride_count` off its own body, so a hop that drops
+               * it builds five rides under a screen that said four. Whole numbers above zero only.
+               */
+              ...(() => {
+                const n = Number((gsTp as Record<string, unknown>).ride_count);
+                return Number.isInteger(n) && n > 0 ? { ride_count: n } : {};
+              })(),
               /** ⛔ The variant picks (endurance_slot_archetypes) — string map, validated. */
               ...(() => {
                 const raw = (gsTp as Record<string, unknown>).endurance_slot_archetypes;
@@ -3230,6 +3245,12 @@ Deno.serve(async (req: Request) => {
             }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
           }
         }
+      }
+
+      // ⛔ THE SECOND HALF OF THE BIKE GATE ABOVE: a `bike` goal the strength-primary branch did not build
+      // is refused exactly as before, rather than reaching the run or combined builders.
+      if (sport === 'bike') {
+        throw new AppError('unsupported_sport', `Auto-build is not yet supported for "${sport}" goals. Supported: run, triathlon.`);
       }
 
       // ── (b)-run: run-shaped non-race → generate-run-plan with a RETEST head ────────

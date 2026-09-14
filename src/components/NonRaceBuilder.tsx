@@ -12,6 +12,8 @@ import EnduranceWeekCard from './EnduranceWeekCard';
  * screen and stays untouched through this order.
  */
 import RunStrengthWeekCard from './RunStrengthWeekCard';
+// ⛔ THE RIDE + STRENGTH ENDURANCE SCREEN (WORKORDER-ride-strength-2026-09-13 §4): p278's rides, one question.
+import RideStrengthWeekCard from './RideStrengthWeekCard';
 // ⛔ WHAT THE SERVER SAYS ABOUT THE ANSWERS SO FAR (2026-09-10, audit item 26) — see `builder-readout.ts`.
 import { fetchIntakeReadout, type BuilderReadout } from '@/lib/builder-readout';
 // ⛔ THE HARD SLOT'S SESSION CHOICES — one component, shared with anything that renders a slot.
@@ -405,6 +407,20 @@ const TRAIN_OPENS: Record<TrainCardId, 'wizard' | 'programs'> = {
  * ⚠️ NO PROTOCOL NAMES, NO AUTHOR ON A CARD. The numbers on the blurbs are the frame's own counts
  * (p246: four lifting days, four runs; twelve weeks is the block length this path builds).
  */
+/**
+ * ⛔ THE RIDE + STRENGTH REQUIREMENTS LINE — MICHAEL'S WORDS, APPROVED 2026-09-13. What p278 needs:
+ * barbell and rack (its heavy and speed rows are barbell lifts), bench, dumbbells (the secondary push
+ * options), something to carry (p226), a bike; watts need a power meter or smart trainer. The 65 lb
+ * minimum covers the three lifts the week loads (`Frame.testedLifts`).
+ * ⚠️ DECLARED ABOVE `PROGRAM_COPY`, which reads it at module load.
+ */
+const RIDE_STRENGTH_REQUIREMENT_LINE =
+  'Requirements: a barbell and rack, a bench, dumbbells, something to carry, and a bike. Watts need a '
+  + 'power meter or smart trainer. Bench, squat and deadlift each need a 1RM of at least 65 lb.';
+
+/** ⛔ APPROVED (Michael, 2026-09-13) — the Ride + Strength numbers step, beside FTP. p137: the rider coming back. */
+const RIDE_BREAK_FTP_LINE = "If you're coming back from a riding break, make sure your FTP is current.";
+
 type ProgramId = 'run_strength' | 'ride_strength';
 const PROGRAMS_BY_CARD: Record<TrainCardId, ProgramId[]> = {
   standard: [], run: ['run_strength'], ride: ['ride_strength'],
@@ -414,7 +430,15 @@ const PROGRAM_COPY: Record<ProgramId, {
   /** The goal the card seeds; `null` = not built, the card is dimmed and does not navigate. */
   goal: NonRaceGoalId | null;
   /** Which frame the wizard opens on — see `FOCUS_FRAME`. */
-  focus: 'standard' | 'run';
+  focus: 'standard' | 'run' | 'ride';
+  /**
+   * ⛔ A BUILT PROGRAMME WHOSE SCREENS' WORDS ARE NOT ALL APPROVED YET STAYS DIMMED (Ride + Strength,
+   * 2026-09-13: every athlete-facing line goes through Michael before the card is switched on).
+   * Absent = live whenever `goal` is set.
+   */
+  held?: boolean;
+  /** The line under the blurb: what the block needs. Shown on a live card only. */
+  requirement?: string;
 }> = {
   run_strength: {
     label: 'Run + Strength',
@@ -428,9 +452,14 @@ const PROGRAM_COPY: Record<ProgramId, {
   },
   ride_strength: {
     label: 'Ride + Strength',
-    blurb: 'Twelve weeks. Four lifting days, your riding.',
+    // ⛔ APPROVED (Michael, 2026-09-13). p280: Base is for less experienced riders; p137: the rider
+    // coming back. p278: five rides (four with the Day 2 easy ride out), three lifting days.
+    blurb: 'For newer riders and riders coming back. Cycling and strength progress together. '
+      + 'Four or five rides, three lifting days.',
     Icon: Bike, color: getDisciplineColor('ride'),
-    goal: null, focus: 'run',
+    goal: 'get_stronger', focus: 'ride',
+    // ⛔ LIVE (Michael, 2026-09-13): every line on the path approved — docs/COPY-ride-strength-setup-2026-09-13.md.
+    requirement: RIDE_STRENGTH_REQUIREMENT_LINE,
   },
 };
 /** The program screen's title, per grouping — the discipline word, under the eye like Train. */
@@ -440,9 +469,11 @@ const PROGRAM_SCREEN_TITLE: Record<TrainCardId, string> = { standard: 'Standard'
 const COUNT_WORD: Record<number, string> = { 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five' };
 
 /** ⛔ WHICH FRAME EACH FOCUS BUILDS. See `resolveFrame` — the engine takes the same two words. */
-const FOCUS_FRAME: Record<'standard' | 'run', FrameId> = {
+const FOCUS_FRAME: Record<'standard' | 'run' | 'ride', FrameId> = {
   standard: 'all_rounder',
   run: 'strength_5k',
+  // ⛔ Ride Focus → Ride + Strength → Cycling: Base (p278). `resolveFrame` takes the same word.
+  ride: 'cycling_base',
 };
 
 /**
@@ -451,7 +482,15 @@ const FOCUS_FRAME: Record<'standard' | 'run', FrameId> = {
  * is the whole class of defect the per-slot answer exists to prevent.
  * ⚠️ ABSENT IS `strength_5k` — every build that predates the Standard card, and the Run Focus card.
  */
-const frameOf = (st: { focus?: 'standard' | 'run' }): FrameId => FOCUS_FRAME[st.focus ?? 'run'];
+const frameOf = (st: { focus?: 'standard' | 'run' | 'ride' }): FrameId => FOCUS_FRAME[st.focus ?? 'run'];
+
+/**
+ * ⛔ THE PRINTED RIDE WEEK — Ride + Strength (WORKORDER-ride-strength-2026-09-13 §3, §4). The page
+ * fixes every ride at level 1 and the athlete's one answer is four rides or five. Keyed on what the
+ * frame DECLARES (`printedWeekOnly` and a `fewerRidesDropsSlot`), never on its id.
+ */
+const printedRideWeekPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' }): boolean =>
+  st.goal === 'get_stronger' && !!FRAMES[frameOf(st)]?.printedWeekOnly && FRAMES[frameOf(st)]?.fewerRidesDropsSlot != null;
 
 /**
  * ⛔⛔ THE ROTATE-ONLY RUN PATH — Run + Strength (Michael, 2026-09-07 evening,
@@ -467,7 +506,7 @@ const frameOf = (st: { focus?: 'standard' | 'run' }): FrameId => FOCUS_FRAME[st.
  * ⚠️ ONE OWNER, READ IN BOTH SCOPES — the payload assembler and the component. Two copies of this
  * test is how the screen and the payload come to disagree about what was asked.
  */
-const rotateOnlyRunPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' }): boolean =>
+const rotateOnlyRunPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' }): boolean =>
   st.goal === 'get_stronger' && frameOf(st) === 'strength_5k';
 
 /**
@@ -484,7 +523,7 @@ const rotateOnlyRunPath = (st: { goal?: NonRaceGoalId | null; focus?: 'standard'
  * what happens when the two are conflated: the athlete picked one name and was handed a plan called
  * another.
  */
-const programmeName = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' }): string =>
+const programmeName = (st: { goal?: NonRaceGoalId | null; focus?: 'standard' | 'run' | 'ride' }): string =>
   FRAMES[frameOf(st)]?.displayName ?? (st.goal ? GOAL_LABELS[st.goal] : 'Goal');
 
 /**
@@ -1013,8 +1052,14 @@ export type NonRaceState = {
    * FRAME, and it is card-level rather than goal-level because both strength cards seed one goal.
    * ⚠️ Absent is `run`, which is every athlete who picked Strength Focus and everyone before this
    * card existed. It never changes what that path builds.
+   * ⚠️ `'ride'` = Ride + Strength (Cycling: Base, p278), 2026-09-13.
    */
-  focus?: 'standard' | 'run';
+  focus?: 'standard' | 'run' | 'ride';
+  /**
+   * ⛔ RIDE + STRENGTH'S ONE ENDURANCE ANSWER — four rides or five (p278; the 4-ride week leaves out
+   * the Day 2 easy ride). Absent = the page's five.
+   */
+  rideCount?: 4 | 5;
   /**
    * ⛔ WHICH TRAIN CARD WAS TAPPED (2026-09-07). Run Focus and Ride Focus open a program list before
    * any goal is seeded, so the goal cannot say which grouping the athlete is in; this does. It is
@@ -1712,6 +1757,10 @@ function assemblePayload(
            * ⚠️ OMITTED ON THE 5K PATH, so that payload is byte-identical to what it sends today.
            */
           ...(isStrengthFocusPath && state.focus === 'standard' ? { focus: 'standard' } : {}),
+          // ⛔ RIDE + STRENGTH (2026-09-13): the focus, and the ride count on a printed ride week. Both
+          // omitted on every other path, so those payloads are byte-identical.
+          ...(isStrengthFocusPath && state.focus === 'ride' ? { focus: 'ride' } : {}),
+          ...(printedRideWeekPath(state) ? { ride_count: state.rideCount ?? 5 } : {}),
           // "Know your numbers?" — Use current on strength = no test week; the block prices off the numbers on
           // file (`generate-strength-plan` reads `skip_test_week`; create-goal forwards it). Retest = the default
           // test week. The endurance answers travel as data; create-goal inserts the week-one tests with the plan.
@@ -4281,15 +4330,15 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         >
           <div className="space-y-2">
             {PROGRAMS_BY_CARD[state.trainCard].map((p) => {
-              const { label, blurb, Icon, color, goal, focus } = PROGRAM_COPY[p];
-              const live = goal != null;
+              const { label, blurb, Icon, color, goal, focus, held, requirement } = PROGRAM_COPY[p];
+              const live = goal != null && !held;
               return (
                 <button
                   key={p} type="button"
                   className={optBtn(state.program === p, !live)}
                   disabled={!live}
                   onClick={() => {
-                    if (!goal) return;
+                    if (!goal || !live) return;
                     reseed(goal, undefined);
                     // ⛔ THE FOCUS TRAVELS FROM HERE — it picks the frame (`FOCUS_FRAME`). Set AFTER
                     // `reseed`, which does not touch it.
@@ -4308,7 +4357,7 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                           carries; this block refuses at the gate without it. */}
                       {live ? (
                         <span className="block text-xs mt-1.5 leading-relaxed text-white/45">
-                          {p === 'run_strength' ? RUN_STRENGTH_REQUIREMENT : STANDARD_FOCUS_REQUIREMENT}
+                          {requirement ?? (p === 'run_strength' ? RUN_STRENGTH_REQUIREMENT : STANDARD_FOCUS_REQUIREMENT)}
                         </span>
                       ) : null}
                     </span>
@@ -6013,7 +6062,24 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
         </StepLayout>
       )}
 
-      {currentStep === 'endurance' && !rotateOnlyRunPath(state) && (
+      {/* ⛔ RIDE + STRENGTH HAS ITS OWN ENDURANCE SCREEN (WORKORDER-ride-strength-2026-09-13 §4). The
+          page fixes every ride; the one answer is four rides or five, seeded at the page's five, so
+          Continue is never blocked here. See `RideStrengthWeekCard`. */}
+      {currentStep === 'endurance' && printedRideWeekPath(state) && (
+        <StepLayout
+          step={stepNo('endurance')} totalSteps={steps.length} title={eyeTitle('Endurance focus')}
+          onBack={back} onContinue={next}
+          canContinue
+        >
+          <RideStrengthWeekCard
+            frame={wizardFrame}
+            rideCount={state.rideCount ?? 5}
+            onRideCount={(n) => setState((st) => ({ ...st, rideCount: n }))}
+          />
+        </StepLayout>
+      )}
+
+      {currentStep === 'endurance' && !rotateOnlyRunPath(state) && !printedRideWeekPath(state) && (
         <StepLayout
           step={stepNo('endurance')} totalSteps={steps.length} title={eyeTitle('Endurance focus')}
           // ⚠️ NO SUBTITLE. Michael's header is the first thing on the card and it is verbatim; a
@@ -7578,6 +7644,14 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
           row={paceRow as never}
           strength={builder}
           include={numbersInclude}
+          /* ⛔ THE LIFTS THE PLAN'S WEEK LOADS (`Frame.testedLifts`) — Ride + Strength tests no press.
+             Omitted when the frame tests all four, so those plans' row is unchanged. */
+          testedLifts={isStrengthFocus && (FRAMES[wizardFrame]?.testedLifts ?? []).length < 4
+            ? FRAMES[wizardFrame].testedLifts : undefined}
+          /* ⛔ APPROVED (Michael, 2026-09-13), on the step where FTP is confirmed, for a plan whose
+             endurance is rides only (`Frame.enduranceSports`). */
+          ftpNote={isStrengthFocus && FRAMES[wizardFrame]?.enduranceSports.every((sp) => sp === 'ride')
+            ? RIDE_BREAK_FTP_LINE : null}
           choice={state.numbersChoice ?? {}}
           onChoice={(next) => setState((st) => ({ ...st, numbersChoice: next }))}
           onBack={back}
@@ -7594,7 +7668,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
             ? `${state.raceDistance} — ${state.raceDate}${planWeeks !== null ? `, about ${planWeeks} weeks` : ''}.`
             /* ⛔ "of the previous program" DELETED (2026-08-24): his trademark on the final commit
                screen, and no longer true — the block is the Standing Plan engine, not the previous program. */
-            : `${programmeName(state)} — ${state.targetWeeks} weeks. Strength leads; your endurance holds.`}
+            // ⛔ RIDE + STRENGTH'S OWN LINE (Michael, 2026-09-13; COPY-ride-strength-setup). Every other plan unchanged.
+            : printedRideWeekPath(state)
+              ? `${programmeName(state)}, ${state.targetWeeks} weeks.`
+              : `${programmeName(state)} — ${state.targetWeeks} weeks. Strength leads; your endurance holds.`}
           onBack={back} onContinue={handleConfirm} canContinue={!saving}
           continueLabel={saving ? 'Building…' : 'Build plan'} saving={saving}
         >
@@ -7758,6 +7835,10 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
                     on a close race. "About" is doing real work in this sentence. */
                 <>Running leads to {state.raceDistance.toLowerCase()} day, about {planWeeks ?? '—'} weeks
                 out, with a taper into the race. Everything you kept is held underneath it.</>
+              ) : printedRideWeekPath(state) ? (
+                /* ⛔ APPROVED, MICHAEL'S WORDS (2026-09-13), Ride + Strength only. Lifts move when earned
+                   (work order §3); the old three-cycle sentence below is not this plan. */
+                <>A {state.targetWeeks}-week plan to get faster and stronger. The weights go up as you adapt to the training.</>
               ) : isStrengthFocus ? (
                 /* ⛔ "every third week" was false — the open set exists ONLY in the anchor cycle
                    (`wendler-531.ts:61`: amrap = anchor && !deload && last set), so weeks 9-11 of

@@ -22,7 +22,7 @@ export type StepRouterState = {
    * carries (`skipsSportScope`, `fixedSportScope`). Absent is `run`, which is every build that
    * predates the Standard card.
    */
-  focus?: 'standard' | 'run';
+  focus?: 'standard' | 'run' | 'ride';
   /**
    * ⛔ WHICH TRAIN CARD WAS TAPPED (2026-09-07) — `standard`, `run` or `ride`. Run and Ride are
    * groupings that open a program list (`program`) before any goal exists; Standard opens the
@@ -126,6 +126,12 @@ function scheduleSteps(state: StepRouterState, isStrengthFocus: boolean, isRaceG
   // ⚠️ ON THE STRENGTH PATH THIS MOVED DOWN, to after the volume — see the block below. Every other
   // goal keeps it here: there is no endurance tier deciding its numbers.
   if (strengthDevelop && !isStrengthFocus) out.push('accessory');
+  /**
+   * ⛔ RIDE + STRENGTH HAS NO ACCESSORY SCREEN (Michael's path, 2026-09-13: Train → Ride → Ride +
+   * Strength → rides → schedule → numbers → confirm). The accessory cells p278 prints build on the
+   * picks' defaults. Keyed on the focus, like `skipsSportScope`.
+   */
+  const asksAccessory = strengthDevelop && (state.focus ?? 'run') !== 'ride';
   // ⛔ ONE SCHEDULER ON THE STRENGTH PATH. Every other goal keeps the per-discipline cards, because
   // there the endurance IS the plan and there is no lifting frequency to fit it around.
   /**
@@ -158,7 +164,7 @@ function scheduleSteps(state: StepRouterState, isStrengthFocus: boolean, isRaceG
     // — moved into the endurance screen's slot cards, where each sits inside the session it is
     // about. The accessory card's data dependency is unchanged: it still runs after the endurance
     // answer, which is now one step instead of two.
-    if (strengthDevelop) out.push('accessory');
+    if (asksAccessory) out.push('accessory');
     out.push('schedule');
   } else {
     if (kept('run')) out.push('run');
@@ -244,6 +250,13 @@ export const STANDARD_FOCUS_POSTURE = { run: 'maintain', bike: 'maintain' } as c
 export const RUN_STRENGTH_POSTURE = { run: 'maintain', bike: 'out' } as const;
 
 /**
+ * ⛔ RIDE + STRENGTH HOLDS RIDING ONLY (WORKORDER-ride-strength-2026-09-13 §3). p278 is a ride week
+ * with no run slot, so the sport-scope cards are not asked and run is `out` — which keeps every run
+ * control off the later screens and sends `endurance_sport: 'bike'` to the builder.
+ */
+export const RIDE_STRENGTH_POSTURE = { run: 'out', bike: 'maintain' } as const;
+
+/**
  * ⛔ THE SPORT SCOPE A FRAME ANSWERS FOR THE ATHLETE, or `null` where the screen still asks.
  * Standard Focus: both held (p274 prescribes both). Run + Strength: running held, riding out
  * (p246 prescribes runs). Every other goal: the cards are asked.
@@ -253,9 +266,10 @@ export const RUN_STRENGTH_POSTURE = { run: 'maintain', bike: 'out' } as const;
  */
 export function fixedSportScope(
   state: StepRouterState,
-): typeof STANDARD_FOCUS_POSTURE | typeof RUN_STRENGTH_POSTURE | null {
+): typeof STANDARD_FOCUS_POSTURE | typeof RUN_STRENGTH_POSTURE | typeof RIDE_STRENGTH_POSTURE | null {
   if (state.goal !== 'get_stronger') return null;
-  return (state.focus ?? 'run') === 'standard' ? STANDARD_FOCUS_POSTURE : RUN_STRENGTH_POSTURE;
+  const focus = state.focus ?? 'run';
+  return focus === 'standard' ? STANDARD_FOCUS_POSTURE : focus === 'ride' ? RIDE_STRENGTH_POSTURE : RUN_STRENGTH_POSTURE;
 }
 
 export function getSteps(state: StepRouterState): StepKey[] {

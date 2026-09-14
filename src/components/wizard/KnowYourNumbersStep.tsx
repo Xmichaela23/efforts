@@ -89,7 +89,7 @@ function Toggle({ k, value, canUse, onSet, useLabel = 'Use current', testLabel =
 }
 
 export function KnowYourNumbersStep({
-  step, totalSteps, row, strength, include, choice, onChoice, onBack, onContinue,
+  step, totalSteps, row, strength, include, choice, onChoice, onBack, onContinue, testedLifts, ftpNote,
 }: {
   step: number; totalSteps: number;
   row: BaselinesRowLike;
@@ -100,20 +100,40 @@ export function KnowYourNumbersStep({
   onChoice: (next: NumbersChoice) => void;
   onBack: () => void;
   onContinue: () => void;
+  /**
+   * ⛔ THE BARBELL LIFTS THE PLAN'S WEEK LOADS (`Frame.testedLifts`, 2026-09-13). Ride + Strength loads
+   * bench, squat and deadlift, so the row neither lists a press nor says one is tested in week one.
+   * Absent = all four, which is every other plan.
+   */
+  testedLifts?: string[];
+  /** One line under the FTP row, for the plan that asks for it. Null or absent = none. */
+  ftpNote?: string | null;
 }) {
   const metric = String(row?.units ?? '').toLowerCase() === 'metric';
   const pn = (row?.performance_numbers ?? {}) as Record<string, unknown>;
 
-  const lifts = LIFT_FIELDS.map((f) => ({ f, onFile: strength?.lifts?.[f.key] ?? null }));
+  // ⚠️ `overheadPress1RM` is Baselines' key for the lift the frame calls `overheadPress`.
+  const planLoads = (key: LiftKey) =>
+    !testedLifts || key === 'pullupMaxReps' || testedLifts.includes(key === 'overheadPress1RM' ? 'overheadPress' : key);
+  const lifts = LIFT_FIELDS.filter((f) => planLoads(f.key)).map((f) => ({ f, onFile: strength?.lifts?.[f.key] ?? null }));
   const barbell = lifts.filter((l) => !l.f.reps);
-  const strengthComplete = strength?.barbell_lifts_on_file === 'all';
-  const strengthAny = strength?.barbell_lifts_on_file === 'all' || strength?.barbell_lifts_on_file === 'some';
+  // ⛔ WITHOUT `testedLifts` THESE ARE THE SERVER'S COUNTS, as before. With it, the same counts over the
+  // lifts the plan loads — the server counts all four, and a press on file is not this plan's number.
+  const strengthComplete = testedLifts
+    ? barbell.length > 0 && barbell.every((l) => l.onFile)
+    : strength?.barbell_lifts_on_file === 'all';
+  const strengthAny = testedLifts
+    ? barbell.some((l) => l.onFile)
+    : strength?.barbell_lifts_on_file === 'all' || strength?.barbell_lifts_on_file === 'some';
+  const strengthDefault: 'use' | 'test' = testedLifts
+    ? (strengthAny ? 'use' : 'test')
+    : strength?.strength_default ?? 'test';
 
   const ftp = resolveCurrentFtp(row as never);
   const thr = resolveCurrentRunThresholdPace(row as never);
   const swimOnFile = typeof pn.swimPace100 === 'string' && pn.swimPace100.trim() !== '' ? String(pn.swimPace100) : null;
 
-  const strengthChoice: 'use' | 'test' = choice.strength ?? strength?.strength_default ?? 'test';
+  const strengthChoice: 'use' | 'test' = choice.strength ?? (strength ? strengthDefault : 'test');
   const ftpChoice: 'use' | 'test' = choice.ftp ?? (ftp.value != null ? 'use' : 'test');
   const runChoice: 'use' | 'test' = choice.run ?? (thr.sec_per_mi != null ? 'use' : 'test');
 
@@ -122,12 +142,12 @@ export function KnowYourNumbersStep({
   // strength key waits for the server's default.
   React.useEffect(() => {
     const seeded: NumbersChoice = {};
-    if (include.strength && choice.strength == null && strength) seeded.strength = strength.strength_default;
+    if (include.strength && choice.strength == null && strength) seeded.strength = strengthDefault;
     if (include.bike && choice.ftp == null) seeded.ftp = ftpChoice;
     if (include.run && choice.run == null) seeded.run = runChoice;
     if (Object.keys(seeded).length > 0) onChoice({ ...seeded, ...choice });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [strength?.strength_default, ftp.value, thr.sec_per_mi]);
+  }, [strength?.strength_default, strengthDefault, ftp.value, thr.sec_per_mi]);
 
   const set = (k: NumbersChoiceKey, v: 'use' | 'test') => onChoice({ ...choice, [k]: v });
 
@@ -167,10 +187,13 @@ export function KnowYourNumbersStep({
         )}
         {include.bike && rowShell(
           'FTP',
-          ftp.value != null
-            ? <>{Math.round(ftp.value)} W <span className="text-white/40">· {ftp.source === 'manual' ? 'typed in Baselines' : ftp.source === 'learned' ? 'estimated from your rides' : 'estimated, low confidence'}</span>
-                {ftpChoice === 'test' && <div className="text-white/50 mt-1">The 20-minute FTP test (p212) is scheduled into week one.</div>}</>
-            : <>Nothing on file. The 20-minute FTP test (p212) is scheduled into week one.</>,
+          <>
+            {ftp.value != null
+              ? <>{Math.round(ftp.value)} W <span className="text-white/40">· {ftp.source === 'manual' ? 'typed in Baselines' : ftp.source === 'learned' ? 'estimated from your rides' : 'estimated, low confidence'}</span>
+                  {ftpChoice === 'test' && <div className="text-white/50 mt-1">The 20-minute FTP test (p212) is scheduled into week one.</div>}</>
+              : <>Nothing on file. The 20-minute FTP test (p212) is scheduled into week one.</>}
+            {ftpNote ? <div className="text-white/70 mt-1">{ftpNote}</div> : null}
+          </>,
           <Toggle k="ftp" value={ftpChoice} canUse={ftp.value != null} onSet={set} />,
         )}
 

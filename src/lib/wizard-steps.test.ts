@@ -12,7 +12,7 @@
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
-  fixedSportScope, getSteps, RUN_STRENGTH_POSTURE, skipsSportScope, STANDARD_FOCUS_POSTURE,
+  fixedSportScope, getSteps, RIDE_STRENGTH_POSTURE, RUN_STRENGTH_POSTURE, skipsSportScope, STANDARD_FOCUS_POSTURE,
   type StepRouterState,
 } from './wizard-steps.ts';
 
@@ -21,7 +21,7 @@ import {
  * Focus tap records `run` and goes through the program list. A build with no focus at all is a
  * draft from before the Standard card existed, and it has no Train card either.
  */
-const strengthPath = (focus?: 'standard' | 'run'): StepRouterState => ({
+const strengthPath = (focus?: 'standard' | 'run' | 'ride'): StepRouterState => ({
   goal: 'get_stronger',
   entry: 'train',
   ...(focus ? { focus, trainCard: focus } : {}),
@@ -128,6 +128,25 @@ Deno.test('⛔ RIDE FOCUS OPENS ITS OWN LIST — one dimmed card, no goal, nothi
   const st: StepRouterState = { goal: null, entry: 'train', trainCard: 'ride', posture: {} };
   assertEquals(landsOn(st), 'program', 'the Ride Focus card does not open the program list');
   assertEquals(getSteps(st).slice(0, 3), ['goal', 'train', 'program']);
+});
+
+Deno.test('⛔⛔ RIDE + STRENGTH — the exact step list (WORKORDER-ride-strength-2026-09-13 §4, §5)', () => {
+  /**
+   * Michael, 2026-09-13: Train → Ride → Ride + Strength → rides (4 or 5) → schedule → numbers →
+   * confirm. The rides screen is `endurance`. No sport-scope card (p278 holds rides only), no
+   * accessory screen, no lifting question (§3b is not built).
+   */
+  const st = strengthPath('ride');
+  assertEquals(landsOn(st), 'program');
+  assertEquals(getSteps(st), ['goal', 'train', 'program', 'endurance', 'schedule', 'numbers', 'confirm']);
+  assertEquals(fixedSportScope(st), RIDE_STRENGTH_POSTURE);
+  assertEquals(RIDE_STRENGTH_POSTURE.run, 'out');
+  assertEquals(RIDE_STRENGTH_POSTURE.bike, 'maintain');
+  // ⚠️ The posture the effect writes: the list holds with run out as well as before it is written.
+  assertEquals(getSteps({ ...st, posture: { ...st.posture, ...RIDE_STRENGTH_POSTURE } }), getSteps(st));
+  // ⛔ One guard for the other two: their lists are unchanged.
+  assertEquals(getSteps(strengthPath('run')), ['goal', 'train', 'program', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm']);
+  assertEquals(getSteps(strengthPath('standard')), ['goal', 'train', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm']);
 });
 
 Deno.test('⚠️ A DRAFT FROM BEFORE THE TRAIN CARD EXISTED SEES NO PROGRAM SCREEN', () => {
