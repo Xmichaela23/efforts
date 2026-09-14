@@ -88,3 +88,11 @@ Deno.test('⛔ MULTISPORT FOCUS — the Run + Ride + Strength card opens today\'
     'the program lists changed');
   assert(/standard: 'programs', run: 'programs', ride: 'programs'/.test(WIZARD), 'a section no longer opens its list');
 });
+
+Deno.test('⛔ THE SAMPLE WEEK FOLLOWS THE NUMBERS ANSWER (Michael, off his phone 2026-09-13)', () => {
+  // Build this plan? rebuilds a sample week built from older answers; Your week rebuilds on the numbers answer.
+  assert(/previewBuiltFrom\.current !== JSON\.stringify\(payloadNow\(\)\)/.test(WIZARD),
+    'Build this plan? can show a sample week built before the numbers were answered');
+  assert(/state\.runClubIntensity, state\.trainingDays,[\s\S]{0,120}state\.numbersChoice\]/.test(WIZARD),
+    'Your week no longer rebuilds when the numbers answer changes');
+});

@@ -4011,10 +4011,18 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
    */
   const previewSupported = true;
 
+  /**
+   * ⛔ THE ANSWERS THE SHOWN SAMPLE WEEK WAS BUILT FROM (Michael, off his phone 2026-09-13). "Build this plan?"
+   * reused the week "Your week" had built, so an answer given after it (Use current on the lifts) never reached
+   * the sample: it still showed Test: Upper and Test: Lower while the built plan had none.
+   */
+  const previewBuiltFrom = React.useRef<string | null>(null);
   const runPreview = async () => {
     if (!state.goal || previewing || !previewSupported) return;
     setPreviewing(true);
-    const plan = (await preview(payloadNow())) as PreviewPlan | null;
+    const payload = payloadNow();
+    previewBuiltFrom.current = JSON.stringify(payload);
+    const plan = (await preview(payload)) as PreviewPlan | null;
     const wk1 = plan?.sessions_by_week?.['1'];
     // ⛔ A FAILED PREVIEW IS NOT AN EMPTY WEEK. This used to coerce anything unusable to `[]`, which
     // the card below then rendered as "0 training days, 7 rest · about 0h a week" — a confident,
@@ -4116,7 +4124,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
       state.qualityDays, state.hardDays, state.targetMiles, state.targetRunHours, state.rideHours,
       // ⚠️ THE EXPERIENCE ANSWER CHANGES EVERY HARD SESSION'S LENGTH, so it changes the preview.
       unavailableDays, state.slotSports, state.swimEasySessions, state.enduranceExperience,
-      state.runClubIntensity, state.trainingDays]);
+      state.runClubIntensity, state.trainingDays,
+      // ⚠️ THE NUMBERS ANSWER DECIDES WHETHER WEEK 1 IS THE TEST WEEK (2026-09-13).
+      state.numbersChoice]);
 
   /**
    * ⛔ THE CONFIRM SCREEN SHOWS THE WEEK, NOT A BUTTON THAT OFFERS ONE. Michael, 2026-07-29:
@@ -4133,7 +4143,9 @@ export default function NonRaceBuilder({ onClose, entry: initialEntry, onPlanSea
   React.useEffect(() => {
     if (currentStep !== 'confirm') return;
     if (!previewSupported) return;   // race goals: previewing would WRITE — see `previewSupported`
-    if (previewWeek !== null || previewing || previewFailed) return;
+    // ⛔ AND IT REBUILDS WHEN THE ANSWERS CHANGED SINCE THE SHOWN WEEK WAS BUILT — see `previewBuiltFrom`.
+    const stale = previewWeek !== null && previewBuiltFrom.current !== JSON.stringify(payloadNow());
+    if ((previewWeek !== null && !stale) || previewing || (previewFailed && !stale)) return;
     void runPreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep]);

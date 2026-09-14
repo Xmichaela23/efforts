@@ -118,7 +118,7 @@ Deno.test('⛔⛔ RUN FOCUS OPENS THE PROGRAM LIST, THEN THE ENDURANCE SCREEN �
   const st = strengthPath('run');
   assertEquals(landsOn(st), 'program', 'the Run Focus card does not open the program list');
   assertEquals(getSteps(st), [
-    'goal', 'train', 'program', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm',
+    'goal', 'train', 'program', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm',
   ]);
   assert(!(getSteps(st) as string[]).includes('posture'),
     'the posture card is back in the Run + Strength flow');
@@ -143,16 +143,16 @@ Deno.test('⛔⛔ RIDE + STRENGTH — the exact step list (WORKORDER-ride-streng
    */
   const st = strengthPath('ride');
   assertEquals(landsOn(st), 'program');
-  assertEquals(getSteps(st), ['goal', 'train', 'program', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm']);
+  assertEquals(getSteps(st), ['goal', 'train', 'program', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm']);
   assertEquals(fixedSportScope(st), RIDE_STRENGTH_POSTURE);
   assertEquals(RIDE_STRENGTH_POSTURE.run, 'out');
   assertEquals(RIDE_STRENGTH_POSTURE.bike, 'maintain');
   // ⚠️ The posture the effect writes: the list holds with run out as well as before it is written.
   assertEquals(getSteps({ ...st, posture: { ...st.posture, ...RIDE_STRENGTH_POSTURE } }), getSteps(st));
   // ⛔ One guard for the other two: their lists are unchanged.
-  assertEquals(getSteps(strengthPath('run')), ['goal', 'train', 'program', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm']);
+  assertEquals(getSteps(strengthPath('run')), ['goal', 'train', 'program', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm']);
   // ⚠️ Multisport Focus gained its program list (2026-09-13); nothing else in its list moved.
-  assertEquals(getSteps(strengthPath('standard')), ['goal', 'train', 'program', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm']);
+  assertEquals(getSteps(strengthPath('standard')), ['goal', 'train', 'program', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm']);
 });
 
 Deno.test('⚠️ A DRAFT FROM BEFORE THE TRAIN CARD EXISTED SEES NO PROGRAM SCREEN', () => {
@@ -166,7 +166,7 @@ Deno.test('⚠️ A DRAFT FROM BEFORE THE TRAIN CARD EXISTED SEES NO PROGRAM SCR
   const st = strengthPath(undefined);
   assert(!(getSteps(st) as string[]).includes('program'));
   assertEquals(getSteps(st), [
-    'goal', 'train', 'endurance', 'accessory', 'schedule', 'numbers', 'confirm',
+    'goal', 'train', 'endurance', 'accessory', 'numbers', 'schedule', 'confirm',
   ]);
 });
 
@@ -217,7 +217,7 @@ Deno.test('⛔ THE FLOW IS COMPLETE WITHOUT A STANDARD-ONLY SCREEN', () => {
   // ⚠️ AND SINCE 2026-09-13 NOT APART AT ALL: Multisport Focus has its program list too, and neither has the
   // sport-scope card. The flows are the same screens.
   assertEquals(standard, run, 'the two flows differ');
-  for (const required of ['endurance', 'schedule', 'numbers', 'confirm'] as const) {
+  for (const required of ['endurance', 'numbers', 'schedule', 'confirm'] as const) {
     assert(standard.includes(required), `Standard Focus never asks for ${required}`);
   }
 });

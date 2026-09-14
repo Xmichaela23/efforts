@@ -368,5 +368,15 @@ export function getSteps(state: StepRouterState): StepKey[] {
   const head: StepKey[] = isStrengthFocus
     ? [...door, ...(fixedSportScope(state) != null ? [] : ['posture' as StepKey])]
     : [...door, 'posture', 'commitment', 'length'];
-  return [...head, ...scheduleSteps(state, isStrengthFocus, isRaceGoal), 'numbers', 'confirm'];
+  const sched = scheduleSteps(state, isStrengthFocus, isRaceGoal);
+  /**
+   * ⛔ ON THE STRENGTH PATH "KNOW YOUR NUMBERS?" COMES BEFORE "YOUR WEEK" (Michael, off his phone 2026-09-13).
+   * "Your week" draws week 1, and whether week 1 is the lift test week is this screen's answer, so asked
+   * after it the week showed Test: Upper / Test: Lower to everyone. Every other goal keeps its order.
+   */
+  if (isStrengthFocus && sched.includes('schedule')) {
+    const i = sched.indexOf('schedule');
+    return [...head, ...sched.slice(0, i), 'numbers', ...sched.slice(i), 'confirm'];
+  }
+  return [...head, ...sched, 'numbers', 'confirm'];
 }
