@@ -1463,6 +1463,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             </div>
           ) : showAllPlans ? (
             <div className="pt-4 flex min-h-0 flex-1 flex-col">
+              <div className="wizard-galaxy wizard-galaxy--plans flex min-h-0 flex-1 flex-col pt-3 px-1">
               <AllPlansInterface
                 onClose={handleBackToDashboard}
                 onSelectPlan={handlePlanSelect}
@@ -1478,6 +1479,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 focusWeek={focusWeek}
                 showCompleted={showCompletedPlans}
               />
+              </div>
             </div>
           ) : showStrengthLogger ? (
             <div className="pt-4">
@@ -1518,8 +1520,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               />
             </div>
           ) : showConnections ? (
-            <div className="pt-4 h-full overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + var(--tabbar-extra, 0px))' }}>
-              <Connections embedded />
+            <div className="pt-4 h-full">
+              <div className="wizard-galaxy wizard-galaxy--connections h-full">
+                <div className="h-full overflow-y-auto pt-4" style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + var(--tabbar-extra, 0px))' }}>
+                  <Connections embedded />
+                </div>
+              </div>
             </div>
           ) : showSupport ? (
             <div className="pt-4 h-full overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px) + var(--tabbar-extra, 0px))' }}>

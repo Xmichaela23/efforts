@@ -1856,18 +1856,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           opacity: 1,
           mixBlendMode: 'soft-light',
           backgroundColor: 'rgba(0,0,0,0.22)',
+          // The texture is Home's (2026-09-13, Michael: "cleaner"): the Today panel's diagonal lines at
+          // 26px and 52px, at that layer's strength (its 0.30 opacity folded into the line alphas so the
+          // dark tint above stays as it was). The 9px square grid is gone.
           backgroundImage: `
-            repeating-linear-gradient(0deg, rgba(255,255,255,0.22) 0px, rgba(255,255,255,0.22) 1px, transparent 1px, transparent 9px),
-            repeating-linear-gradient(90deg, rgba(255,255,255,0.18) 0px, rgba(255,255,255,0.18) 1px, transparent 1px, transparent 9px),
-            linear-gradient(45deg, rgba(255,255,255,0.65) 1px, transparent 1px),
-            linear-gradient(-45deg, rgba(255,255,255,0.52) 1px, transparent 1px),
-            linear-gradient(45deg, rgba(255,255,255,0.40) 1px, transparent 1px),
-            linear-gradient(-45deg, rgba(255,255,255,0.34) 1px, transparent 1px)
+            linear-gradient(45deg, rgba(255,255,255,0.066) 1px, transparent 1px),
+            linear-gradient(-45deg, rgba(255,255,255,0.054) 1px, transparent 1px),
+            linear-gradient(45deg, rgba(255,255,255,0.030) 1px, transparent 1px),
+            linear-gradient(-45deg, rgba(255,255,255,0.024) 1px, transparent 1px)
           `,
-          backgroundSize: '20px 20px, 20px 20px, 20px 20px, 20px 20px, 40px 40px, 40px 40px',
-          backgroundPosition: 'center, center, center, center, center, center',
-          backgroundBlendMode: 'soft-light, soft-light, soft-light, soft-light, soft-light, soft-light',
-          filter: 'blur(0.2px) contrast(1.12)',
+          backgroundSize: '26px 26px, 26px 26px, 52px 52px, 52px 52px',
+          backgroundPosition: 'center, center, center, center',
+          backgroundBlendMode: 'soft-light, soft-light, soft-light, soft-light',
         }}
       />
     </div>

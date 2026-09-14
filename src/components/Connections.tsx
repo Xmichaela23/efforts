@@ -1077,7 +1077,7 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
 
       <div className="grid gap-6">
         {connections.map((connection) => (
-          <Card key={connection.provider} className="relative">
+          <Card key={connection.provider} className="relative rounded-xl border-white/12 bg-white/[0.03] shadow-none">
             <CardHeader className="pb-3">
               <div className="flex items-start gap-3">
                 {getProviderIcon(connection.provider)}
@@ -1403,7 +1403,7 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
 
       {/* Apple Health Section - Only visible on iOS native app */}
       {isNativeIOS && (
-        <Card className="mt-6">
+        <Card className="mt-6 rounded-xl border-white/12 bg-white/[0.03] shadow-none">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2 text-white/90">
               <Heart className="h-5 w-5 text-red-400" />
@@ -1466,7 +1466,7 @@ const Connections: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => 
       )}
 
       {/* Activity Source Preference Section */}
-      <Card className="mt-6">
+      <Card className="mt-6 rounded-xl border-white/12 bg-white/[0.03] shadow-none">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2 text-white/90">
             <Settings className="h-5 w-5" />

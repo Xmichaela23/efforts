@@ -38,15 +38,46 @@ export function AuthScreenLayout({ children }: AuthScreenLayoutProps) {
     `,
   };
 
+  // The warm sun from Home (TodaysEffort.tsx, "THE SUN"): a small warm-white core with a gold and
+  // peach halo, sitting just above the card so the card's top edge catches it. It breathes on the
+  // same slow pulse as the nova.
+  const sunStyle: React.CSSProperties = {
+    mixBlendMode: 'screen',
+    filter: 'blur(10px)',
+    background: `
+      radial-gradient(150px 90px at 50% 50%, rgba(255,240,210,0.55) 0%, rgba(255,224,170,0.16) 50%, rgba(255,224,170,0) 100%),
+      radial-gradient(420px 240px at 50% 52%, rgba(255,190,100,0.22) 0%, rgba(255,190,100,0) 100%),
+      radial-gradient(760px 420px at 50% 54%, rgba(255,150,80,0.12) 0%, rgba(255,150,80,0) 100%)
+    `,
+  };
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-black">
+    // The same room as Focus and the Train screens: `wizard-galaxy` (nebula, stars, grain).
+    <div className="wizard-galaxy relative min-h-screen overflow-hidden">
       <div
         className="pointer-events-none absolute inset-0 animate-auth-nova-pulse"
-        style={supernovaStyle}
+        style={{ ...supernovaStyle, opacity: 0.7 }}
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.028)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.028)_1px,transparent_1px)] bg-[length:24px_24px]"
+        className="pointer-events-none absolute inset-x-0 animate-auth-nova-pulse"
+        style={{ ...sunStyle, top: 'calc(50% - 440px)', height: '420px' }}
+        aria-hidden
+      />
+      {/* Home's texture: diagonal lines at 26px and 52px, in place of the square grid. */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          opacity: 0.30,
+          mixBlendMode: 'soft-light',
+          backgroundImage: `
+            linear-gradient(45deg, rgba(255,255,255,0.22) 1px, transparent 1px),
+            linear-gradient(-45deg, rgba(255,255,255,0.18) 1px, transparent 1px),
+            linear-gradient(45deg, rgba(255,255,255,0.10) 1px, transparent 1px),
+            linear-gradient(-45deg, rgba(255,255,255,0.08) 1px, transparent 1px)
+          `,
+          backgroundSize: '26px 26px, 26px 26px, 52px 52px, 52px 52px',
+        }}
         aria-hidden
       />
       <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10">

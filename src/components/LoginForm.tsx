@@ -82,7 +82,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
   };
 
   return (
-    <div className="w-full max-w-md space-y-8 rounded-2xl border border-white/10 bg-zinc-950/75 px-8 py-10 shadow-[0_0_0_1px_rgba(255,255,255,0.04)_inset,0_24px_80px_-20px_rgba(0,0,0,0.85)] backdrop-blur-xl">
+    <div
+      // The card is its own piece of space: `galaxy-card` + `--auth` (nebula, novas, stars), lit from
+      // its top edge in the sun's gold, with the rim the sun above it catches.
+      className="galaxy-card galaxy-card--auth w-full max-w-md space-y-8 rounded-2xl border border-white/12 px-8 py-10 shadow-[inset_0_1px_0_rgba(255,236,200,0.22),0_24px_80px_-20px_rgba(0,0,0,0.85)]"
+      style={{ ['--card-accent-rgb' as any]: '255, 196, 120', ['--card-accent-a' as any]: '0.24', ['--card-star-x' as any]: '6%' }}
+    >
       <div className="flex flex-col items-center text-center">
         <div className="flex justify-center [&_svg]:drop-shadow-[0_0_28px_rgba(255,215,0,0.15)]">
           <EffortsWordmark

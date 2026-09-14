@@ -1655,7 +1655,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           </div>
         </div>
 
-        <div className="bg-white/[0.05] backdrop-blur-xl border-2 border-white/20 rounded-2xl shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)]">
+        <div className="bg-white/[0.03] border border-white/12 rounded-xl">
           <div className="p-3 border-b border-white/10">
             <div className="flex items-center justify-between">
               <div>
@@ -1978,7 +1978,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                         })() : '';
 
                         return (
-                        <div key={day} className="bg-white/[0.05] backdrop-blur-md border border-white/15 rounded-xl overflow-hidden">
+                        <div key={day} className="bg-white/[0.03] border border-white/12 rounded-xl overflow-hidden">
                           <div className="px-3 py-2 text-sm font-medium text-white flex items-center gap-2">
                             <span>{day}</span>
                             {formattedDate && <span className="text-white/50 font-normal">{formattedDate}</span>}
@@ -1988,7 +1988,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                               <div
                                 key={workout.id || `workout-${day}-${index}`}
                                 onClick={() => handleWorkoutClick(workout)}
-                                className={`p-4 rounded-lg border transition-colors cursor-pointer ${workout.type === 'rest' ? 'bg-white/[0.03] border-white/10' : 'bg-white/[0.08] border-white/15 hover:bg-white/[0.12] hover:border-white/25'}`}
+                                className={`p-4 rounded-lg border transition-colors cursor-pointer ${workout.type === 'rest' ? 'bg-white/[0.02] border-white/8' : 'bg-white/[0.04] border-white/12 hover:bg-white/[0.07] hover:border-white/20'}`}
                               >
                                 {false ? (
                                   <></>

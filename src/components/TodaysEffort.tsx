@@ -1645,9 +1645,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           filter: 'blur(10px)',
           transform: 'translateZ(0)',
           backgroundImage: `
-            radial-gradient(170px 96px at 50% 20%, rgba(255,253,248,0.60) 0%, rgba(255,253,248,0.18) 46%, rgba(255,253,248,0.00) 100%),
-            radial-gradient(380px 210px at 50% 22%, rgba(255,242,214,0.24) 0%, rgba(255,242,214,0.00) 100%),
-            radial-gradient(660px 340px at 50% 24%, rgba(255,214,150,0.11) 0%, rgba(255,214,150,0.00) 100%)
+            /* SUNRISE (2026-09-14, Michael: "a bit brown… can it feel more sunrise?"). Bands that cool as
+               they rise, not one warm wash: a bright pale-yellow core, a coral-pink ring around it,
+               violet above, fading to deep blue. Dim orange over the dark panel read as brown. */
+            radial-gradient(140px 80px at 50% 30%, rgba(255,246,214,0.62) 0%, rgba(255,236,190,0.20) 50%, rgba(255,236,190,0.00) 100%),
+            radial-gradient(360px 190px at 50% 32%, rgba(255,128,120,0.22) 0%, rgba(255,128,120,0.00) 100%),
+            radial-gradient(620px 220px at 50% 0%, rgba(160,110,230,0.20) 0%, rgba(160,110,230,0.00) 100%),
+            radial-gradient(760px 300px at 50% -8%, rgba(70,100,210,0.14) 0%, rgba(70,100,210,0.00) 100%)
           `,
         }}
       />
@@ -1687,15 +1691,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               mixBlendMode: 'screen',
               backgroundImage: rgb
                 ? `
-            radial-gradient(320px 150px at 28% 42%, rgba(${rgb}, 0.30) 0%, rgba(${rgb}, 0.0) 74%),
-            radial-gradient(300px 160px at 68% 52%, rgba(${rgb}, 0.18) 0%, rgba(${rgb}, 0.0) 74%)
+            radial-gradient(320px 150px at 22% 42%, rgba(${rgb}, 0.26) 0%, rgba(${rgb}, 0.0) 74%),
+            radial-gradient(300px 160px at 78% 52%, rgba(${rgb}, 0.14) 0%, rgba(${rgb}, 0.0) 74%)
           `
                 : `
             radial-gradient(200px 120px at 18% 40%, rgba(255, 215, 0, 0.28) 0%, rgba(255, 215, 0, 0.0) 72%),
-            radial-gradient(220px 140px at 40% 52%, rgba(255, 140, 66, 0.20) 0%, rgba(255, 140, 66, 0.0) 72%),
             radial-gradient(220px 140px at 60% 52%, rgba(183, 148, 246, 0.18) 0%, rgba(183, 148, 246, 0.0) 72%),
-            radial-gradient(200px 120px at 82% 40%, rgba(74, 158, 255, 0.18) 0%, rgba(74, 158, 255, 0.0) 72%),
-            radial-gradient(260px 170px at 50% 72%, rgba(239, 68, 68, 0.14) 0%, rgba(239, 68, 68, 0.0) 76%)
+            radial-gradient(200px 120px at 82% 40%, rgba(74, 158, 255, 0.18) 0%, rgba(74, 158, 255, 0.0) 72%)
           `,
               opacity: 0.85,
               filter: 'blur(26px) saturate(1.15)',
@@ -1804,13 +1806,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             // show through it, and that lid is what kept the screen's own light off the top of Home.
             // The blur does the same job: rows passing under it are smeared rather than read, and the
             // light behind the panel comes up through it.
-            backgroundColor: 'rgba(9,10,14,0.58)',
+            backgroundColor: 'rgba(9,10,14,0.72)',
             backdropFilter: 'blur(18px)',
             WebkitBackdropFilter: 'blur(18px)',
             // Option 1 lighting: keep texture, but bias glow to a top-left “key light” (white)
             backgroundImage: `
-              radial-gradient(ellipse at 18% 0%, rgba(255, 255, 255, 0.18) 0%, transparent 60%),
-              radial-gradient(ellipse at 70% 45%, rgba(255, 255, 255, 0.06) 0%, transparent 62%),
+              radial-gradient(ellipse at 18% 0%, rgba(255, 255, 255, 0.08) 0%, transparent 60%),
+              radial-gradient(ellipse at 70% 45%, rgba(255, 255, 255, 0.03) 0%, transparent 62%),
               linear-gradient(45deg, rgba(255,255,255,0.18) 1px, transparent 1px),
               linear-gradient(-45deg, rgba(255,255,255,0.14) 1px, transparent 1px),
               linear-gradient(45deg, rgba(255,255,255,0.08) 1px, transparent 1px),

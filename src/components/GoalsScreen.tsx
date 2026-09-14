@@ -1330,7 +1330,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
       : goal.name;
 
     return (
-      <div key={goal.id} className={`rounded-2xl border p-4 transition-all duration-200 ${isExpanded ? 'border-white/20 bg-white/[0.06]' : 'border-white/10 bg-white/[0.04]'}`}>
+      <div key={goal.id} className={`rounded-xl border p-4 transition-all duration-200 ${isExpanded ? 'border-white/20 bg-white/[0.05]' : 'border-white/12 bg-white/[0.03]'}`}>
         <button className="w-full text-left" onClick={() => setExpandedGoalId(isExpanded ? null : goal.id)}>
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex items-center gap-1.5">
@@ -1813,7 +1813,8 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
   // ===================== MAIN SCREEN =====================
 
   return (
-    <div className="flex flex-col h-full">
+    // Same room as the Train screens: `wizard-galaxy`, the builder's own deep-space background.
+    <div className="wizard-galaxy flex flex-col h-full">
       {/* Conflict dialog */}
       {conflictDialog && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-6">
@@ -2274,7 +2275,7 @@ const GoalsScreen: React.FC<GoalsScreenProps> = ({
             type="button"
             disabled={!live}
             onClick={() => { if (live) setShowBuilder(id); }}
-            className="w-full flex items-start gap-3.5 rounded-2xl p-5 text-left transition-all border border-white/10 bg-white/[0.06] hover:bg-white/[0.10]"
+            className="w-full flex items-start gap-3.5 rounded-xl p-5 text-left transition-all border border-white/12 bg-white/[0.03] hover:bg-white/[0.06]"
           >
             {/* The colour stays on a dimmed card, at lower opacity — "not yet" without losing which
                 discipline it belongs to. No colour (Build) falls back to the neutral white. */}

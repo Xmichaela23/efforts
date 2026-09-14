@@ -1038,6 +1038,42 @@ body.wizard-active { --tabbar-h: 0px; }
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
+/* Connections — the same room as `.wizard-galaxy` (nebula + stars + grain), lit from the other
+   side so the two screens are told apart: blue leads from the top right, gold is the low fill at the
+   bottom left. The hues are the wizard's own; only their position and weight change. */
+.wizard-galaxy--connections::before {
+  background-image:
+    radial-gradient(60% 44% at 50% 28%, rgba(190,215,255,0.14), transparent 62%),
+    radial-gradient(82% 54% at 94% 0%, rgba(74,140,230,0.30), transparent 60%),
+    radial-gradient(76% 58% at 4% 24%, rgba(138,104,230,0.22), transparent 60%),
+    radial-gradient(80% 60% at 30% 118%, rgba(255,188,84,0.16), transparent 62%),
+    radial-gradient(44% 34% at 88% 92%, rgba(56,180,200,0.12), transparent 64%),
+    radial-gradient(1.2px 1.2px at 18% 22%, rgba(255,255,255,0.65), transparent),
+    radial-gradient(1px 1px at 78% 58%, rgba(255,240,210,0.5), transparent),
+    radial-gradient(1px 1px at 60% 34%, rgba(210,225,255,0.55), transparent),
+    radial-gradient(1px 1px at 33% 74%, rgba(255,255,255,0.45), transparent),
+    radial-gradient(1.4px 1.4px at 88% 46%, rgba(255,245,220,0.5), transparent),
+    radial-gradient(ellipse at center, #0b0a20 0%, #070716 58%, #020209 100%);
+}
+
+/* Plans — the same room as `.wizard-galaxy`, lit from the BOTTOM: the schedule sits in the glow
+   rising under it, the way the nova cards on State do. Gold and violet low, a faint blue at the top.
+   The hues are the wizard's own; only their position and weight change. */
+.wizard-galaxy--plans::before {
+  background-image:
+    radial-gradient(60% 40% at 50% 78%, rgba(255,216,150,0.14), transparent 62%),
+    radial-gradient(82% 54% at 12% 104%, rgba(255,188,84,0.24), transparent 60%),
+    radial-gradient(76% 58% at 92% 96%, rgba(138,104,230,0.28), transparent 60%),
+    radial-gradient(80% 50% at 50% -14%, rgba(56,112,206,0.18), transparent 62%),
+    radial-gradient(44% 34% at 88% 8%, rgba(232,78,156,0.10), transparent 64%),
+    radial-gradient(1.2px 1.2px at 18% 22%, rgba(255,255,255,0.65), transparent),
+    radial-gradient(1px 1px at 78% 58%, rgba(255,240,210,0.5), transparent),
+    radial-gradient(1px 1px at 60% 34%, rgba(210,225,255,0.55), transparent),
+    radial-gradient(1px 1px at 33% 74%, rgba(255,255,255,0.45), transparent),
+    radial-gradient(1.4px 1.4px at 88% 46%, rgba(255,245,220,0.5), transparent),
+    radial-gradient(ellipse at center, #0b0a20 0%, #070716 58%, #020209 100%);
+}
+
 /* Galaxy CARD — the same deep-space treatment as the Strong Focus wizard, on a card.
    (2026-08-14, Michael: "give the cards background the same space treatment as the current plan
    wizard in Strong Focus.")
@@ -1074,6 +1110,40 @@ body.wizard-active { --tabbar-h: 0px; }
     radial-gradient(1.4px 1.4px at calc(88% - var(--card-star-x, 0%)) 46%, rgba(255,245,220,0.5), transparent),
     radial-gradient(ellipse at center, #0b0a20 0%, #070716 58%, #020209 100%);
 }
+/* SIGN-IN card — a deeper piece of space than a data card: the galaxy-card's nebula, plus three
+   small novas (a bright point with a coloured bloom, in the wordmark's own hues: violet, green,
+   gold) and a denser star field. It holds no data, so it gets no grid. */
+.galaxy-card--auth::before {
+  background-color: #060614;
+  background-image:
+    /* novas: bright core + soft bloom */
+    radial-gradient(2px 2px at 16% 14%, rgba(255,255,255,0.95), transparent),
+    radial-gradient(90px 90px at 16% 14%, rgba(183,148,246,0.30), transparent 70%),
+    radial-gradient(1.8px 1.8px at 86% 64%, rgba(255,255,255,0.9), transparent),
+    radial-gradient(110px 110px at 86% 64%, rgba(80,200,120,0.20), transparent 70%),
+    radial-gradient(2.2px 2.2px at 30% 90%, rgba(255,250,235,0.95), transparent),
+    radial-gradient(130px 130px at 30% 90%, rgba(255,196,120,0.26), transparent 70%),
+    /* the sun's gold on the top edge */
+    radial-gradient(135% 70% at 50% -12%, rgba(var(--card-accent-rgb, 255,196,120), var(--card-accent-a, 0.24)), transparent 62%),
+    radial-gradient(76% 58% at 100% 30%, rgba(138,104,230,0.20), transparent 60%),
+    radial-gradient(80% 60% at 0% 70%, rgba(56,112,206,0.16), transparent 62%),
+    radial-gradient(44% 34% at 90% 96%, rgba(232,78,156,0.12), transparent 64%),
+    /* star field */
+    radial-gradient(1.2px 1.2px at 8% 38%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 24% 60%, rgba(210,225,255,0.6), transparent),
+    radial-gradient(1px 1px at 38% 8%, rgba(255,255,255,0.55), transparent),
+    radial-gradient(1.3px 1.3px at 47% 76%, rgba(255,240,210,0.6), transparent),
+    radial-gradient(1px 1px at 58% 30%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 66% 94%, rgba(210,225,255,0.55), transparent),
+    radial-gradient(1.4px 1.4px at 72% 18%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 78% 46%, rgba(255,245,220,0.5), transparent),
+    radial-gradient(1px 1px at 92% 10%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1.1px 1.1px at 94% 82%, rgba(210,225,255,0.6), transparent),
+    radial-gradient(1px 1px at 12% 80%, rgba(255,255,255,0.45), transparent),
+    radial-gradient(1px 1px at 52% 52%, rgba(255,255,255,0.35), transparent),
+    radial-gradient(ellipse at center, #0b0a20 0%, #070716 58%, #020209 100%);
+}
+
 /* ⛔ THE TEXTURE IS THE "THIS IS DATA" CUE (2026-08-15, Michael: "it's a cue that it's data").
    The grain alone was atmosphere; the READOUT card in the workout Details tab reads as an
    instrument because it carries the console's grid — dot matrix + micro grid + diamond grid, the
@@ -1173,7 +1243,26 @@ body.wizard-active { --tabbar-h: 0px; }
    etched grid reads through the type as a faint instrument face; the session panels carry tables and
    readings with bare bed between them, and the same grid at the same strength read harder there. Same
    layers, same hues, same stars — only the overlay's opacity comes down. */
-.readout-texture--quiet::after { opacity: 0.35; }
+.readout-texture--quiet::after {
+  /* The grid is Home's (2026-09-13, Michael: "replace the grid in Performance and Details with it, so
+     they are cleaner"). Same spectral hues as `--spectral`; the dot + micro grid + 22px diamond is
+     swapped for the diagonal texture under the Today panel (TodaysEffort.tsx, the dot-grid layer):
+     two 45° line sets at 26px and 52px, no micro grid, no blur. */
+  background-image:
+    radial-gradient(ellipse at 12% 18%, rgba(255, 215, 0, 0.30) 0%, transparent 62%),
+    radial-gradient(ellipse at 50% 10%, rgba(183, 148, 246, 0.19) 0%, transparent 64%),
+    radial-gradient(ellipse at 86% 18%, rgba(74, 158, 255, 0.22) 0%, transparent 64%),
+    radial-gradient(ellipse at 78% 34%, rgba(80, 200, 120, 0.28) 0%, transparent 66%),
+    radial-gradient(ellipse at 30% 40%, rgba(255, 140, 66, 0.28) 0%, transparent 66%),
+    linear-gradient(45deg, rgba(255,255,255,0.22) 1px, transparent 1px),
+    linear-gradient(-45deg, rgba(255,255,255,0.18) 1px, transparent 1px),
+    linear-gradient(45deg, rgba(255,255,255,0.10) 1px, transparent 1px),
+    linear-gradient(-45deg, rgba(255,255,255,0.08) 1px, transparent 1px);
+  background-size: cover, cover, cover, cover, cover, 26px 26px, 26px 26px, 52px 52px, 52px 52px;
+  background-blend-mode: screen, screen, screen, screen, screen, soft-light, soft-light, soft-light, soft-light;
+  opacity: 0.35;
+  filter: none;
+}
 
 /* FORGE — the Adjust plate (2026-09-05, Michael: "cool texture and lighting like these but different").
    Same nebula ground, stars and grain as every galaxy card, but lit from the LEFT edge instead of
