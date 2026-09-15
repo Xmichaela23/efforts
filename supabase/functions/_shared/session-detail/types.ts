@@ -76,7 +76,7 @@ export type StrengthTestLiftResult = {
   /** Stored baseline at analysis time (for the outcome). */
   stored: number | null;
   /** Baseline outcome vs stored. Null when zero_rep (no valid measurement). */
-  outcome: 'new_baseline' | 'updated' | 'kept' | null;
+  outcome: 'updated' | 'kept' | null; // read off performance_numbers; "new baseline" struck 2026-09-15 (TRUTH-MAP §9 Q5)
   /** True → "test set logged 0 reps — retest for a number." Never narrated as success. */
   zero_rep: boolean;
   /** Optional per-lift note (e.g. the deadlift-conservative caveat). */

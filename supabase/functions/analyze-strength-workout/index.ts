@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { withAlarm } from '../_shared/alarm.ts';
-import { isBandAssistedMovement } from '../../../src/lib/band-assistance.ts';
+import { estimate1RMRounded } from '../../../src/lib/estimate-1rm.ts';
+import { pickTestLifts, type PickedLift } from '../save-baseline-test/pick.ts';
 import { energyLevel, sorenessLevel, sleepQuality, overallReadinessLabel } from '../_shared/readiness-scale.ts';
 import { isPlanTransitionWindowByWeekIndex } from '../_shared/plan-week.ts';
 // ⛔ SEVEN IMPORTS DELETED WITH THE NARRATIVE LLM (2026-08-02): `getArcContext`,
@@ -747,9 +748,9 @@ async function getE1rmTrend(
 
 // ── 1RM / baseline TEST recognition + result (Q-097/Q-102 phase 2) ──────────────
 // A test is measurement, not training: no execution/volume/adherence framing. It reports the
-// per-lift result (reps × weight → e1RM), the prior-test → this-test delta, and the baseline
-// outcome (computed fresh at display time from performance_numbers — see build.ts). Marker: the
-// `1rm_test` tag OR a name containing "baseline test" (mirrors StrengthLogger's isBaselineTestWorkout).
+// per-lift result (reps × weight → e1RM), the previous-test → this-test delta, and the baseline
+// outcome read back off performance_numbers. Marker: the `1rm_test` tag OR a name containing
+// "baseline test" (mirrors StrengthLogger's isBaselineTestWorkout).
 function detectStrengthTest(workout: any, plannedWorkout: any): boolean {
   const nm = (s: any) => String(s || '').toLowerCase();
   if (nm(workout?.name).includes('baseline test') || nm(plannedWorkout?.name).includes('baseline test')) return true;
@@ -760,65 +761,101 @@ function detectStrengthTest(workout: any, plannedWorkout: any): boolean {
   return tags.includes('1rm_test');
 }
 
+/** The session identity `pickTestLifts` reads — what the logger sends the save: the planned session's name and tags. */
+function testSessionOf(workout: any, plannedWorkout: any): { name: string | null; tags: unknown } {
+  return { name: plannedWorkout?.name ?? workout?.name ?? null, tags: plannedWorkout?.tags ?? workout?.tags ?? null };
+}
+
+/** A picked test set's number: the rep count for pull-ups, else the one 1RM formula rounded once (nearest 5, p215). */
+function testedNumber(p: PickedLift): number {
+  return p.baselineKey === 'pullupMaxReps' ? p.reps : estimate1RMRounded(p.weight, p.reps);
+}
+
 // Canonical baseline key from an exercise name: `strengthTestKey` from `_shared/strength-test-key.ts`,
 // the one map `save-baseline-test` and the logger also read (2026-09-10).
 
 const DEADLIFT_TEST_NOTE = "e1RM formulas read deadlift conservative — a flat number isn't necessarily a flat lift.";
 
-// Per-lift test result: the measured facts (reps × weight → e1RM), the prior→now e1RM delta, and the
-// baseline outcome vs the stored 1RM. Outcome uses performance_numbers AT ANALYSIS TIME — accurate when
-// baselines are saved before the workout is finalized (the natural order) or after a recompute.
-function buildStrengthTestResult(executedExercises: any[], e1rmTrend: any[], perf: any): any {
-  const lifts: any[] = [];
-  for (const ex of (Array.isArray(executedExercises) ? executedExercises : [])) {
-    const key = strengthTestKey(ex?.name || '');
-    if (!key) continue;
-    const sets = Array.isArray(ex?.sets) ? ex.sets : [];
-    // The scored set: the amrap/rep-max flag first; else the last performed working set; else the heaviest.
-    const working =
-      sets.find((s: any) => s?.amrap === true || s?.repMaxTest === true) ||
-      [...sets].reverse().find((s: any) => s?.setType === 'working' && isPerformedStrengthSet(s)) ||
-      [...sets].filter(isPerformedStrengthSet).sort((a: any, b: any) => (Number(b?.weight) || 0) - (Number(a?.weight) || 0))[0] ||
-      null;
-    if (!working) continue;
-    const reps = Number(working.reps);
-    const weight = Number(working.weight);
-    const isPullup = key === 'pullupMaxReps';
-    // ⛔ A BAND-ASSISTED SET IS NOT A PULL-UP TEST. Added 2026-08-13 with the pull-up progression.
-    // For a rep-count lift `e1rm` IS the rep count, so an assisted set was reported as a new or
-    // updated baseline — the number climbing while the athlete walked the band down more slowly.
-    // Reads `resistance_level`, the field the logger already writes; `band-assistance.ts` documents
-    // why the movement has to be tested first (on a band pull-apart the same field is the LOAD).
-    if (isPullup && isBandAssistedMovement(ex?.name || '')) {
-      const rl = (working as { resistance_level?: unknown })?.resistance_level;
-      const assistNum = Number(rl);
-      const assisted = rl != null && String(rl).trim() !== ''
-        && (Number.isFinite(assistNum) ? assistNum > 0 : true);
-      if (assisted) continue;
+/**
+ * THE PREVIOUS TEST'S NUMBER PER LIFT (2026-09-15, TRUTH-MAP §9 Q5). "Last test" compares to the most recent
+ * earlier TEST session for the lift (`isTestSession`, the save's own rule), never to a training session;
+ * with none, the lift is absent and the line is omitted. Same pick and rounding as this session.
+ * // OURS — test-to-test comparison (the book only says tests are for troubleshooting, p120); line omitted
+ * with no prior test. STATE-SOURCES row "Tested max — which set, what it is compared to".
+ */
+async function getPriorTestNumbers(supabase: any, userId: string, workoutDate: string): Promise<Record<string, number>> {
+  const out: Record<string, number> = {};
+  try {
+    const { data: rows } = await supabase
+      .from('workouts')
+      .select('id, date, name, planned_id')
+      .eq('user_id', userId)
+      .eq('type', 'strength')
+      .lt('date', workoutDate)
+      .order('date', { ascending: false });
+    const list = Array.isArray(rows) ? rows : [];
+    const plannedIds = [...new Set(list.map((r: any) => r?.planned_id).filter(Boolean))];
+    const plannedById = new Map<string, any>();
+    if (plannedIds.length > 0) {
+      const { data: planned } = await supabase.from('planned_workouts').select('id, name, tags').in('id', plannedIds);
+      for (const pw of planned ?? []) plannedById.set(String(pw.id), pw);
     }
-    const zeroRep = !(reps > 0);
-    const trendRow = (Array.isArray(e1rmTrend) ? e1rmTrend : []).find((e: any) =>
-      strengthTestKey(String(e?.canonical || e?.exercise || '')) === key);
-    // 1RM lifts: e1RM from the canonical trend. Pull-ups: the rep count IS the value (no e1RM).
-    const e1rm = isPullup ? (Number.isFinite(reps) ? reps : null) : (trendRow?.current_e1rm ?? null);
-    const priorE1rm = isPullup ? (null) : (trendRow?.prior_e1rm ?? null);
-    // Baseline outcome vs the stored 1RM (pull-ups compare rep count; 1RM lifts compare e1RM).
+    for (const r of list) {
+      const pw = r?.planned_id ? plannedById.get(String(r.planned_id)) : null;
+      if (!detectStrengthTest(r, pw)) continue;
+      const { data: full } = await supabase.from('workouts').select('strength_exercises').eq('id', r.id).maybeSingle();
+      for (const p of pickTestLifts(parseStrengthExercises(full?.strength_exercises), testSessionOf(r, pw))) {
+        if (out[p.baselineKey] != null) continue; // newest test wins
+        const n = testedNumber(p);
+        if (p.baselineKey === 'pullupMaxReps' ? n >= 0 : n > 0) out[p.baselineKey] = n;
+      }
+    }
+  } catch (e) {
+    console.warn('[analyze-strength] getPriorTestNumbers failed (non-fatal → no last-test line):', (e as Error)?.message ?? e);
+  }
+  return out;
+}
+
+/**
+ * Per-lift test result (2026-09-15, TRUTH-MAP §9 Q5) — the number the athlete sees is the number the save wrote.
+ *  · THE SET: `pickTestLifts`, the save's own pick (imported, not copied).
+ *  · THE NUMBER: `estimate1RMRounded` on that set (nearest 5, p215); pull-ups: the rep count.
+ *  · THE OUTCOME, read off performance_numbers: stored = this number → "updated to N"; stored ≠ → "kept P";
+ *    nothing stored (analysis ran before the save) → no line. §9 Q5's "new baseline" is struck: nothing on
+ *    file says whether the lift had a number before the save (Michael, 2026-09-15).
+ *  · LAST TEST: the previous test session's number (`getPriorTestNumbers`).
+ */
+function buildStrengthTestResult(executedExercises: any[], session: { name: string | null; tags: unknown }, perf: any, priorTest: Record<string, number>): any {
+  const exercises = Array.isArray(executedExercises) ? executedExercises : [];
+  const picked = new Map(pickTestLifts(exercises, session).map((p) => [p.baselineKey, p]));
+  const lifts: any[] = [];
+  const shown = new Set<string>();
+  for (const ex of exercises) {
+    const key = strengthTestKey(ex?.name || '');
+    if (!key || shown.has(key)) continue;
+    const isPullup = key === 'pullupMaxReps';
+    const p = picked.get(key);
+    if (p && p.exercise !== String(ex?.name ?? '')) continue; // two exercises on one key: the picked one shows
+    const sets = Array.isArray(ex?.sets) ? ex.sets : [];
+    // A scored set logged at 0 reps is not a candidate for the pick, but the athlete still sees
+    // "test set logged 0 reps — retest for a number" for it.
+    const zeroScored = sets.some((s: any) => (s?.amrap === true || s?.repMaxTest === true) && !(Number(s?.reps) > 0));
+    if (!p && !zeroScored) continue;
+    shown.add(key);
+    const zeroRep = !p || !(p.reps > 0);
+    const value = p ? testedNumber(p) : null;
     const storedRaw = Number(perf?.[key]);
     const stored = Number.isFinite(storedRaw) && storedRaw > 0 ? storedRaw : null;
-    const value = e1rm; // e1rm already holds reps for pull-ups
-    let outcome: 'new_baseline' | 'updated' | 'kept' | null = null;
-    if (zeroRep) outcome = null;
-    else if (stored == null) outcome = 'new_baseline';
-    else if (value != null && Math.round(value) >= stored) outcome = 'updated';
-    else outcome = 'kept';
+    let outcome: 'updated' | 'kept' | null = null;
+    if (!zeroRep && value != null && stored != null) outcome = stored === value ? 'updated' : 'kept';
     lifts.push({
       name: ex.name,
       key,
-      reps: Number.isFinite(reps) ? reps : null,
-      weight: isPullup ? null : (Number.isFinite(weight) && weight > 0 ? weight : null),
+      reps: p ? p.reps : 0,
+      weight: isPullup || !p ? null : p.weight,
       unit: isPullup ? 'reps' : 'lb',
-      e1rm: e1rm != null ? Math.round(e1rm) : null,
-      prior_e1rm: priorE1rm != null ? Math.round(priorE1rm) : null,
+      e1rm: value,
+      prior_e1rm: priorTest[key] ?? null,
       stored,
       outcome,
       zero_rep: zeroRep,
@@ -1532,7 +1569,14 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   // structured test result (reps×weight→e1RM + prior→now delta) and let downstream SUPPRESS the
   // execution/volume/adherence framing and the training narrative — a test has no "execution score."
   const isTest = detectStrengthTest(workout, plannedWorkout);
-  const testResultV1 = isTest ? buildStrengthTestResult(executedExercises, e1rmTrend, userBaselines?.performance_numbers || {}) : null;
+  const testResultV1 = isTest
+    ? buildStrengthTestResult(
+        executedExercises,
+        testSessionOf(workout, plannedWorkout),
+        userBaselines?.performance_numbers || {},
+        await getPriorTestNumbers(supabase, workout.user_id, workout.date),
+      )
+    : null;
   if (isTest) console.log(`🧪 TEST detected → ${testResultV1?.lifts?.length ?? 0} lift result(s); execution/narrative suppressed`);
 
   // Generate comprehensive exercise-by-exercise breakdown
@@ -1635,9 +1679,9 @@ async function analyzeStrengthWorkout(workout: any, plannedWorkout: any, userBas
   // That is TWO database round-trips removed from every strength analysis and every recompute, on top
   // of the model call itself.
   //
-  // ⚠️ `getE1rmTrend` ABOVE STAYS. It is not narrator-only: `buildStrengthTestResult` reads it for the
-  // test frame, and the e1RM numbers are the receipt behind the all-out set. Only the spine TAGGING of
-  // its rows was for the paragraph.
+  // ⚠️ `getE1rmTrend` ABOVE STAYS: the e1RM numbers are the receipt behind the all-out set. (Since
+  // 2026-09-15 the test frame no longer reads it — it picks and rounds the test set itself, §9 Q5.) Only
+  // the spine TAGGING of its rows was for the paragraph.
   //
   // ⛔ IF A DETERMINISTIC STRENGTH LINE IS EVER BUILT, DO NOT START BY RESTORING THIS BLOCK. It is the
   // input list for a *prompt*, not for a fact. A deterministic composer would name its own inputs, and

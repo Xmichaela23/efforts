@@ -19,11 +19,11 @@
 // derivation — only the athlete knows whether a lower test is a real regression or a bad day. So this
 // function is two-phase: it reports what needs deciding, and writes once the decisions come back.
 //
-// ⚠️ NOT A NEW FORMULA. `estimate1RM` is the app's one 1RM formula (D-339, the standard), the same
+// ⚠️ NOT A NEW FORMULA. `estimate1RM` (via `estimate1RMRounded`) is the app's one 1RM formula (D-339, the standard), the same
 // module `compute-facts` uses. This function moves WHERE the arithmetic runs, not WHAT it computes.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser } from '../_shared/require-user.ts';
-import { estimate1RM } from '../../../src/lib/estimate-1rm.ts';
+import { estimate1RMRounded } from '../../../src/lib/estimate-1rm.ts';
 import { pickTestLifts } from './pick.ts';
 
 /**
@@ -48,17 +48,13 @@ const LIFT_LABEL: Record<string, string> = {
 };
 
 /**
- * ⛔ FLOOR TO THE NEXT 5 DOWN, NOT NEAREST — and this differs from `compute-facts` ON PURPOSE.
- *
- * A tested max is written straight into `performance_numbers`, where it becomes the basis for every
- * prescribed weight in the next block. Rounding UP there means prescribing off a number the athlete
- * has not demonstrated. `compute-facts` rounds to nearest because its output is an observation in a
- * trend series, not a prescription basis. Preserved verbatim from the client behaviour it replaces.
+ * ⛔ NEAREST 5 LB, ROUNDED ONCE (2026-09-15, TRUTH-MAP §9 Q5) — `estimate1RMRounded`, the same function
+ * compute-facts and the test result read. Viada p215's own worked example rounds 224.25 to 225, and the
+ * prescription basis is already 96% of this number (p215), so the old floor was a second haircut the page
+ * does not print. STATE-SOURCES row "e1RM = average of Epley and Brzycki, nearest 5 lb".
  */
 function roundedFromTest(weight: number, reps: number): number {
-  const raw = estimate1RM(Number(weight) || 0, Number(reps) || 0);
-  if (!(raw > 0)) return 0;
-  return Math.floor(raw / 5) * 5;
+  return estimate1RMRounded(Number(weight) || 0, Number(reps) || 0);
 }
 
 /**

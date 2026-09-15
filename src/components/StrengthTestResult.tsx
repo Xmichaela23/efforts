@@ -2,7 +2,8 @@ import React from 'react';
 
 // Q-097/Q-102 phase 2 — the Performance-screen frame for a 1RM/baseline TEST.
 // A test is measurement, not training: per-lift result (weight × reps → e1RM), the prior-test → this-test
-// delta, the baseline outcome (kept / updated / new baseline), a deadlift-conservative note, and a 0-rep
+// delta, the baseline outcome (kept / updated — read off the file by the server; "new baseline" struck 2026-09-15,
+// TRUTH-MAP §9 Q5), a deadlift-conservative note, and a 0-rep
 // "retest for a number" line. No execution score, no volume, no adherence — none of the training framing.
 
 type Lift = {
@@ -14,7 +15,7 @@ type Lift = {
   e1rm: number | null;
   prior_e1rm: number | null;
   stored: number | null;
-  outcome: 'new_baseline' | 'updated' | 'kept' | null;
+  outcome: 'updated' | 'kept' | null;
   zero_rep: boolean;
   note: string | null;
 };
@@ -33,8 +34,7 @@ function OutcomeChip({ l }: { l: Lift }) {
   if (l.zero_rep || !l.outcome) return null;
   const suffix = l.unit === 'reps' ? '' : '';
   let text = '';
-  if (l.outcome === 'new_baseline') text = 'new baseline';
-  else if (l.outcome === 'updated') text = `updated to ${l.e1rm ?? ''}${suffix}`;
+  if (l.outcome === 'updated') text = `updated to ${l.e1rm ?? ''}${suffix}`;
   else if (l.outcome === 'kept') text = `kept ${l.stored ?? ''}`;
   const kept = l.outcome === 'kept';
   const cls = kept ? 'text-white/55' : 'text-emerald-300/90';

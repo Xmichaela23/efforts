@@ -1,5 +1,5 @@
 import { assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
-import { estimate1RM } from '../../../src/lib/estimate-1rm.ts';
+import { estimate1RM, estimate1RMRounded } from '../../../src/lib/estimate-1rm.ts';
 
 /**
  * SAVE-BASELINE-TEST — the rules that moved off the phone (2026-07-30).
@@ -21,22 +21,18 @@ function canonKey(k: string): string {
   return s;
 }
 function roundedFromTest(weight: number, reps: number): number {
-  const raw = estimate1RM(Number(weight) || 0, Number(reps) || 0);
-  if (!(raw > 0)) return 0;
-  return Math.floor(raw / 5) * 5;
+  return estimate1RMRounded(Number(weight) || 0, Number(reps) || 0);
 }
 const isRepCountLift = (key: string) => key === 'pullupMaxReps';
 
 // ── the rules ───────────────────────────────────────────────────────────────
 
-Deno.test('a tested max ROUNDS DOWN, never to nearest', () => {
-  // 100 × 5 = 116.65 → 115, not 115 either way; pick one that actually straddles:
-  // 100 × 3 = 109.99 → floors to 105. Nearest would have given 110 — a weight never demonstrated.
-  assertEquals(roundedFromTest(100, 3), 105);
-  assertEquals(Math.round(estimate1RM(100, 3) / 5) * 5, 110);
-  // ⛔ THE DIRECTION IS THE WHOLE POINT. This number becomes the basis for every prescribed weight in
-  // the next block. Rounding up prescribes off something the athlete has not done.
-});
+Deno.test('a tested max rounds to the NEAREST 5, once (§9 Q5, p215)', () => {
+  // 100 × 3 = 109.99 → 110. The floor (105) was a second haircut: the working weight is already 96% (p215).
+  assertEquals(roundedFromTest(100, 3), 110);
+  // p215's worked example: 190 × 6 → 224.25 → "225 is your true max".
+  assertEquals(roundedFromTest(190, 6), 225);
+})
 
 Deno.test('a rep-count lift stores the reps — no formula, and zero is legal', () => {
   assertEquals(isRepCountLift('pullupMaxReps'), true);
@@ -87,11 +83,11 @@ Deno.test('⛔ phase one writes NOTHING when any lift needs deciding', () => {
 });
 
 Deno.test('the formula is the app\'s one formula — not a copy', () => {
-  // A 5-rep test at 185: whatever `estimate1RM` says, floored to plate granularity.
-  assertEquals(roundedFromTest(185, 5), Math.floor(estimate1RM(185, 5) / 5) * 5);
+  // A 5-rep test at 185: whatever `estimate1RM` says, to the nearest 5.
+  assertEquals(roundedFromTest(185, 5), Math.round(estimate1RM(185, 5) / 5) * 5);
   // ⚠️ THE SECOND ASSERTION PINNED THE PREVIOUS PROGRAM'S p32 EXAMPLE (322) UNTIL 2026-08-29. The estimator is
   // Viada's now — Epley and Brzycki averaged, p215 — so the claim being pinned is the one that
   // matters here and always was: this path and `compute-facts` call the SAME function, whichever
   // equations live inside it.
-  assertEquals(roundedFromTest(255, 8), Math.floor(estimate1RM(255, 8) / 5) * 5);
+  assertEquals(roundedFromTest(255, 8), Math.round(estimate1RM(255, 8) / 5) * 5);
 });
