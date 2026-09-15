@@ -108,11 +108,22 @@ export function pedalingAveragePowerW(
  * The ONE number a stretch of riding is judged by: normalized power when the stretch is 20 minutes or
  * longer, average power (zeros included) when shorter. The segment row, its colour, the adherence lines
  * and the Execution score all read this.
+ *
+ * ⛔ THE DEVICE'S NORMALIZED POWER FIRST (2026-09-15, WORKORDER §1 rule 7, Michael). For a whole ride the
+ * caller passes the provider's normalized power (`workouts.normalized_power`: Garmin `normalized_power`,
+ * Strava `weighted_average_watts`); when present it is the number, and ours from the samples is the
+ * fallback. Segments pass nothing — no provider sends a per-segment normalized power — and are unchanged.
+ * // OURS — the order (provider first, ours second). STATE-SOURCES row "Judged ride power".
  */
 export function judgedPowerW(
   stream: ReadonlyArray<number>,
   durationS: number,
+  providerNormalizedW?: number | null,
 ): { watts: number | null; basis: 'normalized' | 'average' | null } {
+  const sent = Number(providerNormalizedW);
+  if (durationS >= NORMALIZED_POWER_MIN_DURATION_S && Number.isFinite(sent) && sent > 0) {
+    return { watts: sent, basis: 'normalized' };
+  }
   if (!stream.length) return { watts: null, basis: null };
   if (durationS >= NORMALIZED_POWER_MIN_DURATION_S) {
     const np = normalizedPowerW(stream);

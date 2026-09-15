@@ -40,6 +40,15 @@ Deno.test('20 minutes or longer is judged on normalized power, shorter on averag
   assertEquals(judgedPowerW([], 1200), { watts: null, basis: null });
 });
 
+Deno.test('rule 7: the provider\'s normalized power wins for 20 minutes or longer; ours is the fallback', () => {
+  const s = Array.from({ length: 1200 }, () => 200);
+  assertEquals(judgedPowerW(s, 1200, 214), { watts: 214, basis: 'normalized' });
+  assertEquals(judgedPowerW(s, 1200, null).watts, normalizedPowerW(s));
+  assertEquals(judgedPowerW(s, 1200, 0).watts, normalizedPowerW(s)); // 0 = not sent
+  // under 20 minutes normalized power is not used, sent or not
+  assertEquals(judgedPowerW(s.slice(0, 600), 600, 214), { watts: 200, basis: 'average' });
+});
+
 Deno.test('pedalling average: seconds above 25 W, time-weighted, long gaps skipped', () => {
   const t = [0, 1, 2, 3, 4, 1000];
   const p = [0, 200, 20, 100, 0, 300];
