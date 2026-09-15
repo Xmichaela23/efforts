@@ -1504,7 +1504,62 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success:true, computed, mode: laps.length ? 'laps-no-plan' : 'splits-no-plan' }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
 
-    const snapped = trySnapToLaps(plannedSteps, laps);
+    /**
+     * ⛔ ON A STRUCTURED RUN, THE WATCH'S LAPS ARE THE ROWS (2026-09-14, Michael). Garmin Connect and
+     * TrainingPeaks show a workout as the laps the watch recorded. This step used to cut the recording at the
+     * plan's distances whenever the lap count was not within one of the step count, so a watch workout that
+     * differed from the plan read as 0.10 mi reps at 5:46–16:20/mi with invented "not done" rows (7 Sep).
+     *   · Each lap is one row with its own moving time, distance and pace (`_shared/run-pace.ts`).
+     *   · MATCHED only when it is clear: no more laps than planned steps, and every lap, in order, fits its
+     *     step's time or distance within the existing tolerance. Then the rows take the steps' names and ranges,
+     *     and planned steps after the last lap stay "not done" — they were owed.
+     *   · Otherwise the rows read "Lap 1…N" with no plan, no range, no colour, and no "not done" rows; the analyzer
+     *     scores Execution on duration only.
+     * ⚠️ OURS — "structured": the plan has two or more work steps. A steady planned run keeps the existing path,
+     * so a watch's automatic mile laps do not turn an easy run into unlabelled rows.
+     * The watch's own step type per lap (in its activity file) is not read yet — a later build.
+     */
+    let snapped: any[] | null = null;
+    let snapMode = 'snap-to-laps';
+    const structuredPlan = plannedSteps.filter((st: any) => stepRole(st) === 'work').length >= 2;
+    if ((sport === 'run' || sport === 'walk') && structuredPlan && laps.length >= 2) {
+      const lapWins = laps.map((L) => windowIdxFromLap(rows, L)).filter(([a, b]) => b > a);
+      if (lapWins.length >= 2) {
+        const matched = lapWins.length <= plannedSteps.length && lapWins.every(([a, b], i) => {
+          const measured = { ...laps[i], dist_m: Math.max(0, (rows[b]?.d || 0) - (rows[a]?.d || 0)), time_s: movingSecondsBetween(rows, a, b) } as Lap;
+          return stepLapWithinTolerance(plannedSteps[i], measured);
+        });
+        if (matched) {
+          snapped = lapWins.map(([a, b], i) => ({ ...execIntervalFromWindow(plannedSteps[i], a, b), lap_number: i + 1, sample_idx_start: a, sample_idx_end: b }));
+          for (const stND of plannedSteps.slice(lapWins.length)) {
+            snapped.push({
+              planned_step_id: stND?.id ?? null,
+              planned_label: formatPlannedLabel(stND, sport),
+              kind: stND?.type || stND?.kind || null,
+              role: stepRole(stND),
+              planned: {
+                duration_s: deriveSecondsFromPlannedStep(stND),
+                distance_m: deriveMetersFromPlannedStep(stND),
+                target_pace_s_per_mi: derivePlannedPaceSecPerMi(stND),
+              },
+              executed: { duration_s: null, distance_m: null, avg_pace_s_per_mi: null, avg_hr: null, avg_cadence_spm: null, avg_power_w: null, adherence_percentage: null },
+              pass_state: 'skip',
+              not_done: true,
+              sample_idx_start: null,
+              sample_idx_end: null,
+            });
+          }
+          snapMode = 'laps-matched';
+        } else {
+          snapped = lapWins.map(([a, b], i) => {
+            const row = execFromIdx(rows, a, b, 'lap', 'lap');
+            return { ...row, planned_label: `Lap ${i + 1}`, kind: 'lap', lap_number: i + 1, sample_idx_start: a, sample_idx_end: b };
+          });
+          snapMode = 'laps-unmatched';
+        }
+      }
+    }
+    if (!snapped) snapped = trySnapToLaps(plannedSteps, laps);
     if (snapped && snapped.length) {
       let overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d || 0) - (rows[0].d || 0)) : 0;
       // For runs/walks/rides: Use moving_time, NOT elapsed time from timestamps
@@ -1599,7 +1654,10 @@ Deno.serve(async (req) => {
 
       const computed = {
         version: COMPUTED_VERSION,
+        alignment_mode: snapMode,
+        mismatch_reason: null,
         intervals: snapped,
+        steps_not_done: snapped.filter((x: any) => x?.not_done === true).length,
         overall: {
           duration_s_moving: overallSec,
           distance_m: Math.round(overallMeters),
@@ -1609,9 +1667,9 @@ Deno.serve(async (req) => {
           hot_conditions: hot2 || undefined,
         }
       };
-      try { console.error('[compute] mode=snap-to-laps intervals:', snapped.length); } catch {}
+      try { console.error(`[compute] mode=${snapMode} intervals:`, snapped.length); } catch {}
       await writeComputed(computed);
-      return new Response(JSON.stringify({ success:true, computed, mode:'snap-to-laps' }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
+      return new Response(JSON.stringify({ success:true, computed, mode: snapMode }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
 
     // ────────────── MISMATCH DETECTOR ──────────────

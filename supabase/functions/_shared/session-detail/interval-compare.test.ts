@@ -94,6 +94,14 @@ Deno.test('a run recovery, warm-up or cool-down is not coloured', () => {
   }
 });
 
+Deno.test('an unmatched watch lap keeps its label and gets no range or colour', () => {
+  const sd: any = build('run', { interval_id: null, interval_type: 'lap', planned_label: 'Lap 3', actual_pace_min_per_mi: 6.9, actual_duration_s: 41, actual_distance_m: 158 });
+  assertEquals(sd.intervals[0].interval_type, 'lap');
+  assertEquals(sd.intervals[0].planned_label, 'Lap 3');
+  assertEquals(sd.intervals[0].planned_pace_range, undefined);
+  assertEquals(sd.intervals[0].executed.band, null);
+});
+
 Deno.test('a goal race gets percents and words, and no band', () => {
   const sd: any = build('run', runRep, {
     session_state_v1: { race: { is_goal_race: true, goal_avg_pace_s_per_mi: 600, fitness_projection_avg_pace_s_per_mi: 640 } },

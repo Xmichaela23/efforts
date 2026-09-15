@@ -840,7 +840,8 @@ export type ForwardContextV1 = {
 // ── Interval row: fully resolved, ready to render ─────────────────────────
 export type IntervalRow = {
   id: string;
-  interval_type: 'warmup' | 'work' | 'recovery' | 'cooldown';
+  /** `lap` = a watch lap not matched to a planned step (no plan, no range, no colour). */
+  interval_type: 'warmup' | 'work' | 'recovery' | 'cooldown' | 'lap';
   interval_number?: number;
   recovery_number?: number;
   planned_label: string;

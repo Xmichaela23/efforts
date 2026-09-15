@@ -1390,6 +1390,7 @@ function normIntervalType(t: unknown): IntervalRow['interval_type'] {
   if (s === 'warmup' || s === 'warm_up' || s === 'warm-up') return 'warmup';
   if (s === 'cooldown' || s === 'cool_down' || s === 'cool-down') return 'cooldown';
   if (s === 'recovery' || s === 'rest') return 'recovery';
+  if (s === 'lap') return 'lap';
   return 'work';
 }
 

@@ -2023,6 +2023,16 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
       if (enhancedAnalysis?.performance) enhancedAnalysis.performance.execution_adherence = governed;
     }
 
+    // ⛔ LAPS THAT DID NOT MATCH THE PLAN (2026-09-14, Michael): no lap can be judged against a planned range, so
+    // Execution is the duration share alone and there is no pace score. `compute-workout-summary` decides the match.
+    if (String((workout as any)?.computed?.alignment_mode || '') === 'laps-unmatched' && Number.isFinite(performance.duration_adherence)) {
+      console.log(`🏃 [LAPS UNMATCHED] execution ${performance.execution_adherence}% → duration only ${performance.duration_adherence}%`);
+      performance.execution_adherence = Math.round(Number(performance.duration_adherence));
+      (performance as any).pace_adherence = null;
+      const ep = (enhancedAnalysis as any)?.performance;
+      if (ep) { ep.execution_adherence = performance.execution_adherence; ep.pace_adherence = null; }
+    }
+
     // Create analysis_v2 with version metadata
     const analysisV2 = {
       _meta: {
@@ -3502,7 +3512,10 @@ function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], gran
   const intervalsForBreakdown = workIntervals.length > 0
     ? workIntervals
     : sortIntervalsChrono(intervals.filter((i: any) => i?.executed));
-  const mergedForBreakdown = mergeMicroSegments(intervalsForBreakdown, MIN_SEGMENT_DISTANCE_MI, MIN_SEGMENT_DURATION_S);
+  // The watch's own laps are shown as recorded — a 90 m lap is not merged into its neighbour (2026-09-14).
+  const mergedForBreakdown = intervalsForBreakdown.some((i: any) => String(i?.role || '').toLowerCase() === 'lap')
+    ? intervalsForBreakdown
+    : mergeMicroSegments(intervalsForBreakdown, MIN_SEGMENT_DISTANCE_MI, MIN_SEGMENT_DURATION_S);
   const intervalBreakdown = generateIntervalBreakdown(mergedForBreakdown, intervals, paceAdherenceForBreakdown, granularAnalysis, sensorData, userUnits, plannedWorkout, workout);
   
   // Pacing consistency analysis
