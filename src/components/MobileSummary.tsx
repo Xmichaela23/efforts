@@ -350,7 +350,6 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         sessionDetail={sd}
         hasSessionDetail={hasSessionDetail}
         noPlannedCompare={noPlannedCompare}
-        planLinkNote={!planned ? 'No plan session linked.' : null}
         recomputing={recomputing}
         recomputeError={recomputeError}
         analysisFailure={analysisFailure}
@@ -393,7 +392,9 @@ export default function MobileSummary({ planned, completed, session_detail_v1, s
         </div>
       )}
       {/* NEXT sits last, after the interval table (Michael, 2026-09-07). */}
-      {(sd as any)?.next_session && <NextUp session={(sd as any).next_session} />}
+      {(sd as any)?.next_session && (
+        <div className="px-3 py-3 border-t border-white/[0.055]"><NextUp session={(sd as any).next_session} /></div>
+      )}
       {/* Swim "richer data — join the iOS beta" CTA REMOVED (2026-07-19, Michael) — a promo pitch on the
           swim screen; not wanted. The swim read is facts-only; we don't upsell on it. Component left in
           the tree (unrendered) for the cleanup sweep. */}

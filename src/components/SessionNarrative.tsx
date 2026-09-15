@@ -112,7 +112,6 @@ interface SessionNarrativeProps {
   } | null;
   hasSessionDetail: boolean;
   noPlannedCompare: boolean;
-  planLinkNote: string | null;
   recomputing: boolean;
   recomputeError: string | null;
   /** The stored failure line ("Analysis failed at …" / "Analysis did not finish.") — plumbing §3. */
@@ -157,10 +156,8 @@ export function NextUp({ session }: { session: NextSession }) {
       text={(
         <>
           {dayName && <span className="text-white/55">{dayName} </span>}
+          {/* Name only (2026-09-15, Michael). The prescription stays in the contract for race readiness. */}
           {session.name}
-          {session.prescription && (
-            <span className="text-white/55"> — {session.prescription}</span>
-          )}
         </>
       )}
     />
@@ -213,7 +210,6 @@ export default function SessionNarrative({
   sessionDetail: sd,
   hasSessionDetail,
   noPlannedCompare,
-  planLinkNote,
   recomputing,
   recomputeError,
   analysisFailure,
@@ -299,11 +295,6 @@ export default function SessionNarrative({
   if (!hasSessionDetail || hasNothing) {
     return (
       <div className="mt-4 px-3 pb-4">
-        {noPlannedCompare && (
-          <div className="text-xs text-gray-500 italic mb-2">
-            {planLinkNote ?? 'No planned session to compare.'}
-          </div>
-        )}
         <div className="flex items-center justify-end">
           <GalaxyButton
             variant="secondary"
@@ -344,11 +335,6 @@ export default function SessionNarrative({
         ['--card-accent-a' as any]: '0.22',
       }}
     >
-      {noPlannedCompare && (
-        <div className="text-xs text-gray-500 italic">
-          {planLinkNote ?? 'No planned session to compare.'}
-        </div>
-      )}
       {/* ⛔ RECOMPUTE RIDES ON THE STAT LINE (2026-08-02, Michael: "can recompute be on the top right so
           it doesn't interfere with layout"). It used to own a full-width row of its own between the
           adherence chips and the first real content, which pushed everything down and read as a section

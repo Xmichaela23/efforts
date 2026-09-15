@@ -1322,9 +1322,14 @@ Deno.serve(async (req) => {
       const outIntervals:any[] = [];
 
       if (laps.length) {
+        // "Lap 1…N", as on a run with a plan whose laps do not match it (2026-09-15, Michael: an unattached run's
+        // rows read a bare "lap").
         for (const L of laps) {
           const [sIdx, eIdx] = windowIdxFromLap(rows, L);
-          if (eIdx > sIdx) outIntervals.push(execFromIdx(rows, sIdx, eIdx, 'lap', 'lap'));
+          if (eIdx > sIdx) {
+            const n = outIntervals.length + 1;
+            outIntervals.push({ ...execFromIdx(rows, sIdx, eIdx, 'lap', 'lap'), planned_label: `Lap ${n}`, kind: 'lap', lap_number: n });
+          }
         }
       } else {
         const totalMeters = rows.length ? Math.max(0, (rows[rows.length-1].d || 0) - (rows[0].d || 0)) : 0;
@@ -1473,6 +1478,9 @@ Deno.serve(async (req) => {
 
       const computed = {
         version: COMPUTED_VERSION,
+        // No plan, so no plan alignment. Written as null so a mode saved while the run had a plan (a partial merge
+        // keeps old keys) does not outlive an Unattach.
+        alignment_mode: null,
         intervals: outIntervals,
         // 2026-09-03: how many planned steps the recording never reached (a session cut short); 0 = all laid out.
         steps_not_done: outIntervals.filter((x: any) => x?.not_done === true).length,

@@ -751,8 +751,20 @@ async function runSessionDetailPipelineAndPersist(
     const byDateThenId = (a: any, b: any) =>
       String(a.date).localeCompare(String(b.date)) || String(a.id).localeCompare(String(b.id));
 
+    // ⛔ A SAME-DAY PLANNED SESSION OF THE SAME SPORT IS NOT NEXT (2026-09-15, Michael: an unattached Monday run
+    // showed "Mon Hard Run" as next). It is the session this one was done instead of; a different sport later
+    // the same day still is next.
+    const sportFamily = (t: unknown): string => {
+      const s = String(t || '').toLowerCase();
+      if (/run|jog/.test(s)) return 'run';
+      if (/ride|bike|cycl/.test(s)) return 'ride';
+      if (/swim/.test(s)) return 'swim';
+      if (/strength|weight/.test(s)) return 'strength';
+      return s;
+    };
+    const thisSport = sportFamily(row?.type);
     let nextPlanned = plannedRows
-      .filter((p: any) => String(p?.date || '').slice(0, 10) === workoutDate && notThisSession(p) && !isPlannedDone(p))
+      .filter((p: any) => String(p?.date || '').slice(0, 10) === workoutDate && notThisSession(p) && !isPlannedDone(p) && sportFamily(p?.type) !== thisSport)
       .sort(byDateThenId)[0] ?? null;
 
     if (!nextPlanned) {
