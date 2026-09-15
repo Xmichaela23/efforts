@@ -16,6 +16,9 @@ import {
   resolveStrengthEquipmentTypeForPlan,
 } from '../_shared/strength-equipment-tier.ts';
 import { resolveSwimStepEquipment } from '../_shared/swim/swim-step-equipment.ts';
+// Easy and long rides, and the easy parts of sprint rides: Coggan's endurance zone, 56–75% of FTP — the same band
+// State reads (2026-09-14, Michael). The top is the book's "below 75%" (p239); the old 65% floor was ours.
+import { COGGAN_Z2 } from '../_shared/state-trend/zones.ts';
 import {
   categorizeSwimTokensForDisplay,
   formatSwimSubtitleFromBuckets,
@@ -2214,16 +2217,16 @@ function expandBikeToken(tok: string, baselines: Baselines): any[] {
     const total = parseInt(m[1], 10) * 60, sprint = parseInt(m[2], 10), every = parseInt(m[3], 10) * 60;
     const n = every > sprint ? Math.floor(total / every) : 0;
     for (let k = 0; k < n; k += 1) {
-      out.push({ id: uid(), kind: 'work', duration_s: every - sprint, power_range: pctRange(0.65, 0.75) });
+      out.push({ id: uid(), kind: 'work', duration_s: every - sprint, power_range: pctRange(COGGAN_Z2.lo, COGGAN_Z2.hi) });
       out.push({ id: uid(), kind: 'work', duration_s: sprint, label: 'Sprint' });
     }
     const tail = total - n * every;
-    if (tail > 0) out.push({ id: uid(), kind: 'work', duration_s: tail, power_range: pctRange(0.65, 0.75) });
+    if (tail > 0) out.push({ id: uid(), kind: 'work', duration_s: tail, power_range: pctRange(COGGAN_Z2.lo, COGGAN_Z2.hi) });
     return out;
   }
   // Endurance z2 time: bike_endurance_90min_Z2
   m = lower.match(/bike_endurance_(\d+)min/);
-  if (m) { const sec=parseInt(m[1],10)*60; out.push({ id: uid(), kind:'work', duration_s: sec, power_range: pctRange(0.65,0.75) }); return out; }
+  if (m) { const sec=parseInt(m[1],10)*60; out.push({ id: uid(), kind:'work', duration_s: sec, power_range: pctRange(COGGAN_Z2.lo, COGGAN_Z2.hi) }); return out; }
   // Tempo steady time: bike_tempo_Xmin (map to race power ~80-85% FTP)
   m = lower.match(/bike_tempo_(\d+)min/);
   if (m) { const sec=parseInt(m[1],10)*60; out.push({ id: uid(), kind:'work', duration_s: sec, power_range: pctRange(0.80,0.85) }); return out; }

@@ -19,7 +19,8 @@ export interface ZoneBand {
 
 // Coggan Z2 power band (population default) for the HR-at-power reference. WIDE is the coverage
 // fallback when too few rides land enough time in the narrow band (build-time check).
-const COGGAN_Z2 = { lo: 0.56, hi: 0.75 };
+/** Coggan endurance zone, 56–75% of FTP (TrainingPeaks / TrainerRoad). Also the planned range for easy and long rides (2026-09-14). */
+export const COGGAN_Z2 = { lo: 0.56, hi: 0.75 } as const;
 const COGGAN_Z2_WIDE = { lo: 0.56, hi: 0.85 };
 
 /**
