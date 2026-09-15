@@ -768,7 +768,7 @@ Deno.serve(async (req) => {
     }
     // Global sanitation: remove malformed entries and enforce numeric time
     try {
-      const out: Array<{ t:number; d:number; v?:number; elev?:number; hr?:number; cad?:number; p?:number }> = [];
+      const out: Array<{ ts?:number; t:number; d:number; v?:number; elev?:number; hr?:number; cad?:number; p?:number }> = [];
       let lastT = 0;
       let lastD = 0;
       for (let i = 0; i < rows.length; i += 1) {
@@ -778,7 +778,9 @@ Deno.serve(async (req) => {
         if (out.length && t < lastT) t = lastT + 1;
         let d = Number(r?.d);
         if (!Number.isFinite(d)) d = lastD;
-        out.push({ t, d, v: (typeof r?.v === 'number' ? r.v : undefined), elev: (typeof r?.elev === 'number' ? r.elev : undefined), hr: (typeof r?.hr === 'number' ? r.hr : undefined), cad: (typeof r?.cad === 'number' ? r.cad : undefined), p: (typeof r?.p === 'number' ? r.p : undefined) });
+        // ⛔ `ts` (the sample's clock) is kept (2026-09-14): lap times on the clock are matched against it. Dropping it
+        // here left a .fit or Strava-style run's laps compared with timer seconds, so every lap fell past the end.
+        out.push({ ts: (Number.isFinite(Number(r?.ts)) ? Number(r.ts) : undefined), t, d, v: (typeof r?.v === 'number' ? r.v : undefined), elev: (typeof r?.elev === 'number' ? r.elev : undefined), hr: (typeof r?.hr === 'number' ? r.hr : undefined), cad: (typeof r?.cad === 'number' ? r.cad : undefined), p: (typeof r?.p === 'number' ? r.p : undefined) });
         lastT = t; lastD = d;
       }
       rows = out;
