@@ -573,7 +573,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       const distM = Number(overall?.distance_m ?? overall?.distanceMeters ?? overall?.distance_meters);
       // ⛔ THE SERVER'S MOVING TIME (2026-09-10, audit H-D10) — `moving_seconds`, not a ladder over `overall`.
       const durS = Number(w?.moving_seconds);
-      const avgHr = Number(overall?.avg_hr ?? w?.avg_heart_rate ?? w?.metrics?.avg_heart_rate);
+      // ⛔ THE SERVER'S AVERAGE HEART RATE (D-477) — get-week resolves it into `overall.avg_hr`; no picking here.
+      const avgHr = Number(overall?.avg_hr);
       const elevM = Number(overall?.elevation_gain_m ?? w?.elevation_gain ?? w?.metrics?.elevation_gain);
 
       const parts: string[] = [];
@@ -1193,7 +1194,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           paceSpeed = `${Math.round(speedMph * 10) / 10} mph`;
         }
 
-        const heartRate = Number(overall?.avg_hr ?? workout.avg_heart_rate ?? workout.metrics?.avg_heart_rate);
+        // ⛔ THE SERVER'S AVERAGE HEART RATE (D-477) — get-week resolves it into `overall.avg_hr`.
+        const heartRate = Number(overall?.avg_hr);
         const hrDisplay = (Number.isFinite(heartRate) && heartRate > 0) ? `${Math.round(heartRate)} bpm` : 'N/A';
         const elevationM = Number(overall?.elevation_gain_m ?? workout.elevation_gain ?? workout.metrics?.elevation_gain);
         const elevationFt = (Number.isFinite(elevationM) && elevationM > 0) ? `${Math.round(elevationM * 3.28084)} ft` : 'N/A';

@@ -36,6 +36,7 @@ import { normalizeCompletedStrengthExercise } from '../../../src/lib/normalize-s
 // on every item; the phone prints them and computes none of them.
 import { plannedDurationFields } from './planned-duration-label.ts';
 import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
+import { getOverallAvgHr } from '../_shared/fact-packet/queries.ts';
 import { completedStrengthVolume, isPerformedSet } from '../_shared/strength/session-volume.ts';
 import { resolveBodyweightLb } from '../_shared/workload.ts';
 // ⛔ ONE "WAS IT DONE" AND THE WEEK BAR'S TOTALS (2026-09-10, audit H-T10 / H-T03).
@@ -870,7 +871,9 @@ Deno.serve(async (req)=>{
         if (overall.avg_power_w == null) overall.avg_power_w = num(w?.avg_power);
         if (overall.normalized_power_w == null) overall.normalized_power_w = num(w?.normalized_power);
         if (overall.functional_threshold_power_w == null) overall.functional_threshold_power_w = num(w?.functional_threshold_power);
-        if (overall.avg_hr == null) overall.avg_hr = num(w?.avg_heart_rate);
+        // ⛔ THE ONE AVERAGE HEART RATE (D-477, 2026-09-15): `getOverallAvgHr`, the provider's average first and
+        // the sample mean only when none — the same number Details and Performance print. Today reads this.
+        { const hr = getOverallAvgHr(w); overall.avg_hr = hr != null ? hr : undefined; }
         // Elevation gain is stored in meters in our importer
         if (overall.elevation_gain_m == null) overall.elevation_gain_m = num(w?.elevation_gain);
         executed.overall = overall;

@@ -12,6 +12,7 @@ import { buildBodyResponse } from '../_shared/athlete-snapshot/body-response.ts'
 import { buildSessionDetailV1 } from '../_shared/session-detail/build.ts';
 import { resolveSwimScalars } from '../_shared/swim/swim-scalars.ts';
 import { resolveRunScalars } from '../_shared/run/run-scalars.ts';
+import { getOverallAvgHr } from '../_shared/fact-packet/queries.ts';
 import { swimPacePer100Seconds } from '../_shared/swim/swim-pace.ts';
 import { disciplineOf } from '../_shared/state-trend/index.ts';
 import {
@@ -366,6 +367,10 @@ function buildDetailCoreForSession(row: any): { detail: any; processingComplete:
   (detail as any).moving_seconds = completedMovingSeconds(row);
   try { (detail as any).computed =(()=>{ try { return typeof row.computed === 'string' ? JSON.parse(row.computed) : (row.computed || null); } catch { return row.computed || null; } })(); } catch {}
   try { (detail as any).metrics  = (()=>{ try { return typeof row.metrics  === 'string' ? JSON.parse(row.metrics)  : (row.metrics  || null); } catch { return row.metrics  || null; } })(); } catch {}
+  // ⛔ THE SESSION'S ONE AVERAGE HEART RATE (D-477, 2026-09-15) — `getOverallAvgHr`, provider first. Written
+  // into the served `computed.overall.avg_hr` so the Details tile and every Performance reader of the
+  // overall print the same bpm (the moving-time pattern above). The stored row is not touched.
+  try { const _hr = getOverallAvgHr(detail); const _ov = (detail as any).computed?.overall; if (_hr != null && _ov && typeof _ov === 'object') _ov.avg_hr = _hr; } catch {}
   try { (detail as any).workout_analysis = (()=>{ try { return typeof row.workout_analysis === 'string' ? JSON.parse(row.workout_analysis) : (row.workout_analysis || null); } catch { return row.workout_analysis || null; } })(); } catch {}
   try {
     let se = (()=>{ try { return typeof row.strength_exercises === 'string' ? JSON.parse(row.strength_exercises) : (row.strength_exercises || null); } catch { return row.strength_exercises || null; } })();
@@ -1754,6 +1759,11 @@ Deno.serve(async (req) => {
     // Parse/attach structured fields
     try { (detail as any).computed = (()=>{ try { return typeof row.computed === 'string' ? JSON.parse(row.computed) : (row.computed || null); } catch { return row.computed || null; } })(); } catch {}
     try { (detail as any).metrics  = (()=>{ try { return typeof row.metrics  === 'string' ? JSON.parse(row.metrics)  : (row.metrics  || null); } catch { return row.metrics  || null; } })(); } catch {}
+
+    // ⛔ THE SESSION'S ONE AVERAGE HEART RATE (D-477, 2026-09-15) — `getOverallAvgHr`, provider first. Written
+    // into the served `computed.overall.avg_hr` so the Details tile and every Performance reader of the
+    // overall print the same bpm (the moving-time pattern above). The stored row is not touched.
+    try { const _hr = getOverallAvgHr(detail); const _ov = (detail as any).computed?.overall; if (_hr != null && _ov && typeof _ov === 'object') _ov.avg_hr = _hr; } catch {}
     try { (detail as any).workout_analysis = (()=>{ try { return typeof row.workout_analysis === 'string' ? JSON.parse(row.workout_analysis) : (row.workout_analysis || null); } catch { return row.workout_analysis || null; } })(); } catch {}
     try {
       let se = (()=>{ try { return typeof row.strength_exercises === 'string' ? JSON.parse(row.strength_exercises) : (row.strength_exercises || null); } catch { return row.strength_exercises || null; } })();
@@ -1922,7 +1932,7 @@ Deno.serve(async (req) => {
       : (Number.isFinite(d?.computed?.overall?.duration_s_elapsed) ? Number(d.computed.overall.duration_s_elapsed) : (Number.isFinite(d?.elapsed_time ?? d?.metrics?.elapsed_time) ? Number(d.elapsed_time ?? d.metrics.elapsed_time) * 60 : null) ?? durS);
     const elevation_gain_m = Number.isFinite(d?.elevation_gain ?? d?.metrics?.elevation_gain) ? Number(d.elevation_gain ?? d.metrics.elevation_gain) : null;
     const avg_power = Number.isFinite(d?.avg_power ?? d?.metrics?.avg_power) ? Number(d.avg_power ?? d.metrics.avg_power) : null;
-    const avg_hr = Number.isFinite(d?.avg_heart_rate ?? d?.metrics?.avg_heart_rate) ? Number(d.avg_heart_rate ?? d.metrics.avg_heart_rate) : null;
+    const avg_hr = getOverallAvgHr(d); // D-477: the one average heart rate, same as Performance and Today
     const max_hr = Number.isFinite(d?.max_heart_rate ?? d?.metrics?.max_heart_rate) ? Number(d.max_heart_rate ?? d.metrics.max_heart_rate) : null;
     const max_power = Number.isFinite(d?.max_power ?? d?.metrics?.max_power) ? Number(d.max_power ?? d.metrics.max_power) : null;
     const avg_speed_kmh = Number.isFinite(d?.metrics?.avg_speed) ? Number(d.metrics.avg_speed) : (Number.isFinite(d?.avg_speed) ? Number(d.avg_speed) : (distKm && durS && durS > 0 ? (distKm / (durS / 3600)) : null));

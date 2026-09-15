@@ -160,10 +160,15 @@ export function isMixedEffortRow(row: any): boolean {
 }
 
 /**
- * Canonical avg-HR resolution for any workout row. Three-stage fallback —
- * `computed.overall.avg_hr` (the primary key compute-workout-summary writes)
- * → `computed.overall.avg_heart_rate` (alternate key from legacy rows / some
- * ingest paths) → row-level `workouts.avg_heart_rate` (older Garmin imports).
+ * THE ONE AVERAGE HEART RATE for any workout row (2026-09-15, TRUTH-MAP §9 Q3). First positive of —
+ * row-level `workouts.avg_heart_rate` (the provider's activity average: what the watch, Garmin Connect
+ * and Strava show) → `computed.overall.avg_hr` (our plain sample mean) → `computed.overall.avg_heart_rate`
+ * (alternate key from legacy rows). Details, Performance, Today (via get-week), the ride efficiency
+ * factor and the fact packet all read this.
+ * // OURS — the fallback order (provider first, sample mean only when the provider sent none). The book
+ * is silent on averaging; Garmin/Strava show the device average. Ledger row in STATE-SOURCES.md
+ * ("Average heart rate"). Supersedes the computed.overall-first order of D-182/D-185 for average heart
+ * rate only (D-477).
  *
  * **Exported** (D-047 / Q-024) so the current-workout resolution in
  * `fact-packet/build.ts` can share the same fallback chain as the
@@ -174,8 +179,11 @@ export function isMixedEffortRow(row: any): boolean {
  */
 export function getOverallAvgHr(row: any): number | null {
   const overall = getComputedOverall(row)?.overall;
-  const v = coerceNumber(overall?.avg_hr ?? overall?.avg_heart_rate ?? row?.avg_heart_rate);
-  return v != null && v > 0 ? Math.round(v) : null;
+  for (const raw of [row?.avg_heart_rate, overall?.avg_hr, overall?.avg_heart_rate]) {
+    const v = coerceNumber(raw);
+    if (v != null && v > 0) return Math.round(v);
+  }
+  return null;
 }
 
 function getOverallMaxHr(row: any): number | null {

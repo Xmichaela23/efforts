@@ -133,3 +133,27 @@ hard at 48 minutes.
 **> Supersedes** the 2026-09-10 ruling recorded in `today-lines.ts` that *"the band no longer picks a
 branch"* — **for the first sentence only**. The ORDER sentence still reads the same on every band,
 because p145 rule 6 and p77 are about the lift's own freshness and say nothing about the other session.
+
+---
+
+## D-477 — Average heart rate: the provider's number first, one resolver (2026-09-15)
+
+**The call.** A session's average heart rate is `workouts.avg_heart_rate` — the provider's activity average,
+the number Garmin Connect and Strava show. Our plain sample mean (`computed.overall.avg_hr`) is used only when
+the provider sent none. One resolver, `_shared/fact-packet/queries.ts getOverallAvgHr`, and every screen reads
+it: `workout-detail` writes it into the served overall once, so the Details tile and Performance print the
+same bpm; `get-week` does the same for Today; `compute-facts` ride facts and the ride efficiency factor read it.
+
+**Why.** TRUTH-MAP §9 Q3 (accepted 2026-09-15). The book is silent on averaging. Garmin and Strava show the
+device average and agree with each other. Our sample mean is unweighted over unevenly spaced samples (Garmin
+smart recording), so it is the less defensible of the two, and the app was printing both on one session —
+Details the provider's, Performance and Today the sample mean.
+
+**OURS:** the fallback order. Ledger row "Average heart rate" in `STATE-SOURCES.md`.
+
+**> Supersedes** the computed.overall-first order of D-182 / D-185 (archive) **for average heart rate only**;
+pace, distance and GAP keep D-185's order. Back-annotated there.
+
+**Rejected:** a time-weighted sample mean everywhere (intervals.icu's method) — disagrees with the watch by a
+few bpm on every session and needs every stored workout re-analysed.
+

@@ -3957,6 +3957,8 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 
 ## D-182 — Swim pace + HR single-sourced to the RAW-column scalar across card AND narrative (computed.overall is not authoritative for swims)
 
+> **2026-09-15 — D-477 (`docs/DECISIONS-LOG-4.md`) makes the raw column first for AVERAGE HEART RATE on every sport**, which is what this entry already did for swims. The computed.overall-primary rule for non-swim heart rate referred to below no longer holds.
+
 - **Date:** 2026-06-16
 - **Symptom:** same swim, two numbers — the Performance **card** showed Pace **3:03/100yd** + Avg HR **125**, while the **narrative** said **2:00** + **119**. The D-156/D-164/D-167 single-source divergence class, resurfaced cross-surface.
 - **Root cause (confirmed by a read-only prod dump of the row, not asserted):** D-167 single-sourced pace *within* each surface (both call `swimPacePer100Seconds`) but the two surfaces fed it **different upstream layers**. Narrative read the raw `workouts` columns (`moving_time` 24 min → 1440s, `distance` 1.1 km → 1100 m, `avg_heart_rate` 119). Card (`session-detail/build.ts`) read `computed.overall` (`duration_s_moving` **2202s**, `avg_hr` **125**). `computed.overall.duration_s_moving = 2202s` is **larger than elapsed (2100s)** — physically impossible; moving cannot exceed elapsed. The sample-derived `computed.overall` layer is unreliable for swims — the exact Q-038 / D-156 lesson ("701:00 duration / 2263% adherence"). The raw provider-summary scalar (2:00 / 119) is authoritative.
@@ -4026,6 +4028,8 @@ Note vs the earlier spot-check: that used canonical `deadlift`'s *latest-session
 ---
 
 ## D-185 — Run scalar resolver: one guarded source for run pace/HR across card, narrative, facts (continuity audit fix #1)
+
+> **2026-09-15 — superseded for AVERAGE HEART RATE ONLY by D-477 (`docs/DECISIONS-LOG-4.md`).** `getOverallAvgHr` (`_shared/fact-packet/queries.ts`) now reads the provider's `workouts.avg_heart_rate` first and the `computed.overall` sample mean only when none. Pace, distance and GAP keep the order below. Everything below is history for heart rate.
 
 - **Date:** 2026-06-16
 - **Fracture (continuity audit 2026-06-16, HALF 1):** run pace had THREE derivations — the **card** (`build.ts`) read the RAW `computed.overall.avg_pace_s_per_mi`; the **narrative** (fact packet) read the robust, guarded `resolveOverallPaceSecPerMi` (`_shared/fact-packet/pace-resolution.ts` — reconciles stored avg-pace vs distance+duration, rejects unit-corruption); **compute-facts** used a third, simpler `overall.avg_pace_s_per_mi × 0.6214 ?? raw` path. The swim-D-182 latent class for run: currently consistent (all trace to the same samples) but no single source, so it *could* drift — and the card read the LEAST-guarded value. Run had no resolver while ride (`rideComputedNp`) and swim (`resolveSwimScalars`) did.

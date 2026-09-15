@@ -57,6 +57,7 @@ import {
 } from "../_shared/exercise-registry-lookup.ts";
 import { rewriteSessionLoad, type ExerciseLogRowForLoad } from "../_shared/session-load.ts";
 import { resolveRunScalars } from "../_shared/run/run-scalars.ts";
+import { getOverallAvgHr } from "../_shared/fact-packet/queries.ts";
 import { detectSwimEquipment } from "../_shared/swim/swim-equipment.ts";
 import { resolveSwimScalars } from "../_shared/swim/swim-scalars.ts";
 import { resolveRouteCluster } from "../_shared/route-intelligence.ts";
@@ -1252,7 +1253,8 @@ function buildRideFacts(w: WorkoutRow, baselines: Baselines | null): Record<stri
     // through. Pick the first POSITIVE source; null falls back cleanly downstream.
     avg_power: [w.avg_power, overall.avg_power_w].map((x) => toNum(x)).find((v) => v != null && v > 0) ?? null,
     normalized_power: w.normalized_power ?? analysis.power?.normalized_power ?? null,
-    avg_hr: [w.avg_heart_rate, overall.avg_hr].map((x) => toNum(x)).find((v) => v != null && v > 0) ?? null,
+    // D-477: the one average heart rate (provider first, sample mean when none).
+    avg_hr: getOverallAvgHr(w),
   };
 
   if (ftp && facts.normalized_power) {

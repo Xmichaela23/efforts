@@ -119,7 +119,14 @@ Deno.test('D-038 b70658b0 fixture: filter excludes 11-13 min/mi historicals from
 // null despite `sample_size >= 3`. build.ts now shares this helper, so these
 // tests lock the contract for both paths.
 
-Deno.test('D-047 / Q-024: getOverallAvgHr resolves overall.avg_hr (primary key)', () => {
+// D-477 (2026-09-15, TRUTH-MAP §9 Q3): the provider's average now comes first; the sample mean is the
+// fallback. The D-047 alt key and the zero-not-null guard are unchanged.
+Deno.test('D-477: getOverallAvgHr takes the provider average (row column) over the sample mean', () => {
+  const row = { computed: JSON.stringify({ overall: { avg_hr: 152 } }), avg_heart_rate: 147 };
+  assertEquals(getOverallAvgHr(row), 147);
+});
+
+Deno.test('D-047 / D-477: getOverallAvgHr falls back to overall.avg_hr when the provider sent none', () => {
   const row = { computed: JSON.stringify({ overall: { avg_hr: 152 } }) };
   assertEquals(getOverallAvgHr(row), 152);
 });
@@ -129,14 +136,14 @@ Deno.test('D-047 / Q-024: getOverallAvgHr falls back to overall.avg_heart_rate (
   assertEquals(getOverallAvgHr(row), 148);
 });
 
-Deno.test('D-047 / Q-024: getOverallAvgHr falls back to row-level avg_heart_rate (legacy ingest)', () => {
-  const row = { computed: JSON.stringify({ overall: {} }), avg_heart_rate: 145 };
-  assertEquals(getOverallAvgHr(row), 145);
-});
-
 Deno.test('D-047 / Q-024: getOverallAvgHr returns null when all three sources are missing', () => {
   const row = { computed: JSON.stringify({ overall: {} }) };
   assertEquals(getOverallAvgHr(row), null);
+});
+
+Deno.test('D-477: a zero provider average is missing, not a reading — the sample mean is used', () => {
+  const row = { computed: JSON.stringify({ overall: { avg_hr: 140 } }), avg_heart_rate: 0 };
+  assertEquals(getOverallAvgHr(row), 140);
 });
 
 Deno.test('D-047 / Q-024: getOverallAvgHr returns null when value is non-positive (zero/negative HR)', () => {
@@ -151,10 +158,10 @@ Deno.test('D-047 / Q-024: getOverallAvgHr coerces stringified numbers', () => {
   assertEquals(getOverallAvgHr(row), 156);
 });
 
-Deno.test('D-047 / Q-024: getOverallAvgHr primary key wins over fallbacks when both present', () => {
+Deno.test('D-477: provider average wins when all three are present', () => {
   const row = {
     computed: JSON.stringify({ overall: { avg_hr: 150, avg_heart_rate: 200 } }),
-    avg_heart_rate: 300,
+    avg_heart_rate: 146,
   };
-  assertEquals(getOverallAvgHr(row), 150);
+  assertEquals(getOverallAvgHr(row), 146);
 });
