@@ -3,7 +3,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { withAlarm } from '../_shared/alarm.ts';
 import { normalizedPowerW, pedalingAveragePowerW, powerStreamW } from '../_shared/ride-power.ts';
-import { buildRunPaceCurve, buildRunHrCurve, type RunPaceCurve, type RunHrCurve } from '../../../src/lib/run-critical-speed.ts';
+import { buildRunDistanceBests, buildRunPaceCurve, buildRunHrCurve, type RunDistanceBests, type RunPaceCurve, type RunHrCurve } from '../../../src/lib/run-critical-speed.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { normalizeSamples } from '../../lib/analysis/sensor-data/extractor.ts';
 import { parseRunningTokens } from '../_shared/token-parser.ts';
@@ -13,7 +13,7 @@ import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
 import { powerZoneBoundaries as powerZoneBoundariesFor } from '../_shared/endurance/display-zones.ts';
 import { runEasyZone3FloorBpm } from '../_shared/easy-hr.ts';
-import { gapSecPerMiBetween, movingSecondsBetween, runGrades, runMovingSeconds } from '../_shared/run-pace.ts';
+import { cumulativeMovingSeconds, gapSecPerMiBetween, movingSecondsBetween, runGrades, runMovingSeconds } from '../_shared/run-pace.ts';
 import { isIndoorSession } from '../_shared/indoor-session.ts';
 import { buildDisplaySeriesColumn } from './display-series.ts';
 // The bike FTP estimator's two per-ride substrates: the widened power-curve durations and the
@@ -2040,6 +2040,7 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
     let bestEfforts: BestEfforts | null = null;
     let paceCurve: RunPaceCurve | null = null;
     let hrCurve: RunHrCurve | null = null;
+    let runDistanceBests: RunDistanceBests | null = null;
     
     if (w.type === 'ride' || w.type === 'cycling' || w.type === 'bike') {
       // Calculate power curve for bikes
@@ -2076,6 +2077,9 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
       // (src/lib/run-critical-speed.ts buildRunHrCurve, TrainingPeaks' rule). The pace curve's avgHr is the
       // heart rate of the FASTEST window, which is not the same thing.
       hrCurve = buildRunHrCurve(time_s, hr_bpm);
+      // The fastest moving time over 400 m to 5 km — the efforts the threshold suggestion is fitted from
+      // (Smyth & Muniz-Pumares 2020; `src/lib/run-critical-speed.ts`).
+      if (runView) runDistanceBests = buildRunDistanceBests(distance_m, cumulativeMovingSeconds(runView), hr_bpm, elevation_m);
     }
 
     // Build partial computed data (only what this function writes)
@@ -2088,6 +2092,7 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
       best_efforts: bestEfforts,
       pace_curve: paceCurve,
       hr_curve: hrCurve,
+      run_best_distances: runDistanceBests,
     };
 
     console.log('📝 About to UPDATE:', {

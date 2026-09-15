@@ -26,9 +26,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import {
-  fitRunCriticalSpeed,
-  paceCurveToEfforts,
+  fitRunThresholdFromBestEfforts,
   thresholdHrFromHrCurves,
+  type RunDistanceBests,
   type RunPaceCurve,
   type RunHrCurve,
 } from '../../../src/lib/run-critical-speed.ts';
@@ -890,206 +890,8 @@ export function analyzeRuns(runs: WorkoutRecord[], allRunCurves: WorkoutRecord[]
     }
   }
 
-  // ==========================================================================
-  // STEP 5b: Threshold PACE — the pace at which threshold HR occurs.
-  //
-  // ⛔⛔ IT PUBLISHED A THRESHOLD PACE SLOWER THAN THE ATHLETE'S EASY PACE (2026-08-19, seen on
-  // Michael's baselines: easy 12:35/mi, threshold 14:44/mi, 5K 25:21 = 8:10/mi). A threshold pace
-  // slower than easy is not a low-confidence reading, it is not a reading at all.
-  //
-  // ⛔ THE MECHANISM. The filter took any run ≥15 min whose AVERAGE HR sat within ±5 bpm of
-  // threshold HR, then took the median of that run's AVERAGE PACE over the whole activity. A
-  // hill-repeat session averages near threshold HR — and its average pace includes the walk-back
-  // descents. So the walking was folded into "threshold pace". The same is true of any interval run
-  // with recoveries, and of any run with stops. Two such sessions were enough: the minimum was 2.
-  //
-  // ⛔ THE GUARD IS AN INVARIANT, NOT A CONTAMINATION LIST. Detecting hills, then intervals, then
-  // stops, then whatever comes next is a guard per source, forever. **A threshold effort is faster
-  // than an easy effort** is true for every athlete in every sport, so it is applied twice: once to
-  // drop the individual dirty candidates, and once to the median as a last check. A session whose
-  // whole-activity average pace is slower than the athlete's own easy pace cannot be a threshold
-  // read, whatever its average HR says.
-  //
-  // ⚠️ AND WHEN IT CANNOT BE MEASURED IT PUBLISHES NOTHING — the same call the swim CSS learner
-  // above already makes, and LAW 2 in this file ("we do not know it yet; say so"). `null` is safe
-  // here because `resolveCurrentRunThresholdPace` (`src/lib/resolve-current-run-pace.ts:274`) has a
-  // tier chain beneath it: the athlete's typed value, then the wizard/VDOT pace off their 5K. An
-  // abstention falls back to a sane derived number; a published lie does not.
-  // ==========================================================================
-
-  /**
-   * ⛔ A PACE "AT THRESHOLD HR" REQUIRES A THRESHOLD HR THAT WAS DETECTED (2026-08-20).
-   *
-   * This filtered candidates to within ±5 bpm of `thresholdHRValue` without asking where that number
-   * came from. When STEP 2 detects nothing it fills the hole — `95th percentile of sustained efforts
-   * (no clear threshold data)`, or `88% of observed max` — and this read then measured a pace against
-   * a guess and published the result as `Measured from your runs`. That is Law 2 one layer up: not an
-   * invented number, but a real measurement of an invented reference, which is harder to spot and
-   * carries the same lie to the athlete.
-   *
-   * ⚠️ IT ABSTAINS RATHER THAN WIDENING. There is no honest weaker version of "pace at threshold HR"
-   * when threshold HR is unknown — and abstaining is not a hole, because
-   * `resolveCurrentRunThresholdPace` derives from the measured easy pace beneath this, which is a
-   * reference the athlete actually produced.
-   */
-  const thresholdHrDetected = threshold_hr != null && threshold_hr.is_estimate !== true;
-  if (thresholdHRValue && observedMaxHR && thresholdHrDetected) {
-    /**
-     * ⚠️ THE CEILING IS THE LEARNED EASY PACE WHEN THERE IS ONE, AND OTHERWISE NOTHING.
-     * With no easy pace learned there is no reference to measure against, and inventing one (a
-     * fraction of threshold HR pace, say) would be the fabrication LAW 2 deleted from this file.
-     * Candidates are then unfiltered and the abstention below is the only guard — which is the
-     * honest position, not a gap.
-     */
-    const easyRaw = Number(easy_pace?.value);
-    const easyPaceCeiling = Number.isFinite(easyRaw) && easyRaw > 0 ? easyRaw : null;
-
-    const thresholdPaceRuns = runs.filter(r => {
-      const duration = r.moving_time || r.duration || 0;
-      const hr = r.avg_heart_rate || 0;
-      const pace = r.avg_pace || 0;
-      if (!(duration >= 15 && pace > 150 && pace < 900)) return false;   // Valid pace range
-      if (Math.abs(hr - thresholdHRValue!) > 5) return false;
-      // ⛔ SLOWER THAN EASY → NOT A THRESHOLD READ. `avg_pace` is sec/km, so LARGER is slower.
-      if (easyPaceCeiling != null && pace >= easyPaceCeiling) return false;
-      return true;
-    });
-
-    /**
-     * ⛔ THREE, NOT TWO — AND THE TIER MOVED WITH IT. Two runs used to publish at `medium`, and
-     * `resolveCurrentRunThresholdPace` treats medium as TRUSTED, so a two-session read drove real
-     * prescriptions. Both of Michael's were contaminated. Two runs is now `low` — visible on the
-     * baselines card, ignored by the resolver — and it takes three to steer a plan.
-     */
-    if (thresholdPaceRuns.length >= 2) {
-      const sortedPaces = thresholdPaceRuns.map(r => r.avg_pace).sort((a, b) => a - b);
-      const medianPace = sortedPaces[Math.floor(sortedPaces.length / 2)];
-
-      /**
-       * ⛔ THE INVARIANT IS ENFORCED ON THE CANDIDATES, AND ONLY THERE. A second check on the
-       * MEDIAN stood here and was deleted the hour it was written: every candidate is already
-       * faster than the ceiling, so their median is too — it could never fire, and unreachable
-       * defence is how this codebase's guards multiply. Filtering also SALVAGES the clean runs
-       * instead of throwing away the whole read because one session was dirty.
-       *
-       * ⚠️ WHAT PROTECTS IT NOW IS THE TEST, NOT A SECOND BRANCH. Deleting the filter above fails
-       * `threshold-pace.test.ts` — verified by mutation, which is also how the dead branch was
-       * caught: removing it broke nothing.
-       */
-      threshold_pace = {
-        value: Math.round(medianPace),
-        confidence: thresholdPaceRuns.length >= 5
-          ? 'high'
-          : (thresholdPaceRuns.length >= 3 ? 'medium' : 'low'),
-        source: `pace at threshold HR (${thresholdPaceRuns.length} runs)`,
-        sample_count: thresholdPaceRuns.length,
-        as_of: newestDate(thresholdPaceRuns),
-      };
-    }
-  }
-
-  /**
-   * ═══════════════════════════════════════════════════════════════════════════
-   * STEP 5c: THE MEASURED THRESHOLD — FITTED FROM BEST EFFORTS (2026-08-20)
-   * ═══════════════════════════════════════════════════════════════════════════
-   *
-   * ⛔ THIS OUTRANKS STEP 5b, AND STEP 5b IS THE BUG. 5b averages a WHOLE ACTIVITY whose average
-   * heart rate happened to land near threshold. A hill-repeat session averages near threshold heart
-   * rate and its average pace includes every walk back down — which is how a threshold pace slower
-   * than the athlete's own easy pace reached a real screen. Averaging an activity cannot measure a
-   * sustained effort; looking inside it can.
-   *
-   * ⛔ THE BIKE AND THE SWIM ALREADY DO THIS. FTP is learned from the best 20-minute power window;
-   * the swim fits a critical-speed curve across best efforts and abstains when the curve does not
-   * hold. Running was the last discipline still averaging.
-   *
-   * ⚠️ IT ABSTAINS OFTEN, AND THAT IS CORRECT. It needs at least two genuinely hard efforts in
-   * DIFFERENT duration bands. An athlete whose hard running is all hill repeats has one band and
-   * gets nothing — at which point 5b's read, and below that the easy-pace derivation in
-   * `resolveCurrentRunThresholdPace`, are what answer. The tiers stack; none of them was removed.
-   *
-   * ⚠️ NO BACKFILL (Michael's call). `pace_curve` is written by `compute-workout-analysis` at
-   * analysis time, so it lands on runs from here forward and older runs carry none. Until two
-   * qualifying efforts accumulate this returns null and nothing changes.
-   */
-  const csEfforts = runs.flatMap((r) =>
-    paceCurveToEfforts((r.computed as { pace_curve?: RunPaceCurve } | null)?.pace_curve, String(r.date ?? ''))
-  );
-  if (csEfforts.length > 0) {
-    const fit = fitRunCriticalSpeed(
-      csEfforts,
-      thresholdHRValue ?? null,
-      // The invariant's reference — the easy pace THIS pass just learned, in the same sec/km unit.
-      Number.isFinite(Number(easy_pace?.value)) ? Number(easy_pace!.value) : null,
-      // ⛔ the hard-effort gate's anchor — the OBSERVED max, a measurement, never the LTHR estimate
-      // (2026-09-02: four months of easy running had been written as a high-confidence threshold).
-      observedMaxHR ?? null,
-    );
-    console.log(`  📊 Run critical speed: ${fit.csSecPerKm ?? 'abstained'} — ${fit.reason}`);
-    if (fit.csSecPerKm != null) {
-      threshold_pace = {
-        value: fit.csSecPerKm,
-        // The fit's own tiers map straight across; `low` still means "visible, not steerable".
-        confidence: fit.confidence === 'high' ? 'high' : (fit.confidence === 'moderate' ? 'medium' : 'low'),
-        source: `critical speed from ${fit.nPoints} best-effort windows (R² ${fit.r2})`,
-        sample_count: fit.nPoints,
-        // ⚠️ DATES THE RUNS THAT ACTUALLY SURVIVED THE GATES, not every run carrying a curve. The
-        // looser version overstated freshness: a recent easy run has a pace curve and contributes
-        // nothing, so it would have stamped the fit as newer than the efforts it rests on.
-        as_of: newestDate(runs.filter((r) => {
-          const c = (r.computed as { pace_curve?: RunPaceCurve } | null)?.pace_curve;
-          if (!c) return false;
-          return paceCurveToEfforts(c, String(r.date ?? '')).some((e) =>
-            e.avgHr != null && thresholdHRValue != null && e.avgHr >= thresholdHRValue * 0.92
-          );
-        })),
-      };
-    }
-  }
-
-  // ⛔ BEST SUSTAINED 45 MINUTES — THRESHOLD PACE (2026-09-13; was the best 20 minutes, 2026-09-02). Overrides the
-  // critical-speed fit above. TrainingPeaks: "We suggest a threshold if your Peak 45 Min Average Pace is faster than the
-  // currently set threshold" (trainingpeaks.com/blog/are-you-using-threshold-improvement-notifications). The 20-minute
-  // window offered 7:50/mi from a 32-minute run at 129 bpm (2025-12-26); a 45-minute window needs a run that long.
-  // ONLY UP: a prior best-45 value with a faster pace is kept (a prior from the retired 20-minute rule is not).
-  // NO WINDOW: the whole history on file. A window under 85% of the observed max is marked 'medium'.
-  // Threshold HEART RATE is no longer read here — see the heart-rate-window block below.
-  {
-    let best: { date: string; paceSecPerKm: number; avgHr: number | null } | null = null;
-    for (const r of allRunCurves) {
-      const w = (r.computed as { pace_curve?: RunPaceCurve } | null)?.pace_curve?.['2700'];
-      if (!w || !(Number(w.distanceM) > 0) || !(Number(w.timeS) > 0)) continue;
-      const paceSecPerKm = (Number(w.timeS) / Number(w.distanceM)) * 1000;
-      if (!Number.isFinite(paceSecPerKm) || paceSecPerKm < 120 || paceSecPerKm > 900) continue;
-      const hr = Number(w.avgHr);
-      if (!best || paceSecPerKm < best.paceSecPerKm) best = { date: String(r.date ?? '').slice(0, 10), paceSecPerKm, avgHr: Number.isFinite(hr) && hr > 60 ? Math.round(hr) : null };
-    }
-    const priorPace = priorLearned?.run_threshold_pace_sec_per_km;
-    const priorHr = priorLearned?.run_threshold_hr;
-    // a prior MEASURED threshold — a best-20 read or the 12-minute test — is kept when it is faster (only up)
-    const priorIsBest20 = priorPace && /best 45-minute|time trial/.test(String(priorPace.source ?? '')) && Number(priorPace.value) > 0;
-    // ⛔ A TEST BEATS AN INFERENCE (p210): a prior written by the time trial stands regardless of what the
-    // best-20 read says; only a newer trial (or "my number") replaces it. A prior best-20 read stands
-    // only while it is faster (only up).
-    const priorIsTrial = priorPace && /time trial/.test(String(priorPace.source ?? '')) && Number(priorPace.value) > 0;
-    if (best && priorIsTrial) {
-      threshold_pace = priorPace as LearnedMetric;
-      if (priorHr && /time trial/.test(String(priorHr.source ?? ''))) { threshold_hr = priorHr as LearnedMetric; thresholdHRValue = Number(priorHr.value) || thresholdHRValue; }
-      console.log(`  📊 Threshold: the time trial stands (${priorPace.value}s/km, ${priorPace.as_of})`);
-    } else if (best && priorIsBest20 && Number(priorPace.value) < best.paceSecPerKm) {
-      threshold_pace = priorPace as LearnedMetric;            // only up: the earlier best still stands
-      console.log(`  📊 Threshold: prior best 45-minute effort stands (${priorPace.value}s/km, ${priorPace.as_of})`);
-    } else if (best) {
-      const hard = observedMaxHR != null && best.avgHr != null && best.avgHr >= observedMaxHR * 0.85;
-      const paceMi = Math.round(best.paceSecPerKm * 1.60934);
-      const label = `best 45-minute effort on ${best.date} (${Math.floor(paceMi / 60)}:${String(paceMi % 60).padStart(2, '0')}/mi${best.avgHr != null ? ` at ${best.avgHr} bpm` : ''})`;
-      threshold_pace = { value: Math.round(best.paceSecPerKm), confidence: hard ? 'high' : 'medium', source: label, sample_count: 1, as_of: best.date };
-      console.log(`  📊 Threshold pace: ${label}${hard ? '' : ' — under 85% of observed max, medium'}`);
-    }
-  }
-
   // ⛔ THRESHOLD HEART RATE IS READ OFF THE HIGHEST-HEART-RATE WINDOWS, NOT THE FASTEST ONE (2026-09-13).
-  // The block above used to write threshold_hr = the heart rate during the FASTEST 20 minutes. On an easy-but-quick
+  // The retired best-45-minute pace block used to write threshold_hr = the heart rate during the FASTEST 20 minutes. On an easy-but-quick
   // stretch that is far below threshold (Michael: 152 bpm from 2026-04-02 against a Garmin-measured 172, which set every
   // easy-day heart-rate range 17 bpm low). TrainingPeaks: "your best 60-minute average heart rate, or 95% of your best
   // 20-minute average heart rate, whichever is higher" (trainingpeaks.com/blog/are-you-using-threshold-improvement-notifications);
@@ -1117,6 +919,50 @@ export function analyzeRuns(runs: WorkoutRecord[], allRunCurves: WorkoutRecord[]
       threshold_hr = { value: fromCurves.value, confidence: 'high', source: label, sample_count: 1, as_of: fromCurves.date };
       thresholdHRValue = fromCurves.value;
       console.log(`  📊 Threshold HR: ${fromCurves.value} bpm — ${label}`);
+    }
+  }
+
+  // ==========================================================================
+  // THRESHOLD PACE — A SUGGESTION FROM BEST EFFORTS (2026-09-14, Michael)
+  //
+  // Critical speed from the fastest 400 m – 5 km efforts of the last 16 weeks, plus the best 45 minutes when that
+  // window was hard (Smyth & Muniz-Pumares 2020; `src/lib/run-critical-speed.ts`). It writes the MEASURED threshold
+  // only: the athlete accepts it (Adjust, the post-run popup, the six-week checkpoint) before anything re-prices.
+  // It replaces three earlier readers — the median of runs near threshold heart rate, the duration-bucket fit,
+  // and the best-45-minute override with its "only faster" rule.
+  // ⛔ A TEST BEATS AN INFERENCE (p210): a threshold written by the 12-minute time trial stands until a newer trial
+  // or the athlete's own number replaces it.
+  // ⚠️ It runs after threshold heart rate, which the 45-minute point is checked against.
+  // ==========================================================================
+  {
+    const priorPace = priorLearned?.run_threshold_pace_sec_per_km;
+    const priorIsTrial = priorPace && /time trial/.test(String(priorPace.source ?? '')) && Number(priorPace.value) > 0;
+    if (priorIsTrial) {
+      threshold_pace = priorPace as LearnedMetric;
+      console.log(`  📊 Threshold pace: the time trial stands (${priorPace.value}s/km, ${priorPace.as_of})`);
+    } else {
+      const today = new Date().toISOString().slice(0, 10);
+      const fit = fitRunThresholdFromBestEfforts(
+        allRunCurves.map((r) => {
+          const c = r.computed as { run_best_distances?: RunDistanceBests; pace_curve?: RunPaceCurve } | null;
+          return { date: String(r.date ?? ''), distanceBests: c?.run_best_distances ?? null, paceCurve: c?.pace_curve ?? null };
+        }),
+        today,
+        // Only a threshold heart rate that was read from runs or a test — never the percentile fill-in, which can sit
+        // inside the easy band and would call an easy 45 minutes hard.
+        threshold_hr != null && threshold_hr.is_estimate !== true ? (thresholdHRValue ?? null) : null,
+        Number.isFinite(Number(easy_pace?.value)) ? Number(easy_pace!.value) : null,
+      );
+      console.log(`  📊 Threshold pace suggestion: ${fit.csSecPerKm ?? 'none'} — ${fit.reason}`);
+      threshold_pace = fit.csSecPerKm != null
+        ? {
+          value: fit.csSecPerKm,
+          confidence: fit.confidence === 'high' ? 'high' : 'medium',
+          source: fit.reason,
+          sample_count: fit.nPoints,
+          as_of: fit.asOf ?? undefined,
+        }
+        : null;
     }
   }
 

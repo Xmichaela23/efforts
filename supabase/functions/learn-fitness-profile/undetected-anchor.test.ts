@@ -81,21 +81,6 @@ Deno.test('THE INVARIANT, restated end to end: nothing publishes a threshold slo
   }
 });
 
-Deno.test('a DETECTED threshold HR still works exactly as before', () => {
-  // Real threshold efforts in the 85-92% band (174 × 0.85 = 148 … × 0.92 = 160).
-  const withRealEfforts = [
-    ...Array.from({ length: 10 }, (_, i) => run({ avg_heart_rate: 133 + (i % 8), avg_pace: 470, date: `2026-08-0${(i % 9) + 1}` })),
-    ...Array.from({ length: 4 }, (_, i) => run({
-      avg_heart_rate: 155, avg_pace: 400, duration: 35, moving_time: 35, date: `2026-08-2${i + 1}`,
-    })),
-  ];
-  const out = analyzeRuns(withRealEfforts as never);
-  assert(out.threshold_hr != null);
-  assert(out.threshold_hr!.is_estimate !== true, 'a real detection was marked an estimate');
-  assert(out.threshold_pace != null, 'a detected anchor no longer produces a threshold pace');
-  assert(out.threshold_pace!.value < out.easy_pace!.value, 'threshold came out slower than easy');
-});
-
 Deno.test('the gate BITES where the easy-pace ceiling cannot: fast candidates, guessed anchor', () => {
   // ⛔ WRITTEN BECAUSE MUTATION SHOWED THE GATE WAS UNPINNED. In the chain above the easy-pace ceiling
   // already drops the candidates, so removing the detected-anchor check changed nothing. It bites in

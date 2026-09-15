@@ -170,3 +170,19 @@ export function driftReachesLine(pct: number | null | undefined): boolean {
   const n = num(pct);
   return n != null && n >= DRIFT_LINE_PCT;
 }
+
+/** Cumulative moving seconds at each sample (the same moving rule as every run pace above). */
+export function cumulativeMovingSeconds(samples: ReadonlyArray<RunSample>): number[] {
+  const out = new Array<number>(samples.length).fill(0);
+  for (let i = 1; i < samples.length; i += 1) {
+    const t1 = num(samples[i]?.t);
+    const t0 = num(samples[i - 1]?.t);
+    let add = 0;
+    if (t1 != null && t0 != null) {
+      const dt = t1 - t0;
+      if (dt > 0 && dt <= SAMPLE_BREAK_S && speedAt(samples, i, dt) >= STOPPED_BELOW_MPS) add = dt;
+    }
+    out[i] = out[i - 1] + add;
+  }
+  return out;
+}

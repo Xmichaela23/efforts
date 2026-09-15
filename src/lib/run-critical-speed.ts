@@ -1,374 +1,261 @@
 /**
- * RUN CRITICAL SPEED — a MEASURED threshold pace, fitted from the athlete's own best efforts.
+ * RUN THRESHOLD FROM BEST EFFORTS — critical speed, fitted from the athlete's own training runs, offered as a
+ * suggestion to accept (the FTP pattern: the learner measures, the athlete accepts, nothing re-prices until then).
  *
- * ⛔ WHY THIS EXISTS, AND WHAT IT REPLACES. The run threshold learner takes every run whose AVERAGE
- * heart rate lands near threshold and medians their AVERAGE PACE over the whole activity. A
- * hill-repeat session averages near threshold heart rate, and its average pace includes every walk
- * back down — which is how a threshold pace SLOWER than the athlete's easy pace reached a real
- * screen (2026-08-19). Averaging a whole activity cannot measure a sustained effort. Looking inside
- * it can.
+ * SOURCE — Smyth B, Muniz-Pumares D. "Calculation of critical speed from raw training data in recreational
+ * marathon runners." Med Sci Sports Exerc 2020;52(12):2637–2645. doi:10.1249/MSS.0000000000002412. Read directly:
+ *   · "the fastest time recorded at any time within the 16-week period … for a range of target distances:
+ *     400 m, 800 m, 1,000 m, 1,500 m, 3,000 m, and 5,000 m"
+ *   · CS is "the slope of the line" of distance against time, D′ the intercept, from "at least three of the
+ *     target distances"
+ *   · runners with "at least 24 activities logged during this period"
+ *   · no heart-rate check: the paper had none, and the straightness of the distance-time line is its support.
  *
- * ⛔ THIS IS THE MODEL THE OTHER TWO SPORTS ALREADY USE. The bike learns FTP from the best 20-minute
- * power window across rides; the swim fits a critical-speed curve across best efforts at distinct
- * durations and abstains when the curve does not hold. Running was the one discipline still
- * averaging. It is also what the field does — Strava's best-efforts table and power curve, every
- * critical-power tool — so this is not a new idea, it is the standard one, arriving late.
+ * WHERE THIS DIFFERS FROM THE PAPER, EACH MARKED OURS (docs/STATE-SOURCES.md):
+ *   · RAW PACE, not grade-adjusted (Michael, 2026-09-14). The paper smoothed grade over 100 m; the app works
+ *     grade out every second, and on a short hilly stretch that read a 400 m in 1:26 whose raw time was 2:54.
+ *     Downhill is refused instead: net descent steeper than 1% of the effort's distance (course-measurement
+ *     practice: 1 m/km of net drop ends record eligibility).
+ *   · THE BEST 45 MINUTES IS A SEVENTH POINT, and only when that window was hard: average heart rate at or above
+ *     95% of threshold heart rate, the floor of Friel's run Zone 4 "threshold" (`friel-zones.ts`). The window is
+ *     TrainingPeaks' threshold read ("Peak 45 Min Average Pace", trainingpeaks.com/blog/are-you-using-
+ *     threshold-improvement-notifications); here it is one point on the line, never an override.
+ *   · The checks on the fit: efforts on at least two different days, longer efforts not faster, R² ≥ 0.95,
+ *     D′ 30–600 m, and at least 4% faster than the measured easy pace.
  *
- * ⛔ RUN MATHS, IN A RUN FILE. `_shared/swim/swim-css-learner.ts` fits the same line and is NOT
- * shared with this on purpose. What is common between them is a least-squares regression — fifteen
- * lines with no opinion in it, which cannot meaningfully drift. What is NOT common is every gate
- * that matters: swim rejects drill laps, kick laps, paddles and pool-length errors; running has to
- * reject downhill stretches, stopped time, treadmill pace and heart-rate dropouts. If the gates all
- * differ, "sharing" means sharing the regression and calling it reuse. The two files point at each
- * other so nobody merges them by accident.
- *
- * ⚠️ WHAT THIS MEASURES IS CRITICAL SPEED, WHICH IS NOT LITERALLY LACTATE THRESHOLD. CS is the
- * asymptote of the speed-duration curve — the boundary of the severe-intensity domain — and it sits
- * a few percent above maximal lactate steady state, which is closer to what a coach means by
- * "threshold pace". The app already made this call for swimming (the CSS fit is stored and shown as
- * the swim threshold), so treating CS as the run threshold is consistent with existing precedent
- * rather than a new claim. Recorded here so it is not rediscovered as a bug.
- *
- * ⛔ IT ABSTAINS. Every gate below returns null rather than a hedged number, for the reason LAW 2
- * exists in `learn-fitness-profile`: a value published without the evidence to stand it up is worse
- * than no value, because a null re-learns and a lie does not.
+ * ⚠️ CRITICAL SPEED IS TAKEN AS THE THRESHOLD PACE, UNSCALED. It sits a few percent above maximal lactate steady
+ * state; the swim already shows its critical speed as threshold. The ride's 0.97 × critical power has no run
+ * source that was found.
  *
  * No I/O. Pure functions. Importable from the React client AND Deno edge functions.
  */
+import { Z4_FLOOR_PCT_LTHR } from './friel-zones.ts';
 
 const SEC_PER_KM_TO_SEC_PER_MI = 1.609344;
 
-/**
- * One best effort pulled out of a single run: the fastest stretch of that DURATION inside it.
- *
- * ⚠️ DURATION-BASED, NOT DISTANCE-BASED, AND THE DIFFERENCE IS THE WHOLE POINT. The app already
- * computes a best 1-mile / 5K / 10K per run (`compute-workout-analysis:132`), but those only exist
- * when the run is long enough to contain the distance, and they cluster: a 10K runner's best mile
- * and best 5K sit close together on the curve, which is exactly the "no duration spread" case a
- * critical-speed fit refuses. Fixed durations sample the curve where it actually bends, and it is
- * the shape the bike's power curve already uses.
- */
-export type RunEffort = {
-  /** metres covered in the window. */
-  distanceM: number;
-  /** seconds of the window. Moving time — a window containing a stop is not an effort. */
-  timeS: number;
-  /** mean heart rate over the window, or null if the trace dropped out there. */
-  avgHr: number | null;
-  /** net elevation change over the window, metres. Negative = net descent. */
-  netAscentM?: number | null;
-  /** ISO date of the run, for recency filtering by the caller. */
-  date: string;
-};
+/** Smyth & Muniz-Pumares 2020 target distances, metres. */
+export const RUN_BEST_EFFORT_DISTANCES_M = [400, 800, 1000, 1500, 3000, 5000] as const;
+/** The paper's window: the 16 weeks before. */
+export const RUN_CS_WINDOW_DAYS = 16 * 7;
+/** The paper's inclusion rule: at least 24 runs logged in the window. */
+export const RUN_CS_MIN_RUNS = 24;
+/** The paper's minimum: at least three target distances. */
+export const RUN_CS_MIN_DISTANCES = 3;
+/** OURS — the best-45-minute window counts only at or above the floor of Friel run Zone 4 (95% of threshold HR). */
+export const HARD_45_MIN_PCT_LTHR = Z4_FLOOR_PCT_LTHR;
+/** OURS — net descent steeper than 1% of the distance is gravity, not fitness. */
+const MAX_NET_DESCENT_FRACTION = -0.01;
+/** Sanity band for a fitted threshold pace, sec/MILE. Same band the pace resolvers use. */
+const CS_SANE_SEC_PER_MI = { min: 180, max: 1200 };
+/** OURS — the app's ±4% pace-divergence band (`RUN_PACE_DIVERGENCE_THRESHOLD`); a threshold must beat easy by it. */
+const CS_MIN_MARGIN_ON_EASY = 0.04;
+/** OURS — the line must be straight; the paper's lines averaged R² 0.9999. */
+const CS_MIN_R2 = 0.95;
+/** Plausible anaerobic distance capacity, metres (literature ~100–300 m for trained runners; wider on purpose). */
+const D_PRIME_SANE_M = { min: 30, max: 600 };
 
-export type RunCsConfidence = 'insufficient' | 'low' | 'moderate' | 'high';
+export type RunCsConfidence = 'insufficient' | 'moderate' | 'high';
+
+export type RunCsPoint = { label: string; distanceM: number; timeS: number; date: string; avgHr: number | null };
 
 export type RunCsResult = {
-  /** MEASURED threshold pace, sec per KM — the unit `learned_fitness` stores. null = abstained. */
+  /** Suggested threshold pace, sec per KM — the unit `learned_fitness` stores. null = abstained. */
   csSecPerKm: number | null;
-  /** The same value in sec per MILE — the unit every resolver speaks. */
+  /** The same value in sec per MILE. */
   csSecPerMi: number | null;
   /** Anaerobic distance capacity, metres. The line's intercept; a plausibility check, not a product. */
   dPrimeM: number | null;
   r2: number | null;
   confidence: RunCsConfidence;
-  /** How many distinct duration buckets survived every gate. */
   nPoints: number;
+  /** The efforts the line was drawn through — the receipt. */
+  points: RunCsPoint[];
+  /** The newest date among those efforts. */
+  asOf: string | null;
   /** Plain-language account of what happened — the receipt, and the abstention reason. */
   reason: string;
 };
 
-/**
- * ⛔ THE DURATION BUCKETS, AND WHY THESE. Bounded BELOW at 3 minutes because anything shorter is
- * dominated by anaerobic capacity and bends the line away from the asymptote the fit is trying to
- * find. Bounded ABOVE at 60 minutes because a longer effort drifts below critical speed for reasons
- * that are not fitness — fuelling, heat, boredom. Between those, five buckets spaced so a typical
- * threshold session (3 × 8 min) and a typical long tempo (25 min) land in different ones.
- *
- * ⚠️ These are BUCKET EDGES, not target durations. An effort is filed by which band its length falls
- * in, and only the fastest per band survives — one hard session cannot supply three points.
- */
-const DURATION_BUCKETS_S = [180, 360, 720, 1200, 2100, 3600];
+/** One run's fastest stretch at each target distance, timed on moving seconds. Keys are the distance in metres. */
+export type RunDistanceBests = Record<string, PaceCurvePoint>;
 
-/**
- * ⛔ THERE IS NO HEART-RATE GATE, AND REMOVING IT WAS THE FIX (2026-08-20).
- *
- * The first version required each window to reach 92% of the athlete's threshold heart rate. That
- * imported the one anchor this method never needed — and it is precisely the anchor a base-training
- * athlete does not have. Months of Zone 2 produce no hard efforts, so threshold HR is not DETECTED;
- * the learner fills the hole with `95th percentile of sustained efforts`. On a real account that was
- * 146 bpm, so the gate sat at 92% × 146 = **134** — and that athlete's easy runs run at 133-141. The
- * gate would have admitted his easy runs as threshold efforts. A guard that inverts on the exact
- * athlete it exists to protect is not a guard.
- *
- * ⛔ AND THE ALTERNATIVE WAS A THIRD COPY OF THE SAME PATCH. Two other readers already carry an "is
- * this anchor real" check. Adding a third here is a guard per consumer, forever, all of them
- * downstream of one absent fact.
- *
- * ⛔ WHAT ACTUALLY FILTERS, AND WHAT THE FIELD USES. Critical-power modelling does not heart-rate
- * gate — Strava, WKO and Golden Cheetah all build the curve from best efforts alone. The filter is
- * the CURVE'S OWN SHAPE, and it is already here:
- *
- *   · **monotonic** — a longer effort cannot be faster than a shorter one
- *   · **R² ≥ 0.95** — the points must actually describe one hyperbola; scattered submaximal windows
- *     do not, because how hard the athlete happened to be going varies between them
- *   · **faster than measured easy pace** — the invariant. A curve fitted from jogging returns
- *     roughly the jogging pace, which fails this outright.
- *
- * Those three need nothing but the athlete's own runs. No external anchor, nothing to be absent.
- *
- * ⚠️ SUBMAXIMAL EFFORTS UNDER-ESTIMATE, AND THAT IS THE SAFE DIRECTION. A tempo run that was real but
- * not maximal pulls the fitted speed down, so the prescription comes out conservative rather than
- * too fast — the expensive error this whole area exists to prevent.
- *
- * ⚠️ HEART RATE STILL TRAVELS ON EVERY WINDOW and still earns CONFIDENCE below. It is evidence, not
- * a gate: a window that reached threshold heart rate is better evidence than one that did not, and
- * an absent reading is no longer fatal.
- */
-const HARD_EFFORT_HR_FRACTION = 0.92;
-/**
- * ⛔ THE HARD-EFFORT GATE IS BACK, ON A RELIABLE ANCHOR (2026-09-02, Michael: "if somebody has had a weird
- * summer I don't want them getting prescribed 12-minute easy zones"). The 2026-08-20 removal was right
- * about its reason — the LTHR ESTIMATE inverted the gate — and wrong about its conclusion: with no gate
- * at all, four months of easy running fit a clean curve, passed the easy-pace invariant (because the
- * easy pace was heat-inflated too), and was written as a HIGH-confidence 12:12 threshold. The curve's
- * shape cannot tell "everything easy" from "everything hard".
- *
- * The anchor is now the athlete's OBSERVED MAX heart rate — a measurement, not a formula. A best
- * effort that averages under 85% of it is not a threshold effort (LT sits at ~85–92% of max in trained
- * runners). Two such windows are required, or the fit abstains and says what to do instead.
- * ⚠️ OURS: the 85%. ⚠️ Applied only when the windows carry heart rate — a strapless runner keeps the
- * shape-only fit, capped at moderate confidence as before.
- */
-const HARD_EFFORT_MAX_FRACTION = 0.85;
+/** One run as the fit reads it. */
+export type RunCsRun = { date: string; distanceBests?: RunDistanceBests | null; paceCurve?: RunPaceCurve | null };
 
-/**
- * ⛔ THE DOWNHILL GATE. A fast stretch that drops 40 metres is gravity, not fitness, and it is the
- * one contamination running has that neither of the other two sports does. Net descent steeper than
- * 1% of the window's distance is refused.
- *
- * ⚠️ ONE PERCENT IS A BAND, NOT A CLIFF. Course-measurement bodies treat 1 m/km of net drop as the
- * point where a road course stops being record-eligible; borrowing that line means the app refuses
- * what the sport already refuses, rather than picking a number. Rolling terrain that returns to
- * where it started has a net of roughly zero and passes, which is correct — the effort was real.
- *
- * ⚠️ ELEVATION IS OPTIONAL. When the window carries no elevation the effort is KEPT: refusing every
- * effort from a device without a barometer would silently exclude whole athletes, and the invariant
- * gate below still catches an implausible result. Absent data is not evidence of a hill.
- */
-const MAX_NET_DESCENT_FRACTION = -0.01;
-
-/** Sanity band for a fitted threshold pace, sec/MILE. Same band the pace resolvers use. */
-const CS_SANE_SEC_PER_MI = { min: 180, max: 1200 };
-
-/**
- * How much faster than the measured easy pace a fitted threshold must be before it is believed.
- * The app's existing ±4% pace-divergence band (`RUN_PACE_DIVERGENCE_THRESHOLD`), restated here as a
- * local constant rather than imported: this file is on the client bundle path and that constant
- * lives in an edge-function module. Same number, and the test below pins them equal so they cannot
- * drift apart silently.
- */
-const CS_MIN_MARGIN_ON_EASY = 0.04;
-
-/**
- * Plausible anaerobic distance capacity for running, metres. Reported D' in the literature clusters
- * around 100-300 m for trained runners; this band is deliberately wider than that, because its job
- * is to catch a fit that has gone geometrically wrong — two points nearly on top of each other, or a
- * curve bent by a mis-measured window — not to police an athlete's physiology.
- */
-const D_PRIME_SANE_M = { min: 30, max: 600 };
-
-function abstain(reason: string, n = 0): RunCsResult {
-  return { csSecPerKm: null, csSecPerMi: null, dPrimeM: null, r2: null, confidence: 'insufficient', nPoints: n, reason };
+function abstain(reason: string, points: RunCsPoint[] = []): RunCsResult {
+  return { csSecPerKm: null, csSecPerMi: null, dPrimeM: null, r2: null, confidence: 'insufficient', nPoints: points.length, points, asOf: null, reason };
 }
 
+const isLevel = (p: { distanceM: number; netAscentM?: number | null }) =>
+  p.netAscentM == null || !Number.isFinite(p.netAscentM) || (p.netAscentM / p.distanceM) >= MAX_NET_DESCENT_FRACTION;
+
+const dayNumber = (iso: string) => Math.floor(Date.parse(`${String(iso).slice(0, 10)}T00:00:00Z`) / 86_400_000);
+
 /**
- * Fit a run threshold pace from best efforts.
+ * The suggested threshold pace from the runs in the 16 weeks up to `asOf`.
  *
- * @param efforts        every candidate window across the athlete's recent runs
- * @param thresholdHrBpm the athlete's own threshold heart rate — the hard-effort gate's reference.
- *                       null means the gate CANNOT be applied, and the fit abstains rather than
- *                       running ungated: a curve from unverified efforts is the averaging bug again,
- *                       one level up.
- * @param easyPaceSecPerKm the athlete's MEASURED easy pace, for the invariant check. null skips it —
- *                       there is then no reference, and inventing one is the fabrication LAW 2
- *                       already deleted from the learner.
+ * @param runs             every run on file (any window); the fit keeps those inside the 16 weeks
+ * @param asOf             the day the window ends, YYYY-MM-DD
+ * @param thresholdHrBpm   the athlete's threshold heart rate — only for the best-45-minute point; null leaves it out
+ * @param easyPaceSecPerKm the measured easy pace, for the faster-than-easy check; null skips that check
  */
-export function fitRunCriticalSpeed(
-  efforts: RunEffort[],
+export function fitRunThresholdFromBestEfforts(
+  runs: RunCsRun[],
+  asOf: string,
   thresholdHrBpm: number | null,
   easyPaceSecPerKm: number | null,
-  /** the athlete's observed max HR — the hard-effort gate's anchor (see HARD_EFFORT_MAX_FRACTION) */
-  maxHrObservedBpm: number | null = null,
 ): RunCsResult {
-  const wellFormed = (efforts || []).filter((e) =>
-    e && Number.isFinite(e.distanceM) && e.distanceM > 0 && Number.isFinite(e.timeS) && e.timeS > 0
-  );
-  if (wellFormed.length === 0) return abstain('no usable best efforts');
-
-  // ── GATE 1: was it downhill? Gravity is the one contamination the curve's shape cannot see. ──
-  const level = wellFormed.filter((e) => {
-    if (e.netAscentM == null || !Number.isFinite(e.netAscentM)) return true;  // absent ≠ downhill
-    return (e.netAscentM / e.distanceM) >= MAX_NET_DESCENT_FRACTION;
+  const end = dayNumber(asOf);
+  if (!Number.isFinite(end)) return abstain('no date to count the 16 weeks back from');
+  const inWindow = (runs || []).filter((r) => {
+    const d = dayNumber(r?.date);
+    return Number.isFinite(d) && d <= end && d > end - RUN_CS_WINDOW_DAYS;
   });
-  if (level.length === 0) return abstain('every effort was net downhill — that is gravity, not fitness', wellFormed.length);
+  if (inWindow.length < RUN_CS_MIN_RUNS) {
+    return abstain(`${inWindow.length} runs in the last 16 weeks; the method needs ${RUN_CS_MIN_RUNS}`);
+  }
 
-  // ── Best (fastest) effort per duration bucket. One session cannot supply three points. ──
-  const byBucket = new Map<number, RunEffort>();
-  for (const e of level) {
-    let bi = -1;
-    for (let i = 0; i < DURATION_BUCKETS_S.length - 1; i++) {
-      if (e.timeS >= DURATION_BUCKETS_S[i] && e.timeS < DURATION_BUCKETS_S[i + 1]) { bi = i; break; }
+  // ── The fastest level effort at each target distance, across the window. ──
+  const points: RunCsPoint[] = [];
+  for (const D of RUN_BEST_EFFORT_DISTANCES_M) {
+    let best: RunCsPoint | null = null;
+    for (const r of inWindow) {
+      const p = r.distanceBests?.[String(D)];
+      if (!p || !(p.timeS > 0) || !(p.distanceM > 0) || !isLevel(p)) continue;
+      const timeS = p.timeS * (D / p.distanceM);
+      if (!best || timeS < best.timeS) best = { label: `${D} m`, distanceM: D, timeS, date: String(r.date).slice(0, 10), avgHr: p.avgHr ?? null };
     }
-    if (bi < 0) continue;   // outside 3-60 min: too short to be aerobic, too long to hold CS
-    const cur = byBucket.get(bi);
-    if (!cur || (e.timeS / e.distanceM) < (cur.timeS / cur.distanceM)) byBucket.set(bi, e);
+    if (best) points.push(best);
   }
-  const pts = [...byBucket.values()].sort((a, b) => a.timeS - b.timeS);
-  if (pts.length < 2) {
-    return abstain(`efforts span ${pts.length} duration band(s); a critical-speed fit needs at least 2`, pts.length);
+  if (points.length < RUN_CS_MIN_DISTANCES) {
+    return abstain(`fastest efforts at ${points.length} of the six distances; the method needs ${RUN_CS_MIN_DISTANCES}`, points);
   }
 
-  /**
-   * ⛔ THE BANDS MUST COME FROM DIFFERENT SESSIONS, AND THIS IS THE PROPERTY — not a proxy for it.
-   *
-   * A single 40-minute run with a 12-minute surge fills FOUR duration bands: the 3, 6 and 12-minute
-   * bests all sit inside the surge, and the 20 and 35-minute bests drag in the easy running around
-   * it. Monotonic, plausible, and meaningless — one run is not a maximal test at every duration, it
-   * is one effort measured five ways.
-   *
-   * ⚠️ THE HEART-RATE GATE USED TO ENFORCE THIS BY ACCIDENT, by admitting only the windows inside the
-   * surge. That was never what it was for, and it broke on the athlete whose threshold HR is a guess.
-   * The requirement is stated outright now, off the effort's own date — nothing external, nothing to
-   * be absent.
-   */
-  const distinctDays = new Set(pts.map((p) => String(p.date || '').slice(0, 10)).filter(Boolean));
-  if (distinctDays.size < 2) {
-    return abstain('every band came from one session — a curve needs efforts on different days, not one run measured five ways', pts.length);
+  // ── The best 45 minutes, when it was hard. ──
+  const hardFloor = thresholdHrBpm != null && Number.isFinite(thresholdHrBpm) && thresholdHrBpm > 0 ? thresholdHrBpm * HARD_45_MIN_PCT_LTHR : null;
+  if (hardFloor != null) {
+    let best45: RunCsPoint | null = null;
+    for (const r of inWindow) {
+      const w = r.paceCurve?.['2700'];
+      if (!w || !(w.distanceM > 0) || !(w.timeS > 0) || !isLevel(w)) continue;
+      if (!(w.avgHr != null && w.avgHr >= hardFloor)) continue;
+      if (!best45 || w.distanceM > best45.distanceM) best45 = { label: 'best 45 min', distanceM: w.distanceM, timeS: w.timeS, date: String(r.date).slice(0, 10), avgHr: w.avgHr };
+    }
+    if (best45) points.push(best45);
   }
 
-  // ── GATE 2: monotonic. A longer effort cannot be FASTER than a shorter one on a real curve. ──
+  const pts = [...points].sort((a, b) => a.timeS - b.timeS);
+  const days = new Set(pts.map((p) => p.date));
+  if (days.size < 2) return abstain('every effort came from one run — a line needs efforts on different days', pts);
+
   for (let i = 1; i < pts.length; i++) {
     const prev = pts[i - 1].timeS / pts[i - 1].distanceM;
     const cur = pts[i].timeS / pts[i].distanceM;
-    if (cur < prev - 0.002) {   // ~3 s/km of tolerance for GPS noise
-      return abstain('a longer effort came out faster than a shorter one — not a clean speed-duration curve', pts.length);
-    }
+    if (cur < prev - 0.002) return abstain('a longer effort came out faster than a shorter one — not a clean speed-duration line', pts);
   }
 
-  // ── THE FIT: distance = CS · time + D'. Least squares; the same line the swim learner draws. ──
-  const X = pts.map((p) => p.timeS);
-  const Y = pts.map((p) => p.distanceM);
-  const n = X.length;
-  const mx = X.reduce((a, b) => a + b, 0) / n;
-  const my = Y.reduce((a, b) => a + b, 0) / n;
+  // ── distance = CS · time + D′ ──
+  const n = pts.length;
+  const mx = pts.reduce((a, p) => a + p.timeS, 0) / n;
+  const my = pts.reduce((a, p) => a + p.distanceM, 0) / n;
   let sxy = 0, sxx = 0, syy = 0;
-  for (let i = 0; i < n; i++) { sxy += (X[i] - mx) * (Y[i] - my); sxx += (X[i] - mx) ** 2; syy += (Y[i] - my) ** 2; }
-  if (sxx <= 0) return abstain('degenerate fit — no spread in effort duration', n);
-  const cs = sxy / sxx;                       // metres per second
-  const dPrime = my - cs * mx;                // metres
+  for (const p of pts) { sxy += (p.timeS - mx) * (p.distanceM - my); sxx += (p.timeS - mx) ** 2; syy += (p.distanceM - my) ** 2; }
+  if (sxx <= 0) return abstain('no spread in effort duration', pts);
+  const cs = sxy / sxx;
+  const dPrime = my - cs * mx;
   const r2 = syy > 0 ? (sxy * sxy) / (sxx * syy) : 0;
-  if (!(cs > 0)) return abstain('fit produced a non-positive critical speed', n);
-
+  if (!(cs > 0)) return abstain('the line produced no speed', pts);
   const csSecPerKm = 1000 / cs;
   const csSecPerMi = csSecPerKm * SEC_PER_KM_TO_SEC_PER_MI;
 
-  // ── GATE 3: the sanity band every pace reader in this app already applies. ──
   if (csSecPerMi < CS_SANE_SEC_PER_MI.min || csSecPerMi > CS_SANE_SEC_PER_MI.max) {
-    return abstain(`fitted pace ${Math.round(csSecPerMi)} s/mi is outside the plausible band`, n);
+    return abstain(`fitted pace ${Math.round(csSecPerMi)} s/mi is outside the plausible band`, pts);
   }
-
-  /**
-   * ── GATE 4: THE INVARIANT. A threshold effort is faster than an easy effort.
-   *
-   * ⛔ THE SAME RULE, AT THE THIRD SITE. `learn-fitness-profile` applies it to its own candidates and
-   * `run-threshold-from-easy.ts` applies it to inferred values. Here it applies to a MEASUREMENT —
-   * so the answer is to REFUSE, never to clamp. A measurement that contradicts physiology is not a
-   * measurement to be corrected into range; it is evidence that the windows were not what they
-   * looked like.
-   */
-  /**
-   * ⚠️ WITH A MARGIN, BECAUSE "ONE SECOND FASTER" IS NOT FASTER. A bare `>=` let a fit land a second
-   * or two under the easy pace and pass — which is what a jog produces when one window happens to
-   * carry a slight surge. The margin is the app's existing ±4% divergence band, the same tolerance
-   * the inference bound uses; it is deliberately far looser than the ~16% the pace table says
-   * separates easy from threshold, because this gate exists to refuse the IMPOSSIBLE, not to police
-   * how the athlete trains.
-   */
-  const impossiblyClose = easyPaceSecPerKm * (1 - CS_MIN_MARGIN_ON_EASY);
   if (easyPaceSecPerKm != null && Number.isFinite(easyPaceSecPerKm) && easyPaceSecPerKm > 0
-      && csSecPerKm >= impossiblyClose) {
-    return abstain(`fitted threshold ${Math.round(csSecPerKm)} s/km is not meaningfully faster than measured easy pace ${Math.round(easyPaceSecPerKm)} s/km — impossible, so the efforts were not what they appeared`, n);
+      && csSecPerKm >= easyPaceSecPerKm * (1 - CS_MIN_MARGIN_ON_EASY)) {
+    return abstain(`fitted threshold ${Math.round(csSecPerKm)} s/km is not at least 4% faster than the measured easy pace ${Math.round(easyPaceSecPerKm)} s/km`, pts);
   }
-
-  // ── GATE 5: do the points actually lie on a line? ──
-  if (r2 < 0.95) return abstain(`fit R² ${r2.toFixed(3)} is below the 0.95 floor — the points do not describe one curve`, n);
-
+  if (r2 < CS_MIN_R2) return abstain(`R² ${r2.toFixed(3)} is below ${CS_MIN_R2} — the efforts do not lie on one line`, pts);
   if (dPrime < D_PRIME_SANE_M.min || dPrime > D_PRIME_SANE_M.max) {
-    return abstain(`implausible anaerobic capacity D' ${Math.round(dPrime)} m (expect roughly 100-300)`, n);
+    return abstain(`implausible anaerobic capacity D′ ${Math.round(dPrime)} m`, pts);
   }
 
-  /**
-   * Confidence tiers. More points and a tighter line earn more trust; two points is a LINE THROUGH
-   * TWO POINTS, whose R² is 1.0 by construction and means nothing, so it can never exceed `low`.
-   */
-  /**
-   * ⚠️ HEART RATE EARNS CONFIDENCE, IT DOES NOT GATE. A window that reached threshold heart rate is
-   * better evidence that the effort was maximal — but only when there IS a threshold heart rate to
-   * compare against, and only as a tie-break. `high` needs corroboration; without it the fit tops out
-   * at `moderate`, which is visible on the card and still steers a plan.
-   */
-  // ── GATE: was anything in the window actually HARD? (see HARD_EFFORT_MAX_FRACTION) ──
-  const withHr = pts.filter((p) => p.avgHr != null && Number.isFinite(p.avgHr));
-  const hardRef = (maxHrObservedBpm != null && Number.isFinite(maxHrObservedBpm) && maxHrObservedBpm > 0)
-    ? maxHrObservedBpm * HARD_EFFORT_MAX_FRACTION
-    : ((thresholdHrBpm != null && Number.isFinite(thresholdHrBpm) && thresholdHrBpm > 0) ? thresholdHrBpm * HARD_EFFORT_HR_FRACTION : null);
-  if (hardRef != null && withHr.length >= 2) {
-    const hard = withHr.filter((p) => (p.avgHr as number) >= hardRef).length;
-    if (hard < 2) {
-      return abstain(`no hard effort in the window — every best effort averaged under ${Math.round(hardRef)} bpm; enter your threshold pace, or run the 12-minute test`, pts.length);
-    }
-  }
-
-  const hrCorroborated = thresholdHrBpm != null && Number.isFinite(thresholdHrBpm) && thresholdHrBpm > 0
-    ? pts.filter((p) => p.avgHr != null && p.avgHr >= thresholdHrBpm * HARD_EFFORT_HR_FRACTION).length
-    : 0;
-
-  let confidence: RunCsConfidence;
-  if (n >= 4 && r2 >= 0.97 && hrCorroborated >= 2) confidence = 'high';
-  else if (n >= 3 && r2 >= 0.96) confidence = 'moderate';
-  else confidence = 'low';
-
+  // OURS — confidence: five or more points on a near-perfect line is high; anything that passed is moderate.
+  const confidence: RunCsConfidence = n >= 5 && r2 >= 0.99 ? 'high' : 'moderate';
+  const asOfDate = pts.map((p) => p.date).sort().at(-1) ?? null;
   return {
     csSecPerKm: Math.round(csSecPerKm),
     csSecPerMi: Math.round(csSecPerMi),
     dPrimeM: Math.round(dPrime),
-    r2: Number(r2.toFixed(3)),
+    r2: Number(r2.toFixed(4)),
     confidence,
     nPoints: n,
-    reason: `fitted from ${n} best-effort windows across ${n} duration bands${hrCorroborated > 0 ? `, ${hrCorroborated} at threshold HR` : ''}`,
+    points: pts,
+    asOf: asOfDate,
+    reason: `critical speed from ${n} best efforts (${pts.map((p) => p.label).join(', ')}), R² ${r2.toFixed(3)}`,
   };
 }
 
 /**
- * ⛔ THE EXTRACTOR — the fastest stretch of each TARGET DURATION inside one run.
+ * The fastest stretch at each target distance inside one run, timed on MOVING seconds (`_shared/run-pace.ts`),
+ * so a stop at a light does not slow the effort. Heart rate and net elevation ride along for the fit's checks.
+ *
+ * @param distanceM      cumulative metres, one entry per sample
+ * @param movingTimeS    cumulative moving seconds, same length
+ * @param hrBpm          heart rate per sample; null where the trace dropped out
+ * @param elevationM     elevation per sample; null where the device reports none
+ */
+export function buildRunDistanceBests(
+  distanceM: number[],
+  movingTimeS: number[],
+  hrBpm: (number | null)[],
+  elevationM?: (number | null)[],
+): RunDistanceBests | null {
+  const n = Math.min(distanceM?.length ?? 0, movingTimeS?.length ?? 0);
+  if (n < 10) return null;
+  const out: RunDistanceBests = {};
+  for (const D of RUN_BEST_EFFORT_DISTANCES_M) {
+    if (distanceM[n - 1] - distanceM[0] < D) continue;
+    let best: PaceCurvePoint | null = null;
+    let start = 0;
+    for (let e = 1; e < n; e++) {
+      // Keep the shortest window that still covers D metres.
+      while (start < e - 1 && distanceM[e] - distanceM[start + 1] >= D) start++;
+      const dist = distanceM[e] - distanceM[start];
+      if (dist < D) continue;
+      const moving = movingTimeS[e] - movingTimeS[start];
+      if (!(moving > 0)) continue;
+      const timeS = moving * (D / dist);          // exactly D metres
+      if (best && timeS >= best.timeS) continue;
+      const hr = hrBpm?.slice(start, e + 1).filter((h): h is number => h != null && Number.isFinite(h)) ?? [];
+      let netAscentM: number | null = null;
+      if (elevationM) {
+        const a = elevationM[start], b = elevationM[e];
+        if (a != null && b != null && Number.isFinite(a) && Number.isFinite(b)) netAscentM = b - a;
+      }
+      best = { distanceM: D, timeS: Math.round(timeS * 10) / 10, avgHr: hr.length ? Math.round(hr.reduce((x, y) => x + y, 0) / hr.length) : null, netAscentM };
+    }
+    if (best) out[String(D)] = best;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+/**
+ * ⛔ THE DURATION CURVE — the fastest stretch of each TARGET DURATION inside one run.
  *
  * The run twin of `calculatePowerCurve` (`compute-workout-analysis:92`), which does exactly this for
  * the bike over watts. Same shape, same reason, one sport later.
  *
  * ⚠️ IT DOES NOT JUDGE. Every gate — was it hard, was it downhill, does it lie on a curve — belongs
- * to `fitRunCriticalSpeed`, which sees efforts from MANY runs and can compare them. This function's
+ * to `fitRunThresholdFromBestEfforts`, which sees efforts from MANY runs and can compare them. This function's
  * whole job is to report what happened inside one activity, including the heart rate and the
- * elevation change the gates will need. A window that turns out to be a jog is still reported; the
- * fit is what refuses it.
+ * elevation change the checks will need. The threshold fit reads only its 45-minute window.
  */
 
 /**
- * The durations sampled. 180–2100 are the lower edges of the fit's buckets, so each lands in its own.
- * 2700 (45 minutes, added 2026-09-13) is the window threshold PACE is read from — TrainingPeaks: "We suggest a threshold if
- * your Peak 45 Min Average Pace is faster than the currently set threshold"
- * (trainingpeaks.com/blog/are-you-using-threshold-improvement-notifications). It shares the 2100–3600 bucket with the
- * 35-minute window; the fit keeps the faster of the two per bucket, so it can only ever add a real point there.
+ * The durations sampled. 2700 (45 minutes, added 2026-09-13) is the one the threshold fit reads, as one point when
+ * the window was hard — TrainingPeaks: "We suggest a threshold if your Peak 45 Min Average Pace is faster than the
+ * currently set threshold" (trainingpeaks.com/blog/are-you-using-threshold-improvement-notifications).
  */
 export const PACE_CURVE_TARGETS_S = [180, 360, 720, 1200, 2100, 2700] as const;
 
@@ -524,18 +411,4 @@ export function thresholdHrFromHrCurves(
     }
   }
   return best;
-}
-
-/** A stored curve → the fit's input shape. One place that knows the storage keys. */
-export function paceCurveToEfforts(curve: RunPaceCurve | null | undefined, date: string): RunEffort[] {
-  if (!curve || typeof curve !== 'object') return [];
-  return Object.values(curve)
-    .filter((p) => p && Number.isFinite(p.distanceM) && p.distanceM > 0 && Number.isFinite(p.timeS) && p.timeS > 0)
-    .map((p) => ({
-      distanceM: p.distanceM,
-      timeS: p.timeS,
-      avgHr: p.avgHr ?? null,
-      netAscentM: p.netAscentM ?? null,
-      date,
-    }));
 }
