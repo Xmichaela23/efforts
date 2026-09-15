@@ -42,6 +42,17 @@ export const Z2_FLOOR_PCT_LTHR = 0.85;
 export const Z4_FLOOR_PCT_LTHR = 0.95;
 export const Z5_FLOOR_PCT_LTHR = 1.05;
 
+/**
+ * FRIEL RUN PACE ZONE 2 — the easy pace range, as multiples of threshold PACE (2026-09-15, TRUTH-MAP §9 Q2, D-478).
+ * Pace-seconds run backwards from speed, so ×1.14 is the FAST edge and ×1.29 the slow one. Beside the heart-rate
+ * pair above because it is the same zone of the same author: Friel run Zone 2 = 114–129% of threshold pace
+ * (trainingbible.com "114% to 129% of FTPa"; TrainingPeaks "Joe Friel for Running" calculator). Easy days are
+ * prescribed by the heart-rate range; this is the pace that usually lands there. Read by
+ * `run-paces-from-threshold.ts`, and through it every screen and the plan's easy steps.
+ */
+export const EASY_PACE_FAST_X_THRESHOLD = 1.14;
+export const EASY_PACE_SLOW_X_THRESHOLD = 1.29;
+
 /** The top of EASY, in bpm. The single number every "is this easy?" decision must agree with. */
 export function easyCeilingBpm(lthr: number): number {
   return Math.round(lthr * EASY_CEILING_PCT_LTHR);

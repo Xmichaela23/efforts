@@ -40,16 +40,22 @@ export type RunPaceSource =
   | 'learned'        // measured from the athlete's own easy runs, confidence medium|high
   | 'manual'         // the athlete typed it, but has not chosen it over the learned value
   /**
-   * EASY ONLY (2026-09-02). Nothing measured or typed for easy, so it comes off the resolved
-   * threshold × 1.19 — the same ratio the threshold derivation uses in the other direction. An
-   * INFERENCE — is_estimate: true. Never returned when threshold was itself derived from easy.
+   * EASY ONLY. The easy pace RANGE off the resolved threshold, Friel run Zone 2 (× 1.14 to × 1.29;
+   * 2026-09-15, D-478). The only source easy pace has. An INFERENCE — is_estimate: true.
    */
   | 'derived-from-threshold'
   | 'learned-low'    // measured, but the learner is not confident yet;
 
 export type ResolvedRunPace = {
-  /** sec per MILE. null = we do not know. Consumers MUST disclose, never invent. */
+  /**
+   * sec per MILE. null = we do not know. Consumers MUST disclose, never invent.
+   * ⚠️ FOR EASY PACE THIS IS THE RANGE MIDPOINT (D-478) — for the readers that structurally need one number
+   * (step minutes ↔ miles, a coach entry). Screens and the plan's easy steps print the range below.
+   */
   sec_per_mi: number | null;
+  /** EASY ONLY — the easy pace range, sec per MILE: fast edge (threshold × 1.14) and slow edge (× 1.29). */
+  range_lo_sec_per_mi?: number | null;
+  range_hi_sec_per_mi?: number | null;
   source: RunPaceSource | null;
   confidence: 'low' | 'medium' | 'high' | null;
   sample_count: number | null;
@@ -145,59 +151,31 @@ function confOf(raw: LearnedMetricLike): 'low' | 'medium' | 'high' | null {
 }
 
 /**
- * The athlete's current easy run pace, in sec/MILE, with its provenance attached.
- *
- * Precedence:
- *   0. THE ATHLETE'S EXPLICIT CHOICE (`performance_numbers.easy_pace_source`) — Q-174. If they picked
- *      'manual' and a manual value exists, it WINS, even over a high-confidence learned pace. They looked
- *      at both and chose. An assertion outranks an inference; Garmin and TrainingPeaks both honour a value
- *      you set. If they picked 'learned', we skip the manual tier entirely and track the learner live.
- *   1. learned (confidence medium|high)  — MEASURED from their own runs
- *   2. manual                            — typed, but not explicitly chosen over the learner
- *   3. effort_paces.base                 — an INFERENCE (wizard/VDOT). is_estimate: true.
- *   4. learned (any confidence)          — measured but thin
- *   5. null                              — we do not know. SAY SO. (Never 540. Never 600.)
- *
- * An ABSENT choice behaves exactly as before, so this is purely additive: no migration, no regression for
- * an athlete who has never expressed a preference.
+ * The athlete's current easy run pace: ONE RANGE off the accepted threshold pace, sec/MILE (2026-09-15,
+ * TRUTH-MAP §9 Q2, D-478). Threshold × 1.14 to × 1.29 — Friel run Zone 2. `sec_per_mi` is the range
+ * midpoint; `range_lo_sec_per_mi` / `range_hi_sec_per_mi` are the edges. No threshold → null (heart-rate
+ * range only). No learned tier, no typed tier, no `easy_pace_source` choice.
  */
 export function resolveCurrentRunEasyPace(baselines: RunBaselinesLike): ResolvedRunPace {
   /**
-   * ⛔ EASY IS NOT A PACE SOURCE (Michael, 2026-09-02, final): *"we are still fighting where easy and
-   * threshold come from."* Easy days are a HEART-RATE zone off threshold HR (`resolve-current-lthr.ts`).
-   * The easy PACE is only a reference band: threshold × 1.19, nothing else. No learned tier, no typed
-   * tier, no `easy_pace_source` choice — every one of those was a second anchor arguing with the first.
+   * ⛔ EASY IS NOT A PACE SOURCE (Michael, 2026-09-02, final). Easy days are a HEART-RATE zone off threshold HR
+   * (`resolve-current-lthr.ts`). The easy PACE is the range that usually lands there.
    *
-   * ⚠️ THE LEARNED EASY PACE IS NOT DELETED. It stays an INPUT: the six-week checkpoint's evidence
-   * reads it (`resolveMeasuredEasyPaceSecPerMi`). It never prescribes anything by itself.
-   *
-   * Every consumer gets `is_estimate: true` — a reference band is an inference, not a measurement.
-   * ⛔ Q-174 (the easy-pace choice) is SUPERSEDED by this ruling; the field is ignored here.
+   * ⛔ "FROM RUNS" IS GONE (2026-09-15, D-478, superseding the 2026-09-05 measured-first tier). The athlete's own
+   * last-five easy median is NOT deleted: it stays the State row's receipt and the six-week checkpoint's evidence,
+   * and the readers that need a MEASUREMENT of the athlete's running read it through
+   * `resolveMeasuredEasyPaceSecPerMi`. It prescribes nothing and it is not offered to accept — accepting it would be
+   * a second pace anchor, and the book says the easy percentage moves (p235).
    */
   if (!baselines) return NULL_RESULT;
-  /**
-   * ⛔ MEASURED FIRST (Michael, 2026-09-05: "from runs, with a note that heat and hills can factor").
-   * Easy still prescribes nothing — the heart-rate range does — so this is a READOUT, and the truest
-   * readout is the athlete's own last five easy runs (`learned_fitness.run_easy_pace_sec_per_km`, the
-   * learner's median of the five most recent; `high` = five on file). Threshold × 1.19 is the fallback
-   * for an athlete with fewer than five easy runs, which is Daniels' fast edge (easy = 1.21–1.30 ×
-   * threshold) and Friel's zone-2 top (1.14×) — a table, not a person. No typed tier, no accept step:
-   * a reference number is not a prescription and gets no ceremony.
-   */
-  const learned = baselines.learned_fitness?.run_easy_pace_sec_per_km;
-  const learnedMi = confOf(learned) === 'high' ? secPerKmToMi(asPositiveFinite(learned?.value)) : null;
-  if (learnedMi != null) {
-    return {
-      sec_per_mi: learnedMi, source: 'learned', confidence: 'high',
-      sample_count: asPositiveFinite(learned?.sample_count) ?? null, as_of: typeof learned?.as_of === 'string' ? learned.as_of : null,
-      is_estimate: false,
-    };
-  }
   const thr = resolveCurrentRunThresholdPace(baselines);
   const derived = pacesFromThresholdSecPerMi(thr.sec_per_mi);
   if (!derived) return NULL_RESULT;
   return {
-    sec_per_mi: derived.easy, source: 'derived-from-threshold', confidence: thr.confidence,
+    sec_per_mi: derived.easy.mid,
+    range_lo_sec_per_mi: derived.easy.lo,
+    range_hi_sec_per_mi: derived.easy.hi,
+    source: 'derived-from-threshold', confidence: thr.confidence,
     sample_count: thr.sample_count, as_of: thr.as_of, is_estimate: true,
   };
 }
@@ -340,25 +318,8 @@ export function resolveCurrentRunThresholdPace(baselines: RunBaselinesLike): Res
     is_estimate,
   });
 
-  /**
-   * ⛔ THE BOUND, AND WHAT IT IS FOUNDED ON (2026-08-19). A threshold pace may not be faster than
-   * the athlete's own MEASURED easy pace ÷ 1.19 (`run-threshold-from-easy.ts`). It exists because
-   * the tier below — the wizard/VDOT pace — is computed from a 5K the athlete TYPED ONCE, that
-   * nothing measures and nothing dates. A 5K goes stale as fitness changes, and a stale 5K
-   * prescribes a threshold that is too FAST.
-   *
-   * ⛔ MEASURED ONLY, AND THAT IS NOT FUSSINESS — IT IS THE WHOLE POINT. `resolveCurrentRunEasyPace`
-   * can itself answer from `effort_paces.base`, which is the SAME VDOT lookup off the SAME typed 5K.
-   * Founding the bound on that would derive the 5K's answer from the 5K and bound it with itself:
-   * a floor that can never be crossed, and a guard that always passes. So the bound reads the
-   * learned metric directly, at medium/high confidence — the athlete's own runs, measured
-   * independently of anything they typed.
-   *
-   * ⚠️ `low` IS EXCLUDED HERE ON PURPOSE. The learner saying "not confident yet" is not a base to
-   * bound a prescription with, and a thin easy read that is itself too slow would drag threshold
-   * with it. No easy pace at this bar → `null` → the bound does not exist → nothing is clamped and
-   * nothing is fabricated. LAW 2.
-   */
+  // ⛔ THE EASY-PACE BOUND (2026-08-19: threshold no faster than measured easy ÷ 1.19) IS GONE — it had no caller
+  // once the 5K tier went (2026-09-02), and its file was deleted with the × 1.19 point (2026-09-15, D-478).
   // ── Tier 0 (Q-174): the athlete's explicit choice outranks everything. ──
   const chosen = pn?.threshold_pace_source;
   if (chosen === 'manual' && manual != null) return mk(manual, 'manual-chosen', false);

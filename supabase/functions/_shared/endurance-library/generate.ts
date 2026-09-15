@@ -122,7 +122,7 @@ function resolveTarget(intensity: Intensity, sport: Sport, anchor: AnchorReport)
 
   if (sport === 'run') {
     const threshold = anchor.value;
-    const vt1 = anchor.vt1SecPerMi ?? null;
+    const easyRange = anchor.easyRangeSecPerMi ?? null;
     switch (intensity.kind) {
       case 'pct_threshold':
         if (threshold == null) return { unresolved: 'No run threshold pace on file yet.' };
@@ -130,8 +130,9 @@ function resolveTarget(intensity: Intensity, sport: Sport, anchor: AnchorReport)
         return { paceSecPerMi: { lo: paceFromPct(threshold, intensity.hi), hi: paceFromPct(threshold, intensity.lo) } };
       case 'vt1':
       case 'easy':
-        if (vt1 == null) return { unresolved: 'No measured easy pace on file yet.' };
-        return { paceSecPerMi: { lo: vt1, hi: vt1 } };
+        // D-478: the easy pace range off threshold (× 1.14 to × 1.29), fast edge first.
+        if (easyRange == null) return { unresolved: 'No threshold pace on file yet.' };
+        return { paceSecPerMi: { lo: easyRange.lo, hi: easyRange.hi } };
       case 'all_out':
         return { unresolved: 'All-out — the best speed available that day. No pace is prescribed.' };
       case 'faster_than_vvo2':

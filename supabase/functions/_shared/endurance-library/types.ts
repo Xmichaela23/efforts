@@ -200,8 +200,13 @@ export type AnchorReport = {
   /** The resolver's own source label — carried through, never restated. */
   source: string | null;
   isEstimate: boolean;
-  /** Run only: the athlete's measured easy pace, which is what VT1 resolves against (B4, zone 2). */
+  /**
+   * Run only: the athlete's MEASURED easy pace (`resolveMeasuredEasyPaceSecPerMi`, the learner's last-five median) —
+   * where VT1 sits for this athlete, read by `vt1FractionFor` to place minutes. A measurement, not a prescription.
+   */
   vt1SecPerMi?: number | null;
+  /** Run only: the easy pace RANGE off threshold (× 1.14 to × 1.29, D-478) — what an easy / VT1 step prescribes. */
+  easyRangeSecPerMi?: { lo: number; hi: number } | null;
 };
 
 export type EnduranceSession = {

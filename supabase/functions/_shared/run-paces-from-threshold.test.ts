@@ -1,32 +1,28 @@
 /**
- * Fixtures for `run-paces-from-threshold.ts` — the easy-pace reference band off the threshold anchor.
+ * Fixtures for `run-paces-from-threshold.ts` — the easy pace RANGE off the threshold anchor (§9 Q2, D-478).
  *
  * Run: deno test supabase/functions/_shared/run-paces-from-threshold.test.ts --no-check
  * Athlete-agnostic: synthetic numbers, never tuned to the primary user.
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { pacesFromThresholdSecPerMi } from '../../../src/lib/run-paces-from-threshold.ts';
-import { EASY_TO_THRESHOLD_PACE_RATIO } from '../../../src/lib/run-threshold-from-easy.ts';
-import { getPacesFromScore } from '../generate-run-plan/effort-score.ts';
+import { EASY_PACE_FAST_X_THRESHOLD, EASY_PACE_SLOW_X_THRESHOLD } from '../../../src/lib/friel-zones.ts';
 
-Deno.test('the band reproduces the pace table\'s easy column within the app\'s ±4% tolerance, across all 21 rows', () => {
-  for (const v of [30, 32, 34, 36, 38, 40, 42, 44, 45, 46, 48, 50, 52, 54, 56, 58, 60, 65, 70, 75, 80]) {
-    const t = getPacesFromScore(v);
-    const d = pacesFromThresholdSecPerMi(t.steady)!;
-    assert(Math.abs(d.easy - t.base) / t.base <= 0.04, `vdot ${v} easy ${d.easy} vs table ${t.base}`);
-    assertEquals(d.threshold, t.steady);
-  }
+Deno.test('Friel run Zone 2: threshold × 1.14 to × 1.29, imported beside the heart-rate seams', () => {
+  assertEquals(EASY_PACE_FAST_X_THRESHOLD, 1.14);
+  assertEquals(EASY_PACE_SLOW_X_THRESHOLD, 1.29);
+  // The approved screen example: an 8:00/mi threshold → 9:07–10:19/mi.
+  const p = pacesFromThresholdSecPerMi(480)!;
+  assertEquals(p.easy.lo, 547);   // 9:07
+  assertEquals(p.easy.hi, 619);   // 10:19
+  assertEquals(p.easy.mid, 583);  // the range midpoint, for readers that need one number
+  assertEquals(p.threshold, 480);
 });
 
-Deno.test('the ratio is the measured one and is imported, not re-stated', () => {
-  assertEquals(EASY_TO_THRESHOLD_PACE_RATIO, 1.19);
-  assertEquals(pacesFromThresholdSecPerMi(500)!.easy, 595);
-});
-
-Deno.test('easy is always slower than threshold', () => {
+Deno.test('the whole range is slower than threshold, fast edge first', () => {
   for (const thr of [240, 330, 420, 540, 660]) {
     const p = pacesFromThresholdSecPerMi(thr)!;
-    assert(p.threshold < p.easy, `thr ${thr}`);
+    assert(p.threshold < p.easy.lo && p.easy.lo < p.easy.mid && p.easy.mid < p.easy.hi, `thr ${thr}`);
   }
 });
 

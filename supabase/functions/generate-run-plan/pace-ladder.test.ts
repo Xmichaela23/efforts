@@ -134,8 +134,8 @@ const SELECTED_12_35 = {
 
 Deno.test('⛔ THE SELECTED EASY PACE BEATS THE 5K — they are not close, so this cannot pass by luck', () => {
   const easy = resolveCurrentRunEasyPace(SELECTED_12_35 as never);
-  // 12:35/mi measured → threshold derived (÷1.19) → easy reference (×1.19): within a second of itself.
-  assert(Math.abs(easy.sec_per_mi! - 755) <= 1, `expected ~755, got ${easy.sec_per_mi}`);
+  // D-478 (2026-09-15): easy is the range threshold × 1.14–1.29 (723–818 s/mi); `sec_per_mi` is its midpoint, 771.
+  assert(Math.abs(easy.sec_per_mi! - 771) <= 1, `expected ~771, got ${easy.sec_per_mi}`);
   assertEquals(easy.source, 'derived-from-threshold');      // easy is downstream of threshold (2026-09-02)
   const fromSelection = estimateVdotFromBasePace(easy.sec_per_mi!)!;
   const fromFiveK = calculateEffortScore(5000, 25 * 60 + 21);

@@ -1564,6 +1564,8 @@ Baselines save leaves them alone rather than nulling them.
 
 ## D-462 — Threshold pace is the only pace anchor; easy is a heart-rate zone (2026-09-02)
 
+> **2026-09-15 — the × 1.19 easy point is superseded by D-478 (`docs/DECISIONS-LOG-4.md`).** Easy pace is one range, threshold × 1.14 to × 1.29 (Friel run Zone 2), `resolveCurrentRunEasyPace`; the constant and `src/lib/run-threshold-from-easy.ts` are deleted; the derived-from-easy threshold tier and bound described below were already uncalled. Threshold as the only anchor and easy prescribed by heart rate stand. Everything below about 1.19 is history.
+
 **Rulings (Michael, in order, same evening).** *"Easy: no pace. Prescribe a heart rate zone. Threshold
 and harder: prescribe a pace, from threshold pace."* Then: *"we don't have to do any easy or threshold
 math from 5K, it's either learned or entered."* Industry check: TrainingPeaks / Garmin / Coros / Daniels

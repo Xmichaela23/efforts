@@ -5,7 +5,7 @@ import { withAlarm } from '../_shared/alarm.ts';
 import { judgedPowerW, normalizedPowerW, pedalingAveragePowerW, powerStreamW } from '../_shared/ride-power.ts';
 import { getOverallAvgHr } from '../_shared/fact-packet/queries.ts';
 import { buildRunDistanceBests, buildRunPaceCurve, buildRunHrCurve, type RunDistanceBests, type RunPaceCurve, type RunHrCurve } from '../../../src/lib/run-critical-speed.ts';
-import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveMeasuredEasyPaceSecPerMi } from '../../../src/lib/resolve-current-run-pace.ts';
 import { normalizeSamples } from '../../lib/analysis/sensor-data/extractor.ts';
 import { parseRunningTokens } from '../_shared/token-parser.ts';
 import { computeRideEfficiency, computeRideTss, computeRideVam } from '../_shared/cycling-v1/ride-physiology.ts';
@@ -873,8 +873,9 @@ async function extractAssessmentBaseline(
         // ⛔ THROUGH THE OWNER (the anchor lint caught the raw read the moment it was written — which is
         // the ledger doing its job on brand-new code, not on legacy). The resolver is sec/MILE; this
         // comparison is sec/KM because a TT lap is measured in metres per second. Converted once.
-        const easyResolved = resolveCurrentRunEasyPace({ learned_fitness: existingLF } as never);
-        const easySecPerKm = easyResolved.sec_per_mi != null ? easyResolved.sec_per_mi / 1.609344 : NaN;
+        // D-478: a MEASUREMENT of the athlete's easy running (the learner's value), not the easy range.
+        const measuredEasyMi = resolveMeasuredEasyPaceSecPerMi({ learned_fitness: existingLF } as never);
+        const easySecPerKm = measuredEasyMi != null ? measuredEasyMi / 1.609344 : NaN;
         const slowerThanEasy = Number.isFinite(easySecPerKm) && easySecPerKm > 0 && paceSecPerKm >= easySecPerKm;
         if (slowerThanEasy) {
           console.warn(`[assessment] run TT ${paceSecPerKm} s/km is not faster than easy pace ${easySecPerKm} — not a threshold reading, skipped`);

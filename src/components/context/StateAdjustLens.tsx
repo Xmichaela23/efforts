@@ -20,7 +20,6 @@ import { resolveCurrentFtp, pendingFtpProposal } from '@/lib/resolve-current-ftp
 import { resolveCurrentRunThresholdPace, resolveCurrentRunEasyPace, pendingRunThresholdProposal } from '@/lib/resolve-current-run-pace';
 import { acceptMeasuredNumber } from '@/lib/accept-measured';
 import { resolveCurrentLthr } from '@/lib/resolve-current-lthr';
-import { frielZones } from '@shared/endurance/hr-zones';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { runThresholdTestRow, ftpTestRow, ftp5MinTestRow, addDaysISO } from '@/lib/baseline-tests';
 
@@ -171,7 +170,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
   // Writes go through AppContext.saveUserBaselines — the SAME save Training Baselines uses — with the same
   // fields: a lift becomes `locked_baselines[key]` (your number, auto off); FTP becomes `performanceNumbers.ftp`
   // + `ftp_source: 'manual'`; threshold pace becomes `threshold_pace_min_per_mi` ("m:ss", per mile) +
-  // `threshold_pace_source: 'manual'`. Easy pace is a readout (last five easy runs, else threshold × 1.19) and is not edited.
+  // `threshold_pace_source: 'manual'`. Easy pace is a range off threshold (× 1.14 to × 1.29, D-478) and is not edited.
   // ⛔ DELOAD — the book's TAPER/DELOAD column (p274), deployed by the athlete, never scheduled (p120 rejects
   // overreach-to-deload). Read the plan's current week + deload weeks from the rebuild's dry run; toggling
   // next week calls the same rebuild with `taper_weeks` and applies.
@@ -391,7 +390,7 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
     })();
   };
   const STRENGTH_INFO = "A retest goes on today's calendar as a test session and opens in the logger: warm-up ramp, then one all-out set per lift. When it is saved, the sessions you have not started take the new number. Typing a number makes it your number and locks it; auto uses what your lifts measure. Swaps and added movements live in the logger.";
-  const RUN_INFO = "Easy days run on a heart-rate range off threshold heart rate; the easy pace shown is what your last five easy runs measured, or threshold pace × 1.19 until there are five. The threshold test goes on the calendar three days out; a run logged within a day of it is read as the test, and the result shows here and after the run as a number to accept. Typing a number makes it your number; auto uses what your runs measure.";
+  const RUN_INFO = "Easy days run on a heart-rate range off threshold heart rate; the easy pace shown is your zone 2 pace, worked out from threshold pace. The threshold test goes on the calendar three days out; a run logged within a day of it is read as the test, and the result shows here and after the run as a number to accept. Typing a number makes it your number; auto uses what your runs measure.";
   const BIKE_INFO = "The FTP tests go on the calendar two days out; a ride logged within a day of the test is read as the test. The 20-minute test is the classic. The 5-minute test is all-out with no pacing, so it repeats well; it counts together with a ride that had a 20-minute effort in the last 90 days. The result shows here and after the ride as a number to accept. Typing a number makes it your number; auto uses what your rides measure.";
 
   type Section = { id: string; label: string; sport?: 'strength' | 'run' | 'bike'; Icon: React.ComponentType<any>; info?: string; body: React.ReactNode };
@@ -441,12 +440,10 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
           )}
           <Row id="lthr" name="Threshold heart rate" value={withSource('lthr', lthr?.bpm != null ? `${Math.round(lthr.bpm)} bpm` : null, lthr?.source)} hint="bpm" sport="run" />
           <Row id="easy" name="Easy pace" editable={false} sport="run"
-            value={fmtPace(easy?.sec_per_mi, metric) ? `${fmtPace(easy?.sec_per_mi, metric)} · ${easy?.source === 'learned' ? 'from runs' : 'from threshold'}` : null}
-            note={easy?.source === 'learned'
-              ? (lthr?.bpm != null
-                ? `Your pace at ${frielZones(lthr.bpm)[1].min}–${frielZones(lthr.bpm)[1].max} bpm, your zone 2, over your last five easy runs. Heat and hills slow this pace at the same heart rate.`
-                : 'Your last five easy runs. Heat and hills slow this pace at the same heart rate.')
-              : 'Worked out from threshold until five easy runs are on file.'} />
+            value={fmtPace(easy?.range_lo_sec_per_mi, metric) && fmtPace(easy?.range_hi_sec_per_mi, metric)
+              ? `${fmtPace(easy?.range_lo_sec_per_mi, metric)!.replace(/\/(mi|km)$/, '')}–${fmtPace(easy?.range_hi_sec_per_mi, metric)} · from threshold`
+              : null}
+            note="Your zone 2 pace, worked out from your threshold pace. Easy days run by heart rate; this is the pace that usually lands there. Heat and hills slow it at the same heart rate." />
           <div className="flex items-center justify-between py-1 gap-3">
             <span className="text-[14px] text-white/85">Retest</span>
             <span className="flex flex-wrap gap-2 justify-end">

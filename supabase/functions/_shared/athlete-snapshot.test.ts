@@ -298,7 +298,8 @@ Deno.test('buildAthleteSnapshot: extracts run paces from learned_fitness with km
     },
   });
   assertEquals(snap.run?.threshold_pace_sec_per_mi, 386);
-  assertEquals(snap.run?.easy_pace_sec_per_mi, 483);
+  // D-478: easy is not pinned — a plan's easy range follows its pinned threshold.
+  assertEquals(snap.run?.easy_pace_sec_per_mi, undefined);
 });
 
 Deno.test('buildAthleteSnapshot: run null when no learned paces present', () => {
@@ -370,9 +371,9 @@ Deno.test('readAthleteSnapshotOrLive: bike+run fall back to live cleanly when no
   assertEquals(resolved.source, 'live');
   // Bike: resolver picks learned ≥medium over manual.
   assertEquals(resolved.bike.ftp_w, 260);
-  // Run: 250 × 1.609344 → 402; 310 × 1.609344 → 499.
+  // Run: 250 × 1.609344 → 402. Easy (D-478) = the range off that threshold, 458–519, midpoint 489 — not the learner's 499.
   assertEquals(resolved.run.threshold_pace_sec_per_mi, 402);
-  assertEquals(resolved.run.easy_pace_sec_per_mi, 499);
+  assertEquals(resolved.run.easy_pace_sec_per_mi, 489);
   assertEquals(resolved.run.fiveK_pace_sec_per_mi, null, 'no learned 5K pace path today');
 });
 

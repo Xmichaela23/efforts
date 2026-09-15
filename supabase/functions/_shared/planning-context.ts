@@ -3,7 +3,7 @@
  * Reads athlete_snapshot rows + ended-plan tombstones so starting volume matches reality.
  */
 import type { CompletedEvent, SwimTrainingFromWorkouts } from './arc-context.ts';
-import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveMeasuredEasyPaceSecPerMi } from '../../../src/lib/resolve-current-run-pace.ts';
 
 /**
  * ⛔ WHICH PLAN WEEK A DATE FALLS IN, counting from the plan's own first Monday. 1-based; null when
@@ -404,7 +404,8 @@ export function computeRunPlanningSignals(
     // D-285 / LAW 2 — was `?? 600` (an invented 10:00/mi). Same conversion, same lie as end-plan-core:
     // it turns a long-run DURATION into MILES, so an invented pace silently rewrites the athlete's recorded
     // long-run volume by ~10%. Routed through the ONE run-pace resolver; unknown pace -> we do not convert.
-    const easyPaceSecPerMile: number | null = resolveCurrentRunEasyPace(baseline as any).sec_per_mi;
+    // D-478: minutes → miles needs the athlete's MEASURED easy pace, not the prescribed range off threshold.
+    const easyPaceSecPerMile: number | null = resolveMeasuredEasyPaceSecPerMi(baseline as any);
     const snapshotsWithLongRun = recentSnapshots
       .map((s: any, idx: number) => ({
         duration: s.run_long_run_duration as number | null,

@@ -1,6 +1,7 @@
 /**
- * Fixtures for the threshold-from-easy invariant (2026-08-19) — the rule that a threshold pace may
- * not be faster than the athlete's own measured easy pace ÷ 1.19, and the resolver tiers built on it.
+ * Fixtures for the run THRESHOLD resolver tiers. ⛔ 2026-09-15 (D-478): the threshold-from-easy invariant
+ * (easy ÷ 1.19) and `src/lib/run-threshold-from-easy.ts` are deleted — the × 1.19 point is gone and the bound
+ * helpers had no caller. The resolver tests below stand; the mutation table at the bottom is history.
  *
  * Run: deno test supabase/functions/_shared/run-threshold-from-easy.test.ts --no-check
  *
@@ -13,12 +14,6 @@
  * bug is the spec, the athlete is not.
  */
 import { assert, assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import {
-  boundInferredThresholdSecPerMi,
-  deriveThresholdFromEasySecPerMi,
-  EASY_TO_THRESHOLD_PACE_RATIO,
-  thresholdFloorSecPerMi,
-} from '../../../src/lib/run-threshold-from-easy.ts';
 import {
   describeThresholdBasis,
   resolveCurrentRunThresholdPace,
@@ -36,128 +31,9 @@ const easyLearned = (secPerMi: number, confidence = 'high', sample_count = 10) =
 // THE RATIO AND THE DERIVATION
 // ═══════════════════════════════════════════════════════════════════════════
 
-Deno.test('THE RATIO is the pace table\'s, and derivation is easy ÷ ratio', () => {
-  // The whole point of the constant: it is measured from PACE_TABLE, not chosen.
-  assertEquals(EASY_TO_THRESHOLD_PACE_RATIO, 1.19);
-  // 10:00/mi easy -> 600 / 1.19 = 504.2 -> 504 s/mi = 8:24/mi threshold.
-  assertEquals(deriveThresholdFromEasySecPerMi(600), 504);
-  // 8:00/mi easy -> 480 / 1.19 = 403.4 -> 403 s/mi.
-  assertEquals(deriveThresholdFromEasySecPerMi(480), 403);
-});
-
-Deno.test('derivation REFUSES rather than guesses on unusable input', () => {
-  for (const bad of [null, undefined, 0, -1, NaN, Infinity]) {
-    assertEquals(deriveThresholdFromEasySecPerMi(bad as number), null, `input ${String(bad)}`);
-  }
-});
-
-Deno.test('a derivation outside the sane band is REFUSED, not clamped into it', () => {
-  // 25:00/mi "easy" derives 1260 s/mi — past the 1200 ceiling. A number we would not read is a
-  // number we must not write. (LAW 2: no fabrication to fill a hole.)
-  assertEquals(deriveThresholdFromEasySecPerMi(1500), null);
-  // 3:00/mi easy derives 151 s/mi — below the 180 floor. Same refusal, other end.
-  assertEquals(deriveThresholdFromEasySecPerMi(180), null);
-  // And the band's inside edge still answers, so the refusal is a band and not an off switch.
-  assert(deriveThresholdFromEasySecPerMi(1400) != null);
-});
-
-Deno.test('floor and derivation are the SAME number — one constant, one rounding', () => {
-  for (const easy of [400, 500, 600, 700, 800, 900]) {
-    assertEquals(thresholdFloorSecPerMi(easy), deriveThresholdFromEasySecPerMi(easy), `easy ${easy}`);
-  }
-});
-
 // ═══════════════════════════════════════════════════════════════════════════
 // THE BAND — the invariant itself, and it has TWO edges
 // ═══════════════════════════════════════════════════════════════════════════
-
-Deno.test('BAND, fast edge: a candidate faster than the ratio allows is replaced', () => {
-  // Easy 12:00/mi (720) -> floor 605 s/mi (10:05/mi). A 8:00/mi (480) candidate is far too fast.
-  const r = boundInferredThresholdSecPerMi(480, 720);
-  assertEquals(r.sec_per_mi, 605);
-  assertEquals(r.replaced, true);
-});
-
-Deno.test('BAND, inside: a coherent candidate passes through UNTOUCHED — the 5K still wins', () => {
-  // Easy 9:30/mi (570) -> floor 479. A 8:15/mi (495) threshold respects it: a race time is a
-  // PERFORMANCE and stays the sharper anchor when it is not contradicted.
-  const r = boundInferredThresholdSecPerMi(495, 570);
-  assertEquals(r.sec_per_mi, 495);
-  assertEquals(r.replaced, false);
-});
-
-Deno.test('BAND, fast edge is INCLUSIVE: exactly on the derived value is plausible', () => {
-  const floor = thresholdFloorSecPerMi(720)!;
-  const r = boundInferredThresholdSecPerMi(floor, 720);
-  assertEquals(r.sec_per_mi, floor);
-  assertEquals(r.replaced, false);
-});
-
-Deno.test('BAND, fast edge carries ±4%: the table\'s OWN pairs are never judged implausible', () => {
-  // ⛔ THE FALSE POSITIVE THIS TOLERANCE EXISTS FOR, and a fixture sweep found it, not a mutation.
-  // Every (base, steady) pair below is one row of PACE_TABLE — an athlete sitting exactly on the
-  // app's own model, with a perfectly fresh 5K. A bound at a flat 1.19 rejected the slow rows
-  // (whose true ratio is 1.196) by ~3 s/mi, replaced a correct number, and then told the athlete on
-  // screen it had been "worked out from your easy pace". A bound tighter than the table it came
-  // from will always do that.
-  const rows: [number, number][] = [
-    [744, 622], [708, 592], [672, 564], [642, 538], [612, 514], [585, 491], [560, 470],
-    [536, 450], [525, 441], [514, 432], [494, 415], [474, 399], [456, 383], [439, 369],
-    [423, 355], [408, 343], [394, 331], [362, 304], [334, 280], [309, 260], [287, 241],
-  ];
-  for (const [base, steady] of rows) {
-    const r = boundInferredThresholdSecPerMi(steady, base);
-    assertEquals(r.replaced, false, `easy ${base} / threshold ${steady} — the app's own table row was replaced`);
-    assertEquals(r.sec_per_mi, steady);
-  }
-});
-
-Deno.test('BAND, fast edge: the tolerance is a tolerance, not an off switch', () => {
-  // easy 720 -> derived 605 -> fast edge 605 x 0.96 = 580.8. Either side of it must differ.
-  assertEquals(boundInferredThresholdSecPerMi(585, 720).replaced, false);   // inside the tolerance
-  assertEquals(boundInferredThresholdSecPerMi(575, 720).replaced, true);    // past it
-  // And a value well past it comes back AT the derivation, not at the tolerated edge — the answer
-  // is the athlete's own easy pace, not the widest number we would still have accepted.
-  assertEquals(boundInferredThresholdSecPerMi(480, 720).sec_per_mi, thresholdFloorSecPerMi(720));
-});
-
-Deno.test('BAND, slow edge: a candidate SLOWER THAN EASY is not a threshold reading', () => {
-  // ⛔ THE BUG THAT STARTED THIS, ARRIVING BY THE OTHER DOOR. The learner was taught to refuse a
-  // threshold slower than easy; the INFERENCE path had no such rule, so a 5K incoherent enough to
-  // imply a threshold slower than the athlete's own easy running sailed straight through. Caught by
-  // the sweep, not by hand.
-  const r = boundInferredThresholdSecPerMi(800, 744);
-  assertEquals(r.sec_per_mi, thresholdFloorSecPerMi(744));
-  assertEquals(r.replaced, true);
-});
-
-Deno.test('BAND, slow edge is EXCLUSIVE: equal to easy is already impossible', () => {
-  const r = boundInferredThresholdSecPerMi(744, 744);
-  assertEquals(r.sec_per_mi, thresholdFloorSecPerMi(744));
-  assertEquals(r.replaced, true);
-});
-
-Deno.test('BAND: between the edges nothing is touched, even well off the ratio', () => {
-  // easy 744 -> derived 625. A 700 s/mi candidate is nowhere near 1.19 but IS faster than easy, so
-  // it is physiologically possible and the athlete's own 5K keeps it. The band is a plausibility
-  // check, not a demand that every athlete sit exactly on the table.
-  const r = boundInferredThresholdSecPerMi(700, 744);
-  assertEquals(r.sec_per_mi, 700);
-  assertEquals(r.replaced, false);
-});
-
-Deno.test('BAND: no measured easy pace means NO BAND — and no fabrication', () => {
-  // LAW 2. With no reference there is nothing to measure against; the candidate is not touched and
-  // a ceiling is not invented for it.
-  const r = boundInferredThresholdSecPerMi(480, null);
-  assertEquals(r.sec_per_mi, 480);
-  assertEquals(r.replaced, false);
-});
-
-Deno.test('BAND: no candidate stays no candidate', () => {
-  assertEquals(boundInferredThresholdSecPerMi(null, 720).sec_per_mi, null);
-  assertEquals(boundInferredThresholdSecPerMi(0, 720).sec_per_mi, null);
-});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // THE INVARIANT ACROSS EVERY ATHLETE — not tuned to one
@@ -177,23 +53,6 @@ Deno.test('SWEEP: across the whole pace table, a measured easy pace plus a typed
       assertEquals(r.sec_per_mi, null, `easy ${easy} 5K ${fiveK}: something derived a threshold`);
       assertEquals(r.source, null);
     }
-  }
-});
-
-Deno.test('SWEEP: the ratio holds the derived value inside the band the app calls noise', () => {
-  // The defence of a single flat 1.19 instead of a VDOT lookup: PACE_TABLE's own base/steady runs
-  // 1.1880..1.1961, so a flat constant is at most ~0.7% off — well inside the ±4%
-  // RUN_PACE_DIVERGENCE_THRESHOLD the app already tolerates. If the table ever changes enough to
-  // break this, the constant must be re-measured, not nudged.
-  const rows: [number, number][] = [
-    [744, 622], [708, 592], [672, 564], [642, 538], [612, 514], [585, 491], [560, 470],
-    [536, 450], [525, 441], [514, 432], [494, 415], [474, 399], [456, 383], [439, 369],
-    [423, 355], [408, 343], [394, 331], [362, 304], [334, 280], [309, 260], [287, 241],
-  ];
-  for (const [base, steady] of rows) {
-    const derived = deriveThresholdFromEasySecPerMi(base)!;
-    const errPct = Math.abs(derived - steady) / steady;
-    assert(errPct < 0.04, `easy ${base}: derived ${derived} vs table ${steady} = ${(errPct * 100).toFixed(2)}% off`);
   }
 });
 
@@ -223,16 +82,6 @@ Deno.test('the measured easy pace alone derives NOTHING — it is checkpoint evi
   const r = resolveCurrentRunThresholdPace({ learned_fitness: easyLearned(600) });
   assertEquals(r.sec_per_mi, null);
   assertEquals(r.source, null);
-  // The helper still answers for the checkpoint; the resolver does not call it.
-  assertEquals(deriveThresholdFromEasySecPerMi(600), 504);
-});
-
-Deno.test('the bound helper still holds a candidate to the easy band — even though the resolver has no candidate tier left', () => {
-  // `boundInferredThresholdSecPerMi` is kept for the checkpoint (a proposed threshold is a
-  // candidate). With a measured easy of 755, a 400 candidate is held to the floor.
-  const b = boundInferredThresholdSecPerMi(400, 755);
-  assertEquals(b.replaced, true);
-  assertEquals(b.sec_per_mi, thresholdFloorSecPerMi(755));
 });
 
 Deno.test('a LOW-confidence easy pace does not found the bound', () => {

@@ -3,7 +3,7 @@
  * Used by end-plan edge and complete-race.
  */
 // @ts-nocheck
-import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveMeasuredEasyPaceSecPerMi } from '../../../src/lib/resolve-current-run-pace.ts';
 
 export async function executeEndPlan(
   supabase: { from: (t: string) => any },
@@ -77,7 +77,8 @@ export async function executeEndPlan(
       // recorded peak long run: at the invented 10:00/mi a 90-min run is 9.0 mi; at a real 11:08/mi it is
       // 8.1 mi. That ~10% fiction then feeds volume/progression reasoning. If we do not know the pace we
       // CANNOT do this conversion — so we skip it, rather than manufacture a mileage.
-      const easyPaceSec: number | null = resolveCurrentRunEasyPace(bl as any).sec_per_mi;
+      // D-478: minutes → miles needs the athlete's MEASURED easy pace, not the prescribed range off threshold.
+      const easyPaceSec: number | null = resolveMeasuredEasyPaceSecPerMi(bl as any);
 
       for (const s of snapshots) {
         if (easyPaceSec != null && s.run_long_run_duration && s.run_long_run_duration > 0) {

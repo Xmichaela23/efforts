@@ -15,7 +15,7 @@
 // =============================================================================
 
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
-import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveMeasuredEasyPaceSecPerMi } from '../../../src/lib/resolve-current-run-pace.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { ageEstimateMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
 
@@ -223,12 +223,13 @@ function isComparableZ2Run(
    * ⚠️ The resolver is sec/MILE; this gate works in sec/KM (it compares against `workout.avg_pace`).
    * Converted once, here.
    */
-  const resolvedEasy = resolveCurrentRunEasyPace({
+  // ⛔ D-478 (2026-09-15): "does this run's pace look easy for THIS athlete" asks for a MEASUREMENT — the learner's
+  // easy pace (`resolveMeasuredEasyPaceSecPerMi`, medium/high confidence) — not the prescribed range off threshold.
+  const measuredEasyMi = resolveMeasuredEasyPaceSecPerMi({
     learned_fitness: lf2, performance_numbers: perfNumbers,
   } as never);
-  const learnedEasyPaceConf = confidenceToNumber(resolvedEasy.confidence ?? undefined);
-  const baselineEasySecPerKm = resolvedEasy.sec_per_mi != null
-    ? resolvedEasy.sec_per_mi / 1.60934
+  const baselineEasySecPerKm = measuredEasyMi != null
+    ? measuredEasyMi / 1.60934
     : parseEasyPaceMmSsPerMiToSecPerKm(perfNumbers?.easyPace);
   if (!Number.isFinite(avgPace) || !(avgPace > 0)) {
     // If HR matches our easy range, we can still accept and store pace as missing (but aerobic efficiency can't be computed).
@@ -280,9 +281,9 @@ function isComparableZ2Run(
         notClearlyHard,
         // The debug receipt reports what was actually USED, and now says where it came from —
         // `source` is the resolver's tier, so a typed pace can no longer be logged as a learned one.
-        learned_easy_pace_sec_per_km: resolvedEasy.sec_per_mi != null ? resolvedEasy.sec_per_mi / 1.60934 : null,
-        learned_easy_pace_conf: resolvedEasy.confidence ?? null,
-        easy_pace_source: resolvedEasy.source ?? null,
+        learned_easy_pace_sec_per_km: measuredEasyMi != null ? measuredEasyMi / 1.60934 : null,
+        learned_easy_pace_conf: null, // D-478: the measured value is medium/high only; no raw read past the resolver
+        easy_pace_source: measuredEasyMi != null ? 'learned' : null,
       },
     };
   }
@@ -305,9 +306,9 @@ function isComparableZ2Run(
       hrLooksEasy,
       hrHardCap,
       notClearlyHard,
-      learned_easy_pace_sec_per_km: resolvedEasy.sec_per_mi != null ? resolvedEasy.sec_per_mi / 1.60934 : null,
-      learned_easy_pace_conf: resolvedEasy.confidence ?? null,
-      easy_pace_source: resolvedEasy.source ?? null,
+      learned_easy_pace_sec_per_km: measuredEasyMi != null ? measuredEasyMi / 1.60934 : null,
+      learned_easy_pace_conf: null, // D-478: the measured value is medium/high only; no raw read past the resolver
+      easy_pace_source: measuredEasyMi != null ? 'learned' : null,
     },
   };
 }

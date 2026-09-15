@@ -1,32 +1,30 @@
 /**
- * THE RUN EASY-PACE REFERENCE BAND, OFF THE ONE ANCHOR: THRESHOLD PACE.
+ * THE RUN EASY PACE RANGE, OFF THE ONE ANCHOR: THRESHOLD PACE.
  *
- * ⛔ THE RULING (Michael, 2026-09-02, final, relayed from the plan-materialization audit):
- *   - THRESHOLD is the only pace anchor, and it is learned (measured) or entered. Nothing derives it —
- *     not the 5K, not the easy runs.
+ * ⛔ THE RULINGS:
+ *   - THRESHOLD is the only pace anchor, and it is learned (measured) or entered (Michael, 2026-09-02).
  *   - EASY is not a pace source. Easy days are prescribed as a HEART-RATE zone off threshold HR
- *     (`resolve-current-lthr.ts`); the easy PACE shown is a reference band only: threshold × 1.19.
+ *     (`resolve-current-lthr.ts`); the easy PACE shown is ONE RANGE: threshold × 1.14 to × 1.29, Friel run
+ *     Zone 2 (2026-09-15, TRUTH-MAP §9 Q2, D-478). The × 1.19 point it replaced is gone — the book gives easy
+ *     by feel (p235: the percentage of threshold moves with fatigue, hydration, environment), and Daniels
+ *     allows ±20 s/mi on a given day, so a range and not a point.
  *   - MARATHON race pace is the plan's ENTERED goal time ÷ the race distance. Not derived.
  *   - 5K-pace work is the typed 5K time ÷ 3.107 (`resolve-current-5k-pace.ts`). Not derived.
- * Viada p275 for the Standard Focus programme: *"few changes are needed as the months progress beyond
- * adjustment of 1RM and threshold as you improve"* — threshold is the one endurance number that moves.
  *
- * So this file holds exactly one derivation. The five-pace vDOT table (`effort_paces`) that used to
- * fill every gap is not read by the resolvers or the materializer any more; a marathon ratio and a
- * 5K seed each lived here for one afternoon and were removed the same day by the rulings above.
- *
- * ⛔ THE RATIO IS MEASURED, NOT PICKED: `EASY_TO_THRESHOLD_PACE_RATIO` (`run-threshold-from-easy.ts`)
- * is base ÷ steady across all 21 rows of the app's own pace table, spread 0.69%. Imported, not
- * re-stated. Do not tune it.
+ * The two multipliers live beside Friel's heart-rate seams in `friel-zones.ts`, imported, not re-stated.
  *
  * No I/O. Pure functions. Importable from the React client AND Deno edge functions.
  */
 
-import { EASY_TO_THRESHOLD_PACE_RATIO } from './run-threshold-from-easy.ts';
+import { EASY_PACE_FAST_X_THRESHOLD, EASY_PACE_SLOW_X_THRESHOLD } from './friel-zones.ts';
 
 export type RunPacesFromThreshold = {
-  /** sec/mi — the reference band for a heart-rate-prescribed easy day. threshold × 1.19. */
-  easy: number;
+  /**
+   * sec/mi — the easy pace range for a heart-rate-prescribed easy day. `lo` is the fast edge (threshold × 1.14),
+   * `hi` the slow edge (× 1.29). `mid` is the range midpoint, for the few readers that need ONE number
+   * (step minutes ↔ miles) — a midpoint of a range, not a measurement.
+   */
+  easy: { lo: number; hi: number; mid: number };
   /** sec/mi — the anchor, echoed. */
   threshold: number;
 };
@@ -40,5 +38,7 @@ function positive(n: unknown): number | null {
 export function pacesFromThresholdSecPerMi(thresholdSecPerMi: number | null | undefined): RunPacesFromThreshold | null {
   const t = positive(thresholdSecPerMi);
   if (t == null) return null;
-  return { easy: Math.round(t * EASY_TO_THRESHOLD_PACE_RATIO), threshold: Math.round(t) };
+  const lo = Math.round(t * EASY_PACE_FAST_X_THRESHOLD);
+  const hi = Math.round(t * EASY_PACE_SLOW_X_THRESHOLD);
+  return { easy: { lo, hi, mid: Math.round((lo + hi) / 2) }, threshold: Math.round(t) };
 }

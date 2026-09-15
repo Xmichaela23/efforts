@@ -1,7 +1,8 @@
 /**
- * Fixtures for `resolveCurrentRunEasyPace` — the run easy-pace REFERENCE BAND.
+ * Fixtures for `resolveCurrentRunEasyPace` — the run easy pace RANGE.
  *
- * ⛔ REWRITTEN 2026-09-02 (Michael's ruling: easy is not a pace source). Easy pace is threshold × 1.19
+ * ⛔ 2026-09-15 (D-478): easy pace is ONE RANGE, threshold × 1.14 to × 1.29 (Friel run Zone 2); `sec_per_mi` is its
+ * midpoint. ⛔ REWRITTEN 2026-09-02 (Michael's ruling: easy is not a pace source). Easy pace comes off threshold
  * and nothing else — no learned tier, no typed tier, no `easy_pace_source` choice (Q-174 superseded).
  * The learned easy pace survives only as checkpoint EVIDENCE (`resolveMeasuredEasyPaceSecPerMi`);
  * here it is proven NOT to prescribe by itself.
@@ -17,19 +18,21 @@ const learnedEasy = (secPerKm: number, confidence = 'high', sample_count = 10, a
 const learnedThr = (secPerKm: number, confidence = 'high', sample_count = 5, as_of: string | null = '2026-06-28') =>
   ({ learned_fitness: { run_threshold_pace_sec_per_km: { value: secPerKm, confidence, sample_count, as_of } } });
 
-// ═══ THE ONE RULE: easy = threshold × 1.19, a reference band ══════════════════
-Deno.test('easy is threshold × 1.19 off a MEASURED threshold — and declares itself an estimate', () => {
-  // 372 s/km threshold = 599 s/mi → easy 713 s/mi
+// ═══ THE ONE RULE: easy = threshold × 1.14 to × 1.29, one range ══════════════════
+Deno.test('easy is threshold × 1.14–1.29 off a MEASURED threshold — and declares itself an estimate', () => {
+  // 372 s/km threshold = 599 s/mi → easy 683–773 s/mi, midpoint 728
   const r = resolveCurrentRunEasyPace(learnedThr(372));
-  assertEquals(r.sec_per_mi, 713);
+  assertEquals(r.range_lo_sec_per_mi, 683);
+  assertEquals(r.range_hi_sec_per_mi, 773);
+  assertEquals(r.sec_per_mi, 728);
   assertEquals(r.source, 'derived-from-threshold');
   assertEquals(r.is_estimate, true);
   assertEquals(r.as_of, '2026-06-28');   // the threshold's date travels with it (Law 3)
 });
 
-Deno.test('easy is threshold × 1.19 off a TYPED threshold', () => {
+Deno.test('easy is threshold × 1.14–1.29 off a TYPED threshold', () => {
   const r = resolveCurrentRunEasyPace({ performance_numbers: { threshold_pace_sec_per_mi: 500 } });
-  assertEquals(r.sec_per_mi, 595);
+  assertEquals([r.range_lo_sec_per_mi, r.range_hi_sec_per_mi, r.sec_per_mi], [570, 645, 608]);
   assertEquals(r.source, 'derived-from-threshold');
 });
 
@@ -53,7 +56,7 @@ Deno.test('a TYPED easy pace is IGNORED — it is not a source (2026-09-02)', ()
 
 Deno.test('the easy_pace_source choice is IGNORED — Q-174 is superseded', () => {
   const r = resolveCurrentRunEasyPace({ ...learnedThr(372), performance_numbers: { easyPace: 800, easy_pace_source: 'manual' } });
-  assertEquals(r.sec_per_mi, 713);
+  assertEquals(r.sec_per_mi, 728);
   assertEquals(r.source, 'derived-from-threshold');
 });
 

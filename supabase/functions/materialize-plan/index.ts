@@ -693,6 +693,10 @@ export function stampRunPrescription(tok: string, steps: any[], baselines: Basel
     if (easyStep) {
       s.prescription = 'heart_rate';
       if (hr) s.hr_range = { lower: hr.lower, upper: hr.upper };
+      // ⛔ THE EASY PACE RANGE, NOT ±6% AROUND ONE PACE (2026-09-15, D-478). A step priced at the easy pace shows the
+      // Friel Zone 2 range off threshold (× 1.14 to × 1.29); `toV3Step` keeps an array `pace_range` over its tolerance.
+      const easyRange = (baselines as any)?._resolvedEasyRange as { lo: number; hi: number } | undefined;
+      if (easyRange && easyBand != null && s.pace_sec_per_mi === easyBand) s.pace_range = [easyRange.lo, easyRange.hi];
       continue;
     }
     if (kind === 'work' && isThresholdToken) s.target_rpe = { lo: 5, hi: 6 };
@@ -728,10 +732,9 @@ function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'|'th
     | { threshold_pace_sec_per_mi?: number | null; easy_pace_sec_per_mi?: number | null; fiveK_pace_sec_per_mi?: number | null }
     | undefined;
   if (snapPaces) {
-    if (which === 'easy' && snapPaces.easy_pace_sec_per_mi != null) {
-      console.log(`[Paces] Using snapshot easy: ${snapPaces.easy_pace_sec_per_mi}s/mi`);
-      return snapPaces.easy_pace_sec_per_mi;
-    }
+    // ⛔ EASY IS OFF THE PIN (2026-09-15, D-478). Easy pace is a range off threshold, so it follows the pinned
+    // threshold instead of being frozen beside it — a pinned easy number would keep an old point on a re-materialized
+    // plan. Where a threshold is pinned, `_resolvedEasySecPerMi` / `_resolvedEasyRange` are set from it (pin block).
     if (which === 'threshold' && snapPaces.threshold_pace_sec_per_mi != null) {
       console.log(`[Paces] Using snapshot threshold: ${snapPaces.threshold_pace_sec_per_mi}s/mi`);
       return snapPaces.threshold_pace_sec_per_mi;
@@ -766,7 +769,7 @@ function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'|'th
   }
 
   // §1c — THE RULING (2026-09-02, final): threshold is learned or entered, nothing else; 'easy' is
-  // threshold × 1.19, a reference band under a heart-rate prescription; 'fivek' is the typed 5K by
+  // the range threshold × 1.14 to × 1.29 (D-478; the midpoint here), under a heart-rate prescription; 'fivek' is the typed 5K by
   // division; 'marathon' is the goal's entered time ÷ distance. Nothing is derived from the 5K, from
   // the easy runs, or from the vDOT table.
   //
@@ -808,8 +811,8 @@ function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'|'marathon'|'th
   if (which === 'easy') {
     // Reached only when the easy resolver abstained; the resolver's own derived-from-threshold tier
     // normally answers first with this exact number.
-    console.log(`[Paces] Using easy pace from threshold: ${derived.easy}s/mi`);
-    return derived.easy;
+    console.log(`[Paces] Using easy pace from threshold: ${derived.easy.lo}–${derived.easy.hi}s/mi, midpoint ${derived.easy.mid}`);
+    return derived.easy.mid;
   }
   return null;
 }
@@ -3954,8 +3957,13 @@ Deno.serve(async (req) => {
       // nothing is lost — it is simply consulted in the one agreed order.
       const easyResolved = resolveCurrentRunEasyPace(ub as any);
       if (easyResolved.sec_per_mi != null) {
+        // D-478: `sec_per_mi` is the range MIDPOINT — one number for step minutes ↔ miles and for matching an
+        // easy step in `stampRunPrescription`. The range itself is what the easy step shows.
         (baselines as any)._resolvedEasySecPerMi = easyResolved.sec_per_mi;
-        console.log(`[Paces] Resolved easy: ${easyResolved.sec_per_mi}s/mi (source=${easyResolved.source})`);
+        if (easyResolved.range_lo_sec_per_mi != null && easyResolved.range_hi_sec_per_mi != null) {
+          (baselines as any)._resolvedEasyRange = { lo: easyResolved.range_lo_sec_per_mi, hi: easyResolved.range_hi_sec_per_mi };
+        }
+        console.log(`[Paces] Resolved easy: ${easyResolved.range_lo_sec_per_mi}–${easyResolved.range_hi_sec_per_mi}s/mi, midpoint ${easyResolved.sec_per_mi} (source=${easyResolved.source})`);
       }
 
       // ⛔ THRESHOLD PACE VIA THE SAME RESOLVER — AND IT HAD NEVER BEEN CONSULTED HERE AT ALL
@@ -4131,6 +4139,13 @@ Deno.serve(async (req) => {
             resolved.run.fiveK_pace_sec_per_mi != null
           ) {
             (baselines as any)._snapshotRunPaces = resolved.run;
+            // D-478: easy is off the pin; its range follows the PINNED threshold, so the plan's easy steps and its
+            // threshold work stay one pair for the plan's life.
+            const pinnedEasy = pacesFromThresholdSecPerMi(resolved.run.threshold_pace_sec_per_mi ?? null);
+            if (pinnedEasy) {
+              (baselines as any)._resolvedEasySecPerMi = pinnedEasy.easy.mid;
+              (baselines as any)._resolvedEasyRange = { lo: pinnedEasy.easy.lo, hi: pinnedEasy.easy.hi };
+            }
           }
           console.log(`[materialize-plan] athlete-snapshot source=${resolved.source}`, {
             performance_numbers: resolved.performance_numbers,

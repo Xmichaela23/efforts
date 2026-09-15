@@ -157,3 +157,36 @@ pace, distance and GAP keep D-185's order. Back-annotated there.
 **Rejected:** a time-weighted sample mean everywhere (intervals.icu's method) — disagrees with the watch by a
 few bpm on every session and needs every stored workout re-analysed.
 
+---
+
+## D-478 — Easy pace is one range off threshold: × 1.14 to × 1.29 (2026-09-15)
+
+**The call.** Easy pace is ONE RANGE off the accepted threshold pace — threshold × 1.14 (fast edge) to × 1.29
+(slow edge), Friel run Zone 2 — on every screen and on the plan's easy steps. The × 1.19 point goes. Until a
+threshold exists there is no easy pace (heart-rate range only). The pair lives in `src/lib/friel-zones.ts` beside
+Friel's heart-rate seams; `pacesFromThresholdSecPerMi` returns the range and its midpoint;
+`resolveCurrentRunEasyPace` returns it with `sec_per_mi` = midpoint and `range_lo/hi_sec_per_mi` = the edges.
+
+**Why.** TRUTH-MAP §9 Q2 (accepted 2026-09-15). The book gives easy by feel (p235: the percentage of threshold moves
+with fatigue, hydration and environment) and prints only the talk test; Friel via TrainingPeaks gives Zone 2 as
+114–129% of threshold pace, the same author whose heart-rate table already sets the easy heart-rate range; Daniels'
+easy is a range with ±20 s/mi daily allowance. A point competed with the heart-rate prescription; a range does not.
+
+**What moved with it.**
+- "From runs" is not a source and not a proposal (it would be a second pace anchor). The learner's last-five easy
+  median stays the State receipt and the checkpoint evidence, and is the MEASUREMENT for the readers that ask
+  about the athlete's own running: the time-trial "slower than easy" check (`compute-workout-analysis`), the
+  adaptation easy gate (`compute-adaptation-metrics`), long-run minutes → miles (`planning-context`,
+  `end-plan-core`) and the VT1 fraction (`endurance-library` anchors → `vt1FractionFor`) — all via
+  `resolveMeasuredEasyPaceSecPerMi`.
+- Easy is off the plan pin (`athlete-snapshot`); a pinned plan's easy range comes from its pinned threshold.
+- The heart-rate easy step's `pace_range` is the Friel range, not ±6% around one pace (`stampRunPrescription`).
+- The run summary's easy-portion line judges against the range (inside / how far outside the nearer edge).
+- The endurance library's easy/VT1 target is the range.
+- Deleted: `EASY_TO_THRESHOLD_PACE_RATIO`, `src/lib/run-threshold-from-easy.ts` and its bound helpers (no callers).
+
+**OURS:** printing a pace range under the heart-rate prescription rather than heart rate alone. Ledger row "Easy pace".
+
+**> Supersedes** D-462's × 1.19 (back-annotated) and STATE-SOURCES row "Easy pace on Adjust…" (rewritten).
+Race path and season wizard readers (parked, §3a) take the midpoint through the same resolver, unedited.
+

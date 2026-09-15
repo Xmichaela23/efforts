@@ -92,3 +92,17 @@ Deno.test('v3 round-trip: prescription, hr_range and target_rpe reach computed.s
   for (const s of w) assertEquals(s.target_rpe, { lo: 5, hi: 6 });
   for (const s of hard.filter((x) => x.kind === 'recovery')) assertEquals(s.hr_range, HR);
 });
+
+Deno.test('D-478: an easy step priced at the easy pace shows the Friel range, not ±6% around one pace', () => {
+  // threshold 450 s/mi → range 513–581, midpoint 547
+  const b = { ...baselines, _resolvedEasySecPerMi: 547, _resolvedEasyRange: { lo: 513, hi: 581 } };
+  for (const tok of ['run_easy_30min', 'warmup_run_10min_easy']) {
+    for (const s of expand(tok, b)) {
+      assertEquals(s.pace_range, [513, 581], `${tok}: ${s.kind}`);
+      assertEquals(toV3Step(s).pace_range, { lower: 513, upper: 581 }, `${tok}: the v3 step keeps the range`);
+    }
+  }
+  // threshold work is untouched: its own ±2% around its pace
+  for (const s of work(expand('cruise_4x1mi_threshold', b))) assertEquals(s.pace_range, undefined);
+});
+

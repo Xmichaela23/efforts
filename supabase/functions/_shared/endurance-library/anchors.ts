@@ -4,7 +4,8 @@
 // ⛔ NOT A NEW RESOLVER. Every fact here has an owner already, and this file calls it:
 //
 //   run threshold pace   `src/lib/resolve-current-run-pace.ts`  resolveCurrentRunThresholdPace
-//   run VT1 / easy pace  `src/lib/resolve-current-run-pace.ts`  resolveCurrentRunEasyPace
+//   run easy pace range  `src/lib/resolve-current-run-pace.ts`  resolveCurrentRunEasyPace (D-478)
+//   run VT1 (measured)   `src/lib/resolve-current-run-pace.ts`  resolveMeasuredEasyPaceSecPerMi
 //   FTP                  `src/lib/resolve-current-ftp.ts`       resolveCurrentFtp
 //   swim pace            `_shared/planning-context.ts`          swimSecPer100YdFromArcSwimInputs
 //
@@ -20,6 +21,7 @@ import { resolveCurrentFtp } from '../../../../src/lib/resolve-current-ftp.ts';
 import {
   resolveCurrentRunEasyPace,
   resolveCurrentRunThresholdPace,
+  resolveMeasuredEasyPaceSecPerMi,
 } from '../../../../src/lib/resolve-current-run-pace.ts';
 import { swimSecPer100YdFromArcSwimInputs } from '../planning-context.ts';
 import type { AnchorReport, Sport } from './types.ts';
@@ -69,7 +71,9 @@ export function resolveEnduranceAnchors(baselines: EnduranceBaselines): Enduranc
       unit: 'sec_per_mi',
       source: runThreshold.source,
       isEstimate: runThreshold.is_estimate,
-      vt1SecPerMi: runEasy.sec_per_mi,
+      vt1SecPerMi: resolveMeasuredEasyPaceSecPerMi(baselines as never),
+      easyRangeSecPerMi: runEasy.range_lo_sec_per_mi != null && runEasy.range_hi_sec_per_mi != null
+        ? { lo: runEasy.range_lo_sec_per_mi, hi: runEasy.range_hi_sec_per_mi } : null,
     },
     ride: {
       sport: 'ride',
@@ -98,7 +102,7 @@ export function anchorFor(anchors: EnduranceAnchors, sport: Sport): AnchorReport
 
 /** An anchors object with nothing in it — for callers previewing a plan before baselines exist. */
 export const UNKNOWN_ANCHORS: EnduranceAnchors = {
-  run: { sport: 'run', value: null, unit: 'sec_per_mi', source: null, isEstimate: false, vt1SecPerMi: null },
+  run: { sport: 'run', value: null, unit: 'sec_per_mi', source: null, isEstimate: false, vt1SecPerMi: null, easyRangeSecPerMi: null },
   ride: { sport: 'ride', value: null, unit: 'watts', source: null, isEstimate: false },
   swim: { sport: 'swim', value: null, unit: 'sec_per_100m', source: null, isEstimate: false },
 };

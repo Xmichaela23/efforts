@@ -348,6 +348,9 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
     } as any);
     const baselinePacesSecPerMi = {
       base: resolvedEasy.sec_per_mi,
+      // D-478: the easy pace RANGE off threshold (× 1.14 to × 1.29); the easy-portion line judges against it.
+      baseLo: resolvedEasy.range_lo_sec_per_mi ?? null,
+      baseHi: resolvedEasy.range_hi_sec_per_mi ?? null,
       steady: Number.isFinite(Number(effortPaces?.steady)) ? Number(effortPaces.steady) : null,
       power: Number.isFinite(Number(effortPaces?.power)) ? Number(effortPaces.power) : null,
       speed: Number.isFinite(Number(effortPaces?.speed)) ? Number(effortPaces.speed) : null,
@@ -2749,15 +2752,19 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
             );
           }
           // Below the FLOOR (a walk / stopped strap) is not a verdict worth speaking. Silence.
-        } else if (seg?.hasFinishSegment && Number.isFinite(baseActual) && baseActual > 0 && Number.isFinite(baseBaseline) && baseBaseline > 0) {
-          // NOT a steady easy run -> it had a PACE target. Judge it on pace, as before.
-          const d = baseActual - baseBaseline;
-          const abs = Math.abs(d);
-          if (abs <= 10) {
-            bullets.push(`Easy portion aligned with your baseline base pace (~${fmtPace(baseBaseline)}).`);
+        } else if (seg?.hasFinishSegment && Number.isFinite(baseActual) && baseActual > 0
+          && Number(baselinePacesSecPerMi.baseLo) > 0 && Number(baselinePacesSecPerMi.baseHi) > 0) {
+          // NOT a steady easy run -> it had a PACE target. Judged against the easy pace RANGE (D-478): inside it, or how
+          // far outside the nearer edge. The ±10 s "aligned" allowance around one point is gone with the point.
+          const lo = Number(baselinePacesSecPerMi.baseLo);
+          const hi = Number(baselinePacesSecPerMi.baseHi);
+          const rangeTxt = `${fmtPace(lo).replace(/\/mi$/, '')}–${fmtPace(hi)}`;
+          if (baseActual >= lo && baseActual <= hi) {
+            bullets.push(`Easy portion was inside your easy pace range (${rangeTxt}).`);
           } else {
+            const d = baseActual > hi ? baseActual - hi : baseActual - lo;
             const dir = d > 0 ? 'slower' : 'faster';
-            bullets.push(`Easy portion was ${fmtDelta(d)}/mi ${dir} than your baseline base pace (~${fmtPace(baseBaseline)}).`);
+            bullets.push(`Easy portion was ${fmtDelta(d)}/mi ${dir} than your easy pace range (${rangeTxt}).`);
           }
         }
 
