@@ -1019,7 +1019,7 @@ Deno.serve(async (req) => {
       return { avg_power_w: r(avgW), normalized_power_w: r(npW), judged_power_w: r(judged.watts), judged_power_basis: judged.basis };
     }
 
-    type Lap = { start_ts:number; end_ts:number; time_s:number; dist_m:number; start_idx?:number; end_idx?:number };
+    type Lap = { start_ts:number; end_ts:number; time_s:number; dist_m:number; start_idx?:number; end_idx?:number; number:number };
     function normalizeLaps(raw:any): Lap[] {
       if (!raw) return [];
       // Garmin rows written before 2026-09-07 hold the laps as a JSON STRING inside the jsonb column
@@ -1070,7 +1070,10 @@ Deno.serve(async (req) => {
         const rawEndIdx = Number(L?.end_index ?? L?.endIndex);
 
         if (Number.isFinite(start_ts) && Number.isFinite(end_ts) && end_ts > start_ts) {
-          const lap: Lap = { start_ts, end_ts, time_s: Math.max(0, time_s), dist_m: Math.max(0, dist_m) };
+          // The watch's own lap number: Strava's `lap_index`, else the lap's place in the provider's list. A row
+          // reads "Lap N" from this, so a lap that cannot be placed leaves a gap rather than renumbering the rest.
+          const ownNumber = Number(L?.lap_index ?? L?.lapIndex);
+          const lap: Lap = { start_ts, end_ts, time_s: Math.max(0, time_s), dist_m: Math.max(0, dist_m), number: Number.isFinite(ownNumber) && ownNumber > 0 ? ownNumber : li + 1 };
           if (Number.isFinite(rawStartIdx) && rawStartIdx >= 0) lap.start_idx = rawStartIdx;
           if (Number.isFinite(rawEndIdx) && rawEndIdx >= 0) lap.end_idx = rawEndIdx;
           out.push(lap);
@@ -1216,28 +1219,8 @@ Deno.serve(async (req) => {
       while (i < plannedSteps.length && j < laps.length) {
         const st = plannedSteps[i], L = laps[j];
         if (!stepLapWithinTolerance(st, L)) return null;
-        let sIdx: number, eIdx: number;
-        if (Number.isFinite(L.start_idx) && Number.isFinite(L.end_idx)) {
-          sIdx = Math.max(0, Math.min(L.start_idx!, rows.length - 1));
-          eIdx = Math.max(sIdx, Math.min(L.end_idx!, rows.length - 1));
-        } else {
-          sIdx = 0; while (sIdx + 1 < rows.length && (rows[sIdx].t ?? rows[sIdx].ts) < L.start_ts) sIdx++;
-          eIdx = sIdx; while (eIdx + 1 < rows.length && (rows[eIdx].t ?? rows[eIdx].ts) < L.end_ts) eIdx++;
-        }
-        // tighten to moving edges (prefer distance increase; fallback to speed)
-        const floor = ALIGN.idle_speed_mps;
-        while (sIdx < eIdx) {
-          const a2 = rows[sIdx], b2 = rows[sIdx+1];
-          const dInc = (typeof a2?.d === 'number' && typeof b2?.d === 'number') ? ((b2.d - a2.d) > 0) : false;
-          if (dInc || (rows[sIdx].v > floor)) break;
-          sIdx++;
-        }
-        while (eIdx > sIdx) {
-          const a2 = rows[eIdx-1], b2 = rows[eIdx];
-          const dInc = (typeof a2?.d === 'number' && typeof b2?.d === 'number') ? ((b2.d - a2.d) > 0) : false;
-          if (dInc || (rows[eIdx].v > floor)) break;
-          eIdx--;
-        }
+        // Placed the same way as every other lap read (`windowIdxFromLap`): by the lap's own start time and length.
+        const [sIdx, eIdx] = windowIdxFromLap(rows, L);
         out.push(execIntervalFromWindow(st, sIdx, eIdx));
         i++; j++;
       }
@@ -1245,8 +1228,16 @@ Deno.serve(async (req) => {
     }
 
     // Helpers for no-plan fallback (laps or auto-splits)
+    /**
+     * ⛔ A LAP IS PLACED BY ITS START TIME AND LENGTH (2026-09-15, Michael: 28 May showed 2 of 4 watch laps, 28 Aug 1 of 8).
+     * Strava's lap `start_index` / `end_index` count points in Strava's own stream, not in the one-per-second recording
+     * stored here: on 28 May laps 2–4 all ended at point 237 of 1,179 and on 28 Aug laps 1–8 at point 681 of 1,760, so
+     * those laps had no length and were dropped, and the rest were cut in the wrong place (24 Aug Lap 1 read 1,161 m,
+     * watch 1,269 m). Placed by start time and elapsed seconds, every lap on the three runs came within 6 m of the
+     * watch's distance. Point numbers are used only by a lap that has no time.
+     */
     function windowIdxFromLap(rows:any[], L:Lap): [number, number] {
-      if (Number.isFinite(L.start_idx) && Number.isFinite(L.end_idx)) {
+      if (!(L.start_ts > 0 && L.end_ts > L.start_ts) && Number.isFinite(L.start_idx) && Number.isFinite(L.end_idx)) {
         return [
           Math.max(0, Math.min(L.start_idx!, rows.length - 1)),
           Math.max(0, Math.min(L.end_idx!, rows.length - 1))
@@ -1259,7 +1250,9 @@ Deno.serve(async (req) => {
       // on the timer are matched against the timer (`t`). Comparing epoch laps to timer rows put
       // every lap past the end of the run (2026-09-07).
       const onClock = start_ts > 1e9 && Number(rows[0]?.ts) > 1e9;
-      const rt = (r: any) => (onClock ? (r?.ts ?? 0) : (r?.t ?? 0));
+      // A row clock in milliseconds (a sample `timestamp` with no seconds field) is compared in seconds.
+      const clockScale = onClock && Number(rows[0]?.ts) > 1e12 ? 1000 : 1;
+      const rt = (r: any) => (onClock ? (r?.ts ?? 0) / clockScale : (r?.t ?? 0));
       let sIdx = 0; while (sIdx + 1 < rows.length && rt(rows[sIdx]) < start_ts) sIdx++;
       let eIdx = sIdx; while (eIdx + 1 < rows.length && rt(rows[eIdx]) < end_ts) eIdx++;
       // tighten to moving (prefer distance increase; fallback to speed)
@@ -1327,8 +1320,7 @@ Deno.serve(async (req) => {
         for (const L of laps) {
           const [sIdx, eIdx] = windowIdxFromLap(rows, L);
           if (eIdx > sIdx) {
-            const n = outIntervals.length + 1;
-            outIntervals.push({ ...execFromIdx(rows, sIdx, eIdx, 'lap', 'lap'), planned_label: `Lap ${n}`, kind: 'lap', lap_number: n });
+            outIntervals.push({ ...execFromIdx(rows, sIdx, eIdx, 'lap', 'lap'), planned_label: `Lap ${L.number}`, kind: 'lap', lap_number: L.number });
           }
         }
       } else {
@@ -1542,14 +1534,15 @@ Deno.serve(async (req) => {
     let snapMode = 'snap-to-laps';
     const structuredPlan = plannedSteps.filter((st: any) => stepRole(st) === 'work').length >= 2;
     if ((sport === 'run' || sport === 'walk') && structuredPlan && laps.length >= 2) {
-      const lapWins = laps.map((L) => windowIdxFromLap(rows, L)).filter(([a, b]) => b > a);
+      const placed = laps.map((L) => ({ L, win: windowIdxFromLap(rows, L) })).filter(({ win: [a, b] }) => b > a);
+      const lapWins = placed.map((x) => x.win);
       if (lapWins.length >= 2) {
         const matched = lapWins.length <= plannedSteps.length && lapWins.every(([a, b], i) => {
-          const measured = { ...laps[i], dist_m: Math.max(0, (rows[b]?.d || 0) - (rows[a]?.d || 0)), time_s: movingSecondsBetween(rows, a, b) } as Lap;
+          const measured = { ...placed[i].L, dist_m: Math.max(0, (rows[b]?.d || 0) - (rows[a]?.d || 0)), time_s: movingSecondsBetween(rows, a, b) } as Lap;
           return stepLapWithinTolerance(plannedSteps[i], measured);
         });
         if (matched) {
-          snapped = lapWins.map(([a, b], i) => ({ ...execIntervalFromWindow(plannedSteps[i], a, b), lap_number: i + 1, sample_idx_start: a, sample_idx_end: b }));
+          snapped = lapWins.map(([a, b], i) => ({ ...execIntervalFromWindow(plannedSteps[i], a, b), lap_number: placed[i].L.number, sample_idx_start: a, sample_idx_end: b }));
           for (const stND of plannedSteps.slice(lapWins.length)) {
             snapped.push({
               planned_step_id: stND?.id ?? null,
@@ -1572,7 +1565,8 @@ Deno.serve(async (req) => {
         } else {
           snapped = lapWins.map(([a, b], i) => {
             const row = execFromIdx(rows, a, b, 'lap', 'lap');
-            return { ...row, planned_label: `Lap ${i + 1}`, kind: 'lap', lap_number: i + 1, sample_idx_start: a, sample_idx_end: b };
+            const n = placed[i].L.number;
+            return { ...row, planned_label: `Lap ${n}`, kind: 'lap', lap_number: n, sample_idx_start: a, sample_idx_end: b };
           });
           snapMode = 'laps-unmatched';
         }
@@ -1817,11 +1811,11 @@ Deno.serve(async (req) => {
       const gap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1), pace);
 
       // Preserve raw laps so the client can optionally show "here's what your watch recorded"
-      const rawLaps = laps.length > 0 ? laps.map((L, i) => {
+      const rawLaps = laps.length > 0 ? laps.map((L) => {
         const [sIdx, eIdx] = windowIdxFromLap(rows, L);
         if (eIdx <= sIdx) return null;
         const lapInterval = execFromIdx(rows, sIdx, eIdx, 'lap', 'lap');
-        return { lap_number: i + 1, ...lapInterval };
+        return { lap_number: L.number, ...lapInterval };
       }).filter(Boolean) : [];
 
       const computed: any = {
