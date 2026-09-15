@@ -70,6 +70,20 @@ guard (Stage 6) enforces it.
 
 ---
 
+## 3a. Scope ruling (Michael, 2026-09-15, after Stage 1)
+
+**The north star is the standing-plan path:** anchors → composer → the week → the screens → logging → learning →
+checkpoint. The three plans on offer (Run + Strength · Ride + Strength · Run + Ride + Strength) are the blueprint;
+every later plan adopted from the book is a new frame in the composer plus its copy, and inherits this path. The
+book (`docs/SOURCE-viada-hybrid-athlete.md`) is the source; commercial practice fills its silences; anything else is
+marked ours. No bad maths, no competing data, anywhere on that path.
+
+**Scope is still the whole app.** Every screen and every item in `TRUTH-MAP.md` §8.0 is in, in this order:
+the standing-plan path first, then the rest of the screens, then the metric labels.
+
+**Parked (silent until reopened):** the race plan path and the season wizard — §8.0 items 28, 33, 34, 37, 38, 39, 40
+and the race-projection question in Stage 2. They are recorded with file and line and wait.
+
 ## 4. Stages — one terminal session each, in this order
 
 Every stage: **trace → report → Michael's go → build → throwaway-account check → commit exact files → deploy
@@ -125,7 +139,13 @@ each number equals the one server value, same on every screen. Report a table: n
 
 ## 5. Rules for every terminal
 
-- Read `CLAUDE.md`, this file, and `docs/TRUTH-MAP.md` §6 first.
+- Read `CLAUDE.md`, this file, and `docs/TRUTH-MAP.md` §6–§9 first.
+- **Fix what is there. Never build beside it (Michael, 2026-09-15: "a new feature, a new math, a whole new thing, as
+  opposed to fixing what was there" is how the mess started).** The report names the existing function, file and line
+  that already does the job and the one change it needs. The diff is edits and deletions. A new exported function,
+  file, table column or screen is refused unless the report says why the existing one cannot be changed and the PM
+  has agreed before the build. Two places become one by deleting one, never by adding a third that reads both. The PM
+  reviews the diff, not only the report.
 - **Trace before build.** Name what you searched; no "it doesn't exist" without the search.
 - **Plan before code.** Report, then wait for Michael's word **go**.
 - **Commit exact files. Never `git commit -a`** — other terminals share the tree.
@@ -164,9 +184,9 @@ each number equals the one server value, same on every screen. Report a table: n
 
 | Stage | State | Date | Notes |
 |---|---|---|---|
-| 0 Finish the map | not started | | |
-| 1 Verify the flags | not started | | |
-| 2 Book/commercial questions | not started | | |
+| 0 Finish the map | done — awaiting review | 2026-09-15 | `docs/TRUTH-MAP.md` §7: 514 rows over 7 screen groups; flags TWO 91 · PHONE 123 · NO-SRC 109 · LEDGER≠CODE 10; §7.0 lists two §6 citation errors; §7.9 = 8 rows re-read from code. Docs only, nothing committed. |
+| 1 Verify the flags | done — awaiting review | 2026-09-15 | `docs/TRUTH-MAP.md` §8: 481 flag lines re-opened — confirmed 308 · corrected 88 · struck 85 · unverified 4. §8.0 = 42 rank-A items (wrong or contradicting number visible today), grouped: unit/label 6 · metric-only 6 · two-screens 22 · data lost 4 · setup 2 · State 2. Docs only, nothing committed. |
+| 2 Book/commercial questions | accepted | 2026-09-15 | `docs/TRUTH-MAP.md` §9: five rulings (lift numbers · easy pace range 1.14–1.29 · provider avg HR · EF = NP ÷ whole-ride avg HR 2 dp · tested max nearest 5, athlete's Keep honoured). Three forks with recommendations. Q2 changes three athlete-facing lines (printed in §9). Race projection parked (§3a). Docs only, nothing committed. |
 | 3 Two places that disagree | not started | | |
 | 4 Maths off the phone | not started | | |
 | 5 Every number sourced | not started | | |

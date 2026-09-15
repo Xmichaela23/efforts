@@ -14,6 +14,14 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## QUEUED — SMART PLATE MATH IN THE LOGGER (Michael, 2026-09-15, "nice to have, don't get stuck on it")
+
+After the one-truth workorder's Stage 4 has touched the logger. The plate popover (`src/components/StrengthLogger.tsx:488-564`)
+works each set from scratch, greedy from the biggest plate, fixed rack 45/35/25/10/5/2.5 per side. Smart = read the
+set plan the server already sends (ramp + work sets) and pick each set's plates so what is on the bar stays and
+plates are only added; say so when a target needs a swap. Presentation only, no new number, stays on the phone.
+Missing input: the athlete's own rack (a Baselines field if wanted). Not a build until the workorder is through.
+
 ## ⏳ AWAITING MICHAEL — 2026-09-14 (look pass: sunrise on Home, space background on four screens — PUSHED, iOS synced, NOT device-checked)
 
 main = `ce546cd8`. No server functions touched. iOS synced from `ce546cd8`. Seen in the local browser only.
