@@ -955,7 +955,7 @@ Deno.serve(async (req) => {
     const workoutQueryTo = addDaysISO(asOfDate, 2);
     const { data: weekWorkoutsRows, error: wwErr } = await supabase
       .from('workouts')
-      .select('id,date,timestamp,type,name,workout_status,workload_actual,planned_id,computed,workout_analysis,workout_metadata,rpe,session_rpe,feeling,strength_exercises')
+      .select('id,date,timestamp,type,name,workout_status,workload_actual,planned_id,computed,workout_analysis,workout_metadata,rpe,session_rpe,feeling,strength_exercises,metrics,moving_time')
       .eq('user_id', userId)
       .gte('date', workoutQueryFrom)
       .lte('date', workoutQueryTo);

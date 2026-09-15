@@ -3,6 +3,7 @@
 // Behavior: deterministically detach a completed workout from a planned workout (both sides).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { requireUser } from '../_shared/require-user.ts';
+import { withUnattached } from '../_shared/unattached-planned.ts';
 
 /**
  * ⛔ UNATTACH RE-RUNS THE CHAIN, AS ATTACH DOES (2026-09-13, Michael, on a ride he had just unattached
@@ -62,7 +63,7 @@ Deno.serve(async (req) => {
     // Load workout to get user_id and current planned_id (source of truth).
     const { data: w, error: wErr } = await supabase
       .from('workouts')
-      .select('id,user_id,planned_id')
+      .select('id,user_id,planned_id,workout_metadata')
       .eq('id', String(workout_id))
       .maybeSingle();
 
@@ -115,7 +116,7 @@ Deno.serve(async (req) => {
     //     is the only entity still in existence — so there is nothing left to authorise against.
     //   · row EXISTS but belongs to someone else → still a hard 404. Unchanged.
     if (!p) {
-      await supabase.from('workouts').update({ planned_id: null }).eq('id', w.id).eq('user_id', w.user_id);
+      await supabase.from('workouts').update({ planned_id: null, workout_metadata: withUnattached(w.workout_metadata, pid) }).eq('id', w.id).eq('user_id', w.user_id);
       fireRecompute(String(w.id), String(w.user_id));
       return new Response(JSON.stringify({
         success: true,
@@ -133,8 +134,9 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 1) Clear workout side.
-    await supabase.from('workouts').update({ planned_id: null }).eq('id', w.id).eq('user_id', w.user_id);
+    // 1) Clear workout side, and remember the unattach so the recompute below does not link it back
+    //    (`_shared/unattached-planned.ts`).
+    await supabase.from('workouts').update({ planned_id: null, workout_metadata: withUnattached(w.workout_metadata, pid) }).eq('id', w.id).eq('user_id', w.user_id);
 
     // 2) Clear planned side ONLY if it points to this workout.
     if (String(p.completed_workout_id || '') === String(w.id)) {

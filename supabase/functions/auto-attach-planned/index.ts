@@ -10,6 +10,7 @@ import { strengthSessionsShareTheWork } from '../_shared/strength/match-exercise
 // for why it moved out of recompute-workout (this file's private `if run` copy was the bug).
 import { resolveAnalyzeEdgeFn } from '../_shared/analyze-routing.ts';
 import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
+import { unattachedPlannedIds, withoutUnattached } from '../_shared/unattached-planned.ts';
 
 function pctDiff(a: number, b: number): number { if (!(a>0) || !(b>0)) return Infinity; return Math.abs(a-b)/a; }
 
@@ -114,7 +115,7 @@ Deno.serve(async (req) => {
     console.log('[auto-attach-planned] Loading workout with ID:', workout_id);
     const { data: w, error: wErr } = await supabase
       .from('workouts')
-      .select('id,user_id,type,provider_sport,date,timestamp,distance,moving_time,avg_heart_rate,tss,intensity_factor,metrics,computed,planned_id,strength_exercises,mobility_exercises,workout_analysis,analysis_status')
+      .select('id,user_id,type,provider_sport,date,timestamp,distance,moving_time,avg_heart_rate,tss,intensity_factor,metrics,computed,planned_id,strength_exercises,mobility_exercises,workout_analysis,analysis_status,workout_metadata')
       .eq('id', workout_id)
       .maybeSingle();
     console.log('[auto-attach-planned] Query result - data:', w, 'error:', wErr);
@@ -239,6 +240,9 @@ Deno.serve(async (req) => {
         const updates: any = { 
           planned_id: String(plannedRow.id)
         };
+        // The athlete attached this one by hand: it leaves the unattached list (`_shared/unattached-planned.ts`).
+        const metaWithoutUnattach = withoutUnattached((w as any).workout_metadata, String(plannedRow.id));
+        if (metaWithoutUnattach) updates.workout_metadata = metaWithoutUnattach;
         
         // Only clear analysis if it's old/incomplete format (not if already complete)
         if (!hasNewFormatAnalysis) {
@@ -470,8 +474,15 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_candidates' }), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
+    // ⛔ A PLANNED SESSION THE ATHLETE UNATTACHED FROM THIS WORKOUT IS NEVER MATCHED AGAIN AUTOMATICALLY
+    // (`_shared/unattached-planned.ts`). Unattach runs the recompute, whose first step is this function.
+    const unattached = new Set(unattachedPlannedIds((w as any).workout_metadata));
     // Filter candidates by date/type match - normalize planned workout type the same way
     candidates = candidates.filter((p: any) => {
+      if (unattached.has(String(p?.id))) {
+        console.log('[auto-attach-planned] Candidate skipped, unattached by the athlete:', p.id);
+        return false;
+      }
       const pdate = String((p as any).date || '').slice(0,10);
       const plannedTypeNormalized = sportSubtype((p as any).type).sport;
       const matches = dateOk(p) && plannedTypeNormalized === finalSport;

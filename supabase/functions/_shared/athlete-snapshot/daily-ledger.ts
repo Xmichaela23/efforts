@@ -5,6 +5,7 @@
 // For each day: what was planned, what happened, and how they compare.
 // =============================================================================
 
+import { completedMovingSeconds } from '../moving-seconds.ts';
 import type {
   LedgerDay,
   PlannedSession,
@@ -203,8 +204,12 @@ function parseStrengthExercisesField(raw: unknown): any[] {
 // ---------------------------------------------------------------------------
 
 export function buildActualSession(row: any, imperial: boolean): ActualSession {
+  // ⛔ THE ONE MOVING TIME (2026-09-15, Michael: Duration "30 of 48 min" beside plan context "29 of 48 min"
+  // on one run). This read the whole-minute `moving_time` column while the Duration chip read the true
+  // moving seconds; both now come from `completedMovingSeconds`. The minute columns stay the last resort.
   const durRaw = Number(row?.moving_time) || Number(row?.duration) || null;
-  const durSec = durRaw != null ? (durRaw < 1000 ? Math.round(durRaw * 60) : Math.round(durRaw)) : null;
+  const durSec = completedMovingSeconds(row)
+    ?? (durRaw != null ? (durRaw < 1000 ? Math.round(durRaw * 60) : Math.round(durRaw)) : null);
   const distKm = Number(row?.distance) || null;
   const distM = distKm != null ? Math.round(distKm * 1000) : null;
   const avgHr = Number(row?.avg_hr) || Number(row?.average_heartrate) || null;

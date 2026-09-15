@@ -7,6 +7,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { planLine } from '../_shared/plan-line.ts';
 import { weekStartOf } from '../_shared/plan-week.ts';
 import { buildDailyLedger, buildPlannedSession } from '../_shared/athlete-snapshot/daily-ledger.ts';
+import { unattachedPlannedIds } from '../_shared/unattached-planned.ts';
 import { buildBodyResponse } from '../_shared/athlete-snapshot/body-response.ts';
 import { buildSessionDetailV1 } from '../_shared/session-detail/build.ts';
 import { resolveSwimScalars } from '../_shared/swim/swim-scalars.ts';
@@ -157,6 +158,12 @@ function isSessionDetailStale(workoutRow: { updated_at?: string | null; planned_
   //
   // ⛔ BUMP `BLOCK_CARD_VERSION` WHENEVER A FIELD IS ADDED TO THE CARD OR TO `strength_all_out`.
   // A stored copy below the current version refreshes exactly once, then serves from cache.
+  // 2026-09-15 — a saved copy built with a plan the athlete has since unattached. Gated on the unattached
+  // list, not on a bare "no link": a run with no link can still carry the same-day plan through the week
+  // ledger's pairing, and that copy would refresh on every open.
+  const savedPlannedId = String((sessionDetail as any)?.plan_context?.planned_id ?? '');
+  if (savedPlannedId && !(workoutRow as any)?.planned_id && unattachedPlannedIds((workoutRow as any)?.workout_metadata).includes(savedPlannedId)) return true;
+
   const bcv = Number((sessionDetail as any)?.block_v);
   if ((workoutRow as any)?.planned_id && (!Number.isFinite(bcv) || bcv < BLOCK_CARD_VERSION)) return true;
 
@@ -510,7 +517,7 @@ async function runSessionDetailPipelineAndPersist(
         .lte('date', weekEndDate),
       supabase
         .from('workouts')
-        .select('id,date,timestamp,type,name,workout_status,workload_actual,planned_id,computed,workout_analysis,workout_metadata,rpe,moving_time,duration,distance,avg_heart_rate,strength_exercises')
+        .select('id,date,timestamp,type,name,workout_status,workload_actual,planned_id,computed,workout_analysis,workout_metadata,rpe,metrics,moving_time,duration,distance,avg_heart_rate,strength_exercises')
         .eq('user_id', userId)
         .gte('date', weekStartDate)
         .lte('date', weekEndDate),
@@ -602,6 +609,12 @@ async function runSessionDetailPipelineAndPersist(
     const ledgerDay = dailyLedger.find((d) => d.date === workoutDate) ?? null;
     const actualSession = ledgerDay?.actual.find((a) => a.workout_id === id) ?? null;
     let match = ledgerDay?.matches.find((m) => m.workout_id === id) ?? null;
+    // ⛔ THE WEEK LEDGER PAIRS ONE PLANNED AND ONE DONE SESSION OF A SPORT ON A DAY BY TYPE ALONE, so after an
+    // Unattach it still handed this session its plan and the plan context row stayed. A planned session the
+    // athlete unattached from this workout is not its plan (`_shared/unattached-planned.ts`).
+    if (match?.planned_id && !(row?.planned_id) && unattachedPlannedIds(row?.workout_metadata).includes(String(match.planned_id))) {
+      match = null;
+    }
     let plannedSession = match?.planned_id
       ? ledgerDay?.planned.find((p) => p.planned_id === match.planned_id) ?? null
       : null;
