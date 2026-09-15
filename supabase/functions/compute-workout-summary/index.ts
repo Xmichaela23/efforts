@@ -383,9 +383,18 @@ function gradesFor(rows:any[]): number[] | null {
   return _runGradesCache.get(rows) ?? null;
 }
 /** Grade-adjusted pace for rows sIdx..eIdx, against the pace shown for that stretch. */
+/**
+ * OURS — no grade-adjusted pace on a row shorter than 400 m (2026-09-14, Michael). No app publishes a minimum, but
+ * Strava notes "the difference between GAP and actual pace generally becomes larger as the grade steepens"
+ * (support.strava.com/en-us/articles/15402117-grade-adjusted-pace-gap), and over a short row one steep stretch is
+ * most of it. Applies to every row this step writes: reps, laps, recoveries, splits of a lap.
+ */
+const GAP_MIN_ROW_M = 400;
 function gapSecPerMi(rows:any[], sIdx:number, eIdx:number, paceSecPerMi:number|null) {
   try {
     if (!Array.isArray(rows) || rows.length < 2) return null;
+    const meters = Math.max(0, (rows[Math.min(Math.floor(eIdx), rows.length - 1)]?.d || 0) - (rows[Math.max(0, Math.floor(sIdx))]?.d || 0));
+    if (meters < GAP_MIN_ROW_M) return null;
     return gapSecPerMiBetween(rows, gradesFor(rows), Math.max(0, Math.floor(sIdx)), Math.floor(eIdx), paceSecPerMi);
   } catch (err:any) {
     try { console.error('Exact error location: gapSecPerMi', { error: err?.message }); } catch {}
