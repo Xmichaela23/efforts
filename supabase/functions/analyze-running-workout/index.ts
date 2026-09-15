@@ -648,7 +648,13 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         )
       : (computedOnlyIntervals.length > 0 ? 'unlinked-sensor-primary' : 'unlinked-planned-fallback');
 
-    const computedIntervals = isPlanLinkedWorkout
+    // ⛔ UNMATCHED WATCH LAPS ARE THE ROWS (2026-09-14). The plan's steps cannot be paired with them, and a plan step
+    // reads as "measured" above because its PLANNED duration sits in `duration_s` — so without this the analyzer
+    // chose 46 unexecuted plan steps and printed no rows at all.
+    const lapsUnmatched = String((workout as any)?.computed?.alignment_mode || '') === 'laps-unmatched' && computedOnlyIntervals.length > 0;
+    const computedIntervals = lapsUnmatched
+      ? computedOnlyIntervals
+      : isPlanLinkedWorkout
       ? (
           plannedHasMeasuredEvidence
             ? plannedStructuredIntervals
