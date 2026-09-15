@@ -11,17 +11,23 @@
  *   · runners with "at least 24 activities logged during this period"
  *   · no heart-rate check: the paper had none, and the straightness of the distance-time line is its support.
  *
+ * GRADE-ADJUSTED PACE ON EVERY EFFORT, NO MINIMUM LENGTH (Michael, 2026-09-14, final). The paper used grade-adjusted
+ * pace; so do the field's tools on any stretch of any length — TrainingPeaks' Normalized Graded Pace ("what your speed
+ * would have been if you ran on flat terrain", trainingpeaks.com/learn/articles/what-is-normalized-graded-pace) and
+ * Garmin's Grade Adjusted Pace ("your equivalent running pace at the same effort on flat ground … depending on the
+ * current gradient", support.garmin.com FAQ BAoTNwybG874OFTrWhzlq8). The metres are the ones `_shared/run-pace.ts`
+ * weights by grade; a run with no usable elevation keeps its metres as run. Timing is moving seconds.
+ *
  * WHERE THIS DIFFERS FROM THE PAPER, EACH MARKED OURS (docs/STATE-SOURCES.md):
- *   · RAW PACE, not grade-adjusted (Michael, 2026-09-14). The paper smoothed grade over 100 m; the app works
- *     grade out every second, and on a short hilly stretch that read a 400 m in 1:26 whose raw time was 2:54.
- *     Downhill is refused instead: net descent steeper than 1% of the effort's distance (course-measurement
- *     practice: 1 m/km of net drop ends record eligibility).
+ *   · Net descent steeper than 1% of the effort's distance is refused (course-measurement practice: 1 m/km of net
+ *     drop ends record eligibility).
  *   · THE BEST 45 MINUTES IS A SEVENTH POINT, and only when that window was hard: average heart rate at or above
  *     95% of threshold heart rate, the floor of Friel's run Zone 4 "threshold" (`friel-zones.ts`). The window is
  *     TrainingPeaks' threshold read ("Peak 45 Min Average Pace", trainingpeaks.com/blog/are-you-using-
  *     threshold-improvement-notifications); here it is one point on the line, never an override.
- *   · The checks on the fit: efforts on at least two different days, longer efforts not faster, R² ≥ 0.95,
- *     D′ 30–600 m, and at least 4% faster than the measured easy pace.
+ *   · The checks on the fit: efforts from at least two different runs, R² ≥ 0.95, D′ 30–600 m, and at least 4%
+ *     faster than the measured easy pace. There is no heart-rate check on the distance efforts and no check that
+ *     longer efforts are slower — the paper has neither; the straight line is the check.
  *
  * ⚠️ CRITICAL SPEED IS TAKEN AS THE THRESHOLD PACE, UNSCALED. It sits a few percent above maximal lactate steady
  * state; the swim already shows its critical speed as threshold. The ride's 0.97 × critical power has no run
@@ -148,12 +154,6 @@ export function fitRunThresholdFromBestEfforts(
   const days = new Set(pts.map((p) => p.date));
   if (days.size < 2) return abstain('every effort came from one run — a line needs efforts on different days', pts);
 
-  for (let i = 1; i < pts.length; i++) {
-    const prev = pts[i - 1].timeS / pts[i - 1].distanceM;
-    const cur = pts[i].timeS / pts[i].distanceM;
-    if (cur < prev - 0.002) return abstain('a longer effort came out faster than a shorter one — not a clean speed-duration line', pts);
-  }
-
   // ── distance = CS · time + D′ ──
   const n = pts.length;
   const mx = pts.reduce((a, p) => a + p.timeS, 0) / n;
@@ -200,7 +200,7 @@ export function fitRunThresholdFromBestEfforts(
  * The fastest stretch at each target distance inside one run, timed on MOVING seconds (`_shared/run-pace.ts`),
  * so a stop at a light does not slow the effort. Heart rate and net elevation ride along for the fit's checks.
  *
- * @param distanceM      cumulative metres, one entry per sample
+ * @param distanceM      cumulative GRADE-ADJUSTED metres, one entry per sample (`cumulativeFlatMeters`)
  * @param movingTimeS    cumulative moving seconds, same length
  * @param hrBpm          heart rate per sample; null where the trace dropped out
  * @param elevationM     elevation per sample; null where the device reports none

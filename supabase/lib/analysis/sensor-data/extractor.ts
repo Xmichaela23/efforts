@@ -225,13 +225,16 @@ export function normalizeSamples(samplesIn: any[]): Array<{ t:number; d:number; 
   const out: Array<{ t:number; d:number; elev?:number; hr?:number; cad_spm?:number; cad_rpm?:number; power_w?:number; v_mps?:number }> = [];
     for (let i=0;i<samplesIn.length;i+=1) {
       const s = samplesIn[i] || {} as any;
+      // ⛔ GARMIN'S SHORT FIELD NAMES (2026-09-14). Some Garmin rows store `timerDuration` / `clockDuration` and
+      // `elevation` instead of the `...InSeconds` / `elevationInMeters` names. Unread, time fell to the sample's
+      // position in the list (so a watch pause vanished) and elevation had to be borrowed from the GPS track.
       const t = Number(
-        s.timerDurationInSeconds ?? s.clockDurationInSeconds ?? s.elapsed_s ?? s.offsetInSeconds ?? s.startTimeInSeconds ?? i
+        s.timerDurationInSeconds ?? s.timerDuration ?? s.clockDurationInSeconds ?? s.clockDuration ?? s.elapsed_s ?? s.offsetInSeconds ?? s.startTimeInSeconds ?? i
       );
       const d = Number(
         s.totalDistanceInMeters ?? s.distanceInMeters ?? s.cumulativeDistanceInMeters ?? s.totalDistance ?? s.distance
       );
-      const elev = (typeof s.elevationInMeters === 'number' && s.elevationInMeters) || (typeof s.altitudeInMeters === 'number' && s.altitudeInMeters) || (typeof s.altitude === 'number' && s.altitude) || undefined;
+      const elev = (typeof s.elevationInMeters === 'number' && s.elevationInMeters) || (typeof s.altitudeInMeters === 'number' && s.altitudeInMeters) || (typeof s.altitude === 'number' && s.altitude) || (typeof s.elevation === 'number' && s.elevation) || undefined;
       const hr = (typeof s.heartRate === 'number' && s.heartRate) || (typeof s.heart_rate === 'number' && s.heart_rate) || (typeof s.heartRateInBeatsPerMinute === 'number' && s.heartRateInBeatsPerMinute) || undefined;
     const genericCad = typeof s.cadence === 'number' && Number.isFinite(s.cadence) ? s.cadence : undefined;
     const hasBikeCadField = (typeof s.bikeCadenceInRPM === 'number' && s.bikeCadenceInRPM)

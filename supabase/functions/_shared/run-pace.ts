@@ -12,7 +12,8 @@
  *   are active … Strava will generally prioritize moving time and pace based on moving time"; a run
  *   tagged as a race uses elapsed time (that rule is unchanged, `_shared/moving-seconds.ts`):
  *   support.strava.com/hc/en-us/articles/115001188684-Moving-Time-Speed-and-Pace-Calculations
- * - Grade-adjusted pace: Minetti et al. 2002, the cost curve and per-sample grade in `./gap.ts`.
+ * - Grade-adjusted pace: Minetti et al. 2002, the cost curve in `./gap.ts`; grade over 100 m (Smyth & Muniz-Pumares
+ *   2020, `GRADE_WINDOW_M` below).
  * - Drift: Viada p107 — a session "is terminated when cardiac drift reaches 10 percent", 5 percent for
  *   hybrid athletes. "Reaches" — 5.0% is at the line.
  * - "Inside the range" has no allowance; the book prints none (docs/SOURCE-viada-hybrid-athlete.md,
@@ -24,7 +25,7 @@
  * - A jump of more than 60 s between two samples is a recording break and counts as stopped. The summary
  *   step's existing cap, moved here unchanged.
  */
-import { computeSampleGrades, hasUsableElevation, paceToGAP } from './gap.ts';
+import { hasUsableElevation, paceToGAP } from './gap.ts';
 
 const METERS_PER_MILE = 1609.34;
 
@@ -106,11 +107,45 @@ export function runMovingSeconds(
   return counted > 0 ? Math.round(counted) : null;
 }
 
-/** Per-sample grades for the whole run, or null when the run has no usable elevation. Compute once per run. */
+/**
+ * THE GRADE WINDOW: 100 METRES (2026-09-14, Michael). Smyth & Muniz-Pumares 2020 (Med Sci Sports Exerc
+ * 52:2637) took "elevation data sampled every 100 m" and "computed pacing and grade-adjusted pacing at 100 m
+ * intervals". Grade over a few seconds reads GPS and barometer noise as hills: a 400 m on 13 Aug went from 2:54
+ * raw to 1:26 adjusted on a 30-sample window. Each sample's grade is the elevation change across the 100 m of
+ * running centred on it (50 m either side, shorter only at the start and end of the run), capped at ±45% as in
+ * `./gap.ts`.
+ */
+export const GRADE_WINDOW_M = 100;
+
+/** Per-sample grades in percent for the whole run, or null when the run has no usable elevation. Compute once per run. */
 export function runGrades(samples: ReadonlyArray<RunSample>): number[] | null {
   const view = samples.map((x) => ({ elevation_m: num(x?.elev), distance_m: num(x?.d) }));
   if (!hasUsableElevation(view)) return null;
-  return computeSampleGrades(view);
+  const n = samples.length;
+  // Cumulative distance, never decreasing; elevation carried forward over gaps.
+  const dist = new Array<number>(n).fill(0);
+  const elev = new Array<number | null>(n).fill(null);
+  let lastD = 0, lastE: number | null = null;
+  for (let i = 0; i < n; i += 1) {
+    const d = num(samples[i]?.d);
+    lastD = d != null && d >= lastD ? d : lastD;
+    dist[i] = lastD;
+    const e = num(samples[i]?.elev);
+    if (e != null) lastE = e;
+    elev[i] = lastE;
+  }
+  const half = GRADE_WINDOW_M / 2;
+  const grades = new Array<number>(n).fill(0);
+  let lo = 0, hi = 0;
+  for (let i = 0; i < n; i += 1) {
+    while (lo < i && dist[i] - dist[lo + 1] >= half) lo += 1;
+    if (hi < i) hi = i;
+    while (hi < n - 1 && dist[hi] - dist[i] < half) hi += 1;
+    const span = dist[hi] - dist[lo];
+    const a = elev[lo], b = elev[hi];
+    if (a != null && b != null && span > 5) grades[i] = Math.max(-45, Math.min(45, ((b - a) / span) * 100));
+  }
+  return grades;
 }
 
 /**
@@ -181,6 +216,31 @@ export function cumulativeMovingSeconds(samples: ReadonlyArray<RunSample>): numb
     if (t1 != null && t0 != null) {
       const dt = t1 - t0;
       if (dt > 0 && dt <= SAMPLE_BREAK_S && speedAt(samples, i, dt) >= STOPPED_BELOW_MPS) add = dt;
+    }
+    out[i] = out[i - 1] + add;
+  }
+  return out;
+}
+
+/**
+ * Cumulative grade-adjusted metres at each sample: each moving metre weighted by the Minetti cost of its grade,
+ * the same weighting as `gapSecPerMiBetween`. Without usable elevation (`grades` null) the metres stay as run.
+ */
+export function cumulativeFlatMeters(samples: ReadonlyArray<RunSample>, grades: ReadonlyArray<number> | null): number[] {
+  const out = new Array<number>(samples.length).fill(0);
+  for (let i = 1; i < samples.length; i += 1) {
+    const t1 = num(samples[i]?.t);
+    const t0 = num(samples[i - 1]?.t);
+    let add = 0;
+    if (t1 != null && t0 != null) {
+      const dt = t1 - t0;
+      if (dt > 0 && dt <= SAMPLE_BREAK_S && speedAt(samples, i, dt) >= STOPPED_BELOW_MPS) {
+        const d1 = num(samples[i]?.d);
+        const d0 = num(samples[i - 1]?.d);
+        const dm = d1 != null && d0 != null ? Math.max(0, d1 - d0) : speedAt(samples, i, dt) * dt;
+        const g = grades && Number.isFinite(grades[i]) ? grades[i] : 0;
+        add = grades ? dm * (1000 / paceToGAP(1000, g)) : dm;
+      }
     }
     out[i] = out[i - 1] + add;
   }

@@ -13,7 +13,7 @@ import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 import { resolveCurrentMaxHr } from '../../../src/lib/resolve-current-max-hr.ts';
 import { powerZoneBoundaries as powerZoneBoundariesFor } from '../_shared/endurance/display-zones.ts';
 import { runEasyZone3FloorBpm } from '../_shared/easy-hr.ts';
-import { cumulativeMovingSeconds, gapSecPerMiBetween, movingSecondsBetween, runGrades, runMovingSeconds } from '../_shared/run-pace.ts';
+import { cumulativeFlatMeters, cumulativeMovingSeconds, gapSecPerMiBetween, movingSecondsBetween, runGrades, runMovingSeconds } from '../_shared/run-pace.ts';
 import { isIndoorSession } from '../_shared/indoor-session.ts';
 import { buildDisplaySeriesColumn } from './display-series.ts';
 // The bike FTP estimator's two per-ride substrates: the widened power-curve durations and the
@@ -2069,7 +2069,11 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
        * can decide whether the effort was hard and whether it was downhill. Deciding here would put
        * the gates in the one place that can only see a single activity.
        */
-      paceCurve = buildRunPaceCurve(distance_m, time_s, hr_bpm, elevation_m);
+      // ⛔ GRADE-ADJUSTED METRES ON MOVING SECONDS (2026-09-14): the threshold suggestion reads every effort on
+      // grade-adjusted pace (`src/lib/run-critical-speed.ts`). No usable elevation → the metres as run.
+      const flatCum = runView ? cumulativeFlatMeters(runView, runGr) : null;
+      const movingCum = runView ? cumulativeMovingSeconds(runView) : null;
+      paceCurve = flatCum && movingCum ? buildRunPaceCurve(flatCum, movingCum, hr_bpm, elevation_m) : buildRunPaceCurve(distance_m, time_s, hr_bpm, elevation_m);
       if (paceCurve) {
         console.log(`🏃 Pace curve: ${Object.keys(paceCurve).join(', ')}s windows`);
       }
@@ -2079,7 +2083,7 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
       hrCurve = buildRunHrCurve(time_s, hr_bpm);
       // The fastest moving time over 400 m to 5 km — the efforts the threshold suggestion is fitted from
       // (Smyth & Muniz-Pumares 2020; `src/lib/run-critical-speed.ts`).
-      if (runView) runDistanceBests = buildRunDistanceBests(distance_m, cumulativeMovingSeconds(runView), hr_bpm, elevation_m);
+      if (flatCum && movingCum) runDistanceBests = buildRunDistanceBests(flatCum, movingCum, hr_bpm, elevation_m);
     }
 
     // Build partial computed data (only what this function writes)

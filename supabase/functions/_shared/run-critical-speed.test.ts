@@ -88,10 +88,10 @@ Deno.test('the best 45 minutes counts only when its heart rate reached 95% of th
   assertEquals(fitRunThresholdFromBestEfforts(history({ hard45: { distanceM: CS * 2700 + DP, avgHr: 200 } }), AS_OF, null, null).nPoints, 6);
 });
 
-Deno.test('a longer effort faster than a shorter one: no suggestion', () => {
+Deno.test('no order check: a 1000 m a touch faster than the 800 m still fits (the paper has no such check)', () => {
   const runs = history();
-  runs[5].distanceBests = { '5000': { distanceM: 5000, timeS: 1000, avgHr: 160, netAscentM: 0 } };   // 5 m/s over 5 km
-  assertEquals(fitRunThresholdFromBestEfforts(runs, AS_OF, LTHR, null).csSecPerKm, null);
+  runs[2].distanceBests = { '1000': { distanceM: 1000, timeS: timeFor(CS, DP, 1000) - 5, avgHr: 160, netAscentM: 0 } };
+  assert(fitRunThresholdFromBestEfforts(runs, AS_OF, LTHR, null).csSecPerKm != null);
 });
 
 Deno.test('all efforts from one run: no suggestion', () => {

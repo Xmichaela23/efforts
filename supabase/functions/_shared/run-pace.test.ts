@@ -92,3 +92,16 @@ Deno.test('drift of 5.0% has reached the line (p107 "reaches")', () => {
   assertEquals(driftReachesLine(-2), false);
   assertEquals(driftReachesLine(null), false);
 });
+
+Deno.test('grade is read over 100 m, so a few metres of elevation noise is not a hill', () => {
+  // Flat 400 m with a 3 m barometer spike lasting 12 m in the middle. A 30-sample window read it as a 20% hill.
+  // (a climb later in the run gives it the 5 m of range that counts as usable elevation)
+  const s = run(Array(300).fill(3), (i) => (i >= 65 && i <= 68 ? 103 : i > 150 ? 100 + (i - 150) * 0.1 : 100));
+  const g = runGrades(s)!;
+  const peak = Math.max(...g.slice(40, 95).map(Math.abs));
+  assert(peak <= 3.5, `a 3 m spike read as a ${peak.toFixed(1)}% grade`);
+  // A real 10% hill still reads about 10% in the middle of it.
+  const up = run(Array(200).fill(3), (i) => 100 + i * 0.3);
+  const gu = runGrades(up)!;
+  assertAlmostEquals(gu[100], 10, 0.5);
+});
