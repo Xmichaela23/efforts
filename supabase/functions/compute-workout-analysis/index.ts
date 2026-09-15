@@ -2,7 +2,8 @@
 // @ts-nocheck
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { withAlarm } from '../_shared/alarm.ts';
-import { normalizedPowerW, pedalingAveragePowerW, powerStreamW } from '../_shared/ride-power.ts';
+import { judgedPowerW, normalizedPowerW, pedalingAveragePowerW, powerStreamW } from '../_shared/ride-power.ts';
+import { getOverallAvgHr } from '../_shared/fact-packet/queries.ts';
 import { buildRunDistanceBests, buildRunPaceCurve, buildRunHrCurve, type RunDistanceBests, type RunPaceCurve, type RunHrCurve } from '../../../src/lib/run-critical-speed.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
 import { normalizeSamples } from '../../lib/analysis/sensor-data/extractor.ts';
@@ -978,7 +979,7 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
       .from('workouts')
       // name, provider_sport, strava_data, start_position_lat: the indoor rule (no grade or VAM series indoors).
       // elevation_gain, elevation_loss, metrics: the recorded totals the running climb ends on (audit H-D03).
-      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed, date, timestamp, swim_data, pool_length, number_of_active_lengths, distance, moving_time, avg_speed, avg_pace, planned_id, threshold_heart_rate, default_max_heart_rate, name, provider_sport, strava_data, start_position_lat, elevation_gain, elevation_loss, metrics')
+      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed, date, timestamp, swim_data, pool_length, number_of_active_lengths, distance, avg_heart_rate, moving_time, avg_speed, avg_pace, planned_id, threshold_heart_rate, default_max_heart_rate, name, provider_sport, strava_data, start_position_lat, elevation_gain, elevation_loss, metrics')
       .eq('id', workout_id)
       .maybeSingle();
     if (wErr) throw wErr;
@@ -1567,8 +1568,14 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
       // HR-at-power + aerobic decoupling (design Build Order #4). Rides only;
       // pairs the index-aligned hr_bpm/power_watts/time_s series. Pure logic in
       // _shared/cycling-v1/ride-physiology.ts.
+      // ⛔ §9 Q4 (2026-09-15): judged power (the §2 rule) ÷ the ride's one average heart rate
+      // (`getOverallAvgHr`, provider first), 2 dp. compute-facts copies this; State and Performance agree.
       efficiency: (isRide && hasRows)
-        ? (computeRideEfficiency(time_s, hr_bpm, power_watts, normalizedPower) ?? undefined)
+        ? (computeRideEfficiency(
+            time_s, hr_bpm, power_watts,
+            judgedPowerW(powerStreamW(rows.map((r) => r.power_w)), time_s.length >= 2 ? (time_s[time_s.length - 1] - time_s[0]) : 0).watts,
+            getOverallAvgHr(w),
+          ) ?? undefined)
         : undefined,
       // VAM / climbing rate (design Build Order #5). Rides only.
       climbing: (isRide && hasRows)

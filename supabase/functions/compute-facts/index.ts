@@ -1261,9 +1261,11 @@ function buildRideFacts(w: WorkoutRow, baselines: Baselines | null): Record<stri
     facts.intensity_factor = Math.round((facts.normalized_power / ftp) * 100) / 100;
   }
 
-  if (facts.normalized_power && facts.avg_hr && facts.avg_hr > 0) {
-    facts.efficiency_factor = Math.round((facts.normalized_power / facts.avg_hr) * 100) / 100;
-  }
+  // ⛔ ONE EFFICIENCY FACTOR (2026-09-15, TRUTH-MAP §9 Q4): the analyser's number, copied as stored —
+  // judged power ÷ the ride's one average heart rate, 2 dp (`cycling-v1/ride-physiology.ts`). This used to
+  // divide here too, on the provider's NP, while Performance printed the analyser's pedaling-HR version.
+  const storedEf = toNum(analysis.efficiency?.efficiency_factor);
+  if (storedEf != null && storedEf > 0) facts.efficiency_factor = storedEf;
 
   const rideHrZoneData = analysis.zones?.hr;
   if (rideHrZoneData?.bins && Array.isArray(rideHrZoneData.bins)) {

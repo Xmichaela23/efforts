@@ -68,38 +68,40 @@ Deno.test('efficiency: fewer than 60 paired pedaling samples → null', () => {
   const t = Array.from({ length: 40 }, (_, i) => i);
   const hr = t.map(() => 140);
   const p = t.map(() => 200);
-  assertEquals(computeRideEfficiency(t, hr, p, null), null);
+  assertEquals(computeRideEfficiency(t, hr, p, 200, 140), null);
 });
 
-Deno.test('efficiency: steady ride, no NP → EF = avgPower/avgHR, no decoupling under 20 min', () => {
+Deno.test('efficiency (§9 Q4): EF = judged power ÷ whole-ride average HR, 2 dp; no decoupling under 20 min', () => {
   const t = Array.from({ length: 100 }, (_, i) => i); // 99 s span < 1200
   const hr = t.map(() => 140);
   const p = t.map(() => 210);
-  const r = computeRideEfficiency(t, hr, p, null)!;
+  const r = computeRideEfficiency(t, hr, p, 210, 140)!;
   assert(r);
   assertEquals(r.efficiency_factor, 1.5); // 210/140
   assertEquals(r.avg_pedaling_power_w, 210);
-  assertEquals(r.avg_pedaling_hr_bpm, 140);
   assertEquals(r.aerobic_decoupling_pct, undefined); // span < 1200 s
 });
 
-Deno.test('efficiency: NP provided → EF uses NP/HR (not avg power)', () => {
+Deno.test('efficiency (§9 Q4): rounds to 2 dp', () => {
   const t = Array.from({ length: 100 }, (_, i) => i);
-  const hr = t.map(() => 150);
-  const p = t.map(() => 200);
-  const r = computeRideEfficiency(t, hr, p, 240)!;
-  assertEquals(r.efficiency_factor, 1.6); // 240/150, not 200/150
+  const r = computeRideEfficiency(t, t.map(() => 150), t.map(() => 200), 241, 151)!;
+  assertEquals(r.efficiency_factor, 1.6); // 241/151 = 1.596 → 1.60
 });
 
-Deno.test('efficiency: coasting (power 0) samples excluded from the read', () => {
-  // 80 pedaling @ 200W/140bpm + 80 coasting @ 0W/120bpm. Coasting must not
-  // drag avg HR down or count toward the sample floor incorrectly.
+Deno.test('efficiency (§9 Q4): denominator is the passed whole-ride average, not the pedaling-only mean', () => {
+  // 80 pedaling @ 200W/140bpm + 80 coasting @ 0W/120bpm. Whole-ride average HR 130 is what divides.
   const t = Array.from({ length: 160 }, (_, i) => i);
   const p = t.map((_, i) => (i < 80 ? 200 : 0));
   const hr = t.map((_, i) => (i < 80 ? 140 : 120));
-  const r = computeRideEfficiency(t, hr, p, null)!;
-  assertEquals(r.avg_pedaling_hr_bpm, 140); // coasting 120s ignored
-  assertEquals(r.avg_pedaling_power_w, 200);
+  const r = computeRideEfficiency(t, hr, p, 100, 130)!;
+  assertEquals(r.efficiency_factor, 0.77); // 100/130
+});
+
+Deno.test('efficiency (§9 Q4): no average HR → no efficiency factor, decoupling still read', () => {
+  const t = Array.from({ length: 1400 }, (_, i) => i);
+  const r = computeRideEfficiency(t, t.map(() => 145), t.map(() => 200), 200, null)!;
+  assertEquals(r.efficiency_factor, null);
+  assertEquals(r.aerobic_decoupling_pct, 0);
 });
 
 Deno.test('efficiency: ≥20 min span → aerobic_decoupling_pct; positive when HR drifts up at held power', () => {
@@ -108,7 +110,7 @@ Deno.test('efficiency: ≥20 min span → aerobic_decoupling_pct; positive when 
   const t = Array.from({ length: 1400 }, (_, i) => i);
   const p = t.map(() => 200);
   const hr = t.map((_, i) => (i < 700 ? 140 : 154));
-  const r = computeRideEfficiency(t, hr, p, null)!;
+  const r = computeRideEfficiency(t, hr, p, 200, 147)!;
   assert(typeof r.aerobic_decoupling_pct === 'number');
   // r1 = 200/140 = 1.4286 ; r2 = 200/154 = 1.2987 ; (r1-r2)/r1 ≈ 9.1%
   assert(r.aerobic_decoupling_pct! > 8 && r.aerobic_decoupling_pct! < 10);
@@ -118,7 +120,7 @@ Deno.test('efficiency: held HR + held power over 20 min → ~0% decoupling', () 
   const t = Array.from({ length: 1400 }, (_, i) => i);
   const p = t.map(() => 200);
   const hr = t.map(() => 145);
-  const r = computeRideEfficiency(t, hr, p, null)!;
+  const r = computeRideEfficiency(t, hr, p, 200, 147)!;
   assertEquals(r.aerobic_decoupling_pct, 0);
 });
 

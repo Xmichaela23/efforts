@@ -13,8 +13,12 @@
  *
  * Conservative thresholds (documented; the doc gives intent, sports-science
  * fixes the formulas):
- *  - efficiency: pedaling-only (power>0) so coasting HR doesn't dilute the read;
- *    needs >= 60 paired pedaling samples.
+ *  - efficiency factor (2026-09-15, TRUTH-MAP §9 Q4): the ride's judged power (`_shared/ride-power.ts
+ *    judgedPowerW` — normalized power for >= 20 min, else average, coasting at 0 W) ÷ the ride's ONE
+ *    average heart rate (`fact-packet/queries.ts getOverallAvgHr`, the provider's average), 2 dp. FIELD —
+ *    TrainingPeaks EF ("average heart rate for the workout"), intervals.icu. The pedaling-only HR
+ *    denominator is gone: no vendor divides by it, and it made Performance disagree with State.
+ *    compute-facts copies this number; it does not recompute it. Still needs >= 60 paired samples.
  *  - aerobic decoupling: Friel first-half vs second-half power:HR ratio; only
  *    emitted when the paired pedaling span >= 20 min (1200 s), else interval
  *    structure is conflated with drift. Positive % = HR drifted up relative to
@@ -24,11 +28,10 @@
  */
 
 export type RideEfficiency = {
-  /** NP/HR when NP available (standard EF), else avg pedaling power / avg HR.
+  /** Judged power ÷ whole-ride average heart rate, 2 dp (see header). Null when either is missing.
    *  Higher = more aerobic output per heartbeat; comparable over time. */
-  efficiency_factor: number;
+  efficiency_factor: number | null;
   avg_pedaling_power_w: number;
-  avg_pedaling_hr_bpm: number;
   /** Friel aerobic decoupling %. Present only for steady efforts >= 20 min. */
   aerobic_decoupling_pct?: number;
 };
@@ -113,7 +116,8 @@ export function computeRideEfficiency(
   timeS: ReadonlyArray<number>,
   hrBpm: ReadonlyArray<number | null>,
   powerW: ReadonlyArray<number | null>,
-  normalizedPower: number | null,
+  judgedPowerW: number | null,
+  avgHrBpm: number | null,
 ): RideEfficiency | null {
   const n = Math.min(timeS.length, hrBpm.length, powerW.length);
   const ped: Array<{ t: number; hr: number; p: number }> = [];
@@ -126,16 +130,12 @@ export function computeRideEfficiency(
     }
   }
   if (ped.length < 60) return null;
-  const avgHr = mean(ped.map((x) => x.hr));
   const avgP = mean(ped.map((x) => x.p));
-  if (!(avgHr > 0)) return null;
-  const numer = (normalizedPower != null && Number.isFinite(normalizedPower) && normalizedPower > 0)
-    ? normalizedPower
-    : avgP;
+  const judged = Number(judgedPowerW);
+  const hr = Number(avgHrBpm);
   const out: RideEfficiency = {
-    efficiency_factor: Math.round((numer / avgHr) * 1000) / 1000,
+    efficiency_factor: judged > 0 && hr > 0 ? Math.round((judged / hr) * 100) / 100 : null,
     avg_pedaling_power_w: Math.round(avgP),
-    avg_pedaling_hr_bpm: Math.round(avgHr),
   };
   const span = ped[ped.length - 1].t - ped[0].t;
   if (span >= 1200) {
