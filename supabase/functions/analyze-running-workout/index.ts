@@ -1,3 +1,4 @@
+import { rowsComeFromTheWatch } from './lib/interval-display.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { withAlarm } from '../_shared/alarm.ts';
 import { hrDriftHalvesPct, warmupSkipSeconds } from '../_shared/hr-drift-halves.ts';
@@ -4516,6 +4517,18 @@ function buildSessionIntervalRows(
   const plannedSteps: any[] = Array.isArray(plannedWorkout?.computed?.steps) ? plannedWorkout.computed.steps : [];
   const expectedWorkRows = getPlannedWorkSteps(plannedWorkout).length;
   const isStructuredIntervalSession = expectedWorkRows >= 2;
+
+  // ⛔ ROWS FROM THE WATCH ARE READY (2026-09-15): unmatched laps, or a structured run with no laps, carry no planned
+  // step ids by design. The table reads them from the breakdown; the missing-steps check below is for plan-aligned runs.
+  if (rowsComeFromTheWatch(workout?.computed?.alignment_mode)) {
+    return {
+      rows: [],
+      mode: 'interval_compare_ready',
+      reason: null,
+      expected_work_rows: expectedWorkRows,
+      measured_work_rows: Array.isArray(computedIntervals) ? computedIntervals.filter((i: any) => !i?.not_done).length : 0,
+    };
+  }
 
   // Measured-evidence gate (Bug A.1 / D-NNN): when the analyzer's interval
   // breakdown produced ≥2 measured intervals, surface them as a per-interval
