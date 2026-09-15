@@ -1568,6 +1568,15 @@ Deno.serve(async (req) => {
         }
       }
     }
+    /**
+     * ⛔ A STRUCTURED RUN WITH NO LAPS IS ONE WHOLE-RUN ROW (2026-09-14, Michael). Cutting the recording at the plan's
+     * distances invented reps and "not done" rows; with no laps there is nothing that says where a rep was. The
+     * analyzer scores Execution on duration only, as for laps that do not match.
+     */
+    if (!snapped && (sport === 'run' || sport === 'walk') && structuredPlan && laps.length < 2 && rows.length >= 2) {
+      snapped = [{ ...execFromIdx(rows, 0, rows.length - 1, 'split', 'overall'), planned_label: 'Overall session', kind: 'overall', sample_idx_start: 0, sample_idx_end: rows.length - 1 }];
+      snapMode = 'no-laps-whole-run';
+    }
     if (!snapped) snapped = trySnapToLaps(plannedSteps, laps);
     if (snapped && snapped.length) {
       let overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d || 0) - (rows[0].d || 0)) : 0;

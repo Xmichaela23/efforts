@@ -127,6 +127,31 @@ export function samplesFromRecords(records: Json[]): { samples: FitSample[]; gps
 }
 
 /**
+ * ⛔ THE FILE'S LAPS (2026-09-14). A COROS, Apple Watch or Suunto file carries a lap message per lap (a workout step,
+ * a lap-button press or an automatic lap); this parser dropped them, so an uploaded interval session could never show
+ * its laps. Each becomes the shape the summary step already reads for a Garmin lap: start, end, elapsed and timer
+ * seconds, metres.
+ */
+export function lapsFromFit(data: Json): Json[] {
+  const laps = Array.isArray(data?.laps) ? data.laps : [];
+  const out: Json[] = [];
+  for (const L of laps) {
+    const start = L?.start_time ? Math.round(new Date(L.start_time).getTime() / 1000) : NaN;
+    if (!Number.isFinite(start)) continue;
+    const elapsed = pos(L.total_elapsed_time);
+    const end = L?.timestamp ? Math.round(new Date(L.timestamp).getTime() / 1000) : (elapsed != null ? start + Math.round(elapsed) : NaN);
+    out.push({
+      startTimeInSeconds: start,
+      endTimeInSeconds: Number.isFinite(end) && end > start ? end : null,
+      totalElapsedTimeInSeconds: elapsed,
+      totalTimerTimeInSeconds: pos(L.total_timer_time),
+      totalDistanceInMeters: num(L.total_distance),
+    });
+  }
+  return out;
+}
+
+/**
  * The workout `save-imported-workout` takes, built from the parsed file. Same fields the phone sent,
  * in the same places, plus the recording. Throws when the file holds no activity.
  */
@@ -231,6 +256,7 @@ export function workoutFromFit(data: Json, fileName: string): Json {
       product: fileId?.product ?? 'FIT Device',
     },
     sensor_data: samples.length ? { samples } : null,
+    laps: lapsFromFit(data),
     gps_track: gps_track.length ? gps_track : null,
   };
 }

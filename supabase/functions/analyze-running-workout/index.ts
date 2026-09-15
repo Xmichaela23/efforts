@@ -651,7 +651,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
     // ⛔ UNMATCHED WATCH LAPS ARE THE ROWS (2026-09-14). The plan's steps cannot be paired with them, and a plan step
     // reads as "measured" above because its PLANNED duration sits in `duration_s` — so without this the analyzer
     // chose 46 unexecuted plan steps and printed no rows at all.
-    const lapsUnmatched = String((workout as any)?.computed?.alignment_mode || '') === 'laps-unmatched' && computedOnlyIntervals.length > 0;
+    const lapsUnmatched = ['laps-unmatched', 'no-laps-whole-run'].includes(String((workout as any)?.computed?.alignment_mode || '')) && computedOnlyIntervals.length > 0;
     const computedIntervals = lapsUnmatched
       ? computedOnlyIntervals
       : isPlanLinkedWorkout
@@ -2031,7 +2031,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
 
     // ⛔ LAPS THAT DID NOT MATCH THE PLAN (2026-09-14, Michael): no lap can be judged against a planned range, so
     // Execution is the duration share alone and there is no pace score. `compute-workout-summary` decides the match.
-    if (String((workout as any)?.computed?.alignment_mode || '') === 'laps-unmatched' && Number.isFinite(performance.duration_adherence)) {
+    if (['laps-unmatched', 'no-laps-whole-run'].includes(String((workout as any)?.computed?.alignment_mode || '')) && Number.isFinite(performance.duration_adherence)) {
       console.log(`🏃 [LAPS UNMATCHED] execution ${performance.execution_adherence}% → duration only ${performance.duration_adherence}%`);
       performance.execution_adherence = Math.round(Number(performance.duration_adherence));
       (performance as any).pace_adherence = null;
@@ -3519,7 +3519,7 @@ function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], gran
     ? workIntervals
     : sortIntervalsChrono(intervals.filter((i: any) => i?.executed));
   // The watch's own laps are shown as recorded — a 90 m lap is not merged into its neighbour (2026-09-14).
-  const mergedForBreakdown = intervalsForBreakdown.some((i: any) => String(i?.role || '').toLowerCase() === 'lap')
+  const mergedForBreakdown = intervalsForBreakdown.some((i: any) => ['lap', 'overall'].includes(String(i?.role || '').toLowerCase()))
     ? intervalsForBreakdown
     : mergeMicroSegments(intervalsForBreakdown, MIN_SEGMENT_DISTANCE_MI, MIN_SEGMENT_DURATION_S);
   const intervalBreakdown = generateIntervalBreakdown(mergedForBreakdown, intervals, paceAdherenceForBreakdown, granularAnalysis, sensorData, userUnits, plannedWorkout, workout);

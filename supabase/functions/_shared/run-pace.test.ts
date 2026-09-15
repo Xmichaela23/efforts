@@ -58,8 +58,8 @@ Deno.test('whole run: provider seconds, then provider speed, then the samples â€
 Deno.test('grade-adjusted pace equals the pace on flat ground', () => {
   const s = run(Array(200).fill(3), (i) => 100 + (i % 2) * 0.01);
   const pace = paceSecPerMi(metersBetween(s, 0, 199), movingSecondsBetween(s, 0, 199))!;
-  // Flat: elevation range under 5 m reads as no usable elevation â€” no adjusted pace, never a made-up one.
-  assertEquals(runGrades(s), null);
+  // Flat: elevation range under 5 m reads as grade 0 everywhere, so the adjusted pace is the pace.
+  assertAlmostEquals(gapSecPerMiBetween(s, runGrades(s), 0, 199, pace)!, pace, 1e-9);
   assertEquals(gapSecPerMiBetween(s, null, 0, 199, pace), null);
   // A zero-grade series with usable elevation elsewhere: the adjusted pace is the pace.
   const grades = new Array(200).fill(0);
@@ -104,4 +104,14 @@ Deno.test('grade is read over 100 m, so a few metres of elevation noise is not a
   const up = run(Array(200).fill(3), (i) => 100 + i * 0.3);
   const gu = runGrades(up)!;
   assertAlmostEquals(gu[100], 10, 0.5);
+});
+
+Deno.test('a flat run with elevation: grade 0, adjusted pace equals pace; no elevation: none', () => {
+  const flat = run(Array(300).fill(3), () => 100);
+  const g = runGrades(flat)!;
+  assert(g != null && g.every((x) => x === 0));
+  const pace = paceSecPerMi(metersBetween(flat, 0, 299), movingSecondsBetween(flat, 0, 299))!;
+  assertAlmostEquals(gapSecPerMiBetween(flat, g, 0, 299, pace)!, pace, 1e-9);
+  const none = flat.map((x) => ({ ...x, elev: null }));
+  assertEquals(runGrades(none), null);
 });

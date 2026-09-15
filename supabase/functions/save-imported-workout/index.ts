@@ -14,8 +14,9 @@ const corsHeaders = {
 function buildMinimalComputed(workout: any, m: Record<string, unknown>) {
   const distKm = Number(workout?.distance);
   const distM = Number.isFinite(distKm) && distKm > 0 ? Math.round(distKm * 1000) : null;
-  const movMin = Number(workout?.moving_time ?? m?.moving_time);
-  const durSec = Number.isFinite(movMin) && movMin > 0 ? Math.round(movMin < 1000 ? movMin * 60 : movMin) : null;
+  // The file's own moving seconds (`total_timer_time`) — never a minute column guessed back into seconds.
+  const timerS = Number(m?.total_timer_time ?? workout?.moving_time);
+  const durSec = Number.isFinite(timerS) && timerS > 0 ? Math.round(timerS) : null;
   const paceSecPerMi = (distM != null && durSec != null && distM > 0 && durSec > 0)
     ? Math.round((durSec / (distM / 1609.34)))
     : null;
@@ -30,6 +31,17 @@ function buildMinimalComputed(workout: any, m: Record<string, unknown>) {
   };
 }
 
+/** A FIT speed is metres per second; the `workouts` speed columns hold km/h (Strava and Garmin both store km/h). */
+const toKmh = (mps: unknown): number | null => {
+  const n = Number(mps);
+  return Number.isFinite(n) && n > 0 ? Number((n * 3.6).toFixed(2)) : null;
+};
+/** The `workouts` minute columns, from the file's seconds. */
+const toMin = (sec: unknown): number | null => {
+  const n = Number(sec);
+  return Number.isFinite(n) && n > 0 ? Math.round(n / 60) : null;
+};
+
 function mapImportToDb(workout: any, userId: string) {
   const m = workout?.metrics || {};
   const elevGain = m.elevation_gain != null ? Math.round(Number(m.elevation_gain)) : (workout.elevation_gain != null ? Math.round(Number(workout.elevation_gain)) : null);
@@ -39,7 +51,7 @@ function mapImportToDb(workout: any, userId: string) {
     name: workout.name ?? 'Imported Workout',
     type: workout.type ?? 'run',
     date: workout.date,
-    duration: Math.round(workout.duration ?? 0),
+    duration: toMin(workout.duration) ?? 0,
     description: workout.description ?? '',
     usercomments: workout.userComments ?? '',
     completedmanually: false,
@@ -53,8 +65,15 @@ function mapImportToDb(workout: any, userId: string) {
     avg_power: m.avg_power ?? null,
     max_power: m.max_power ?? null,
     normalized_power: m.normalized_power ?? null,
-    avg_speed: workout.avg_speed ?? m.avg_speed ?? null,
-    max_speed: workout.max_speed ?? m.max_speed ?? null,
+    // ⛔ UNITS (2026-09-14): the file's speeds are m/s and its times seconds. Stored as-is they were read as km/h and
+    // minutes, so moving time came out 3.6× too long (a 23:35 5 km read 84:47). The seconds ride in `metrics`, which
+    // every moving-time reader takes first.
+    avg_speed: toKmh(workout.avg_speed ?? m.avg_speed),
+    max_speed: toKmh(workout.max_speed ?? m.max_speed),
+    metrics: {
+      moving_time_seconds: m.total_timer_time != null ? Math.round(m.total_timer_time) : null,
+      elapsed_time_seconds: m.total_elapsed_time != null ? Math.round(m.total_elapsed_time) : null,
+    },
     avg_cadence: m.avg_cadence ?? null,
     max_cadence: m.max_cadence ?? null,
     elevation_gain: elevGain,
@@ -65,8 +84,8 @@ function mapImportToDb(workout: any, userId: string) {
     start_position_lat: workout.start_position_lat ?? null,
     start_position_long: workout.start_position_long ?? null,
     friendly_name: workout.friendly_name ?? null,
-    moving_time: workout.moving_time != null ? Math.round(workout.moving_time) : null,
-    elapsed_time: workout.elapsed_time != null ? Math.round(workout.elapsed_time) : null,
+    moving_time: toMin(m.total_timer_time ?? workout.moving_time),
+    elapsed_time: toMin(m.total_elapsed_time ?? workout.elapsed_time),
     avg_temperature: m.avg_temperature ?? null,
     max_temperature: m.max_temperature ?? null,
     total_timer_time: m.total_timer_time != null ? Math.round(m.total_timer_time) : null,
@@ -98,6 +117,8 @@ function mapImportToDb(workout: any, userId: string) {
     device_info: workout.deviceInfo ?? null,
     gps_track: workout.gps_track ?? null,
     sensor_data: workout.sensor_data ?? null,
+    // The file's laps (`import-fit-file/parse.ts lapsFromFit`), in the shape the summary step reads.
+    laps: Array.isArray(workout.laps) && workout.laps.length ? workout.laps : null,
     swim_data: workout.swim_data ?? null,
     // steps_preset removed 2026-09-04: it is a planned_workouts column, not a workouts one — writing it
     // here made the DB reject every imported row (400). A completed import carries no steps preset anyway.

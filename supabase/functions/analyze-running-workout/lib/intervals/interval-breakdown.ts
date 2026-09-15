@@ -352,7 +352,8 @@ export function generateIntervalBreakdown(
         return 'Stride';
       })(),
       // A watch lap that could not be matched to a planned step is a lap, not a rep (2026-09-14).
-      interval_type: String(interval.role || '').toLowerCase() === 'lap' ? 'lap' : 'work',
+      // A lap not matched to the plan, or a structured run's one whole-run row: shown, never judged as a rep.
+      interval_type: ['lap', 'overall'].includes(String(interval.role || '').toLowerCase()) ? 'lap' : 'work',
       interval_number: index + 1,
       interval_id: interval.planned_step_id || interval.id || null,
       planned_duration_s: plannedDuration,

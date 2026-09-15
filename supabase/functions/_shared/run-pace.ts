@@ -120,8 +120,13 @@ export const GRADE_WINDOW_M = 100;
 /** Per-sample grades in percent for the whole run, or null when the run has no usable elevation. Compute once per run. */
 export function runGrades(samples: ReadonlyArray<RunSample>): number[] | null {
   const view = samples.map((x) => ({ elevation_m: num(x?.elev), distance_m: num(x?.d) }));
-  if (!hasUsableElevation(view)) return null;
   const n = samples.length;
+  // ⛔ A FLAT RUN IS GRADE 0, NOT "NO ADJUSTED PACE" (2026-09-14, Michael). Elevation on half the samples or more
+  // counts; under 5 m of range every grade reads 0 and the adjusted pace equals the pace, as Strava and Garmin show it.
+  // No elevation at all still returns null — nothing says the ground was flat.
+  const withElev = view.filter((x) => x.elevation_m != null).length;
+  if (n < 2 || withElev < n * 0.5) return null;
+  if (!hasUsableElevation(view)) return new Array<number>(n).fill(0);
   // Cumulative distance, never decreasing; elevation carried forward over gaps.
   const dist = new Array<number>(n).fill(0);
   const elev = new Array<number | null>(n).fill(null);
