@@ -1,6 +1,24 @@
 # Engine State
 
-## 🧭 NEXT SESSION — START HERE (written 2026-09-13, late — Ride + Strength, look-first picks, Multisport Focus, setup from the server; PUSHED, DEPLOYED, iOS SYNCED, partly phone-checked)
+## 🧭 NEXT SESSION — START HERE (written 2026-09-15, PM chat — the whole app on one truth; ride power, run pace, threshold, laps, effort PUSHED AND DEPLOYED, mostly not phone-checked)
+
+> **Your job:** run `docs/WORKORDER-app-one-truth-2026-09-15.md`. It is the final clean-up of every number the app
+> shows: one source per number, all maths on the server, every formula from the book or commercial practice (or
+> marked OURS), every screen reading the same value. Start at Stage 0 (finish the map for the screens not in
+> `docs/TRUTH-MAP.md` §6). One stage per terminal session; Michael says go before any build.
+>
+> **Shipped 2026-09-14/15 — do not redo (workorder §2):** ride power rules (`_shared/ride-power.ts`), easy/long ride
+> targets 56–75% FTP, effort words + talk test (`_shared/effort-words.ts`), run pace rules (stops out, one
+> grade-adjusted pace over 100 m, strict rep colours), threshold suggestion from critical speed, watch laps as rows
+> (Strava laps by start time), Unattach sticks. main = `495069a5`.
+>
+> **Unverified on a phone:** workorder §7. **Parked:** Apple Watch, phone recording, the Intervals.icu import, the
+> rest of .fit upload (workorder §3). **Running separately:** threshold test on the day you pick.
+>
+> **Also uncommitted in the tree:** `docs/TRUTH-MAP.md` §6 audit and `docs/WORKORDER-run-pace-one-source-2026-09-14.md`
+> (superseded by the new workorder, kept as history).
+
+## (older banner) (written 2026-09-13, late — Ride + Strength, look-first picks, Multisport Focus, setup from the server; PUSHED, DEPLOYED, iOS SYNCED, partly phone-checked)
 
 > main = `628392fa`. Server functions deployed 06:15 UTC. Read `docs/WORKORDER-ride-strength-2026-09-13.md`,
 > `docs/COPY-ride-strength-setup-2026-09-13.md` and `docs/WORKORDER-look-first-default-picks-2026-09-13.md`.
