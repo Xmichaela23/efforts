@@ -1513,6 +1513,7 @@ export function pickOptionLabel(o: PickOption): string {
    * ⚠️ THE SUBSTITUTE'S MARK NAMES THE REASON, because the reason is the useful part — the athlete
    * can see it is about their kit rather than about the programme, and the muscle is unchanged.
    */
+  // OURS — `pickOptionLabel` suffix wording "- for your gear" / "- added" (Michael, 2026-08-29 / 08-30); no number.
   if (o.substituted === true) return `${o.display} - for your gear`;
   return o.ours === true ? `${o.display} - added` : o.display;
 }
@@ -1681,6 +1682,7 @@ export function pickOptions(
     const printed = (spec.hisList ?? []).map((n) => stabilityOf(n));
     if (printed.length === 0) return null;
     const supported = printed.filter((x) => x === 'supported').length;
+    // OURS — `cellStability` a cell reads as supported when at least half its printed movements are machines; no page.
     return supported * 2 >= printed.length ? 'supported' : 'free';
   })();
   const alsoKeys = (spec.alsoHis ?? []).map((n) => canonicalize(n));
@@ -1698,6 +1700,7 @@ export function pickOptions(
     // ⛔ STEP 2 — then the like-for-light tests, most held first. The base keeps every one of his
     // ahead of every substitute, whatever the substitute holds.
     let penalty = leadKeys.length + alsoKeys.length + subKeys.length;
+    // OURS — `rank` substitute penalties: +2 for a different pattern, +1 for a different stability; the order is ours (see above).
     if (cellPattern && (m as { pattern?: string }).pattern && (m as { pattern?: string }).pattern !== cellPattern) penalty += 2;
     if (cellStability && stabilityOf(m.name) !== cellStability) penalty += 1;
     return penalty;
@@ -2064,6 +2067,7 @@ export const DIAL_LABEL: Record<DialChip, string> = {
  * carry seven to nine counted sets before anything is added. Two muscles running toward the solid
  * band is roughly what the week's remaining room holds; three is how the ceiling gets crossed.
  */
+// OURS — `DIAL_CAP` two chips at most, read off p086's 6-8 set session ceiling against this frame's 7-9 counted sets; the page gives no chip count.
 export const DIAL_CAP = 2;
 
 export function isDialChip(v: unknown): v is DialChip {
@@ -2135,6 +2139,7 @@ export const DIAL_IS_OURS =
 export const DIAL_MECHANISM_IS = [
   'The picks that can reach it open on a movement that trains it.',
   'Its hypertrophy slots go to four sets instead of three.',
+  // Viada p086: the accessory dose is 3 x 8-10 at 1-2 RIR.
   'Extra sets of 8 to 10, by feel, go on the lifting days with the most room.',
 ];
 
@@ -2207,6 +2212,7 @@ export function dialDose(opts: {
   const advanced = Math.max(0, Math.round(Number(opts.advancedTierSessions) || 0));
   if (advanced > 0) {
     return {
+      // OURS — `dialDose` the advanced running tier aims at two floor slots for the muscle (`DIAL_PULLBACK_IS_OURS`).
       targetSets: muscleFloorSets() * 2,
       pullBack: 'Your running already earns an extra easy session, so this stops at two extra slots '
         + 'for the muscle rather than filling the week out.',

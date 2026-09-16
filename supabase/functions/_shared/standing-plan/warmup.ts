@@ -73,6 +73,7 @@ export const RAMP_RUNGS_ARE_OURS =
   + 'weight, and let the first work set be the last warm-up set - but gives no percentages. The '
   + 'rungs, the rep counts and the three-rung cap are ours, from field practice.';
 
+// OURS — `RAMP_FRACTIONS` / `RAMP_REPS` 55/75/90% of the work weight for 5/3/2 reps, three rungs at most; p140 gives no percentages.
 export const RAMP_FRACTIONS: readonly number[] = [0.55, 0.75, 0.90];
 export const RAMP_REPS: readonly number[] = [5, 3, 2];
 
@@ -85,6 +86,7 @@ export const RAMP_REPS: readonly number[] = [5, 3, 2];
  * (`strength-logging-mode.ts` draws a 45 lb bar by default). A caller that knows the athlete's bar
  * passes it.
  */
+// OURS — `DEFAULT_BAR_LB` 45 lb standard bar assumed when the caller passes none; p140's empty bar gives no weight.
 export const DEFAULT_BAR_LB = 45;
 
 /**
@@ -110,6 +112,7 @@ export function rampFor(
 ): WarmupSet[] {
   const w = Number(workWeight);
   if (!Number.isFinite(w) || w <= 0) return [];
+  // OURS — `rampFor` falls back to a 5 lb step when no plate step is passed; no page, kept as found.
   const step = Number.isFinite(roundTo) && roundTo > 0 ? roundTo : 5;
   const bar = Number.isFinite(Number(barLb)) && Number(barLb) > 0 ? Number(barLb) : null;
 
@@ -121,6 +124,7 @@ export function rampFor(
 
   // ⛔ HIS FIRST RUNG: unloaded, fast. Only where there is a bar to be empty.
   if (bar != null) {
+    // OURS — `rampFor` five reps on the empty bar; p140 says "rapid concentric" with no count.
     out.push({ weight: bar, reps: 5, warmup: true, cue: RAMP_BAR_CUE });
     seen.add(bar);
   }
@@ -139,6 +143,7 @@ export function rampFor(
      * again with a note. ⚠️ OURS: two increments is the smallest gap that reads as a jump, and it is
      * the reading of *"extremely efficient"* that keeps a 95 lb bench from carrying four sets.
      */
+    // OURS — `rampFor` a rung must sit at least two plate steps above the one before (see above).
     const prev = out.length > 0 ? out[out.length - 1].weight : 0;
     if (raw - prev < step * 2) return;
     seen.add(raw);

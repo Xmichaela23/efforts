@@ -123,6 +123,7 @@ export const PRETEST_STEPS: {
   fractionOfPredicted: number;
   reps: number | 'max';
 }[] = [
+  // Viada p215: A at ~75% of the predicted max for 6, D = A + 0.1A for 5, E = D + 0.05A for max reps.
   { multipleOfWarmup: 1.00, fractionOfPredicted: 0.75, reps: 6 },
   { multipleOfWarmup: 1.10, fractionOfPredicted: 0.825, reps: 5 },
   { multipleOfWarmup: 1.15, fractionOfPredicted: 0.8625, reps: 'max' },
@@ -158,6 +159,7 @@ export function brzycki1RM(weight: number, reps: number): number {
  */
 export function predictedTrue1RM(weight: number, reps: number): number | null {
   if (!Number.isFinite(weight) || weight <= 0) return null;
+  // FIELD — Brzycki: the (37 − reps) denominator reaches zero at 37 reps, so the formula stops there.
   if (!Number.isInteger(reps) || reps < 1 || reps >= 37) return null;
   return estimate1RM(weight, reps);
 }
@@ -237,6 +239,7 @@ export function pretestSession(
   roundTo: number,
 ): { fractionOfPredicted: number; weight: number; reps: number | 'max' }[] | null {
   if (!Number.isFinite(predictedFromFile) || predictedFromFile <= 0) return null;
+  // OURS — `pretestSession` rounds each step to the plate step, 5 lb when none is passed; p215 rounds by eye.
   const step = Number.isFinite(roundTo) && roundTo > 0 ? roundTo : 5;
   // ⛔ A IS THE UNIT (p215). The warm-up weight is rounded to a loadable increment FIRST, and the
   // upper two steps are multiples of that rounded number — his arithmetic, not three independent
@@ -282,6 +285,7 @@ export function pretestSession(
  */
 export function pretestStepWeights(warmupWeight: number, roundTo: number): (number | null)[] | null {
   if (!Number.isFinite(warmupWeight) || warmupWeight <= 0) return null;
+  // OURS — `pretestStepWeights` 5 lb step fallback and the collided-rung drop (see `pretestSession`).
   const step = Number.isFinite(roundTo) && roundTo > 0 ? roundTo : 5;
   const warmup = Math.round(warmupWeight / step) * step;
   const weights = PRETEST_STEPS.map((s) => Math.round((warmup * s.multipleOfWarmup) / step) * step);
@@ -301,6 +305,7 @@ export function pretestStepWeights(warmupWeight: number, roundTo: number): (numb
  * ⚠️ A FRESH TEST FOR EVERYONE, every block. Not "if we have no number" — a stored number is a seed
  * and a stale seed is exactly what the test exists to correct.
  */
+// OURS — `TEST_WEEK_INDEX` week one is the test week (Michael, 2026-08-23); p275 says pretest before a program, not which week.
 export const TEST_WEEK_INDEX = 1;
 
 export function isTestWeek(week: number): boolean {
@@ -308,6 +313,7 @@ export function isTestWeek(week: number): boolean {
 }
 
 /** Which lifts are tested on which of the frame's ME days. Upper day 1, lower day 2. */
+// Viada p274: days 1 and 2 open on the ME slot. OURS — `TEST_DAY_LIFTS` which tested lift goes on which of those days.
 export const TEST_DAY_LIFTS: Record<number, TestedLift[]> = {
   1: ['bench', 'overheadPress'],
   2: ['squat', 'deadlift'],
@@ -462,6 +468,7 @@ export function readTestWeek(
     }
     const wn = workingNumberFromTest(lift, measured);
     if (!wn) {
+      // Viada p215: the test set goes through Epley and Brzycki; `predictedTrue1RM` refuses reps outside 1-36.
       missing.push({ lift, reason: `the logged set (${measured.weight} x ${measured.reps}) is not a strength test` });
       continue;
     }

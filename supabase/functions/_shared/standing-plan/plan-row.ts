@@ -363,6 +363,7 @@ export function buildStandingPlanRow(args: {
             ...(args.compose.sportMix.rideCount != null ? { rideCount: args.compose.sportMix.rideCount } : {}),
           }
         : null,
+      // OURS — `buildStandingPlanRow` at most 2 easy swims a week (Michael, 2026-08-24), the same clamp as compose.ts; no page.
       swim_easy_sessions: Math.min(2, Math.max(0, Math.round(Number(args.compose.swimEasySessions) || 0))) || null,
       accessory_picks: (args.compose.accessoryPicks ?? []).length > 0
         ? [...(args.compose.accessoryPicks as string[])]
@@ -566,6 +567,7 @@ function describeBlock(
    * fell past the cut would print the duplicate again.
    */
   const allSourced = notes.filter((n) => n.kind === 'source').map((n) => n.text);
+  // OURS — `describeBlock` prints at most three of the block's sourced notes; display cap, no page.
   const sourced = allSourced.filter((t) => !t.includes('first week is the test')).slice(0, 3);
 
   /**
@@ -582,6 +584,7 @@ function describeBlock(
     shape.swim > 0 ? plural(shape.swim, 'swim', 'swims') : '',
     shape.plyo ? 'a plyometric day' : '',
   ].filter(Boolean);
+  // Viada p246 / p274 / p278: the counts in this sentence are the composed week's own lifting days, sessions and rest day.
   const restClause = shape == null || shape.rest === 0
     ? ''
     : `, with ${shape.rest === 1 ? 'one full rest day' : `${countWord(shape.rest)} full rest days`}`;

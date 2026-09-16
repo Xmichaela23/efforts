@@ -41,8 +41,10 @@ export type LiveNumbers = {
   lthr_source: string | null;
 };
 
+// OURS — `CHECKPOINT_WEEK` week 6 and the block end; Viada p123 says "after six weeks", the exact week is ours.
 export const CHECKPOINT_WEEK = 6;
 /** OURS — the flag thresholds for a move the book would call more than "several seconds per km". */
+// OURS — `LARGE_MOVE` 8 s/mi, 3% FTP, 3 bpm; p123 says "several seconds per kilometer" with no number.
 export const LARGE_MOVE = { threshold_sec_per_mi: 8, ftp_pct: 3, lthr_bpm: 3 } as const;
 export const CHECKPOINT_IS_OURS =
   'Week 6 and the block end are ours; the book says "after six weeks" and "the next cycle". The large-move '
@@ -55,11 +57,13 @@ export function checkpointDue(currentWeek: number | null, durationWeeks: number,
   if (currentWeek == null || !Number.isFinite(currentWeek)) return { due: false, week: null, reason: 'no plan week' };
   const done = new Set(answered.map((w) => Number(w)));
   if (currentWeek > CHECKPOINT_WEEK && !done.has(CHECKPOINT_WEEK) && currentWeek <= durationWeeks) {
+    // OURS — `CHECKPOINT_WEEK` in the reason text (see above).
     return { due: true, week: CHECKPOINT_WEEK, reason: `week ${CHECKPOINT_WEEK} is behind you and unanswered` };
   }
   if (currentWeek > durationWeeks && !done.has(durationWeeks)) {
     return { due: true, week: durationWeeks, reason: 'the block has ended' };
   }
+  // OURS — `CHECKPOINT_WEEK` in the reason text (see above).
   return { due: false, week: null, reason: currentWeek <= CHECKPOINT_WEEK ? `not until week ${CHECKPOINT_WEEK + 1}` : 'answered' };
 }
 
@@ -132,6 +136,7 @@ const mean = (xs: (number | null)[]): number | null => {
  */
 export function evidenceFor(sport: 'run' | 'ride', sessions: HardSession[]): Evidence {
   const s = sessions.filter((x) => x.sport === sport).sort((a, b) => a.date.localeCompare(b.date));
+  // OURS — `evidenceFor` splits the block's sessions into early and late halves by date; p123 names the signals, not the split.
   const half = Math.floor(s.length / 2);
   const early = s.slice(0, half), late = s.slice(half);
   const summarise = (xs: HardSession[]): EvidenceHalf => ({

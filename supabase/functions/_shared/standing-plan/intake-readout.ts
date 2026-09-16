@@ -183,6 +183,7 @@ export function enduranceIntakeReadout(args: {
     const options = (slotLengthOptions('long', slots, { baselines, frame })?.options ?? [])
       .filter((m) => m <= rsw.longRunChipCeilingMinutes);
     // The ruled default where the ladder offers it, else the middle of what it offers.
+    // OURS — `enduranceIntakeReadout` falls back to the middle long-run option when the frame's default is not offered.
     const def = options.length === 0
       ? null
       : options.includes(rsw.longRunDefaultMinutes)
@@ -248,6 +249,7 @@ export function enduranceIntakeReadout(args: {
     if (extra <= 0) return null;
     // The frame's own endurance slots plus the tier's extra runs — four on Run + Strength, five on
     // Standard Focus. The phone printed four on both.
+    // Viada p247: "adding one or two VT1 sessions" for more advanced runners; the tier gate is `advancedTierSessions` in frames.ts.
     const total = frameSlots(frame).length + extra;
     return `Your history supports a ${total}-session endurance week — ${extra} extra easy `
       + `run${extra === 1 ? '' : 's'} (${d.source}).`;

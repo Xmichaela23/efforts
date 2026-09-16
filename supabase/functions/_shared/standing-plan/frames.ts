@@ -438,6 +438,7 @@ const STRENGTH_5K_STANDARD: FrameDay[] = [
     day: 1,
     label: 'ME: Upper',
     strength: [
+      // p246 day 1, standard column: row text verbatim (SOURCE-viada Part E1a)
       S('ME', 'competition', 'primary', 'push_upper', '1 x ME: Primary push'),
       S('ME', 'accessory', 'primary', 'pull_upper', '1 x ME: Accessory: primary pull'),
       /**
@@ -457,6 +458,7 @@ const STRENGTH_5K_STANDARD: FrameDay[] = [
           'overhead press', 'military press', 'standing barbell overhead press', 'push press',
         ],
       }),
+      // p246 day 1 (cont.) and its endurance cell MLSS+ (level 2), verbatim
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),
       S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: Accessory: focused pull, focused push'),
     ],
@@ -505,11 +507,13 @@ const STRENGTH_5K_STANDARD: FrameDay[] = [
     day: 4,
     label: 'DE: Upper',
     strength: [
+      // p246 day 4, standard column: row text verbatim
       S('DE', 'competition', 'primary', 'push_upper', '1 x DE: Primary push'),
       S('DE', 'accessory', 'primary', 'pull_upper', '1 x DE: Accessory: primary pull'),
       S('HYP', 'accessory', 'secondary', 'push_upper', '1 x HYP: Accessory: secondary push'),
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),
     ],
+    // p246 day 4 endurance cell: VT1 (level 1)
     // ⛔ THE WEEK'S ECONOMY WORK RIDES ON THIS SLOT — see `EnduranceSlot.carriesStrides`. It is the
     // lightest running session in the week and it sits after the hardest day and before the long one.
     endurance: [E('run_vt1', 1, 'VT1 (level 1)', { carriesStrides: true })],
@@ -519,6 +523,7 @@ const STRENGTH_5K_STANDARD: FrameDay[] = [
     label: 'DE: Lower',
     lowerRole: 'de',
     strength: [
+      // p246 day 5, standard column: row text verbatim
       S('DE', 'competition', 'primary', 'press_lower', '1 x DE: Primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),
       S('DE', 'accessory', 'primary', 'hinge_lower', '1 x DE: Accessory: primary hinge lower (rotate with primary push lower)', { rotatesWith: 'press_lower' }),
       S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Accessory: secondary push lower'),
@@ -526,6 +531,7 @@ const STRENGTH_5K_STANDARD: FrameDay[] = [
     ],
     endurance: [],
   },
+  // p246 day 6 endurance cell: LSD (level 2)
   { day: 6, label: null, strength: [], endurance: [E('run_lsd', 2, 'LSD (level 2)', { archetype: 'long_with_inserts' })] },
   { day: 7, label: null, strength: [], endurance: [], rest: true },
 ];
@@ -544,6 +550,7 @@ const STRENGTH_5K_TAPER: FrameDay[] = [
     day: 1,
     label: 'ME: Upper',
     strength: [
+      // p246 day 1, taper column: row text verbatim, endurance MLSS+ (level 1)
       S('ME', 'competition', 'primary', 'push_upper', '1 x ME: Primary push'),
       S('DE', 'accessory', 'primary', 'pull_upper', '1 x DE: Accessory: primary pull'),
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),
@@ -573,6 +580,7 @@ const STRENGTH_5K_TAPER: FrameDay[] = [
     day: 3,
     label: null,
     strength: [],
+    // p246 day 3, taper column: NT (race tempo) (level 1)
     endurance: [E('run_near_threshold', 1, 'NT (race tempo) (level 1)', { archetype: 'below_threshold', raceTempo: true })],
     plyo: true,
   },
@@ -580,6 +588,7 @@ const STRENGTH_5K_TAPER: FrameDay[] = [
     day: 4,
     label: 'DE: Upper',
     strength: [
+      // p246 day 4, taper column: row text verbatim
       S('DE', 'competition', 'primary', 'push_upper', '1 x DE: Primary push'),
       S('DE', 'accessory', 'primary', 'pull_upper', '1 x DE: Accessory: primary pull'),
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: Accessory: focused pull, focused push'),
@@ -591,6 +600,7 @@ const STRENGTH_5K_TAPER: FrameDay[] = [
     label: 'DE: Lower',
     lowerRole: 'de',
     strength: [
+      // p246 day 5, taper column: row text verbatim
       S('DE', 'competition', 'primary', 'press_lower', '1 x DE: Primary push lower (rotate)', { rotatesWith: 'hinge_lower' }),
       S('DE', 'accessory', 'primary', 'hinge_lower', '1 x DE: Accessory: primary hinge lower'),
       S('HYP', 'accessory', 'secondary', 'press_lower', '1 x HYP: Accessory: accessory lower', {
@@ -763,6 +773,7 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
     label: null,
     themeTag: 'jumps',
     strength: [],
+    // p274 day 3 endurance cell: NT (level 2)
     endurance: [E('run_near_threshold', 2, 'NT (level 2)', { role: 'hard' })],
     plyo: true,
   },
@@ -787,6 +798,7 @@ const ALL_ROUNDER_STANDARD: FrameDay[] = [
       S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset'),
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: focused pull'),
     ],
+    // p274 day 4 endurance cell: Cyc endurance (level 1)
     endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy' })],
   },
   {
@@ -840,11 +852,13 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
        * which is deltoids: right pattern, wrong muscle, and nothing said. Michael's rule — the muscle
        * is the law, the movement may leave his list when the kit demands it.
        */
+      // p274 day 1, taper column: row text verbatim
       S('HYP', 'accessory', 'braced', 'push_upper', '1 x HYP: braced push', { muscle: 'chest' }),
       S('HYP', 'accessory', 'focused', 'push_upper', '2 x HYP: focused push/pull (arms) superset'),
       S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset'),
       S('HYP', 'accessory', 'focused', 'push_upper', '1 x HYP: focused push'),
     ],
+    // p274 day 1 taper endurance cell: MLSS+ (level 1)
     endurance: [E('run_mlss', 1, 'MLSS+ (level 1)', { role: 'hard' })],
   },
   {
@@ -873,6 +887,7 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
     label: null,
     themeTag: 'jumps',
     strength: [],
+    // p274 day 3 taper endurance cell: VT1 (level 1)
     endurance: [E('run_vt1', 1, 'VT1 (level 1)', { role: 'easy' })],
     plyo: true,
   },
@@ -889,6 +904,7 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
       S('HYP', 'accessory', 'focused', 'pull_upper', '2 x HYP: focused push/pull (arms) superset'),
       S('HYP', 'accessory', 'focused', 'pull_upper', '1 x HYP: focused pull'),
     ],
+    // p274 day 4 taper endurance cell: Cyc endurance (level 1)
     endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy' })],
   },
   {
@@ -897,6 +913,7 @@ const ALL_ROUNDER_TAPER: FrameDay[] = [
     themeTag: 'legs',
     lowerRole: 'de',
     strength: [
+      // p274 day 5, taper column: row text verbatim
       S('DE', 'competition', 'primary', 'press_lower', '1 x DE: secondary push'),
       S('HYP', 'accessory', 'focused', 'press_lower', '1 x HYP: focused quadriceps', { muscle: 'quadriceps' }),
       S('SKILL', 'accessory', 'braced', 'press_lower', '1 x SKILL: braced push (asymmetrical)', { asymmetrical: true, prefer: ['reverse lunge', 'walking lunge', 'bulgarian split squat'] }),
@@ -1047,6 +1064,7 @@ const CYCLING_BASE_TAPER: FrameDay[] = [
         ambiguousNotation: '"accessory lower" is not a category in pp.218-223; read as a lower-body noncompetition movement.',
       }),
     ],
+    // p278 Deload column, day 2 endurance cell: Cyc endurance (level 1)
     endurance: [E('ride_endurance', 1, 'Cyc endurance (level 1)', { role: 'easy' })],
   },
   { ...CYCLING_BASE_STANDARD[2] },
@@ -1055,6 +1073,7 @@ const CYCLING_BASE_TAPER: FrameDay[] = [
     label: 'DE: Full',
     lowerRole: 'de',
     strength: [
+      // p278 Deload column, day 4: row text verbatim
       S('DE', 'competition', 'primary', 'push_upper', '1 x DE: Primary push'),
       S('DE', 'competition', 'primary', 'press_lower', '1 x DE: Primary push lower (rotate with primary hinge)', { rotatesWith: 'hinge_lower' }),
       S('DE', 'accessory', 'primary', 'pull_upper', '1 x DE: Accessory: primary pull'),
@@ -1141,6 +1160,7 @@ export const FRAMES: Record<FrameId, Frame> = {
     sourceName: 'Strength + 5K',
     cite: 'Viada pp246-247',
     liftingDays: 4,
+    // 30 min = p246's VT1 level 1 rung top (p235: 25-30 min). OURS — `longRunChipCeilingMinutes` 90 and `longRunDefaultMinutes` 75, see `RunStrengthWeek`
     runStrengthWeek: { easyRunMinutes: 30, longRunChipCeilingMinutes: 90, longRunDefaultMinutes: 75 },
     columns: { standard: STRENGTH_5K_STANDARD, taper: STRENGTH_5K_TAPER },
     workingNumberRatePerWeek: RATE_ANCHOR.strength_5k.perWeek,
@@ -1172,6 +1192,7 @@ export const FRAMES: Record<FrameId, Frame> = {
     enduranceSports: ['ride'],
     hardSessionsFixed: true,
     printedWeekOnly: true,
+    // OURS — `fewerRidesDropsSlot` the four-ride week (Michael, 2026-09-13); p278's Deload column prints five rides, and day 2's easy ride is the one that comes out
     fewerRidesDropsSlot: { rideCount: 4, day: 2, index: 0 },
   },
 };
@@ -1206,6 +1227,7 @@ export const ADVANCED_TIER_VT1_SESSIONS = { min: 1, max: 2, cite: 'Viada p247' }
  * one line — the pivot §8 discipline.**
  */
 export const ADVANCED_TIER_MIN_WEEKLY_MILES = 25;
+// OURS — `ADVANCED_TIER_MIN_WEEKLY_MILES` 25 mi a week, the top third of the 10-30 mi audience; p247 gives the one or two sessions, not the gate
 export const ADVANCED_TIER_GATE_IS_OURS =
   'The source says "more advanced runners" and defines nothing. Twenty-five miles a week is ours — '
   + 'the top third of this plan\'s stated 10-to-30-mile audience — and it gates on running the '
@@ -1214,6 +1236,7 @@ export const ADVANCED_TIER_GATE_IS_OURS =
 export function advancedTierSessions(demonstratedWeeklyMiles: number | null | undefined): number {
   const miles = Number(demonstratedWeeklyMiles);
   if (!Number.isFinite(miles) || miles < ADVANCED_TIER_MIN_WEEKLY_MILES) return 0;
+  // OURS — `advancedTierSessions` the second session at twice the gate (50 mi); p247 says "one or two" and names no mileage
   // ⚠️ One session at the gate, two once the athlete is clear of it by the same margin again.
   return miles >= ADVANCED_TIER_MIN_WEEKLY_MILES * 2
     ? ADVANCED_TIER_VT1_SESSIONS.max
@@ -1256,6 +1279,7 @@ export function advancedTierSessions(demonstratedWeeklyMiles: number | null | un
  * FLOOR — three hours twenty becomes about two.
  */
 export const LOW_VOLUME_TIER_LEVELS: Record<string, Level> = {
+  // Viada p246 taper column prints MLSS+ and NT at level 1; run_lsd level 1 is p235's own LSD level
   run_mlss: 1,
   run_near_threshold: 1,
   run_lsd: 1,
@@ -1283,6 +1307,7 @@ export const LOW_VOLUME_TIER_LEVELS: Record<string, Level> = {
    * ⚠️ USING LEVEL 1 FOR A LOWER-VOLUME RIDER IS OURS, the same call as the two families below and
    * carrying the same label — see `LOW_VOLUME_RIDE_LEVELS_ARE_OURS`.
    */
+  // OURS — `LOW_VOLUME_TIER_LEVELS` ride families at level 1 for a newer rider; the levels are p237-p239's, using them here is ours
   ride_anaerobic: 1,
   ride_sweet_spot: 1,
   ride_endurance: 1,

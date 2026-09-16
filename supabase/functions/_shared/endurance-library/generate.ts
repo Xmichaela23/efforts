@@ -58,6 +58,7 @@ import type {
   Step,
 } from './types.ts';
 
+// FIELD — definition (1 mi = 1609.344 m).
 const METRES_PER_MILE = 1609.344;
 
 /**
@@ -101,6 +102,7 @@ export type SessionRequest = {
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const lerp = (band: Range, t: number) => band.lo + (band.hi - band.lo) * clamp(t, 0, 1);
 /** The level's position inside a band: level 1 at the bottom, level 3 at the top. */
+// OURS — `levelT` places the three printed levels evenly along a band (0, 0.5, 1); the pages print the levels, not the spacing.
 const levelT = (level: Level) => (level - 1) / 2;
 
 // ── resolving an intensity against THIS athlete ─────────────────────────────────────────────────
@@ -141,6 +143,7 @@ function resolveTarget(intensity: Intensity, sport: Sport, anchor: AnchorReport)
         return { unresolved: 'Race pace — set by the race being trained for, not by this library.' };
       case 'below_pct':
         if (threshold == null) return { unresolved: 'No run threshold pace on file yet.' };
+        // OURS — `resolveTarget` 1% of threshold stands in for "no slower limit" on a below-X% run step; no page.
         return { paceSecPerMi: { lo: paceFromPct(threshold, intensity.hi), hi: paceFromPct(threshold, 0.01) } };
     }
   }
@@ -238,6 +241,7 @@ function recoveryStep(a: Archetype, workSeconds: number, sport: Sport, anchor: A
   if (r.kind === 'stated') {
     // A stated band of zero is the source saying the reps run back to back. No step, not a 0-second one.
     if (r.band.lo === 0 && r.band.hi === 0) return null;
+    // OURS — `recoveryStep` takes the middle of a stated recovery band; the band is the page's.
     return step('recovery', 'Recovery', lerp(r.band, 0.5), r.intensity, sport, anchor);
   }
   if (r.kind === 'proportional') {
@@ -490,6 +494,7 @@ function buildIntervals(ctx: BuildContext): Block[] {
       repeat: sets,
       label: `${sets} x ${perSet} ${a.label.toLowerCase()}`,
       steps: inner,
+      // OURS — the middle of the stated between-sets rest band (see `recoveryStep`).
       restBetween: step('recovery', 'Between sets', lerp(a.set.restBand, 0.5), a.set.intensity, sport, anchor),
     }];
   }
@@ -520,6 +525,7 @@ function buildIntervals(ctx: BuildContext): Block[] {
 
 function buildDistanceIntervals(ctx: BuildContext): Block[] {
   const { archetype: a, sport, anchor } = ctx;
+  // OURS — `buildDistanceIntervals` rounds a rep distance to whole 25 m lengths, 25 m at least; no page.
   const repMeters = Math.max(25, Math.round(lerp(a.repBand, levelT(ctx.level)) / 25) * 25);
   const reps = repCount(a, ctx, repMeters);
 
@@ -548,6 +554,7 @@ function buildDistanceIntervals(ctx: BuildContext): Block[] {
       repeat: sets,
       label: `${sets} x ${perSet} x ${repMeters} m`,
       steps: inner,
+      // OURS — the middle of the stated between-sets rest band (see `recoveryStep`).
       restBetween: step('recovery', 'Between sets', lerp(a.set.restBand, 0.5), a.set.intensity, sport, anchor),
     }];
   }
@@ -632,6 +639,7 @@ function buildContinuousWithInserts(ctx: BuildContext): Block[] {
    */
   const insertBlockSeconds =
     inserts * (repSeconds + floatSeconds) + Math.max(0, inserts - 1) * (rest?.seconds ?? 0);
+  // Viada p239: easy riding "below 75%".
   const steadyIntensity: Intensity = sport === 'ride' ? { kind: 'below_pct', hi: 0.75 } : { kind: 'vt1' };
   // ⛔ THE SAME FLOOR AND CAP AS A PLAIN BOUT. An LSD run with sets inserted into it is still a
   // continuous VT1 run, and Chapter 4's two-hour figure binds it; only the hike is exempt.
@@ -672,6 +680,7 @@ function buildPrintedRide(ctx: BuildContext, p: PrintedRide): Block[] {
   const blocks: Block[] = [{
     repeat: 1,
     label: 'Easy spin',
+    // Viada p239: easy riding "below 75%".
     steps: [step('work', 'Easy spin', p.openSeconds, { kind: 'below_pct', hi: 0.75 }, sport, anchor)],
     restBetween: null,
   }];
@@ -774,6 +783,7 @@ function buildDescending(ctx: BuildContext): Block[] {
     return [{ repeat: 1, label: `Cut-downs, ${rungCount} rungs`, steps, restBetween: null }];
   }
   const meanRep = (a.repBand.lo + a.repBand.hi) / 2;
+  // OURS — `buildDescending` fallback ladder: 2 to 12 rungs at the band's mean rep, for a shape with no printed rungs; no page.
   const rungs = clamp(Math.round(ctx.target / meanRep), 2, 12);
   for (let i = 0; i < rungs; i++) {
     const t = rungs === 1 ? 0 : i / (rungs - 1);
@@ -863,6 +873,7 @@ function addOnBlock(
   // ⚠️ THE DOSE SCALES WITH THE SESSION'S OWN SIZE — a longer easy day carries a few more. Both ends
   // are ours (`STRIDES_DOSE_IS_OURS`); the page gives no dose for a stride at all.
   const reps = Math.round(lerp(spec.reps, ctx.size));
+  // OURS — `STRIDES_DOSE_IS_OURS` stride seconds rounded to 5 (see above).
   const seconds = Math.round(lerp(spec.secondsPerRep, ctx.size) / 5) * 5;
   const work = step('work', spec.label.replace(/s$/, ''), seconds, spec.work, ctx.sport, ctx.anchor);
   const rest = step('rest', 'Full recovery', null, { kind: 'easy' }, ctx.sport, ctx.anchor);
@@ -891,6 +902,7 @@ export function buildEnduranceSession(req: SessionRequest): EnduranceSession {
     throw new Error(`archetype ${req.archetype} is not offered for ${req.family} at level ${req.level}`);
   }
 
+  // OURS — `buildEnduranceSession` size 0.5 (the middle of the band) when none is asked; same as volume-bounds `DEFAULT_SIZE`.
   const size = clamp(req.size ?? 0.5, 0, 1);
   const anchors = req.anchors ?? (req.baselines !== undefined ? resolveEnduranceAnchors(req.baselines) : UNKNOWN_ANCHORS);
   const sport = familyRules.sport;
@@ -946,6 +958,7 @@ export function buildEnduranceSession(req: SessionRequest): EnduranceSession {
 
     // The swim opener IS the warm-up (pp240-241 print no box), and it is built with a distance.
     if (openerMeters > 0) {
+      // OURS — `buildEnduranceSession` splits the swim opener evenly across the drills, in 50 m pieces, 50 m at least; no page.
       const per = Math.max(50, Math.round(openerMeters / SWIM_DRILLS.length / 50) * 50);
       for (const name of SWIM_DRILLS) {
         const { seconds, fromDistance } = secondsForDistance(per, sport, anchor, null);
@@ -984,6 +997,7 @@ export function buildEnduranceSession(req: SessionRequest): EnduranceSession {
    */
   if (isPoolSwim && built.totals.clockedSeconds > SWIM_SESSION_CEILING_SECONDS) {
     let scale = 1;
+    // OURS — `buildEnduranceSession` shrinks the swim distance up to 6 times, each to 98% of the ceiling ratio; solver margin, no page.
     for (let i = 0; i < 6 && built.totals.clockedSeconds > SWIM_SESSION_CEILING_SECONDS; i++) {
       scale *= (SWIM_SESSION_CEILING_SECONDS / built.totals.clockedSeconds) * 0.98;
       built = attempt(scale);

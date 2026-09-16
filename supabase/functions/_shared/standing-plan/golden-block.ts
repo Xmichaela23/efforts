@@ -30,12 +30,14 @@ import { composeBlock, type ComposedWeek, type PlanSession, type StrengthExercis
   from './compose.ts';
 import type { WorkingNumber } from './working-number.ts';
 
+// OURS — `golden-block` `WEEKS` 12-week fixture length for the printed test block; test output, not plan copy.
 const WEEKS = 12;
 
 /** ⛔ A tested lift as the reader stores it. Fixed figures — the archetype's, not an athlete's. */
 const tested = (lift: string, oneRm: number, weight: number, reps: number): WorkingNumber => ({
   lift: lift as WorkingNumber['lift'],
   predicted1RM: oneRm,
+  // Viada p215: the working number is 96% of the predicted 1RM (same fraction as `WORKING_MAX_FRACTION`).
   workingNumber: oneRm * 0.96,
   measured: { weight, reps },
   cite: 'archetype fixture',
@@ -137,6 +139,7 @@ function printRow(e: StrengthExercise): string {
   if (e.percent_1rm != null) tail.push(`${Math.round(e.percent_1rm * 100)}%`);
   if (e.target_rir != null) tail.push(`RIR ${e.target_rir}`);
   if (e.load_basis) tail.push(e.load_basis);
+  // OURS — `golden-block` printer text: test output for the committed golden files, not athlete copy.
   if (e.execution_name) tail.push(`shown as "${e.execution_name}"`);
   if (e.how_to) tail.push('how-to');
   if (Array.isArray(e.set_plan) && e.set_plan.length > 0) {
@@ -146,6 +149,7 @@ function printRow(e: StrengthExercise): string {
   return (bits.join(' ') + (tail.length ? `  | ${tail.join(' · ')}` : '')).trimEnd();
 }
 
+// OURS — `golden-block` printer text: test output for the committed golden files, not athlete copy.
 function printSession(s: PlanSession): string[] {
   if (s.type !== 'strength') {
     return [`  [${s.day}] ${pad(s.type, 8)} ${s.name}${s.duration ? ` — ${s.duration} min` : ''}`];
@@ -157,6 +161,7 @@ function printSession(s: PlanSession): string[] {
 }
 
 function printWeek(w: ComposedWeek): string[] {
+  // OURS — `golden-block` printer text: test output for the committed golden files, not athlete copy.
   const out = [
     '',
     `WEEK ${String(w.week).padStart(2, '0')}  column=${w.column}${w.isTestWeek ? '  ⟵ TEST WEEK' : ''}`,
@@ -172,6 +177,7 @@ function printWeek(w: ComposedWeek): string[] {
 
 export function render(a: Archetype): string {
   const weeks = composeBlock({ ...a.args, weeks: WEEKS, taperWeeks: [] } as never);
+  // OURS — `golden-block` printer text: test output for the committed golden files, not athlete copy.
   const head = [
     '='.repeat(100),
     `GOLDEN BLOCK — ${a.title}`,

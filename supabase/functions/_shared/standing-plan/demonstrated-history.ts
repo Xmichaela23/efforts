@@ -24,6 +24,7 @@
  * reads `distKm = Number(row.distance)` and multiplies by 1000 for metres, and
  * `compute-facts/index.ts:126` carries the same reading with an explicit small-number guard.
  */
+// FIELD — definition (1 km = 0.621371 mi).
 export const KM_TO_MILES = 0.621371;
 
 /**
@@ -32,6 +33,7 @@ export const KM_TO_MILES = 0.621371;
  * would let one big week qualify an athlete for permanent extra volume; a longer one would keep
  * telling a runner who stopped that they are still a runner.
  */
+// OURS — `DEMONSTRATED_WINDOW_DAYS` 28 days, the app's ACWR chronic window; no page.
 export const DEMONSTRATED_WINDOW_DAYS = 28;
 export const DEMONSTRATED_WINDOW_IS_OURS =
   'Twenty-eight days is ours. It is the same chronic window every ACWR in this app already uses, so '
@@ -85,10 +87,12 @@ export function demonstratedRunVolume(
     km += d;
     runs += 1;
   }
+  // OURS — `DEMONSTRATED_WINDOW_DAYS` printed in the source line (see above).
   if (runs === 0) {
     return { weeklyMiles: null, runs: 0, source: `no logged runs in the last ${DEMONSTRATED_WINDOW_DAYS} days` };
   }
   const weeks = DEMONSTRATED_WINDOW_DAYS / 7;
+  // OURS — `demonstratedRunVolume` weekly miles to one decimal, printed with the 28-day window.
   const weeklyMiles = Math.round(((km * KM_TO_MILES) / weeks) * 10) / 10;
   return {
     weeklyMiles,
@@ -146,6 +150,7 @@ export function demonstratedWeeklyMinutes(
     seconds += secs;
     sessions += 1;
   }
+  // OURS — `DEMONSTRATED_WINDOW_DAYS` printed in the source line (see above).
   if (sessions === 0) {
     const word = sport === 'ride' ? 'ride' : 'run';
     return {
@@ -154,8 +159,10 @@ export function demonstratedWeeklyMinutes(
       source: `no logged ${word}s with a recorded time in the last ${DEMONSTRATED_WINDOW_DAYS} days`,
     };
   }
+  // OURS — `demonstratedWeeklyMinutes` weekly minutes to one decimal over the 28-day window.
   const weeks = DEMONSTRATED_WINDOW_DAYS / 7;
   const word = sport === 'ride' ? 'ride' : 'run';
+  // OURS — `DEMONSTRATED_WINDOW_DAYS` printed in the source line (see above).
   return {
     weeklyMinutes: Math.round((seconds / 60 / weeks) * 10) / 10,
     sessions,

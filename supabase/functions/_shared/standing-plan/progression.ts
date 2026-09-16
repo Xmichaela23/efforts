@@ -41,7 +41,9 @@ export function scheduledRise(frame: FrameId, weeks: number): number {
  * ⚠️ 3.5% is the midpoint of his own 3-4% and is the only value here that is a choice; the phase-out
  * rate and its length are his, exactly.
  */
+// OURS — `LOWER_HAIRCUT_INITIAL` 3.5% is the midpoint of Viada p247's "3 to 4 percent"; the pick inside his range is ours.
 export const LOWER_HAIRCUT_INITIAL = 0.035;
+// Viada p247: "about 2 percent every three weeks for the first nine weeks" (both numbers below).
 export const LOWER_HAIRCUT_PHASE_OUT_PER_3_WEEKS = 0.02;
 export const LOWER_HAIRCUT_PHASE_OUT_WEEKS = 9;
 export const LOWER_HAIRCUT_CITE = 'Viada p247';
@@ -121,6 +123,7 @@ export function prescribedLoad(args: {
   const causePresent = args.hardRunBeforeLower !== false;
   const haircut = args.isLower && causePresent ? lowerBodyHaircut(args.week) : 1;
   const raw = args.working.workingNumber * risen * haircut * args.pctOfWorkingNumber;
+  // OURS — `prescribedLoad` falls back to a 5 lb step when no plate step is passed; no page, kept as found.
   const step = Number.isFinite(args.roundTo) && args.roundTo > 0 ? args.roundTo : 5;
   return { weight: Math.round(raw / step) * step, haircut, risen };
 }
@@ -260,6 +263,7 @@ export function progressionVerdict(
  * take anything smaller than 20, and the step is raised to what they can actually load rather than
  * prescribing a weight they cannot make.
  */
+// OURS — `STEP_UPPER_LB` / `STEP_LOWER_LB` 5 lb upper, 10 lb lower: pivot §4 field-standard step, no page.
 export const STEP_UPPER_LB = 5;
 export const STEP_LOWER_LB = 10;
 
@@ -355,6 +359,7 @@ export const ME_CLEAN_SESSIONS_TO_EARN = 2;
  * reachable session, which is the whole point: a threshold nobody clears is a ladder that never
  * moves, and the frozen single-set slot is exactly what this replaces.
  */
+// OURS — `ME_CLEAN_REPS_WITHIN_TOP` one rep of the p218 band top counts as clean (Michael, 2026-08-24); no page.
 export const ME_CLEAN_REPS_WITHIN_TOP = 1;
 
 /** One logged set of an ME slot, as the workouts table carries it. */
@@ -519,6 +524,7 @@ export const REPS_CARRY_THE_PROGRESSION_IS_OURS =
   + 'ours: the book\'s own rate cannot be expressed on a bar light enough to need it.';
 
 /** ⛔ THREE FALLING SESSIONS, AND STRICTLY FALLING. See `barLadderStep` for why not two, and why not equal. */
+// OURS — `DECLINE_SESSIONS_TO_UNDO` three strictly falling sessions undo a jump (Michael, 2026-08-26); no page.
 export const DECLINE_SESSIONS_TO_UNDO = 3;
 
 /**

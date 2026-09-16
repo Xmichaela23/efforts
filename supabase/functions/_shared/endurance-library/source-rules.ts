@@ -63,6 +63,7 @@ export const INFERRED_CYCLING_BASIS_NOTE =
  * *"VT1 bouts: minimum ~10-15 min each."* The floor takes the LOW end of his own range, so it
  * forbids only what he forbids.
  */
+// Viada p107: "single bouts of much less than 10 to 15 minutes are … unlikely to be worthwhile".
 export const VT1_BOUT_FLOOR_SECONDS = 10 * 60;
 
 /**
@@ -108,6 +109,7 @@ export const TEMPO_CROSSOVER_SECONDS = 15 * 60;
  * describes every athlete this plan is for, so the 5% branch applies on its own — it does not wait
  * for a key session tomorrow.
  */
+// Viada p107: 10 percent, or 5 percent for hybrid athletes training several times a week (see above).
 export const CARDIAC_DRIFT_TERMINATION_PCT = 5;
 export const CARDIAC_DRIFT_NOTE =
   'End the session when heart rate has drifted 5% at the same pace, or pace has fallen 5% at the '
@@ -1754,6 +1756,7 @@ export const POWER_FLOOR_NOTE =
  */
 export const SWIM_SESSION_CEILING_SECONDS = 90 * 60;
 
+// Viada pp240-241: mean opener share of his six pool sessions, 14.9% rounded to 15% (see the note above `SWIM_SESSION_CEILING_SECONDS`).
 export const SWIM_OPENER_SHARE = 0.15;
 
 export const SWIM_DRILLS = [

@@ -71,8 +71,10 @@ const minutes = (seconds: number) => Math.max(1, Math.round(seconds / 60));
  * run at roughly vVO2 for most athletes, so `5kpace` is the closest thing the existing vocabulary
  * has. It is not exact and the note on the session says the intensity is MLSS rather than 5K pace.
  */
+// FIELD — definition (1 mi = 1609.344 m)
 const METRES_PER_MILE = 1609.344;
 
+// OURS — `round5` interval metres round to 5 m and never under 5, a readable watch distance; no page, kept as found
 function round5(n: number): number {
   return Math.max(5, Math.round(n / 5) * 5);
 }
@@ -313,6 +315,7 @@ function repShape(session: EnduranceSession): { reps: number; repSeconds: number
   return {
     reps: Math.max(1, reps),
     repSeconds: reps > 0 ? Math.round(repTotal / reps) : 0,
+    // OURS — `repShape` 90 s when the session has no rest between reps; no page, kept as found
     restSeconds: restCount > 0 ? Math.round(restTotal / restCount) : 90,
   };
 }
@@ -342,6 +345,7 @@ function wrapperTokens(session: EnduranceSession, sport: SessionType): { pre: st
     };
   }
   if (sport === 'swim') {
+    // OURS — `wrapperTokens` swim warm-up and cool-down metres round to 50 m; no page, kept as found
     const m = (steps: typeof session.warmup) =>
       Math.round(steps.reduce((a, s) => a + (s.meters ?? 0), 0) / 50) * 50;
     const wm = m(session.warmup);
@@ -589,11 +593,13 @@ export function translateEnduranceSession(
       const { restSeconds } = repShape(session);
       const paceSecPerMi = session.anchor.value ?? null;
       const totalWork = workSeconds(session);
+      // OURS — no pace on file: 6 x 400 m, and rest never under 30 s; no page, kept as found
       if (!paceSecPerMi || totalWork <= 0) {
         work = [`interval_6x400m_5kpace_R${Math.max(30, restSeconds)}s`];
         break;
       }
       const totalMetres = (totalWork / paceSecPerMi) * METRES_PER_MILE;
+      // OURS — a sixth of the work per rep, clamped to 200-1600 m (the running library's shortest and longest work reps), rounded to 5 m
       // Aim at a readable rep, then clamp into the library's own distance band.
       const target = Math.min(1600, Math.max(200, round5(totalMetres / 6)));
       const reps = Math.max(1, Math.round(totalMetres / target));
@@ -736,6 +742,7 @@ export function translateEnduranceSession(
         .flatMap((b) => b.steps)
         .filter((st) => st.role === 'work' && st.meters != null)
         .map((st) => st.meters as number);
+      // OURS — swim rep metres round to 50 m (never under 50), 200 m when the session names none, rest never under 10 s; no page, kept as found
       const per = metres.length > 0
         ? Math.max(50, Math.round(metres[0] / 50) * 50)
         : 200;

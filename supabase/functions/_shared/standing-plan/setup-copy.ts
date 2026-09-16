@@ -25,6 +25,8 @@ export const PROGRAM_COPY = {
     requirement: 'Needs a barbell and plates, a rack and a bench. A lift you have not tested gets a test session in '
       + 'week one.',
   },
+  // Viada p246: four lifting days and four runs. Viada p247: the long run goes up to 90 to 100 minutes.
+  // OURS — `PROGRAM_COPY` "Twelve weeks", "comfortable running a full hour" and "about three hours of running and seven to nine hours of training in all"; no page.
   run_strength: {
     label: 'Run + Strength',
     blurb: 'You get stronger. Your speed and mileage hold. Twelve weeks: four lifting days, four runs. '
@@ -33,10 +35,13 @@ export const PROGRAM_COPY = {
       + 'the week holds about three hours of running and seven to nine hours of training in all. '
       + 'A lift you have not tested gets a test session in week one.',
   },
+  // Viada p278: three lifting days; five rides are its Deload column's five. OURS — `PROGRAM_COPY` the four-ride option (`fewerRidesDropsSlot`).
+  // OURS — `PROGRAM_COPY` "a 1RM of at least 65 lb" per lift: the entry minimum shared with `barbell-maxes.ts`; no page.
   ride_strength: {
     label: 'Ride + Strength',
     blurb: 'For newer riders and riders coming back. Cycling and strength progress together. '
       + 'Four or five rides, three lifting days.',
+    // OURS — `PROGRAM_COPY` 65 lb entry minimum (see above).
     requirement: 'Requirements: a barbell and rack, a bench, dumbbells, something to carry, and a bike. Watts need a '
       + 'power meter or smart trainer. Bench, squat and deadlift each need a 1RM of at least 65 lb.',
   },
@@ -113,6 +118,7 @@ export const NUMBERS_COPY = {
 export const BUILD_FOCUS_COPY = {
   subtitle: 'These are your hypertrophy lifts and super sets based on the equipment you have. You can swap on the '
     + 'day or adjust now for the plan.',
+  // Viada p86: 8 to 10 reps is the preferred hypertrophy range, 1 to 2 reps in reserve, never to failure.
   dose_line: 'Accessory sets are 8 to 10 reps with a rep or two left in the tank. Going to failure costs the next '
     + 'main lift.',
   day_heading: 'Day {day}',
@@ -132,6 +138,7 @@ export const BUILD_FOCUS_COPY = {
 
 export const RIDES_COPY = {
   count_label: 'Rides a week',
+  // Viada p278 Deload column prints five rides; OURS — `RIDES_COPY` the four-ride choice (see `PROGRAM_COPY`).
   count_chip: { 4: 'Four rides', 5: 'Five rides' } as Record<number, string>,
   row: 'Day {day} · {name}',
   easy_line: 'If easy rides are kept conversational, use your own judgement to go longer.',

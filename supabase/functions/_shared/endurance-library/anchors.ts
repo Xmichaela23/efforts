@@ -44,6 +44,7 @@ export type EnduranceAnchors = {
 };
 
 /** 100 yards is 91.44 metres. The conversion lives once, here. */
+// FIELD — definition (1 yd = 0.9144 m).
 const YD100_TO_M100 = 100 / 91.44;
 
 /**

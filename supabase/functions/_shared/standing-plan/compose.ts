@@ -826,6 +826,7 @@ function noteForWeek(slot: StrengthSlot, week: number): string {
 function targetRirForIntent(intent: 'ME' | 'DE' | 'SKILL' | 'HYP'): number | null {
   const p = prescribe(intent, 'barbell');
   if (p.kind !== 'barbell' || !p.rir) return null;
+  // OURS — `targetRirForIntent` takes the midpoint of the p218 RIR band, rounded to the half; the band is Viada p218
   return Math.round(((p.rir.lo + p.rir.hi) / 2) * 2) / 2;
 }
 
@@ -837,6 +838,7 @@ function targetRirForIntent(intent: 'ME' | 'DE' | 'SKILL' | 'HYP'): number | nul
  * hypertrophy slot**, and p86's 1-2 is the reserve for **accessory work added on top**. Two pages,
  * two doses, and the rows that carry each are decided in different places.
  */
+// Viada p86: 1-2 RIR for accessory work. OURS — `ACCESSORY_TARGET_RIR` takes the midpoint, 1.5
 const ACCESSORY_TARGET_RIR = 1.5;
 
 /**
@@ -1645,6 +1647,7 @@ function exerciseForSlot(
   }
   const p = prescribe(slot.intent, 'barbell', setPosition);
   const sets = p.kind === 'barbell' ? p.sets : 1;
+  // Viada p218: the rep band per intent (ME 1-5, DE 2-4, SKILL 3-5, HYP 6-12), read off strength-grid
   const reps = p.kind === 'barbell' ? `${p.reps.lo}-${p.reps.hi}` : '';
   const isLower = LOWER_PATTERNS.includes(pattern);
   const pct = pctForIntent(slot.intent);
@@ -1784,6 +1787,7 @@ function exerciseForSlot(
      * ratio is applied to that already-rounded figure afterwards.
      */
     pctOfWorkingNumber: pct,
+    // OURS — `roundTo` default 5 lb: the bar rounds to the nearest 5 lb, no page, kept as found
     roundTo: args.roundTo ?? 5,
   });
 
@@ -1831,6 +1835,7 @@ function exerciseForSlot(
       // absorb it"*, and the days are what make it checkable against the calendar rather than a
       // claim the athlete has to take on trust. This is the COMPENSATED break — p247's own layout —
       // so it is the one sentence here that reports a cost already paid.
+      // Viada p247: a 3-4% reduction phased out over the first nine weeks. OURS — "three and a half" is the midpoint of 3-4 (see progression.ts)
       text: `The hard run lands the day before the heavy leg session, so the lower-body weights `
         + 'start about three and a half per cent under where the test put them. That comes back over '
         + 'the first nine weeks.',
@@ -1919,6 +1924,7 @@ function exerciseForSlot(
        * converge on, and `slotTakesRamp` keeps it off the HYP rows — a twelve-rep set is its own ramp.
        */
       set_plan: [
+        // OURS — `roundTo` default 5 lb, as above
         ...(slotTakesRamp(slot.intent) ? rampFor(weight, args.roundTo ?? 5) : []),
         ...Array.from({ length: sets }, () => ({
           weight,
@@ -1984,6 +1990,7 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], 
   const exercises: StrengthExercise[] = [];
   for (const lift of lifts) {
     const seed = args.seed1RMs?.[lift];
+    // Viada p215 pretest steps; OURS — `roundTo` default 5 lb, as above
     const steps = seed ? pretestSession(lift, seed, args.roundTo ?? 5) : null;
     if (!steps) {
       /**
@@ -2009,6 +2016,7 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], 
        */
       exercises.push({
         name: names[lift],
+        // Viada p215: the pretest steps are 6 reps, 5 reps, then max reps
         reps: '6, 5, max',
         weight: 'By feel',
         load_prescribed: false,
@@ -2066,6 +2074,7 @@ function testDaySession(day: FrameDay, args: ComposeArgs, notes: ComposeNote[], 
      * ⚠️ EMPTY, NOT REMOVED. `PlanSession.description` is required and every reader expects a string.
      */
     description: '',
+    // OURS — `duration` 45 min on the test session row: placeholder length, no page, kept as found
     duration: 45,
     strength_exercises: exercises,
     /**
@@ -2144,6 +2153,7 @@ function plyoSession(day: FrameDay, args: ComposeArgs, rows: StrengthExercise[])
     // ⛔ 2026-09-09 (§B2): the stop rule is on every drill row already, in his approved words. Saying
     // it a fourth time at the session level is the wallpaper this order exists to remove.
     description: '',
+    // OURS — `duration` 20 min on the plyo session row: placeholder length, no page, kept as found
     duration: 20,
     strength_exercises: rows,
     tags: ['standing_plan', 'plyo'],
@@ -2175,6 +2185,7 @@ function plyoSession(day: FrameDay, args: ComposeArgs, rows: StrengthExercise[])
  * reason: p125's *"why"* is stated once, not twelve times. Said weekly it becomes wallpaper.
  * ⚠️ PASSES `voiceViolation` UNAIDED — measured, not assumed.
  */
+// OURS — `SET_END_CUE` "1 or 2 reps left" is Michael's sentence; p82/p83 are not in the corpus, and p86's 1-2 RIR is the hypertrophy dose. No caller today
 export const SET_END_CUE =
   'End the set when your form goes or you still have 1 or 2 reps left. Beyond that could mean '
   + 'longer recovery and fewer gains.';
@@ -2717,12 +2728,14 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         });
       });
     }
+    // OURS — at most 2 easy swims a week (Michael, 2026-08-24: 1 or 2 a week), no page
     const swims = Math.min(2, Math.max(0, Math.round(Number(args.swimEasySessions) || 0)));
     if (args.column === 'standard') {
       for (let i = 0; i < swims; i++) {
         out.push({ family: SWIM_SLOT.family, level: SWIM_SLOT.level, sport: 'swim' });
       }
       for (let i = 0; i < advancedTierSessions(args.demonstratedWeeklyMiles); i++) {
+        // OURS — the advanced tier's extra VT1 at level 1: p247 says "one or two VT1 sessions" and names no level
         out.push({ family: 'run_vt1', level: 1, sport: 'run' });
       }
       /**
@@ -3096,6 +3109,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
             // ⛔ IT NAMES THE CAUSE AND THE FIX. "Came up short" on its own teaches the athlete
             // nothing — the cause is the equipment on file, and adding to it is the thing that
             // changes the answer.
+            // The day number is the frame's own (p246, p274, p278); the count is the slots the kit left unfilled, not a threshold
             text: `${day.label ?? `Day ${day.day}`} is ${droppedHere} `
               + `${droppedHere === 1 ? 'exercise' : 'exercises'} short. The equipment on file does `
               + 'not cover enough different movements for this part of the body to fill the day '
@@ -3121,6 +3135,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
            * `STANDING_DE_SET_CUE`. Their comments are why particular phrasings must not come back.
            */
           description: '',
+          // OURS — `duration` 55 min on a lifting session row: placeholder length, no page, kept as found
           duration: 55,
           strength_exercises: exercises,
           // ⛔ THE DAY'S STRUCTURAL FACT TRAVELS WITH THE SESSION — see `FrameDay.lowerRole`. The
@@ -3152,6 +3167,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
             label: partialTest.name,
             day: day.day,
             isTest: true,
+            // p246 and p278 day 2 is the heavy lower day (ME: Lower)
             region: day.day === 2 ? ('lower' as const) : ('upper' as const),
             ...(day.day === 2 ? { heavyLower: true } : {}),
             sets: (partialTest.strength_exercises ?? []).map((e) => ({
@@ -3309,6 +3325,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   // week, appended to the lift-only days (the frame's no-endurance days, where easy swimming is the
   // one endurance that taxes neither the legs nor the pressing). The hard swim families are never
   // prescribed by this plan. Supersedes slice 4's easy-slot substitution.
+  // OURS — at most 2 easy swims a week (Michael, 2026-08-24), no page
   const swimAddOns = Math.min(2, Math.max(0, Math.round(Number(args.swimEasySessions) || 0)));
   if (swimAddOns > 0 && args.column === 'standard') {
     const liftOnlyDays = days.filter((d) => !d.rest && d.endurance.length === 0 && d.strength.length > 0);
@@ -3359,6 +3376,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     const targets = openDays.length > 0 ? openDays : days.filter((d) => !d.rest && d.endurance.length === 0);
     for (let i = 0; i < extraVt1 && i < targets.length; i++) {
       // ⛔ THE TIER'S RUNS TAKE THE RUN DIAL TOO — they are miles in the same week.
+      // OURS — the same level 1 for the advanced tier's extra VT1; p247 names no level
       const built = buildEnduranceSession({ family: 'run_vt1', level: 1, anchors, size: dialForSport('run') });
       builtEndurance.push(built);
       const row = translateEnduranceSession(built);
@@ -3477,6 +3495,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       if (fillsPlaced > 0) {
         notes.push({
           kind: 'ours',
+          // OURS — Michael's sentence (2026-08-26); prints no number
           text: `The extra hours are added as easy ${sport === 'run' ? 'runs' : 'rides'}, which can `
             + 'add training days to the week.',
         });
@@ -3534,10 +3553,12 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       );
       if (!Number.isFinite(askedHours) || !Number.isFinite(solved.expected)) continue;
       if (solved.verdict !== 'over_cap') continue;
+      // OURS — a quarter-hour dead band: a gap that small is rounding, not news
       if (askedHours - solved.expected <= 0.25) continue;
       const noun = sport === 'run' ? 'run' : 'ride';
       notes.push({
         kind: 'warning',
+        // OURS — the over-ask sentence (2026-08-30); the hours printed are the athlete's ask and what the week's own sessions hold
         text: `You asked for ${sayHours(askedHours)} of ${sport === 'run' ? 'running' : 'riding'} `
           + `across ${statedCount} ${noun}${statedCount === 1 ? '' : 's'}. That many ${noun}s hold `
           + `${sayHours(solved.expected)}, so the week builds that. `
@@ -3572,6 +3593,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       );
       if (!Number.isFinite(askedHours) || !Number.isFinite(solved.expected)) continue;
       // ⚠️ THE SAME QUARTER-HOUR DEAD BAND THE OVER-ASK USES — a rounding-sized gap is not news.
+      // OURS — the same quarter-hour dead band, and the under-ask sentence below (2026-08-30)
       if (solved.expected - askedHours <= 0.25) continue;
       notes.push({
         kind: 'warning',
@@ -3670,6 +3692,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     .map((f) => picks.byFold.get(f) ?? f)
     .some((n) => musclesWorkedBy(n)?.primary === 'core');
 
+  // OURS — `CORE_SLOTS_PER_WEEK` twice a week, see `CORE_PICK_FREQUENCY_IS_OURS`; zero while additions are off
   const CORE_SLOTS_PER_WEEK = ATHLETE_ADDITIONS_ON ? 2 : 0;
   /**
    * ⛔ ONE ANSWER IS ONE SLOT, AND THAT IS AN EXISTING LAW RATHER THAN A DOSE OPINION. *"A pick is
@@ -3760,6 +3783,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         // ⛔ A HOLD DOES NOT GET REPS (2026-08-24, seen on a device as "Plank — 3 x 8-10"). The row
         // is dosed in sets either way; what changes is the unit of the second number, and
         // `repPrescribable` was resolved where the movement was chosen so this never re-derives it.
+        // Viada p86: 8-10 reps for accessory work
         reps: add.repPrescribable ? '8-10' : HOLD_PRESCRIPTION,
         weight: 'By feel',
         load_prescribed: false,
@@ -3800,6 +3824,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
          * engine stating on the plan that it never saw the choice — and the same sentence under an
          * Dial row says the opposite of what happened.
          */
+        // OURS — the row's ownership words (A1 ruling); no number printed
         notes: add.reason === 'target'
           ? `Your ${DIAL_OWNERSHIP[chipForMuscle(add.muscle) ?? 'core']} focus.`
           : add.fromAthletePick
@@ -3920,6 +3945,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
           // it is not ours to relabel.
           name: movementLabel(movement),
           sets: muscleFloorSets(),
+          // Viada p86: 8-10 reps for accessory work
           reps: takesReps ? '8-10' : HOLD_PRESCRIPTION,
           weight: 'By feel',
           load_prescribed: false,
@@ -3976,6 +4002,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     const names = [...picks.unplaced].map((f) => picks.byFold.get(f) ?? f).sort();
     notes.push({
       kind: 'warning',
+      // OURS — the unplaced-pick warning (A1 ruling); names movements, prints no number
       text: `Not placed this week: ${names.join(', ')}. The programme owns how many slots the week `
         + 'holds, and every slot that suits these was already filled — by another of your choices, or '
         + 'by the movement the week was short of.',
@@ -3996,6 +4023,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
   {
     const said = new Set<string>();
     for (const m of enduranceMoves) {
+      // OURS — the day-off move sentence (2026-08-25); names days, prints no number
       const text = `${m.from} is a day off — ${m.session} moved to ${m.to}.`;
       if (said.has(text)) continue;
       said.add(text);
@@ -4094,6 +4122,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
       const at = steps.findIndex((t) => /^run_easy_\d+min$/.test(String(t)));
       if (at < 0) continue;
       const was = Number(String(steps[at]).match(/^run_easy_(\d+)min$/)![1]);
+      // Viada pp139-145 rule 5 (see above): VT1 run volume cut "by a third or so" after a hard leg day
       const now = Math.max(1, Math.round((was * 2) / 3));
       if (now >= was) continue;
       steps[at] = `run_easy_${now}min`;

@@ -217,6 +217,7 @@ export function placementsOf(typed: TypedSession[]): {
           : t.s.type === 'swim'
             ? { sport: 'swim' as const }
             : {}),
+      // OURS — `placementsOf` a session with no duration is read as 45 minutes for the law; no page, kept as found.
       minutes: Number(t.s.duration) || 45,
     });
   });
@@ -301,6 +302,7 @@ function framePrintsHardOnHeavyDay(
  * already answers that — the SUBJECT is the session whose clearance was not met, so the subject is
  * always the one running on legs the blocker left behind.
  */
+// Viada p77: "if you're tired, you move slowly, lift slowly … learn improper coordination patterns". Viada p130 / p131 for the second line.
 const liftingAfterEndurance = (day: Weekday, session: string): string =>
   `${day}: heavy legs after ${session}. Tired legs cause you to lift slowly and establish improper `
   + 'coordination patterns.';
@@ -415,6 +417,7 @@ export function weekConflicts(args: {
           days,
           sessions,
           shortBy: u.shortBy,
+          // Viada p145 (rule 6): skill movements in the first session, at least 6-8 hours before the next; p108 the same 6-8 h.
           text: `${sDay}: hard ride and heavy legs. Lifts in the first session, 6 to 8 hours before `
             + 'the ride.',
         });
@@ -457,6 +460,7 @@ export function weekConflicts(args: {
         shortBy: u.shortBy,
         text: apart === 'same'
           ? enduranceAfterLifting(sDay, bareFor(subject))
+          // Viada p130 / p131: keystone sessions need the relevant systems fresh.
           : `${bDay} heavy legs, ${sDay} long run. The run is on legs that have not recovered.`,
       });
       continue;
@@ -509,6 +513,7 @@ export function weekConflicts(args: {
           // ⛔ HIS OWN REASON FOR THE DAY. p218-219: DE is "bar speed and quality of movement…
           // fatigue is discouraged", and rule 3b — high-rep work straight after heavy squats
           // "trains reduced velocity and a lower force peak… it trains the skill wrong."
+          // Viada pp218-219: DE is bar speed and quality of movement.
           text: `${speedDay} has ${phraseFor(speed)} and ${phraseFor(hard)} on it. The speed day is `
             + 'prescribed for bar speed rather than load, and bar speed drops on legs that have '
             + 'already gone hard the same day.',
@@ -538,6 +543,7 @@ export function weekConflicts(args: {
       rule: 'easy_run_with_heavy_legs',
       days: [day],
       sessions: [...(heavy ? [heavy.s.name] : []), run.s.name],
+      // Viada p144 (rule 5): "cut your VT1 run volume by a third or so after a hard leg workout".
       text: `${day}: heavy legs and an easy run. The run is cut by a third.`,
     });
   }
@@ -569,6 +575,7 @@ export function weekConflicts(args: {
         rule: 'two_hard_one_day',
         days: [day],
         sessions: xs.map((t) => t.s.name),
+        // Viada p108 / p145: at least 6-8 hours between two sessions in one day.
         text: `${day} has ${list} on it. Six to eight hours between them, and the second one runs `
           + 'on legs that have already worked.',
       });
@@ -591,6 +598,7 @@ export function weekConflicts(args: {
         rule: 'no_rest_day',
         days: [restDay],
         sessions: took.map((t) => t.s.name),
+        // Viada p145 (rule 7): a rest day is not always needed; the rest day named is the frame's own (p246 / p274 day 7).
         text: `No day this week is clear. The program's week rests on ${restDay}, and `
           + `${took.length === 1 ? phraseFor(took[0]) : 'the sessions placed there'} took it.`,
       });

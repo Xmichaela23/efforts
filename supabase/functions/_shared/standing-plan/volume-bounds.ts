@@ -107,6 +107,7 @@ export const isBaseFamily = (family: string): boolean => BASE_FAMILIES.includes(
  * well inside that, which is the check worth remembering if a cap is ever raised.
  */
 export const LADDER_CEILING_MIN: Record<string, number> = {
+  // Viada p235: VT1 level 3 is 80-90 min. Viada p247: the long run goes "up to 90 to 100 minutes".
   run_vt1: 90,
   run_lsd: 100,
   /**
@@ -124,6 +125,7 @@ export const LADDER_CEILING_MIN: Record<string, number> = {
  * ⚠️ WHAT THE ATHLETE SEES IS 100, not 120: p239 prints no ride between 100 (top of level 1) and 130
  * (floor of level 2's mixed ride), and `ladderOf` drops a rung whose floor is past the cap.
  */
+// Viada p108: "rarely more than two hours of VT1 work in a single session" (see above).
 export const RIDE_EASY_CEILING_MIN = 120;
 
 /** The ceiling this one slot's ladder is clipped to. */
@@ -171,6 +173,7 @@ export type SlotSpan = {
   rungs: Rung[];
 };
 
+// FIELD — definition (1 min = 60 s).
 const SECONDS_PER_MIN = 60;
 
 /**
@@ -178,6 +181,7 @@ const SECONDS_PER_MIN = 60;
  * ABOVE `ladderOf` (2026-08-27) because a quality rung is now measured at it; it was declared below
  * and a `const` is not hoisted the way a function is.
  */
+// OURS — `DEFAULT_SIZE` the middle of a session's own band when nothing is asked; the band is the page's, the midpoint is ours.
 export const DEFAULT_SIZE = 0.5;
 
 /**
@@ -246,6 +250,7 @@ export function slotSpans(specs: SlotSpec[], anchors: EnduranceAnchors): SlotSpa
  */
 export function ladderOf(spec: SlotSpec, anchors: EnduranceAnchors): Rung[] {
   const ceiling = ladderCeilingFor(spec);
+  // Viada p235 / p239: the base families print three levels, so level 3 is the top rung.
   const top: Level = isBaseFamily(spec.family) ? 3 : spec.level;
   const out: Rung[] = [];
   for (let level = spec.level; level <= top; level++) {
@@ -481,6 +486,7 @@ export function slotMinutesBand(rungs: Rung[]): { min: number; max: number } {
  * prints. ⚠️ Deduplicated and sorted, so overlapping rungs (60-100, 130-210, 180-300) read as one
  * list of lengths rather than three.
  */
+// OURS — `slotMinuteOptions` offers quarter-hours (15 min) inside each rung; the rung ends are the page's, the 15-minute step has no page.
 export function slotMinuteOptions(rungs: Rung[], step = 15): number[] {
   const out = new Set<number>();
   for (const r of rungs) {
@@ -663,6 +669,7 @@ export function sizeFor(
  * with one run slot can hold. That case builds at that shape's own maximum and says where the hours
  * went, which is the specified behaviour and not a gap.
  */
+// OURS — `WEEKLY_HOUR_OPTIONS` run 1-6 h, ride 1-11 h: Michael 2026-08-26 (D-454), tops from the widest buildable week above; no page.
 export const WEEKLY_HOUR_OPTIONS: Record<'run' | 'ride', number[]> = {
   run: [1, 2, 3, 4, 5, 6],
   ride: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
@@ -679,6 +686,7 @@ export const WEEKLY_HOUR_OPTIONS: Record<'run' | 'ride', number[]> = {
  * — but it is not counted here, because a week that answers "more hours" by doubling up on the squat
  * day is not what the athlete asked for.
  */
+// Viada p246: days 2 and 5 carry no endurance and day 7 is the one full rest day.
 export const FREE_ENDURANCE_DAYS = 2;
 export const REST_DAY_RUNG = 1;
 
@@ -720,10 +728,12 @@ export function easyFillHours(sport: 'run' | 'ride', anchors: EnduranceAnchors):
   return rung ? rung.hi / 60 : 0;
 }
 
+// OURS — `sayHours` rounds the printed length to the nearest 5 minutes and says "about"; display rounding, no page.
 export function sayHours(n: number): string {
   const mins = Math.round(n * 60 / 5) * 5;
   const h = Math.floor(mins / 60);
   const m = mins % 60;
+  // OURS — `sayHours` wording (see above).
   if (h === 0) return `about ${m} minutes`;
   return m === 0 ? `about ${h}h` : `about ${h}h${String(m).padStart(2, '0')}`;
 }
@@ -760,15 +770,18 @@ export function fixedHoursLine(
    * built the clauses as a list and printed "At most, the long ride to about 3h30." — a sentence
    * with no verb, on every week whose only fixed session is the long one.
    */
+  // OURS — `fixedHoursLine` prints the hard and long sessions' own maxima from the ladder above; the minutes are the page's, the sentence is ours.
   const hardClause = hard > 0
     ? `The hard ${hardSpans.length === 1 ? `${noun} comes` : `${noun}s come`} to ${sayHours(hard)}`
     : '';
   const longClause = long > 0 ? `the long ${noun} to ${sayHours(long)}` : '';
 
+  // OURS — `fixedHoursLine` wording (see above).
   const head = hard > 0 && long > 0
     ? `${hardClause} and ${longClause} at most.`
     : hard > 0
       ? `${hardClause} at most.`
       : `The long ${noun} comes to ${sayHours(long)} at most.`;
+  // OURS — `fixedHoursLine` wording (see above).
   return `${head} The rest of the ${word} is easy.`;
 }

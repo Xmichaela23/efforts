@@ -37,6 +37,7 @@ import {
  * ⛔ IT IS STILL LABELLED OURS. He states a rate, not a staleness limit; turning one into the other
  * is our step.
  */
+// OURS — `EVIDENCE_WINDOW_DAYS` six weeks, two of p247's 1%-per-three-weeks steps; p247 gives a rate, not a staleness limit.
 export const EVIDENCE_WINDOW_DAYS = 42;
 export const EVIDENCE_WINDOW_IS_OURS =
   'Six weeks is ours. The source puts this plan\'s working max at one per cent every three weeks '
@@ -174,6 +175,7 @@ export function evidenceForSkip(args: {
   for (const lift of required) {
     const hit = best.get(lift);
     if (hit) { evidence[lift] = hit; continue; }
+    // OURS — `EVIDENCE_WINDOW_DAYS` printed in the reason (see above).
     missing.push({
       lift,
       reason: `no completed set of ${args.liftForName[lift]} in the last ${windowDays} days that a max `
@@ -188,6 +190,7 @@ export function evidenceForSkip(args: {
     missing,
     // ⚠️ "The", not "Your" — voice rule 1. States what is on file and what it buys; the decision is
     // the athlete's and the sentence does not push it either way.
+    // OURS — `EVIDENCE_WINDOW_DAYS` printed as weeks in the summary (see above).
     summary: available
       ? `All ${required.length} lifts have a recent set on file from the past `
         + `${Math.round(windowDays / 7)} weeks. The block can open on those numbers instead of a test week.`

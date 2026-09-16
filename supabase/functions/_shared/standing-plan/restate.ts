@@ -555,6 +555,7 @@ export function restateEndurance(args: {
     if (week < args.afterWeek) continue;
     const have = [...(plannedBySlot.get(key) ?? [])].sort((a, b) => String(a.date ?? '').localeCompare(String(b.date ?? '')) || String(a.id).localeCompare(String(b.id)));
     if (have.length === 0) { unmatched.push({ week, day, reason: 'no materialized row for this day' }); continue; }
+    // OURS — `restateEndurance` unmatched-row reason: a diagnostic count of rows, not plan copy.
     if (have.length !== wanted.length) { unmatched.push({ week, day, reason: `composer has ${wanted.length} session(s), calendar has ${have.length}` }); continue; }
     wanted.forEach((fresh, i) => {
       const row = have[i];

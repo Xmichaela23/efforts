@@ -248,6 +248,7 @@ export const HARD_ON_BIKE_CITE = 'Viada p280 — UNVERIFIED, page not transcribe
 export function hardOnBikeNote(hardRides: number, hardRuns: number): string | null {
   if (hardRides <= 0) return null;
   // ⚠️ NAMED BY COUNT, and the mixed case is its own sentence rather than a hedge on the plural.
+  // Viada p280 — UNVERIFIED, page not in the corpus (`HARD_ON_BIKE_CITE`); the count is the athlete's own hard rides.
   const subject = hardRuns > 0
     ? (hardRides === 1 ? 'One of the hard sessions is on the bike' : `${hardRides} of the hard sessions are on the bike`)
     : (hardRides === 1 ? 'The hard session is on the bike' : 'The hard sessions are on the bike');
@@ -358,6 +359,7 @@ export const SWIM_IS_EASY_ONLY =
  * ⚠️ `ride_sprints` / `ride_vo2` ARE DELIBERATELY ABSENT. No frame prescribes them, and a family
  * with no role is the honest answer for a session this plan never builds — see `isHardSlot`.
  */
+// Viada p231 / p233 / p235: the run families' intensity bands give the order. OURS — `HARDNESS` the ordinal values, and the ride rows mirroring the run rows.
 const HARDNESS: Partial<Record<FamilyId, number>> = {
   run_mlss: 4,
   run_near_threshold: 3,
@@ -446,6 +448,7 @@ export function isHardSlot(slot: { family: FamilyId; role?: string | null }): bo
   // ⛔ THE SLOT'S OWN MARKER WINS — see `isLongSlot`. Absent, the intensity table decides, and a
   // family the table does not rank is NOT hard: the honest answer for a session no frame builds.
   if (slot.role) return slot.role === 'hard';
+  // OURS — `HARDNESS` 3 and up (near-threshold and harder) counts as hard (see the table).
   return (HARDNESS[slot.family] ?? 0) >= 3;
 }
 
@@ -631,6 +634,7 @@ export const HARD_SLOT_FRAME_KEYS = { hard1: '1:0', hard2: '3:0' } as const;
 function hardPairIsInterchangeable(days: FrameDay[]): boolean {
   const hard: EnduranceSlot[] = [];
   for (const d of days) for (const slot of d.endurance ?? []) if (isHardSlot(slot)) hard.push(slot);
+  // Viada p246: the week's first two hard slots (days 1 and 3); p274 prints the second as a ride.
   return hard.slice(0, 2).length === 2
     && hard.slice(0, 2).every((s) => !String(s.family).startsWith('ride_'));
 }

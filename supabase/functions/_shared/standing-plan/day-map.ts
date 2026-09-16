@@ -252,6 +252,7 @@ export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind =
   const hardPins = [...new Set((pins.hardDays ?? []).map(livePin).filter((d) => d !== ''))];
   const startIdx = startWeekdayIndex(pins.startDateIso);
   // The frame days the test week uses. ⛔ Read from the source of that rule, not restated here.
+  // OURS — `TEST_DAY_LIFTS` the test sessions sit on frame days 1 and 2 (working-number.ts).
   const testDays = [1, 2];
 
   /** How many blocked days a rotation puts frame-fixed work on. 0 = the athlete's days off are clear. */
@@ -385,10 +386,12 @@ export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind =
       liftHits.length === 0 ? '' : liftHits.length === 1 ? 'a lifting day' : 'lifting days',
       plyoOnlyHits.length > 0 ? 'the jump drills' : '',
     ].filter(Boolean).join(' and ');
+    // OURS — `chooseDayMap` compromise note wording; the counts in it are the frame's lifting days (Viada p246 / p274) and the athlete's pins, no number of ours.
     const offClause = `${list(named)} ${named.length === 1 ? 'is a day off' : 'are days off'}, `
       + `but the week still puts ${what} there`;
     const nLifts = frameFixed.lifting.length;
     const longName = `long ${longSlotSport === 'ride' ? 'ride' : 'run'}`;
+    // OURS — `chooseDayMap` compromise note wording (see above).
     compromises.push({
       kind: 'cost',
       text: clearableAtAll && longPin !== '' && chosen.long
@@ -408,6 +411,7 @@ export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind =
     const longName = `long ${longSlotSport === 'ride' ? 'ride' : 'run'}`;
     compromises.push({
       kind: 'cost',
+      // OURS — `chooseDayMap` compromise note wording (see above).
       text: `Taper weeks have no ${longName}, so there is nothing to put on ${longPin}.`,
     });
   }
@@ -443,6 +447,7 @@ export function chooseDayMap(frame: FrameId, pins: DayPins, column: ColumnKind =
     const kept = longSlotSport === 'ride' ? 'ride' : 'run';
     compromises.push({
       kind: 'cost',
+      // OURS — `chooseDayMap` compromise note wording (see above).
       text: `This week has one long session, and it's a ${kept}. The long `
         + `${orphanPin.sport} on ${orphanPin.day} isn't in it.`,
     });
