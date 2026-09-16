@@ -880,13 +880,18 @@ interface RunAnalysisResult {
 
 export function analyzeRuns(runs: WorkoutRecord[], allRunCurves: WorkoutRecord[] = [], priorLearned: Record<string, any> | null = null): RunAnalysisResult {
   if (runs.length < 3) {
+    // ⛔ A TEST BEATS AN INFERENCE, EVEN WITH TOO FEW RUNS TO INFER (2026-09-16, Stage 7 session 1): the trial's
+    // threshold pace is the same one the full read below keeps (p210). Without this an athlete whose first runs
+    // include the trial lost it on the learn that recorded it.
+    const priorPace = priorLearned?.run_threshold_pace_sec_per_km;
+    const trialPace = priorPace && /time trial/.test(String(priorPace.source ?? '')) && Number(priorPace.value) > 0 ? priorPace as LearnedMetric : null;
     return {
       easy_hr: null,
       threshold_hr: null,
       race_hr: null,
       max_hr_observed: null,
       easy_pace: null,
-      threshold_pace: null
+      threshold_pace: trialPace
     };
   }
 
