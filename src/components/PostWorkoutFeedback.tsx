@@ -14,6 +14,7 @@ import { readinessSorenessPatch } from '@/utils/workoutMetadata';
 import { pendingFtpProposal } from '@/lib/resolve-current-ftp';
 import { pendingRunThresholdProposal } from '@/lib/resolve-current-run-pace';
 import { acceptMeasuredNumber } from '@/lib/accept-measured';
+import { formatPace } from '@/utils/workoutFormatting';
 import {
   Select,
   SelectContent,
@@ -110,7 +111,8 @@ export default function PostWorkoutFeedback({
   // saves the accept; then the unstarted endurance rows re-price). Nothing is applied on its own.
   const [ftpProposal, setFtpProposal] = useState<{ measured: number; applied: number } | null>(null);
   const [thrProposal, setThrProposal] = useState<{ measuredSecPerKm: number; measuredSecPerMi: number; appliedSecPerMi: number } | null>(null);
-  const fmtMi = (secPerMi: number) => `${Math.floor(secPerMi / 60)}:${String(Math.round(secPerMi % 60)).padStart(2, '0')}/mi`;
+  // ⛔ THE ONE PACE FORMATTER (2026-09-15, §8.0 #2). This rounded the seconds on their own and printed "7:60/mi".
+  const fmtMi = (secPerMi: number) => formatPace(secPerMi / 1.60934, true);
   const [ftpAccepting, setFtpAccepting] = useState(false);
   const [ftpNote, setFtpNote] = useState<string | null>(null);
   useEffect(() => {
@@ -410,7 +412,9 @@ export default function PostWorkoutFeedback({
         // Simplified clean flag (D-201 model): one boolean. checked (true) = clean / as-prescribed →
         // counts toward fitness markers; unchecked = deviated / drills-kick → excluded. Volume (time +
         // distance) feeds the markers separately from the activity itself.
-        meta.swim_as_planned = swamAsPlanned;
+        // ⛔ ONE SPELLING (2026-09-15, §8.0 #35): `swam_as_planned`, the name compute-facts, the snapshot and the
+        // swim nudge have always read. This wrote `swim_as_planned`, so an unticked box reached none of them.
+        meta.swam_as_planned = swamAsPlanned;
         // Planned + as-prescribed → auto-confirm the plan's gear so the contamination flag still reflects
         // prescribed fins/kick steps (no extra UI; the plan already knows the gear).
         if (prescribedEquip.length > 0 && swamAsPlanned) {

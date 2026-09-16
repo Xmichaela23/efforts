@@ -402,7 +402,7 @@ Deno.serve(async (req) => {
         meta = meta || {};
         const kind = String(meta.swim_session_kind || '').toLowerCase();
         if (kind === 'drills' || kind === 'mixed') return null;     // ad-hoc non-straight → not a clean threshold read
-        if (meta.swim_as_planned === false) return null;            // planned but deviated → exclude
+        if (meta.swam_as_planned === false) return null;            // planned but deviated → exclude (one spelling, §8.0 #35)
         const rpe = Number((w as any).rpe);
         return { distanceM: Math.round(distM), timeS: Math.round((pace as number) * (distM / 100)), confirmedHard: Number.isFinite(rpe) && rpe >= 7, date: String((w as any).date || (w as any).timestamp || '') };
       })
