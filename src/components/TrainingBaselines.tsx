@@ -1215,7 +1215,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
     const thrMine = pnAny.threshold_pace_source === 'manual';
     const thrSamples = Number(learnedFitness?.run_threshold_pace_sec_per_km?.sample_count);
     const thrAccepted = learnedFitness?.run_threshold_pace_accepted?.value != null;
-    const thrNote = thrMine ? 'your number' : thr.source === 'learned' ? (thrAccepted ? 'accepted from runs' : `from runs${Number.isFinite(thrSamples) && thrSamples > 0 ? `, ${thrSamples} runs` : ''}`) : thr.sec_per_mi != null ? 'typed, until your runs measure' : null;
+    const thrNote = thrMine ? 'your number' : thr.source === 'learned' ? (thrAccepted ? 'accepted from runs' : `from runs${Number.isFinite(thrSamples) && thrSamples > 0 ? `, ${thrSamples} best efforts` : ''}`) : thr.sec_per_mi != null ? 'typed, until your runs measure' : null;
     const thrProposal = pendingRunThresholdProposal(baselinesLike);
     const fiveKMine = pnAny.fiveK_source !== 'learned';
     const implied = arcFiveKNudge?.implied_5k_label ?? null;
@@ -1327,7 +1327,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
       const learnedEntry = lift.learnedKey ? learnedFitness?.strength_1rms?.[lift.learnedKey] : null;
       const sets = Number(learnedEntry?.sample_count);
       const unit = lift.reps ? 'reps' : (metric ? 'kg' : 'lb');
-      const note = locked ? 'your number' : r.source === 'learned' ? `from your lifts${Number.isFinite(sets) && sets > 0 ? `, ${sets} sets` : ''}` : r.source === 'typed' ? (lift.reps ? 'typed' : 'typed, until your lifts measure') : null;
+      const note = locked ? 'your number' : r.source === 'learned' ? `from your lifts${Number.isFinite(sets) && sets > 0 ? `, ${sets} sessions` : ''}` : r.source === 'typed' ? (lift.reps ? 'typed' : 'typed, until your lifts measure') : null;
       const sug = r.suggestion && r.suggestion.divergencePct > 0 ? ` Your lifts suggest ${Math.round(r.suggestion.computed)}.` : '';
       return (
         <NumberRow key={lift.key} id={lift.key} name={lift.label} hint={unit} inputMode="numeric" sport="strength" value={r.value != null ? `${Math.round(r.value)} ${unit} · ${numberWord(r.source, locked)}` : null} note={note ? note + sug : null} mine={locked}
@@ -1336,7 +1336,7 @@ const sportSections = (): Array<{ id: string; label: string; Icon: React.Compone
       );
     });
     return [
-      { id: 'strength-numbers', label: 'Lifts · 1RM', Icon: Dumbbell, info: 'The four lifts the block works from, and pull-ups as reps. Typing a number makes it your number and locks it; auto uses what your lifts measure, three logged sets and up. A number typed here is also the number on file for a new block.', body: <div className="space-y-1.5">{liftRows}</div> },
+      { id: 'strength-numbers', label: 'Lifts · 1RM', Icon: Dumbbell, info: 'The four lifts the block works from, and pull-ups as reps. Typing a number makes it your number and locks it; auto uses what your lifts measure, three logged sessions and up. A number typed here is also the number on file for a new block.', body: <div className="space-y-1.5">{liftRows}</div> },
       { id: 'strength-equipment', label: 'Equipment', Icon: Wrench, info: 'A commercial gym has everything. A home gym lists what you have; the plan picks movements from it.', body: (
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
