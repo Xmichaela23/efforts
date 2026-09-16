@@ -79,7 +79,7 @@ serve(async (req) => {
     const exercises = parseExercises(workout.strength_exercises);
     // ⛔ THE ONE VOLUME (2026-09-15, §8.0 #32) — `completedStrengthVolume`, the same pricing Performance and
     // Today print, so the posted "lb moved" is the number on the athlete's own screens.
-    const { data: ubRow } = await supabase.from('user_baselines').select('weight, units').eq('user_id', user.id).maybeSingle();
+    const { data: ubRow } = await supabase.from('user_baselines').select('weight, units').eq('user_id', userId).maybeSingle();
     const bodyweightLb = resolveBodyweightLb(ubRow as any);
     const volumeLb = completedStrengthVolume(exercises as unknown[], bodyweightLb).completed_total_lb;
     const description = shareBody(exercises, volumeLb);
