@@ -4617,8 +4617,14 @@ Deno.serve(async (req) => {
           if (fatigueRefinement?.loadedLegs) return fatigueRefinement.loadedLegs.why;
           if (readinessState !== 'fatigued' && readinessState !== 'overreached') return null;
           const e = weeklyResponseModel.endurance;
-          const acwr = metrics.acwr;
-          const loadLabel = (acwr != null && acwr >= 1.2) ? `load elevated (ACWR ${acwr.toFixed(2)})` : 'load balanced';
+          /**
+           * ⛔ NO ACWR CLAUSE (2026-09-15, §8.0 #41). This read `metrics.acwr` and appended
+           * "load elevated (ACWR 1.xx)" to the Why — the one place the ratio still reached an athlete after it
+           * came off every surface (ledger row "ACWR and the reconciled load word"), and the receipts type
+           * beside it already said "TrainingPeaks' zone, never ACWR". The label is empty and
+           * `buildReadinessWhy` drops an empty one, so the clause is gone and nothing replaces it.
+           */
+          const loadLabel = '';
           // The RPE driver now renders under BODY (readiness_rpe_driver, Whoop verdict+driver pairing).
           // rpeUnderBody drops it here so it never double-shows; the Why keeps only the NON-RPE factors.
           // For Michael (RPE-only) this returns null → the "open for more" expand disappears.
