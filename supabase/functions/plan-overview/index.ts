@@ -47,7 +47,7 @@ Deno.serve(async (req) => {
     if (!plan) return json({ success: false, error: 'Plan not found' }, 404);
     const { data: rows, error: rowsErr } = await supabase
       .from('planned_workouts')
-      .select('id,week_number,day_number,date,type,name,tags,workout_metadata,duration,total_duration_seconds,computed,intervals')
+      .select('id,week_number,day_number,date,type,name,tags,duration,total_duration_seconds,computed,intervals')
       .eq('training_plan_id', planId)
       .eq('user_id', userId);
     if (rowsErr) return json({ success: false, error: rowsErr.message }, 500);
