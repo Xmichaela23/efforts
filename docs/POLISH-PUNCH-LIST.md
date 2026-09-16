@@ -14,6 +14,33 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
+## QUEUED (Michael, 2026-09-15: "broaden the range and communicate it") — ANAEROBIC RIDE: "NO CEILING" IN WORDS, A POINT RANGE IN THE VERDICT
+
+`family-lines.ts:26` prints "Stay above the floor. No ceiling." for `ride_anaerobic` (Viada p237, `POWER_FLOOR_NOTE`),
+but the work steps on the built session carried `202–202 W` and every set above the floor read red ("0 of 15 inside
+their range"). Question, not a finding: does the materializer write lo = hi for a floor-only step, and should
+`interval-compare` judge a floor-only step as green at or above the floor? Trace `materialize-plan` power-range
+writer (:3523-3553) and `analyze-cycling-workout:1433` before anyone touches it. Standing-plan path.
+Direction agreed: (1) floor-only efforts print "202 W and up" (zone-row house style) and judge green at or above the
+floor (p237: start 110%, climb to 125–130%); (2) fixed-percent steps (90%, 50%) get the one single-percent band the
+materializer already applies elsewhere (±5%, NO-SRC — source it or mark OURS in the same session). Step-line words to
+Michael before the build. One-truth workorder Stage 3 session 6, after Stage 4 session 1 reports.
+
+## QUEUED — "Zwift - Intervals icu:" PREFIX ON A RIDE TITLE (Michael, 2026-09-15, screenshot)
+
+A Zwift ride built in Intervals.icu arrives via the Strava webhook titled "Zwift - Intervals icu: Anaerobic Ride"
+with "powered by Strava via Zwift". The attribution is right (Strava delivered the file; `lib/provider-attribution.ts`).
+The title is the file's own name: Intervals pushed the workout to Zwift with that prefix. Two items, after the
+workorder: strip a "Zwift - Intervals icu:" style prefix in `lib/derive-workout-title.ts`; and when the Intervals.icu
+import (parked) is built, show Intervals as the source where it provided the file.
+
+## QUEUED — TODAY HEADER CARD RE-POPS ON RETURN TO TODAY (Michael, 2026-09-15, screenshot)
+
+Scrolling back to today, the header card grows again because the weather block (`c/TodayWeather.tsx`) renders
+only for today; other days have no weather so the card is shorter, and the return snaps it back. Not a reload.
+Two fixes, look decision for Michael: hold the card at one height on every day, or animate the weather in.
+After the one-truth workorder.
+
 ## QUEUED — SMART PLATE MATH IN THE LOGGER (Michael, 2026-09-15, "nice to have, don't get stuck on it")
 
 After the one-truth workorder's Stage 4 has touched the logger. The plate popover (`src/components/StrengthLogger.tsx:488-564`)
