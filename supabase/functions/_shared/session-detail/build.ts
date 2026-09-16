@@ -278,6 +278,14 @@ export type SessionDetailInput = {
    *  athlete_snapshot.state_trends_v1 in workout-detail. The builder only passes it through
    *  (no re-derivation); null when no cache is available. */
   disciplineTrend?: SessionDetailV1['discipline_trend'];
+  /**
+   * ⛔ THE RIDER'S OWN RECENT WATTS PER HEARTBEAT — `state_trends_v1.bike.efficiency.recentValue`,
+   * the average over the trend's recent 28 days, read off the snapshot by workout-detail (the only DB
+   * reader). The EFFICIENCY row compares this session against it instead of printing its definition.
+   * ⚠️ IT IS STATE'S OWN SERIES, not a second pool: `computeEfficiencyFactorTrend` builds it from the
+   * same `efficiency_factor` this session writes, over rides that passed `counts_toward_trend`.
+   */
+  rideEfficiencyRecent?: number | null;
   /** core_verdicts rows for the core(s) this run traversed — loaded by workout-detail (the ONLY DB
    *  reader). build.ts renders them (Law 4); it does not fetch or recompute. */
   coreVerdicts?: CoreVerdictRow[] | null;
@@ -536,11 +544,19 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
        * so a zero-lower band still colours nothing, and nothing on the phone renders the watts as
        * text — the field is read by the comparison and by the drift window.
        */
+      /**
+       * ⛔ AND A BAND WITH NO TOP IS A REAL PRESCRIPTION TOO (2026-09-15, p237). The anaerobic work
+       * carries a floor and no ceiling; requiring an upper dropped the band off every one of those
+       * rows, so the row printed no target and the comparison had nothing to colour.
+       */
+      const floorOnlyPower = Number.isFinite(pwLower) && Number(pwLower) > 0 && pwUpper == null;
       const hasPowerRange =
-        Number.isFinite(pwLower) &&
-        Number.isFinite(pwUpper) &&
-        Number(pwLower) >= 0 &&
-        Number(pwUpper) > 0;
+        floorOnlyPower || (
+          Number.isFinite(pwLower) &&
+          Number.isFinite(pwUpper) &&
+          Number(pwLower) >= 0 &&
+          Number(pwUpper) > 0
+        );
       const ivType = normIntervalType(iv?.interval_type || iv?.kind);
       intervals.push({
         id: String(iv?.interval_id || iv?.interval_number || intervals.length),
@@ -558,11 +574,15 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         ),
         planned_duration_s: fin(iv?.planned_duration_s),
         planned_pace_range: hasRange ? { lower_sec_per_mi: Number(lower), upper_sec_per_mi: Number(upper) } : undefined,
-        planned_power_range: hasPowerRange ? { lower_w: Number(pwLower), upper_w: Number(pwUpper) } : undefined,
+        planned_power_range: hasPowerRange
+          ? (floorOnlyPower ? { lower_w: Number(pwLower) } : { lower_w: Number(pwLower), upper_w: Number(pwUpper) })
+          : undefined,
         planned_pace_display: (() => {
           if (typeof sr?.planned_pace_display === 'string') return sr.planned_pace_display;
           if (hasRange) return fmtPaceRange(Number(lower), Number(upper));
           // D-089: cycling — use the power range as the planned subtitle.
+          // Approved 2026-09-15: the zone rows' house style for an open bound — "202 W and up".
+          if (floorOnlyPower) return `${Math.round(Number(pwLower))} W and up`;
           if (hasPowerRange) return `${Math.round(Number(pwLower))}-${Math.round(Number(pwUpper))} W`;
           return null;
         })(),
@@ -660,7 +680,9 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         planned_label: String(iv?.planned_label ?? ''),
         planned_duration_s: fin(iv?.planned?.duration_s),
         planned_pace_display: Number.isFinite(prLo) && prLo > 0
-          ? `${Math.round(prLo)}${Number.isFinite(prHi) && prHi !== prLo ? `-${Math.round(prHi)}` : ''} W`
+          ? (pr?.upper == null
+            ? `${Math.round(prLo)} W and up`
+            : `${Math.round(prLo)}${Number.isFinite(prHi) && prHi !== prLo ? `-${Math.round(prHi)}` : ''} W`)
           : (tp != null ? fmtPaceRange(tp, tp) : null),
         executed: { duration_s: null, distance_m: null, avg_hr: null, actual_pace_sec_per_mi: null, actual_gap_sec_per_mi: null, power_watts: null },
         pace_adherence_pct: null,
@@ -884,7 +906,11 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
      * says `not_applicable`, so it keeps the ordinary read below. See that file for why the test is
      * p107's bout length rather than the step's prescribed intensity.
      */
-    const win = vt1WindowDrift({ intervals, workoutAnalysis: wa, sport: type });
+    // ⛔ THE SAME MATERIALS THE LADDER READS BELOW — the window may not answer where p107's gate says no.
+    const driftSteadiness = {
+      factPacket, intervals, plannedRow: plannedRowRaw as any, workoutRow: completedRow,
+    };
+    const win = vt1WindowDrift({ intervals, workoutAnalysis: wa, sport: type, steadiness: driftSteadiness });
     if (win.kind === 'too_short') {
       return {
         pct: null, basis: null, assessment: null, confounded: false, whole_session: false,
@@ -898,7 +924,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       workoutAnalysis: wa, computed: comp, sport: type,
       // The materials, not a verdict — `session-steadiness.ts` decides. `plannedRowRaw` carries the
       // plan's family tag, `completedRow` the provider's word and the device's lap markings.
-      steadiness: { factPacket, intervals, plannedRow: plannedRowRaw as any, workoutRow: completedRow },
+      steadiness: driftSteadiness,
     });
     if (win.kind === 'read') {
       // The windowed number replaces the whole-file one; everything else about the row is unchanged.
@@ -962,6 +988,8 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
         indoorVenue,
         plannedRowRaw ?? null,
         completedRow ?? null,
+        (wa as any)?.bike_fitness_v1?.counts_toward_trend ?? null,
+        input.rideEfficiencyRecent ?? null,
       );
 
   /**
@@ -1616,12 +1644,34 @@ export function formatCyclingPacingRow(
  * persisted keys efficiency_factor + aerobic_decoupling_pct. (The request named
  * the decoupling field generically; the shipped shape uses
  * `aerobic_decoupling_pct` — Friel aerobic decoupling %. Documented deviation.)
- * Gate: BOTH finite — decoupling is only present for steady efforts ≥20 min, so
- * short/interval rides correctly produce no row. Label literal per request.
+ *
+ * ⛔⛔ STEADY AEROBIC RIDES ONLY, AND IT TAKES BOTH GATES (2026-09-15). The only gate here was "both
+ * numbers are on file", which is a data-presence test rather than a statement about the session — so
+ * an interval ride that happened to carry both printed the row.
+ *
+ * ⛔ GATE 1: `bike_fitness_v1.counts_toward_trend` — `bikeEfficiencyRideEligible`, Garmin's rule of 10
+ * minutes or more at aerobic intensity, written by `analyze-cycling-workout` and already asked by
+ * State's chart and Today's ride line. ⚠️ A ride analysed before the field existed carries `undefined`
+ * and still counts, the same reading `session-boom/line.ts` takes; only an explicit `false` withholds.
+ *
+ * ⛔ GATE 2: `sessionSteadiness` — AND IT IS NOT OPTIONAL, because gate 1 does not answer the question
+ * this row is asking (verified on a throwaway account 2026-09-15). p237's anaerobic ride carries a
+ * 15-minute warm-up, four 4-minute spins and a 10-minute cool-down: over 40 minutes in the aerobic
+ * band, so Garmin's dwell rule passes it and the row appeared on an interval session. Gate 1 asks "is
+ * there enough in-band time to read heart rate at power"; gate 2 asks "was this a steady session",
+ * which is the same ladder the drift read uses and the one that knows the plan's family.
+ *
+ * ⛔ AND IT IS A COMPARISON, NOT A DEFINITION (2026-09-15, approved copy). The row used to spend its
+ * second half explaining what the number is and which way is good. It now says what it is against the
+ * rider's own recent rides — `state_trends_v1.bike.efficiency.recentValue`, State's series, so the
+ * two screens cannot disagree about the same rider. With no trend yet, the number alone.
  */
 export function formatCyclingEfficiencyRow(
   efficiency: unknown,
+  opts?: { countsTowardTrend?: boolean | null; recentEf?: number | null; steady?: boolean | null },
 ): { label: string; value: string } | null {
+  if (opts?.countsTowardTrend === false) return null;
+  if (opts?.steady === false) return null;
   const e = (efficiency ?? null) as any;
   if (!e || typeof e !== 'object') return null;
   // Explicit null/undefined check before Number(): aerobic_decoupling_pct is
@@ -1643,9 +1693,12 @@ export function formatCyclingEfficiencyRow(
   // and the other headlined it. `dec` is still required above as an eligibility signal (a ride without
   // it is not a readable aerobic effort), it is simply no longer PRINTED here. See the Heart rate row.
   void dec;
-  // Say what the number is and which way is good (Michael, 2026-09-07: "this makes sense to someone?").
-  // Efficiency factor = normalized power ÷ average heart rate (Friel / TrainingPeaks EF); the field's own term.
-  return { label: 'EFFICIENCY', value: `Efficiency factor ${ef.toFixed(2)}: power per heartbeat (normalized power ÷ average heart rate). Higher on the same kind of ride over time means fitter.` };
+  // ⚠️ APPROVED WORD FOR WORD, 2026-09-15. Two plain sentences; no definition, no "higher is fitter".
+  const recent = Number(opts?.recentEf);
+  const against = Number.isFinite(recent) && recent > 0
+    ? ` Your average on steady rides over the last four weeks is ${recent.toFixed(2)}.`
+    : '';
+  return { label: 'EFFICIENCY', value: `Watts per heartbeat ${ef.toFixed(2)}.${against}` };
 }
 
 /**
@@ -1699,6 +1752,15 @@ export function buildAnalysisDetailRows(
    *  same screen said nothing. Both default null: a caller that passes neither behaves as before. */
   plannedRowForSteadiness: unknown = null,
   completedRowForSteadiness: unknown = null,
+  /**
+   * ⛔ THE RIDE'S OWN STEADY-AEROBIC STAMP — `bike_fitness_v1.counts_toward_trend`, Garmin's 10-minutes
+   * -at-aerobic-intensity rule, written by `analyze-cycling-workout` and already read by State's chart
+   * and Today's ride line. The EFFICIENCY row asks it now; only an explicit `false` withholds the row.
+   * ⚠️ POSITIONAL — see the 2026-08-02 note above about the row that vanished.
+   */
+  bikeCountsTowardTrend: boolean | null = null,
+  /** The rider's recent watts per heartbeat, `state_trends_v1.bike.efficiency.recentValue`. */
+  rideEfficiencyRecentEf: number | null = null,
 ): Array<{ label: string; value: string }> {
   const rows: Array<{ label: string; value: string }> = [];
   if (!factPacket) return rows;
@@ -1878,7 +1940,12 @@ export function buildAnalysisDetailRows(
   // Efficiency (cycling): HR-at-power EF from computed.analysis.efficiency.
   try {
     if (sport === 'ride') {
-      const row = formatCyclingEfficiencyRow(comp?.analysis?.efficiency);
+      const row = formatCyclingEfficiencyRow(comp?.analysis?.efficiency, {
+        countsTowardTrend: bikeCountsTowardTrend,
+        recentEf: rideEfficiencyRecentEf,
+        // The same ladder the drift rows in this file ask, through the same name.
+        steady: !shouldSuppressSessionHrDrift(factPacket, intervals, plannedRowForSteadiness, completedRowForSteadiness),
+      });
       if (row) rows.push(row);
     }
   } catch { /* */ }

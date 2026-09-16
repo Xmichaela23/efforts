@@ -18,15 +18,62 @@ import { formatCyclingClimbingRow, formatCyclingEfficiencyRow } from './build.ts
 // durability read inside an efficiency figure while the RUN gave the same idea a row of its own. It now
 // has its own "Heart rate" row on both sports. `aerobic_decoupling_pct` is STILL REQUIRED here as an
 // eligibility signal (a ride without it is not a readable aerobic effort); it is simply not printed.
+// ⛔ AND THE ROW IS A COMPARISON, NOT A DEFINITION (2026-09-15, approved copy). It spent its second
+// half explaining what the number is and which way is good; it now says what it is against the rider's
+// own recent rides. With no trend to read, the number alone.
 Deno.test('efficiency: both values finite → "Watts per heartbeat {ef}", drift NOT printed here', () => {
   assertEquals(
     formatCyclingEfficiencyRow({ efficiency_factor: 1.62, aerobic_decoupling_pct: 4.3 }),
-    { label: 'EFFICIENCY', value: 'Efficiency factor 1.62: power per heartbeat (normalized power ÷ average heart rate). Higher on the same kind of ride over time means fitter.' },
+    { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.62.' },
   );
   // 0% decoupling is finite → still renders (Number(null) trap: 0 is a value, absent is not)
   assertEquals(
     formatCyclingEfficiencyRow({ efficiency_factor: 1.7, aerobic_decoupling_pct: 0 }),
-    { label: 'EFFICIENCY', value: 'Efficiency factor 1.70: power per heartbeat (normalized power ÷ average heart rate). Higher on the same kind of ride over time means fitter.' },
+    { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.70.' },
+  );
+});
+
+Deno.test('efficiency: the rider\'s own recent average is the second sentence', () => {
+  assertEquals(
+    formatCyclingEfficiencyRow({ efficiency_factor: 1.42, aerobic_decoupling_pct: 3.1 }, { recentEf: 1.384 }),
+    { label: 'EFFICIENCY', value: 'Watts per heartbeat 1.42. Your average on steady rides over the last four weeks is 1.38.' },
+  );
+});
+
+/**
+ * ⛔ STEADY AEROBIC RIDES ONLY (2026-09-15). The gate is `bike_fitness_v1.counts_toward_trend`, already
+ * stamped on every ride; only an explicit `false` withholds the row, so a ride analysed before the field
+ * existed still prints one.
+ */
+Deno.test('efficiency: an interval ride gets no row, however good its numbers are', () => {
+  assertEquals(
+    formatCyclingEfficiencyRow({ efficiency_factor: 1.62, aerobic_decoupling_pct: 4.3 }, { countsTowardTrend: false }),
+    null,
+  );
+  assertEquals(
+    formatCyclingEfficiencyRow({ efficiency_factor: 1.62, aerobic_decoupling_pct: 4.3 }, { countsTowardTrend: true })?.label,
+    'EFFICIENCY',
+  );
+  assertEquals(
+    formatCyclingEfficiencyRow({ efficiency_factor: 1.62, aerobic_decoupling_pct: 4.3 }, { countsTowardTrend: null })?.label,
+    'EFFICIENCY',
+  );
+});
+
+/**
+ * ⛔ AND THE SECOND GATE, WHICH IS THE ONE THAT ACTUALLY CATCHES AN INTERVAL RIDE (verified on a
+ * throwaway account 2026-09-15). p237's anaerobic ride spends over 40 minutes in the aerobic band —
+ * a 15-minute warm-up, four 4-minute spins, a 10-minute cool-down — so Garmin's dwell rule passes it
+ * and the row appeared on an interval session. `sessionSteadiness` is the ladder that knows the family.
+ */
+Deno.test('efficiency: a session the steadiness ladder refuses gets no row', () => {
+  assertEquals(
+    formatCyclingEfficiencyRow({ efficiency_factor: 1.62, aerobic_decoupling_pct: 4.3 }, { countsTowardTrend: true, steady: false }),
+    null,
+  );
+  assertEquals(
+    formatCyclingEfficiencyRow({ efficiency_factor: 1.62, aerobic_decoupling_pct: 4.3 }, { countsTowardTrend: true, steady: true })?.label,
+    'EFFICIENCY',
   );
 });
 

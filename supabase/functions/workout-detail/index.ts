@@ -549,6 +549,7 @@ async function runSessionDetailPipelineAndPersist(
     // Map the cached spine verdict for this session's discipline (one source — same state_trends_v1
     // the STATE screen and coach read).
     let disciplineTrend: any = null;
+    let rideEfficiencyRecent: number | null = null;
     try {
       const st = snapRes?.data?.[0]?.state_trends_v1;
       const disc = disciplineOf(row?.type);
@@ -562,6 +563,14 @@ async function runSessionDetailPipelineAndPersist(
       if (st && disc && disc !== 'swim' && disc !== 'run' && st[disc]) {
         disciplineTrend = { discipline: disc, verdict: st[disc].verdict, pct_change: st[disc].pctChange ?? null };
       }
+      /**
+       * ⛔ THE RIDER'S OWN RECENT WATTS PER HEARTBEAT (2026-09-15) — `bike.efficiency.recentValue`,
+       * off the SAME cached spine read above. The Performance EFFICIENCY row compares this ride
+       * against it instead of printing what the number means, and State's chart reads the same series,
+       * so neither screen mints its own average.
+       */
+      const ef = Number(st?.bike?.efficiency?.recentValue);
+      if (Number.isFinite(ef) && ef > 0) rideEfficiencyRecent = ef;
     } catch {}
 
     const plannedRows = Array.isArray(plannedRes?.data) ? plannedRes.data : [];
@@ -1117,6 +1126,7 @@ async function runSessionDetailPipelineAndPersist(
         };
       })(),
       disciplineTrend,
+      rideEfficiencyRecent,
     });
 
     if (sessionDetailV1?.race?.is_goal_race) {
