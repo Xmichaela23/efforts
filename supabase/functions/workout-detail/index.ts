@@ -283,8 +283,11 @@ const STRENGTH_VOLUME_VERSION = 2;
  *       each performed strength set's weight_display / assist_display. A copy stored at v4 has none, and
  *       the header line, the Duration chip, the swim card, the interval table and the compare table
  *       would print nothing in those slots.
+ *   6 — completed_totals.avg_hr from the one provider-first heart-rate resolver for every sport (2026-09-16,
+ *       Stage 7 session 1, rule (d)). A copy stored at v5 carries a ride, walk or lift's sample mean where the
+ *       device sent an average, so Performance and Today would print the old number until the copy rebuilds.
  */
-const SESSION_TOTALS_VERSION = 5;
+const SESSION_TOTALS_VERSION = 6;
 
 type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_missing';
 
