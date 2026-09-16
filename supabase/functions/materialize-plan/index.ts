@@ -26,6 +26,7 @@ import {
   type SwimDistanceTally,
 } from '../_shared/swim/swim-plan-summary.ts';
 import { formatStrengthExercise, formatStrengthExerciseLines, type WeightUnit } from '../_shared/strength/strength-display-lines.ts';
+import { plannedStepLines } from '../_shared/planned-step-lines.ts';
 import { mobilitySetsFrom } from '../_shared/mobility-sets.ts';
 /**
  * ⛔ THE QUALITY SHAPES ARE PARSED AND PRICED IN ONE PLACE (2026-09-11) — `_shared/plan-tokens/
@@ -4417,6 +4418,11 @@ Deno.serve(async (req) => {
               total_duration_seconds: finalTotalSeconds,
               duration: Math.max(1, finalDuration),
             };
+            // The same grouped lines as every other run or ride row (`_shared/planned-step-lines.ts`).
+            const assessSport = String(row?.type || '').toLowerCase();
+            if (assessSport === 'run' || assessSport === 'ride' || assessSport === 'walk') {
+              update.computed.step_lines = plannedStepLines(v3, { units: (row as any)?.units ?? null, sport: assessSport });
+            }
             await supabase.from('planned_workouts').update(update).eq('id', String(row.id));
             count++;
             continue;
@@ -4520,6 +4526,18 @@ Deno.serve(async (req) => {
                 return typeof d === 'string' && d.trim() ? { ...rest, weight_display: d } : rest;
               });
             }
+          }
+
+          // ⛔ THE LINES UNDER A PLANNED RUN, RIDE OR WALK (2026-09-16) — grouped once, here, off these steps;
+          // every planned screen prints `computed.step_lines`. See `_shared/planned-step-lines.ts`.
+          const stepLineSport = String(row?.type || '').toLowerCase();
+          if (stepLineSport === 'run' || stepLineSport === 'ride' || stepLineSport === 'walk') {
+            const lineTags: string[] = Array.isArray((row as any)?.tags) ? (row as any).tags.map((t: any) => String(t).toLowerCase()) : [];
+            update.computed.step_lines = plannedStepLines(v3, {
+              units: (row as any)?.units ?? null,
+              sport: stepLineSport,
+              raceDay: lineTags.includes('race_day') || lineTags.includes('marathon_pace'),
+            });
           }
           
           // Update race day description to match actual pace used in computed steps
