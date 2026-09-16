@@ -21,6 +21,9 @@ import { getDisciplineColor } from '@/lib/context-utils';
  * 12 — "last 13 weeks" under a 12-week model. The label, the gate and the model now agree at 12.
  * (Superseded: the 2026-07-31 rule that the label states the raw span so a 13-week pool would not read
  * "last 12 weeks" under a row saying "13wk" — that row no longer prints a week count.)
+ * ⛔ AND THE SPAN, THE CUT AND THE RANGE ARE THE SERVER'S SINCE 2026-09-15 (Stage 4 session 2). They
+ * ride on `fit` (`_shared/state-trend/trend-fit.ts`), on both of its outcomes. Nothing here works out a
+ * number that reaches the screen; the SVG maths below is the plotting domain in pixels.
  *
  * ── the rulings that travelled with it, unchanged ──────────────────────────────────────────────
  * ⛔ THE COVERAGE LABEL, OVERRIDABLE AT THE CALL SITE (2026-08-01). "building · 3 of 12 weeks" is
@@ -67,6 +70,8 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
   }
   const runColor = color ?? getDisciplineColor('run');
   const W = 300, H = 44, PAD_Y = 6, PAD_X = 2;
+  // ⚠️ CHART GEOMETRY ONLY — the plotting domain, in pixels. The printed low and high come off the fit
+  // below; these two never reach the screen as numbers.
   const vals = pts.map((p) => p.value);
   const minV = Math.min(...vals), maxV = Math.max(...vals);
   const rawRange = maxV - minV;
@@ -79,15 +84,23 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
   // colour" split was ours. TrainingPeaks and intervals.icu draw one line, a dot per session.
   const poly = pts.map((p, i) => `${x(i)},${y(p.value)}`).join(' ');
   const last = pts[pts.length - 1];
-  const spanWeeksRaw = Math.max(1, Math.ceil((Date.parse(last.date + 'T12:00:00Z') - Date.parse(pts[0].date + 'T12:00:00Z')) / (7 * 86_400_000)));
-  const spanWeeks = Math.min(12, spanWeeksRaw);
-  const building = spanWeeks < 11;
+  // ⛔ THE SPAN, THE BUILDING STATE AND THE RANGE ARE THE SERVER'S (2026-09-15, Stage 4 session 2).
+  // This re-derived the week span from the dots' dates, applied an 11-week cut with no source, and took
+  // the low and the high of the series itself — three rules on the phone over points the server chose.
+  // They ride on the fit (`trend-fit.ts`), on both its outcomes, so a chart too thin for a line still
+  // has them. ⚠️ A payload written before this carries none: the caption is dropped rather than rebuilt.
+  const spanWeeks = fit?.spanWeeks ?? null;
+  const building = fit?.building === true;
   // ⛔ THE TRENDLINE IS A FIT, NOT A VERDICT (2026-09-04, Michael: "this line means nothing; it needs something
   // that says what it is"). TrainingPeaks' dashboard chart of Pa:Hr / EF is bare dots; WKO5, its analysis tool,
   // adds a fitted trendline. The caption prints the line's start and end values — "8.1% → 5.2%" — nothing about
   // the last session, no improving/sliding word. ⚠️ The fit is the server's (audit 2026-09-10, H-B07).
   const line = fit && fit.tooFew === false ? fit : null;
-  const rangeLabel = unit ? `${fmtVal(minV)}–${fmtVal(maxV)}${unit}` : null;
+  // The low and the high are the server's two numbers; how many decimals and which unit they print in
+  // is this caller's, and that is formatting.
+  const rangeLabel = unit && fit?.low != null && fit?.high != null
+    ? `${fmtVal(fit.low)}–${fmtVal(fit.high)}${unit}`
+    : null;
   return (
     <span className={`basis-full flex flex-col gap-0.5 ${divider ? 'mt-2 pt-2 border-t border-white/10' : 'mt-1'}`}>
       {label ? (
@@ -123,12 +136,12 @@ export default function TrendSparkline({ series, color, dotNoun = 'steady run', 
         </span>
       )}
       {(title || label) ? (
-        (building || provenance) && (
-          <span className="text-[12px] text-white/55">{[building ? buildingLabel(spanWeeks) : null, provenance].filter(Boolean).join(' · ')}</span>
+        ((building && spanWeeks != null) || provenance) && (
+          <span className="text-[12px] text-white/55">{[building && spanWeeks != null ? buildingLabel(spanWeeks) : null, provenance].filter(Boolean).join(' · ')}</span>
         )
       ) : (
         <span className="text-[10px] text-white/45 flex items-center justify-between">
-          <span>{building ? buildingLabel(spanWeeks) : `last ${spanWeeks} weeks`}</span>
+          <span>{spanWeeks == null ? '' : building ? buildingLabel(spanWeeks) : `last ${spanWeeks} weeks`}</span>
           {rangeLabel ? <span className="tabular-nums text-white/30">{rangeLabel}</span> : <span />}
         </span>
       )}

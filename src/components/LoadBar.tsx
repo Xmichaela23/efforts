@@ -10,7 +10,24 @@ export interface LoadBarData {
    * fitness = 42-day exponential average of daily workload (CTL), fatigue = 7-day (ATL), form = yesterday's
    * fitness − yesterday's fatigue (TSB). Server-computed (`_shared/fitness-fatigue.ts`) over the whole history.
    */
-  fitness_fatigue?: { fitness: number | null; fatigue: number | null; form: number | null; fitness_prior?: number | null; fatigue_prior?: number | null; key_line?: { fitness: number; fatigue: number; form: number } | null; week_ago?: { fitness: number | null; fatigue: number | null; form: number | null } | null; provenance?: { tau_fitness_days?: number | null; tau_fatigue_days?: number | null } | null } | null;
+  fitness_fatigue?: {
+    fitness: number | null; fatigue: number | null; form: number | null;
+    fitness_prior?: number | null; fatigue_prior?: number | null;
+    key_line?: { fitness: number; fatigue: number; form: number } | null;
+    week_ago?: { fitness: number | null; fatigue: number | null; form: number | null } | null;
+    provenance?: { tau_fitness_days?: number | null; tau_fatigue_days?: number | null } | null;
+    /**
+     * ⛔ THE THREE READINGS AS TEXT (2026-09-15, Stage 4 session 2) — the number, the week's change and
+     * the window, each finished by the coach (`coach/index.ts`, beside `week_ago`). This bar rounded all
+     * three itself, subtracted this week from last, and divided the averaging constants by 7 to write the
+     * windows. It prints these and works nothing out. A payload without it prints no readings.
+     */
+    display?: {
+      fitness: { value: string | null; change: string | null; window: string | null };
+      fatigue: { value: string | null; change: string | null; window: string | null };
+      form: { value: string | null; change: string | null; window: string | null };
+    } | null;
+  } | null;
   /** Kept on the payload for the coach; NOT rendered here since 2026-09-04 (ACWR is Gabbett's — neither Garmin nor TrainingPeaks). */
   acwr?: number | null;
   acwr_provisional?: boolean;
@@ -167,25 +184,16 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
   // ACWR ratio (Gabbett). Neither is Garmin's or TrainingPeaks' rule; both stay on the payload for the coach.
   const ff = load.fitness_fatigue ?? null;
   const zone = load.label ?? null;
-  const fmt1 = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? null : Math.round(v));
-  // The week's change beside each number (intervals.icu's tile). Printed as a signed number, never an arrow.
-  const delta = (now: number | null | undefined, then: number | null | undefined) => {
-    if (now == null || then == null || !Number.isFinite(now) || !Number.isFinite(then)) return null;
-    const d = Math.round(now - then); return d === 0 ? '±0' : d > 0 ? `+${d}` : `${d}`;
-  };
-  const wk = ff?.week_ago ?? null;
-  const Delta = ({ v }: { v: string | null }) => v ? <span className="ml-0.5 text-[10.5px] text-white/45 tabular-nums">{v}</span> : null;
-  // ⛔ EACH NUMBER CARRIES ITS WINDOW, ONCE, IN THE GREY LABEL (Michael 2026-09-10). The windows are the
-  // server's own averaging constants (`provenance.tau_*_days`, 42 and 7 — TrainingPeaks' PMC, ledger row
-  // "Fitness (CTL, 42-day EWMA)"). Fitness prints in weeks, fatigue in days. Form has no window: it is the
-  // gap between the two. A cached payload without the constants prints no window rather than a guess.
-  const tauFit = ff?.provenance?.tau_fitness_days ?? null;
-  const tauFat = ff?.provenance?.tau_fatigue_days ?? null;
-  const fitWindow = tauFit != null && Number.isFinite(tauFit) && tauFit > 0 ? `${Math.round(tauFit / 7)} wk` : null;
-  const fatWindow = tauFat != null && Number.isFinite(tauFat) && tauFat > 0 ? `${Math.round(tauFat)} d` : null;
-  const Window = ({ w }: { w: string | null }) => w ? <span className="ml-1">· {w}</span> : null;
-  const formNum = fmt1(ff?.form);
-  const formSign = formNum == null || formNum === 0 ? '' : formNum > 0 ? '+' : '−';
+  // ⛔ NOTHING IS WORKED OUT HERE (2026-09-15, Stage 4 session 2). The number, the week's change and the
+  // window are the coach's finished text. What this replaced: a rounder over all three readings, a
+  // subtraction of this week against last week, `tau ÷ 7` for the fitness window, and a sign split off
+  // form — four rules on the phone over numbers the server already owned.
+  // ⛔ EACH NUMBER CARRIES ITS WINDOW, ONCE, IN THE GREY LABEL (Michael 2026-09-10), and the windows are
+  // the model's own averaging constants (TrainingPeaks' PMC 42 and 7 — ledger row "Fitness (CTL, 42-day
+  // EWMA)"). Fitness reads in weeks, fatigue in days; form has none, it is the gap between the two.
+  const rd = ff?.display ?? null;
+  const Delta = ({ v }: { v: string | null | undefined }) => v ? <span className="ml-0.5 text-[10.5px] text-white/45 tabular-nums">{v}</span> : null;
+  const Window = ({ w }: { w: string | null | undefined }) => w ? <span className="ml-1">· {w}</span> : null;
 
   // ⛔ THE LOAD-SHARE BAR LEFT THIS CARD (Michael, 2026-09-10). "Where your load is going", its bar and its
   // legend are gone; the same `load.composition_7d` shares and `load.total_7d` now print once, as the legend
@@ -200,12 +208,12 @@ export default function LoadBar({ load, garminDerived = false }: LoadBarProps) {
           LOAD{' '}
           <button type="button" onClick={() => setShowKey((o) => !o)} aria-label="What do fitness, fatigue and form mean?" aria-expanded={showKey} className="bg-transparent border-none p-0 cursor-pointer text-white/45 normal-case tracking-normal font-normal text-[12px] align-baseline">ⓘ</button>
         </span>
-        {ff && fmt1(ff.fitness) != null ? (
+        {rd && rd.fitness.value != null ? (
           <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 overflow-hidden py-0.5 -my-0.5 text-[11px] text-white/45 leading-none [&>span]:whitespace-nowrap [&>span]:-ml-3">
-            <span><Dot />fitness <span className="readout-num text-[13px] text-white/85">{fmt1(ff.fitness)}</span><Delta v={delta(ff.fitness, wk?.fitness)} /><Window w={fitWindow} /></span>
-            <span><Dot />fatigue <span className="readout-num text-[13px] text-white/85">{fmt1(ff.fatigue)}</span><Delta v={delta(ff.fatigue, wk?.fatigue)} /><Window w={fatWindow} /></span>
+            <span><Dot />fitness <span className="readout-num text-[13px] text-white/85">{rd.fitness.value}</span><Delta v={rd.fitness.change} /><Window w={rd.fitness.window} /></span>
+            <span><Dot />fatigue <span className="readout-num text-[13px] text-white/85">{rd.fatigue.value}</span><Delta v={rd.fatigue.change} /><Window w={rd.fatigue.window} /></span>
             <span>
-              <Dot />form <span className="readout-num text-[13px] text-white/85">{formSign}{formNum == null ? null : Math.abs(formNum)}</span>
+              <Dot />form <span className="readout-num text-[13px] text-white/85">{rd.form.value}</span>
               {zone && <><span className="ml-1">·</span><span className="ml-1" style={{ color: formZoneColor(zone) }}>{zone}</span></>}
             </span>
           </div>

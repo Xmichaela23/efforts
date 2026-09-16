@@ -3,13 +3,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import type { CoachWeekContextV1 } from '@/hooks/useCoachWeekContext';
-import { formatLocalDate } from '@/lib/dateUtils';
 // [D-374 → Step 2] The SAME axis the server gates coaching language on, so the row that renders and
 // the verdict that fills it can never disagree about what a main lift is. `coached` is true on
 // exactly one type row and that row is built from `MAIN_BARBELL_LIFTS`, so this is the same answer
 // `isMainBarbellLift` gave — asked as a capability, from the table that also says what to render
 // instead. See SPEC-strength-language, Step 2.
-import { capabilitiesForExercise } from '@/lib/exercise-role';
 import LoadBar from '@/components/LoadBar';
 import { useGarminDataPresence } from '@/hooks/useGarminDataPresence';
 import StateBodyBlock from './StateBodyBlock';
@@ -25,7 +23,6 @@ import StateHubTabs, { type StateLens } from '@/components/context/StateHubTabs'
 import { takePendingStateLens } from '@/lib/state-lens';
 import StateAdjustLens from '@/components/context/StateAdjustLens';
 import { readoutPlateStyle } from '@/lib/readout-plate';
-import { useSwimBaselineNudge } from '@/hooks/useSwimBaselineNudge';
 import { useAppContext } from '@/contexts/AppContext';
 import StrengthLoggedSets from './StrengthLoggedSets';
 import StateNextBlock from './StateNextBlock';
@@ -83,7 +80,10 @@ export default function StateTab({
   // `readiness`/`readiness_state` (cycling form) used further down in render.
   const [checkinReadiness, setCheckinReadiness] = useState<ArcReadiness | null>(null);
   const [nudgeDismissNonce, setNudgeDismissNonce] = useState(0);
-  const swimNudge = useSwimBaselineNudge(); // D-200: honored-swim-gated swim re-test nudge (State only)
+  // ⛔ THE SWIM RE-TEST NUDGE ARRIVES FINISHED (2026-09-15, Stage 4 session 2) — `swim_retest_nudge` on
+  // the arc payload this screen already reads. It used to be `useSwimBaselineNudge`, which ran seventy
+  // days of swims and the baselines row as its own two queries from the browser.
+  const [swimNudge, setSwimNudge] = useState<{ sentence: string } | null>(null);
   const { useImperial } = useAppContext(); // imperial → yards, metric → meters — for the SWIM sessions row distance
   // docs/WORKORDER-garmin-strava-attribution-2026-09-09.md §3 — the load plate's derived-data footer.
   const garminDerived = useGarminDataPresence();
@@ -92,6 +92,7 @@ export default function StateTab({
     fetchArcContext().then((arc) => {
       setLongitudinalSignals(arc?.longitudinal_signals ?? null);
       setCheckinReadiness((arc?.readiness as ArcReadiness | null) ?? null);
+      setSwimNudge(arc?.swim_retest_nudge ?? null);
     });
   }, []);
 
@@ -464,22 +465,17 @@ export default function StateTab({
   // four barbell lifts; you do not test one on a Hip Thrust. So an accessory can never fill that
   // column, and before [D-373] it fell through to the raw verdict and printed a red "back off
   // weight" instead. D-373 silenced the command; this removes the row that had nothing to say.
-  // ⚠️ FILTERED HERE, NOT SERVER-SIDE, ON PURPOSE. `per_lift` is a shared contract — the coach reads
-  // it for strength maxes (`coach/index.ts:3557`) and the block model iterates it (`block.ts:322`).
-  // Narrowing it at the source would quietly change that reasoning. This is a DISPLAY choice about
-  // which rows belong in one section, made with the same shared classifier the server gates on, so
-  // the two cannot drift. `perLift` itself is left intact for the adjust lens below.
+  // ⛔ THE MAIN-LIFT TEST IS THE COACH'S, AND ONLY THE COACH'S (2026-09-15, Stage 4 session 2).
+  // `buildStrengthLoggedSets` (`coach/strength-logged-sets.ts`) applies exactly this predicate — the
+  // same shared classifier, the same cap of five — and its answer already reaches this screen on
+  // `weekly_state_v1.strength_logged_sets.main`. A second copy stood here and fed the Adjust tab; it
+  // is deleted, and the tab reads the server's list (see the render below).
+  // ⚠️ `per_lift` IS STILL NOT NARROWED AT THE SOURCE. It is a shared contract — the coach reads it
+  // for strength maxes and the block model iterates it — so the narrowing stays a display choice,
+  // made once, on the server.
   // ⛔ Accessories are not being hidden as unimportant — they have no home YET. Per Michael's
   // direction on [Q-251], by-feel work should be read against the athlete's OWN history (reps at a
   // weight, volume over weeks), never against a tested max. That row is unbuilt. See [Q-253].
-  // FILTER FIRST, THEN CAP — off the uncapped list, so a main lift can never be cut by an accessory
-  // that happened to sort ahead of it. The cap is kept at the same 5 as a display bound; after the
-  // filter it has nothing to cut in practice (the previous program has four slots, and only a variant like a
-  // trap-bar deadlift adds a fifth main-class row).
-  const perLiftMain = perLiftSufficient
-    .filter((l: { canonical_name?: string | null }) =>
-      capabilitiesForExercise(String(l?.canonical_name ?? '')).coached)
-    .slice(0, 5);
 
   // ── "How your sessions went" — REBUILT (docs/STATE-WEEK-EXECUTION.md). The old per-discipline
   //    execution-row builders (run/ride/strength/swim `efficiency_label` chips) lived here and were
@@ -494,28 +490,18 @@ export default function StateTab({
    * *"I dont think we need today reflected on state screen or next — its a broader picture."*
    * Today's session belongs to the day screen; State is the arc around it.
    *
-   * ⛔ THE SERVER'S FIELD IS CORRECT AND IS NOT CHANGED. `key_sessions_remaining` is documented as
-   * *"from as_of_date (inclusive), excluding completed planned rows"* (`coach/types.ts:221`) and
-   * built that way at `coach/index.ts:1200` — today is listed BECAUSE it is not done yet. That is the
-   * right answer to the question the coach is asking, and the coach asks it for more than this row:
-   * `hasUpcomingLong` (`coach/index.ts:739`) reads the same field to write race-week guidance. Moving
-   * the exclusion into that filter would silently change race-week copy for a State-screen ruling.
-   * ⚠️ SO THE NARROWING LIVES HERE, ON THE ONE SURFACE IT WAS RULED FOR, and `StateTab` is the only
-   * client reader of the field (checked). This is a display scope, not a second definition of
-   * "remaining" — nothing here re-decides what is left, it chooses what this screen shows.
+   * ⛔ THE CUT IS THE COACH'S (2026-09-15, Stage 4 session 2) — `week.next_sessions`, the same list
+   * after the as-of date, at most three. This filtered `key_sessions_remaining` here against a date
+   * built from the device clock.
    *
-   * ⚠️ LOCAL DATE, NOT UTC. `toISOString().slice(0,10)` is tomorrow's date for anyone west of UTC in
-   * the evening, which would drop tomorrow's session as well as today's. `formatLocalDate` is the
-   * repo's own helper for exactly this.
+   * ⚠️ `key_sessions_remaining` IS STILL CORRECT AND STILL INCLUDES TODAY, deliberately: it is
+   * documented as "from as_of_date (inclusive)" and `hasUpcomingLong` on the server reads it to write
+   * race-week guidance. Two lists, one rule each, neither re-deciding what is left in the week.
    *
    * ⚠️ AND THE ROW KEEPS ITS NAME. "NEXT" was only inaccurate because today was in it; with today
    * gone the word is correct, so this closes the rename rather than needing copy.
    */
-  const sessionsRemaining = data.week?.key_sessions_remaining ?? [];
-  const todayYmd = formatLocalDate(new Date());
-  const nextSessions = sessionsRemaining
-    .filter((s) => String(s?.date || '').slice(0, 10) > todayYmd)
-    .slice(0, 3);
+  const nextSessions = data.week?.next_sessions ?? [];
 
   // ── intent summary + readiness — server-computed ─────────────────────────
   const intentSummary = wsv.week.intent_summary ?? null;
@@ -579,7 +565,7 @@ export default function StateTab({
   /**
    * ⛔⛔ EVERY OTHER LIFT THE ATHLETE LOGGED — SECONDARIES AND ACCESSORIES (work order item 5).
    *
-   * ⛔ THE COMMENT ON `perLiftMain` SAID IT OUTRIGHT: *"Accessories are not being hidden as
+   * ⛔ THE MAIN-LIFT FILTER'S OWN COMMENT SAID IT OUTRIGHT: *"Accessories are not being hidden as
    * unimportant — they have no home YET… That row is unbuilt."* This is that home, and it is
    * deliberately **not a new surface**: they hang in the "from your logged sets" section that already
    * exists, under the lifts already there.
@@ -599,7 +585,7 @@ export default function StateTab({
    * ⛔ DECIDED ON THE SERVER SINCE 2026-09-10 (audit H-S20). This screen used to run its own
    * `exercise_log` query and pick each lift's recent sets, the "best" tag, each accessory's heaviest set
    * and which lifts are listed. `weekly_state_v1.strength_logged_sets` carries all of it now — the coach
-   * splits main from other off the same `per_lift` list `perLiftMain` reads, over the history
+   * splits main from other off the same `per_lift` list, over the history
    * `compute-snapshot` builds. The heaviest-set rule, the most-logged-first order and the cap of eight
    * went with it. An older payload without the field prints no section.
    */
@@ -621,7 +607,9 @@ export default function StateTab({
 
       {/* 2026-09-03 (Michael: "the compounds are the only ones that are prescribed"): the Adjust tab lists the
           coached lifts only — the ones the plan prescribes a number for — never the whole logged list. */}
-      {stateLens === 'adjust' && <StateAdjustLens perLift={perLiftMain} />}
+      {/* The coach's main-lift list (`strength_logged_sets.main`) — the extra lifts Adjust lists
+            beside the four the block prices from. An older snapshot carries none and Adjust shows the four. */}
+      {stateLens === 'adjust' && <StateAdjustLens mainLifts={(loggedSets?.main ?? []).map((m) => m.canonical)} />}
       {stateLens === 'schedule' && (
         <div className="px-2 py-10 text-center text-white/40 text-[13px] leading-snug">
           Schedule — rearrange your week: drag a session and everything re-flows around it. Coming next.
@@ -754,9 +742,9 @@ export default function StateTab({
 
         {/* SWIM re-test nudge (D-200) — fires after ≥4 weeks + ≥4 honored swims; auto-clears when the
             threshold is updated/tested (lastUpdatedAt moves). Dismiss = 7-day snooze (shared pattern). */}
-        {swimNudge?.show && nudgeDismissNonce >= 0 && !isNudgeSnoozed('swim_retest') && (
+        {swimNudge && nudgeDismissNonce >= 0 && !isNudgeSnoozed('swim_retest') && (
           <StateSwimNudge
-            weeksSince={swimNudge.weeksSince}
+            sentence={swimNudge.sentence}
             onDismiss={() => setNudgeDismissNonce((n) => n + 1)}
           />
         )}

@@ -159,8 +159,10 @@ function SpineCard({ series, trends, asOf: asOfIn }: { series: SpineSeries; tren
   // sessions; the logged count comes from every point. Undefined = counts (every run).
   // ⛔ THE CHART'S POINTS AND ITS LINE ARE THE SERVER'S (audit 2026-09-10, H-B07) — `trends.efficiencyTrend`,
   // chosen by the same rule in `_shared/state-trend/trend-fit.ts`. Absent on an older snapshot: no chart.
-  const trendPts = pts.filter((p) => p.countsTowardTrend !== false);
-  const leftOut = pts.length - trendPts.length;
+  // ⛔ THE COUNT IS THE SERVER'S (2026-09-15, Stage 4 session 2) — `leftOutOfTrend`, decided inside the
+  // same `spineTrends` call that chose the chart's points. This re-ran the `countsTowardTrend` filter
+  // here to reach the same number, which is one rule written in two places.
+  const leftOut = trends?.leftOutOfTrend ?? 0;
   const eff = trends?.efficiencyTrend.points ?? [];
   // ⛔ THE HEADLINE IS TRAININGPEAKS', WHOLE (Michael 2026-09-04: one absolute reference per metric, never a
   // TrainingPeaks formula under a Garmin window). FIELD — TrainingPeaks: EF is a per-workout number in the
@@ -241,8 +243,10 @@ function SpineCard({ series, trends, asOf: asOfIn }: { series: SpineSeries; tren
       {/* HEAT (2026-09-04, Michael: "summer has an impact — put a note"). A fixed line, not generated: a fact with a
           source, the same every time. Shown when any session in the window was 72°F or hotter — Garmin's own
           heat cut-off (its fitness estimate is corrected above 72°F / 22°C); TrainingPeaks applies no correction and
-          Friel's guidance is to compare like with like. Ledger: docs/STATE-SOURCES.md. */}
-      {pts.some((p) => typeof p.tempF === 'number' && p.tempF >= 72) && (
+          Friel's guidance is to compare like with like. Ledger: docs/STATE-SOURCES.md.
+          ⛔ THE TEST IS THE SERVER'S (2026-09-15, Stage 4 session 2) — `heatInWindow`, beside the points it
+          reads. This card compared every point's temperature against the cut-off itself. */}
+      {trends?.heatInWindow === true && (
         <div className="text-[12px] text-white/55 mt-1 leading-snug">
           Hot days read lower on efficiency and higher on drift: heat raises heart rate at the same {isRide ? 'power' : 'pace'}.
         </div>

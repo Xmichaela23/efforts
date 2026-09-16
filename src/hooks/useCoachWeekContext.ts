@@ -168,6 +168,14 @@ export type CoachWeekContextV1 = {
       category: string;
       workload_planned: number | null;
     }>;
+    /** State's NEXT row — the same list after today, at most three, cut by the coach (2026-09-15). */
+    next_sessions?: Array<{
+      date: string;
+      type: string;
+      name: string | null;
+      category: string;
+      workload_planned: number | null;
+    }>;
   };
   reaction: {
     key_sessions_planned: number;

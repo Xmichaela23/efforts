@@ -14,7 +14,10 @@ import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary
 import type { CoachWeekContextV1 } from '@/hooks/useCoachWeekContext';
 import { useStateTrends } from '@/hooks/useStateTrends';
 import { useAppContext } from '@/contexts/AppContext';
-import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/lib/trend-receipt';
+// ⛔ THE RECEIPT LINES ARE THE SERVER'S SINCE 2026-09-15 (Stage 4 session 2) — `card.display`,
+// `bikeFitness.evidenceLine` and `perf.signedPct`. This file called `trendEvidence` / `trendReceipt`
+// and ran its own `verdictSignedPct` and `recencyOf` as it drew each row; `src/lib/trend-receipt.ts`
+// still holds the rules and `_shared/state-trend/discipline.ts` now calls them.
 import { formatPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor } from '@/lib/context-utils';
 import { readoutPlateStyle } from '@/lib/readout-plate';
@@ -95,28 +98,9 @@ const VERDICT: Record<TrendVerdict, { word: string; cls: string; arr: string }> 
 // ⛔ LOAD_FRESHNESS_WORDS removed (2026-09-01) — its only consumer was the bike CTL/TSB line, now gone.
 
 
-function recencyOf(ageDays: number | null | undefined): string | null {
-  if (ageDays == null || ageDays < 0) return null;
-  return ageDays <= 0 ? 'newest today' : `newest ${Math.round(ageDays)}d ago`;
-}
 
-// D-160: pctChange is the RAW metric delta (classify.ts keeps it raw so the UI knows real direction).
-// For lower-is-better disciplines (swim/run pace) an improvement is a NEGATIVE delta — printing it
-// verbatim gives "↑ improving −34%". The verdict already encodes good/bad; sign the magnitude by the
-// verdict so the number and the arrow always agree. improving → +, sliding → −, holding → raw.
-// `dp` is DISPLAY ONLY — `eff.pctChange` stays raw on the object. A tenth of a percent on a
-// regression slope over three months is false precision; the confidence interval is the honest
-// statement of how sure the number is, and it is now rendered beside it.
-function verdictSignedPct(verdict: string, pct: number | null | undefined, dp = 1): string | null {
-  if (pct == null) return null;
-  const mag = (n: number) => Math.abs(n).toFixed(dp).replace(/\.0+$/, '');
-  // ⚠️ ONE MINUS GLYPH, ALL THREE BRANCHES. The `holding` fallback used to print JS's own negative
-  // ("-0.4%", ASCII hyphen U+002D) while the sliding branch printed a true minus ("−15.2%", U+2212).
-  // Adjacent rows on one screen, two different characters at two different widths. 2026-08-01.
-  if (verdict === 'improving') return `+${mag(pct)}%`;
-  if (verdict === 'sliding') return `−${mag(pct)}%`;
-  return `${pct > 0 ? '+' : pct < 0 ? '−' : ''}${mag(pct)}%`;
-}
+// ⛔ `verdictSignedPct` and `recencyOf` MOVED TO THE SERVER (2026-09-15) — `perf.signedPct` and the
+// evidence tail carry what they wrote. The rules live on in `src/lib/trend-receipt.ts`.
 
 
 // ── THE BLOCK, STATED — read from the card, translated by nobody ──────────────────────────────────
@@ -256,14 +240,15 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
   // "does this include today?" — which the row could no longer answer. Recency is the one thing a
   // count-and-window headline cannot say, and on a building row it is the most useful fact there is,
   // because it tells the athlete whether the ride they just did has landed yet.
-  const buildingRecency = building ? recencyOf(fitness.efficiency.newestAgeDays ?? fitness.power.newestAgeDays) : null;
-  const tail = (!building && lead.sampleCount != null && lead.windowDays != null)
-    ? trendEvidence({ windowDays: lead.windowDays, sampleCount: lead.sampleCount, newestAgeDays: lead.newestAgeDays, discipline: 'bike', omitCount: aerobicLead })
-    : null;
-  // Qualifying rides we can see — the larger of the two pools (they count different things: power
-  // counts hard rides in the winning terrain bin, efficiency counts clean easy rides). Stated as
-  // "rides we can read from", never as their total ride count, which we do not have here.
-  const rideCount = Math.max(fitness.power.sampleCount ?? 0, fitness.efficiency.sampleCount ?? 0);
+  const buildingRecency = building ? (fitness.newestRecencyLine ?? null) : null;
+  // ⛔ THE TAIL IS THE SERVER'S (2026-09-15, Stage 4 session 2) — written beside the signals it reads,
+  // with the count already dropped on the aerobic read. This composed it here from the window in days.
+  const tail = !building ? (fitness.evidenceLine ?? null) : null;
+  // ⛔ THE LINE IS THE SERVER'S (2026-09-15, Stage 4 session 2) — `ridesReadLine`, "6 rides in 8 weeks".
+  // This took the larger of the two pools itself (power counts hard rides in the winning terrain bin,
+  // efficiency counts clean easy rides) and typed "8 weeks" beside a window the server owns.
+  const ridesReadLine = fitness.ridesReadLine ?? null;
+  const noRidesYet = ridesReadLine === 'No rides yet';
   // The number in use first (`applied_ftp`); the anchor only when the payload predates v210.
   const ftpNow = fallbackFtp ?? (anchor?.value != null && Number.isFinite(anchor.value) ? Math.round(anchor.value) : null);
   // ⛔ FTP OVER TIME, NOT A DOT (2026-09-04, docs/SPEC-ftp-trend-line-2026-09-04.md). The dot placed
@@ -283,7 +268,8 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
   // The FTP line and the "accept your FTP" tag belong to a REAL read; a withheld or absent one gets neither.
   const anchoredPower = anchored && assertsLead && leadIsPower;
   // ⚠️ NO LINE THROUGH ONE DOT: fewer than two readings prints the number alone.
-  const showFtpLine = anchoredPower && ftpHistory.length >= 2;
+  // ⛔ TWO READINGS DRAW THE DOTS, THREE FIT THE LINE — both counts named on the server (2026-09-15).
+  const showFtpLine = anchoredPower && fitness.drawFtpLine === true;
   const trendOnly = !anchored && assertsLead && leadIsPower;
   return (
     <Row label="bike">
@@ -298,17 +284,17 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
         // measurement promise. Floor absent → the original copy, unchanged.
         fitness.loadFloor ? (
           <span className="inline-flex items-baseline gap-1.5 flex-wrap text-white/60">
-            {(recencyOf(fitness.loadFloor.newest_ride_age_days) ?? buildingRecency) && (
-              <span className="text-white/45">{recencyOf(fitness.loadFloor.newest_ride_age_days) ?? buildingRecency}</span>
+              {(fitness.loadFloor.newest_ride_recency_line ?? buildingRecency) && (
+              <span className="text-white/45">{fitness.loadFloor.newest_ride_recency_line ?? buildingRecency}</span>
             )}
             {/* 2026-09-03 (Michael: "bike is the missing stepchild"): no sentence here — the count and the
                 recency above are the facts; the power read appears when it exists. */}
           </span>
         ) : (
         <span className="inline-flex items-baseline gap-1.5 flex-wrap text-white/60">
-          <span className="text-white/85">{rideCount === 0 ? 'No rides yet' : `${rideCount} ${rideCount === 1 ? 'ride' : 'rides'} in 8 weeks`}</span>
+          {ridesReadLine && <span className="text-white/85">{ridesReadLine}</span>}
           {buildingRecency && <span className="text-white/45">{buildingRecency}</span>}
-          <span className="basis-full">{rideCount === 0 ? 'Ride and this reads your aerobic fitness' : 'A few more and this reads your aerobic fitness'}</span>
+          <span className="basis-full">{noRidesYet ? 'Ride and this reads your aerobic fitness' : 'A few more and this reads your aerobic fitness'}</span>
         </span>
         )
       ) : aerobicLead ? (
@@ -436,6 +422,8 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
             unit=" W"
             minSpanFraction={0.15}
             divider
+            // The chart's span, range and building state, from the same place every other chart's come.
+            fit={fitness.powerSeriesFit ?? null}
             label="Best 20-minute power"
             buildingLabel={(w) => `${w} of 12 weeks`}
             keyLine="dots: one ride's best 20 minutes · does not set FTP"
@@ -614,16 +602,20 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
                     above already says so, and repeating the number reads as two different facts.
                     "e1RM" labels the number an ESTIMATE, not a tested max (2026-08-11). */}
                 {(() => {
-                  const best = (l as any).allTimeBestE1rm as number | null;
-                  const latest = l.latestE1rm as number;
-                  const showBest = best != null && best > latest + 0.5;
+                  // ⛔ THE TILES ARE THE SERVER'S (2026-09-15, Stage 4 session 2). This rounded each
+                  // number, printed "lb" whatever unit the account read in, and ran its OWN half-pound
+                  // test to decide whether to show the record — a second copy of the slack the PR rule
+                  // already uses. `best` comes back null when it is not worth showing; its presence IS
+                  // the decision, so there is no flag here to disagree with it.
+                  const r = (l as any).readout as { e1rm: string | null; best: string | null } | null | undefined;
+                  if (!r) return null;
                   return (
                     <ReadoutTiles
                       size="sm"
                       columns={3}
                       tiles={[
-                        { value: `${Math.round(latest)} lb`, label: 'e1RM' },
-                        showBest ? { value: `${Math.round(best as number)} lb`, label: 'best' } : null,
+                        r.e1rm ? { value: r.e1rm, label: 'e1RM' } : null,
+                        r.best ? { value: r.best, label: 'best' } : null,
                         {
                           value: String(l.sampleCount),
                           label: l.sampleCount === 1 ? 'session' : 'sessions',
@@ -663,7 +655,8 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
                   const tooManyReps = ao.reps > trustedMaxReps(l.canonical);
                   return (
                     <span className="basis-full text-white/50 text-[11px] -mt-0.5 inline-flex items-baseline gap-1.5 flex-wrap">
-                      <span className="tabular-nums">all-out {Math.round(ao.weight)} lb × {ao.reps}</span>
+                      {/* The set as the athlete reads it, unit and all, from the server (2026-09-15). */}
+                      <span className="tabular-nums">all-out {(l as any).readout?.allOut ?? `${ao.weight} × ${ao.reps}`}</span>
                       {aoDate && <span className="text-white/40">{aoDate}</span>}
                       {ao.isRepRecord && (
                         <span className="text-strength text-[10px] uppercase tracking-wide font-semibold">rep PR</span>
@@ -682,8 +675,9 @@ function StrengthFitnessRow({ fitness, fatigue, planWeek, block, calibration }: 
                     color={getDisciplineColor('strength')}
                     dotNoun="session"
                     fmtVal={(v) => String(Math.round(v))}
-                    unit=" lb"
+                    unit={` ${(l as any).readout?.unit ?? 'lb'}`}
                     minSpanFraction={0.25}
+                    fit={(l as any).seriesFit ?? null}
                     // This lift's own reading history — NOT a position in the block. The block is
                     // stated once, at the top of the row, from the card.
                     buildingLabel={(w) => `${w} ${w === 1 ? 'week' : 'weeks'} of readings`}
@@ -827,13 +821,15 @@ function FitnessDot({ pct, confident, tickPct, overflow }: { pct: number; confid
 
 // Shared dot+arrow block: metric name + trend ARROW on top, the DOT (level in the 12wk range) below, the
 // relative-frame label under it. Used by bike/swim/strength; run has its own (adds an "i" explainer).
-function FitnessDotBlock({ label, range, verdict, pctChange, provisional, wordMap = VERDICT, showAxis = true, frame = 'vs your 12-week range', explain }: {
+function FitnessDotBlock({ label, range, verdict, signedPct, provisional, wordMap = VERDICT, showAxis = true, frame = 'vs your 12-week range', explain }: {
   label: string;
   range: { positionPct: number; confident: boolean };
   verdict: TrendVerdict;
   // ⚠️ REQUIRED WHENEVER `wordMap` IS WORDLESS. Without a word this block would render a bare arrow
   // and say nothing about size. Callers on the VERDICT map may omit it — the word carries them.
-  pctChange?: number | null;
+  // ⛔ THE SIGNED PERCENT ARRIVES AS TEXT (`perf.signedPct`, 2026-09-15) — this file signed and rounded
+  // it in the render. It is accepted and not printed; see the dead branch below.
+  signedPct?: string | null;
   provisional?: boolean;
   wordMap?: Record<TrendVerdict, { word: string; cls: string; arr: string }>;
   showAxis?: boolean; // the "weaker / frame / stronger" grammar renders on the FIRST band only (item 7)
@@ -842,20 +838,17 @@ function FitnessDotBlock({ label, range, verdict, pctChange, provisional, wordMa
 }) {
   // ⛔ NO VERDICT WORD, ARROW OR PERCENT (2026-09-04, one reference per metric): the 28/28 verdict was Garmin's
   // rule on TrainingPeaks numbers and is off every State surface. The label and the dot (position in the
-  // 12-week range) stay; `verdict` / `pctChange` / `wordMap` are accepted and not rendered.
-  void wordMap; void pctChange;
+  // 12-week range) stay; `verdict` / `signedPct` / `wordMap` are accepted and not rendered.
+  void wordMap; void signedPct;
   return (
     <>
       <span className="basis-full flex items-baseline justify-between gap-2">
         <span className="text-white/55 text-[13px]">{label}</span>
-        {false && verdict !== 'needs_data' && (
-          // ⛔ `withheld` PRINTS NO NUMBER. "Too few to read −0.4%" reads as a result with a caveat
-          // attached, and the number is the part people take away — so the row would say the opposite
-          // of what the engine decided. Withheld means we are not making a claim; the percent IS the
-          // claim. (Only the bike lead passes `pctChange` here today — the card caller at :1035 omits
-          // it — so this changes the bike row and nothing else.)
-          <span className={`inline-flex items-baseline gap-0.5 text-[13px] ${v.cls}`}>{v.arr && <span>{v.arr}</span>}{v.word && <span>{v.word}</span>}{pctChange != null && <span className="text-white/60 ml-0.5">{verdictSignedPct(verdict, pctChange)}</span>}</span>
-        )}
+        {/* ⛔ THE VERDICT WORD, ARROW AND PERCENT WERE DELETED FROM THIS ROW ON 2026-09-04 and the
+            branch was left behind as `{false && …}`, referencing a `v` that no longer exists. Removed
+            2026-09-15 rather than carried: it was unreachable and it did not compile. What it said,
+            kept as the reason: a withheld read prints NO number, because "too few to read −0.4%" is
+            taken away as a result with a caveat, which is the opposite of what the engine decided. */}
       </span>
       <FitnessDot pct={range.positionPct} confident={range.confident} />
       {showAxis ? (
@@ -903,7 +896,7 @@ function RestTag({ rest }: { rest: PerfSummary | null | undefined }) {
       <span className="text-white/60">· rest</span>
       {v.arr && <span>{v.arr}</span>}
       <span>{v.word}</span>
-      {rest.pctChange != null && <span className="text-white/60">{verdictSignedPct(rest.verdict, rest.pctChange)}</span>}
+      {rest.signedPct && <span className="text-white/60">{rest.signedPct}</span>}
     </span>
   );
 }
@@ -914,7 +907,9 @@ function RestTag({ rest }: { rest: PerfSummary | null | undefined }) {
 // — swim count, total distance, longest swim — over the 8wk window. Garmin/Strava fallback: volume, not
 // a fitness score. No dot, no arrow, no verdict. useImperial → yards (imperial) or meters (metric).
 function SwimVolumeRow({ vol }: { vol: SwimVolume }) {
-  const weeks = Math.round((vol.windowDays || 56) / 7);
+  // The window in weeks, written on the server (`swimVolume.windowLabel`) — this divided by 7 here and
+  // again further down the same file (2026-09-15, Stage 4 session 2).
+  const weeks = vol.windowLabel ?? '';
   // ⛔ THE CUMULATIVE TOTAL IS GONE (2026-09-01, Michael twice: it "reads as an achievement while
   // actually recording that he stopped"). Total and longest yardage were a running sum that only
   // grows — meaningless as a state read. Swim is a MINIMAL placement block (never a feature), so it
@@ -925,14 +920,14 @@ function SwimVolumeRow({ vol }: { vol: SwimVolume }) {
   if (!vol.swims) {
     return (
       <Row label="swim">
-        <span className="text-white/60 text-[13px]">no swims in the last {weeks}wk</span>
+        <span className="text-white/60 text-[13px]">no swims in the last {weeks}</span>
       </Row>
     );
   }
   return (
     <Row label="swim">
       <span className="text-white/70 text-[13px]">
-        <span className="text-white/85">{vol.swims}</span> {vol.swims === 1 ? 'swim' : 'swims'} in the last {weeks}wk
+        <span className="text-white/85">{vol.swims}</span> {vol.swims === 1 ? 'swim' : 'swims'} in the last {weeks}
       </span>
     </Row>
   );
@@ -947,15 +942,15 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
     const metricLabel = card.discipline === 'run' ? 'Efficiency'
       : card.discipline === 'swim' ? 'Pace'
       : card.discipline === 'bike' ? 'Power' : null;
-    // item 4: a THIN + STALE trend must not render at full confidence. De-weight (dim + "limited
-    // data") when < 5 samples AND newest point > 21d old — the counts are already at the render.
-    const thinStale = (perf?.sampleCount ?? 99) < 5 && (perf?.newestAgeDays ?? 0) > 21;
+    // ⛔ THE LINES AND THE CAUTION ARE THE SERVER'S (2026-09-15, Stage 4 session 2) — `card.display`,
+    // written in `_shared/state-trend/discipline.ts` beside the verdict. "Limited data" was a threshold
+    // pair on the phone with no source; it is marked OURS in `src/lib/trend-receipt.ts` with a ledger
+    // row now. A payload written before this carries no lines and the row prints none.
+    const disp = (card as any).display as { evidence: string | null; needsDataReceipt: string | null; limitedData: boolean } | undefined;
+    const thinStale = disp?.limitedData === true;
     const vCls = thinStale ? 'text-white/60' : v.cls;
-    // D-232 glass-box: verdict-colored delta + a DIMMED evidence tail (window · samples · recency).
-    const hasEvidence = perf?.sampleCount != null && perf.windowDays != null;
-    const evidence = hasEvidence
-      ? trendEvidence({ windowDays: perf!.windowDays!, sampleCount: perf!.sampleCount!, newestAgeDays: perf!.newestAgeDays, discipline: card.discipline as Discipline })
-      : null;
+    const evidence = disp?.evidence ?? null;
+    const hasEvidence = evidence != null;
     const range = (perf as any)?.range as { positionPct: number; confident: boolean } | null | undefined;
     return (
       <Row label={card.discipline}>
@@ -988,9 +983,8 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
   // D-232 glass-box: an actionable needs_data receipt ("Not enough data yet — 0 swims in 8wk (need 3)")
   // where the spine carries the series count (run/swim). Strength has no series here → legacy fallback
   // ("needs data · N unplanned"), left for the H3 strength-row reconciliation (Q-111).
-  const ndReceipt = (perf?.sampleCount != null && perf.windowDays != null)
-    ? trendReceipt({ verdict: 'needs_data', pctChange: null, windowDays: perf.windowDays, sampleCount: perf.sampleCount, newestAgeDays: perf.newestAgeDays, stale: perf.stale, floor: perf.minSessions, discipline: card.discipline as Discipline })
-    : null;
+  // The whole needs-data sentence, written on the server beside the verdict that produced it.
+  const ndReceipt = ((card as any).display?.needsDataReceipt as string | null | undefined) ?? null;
   return (
     <Row label={card.discipline}>
       {ndReceipt ? (
@@ -1117,7 +1111,9 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
         if (grp.recentPaceSecPerKm != null) {
           // 2026-09-04: the warm-up stand-in (easy rows read off the warm-ups of hard runs) was OURS and is gone —
           // an easy row is easy runs, a hard row is hard runs, recorded pace and heart rate, nothing borrowed.
-          return { name: label, value: formatPace(grp.recentPaceSecPerKm, useImperial), note: [grp.recentHrAvg != null ? `${grp.recentHrAvg} bpm` : '', grp.paceIsGraded === false ? 'flat pace, no elevation' : ''].filter(Boolean).join(' · ') || undefined };
+          // ⛔ THE PACE ARRIVES IN THE ATHLETE'S OWN UNIT (2026-09-15, Stage 4 session 2). This multiplied
+          // the server's seconds-per-kilometre by 1.60934 in the render — a unit pick on the screen.
+          return { name: label, value: grp.recentPaceDisplay ?? '—', note: [grp.recentHrAvg != null ? `${grp.recentHrAvg} bpm` : '', grp.paceIsGraded === false ? 'flat pace, no elevation' : ''].filter(Boolean).join(' · ') || undefined };
         }
         return { name: label, value: `${grp.runs} run${grp.runs === 1 ? '' : 's'}` };
       };
@@ -1156,7 +1152,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       if (!ef) return [{ name: 'runs', value: 'none logged' }];
       // No verdict word here either (2026-09-02, same ruling): the number and the count, nothing graded.
       if (ef.recentPaceSecPerKm != null) {
-        return [{ name: 'pace', value: formatPace(ef.recentPaceSecPerKm, useImperial), note: ef.recentHrAvg != null ? `${ef.recentHrAvg} bpm` : undefined }];
+        return [{ name: 'pace', value: ef.recentPaceDisplay ?? '—', note: ef.recentHrAvg != null ? `${ef.recentHrAvg} bpm` : undefined }];
       }
       const n = Number(ef.sampleCount) || 0;
       return [{ name: 'runs', value: String(n) }];
@@ -1212,9 +1208,9 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
     }
     if (disc === 'swim') {
       // Swim is DESCRIBED, not graded — volume facts, never a dot (see SwimVolumeRow).
-      const w = Math.round((swimVolume?.windowDays ?? 56) / 7);
+      const w = swimVolume?.windowLabel ?? null;
       const n = swimVolume?.swims ?? 0;
-      return [{ name: 'swims', value: n > 0 ? String(n) : 'none', note: `last ${w}wk` }];
+      return [{ name: 'swims', value: n > 0 ? String(n) : 'none', note: w ? `last ${w}` : undefined }];
     }
     return [];
   };

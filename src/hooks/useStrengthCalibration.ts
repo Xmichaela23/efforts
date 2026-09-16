@@ -46,10 +46,9 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import {
-  type LiftCalibrationStatus,
-  type StrengthCalibrationEvent,
-  liftStatus,
+import type {
+  LiftCalibrationStatus,
+  StrengthCalibrationEvent,
 } from '../../supabase/functions/shared/strength-system/loading/calibration';
 
 export type CalibratedLift = {
@@ -58,8 +57,15 @@ export type CalibratedLift = {
   /** Display name — 'Back Squat'. */
   name: string;
   status: LiftCalibrationStatus;
-  /** The training max the lift is currently running on, in lb. 0 when unknown. */
+  /** The training max the lift is currently running on, in the athlete's own unit. 0 when unknown. */
   trainingMax: number;
+  /** 'lb' | 'kg' — what `trainingMax` is written in. */
+  trainingMaxUnit: string;
+  /**
+   * ⛔ THE WHOLE LINE, FROM THE SERVER (2026-09-15, Stage 4 session 2) — "Back Squat — climbing,
+   * training max 210 lb". Empty when the server did not send one.
+   */
+  statusLine: string;
   /**
    * The most recent event still standing for this lift, or null. ⚠️ **UNDONE EVENTS ARE EXCLUDED** —
    * a line the athlete already reversed must not keep announcing itself on two other screens.
@@ -100,23 +106,22 @@ export function useStrengthCalibration(enabled = true): StrengthCalibrationRead 
         if (!data?.success) { setByLift([]); setLoading(false); return; }
         const perLift = (data.per_lift ?? {}) as Record<string, any>;
         const log = (Array.isArray(data.calibration) ? data.calibration : []) as StrengthCalibrationEvent[];
-        // ⛔ THE SERVER'S OWN CYCLE, NOT A CLIENT DERIVATION. It knows the stored phase structure and
-        // the week; re-deriving it here is how two screens start naming different cycles for one week.
-        const cycle = Number(data.current_cycle) || 1;
+        // ⛔ THE STATUS, THE NUMBER AND THE LINE ARE ALL THE SERVER'S (2026-09-15, Stage 4 session 2).
+        // This picked the cycle to read, ran the status rule and composed the sentence — the engine
+        // already knows the stored phase structure and the week, and a second derivation is how two
+        // screens start naming different cycles for one week.
         const out: CalibratedLift[] = Object.entries(perLift).map(([ref, v]: [string, any]) => {
-          const byCycle = Array.isArray(v?.byCycle) ? v.byCycle : [];
-          const at = byCycle.some((b: any) => b.cycle === cycle)
-            ? cycle
-            : (byCycle[byCycle.length - 1]?.cycle ?? 1);
           const event = [...log].reverse().find((e) => e?.ref === ref && !e?.undone_at) ?? null;
           return {
             ref,
             name: String(v?.name ?? ref),
-            status: liftStatus(byCycle, v?.resetAtCycle ?? null, at),
-            trainingMax: Number(byCycle.find((b: any) => b.cycle === at)?.workingNumber) || 0,
+            status: v?.status as LiftCalibrationStatus,
+            trainingMax: Number(v?.training_max) || 0,
+            trainingMaxUnit: String(v?.training_max_unit ?? 'lb'),
+            statusLine: String(v?.status_line ?? ''),
             event,
           };
-        });
+        }).filter((l) => !!l.status);
         setByLift(out);
         setLoading(false);
       } catch {

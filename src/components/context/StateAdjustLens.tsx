@@ -30,9 +30,16 @@ import { useBaselineZones } from '@/hooks/useBaselineZones';
 const REPRICE_WAIT = 'Updating your upcoming sessions…';
 // The heading carries LOAD's ⓘ (LoadBar.tsx): one line stays under the sport, the rest opens here.
 
-type Lift = { canonical_name: string; display_name?: string };
 
-export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
+export default function StateAdjustLens({ mainLifts }: {
+  /**
+   * The canonical names of the athlete's MAIN lifts, as the coach picked them
+   * (`weekly_state_v1.strength_logged_sets.main`). ⛔ The screen used to be handed the raw per-lift
+   * list and `StateTab` applied the main-lift test itself, a second copy of the server's own
+   * (2026-09-15, Stage 4 session 2).
+   */
+  mainLifts: string[];
+}) {
   // 2026-09-03 (Michael: "maybe it should be here"): the one control that already works — rewrite the
   // unstarted sessions of the block from the plan (same lifts, weights, days; completed sessions never
   // touched). It used to fire only as a side effect of saving Baselines after a lift lock changed.
@@ -102,13 +109,13 @@ export default function StateAdjustLens({ perLift }: { perLift: Lift[] }) {
    * The four lifts the block prices from are always listed, whether or not a set has been logged:
    * a fresh account with numbers typed on the profile page saw "Logged lifts show up here." and no
    * rows, while the profile page showed all four (throwaway check, 2026-09-05). Logged lifts beyond
-   * the four (the State screen's list, `perLift`) follow them; the same lift is not listed twice.
+   * the four (the coach's main-lift list) follow them; the same lift is not listed twice.
    */
   const FOUR: string[] = ['squat', 'deadlift', 'bench', 'overheadPress1RM'];
   const liftRows = (() => {
     const all = readout?.strength.lifts ?? [];
     const extraKeys = new Set(
-      perLift.map((l) => canonicalizeLiftKey(l.canonical_name)).filter((k): k is NonNullable<typeof k> => k != null).map(String),
+      mainLifts.map((n) => canonicalizeLiftKey(n)).filter((k): k is NonNullable<typeof k> => k != null).map(String),
     );
     return all.filter((l) => FOUR.includes(l.key) || extraKeys.has(l.key))
       .sort((a, b) => (FOUR.indexOf(a.key) + 1 || 99) - (FOUR.indexOf(b.key) + 1 || 99));

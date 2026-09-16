@@ -2,16 +2,17 @@ import React from 'react';
 import { snoozeNudge } from './state-primitives';
 
 /**
- * SWIM re-test nudge — extracted from StateTab 2026-09-01 (Round 0a). No behaviour change.
- * ⛔ THE VISIBILITY TEST STAYS IN THE CALLER (`swimNudge?.show && nonce >= 0 && !isNudgeSnoozed`),
- *    because the plate above uses `divide-y` — a child that renders null still draws no divider,
- *    but a wrapper element would. Same reason the 0b gate stayed out.
+ * SWIM re-test nudge — extracted from StateTab 2026-09-01 (Round 0a).
+ * ⛔ THE VISIBILITY TEST STAYS IN THE CALLER, because the plate above uses `divide-y` — a child that
+ *    renders null still draws no divider, but a wrapper element would.
+ * ⛔ THE SENTENCE IS THE SERVER'S (2026-09-15, Stage 4 session 2) — `arc.swim_retest_nudge.sentence`.
+ *    This card was handed a fraction of a week and rounded it in the render.
  */
 export default function StateSwimNudge({
-  weeksSince,
+  sentence,
   onDismiss,
 }: {
-  weeksSince: number;
+  sentence: string;
   onDismiss: () => void;
 }) {
   return (
@@ -19,9 +20,7 @@ export default function StateSwimNudge({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[12px] font-semibold tracking-[0.12em] text-sky-300/85 uppercase mb-1">Swim check-in</p>
-          <p className="text-[13px] text-white/75 leading-snug">
-            About {Math.round(weeksSince)} weeks of steady swimming since your last update — a quick CSS test would refresh your threshold.
-          </p>
+          <p className="text-[13px] text-white/75 leading-snug">{sentence}</p>
         </div>
         <button
           type="button"

@@ -53,11 +53,15 @@ export default function StrengthLoggedSets({ sets }: { sets: StrengthLoggedSetsD
                 const dateLabel = e.date
                   ? new Date(e.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                   : '';
+                // ⛔ THE SET AND ITS ESTIMATE ARRIVE AS TEXT, IN THE ATHLETE'S OWN UNIT (2026-09-15,
+                // Stage 4 session 2). This printed "lb" on every account whatever they had chosen.
+                const setLine = (lt as any).set_lines?.[i] as string | undefined;
+                const e1rmLine = (lt as any).e1rm_lines?.[i] as string | null | undefined;
                 return (
                   <div key={i} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px]">
-                    <span className="text-white/75 tabular-nums">{e.weight} lb × {e.reps}</span>
+                    {setLine && <span className="text-white/75 tabular-nums">{setLine}</span>}
                     {dateLabel && <span className="text-white/40">{dateLabel}</span>}
-                    {e.e1rm != null && e.e1rm > 0 && <span className="text-white/45 tabular-nums">e1RM {e.e1rm} lb</span>}
+                    {e1rmLine && <span className="text-white/45 tabular-nums">{e1rmLine}</span>}
                     {/* Sport colour, not green — green means bike (Michael 2026-08-15, with the PR tags). */}
                     {e.best && <span className="text-strength font-medium">best</span>}
                   </div>
@@ -77,7 +81,8 @@ export default function StrengthLoggedSets({ sets }: { sets: StrengthLoggedSetsD
           {sets.others.map((l) => (
             <div key={l.canonical} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[12px]">
               <span className="text-white/75">{l.display_name}</span>
-              <span className="text-white/75 tabular-nums">{l.weight} lb × {l.reps}</span>
+              {/* The heaviest set as the athlete reads it, from the server (2026-09-15). */}
+              {(l as any).set_line && <span className="text-white/75 tabular-nums">{(l as any).set_line}</span>}
               {/* ⛔ NO e1RM AND NO DIRECTION WORD. Nobody trends a one-rep max on a curl, and this app
                   does not assert a direction it cannot support. The count is the receipt. */}
               <span className="text-white/40 tabular-nums">{l.sessions} {l.sessions === 1 ? 'session' : 'sessions'}</span>

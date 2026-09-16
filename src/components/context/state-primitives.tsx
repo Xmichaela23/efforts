@@ -209,7 +209,9 @@ export function WeekMixBar({ counts, hasPlan, partialWeek, loadShare = null }: {
             if (!keys.includes(k)) keys.push(k);
           }
           const sorted = [...ORDER.filter((d) => keys.includes(d)), ...keys.filter((d) => !ORDER.includes(d))];
-          const total = loadShare && loadShare.totalPts > 0 ? Math.round(loadShare.totalPts) : null;
+          // The coach's whole number (`load.total_7d`, rounded in `coach/load-composition.ts`) — this
+          // rounded it here until 2026-09-15.
+          const total = loadShare && loadShare.totalPts > 0 ? loadShare.totalPts : null;
           const parts: React.ReactNode[] = sorted.map((d) => {
             const share = shareOf.get(d);
             return (
