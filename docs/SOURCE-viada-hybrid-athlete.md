@@ -867,7 +867,7 @@ ones — while controlling fatigue.
 - 4 × 1200m @ 90% with rest equal to 50% of the run
 - 2 × 1600m @ 90% with 3-min rest, then 3 × 400m @ 92–95% with 2-min rest
 - 1 × 800m @ 95% with 3-min rest, 2 × 400m @ 95% with 1:30 rest, 4 × 200m @ 95% with 1-min rest
-- 2 sets of 4 rounds of: 1 min @ 105% / 1:30 @ 90%; 3-min recovery walk/jog between sets
+- 2 sets of 4 rounds of: 1 min @ 105% / 1 min @ 90%; 3-min recovery walk/jog between sets *(corrected 2026-09-16 off `p233.jpg`: Level 1 prints "1 minute @ 90%"; this line read 1:30, which is Levels 2 and 3 on p234)*
 - 5 rounds of: 20s @ 140% / 4:40 @ 92% / 1-min easy jog
 - 4 rounds of: 2 min @ 95% / 15s @ 115% / 1:15 @ 95% / 2 min @ 90% / 1:30–2 min VT1 recovery
 - 5 rounds of: 3:30 @ 90% / 1 min @ VT1
