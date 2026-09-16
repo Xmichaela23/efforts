@@ -308,11 +308,15 @@ export default function EnduranceIntervalTable({
         </thead>
         <tbody>
           {visibleIntervals.map((iv, idx) => {
-            // ⚠️ A SEGMENT WITH NO ADJUSTED NUMBER KEEPS ITS RAW ONE while the toggle is on — a rep
-            // too short to grade honestly still ran at a pace, and blanking it would read as missing
-            // data rather than as an unadjustable segment.
+            /**
+             * ⛔ UNDER THE "GAP" HEADER, ONLY A GAP NUMBER (2026-09-15, §8.0 #3). This kept the RAW pace on a
+             * segment with no adjusted number — the 2026-09 reading was that a blank looks like missing data —
+             * but a raw pace under that header is the wrong number wearing the right label, and the ledger row
+             * ("No grade-adjusted pace on a run row shorter than 400 m; the column prints '—'") says so. The
+             * row prints "—"; tapping the header back to "Pace" shows what it ran.
+             */
             const paceCellSec = showGapPace
-              ? (iv.executed.actual_gap_sec_per_mi ?? iv.executed.actual_pace_sec_per_mi)
+              ? iv.executed.actual_gap_sec_per_mi
               : iv.executed.actual_pace_sec_per_mi;
             const execCell = isRide
               ? (iv.executed.power_watts != null ? `${Math.round(iv.executed.power_watts)} W` : '—')
