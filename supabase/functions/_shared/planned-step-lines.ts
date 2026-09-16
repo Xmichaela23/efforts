@@ -9,7 +9,8 @@
  *
  * The words (approved by Michael, 2026-09-16, off p231-232's forty-twenty at level 2):
  *   10:00 warm-up · ref 8:33–9:41/mi
- *   5 sets of 4 × 40 s @ 5:39–5:53/mi, 20 s @ 14:06–15:54/mi between · 2:00 @ 8:33–9:41/mi between sets
+ *   5 sets of 4 × 40 s @ 5:39–5:53/mi · RPE 8–10, 20 s @ 14:06–15:54/mi between · 2:00 @ 8:33–9:41/mi between sets
+ *   ("RPE 8–10" added 2026-09-16, Michael: effort prints in the book's term)
  *   8:00 cool-down · ref 8:33–9:41/mi
  *
  * ⚠️ GROUPING READS THE STEPS, NOT THE TOKEN. The smallest run of steps that repeats back to back is the
@@ -110,17 +111,22 @@ function lengthText(s: PlannedStep, opts: StepLineOptions): string {
   return String(s?.label || '').trim() || 'interval';
 }
 
+const rpeText = (s: PlannedStep) =>
+  s?.target_rpe && typeof s.target_rpe.lo === 'number' && typeof s.target_rpe.hi === 'number'
+    ? (s.target_rpe.lo === s.target_rpe.hi ? `RPE ${s.target_rpe.lo}` : `RPE ${s.target_rpe.lo}–${s.target_rpe.hi}`) : undefined;
+
 /**
- * " @ 5:39–5:53/mi", " @ HR 138–144 · ref 10:05–11:25/mi", " @ 202 W and up", " easy".
- * ⚠️ NO "effort 8–10" ON THESE LINES: the approved words print the pace alone. The step still carries
- * `target_rpe`; the logger and the watch read it from there.
+ * " @ 5:39–5:53/mi · RPE 8–10", " @ HR 138–144 · ref 10:05–11:25/mi", " @ 202 W and up", " easy".
+ * ⛔ THE EFFORT IS "RPE", THE BOOK'S TERM (Michael, 2026-09-16), after the pace or watts it gauges.
  */
 function targetText(s: PlannedStep, opts: StepLineOptions): string {
-  const pace = paceText(s, opts), hr = hrText(s), pow = powerText(s);
+  const pace = paceText(s, opts), hr = hrText(s), pow = powerText(s), rpe = rpeText(s);
+  const withRpe = (t: string) => (rpe ? `${t} · ${rpe}` : t);
   if (hr) return ` @ ${hr}${pace ? ` · ref ${pace}` : ''}`;
-  if (pace) return ` @ ${pace}`;
+  if (pace) return withRpe(` @ ${pace}`);
   if (isRecovery(s) && String(opts.sport || '').toLowerCase() === 'ride') return ' easy';
-  if (pow) return ` @ ${pow}`;
+  if (pow) return withRpe(` @ ${pow}`);
+  if (rpe) return ` @ ${rpe}`;
   return isRecovery(s) ? ' easy' : '';
 }
 
