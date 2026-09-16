@@ -79,7 +79,9 @@ Deno.serve(async (req: Request) => {
     // stranger to half the app.
     const isStanding = String(config?.strength_protocol ?? '') === STANDING_PLAN_PROTOCOL_ID
       || String(config?.source ?? '').toLowerCase() === STANDING_PLAN_PROTOCOL_ID;
-    if (!isStanding) return json({ success: false, reason: 'not_a_standing_plan_block' }, 400);
+    // ⛔ THE OTHER BLOCK TYPE IS AN ANSWER, NOT A FAILURE (2026-09-16): every caller asks both rematerializers and
+    // reads `data.success`; a 400 here printed a failed call in the console on every plan of the other type.
+    if (!isStanding) return json({ success: false, reason: 'not_a_standing_plan_block' }, 200);
 
     const sp = config?.standing_plan ?? null;
     if (!sp?.frame || !sp?.test_lift_names) {

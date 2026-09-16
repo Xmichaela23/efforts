@@ -167,7 +167,9 @@ Deno.serve(async (req) => {
     const config = plan.config ?? {};
     const isStrengthPrimary = String(config?.source ?? '').toLowerCase() === 'strength_primary'
       || String(config?.strength_protocol ?? '') === 'strength_primary';
-    if (!isStrengthPrimary) return json({ success: false, reason: 'not_a_strength_block' }, 400);
+    // ⛔ THE OTHER BLOCK TYPE IS AN ANSWER, NOT A FAILURE (2026-09-16): every caller asks both rematerializers and
+    // reads `data.success`; a 400 here printed a failed call in the console on every plan of the other type.
+    if (!isStrengthPrimary) return json({ success: false, reason: 'not_a_strength_block' }, 200);
 
     const weeks = Number(plan.duration_weeks) || Number(config?.duration_weeks) || 12;
     const cycles = cyclesFromStoredPhases(config, weeks);
