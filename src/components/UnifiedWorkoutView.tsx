@@ -1161,7 +1161,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   onClick={async () => {
                   try {
                     const w = workout as Record<string, unknown> | null;
-                    const text = shareSessionText(w, Boolean(shareUseImperial));
+                    // ⛔ THE SERVER'S TOTALS (2026-09-15, §8.0 #36) — `completed_totals` and the Details
+                    // `display_metrics`, the same figures Performance and Details print. The share text
+                    // works nothing out; the row it used to read loses `moving_seconds` on a refresh.
+                    const sd = sessionDetailV1 as { completed_totals?: unknown; strength_totals?: unknown } | null;
+                    const text = shareSessionText(w, Boolean(shareUseImperial), {
+                      completed_totals: (sd?.completed_totals ?? null) as never,
+                      strength_totals: (sd?.strength_totals ?? null) as never,
+                      display_metrics: ((w as { display_metrics?: unknown } | null)?.display_metrics ?? null) as never,
+                    });
                     const how = await shareSession(text, String(w?.name || 'Session'));
                     setShareNote(how === 'copied' ? 'Copied. Paste it anywhere.' : null);
                     if (how === 'copied') setTimeout(() => setShareNote(null), 2500);
