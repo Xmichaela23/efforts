@@ -286,8 +286,11 @@ const STRENGTH_VOLUME_VERSION = 2;
  *   6 — completed_totals.avg_hr from the one provider-first heart-rate resolver for every sport (2026-09-16,
  *       Stage 7 session 1, rule (d)). A copy stored at v5 carries a ride, walk or lift's sample mean where the
  *       device sent an average, so Performance and Today would print the old number until the copy rebuilds.
+ *   7 — Stage 7 session 3 (2026-09-16): the device's distance first (rule 7), one swim distance format, the test card,
+ *       the Volume tile and the grade-adjusted pace row in the athlete's unit, one planned-length label. A copy stored at
+ *       v6 carries the sample distance and the old words until it rebuilds.
  */
-const SESSION_TOTALS_VERSION = 6;
+const SESSION_TOTALS_VERSION = 7;
 
 type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_missing';
 
@@ -2001,7 +2004,14 @@ Deno.serve(async (req) => {
     const _swimSc = _isSwim
       ? resolveSwimScalars({ moving_time: d?.moving_time ?? d?.metrics?.moving_time, elapsed_time: d?.elapsed_time ?? d?.metrics?.elapsed_time, distance: d?.distance, avg_heart_rate: d?.avg_heart_rate ?? d?.metrics?.avg_heart_rate })
       : null;
-    const getDistM = () => { const distKm = Number.isFinite(d?.distance) ? Number(d.distance) * 1000 : null; const distM = d?.computed?.overall?.distance_m ?? null; return Number.isFinite(distM) && distM > 0 ? Number(distM) : (Number.isFinite(distKm) ? Number(distKm) : null); };
+    // ⛔ THE DEVICE'S TOTAL FIRST (2026-09-16, WORKORDER §1 rule 7, Stage 7 session 3) — the `distance` column (km);
+    // the analysis's stored figure only when none was sent.
+    const getDistM = () => {
+      /* sent-held: distance — sentM */
+      const sentM = Number.isFinite(d?.distance) && Number(d.distance) > 0 ? Number(d.distance) * 1000 : null;
+      const oursM = Number(d?.computed?.overall?.distance_m);
+      return sentM ?? (Number.isFinite(oursM) && oursM > 0 ? oursM : null);
+    };
     const distM = (_isSwim && _swimSc?.distanceMeters != null) ? _swimSc.distanceMeters : getDistM();
     const distKm = Number.isFinite(distM) && distM > 0 ? distM / 1000 : null;
     // ⛔ THE DETAILS TAB'S MOVING TIME IS THE SESSION'S ONE MOVING TIME (2026-09-10, audit H-D10). This
@@ -2024,7 +2034,12 @@ Deno.serve(async (req) => {
     const avg_speed_kmh = Number.isFinite(d?.metrics?.avg_speed) ? Number(d.metrics.avg_speed) : (Number.isFinite(d?.avg_speed) ? Number(d.avg_speed) : (distKm && durS && durS > 0 ? (distKm / (durS / 3600)) : null));
     const avg_speed_mps = Number.isFinite(avg_speed_kmh) ? avg_speed_kmh / 3.6 : null;
     const avg_pace_s_per_km = Number.isFinite(d?.computed?.overall?.avg_pace_s_per_mi) ? Number(d.computed.overall.avg_pace_s_per_mi) / 1.60934 : (Number.isFinite(d?.avg_pace ?? d?.metrics?.avg_pace) ? Number(d.avg_pace ?? d.metrics.avg_pace) : (avg_speed_kmh && avg_speed_kmh > 0 ? (3600 / avg_speed_kmh) : null));
-    let max_speed_mps: number | null = Number.isFinite(d?.computed?.analysis?.bests?.max_speed_mps) ? Number(d.computed.analysis.bests.max_speed_mps) : Number.isFinite(d?.computed?.overall?.max_speed_mps) ? Number(d.computed.overall.max_speed_mps) : (Number.isFinite(d?.max_speed ?? d?.metrics?.max_speed) ? Number(d.max_speed ?? d.metrics.max_speed) / 3.6 : null);
+    // ⛔ THE DEVICE'S MAX SPEED FIRST (2026-09-16, WORKORDER §1 rule 7, Stage 7 session 3) — `max_speed` (km/h) as sent;
+    // the samples' best only when none was sent. The samples' best stood ahead of the device's.
+    /* sent-held: max_speed — sentMaxKmh */
+    const sentMaxKmh = Number(d?.max_speed ?? d?.metrics?.max_speed);
+    let max_speed_mps: number | null = Number.isFinite(sentMaxKmh) && sentMaxKmh > 0 ? sentMaxKmh / 3.6
+      : Number.isFinite(d?.computed?.analysis?.bests?.max_speed_mps) ? Number(d.computed.analysis.bests.max_speed_mps) : null;
     // Series-based fallback: derive from speed_mps samples when all other sources are null
     if (max_speed_mps == null) {
       const speeds: number[] | undefined = d?.computed?.analysis?.series?.speed_mps;
@@ -2135,7 +2150,9 @@ Deno.serve(async (req) => {
       const power = withShare(z?.power?.bins);
       if (!hr && !power) return null;
       return {
-        ...(hr ? { hr: { ...(z?.hr ?? {}), bins: hr, total_s: hr.reduce((a, b) => a + (Number(b.t_s) || 0), 0) } } : {}),
+        // `duration_display` — the chart's "Duration" is the device's elapsed time (rule 7), the same seconds as the
+        // Elapsed tile; the bins sum one sample interval short of it (Stage 7 session 3).
+        ...(hr ? { hr: { ...(z?.hr ?? {}), bins: hr, total_s: hr.reduce((a, b) => a + (Number(b.t_s) || 0), 0), duration_display: elapsedS != null && elapsedS > 0 ? clock(elapsedS) : null } } : {}),
         ...(power ? { power: { ...(z?.power ?? {}), bins: power, total_s: power.reduce((a, b) => a + (Number(b.t_s) || 0), 0) } } : {}),
       };
     })();
@@ -2202,10 +2219,15 @@ Deno.serve(async (req) => {
         return dist.map((_, i) => { const v = finite(a[i]); return v == null ? null : f(v); });
       };
       // The distance never steps back: the chart's running maximum, which is what its cursor read.
+      // ⛔ THE LAST POINT IS THE DEVICE'S TOTAL (2026-09-16, WORKORDER §1 rule 7, Stage 7 session 3) — the running
+      // distance is scaled so it ends on the session's distance, the way the climb lines end on the device's gain
+      // (`compute-workout-analysis/display-series.ts`). The map's "(total)" printed the samples' last point.
+      const seriesLast = dist.reduce((m: number, v) => Math.max(m, finite(v) ?? 0), 0);
+      const kDist = Number.isFinite(distM) && (distM as number) > 0 && seriesLast > 0 ? (distM as number) / seriesLast : 1;
       let runMax = finite(dist[0]) ?? 0;
       const distance = dist.map((v) => {
         runMax = Math.max(runMax, finite(v) ?? 0);
-        return dmFmt.distanceNumber(runMax, dmMetric ? 2 : 1) as number;
+        return dmFmt.distanceNumber(runMax * kDist, dmMetric ? 2 : 1) as number;
       });
       const elevLine = arr('elevation_m');
       return {
@@ -2232,9 +2254,10 @@ Deno.serve(async (req) => {
     (detail as any).display_metrics = { gap_pace_s_per_km,
       // ⛔ EVERY LINE BELOW IS ALREADY IN THE ATHLETE'S UNIT (2026-09-16) — the screen prints them.
       unit_system: dmMetric ? 'metric' : 'imperial',
-      distance_display: dmDistance(distM),
+      // A swim reads whole yards / metres on both lines, the athlete's unit, the one swim format (Stage 7 session 3).
+      distance_display: _isSwim ? dmFmt.distance(distM, true) : dmDistance(distM),
       // The ride tile's shape: 1 dp mi / km, never yards (Stage 7 — the tile's wording is kept).
-      distance_tile_display: dmFmt.distance(distM),
+      distance_tile_display: dmFmt.distance(distM, _isSwim),
       // No climb reads "N/A" on the tile, so a zero or missing gain sends nothing.
       elevation_display: Number(elevation_gain_m) > 0 ? dmElevation(elevation_gain_m) : null,
       max_speed_display: dmFmt.speedFromMps(max_speed_mps),

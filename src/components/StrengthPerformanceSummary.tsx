@@ -61,7 +61,7 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
 
   const slots: StrengthSlot[] | null = Array.isArray(sessionDetail?.strength_slots) ? sessionDetail!.strength_slots : null;
   const counts = (sessionDetail?.strength_counts ?? null) as { exercises_completed: number; exercises_planned: number } | null;
-  const totals = (sessionDetail?.strength_totals ?? null) as { sets_completed: number; reps_completed: number; volume_lb: number } | null;
+  const totals = (sessionDetail?.strength_totals ?? null) as { sets_completed: number; reps_completed: number; volume_lb: number; volume_display?: string; volume_label?: string } | null;
   // The all-out set + the block it belonged to — both server-computed, rendered verbatim.
   const allOut = sessionDetail?.strength_all_out ?? null;
   const allOutReason = sessionDetail?.strength_all_out_reason ?? null;
@@ -223,8 +223,8 @@ export default function StrengthPerformanceSummary({ completed, sessionDetail, o
             <div className="text-[11px] text-white/50">Total Reps</div>
           </div>
           <div>
-            <div className="text-lg font-semibold text-white">{totals.volume_lb.toLocaleString()}</div>
-            <div className="text-[11px] text-white/50">Volume (lbs)</div>
+            <div className="text-lg font-semibold text-white">{totals.volume_display ?? '—'}</div>
+            <div className="text-[11px] text-white/50">{totals.volume_label ?? 'Volume'}</div>
           </div>
           {/* DURATION — the fourth tile, and the only editable one. It reads "—" on sessions logged
               before the clock existed, and the edit is how those get a number at all. */}

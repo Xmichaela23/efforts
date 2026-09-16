@@ -1659,6 +1659,7 @@ const formatMovingTime = () => formatDuration(norm.duration_s);
                 <HRZoneChart
                   zoneDurationsSeconds={zonesHr.bins.map((b:any)=> Number(b.t_s)||0)}
                   zoneShares={zonesHr.bins.map((b:any)=> Number(b.share)||0)}
+                  durationDisplay={typeof zonesHr.duration_display === 'string' ? zonesHr.duration_display : undefined}
                   zones={zonesHr.bins.map((b:any, i:number) => ({ name: `Zone ${i+1}`, min: Number(b.min)||0, max: Number(b.max)||0 }))}
                   avgHr={norm.avg_hr ?? undefined}
                   maxHr={norm.max_hr ?? undefined}

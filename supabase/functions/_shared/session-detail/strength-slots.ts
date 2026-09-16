@@ -27,7 +27,7 @@
  */
 import { matchExercises, normalizeExerciseName, type ExerciseMatch } from '../strength/match-exercises.ts';
 import { canonicalize } from '../canonicalize.ts';
-import { completedStrengthVolume, isPerformedSet, liftInAthletesUnit } from '../strength/session-volume.ts';
+import { completedStrengthVolume, isPerformedSet, liftInAthletesUnit, KG_PER_LB } from '../strength/session-volume.ts';
 import type { SessionDetailV1 } from './types.ts';
 import { isAssistanceSlot } from '../../../../src/lib/assistance-slot.ts';
 import { normalizeCompletedStrengthSet } from '../../../../src/lib/normalize-strength-set.ts';
@@ -335,11 +335,17 @@ export function buildStrengthSlots(input: StrengthSlotsInput): StrengthSlotsFiel
         && ((m.executed as any).sets as any[]).some((s) => isPerformedSet(s) && ((Number(s?.reps) || 0) > 0 || (Number(s?.duration_seconds) || 0) > 0))).length,
     }
     : null;
+  const volumeLb = input.strengthVolume?.completed_total_lb ?? completedVolume.reduce((s, e) => s + e.volume_lb, 0);
   const totals = logged.length > 0
     ? {
       sets_completed: performedWithReps.length,
       reps_completed: performedWithReps.reduce((s, st) => s + (Number(st?.reps) || 0), 0),
-      volume_lb: input.strengthVolume?.completed_total_lb ?? completedVolume.reduce((s, e) => s + e.volume_lb, 0),
+      volume_lb: volumeLb,
+      // ⛔ THE VOLUME TILE IN THE ATHLETE'S UNIT (2026-09-16, Stage 7 session 3) — the Week row's rule
+      // (`display-format` `weightGrouped`): whole kilograms by the definition constant, en-US commas. The tile
+      // printed pounds under "Volume (lbs)" on a metric account while the Week row printed kilograms.
+      volume_display: Math.round(input.athleteMetric === true ? volumeLb * KG_PER_LB : volumeLb).toLocaleString('en-US'),
+      volume_label: input.athleteMetric === true ? 'Volume (kg)' : 'Volume (lbs)',
     }
     : null;
 

@@ -934,8 +934,26 @@ Deno.serve(async (req) => {
             : null;
         }
       } catch { /* non-fatal */ }
+      /**
+       * ⛔ ONE WRITER OF A RUN'S OR RIDE'S DISTANCE AND PACE (2026-09-16, WORKORDER §1 rule 7, Stage 7 session 3).
+       * `compute-workout-analysis` writes them, the device's total first. This step used to write its own
+       * figure from the samples, and `merge_computed` replaces `overall` whole — so when this step finished
+       * second (both are fired at ingest) the sample distance won. It now carries the stored figure through
+       * untouched, or leaves the key out. Swims are unchanged: the analysis writes no swim pace.
+       */
+      try {
+        const sportOne = String((w as any)?.type || '').toLowerCase();
+        if (sportOne !== 'swim' && computedPayload?.overall) {
+          const prevC = typeof (w as any)?.computed === 'string' ? JSON.parse((w as any).computed) : ((w as any)?.computed || {});
+          const prevO = prevC?.overall || {};
+          for (const k of ['distance_m', 'avg_pace_s_per_mi'] as const) {
+            if (prevO[k] != null) computedPayload.overall[k] = prevO[k];
+            else delete computedPayload.overall[k];
+          }
+        }
+      } catch { /* non-fatal */ }
       const normalized = normalizeComputedPaces(computedPayload);
-      
+
       // Use database RPC for atomic JSONB merge - REQUIRED, no fallbacks
       const { error: rpcError } = await supabase.rpc('merge_computed', {
         p_workout_id: workout_id,

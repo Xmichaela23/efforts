@@ -9,7 +9,7 @@
  * ⚠️ M:SS IS ROUNDED WHOLE, THEN SPLIT — rounding the remainder alone is what printed "7:60/mi" (§8.0 #2).
  *
  * Two distance shapes exist on purpose, because the screens already print both:
- *   - `distance`       — 1 dp mi / km; a swim reads yd / m.            (Performance, Today, Week)
+ *   - `distance`       — 1 dp mi / km; a swim reads yd / m, grouped.   (Performance, Today, Week, Details)
  *   - `distanceDetail` — 1 dp km; under a mile prints yd, else 1 dp mi. (Details)
  */
 import { KG_PER_LB } from '../../../src/lib/bar-types.ts';
@@ -57,7 +57,9 @@ export function displayFormat(metric: boolean) {
     distance(metres: number | null | undefined, swim = false): string | null {
       const v = finitePos(metres);
       if (v == null) return null;
-      if (swim) return metric ? `${Math.round(v)} m` : `${Math.round(v / M_PER_YD)} yd`;
+      // A swim's whole yards / metres with en-US thousands commas: "1,650 yd" · "1,500 m" — the one swim distance
+      // on Today, the Week row, Performance and Details (Stage 7 session 3).
+      if (swim) return metric ? `${Math.round(v).toLocaleString('en-US')} m` : `${Math.round(v / M_PER_YD).toLocaleString('en-US')} yd`;
       return metric ? `${(v / 1000).toFixed(1)} km` : `${(v / M_PER_MI).toFixed(1)} mi`;
     },
     /**
@@ -134,12 +136,6 @@ export function displayFormat(metric: boolean) {
       return metric ? `${Math.round(v * KG_PER_LB)} kg` : `${Math.round(v)} lb`;
     },
     // ⛔ ADDED FOR TODAY, THE SESSION CARD, THE WEEK ROW AND THE WEEK BAR (2026-09-16, Stage 7 session 1).
-    /** A swim's whole yards / metres with en-US thousands commas: "1,650 yd" · "1,500 m". */
-    swimDistanceGrouped(metres: number | null | undefined): string | null {
-      const v = finitePos(metres);
-      if (v == null) return null;
-      return metric ? `${Math.round(v).toLocaleString('en-US')} m` : `${Math.round(v / M_PER_YD).toLocaleString('en-US')} yd`;
-    },
     /** Whole mi / km, or null under `minUnits` of the athlete's unit: the Week bar's "18 mi". */
     distanceWhole(metres: number | null | undefined, minUnits = 0): string | null {
       const v = Number(metres);

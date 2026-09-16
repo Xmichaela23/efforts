@@ -11,7 +11,7 @@ type Lift = {
   key: string;
   reps: number | null;
   weight: number | null;
-  unit: 'lb' | 'reps';
+  unit: 'lb' | 'kg' | 'reps';
   e1rm: number | null;
   prior_e1rm: number | null;
   stored: number | null;
@@ -26,7 +26,7 @@ function measureLine(l: Lift): string {
     return `${l.zero_rep ? 0 : (l.reps ?? 0)} clean reps`;
   }
   const rw = l.weight != null && l.reps != null ? `${l.weight} × ${l.reps}` : '';
-  const e = l.e1rm != null ? `e1RM ${l.e1rm} lb` : '';
+  const e = l.e1rm != null ? `e1RM ${l.e1rm} ${l.unit}` : '';
   return [rw, e].filter(Boolean).join(' → ') || '—';
 }
 
@@ -80,7 +80,7 @@ export function StrengthTestResult({
               {!l.zero_rep && l.prior_e1rm != null && l.e1rm != null && (
                 <div className="mt-0.5 text-xs text-white/50 tabular-nums">
                   last test {l.prior_e1rm} → {l.e1rm}
-                  {l.unit === 'lb' ? ' lb' : ' reps'}
+                  {` ${l.unit}`}
                 </div>
               )}
               {l.zero_rep && (

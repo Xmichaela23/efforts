@@ -86,8 +86,10 @@ const pos = (v: unknown): number | null => {
  *   · `done_distance` — "5.0 mi" (1 dp mi / km); the session card and the Week row.
  *   · `done_volume`   — a lift's "3,725 lb"; the Week row.
  *   · `done_headline` — the session card: "5.0 mi · 48:00" or "3,725 lb · 3 lifts".
- * ⚠️ ONE DISTANCE: `session_detail_v1.completed_totals.distance_m` first (what Performance prints), then
- * `executed.overall.distance_m` for a session whose detail has not been built.
+ * ⚠️ ONE DISTANCE: `executed.overall.distance_m` — the analysis's stored total, the device's own first (rule 7) —
+ * which is also what Performance's `completed_totals.distance_m` is built from. The stored session detail is read
+ * only when the overall carries none: a stored detail is rebuilt when the session is opened, so after a
+ * recalculation it can hold the old figure until then (2026-09-16, Stage 7 session 3).
  */
 export type DoneLines = {
   done_metrics: string[];
@@ -98,7 +100,7 @@ export type DoneLines = {
 
 export function doneDistanceMeters(item: Item): number | null {
   const totals = item?.workout_analysis?.session_detail_v1?.completed_totals ?? null;
-  return pos(totals?.distance_m) ?? pos(item?.executed?.overall?.distance_m);
+  return pos(item?.executed?.overall?.distance_m) ?? pos(totals?.distance_m);
 }
 
 export function doneLines(item: Item, fmt: DisplayFormat): DoneLines {
@@ -118,7 +120,7 @@ export function doneLines(item: Item, fmt: DisplayFormat): DoneLines {
   const totals = item?.workout_analysis?.session_detail_v1?.completed_totals ?? null;
   const overall = item?.executed?.overall ?? {};
   const distM = doneDistanceMeters(item);
-  const done_distance = fmt.distance(distM);
+  const done_distance = fmt.distance(distM, type === 'swim');
   const headParts = [done_distance, durationClock(item?.moving_seconds)].filter(Boolean);
 
   const durS = pos(totals?.moving_s) ?? pos(item?.moving_seconds);
@@ -127,10 +129,10 @@ export function doneLines(item: Item, fmt: DisplayFormat): DoneLines {
   const isRun = type === 'run' || type === 'walk';
   const isRide = type === 'ride' || type === 'bike' || type === 'cycling';
   const metrics: string[] = [];
-  if (distM != null) metrics.push((type === 'swim' ? fmt.swimDistanceGrouped(distM) : done_distance) as string);
+  if (done_distance != null) metrics.push(done_distance);
   if (durS != null && distM != null) {
     if (isRun) {
-      const paceMi = pos(totals?.avg_pace_s_per_mi);
+      const paceMi = pos(overall?.avg_pace_s_per_mi) ?? pos(totals?.avg_pace_s_per_mi);
       const p = fmt.pacePerUnit(paceMi != null ? paceMi / (M_PER_MI / 1000) : durS / (distM / 1000));
       if (p) metrics.push(p);
     } else if (isRide) {

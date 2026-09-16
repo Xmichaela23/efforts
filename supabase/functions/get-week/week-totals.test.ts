@@ -75,7 +75,9 @@ Deno.test('a ride prints mph with a whole number bare, km/h on metric; a swim pr
   const swim = { type: 'swim', status: 'completed', moving_seconds: 1650, executed: { overall: { distance_m: 1508.76 } } };
   const s = doneLines(swim, displayFormat(false));
   assertEquals(s.done_metrics, ['1,650 yd', '1:40 /100yd']);
-  assertEquals(s.done_headline, '0.9 mi · 27:30');
+  // One swim distance on every screen (2026-09-16, Stage 7 session 3): the headline reads yards too.
+  assertEquals(s.done_headline, '1,650 yd · 27:30');
+  assertEquals(doneLines(swim, displayFormat(true)).done_metrics[0], '1,509 m');
 });
 
 Deno.test('a lift: grouped weight and the lift count', () => {

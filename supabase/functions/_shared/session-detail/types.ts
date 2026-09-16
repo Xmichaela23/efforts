@@ -68,7 +68,8 @@ export type StrengthTestLiftResult = {
   reps: number | null;
   /** Working weight (lb) for 1RM lifts; null for bodyweight rep-max (pull-ups). */
   weight: number | null;
-  unit: 'lb' | 'reps';
+  /** The unit every weight on this row is in: the athlete's ('kg' on a metric account, converted when the detail is built). */
+  unit: 'lb' | 'kg' | 'reps';
   /** Estimated 1RM (lb) for barbell lifts; the rep count for pull-ups. */
   e1rm: number | null;
   /** Prior TEST's value → drives the "160 → 150" delta line. Null if no prior test. */
@@ -660,7 +661,7 @@ export type SessionDetailV1 = {
   strength_counts?: { exercises_completed: number; exercises_planned: number } | null;
 
   /** Performed sets with reps, their reps, and `strength_volume.completed_total_lb` (audit H-S14 / H-S15). */
-  strength_totals?: { sets_completed: number; reps_completed: number; volume_lb: number } | null;
+  strength_totals?: { sets_completed: number; reps_completed: number; volume_lb: number; volume_display?: string; volume_label?: string } | null;
 
   /** Strength only: server-computed deviations. */
   strength_weight_deviation?: {

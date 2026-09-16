@@ -1217,10 +1217,16 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
     let variabilityIndex: number | null = null;
     
     try {
-      if (isRide && hasRows && power_watts.some(p => p !== null)) {
-        // ⛔ ONE NORMALIZED POWER (2026-09-14): `_shared/ride-power.ts`, the same function the segment rows
+      // ⛔ THE DEVICE'S NORMALIZED POWER FIRST (2026-09-16, WORKORDER §1 rule 7, Stage 7 session 3) — the
+      // `normalized_power` column (Garmin `normalized_power`, Strava `weighted_average_watts`), the order
+      // `judgedPowerW` already reads; Details printed ours beside it. Intensity factor and variability index are
+      // worked from this one number.
+      /* sent-held: normalized_power — sentNp */
+      const sentNp = Number((w as any)?.normalized_power);
+      if (isRide && ((Number.isFinite(sentNp) && sentNp > 0) || (hasRows && power_watts.some(p => p !== null)))) {
+        // ONE NORMALIZED POWER (2026-09-14): `_shared/ride-power.ts`, the same function the segment rows
         // use. Same maths as before (30-sample window, first 29 dropped, zeros included).
-        const np = normalizedPowerW(powerStreamW(rows.map((r) => r.power_w)));
+        const np = Number.isFinite(sentNp) && sentNp > 0 ? sentNp : normalizedPowerW(powerStreamW(rows.map((r) => r.power_w)));
         if (np != null) {
           normalizedPower = np;
 
@@ -1752,9 +1758,13 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
             };
           }
           // Non-swim (runs, rides)
-          const dist = Number.isFinite(distSeries) && distSeries>0 ? Math.round(distSeries)
-            // ⛔ The previous analysis's own figure no longer stands behind the provider's (2026-09-16, Stage 7 session 1).
-            : (Number((w as any)?.distance)*1000 || null);
+          // ⛔ THE DEVICE'S TOTAL FIRST (2026-09-16, WORKORDER §1 rule 7, Stage 7 session 3) — the `distance`
+          // column (km) Garmin and Strava sent, the number the popup already prints; the last sample's running
+          // distance only when none was sent. The pace below is worked from this distance, so it follows.
+          const providerKm = Number((w as any)?.distance);
+          /* sent-held: distance_m — providerKm */
+          const dist = Number.isFinite(providerKm) && providerKm > 0 ? Math.round(providerKm * 1000)
+            : (Number.isFinite(distSeries) && distSeries > 0 ? Math.round(distSeries) : null);
           // Extract duration - PRIORITIZE moving time over elapsed time
           // timeSeries might be elapsed time, so we need to get moving time explicitly
           let dur = null;

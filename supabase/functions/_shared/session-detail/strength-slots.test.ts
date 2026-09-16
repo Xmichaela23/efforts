@@ -74,7 +74,7 @@ Deno.test('a rep-total row counts ticked sets only — typed-but-unticked and un
   const r = out.strength_slots![0];
   assertEquals([r.target_label, r.reps_target, r.reps_done, r.reps_line, r.sets_done], ['25 total · by feel', 25, 18, '18 of 25 reps', 2]);
   assertEquals(r.completed_sets.length, 2);
-  assertEquals(out.strength_totals, { sets_completed: 2, reps_completed: 18, volume_lb: 3150 }); // 175 x 18
+  assertEquals(out.strength_totals, { sets_completed: 2, reps_completed: 18, volume_lb: 3150, volume_display: '3,150', volume_label: 'Volume (lbs)' }); // 175 x 18
 });
 
 Deno.test('a banded assistance row says the band, not a midpoint', () => {

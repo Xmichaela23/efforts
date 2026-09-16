@@ -1122,7 +1122,10 @@ export default function WorkoutCalendar({
     const parts: string[] = [];
     // ⛔ THE SERVER'S DISTANCE (2026-09-16, Stage 7 session 1) — `done_distance`, the one Today and the done card read.
     if (done && typeof row?.done_distance === 'string' && row.done_distance) parts.push(row.done_distance);
-    if (mins > 0) parts.push(fmtDur(mins));
+    // ⛔ ONE PLANNED LENGTH (2026-09-16, Stage 7 session 3) — `planned_duration_label`, the words Today's card and the
+    // Planned header print ("110:00", "25–35 min"); this printed its own "1h 50m" for a session still ahead.
+    if (done) { if (mins > 0) parts.push(fmtDur(mins)); }
+    else if (typeof row?.planned_duration_label === 'string' && row.planned_duration_label) parts.push(row.planned_duration_label);
     return parts.join(' · ');
   };
 

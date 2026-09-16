@@ -40,6 +40,8 @@ export interface HRZoneChartProps {
   zoneDurationsSeconds?: number[];   // per-zone seconds [Z1..Z5]
   /** 2026-09-16: each bin's share of the window (0–1), written on the server beside the bins. */
   zoneShares?: number[];
+  /** The "Duration" the server wrote (the device's elapsed time); the chart's own bin sum only when absent. */
+  durationDisplay?: string;
   zones?: ZoneDef[];                 // explicit bpm zones (overrides everything)
 
   // Auto-zone helpers
@@ -86,6 +88,7 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
   samples = [],
   zoneDurationsSeconds,
   zoneShares,
+  durationDisplay,
   zones,
   age,
   sex = "male",
@@ -240,7 +243,7 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
         {/* Summary Stats */}
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
-            <div className="text-base font-light text-white mb-0.5" style={monospaceStyle}>{fmtTime(totalTime)}</div>
+            <div className="text-base font-light text-white mb-0.5" style={monospaceStyle}>{durationDisplay ?? fmtTime(totalTime)}</div>
             <div className="text-xs text-white/70 font-light">Duration</div>
           </div>
           <div>

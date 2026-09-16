@@ -8,6 +8,7 @@ import { resolveSessionDrift } from './drift-pct.ts';
 import { sessionSteadiness } from './session-steadiness.ts';
 import { vt1WindowDrift } from './vt1-window-drift.ts';
 import { resolvePlannedDurationSeconds } from '../planned-duration.ts';
+import { plannedDurationFields } from '../planned-duration-label.ts';
 import { pacingVariability, stampIntervalCompare } from './interval-compare.ts';
 import { driftReachesLine } from '../run-pace.ts';
 import { planShare } from './swim-plan-share.ts';
@@ -41,7 +42,7 @@ import { isBandAssistedMovement } from '../../../../src/lib/band-assistance.ts';
 import { buildStrengthSlots } from './strength-slots.ts';
 // ⛔ THE COMPLETED SIDE'S PRICING LIVES IN ONE FILE (2026-09-10, audit H-T04) so `get-week` sends the
 // same pounds for the done card and the Week row that this contract prints on Performance.
-import { completedStrengthVolume } from '../strength/session-volume.ts';
+import { completedStrengthVolume, liftInAthletesUnit, KG_PER_LB } from '../strength/session-volume.ts';
 
 import { clock, displayFormat, durationClock, M_PER_MI, M_PER_YD, wholeMinutes } from '../display-format.ts';
 // Server-authored Tier-1 route readout (Familiar Routes, "arm of State"). The honest, effort-aware
@@ -911,7 +912,12 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
    * ──────────────────────────────────────────────────────────────────────────────────────────── */
   completedTotals.distance_display = sdDistance(completedTotals.distance_m, type === 'swim');
   plannedTotals.distance_display = sdDistance(plannedTotals.distance_m, type === 'swim');
-  plannedTotals.duration_display = sdDuration(plannedTotals.duration_s);
+  // ⛔ ONE PLANNED LENGTH (2026-09-16, Stage 7 session 3) — the label `get-week` sends on every planned row
+  // (`planned-duration-label.ts`): "110:00", "25–35 min". This printed its own "1:50:15" for the same seconds.
+  plannedTotals.duration_display = plannedDurationFields(
+    plannedRowRaw ?? { total_duration_seconds: plannedTotals.duration_s },
+    type,
+  ).planned_duration_label;
   completedTotals.duration_display = sdDuration(completedTotals.duration_s);
   completedTotals.duration_minutes = sdMinutes(completedTotals.duration_s);
   completedTotals.avg_pace_display = (() => {
@@ -1101,7 +1107,9 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     const rawPace = fin(completedTotals.avg_pace_s_per_mi);
     const gapPace = fin(completedTotals.avg_gap_s_per_mi);
     if (rawPace != null && gapPace != null && rawPace > 0 && gapPace > 0) {
-      const fmt = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}/mi`;
+      // ⛔ THE ATHLETE'S UNIT, WHOLE PACE ROUNDED ONCE (2026-09-16, Stage 7 session 3) — this printed "/mi" on every
+      // account and rounded the seconds on their own (":60"). The average pace line's rule (`sdClock`).
+      const fmt = (secPerMi: number) => `${sdClock(sdMetric ? secPerMi / (M_PER_MI / 1000) : secPerMi)}${sdMetric ? '/km' : '/mi'}`;
       // ⛔ BOTH NUMBERS, AND THE RAW ONE IS NAMED. The table above prints raw pace per segment; a
       // lone adjusted figure here would read as a correction to it rather than a second view of it.
       analysisDetailRows.push({
@@ -1203,7 +1211,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     iv.executed.distance_display = (() => {
       const m = Number(iv.executed.distance_m);
       if (!Number.isFinite(m) || m <= 0) return null;
-      if (type === 'swim') return sdMetric ? `${Math.round(m)} m` : `${Math.round(m / M_PER_YD)} yd`;
+      if (type === 'swim') return sdDistance(m, true);
       if (sdMetric) return `${(m / 1000).toFixed(m < 1000 ? 2 : 1)} km`;
       const mi = m / M_PER_MI;
       return `${mi.toFixed(mi < 1 ? 2 : 1)} mi`;
@@ -1499,7 +1507,26 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     // Q-097/Q-102 phase 2 — a 1RM/baseline TEST + its per-lift result. The Performance screen renders the
     // test-result frame instead of the training table + execution/volume when is_test is true.
     is_test: isTest,
-    test_result: testResult,
+    // ⛔ THE TEST CARD IN THE ATHLETE'S UNIT (2026-09-16, Stage 7 session 3). The analyser stores pounds; a metric
+    // account read "e1RM 290 lb" beside the logger's "Saved: 132 kg". The set weight follows the set rows' rule
+    // (`liftInAthletesUnit`); the estimated, last-test and stored maxes are whole kilograms, as Adjust prints.
+    test_result: testResult && sdMetric && Array.isArray((testResult as any).lifts)
+      ? {
+        ...(testResult as any),
+        lifts: (testResult as any).lifts.map((l: any) => {
+          if (l?.unit !== 'lb') return l;
+          const kgWhole = (v: unknown) => (Number.isFinite(Number(v)) && v != null ? Math.round(Number(v) * KG_PER_LB) : null);
+          return {
+            ...l,
+            unit: 'kg',
+            weight: l.weight != null && Number.isFinite(Number(l.weight)) ? liftInAthletesUnit(Number(l.weight), true) : null,
+            e1rm: kgWhole(l.e1rm),
+            prior_e1rm: kgWhole(l.prior_e1rm),
+            stored: kgWhole(l.stored),
+          };
+        }),
+      }
+      : testResult,
 
     strength_weight_deviation: weightDev,
     strength_volume_deviation: volumeDev,
