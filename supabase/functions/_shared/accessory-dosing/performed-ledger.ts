@@ -19,7 +19,7 @@
 // bands is exactly how the planned and performed readings would come to disagree about the same
 // muscle in the same week.
 //
-// ⚠️ WHAT IS GENUINELY NEW HERE IS THE SECOND DOSE — p084's *"4 to 6 reps above 90 percent, plus 15
+// ⚠️ WHAT IS GENUINELY NEW HERE IS THE SECOND DOSE — p80's *"4 to 6 reps above 90 percent, plus 15
 // to 20 velocity reps at 70 to 85 percent, per movement pattern per week"*. The composer reads that
 // figure to EARN an ME slot's set count (`compose.ts`); nothing has ever counted what was performed
 // against it. See {@link performedStrengthDose}.
@@ -99,10 +99,10 @@ export function performedLedgerFor(week: PerformedSession[]): DoseLedger {
   return ledgerFor(performedWeekAsSessions(week));
 }
 
-// ── p084's OTHER DOSE ────────────────────────────────────────────────────────────────────────────
+// ── p80's OTHER DOSE ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * ⛔ HIS FIGURES, STATED ONCE (p084, via `SOURCE-viada-hybrid-athlete.md` B1): per movement pattern
+ * ⛔ HIS FIGURES, STATED ONCE (p80, via `SOURCE-viada-hybrid-athlete.md` B4d; read off `p080.jpg`): per movement pattern
  * per week, **4-6 reps above 90%** plus **15-20 velocity reps at 70-85%**.
  * ⚠️ THE PERCENTAGES ARE OF A KNOWN MAX, which is why this function demands one per lift and counts
  * nothing for a lift it has no max for — see {@link PerformedStrengthDose.unpriced}.
@@ -110,7 +110,7 @@ export function performedLedgerFor(week: PerformedSession[]): DoseLedger {
 export const HEAVY_REPS_PER_WEEK = { lo: 4, hi: 6 } as const;
 export const VELOCITY_REPS_PER_WEEK = { lo: 15, hi: 20 } as const;
 export const HEAVY_PCT = 0.90;
-// Viada p80 (corpus B4d quotes 4-6 reps over 90% and 15-20 at 70-85% on p80; the p084 above is the older B1 note).
+// Viada p80 — the strength dose, read off `p080.jpg` (2026-09-16; this file cited p084 before).
 export const VELOCITY_PCT = { lo: 0.70, hi: 0.85 } as const;
 
 export type PatternDose = {
@@ -139,7 +139,7 @@ function bandWord(n: number, band: { lo: number; hi: number }): 'below' | 'in_ba
 }
 
 /**
- * ⛔ WHAT THE WEEK ACTUALLY BOUGHT EACH MOVEMENT PATTERN, against p084.
+ * ⛔ WHAT THE WEEK ACTUALLY BOUGHT EACH MOVEMENT PATTERN, against p80.
  *
  * @param week           the logged sessions
  * @param maxForLift     the athlete's reference max for a lift, or null when there is none. ⚠️ PASS
@@ -181,7 +181,7 @@ export function performedStrengthDose(
           velocity.set(pattern, (velocity.get(pattern) ?? 0) + reps);
         }
         // ⚠️ A SET BETWEEN 85% AND 90% COUNTS TO NEITHER, AND THAT IS HIS PAGE, NOT AN OVERSIGHT.
-        // p084 names two bands and leaves the gap between them unnamed; filling it would be ours.
+        // p80 names two bands and leaves the gap between them unnamed; filling it would be ours.
       }
     }
   }

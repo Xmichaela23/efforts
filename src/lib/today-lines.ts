@@ -92,7 +92,7 @@ const intentOf = (ex: TodayStrengthRow | null | undefined): 'ME' | 'DE' | 'SKILL
 
 /**
  * ⛔ ONLY WHEN THE DAY HAS TWO SESSIONS, and only when one of them is the lift and the other is a
- * ride or a run. p145's rule 6 is about how long to leave *before the resistance session*, so a day
+ * ride or a run. p143's rule 6 is about how long to leave *before the resistance session*, so a day
  * with no lift on it has nothing to space.
  *
  * ⛔ REVISED 2026-09-10 (work order §2.1): TWO LINES ALWAYS, THE REST UNDER A CHEVRON. The earlier
@@ -101,7 +101,7 @@ const intentOf = (ex: TodayStrengthRow | null | undefined): 'ME' | 'DE' | 'SKILL
  *
  *   · **p144, rule 5** — work that benefits from pre-fatigue goes last, almost always VT1-intensity
  *     endurance, so the LIFT goes first and the ride or run is the one kept easy.
- *   · **p145, rule 6 / p77** — skill movements are best in the first session, being freshest, so
+ *   · **p143, rule 6 / p77** — skill movements are best in the first session, being freshest, so
  *     riding first costs the lift its skill and speed sets.
  *
  * ⛔ THE DAY'S OWN ROWS STILL DECIDE THE WORDS: the endurance row's sport picks "ride" or "run", and
@@ -121,7 +121,7 @@ export function spacingLineFor(rows: readonly TodayRow[]): SpacingLine | null {
   const endurance = planned.find((r) => !isStrengthRow(r) && isEnduranceRow(r));
   if (!lift || !endurance) return null;
 
-  // p145, rule 6.
+  // p143, rule 6.
   const lead = 'Two sessions today. Keep them six to eight hours apart.';
 
   const sport = sportOf(endurance);
@@ -137,13 +137,13 @@ export function spacingLineFor(rows: readonly TodayRow[]): SpacingLine | null {
    * rather than being softened.
    * ⚠️ AN UNKNOWN BAND COUNTS AS NOT EASY: the claim needs the page, not the absence of a tag.
    * ⛔ THIS REVERSES 2026-09-10's "the band no longer picks a branch" FOR THE FIRST SENTENCE ONLY.
-   * The ORDER still reads the same on every band, because p145 rule 6 and p77 are about the lift's
+   * The ORDER still reads the same on every band, because p143 rule 6 and p77 are about the lift's
    * own freshness and say nothing about what the other session is.
    */
   const easy = bandOf(endurance) === 'vt1_or_easier';
-  // p144 rule 5 (the easy clause), p145 rule 6 (the order).
+  // p144 rule 5 (the easy clause), p143 rule 6 (the order).
   const first = easy ? `Lift first and keep the ${sport} easy.` : 'Lift first.';
-  // p145, p77. ⛔ ONLY WHEN THE LIFT HAS SOMETHING THAT NEEDS TO BE FRESH.
+  // p143, p77. ⛔ ONLY WHEN THE LIFT HAS SOMETHING THAT NEEDS TO BE FRESH.
   const intents = rowsOf(lift).map(intentOf);
   /**
    * ⛔ AN UPPER-BODY DAY DROPS THE SECOND SENTENCE (Michael, 2026-09-10, §2.1). Riding or running first
