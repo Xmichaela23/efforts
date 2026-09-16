@@ -14,17 +14,43 @@ Read `START-HERE.md` and `LIFECYCLE.md` first. **`CAPABILITY-MAP.md` is the anti
 
 ---
 
-## QUEUED (Michael, 2026-09-15: "broaden the range and communicate it") — ANAEROBIC RIDE: "NO CEILING" IN WORDS, A POINT RANGE IN THE VERDICT
+## DONE 2026-09-15 — ANAEROBIC RIDE: THE FLOOR, THE DRIFT GATE AND THE EFFICIENCY ROW
 
-`family-lines.ts:26` prints "Stay above the floor. No ceiling." for `ride_anaerobic` (Viada p237, `POWER_FLOOR_NOTE`),
-but the work steps on the built session carried `202–202 W` and every set above the floor read red ("0 of 15 inside
-their range"). Question, not a finding: does the materializer write lo = hi for a floor-only step, and should
-`interval-compare` judge a floor-only step as green at or above the floor? Trace `materialize-plan` power-range
-writer (:3523-3553) and `analyze-cycling-workout:1433` before anyone touches it. Standing-plan path.
-Direction agreed: (1) floor-only efforts print "202 W and up" (zone-row house style) and judge green at or above the
-floor (p237: start 110%, climb to 125–130%); (2) fixed-percent steps (90%, 50%) get the one single-percent band the
-materializer already applies elsewhere (±5%, NO-SRC — source it or mark OURS in the same session). Step-line words to
-Michael before the build. One-truth workorder Stage 3 session 6, after Stage 4 session 1 reports.
+One-truth workorder Stage 3 session 6. All three items shipped together; deployed, throwaway-checked on Garmin and
+Strava shapes three rounds, not pushed, not phone-checked.
+
+**1. The floor.** Michael's ruling: fork A, the whole family. p237's anaerobic work carries a power FLOOR and no
+ceiling — `FAMILIES.ride_anaerobic.floorOnly` — so a work step at or above the family's `workFloorPct` writes a lower
+and no upper, prints "202 W and up" and reads green at or above the floor. A step BELOW the floor (the 90% middle, the
+50% half) keeps a band. `ride_vo2` is deliberately excluded, on p238's own instruction. The single-percent band is
+`SINGLE_PERCENT_BAND` (±5%), defined once where a percentage becomes watts, OURS with a ledger row after a named search
+of TrainerRoad, Zwift, TrainingPeaks and intervals.icu found no published figure; three copies deleted. A floor-only step
+goes to the watch as floor → **130% of FTP** (p237's own top, a percentage of FTP, not 1.30 × the floor).
+
+**2. The drift gate.** The VT1 window ran BEFORE the steadiness ladder in all three callers, so an interval family's
+session got a number the gate would have refused. The window now inherits the gate: no drift computed or counted on a
+band-above or band-near family. The relative "easiest work step is the VT1 level" test had crowned p237's 90%-of-FTP
+middles as the rider's easy riding, which is where the 3.4% came from.
+
+**3. The efficiency row.** Steady aerobic rides only, and it took BOTH gates — `counts_toward_trend` (Garmin's 10
+minutes at aerobic intensity) passes an anaerobic ride, because its warm-up, spins and cool-down are over 40 minutes in
+the band. `sessionSteadiness` is the second gate and the one that knows the family. The row reads
+"Watts per heartbeat 1.42. Your average on steady rides over the last four weeks is 1.38." off
+`state_trends_v1.bike.efficiency.recentValue` — State's own series, so the two screens cannot mint different averages.
+
+⚠️ **A mixed session keeps the range wording.** p237's sandwich carries ten floor-only surges beside five banded
+middles, so its line reads "15 of 15 work intervals inside their range." The "at or above their floor" line appears on
+the archetypes whose judged work is all floor-only — the progressive repeats and the one-to-one.
+
+## QUEUED — AN UNATTACHED INTERVAL RIDE STILL GETS A DRIFT NUMBER (filed 2026-09-15, Michael: separate item)
+
+Found while closing the drift gate above and left alone on his ruling. `sessionSteadiness`'s ladder ends at
+`nothing_said`, which returns STEADY — the right default for an unlinked easy run and the wrong one for an interval ride
+that arrived with no plan attached. A Zwift session delivered by the Strava webhook has no planned row (rung 1 and 2
+silent), no athlete tag (rung 3 not built), `workout_type` 10 rather than 12 (rung 4 silent), no lap intensity (rung 5),
+no run segments to swing (rung 6) and no rendered rows at the boom line (rung 7) — so it falls through to steady and
+gets a whole-file drift number. Related: the same file's set detector is relative with no absolute floor, so on a
+session where nothing is easy the least-hard step becomes "easy". After the workorder.
 
 ## QUEUED — "Zwift - Intervals icu:" PREFIX ON A RIDE TITLE (Michael, 2026-09-15, screenshot)
 
