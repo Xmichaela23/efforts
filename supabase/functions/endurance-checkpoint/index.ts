@@ -25,6 +25,7 @@ import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current
 import { resolveCurrentFtp, pendingFtpProposal } from '../../../src/lib/resolve-current-ftp.ts';
 import { pendingRunThresholdProposal } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
+import { displayFormat, M_PER_MI } from '../_shared/display-format.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,6 +33,27 @@ const corsHeaders = {
 };
 function json(obj: unknown, status = 200): Response {
   return new Response(JSON.stringify(obj), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+}
+
+/**
+ * ONE ROW THROUGH THE PER-ROW MATERIALIZER, AND WHY IT FAILED WHEN IT DID (2026-09-16, Stage 7 session 3). Both
+ * loops below counted a row only when the call returned no error, and threw the error and the row id away — a
+ * re-price finished "30 of 33" with nothing on record about the three. The status, the row, its date and type and
+ * the reply are logged now, so the misses can be named.
+ */
+async function repriceOneRow(supabase: any, r: any, tag: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(r.id) } });
+    if (!error) return true;
+    const ctx = (error as { context?: Response }).context;
+    let body = '';
+    try { body = ctx && typeof ctx.text === 'function' ? (await ctx.text()).slice(0, 300) : ''; } catch { /* no body */ }
+    console.warn(`[${tag}] row ${r.id} (${r.date} ${r.type}) not re-priced: status=${ctx?.status ?? 'none'} ${error.name ?? ''} ${error.message ?? ''} body=${body} data=${JSON.stringify(data ?? null).slice(0, 200)}`);
+    return false;
+  } catch (e) {
+    console.warn(`[${tag}] row ${r.id} (${r.date} ${r.type}) not re-priced: threw ${(e as Error)?.message ?? String(e)}`);
+    return false;
+  }
 }
 
 const HARD_FAMILIES = new Set(['run_mlss', 'run_near_threshold', 'ride_sweet_spot', 'ride_anaerobic']);
@@ -96,10 +118,7 @@ Deno.serve(async (req: Request) => {
       const run = async () => {
         let repriced = 0;
         for (const r of pending) {
-          try {
-            const { error } = await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(r.id) } });
-            if (!error) repriced += 1;
-          } catch (e) { console.warn(`[reprice] row ${r.id} not re-priced:`, (e as Error)?.message ?? String(e)); }
+          if (await repriceOneRow(supabase, r, 'reprice')) repriced += 1;
           if (repriced % 5 === 0) await writeJob({ ...job, done: repriced });
         }
         await writeJob({ ...job, done: repriced, finished_at: new Date().toISOString() });
@@ -127,7 +146,7 @@ Deno.serve(async (req: Request) => {
     // ── LIVE NUMBERS — the same resolvers everything else reads ────────────
     const { data: ub } = await supabase
       .from('user_baselines')
-      .select('performance_numbers, learned_fitness, locked_baselines, configured_hr_zones, effort_source_distance, effort_source_time')
+      .select('performance_numbers, learned_fitness, locked_baselines, configured_hr_zones, effort_source_distance, effort_source_time, units')
       .eq('user_id', userId)
       .maybeSingle();
     const thr = resolveCurrentRunThresholdPace(ub as any);
@@ -201,7 +220,30 @@ Deno.serve(async (req: Request) => {
         };
       });
     }
-    const evidence = { run: evidenceFor('run', sessions), ride: evidenceFor('ride', sessions) };
+    const evidenceRaw = { run: evidenceFor('run', sessions), ride: evidenceFor('ride', sessions) };
+
+    /**
+     * ⛔ THE SHEET'S WORDS ARE WRITTEN HERE, IN THE ATHLETE'S UNIT (2026-09-16, Stage 7 session 3). The sheet
+     * formatted every number itself and printed "/mi" on a metric account ("7:02/mi" beside Adjust's "4:22/km").
+     * Paces are per mile on this payload; the whole pace is rounded once (`display-format`).
+     */
+    const dfmt = displayFormat(String((ub as { units?: unknown } | null)?.units ?? 'imperial') === 'metric');
+    const paceFromPerMi = (v: number | null) => (v != null && v > 0 ? dfmt.pacePerUnit(v / (M_PER_MI / 1000)) : null);
+    const numberDisplay = (v: number | null, unit: string) =>
+      unit === 'sec/mi' ? paceFromPerMi(v) : (v != null && Number.isFinite(v) ? `${Math.round(v)} ${unit}` : null);
+    for (const n of numbers as Array<Record<string, any>>) {
+      n.on_plan_display = numberDisplay(n.on_plan, n.unit);
+      n.live_display = numberDisplay(n.live, n.unit);
+    }
+    const halfDisplay = (sport: 'run' | 'ride', h: Record<string, any>) => ({
+      ...h,
+      // A ride's watts print bare: the sheet's line ends "… → 160 W".
+      work_display: h.avg_work == null ? null : sport === 'run' ? paceFromPerMi(h.avg_work) : String(Math.round(h.avg_work)),
+    });
+    const evidence = {
+      run: { ...evidenceRaw.run, early: halfDisplay('run', evidenceRaw.run.early), late: halfDisplay('run', evidenceRaw.run.late) },
+      ride: { ...evidenceRaw.ride, early: halfDisplay('ride', evidenceRaw.ride.early), late: halfDisplay('ride', evidenceRaw.ride.late) },
+    };
 
     if (!willWrite) {
       return json({
@@ -249,10 +291,7 @@ Deno.serve(async (req: Request) => {
         if (thrProposal) await acceptVia('run_threshold', thrProposal.measuredSecPerKm);
       } catch (e) { console.warn('[checkpoint] run threshold accept failed:', (e as Error)?.message ?? String(e)); }
       for (const r of pending) {
-        try {
-          const { error } = await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String(r.id) } });
-          if (!error) repriced += 1;
-        } catch (e) { console.warn(`[checkpoint] row ${r.id} not re-priced:`, (e as Error)?.message ?? String(e)); }
+        if (await repriceOneRow(supabase, r, 'checkpoint')) repriced += 1;
       }
     }
     const record = {

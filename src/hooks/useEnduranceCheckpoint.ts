@@ -16,8 +16,11 @@ export type CheckpointNumber = {
   moves: boolean;
   large: boolean;
   unit: 'sec/mi' | 'W' | 'bpm';
+  /** The two numbers as the sheet prints them, in the athlete's unit ("4:22/km", "164 W", "168 bpm"). */
+  on_plan_display?: string | null;
+  live_display?: string | null;
 };
-export type CheckpointEvidenceHalf = { sessions: number; avg_hr: number | null; avg_work: number | null; avg_rpe: number | null; avg_drift_pct: number | null };
+export type CheckpointEvidenceHalf = { sessions: number; avg_hr: number | null; avg_work: number | null; avg_rpe: number | null; avg_drift_pct: number | null; work_display?: string | null };
 export type CheckpointEvidence = {
   sport: 'run' | 'ride';
   sessions: number;

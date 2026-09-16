@@ -11,21 +11,18 @@ import { useEnduranceCheckpoint, type CheckpointEvidence, type CheckpointNumber 
 
 const LABEL: Record<CheckpointNumber['key'], string> = { threshold_pace: 'Threshold pace', ftp: 'FTP', lthr: 'Threshold heart rate' };
 
-function fmt(n: number | null, unit: CheckpointNumber['unit']): string {
-  if (n == null || !Number.isFinite(n)) return '—';
-  if (unit === 'sec/mi') { const s = Math.round(n); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}/mi`; }
-  return `${Math.round(n)} ${unit}`;
-}
+// ⛔ NO FORMATTING HERE (2026-09-16, Stage 7 session 3): every number arrives written, in the athlete's unit
+// (`endurance-checkpoint`). This printed "/mi" on a metric account.
 
 function evidenceLine(e: CheckpointEvidence | null): string | null {
   if (!e || e.sessions < 2 || e.early.sessions === 0 || e.late.sessions === 0) return null;
   const noun = e.sport === 'run' ? 'Hard runs' : 'Hard rides';
   const parts: string[] = [];
   if (e.early.avg_hr != null && e.late.avg_hr != null) parts.push(`heart rate ${Math.round(e.early.avg_hr)} → ${Math.round(e.late.avg_hr)}`);
-  if (e.early.avg_work != null && e.late.avg_work != null) {
+  if (e.early.work_display && e.late.work_display) {
     parts.push(e.sport === 'run'
-      ? `pace ${fmt(e.early.avg_work, 'sec/mi')} → ${fmt(e.late.avg_work, 'sec/mi')}`
-      : `power ${Math.round(e.early.avg_work)} → ${Math.round(e.late.avg_work)} W`);
+      ? `pace ${e.early.work_display} → ${e.late.work_display}`
+      : `power ${e.early.work_display} → ${e.late.work_display} W`);
   }
   if (e.early.avg_rpe != null && e.late.avg_rpe != null) parts.push(`effort ${e.early.avg_rpe} → ${e.late.avg_rpe}`);
   /**
@@ -75,8 +72,8 @@ export function EnduranceCheckpointSheet({ enabled }: { enabled: boolean }) {
           <div key={n.key} className="flex items-baseline justify-between gap-3 text-[13px]">
             <span className="text-white/70">{LABEL[n.key]}</span>
             <span className="tabular-nums text-white/90">
-              {stamped && n.on_plan != null ? <>{fmt(n.on_plan, n.unit)} <span className="text-white/45">→</span> </> : null}
-              {fmt(n.live, n.unit)}
+              {stamped && n.on_plan_display ? <>{n.on_plan_display} <span className="text-white/45">→</span> </> : null}
+              {n.live_display ?? '—'}
               {n.large && <span className="ml-2 text-[11px] text-white/50">big move</span>}
             </span>
           </div>
