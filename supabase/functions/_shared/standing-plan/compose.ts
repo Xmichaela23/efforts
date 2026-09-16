@@ -4165,10 +4165,12 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
     const namedByConflict = new Set(conflicts.filter((c) => c.rule === 'two_hard_one_day').flatMap((c) => c.days));
     for (const d of [...perDay.keys()]) if (namedByConflict.has(d as never)) perDay.delete(d);
     if (![...perDay.values()].some((n) => n > 1)) continue;
-    const text = `Two ${sport === 'run' ? 'runs' : 'rides'} land on one day. The source leaves six to `
-      + 'eight hours between them, or four to six when the first is under an hour.';
+    // ⛔ THE HOURS CLAUSE IS GONE (Michael, 2026-09-16, WORKORDER §3b item 4, option A). p143 rule 6 sets the
+    // gap between a morning session and the RESISTANCE session (6-8 h; 4-6 h after a VT1 session under an
+    // hour) — it prints no gap between two runs or two rides, so the line states the fact and stops.
+    const text = `Two ${sport === 'run' ? 'runs' : 'rides'} land on one day.`;
     if (!notes.some((n) => n.text === text)) {
-      notes.push({ kind: 'warning', text, cite: 'Viada pp.69-125, p139-145' });
+      notes.push({ kind: 'warning', text, cite: 'Viada p143' });
     }
   }
 
