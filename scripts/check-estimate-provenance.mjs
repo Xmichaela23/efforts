@@ -362,17 +362,19 @@ const markNear = (lines, i, re) => re.test(lines[i] || '') || re.test(lines[i - 
 const PARKED = (TRUTH.parked || []).map((p) => ({ ...p, re: globRe(p.path) }));
 const isParkedPath = (rel) => PARKED.some((p) => p.re.test(rel));
 const PARKED_MARK = /parked\s*:/i;
-function inParkedBlock(sf, node) {
+function inParkedBlock(sf, node) { return inMarkedBlock(sf, node, PARKED_MARK); }
+// a marker in a leading comment on the node or any enclosing statement / declaration, or a {/* … */} JSX child before it
+function inMarkedBlock(sf, node, MARK) {
   for (let a = node; a && a.kind !== ts.SyntaxKind.SourceFile; a = a.parent) {
     const lead = ts.getLeadingCommentRanges(sf.text, a.getFullStart()) || [];
-    if (lead.some((c) => PARKED_MARK.test(sf.text.slice(c.pos, c.end)))) return true;
+    if (lead.some((c) => MARK.test(sf.text.slice(c.pos, c.end)))) return true;
     const p = a.parent;
     if (p && (ts.isJsxElement(p) || ts.isJsxFragment(p))) {
       const kids = p.children; const idx = kids.indexOf(a);
       for (let k = idx - 1; k >= 0; k--) {
         const sib = kids[k];
         if (ts.isJsxText(sib) && !sib.getText(sf).trim()) continue;
-        if (ts.isJsxExpression(sib) && !sib.expression && PARKED_MARK.test(sib.getText(sf))) return true;
+        if (ts.isJsxExpression(sib) && !sib.expression && MARK.test(sib.getText(sf))) return true;
         break;
       }
     }
@@ -391,7 +393,7 @@ const OURS = /\bOURS\b/;
 
 const hits = [];       // { rule, file, line, what }
 const parkedHits = [];
-const allowed = { plumbing: 0, partitioned: 0 };
+const allowed = { plumbing: 0, partitioned: 0, keyed: 0 };
 function push(rule, file, line, what, parked) {
   (parked ? parkedHits : hits).push({ rule: String(rule), file, line, what: what || null });
 }
@@ -409,6 +411,10 @@ function rule1() {
   // SVG, layout and handler attributes carry pixels or behaviour, never a printed athlete number.
   const SKIP_ATTR = /^(on[A-Z]\w*|key|ref|style|className|x|y|x1|x2|y1|y2|cx|cy|r|rx|ry|dx|dy|d|points|transform|viewBox|width|height|strokeDasharray|strokeDashoffset|strokeWidth|opacity|fillOpacity|strokeOpacity|offset|fontSize|top|left|right|bottom|radius|innerRadius|outerRadius|startAngle|endAngle|tabIndex|zIndex)$/;
   const SERVER_FIELD = /server-field\s*:/;
+  // Stage 7 markers, each with a reason after the dash: pixels / axis ticks that are not a printed athlete number,
+  // and a calculator or timer that works off what the athlete is typing or doing on the device right now.
+  const LAYOUT = /guard:\s*layout\s*[—–-]\s*\S/;
+  const DEVICE = /guard:\s*device\s*[—–-]\s*\S/;
   const K = ts.SyntaxKind;
   const ARITH = new Set([K.PlusToken, K.MinusToken, K.AsteriskToken, K.SlashToken, K.PercentToken]);
   const CMP = new Set([K.LessThanToken, K.LessThanEqualsToken, K.GreaterThanToken, K.GreaterThanEqualsToken, K.EqualsEqualsEqualsToken, K.EqualsEqualsToken, K.ExclamationEqualsEqualsToken, K.ExclamationEqualsToken]);
@@ -483,7 +489,8 @@ function rule1() {
       if (seen.has(key)) return;
       seen.add(key);
       const line = lineOf(sf, node);
-      if (markNear(s.lines, line, SERVER_FIELD)) return;
+      if (markNear(s.lines, line, SERVER_FIELD) || markNear(s.lines, line, LAYOUT) || markNear(s.lines, line, DEVICE)) return;
+      if (inMarkedBlock(sf, node, LAYOUT) || inMarkedBlock(sf, node, DEVICE)) return;
       push(1, rel, line + 1, cat, pathParked || inParkedBlock(sf, node));
     };
     const insideIter = (node, root) => {
@@ -627,8 +634,16 @@ function rule3() {
   const TABLES = new Set(R.tables || []);
   const PLUMB = new Set((R.plumbingColumns || []).map((c) => c.column));
   const PART = new Set((R.partitionedColumns || []).map((c) => c.column));
+  // per-key ownership of a JSON column: `/* writes-keys: a, b */` on or up to three lines above a write site
+  const WRITES_KEYS = /writes-keys\s*:\s*([\w\s,]+)/;
   const writes = new Map(); // table.column | computed.key | facts.key -> [{ step, file, line }]
-  const add = (key, step, file, line) => { if (!writes.has(key)) writes.set(key, []); writes.get(key).push({ step, file, line }); };
+  const add = (key, step, file, line) => {
+    if (!writes.has(key)) writes.set(key, []);
+    const lines = source(file).lines;
+    let owned = null;
+    for (let i = line - 1; i >= Math.max(0, line - 4); i--) { const m = WRITES_KEYS.exec(lines[i] || ''); if (m) { owned = m[1].split(',').map((k) => k.trim()).filter(Boolean); break; } }
+    writes.get(key).push({ step, file, line, owned });
+  };
   const stepOf = (rel) => { const seg = rel.split('/').slice(2); return seg[0] === '_shared' ? `_shared/${(seg[1] || '').replace(/\.tsx?$/, '')}` : seg[0]; };
   const unwrap = (n) => { while (n && (ts.isParenthesizedExpression(n) || ts.isAsExpression(n) || ts.isNonNullExpression(n) || ts.isAwaitExpression(n))) n = n.expression; return n; };
   for (const rel of ALL_FILES.filter((f) => f.startsWith('supabase/functions/'))) {
@@ -690,6 +705,12 @@ function rule3() {
     const live = ws.filter((w) => !isParkedPath(w.file));
     const liveSteps = new Set(live.map((w) => w.step));
     const parked = liveSteps.size < 2;
+    if (!parked && live.every((w) => w.owned && w.owned.length)) {
+      // keyed: every live site names its keys, and no key is claimed by two steps
+      const owner = new Map(); let clash = false;
+      for (const w of live) for (const k of w.owned) { if (owner.has(k) && owner.get(k) !== w.step) clash = true; owner.set(k, w.step); }
+      if (!clash) { allowed.keyed++; continue; }
+    }
     const shown = [...new Map((parked ? ws : live).map((w) => [`${w.file}:${w.line}`, w])).values()];
     const n = (parked ? steps : liveSteps).size;
     for (const w of shown) push(3, w.file, w.line, `${key} · ${n} steps`, parked);
@@ -699,8 +720,10 @@ function rule3() {
 // ---- rule 4 (d): WORKORDER §1 rule 7, the device's number wins (design §4) ----
 function rule4() {
   const FIELDS = new Set(TRUTH.rule4?.providerFields || []);
-  const COERCE = new Set(['Number', 'positive', 'coerceNumber', 'fin', 'toNum', 'asNumber', 'finite']);
+  const COERCE = new Set(['Number', 'positive', 'coerceNumber', 'fin', 'toNum', 'asNumber', 'finite', 'num', 'pos', 'safeNum', 'asPositiveFinite']);
   const PROVIDER_FIRST = /provider-first\s*:/;
+  // a sent value read into a local before the chain: `/* sent-held: <field> — <local> */`
+  const SENT_HELD = /sent-held\s*:\s*\w+/;
   const K = ts.SyntaxKind;
   const isChainOp = (n) => !!n && ts.isBinaryExpression(n) && (n.operatorToken.kind === K.QuestionQuestionToken || n.operatorToken.kind === K.BarBarToken);
   const CMP = new Set([K.LessThanToken, K.LessThanEqualsToken, K.GreaterThanToken, K.GreaterThanEqualsToken, K.EqualsEqualsEqualsToken, K.EqualsEqualsToken, K.ExclamationEqualsEqualsToken, K.ExclamationEqualsToken]);
@@ -759,8 +782,8 @@ function rule4() {
       const worked = collapsed.map((k, i) => ({ k, i })).filter((x) => x.k !== 'sent');
       if (!(worked.length >= 2 || worked.some((x) => x.i < collapsed.length - 1))) return;
       const line = lineOf(sf, chain);
-      if (markNear(s.lines, line, PROVIDER_FIRST)) return;
-      push(4, rel, line + 1, collapsed.join(' → '), parkedPath);
+      if (markNear(s.lines, line, PROVIDER_FIRST) || markNear(s.lines, line, SENT_HELD)) return;
+      push(4, rel, line + 1, collapsed.join(' → '), parkedPath || inParkedBlock(sf, chain));
     };
     const visit = (n) => {
       if (isChainOp(n)) {
@@ -849,6 +872,6 @@ for (const r of RULE_ORDER) {
   const p = inRule(parkedHits, r).length;
   console.log(`${sev(r).toUpperCase().padEnd(4)} ${String(inRule(hits, r).length).padStart(4)}  ${RULE_LABEL[r]}${p ? `  (parked ${p})` : ''}`);
 }
-if (ruleOn(3)) console.log(`          rule 3 allowed: ${allowed.plumbing} plumbing, ${allowed.partitioned} partitioned`);
+if (ruleOn(3)) console.log(`          rule 3 allowed: ${allowed.plumbing} plumbing, ${allowed.partitioned} partitioned, ${allowed.keyed} keyed`);
 if (ruleOn(0) && knownCount) console.log(`          rule 0 known-unresolved: ${knownCount}`);
 process.exit(failing.length ? 1 : 0);

@@ -163,6 +163,26 @@
       {
         "path": "supabase/functions/_shared/race-feedback.ts",
         "reason": "WORKORDER §3a — race plan path and season wizard, parked (Stage 5 report §7)"
+      },
+      {
+        "path": "supabase/functions/ingest-phone-workout/**",
+        "reason": "integration project parked (WORKORDER §3): phone recording, Apple Watch, the .fit upload — silent until reopened (Stage 7)"
+      },
+      {
+        "path": "src/components/workout-execution/**",
+        "reason": "integration project parked (WORKORDER §3): phone recording, Apple Watch, the .fit upload — silent until reopened (Stage 7)"
+      },
+      {
+        "path": "supabase/functions/import-fit-file/**",
+        "reason": "integration project parked (WORKORDER §3): phone recording, Apple Watch, the .fit upload — silent until reopened (Stage 7)"
+      },
+      {
+        "path": "supabase/functions/save-imported-workout/**",
+        "reason": "integration project parked (WORKORDER §3): phone recording, Apple Watch, the .fit upload — silent until reopened (Stage 7)"
+      },
+      {
+        "path": "src/components/FitFileImporter.tsx",
+        "reason": "integration project parked (WORKORDER §3): phone recording, Apple Watch, the .fit upload — silent until reopened (Stage 7)"
       }
     ],
     "_parked_block_doc": "NonRaceBuilder.tsx is half parked (design §7): its race step is parked by a `parked: race step, WORKORDER §3a` comment on the block, not by path.",
@@ -298,6 +318,7 @@
         "distance_meters",
         "calories"
       ]
-    }
+    },
+    "_markers_doc": "Stage 7 escapes, each carrying its reason: rule 1 `/* guard: layout — <why> */` (pixels, axis ticks) and `/* guard: device — <why> */` (a calculator or timer on what the athlete is typing or doing), on the line, the line above, or a leading comment on an enclosing statement; rule 4 `/* sent-held: <field> — <local> */` (a sent value read into a local first) and a `parked:` block comment; rule 3 `/* writes-keys: a, b */` on or up to three lines above each write site — a JSON column passes when every live site names its keys and no key has two steps."
   }
 }
