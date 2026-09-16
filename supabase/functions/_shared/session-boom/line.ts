@@ -170,13 +170,16 @@ function driftPct(w: BoomWorkout): number | null {
    * whole-file number on a session Performance printed at 4.8%, so the line and the tile disagreed about the
    * same run. `too_short` means the session cannot be read at all: no number, and the streak skips it.
    */
-  const win = vt1WindowDrift({ workoutAnalysis: parseAnalysis(w), sport: w.type ?? null });
-  if (win.kind === 'too_short') return null;
-  if (win.kind === 'read') return win.pct;
-  return sessionDriftPct(parseAnalysis(w), w.computed ?? null, w.type ?? null, {
+  // ⛔ AND THE WINDOW INHERITS THE GATE (2026-09-15) — the same materials the ladder reads below, so
+  // the streak cannot count a session p107 says has no drift. See `vt1-window-drift.ts`.
+  const driftSteadiness = {
     plannedRow: w.planned_row ?? null,
     workoutRow: { strava_data: w.strava_data, laps: w.laps },
-  });
+  };
+  const win = vt1WindowDrift({ workoutAnalysis: parseAnalysis(w), sport: w.type ?? null, steadiness: driftSteadiness });
+  if (win.kind === 'too_short') return null;
+  if (win.kind === 'read') return win.pct;
+  return sessionDriftPct(parseAnalysis(w), w.computed ?? null, w.type ?? null, driftSteadiness);
 }
 
 /**

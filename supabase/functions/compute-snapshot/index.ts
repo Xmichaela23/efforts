@@ -159,7 +159,7 @@ function driftReadForPoint(input: {
    * windowed one — 12.9% against 4.8% on the same run. State has no rendered interval rows, so the
    * window reads the analyser's breakdown off the row this function was already handed.
    */
-  const win = vt1WindowDrift({ workoutAnalysis: wa, sport: input.sport ?? null });
+  const win = vt1WindowDrift({ workoutAnalysis: wa, sport: input.sport ?? null, steadiness });
   if (win.kind === 'too_short') return { driftPct: null, driftBasis: null, driftWholeSession: !steady, fadeWithheld: true };
   if (win.kind === 'read') return { driftPct: win.pct, driftBasis: win.basis, driftWholeSession: !steady, fadeWithheld: false };
   const d = resolveSessionDrift({

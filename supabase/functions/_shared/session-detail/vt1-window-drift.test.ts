@@ -146,3 +146,80 @@ Deno.test('graded pace is preferred, and never mixed with raw across the halves'
   const mixed = vt1WindowDrift({ intervals: [g(1800, 140, 600), set(90, 178, 380), rec(30), vt1(1800, 147, 620)], sport: 'run' });
   assertEquals(mixed.kind === 'read' && mixed.basis, 'raw');
 });
+
+/**
+ * ⛔⛔ THE WINDOW INHERITS p107's GATE (2026-09-15, Michael's ruling). All three callers ran the window
+ * BEFORE the steadiness ladder, so an interval family's session got a drift number without the ladder
+ * ever being asked. The relative "easiest work step is the VT1 level" test then crowned the least-hard
+ * step — on p237's sandwich, the 90%-of-FTP middles — as this rider's easy riding.
+ */
+Deno.test('a band-above family gets no window, however the rows look', () => {
+  const rows = [
+    vt1(1800, 140, 600), set(90, 178, 380), rec(30), vt1(1800, 147, 600),
+  ];
+  // With no materials the window still reads — the ladder is only consulted when it is handed something.
+  assertEquals(vt1WindowDrift({ intervals: rows, sport: 'run' }).kind, 'read');
+  // The plan's own family tag says this is above threshold: no drift, whatever the rows show.
+  assertEquals(
+    vt1WindowDrift({
+      intervals: rows, sport: 'run',
+      steadiness: { plannedRow: { tags: ['family:run_mlss'] } },
+    }),
+    { kind: 'not_applicable' },
+  );
+  assertEquals(
+    vt1WindowDrift({
+      intervals: rows, sport: 'run',
+      steadiness: { plannedRow: { tags: ['family:run_near_threshold'] } },
+    }),
+    { kind: 'not_applicable' },
+  );
+});
+
+Deno.test('an anaerobic ride gets no window — its 90% middles are not easy riding', () => {
+  /**
+   * p237's sandwich, level 1 at FTP 168, AS THE ROWS STOOD BEFORE this session's floor-only change:
+   * 5 rounds of 30s at 202-202 W / 2:30 at 151-151 W. That is the shape the 3.4% was read off — the
+   * five 2:30 middles were the session's easiest work step, so the window called them VT1 riding,
+   * 750 seconds cleared p107's floor, and their first half was compared against their second.
+   * ⚠️ THE FIXTURE KEEPS THE OLD SHAPE ON PURPOSE. The floor-only change happens to hide the surges
+   * from `demand` (a row with no upper carries no demand), which closes this by accident. The GATE is
+   * the fix; this pins that it holds on the rows that actually produced the number.
+   */
+  const surge = (hr: number, w: number) =>
+    ({ interval_type: 'work', planned_power_range: { lower_w: 202, upper_w: 202 },
+       executed: { duration_s: 30, avg_hr: hr, power_watts: w, actual_pace_sec_per_mi: null, actual_gap_sec_per_mi: null } });
+  const sustained = (hr: number, w: number) =>
+    ({ interval_type: 'work', planned_power_range: { lower_w: 151, upper_w: 151 },
+       executed: { duration_s: 150, avg_hr: hr, power_watts: w, actual_pace_sec_per_mi: null, actual_gap_sec_per_mi: null } });
+  const rows: unknown[] = [];
+  for (let i = 0; i < 5; i += 1) {
+    rows.push(surge(165 + i, 230), sustained(150 + i, 152), surge(168 + i, 228), rec(240));
+  }
+  // Ungated, the window reads — this is the number that printed and counted in the streak.
+  assertEquals(vt1WindowDrift({ intervals: rows as never, sport: 'ride' }).kind, 'read');
+  // Gated by the plan's family, it says nothing.
+  assertEquals(
+    vt1WindowDrift({
+      intervals: rows as never, sport: 'ride',
+      steadiness: { plannedRow: { tags: ['family:ride_anaerobic'] } },
+    }),
+    { kind: 'not_applicable' },
+  );
+  assertEquals(
+    vt1WindowDrift({
+      intervals: rows as never, sport: 'ride',
+      steadiness: { plannedRow: { tags: ['family:ride_vo2'] } },
+    }),
+    { kind: 'not_applicable' },
+  );
+});
+
+Deno.test('a vt1-or-easier family still gets its window', () => {
+  const r = vt1WindowDrift({
+    intervals: [vt1(1800, 140, 600), set(90, 178, 380), rec(30), vt1(1800, 147, 600)],
+    sport: 'run',
+    steadiness: { plannedRow: { tags: ['family:run_lsd'] } },
+  });
+  assertEquals(r.kind, 'read');
+});

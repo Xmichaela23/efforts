@@ -49,6 +49,7 @@
  * a filter in another. It is used once, below, to decide whether enough VT1 time is left to read.
  */
 import { VT1_MIN_BOUT_S } from './vt1-bout.ts';
+import { sessionSteadiness, type SteadinessInput } from './session-steadiness.ts';
 
 export type Vt1WindowDrift =
   /** Read over the VT1 portions. `pct` matches Friel's sign: positive means efficiency fell. */
@@ -146,7 +147,30 @@ export function vt1WindowDrift(input: {
   /** The analysis, for a caller that has no rendered rows (State). Read only when `intervals` is empty. */
   workoutAnalysis?: unknown;
   sport?: string | null;
+  /**
+   * ⛔ THE MATERIALS THE STEADINESS LADDER READS — the same ones `resolveSessionDrift` is handed,
+   * and for the same reason: the window may not answer a question the session is not eligible for.
+   */
+  steadiness?: SteadinessInput;
 }): Vt1WindowDrift {
+  /**
+   * ⛔⛔ THE WINDOW INHERITS THE GATE (2026-09-15, Michael's ruling; WORKORDER Stage 3 session 6).
+   * All three callers ran this BEFORE `resolveSessionDrift`, and a `read` result returned a number
+   * without the steadiness ladder ever being asked — so p107's gate, which answers "not steady" for
+   * every band-above and band-near family, was bypassed on exactly the sessions it exists to stop.
+   *
+   * ⛔ WHAT IT COST, TRACED ON p237's SANDWICH (5 rounds of 30s @ 120% / 2:30 @ 90% / 30s @ 120%):
+   * `isSet` below is RELATIVE — the session's easiest work step is taken as the VT1 level. On a
+   * session where nothing is easy, the least-hard hard thing wins the title: the five 2:30 blocks at
+   * 90% of FTP were read as this rider's easy riding, 750 seconds cleared p107's floor, and their
+   * first half was compared against their second. An anaerobic interval ride printed a drift number
+   * and counted toward the streak.
+   *
+   * ⚠️ THE RELATIVE TEST IS UNCHANGED AND STILL HAS NO ABSOLUTE FLOOR. It is safe on the sessions
+   * this file was written for — p235's long run with sets, a `vt1_or_easier` family — and the gate is
+   * what keeps it on those. It is the gate, not the test, that decides eligibility.
+   */
+  if (input.steadiness && !sessionSteadiness(input.steadiness).steady) return { kind: 'not_applicable' };
   const given = Array.isArray(input.intervals) ? input.intervals : [];
   const rows = given.length > 0 ? given : rowsFromAnalysis(input.workoutAnalysis);
   if (rows.length === 0) return { kind: 'not_applicable' };
