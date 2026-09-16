@@ -161,10 +161,12 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           if (m) {
             const sec = parseInt(m[1], 10) * 60 + parseInt(m[2], 10)
             const unit = m[3].toLowerCase()
+            // FIELD — definition (1 mi = 1609.344 m; 1.60934 / 1609.34 as written)
             secPerMi = unit === 'km' ? Math.round(sec * 1.60934) : sec
           }
         }
         // Convert pace (sec/mi) to speed (m/s)
+        // FIELD — definition (1 mi = 1609.344 m; 1.60934 / 1609.34 as written)
         const toSpeed = (sec: number) => 1609.34 / sec
         // Garmin run targets should use SPEED (m/s); Connect displays as Pace
         step.targetType = 'SPEED'
@@ -184,6 +186,7 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
             }
           )
           const center = toSpeed(secPerMi)
+          // OURS — `applyComputedTargetIfMissing` a single pace with no widening goes as ±3% speed (×0.97 / ×1.03); no source, kept as found
           step.targetValueLow = widened ? widened.low : center * 0.97
           step.targetValueHigh = widened ? widened.high : center * 1.03
           delete (step as any).targetValue
@@ -350,6 +353,7 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       const toMeters = (val: number, unit?: string) => {
         const u = String(unit||'').toLowerCase();
         if (u==='m') return Math.floor(val)
+        // FIELD — definition (1 yd = 0.9144 m, 1 mi = 1609.34 m as written)
         if (u==='yd') return Math.floor(val*0.9144)
         if (u==='mi') return Math.floor(val*1609.34)
         if (u==='km') return Math.floor(val*1000)
@@ -423,6 +427,7 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           const typeLower = String((workout as any).type || '').toLowerCase()
           const isSwim = typeLower === 'swim'
           const isRun = typeLower === 'run'
+          // FIELD — definition (1 yd = 0.9144 m)
           const toMetersFromYd = (yd?: number) => (yd && yd > 0) ? Math.round(yd * 0.9144) : undefined
           const warmArr: any[] = []
           const mainArr: any[] = []
@@ -558,6 +563,7 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       // Omit exerciseName mapping (Garmin expects enum/id). Keep the label in description.
       if (weight > 0) {
         // Convert provided pounds to kilograms for API value; set display to POUND
+        // FIELD — definition (1 lb = 0.45359237 kg)
         const kg = Math.round((weight * 0.45359237) * 10) / 10
         step.weightValue = kg
         step.weightDisplayUnit = 'POUND'
@@ -619,6 +625,7 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
             ...(sLapButton ? {} : {
               durationValue: (Number.isFinite(sMeters) && sMeters > 0) ? ((): number => {
                 if (isSwimSport && poolUnitPref === 'yd') {
+                  // FIELD — definition (1 yd = 0.9144 m)
                   return Math.max(1, Math.round((sMeters as number) / 0.9144))
                 }
                 return Math.round(sMeters as number)
@@ -723,6 +730,7 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       ...(lapButton ? {} : {
         durationValue: (Number.isFinite(meters) && meters > 0) ? ((): number => {
           if (isSwimSport && poolUnitPref === 'yd') {
+            // FIELD — definition (1 yd = 0.9144 m)
             return Math.max(1, Math.round((meters as number) / 0.9144))
           }
           return Math.round(meters as number)
@@ -818,6 +826,7 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   const poolFields = (() => {
     if (!isSwimSport) return {}
     if (!poolUnit) return { poolLength: null as any, poolLengthUnit: null as any }
+    // OURS — `poolFields` a yard pool is always sent as 25 yd; a metre pool of 40 m or more is sent as 50 m, else 25 m; no source, kept as found
     if (poolUnit === 'yd') return { poolLength: 25.0, poolLengthUnit: 'YARD' }
     // meters: choose 50 when >= 40m, else 25
     const len = (typeof poolLenM === 'number' && isFinite(poolLenM)) ? poolLenM : 25.0
@@ -910,6 +919,7 @@ function parsePaceToMetersPerSecond(pace: string): { value?: number; low?: numbe
   const parseOne = (p: string): number => {
     const secs = parseTimeToSeconds(p)
     if (secs <= 0) return 0
+    // FIELD — definition (1 mi = 1609.344 m; 1.60934 / 1609.34 as written)
     if (unitMatch === 'mi') return 1609.34 / secs
     if (unitMatch === 'km') return 1000 / secs
     if (unitMatch === '100m') return 100 / secs
@@ -948,6 +958,7 @@ function widenPaceToRangeMetersPerSecond(pace: string, intensity: string, opts?:
   // Determine bucket: short reps, tempo/threshold, or endurance
   let bucket: 'short' | 'tempo' | 'endurance' = 'endurance'
   if (d > 0) {
+    // OURS — `widenPaceToRangeMetersPerSecond` buckets: a rep of 5 min or 1200 m or less is short, 10–30 min or 3200–10000 m is tempo, else endurance; no source (the "science-based" note above cites nothing), kept as found
     if (d <= 5 * 60) bucket = 'short'
     else if (d >= 10 * 60 && d <= 30 * 60) bucket = 'tempo'
     else bucket = 'endurance'
@@ -963,10 +974,12 @@ function widenPaceToRangeMetersPerSecond(pace: string, intensity: string, opts?:
   }
 
   let delta = 0
+  // OURS — `widenPaceToRangeMetersPerSecond` a single pace widened ±4 / 7 / 12 s per mile (±3 / 5 / 8 s per km) by bucket; no source, kept as found
   if (bucket === 'short') delta = mi ? 4 : 3
   else if (bucket === 'tempo') delta = mi ? 7 : 5
   else delta = mi ? 12 : 8
 
+  // FIELD — definition (1 mi = 1609.344 m; 1.60934 / 1609.34 as written)
   const unitMeters = mi ? 1609.34 : 1000
   const lowSpeed = unitMeters / (secs + delta) // slower pace -> lower speed
   const highSpeed = unitMeters / (secs - delta) // faster pace -> higher speed
@@ -1000,6 +1013,7 @@ function applyTargets(step: GarminStep, primary: any, fallback?: any) {
       } else if (parsed.value != null) {
         const widened = widenPaceToRangeMetersPerSecond(pace, step.intensity || '', { durationSec: (step.durationType === 'TIME' ? step.durationValue : undefined) as any, distanceMeters: (step.durationType === 'DISTANCE' ? step.durationValue : undefined) as any })
         const v = parsed.value
+        // OURS — `applyTargets` a single text pace with no widening goes as ±3% speed (×0.97 / ×1.03); no source, kept as found
         step.targetValueLow = widened ? widened.low : v * 0.97
         step.targetValueHigh = widened ? widened.high : v * 1.03
       }
@@ -1017,6 +1031,7 @@ function applyTargets(step: GarminStep, primary: any, fallback?: any) {
     } else if (pow.value != null) {
       // Expand single wattage to ±5%
       const base = pow.value
+      // OURS — `applyTargets` single power text target ±5%, at least ±1; no source, kept as found
       const band = Math.max(1, Math.round(base * 0.05))
       step.targetValueLow = base - band
       step.targetValueHigh = base + band
@@ -1033,6 +1048,7 @@ function applyTargets(step: GarminStep, primary: any, fallback?: any) {
       step.targetValueHigh = hr.high
     } else if (hr.value != null) {
       const base = hr.value
+      // OURS — `applyTargets` single heart-rate text target ±5%, at least ±1; no source, kept as found
       const band = Math.max(1, Math.round(base * 0.05))
       step.targetValueLow = base - band
       step.targetValueHigh = base + band
@@ -1048,6 +1064,7 @@ function applyTargets(step: GarminStep, primary: any, fallback?: any) {
       step.targetValueHigh = cad.high
     } else if (cad.value != null) {
       const base = cad.value
+      // OURS — `applyTargets` single cadence text target ±5%, at least ±1; no source, kept as found
       const band = Math.max(1, Math.round(base * 0.05))
       step.targetValueLow = base - band
       step.targetValueHigh = base + band
@@ -1076,6 +1093,7 @@ function estimateWorkoutSeconds(
   };
 
   const mid = (a: number, b: number) => (a + b) / 2;
+  // OURS — `estimateWorkoutSeconds` a distance step with no pace is timed at 9:30/mi (570 s); no source, kept as found. 1609.34 m = 1 mi by definition
   const mpsFromSecPerMi = (sec: number) => 1609.34 / Math.max(1, sec);
   const fallbackMps = mpsFromSecPerMi(570); // ~9:30/mi
 

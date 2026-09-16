@@ -762,6 +762,7 @@ export function sessionSwapExtras(
     } else if (from === 'run') {
       const onTheGround = weekSessions.filter((r) => disciplineOf(r.type) === 'run' && !venueOf(r)).length;
       for (const v of RUN_VENUES) {
+        // Viada p275 (see the block above) — ground impact on at least one day a week
         if (v !== 'treadmill' && onTheGround <= 1) continue;
         options.push({ kind: 'venue', venue: v, copyKey: v === 'treadmill' ? K.machine : K.machineGround, to: from, label: K.machine, needsMaterialize: false, warnings: [], patch: venuePatch(session, v) });
       }

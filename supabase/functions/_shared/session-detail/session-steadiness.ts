@@ -133,6 +133,7 @@ function plannedStepsSteady(factPacket: unknown): boolean | null {
   const fp = (factPacket ?? null) as { derived?: { interval_execution?: { total_steps?: unknown } } } | null;
   const steps = fp?.derived?.interval_execution?.total_steps;
   if (typeof steps !== 'number' || !Number.isFinite(steps)) return null;
+  // OURS — `plannedStepsSteady` more than two planned steps reads as intervals; no page, the same cut compute-snapshot uses for the drift line
   return steps > 2 ? false : null;
 }
 
@@ -151,6 +152,7 @@ function providerWordSteady(workoutRow: unknown): boolean | null {
   const a = (sd as { original_activity?: Record<string, unknown> } | null)?.original_activity;
   const wt = Number(a?.workout_type);
   if (!Number.isFinite(wt)) return null;
+  // FIELD — Strava API `workout_type` values (3 = run workout, 12 = ride workout), a definition
   if (wt === 3 || wt === 12) return false;
   return null;
 }
@@ -170,6 +172,7 @@ function lapIntensitySteady(workoutRow: unknown): boolean | null {
   let raw = w?.laps;
   if (typeof raw === 'string') { try { raw = JSON.parse(raw); } catch { return null; } }
   const arr = Array.isArray(raw) ? raw : (Array.isArray((raw as { laps?: unknown } | null)?.laps) ? (raw as { laps: unknown[] }).laps : []);
+  // OURS — `lapIntensitySteady` needs two laps and reads rest ≥ 1 with active ≥ 2 as intervals; no page, kept as found
   if (arr.length < 2) return null;
   let rest = 0; let active = 0; let marked = 0;
   for (const L of arr as Array<Record<string, unknown>>) {
@@ -190,12 +193,14 @@ function lapIntensitySteady(workoutRow: unknown): boolean | null {
  * than the gap between a rep and its recovery. It is last in the order because it is the only rung
  * that reads the shape of the data rather than a statement about the session.
  */
+// OURS — `PACE_SWING_SEC` 75 s over at least five miles (see the block above; STATE-SOURCES session-steadiness.ts row)
 export const PACE_SWING_SEC = 75;
 
 function paceSwingSteady(factPacket: unknown): boolean | null {
   const fp = (factPacket ?? null) as { facts?: { segments?: unknown } } | null;
   const segments = Array.isArray(fp?.facts?.segments) ? (fp!.facts!.segments as Array<{ pace_sec_per_mi?: unknown }>) : [];
   const paces = segments
+    // OURS — `paceSwingSteady` a mile between 2:00 and 40:00 counts as a real pace, five or more miles needed; no page, kept as found
     .map((s) => { const n = Number(s?.pace_sec_per_mi); return Number.isFinite(n) && n > 120 && n < 2400 ? n : null; })
     .filter((n): n is number => n != null);
   if (paces.length < 5) return null;
@@ -212,6 +217,7 @@ function paceSwingSteady(factPacket: unknown): boolean | null {
  * evidence of steadiness.
  */
 function detectedRowsSteady(intervals: SteadinessInput['intervals']): boolean | null {
+  // OURS — `detectedRowsSteady` four or more rows, at least one recovery and two work rows reads as intervals; no page, kept as found
   if (!intervals || intervals.length < 4) return null;
   const rec = intervals.filter((iv) => lower(iv.interval_type) === 'recovery').length;
   const workish = intervals.filter((iv) => { const t = lower(iv.interval_type); return t === 'work' || t === 'warmup'; }).length;

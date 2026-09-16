@@ -21,6 +21,7 @@ export interface PoolLengthInputs {
 export type PoolLengthSource = 'user_corrected' | 'device' | 'planned' | 'default';
 export interface ResolvedPoolLength { length_m: number; source: PoolLengthSource }
 
+// FIELD — definition (1 yd = 0.9144 m)
 const YARD_M = 0.9144;
 const pos = (v: unknown): number | null => {
   const n = Number(v);
@@ -36,6 +37,7 @@ export function resolvePoolLength(s: PoolLengthInputs): ResolvedPoolLength {
   if (pl != null) return { length_m: pl, source: 'planned' };
   // Default: 25 yd (imperial) or 25 m (metric). Only fires when every captured source is NULL —
   // i.e. a Strava swim with no lengths/correction; log-worthy so a silent default is visible.
+  // OURS — `resolvePoolLength` default 25 yd / 25 m pool when nothing is captured; the same default as planned-pool.ts (STATE-SOURCES planned-pool.ts row)
   const length_m = s.useImperial ? Math.round(25 * YARD_M * 100) / 100 : 25;
   return { length_m, source: 'default' };
 }

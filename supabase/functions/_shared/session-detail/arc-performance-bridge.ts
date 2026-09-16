@@ -4,6 +4,7 @@
 import type { ArcContext, Goal } from '../arc-context.ts';
 import { sanitizeUserFacingPhaseLabel, type ArcNarrativeContextV1, type ArcNarrativeMode } from '../arc-narrative-state.ts';
 
+// OURS — `ARC_PERFORMANCE_BRIDGE_VERSION` a cache version counter, bumped when the block's shape changes; not a training number
 export const ARC_PERFORMANCE_BRIDGE_VERSION = 7;
 
 export type ArcPerformancePrimaryGoalV1 = {
@@ -122,6 +123,7 @@ function buildCoachContext(params: {
     const du = primary.days_until;
     const wu = primary.weeks_until;
     if (!parts.length || nc?.mode !== 'recovery_read') {
+      // OURS — `buildCoachContext` a goal 14 days out or less is named in days, 12 weeks or less in weeks, else by date; no source, kept as found
       if (du != null && du >= 0 && du <= 14) {
         parts.push(
           `Primary Arc target **${primary.name}**${primary.distance ? ` (${primary.distance})` : ''} — **${du} day${du === 1 ? '' : 's'}** out on this workout date.`,

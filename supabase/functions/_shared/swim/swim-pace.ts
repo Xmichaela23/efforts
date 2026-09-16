@@ -13,6 +13,7 @@ export function swimPacePer100Seconds(
   const s = Number(movingSeconds);
   const d = Number(distanceMeters);
   if (!(s > 0 && d > 0)) return null;
+  // FIELD — definition (1 yd = 0.9144 m)
   const per100count = unit === 'yd' ? (d / 0.9144) / 100 : d / 100;
   return per100count > 0 ? Math.round(s / per100count) : null;
 }

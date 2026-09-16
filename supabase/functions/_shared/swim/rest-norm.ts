@@ -21,6 +21,7 @@ export type SwimIntent = 'technique' | 'speed' | 'threshold' | 'endurance' | 'lo
 export type BandPosition = 'in_band' | 'below_band' | 'above_band';
 
 // Provisional bands (fraction of session spent resting), tune-later. [lo, hi] inclusive.
+// OURS — `REST_BANDS` provisional rest fractions per swim type (technique 30–45%, speed 30–50%, threshold 20–35%, endurance 10–20%, long continuous 0–10%); no source, kept as found
 export const REST_BANDS: Record<SwimIntent, [number, number]> = {
   technique: [0.30, 0.45], // technique/drill
   speed: [0.30, 0.50],     // speed/sprint

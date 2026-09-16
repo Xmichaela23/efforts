@@ -32,6 +32,7 @@
 
 import { pacesFromThresholdSecPerMi } from './run-paces-from-threshold.ts';
 
+// FIELD — definition (1 mi = 1.609344 km)
 const SEC_PER_KM_TO_SEC_PER_MI = 1.609344;
 
 /** Where the number came from. Travels to the surface with it (Law 3). */

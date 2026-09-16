@@ -71,6 +71,7 @@ export const familyTagOf = (s: SwappableSession): string | null => tagValue(s, '
  */
 function levelFor(session: SwappableSession, template: SwappableSession | null): Level {
   const raw = Number(tagValue(template ?? session, 'level:') ?? tagValue(session, 'level:'));
+  // OURS — `levelFor` level 2 when neither row carries a level tag; no page, kept as found
   return (raw === 1 || raw === 2 || raw === 3 ? raw : 2) as Level;
 }
 

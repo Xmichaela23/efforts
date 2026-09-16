@@ -11,6 +11,7 @@ export function applyGarminBaselines(workout: any, baselines: any): void {
   if (resolvedFtp) workout.user_ftp = Math.round(resolvedFtp)
   const isSwim = String(workout?.type || '').toLowerCase() === 'swim'
   const hasPool = isSwim && (workout?.pool_unit || workout?.pool_length_m)
+  // OURS — `applyGarminBaselines` default pool 25 yd (22.86 m) imperial / 25 m metric; the same default as planned-pool.ts (STATE-SOURCES planned-pool.ts row)
   if (isSwim && !hasPool) {
     const pref = String(baselines?.units || 'imperial').toLowerCase()
     if (pref === 'imperial') {

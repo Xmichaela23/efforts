@@ -1160,6 +1160,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     if (intervalDisplayMode === 'overall_only') return false;
     if (intervalDisplayMode === 'awaiting_recompute') return true;
     const pSteps: any[] = Array.isArray(plannedComp?.steps) ? plannedComp.steps : [];
+    // OURS — `isStructuredInterval` two or more planned work steps make a structured session; no source, kept as found
     return pSteps.filter((s: any) => s?.kind === 'work' || s?.type === 'work' || s?.kind === 'interval').length >= 2;
   })();
   const isEasyLike = (() => {
@@ -1253,6 +1254,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     ? comp.analysis.events.splits.mi : [];
   const splitsMi: SessionDetailV1['splits_mi'] = rawSplitsMi.map((s: any) => ({
     n: Number(s?.n) || 0,
+    // FIELD — definition: 1 mi = 1.609344 km (1.60934 as written)
     pace_s_per_mi: fin(s?.avgPace_s_per_km) != null ? Math.round(Number(s.avgPace_s_per_km) * 1.60934) : null,
     gap_s_per_mi: fin(s?.avgGapPace_s_per_km) != null ? Math.round(Number(s.avgGapPace_s_per_km) * 1.60934) : null,
     grade_pct: fin(s?.avgGrade_pct),
@@ -1287,6 +1289,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       parts.push(`${lead}.`);
     }
     if (Number.isFinite(vi) && vi > 0) {
+      // OURS — `cyclingNarrativeFallback` variability index 1.05 or less reads "held steady"; no citation in the repo, kept as found
       parts.push(vi <= 1.05
         ? 'Power held steady the whole way.'
         : 'Power came in uneven as a result of surging.');
@@ -1492,6 +1495,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
       // Gate on FAMILIARITY (cluster total), not on recent history — a route run a lot but not lately
       // should still show "run Nx". The efficiency DIRECTION is intentionally NOT surfaced here (heat-
       // confounded + contradicts State's decoupling-led read); State owns efficiency trends.
+      // OURS — `route_runs` a route run twice (or with two comparable runs) gets a route row; eight comparable runs make it chart-eligible; no source, kept as found
       if (timesRun < 2 && history.length < 2) return null;
       return {
         route: {
@@ -1643,6 +1647,7 @@ function buildPlannedTotals(
   })();
   const avgPace = (() => {
     if (durS != null && durS > 0 && distM != null && distM > 0) {
+      // FIELD — definition: 1 mi = 1609.344 m (1609.34 as written); a distance under 0.01 mi gives no pace
       const miles = distM / 1609.34;
       if (miles > 0.01) return Math.round(durS / miles);
     }
@@ -1660,6 +1665,7 @@ function buildPlannedTotals(
     if (baseline != null && baseline > 0) return Math.round(baseline);
     if (durS != null && durS > 0 && distM != null && distM > 0) {
       const unit = swimUnit || 'yd';
+      // FIELD — definition: 1 yd = 0.9144 m
       const per100count = unit === 'yd' ? (distM / 0.9144) / 100 : distM / 100;
       if (per100count > 0) return Math.round(durS / per100count);
     }
@@ -1683,6 +1689,7 @@ export function pickCyclingTrendSeries(
 ): { points: any[]; metricLabel: string; noun: string; rideType: string | null } | null {
   const w = (wa ?? null) as any;
   const pwr20 = w?.pwr20_trend_v1?.points;
+  // OURS — `pickCyclingTrendSeries` a trend needs three or more dated points; no source, kept as found
   if (Array.isArray(pwr20) && pwr20.length >= 3) {
     // pwr20_trend_v1 is filtered to one classified_type by the analyzer;
     // surface it so the summary reads "over N vo2 rides".
@@ -1779,6 +1786,7 @@ export function formatCyclingPacingRow(
         .map((iv) => Number(iv?.executed?.power_watts))
         .filter((w) => Number.isFinite(w) && w > 0)
     : [];
+  // OURS — `formatCyclingPacingRow` two or more work intervals print first → last watts; no source, kept as found
   if (work.length >= 2) {
     return {
       label: 'Pacing',
@@ -1976,6 +1984,7 @@ export function buildAnalysisDetailRows(
   try {
     if (sport !== 'run') throw new Error('skip: pace-per-mile pacing is run-only');
     const ie = derived?.interval_execution;
+    // OURS — `buildAnalysisDetailRows` more than two planned steps is a structured run; two or more work reps with pace print the rep range; no source, kept as found
     const isStructured = typeof ie?.total_steps === 'number' && ie.total_steps > 2;
 
     if (isStructured) {
@@ -2017,6 +2026,7 @@ export function buildAnalysisDetailRows(
         const gapPerKm = Number(s?.avgGapPace_s_per_km);
         return {
           mile: Number(s?.n),
+          // FIELD — definition: 1 mi = 1.609344 km (1.60934 as written)
           pace: Number.isFinite(pacePerKm) && pacePerKm > 0 ? pacePerKm * 1.60934 : NaN,
           gap: Number.isFinite(gapPerKm) && gapPerKm > 0 ? gapPerKm * 1.60934 : NaN,
         };
@@ -2160,6 +2170,7 @@ export function buildAnalysisDetailRows(
         // Bands >2 min shown individually; the rest (≤2 min) aggregate into
         // "+Xm other" so nothing is dropped and the total ≈ ride duration. If
         // no band clears 2 min (tiny / evenly split ride), show all non-zero.
+        // OURS — `buildAnalysisDetailRows` a power band over 2 minutes is listed on its own; no source, kept as found
         const majors = nonZero.filter((s) => s.min > 2);
         const shown = majors.length > 0 ? majors : nonZero;
         // (a) small non-shown non-zero bands + (b) un-binned coasting/rounding
@@ -2216,6 +2227,7 @@ export function buildAnalysisDetailRows(
           comp?.overall?.elevation_gain ??
           lap0?.total_elevation_gain,
       );
+      // OURS — `buildAnalysisDetailRows` a ride with more than 15 m of climbing gets a Conditions row; no source, kept as found
       if (!indoors && Number.isFinite(elevM) && elevM > 15) {
         const tempStr = formatSessionTemp({
           temperature_f: weatherTempF,
@@ -2223,6 +2235,7 @@ export function buildAnalysisDetailRows(
           temp_end_f: weatherTempEndF,
         });
         const tempSuffix = tempStr ? ` · ${tempStr}` : '';
+        // FIELD — definition: 1 m = 3.28084 ft
         rows.push({ label: 'Conditions', value: `${Math.round(elevM * 3.28084)} ft gain${tempSuffix}` });
       }
     }
@@ -2282,6 +2295,7 @@ export function buildAnalysisDetailRows(
       // receipt behind it.
       const p = decoupling!.pct as number;
       const desc = !driftReachesLine(p) ? 'Held steady with pace'
+        // OURS — `buildAnalysisDetailRows` drift over the 5% line and up to 10% reads "Moderate drift", above 10% "Notable drift"; the 10 has no source, kept as found
         : p <= 10 ? 'Moderate drift over the run'
         : 'Notable drift late in the run';
       rows.push({ label: 'Heart rate', value: `${desc} (drift ${p}%)` });
@@ -2309,6 +2323,7 @@ export function buildAnalysisDetailRows(
       // names a missing recording, and an interval session's recording is not missing. Silence.
       const intervalSession = sport !== 'swim' && (decoupling?.whole_session === true || shouldSuppressSessionHrDrift(factPacket, intervals, plannedRowForSteadiness, completedRowForSteadiness));
       const withheldForPaceSpread = !decouplingShown && sport !== 'swim' && !intervalSession
+        // OURS — `buildAnalysisDetailRows` a pace-normalized HR shift of 3 bpm or more is a drift signal; no source, kept as found
         && signal != null && Math.abs(signal) >= 3;
       const pctAny = typeof decoupling?.pct === 'number' && Number.isFinite(decoupling.pct) ? decoupling.pct : null;
       if (!decouplingShown && pctAny != null && !intervalSession) {
@@ -2326,6 +2341,7 @@ export function buildAnalysisDetailRows(
           value: 'Not read on this session — no usable heart-rate data across it',
         });
       }
+    // OURS — `buildAnalysisDetailRows` a raw HR rise of 5 bpm or more on a negative split is named as pace-driven; no source, kept as found
     } else if (driftExplanation === 'pace_driven' && rawAbsDrift != null && Math.abs(rawAbsDrift) >= 5) {
       rows.push({
         label: 'Heart rate',
@@ -2343,6 +2359,7 @@ export function buildAnalysisDetailRows(
         if (terrainContrib != null) {
           value += ` (mostly terrain-driven; ~${Math.round(Math.abs(terrainContrib))} bpm from grade changes)`;
         }
+      // OURS — `buildAnalysisDetailRows` raw drift more than 3 bpm above the normalized signal prints the raw figure; no source, kept as found
       } else if (driftExplanation === 'mixed' && rawAbsDrift != null && Math.abs(rawAbsDrift) > Math.abs(signal) + 3) {
         value += ` (pace-normalized from ${rawAbsDrift > 0 ? '+' : ''}${Math.round(rawAbsDrift)} raw)`;
       }
@@ -2363,6 +2380,7 @@ export function buildAnalysisDetailRows(
         // ⛔ NEITHER CONFOUND EXISTS INDOORS. The forecast belongs to an address, not to a garage,
         // and a trainer has no gradient — so "the heat drove it" / "the terrain drove it" would
         // explain the drift away with something that was not in the room.
+        // OURS — `buildAnalysisDetailRows` heat confound above 75°F, terrain confound at 3 bpm or more; no source, kept as found (the 75°F was removed from the hot-day line, STATE-SOURCES heat-adjust row)
         const heatConfound = !indoors && ((typeof wxD?.temperature_f === 'number' && wxD.temperature_f > 75)
           || (typeof wxD?.heat_stress_level === 'string' && wxD.heat_stress_level !== 'none' && wxD.heat_stress_level !== ''));
         const terrainConfound = !indoors && (driftExplanation === 'terrain_driven'
@@ -2370,6 +2388,7 @@ export function buildAnalysisDetailRows(
         const confoundWord = heatConfound && terrainConfound ? 'heat and terrain'
           : heatConfound ? 'the heat'
           : terrainConfound ? 'the terrain' : null;
+        // OURS — `buildAnalysisDetailRows` drift within 3 bpm of the athlete's typical reads "within your normal range"; no source, kept as found
         if (Math.abs(delta) <= 3) {
           value += ` — within your normal range (typical ${typSign}${Math.round(driftTypical)})`;
         } else if (delta > 0 && confoundWord) {
@@ -2402,6 +2421,7 @@ export function buildAnalysisDetailRows(
     const parts: string[] = [];
     if (terrainType && elevFt != null && elevFt > 0) {
       parts.push(`${terrainType.charAt(0).toUpperCase() + terrainType.slice(1)} (${elevFt} ft gain)`);
+    // OURS — `buildAnalysisDetailRows` elevation over 50 ft is named; humidity at 50% or more is named; no source, kept as found
     } else if (elevFt != null && elevFt > 50) {
       parts.push(`${elevFt} ft elevation gain`);
     }
@@ -2431,6 +2451,7 @@ export function buildAnalysisDetailRows(
     const concerns = flagsV1
       .filter((f: any) => String(f?.category || '').toLowerCase() !== 'fatigue')
       .filter((f: any) => !(intervalHere && String(f?.category || '').toLowerCase() === 'hr'))
+      // OURS — `buildAnalysisDetailRows` only concern flags of priority 1–2 print, two at most, eight rows in all; no source, kept as found
       .filter((f: any) => f && f.type === 'concern' && typeof f.message === 'string' && f.message.length > 0 && Number(f.priority || 99) <= 2)
       .sort((a: any, b: any) => Number(a.priority || 99) - Number(b.priority || 99))
       .slice(0, 2);
@@ -2525,6 +2546,7 @@ function buildSessionInterpretation(params: {
     const worstWorkPace = minWorkIntervalPacePct(intervals);
     if (hasPace) {
       const pct = paceAdherence ?? powerAdherence ?? 0;
+      // OURS — `buildSessionInterpretation` a work rep under 88% of its pace window, or pace/power outside 95–105% of plan, marks the session modified; no source, kept as found
       if (worstWorkPace != null && worstWorkPace < 88) {
         deviations.push({
           dimension: 'pace',
@@ -2544,6 +2566,7 @@ function buildSessionInterpretation(params: {
     }
     if (hasDuration) {
       const pct = durationAdherence ?? 0;
+      // OURS — `buildSessionInterpretation` duration outside 95–105% of plan marks it modified; no source, kept as found
       if (pct > 105) deviations.push({ dimension: 'duration', direction: 'over', detail: `Duration ${Math.round(pct)}% of plan` });
       else if (pct < 95 && pct > 0) deviations.push({ dimension: 'duration', direction: 'under', detail: `Duration ${Math.round(pct)}% of plan` });
       else if (pct >= 95 && pct <= 105) deviations.push({ dimension: 'duration', direction: 'matched', detail: 'Duration on target' });
@@ -2589,6 +2612,7 @@ function buildSessionInterpretation(params: {
 
     if (parts.length > 0) {
       actualStimulus = `Versus plan: ${parts.join(', ')}.`;
+      // OURS — `buildSessionInterpretation` scores 12 points apart read "diverge"; a rep under 88% is named; no source, kept as found
       if (spread >= 12) {
         actualStimulus += ' Scores diverge — treat the lowest % as the limiting factor, not the highest.';
       }
@@ -2602,6 +2626,7 @@ function buildSessionInterpretation(params: {
     }
 
     if (minPct != null) {
+      // OURS — `buildSessionInterpretation` alignment cuts: 105% exceeded, 92% on target, 78% partial, else missed; no source, kept as found
       if (minPct >= 105) {
         alignment = 'exceeded';
       } else if (minPct >= 92) {
@@ -2615,6 +2640,7 @@ function buildSessionInterpretation(params: {
   } else {
     const execPct = executionScore ?? paceAdherence ?? powerAdherence ?? durationAdherence;
     if (execPct != null) {
+      // OURS — `buildSessionInterpretation` non-endurance cuts: 95% on target (105% exceeded), 80% partial, else missed; no source, kept as found
       if (execPct >= 95) {
         actualStimulus = `Executed at ${Math.round(execPct)}% of plan`;
         alignment = execPct >= 105 ? 'exceeded' : 'on_target';
@@ -2802,6 +2828,7 @@ function computeStrengthWeightDeviation(
     const sets = Array.isArray(compEx?.sets) ? compEx.sets : [];
     const bestActual = Math.max(0, ...sets.map((s: any) => Number(s?.weight) || 0));
     if (bestActual <= 0) continue;
+    // OURS — `computeStrengthWeightDeviation` best set more than 5% over the planned weight reads heavier, more than 5% under reads lighter; no source, kept as found
     if (bestActual > plannedW * 1.05) anyHeavier = true;
     else if (bestActual < plannedW * 0.95) anyLighter = true;
   }
@@ -2867,6 +2894,7 @@ function computeStrengthVolumeDeviation(
       if (actual.sets > planned.sets) parts.push(`${actual.sets} sets instead of ${planned.sets}`);
       if (planned.totalReps > 0 && actual.totalReps > planned.totalReps) parts.push(`${actual.totalReps} reps instead of ${planned.totalReps}`);
       overDetails.push(parts.length ? `${parts.join(', ')} on ${name}` : name);
+    // OURS — `computeStrengthVolumeDeviation` fewer sets, or under 90% of planned reps, reads under plan; no source, kept as found
     } else if (actual.sets < planned.sets || (planned.totalReps > 0 && actual.totalReps < planned.totalReps * 0.9)) {
       const parts: string[] = [];
       if (actual.sets < planned.sets) parts.push(`${actual.sets} sets instead of ${planned.sets}`);

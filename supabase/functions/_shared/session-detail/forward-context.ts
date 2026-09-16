@@ -39,6 +39,7 @@ export const PRIOR_FINISH_PROJECTION_AL_RUBRIC = [
 // ── Distance helpers ─────────────────────────────────────────────────────────
 
 /** Canonical run-distance lookup (meters). Lower-cased keys; permissive matches. */
+// FIELD — definition: standard race distances (marathon 42,195 m, half 21,097.5 m, 1 mi = 1609.344 m); `ultra` 50 km default is OURS (next line)
 const RUN_DISTANCE_M: Record<string, number> = {
   '5k': 5000,
   '10k': 10000,
@@ -49,6 +50,7 @@ const RUN_DISTANCE_M: Record<string, number> = {
   'marathon': 42195,
   'full marathon': 42195,
   'full': 42195,
+  // OURS — `RUN_DISTANCE_M` "ultra" read as 50 km when the name gives no distance; no source, kept as found
   'ultra': 50000, // conservative default for "ultra" without further detail
   '50k': 50000,
   '50 mile': 80467,
@@ -57,6 +59,7 @@ const RUN_DISTANCE_M: Record<string, number> = {
 };
 
 /** Run-leg distance (meters) for common multisport formats. */
+// FIELD — definition: World Triathlon / IRONMAN run legs (sprint 5 km, standard 10 km, 70.3 21.1 km, 140.6 42.2 km); `duathlon` 10 km is OURS (below)
 const MULTISPORT_RUN_LEG_M: Record<string, number> = {
   'sprint': 5000, // 5K run leg (varies; 5K is the modal)
   'sprint triathlon': 5000,
@@ -68,6 +71,7 @@ const MULTISPORT_RUN_LEG_M: Record<string, number> = {
   '140.6': 42195,
   'ironman': 42195,
   'full ironman': 42195,
+  // OURS — `MULTISPORT_RUN_LEG_M` duathlon run total read as 10 km; formats vary, no source, kept as found
   'duathlon': 10000, // run-bike-run; default to 10K total run
 };
 
@@ -159,6 +163,7 @@ function fmtClockApprox(seconds: number): string {
 // ── Multisport run-leg adjustment ────────────────────────────────────────────
 
 /** Run-off-the-bike penalty for triathlon run legs. ~6% conservative. */
+// OURS — `MULTISPORT_RUN_PENALTY` a run off the bike projected 6% slower; no source, kept as found
 const MULTISPORT_RUN_PENALTY = 1.06;
 
 /** Project a run finish time onto a target distance, with optional tri penalty. */
@@ -261,6 +266,7 @@ function inferPostRacePhase(
   const phase = arc.athlete_identity?.current_phase;
   if (typeof phase === 'string' && phase.trim()) return phase;
   // Otherwise default by goal distance: marathons → recovery, halfs/shorter → build.
+  // OURS — `inferPostRacePhase` a race of 30 km or more is followed by a recovery phase; no source, kept as found
   if (justFinished?.distance_meters != null && justFinished.distance_meters >= 30000) {
     return 'recovery';
   }
@@ -344,6 +350,7 @@ export function buildForwardContext(args: {
     } else {
       // Same-discipline next race in build/maintenance.
       headline = `${nextGoal.weeks_until} ${weeksWord(nextGoal.weeks_until)} to ${nextGoal.name}.`;
+      // OURS — `buildForwardContext` "final 3–4 weeks" of race-specific work; no page, kept as found
       body = `This ${finishedDistanceCanon ?? 'race'} sets the current fitness reference. Build continues; race-specific sharpening in the final 3–4 weeks.`;
     }
   } else {
@@ -372,6 +379,7 @@ export function buildForwardContext(args: {
 
 function canonicalRunLabel(distanceMeters: number | null): string | null {
   if (distanceMeters == null) return null;
+  // OURS — `canonicalRunLabel` the tolerance windows around each race distance (marathon 41–43.5 km, half 20.5–21.5, 10K 9.5–10.5, 5K 4.5–5.5, 50K 49–51); no source, kept as found
   if (distanceMeters >= 41000 && distanceMeters <= 43500) return 'marathon';
   if (distanceMeters >= 20500 && distanceMeters <= 21500) return 'half marathon';
   if (distanceMeters >= 9500 && distanceMeters <= 10500) return '10K';

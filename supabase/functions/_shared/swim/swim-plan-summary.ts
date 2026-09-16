@@ -125,6 +125,7 @@ export type SwimDistanceTally = { yd: number; m: number };
 export type PlannedSwimDistance = { distance: number; unit: 'yd' | 'm'; label: string };
 
 /** One international yard is exactly 0.9144 m (by definition, 1959). Not a tuning number. */
+// FIELD — definition (1 yd = 0.9144 m)
 const M_PER_YD = 0.9144;
 
 /**

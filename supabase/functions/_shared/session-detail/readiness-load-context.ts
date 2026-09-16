@@ -38,6 +38,7 @@ function muscularStatusLabel(
     : 1;
   const th = adjustedThreshold(target, mult);
   const ratio = residual / Math.max(th, 1);
+  // OURS — `muscularStatusLabel` residual under 40% of the muscle's threshold reads fresh, under 85% manageable; no source, kept as found
   if (ratio < 0.4) return "fresh";
   if (ratio < 0.85) return "manageable";
   return "compromised";
@@ -45,6 +46,7 @@ function muscularStatusLabel(
 
 function aerobicTrendLabel(trend: number | null | undefined): string {
   if (trend == null || !Number.isFinite(trend)) return "stable";
+  // OURS — `aerobicTrendLabel` a 7-day aerobic trend beyond ±5% reads building / declining; no source, kept as found
   if (trend > 5) return `+${Math.round(trend)}% (building as expected)`;
   if (trend < -5) return `${Math.round(trend)}% (declining)`;
   return "stable";
@@ -86,6 +88,7 @@ export function buildLoadDisplaySummaryFromReadiness(readiness: ReadinessSnapsho
   }
 
   const topMuscles = Object.entries(readiness.muscular || {})
+    // OURS — `buildLoadDisplaySummaryFromReadiness` a muscle with residual stress above 50 is named; no source, kept as found
     .filter(([, v]) => (v?.residual_stress ?? 0) > 50)
     .sort((a, b) => (b[1]?.residual_stress ?? 0) - (a[1]?.residual_stress ?? 0))
     .slice(0, 3)
@@ -102,6 +105,7 @@ export function buildLoadDisplaySummaryFromReadiness(readiness: ReadinessSnapsho
   const impactingSessions = (() => {
     const bySession = new Map<string, { label: string; share: number }>();
     for (const [, data] of Object.entries(readiness.muscular || {})) {
+      // OURS — same residual-above-50 cut as the muscle list; no source, kept as found
       if ((data?.residual_stress ?? 0) <= 50) continue;
       const src = Array.isArray(data.top_sources) ? data.top_sources[0] : null;
       if (!src?.workout_id) continue;
@@ -129,6 +133,7 @@ export function buildLoadDisplaySummaryFromReadiness(readiness: ReadinessSnapsho
       ?? null;
     const aeroShort = t == null || !Number.isFinite(t)
       ? "aerobic stable"
+      // OURS — same ±5% cut as `aerobicTrendLabel`; no source, kept as found
       : (t > 5 ? "aerobic building" : t < -5 ? "aerobic declining" : "aerobic stable");
     parts.push(aeroShort);
   }
@@ -198,6 +203,7 @@ export function buildLoadContextFromReadiness(readiness: ReadinessSnapshotV1): s
   lines.push("");
   lines.push("Muscular state (significant residual only):");
   const muscularEntries = Object.entries(readiness.muscular || {})
+    // OURS — a muscle with residual stress above 50 is listed as significant; no source, kept as found
     .filter(([, v]) => (v?.residual_stress ?? 0) > 50)
     .sort((a, b) => (b[1]?.residual_stress ?? 0) - (a[1]?.residual_stress ?? 0));
 
@@ -224,6 +230,7 @@ export function buildLoadContextFromReadiness(readiness: ReadinessSnapshotV1): s
     const aeroTrend = aerobicTrendLabel(aeroTrendRaw ?? null);
     lines.push(`  aerobic: ${Math.round(es.aerobic.residual_stress)} residual, 7d trend ${aeroTrend}`);
     lines.push(
+      // OURS — glycolytic residual above 5 and neuromuscular above 1 print a number, else "minimal"; no source, kept as found
       `  glycolytic: ${es.glycolytic.residual_stress > 5 ? `${Math.round(es.glycolytic.residual_stress)} residual` : "minimal"}`,
     );
     lines.push(

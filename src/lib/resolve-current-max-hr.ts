@@ -48,6 +48,7 @@ export type ResolvedMaxHr = {
  * debrief (was /0.95) and the run analyzer (was /0.90) stop producing two different maxes from one peak.
  * 0.95 chosen (the more conservative of the two shipped values — yields the lower, safer max).
  */
+// OURS — `PEAK_TO_MAX` a session peak ÷ 0.95; the more conservative of the two divisors the app shipped, no field source (D-299 records the choice)
 export const PEAK_TO_MAX = 0.95;
 
 type LearnedMetric = {
@@ -114,6 +115,7 @@ export function ageFromBirthday(birthday: string | null | undefined, asOf: strin
   const [ry, rm, rd] = ref.split('-').map(Number);
   let age = ry - by;
   if (rm < bm || (rm === bm && rd < bd)) age -= 1;
+  // OURS — `ageFromBirthday` an age outside 1–119 reads as a missing birthday; validity bound, kept as found
   return age > 0 && age < 120 ? age : null;
 }
 

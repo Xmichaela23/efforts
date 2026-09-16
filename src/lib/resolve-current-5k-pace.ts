@@ -43,6 +43,7 @@
  * Deno edge functions (the `src/lib/session-frequency-defaults.ts` precedent).
  */
 
+// FIELD — definition (1 mi = 1.609344 km)
 const SEC_PER_KM_TO_SEC_PER_MI = 1.609344;
 
 /** 5 km expressed in miles. The one conversion between a 5K race time and a 5K pace. */
@@ -52,6 +53,7 @@ export const FIVE_K_MILES = 5 / SEC_PER_KM_TO_SEC_PER_MI;   // 3.106856…
  * Is this plausibly a 5K RACE TIME? Copied deliberately from `_shared/arc-context.ts:472`
  * (`FIVEK_TOTAL_SEC_SANE`) so the app holds ONE opinion about what a 5K time can be.
  */
+// OURS — `RACE_TIME_SANE_SEC` a 5K time between 7:00 and 80:00 is accepted; copied from arc-context `FIVEK_TOTAL_SEC_SANE`, no source, kept as found
 const RACE_TIME_SANE_SEC = { min: 7 * 60, max: 80 * 60 };
 
 /**
@@ -63,6 +65,7 @@ const RACE_TIME_SANE_SEC = { min: 7 * 60, max: 80 * 60 };
  * is rejected here rather than prescribed. A tier that fails the band falls through to the next
  * tier; it is never rescued by guessing that the athlete meant a time.
  */
+// OURS — `PACE_SANE_SEC_PER_MI` a 5K pace between 3:00/mi and 20:00/mi is accepted; no source, kept as found
 const PACE_SANE_SEC_PER_MI = { min: 180, max: 1200 };
 
 /** Where the number came from. Travels to the surface with it (Law 3). */

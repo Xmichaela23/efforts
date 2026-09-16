@@ -64,12 +64,14 @@ export type QualityWork =
  * ⛔ THE TWO BANDS ARE THE ONES THE EXPANDER ALREADY USED — sweet spot 85-95% of FTP, the medium
  * repeat 95-105%. They are the token's meaning rather than a number inside it.
  */
+// OURS — `BIKE_BANDS` sweet spot 85–95% and threshold repeat 95–105% of FTP, as the expander already used; no page or field source in the repo, kept as found
 export const BIKE_BANDS = {
   ss: { lo: 0.85, hi: 0.95 },
   thr: { lo: 0.95, hi: 1.05 },
 } as const;
 
 /** The recovery spin either side of a bike interval — `RIDE_RECOVERY_PCT`, unchanged. */
+// OURS — `RIDE_RECOVERY_PCT` recovery spin 45–55% of FTP; no source, kept as found
 export const RIDE_RECOVERY_PCT = { lo: 0.45, hi: 0.55 } as const;
 
 // ⚠️ `allout` AND `{lo}to{hi}` ADDED 2026-09-13 for p278's VO2 and sprint rides. Additive: every token
@@ -162,6 +164,7 @@ export function pacedAt(pct: number | null | undefined, thresholdSecPerMi: numbe
  * different quantity, and borrowing it would be the same class of error as the ACWR clause.
  * Ledger: `docs/STATE-SOURCES.md`, row "Single-percent power band".
  */
+// OURS — `SINGLE_PERCENT_BAND` ±5% (see the block above; STATE-SOURCES single-percent power band row)
 export const SINGLE_PERCENT_BAND = 0.05;
 
 /**
@@ -320,6 +323,7 @@ export type QualityPricing = {
   floorOnlyAtOrAbovePct?: number | null;
 };
 
+// FIELD — definition (1 mi = 1.609344 km; 1.60934 as written)
 const SEC_PER_MI_TO_KM = 1.60934;
 
 /** `4:40`, `3 min`, `45 s` — the page's own way of writing a duration. */

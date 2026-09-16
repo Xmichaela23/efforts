@@ -845,6 +845,7 @@ export type ForwardContextNextGoal = {
 };
 
 /** Bump when forward-context copy/voice changes. Drives one-time cache refresh. */
+// OURS — `FORWARD_CONTEXT_COPY_VERSION` a cache version counter, bumped when the copy changes; not a training number
 export const FORWARD_CONTEXT_COPY_VERSION = 2;
 
 export type ForwardContextV1 = {

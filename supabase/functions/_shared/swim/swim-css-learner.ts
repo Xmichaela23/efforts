@@ -36,6 +36,7 @@ export interface CssResult {
 }
 
 // duration buckets (seconds): <6, 6-12, 12-20, 20-35, 35+ min
+// OURS — `DURATION_BUCKETS_S` best effort per 6 / 12 / 20 / 35-minute bucket; no source, kept as found
 const DURATION_BUCKETS_S = [0, 360, 720, 1200, 2100, Infinity];
 
 function abstain(reason: string, n = 0): CssResult {
@@ -44,6 +45,7 @@ function abstain(reason: string, n = 0): CssResult {
 
 /** Fit CSS from clean efforts. typicalMedianSecPer100m = the athlete's typical pace (for the sanity gate); pass null to skip that gate. */
 export function fitSwimCss(efforts: SwimEffort[], typicalMedianSecPer100m: number | null): CssResult {
+  // OURS — `fitSwimCss` an effort of 200 m or more counts, two or more needed; no source, kept as found
   const valid = (efforts || []).filter((e) => e && e.distanceM >= 200 && e.timeS > 0);
   if (valid.length < 2) return abstain('fewer than 2 clean continuous efforts', valid.length);
 
@@ -62,6 +64,7 @@ export function fitSwimCss(efforts: SwimEffort[], typicalMedianSecPer100m: numbe
   for (let i = 1; i < pts.length; i++) {
     const pPrev = pts[i - 1].timeS / pts[i - 1].distanceM;
     const pCur = pts[i].timeS / pts[i].distanceM;
+    // OURS — `fitSwimCss` monotonic tolerance 0.02 s/m; no source, kept as found
     if (pCur < pPrev - 0.02) return abstain('non-monotonic best-effort curve (a longer effort is faster than a shorter one) — not a clean CS curve', pts.length);
   }
 
@@ -78,6 +81,7 @@ export function fitSwimCss(efforts: SwimEffort[], typicalMedianSecPer100m: numbe
   // sanity gates
   if (typicalMedianSecPer100m && cssSecPer100m >= typicalMedianSecPer100m)
     return abstain(`fitted CSS (${Math.round(cssSecPer100m)} s/100m) is not faster than typical median (${Math.round(typicalMedianSecPer100m)}) — impossible for a threshold`, n);
+  // OURS — `fitSwimCss` D′ 5–75 m and R² ≥ 0.95 accepted; no source, kept as found
   if (dPrime < 5 || dPrime > 75) return abstain(`implausible anaerobic reserve D'=${Math.round(dPrime)} m (expect ~10-60)`, n);
   if (r2 < 0.95) return abstain(`fit R^2=${r2.toFixed(3)} below 0.95 floor`, n);
 
@@ -85,6 +89,7 @@ export function fitSwimCss(efforts: SwimEffort[], typicalMedianSecPer100m: numbe
   const hardCount = pts.filter((p) => p.confirmedHard).length;
   const weighted = n + hardCount;
   let confidence: CssConfidence;
+  // OURS — `fitSwimCss` confidence tiers: weighted 7 with 2 hard and R² ≥ 0.97 high, weighted 4 with 1 hard moderate, 3 points low; no source, kept as found
   if (weighted >= 7 && hardCount >= 2 && r2 >= 0.97) confidence = 'high';
   else if (weighted >= 4 && hardCount >= 1 && r2 >= 0.97) confidence = 'moderate';
   else if (n >= 3) confidence = 'low';
@@ -92,6 +97,7 @@ export function fitSwimCss(efforts: SwimEffort[], typicalMedianSecPer100m: numbe
 
   return {
     cssSecPer100m: Math.round(cssSecPer100m),
+    // FIELD — definition (1 yd = 0.9144 m)
     cssSecPer100yd: Math.round(cssSecPer100m * 0.9144),
     dPrimeM: Math.round(dPrime),
     r2: Number(r2.toFixed(3)),

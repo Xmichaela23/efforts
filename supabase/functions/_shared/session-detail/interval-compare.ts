@@ -58,6 +58,7 @@ const RACE_PCT_NEAR_HI = 120;
 const PROJECTION_AHEAD_S = 0.5;
 const PROJECTION_BEHIND_S = 60;
 /** The table capped the percent at 100 — faster than target does not read above 100. */
+// OURS — `RACE_PCT_CAP` moved unchanged from the phone table (STATE-SOURCES interval-compare.ts row)
 const RACE_PCT_CAP = 100;
 
 function pctStatus(pct: number | null): RaceCompareStatus | null {
@@ -107,6 +108,7 @@ export type PacingVariability = { level: 'high' | 'moderate' | 'good' | 'excelle
 export function pacingVariability(cv: number | null | undefined): PacingVariability | null {
   if (cv == null || !Number.isFinite(Number(cv))) return null;
   const c = Number(cv);
+  // OURS — `pacingVariability` cut-offs 10 / 7 / 3 (STATE-SOURCES interval-compare.ts row)
   if (c > 10) return { level: 'high', label: 'High pacing variability' };
   if (c > 7) return { level: 'moderate', label: 'Moderate pacing variability' };
   if (c > 3) return { level: 'good', label: 'Good pacing' };

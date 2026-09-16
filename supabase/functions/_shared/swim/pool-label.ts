@@ -22,6 +22,7 @@ import { poolUnitOf } from './planned-pool.ts';
 import { resolvePoolLength } from './resolve-pool-length.ts';
 
 /** One international yard is exactly 0.9144 m (by definition). */
+// FIELD — definition (1 yd = 0.9144 m)
 const M_PER_YD = 0.9144;
 
 export type PoolLabel = { label: string | null; unit: 'yd' | 'm' | null };
