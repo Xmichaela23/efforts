@@ -1,5 +1,6 @@
 import { assertEquals } from 'jsr:@std/assert@1';
-import { buildDescription, parseExercises, shareBody, totalVolume } from './strength-description.ts';
+import { buildDescription, parseExercises, shareBody } from './strength-description.ts';
+import { completedStrengthVolume } from '../strength/session-volume.ts';
 
 const done = (weight: number | null, reps: number | null, extra: Record<string, unknown> = {}) =>
   ({ weight, reps, completed: true, ...extra });
@@ -37,29 +38,31 @@ Deno.test('an exercise with nothing performed is omitted entirely', () => {
   assertEquals(out, 'Bench Press  160 lb x 3');
 });
 
-Deno.test('kilos stay kilos — units are never silently converted', () => {
+Deno.test('§8.0 #32: one volume — kilogram sets convert, a weighted chin-up counts the body too', () => {
+  // 60 kg × 5 = 300 kg = 661 lb; 160 lb × 3 = 480 lb. One total, in pounds.
   assertEquals(
-    buildDescription([{ name: 'Front Squat', unit: 'kg', sets: [done(60, 5)] }]),
-    'Front Squat  60 kg x 5',
-  );
-  assertEquals(
-    totalVolume([
+    completedStrengthVolume([
       { name: 'Front Squat', unit: 'kg', sets: [done(60, 5)] },
       { name: 'Bench Press', unit: 'lb', sets: [done(160, 3)] },
-    ]),
-    { lb: 480, kg: 300 },
+    ], null).completed_total_lb,
+    Math.round(60 * (1 / 0.45359237) * 5) + 480,
   );
+  // The three assisted movements price (body weight + added) × reps — the rule Performance and Today print.
+  assertEquals(completedStrengthVolume([{ name: 'Chin Up', unit: 'lb', sets: [done(25, 8)] }], 170).completed_total_lb, (170 + 25) * 8);
+  // The kilograms are no longer kept apart in a second line: the description still prints them per set.
+  assertEquals(buildDescription([{ name: 'Front Squat', unit: 'kg', sets: [done(60, 5)] }]), 'Front Squat  60 kg x 5');
 });
 
 Deno.test('volume counts only performed sets', () => {
   assertEquals(
-    totalVolume([{ name: 'Back Squat', unit: 'lb', sets: [done(135, 5), { weight: 155, reps: 5, prefilled: true, completed: false }] }]),
-    { lb: 675, kg: 0 },
+    completedStrengthVolume([{ name: 'Back Squat', unit: 'lb', sets: [done(135, 5), { weight: 155, reps: 5, prefilled: true, completed: false }] }], null).completed_total_lb,
+    675,
   );
 });
 
 Deno.test('the posted body carries the lifts, the weight moved and where it came from', () => {
-  const body = shareBody([{ name: 'Bench Press', unit: 'lb', sets: [done(160, 5), done(160, 5)] }]);
+  const exs = [{ name: 'Bench Press', unit: 'lb', sets: [done(160, 5), done(160, 5)] }];
+  const body = shareBody(exs, completedStrengthVolume(exs, null).completed_total_lb);
   assertEquals(body, 'Bench Press  160 lb x 5, 160 lb x 5\n\n1,600 lb moved\nLogged in Efforts · efforts.work');
 });
 

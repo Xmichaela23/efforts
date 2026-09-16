@@ -58,30 +58,21 @@ export function buildDescription(exercises: StrengthExercise[]): string {
   return lines.join('\n');
 }
 
-/** Total weight moved, kept in whichever units each exercise was logged in — never silently converted. */
-export function totalVolume(exercises: StrengthExercise[]): { lb: number; kg: number } {
-  let lb = 0;
-  let kg = 0;
-  for (const ex of exercises) {
-    const isKg = String(ex?.unit ?? 'lb').toLowerCase().startsWith('kg');
-    for (const s of (Array.isArray(ex?.sets) ? ex.sets : []).filter(isPerformedStrengthSet)) {
-      const v = (Number(s?.weight) || 0) * (Number(s?.reps) || 0);
-      if (v <= 0) continue;
-      if (isKg) kg += v; else lb += v;
-    }
-  }
-  return { lb: Math.round(lb), kg: Math.round(kg) };
-}
-
 /** The whole posted body: the lifts, the weight moved, and where it came from. */
-export function shareBody(exercises: StrengthExercise[]): string {
+/**
+ * ⛔ THE POUNDS ARE THE APP'S ONE VOLUME, PASSED IN (2026-09-15, §8.0 #32). This file summed added weight ×
+ * reps of its own, so a weighted pull-up, chin-up or dip counted the plates and not the body — the share said
+ * "1,200 lb moved" where Performance and Today said 4,000. The pricing is `completedStrengthVolume`
+ * (`_shared/strength/session-volume.ts`: the bar when the box is blank, bodyweight movements, bands, and
+ * (body weight + added) × reps on the three assisted movements — Hevy's and Strong's rule; kilogram sets
+ * convert inside it). The Strava path prices with it; the phone's share passes the number the server already
+ * sent as `session_detail_v1.strength_totals.volume_lb`. The kilogram line goes with the second sum.
+ */
+export function shareBody(exercises: StrengthExercise[], volumeLb?: number | null): string {
   const lifts = buildDescription(exercises);
   if (!lifts) return '';
-  const vol = totalVolume(exercises);
-  const volLine = [
-    vol.lb > 0 ? `${vol.lb.toLocaleString('en-US')} lb moved` : '',
-    vol.kg > 0 ? `${vol.kg.toLocaleString('en-US')} kg moved` : '',
-  ].filter(Boolean).join(' · ');
+  const lb = Math.round(Number(volumeLb) || 0);
+  const volLine = lb > 0 ? `${lb.toLocaleString('en-US')} lb moved` : '';
   return [lifts, '', volLine, 'Logged in Efforts · efforts.work']
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')

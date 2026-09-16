@@ -31,6 +31,16 @@ export type CompletedStrengthVolume = {
   completed_total_lb: number;
 };
 
+/**
+ * Pounds in a kilogram, by definition (1 lb = 0.45359237 kg exactly, NIST). Not a chosen number.
+ * ⛔ WHY IT IS HERE (2026-09-15, §8.0 #32). An exercise logged in kilograms (`unit: 'kg'`, the shape the
+ * Strava description and the share text carry) priced its sets in a SECOND loop that multiplied weight ×
+ * reps and kept the two units apart — so a weighted pull-up counted the added plates only, while Performance
+ * and Today counted (body weight + added) × reps. One pricing now: the kilogram sets convert here and go
+ * through `strengthSetVolume` like every other set. Body weight is pounds, so there is nothing to keep apart.
+ */
+const LB_PER_KG = 1 / 0.45359237;
+
 export function completedStrengthVolume(
   exercises: any[] | null | undefined,
   bodyweightLb: number | null | undefined,
@@ -48,8 +58,14 @@ export function completedStrengthVolume(
     const bodyIsLoad = typeForExercise(String(ex?.name ?? '')) === 'bodyweight' || bandIsAssistance;
     // ⛔ A barbell lift with a blank weight box is the bar, not zero (2026-08-29).
     const barLb = barLbForExercise(String(ex?.name ?? ''));
+    // An exercise logged in kilograms is converted to pounds before pricing (see `LB_PER_KG`); everything
+    // downstream — the bar, bands, body weight — is already pounds.
+    const isKg = String(ex?.unit ?? 'lb').toLowerCase().startsWith('kg');
     const volume_lb = setsArr.filter(isPerformedSet).reduce(
-      (sum: number, s: any) => sum + strengthSetVolume(s, { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad, barLb }),
+      (sum: number, s: any) => {
+        const set = isKg && Number(s?.weight) > 0 ? { ...s, weight: Number(s.weight) * LB_PER_KG } : s;
+        return sum + strengthSetVolume(set, { bodyweightLb: bw, bandIsAssistance, bandIsLoad, bodyIsLoad, barLb });
+      },
       0,
     );
     return { name: String(ex?.name ?? ''), volume_lb: Math.round(volume_lb) };

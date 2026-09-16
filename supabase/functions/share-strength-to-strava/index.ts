@@ -20,6 +20,8 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { AuthError, requireUser } from '../_shared/require-user.ts';
 import { ensureStravaAccessToken } from '../_shared/strava-access-token.ts';
 import { parseExercises, shareBody } from '../_shared/strava/strength-description.ts';
+import { completedStrengthVolume } from '../_shared/strength/session-volume.ts';
+import { resolveBodyweightLb } from '../_shared/workload.ts';
 
 serve(async (req) => {
   try {
@@ -75,7 +77,12 @@ serve(async (req) => {
     }
 
     const exercises = parseExercises(workout.strength_exercises);
-    const description = shareBody(exercises);
+    // ⛔ THE ONE VOLUME (2026-09-15, §8.0 #32) — `completedStrengthVolume`, the same pricing Performance and
+    // Today print, so the posted "lb moved" is the number on the athlete's own screens.
+    const { data: ubRow } = await supabase.from('user_baselines').select('weight, units').eq('user_id', user.id).maybeSingle();
+    const bodyweightLb = resolveBodyweightLb(ubRow as any);
+    const volumeLb = completedStrengthVolume(exercises as unknown[], bodyweightLb).completed_total_lb;
+    const description = shareBody(exercises, volumeLb);
     if (!description) return json({ error: 'No completed sets on that session.' }, 400);
 
     // ⛔ ELAPSED TIME IS REQUIRED BY STRAVA AND MUST BE SECONDS. ⚠️ EVERY DURATION COLUMN ON A
