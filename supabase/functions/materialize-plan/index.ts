@@ -194,6 +194,7 @@ function parseStrengthExercisesRaw(row: any): any[] {
 // Science-grounded weekly frequency for an ADDED accessory: 2×/week is the hypertrophy sweet spot
 // (Schoenfeld/Ogborn/Krieger 2016 meta-analysis — 2× beats 1× at equated volume; 3× adds no reliable
 // benefit). The plan still dictates WHICH days (matching focus); this caps HOW MANY per week.
+// FIELD — Schoenfeld, Ogborn & Krieger 2016 meta-analysis on training frequency (named above).
 const ADDED_EXERCISE_WEEKLY_CAP = 2;
 
 // Adapt-a-plan add: decide, across the WHOLE plan, exactly which rows each added lift is injected into.
@@ -206,6 +207,9 @@ const ADDED_EXERCISE_WEEKLY_CAP = 2;
 //       it always starts light wherever inserted (a novel movement started submaximal);
 //   (2) the PLAN's deload weeks (phase_by_week recovery/taper) — it backs off WITH the block, gentler
 //       than a main-lift deload (it isn't the primary stressor, and RIR already loosens via Step 0).
+// FIELD — ACSM 2009 load zones: ~70% → ~85% 1RM at ~1–3%/wk (docs/SCIENCE-5x5-linear-progression.md).
+// OURS — `ADD_STEP_PCT` 1.25 is one pick inside that 1–3%; `ADD_DELOAD_MULT` 0.85 is not in that doc
+// (it gives a 40–50% cut for a main-lift deload). Kept as found.
 const ADD_START_PCT = 70;      // conservative first-week %1RM
 const ADD_PEAK_PCT = 85;       // block-linear ceiling
 const ADD_STEP_PCT = 1.25;     // ~1-3%/wk linear increment
@@ -224,11 +228,13 @@ function planAddInjections(
     (a) => a.status === 'active' && a.add_meta && String(a.exercise_name ?? '').trim(),
   );
   if (!adds.length) return byRow;
+  // OURS — `planAddInjections` rounds to 2.5 kg / 5 lb, the same plate step as `roundToIncrement`; no source.
   const inc = (baselines as any)?.isMetric ? 2.5 : 5;
 
   for (const adj of adds) {
     const name = String(adj.exercise_name).trim();
     const group = getMovementGroup(name);
+    // OURS — `planAddInjections` default 3 sets of 10 when the add names none; no page, kept as found.
     const sets = typeof adj.add_meta!.sets === 'number' ? adj.add_meta!.sets : 3;
     const reps = adj.add_meta!.reps ?? 10;
     const cfg = getExerciseConfig(name);
@@ -330,6 +336,8 @@ import { readAthleteSnapshotOrLive, resolveStrengthNumbers } from '../_shared/at
  * strength-PRIMARY engine periodizes its own peak + 1RM retest (≥100%) and passes maxPct=1.05 so its
  * explicit % (97% singles, 100/102.5% test) render at face value instead of collapsing to 85%.
  */
+// OURS — `resolveStrengthPercentForLift`: 0.85 ceiling (1.05 strength-primary); performance 0.60 floor, 0.70 default;
+// support 0.60 cap, 0.50 default, 0.45 on bench and squat. No page, kept as found.
 function resolveStrengthPercentForLift(
   exerciseName: string,
   explicitPercent: number | undefined,
@@ -531,6 +539,7 @@ function isPerformanceAccessoryProgressionExercise(n: string): boolean {
 }
 
 /** +2.5 lb per plan week from baseline prescription; same deload as compounds (week 4n → ×0.9). */
+// OURS — `adjustPerformanceAccessoryLoadLb`: +2.5 lb a week, ×0.9 every 4th week, 2.5 lb floor and step. No source, kept as found.
 function adjustPerformanceAccessoryLoadLb(
   weightLb: number,
   weekNum: number | null | undefined,
@@ -705,6 +714,7 @@ export function stampRunPrescription(tok: string, steps: any[], baselines: Basel
       if (easyRange && easyBand != null && s.pace_sec_per_mi === easyBand) s.pace_range = [easyRange.lo, easyRange.hi];
       continue;
     }
+    // OURS — `stampRunPrescription` effort targets 5–6 (threshold) and 8–10 (intervals): set by hand 2026-09-02, no page.
     if (kind === 'work' && isThresholdToken) s.target_rpe = { lo: 5, hi: 6 };
     else if (kind === 'work' && isIntervalToken) s.target_rpe = { lo: 8, hi: 10 };
   }
@@ -720,12 +730,14 @@ export function goalRacePaceFromTargetTime(targetTimeSec: unknown, distance: unk
   if (!Number.isFinite(t) || t <= 0) return null;
   const d = String(distance ?? '').toLowerCase().replace(/[\s_-]+/g, ' ').trim();
   let miles: number | null = null;
+  // FIELD — definition: 21.0975 km, 42.195 km, 10 km and 5 km in miles (1 mi = 1.609344 km).
   if (/\bhalf\b/.test(d) && /marathon|half$/.test(d) && !/iron/.test(d)) miles = 13.1094;
   else if (/marathon/.test(d) && !/iron/.test(d)) miles = 26.2188;
   else if (/\b10 ?k\b/.test(d)) miles = 6.2137;
   else if (/\b5 ?k\b/.test(d)) miles = 3.1069;
   if (miles == null) return null;
   const pace = Math.round(t / miles);
+  // OURS — `goalRacePaceFromTargetTime` 180–1200 s/mi band, copied from `PACE_SANE_SEC_PER_MI` (resolve-current-5k-pace.ts, no source there).
   return pace >= 180 && pace <= 1200 ? pace : null;   // 3:00–20:00/mi, the same sanity band the 5K resolver uses
 }
 
@@ -885,6 +897,7 @@ function calculateWeightFromConfig(
   }
   
   // Round to nearest 5 lbs (matches real gym equipment)
+  // OURS — `calculateWeightFromConfig` nearest 5 lb, never under 5: plate rounding, no source; kept as found.
   prescribedWeight = Math.max(5, Math.round(prescribedWeight / 5) * 5);
   
   return { 
@@ -896,6 +909,7 @@ function calculateWeightFromConfig(
 // Round to the nearest equipment increment:
 // - imperial: 5 lb plates → round to nearest 5
 // - metric: 2.5 kg plates → round to nearest 2.5
+// OURS — `roundToIncrement` 5 lb / 2.5 kg step and floor: no source cited; kept as found.
 function roundToIncrement(n: number, isMetric = false): number {
   const increment = isMetric ? 2.5 : 5;
   const min = isMetric ? 2.5 : 5;
@@ -958,6 +972,7 @@ function parseWeightInput(input: any, oneRm: number | null): { weight?: number; 
 }
 
 // Accessory mapping → primary 1RM with ratio
+// OURS — `getAccessoryRatio`: every ratio in this table (legacy fallback pricing) has no source in the repo; kept as found.
 function getAccessoryRatio(movement: string): number {
   const m = String(movement || '').toLowerCase();
   // Primary lifts default to 1.0
@@ -973,6 +988,7 @@ function getAccessoryRatio(movement: string): number {
   if (m.includes('reverse_fly') || m.includes('reverse_flye') || m.includes('reverse fly')) return 0.30;
   if (m.includes('chinup') || m.includes('chin_up') || m.includes('pullup') || m.includes('pull_up') || m.includes('chin-up') || m.includes('pull-up')) return 0.65;
   // Upper body push (bench reference)
+  // OURS — ratios, see the `getAccessoryRatio` header.
   if (m.includes('dip')) return 0.90;
   if (m.includes('incline_bench') || m.includes('incline bench')) return 0.85;
   if (m.includes('close_grip_bench') || m.includes('close grip bench')) return 0.90;
@@ -984,6 +1000,7 @@ function getAccessoryRatio(movement: string): number {
   if (m.includes('pike_pushup')) return 0.0;
   if (m.includes('pushup') || m.includes('push_up')) return 0.0;
   // Shoulders (overhead reference)
+  // OURS — ratios, see the `getAccessoryRatio` header.
   if (m.includes('lateral_raise')) return 0.35;
   if (m.includes('front_raise')) return 0.40;
   if (m.includes('rear_delt_fly') || m.includes('rear_delt_flye')) return 0.30;
@@ -991,6 +1008,7 @@ function getAccessoryRatio(movement: string): number {
   if (m.includes('overhead_tricep_extension') || m.includes('tricep_extension')) return 0.40;
   if (m.includes('push_press')) return 1.10;
   // Hip dominant (deadlift reference)
+  // OURS — ratios, see the `getAccessoryRatio` header.
   if (m.includes('hip_thrust') || m.includes('hip thrust')) return 0.80;
   if (m.includes('romanian_deadlift') || m.includes('rdl')) return 0.70;
   if (m.includes('good_morning') || m.includes('good morning')) return 0.45;
@@ -1000,12 +1018,14 @@ function getAccessoryRatio(movement: string): number {
   if (m.includes('sumo_deadlift') || m.includes('sumo')) return 0.95;
   if (m.includes('nordic_curl')) return 0.0;
   // Knee dominant (squat reference)
+  // OURS — ratios, see the `getAccessoryRatio` header.
   if (m.includes('bulgarian_split_squat')) return 0.30;
   if (m.includes('walking_lunge') || m.includes('lunge')) return 0.35;
   if (m.includes('reverse_lunge')) return 0.35;
   if (m.includes('lateral_lunge')) return 0.30;
   if (m.includes('goblet_squat')) return 0.40;
   if (m.includes('step_up') || m.includes('step up')) return 0.25;
+  // OURS — ratios, see the `getAccessoryRatio` header.
   if (m.includes('leg_press')) return 1.20;
   if (m.includes('leg_extension')) return 0.55;
   if (m.includes('front_squat')) return 0.85;
@@ -1089,6 +1109,7 @@ function pickPrimary1RMAndBase(name: string, baselines: any): { base: number | n
   return { base: null, ref: null, ratio: 1.0, unilateral };
 }
 
+// OURS — `repScaleFor` 1.05 (≤6 reps), 1.00 (≤9), 0.95 (≤12), 0.90 (≤15), 0.85 (more): no source; kept as found.
 function repScaleFor(reps?: number | string): number {
   if (typeof reps === 'string' && /amrap/i.test(reps)) return 1.00;
   const r = Number(reps);
@@ -1168,6 +1189,7 @@ export function fallbackUnresolvedPercentDisplay(weight: any, reps: any): string
     const m = String(reps ?? '').match(/(\d+)/);
     if (m) repText = m[1]!;
   }
+  // OURS — `fallbackUnresolvedPercentDisplay` "2 in reserve": no page; strength-display-lines.ts prints "1-2 in reserve" for a row with no target.
   if (!repText) return 'Moderate weight — leave 2 reps in reserve';
   return `Pick a weight you can do for ${repText} reps with 2 in reserve`;
 }
@@ -1197,6 +1219,7 @@ export function carrySetPlan(ex: any, finalWeight: number | null | undefined): a
     : 1;
   return authored.map((s: any) => {
     const w = Number(s?.weight);
+    // OURS — `carrySetPlan` rounds a rescaled set DOWN to 5 lb, never under 5 (compose rounds to nearest). No source.
     const scaled = Number.isFinite(w) && w > 0
       ? (scale === 1 ? w : Math.max(5, Math.floor((w * scale) / 5) * 5))
       : w;
@@ -1205,6 +1228,7 @@ export function carrySetPlan(ex: any, finalWeight: number | null | undefined): a
 }
 
 // Map percentage intensity to band resistance level
+// OURS — `getBandResistanceFromPercentage` cut-offs 35 / 55 / 75 % 1RM: no source; kept as found.
 function getBandResistanceFromPercentage(originalPercent: number): string {
   if (originalPercent <= 35) return "Light Band";
   if (originalPercent <= 55) return "Medium Band";
@@ -1348,6 +1372,7 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
   }
   // Hyrox stations: sled/sandbag need commercial-gym (turf/sled/prowler) access → same-PATTERN barbell/DB
   // fallbacks for a home gym.
+  // OURS — `substituteExerciseForEquipment` rep doses '10/leg' (lunge) and '8-12' (row): no page; kept as found.
   if (name.includes('sled push') && !hasGymAccess) {
     resultName = hasDumbbells ? 'Dumbbell Walking Lunge' : hasBarbell ? 'Barbell Walking Lunge' : 'Walking Lunge';
     notes = 'No sled — loaded walking lunge (forward horizontal drive under load)';
@@ -1358,6 +1383,7 @@ function substituteExerciseForEquipment(exerciseName: string, userEquipment: str
     notes = 'No sandbag — loaded walking lunge';
     repsOverride = '10/leg'; // Q-180: same
   }
+  // OURS — '8-12', see the `substituteExerciseForEquipment` rep-dose note above.
   if (name.includes('sled pull') && !hasGymAccess) {
     resultName = hasDumbbells ? 'Dumbbell Row' : hasBarbell ? 'Bent-Over Row' : hasResistanceBands ? 'Band Row' : 'Inverted Row';
     notes = 'No sled — heavy horizontal pull';
@@ -1405,6 +1431,8 @@ function uid(): string { try { return crypto.randomUUID(); } catch { return `${D
 function buildAssessmentSteps(tags: string[], tokens: string[] = []): { id: string; kind: string; duration_s?: number; distance_m?: number; label: string }[] {
   // Swim CSS Test: 400 yd warmup → 3 min rest → 400 yd TT → 3 min rest → 200 yd TT → 200 yd cool-down
   if (tags.includes('css_test')) {
+    // FIELD — CSS test = a 400 and a 200 time trial (Costill, Maglischo, Richardson; docs/SWIM-PROTOCOL.md).
+    // OURS — the 400 warm-up, 3-min rests and 200 cool-down. 366 / 183 m = 400 / 200 yd × 0.9144 (definition).
     return [
       { id: uid(), kind: 'warmup',   distance_m: 366, label: 'Easy warmup — 400 yd' },
       { id: uid(), kind: 'recovery', duration_s: 180, label: 'Rest — 3 min' },
@@ -1421,6 +1449,7 @@ function buildAssessmentSteps(tags: string[], tokens: string[] = []): { id: stri
   // 3 min at 9/10 · 6–8 min easy · 20 min best effort (FTP = avg watts × 0.95, read by
   // compute-workout-analysis) · cool-down (the page gives none; 5 min, OURS).
   if (tags.includes('ftp_test')) {
+    // Viada p212 (see above): 8 min sits inside the page's 5–10, 3 × 1 min / 1 min, 3 min easy, 3 min at 9/10.
     return [
       { id: uid(), kind: 'warmup',   duration_s: 480,  label: 'Easy spin — 8 min' },
       { id: uid(), kind: 'work',     duration_s: 60,   label: 'High turnover — 1 min (fast pedal, easy resistance)' },
@@ -1431,6 +1460,7 @@ function buildAssessmentSteps(tags: string[], tokens: string[] = []): { id: stri
       { id: uid(), kind: 'recovery', duration_s: 60,   label: 'Easy — 1 min' },
       { id: uid(), kind: 'recovery', duration_s: 180,  label: 'Easy — 3 min' },
       { id: uid(), kind: 'work',     duration_s: 180,  label: 'Hard — 3 min at 9 out of 10' },
+      // Viada p212 (see above): 7 min inside the page's 6–8, then the 20-minute test; the 5-min cool-down is OURS (above).
       { id: uid(), kind: 'recovery', duration_s: 420,  label: 'Easy — 7 min' },
       { id: uid(), kind: 'work',     duration_s: 1200, label: '20-minute test — best effort you can hold the whole way. This is the test.' },
       { id: uid(), kind: 'cooldown', duration_s: 300,  label: 'Easy cool-down — 5 min' },
@@ -1445,6 +1475,8 @@ function buildAssessmentSteps(tags: string[], tokens: string[] = []): { id: stri
     const ttTok = (tokens || []).map((t) => String(t).toLowerCase()).find((t) => /^run_tt_\d+min$/.test(t));
     const ttMin = ttTok ? parseInt(ttTok.match(/^run_tt_(\d+)min$/)![1], 10) : 12;
     const ttSec = Number.isFinite(ttMin) && ttMin > 0 ? ttMin * 60 : 720;
+    // Viada p210 (see above): 7 min inside the page's 6–8, 3 × 30 s with 1 min between, 1 min rest.
+    // OURS — `buildAssessmentSteps` 20 s for a 100 m stride, 1 min after each stride, 9-min cool-down (the corpus records none).
     return [
       { id: uid(), kind: 'warmup',   duration_s: 420, label: 'Easy jog — 7 min' },
       { id: uid(), kind: 'work',     duration_s: 20,  label: 'Stride — about 100 m (20 s), slow to near full tilt' },
@@ -1457,6 +1489,7 @@ function buildAssessmentSteps(tags: string[], tokens: string[] = []): { id: stri
       { id: uid(), kind: 'recovery', duration_s: 60,  label: 'Easy walk or jog — 1 min' },
       { id: uid(), kind: 'work',     duration_s: 30,  label: 'Fast — 30 s at your mile-PR pace' },
       { id: uid(), kind: 'recovery', duration_s: 60,  label: 'Easy walk or jog — 1 min' },
+      // Viada p210 (see above): the 1-min rest and the trial; 9-min cool-down OURS (see above).
       { id: uid(), kind: 'recovery', duration_s: 60,  label: 'Rest — 1 min' },
       { id: uid(), kind: 'work',     duration_s: ttSec, label: `Time trial — ${Math.round(ttSec / 60)} min. Start at 9.5 out of 10, finish at 10. Even the whole way.` },
       { id: uid(), kind: 'cooldown', duration_s: 540, label: 'Easy cool-down — 9 min' },
@@ -1474,8 +1507,11 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
   const lower = String(tok ?? '').toLowerCase();
   
   // Helper: convert miles to meters
+  // FIELD — definition (1 mi = 1609.344 m, written 1609.34)
   const milesToMeters = (mi: number) => Math.round(mi * 1609.34);
   
+  // OURS — `expandRunToken` defaults when a token carries no number: 10 min warm-up/cool-down, 30 min easy,
+  // 25 min tempo. No page, kept as found.
   // warmup/cooldown - TIME based
   if (/warmup/.test(lower) && /min/.test(lower)) {
     const sec = minutesTokenToSeconds(lower) ?? 600; out.push({ id: uid(), kind:'warmup', duration_s: sec, pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined }); return out;
@@ -1574,6 +1610,7 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
     out.push({ id: uid(), kind:'recovery', duration_s: sec, label: `Rest — ${Math.round(sec/60)} min` });
     return out;
   }
+  // OURS — 1800 s default, see the `expandRunToken` defaults note at the top.
   if (/run_easy_\d+min/.test(lower)) {
     const m = lower.match(/run_easy_(\d+)min/); const sec = m ? parseInt(m[1],10)*60 : 1800; out.push({ id: uid(), kind:'work', duration_s: sec, pace_sec_per_mi: secPerMiFromBaseline(baselines,'easy')||undefined }); return out;
   }
@@ -1620,6 +1657,7 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
   // Tempo: tempo_25min_threshold (new style)
   if (/tempo_\d+min_threshold/.test(lower)) {
     const m = lower.match(/tempo_(\d+)min_threshold/);
+    // OURS — 1500 s default, see the `expandRunToken` defaults note at the top.
     const sec = m ? parseInt(m[1],10)*60 : 1500;
     // Threshold pace is ~5K pace + 15-20 sec
     const pace = secPerMiFromBaseline(baselines, 'threshold') ?? undefined;   // threshold IS the anchor (2026-09-02); was 5K + 20
@@ -1641,6 +1679,7 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
   // Tempo: tempo_25min_5kpace_plus0:45 (legacy style)
   if (/tempo_\d+min_5kpace/.test(lower)) {
     const m = lower.match(/tempo_(\d+)min_5kpace(?:_plus(\d+):(\d+))?/);
+    // OURS — 1500 s default, see the `expandRunToken` defaults note at the top.
     const sec = m ? parseInt(m[1],10)*60 : 1500;
     const fkp = secPerMiFromBaseline(baselines,'fivek');
     const plus = (m && m[2] && m[3]) ? (parseInt(m[2],10)*60 + parseInt(m[3],10)) : 0;
@@ -1652,6 +1691,7 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
     const m = lower.match(/tempo_(\d+)mi_5kpace(?:_plus(\d+):(\d+))?/);
     if (m) {
       const miles = parseInt(m[1],10);
+      // FIELD — definition (1 mi = 1609.344 m)
       const dist_m = Math.round(miles * 1609.34);
       const fkp = secPerMiFromBaseline(baselines,'fivek');
       const plus = (m[2] && m[3]) ? (parseInt(m[2],10)*60 + parseInt(m[3],10)) : 0;
@@ -1672,6 +1712,7 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
       const fkp = secPerMiFromBaseline(baselines, 'fivek');
       const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
       // Fartlek pickups are ~10K pace (5K + 10-15 sec)
+      // OURS — `expandRunToken` fartlek: 5K pace + 12 s/mi, and a recovery as long as the pickup. No source.
       const pickupPace = fkp != null ? (fkp + 12) : undefined;
       for (let i = 0; i < reps; i++) {
         out.push({ id: uid(), kind: 'work', duration_s: avgSec, pace_sec_per_mi: pickupPace });
@@ -1718,6 +1759,7 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
     if (m) {
       const reps = parseInt(m[1], 10);
       const work_s = parseInt(m[2], 10) * 60;
+      // OURS — `expandRunToken` run_thr: 60 s recovery when the token names none. No page.
       const rest_s = m[3] ? parseInt(m[3], 10) : 60;
       const faster = m[4] ? parseInt(m[4], 10) : 0;
       const thrBase = secPerMiFromBaseline(baselines, 'threshold');
@@ -1765,6 +1807,7 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
       const reps = parseInt(m[1], 10);
       const workMin = parseInt(m[2], 10);
       const work_s = workMin * 60;
+      // OURS — `expandRunToken` run_vo2: 90 s float when the token names none; pace 5K − 12 s/mi, never faster than 4:30/mi (270 s). No source.
       const rest_s = m[3] ? parseInt(m[3], 10) : 90;
       const fkp = secPerMiFromBaseline(baselines, 'fivek');
       const vo2Pace = fkp != null ? Math.max(270, fkp - 12) : undefined;
@@ -1785,6 +1828,7 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
     if (m) {
       const reps = parseInt(m[1], 10);
       const miles = parseFloat(m[2]);
+      // OURS — `expandRunToken` cruise: 60 s recovery when the token names none. No page.
       const rest_s = m[3] ? parseInt(m[3], 10) : 60;
       // ⛔ THRESHOLD IS THE ANCHOR (2026-09-02). This read `5K + 20` — a private copy of the seed
       // rule — so an athlete with a MEASURED threshold and no typed 5K got NO pace on their cruise
@@ -1861,6 +1905,8 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
       const reps = parseInt(m[1], 10);
       const val = parseInt(m[2], 10);
       const unit = m[3];
+      // FIELD — definition (1 mi = 1609.344 m). OURS — `expandRunToken` interval rest when the token names none:
+      // 90 s (legacy, base, build), 120 s (race-specific, taper). No page.
       const dist_m = unit === 'mi' ? Math.round(val * 1609.34) : val;
       let rest_s = 0;
       let paceWhich: 'fivek' | 'marathon' | 'threshold' = 'fivek';
@@ -1958,6 +2004,7 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
       const descentJogged = m[5] === 'jog';
       const easyPace = secPerMiFromBaseline(baselines, 'easy') || undefined;
       const gradeLabel = `${gradeLo}-${gradeHi}% grade`;
+      // OURS — `expandRunToken` lap-button hill: 10 min warm-up and cool-down, set by hand 2026-08-05 (note below). No page.
       out.push({ id: uid(), kind: 'warmup', duration_s: 600, pace_sec_per_mi: easyPace, label: 'Warm-up' });
       for (let i = 0; i < reps; i++) {
         out.push({
@@ -1980,6 +2027,7 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
       }
       // ⚠️ 10 MINUTES EITHER SIDE ON THIS DRILL (Michael, 2026-08-05) — the fixed-recovery hill below
       // cools down in 8. Not copied from it; stated for this session.
+      // OURS — see the lap-button hill warm-up note above.
       out.push({ id: uid(), kind: 'cooldown', duration_s: 600, pace_sec_per_mi: easyPace, label: 'Cool-down' });
       return out;
     }
@@ -2010,6 +2058,7 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
       // uphill rep from cold — the athlete walks out the door and straight into it. Helgerud's own
       // protocol brackets the work with ~10 min either side, and it is the difference between a 21-min
       // session and the ~35-40 min this doctrine specifies (run-only companion §5).
+      // FIELD — Helgerud 2007 protocol, ~10 min warm-up. OURS — `expandRunToken` fixed-recovery hill 8-min cool-down (below), no source.
       out.push({ id: uid(), kind: 'warmup', duration_s: 600, pace_sec_per_mi: easyPace, label: 'Warm-up' });
       for (let i = 0; i < reps; i++) {
         out.push({
@@ -2041,6 +2090,7 @@ export function expandRunToken(tok: string, baselines: Baselines): any[] {
           });
         }
       }
+      // OURS — 8-min cool-down, see the fixed-recovery hill warm-up note.
       out.push({ id: uid(), kind: 'cooldown', duration_s: 480, pace_sec_per_mi: easyPace, label: 'Cool-down' });
       return out;
     }
@@ -2147,6 +2197,7 @@ function expandBikeToken(
   };
   
   // Warmup tokens with proper FTP-based power ranges
+  // OURS — `expandBikeToken` warm-up bands 55–70% (fast pedal) and 50–65% of FTP; 15-min default. No page.
   if (/warmup_bike_quality_\d+min_fastpedal/.test(lower)) { 
     const sec = minutesTokenToSeconds(lower) ?? 900; 
     out.push({ id: uid(), kind:'warmup', duration_s: sec, power_range: pctRange(0.55, 0.70) }); 
@@ -2159,12 +2210,14 @@ function expandBikeToken(
   }
   
   // Cooldown tokens with proper FTP-based power ranges
+  // OURS — `expandBikeToken` cool-down and recovery band 40–55% of FTP; 10-min / 5-min defaults. No page.
   if (/cooldown.*\d+min/.test(lower)) { 
     const sec = minutesTokenToSeconds(lower) ?? 600; 
     out.push({ id: uid(), kind:'cooldown', duration_s: sec, power_range: pctRange(0.40, 0.55) }); 
     return out; 
   }
   // Recovery zone tokens: bike_recovery_5min_Z1
+  // OURS — 40–55% of FTP, see the cool-down note above.
   if (/bike_recovery_\d+min/.test(lower)) {
     const sec = minutesTokenToSeconds(lower) ?? 300;
     out.push({ id: uid(), kind:'recovery', duration_s: sec, power_range: pctRange(0.40, 0.55), label: 'Recovery' });
@@ -2172,6 +2225,7 @@ function expandBikeToken(
   }
   // FTP Test: bike_ftp_test_20min - maximal sustainable effort (no upper cap!)
   if (/bike_ftp_test_\d+min/.test(lower)) {
+    // Viada p212 — the 20-minute test (1200 s default).
     const sec = minutesTokenToSeconds(lower) ?? 1200;
     // No power_range - this is a maximal test, not a zone workout
     out.push({ id: uid(), kind:'work', duration_s: sec, label: 'FTP Test - Maximal Effort', notes: 'All-out sustainable effort' });
@@ -2231,6 +2285,7 @@ function expandBikeToken(
   m = lower.match(/bike_vo2_(\d+)x(\d+)min_r(\d+)min/);
   if (m) {
     const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60;
+    // Viada p237 (see above): 1.1 = the page's 110% floor. OURS — the 1.2 ceiling, used only on a row with no floor-only family tag.
     const band = wattsAt(1.1, 1.2, ftp, floorOnlyAtOrAbovePct);
     for(let i=0;i<reps;i++){ out.push({ id: uid(), kind:'work', duration_s: work, power_range: band }); if(rest && i < reps - 1) out.push({ id: uid(), kind:'recovery', duration_s: rest }); }
     return out;
@@ -2258,6 +2313,7 @@ function expandBikeToken(
   m = lower.match(/bike_endurance_(\d+)min/);
   if (m) { const sec=parseInt(m[1],10)*60; out.push({ id: uid(), kind:'work', duration_s: sec, power_range: pctRange(COGGAN_Z2.lo, COGGAN_Z2.hi) }); return out; }
   // Tempo steady time: bike_tempo_Xmin (map to race power ~80-85% FTP)
+  // OURS — `expandBikeToken` tempo 80–85% of FTP; race prep recovery = work length; openers 8 min. No page.
   m = lower.match(/bike_tempo_(\d+)min/);
   if (m) { const sec=parseInt(m[1],10)*60; out.push({ id: uid(), kind:'work', duration_s: sec, power_range: pctRange(0.80,0.85) }); return out; }
   // Race prep short efforts: bike_race_prep_4x90s
@@ -2385,6 +2441,7 @@ export function expandTokensForRow(
   // progression (the composer already owns the ramp). Concurrent strength is untouched.
   const isStrengthPrimary = Array.isArray((row as any)?.tags)
     && (row as any).tags.some((t: any) => String(t).toLowerCase() === 'protocol:strength_primary');
+  // OURS — 1.05 / 0.85 ceilings, see `resolveStrengthPercentForLift`.
   const strengthMaxPct = isStrengthPrimary ? 1.05 : 0.85;
   const discipline = String(row?.type||'').toLowerCase();
   const workoutDate = row?.date || new Date().toISOString().split('T')[0];
@@ -3263,6 +3320,7 @@ export function expandTokensForRow(
     else if (discipline==='swim') {
       // Detailed swim expansion — one line per rep
       const s = String(tok).toLowerCase();
+      // FIELD — definition (1 yd = 0.9144 m)
       const ydToM = (yd:number)=> Math.round(yd*0.9144);
       const pushWUCD = (n:number, unit:string, warm:boolean) => {
         const distM = unit==='yd'? ydToM(n) : n;
@@ -3277,6 +3335,8 @@ export function expandTokensForRow(
       // Open water practice: duration from row; continuous steady effort, optional short time warmup, no interval rests
       if (s === 'swim_open_water_practice') {
         const totalMin = Number(row?.duration);
+        // OURS — `expandTokensForRow` open water: 40 min default, warm-up 15% capped at 5 min and dropped under 2 min,
+        // work at least 60 s, "sight every 6–8 strokes". No source, kept as found.
         const totalSec =
           Number.isFinite(totalMin) && totalMin > 0 ? Math.round(totalMin * 60) : 40 * 60;
         const warmupSec = Math.min(5 * 60, Math.floor(totalSec * 0.15));
@@ -3445,6 +3505,7 @@ export function expandTokensForRow(
         continue;
       }
       // Fallback distance/time
+      // OURS — `expandTokensForRow` swim fallback: 10 min for a minutes token with no number, 5 min for an unread token. No source.
       if (/\d+yd/.test(s)) { const mm=s.match(/(\d+)yd/); const yd=mm?parseInt(mm[1],10):0; const mtr=ydToM(yd); swimTally.yd += yd; steps.push({ id: uid(), kind:'work', distance_m: mtr }); continue; }
       if (/\d+min/.test(s)) { const sec=minutesTokenToSeconds(s) ?? 600; steps.push({ id: uid(), kind:'work', duration_s: sec }); continue; }
       steps.push({ id: uid(), kind:'work', duration_s: 300 });
@@ -3465,6 +3526,7 @@ export function expandTokensForRow(
         m = txt.match(/^(\d{1,2}):(\d{2})$/); if (m) return parseInt(m[1],10)*60 + parseInt(m[2],10);
         return 0;
       };
+      // FIELD — definitions (1 yd = 0.9144 m, 1 mi = 1609.344 m, 1 km = 1000 m)
       const toMeters = (txt?: string | number | null): number => {
         if (typeof txt === 'number' && isFinite(txt) && txt>0) return Math.round(txt);
         const t = String(txt||'');
@@ -3541,9 +3603,11 @@ export function expandTokensForRow(
         pMatch = desc.match(/(\d{1,2}):(\d{2})\s*\/km/);
         if (pMatch) {
           const spk = parseInt(pMatch[1],10)*60 + parseInt(pMatch[2],10);
+          // FIELD — definition (1 mi = 1.609344 km, written 1.60934)
           paceSecPerMi = Math.round(spk * 1.60934);
         }
       }
+      // OURS — `expandTokensForRow` 30-min step when the description has a pace and no duration. No source.
       if (durSec > 0 || (paceSecPerMi!=null)) {
         steps.push({ id: uid(), kind: 'work', duration_s: durSec>0?durSec:1800, pace_sec_per_mi: paceSecPerMi || undefined });
       }
@@ -3559,6 +3623,7 @@ export function expandTokensForRow(
       const a = parseInt(m[1],10)*60 + parseInt(m[2],10);
       const b = parseInt(m[3],10)*60 + parseInt(m[4],10);
       const unit = m[5].toLowerCase();
+      // FIELD — definition (1 mi = 1.609344 km, written 1.60934)
       if (unit === 'mi') return [Math.min(a,b), Math.max(a,b)];
       const aMi = Math.round(a * 1.60934); const bMi = Math.round(b * 1.60934);
       return [Math.min(aMi,bMi), Math.max(aMi,bMi)];
@@ -3657,6 +3722,7 @@ export function expandTokensForRow(
         }
         
         // Default fallback: 1:30/100 (90 seconds)
+        // OURS — `swimPacePer100Sec` default 90 s per 100 when no swim pace is on file. No source, kept as found.
         console.log(`  🏊 No baseline found, using default: 90s per 100 (1:30/100)`);
         return 90;
       })();
@@ -3679,6 +3745,7 @@ export function expandTokensForRow(
           let dist100: number;
           if (baselineUnit === 'yd') {
             // Baseline is per 100 yards
+            // FIELD — definition (1 yd = 0.9144 m)
             const distYd = distM / 0.9144;
             dist100 = distYd / 100;
           } else {
@@ -3735,6 +3802,7 @@ export function toV3Step(st: any, row?: any): any {
     }
     
     // Calculate duration: distance (meters) / 1609.34 * pace (sec/mi)
+    // FIELD — definition (1 mi = 1609.344 m)
     if (paceSecPerMi && paceSecPerMi > 0) {
       const miles = distM / 1609.34;
       const durationSec = miles * paceSecPerMi;
@@ -3774,6 +3842,7 @@ export function toV3Step(st: any, row?: any): any {
     }
     
     // Calculate distance: (duration_seconds / pace_sec_per_mi) * 1609.34 meters
+    // FIELD — definition (1 mi = 1609.344 m)
     if (paceSecPerMi && paceSecPerMi > 0) {
       const miles = out.seconds / paceSecPerMi;
       const distanceMeters = miles * 1609.34;
@@ -3827,6 +3896,8 @@ export function toV3Step(st: any, row?: any): any {
       // Use strict tolerance for quality work (matches Garmin/TrainingPeaks standards)
       // Use lenient tolerance for easy/recovery/long runs (accounts for terrain, fatigue)
       const paceSec = st.pace_sec_per_mi;
+      // OURS — `toV3Step` `tolerance` ±2% work / ±6% other steps. The "Garmin/TrainingPeaks standards" line above
+      // names no document; grep of STATE-SOURCES and DECISIONS-LOG finds no such figure. Kept as found.
       const tolerance = (st?.kind === 'work') 
         ? 0.02   // ±2% for quality work (~10-20s for most paces)
         : 0.06;  // ±6% for easy runs (~30-60s for most paces)
@@ -4126,6 +4197,8 @@ Deno.serve(async (req) => {
       // no-snapshot edge so the three plan-weight spots can never disagree again.
       const _legacyAsOf = new Date().toISOString().slice(0, 10);
       const _legacy = resolveStrengthNumbers(perfRaw, ub?.learned_fitness, (ub as any)?.locked_baselines, _legacyAsOf);
+      // OURS — `_legacy` defaults with no number on file: squat, bench, deadlift 135 lb, overhead press 95 lb;
+      // hip thrust = deadlift × 0.55, never under 75 lb. No source, kept as found.
       (baselines as any).squat = _legacy.squat ?? 135;
       (baselines as any).bench = _legacy.bench ?? 135;
       let dlMerged = _legacy.deadlift ?? 0;
@@ -4136,6 +4209,7 @@ Deno.serve(async (req) => {
       (baselines as any).deadlift = dlMerged;
       (baselines as any).overheadPress1RM = _legacy.overheadPress1RM ?? 95;
       const perfHip = Number(perfRaw.hipThrust ?? perfRaw.hip_thrust);
+      // OURS — 135 lb deadlift default and hip thrust × 0.55 / 75 lb floor, see the `_legacy` defaults note above.
       const dlNum = (baselines as any).deadlift as number;
       (baselines as any).hipThrust = mergeAnchor1RmLb(
         Number.isFinite(perfHip) && perfHip > 0 ? perfHip : undefined,
