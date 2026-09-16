@@ -1,6 +1,6 @@
 import FirstRunCard from '@/components/FirstRunCard';
 import FirstRunOverlay from '@/components/FirstRunOverlay';
-import { BAR_TYPES } from '@/lib/bar-types';
+import { BAR_TYPES, KG_PER_LB, barKeysForUnit } from '@/lib/bar-types';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase, getStoredUserId } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -148,7 +148,18 @@ const BAND_LB_HINT =
 interface LoggedSet {
   reps?: number;              // Optional - used for rep-based exercises
   duration_seconds?: number;  // Optional - used for duration-based exercises (planks, holds, carries)
+  /** In the exercise's `unit` — the number the box shows and the athlete types. Stored as pounds at save. */
   weight: number;
+  /**
+   * ⛔ THE POUNDS THE SERVER GAVE THIS NUMBER (2026-09-16, Stage 4 session 4). A prescription, a test step or a
+   * seed arrives as pounds plus the same weight in the athlete's unit; the box shows the second, and an
+   * untouched set is saved as the first, exactly. Any edit to the weight clears it (`updateSet`), and the
+   * typed number converts on the way in. Without it a prescribed 186 lb shown as 84.25 kg and ticked Done
+   * would be saved as 185.74 lb — under the prescription, which the heavy slot reads as a miss.
+   */
+  weight_lb?: number;
+  /** On a PREVIOUS-session set only: the unit its stored numbers are in (the saved row's `unit`, else lb). */
+  unit?: 'kg' | 'lb';
   // ⛔ INTENTIONALLY TWO-IN-ONE — a WORD or a NUMBER — AND BOTH STAY (D-415). Born holding band-tension
   // words ("Light"/"Medium"/"Heavy"/"Extra Heavy"); D-351 also uses it for the band's pull in POUNDS
   // ("75"). Legacy sets carry the words, newer ones carry pounds. DO NOT collapse the words away —
@@ -218,6 +229,13 @@ interface LoggedExercise {
   id: string;
   name: string;
   sets: LoggedSet[];
+  /**
+   * ⛔ THE UNIT OF EVERY WEIGHT ON THIS EXERCISE'S SETS (2026-09-16, Stage 4 session 4) — read off the row
+   * that brought it: the plan step's `unit`, the test session's, the seed's, or a saved row's own (pounds).
+   * Absent on a lift the athlete added by hand before any answer came back; it then takes the athlete's
+   * unit from the week feed (`sessionUnit`). The column header, the plates and the bar print it.
+   */
+  unit?: 'kg' | 'lb';
   expanded?: boolean;
   notes?: string;
   target_rir?: number; // Target RIR from prescription (1-5)
@@ -286,24 +304,6 @@ interface StrengthLoggerProps {
   targetDate?: string; // YYYY-MM-DD date to prefill from planned_workouts
 }
 
-// Simple volume calculator for save button
-const calculateTotalVolume = (exercises: LoggedExercise[]): number => {
-  return exercises
-    .filter(ex => ex.name.trim() && ex.sets.length > 0)
-    .reduce((total, exercise) => {
-      const exerciseVolume = exercise.sets.reduce((sum, set) => {
-        // For duration-based exercises, volume = duration_seconds * weight
-        // For rep-based exercises, volume = reps * weight
-        if (set.duration_seconds && set.duration_seconds > 0) {
-          return sum + (set.duration_seconds * set.weight);
-        } else if (set.reps && set.reps > 0) {
-          return sum + (set.reps * set.weight);
-        }
-        return sum;
-      }, 0);
-      return total + exerciseVolume;
-    }, 0);
-};
 
 // [Step 3] `normalizeExerciseNameForMatch` moved to `src/lib/strength-logging-mode.ts` with the
 // classifier that was its only caller. Its Q-180 lesson (the apostrophe in "Farmer's Carry") moved
@@ -485,23 +485,50 @@ const STRENGTH_CHIP = {
 // ⛔ BAR_TYPES MOVED TO `src/lib/bar-types.ts` (2026-08-29) — the load pricer reads the same table
 // now, and two copies of it is how the plate calculator and the volume number come to disagree.
 
-const PlateMath: React.FC<{ 
-  weight: number; 
-  barType: string;
-  useImperial?: boolean;
-}> = ({ weight, barType, useImperial = true }) => {
-  const imperialPlates = [
+/**
+ * ⛔ ONE PLATE SET PER UNIT, PICKED BY THE EXERCISE'S UNIT (2026-09-16, Stage 4 session 4). A metric account
+ * was handed pound plates under a "lb" label on every set.
+ * Pounds: counts and the 35 are as found, no source.
+ * Kilograms: 25, 20, 15, 10, 5, 2.5 and 1.25 kg — IPF Technical Rules Book 2023, "Bars and Discs": "Discs must
+ * be within the following range: 1.25 kg, 2.5 kg, 5 kg, 10 kg, 15 kg, 20 kg, and 25kg"
+ * (https://www.powerlifting.sport/fileadmin/ipf/data/rules/technical-rules/english/IPF_Technical_Rules_Book_2023__1_.pdf).
+ * Strong's and Hevy's help pages were read for a default kilogram set and name none (help.strongapp.io
+ * article 169, hevyapp.com/help/how-to-use-the-plate-calculator, both 2026-09-16).
+ * OURS — the kilogram counts per side: the imperial table's shape (four of the heaviest, two of each other).
+ * Ledger row in docs/STATE-SOURCES.md.
+ */
+const PLATES_BY_UNIT: Record<'lb' | 'kg', Array<{ weight: number; count: number; color: string }>> = {
+  lb: [
     { weight: 45, count: 4, color: 'bg-blue-500' },
     { weight: 35, count: 2, color: 'bg-yellow-500' },
     { weight: 25, count: 2, color: 'bg-green-500' },
     { weight: 10, count: 2, color: 'bg-gray-500' },
     { weight: 5, count: 2, color: 'bg-red-500' },
     { weight: 2.5, count: 2, color: 'bg-purple-500' },
-  ];
+  ],
+  // Colours: the same rulebook's code — 25 red, 20 blue, 15 yellow, 10 and under any colour.
+  kg: [
+    { weight: 25, count: 4, color: 'bg-red-500' },
+    { weight: 20, count: 2, color: 'bg-blue-500' },
+    { weight: 15, count: 2, color: 'bg-yellow-500' },
+    { weight: 10, count: 2, color: 'bg-green-500' },
+    { weight: 5, count: 2, color: 'bg-gray-500' },
+    { weight: 2.5, count: 2, color: 'bg-gray-500' },
+    { weight: 1.25, count: 2, color: 'bg-gray-500' },
+  ],
+};
 
-  const currentBar = BAR_TYPES[barType] || BAR_TYPES.standard;
-  const barWeight = currentBar.weight;
-  const unit = useImperial ? 'lb' : 'kg';
+const PlateMath: React.FC<{
+  weight: number;
+  barType: string;
+  /** The exercise's unit — the weight, the bar and the plates are all in it. */
+  unit: 'lb' | 'kg';
+}> = ({ weight, barType, unit }) => {
+  const plates = PLATES_BY_UNIT[unit];
+  const currentBar = BAR_TYPES[barType] && BAR_TYPES[barType].unit === unit
+    ? BAR_TYPES[barType]
+    : BAR_TYPES[barKeysForUnit(unit)[0]];
+  const barWeight = currentBar.load;
 
   const calculatePlates = () => {
     if (!weight || weight <= barWeight) {
@@ -518,7 +545,7 @@ const PlateMath: React.FC<{
     const result: Array<{weight: number, count: number, color: string}> = [];
     let remaining = weightPerSide;
 
-    for (const plate of imperialPlates) {
+    for (const plate of plates) {
       const maxUsable = Math.floor(remaining / plate.weight);
       const actualUse = Math.min(maxUsable, plate.count);
       
@@ -837,6 +864,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // D-122: prior-session per-set actuals, keyed by normalized exercise name.
   // Populated by the D-097 autofill fetch; feeds the persistent "last:" anchor line.
   const [previousSessionByName, setPreviousSessionByName] = useState<Record<string, LoggedSet[]>>({});
+  /**
+   * ⛔ THE ATHLETE'S LIFT UNIT, AS THE SERVER SENDS IT (2026-09-16, Stage 4 session 4) — `get-week`'s
+   * `lift_unit`. It is the unit of any exercise that did not arrive carrying one (a lift added by hand).
+   * Null until the feed answers; an exercise with neither is saved as the pounds it always was.
+   */
+  const [sessionUnit, setSessionUnit] = useState<'kg' | 'lb' | null>(null);
+  const unitOf = (ex: Pick<LoggedExercise, 'unit'> | null | undefined): 'kg' | 'lb' | null => ex?.unit ?? sessionUnit;
   const [editingTimerKey, setEditingTimerKey] = useState<string | null>(null);
   const [editingTimerValue, setEditingTimerValue] = useState<string>("");
   // D-135: readOnly-until-focus on the timer editor inputs. iOS Safari (and 1Password/
@@ -1166,6 +1200,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const testSessionToLogged = (rows: any[]): LoggedExercise[] => rows.map((r: any, i: number) => ({
     id: `ex-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
     name: String(r?.name || ''),
+    // The server's unit and its numbers in it (Stage 4 session 4); a row from an older server is pounds.
+    ...(r?.unit === 'kg' || r?.unit === 'lb' ? { unit: r.unit } : {}),
     ...(r?.planned_name ? { planned_name: String(r.planned_name) } : {}),
     ...(typeof r?.target_reps === 'string' ? { target_reps: r.target_reps } : {}),
     ...(typeof r?.target_rir === 'number' ? { target_rir: r.target_rir } : {}),
@@ -1173,7 +1209,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     ...(Number(r?.anchor_round_to) > 0 ? { anchor_round_to: Number(r.anchor_round_to) } : {}),
     expanded: true,
     sets: (Array.isArray(r?.sets) ? r.sets : []).map((s: any) => ({
-      weight: Number(s?.weight) > 0 ? Number(s.weight) : 0,
+      weight: Number(s?.weight) > 0 ? (r?.unit && Number(s?.weight_in_unit) > 0 ? Number(s.weight_in_unit) : Number(s.weight)) : 0,
+      ...(r?.unit && Number(s?.weight) > 0 ? { weight_lb: Number(s.weight) } : {}),
       reps: Number(s?.reps) > 0 ? Number(s.reps) : undefined,
       setType: s?.set_type === 'warmup' ? 'warmup' : 'working',
       barType: 'standard',
@@ -1212,7 +1249,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   /** What the server computed and wrote, echoed back for display. Empty until a save returns. */
   const [baselineServerResults, setBaselineServerResults] = useState<
-    Array<{ key: string; lift: string; weight: number; reps: number; estimated1RM: number }>
+    Array<{ key: string; lift: string; weight: number; reps: number; estimated1RM: number; unit?: string; weight_in_unit?: number; estimated1RM_in_unit?: number }>
   >([]);
   const [savingBaseline, setSavingBaseline] = useState(false);
   // Down-write reconciliation (supersedes D-223 silent ratchet-hold): when a test result lands
@@ -1224,7 +1261,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // and writes nothing until the decisions come back with the same sets, so there is no half-built
   // baseline object sitting in component state waiting to be committed.
   const [downWriteReview, setDownWriteReview] = useState<null | {
-    downs: Array<{ key: string; lift: string; prior: number; next: number }>;
+    downs: Array<{ key: string; lift: string; prior: number; next: number; unit?: string; prior_in_unit?: number; next_in_unit?: number }>;
   }>(null);
   const [downDecisions, setDownDecisions] = useState<Record<string, 'keep' | 'update'>>({});
 
@@ -1242,10 +1279,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const postBaselineTest = async (decisions?: Record<string, 'keep' | 'update'>) => {
     // ⛔ EVERY SET OF THE SESSION, AS LOGGED (2026-09-10, audit H-S08). The server picks which set is
     // the test and which saved max it writes, by the test read-back's rule.
+    // ⛔ AS THE BOXES SHOW THEM, WITH THE UNIT (2026-09-16, Stage 4 session 4). The server converts a
+    // kilogram box to pounds on the way in; an untouched step sends the pounds it came with.
     const sent = exercises.map((ex) => ({
       name: ex.name,
+      unit: unitOf(ex) ?? 'lb',
       sets: ex.sets.map((s) => ({
         weight: s.weight,
+        ...(s.weight_lb != null ? { weight_lb: s.weight_lb } : {}),
         reps: s.reps,
         completed: s.completed === true,
         setType: s.setType,
@@ -1265,8 +1306,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     if (data && data.success === false) throw new Error(data.reason || 'save_failed');
     return data as {
       written: boolean;
-      needs_decision?: Array<{ key: string; lift: string; prior: number; next: number }>;
-      computed?: Array<{ key: string; lift: string; weight: number; reps: number; estimated1RM: number }>;
+      needs_decision?: Array<{ key: string; lift: string; prior: number; next: number; unit?: string; prior_in_unit?: number; next_in_unit?: number }>;
+      computed?: Array<{ key: string; lift: string; weight: number; reps: number; estimated1RM: number; unit?: string; weight_in_unit?: number; estimated1RM_in_unit?: number }>;
     };
   };
 
@@ -1295,7 +1336,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   /** Shared post-write bookkeeping: show what the SERVER computed, clear the form, tell the app. */
   const finishBaselineSave = (
-    computed: Array<{ key: string; lift: string; weight: number; reps: number; estimated1RM: number }>,
+    computed: Array<{ key: string; lift: string; weight: number; reps: number; estimated1RM: number; unit?: string; weight_in_unit?: number; estimated1RM_in_unit?: number }>,
     message: string,
   ) => {
     setBaselineServerResults(computed);
@@ -1312,8 +1353,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const updated: string[] = [];
       const kept: string[] = [];
       downs.forEach((d) => {
-        if (decisions[d.key] === 'update') updated.push(`${d.lift} → ${d.next}`);
-        else kept.push(`${d.lift} stays ${d.prior}`);
+        // The server's numbers in the athlete's unit (Stage 4 session 4); a rep count carries no unit.
+        if (decisions[d.key] === 'update') updated.push(`${d.lift} → ${d.next_in_unit ?? d.next}`);
+        else kept.push(`${d.lift} stays ${d.prior_in_unit ?? d.prior}`);
       });
       const msg = 'Baselines saved.'
         + (updated.length ? ` Updated: ${updated.join(', ')}.` : '')
@@ -1765,15 +1807,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // above is D-324 — the protocol killed reserve, so the number is irrelevant. This one is width: the
   // compact Previous column is 68px (56px on an assist row) and the reserve tail is what pushes the
   // string past it, so the athlete reads "55 × 6 @ R…" and loses the reps. See the call site.
-  const formatLastSet = (p?: LoggedSet, rirTracked?: boolean, showRir = true): string | null => {
+  const formatLastSet = (p?: LoggedSet, rirTracked?: boolean, showRir = true, exerciseUnit?: 'kg' | 'lb' | null): string | null => {
     if (!p) return null;
     if (typeof p.duration_seconds === 'number' && p.duration_seconds > 0) {
       return `last: ${formatSeconds(p.duration_seconds)}`;
     }
     const hasReps = typeof p.reps === 'number' && p.reps > 0;
+    // ⛔ A SAVED WEIGHT IN A UNIT OTHER THAN THE BOX'S CARRIES ITS UNIT (2026-09-16, Stage 4 session 4): the
+    // stored pounds printed bare under a "Kg" header read as kilograms. Same unit → the number alone, as before.
+    const unitTail = p.unit && exerciseUnit && p.unit !== exerciseUnit ? ` ${p.unit}` : '';
     const load = p.resistance_level
       ? p.resistance_level
-      : (typeof p.weight === 'number' && p.weight > 0 ? String(p.weight) : null);
+      : (typeof p.weight === 'number' && p.weight > 0 ? `${p.weight}${unitTail}` : null);
     if (!load && !hasReps) return null; // no real prior data → no line
     let s = 'last: ';
     if (load && hasReps) s += `${load} × ${p.reps}`;
@@ -2015,10 +2060,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   ];
 
 
-  // Calculate simple total volume for save button
-  const currentTotalVolume = React.useMemo(() => {
-    return calculateTotalVolume(exercises);
-  }, [exercises]);
 
   // Create empty starter exercise
   const createEmptyExercise = (): LoggedExercise => ({
@@ -2064,11 +2105,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // baseline-test path's hint so the athlete meets one description of an all-out set, not two.
   const AMRAP_SET_HINT = 'All-out set: as many CLEAN reps as you can at this weight. This count is what moves your training max. Stop on form break — never grind solo.';
 
-  const plannedSetsFor = (source: any): Array<{ weight?: number; reps?: number; amrap: boolean }> | null => {
+  const plannedSetsFor = (source: any): Array<{ weight?: number; weight_in_unit?: number; reps?: number; amrap: boolean }> | null => {
     const sp = Array.isArray(source?.set_plan) ? source.set_plan : null;
     if (!sp || sp.length === 0) return null;
     return sp.map((p: any) => ({
       weight: Number.isFinite(Number(p?.weight)) && Number(p?.weight) > 0 ? Number(p.weight) : undefined,
+      // The same weight in the athlete's unit, written beside it by materialize-plan (Stage 4 session 4).
+      weight_in_unit: Number.isFinite(Number(p?.weight_in_unit)) && Number(p?.weight_in_unit) > 0 ? Number(p.weight_in_unit) : undefined,
       reps: Number.isFinite(Number(p?.reps)) && Number(p?.reps) > 0 ? Math.round(Number(p.reps)) : undefined,
       amrap: p?.amrap === true,
       warmup: p?.warmup === true,
@@ -2146,6 +2189,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const isMeSlotRow = String(s?.slot_intent || '') === 'ME';
         // ⛔ THE SERVER'S WEIGHT, UNCHANGED (2026-09-10, audit H-S04) — no re-rounding to 5 lb, no 5 lb floor.
         const weightNum = typeof s?.weight === 'number' ? s.weight : 0;
+        // ⛔ AND IN THE ATHLETE'S UNIT, AS THE STEP CARRIES IT (2026-09-16, Stage 4 session 4). A step with a
+        // `unit` sends `weight_in_unit` beside every pound figure; a step written before that is pounds.
+        const stepUnit: 'kg' | 'lb' = s?.unit === 'kg' ? 'kg' : 'lb';
+        const stepHasUnit = s?.unit === 'kg' || s?.unit === 'lb';
         const sets = Number(s?.sets) || 0;
         const notes = s?.notes;
         const exerciseType = equipmentForExercise(name);
@@ -2179,7 +2226,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             name,
             expanded: true,
             sets: [] as LoggedSet[],
-            unit: 'lb',
+            unit: stepUnit,
             notes: rawNotes || undefined,
             rir: null,
             target_rir: targetRir, // Target RIR from prescription
@@ -2212,8 +2259,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             // box as a greyed starting point; it does not become the row's `weight`, and nothing
             // here treats it as a prescription. Guarded on a finite positive so an absent
             // suggestion stays absent rather than becoming a prescribed zero.
-            weight_suggested: Number.isFinite(s?.weight_suggested) && s.weight_suggested > 0
-              ? s.weight_suggested : undefined,
+            weight_suggested: stepHasUnit
+              ? (Number.isFinite(s?.weight_suggested_in_unit) && s.weight_suggested_in_unit > 0 ? s.weight_suggested_in_unit : undefined)
+              : (Number.isFinite(s?.weight_suggested) && s.weight_suggested > 0 ? s.weight_suggested : undefined),
           } as LoggedExercise;
         }
         // Per-set prescription when the row carries one; otherwise the row's single weight on every
@@ -2230,6 +2278,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         for (let i=0;i<targetSets;i+=1) {
           const p = planned?.[i];
           const setWeight = p?.weight != null ? p.weight : weightNum;
+          const setWeightInUnit = !stepHasUnit ? setWeight
+            : (p?.weight != null ? (p.weight_in_unit ?? 0) : (Number(s?.weight_in_unit) > 0 ? Number(s.weight_in_unit) : 0));
           const setReps = p?.reps ?? reps;
           const setAmrap = p ? p.amrap : isAmrap === true;
           const baseSet: any = {
@@ -2239,7 +2289,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             // the volume rule gates on, and is untouched. Two fields for one idea, one of them dead,
             // sitting next to each other in the stored JSON is precisely how the next session
             // "fixes" the wrong one.
-            weight: exerciseType === 'band' ? 0 : setWeight,
+            weight: exerciseType === 'band' ? 0 : setWeightInUnit,
+            ...(exerciseType !== 'band' && stepHasUnit && setWeight > 0 ? { weight_lb: setWeight } : {}),
             resistance_level: resistanceLevel,
             rir: null,
             amrap: setAmrap,
@@ -2286,6 +2337,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Prefill once per open (set the ref only after a successful prefill); never overwrite an
   // engaged session. Mirrors didAutofillRef / didInitRef on the sibling prefill effects.
   const didComputedPrefillRef = useRef(false);
+
+  // ⛔ THE ATHLETE'S UNIT FOR A LIFT ADDED BY HAND (2026-09-16, Stage 4 session 4). The two unplanned paths
+  // below ask the week feed anyway and take `lift_unit` from it; a planned or saved session does not, so
+  // this asks once. Nothing is converted with it — it is the label and the unit a typed number is saved from.
+  useEffect(() => {
+    if (sessionUnit) return;
+    let live = true;
+    (async () => {
+      try {
+        const date = targetDate || getStrengthLoggerDateString();
+        const { data } = await (supabase.functions.invoke as any)('get-week', { body: { from: date, to: date } });
+        const u = (data as any)?.lift_unit;
+        if (live && (u === 'kg' || u === 'lb')) setSessionUnit(u);
+      } catch { /* offline: a hand-added lift keeps no unit and saves as pounds, as before */ }
+    })();
+    return () => { live = false; };
+  }, [sessionUnit, targetDate]);
   useEffect(() => {
     if (didComputedPrefillRef.current) return;
     try {
@@ -2311,6 +2379,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // Unified feed → computed-like
         try {
           const { data: unified } = await (supabase.functions.invoke as any)('get-week', { body: { from: date, to: date } });
+          if ((unified as any)?.lift_unit === 'kg' || (unified as any)?.lift_unit === 'lb') setSessionUnit((unified as any).lift_unit);
           const items: any[] = Array.isArray((unified as any)?.items) ? (unified as any).items : [];
           const isMobilityLike = (p:any)=>{
             try { const d = String((p?.planned?.description || p?.planned?.rendered_description || '')||'').toLowerCase(); return /\bmobility\b|\bpt\b/.test(d); } catch { return false; }
@@ -2353,6 +2422,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   useEffect(() => {
     if (didAutofillRef.current) return;
     if (!isInitialized) return;
+    // The weight box of a hand-added lift is in the athlete's unit, and a saved set is copied into it only
+    // when the units match — so this waits for the unit (Stage 4 session 4).
+    if (!sessionUnit) return;
     if (!exercises || exercises.length === 0) return;
     const mode = String((scheduledWorkout as any)?.logger_mode || '').toLowerCase();
     if (mode === 'mobility') return;
@@ -2388,8 +2460,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             if (!nn || !currentNames.has(nn) || previousByName[nn]) continue;
             const priorSets = Array.isArray(ex?.sets) ? ex.sets : [];
             if (priorSets.length === 0) continue;
+            // The saved row's own unit (pounds unless it says kg) travels with each set (Stage 4 session 4).
+            const priorUnit: 'kg' | 'lb' = String(ex?.unit ?? 'lb').toLowerCase().startsWith('kg') ? 'kg' : 'lb';
             previousByName[nn] = priorSets.map((s: any): LoggedSet => ({
               weight: Number(s?.weight) || 0,
+              unit: priorUnit,
               ...(typeof s?.reps === 'number' ? { reps: s.reps } : {}),
               ...(typeof s?.duration_seconds === 'number' ? { duration_seconds: s.duration_seconds } : {}),
               ...(typeof s?.rir === 'number' ? { rir: s.rir } : {}),
@@ -2420,7 +2495,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               if (!nn) continue;
               const w = Number((lr as any)?.best_weight); const r = Number((lr as any)?.best_reps);
               if (!(Number.isFinite(w) && w > 0) && !(Number.isFinite(r) && r > 0)) continue;
-              previousByName[nn] = [{ weight: Number.isFinite(w) && w > 0 ? w : 0, ...(Number.isFinite(r) && r > 0 ? { reps: r } : {}), completed: false }];
+              // `exercise_log.best_weight` is pounds (compute-facts reads the saved sets).
+              previousByName[nn] = [{ weight: Number.isFinite(w) && w > 0 ? w : 0, unit: 'lb', ...(Number.isFinite(r) && r > 0 ? { reps: r } : {}), completed: false }];
             }
           }
         } catch { /* the ten-workout window stands */ }
@@ -2460,9 +2536,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             // target (reps band, reserve) greyed — last session's reps and reserve stay in the Previous
             // column. Only the weight carries over as a starting point.
             const plannedRow = !!(ex as any)?.target_reps;
+            // ⛔ A SAVED POUND FIGURE NEVER GOES INTO A KILOGRAM BOX (2026-09-16, Stage 4 session 4). Every
+            // set is saved in pounds, so on a metric account last time's weight stays in the Previous column
+            // with its unit and the box stays empty; the reps and the band still carry over.
+            const sameUnit = (prior.unit ?? 'lb') === (unitOf(ex) ?? 'lb');
             return {
               ...set,
-              weight: prior.weight ?? set.weight,
+              ...(sameUnit ? { weight: prior.weight ?? set.weight, weight_lb: undefined } : {}),
               ...(!plannedRow && typeof prior.reps === 'number' ? { reps: prior.reps } : {}),
               ...(typeof prior.duration_seconds === 'number' ? { duration_seconds: prior.duration_seconds } : {}),
               ...(!plannedRow && typeof prior.rir === 'number' ? { rir: prior.rir, rir_autofilled: true } : {}),
@@ -2477,7 +2557,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         console.warn('[strength-logger] previous-session fetch/fallback failed:', e);
       }
     })();
-  }, [isInitialized, exercises.length, scheduledWorkout, targetDate]);
+  }, [isInitialized, exercises.length, scheduledWorkout, targetDate, sessionUnit]);
 
   const prefillFromPlanned = (row: any) => {
     try {
@@ -2757,6 +2837,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           ...restFieldsOf(exercise),
           id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
           name: cleanName || '',
+          // A saved or authored row's numbers are in its own unit — pounds unless it says otherwise (Stage 4 session 4).
+          unit: exercise?.unit === 'kg' ? 'kg' : 'lb',
           notes: rawNotes || undefined,
           expanded: true,
           target_reps: isRepTotalRow ? String(rawTargetReps).trim() : undefined,
@@ -2829,6 +2911,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // 1) Unified server feed provides planned.steps even if DB row lacks computed
         try {
           const { data: unified } = await (supabase.functions.invoke as any)('get-week', { body: { from: date, to: date } });
+          if ((unified as any)?.lift_unit === 'kg' || (unified as any)?.lift_unit === 'lb') setSessionUnit((unified as any).lift_unit);
           const items: any[] = Array.isArray((unified as any)?.items) ? (unified as any).items : [];
           const plannedStrength = items.find((it:any)=> !!it?.planned && String(it?.type||'').toLowerCase()==='strength');
           if (plannedStrength && Array.isArray(plannedStrength?.planned?.steps)) {
@@ -2861,6 +2944,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   ...restFieldsOf(exercise),
                   id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
                   name: cleanName || '',
+          // A saved or authored row's numbers are in its own unit — pounds unless it says otherwise (Stage 4 session 4).
+          unit: exercise?.unit === 'kg' ? 'kg' : 'lb',
                   notes: rawNotes || undefined,
                   expanded: true,
                   sets: Array.from({ length: plannedSetsFor(exercise)?.length ?? (exercise.sets || 3) }, (_, setIndex) => {
@@ -2954,6 +3039,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               ...restFieldsOf(exercise),
               id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
               name: cleanName || '',
+          // A saved or authored row's numbers are in its own unit — pounds unless it says otherwise (Stage 4 session 4).
+          unit: exercise?.unit === 'kg' ? 'kg' : 'lb',
               notes: rawNotes || undefined,
               expanded: true,
               target_reps: isRepTotalRow ? String(rawTargetReps).trim() : undefined,
@@ -3339,8 +3426,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
    */
   const resolveSeedWeight = async (
     name: string,
-    opts?: { previousName?: string; currentWeight?: number; targetReps?: number; plannedPercent?: number | null },
-  ): Promise<number | null> => {
+    opts?: { previousName?: string; currentWeight?: number; currentWeightUnit?: 'kg' | 'lb' | null; targetReps?: number; plannedPercent?: number | null },
+  ): Promise<{ weight: number; weight_lb: number; unit: 'kg' | 'lb' } | null> => {
     try {
       const { data, error } = await supabase.functions.invoke('resolve-exercise-weight', {
         body: {
@@ -3349,13 +3436,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           planned_percent: opts?.plannedPercent ?? null,
           previous_name: opts?.previousName ?? null,
           current_weight: opts?.currentWeight ?? 0,
+          // The box is in this unit; the server converts it on the way in (Stage 4 session 4).
+          current_weight_unit: opts?.currentWeightUnit ?? 'lb',
           target_reps: opts?.targetReps,
           date: targetDate || getStrengthLoggerDateString(),
         },
       });
       if (error || !data?.success) return null;
-      const w = Number(data.weight);
-      return Number.isFinite(w) && w > 0 ? w : null;
+      // ⛔ THE SEED IN THE ATHLETE'S UNIT, AS SENT (Stage 4 session 4): `weight_in_unit` for the box, `weight`
+      // (pounds) saved as-is while the athlete leaves it, `unit` for the label. No unit → no seed.
+      const lb = Number(data.weight);
+      const shown = Number(data.weight_in_unit);
+      if (!(Number.isFinite(lb) && lb > 0) || !(Number.isFinite(shown) && shown > 0)) return null;
+      if (data.unit !== 'kg' && data.unit !== 'lb') return null;
+      return { weight: shown, weight_lb: lb, unit: data.unit };
     } catch {
       return null; // graceful: a blank weight box the athlete fills in beats a guessed one
     }
@@ -3420,12 +3514,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     if (!isDurationExercise && !(firstSet.weight! > 0)) {
       void (async () => {
         const last = await resolveSeedWeight(nameToAdd, { plannedPercent: plannedPercentOnScreen() });
-        if (last == null || !(last > 0)) return;
-        setExercises((prev) => prev.map((ex) => ex.id !== newExercise.id ? ex : {
+        if (last == null) return;
+        setExercises((prev) => prev.map((ex) => (ex.id !== newExercise.id || (ex.unit != null && ex.unit !== last.unit)) ? ex : {
           ...ex,
+          unit: last.unit,
           // A logged weight is already a WORKING weight — used as-is, never scaled by intensity.
           sets: ex.sets.map((st, i) => (i === 0 && !st.completed && !(st.weight > 0)
-            ? { ...st, weight: last, from_previous: true } : st)),
+            ? { ...st, weight: last.weight, weight_lb: last.weight_lb, from_previous: true } : st)),
         }));
       })();
     }
@@ -3492,6 +3587,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const updatedSet = {
           ...newSets[setIndex],
           ...updates,
+          // ⛔ A NEW WEIGHT IS NO LONGER THE SERVER'S POUNDS (Stage 4 session 4): it is saved from the box.
+          ...('weight' in updates && !('weight_lb' in updates) ? { weight_lb: undefined } : {}),
           ...(isAutofillUpdate ? {} : { from_previous: false }),
           // D-204: any athlete edit/Done clears the prefill marker (mirrors from_previous),
           // so an engaged set is never treated as a pure untouched prefill.
@@ -3529,6 +3626,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           reps: isRepTotalRow ? undefined : (lastSet?.reps ?? undefined), // blank on rep-total; else copy (until-pattern safe)
           duration_seconds: lastSet?.duration_seconds, // Copy duration for duration-based exercises
           weight: lastSet?.weight || 0,
+          // The copied number is the same number, so its server pounds travel with it (Stage 4 session 4).
+          ...(lastSet?.weight_lb != null ? { weight_lb: lastSet.weight_lb } : {}),
           barType: lastSet?.barType || 'standard',
           // D-351: carry the previous set's band value forward, but never SEED one. The old default
           // was the word 'Light'; a numeric default would be an invented load, and blank correctly
@@ -3710,7 +3809,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             const at = setIndex + offset;
             const next = sets[at];
             if (w == null || !next || next.completed || Number(next.weight) > 0) continue;
-            sets[at] = { ...next, weight: w, prefilled: true };
+            sets[at] = { ...next, weight: w, weight_lb: undefined, prefilled: true };
           }
         }
         return { ...ex, sets };
@@ -3942,6 +4041,38 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       }))
       .filter(ex => ex.sets.length > 0);
 
+    /**
+     * ⛔⛔ THE WRITE-SIDE CONVERSION (2026-09-16, Stage 4 session 4). Sets are stored in POUNDS everywhere
+     * (Stage 4 session 1). This save writes `workouts` directly (`addWorkout` / `updateWorkout`, a table insert
+     * with no function in between), so the one conversion happens here, on the way in, with the one constant
+     * (`KG_PER_LB`, 1 lb = 0.45359237 kg by definition): a metric athlete's typed 100 is saved as 220.46 lb,
+     * not 100 lb. A number the athlete left as the server sent it is saved as the server's own pounds
+     * (`weight_lb`). The exercise is stamped `unit: 'lb'` so every reader keeps reading pounds.
+     * ⚠️ The band and assist boxes are pounds on every account (their words say so), so they are not converted.
+     * OURS — a converted weight is kept to 0.01 lb: any weight typed to a quarter kilogram reads back exactly
+     * through `liftInAthletesUnit`, and the saved row is readable. Ledger row in docs/STATE-SOURCES.md.
+     */
+    const toStoredPounds = (ex: LoggedExercise): LoggedExercise => {
+      const kg = unitOf(ex) === 'kg';
+      return {
+        ...ex,
+        unit: 'lb',
+        sets: ex.sets.map((st) => {
+          const { weight_lb, ...rest } = st;
+          const typed = Number(st.weight) || 0;
+          const weight = weight_lb != null && weight_lb > 0 ? weight_lb
+            : (kg && typed > 0 ? Math.round((typed / KG_PER_LB) * 100) / 100 : st.weight);
+          return {
+            ...rest,
+            weight,
+            // A kilogram bar is saved as its own key; the pricer reads its pounds off the table.
+            ...(kg && st.barType ? { barType: barKeysForUnit('kg').includes(st.barType) ? st.barType : barKeysForUnit('kg')[0] } : {}),
+          };
+        }),
+      };
+    };
+    const storedExercises = validExercises.map(toStoredPounds);
+
     if (validExercises.length === 0) {
       // ⛔ THIS RETURN USED TO LEAVE `isSaving` TRUE. The spinner was raised at the top of this
       // function and nothing lowered it on the way out, so tapping Save with nothing loggable
@@ -3960,7 +4091,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     const isMobilityMode = modeSave === 'mobility';
     const mobilityFromSets = () => {
       try {
-        return validExercises.map((ex:any)=>{
+        return storedExercises.map((ex:any)=>{
           const rep = Array.isArray(ex.sets) && ex.sets.length>0 ? (ex.sets[0].reps || 0) : 0;
           const dur = ex.sets && ex.sets.length ? `${ex.sets.length}x${rep}` : undefined;
           const w0 = Array.isArray(ex.sets) && ex.sets.length>0 ? Number(ex.sets[0].weight||0) : 0;
@@ -4000,7 +4131,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         .map(ex => `${ex.name}: ${ex.sets.length} sets`)
         .join(', '),
       duration: durationMinutes,
-      strength_exercises: validExercises,
+      strength_exercises: storedExercises,
       workout_status: 'completed' as const,
       completedManually: true,
       workout_metadata: workoutMetadata,
@@ -4178,11 +4309,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       if (!isMountedRef.current) return;
       
       // Navigate to completed view (prefer saved row if available)
+      // ⛔ THE "Workout saved! Total volume" ALERT IS DELETED (2026-09-16, Stage 4 session 4). It summed
+      // reps × weight on the phone by rules of its own and fired only with no navigation callback — and both
+      // mounts pass one (`UnifiedWorkoutView`, `AppLayout`). The one volume is the server's, on Performance.
       if (onWorkoutSaved) {
         onWorkoutSaved(saved || completedWorkout);
       } else {
-        // Fallback to old behavior if no navigation callback provided
-        alert(`Workout saved! Total volume: ${currentTotalVolume.toLocaleString()}lbs`);
         onClose();
       }
     }, 1500);
@@ -5131,14 +5263,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           const seed = await resolveSeedWeight(altName, {
                             previousName: prevName,
                             currentWeight: curW,
+                            currentWeightUnit: unitOf(exercise),
                             targetReps,
                             plannedPercent: typeof exercise.planned_percent_1rm === 'number' && exercise.planned_percent_1rm > 0
                               ? exercise.planned_percent_1rm : null,
                           });
-                          if (seed == null || !(seed > 0)) return;
-                          setExercises((prev) => prev.map((ex) => ex.id !== exercise.id ? ex : {
+                          if (seed == null) return;
+                          setExercises((prev) => prev.map((ex) => (ex.id !== exercise.id || (ex.unit != null && ex.unit !== seed.unit)) ? ex : {
                             ...ex,
-                            sets: ex.sets.map((st) => (st.completed ? st : { ...st, weight: seed })),
+                            unit: seed.unit,
+                            sets: ex.sets.map((st) => (st.completed ? st : { ...st, weight: seed.weight, weight_lb: seed.weight_lb })),
                           }));
                         })();
                         setExercises((prev) => prev.map((ex) =>
@@ -5282,10 +5416,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   // The LOAD column. An assist-capable movement always has one — the band IS the
                   // load (D-351) — so it survives the bodyweight test that would otherwise hide it.
                   const exShowWeight = exIsAssistCapable || !(exIsBodyweight || exIsPlyo);
+                  // ⛔ THE UNIT IS THE EXERCISE'S, AS THE SERVER SENT IT (2026-09-16, Stage 4 session 4); it read
+                  // "Lb" on every account. ⚠️ The band stays pounds on every account: its keypad title, hint and
+                  // label say pounds in words, and changing those is wording (see the session report).
+                  const exUnit = unitOf(exercise);
+                  const exUnitWord = exUnit === 'kg' ? 'Kg' : exUnit === 'lb' ? 'Lb' : '';
                   const exWeightLabel = exIsAssistCapable ? 'Assist / Added' /* 2026-09-03: band assist left, added weight right */
                     : exEquip === 'band' ? 'Band lb'
-                    : exEquip === 'dumbbell' ? 'Lb/hand'
-                    : 'Lb';
+                    : exEquip === 'dumbbell' ? (exUnitWord ? `${exUnitWord}/hand` : '')
+                    : exUnitWord;
+                  // The bar the chip and the plates read: the set's own if it is one of this unit's bars, else the unit's first.
+                  const exBarKeys = barKeysForUnit(exUnit ?? 'lb');
+                  const exBarKeyFor = (bt?: string) => (bt && exBarKeys.includes(bt) ? bt : exBarKeys[0]);
 
                   // The RIR column — the SAME gate the tall card's RIR cell carried, unchanged.
                   // ⚠️ The card's ±1 nudge strip carried one EXTRA gate (`!sourcePlannedId`, the
@@ -5648,14 +5790,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         // deliberately does NOT copy `rir`, so the tail could not even be tapped in.
                         // Dropping it makes the whole remaining string fit instead of clipping the
                         // reps, which is the number the athlete is actually reading off it.
-                        const priorTxt = (showPrevious && prior) ? (formatLastSet(prior, exercise.rir_tracked, false) || '').replace(/^last:\s*/, '') : '';
+                        const priorTxt = (showPrevious && prior) ? (formatLastSet(prior, exercise.rir_tracked, false, unitOf(exercise)) || '').replace(/^last:\s*/, '') : '';
                         // Tap Previous to reuse it. Goes through `updateSet`, so provenance clears
                         // exactly as it does for any other athlete edit (from_previous, prefilled,
                         // and — since this writes no `rir` — the rir_autofilled flag is untouched).
                         const fillFromPrior = () => {
                           if (!prior) return;
                           const patch: Partial<LoggedSet> = {};
-                          if (typeof prior.weight === 'number' && prior.weight > 0) patch.weight = prior.weight;
+                          // Only in the box's own unit — see the prefill above (Stage 4 session 4).
+                          if (typeof prior.weight === 'number' && prior.weight > 0 && (prior.unit ?? 'lb') === (unitOf(exercise) ?? 'lb')) patch.weight = prior.weight;
                           if (typeof prior.reps === 'number' && prior.reps > 0) patch.reps = prior.reps;
                           if (typeof prior.duration_seconds === 'number' && prior.duration_seconds > 0) patch.duration_seconds = prior.duration_seconds;
                           if (prior.resistance_level != null) patch.resistance_level = prior.resistance_level;
@@ -6044,7 +6187,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                         on barbell rows, always named — "45 lb bar" is one glance,
                                         changing it is one tap. Writes the whole exercise's sets. */}
                                     <Select
-                                      value={set.barType || 'standard'}
+                                      value={exBarKeyFor(set.barType)}
                                       onValueChange={(value) => setExercises((prev) => prev.map((ex) => ex.id !== exercise.id ? ex : ({
                                         ...ex,
                                         sets: ex.sets.map((st) => ({ ...st, barType: value })),
@@ -6055,17 +6198,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                         className="h-auto text-[12px] font-medium leading-none px-2 py-1 rounded-md border transition-colors bg-transparent gap-1 w-auto shadow-none focus:ring-0"
                                         style={{ color: STRENGTH_CHIP.text, borderColor: STRENGTH_CHIP.border }}
                                       >
-                                        {`${(BAR_TYPES[set.barType || 'standard'] || BAR_TYPES.standard).weight} lb bar`}
+                                        {`${BAR_TYPES[exBarKeyFor(set.barType)].load} ${BAR_TYPES[exBarKeyFor(set.barType)].unit} bar`}
                                       </SelectTrigger>
                                       <SelectContent className="bg-white/[0.12] backdrop-blur-md border-2 border-white/25 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset,0_4px_12px_rgba(0,0,0,0.2)] z-50 text-white/90">
-                                        <SelectItem value="standard" className="hover:bg-white/[0.15]">Barbell (45lb)</SelectItem>
-                                        <SelectItem value="womens" className="hover:bg-white/[0.15]">Light (33lb)</SelectItem>
-                                        <SelectItem value="safety" className="hover:bg-white/[0.15]">Safety Squat (45lb)</SelectItem>
-                                        <SelectItem value="ez" className="hover:bg-white/[0.15]">EZ Curl (25lb)</SelectItem>
-                                        <SelectItem value="trap" className="hover:bg-white/[0.15]">Trap/Hex (60lb)</SelectItem>
-                                        <SelectItem value="cambered" className="hover:bg-white/[0.15]">Cambered (55lb)</SelectItem>
-                                        <SelectItem value="swiss" className="hover:bg-white/[0.15]">Swiss/Football (35lb)</SelectItem>
-                                        <SelectItem value="technique" className="hover:bg-white/[0.15]">Technique (15lb)</SelectItem>
+                                        {exBarKeys.map((k) => (
+                                          <SelectItem key={k} value={k} className="hover:bg-white/[0.15]">{BAR_TYPES[k].name}</SelectItem>
+                                        ))}
                                       </SelectContent>
                                     </Select>
                                   </div>
@@ -6165,7 +6303,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   <span className="text-[11px] font-semibold uppercase tracking-wide text-white/70">Plates</span>
                                   
                                 </div>
-                                <PlateMath weight={set.weight} barType={set.barType || 'standard'} useImperial={true} />
+                                <PlateMath weight={set.weight} barType={exBarKeyFor(set.barType)} unit={exUnit ?? 'lb'} />
                               </div>
                             )}
 
@@ -6182,8 +6320,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                               return (
                                 <div className="mt-2 ml-[30px] mr-1 p-2.5 bg-strength/[0.08] border border-strength/25 rounded-lg">
                                   <div className="text-[13px] text-strength/90">
-                                    Saved: {srv.estimated1RM} lb
-                                    <span className="text-white/72"> — from {srv.weight > 0 ? `${srv.weight} lb × ` : ''}{srv.reps} reps</span>
+                                    {/* The server's numbers in the athlete's unit, with its unit (Stage 4 session 4). */}
+                                    Saved: {srv.estimated1RM_in_unit ?? srv.estimated1RM}{srv.unit ? ` ${srv.unit}` : ''}
+                                    <span className="text-white/72"> — from {srv.weight > 0 ? `${srv.weight_in_unit ?? srv.weight}${srv.unit ? ` ${srv.unit}` : ''} × ` : ''}{srv.reps} reps</span>
                                   </div>
                                 </div>
                               );
@@ -6699,7 +6838,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   <div key={d.key} className="bg-white/[0.06] border-2 border-white/15 rounded-xl p-3">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-white/90">{d.lift}</span>
-                      <span className="text-xs text-white/62 tabular-nums">stored {d.prior} · tested {d.next}</span>
+                      <span className="text-xs text-white/62 tabular-nums">stored {d.prior_in_unit ?? d.prior} · tested {d.next_in_unit ?? d.next}</span>
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -6708,7 +6847,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         className={`flex-1 h-9 rounded-lg text-sm border-2 tabular-nums transition-all disabled:opacity-50 ${choice === 'keep' ? 'bg-white/[0.18] border-white/45 text-white' : 'bg-white/[0.06] border-white/20 text-white/70 hover:border-white/30'}`}
                         style={{ fontFamily: 'Inter, sans-serif' }}
                       >
-                        Keep {d.prior}
+                        Keep {d.prior_in_unit ?? d.prior}
                       </button>
                       <button
                         onClick={() => chooseDown(d.key, 'update')}
@@ -6716,7 +6855,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         className={`flex-1 h-9 rounded-lg text-sm border-2 tabular-nums transition-all disabled:opacity-50 ${choice === 'update' ? 'bg-strength/25 border-strength/60 text-white' : 'bg-white/[0.06] border-white/20 text-white/70 hover:border-white/30'}`}
                         style={{ fontFamily: 'Inter, sans-serif' }}
                       >
-                        Update to {d.next}
+                        Update to {d.next_in_unit ?? d.next}
                       </button>
                     </div>
                   </div>
