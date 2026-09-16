@@ -43,6 +43,7 @@ import { isEasyPrescribedRun } from '../easy-hr.ts';
  *  slot", and the ladder is handed it. Importing it from anywhere else would be a second answer. */
 import { ME_SETS_BAND } from '../standing-plan/compose.ts';
 import { sessionDriftPct } from '../session-detail/drift-pct.ts';
+import { vt1WindowDrift } from '../session-detail/vt1-window-drift.ts';
 import type { SessionBoomV1 } from './types.ts';
 
 /** A completed session, as the `workouts` table carries it. */
@@ -162,6 +163,16 @@ function driftPct(w: BoomWorkout): number | null {
   // and reading the stored copy is the cache trap this function was rewritten to escape (see above).
   // Rungs 1, 2, 4, 5 and 6 all answer before it, so the gap only shows on an unplanned session whose
   // structure nothing else caught.
+  /**
+   * ⛔ THE SAME WINDOW PERFORMANCE AND STATE APPLY (2026-09-15, §8.0 #15). A long session with sets is read
+   * over its VT1 portions — `vt1WindowDrift` off the analyser's breakdown, exactly the call `compute-snapshot`
+   * makes for State's chart — and only then the whole-file read. Without it the streak counted a 12.9%
+   * whole-file number on a session Performance printed at 4.8%, so the line and the tile disagreed about the
+   * same run. `too_short` means the session cannot be read at all: no number, and the streak skips it.
+   */
+  const win = vt1WindowDrift({ workoutAnalysis: parseAnalysis(w), sport: w.type ?? null });
+  if (win.kind === 'too_short') return null;
+  if (win.kind === 'read') return win.pct;
   return sessionDriftPct(parseAnalysis(w), w.computed ?? null, w.type ?? null, {
     plannedRow: w.planned_row ?? null,
     workoutRow: { strava_data: w.strava_data, laps: w.laps },

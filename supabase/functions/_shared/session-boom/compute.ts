@@ -82,6 +82,14 @@ const PRIOR_SELECT = [
   'planned_id',
   'strava_workout_type:strava_data->original_activity->workout_type',
   'segments:workout_analysis->fact_packet_v1->facts->segments',
+  /**
+   * ⛔ THE VT1 WINDOW NEEDS THE ANALYSER'S ROWS (2026-09-15, §8.0 #15). A long session with sets is read over
+   * its VT1 portions on Performance and on State's chart; without this path a PRIOR in the streak was judged
+   * whole-file while the session that just finished was judged windowed — one streak, two rules. This is the
+   * breakdown summary (one entry per interval: role, length, heart rate, output, planned band), not the
+   * sample series, and `rowsFromAnalysis` reads exactly those fields.
+   */
+  'interval_breakdown:workout_analysis->granular_analysis->interval_breakdown',
 ].join(',');
 
 /**
@@ -106,6 +114,7 @@ export function priorFromRow(r: Record<string, unknown>, plannedRow?: { tags?: u
       ...(bf ? { bike_fitness_v1: bf } : {}),
       ...(r.decoupling_pct != null ? { heart_rate_summary: { decouplingPct: r.decoupling_pct } } : {}),
       ...(r.hr_drift_pct != null ? { hr_drift_v1: { pct: r.hr_drift_pct } } : {}),
+      ...(r.interval_breakdown != null ? { granular_analysis: { interval_breakdown: r.interval_breakdown } } : {}),
       ...(r.total_steps != null || r.segments != null
         ? { fact_packet_v1: {
             ...(r.total_steps != null ? { derived: { interval_execution: { total_steps: r.total_steps } } } : {}),
