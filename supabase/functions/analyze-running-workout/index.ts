@@ -37,7 +37,7 @@ import { parseLocalDate } from '../_shared/parse-local-date.ts';
 import { getArcContext } from '../_shared/arc-context.ts';
 import type { ArcNarrativeContextV1 } from '../_shared/arc-narrative-state.ts';
 import { resolveCurrentRunEasyPace } from '../../../src/lib/resolve-current-run-pace.ts';
-import { resolveRunEasyHrBand, isEasyPrescribedRun, easyCeilingBpm, zone3FloorBpm } from '../_shared/easy-hr.ts';
+import { resolveRunEasyHrBand, isEasyPrescribedRun, easyCeilingBpm, frielRunZones } from '../_shared/easy-hr.ts';
 import { timeUnderCeiling } from '../_shared/time-under-ceiling.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 
@@ -1043,11 +1043,12 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         // surfacing next to the facts. audit 2026-07-17. LTHR via the one resolver (learned-first, gated).
         const thr = resolveCurrentLthr({ learned_fitness: learnedFitness as any }).bpm;
         if (thr == null || thr <= 0) return undefined;
-        const z1Max = Math.round(thr * 0.85);
-        const z2Max = zone3FloorBpm(thr);
-        const z3Max = Math.round(thr * 0.95);
-        const z4Max = Math.round(thr * 1.05);
-        return { z1Max, z2Max, z3Max, z4Max, z5Max: 999 };
+        // ⛔ THE ONE TABLE, READ — not a copy of its percentages (WORKORDER §3b, 2026-09-16). The copy that
+        // stood here put each zone's top on the next zone's first beat (Z1 top 85%, Z3 top 95%, Z4 top
+        // 105%), one beat above `frielRunZones`, whose tops are the beat BELOW the next zone's floor.
+        // The bins are `hr <= zNMax`, so the table's `max` is the ceiling exactly.
+        const [fz1, fz2, fz3, fz4] = frielRunZones(thr);
+        return { z1Max: fz1.max!, z2Max: fz2.max!, z3Max: fz3.max!, z4Max: fz4.max!, z5Max: 999 };
       } catch {
         return undefined;
       }
