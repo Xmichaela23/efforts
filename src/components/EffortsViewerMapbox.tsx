@@ -10,7 +10,7 @@ import {
   weatherInvokeArgsFromWorkout,
   workoutHasStoredOpenMeteoBlob,
 } from "@/lib/sessionWeather";
-import { formatSpeed } from "../utils/workoutFormatting";
+import { formatSpeed, formatPace } from "../utils/workoutFormatting";
 import { isVirtualActivity, getVirtualWorkoutLabel } from "../utils/workoutNames";
 import { isIndoorSession } from "@shared/indoor-session";
 import { getDisciplineColorRgb, SPORT_COLORS } from "@/lib/context-utils";
@@ -228,26 +228,21 @@ function getCurrentSample(normalizedSamples: any[], distance: number) {
   return normalizedSamples[Math.min(sampleIdx, normalizedSamples.length - 1)];
 }
 
-function formatSpeedForScrub(speed_mps: number | null, isRide: boolean, useMiles: boolean): string {
-  if (!Number.isFinite(speed_mps)) return '--';
+/**
+ * ⛔ A RUN READS THE RUN'S OWN LINE (2026-09-15, §8.0 #6). This took `speed_mps`, which the server writes for
+ * RIDES only (`compute-workout-analysis/display-series.ts:251`), and turned it into a pace itself — so on a run
+ * the overlay printed "--" while the server's `pace_display_s_per_km` sat unread in the same series. A ride
+ * prints the speed line; everything else prints the pace line, in the one pace formatter (§8.0 #2).
+ */
+function formatSpeedForScrub(speed_mps: number | null, pace_s_per_km: number | null, isRide: boolean, useMiles: boolean): string {
   if (isRide) {
-    return useMiles 
-      ? `${(speed_mps * 2.237).toFixed(1)} mph`
-      : `${(speed_mps * 3.6).toFixed(1)} km/h`;
-  } else {
-    // Running pace
-    const pacePerKm = speed_mps > 0 ? 1000 / speed_mps : 0;
-    const pacePerMile = pacePerKm * 1.609;
-    if (useMiles) {
-      const minutes = Math.floor(pacePerMile / 60);
-      const seconds = Math.floor(pacePerMile % 60);
-      return `${minutes}:${seconds.toString().padStart(2, '0')} /mi`;
-    } else {
-      const minutes = Math.floor(pacePerKm / 60);
-      const seconds = Math.floor(pacePerKm % 60);
-      return `${minutes}:${seconds.toString().padStart(2, '0')} /km`;
-    }
+    if (!Number.isFinite(speed_mps) || (speed_mps as number) <= 0) return '--';
+    return useMiles
+      ? `${((speed_mps as number) * 2.237).toFixed(1)} mph`
+      : `${((speed_mps as number) * 3.6).toFixed(1)} km/h`;
   }
+  if (!Number.isFinite(pace_s_per_km) || (pace_s_per_km as number) <= 0) return '--';
+  return formatPace(pace_s_per_km as number, useMiles).replace('/', ' /');
 }
 
 function formatPowerForScrub(power_w: number | null): string {
@@ -713,7 +708,7 @@ function EffortsViewerMapbox({
   const isRide = workoutData?.type === 'ride';
   
   // Format metrics for thumb scrubbing — the server's series at the cursor
-  const currentSpeed = formatSpeedForScrub(currentSample?.speed_mps, isRide, useMiles);
+  const currentSpeed = formatSpeedForScrub(currentSample?.speed_mps ?? null, currentSample?.pace_s_per_km ?? null, isRide, useMiles);
   const currentPower = formatPowerForScrub(currentSample?.power_w ?? null);
   const currentHR = formatHRForScrub(currentSample?.hr_bpm);
   const currentGrade = formatGradeForScrub(currentSample?.grade_pct);
