@@ -14,7 +14,6 @@ import type { DisciplineCard, TrendVerdict, BikeFitness, BikeSignal, PerfSummary
 import type { CoachWeekContextV1 } from '@/hooks/useCoachWeekContext';
 import { useStateTrends } from '@/hooks/useStateTrends';
 import { useAppContext } from '@/contexts/AppContext';
-import { resolveCurrentFtp } from '@/lib/resolve-current-ftp';
 import { trendReceipt, trendEvidence, trendHeadline, type Discipline } from '@/lib/trend-receipt';
 import { formatPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor } from '@/lib/context-utils';
@@ -195,13 +194,10 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
   // rewritten on an INGEST, so every athlete carries the previous shape until their next workout
   // syncs. A field that lands "sometime after your next ride" reads as broken.
   //
-  // ⚠️ THE FALLBACK IS ONLY HONEST BECAUSE THE SENTENCE CHANGED. It used to claim the number was what
-  // the measurement was computed against — which a client-side read cannot promise. It now reports
-  // the FTP ON RECORD, and that is exactly what `resolveCurrentFtp` returns. Same resolver the coach
-  // and the analyzers use (D-... FTP fracture #2), never a second read of the raw column.
-  // ⛔ 2026-09-03: THE RESOLVE MOVED UP to the section (`useBikeFallbackFtp`) and arrives as a prop.
-  // The collapsed bike row prints FTP too now, and two independent resolves could print two numbers
-  // for one fact — the exact fracture the FTP work exists to close. One resolve, both surfaces.
+  // ⚠️ THE NUMBER IS THE FTP ON RECORD, and it is resolved ON THE SERVER (2026-09-15, §8.0 #22):
+  // `trends.applied_ftp`, from `resolveCurrentFtp` — the same call Adjust, Profile, the power zones and
+  // every prescribed ride make. `fallbackFtp` is that value. The phone resolves nothing and reads no raw
+  // column; before this it printed the learned estimate and ignored a typed FTP entirely.
 
   // ⛔ NO SECOND-LEVEL TAPS ON THIS SCREEN (Michael 2026-09-03: one click). The power ⓘ, the
   // "more" receipt and the label ⓘ are all printed open now; see StrengthReadCards.SpineCard.
@@ -268,7 +264,8 @@ function BikeFitnessRow({ fitness, mode, anchor, fallbackFtp = null }: { fitness
   // counts hard rides in the winning terrain bin, efficiency counts clean easy rides). Stated as
   // "rides we can read from", never as their total ride count, which we do not have here.
   const rideCount = Math.max(fitness.power.sampleCount ?? 0, fitness.efficiency.sampleCount ?? 0);
-  const ftpNow = anchor?.value != null && Number.isFinite(anchor.value) ? Math.round(anchor.value) : fallbackFtp;
+  // The number in use first (`applied_ftp`); the anchor only when the payload predates v210.
+  const ftpNow = fallbackFtp ?? (anchor?.value != null && Number.isFinite(anchor.value) ? Math.round(anchor.value) : null);
   // ⛔ FTP OVER TIME, NOT A DOT (2026-09-04, docs/SPEC-ftp-trend-line-2026-09-04.md). The dot placed
   // best-20-min power in its own 12-week min/max under a label that read "167 W threshold" — marker and
   // number disagreed, and "position in your own range" had no field source. TrainingPeaks' FTP view is a
@@ -1015,26 +1012,22 @@ function DisciplineRow({ card, restTrend, showAxis }: { card: DisciplineCard; re
 // always-visible week-execution trade sentence. (The old always-visible `PostureLine` — orphaned since
 // it was written, F10 — is removed 2026-07-24 now that the ⓘ carries this.)
 
-export default function StatePerformanceSection({ strengthDetail, stateDisplay, primaryDiscipline, planWeek, block, strengthFatigue, hasActivePlan, asOf }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; primaryDiscipline?: string | null; planWeek?: number | null; block?: BlockCard | null; strengthFatigue?: boolean; hasActivePlan?: boolean; asOf?: string | null }) {
+export default function StatePerformanceSection({ strengthDetail, stateDisplay, appliedFtp = null, primaryDiscipline, planWeek, block, strengthFatigue, hasActivePlan, asOf }: { strengthDetail?: React.ReactNode; stateDisplay?: StateDisplayV1 | null; appliedFtp?: number | null; primaryDiscipline?: string | null; planWeek?: number | null; block?: BlockCard | null; strengthFatigue?: boolean; hasActivePlan?: boolean; asOf?: string | null }) {
   // S2: `stateDisplay` is the server-assembled display contract from the coach payload. When present the
   // hook renders it (no in-browser queries/assembly); absent → legacy live path (safe rollout fallback).
   const { cards, bikeFitness, runFitness, strengthFitness, swimRest, swimVolume, fitnessMode, fitnessAnchors, cadenceCounts, posture: declaredPosture, activeDisciplines, loading } = useStateTrends(stateDisplay);
   const { useImperial, loadUserBaselines } = useAppContext(); // for the collapsed run pace-at-HR glance
-  // ⛔ ONE FTP RESOLVE FOR THE WHOLE SECTION (2026-09-03). The collapsed bike row and the open bike
-  // card both print the FTP on record; resolving it twice could print two numbers for one fact.
-  // Server anchor first (`fitnessAnchors.bike`), this only fills the gap until the next ingest.
+  /**
+   * ⛔ ONE FTP FOR THE WHOLE SECTION, AND IT IS THE ONE THE APP RUNS ON (2026-09-03; corrected 2026-09-15,
+   * §8.0 #22). The row used to print `fitnessAnchors.bike.value` — the learned ESTIMATE, with no tier for
+   * a typed FTP — while Adjust, Profile, the power zones and every prescribed ride used the typed one. The
+   * coach payload now carries `applied_ftp` from `resolveCurrentFtp`, the same call those three make, and
+   * this prints it. The phone's own resolve is gone with the last of its arithmetic.
+   * ⚠️ The ANCHOR is untouched and still drives the dot, the "anchored" state and the FTP history line:
+   * it is the measured reading, and its label says "FTP estimate", which is true.
+   */
   const bikeAnchorValue = fitnessAnchors?.bike?.value ?? null;
-  const [fallbackFtp, setFallbackFtp] = React.useState<number | null>(null);
-  React.useEffect(() => {
-    if (bikeAnchorValue != null) return;            // server already told us; don't ask twice
-    let cancelled = false;
-    void loadUserBaselines?.().then((b: any) => {
-      if (cancelled || !b) return;
-      const r = resolveCurrentFtp({ learned_fitness: b.learned_fitness, performance_numbers: b.performanceNumbers });
-      if (r?.value != null) setFallbackFtp(Math.round(r.value));
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [bikeAnchorValue, loadUserBaselines]);
+  const fallbackFtp = appliedFtp;
 
   // ⛔ ATHLETE-SET ROW ORDER (2026-09-05, Michael: "can we make it so the user can move these by their own
   // priority?"). Precedent: Garmin Connect's reorderable cards, TrainingPeaks' reorderable dashboard charts.
@@ -1197,7 +1190,7 @@ export default function StatePerformanceSection({ strengthDetail, stateDisplay, 
       // not offered: no athlete body weight is stored anywhere in the app.
       // ⚠️ "estimated" is not decoration — it is the line that says the number is worth testing, and
       // the book gives two tests we can send (20 min × 0.95, or the ramp; pp.212–213).
-      const ftp = bikeAnchorValue != null ? Math.round(bikeAnchorValue) : fallbackFtp;
+      const ftp = appliedFtp ?? (bikeAnchorValue != null ? Math.round(bikeAnchorValue) : null);
       const ftpBasis = bf?.efficiency?.basis === 'personal' ? 'tested'
         : bf?.efficiency?.basis === 'coggan_ftp' ? 'estimated' : null;
       if (ftp != null) rows.push({ name: 'FTP', value: `${ftp} W`, note: ftpBasis ?? undefined });

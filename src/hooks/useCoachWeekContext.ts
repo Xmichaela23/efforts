@@ -329,6 +329,13 @@ export type CoachWeekContextV1 = {
   evidence: Array<{ code: string; label: string; value: number | string; unit?: string }>;
   week_narrative: string | null;
   fitness_direction: 'improving' | 'stable' | 'declining' | 'mixed';
+  /**
+   * ⛔ THE FTP THE APP RUNS ON (v210, 2026-09-15, §8.0 #22) — `resolveCurrentFtp`, the same number Adjust,
+   * Profile, the power zones and every prescribed ride use. The bike row used to print
+   * `display.fitnessAnchors.bike.value`, which is the learned ESTIMATE and has no tier for a typed FTP,
+   * so an athlete on "your number" read two different watt numbers on two screens.
+   */
+  applied_ftp?: number | null;
   baseline_drift_suggestions?: Array<{ lift: string; label: string; baseline: number; learned: number }>;
   plan_adaptation_suggestions?: Array<{ code: string; title: string; details: string }>;
   marathon_readiness?: {

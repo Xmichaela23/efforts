@@ -10,4 +10,4 @@
  * it and never asked the server — State kept "across 8 sessions" and no "last 7 days" after the
  * 209 deploy. The version history stays beside the import in `coach/index.ts`.
  */
-export const COACH_PAYLOAD_VERSION = 209;
+export const COACH_PAYLOAD_VERSION = 210;
