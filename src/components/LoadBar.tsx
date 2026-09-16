@@ -13,7 +13,6 @@ export interface LoadBarData {
   fitness_fatigue?: {
     fitness: number | null; fatigue: number | null; form: number | null;
     fitness_prior?: number | null; fatigue_prior?: number | null;
-    key_line?: { fitness: number; fatigue: number; form: number } | null;
     week_ago?: { fitness: number | null; fatigue: number | null; form: number | null } | null;
     provenance?: { tau_fitness_days?: number | null; tau_fatigue_days?: number | null } | null;
     /**
@@ -142,12 +141,8 @@ export function LoadKeyForm({ ff, zones }: { ff: NonNullable<LoadBarData['fitnes
         */}
       <p>
         Form is fitness minus fatigue. Below zero you are training harder than usual, building but tired. Above zero you are rested.
-        {/* ⛔ THE SERVER'S THREE NUMBERS (2026-09-15, §8.0 #31) — `key_line`, rounded there so the subtraction
-            holds. This rounded each operand itself and printed the server's separately rounded form, so the
-            line could read "47 − 63 = −15". No arithmetic here. */}
-        {ff.key_line
-          ? ` Today: ${ff.key_line.fitness} − ${ff.key_line.fatigue} = ${ff.key_line.form > 0 ? '+' : ff.key_line.form < 0 ? '−' : ''}${Math.abs(ff.key_line.form)}.`
-          : ''}
+        {/* ⛔ NO EQUATION (Michael, 2026-09-16: "drop it"). The "Today: a − b = c" line printed the numbers entering
+            today beside the bar's end-of-today numbers; TrainingPeaks prints no equation. */}
       </p>
       {rows.length > 0 && (
         <table className="mt-1 text-[12px] tabular-nums">

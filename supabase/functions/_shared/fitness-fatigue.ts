@@ -38,14 +38,6 @@ export interface FitnessFatigue {
   fatigue_prior?: number | null;
   /** TSB — fitness − fatigue ENTERING asOf (freshness). Positive = fresh, negative = fatigued. */
   form: number | null;
-  /**
-   * ⛔ THE KEY LINE'S THREE NUMBERS (2026-09-15, §8.0 #31). The ⓘ prints "Today: 47 − 63 = −16", and the
-   * phone rounded each of `fitness_prior` / `fatigue_prior` / `form` on its own — three roundings of three
-   * 1-dp numbers, so the subtraction on screen could be off by one. These are whole numbers and the form is
-   * the difference of the two printed operands, so the equation holds as printed. Rounding for that line
-   * only: `form` above stays the real 1-dp value every other read uses.
-   */
-  key_line?: { fitness: number; fatigue: number; form: number } | null;
   provenance: {
     method: 'banister_ewma_v1';
     /** ALWAYS false — TrainingPeaks' constants (42 / 7), no per-athlete fit; TrainingPeaks does not fit one either. */
@@ -126,9 +118,6 @@ export function computeFitnessFatigue(
     form: r1(ctlPrior - atlPrior),             // freshness entering asOf (TSB, prior-day convention)
     fitness_prior: r1(ctlPrior),
     fatigue_prior: r1(atlPrior),
-    // §8.0 #31 — the ⓘ's equation. Rounded from the 1-dp values every other read shows (so the operands are
-    // the fitness and fatigue the bar prints), and the form is their difference, so the line adds up.
-    key_line: { fitness: Math.round(r1(ctlPrior)), fatigue: Math.round(r1(atlPrior)), form: Math.round(r1(ctlPrior)) - Math.round(r1(atlPrior)) },
     provenance: prov(daysBetween(earliest, asOf) + 1),
   };
 }

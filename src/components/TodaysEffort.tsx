@@ -1400,7 +1400,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
    */
   const formKey = useMemo(() => {
     const load = coachWeek.data?.weekly_state_v1?.load as {
-      fitness_fatigue?: { fitness: number | null; fatigue: number | null; form: number | null; fitness_prior?: number | null; fatigue_prior?: number | null; key_line?: { fitness: number; fatigue: number; form: number } | null } | null;
+      fitness_fatigue?: { fitness: number | null; fatigue: number | null; form: number | null; fitness_prior?: number | null; fatigue_prior?: number | null } | null;
       form_zones?: Array<{ range: string; word: string; meaning: string; current: boolean }>;
     } | undefined;
     const ff = load?.fitness_fatigue ?? null;
