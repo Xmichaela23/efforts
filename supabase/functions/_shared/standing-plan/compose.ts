@@ -2965,26 +2965,29 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
    * (p247's own layout; the note that used to say so came off on 2026-09-09).
    */
   /**
-   * ⛔ EVERY ME LOWER DAY THE FRAME HAS, ASKED OF THE FRAME (2026-08-30) — see `FrameDay.lowerRole`.
-   * ⚠️ IT WAS A `find` ON THE LABEL `'ME: Lower'`, WHICH IS BOTH TOO NARROW AND TOO FEW. p274 names
-   * the All Rounder's lower days for their pattern and opens BOTH on an ME slot, so the old test
-   * returned nothing and the p247 reduction could never fire on this frame. `strength_5k` still
-   * answers with its one day, in the same order, through the label fallback in `lowerRoleOf`.
+   * ⛔⛔ THE DAY BEFORE EACH LIFTING DAY, ASKED PER DAY (Michael, 2026-09-16; p247: *"Monday's run is fairly
+   * challenging, given that there is an ME lower session the next day"*). This was ONE flag for the whole
+   * week — true when a hard run preceded ANY ME lower day — so a Monday hard run before Tuesday's deadlift
+   * also cut Friday's squat, which follows a ride. Now a lifting day's lower-body slots take the reduction
+   * only when THAT day is a heavy (ME) lower day and a hard RUN is placed on the weekday directly before it.
+   * ⚠️ THE ME LOWER DAYS ARE ASKED OF THE FRAME (2026-08-30) — `FrameDay.lowerRole`, with `strength_5k`'s
+   * `'ME: Lower'` label as the fallback.
    */
-  const meLowerFrameDays = days
+  const meLowerFrameDays = new Set(days
     .filter((d) => (d.lowerRole ?? (d.label === 'ME: Lower' ? 'me' : null)) === 'me')
-    .map((d) => d.day);
-  const daysBeforeMeLower = new Set(
-    meLowerFrameDays.map((fd) => WEEKDAYS[(WEEKDAYS.indexOf(dayNameFor(args, fd)) + 6) % 7]),
-  );
-  const hardRunBeforeLower = daysBeforeMeLower.size > 0 && days.some((d) =>
-    d.endurance.some((slot, i) => {
+    .map((d) => d.day));
+  const hardRunWeekdays = new Set<string>();
+  for (const d of days) {
+    d.endurance.forEach((slot, i) => {
       const assigned = assignedSlot(sportAssignment, d.day, i, slot);
       const placed = enduranceDays.get(`${d.day}:${i}`);
-      return assigned.sport === 'run'
-        && isHardSlot({ family: assigned.family, role: assigned.role })
-        && placed != null && daysBeforeMeLower.has(placed);
-    }));
+      if (assigned.sport === 'run' && isHardSlot({ family: assigned.family, role: assigned.role }) && placed != null) {
+        hardRunWeekdays.add(placed);
+      }
+    });
+  }
+  const hardRunBeforeLowerOn = (frameDay: number): boolean => meLowerFrameDays.has(frameDay) &&
+    hardRunWeekdays.has(WEEKDAYS[(WEEKDAYS.indexOf(dayNameFor(args, frameDay)) + 6) % 7]);
   for (const n of sportAssignment.notes) {
     if (!notes.some((x) => x.text === n.text)) {
       notes.push({ kind: n.kind === 'source' ? 'source' : n.kind === 'warning' ? 'warning' : 'ours', text: n.text, cite: n.cite });
@@ -3052,7 +3055,7 @@ export function composeWeek(args: ComposeArgs): ComposedWeek {
         let droppedHere = 0;
         for (const slot of day.strength) {
           const built = exerciseForSlot(
-            slot, args, notes, hardRunBeforeLower, takenToday, picks, focusMuscles,
+            slot, args, notes, hardRunBeforeLowerOn(day.day), takenToday, picks, focusMuscles,
             dialMuscles, day.day);
           // ⛔ THE DAY RAN OUT OF MOVEMENTS FOR THIS PATTERN — see `exerciseForSlot`'s drop branch.
           if (!built) { droppedHere += 1; continue; }
