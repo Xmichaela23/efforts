@@ -387,6 +387,8 @@ const CITE = new RegExp([
   String.raw`\bpp?\s?\d{2,3}\b`, String.raw`\bViada\b`, String.raw`FIELD\s*[—-]`,
   'TrainingPeaks', 'Garmin', 'Strava', 'intervals\\.icu', 'TrainerRoad', 'COROS', 'Runna', 'WKO5',
   'Friel', 'Daniels', 'Brzycki', 'Epley', 'Coggan', 'Karvonen', 'Tanaka', 'Gulati', 'Foster', 'Smyth',
+  // Stage 7 session 1: standards bodies cited for bar, plate and unit definitions.
+  String.raw`\bIPF\b`, String.raw`\bIWF\b`, String.raw`\bNIST\b`,
   'SOURCE-viada', 'STATE-SOURCES:\\d+', 'ledger row',
 ].join('|'), 'i');
 const OURS = /\bOURS\b/;
