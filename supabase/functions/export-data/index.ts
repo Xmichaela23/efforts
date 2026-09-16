@@ -23,6 +23,9 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { requireUser } from '../_shared/require-user.ts';
 import { KG_PER_LB, liftInAthletesUnit } from '../_shared/strength/session-volume.ts';
+import { zonesForBaselinesRow } from '../save-baselines/zones.ts';
+import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
+import { displayFormat, M_PER_MI } from '../_shared/display-format.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -274,32 +277,45 @@ function plansCsv(plans: Row[], planned: Row[]): { text: string; count: number }
   return { text: csv(header, out), count: out.length };
 }
 
-/** Each number with its source word — the `_source` keys the Profile screen writes, else "entered" (typed by the athlete). */
+/**
+ * Each number with its source word.
+ * ⛔ THE NUMBERS THE APP RUNS ON, NOT THE TYPED ONES (2026-09-16, Stage 7 session 3). This read raw
+ * `performance_numbers` keys: the typed FTP beside an accepted one, no threshold pace, threshold or resting heart
+ * rate (they live in `learned_fitness` / `configured_hr_zones`), and pound lifts beside `weight_unit: "kg"`. It now
+ * reads Adjust's own readout (`save-baselines/zones.ts zonesForBaselinesRow` — the resolvers every screen uses),
+ * so the file and Adjust print the same numbers, in the athlete's unit, with Adjust's source words.
+ */
 function profileJson(ub: Row | null, exportedAt: string): string {
-  const pn: Row = ub?.performance_numbers && typeof ub.performance_numbers === 'object' ? ub.performance_numbers : {};
   const prof: Row = ub?.profile && typeof ub.profile === 'object' ? ub.profile : {};
+  const pn: Row = ub?.performance_numbers && typeof ub.performance_numbers === 'object' ? ub.performance_numbers : {};
+  const units = ub?.units === 'metric' ? 'metric' : 'imperial';
+  const readout = zonesForBaselinesRow(ub as never, { today: exportedAt.slice(0, 10) }).readout;
+  const fromRow = (row: { raw: number | null; note: string | null } | null | undefined) =>
+    row?.raw != null ? { value: row.raw, source: row.note ?? 'entered' } : null;
+  const lift = (key: string) => fromRow(readout.strength.lifts.find((l) => l.key === key)?.row);
+  const thr = resolveCurrentRunThresholdPace({ learned_fitness: ub?.learned_fitness, performance_numbers: pn } as never);
+  const thrText = thr.sec_per_mi != null && thr.sec_per_mi > 0 ? displayFormat(units === 'metric').pacePerUnit(thr.sec_per_mi / (M_PER_MI / 1000)) : null;
   const withSource = (value: unknown, source?: unknown) =>
     value === null || value === undefined || value === '' ? null : { value, source: typeof source === 'string' && source ? source : 'entered' };
-  const units = ub?.units === 'metric' ? 'metric' : 'imperial';
   const body = {
     name: prof.name ?? null,
     location: prof.location ?? null,
     birthday: ub?.birthday ?? null,
     units,
-    weight_unit: units === 'metric' ? 'kg' : 'lb',   // the unit every set weight in sets.csv is in
+    weight_unit: units === 'metric' ? 'kg' : 'lb',   // the unit every set weight in sets.csv and every lift below is in
     height: ub?.height ?? null,
     weight: ub?.weight ?? null,
     numbers: {
-      squat: withSource(pn.squat),
-      bench: withSource(pn.bench),
-      deadlift: withSource(pn.deadlift),
-      overhead_press: withSource(pn.overheadPress1RM),
-      ftp: withSource(pn.ftp, pn.ftp_source),
-      threshold_pace_min_per_mi: withSource(pn.threshold_pace_min_per_mi, pn.threshold_pace_source),
-      threshold_hr: withSource(pn.threshold_heart_rate, pn.lthr_source),
+      squat: lift('squat'),
+      bench: lift('bench'),
+      deadlift: lift('deadlift'),
+      overhead_press: lift('overheadPress1RM'),
+      ftp: fromRow(readout.bike.ftp),
+      threshold_pace: thrText ? { value: thrText, source: readout.run.threshold.note ?? 'entered' } : null,
+      threshold_hr: fromRow(readout.run.lthr),
       five_k: withSource(pn.fiveK, pn.fiveK_source),
       easy_pace: withSource(pn.easyPace),
-      resting_hr: withSource(pn.restingHeartRate),
+      resting_hr: fromRow(readout.run.resting_hr),
     },
     zones: ub?.configured_hr_zones ?? null,
     effort_paces: ub?.effort_paces ? { value: ub.effort_paces, source: ub.effort_paces_source ?? 'calculated' } : null,
@@ -348,7 +364,7 @@ Deno.serve(async (req) => {
         .order('created_at', { ascending: true }).range(from, to)),
       allRows<Row>((from, to) => admin.from('planned_workouts').select('training_plan_id,date,type,name,duration,total_duration_seconds,workout_status')
         .eq('user_id', userId).order('date', { ascending: true }).range(from, to)),
-      admin.from('user_baselines').select('units,birthday,height,weight,performance_numbers,profile,configured_hr_zones,effort_paces,effort_paces_source')
+      admin.from('user_baselines').select('units,birthday,height,weight,performance_numbers,learned_fitness,locked_baselines,gender,updated_at,profile,configured_hr_zones,effort_paces,effort_paces_source')
         .eq('user_id', userId).maybeSingle().then(({ data, error }) => { if (error) throw new Error(error.message); return data as Row | null; }),
     ]);
 
