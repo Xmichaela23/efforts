@@ -137,7 +137,8 @@ Deno.serve(async (req: Request) => {
         name: retestGroup === 2 ? 'Retest: Lower' : 'Retest: Upper',
         description: 'Work up in three steps. The last set is max clean reps and it re-prices the rest of the block.',
         duration: 45, workout_status: 'planned', source: 'training_plan',
-        strength_exercises: exercises, computed: null,
+        // ⛔ NO `computed` KEY: materialize-plan is its one writer; the column default '{}' reads as not-yet-expanded, same as null (2026-09-16, Stage 7 session 1).
+        strength_exercises: exercises,
         units: (config?.units === 'metric' ? 'metric' : 'imperial'),
         tags: ['standing_plan', '1rm_test', 'retest'],
       };

@@ -60,7 +60,7 @@
       "1": "fail",
       "2": "warn",
       "2-ledger": "fail",
-      "3": "warn",
+      "3": "fail",
       "4": "fail",
       "5": "fail"
     },
@@ -295,6 +295,14 @@
         {
           "column": "workouts.workout_analysis",
           "reason": "one analyzer per discipline; a workout has one discipline (design §3.2)"
+        },
+        {
+          "column": "planned_workouts.duration",
+          "reason": "build and rebuild set the written minutes (activate-plan, rematerialize-standing-block); materialize-plan replaces them with the total of the expanded steps when those steps carry time (Stage 7 session 1)"
+        },
+        {
+          "column": "planned_workouts.strength_exercises",
+          "reason": "one rematerializer per block type: rematerialize-strength-block only for strength_primary, rematerialize-standing-block only for Standing Plan; build rows come from activate-plan (Stage 7 session 1)"
         }
       ]
     },

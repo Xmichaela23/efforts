@@ -148,13 +148,31 @@ Deno.serve(async (req) => {
           if (lastBounded.length > 0) {
             configuredZones.max_heart_rate = Math.max(...lastBounded.map((z: any) => Number(z.max)));
           }
-          await supabase
+          // ⛔ NEVER OVER THE ATHLETE'S OWN ZONES (2026-09-16, Stage 7 session 1): this upsert replaced the whole
+          // `configured_hr_zones` on every connect, wiping typed heart rates (manual_* LTHR / max HR, zones_run, zones_ride).
+          // Same guard as the .fit path (save-imported-workout): write only when the row has no zone source or Strava's own.
+          const { data: existingZones } = await supabase
             .from('user_baselines')
-            .upsert(
-              { user_id: userId, configured_hr_zones: configuredZones },
-              { onConflict: 'user_id' }
-            );
-          console.log(`[STRAVA ZONES] Stored ${hrZones.zones.length} HR zones for user ${userId} (custom: ${hrZones.custom_zones})`);
+            .select('configured_hr_zones')
+            .eq('user_id', userId)
+            .maybeSingle();
+          const storedZones = (() => {
+            const z = existingZones?.configured_hr_zones;
+            if (typeof z !== 'string') return z ?? null;
+            try { return JSON.parse(z); } catch { return null; }
+          })();
+          const currentSource = storedZones?.source;
+          if (!currentSource || currentSource === 'strava') {
+            await supabase
+              .from('user_baselines')
+              .upsert(
+                { user_id: userId, configured_hr_zones: configuredZones },
+                { onConflict: 'user_id' }
+              );
+            console.log(`[STRAVA ZONES] Stored ${hrZones.zones.length} HR zones for user ${userId} (custom: ${hrZones.custom_zones})`);
+          } else {
+            console.log(`[STRAVA ZONES] Kept existing zones (source: ${currentSource}) for user ${userId}`);
+          }
         }
       }
     } catch (e) {

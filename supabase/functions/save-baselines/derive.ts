@@ -42,24 +42,59 @@ export function acceptMeasuredForSave(input: {
   learnedFitness: Record<string, unknown> | null | undefined;
   performanceNumbers: Record<string, unknown> | null | undefined;
   now: Date;
+  /** Which door the athlete said yes at; stored as `accepted_via`. The six-week checkpoint sends 'checkpoint'; the
+   *  learner's one-time seed (an athlete already running on a confident estimate, no accepted value) sends 'seed'. */
+  via?: 'baselines' | 'checkpoint' | 'seed';
 }):
   | { ok: true; learned_fitness: Record<string, unknown>; performance_numbers: Record<string, unknown>; accepted_value: number }
   | { ok: false; reason: 'nothing_to_accept' | 'value_changed' } {
   const pn: Record<string, unknown> = { ...(input.performanceNumbers ?? {}) };
+  const via = input.via === 'checkpoint' || input.via === 'seed' ? input.via : 'baselines';
+  // A seed changes nothing the athlete sees, so it leaves a typed number's source alone.
+  const seed = via === 'seed';
   if (input.kind === 'ftp') {
-    const next = acceptEstimatedFtp(input.learnedFitness ?? null, 'baselines', input.now);
+    const next = acceptEstimatedFtp(input.learnedFitness ?? null, via, input.now);
     if (!next) return { ok: false, reason: 'nothing_to_accept' };
     const accepted = Number((next.ride_ftp_accepted as { value: number }).value);
     if (Math.round(accepted) !== Math.round(Number(input.value))) return { ok: false, reason: 'value_changed' };
-    if (pn.ftp_source === 'manual') delete pn.ftp_source;
+    if (!seed && pn.ftp_source === 'manual') delete pn.ftp_source;
     return { ok: true, learned_fitness: next, performance_numbers: pn, accepted_value: accepted };
   }
-  const next = acceptLearnedRunThreshold(input.learnedFitness ?? null, 'baselines', input.now);
+  const next = acceptLearnedRunThreshold(input.learnedFitness ?? null, via, input.now);
   if (!next) return { ok: false, reason: 'nothing_to_accept' };
   const accepted = Number((next.run_threshold_pace_accepted as { value: number }).value);
   if (Math.round(accepted) !== Math.round(Number(input.value))) return { ok: false, reason: 'value_changed' };
-  if (pn.threshold_pace_source === 'manual') pn.threshold_pace_source = 'learned';
+  if (!seed && pn.threshold_pace_source === 'manual') pn.threshold_pace_source = 'learned';
   return { ok: true, learned_fitness: next, performance_numbers: pn, accepted_value: accepted };
+}
+
+// ── the swim CSS test → the plan's swim pace ─────────────────────────────────────────────────────
+
+/** A swim CSS written by the CSS test (it carries `tested_at`, or the test's source), not the learner's fit. */
+export function isTestedSwimCss(m: unknown): boolean {
+  const x = m as { value?: unknown; tested_at?: unknown; source?: unknown } | null;
+  return !!x && Number(x.value) > 0 && (x.tested_at != null || /CSS test/i.test(String(x.source ?? '')));
+}
+
+/**
+ * ⛔ A TESTED CSS SETS THE PLAN'S SWIM PACE, SAVED HERE (2026-09-16, Stage 7 session 1). compute-workout-analysis
+ * wrote `performance_numbers.swimPace100` itself beside the learned CSS; this is now the one writer, and the
+ * learner asks for it right after it stores a CSS test. The conversion moved unchanged: `swimPace100` is the
+ * /100 yd `m:ss` STRING every reader parses, and the test measures sec/100 m — so ×0.9144 (definition) and m:ss.
+ */
+export function swimPaceFromTestedCssForSave(input: {
+  learnedFitness: Record<string, unknown> | null | undefined;
+  performanceNumbers: Record<string, unknown> | null | undefined;
+}):
+  | { ok: true; performance_numbers: Record<string, unknown>; accepted_value: string }
+  | { ok: false; reason: 'nothing_to_accept' } {
+  const css = input.learnedFitness?.swim_css_sec_per_100m as { value?: unknown } | undefined;
+  if (!isTestedSwimCss(css)) return { ok: false, reason: 'nothing_to_accept' };
+  const cssYd = Number(css!.value) * 0.9144;
+  let mm = Math.floor(cssYd / 60), ss = Math.round(cssYd % 60);
+  if (ss === 60) { mm += 1; ss = 0; }
+  const swimPace100 = `${mm}:${String(ss).padStart(2, '0')}`;
+  return { ok: true, performance_numbers: { ...(input.performanceNumbers ?? {}), swimPace100 }, accepted_value: swimPace100 };
 }
 
 // ── 5K → effort score and training paces ────────────────────────────────────────────────────────
@@ -316,6 +351,11 @@ export function liftsForSave(
   perf: Record<string, unknown>,
   lockedStored: Record<string, unknown> | null | undefined,
   metric: boolean,
+  /**
+   * `lock: false` — a 1RM TEST result (save-baseline-test, 2026-09-16): the seed moves, the lock is untouched and a
+   * `null` clears nothing. The typed Adjust / Baselines save keeps the default, which locks.
+   */
+  opts: { lock?: boolean } = {},
 ): { performance_numbers: Record<string, unknown>; locked_baselines: Record<string, unknown> | null } | null {
   if (!lifts || typeof lifts !== 'object') return null;
   const perfOut = { ...perf };
@@ -325,7 +365,8 @@ export function liftsForSave(
     const key = canonicalizeLiftKey(rawKey);
     if (!key) continue;
     touched = true;
-    if (rawValue == null) { delete locked[key]; continue; }
+    const lock = opts.lock !== false;
+    if (rawValue == null) { if (lock) delete locked[key]; continue; }
     const n = Number(rawValue);
     if (!Number.isFinite(n)) continue;
     const reps = key === 'pullupMaxReps';
@@ -333,7 +374,7 @@ export function liftsForSave(
     const stored = reps ? Math.round(n) : Math.round(metric ? n / KG_PER_LB : n);
     perfOut[key] = stored;
     // Pull-ups are reps and are never locked — the row has no auto to switch back to (D-229).
-    if (!reps) locked[key] = stored;
+    if (!reps && lock) locked[key] = stored;
   }
   if (!touched) return null;
   return {

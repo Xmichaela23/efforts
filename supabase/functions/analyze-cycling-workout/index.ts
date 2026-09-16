@@ -1211,39 +1211,6 @@ function extractSensorData(data: any): any[] {
   return [];
 }
 
-function inferSecondsFromMaybeMinutes(args: {
-  value: number | null;
-  workout: any;
-}): number | null {
-  const { value, workout } = args;
-  if (value == null) return null;
-  if (!Number.isFinite(value) || value <= 0) return null;
-
-  const asSeconds = value;
-  const asMinutesSeconds = value * 60;
-
-  // OURS — 36 h longest real ride, 2 km/h and 60 s floors for the unit check; sanity, kept as found
-  // If one option is clearly impossible (> 36h), prefer the other.
-  const tooBig = (s: number) => s > 36 * 3600;
-  if (tooBig(asMinutesSeconds) && !tooBig(asSeconds)) return asSeconds;
-  if (tooBig(asSeconds) && !tooBig(asMinutesSeconds)) return asMinutesSeconds;
-
-  // If we have distance + avg_speed, choose the candidate closer to expected clock time.
-  const distKm = Number(workout?.distance);
-  const avgSpeedKph = Number(workout?.avg_speed);
-  if (Number.isFinite(distKm) && distKm > 0 && Number.isFinite(avgSpeedKph) && avgSpeedKph > 2) {
-    const expectedSeconds = (distKm / avgSpeedKph) * 3600;
-    if (Number.isFinite(expectedSeconds) && expectedSeconds > 60 && expectedSeconds < 36 * 3600) {
-      const d1 = Math.abs(asSeconds - expectedSeconds);
-      const d2 = Math.abs(asMinutesSeconds - expectedSeconds);
-      return d1 <= d2 ? asSeconds : asMinutesSeconds;
-    }
-  }
-
-  // Default: schema typically stores minutes.
-  return asMinutesSeconds;
-}
-
 function toDateOnly(val: any): string | null {
   if (val == null) return null;
   const s = String(val).trim();
@@ -1927,35 +1894,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
     let ai_summary: string | null = null;
     let ai_summary_generated_at: string | null = null;
 
-    // Repair legacy 60x duration units bug in computed.overall.duration_s_moving when detected.
-    try {
-      const overall = (workout as any)?.computed?.overall;
-      const cur = Number(overall?.duration_s_moving);
-      const inferred = inferSecondsFromMaybeMinutes({ value: (workout as any)?.moving_time ?? (workout as any)?.duration ?? null, workout });
-      if (
-        Number.isFinite(cur) &&
-        cur > 0 &&
-        inferred != null &&
-        inferred > 0 &&
-        // OURS — a 10x gap between the two moving times is read as a minutes / seconds mix-up; kept as found
-        (cur / inferred >= 10 || inferred / cur >= 10)
-      ) {
-        const nextComputed = {
-          ...(workout as any).computed,
-          overall: {
-            ...(overall || {}),
-            duration_s_moving: Math.round(inferred),
-          },
-        };
-        await supabase
-          .from('workouts')
-          .update({ computed: nextComputed })
-          .eq('id', workout_id);
-        console.log('🛠️ Repaired computed.overall.duration_s_moving (unit mismatch).', { cur, inferred });
-      }
-    } catch (e) {
-      console.log('⚠️ Failed to repair computed duration units:', e);
-    }
+    // ⛔ NO `workouts.computed` WRITE HERE: compute-workout-summary owns it (merge_computed); the old moving-time "repair" wrote the whole blob back (2026-09-16, Stage 7 session 1).
 
     // Build granular analysis (matches running structure for client compatibility)
     // D-089: wrap intervalBreakdown as { available, intervals } — the run-aligned

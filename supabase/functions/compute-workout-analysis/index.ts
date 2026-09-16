@@ -5,7 +5,6 @@ import { withAlarm } from '../_shared/alarm.ts';
 import { judgedPowerW, normalizedPowerW, pedalingAveragePowerW, powerStreamW } from '../_shared/ride-power.ts';
 import { getOverallAvgHr } from '../_shared/fact-packet/queries.ts';
 import { buildRunDistanceBests, buildRunPaceCurve, buildRunHrCurve, type RunDistanceBests, type RunPaceCurve, type RunHrCurve } from '../../../src/lib/run-critical-speed.ts';
-import { resolveMeasuredEasyPaceSecPerMi } from '../../../src/lib/resolve-current-run-pace.ts';
 import { normalizeSamples } from '../../lib/analysis/sensor-data/extractor.ts';
 import { parseRunningTokens } from '../_shared/token-parser.ts';
 import { computeRideEfficiency, computeRideTss, computeRideVam } from '../_shared/cycling-v1/ride-physiology.ts';
@@ -723,17 +722,16 @@ function analyzeLongRun(computed: any, plannedInterval: any) {
   };
 }
 
-// ── Assessment baseline extraction ──────────────────────────────────────────
-// Runs after the standard analysis pipeline for workouts linked to an assessment
-// planned_workout. Extracts CSS (swim) and threshold pace (run) and writes them
-// back to user_baselines so the Arc no longer treats the discipline as missing.
-// Bike FTP is handled automatically by learn-fitness-profile via power_20min.
+// ── Assessment → the learner ────────────────────────────────────────────────
+// ⛔ ONE WRITER OF LEARNED VALUES (2026-09-16, Stage 7 session 1). This function read the swim CSS test and the run
+// time trial off the laps and wrote `learned_fitness` (and the plan's swim pace) itself. That maths now lives in
+// learn-fitness-profile (`assessmentFromLaps`), the way the FTP test already did; this only asks the learner to
+// run, naming the workout. The learner sets the plan's swim pace through save-baselines.
 async function extractAssessmentBaseline(
   supabase: any,
-  w: { planned_id: any; user_id: any; type?: any },
-  laps: any[],
+  w: { id?: any; planned_id: any; user_id: any; type?: any },
 ): Promise<void> {
-  if (!w.planned_id || !w.user_id) return;
+  if (!w.planned_id || !w.user_id || !w.id) return;
   try {
     const { data: planned } = await supabase
       .from('planned_workouts')
@@ -751,168 +749,12 @@ async function extractAssessmentBaseline(
       console.log('[assessment] ftp_test — write-back delegated to learn-fitness-profile pipeline');
       return;
     }
+    if (!tags.includes('css_test') && !tags.includes('run_test')) return;
 
-    // Fetch existing baselines for merge
-    const { data: baseline } = await supabase
-      .from('user_baselines')
-      .select('id, learned_fitness, performance_numbers')
-      .eq('user_id', String(w.user_id))
-      .maybeSingle();
-
-    const existingLF: Record<string, any> =
-      (typeof baseline?.learned_fitness === 'string'
-        ? JSON.parse(baseline.learned_fitness)
-        : baseline?.learned_fitness) ?? {};
-    const existingPN: Record<string, any> =
-      (typeof baseline?.performance_numbers === 'string'
-        ? JSON.parse(baseline.performance_numbers)
-        : baseline?.performance_numbers) ?? {};
-
-    const lapDist = (L: any) =>
-      Number(L?.totalDistanceInMeters ?? L?.distanceInMeters ?? L?.dist_m ?? L?.distance ?? 0);
-    const lapTime = (L: any) =>
-      Number(L?.totalTimerTimeInSeconds ?? L?.totalElapsedTimeInSeconds ?? L?.time_s ?? L?.elapsed_time ?? 0);
-    // the lap's average heart rate — the threshold HEART RATE the 12-minute test sets alongside its pace (2026-09-02)
-    const lapHr = (L: any) => {
-      const v = Number(L?.averageHeartRateInBeatsPerMinute ?? L?.avg_heart_rate ?? L?.avg_hr ?? L?.averageHeartRate ?? L?.avgHr ?? NaN);
-      return Number.isFinite(v) && v > 100 && v < 220 ? Math.round(v) : null;
-    };
-
-    // ── Swim CSS test ────────────────────────────────────────────────────────
-    // Protocol: 400 yd warmup → rest → 400 yd TT → rest → 200 yd TT → 200 yd cool-down
-    // 400 yd ≈ 366 m, 200 yd ≈ 183 m.
-    // Identify TT laps by being the fastest among laps in each distance range.
-    if (tags.includes('css_test')) {
-      const meaningfulLaps = laps.filter((L) => lapDist(L) > 100 && lapTime(L) > 30);
-      const longGroup = meaningfulLaps.filter((L) => lapDist(L) >= 300 && lapDist(L) <= 430);
-      const shortGroup = meaningfulLaps.filter((L) => lapDist(L) >= 140 && lapDist(L) <= 230);
-
-      if (longGroup.length >= 1 && shortGroup.length >= 1) {
-        const best400 = longGroup.reduce((a, b) => (lapTime(a) <= lapTime(b) ? a : b));
-        const best200 = shortGroup.reduce((a, b) => (lapTime(a) <= lapTime(b) ? a : b));
-        const t400 = lapTime(best400);
-        const t200 = lapTime(best200);
-        const d400 = lapDist(best400);
-        const d200 = lapDist(best200);
-
-        if (t400 > 0 && t200 > 0 && t400 > t200 && d400 > d200) {
-          const cssSecPer100m = Math.round(((t400 - t200) / (d400 - d200)) * 100);
-          console.log(
-            `[assessment] CSS = ${cssSecPer100m} sec/100m  (400yd=${t400}s d=${d400}m, 200yd=${t200}s d=${d200}m)`,
-          );
-          if (cssSecPer100m > 55 && cssSecPer100m < 200) {
-            // The CSS test is a CLEAN, confirmed threshold → write the dedicated swim_css field, NOT the
-            // median key swim_pace_per_100m (analyzeSwims owns that; writing the threshold there was the
-            // audit's 3-meanings-one-key collision). confidence 'moderate' = 2 confirmed efforts (400+200).
-            const newLF = {
-              ...existingLF,
-              swim_css_sec_per_100m: {
-                value: cssSecPer100m,
-                confidence: 'moderate',
-                source: 'CSS test (400/200 yd time trial)',
-                n_efforts: 2,
-                tested_at: new Date().toISOString(),
-              },
-            };
-            // C1 fix: swimPace100 is the canonical /100yd m:ss STRING everywhere else (TrainingBaselines,
-            // the resolver's parseMmSs, AthleticRecord). The CSS test produces sec/100m as a number — writing
-            // it raw corrupted the field (rendered "95"; parseMmSs→null silently dropped it in plan-gen).
-            // Convert m→yd (×0.9144) and format m:ss so every reader gets what it expects.
-            // (learned_fitness.swim_pace_per_100m stays sec/100m — that key IS /100m.)
-            const _cssYd = cssSecPer100m * 0.9144;
-            let _mmYd = Math.floor(_cssYd / 60), _ssYd = Math.round(_cssYd % 60);
-            if (_ssYd === 60) { _mmYd += 1; _ssYd = 0; }
-            const newPN = { ...existingPN, swimPace100: `${_mmYd}:${String(_ssYd).padStart(2, '0')}` };
-            await supabase
-              .from('user_baselines')
-              .update({ learned_fitness: newLF, performance_numbers: newPN, updated_at: new Date().toISOString() })
-              .eq('user_id', String(w.user_id));
-            console.log(`[assessment] ✅ swimPace100 = ${cssSecPer100m} sec/100m written`);
-          } else {
-            console.warn(`[assessment] CSS ${cssSecPer100m} outside 55–200 range — skipped`);
-          }
-        } else {
-          console.warn('[assessment] CSS: lap time/distance logic failed sanity check');
-        }
-      } else {
-        console.warn(
-          `[assessment] CSS: could not find 400/200 lap pair (long=${longGroup.length}, short=${shortGroup.length})`,
-        );
-      }
-    }
-
-    // ── Run 12-min time trial ────────────────────────────────────────────────
-    // Protocol: 15 min warmup → 4×stride/walk → 12-min TT → 10 min cool-down
-    // The TT lap has duration ~720 s (tolerance ±60 s) and distance > 500 m.
-    if (tags.includes('run_test')) {
-      const ttLap = laps.find((L) => {
-        const t = lapTime(L);
-        const d = lapDist(L);
-        // p210: 12 min (beginner) / 10 min (intermediate) / 8 min (advanced) — accept any of the three
-        return t >= 450 && t <= 780 && d > 500;
-      });
-
-      if (ttLap) {
-        const t = lapTime(ttLap);
-        const d = lapDist(ttLap);
-        // ⛔ p210, READ OFF THE PAGE 2026-09-02: the trial gives vVO2 speed; THRESHOLD SPEED = 88% OF IT.
-        // Threshold pace is therefore the trial pace ÷ 0.88. The reader used the trial pace as threshold
-        // directly for months — a threshold set ~14% too fast.
-        const vvo2PaceSecPerKm = Math.round(t / (d / 1000));
-        const paceSecPerKm = Math.round(vvo2PaceSecPerKm / 0.88);
-        console.log(`[assessment] Run TT: ${d}m in ${t}s = ${vvo2PaceSecPerKm} sec/km vVO2 pace → threshold ${paceSecPerKm} sec/km (88% of speed, p210)`);
-
-        /**
-         * ⛔ THE INVARIANT APPLIES TO A TEST RESULT TOO (2026-08-20). This is now the PRIMARY way an
-         * athlete gets a measured threshold — the run card offers the test — so it has to obey the same
-         * rule as every other threshold writer: **a threshold effort is faster than an easy effort.**
-         * A 12-minute TT slower than the athlete's own measured easy pace is not a threshold reading;
-         * it is a lap detected in the wrong place, a GPS dropout, or a test the athlete abandoned. It
-         * refuses rather than publishing at `confidence: 'high'`, which is what every consumer trusts.
-         */
-        // ⛔ THROUGH THE OWNER (the anchor lint caught the raw read the moment it was written — which is
-        // the ledger doing its job on brand-new code, not on legacy). The resolver is sec/MILE; this
-        // comparison is sec/KM because a TT lap is measured in metres per second. Converted once.
-        // D-478: a MEASUREMENT of the athlete's easy running (the learner's value), not the easy range.
-        const measuredEasyMi = resolveMeasuredEasyPaceSecPerMi({ learned_fitness: existingLF } as never);
-        const easySecPerKm = measuredEasyMi != null ? measuredEasyMi / 1.609344 : NaN;
-        const slowerThanEasy = Number.isFinite(easySecPerKm) && easySecPerKm > 0 && paceSecPerKm >= easySecPerKm;
-        if (slowerThanEasy) {
-          console.warn(`[assessment] run TT ${paceSecPerKm} s/km is not faster than easy pace ${easySecPerKm} — not a threshold reading, skipped`);
-        }
-        if (paceSecPerKm > 180 && paceSecPerKm < 600 && !slowerThanEasy) {
-          const ttHr = lapHr(ttLap);
-          const newLF = {
-            ...existingLF,
-            // ⚠️ NO threshold HEART RATE from this trial: it is a VO2-pace effort (p210), and its average heart
-            // rate sits above threshold. The page derives pace only. The lap HR is kept as a fact beside it.
-            run_vvo2_pace_sec_per_km: { value: vvo2PaceSecPerKm, confidence: 'high', source: 'Run time trial (p210)', sample_count: 1, as_of: new Date().toISOString().slice(0, 10), lap_avg_hr: ttHr, lap_seconds: t, lap_meters: d },
-            run_threshold_pace_sec_per_km: {
-              value: paceSecPerKm,
-              confidence: 'high',
-              source: 'Run time trial — 88% of vVO2 speed (Viada p210)',
-              sample_count: 1,
-              // ⛔ `as_of` IS THE FIELD EVERY READER USES (Q-173). This wrote only `tested_at`, so the
-              // resolver reported NO DATE for the app's most authoritative threshold reading — the one
-              // measurement that should never look stale reported as undated. Both are written: `as_of`
-              // for the readers, `tested_at` kept because rows already carry it.
-              as_of: new Date().toISOString().slice(0, 10),
-              tested_at: new Date().toISOString(),
-              is_estimate: false,
-            },
-          };
-          await supabase
-            .from('user_baselines')
-            .update({ learned_fitness: newLF, updated_at: new Date().toISOString() })
-            .eq('user_id', String(w.user_id));
-          console.log(`[assessment] ✅ run_threshold_pace_sec_per_km = ${paceSecPerKm} written (vVO2 ${vvo2PaceSecPerKm}${ttHr != null ? `, lap HR ${ttHr}` : ''})`);
-        } else {
-          console.warn(`[assessment] run pace ${paceSecPerKm} outside 180–600 range — skipped`);
-        }
-      } else {
-        console.warn(`[assessment] run_test: no ~720s lap found in ${laps.length} laps`);
-      }
-    }
+    const { error } = await supabase.functions.invoke('learn-fitness-profile', {
+      body: { user_id: String(w.user_id), assessment_workout_id: String(w.id) },
+    });
+    if (error) console.warn('[assessment] learner did not run:', error.message ?? String(error));
   } catch (e) {
     // Non-fatal: log but never fail the main analysis pipeline
     console.error('[assessment] extractAssessmentBaseline error:', e);
@@ -2171,7 +2013,7 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
     }
 
     // Assessment write-back: extract CSS / run-TT baseline if this is a linked assessment session
-    await extractAssessmentBaseline(supabase, w, laps);
+    await extractAssessmentBaseline(supabase, w);
 
     // FIX: Update analysis_status to complete on success
     // Note: analyze-running-workout will also set this, but we set it here for consistency

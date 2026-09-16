@@ -210,7 +210,7 @@ export function appliedLearnedFtp(learned: LearnedFitnessLike): LearnedMetricLik
  */
 export function acceptEstimatedFtp(
   learned: Record<string, unknown> | null | undefined,
-  via: 'checkpoint' | 'baselines',
+  via: 'checkpoint' | 'baselines' | 'seed',
   now: Date = new Date(),
 ): Record<string, unknown> | null {
   if (!learned || typeof learned !== 'object') return null;

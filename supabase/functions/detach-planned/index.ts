@@ -116,6 +116,7 @@ Deno.serve(async (req) => {
     //     is the only entity still in existence — so there is nothing left to authorise against.
     //   · row EXISTS but belongs to someone else → still a hard 404. Unchanged.
     if (!p) {
+      /* writes-keys: unattached_planned_ids */ // ⛔ the unattach list only (2026-09-16, Stage 7 session 1)
       await supabase.from('workouts').update({ planned_id: null, workout_metadata: withUnattached(w.workout_metadata, pid) }).eq('id', w.id).eq('user_id', w.user_id);
       fireRecompute(String(w.id), String(w.user_id));
       return new Response(JSON.stringify({
@@ -136,6 +137,7 @@ Deno.serve(async (req) => {
 
     // 1) Clear workout side, and remember the unattach so the recompute below does not link it back
     //    (`_shared/unattached-planned.ts`).
+    /* writes-keys: unattached_planned_ids */ // ⛔ the unattach list only (2026-09-16, Stage 7 session 1)
     await supabase.from('workouts').update({ planned_id: null, workout_metadata: withUnattached(w.workout_metadata, pid) }).eq('id', w.id).eq('user_id', w.user_id);
 
     // 2) Clear planned side ONLY if it points to this workout.

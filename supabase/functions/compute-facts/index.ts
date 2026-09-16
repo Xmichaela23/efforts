@@ -974,11 +974,13 @@ async function updateLearnedStrengthFromExerciseLog(
     if (ub?.id) {
       await supabase
         .from("user_baselines")
+        /* writes-keys: strength_1rms */ // ⛔ only strength_1rms; the rest of learned_fitness is spread back as read (2026-09-16, Stage 7 session 1)
         .update({ learned_fitness: merged, updated_at: new Date().toISOString() })
         .eq("id", ub.id);
     } else {
       await supabase.from("user_baselines").insert({
         user_id: userId,
+        /* writes-keys: strength_1rms */ // ⛔ (2026-09-16, Stage 7 session 1)
         learned_fitness: merged,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -1592,6 +1594,7 @@ serve(async (req: Request) => {
         };
         const prev = (w.workout_metadata as any)?.plan_tags;
         if (JSON.stringify({ ...prev, stamped_at: null }) !== JSON.stringify({ ...stamp, stamped_at: null })) {
+          /* writes-keys: plan_tags */ // ⛔ this site owns workout_metadata.plan_tags only (2026-09-16, Stage 7 session 1)
           await supabase.from("workouts").update({ workout_metadata: { ...(w.workout_metadata ?? {}), plan_tags: stamp } }).eq("id", w.id);
           w.workout_metadata = { ...(w.workout_metadata ?? {}), plan_tags: stamp };
         }
@@ -1644,6 +1647,7 @@ serve(async (req: Request) => {
       try {
         await supabase.from("workouts").update({
           workload_actual: workload,
+          /* writes-keys: workload_method, workload_estimated, hr_corrupt */ // ⛔ (2026-09-16, Stage 7 session 1)
           workout_metadata: {
             ...(w.workout_metadata ?? {}),
             workload_method: "hr_rejected_corrupt",

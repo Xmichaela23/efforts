@@ -129,14 +129,12 @@ const LEDGER: Record<string, Reason> = {
   'run easy pace::supabase/functions/learn-fitness-profile/index.ts': 'writer',
   'run easy pace::supabase/functions/generate-combined-plan/index.ts': 'reconciler-input',
   'run easy pace::supabase/functions/_shared/block-adaptation/index.ts': 'comparator',
-  'run easy pace::supabase/functions/adapt-plan/index.ts': 'comparator',
   // The pace gate (2026-09-10, audit H-B13): one presence test on the server, used by create-goal and
   // get-arc-context's `has_pace_benchmark`. It asks whether ANY signal exists, not what the value is.
   'run easy pace::supabase/functions/_shared/pace-benchmark.ts': 'presence-gate',
 
   // ── run threshold pace ───────────────────────────────────────────────────
   'run threshold pace::supabase/functions/learn-fitness-profile/index.ts': 'writer',
-  'run threshold pace::supabase/functions/compute-workout-analysis/index.ts': 'writer',
   'run threshold pace::src/components/TrainingBaselines.tsx': 'receipt',
   // Updates the learned threshold after a race (reads the prior to diff, writes the next).
   'run threshold pace::supabase/functions/_shared/race-feedback.ts': 'writer',
@@ -147,7 +145,6 @@ const LEDGER: Record<string, Reason> = {
   // ── ftp ──────────────────────────────────────────────────────────────────
   'ftp::supabase/functions/learn-fitness-profile/index.ts': 'writer',
   'ftp::supabase/functions/_shared/block-adaptation/index.ts': 'comparator',
-  'ftp::supabase/functions/adapt-plan/index.ts': 'comparator',
   // compute-snapshot's bike anchor (`deriveBike`) was routed 2026-09-04 through `appliedLearnedFtp`
   // (accepted-else-estimate, the resolver's own tier-1 rule) — the entry is paid off.
   // Remaining raw read is the TRI lane (`:3243`), deprioritised — Michael's working plans are Strong

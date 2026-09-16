@@ -22,8 +22,8 @@ import {
   type Anchors, type HardSession, type LiveNumbers,
 } from '../_shared/standing-plan/endurance-checkpoint.ts';
 import { resolveCurrentRunThresholdPace } from '../../../src/lib/resolve-current-run-pace.ts';
-import { resolveCurrentFtp, pendingFtpProposal, acceptEstimatedFtp } from '../../../src/lib/resolve-current-ftp.ts';
-import { pendingRunThresholdProposal, acceptLearnedRunThreshold } from '../../../src/lib/resolve-current-run-pace.ts';
+import { resolveCurrentFtp, pendingFtpProposal } from '../../../src/lib/resolve-current-ftp.ts';
+import { pendingRunThresholdProposal } from '../../../src/lib/resolve-current-run-pace.ts';
 import { resolveCurrentLthr } from '../../../src/lib/resolve-current-lthr.ts';
 
 const corsHeaders = {
@@ -214,40 +214,39 @@ Deno.serve(async (req: Request) => {
     let repriced = 0;
     let ftpAccepted: number | null = null;
     if (decision === 'accept') {
-      // Accept the FTP first — one write, the same shape the Baselines row writes. Re-read the JSONB
-      // so a learner run between the read above and now is not clobbered.
-      if (ftpProposal) {
+      /**
+       * ⛔ THE ACCEPT GOES THROUGH SAVE-BASELINES (2026-09-16, Stage 7 session 1). This wrote `learned_fitness` and
+       * `performance_numbers` itself — the same rules as save-baselines' accept, written twice. It now sends the
+       * athlete's own token (the checkpoint already requires the athlete, above) to that accept, which re-reads the
+       * row, applies `acceptMeasuredForSave` and writes once. The value sent is the one this request measured; if
+       * the learner moved it since, the accept answers `value_changed` and nothing is written.
+       * FTP first, then the run threshold, BEFORE re-pricing, so the rows price off the numbers just accepted.
+       */
+      const acceptVia = async (kind: 'ftp' | 'run_threshold', value: number): Promise<number | null> => {
         try {
-          const { data: fresh } = await supabase.from('user_baselines').select('learned_fitness').eq('user_id', userId).maybeSingle();
-          const lf = (fresh?.learned_fitness && typeof fresh.learned_fitness === 'object') ? fresh.learned_fitness as Record<string, unknown> : null;
-          const next = acceptEstimatedFtp(lf, 'checkpoint');
-          if (next) {
-            const { error: accErr } = await supabase.from('user_baselines').update({ learned_fitness: next, updated_at: new Date().toISOString() }).eq('user_id', userId);
-            if (accErr) console.warn(`[checkpoint] FTP not accepted: ${accErr.message}`);
-            else ftpAccepted = Number((next.ride_ftp_accepted as { value: number }).value);
-            if (!accErr) {
-              const { data: pnRow } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', userId).maybeSingle();
-              const pnCur = (pnRow?.performance_numbers && typeof pnRow.performance_numbers === 'object') ? { ...(pnRow.performance_numbers as Record<string, unknown>) } : null;
-              if (pnCur && pnCur.ftp_source === 'manual') { delete pnCur.ftp_source; await supabase.from('user_baselines').update({ performance_numbers: pnCur }).eq('user_id', userId); }
-            }
+          const { data, error } = await supabase.functions.invoke('save-baselines', {
+            body: { accept: { kind, value, via: 'checkpoint' } },
+            headers: { Authorization: req.headers.get('Authorization') ?? '' },
+          });
+          if (error || !data?.success) {
+            console.warn(`[checkpoint] ${kind} not accepted: ${error?.message ?? data?.error ?? 'refused'}`);
+            return null;
           }
-        } catch (e) { console.warn('[checkpoint] FTP accept failed:', (e as Error)?.message ?? String(e)); }
-      }
-      // Run threshold: the same accept, the same door (2026-09-05).
+          const v = Number(data?.accepted?.value);
+          return Number.isFinite(v) && v > 0 ? v : null;
+        } catch (e) {
+          console.warn(`[checkpoint] ${kind} accept failed:`, (e as Error)?.message ?? String(e));
+          return null;
+        }
+      };
+      if (ftpProposal) ftpAccepted = await acceptVia('ftp', ftpProposal.measured);
+      // Run threshold: the same accept, the same door (2026-09-05). Re-read so the FTP accept above is seen.
       try {
         const { data: fresh2 } = await supabase.from('user_baselines').select('learned_fitness, performance_numbers').eq('user_id', userId).maybeSingle();
         const lf2 = (fresh2?.learned_fitness && typeof fresh2.learned_fitness === 'object') ? fresh2.learned_fitness as Record<string, unknown> : null;
         const pn2 = (fresh2?.performance_numbers && typeof fresh2.performance_numbers === 'object') ? fresh2.performance_numbers as Record<string, unknown> : null;
-        if (pendingRunThresholdProposal({ learned_fitness: lf2, performance_numbers: pn2 } as any)) {
-          const nextT = acceptLearnedRunThreshold(lf2, 'checkpoint');
-          if (nextT) {
-            const { error: tErr } = await supabase.from('user_baselines').update({ learned_fitness: nextT, updated_at: new Date().toISOString() }).eq('user_id', userId);
-            if (tErr) console.warn(`[checkpoint] run threshold not accepted: ${tErr.message}`);
-            if (!tErr && pn2 && (pn2 as any).threshold_pace_source === 'manual') {
-              await supabase.from('user_baselines').update({ performance_numbers: { ...pn2, threshold_pace_source: 'learned' } }).eq('user_id', userId);
-            }
-          }
-        }
+        const thrProposal = pendingRunThresholdProposal({ learned_fitness: lf2, performance_numbers: pn2 } as any);
+        if (thrProposal) await acceptVia('run_threshold', thrProposal.measuredSecPerKm);
       } catch (e) { console.warn('[checkpoint] run threshold accept failed:', (e as Error)?.message ?? String(e)); }
       for (const r of pending) {
         try {

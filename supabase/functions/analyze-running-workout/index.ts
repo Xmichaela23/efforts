@@ -131,23 +131,11 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
     console.log(`🏃‍♂️ Analyzing running workout: ${workout_id}`);
     console.log(`🌡️ [WEATHER] force_weather_refresh param: ${force_weather_refresh}`);
     
-    // Track if we need to force fetch weather (even if cached data exists in memory)
-    let forceWeatherFetch = false;
+    // ⛔ NO WEATHER WRITE HERE (2026-09-16, Stage 7 session 1): get-weather is the one writer of `workouts.weather_data`.
+    // A forced refresh is passed to it as `force_refresh` (it skips both caches and overwrites the row); the stored
+    // weather is no longer cleared first, so a failed fetch leaves the previous weather in place.
+    const forceWeatherFetch = force_weather_refresh;
     
-    // Clear cached weather if force refresh requested
-    if (force_weather_refresh) {
-      console.log('🌡️ [WEATHER] Force refresh requested, clearing cached weather in DB...');
-      const { error: clearError } = await supabase
-        .from('workouts')
-        .update({ weather_data: null })
-        .eq('id', workout_id);
-      if (clearError) {
-        console.warn('🌡️ [WEATHER] Failed to clear cached weather:', clearError.message);
-      } else {
-        console.log('🌡️ [WEATHER] Successfully cleared cached weather from DB');
-        forceWeatherFetch = true;
-      }
-    }
     const _t0 = Date.now();
     const _mem = () => { try { return `${Math.round((Deno as any).memoryUsage().heapUsed / 1048576)}MB`; } catch { return '?'; } };
     console.log(`🏁 START heap=${_mem()}`);
@@ -2182,12 +2170,11 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
             nextOverall.avg_pace_s_per_mi = avgPaceSPerMi;
           }
           const nextComputed = { ...(workoutForFact as any).computed, overall: nextOverall };
+          // ⛔ IN MEMORY ONLY, for the fact packet (2026-09-16, Stage 7 session 1): compute-workout-summary owns
+          // `workouts.computed`; this write spread a computed whose analysis, raw_laps, power_curve, best_efforts
+          // and adaptation were nulled above, and wiped those five keys in the database.
           (workoutForFact as any).computed = nextComputed;
-          await supabase
-            .from('workouts')
-            .update({ computed: nextComputed })
-            .eq('id', workout_id);
-          console.log('🛠️ Repaired computed.overall.duration_s_moving (unit mismatch).', { cur, inferred });
+          console.log('🛠️ Repaired computed.overall.duration_s_moving in memory (unit mismatch).', { cur, inferred });
         }
       } catch (e) {
         console.warn('[analyze-running-workout] duration repair failed (non-fatal):', e);

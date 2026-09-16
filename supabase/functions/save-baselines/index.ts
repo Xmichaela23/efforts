@@ -20,6 +20,12 @@
  *                 { kind: 'lift', lift, value } | { kind: 'swim_pace', value } — My Record's "Logged suggests …
  *                 Update" (2026-09-10, audit H-B12): the logged lift in pounds, or seconds per 100 yd. Checked
  *                 against `_shared/baseline-suggestions.ts`, which respects locked lifts.
+ *                 `via: 'checkpoint'` — the six-week checkpoint's "Use the measured numbers" (2026-09-16), which
+ *                 forwards the athlete's own token here instead of writing the row itself.
+ *                 { kind: 'swim_css_test' } — no value: the plan's swim pace from the TESTED CSS on the row
+ *                 (2026-09-16). The ONE request a service caller may make (learn-fitness-profile, with `user_id`).
+ *   tested_lifts?: { squat: 225, pullupMaxReps: 8 } — a 1RM TEST result (save-baseline-test, 2026-09-16), in
+ *                 POUNDS / reps as that function computed it. Sets the seed only: `locked_baselines` is not touched.
  *   paces?:       { threshold: 'm:ss' } — a typed PACE, IN THE ATHLETE'S OWN UNIT. Per km for a metric
  *                 account, per mile otherwise; converted and stored per mile here. Same shape as
  *                 `heart_rate`: a present key sets it, an absent key leaves the stored one alone.
@@ -41,9 +47,10 @@
  *            lift / swim_pace → { success, accepted: { kind, lift, value, locked }, performance_numbers, locked_baselines }
  *   zones  → { success, zones: { power, swim_pace, run_easy_hr } }
  */
-import { requireUser, AuthError } from '../_shared/require-user.ts';
+import { requireUserOrService, AuthError } from '../_shared/require-user.ts';
 import {
   acceptMeasuredForSave,
+  swimPaceFromTestedCssForSave,
   liftsForSave,
   pacesForSave,
   effortFieldsForPerformanceNumbers,
@@ -92,8 +99,13 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: cors });
 
   try {
-    const { userId, supabase } = await requireUser(req);
     const body = await req.json().catch(() => ({}));
+    const { userId, supabase, internal } = await requireUserOrService(req, body?.user_id);
+    // ⛔ A SERVICE CALLER GETS ONE DOOR (2026-09-16, Stage 7 session 1): the tested CSS → swim pace, which the learner
+    // asks for after a CSS test. Everything else here is the athlete's own save and needs the athlete's token.
+    // And the learner's one-time seed of an accepted value (Stage 7 session 1: the accept stays the one writer of it).
+    const seedAccept = body?.accept?.via === 'seed' && (body?.accept?.kind === 'ftp' || body?.accept?.kind === 'run_threshold');
+    if (internal && !(body?.accept?.kind === 'swim_css_test' || seedAccept)) return json({ error: 'unauthorized' }, 401);
     const nowIso = new Date().toISOString();
 
     /**
@@ -136,6 +148,25 @@ Deno.serve(async (req) => {
     const accept = body?.accept && typeof body.accept === 'object' ? body.accept : null;
     if (accept) {
       const kind = String(accept.kind);
+      if (kind === 'swim_css_test') {
+        const { data: sRow, error: sErr } = await supabase
+          .from('user_baselines')
+          .select('learned_fitness, performance_numbers')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (sErr) throw sErr;
+        const swim = swimPaceFromTestedCssForSave({
+          learnedFitness: parseJson(sRow?.learned_fitness) as Record<string, unknown> | null,
+          performanceNumbers: parseJson(sRow?.performance_numbers) as Record<string, unknown> | null,
+        });
+        if (!swim.ok) return json({ error: swim.reason }, 409);
+        const { error: swErr } = await supabase
+          .from('user_baselines')
+          .update({ performance_numbers: swim.performance_numbers, updated_at: nowIso })
+          .eq('user_id', userId);
+        if (swErr) throw swErr;
+        return json({ success: true, accepted: { kind, value: swim.accepted_value }, performance_numbers: swim.performance_numbers });
+      }
       const value = Number(accept.value);
       if (!['ftp', 'run_threshold', 'lift', 'swim_pace'].includes(kind) || !Number.isFinite(value) || value <= 0) {
         return json({ error: 'accept needs kind ftp | run_threshold | lift | swim_pace and a positive value' }, 400);
@@ -176,16 +207,25 @@ Deno.serve(async (req) => {
         .eq('user_id', userId)
         .maybeSingle();
       if (curErr) throw curErr;
+      if (accept.via === 'seed') {
+        // A seed only fills an empty slot; an answer the athlete already gave stands.
+        const lfNow = parseJson(cur?.learned_fitness) as Record<string, { value?: unknown }> | null;
+        const slot = kind === 'ftp' ? lfNow?.ride_ftp_accepted : lfNow?.run_threshold_pace_accepted;
+        if (slot && Number(slot.value) > 0) return json({ success: true, accepted: null, seeded: false });
+      }
       const res = acceptMeasuredForSave({
         kind,
         value,
         learnedFitness: parseJson(cur?.learned_fitness) as Record<string, unknown> | null,
         performanceNumbers: parseJson(cur?.performance_numbers) as Record<string, unknown> | null,
         now: new Date(),
+        via: accept.via === 'checkpoint' || accept.via === 'seed' ? accept.via : 'baselines',
       });
       if (!res.ok) return json({ error: res.reason }, 409);
+      // ⛔ The accept owns the two accepted keys (2026-09-16, Stage 7 session 1); the learner's keys ride through.
       const { error: accErr } = await supabase
         .from('user_baselines')
+        /* writes-keys: ride_ftp_accepted, run_threshold_pace_accepted */
         .update({ learned_fitness: res.learned_fitness, performance_numbers: res.performance_numbers, updated_at: nowIso })
         .eq('user_id', userId);
       if (accErr) throw accErr;
@@ -196,6 +236,31 @@ Deno.serve(async (req) => {
         performance_numbers: res.performance_numbers,
         zones: await readoutFor(supabase, userId, today),
       });
+    }
+
+    /**
+     * ⛔ A 1RM TEST RESULT (2026-09-16, Stage 7 session 1). save-baseline-test wrote `performance_numbers` itself — a
+     * second writer of the lift keys Adjust types here. It now decides keep / update with the athlete and sends the
+     * result here. Pounds or reps as computed; the seed moves, the lock does not (the test never touched it).
+     */
+    const testedLifts = body?.tested_lifts && typeof body.tested_lifts === 'object' ? body.tested_lifts : null;
+    if (testedLifts) {
+      const { data: tRow, error: tErr } = await supabase
+        .from('user_baselines')
+        .select('id, performance_numbers')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (tErr) throw tErr;
+      const lifted = liftsForSave(testedLifts, (parseJson(tRow?.performance_numbers) ?? {}) as Record<string, unknown>, null, false, { lock: false });
+      if (!lifted) return json({ error: 'nothing to save' }, 400);
+      if (tRow?.id) {
+        const { error } = await supabase.from('user_baselines').update({ performance_numbers: lifted.performance_numbers }).eq('id', tRow.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('user_baselines').insert([{ user_id: userId, performance_numbers: lifted.performance_numbers }]);
+        if (error) throw error;
+      }
+      return json({ success: true, performance_numbers: lifted.performance_numbers, zones: await readoutFor(supabase, userId, today) });
     }
 
     const typed: Record<string, unknown> | null =

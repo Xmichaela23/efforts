@@ -18,6 +18,8 @@ import {
   hrZoneConfigForSave,
   performanceNumbersForSave,
   effortFieldsForPerformanceNumbers,
+  liftsForSave,
+  swimPaceFromTestedCssForSave,
 } from './derive.ts';
 
 const NOW = '2026-09-10T00:00:00.000Z';
@@ -129,4 +131,33 @@ Deno.test('accept refuses a number the athlete did not see, and a low-confidence
   assertEquals(acceptMeasuredForSave({ kind: 'ftp', value: 240, learnedFitness: lf, performanceNumbers: {}, now: new Date(NOW) }), { ok: false, reason: 'value_changed' });
   assertEquals(acceptMeasuredForSave({ kind: 'ftp', value: 251, learnedFitness: { ride_ftp_estimated: { value: 251, confidence: 'low' } }, performanceNumbers: {}, now: new Date(NOW) }), { ok: false, reason: 'nothing_to_accept' });
   assertEquals(acceptMeasuredForSave({ kind: 'run_threshold', value: 262, learnedFitness: null, performanceNumbers: {}, now: new Date(NOW) }), { ok: false, reason: 'nothing_to_accept' });
+});
+
+// ── 2026-09-16, Stage 7 session 1: the three doors save-baselines took over ─────────────────────────
+
+Deno.test('the checkpoint accept is stamped as the checkpoint; the default stays baselines', () => {
+  const lf = { ride_ftp_estimated: { value: 251, confidence: 'high' } };
+  const viaCheckpoint = acceptMeasuredForSave({ kind: 'ftp', value: 251, learnedFitness: lf, performanceNumbers: {}, now: new Date(NOW), via: 'checkpoint' });
+  const viaDefault = acceptMeasuredForSave({ kind: 'ftp', value: 251, learnedFitness: lf, performanceNumbers: {}, now: new Date(NOW) });
+  assertEquals((viaCheckpoint as any).learned_fitness.ride_ftp_accepted.accepted_via, 'checkpoint');
+  assertEquals((viaDefault as any).learned_fitness.ride_ftp_accepted.accepted_via, 'baselines');
+});
+
+Deno.test('a TESTED CSS sets swimPace100 as the analysis used to (sec/100 m × 0.9144 → m:ss per 100 yd); a fitted one does not', () => {
+  const tested = { swim_css_sec_per_100m: { value: 109, source: 'CSS test (400/200 yd time trial)', tested_at: NOW } };
+  assertEquals(swimPaceFromTestedCssForSave({ learnedFitness: tested, performanceNumbers: { ftp: 250 } }),
+    { ok: true, performance_numbers: { ftp: 250, swimPace100: '1:40' }, accepted_value: '1:40' });
+  // 95 × 0.9144 = 86.87 → 1:27
+  assertEquals((swimPaceFromTestedCssForSave({ learnedFitness: { swim_css_sec_per_100m: { value: 95, tested_at: NOW } }, performanceNumbers: null }) as any).accepted_value, '1:27');
+  assertEquals(swimPaceFromTestedCssForSave({ learnedFitness: { swim_css_sec_per_100m: { value: 100, source: 'learner (best-effort CS fit)' } }, performanceNumbers: {} }),
+    { ok: false, reason: 'nothing_to_accept' });
+});
+
+Deno.test('a 1RM test result moves the seed and leaves the lock alone; a typed lift still locks', () => {
+  const locked = { squat: 200 };
+  const test = liftsForSave({ squat: 225, pullupMaxReps: 0 }, { squat: 200, bench: 185 }, locked, false, { lock: false });
+  assertEquals(test, { performance_numbers: { squat: 225, bench: 185, pullupMaxReps: 0 }, locked_baselines: { squat: 200 } });
+  const typed = liftsForSave({ squat: 225 }, { squat: 200 }, locked, false);
+  assertEquals(typed?.locked_baselines, { squat: 225 });
+  assertEquals(liftsForSave({ squat: null }, { squat: 200 }, locked, false, { lock: false })?.locked_baselines, { squat: 200 });
 });

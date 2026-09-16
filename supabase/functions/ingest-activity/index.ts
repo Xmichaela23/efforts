@@ -499,6 +499,14 @@ function mapStravaToWorkout(activity, userId) {
     duration: durationMin,
     moving_time: durationMin,
     elapsed_time: activity.elapsed_time != null ? Math.max(0, Math.round(activity.elapsed_time / 60)) : null,
+    // Strava's own seconds, so the minute columns above do not round the Details screen to :00. Read by
+    // _shared/moving-seconds.ts (moving first, elapsed for Details Elapsed) and compute-workout-summary.
+    // This is the only writer of `metrics` on a Strava row (create, webhook edit, re-ingest, history import);
+    // the upsert replaces the whole object, so any key added for Strava rows belongs here.
+    metrics: {
+      moving_time_seconds: Number.isFinite(Number(activity.moving_time)) && activity.moving_time != null ? Math.round(Number(activity.moving_time)) : null,
+      elapsed_time_seconds: Number.isFinite(Number(activity.elapsed_time)) && activity.elapsed_time != null ? Math.round(Number(activity.elapsed_time)) : null,
+    },
     distance: distanceKm,
     workout_status: 'completed',
     source: 'strava',

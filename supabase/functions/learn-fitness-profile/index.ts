@@ -52,6 +52,9 @@ import {
 // Q-169: the ONE definition of "is this heartbeat easy" — threshold-anchored (Friel Z2), %max-bootstrapped.
 // The RUN sites use it; the BIKE band (65-75% max + power filter) is deliberately NOT routed through it.
 import { resolveRunEasyHrBand, isEasyHr } from '../_shared/easy-hr.ts';
+import { resolveMeasuredEasyPaceSecPerMi } from '../../../src/lib/resolve-current-run-pace.ts';
+// One definition of "this CSS came from the test", shared with save-baselines, which sets the plan's swim pace from it.
+import { isTestedSwimCss } from '../save-baselines/derive.ts';
 
 // =============================================================================
 // CORS HEADERS
@@ -188,6 +191,164 @@ interface LearnedFitnessProfile {
 
   // Strength 1RMs (from compute-facts / exercise_log)
   strength_1rms?: Record<string, LearnedMetric>;
+}
+
+// =============================================================================
+// THE TWO FIELD TESTS — swim CSS and the run time trial
+// =============================================================================
+
+/**
+ * ⛔ ONE WRITER OF LEARNED VALUES (2026-09-16, Stage 7 session 1). `compute-workout-analysis` read these two
+ * tests off the laps and wrote `learned_fitness` itself; the learner then rebuilt the object on its next run,
+ * so two functions wrote one column. The maths moved here UNCHANGED, the way the FTP test already lives here;
+ * the analysis now only asks the learner to run with `assessment_workout_id` after a linked assessment.
+ *
+ * Pure: the planned row's tags, the workout's laps, the stored learned values (for the easy-pace check) and
+ * the clock. Returns the learned keys the test sets, or null when it sets none.
+ */
+export function assessmentFromLaps(
+  tags: string[],
+  laps: any[],
+  priorLearned: Record<string, any> | null,
+  now: Date = new Date(),
+): Record<string, unknown> | null {
+  if (!Array.isArray(tags) || !tags.includes('assessment') || !Array.isArray(laps)) return null;
+  const out: Record<string, unknown> = {};
+  const lapDist = (L: any) =>
+    Number(L?.totalDistanceInMeters ?? L?.distanceInMeters ?? L?.dist_m ?? L?.distance ?? 0);
+  const lapTime = (L: any) =>
+    Number(L?.totalTimerTimeInSeconds ?? L?.totalElapsedTimeInSeconds ?? L?.time_s ?? L?.elapsed_time ?? 0);
+  const lapHr = (L: any) => {
+    const v = Number(L?.averageHeartRateInBeatsPerMinute ?? L?.avg_heart_rate ?? L?.avg_hr ?? L?.averageHeartRate ?? L?.avgHr ?? NaN);
+    return Number.isFinite(v) && v > 100 && v < 220 ? Math.round(v) : null;
+  };
+
+  // ── Swim CSS test ──────────────────────────────────────────────────────────
+  // Protocol: 400 yd warmup → rest → 400 yd TT → rest → 200 yd TT → 200 yd cool-down. 400 yd ≈ 366 m, 200 yd ≈ 183 m.
+  // The TT laps are the fastest in each distance range.
+  if (tags.includes('css_test')) {
+    const meaningfulLaps = laps.filter((L) => lapDist(L) > 100 && lapTime(L) > 30);
+    const longGroup = meaningfulLaps.filter((L) => lapDist(L) >= 300 && lapDist(L) <= 430);
+    const shortGroup = meaningfulLaps.filter((L) => lapDist(L) >= 140 && lapDist(L) <= 230);
+    if (longGroup.length >= 1 && shortGroup.length >= 1) {
+      const best400 = longGroup.reduce((a, b) => (lapTime(a) <= lapTime(b) ? a : b));
+      const best200 = shortGroup.reduce((a, b) => (lapTime(a) <= lapTime(b) ? a : b));
+      const t400 = lapTime(best400), t200 = lapTime(best200), d400 = lapDist(best400), d200 = lapDist(best200);
+      if (t400 > 0 && t200 > 0 && t400 > t200 && d400 > d200) {
+        const cssSecPer100m = Math.round(((t400 - t200) / (d400 - d200)) * 100);
+        console.log(`[assessment] CSS = ${cssSecPer100m} sec/100m  (400yd=${t400}s d=${d400}m, 200yd=${t200}s d=${d200}m)`);
+        if (cssSecPer100m > 55 && cssSecPer100m < 200) {
+          // A CLEAN, confirmed threshold → the dedicated swim_css field, NOT the median key swim_pace_per_100m
+          // (analyzeSwims owns that). confidence 'moderate' = 2 confirmed efforts (400+200).
+          out.swim_css_sec_per_100m = {
+            value: cssSecPer100m,
+            confidence: 'moderate',
+            source: 'CSS test (400/200 yd time trial)',
+            n_efforts: 2,
+            tested_at: now.toISOString(),
+          };
+        } else {
+          console.warn(`[assessment] CSS ${cssSecPer100m} outside 55–200 range — skipped`);
+        }
+      } else {
+        console.warn('[assessment] CSS: lap time/distance logic failed sanity check');
+      }
+    } else {
+      console.warn(`[assessment] CSS: could not find 400/200 lap pair (long=${longGroup.length}, short=${shortGroup.length})`);
+    }
+  }
+
+  // ── Run time trial ─────────────────────────────────────────────────────────
+  // Protocol: 15 min warmup → 4×stride/walk → TT → 10 min cool-down. p210: 12 / 10 / 8 min — accept any of the three.
+  if (tags.includes('run_test')) {
+    const ttLap = laps.find((L) => {
+      const t = lapTime(L);
+      const d = lapDist(L);
+      return t >= 450 && t <= 780 && d > 500;
+    });
+    if (ttLap) {
+      const t = lapTime(ttLap);
+      const d = lapDist(ttLap);
+      // ⛔ p210: the trial gives vVO2 speed; THRESHOLD SPEED = 88% OF IT, so threshold pace = trial pace ÷ 0.88.
+      const vvo2PaceSecPerKm = Math.round(t / (d / 1000));
+      const paceSecPerKm = Math.round(vvo2PaceSecPerKm / 0.88);
+      console.log(`[assessment] Run TT: ${d}m in ${t}s = ${vvo2PaceSecPerKm} sec/km vVO2 pace → threshold ${paceSecPerKm} sec/km (88% of speed, p210)`);
+      // ⛔ A threshold effort is faster than the athlete's MEASURED easy pace (D-478); a trial slower than it is a
+      // lap detected in the wrong place, a GPS dropout, or an abandoned test. The resolver is sec/MILE; the lap is
+      // sec/KM — converted once.
+      const measuredEasyMi = resolveMeasuredEasyPaceSecPerMi({ learned_fitness: priorLearned ?? {} } as never);
+      const easySecPerKm = measuredEasyMi != null ? measuredEasyMi / 1.609344 : NaN;
+      const slowerThanEasy = Number.isFinite(easySecPerKm) && easySecPerKm > 0 && paceSecPerKm >= easySecPerKm;
+      if (slowerThanEasy) {
+        console.warn(`[assessment] run TT ${paceSecPerKm} s/km is not faster than easy pace ${easySecPerKm} — not a threshold reading, skipped`);
+      }
+      if (paceSecPerKm > 180 && paceSecPerKm < 600 && !slowerThanEasy) {
+        const ttHr = lapHr(ttLap);
+        const asOf = now.toISOString().slice(0, 10);
+        // ⚠️ NO threshold HEART RATE from this trial: it is a VO2-pace effort (p210). The lap HR is kept as a fact.
+        out.run_vvo2_pace_sec_per_km = { value: vvo2PaceSecPerKm, confidence: 'high', source: 'Run time trial (p210)', sample_count: 1, as_of: asOf, lap_avg_hr: ttHr, lap_seconds: t, lap_meters: d };
+        out.run_threshold_pace_sec_per_km = {
+          value: paceSecPerKm,
+          confidence: 'high',
+          source: 'Run time trial — 88% of vVO2 speed (Viada p210)',
+          sample_count: 1,
+          // `as_of` is the field every reader uses (Q-173); `tested_at` kept because rows already carry it.
+          as_of: asOf,
+          tested_at: now.toISOString(),
+          is_estimate: false,
+        };
+      } else if (!slowerThanEasy) {
+        console.warn(`[assessment] run pace ${paceSecPerKm} outside 180–600 range — skipped`);
+      }
+    } else {
+      console.warn(`[assessment] run_test: no ~720s lap found in ${laps.length} laps`);
+    }
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+const isTrialThreshold = (m: unknown): boolean => {
+  const x = m as { value?: unknown; source?: unknown } | null;
+  return !!x && Number(x.value) > 0 && /time trial/.test(String(x.source ?? ''));
+};
+const stampOf = (m: unknown): string => {
+  const x = m as { tested_at?: unknown; as_of?: unknown } | null;
+  return String(x?.tested_at ?? x?.as_of ?? '');
+};
+
+/**
+ * ⛔ THE READ-MODIFY-WRITE WINDOW, CLOSED (2026-09-16, Stage 7 session 1). The learner read `learned_fitness`, spent
+ * seconds on goals and identity, then wrote the whole object back — so a strength save (compute-facts), an accept
+ * (save-baselines) or a test result (another learner run) landing in between was lost. The row is re-read
+ * immediately before the write and every key this run does not own is taken from that fresh read:
+ *   · `strength_1rms` — compute-facts';
+ *   · `ride_ftp_accepted` / `run_threshold_pace_accepted` — the athlete's answer, when one is on the row;
+ *   · a time-trial threshold (with its vVO2) or a tested CSS on the fresh row that is newer than this run's.
+ */
+export function carryThroughFresh(
+  merged: Record<string, unknown>,
+  fresh: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...merged };
+  const f = fresh ?? {};
+  out.strength_1rms = f.strength_1rms;
+  for (const k of ['ride_ftp_accepted', 'run_threshold_pace_accepted']) {
+    if (Number((f[k] as { value?: unknown } | undefined)?.value) > 0) out[k] = f[k];
+  }
+  if (isTrialThreshold(f.run_threshold_pace_sec_per_km)) {
+    const ours = out.run_threshold_pace_sec_per_km;
+    if (!isTrialThreshold(ours) || stampOf(f.run_threshold_pace_sec_per_km) > stampOf(ours)) {
+      out.run_threshold_pace_sec_per_km = f.run_threshold_pace_sec_per_km;
+      if (f.run_vvo2_pace_sec_per_km) out.run_vvo2_pace_sec_per_km = f.run_vvo2_pace_sec_per_km;
+    }
+  }
+  if (isTestedSwimCss(f.swim_css_sec_per_100m)) {
+    const ours = out.swim_css_sec_per_100m;
+    if (!isTestedSwimCss(ours) || stampOf(f.swim_css_sec_per_100m) > stampOf(ours)) {
+      out.swim_css_sec_per_100m = f.swim_css_sec_per_100m;
+    }
+  }
+  return out;
 }
 
 // =============================================================================
@@ -353,7 +514,32 @@ Deno.serve(async (req) => {
         return (obj && typeof obj === 'object') ? (obj as Record<string, any>) : null;
       } catch { return null; }
     })();
-    const runProfile = analyzeRuns(runs, allRunCurves, priorLearned);
+
+    // ⛔ A FIELD TEST JUST FINISHED (2026-09-16, Stage 7 session 1): compute-workout-analysis names the workout.
+    // Its result joins the prior values, so the run analysis below keeps the trial as a test (a test beats an
+    // inference) and the CSS merge below keeps the tested CSS. A newer test replaces an older one here.
+    const assessmentWorkoutId = typeof payload?.assessment_workout_id === 'string' ? payload.assessment_workout_id : null;
+    let tested: Record<string, unknown> | null = null;
+    if (assessmentWorkoutId) {
+      try {
+        const { data: aw } = await supabase
+          .from('workouts')
+          .select('id, planned_id, laps')
+          .eq('id', assessmentWorkoutId)
+          .eq('user_id', user_id)
+          .maybeSingle();
+        if (aw?.planned_id) {
+          const { data: ap } = await supabase.from('planned_workouts').select('tags').eq('id', String(aw.planned_id)).maybeSingle();
+          const tags: string[] = Array.isArray(ap?.tags) ? ap.tags.map((t: unknown) => String(t)) : [];
+          const laps = typeof aw.laps === 'string' ? (() => { try { return JSON.parse(aw.laps); } catch { return []; } })() : (aw.laps ?? []);
+          tested = assessmentFromLaps(tags, Array.isArray(laps) ? laps : [], priorLearned);
+        }
+      } catch (e) {
+        console.warn('[assessment] test read failed (non-fatal):', (e as Error)?.message ?? String(e));
+      }
+    }
+    const priorForRuns = tested ? { ...(priorLearned ?? {}), ...tested } : priorLearned;
+    const runProfile = analyzeRuns(runs, allRunCurves, priorForRuns);
 
     // ==========================================================================
     // ANALYZE RIDES
@@ -484,10 +670,20 @@ Deno.serve(async (req) => {
     if (learnedProfile.swim_pace_per_100m == null && existing?.swim_pace_per_100m) {
       mergedLearned.swim_pace_per_100m = existing.swim_pace_per_100m;
     }
-    // Preserve a tested/prior CSS when the learner abstains this run (don't wipe a CSS-test result).
-    if ((learnedProfile as any).swim_css_sec_per_100m == null && (existing as any)?.swim_css_sec_per_100m) {
+    // ⛔ A TESTED CSS BEATS THE FIT (2026-09-16, Stage 7 session 1) — the precedence the run analysis already gives
+    // a time-trial threshold. Before, a publishing fit overwrote a CSS test. A test from this run wins; a stored
+    // test stands; otherwise the fit, or the prior value when the fit abstains.
+    if (tested?.swim_css_sec_per_100m) {
+      mergedLearned.swim_css_sec_per_100m = tested.swim_css_sec_per_100m;
+    } else if (isTestedSwimCss(existing?.swim_css_sec_per_100m)) {
+      mergedLearned.swim_css_sec_per_100m = existing.swim_css_sec_per_100m;
+    } else if ((learnedProfile as any).swim_css_sec_per_100m == null && (existing as any)?.swim_css_sec_per_100m) {
       (mergedLearned as any).swim_css_sec_per_100m = (existing as any).swim_css_sec_per_100m;
     }
+    // ⛔ THE TRIAL'S vVO2 PACE IS CARRIED (2026-09-16). The object is rebuilt on every learn and this key was not in
+    // it, so every learn after a time trial dropped it.
+    const vvo2 = tested?.run_vvo2_pace_sec_per_km ?? existing?.run_vvo2_pace_sec_per_km;
+    if (vvo2) mergedLearned.run_vvo2_pace_sec_per_km = vvo2;
 
     // Tier-cliff guard: block FTP overwrite ONLY when new confidence drops below prior.
     // A decline measured at equal-or-higher confidence still goes through. No-op on INSERT
@@ -511,6 +707,7 @@ Deno.serve(async (req) => {
     // never by this learner — EXCEPT the one-time seed below. It is carried over verbatim on every
     // learn: `mergedLearned` is rebuilt from this run's profile, so without this line the first learn
     // after an accept would drop it and every zone would snap back to the live estimate.
+    const acceptSeeds: Array<{ kind: 'ftp' | 'run_threshold'; value: number }> = [];
     const priorAccepted = existing?.ride_ftp_accepted as Record<string, unknown> | undefined;
     if (priorAccepted && Number(priorAccepted.value) > 0) {
       mergedLearned.ride_ftp_accepted = priorAccepted;
@@ -522,13 +719,8 @@ Deno.serve(async (req) => {
       // (learned-low never proposes, and a low number must not become "the number they said yes to").
       const seedFrom = mergedLearned.ride_ftp_estimated as LearnedMetric | undefined;
       if (seedFrom && Number(seedFrom.value) > 0 && (seedFrom.confidence === 'medium' || seedFrom.confidence === 'high')) {
-        mergedLearned.ride_ftp_accepted = {
-          ...seedFrom,
-          accepted_at: new Date().toISOString(),
-          accepted_from: seedFrom.value,
-          accepted_via: 'seed',
-        };
-        console.log(`  FTP accepted seeded from estimate: ${seedFrom.value}W (${seedFrom.confidence})`);
+        // ⛔ Through save-baselines' accept after this learn is written (Stage 7 session 1) — the one writer of it.
+        acceptSeeds.push({ kind: 'ftp', value: Number(seedFrom.value) });
       }
     }
     // ⛔ RUN THRESHOLD PACE: PROPOSED, THEN ACCEPTED — the FTP pattern applied to the run (2026-09-05). Keep the
@@ -540,8 +732,7 @@ Deno.serve(async (req) => {
     } else {
       const seedThr = mergedLearned.run_threshold_pace_sec_per_km as LearnedMetric | undefined;
       if (seedThr && Number(seedThr.value) > 0 && (seedThr.confidence === 'medium' || seedThr.confidence === 'high')) {
-        mergedLearned.run_threshold_pace_accepted = { ...seedThr, accepted_at: new Date().toISOString(), accepted_from: seedThr.value, accepted_via: 'seed' };
-        console.log(`  run threshold accepted seeded from learned: ${seedThr.value} s/km (${seedThr.confidence})`);
+        acceptSeeds.push({ kind: 'run_threshold', value: Number(seedThr.value) });
       }
     }
 
@@ -583,11 +774,15 @@ Deno.serve(async (req) => {
 
     let baselinesWriteOk = false;
     if (existingBaselines?.id) {
-      // Update existing record
+      // Re-read immediately before the write; see `carryThroughFresh`.
+      const { data: freshRow } = await supabase.from('user_baselines').select('learned_fitness').eq('id', existingBaselines.id).maybeSingle();
+      const toWrite = carryThroughFresh(mergedLearned, parseJsonb(freshRow?.learned_fitness));
+      // ⛔ The learned keys below are this step's (2026-09-16, Stage 7 session 1); strength_1rms and the two accepted keys ride through.
       const { error: updateError } = await supabase
         .from('user_baselines')
-        .update({ 
-          learned_fitness: mergedLearned,
+        .update({
+          /* writes-keys: run_easy_hr, run_threshold_hr, run_race_hr, run_max_hr_observed, run_easy_pace_sec_per_km, run_threshold_pace_sec_per_km, run_vvo2_pace_sec_per_km, ride_easy_hr, ride_threshold_hr, ride_max_hr_observed, ride_ftp_estimated, swim_pace_per_100m, swim_css_sec_per_100m, workouts_analyzed, last_updated, learning_status */
+          learned_fitness: toWrite,
           ...identityUpdate,
           updated_at: new Date().toISOString()
         })
@@ -603,6 +798,7 @@ Deno.serve(async (req) => {
       // Insert new record
       const baseInsert: Record<string, unknown> = {
         user_id: user_id,
+        /* writes-keys: run_easy_hr, run_threshold_hr, run_race_hr, run_max_hr_observed, run_easy_pace_sec_per_km, run_threshold_pace_sec_per_km, run_vvo2_pace_sec_per_km, ride_easy_hr, ride_threshold_hr, ride_max_hr_observed, ride_ftp_estimated, swim_pace_per_100m, swim_css_sec_per_100m, workouts_analyzed, last_updated, learning_status */
         learned_fitness: mergedLearned,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -626,6 +822,31 @@ Deno.serve(async (req) => {
       recomputeRaceProjectionsForUser(supabase, user_id).catch((e) =>
         console.warn('[learn-fitness-profile] recompute goal projection', e)
       );
+    }
+
+    for (const seed of baselinesWriteOk ? acceptSeeds : []) {
+      try {
+        const { data: seeded, error: seedErr } = await supabase.functions.invoke('save-baselines', {
+          body: { user_id, accept: { kind: seed.kind, value: seed.value, via: 'seed' } },
+        });
+        if (seedErr) console.warn(`[seed] ${seed.kind} accepted value not seeded:`, seedErr.message ?? String(seedErr));
+        else console.log(`  ${seed.kind} accepted seeded from the learned value ${seed.value}`, seeded?.seeded === false ? '(already answered)' : '');
+      } catch (e) {
+        console.warn(`[seed] ${seed.kind} accepted value not seeded:`, (e as Error)?.message ?? String(e));
+      }
+    }
+
+    // ⛔ A TESTED CSS STILL SETS THE PLAN'S SWIM PACE (2026-09-16, Stage 7 session 1) — through save-baselines, the
+    // one writer of `performance_numbers`. It reads the tested CSS just written and converts it there.
+    if (baselinesWriteOk && tested?.swim_css_sec_per_100m) {
+      try {
+        const { error: swimErr } = await supabase.functions.invoke('save-baselines', {
+          body: { user_id, accept: { kind: 'swim_css_test' } },
+        });
+        if (swimErr) console.warn('[assessment] swim pace not set from the CSS test:', swimErr.message ?? String(swimErr));
+      } catch (e) {
+        console.warn('[assessment] swim pace not set from the CSS test:', (e as Error)?.message ?? String(e));
+      }
     }
 
     return new Response(JSON.stringify(learnedProfile), {

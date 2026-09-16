@@ -247,12 +247,11 @@ Deno.serve(async (req) => {
     // 2. Get user baselines
     const { data: ub } = await supabase
       .from('user_baselines')
-      .select('performance_numbers,learned_fitness,units')
+      .select('performance_numbers,units')
       .eq('user_id', user_id)
       .maybeSingle();
 
     const perf = parseJson(ub?.performance_numbers) || {};
-    const learned = parseJson(ub?.learned_fitness) || {};
     const isMetric = String(ub?.units || 'imperial').toLowerCase() === 'metric';
 
     // 3. Get exercise_log for strength trends (last 4 weeks)
@@ -366,83 +365,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    // =========================================================================
-    // ENDURANCE PACE/POWER SUGGESTIONS
-    // =========================================================================
-    const learnedEasyPace = learned?.run_easy_pace_sec_per_km;
-    const learnedFtp = learned?.ride_ftp_estimated;
-
-    // Easy pace update: if learned pace differs from manual by 5%+
-    if (learnedEasyPace?.value && learnedEasyPace?.confidence) {
-      const confNum = learnedEasyPace.confidence === 'high' ? 0.9 : learnedEasyPace.confidence === 'medium' ? 0.65 : 0.4;
-      if (confNum >= 0.65) {
-        const learnedSecPerKm = Number(learnedEasyPace.value);
-        const manualEasyMmSs = perf.easyPace;
-        if (manualEasyMmSs) {
-          const manualParts = String(manualEasyMmSs).split(':');
-          if (manualParts.length === 2) {
-            const manualSecPerMi = Number(manualParts[0]) * 60 + Number(manualParts[1]);
-            const learnedSecPerMi = Math.round(learnedSecPerKm * 1.60934);
-            const deltaPct = Math.abs(learnedSecPerMi - manualSecPerMi) / manualSecPerMi;
-
-            if (deltaPct >= 0.05) {
-              const fmtPace = (secs: number) => {
-                const m = Math.floor(secs / 60);
-                const s = Math.round(secs % 60);
-                return `${m}:${String(s).padStart(2, '0')}`;
-              };
-
-              const paceHarder = learnedSecPerMi < manualSecPerMi;
-              const blocked =
-                (paceHarder && !suggestionGates.allowLoadIncrease) ||
-                (!paceHarder && !suggestionGates.allowBackingOff);
-              if (!blocked) {
-                suggestions.push({
-                  id: 'end_easy_pace',
-                  type: 'endurance_pace_update',
-                  title: 'Update easy run pace',
-                  description: `Your actual easy pace has ${learnedSecPerMi < manualSecPerMi ? 'improved' : 'slowed'}. Updating will better calibrate your workouts.`,
-                  current_value: manualSecPerMi,
-                  suggested_value: learnedSecPerMi,
-                  unit: '/mi',
-                  confidence: confNum >= 0.9 ? 'high' : 'medium',
-                  reason: `Learned ${fmtPace(learnedSecPerMi)}/mi from recent runs vs manual ${fmtPace(manualSecPerMi)}/mi`,
-                });
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // FTP update
-    if (learnedFtp?.value && learnedFtp?.confidence) {
-      const confNum = learnedFtp.confidence === 'high' ? 0.9 : learnedFtp.confidence === 'medium' ? 0.65 : 0.4;
-      const manualFtp = Number(perf.ftp);
-      const learnedVal = Number(learnedFtp.value);
-      if (confNum >= 0.65 && Number.isFinite(manualFtp) && manualFtp > 0 && Number.isFinite(learnedVal)) {
-        const deltaPct = Math.abs(learnedVal - manualFtp) / manualFtp;
-        if (deltaPct >= 0.05) {
-          const ftpHarder = learnedVal > manualFtp;
-          const blocked =
-            (ftpHarder && !suggestionGates.allowLoadIncrease) ||
-            (!ftpHarder && !suggestionGates.allowBackingOff);
-          if (!blocked) {
-            suggestions.push({
-              id: 'end_ftp',
-              type: 'endurance_pace_update',
-              title: 'Update cycling FTP',
-              description: `Your estimated FTP has ${learnedVal > manualFtp ? 'increased' : 'decreased'}. Power targets will be more accurate.`,
-              current_value: Math.round(manualFtp),
-              suggested_value: Math.round(learnedVal),
-              unit: 'W',
-              confidence: confNum >= 0.9 ? 'high' : 'medium',
-              reason: `Learned ${Math.round(learnedVal)}W from recent rides vs manual ${Math.round(manualFtp)}W`,
-            });
-          }
-        }
-      }
-    }
+    // ⛔ NO ENDURANCE PACE/FTP SUGGESTIONS HERE (2026-09-16, Stage 7 session 1). `end_easy_pace` and `end_ftp`
+    // were built here and applied in `acceptSuggestion` by writing `performance_numbers` — a second writer of
+    // the athlete's own numbers. No caller ever sent `action: 'accept'` with either id (grep of src and
+    // supabase/functions), and no screen renders the suggestion list. The measured-vs-yours offers live on
+    // save-baselines' accept (Adjust, the post-workout popup, the six-week checkpoint).
 
     // =========================================================================
     // AMRAP CATCH-UP — the training max, at a cycle boundary (D-408)
@@ -905,7 +832,7 @@ async function acceptSuggestion(
   suggestionId: string,
   today: string,
 ): Promise<{ applied: boolean; type: string; detail: string }> {
-  // Suggestion IDs encode the type: str_prog_<lift>, str_deload_<lift>, end_easy_pace, end_ftp, strength_relayout
+  // Suggestion IDs encode the type: str_prog_<lift>, str_deload_<lift>, strength_relayout, strength_training_max
   if (suggestionId === 'strength_relayout') {
     const { data: plans } = await supabase
       .from('plans')
@@ -1089,63 +1016,6 @@ async function acceptSuggestion(
     };
   }
 
-  if (suggestionId === 'end_easy_pace') {
-    const { data: ub } = await supabase
-      .from('user_baselines')
-      .select('performance_numbers,learned_fitness')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    const perf = parseJson(ub?.performance_numbers) || {};
-    const learned = parseJson(ub?.learned_fitness) || {};
-    const learnedVal = Number(learned?.run_easy_pace_sec_per_km?.value);
-
-    if (Number.isFinite(learnedVal) && learnedVal > 0) {
-      const learnedSecPerMi = Math.round(learnedVal * 1.60934);
-      const m = Math.floor(learnedSecPerMi / 60);
-      const s = Math.round(learnedSecPerMi % 60);
-      const newPace = `${m}:${String(s).padStart(2, '0')}`;
-
-      await supabase
-        .from('user_baselines')
-        .update({
-          performance_numbers: { ...perf, easyPace: newPace },
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', userId);
-
-      return { applied: true, type: 'endurance_pace_update', detail: `Easy pace updated to ${newPace}/mi` };
-    }
-
-    return { applied: false, type: 'endurance_pace_update', detail: 'No learned pace available' };
-  }
-
-  if (suggestionId === 'end_ftp') {
-    const { data: ub } = await supabase
-      .from('user_baselines')
-      .select('performance_numbers,learned_fitness')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    const perf = parseJson(ub?.performance_numbers) || {};
-    const learned = parseJson(ub?.learned_fitness) || {};
-    const learnedVal = Number(learned?.ride_ftp_estimated?.value);
-
-    if (Number.isFinite(learnedVal) && learnedVal > 0) {
-      await supabase
-        .from('user_baselines')
-        .update({
-          performance_numbers: { ...perf, ftp: Math.round(learnedVal) },
-          updated_at: new Date().toISOString(),
-        })
-        .eq('user_id', userId);
-
-      return { applied: true, type: 'endurance_pace_update', detail: `FTP updated to ${Math.round(learnedVal)}W` };
-    }
-
-    return { applied: false, type: 'endurance_pace_update', detail: 'No learned FTP available' };
-  }
-
   return { applied: false, type: 'unknown', detail: `Unknown suggestion: ${suggestionId}` };
 }
 
@@ -1157,7 +1027,6 @@ async function acceptSuggestion(
 //   (actual - target) >= protocol.minDeviation AND phase.allowProgress
 // - Strength deload: RIR deviation <= protocol.maxDeviation * phase.deloadSensitivity
 //   for protocol.minSessions consecutive sessions
-// - Endurance targets update when: learned value differs 7%+ with high confidence
 // - Recovery insertion when: response model says "overreaching" with high confidence
 // =============================================================================
 
@@ -1325,18 +1194,17 @@ async function autoAdapt(
   //   · ftp       -> same shape, same silence.
   // It then re-materialized the plan off the number it had just changed behind the athlete's back.
   //
-  // WHY DELETING IT COSTS NOTHING: the athlete-gated SUGGESTION path above (`end_easy_pace` / the FTP twin,
-  // ~line 349) already fires on a STRICTLY LOOSER trigger — >=5% divergence at >=medium confidence, versus
-  // this block's >=7% at high. Every case the auto-write caught was already a suggestion. The only thing
-  // the auto-write added was the absence of consent.
+  // WHY DELETING IT COST NOTHING: an athlete-gated suggestion path (`end_easy_pace` / the FTP twin) fired on a
+  // STRICTLY LOOSER trigger. ⛔ That path is gone too (2026-09-16, Stage 7 session 1) — no caller ever accepted
+  // it; the measured-vs-yours offer is save-baselines' accept.
   //
   // WHY IT IS WRONG: no commercial app rewrites an athlete's entered baseline without asking. Garmin,
   // TrainingPeaks, Runalyze all SUGGEST and let the athlete adopt. And it is a Law 2 violation in the
   // literal sense — an inference silently displacing an assertion, then being read back as if the athlete
   // had said it.
   //
-  // ⛔ DO NOT RE-ADD AN AUTO-WRITE HERE. If a baseline should change, it goes through the suggestion list
-  // and the athlete accepts it. The apply path (~line 935) already writes it on their confirmation.
+  // ⛔ DO NOT RE-ADD AN AUTO-WRITE HERE. If a baseline should change, the athlete accepts it through
+  // save-baselines, the one writer of `performance_numbers`.
 
   // 4. Re-materialize affected workouts if any adaptations were applied
   if (adaptations.some((a) => a.applied) && planId) {

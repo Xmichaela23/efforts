@@ -227,20 +227,28 @@ Deno.serve(async (req) => {
 
     if (Object.keys(updatedPerf).length === 0) return json({ success: false, reason: 'nothing_to_write' }, 400);
 
-    if (row?.id) {
-      const { error } = await supabase
-        .from('user_baselines')
-        .update({ performance_numbers: updatedPerf })
-        .eq('id', row.id);
-      if (error) return json({ success: false, reason: 'write_failed', details: error.message }, 500);
-    } else {
-      const { error } = await supabase
-        .from('user_baselines')
-        .insert([{ user_id: userId, performance_numbers: updatedPerf }]);
-      if (error) return json({ success: false, reason: 'write_failed', details: error.message }, 500);
+    /**
+     * ⛔ SAVE-BASELINES WRITES IT (2026-09-16, Stage 7 session 1). This function wrote `performance_numbers` itself,
+     * a second writer of the lift keys Adjust types through save-baselines. The keep / update decision stays here
+     * (it is the athlete's consent); only the lifts that change go to save-baselines' `tested_lifts`, with the
+     * athlete's own token, and it sets the seed without touching `locked_baselines` — as this write never did.
+     */
+    const testedLifts: Record<string, number> = {};
+    for (const [k, v] of Object.entries(updatedPerf)) {
+      if (v !== currentPerf[k]) testedLifts[k] = Number(v);
+    }
+    if (Object.keys(testedLifts).length === 0) {
+      return json({ success: true, written: true, computed, performance_numbers: currentPerf });
+    }
+    const { data: saved, error: saveErr } = await supabase.functions.invoke('save-baselines', {
+      body: { tested_lifts: testedLifts },
+      headers: { Authorization: req.headers.get('Authorization') ?? '' },
+    });
+    if (saveErr || !saved?.success) {
+      return json({ success: false, reason: 'write_failed', details: saveErr?.message ?? saved?.error ?? 'save-baselines refused' }, 500);
     }
 
-    return json({ success: true, written: true, computed, performance_numbers: updatedPerf });
+    return json({ success: true, written: true, computed, performance_numbers: saved.performance_numbers ?? updatedPerf });
   } catch (e: any) {
     return json({ success: false, reason: 'error', details: e?.message ?? String(e) }, 500);
   }
