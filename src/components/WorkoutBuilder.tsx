@@ -10,6 +10,7 @@ import RideIntervalBuilder, { RideInterval } from './RideIntervalBuilder';
 import SwimIntervalBuilder, { SwimInterval } from './SwimIntervalBuilder';
 import StrengthExerciseBuilder, { StrengthExercise } from './StrengthExerciseBuilder';
 import { useAppContext } from '@/contexts/AppContext';
+import { resolvePlannedDurationSeconds } from '@shared/planned-duration';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { PlannedWorkout } from '@/types/planned-workout';
 
@@ -193,35 +194,18 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     }
   }, [runIntervals, rideIntervals, swimIntervals, strengthExercises]);
 
+  /**
+   * ⛔ THE SERVER LADDER'S ANSWER, NOT A SECOND SUM (2026-09-15, §8.0 #27). This added the intervals up
+   * itself — multiplying a plain interval by its repeat count — while `_shared/planned-duration.ts` (what
+   * Today, the Week and the drawer read off the saved row) did not, so a "4 × 5:00" session was 20 min in the
+   * builder and 5:00 everywhere else. The shared function is the one sum now: shown here, and saved.
+   */
   const calculateTotalTime = () => {
-    let total = 0;
-    switch (formData.type) {
-      case 'run':
-        total = runIntervals.reduce((sum, interval) => {
-          if (interval.isRepeatBlock) {
-            return sum + (interval.duration || 0);
-          }
-          return sum + (interval.duration || 0) * (interval.repeatCount || 1);
-        }, 0);
-        break;
-      case 'ride':
-        total = rideIntervals.reduce((sum, interval) => {
-          if (interval.isRepeatBlock) {
-            return sum + (interval.duration || 0);
-          }
-          return sum + (interval.duration || 0) * (interval.repeatCount || 1);
-        }, 0);
-        break;
-      case 'swim':
-        total = swimIntervals.reduce((sum, interval) => {
-          if (interval.isRepeatBlock) {
-            return sum + (interval.duration || 0);
-          }
-          return sum + (interval.duration || 0) * (interval.repeatCount || 1);
-        }, 0);
-        break;
-    }
-    return total;
+    const intervals = formData.type === 'run' ? runIntervals
+      : formData.type === 'ride' ? rideIntervals
+      : formData.type === 'swim' ? swimIntervals
+      : [];
+    return resolvePlannedDurationSeconds({ intervals }) ?? 0;
   };
 
   const formatTime = (seconds: number) => {
@@ -387,7 +371,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
         type: formData.type as 'run' | 'ride' | 'swim' | 'strength' | 'walk' | 'pilates_yoga',
         date: formData.date,
         description: formData.description || generateWorkoutDescription(),
-        duration: Math.round(calculateTotalTime() / 60), // Convert seconds to minutes
+        duration: Math.round(calculateTotalTime() / 60), // minutes; the shared ladder's seconds
         intervals: formData.type === 'run' ? runIntervals :
                   formData.type === 'ride' ? rideIntervals :
                   formData.type === 'swim' ? swimIntervals : [],
@@ -407,7 +391,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
           type: workoutData.type,
           date: workoutData.date,
           description: workoutData.description,
-          duration: Math.round(calculateTotalTime() / 60), // Convert seconds to minutes
+          duration: Math.round(calculateTotalTime() / 60), // minutes; the shared ladder's seconds
           intervals: workoutData.intervals,
           strength_exercises: workoutData.strength_exercises,
           workout_status: workoutData.workout_status,

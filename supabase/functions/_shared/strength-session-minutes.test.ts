@@ -77,7 +77,7 @@ Deno.test('the pricing itself still answers for plyo rows — the suppression is
 });
 
 // ⚠️ THE PLYO DAY'S SUPPRESSION IS NO LONGER A PHONE HEADER RULE: get-week sends no label for a row
-// tagged `plyo` (pinned in get-week/planned-duration-label.test.ts).
+// tagged `plyo` (pinned in _shared/planned-duration-label.test.ts).
 
 Deno.test('⛔ NOTHING USABLE MEANS NULL, so the caller can keep the stored length', () => {
   assertEquals(strengthSessionMinutes([]), null);

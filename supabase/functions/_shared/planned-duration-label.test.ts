@@ -1,5 +1,5 @@
 // The planned session's length and its header words, as get-week sends them (2026-09-10, audit H-T01/H-T02).
-// Run: ~/.deno/bin/deno test --no-check supabase/functions/get-week/planned-duration-label.test.ts
+// Run: ~/.deno/bin/deno test --no-check supabase/functions/_shared/planned-duration-label.test.ts
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import { plannedDurationFields } from './planned-duration-label.ts';
 

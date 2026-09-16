@@ -58,3 +58,15 @@ Deno.test('legacy `intervals` count, including repeat blocks', () => {
   assertEquals(resolvePlannedDurationSeconds({ intervals: [{ duration: 1200 }, { duration: 1200 }] }), 2400);
   assertEquals(resolvePlannedDurationSeconds({ intervals: [{ repeatCount: 4, segments: [{ duration: 240 }, { duration: 120 }] }] }), 1440);
 });
+
+Deno.test('§8.0 #27: a plain interval counts its repeats; a repeat block already carries its total', () => {
+  // The custom builder's "4 × 5:00" — the row it saves and the total it shows must be the same 20 min.
+  assertEquals(resolvePlannedDurationSeconds({ intervals: [{ duration: 300, repeatCount: 4 }] }), 1200);
+  // A repeat block: `duration` is segments × repeatCount already (RunIntervalBuilder:186-193).
+  assertEquals(resolvePlannedDurationSeconds({
+    intervals: [{ isRepeatBlock: true, repeatCount: 4, duration: 1440, originalSegments: [{ duration: 240 }, { duration: 120 }] }],
+  }), 1440);
+  // No repeat count is one time through, unchanged.
+  assertEquals(resolvePlannedDurationSeconds({ intervals: [{ duration: 600 }] }), 600);
+});
+

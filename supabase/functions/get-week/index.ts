@@ -34,7 +34,7 @@ import { normalizeCompletedStrengthExercise } from '../../../src/lib/normalize-s
 // ⛔ ONE VALUE PER FACT (2026-09-10, audit Stage 2 items 10–12). The planned length and its header
 // words, the finished moving time, and the pounds a lift moved are decided by these three and sent
 // on every item; the phone prints them and computes none of them.
-import { plannedDurationFields } from './planned-duration-label.ts';
+import { plannedDurationFields } from '../_shared/planned-duration-label.ts';
 import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
 import { getOverallAvgHr } from '../_shared/fact-packet/queries.ts';
 import { completedStrengthVolume, isPerformedSet } from '../_shared/strength/session-volume.ts';

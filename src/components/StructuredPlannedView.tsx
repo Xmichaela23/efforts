@@ -677,9 +677,11 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         );
       })() : (
       <div className="p-1">
-        {plannedSecs != null && plannedSecs > 0 && (
-          <div className="text-xs text-gray-300 font-light tracking-normal mb-1">Total duration: {(() => { const m=Math.floor(plannedSecs/60); const s=plannedSecs%60; return `${m}:${String(s).padStart(2,'0')}`; })()}</div>
-        )}
+        {/*
+          * ⛔ ONE LENGTH ON THIS SCREEN, AND IT IS THE HEADER'S (2026-09-15, §8.0 #26). "Total duration: 62:35"
+          * printed the same stored seconds the header above prints as "63:00" — one number, two roundings, six
+          * lines apart. The line is gone; the header is the length.
+          */}
         <ul className="list-none space-y-1">
           {(lines.length
             ? lines

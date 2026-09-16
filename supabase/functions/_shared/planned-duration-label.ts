@@ -1,6 +1,8 @@
 /**
- * A PLANNED SESSION'S LENGTH, AS THE HEADER PRINTS IT — decided here, sent by get-week
- * (2026-09-10, audit H-T01 / H-T02, Stage 2 item 10).
+ * A PLANNED SESSION'S LENGTH, AS THE HEADER PRINTS IT — decided here (2026-09-10, audit H-T01 / H-T02,
+ * Stage 2 item 10). `get-week` sends it on every item; the plan screen, which reads `planned_workouts`
+ * straight from the table, calls this same function (2026-09-15, §8.0 #25) — the phone runs the server's
+ * own rule rather than a second copy, the way it already does with `friel-zones.ts`.
  *
  * ⛔ WHAT THE PHONE USED TO DECIDE. `PlannedSessionHeader.formatSessionDuration` ran the phone's own
  * five-rung duration ladder, priced a lifting session off its rows at 2–4 seconds a rep, and hid the
@@ -11,8 +13,8 @@
  *     for everything else, and nothing for the plyo day (Michael, 2026-09-09: the drill day has no
  *     length on the row or on the page, so none is shown).
  */
-import { resolvePlannedDurationSeconds } from '../_shared/planned-duration.ts';
-import { strengthSessionMinutes } from '../_shared/strength-session-minutes.ts';
+import { resolvePlannedDurationSeconds } from './planned-duration.ts';
+import { strengthSessionMinutes } from './strength-session-minutes.ts';
 
 const STRENGTH_TYPES = new Set(['strength', 'weight_training', 'weights', 'lift']);
 

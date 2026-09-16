@@ -98,7 +98,7 @@ export function plannedStepSeconds(planned: any): number | null {
   return sec > 0 ? Math.round(sec) : null;
 }
 
-/** Sum `intervals[]`, expanding `{ segments, repeatCount }` blocks. */
+/** Sum `intervals[]`: `{ segments, repeatCount }` blocks expanded, a plain `{ duration, repeatCount }` multiplied. */
 function intervalSeconds(intervals: unknown): number | null {
   if (!Array.isArray(intervals) || intervals.length === 0) return null;
   let total = 0;
@@ -108,7 +108,17 @@ function intervalSeconds(intervals: unknown): number | null {
       const seg = (it.segments as Record<string, unknown>[]).reduce((s, sg) => s + (positive(sg?.duration) ?? 0), 0);
       total += seg * repeat;
     } else {
-      total += positive(it?.duration) ?? positive(it?.seconds) ?? 0;
+      /**
+       * ⛔ A PLAIN INTERVAL REPEATS TOO (2026-09-15, §8.0 #27). A block's `{ segments, repeatCount }` was
+       * expanded above while `{ duration, repeatCount }` — what the custom-session builder saves for
+       * "4 × 5:00" — counted its 5 minutes once, so the builder said 20 min and Today said 5:00.
+       * ⚠️ A REPEAT BLOCK'S `duration` IS ALREADY THE TOTAL. `RunIntervalBuilder:186-193` writes
+       * `{ isRepeatBlock: true, repeatCount, duration: segments × repeatCount, originalSegments }` — the
+       * segments live under `originalSegments`, so the branch above does not see them and multiplying here
+       * would count the block twice.
+       */
+      const secs = positive(it?.duration) ?? positive(it?.seconds) ?? 0;
+      total += it?.isRepeatBlock === true ? secs : secs * (repeat ?? 1);
     }
   }
   return total > 0 ? Math.round(total) : null;

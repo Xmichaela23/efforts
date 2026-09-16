@@ -23,6 +23,10 @@ import { swimPlannedEquipmentFromWorkout } from '@/lib/plan-tokens/swim-drill-to
 import { deriveWorkoutTitle } from '@/lib/derive-workout-title';
 // ⛔ THE SERVER'S PLANNED LENGTH, READ (2026-09-10, audit H-T01). See `plannedDurationSecondsOf`.
 import { plannedDurationSecondsOf } from './PlannedSessionHeader';
+// ⛔ THE HEADER'S WORDS ARE THE SERVER'S RULE (2026-09-15, §8.0 #25). This screen reads `planned_workouts`
+// straight from the table, so it calls the same function get-week calls — not a copy — and the header prints
+// the label ("30–40 min" for a lift priced off its rows, "63:00" otherwise, nothing on the plyo day).
+import { plannedDurationFields } from '@shared/planned-duration-label';
 import { formatWizardPrefsMarkdownLines, formatPlanConfigPrefsMarkdownLines } from '@/lib/format-wizard-prefs-export';
 import { plainIntent } from '@/lib/plain-intent';
 
@@ -462,6 +466,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               description: renderedDesc,
               duration,
               planned_duration_seconds: plannedSecs,
+              planned_duration_label: plannedDurationFields(w).planned_duration_label,
               intensity: typeof w.intensity === 'string' ? w.intensity : undefined,
               day: dayName,
               completed: false,
@@ -618,6 +623,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 description: [description, stepsSummary.length ? `(${stepsSummary.join(' • ')})` : ''].filter(Boolean).join(' '),
                 duration,
                 planned_duration_seconds: authoredMin != null ? Math.round(authoredMin * 60) : null,
+                planned_duration_label: plannedDurationFields({ ...s, total_duration_seconds: authoredMin != null ? Math.round(authoredMin * 60) : null }, mappedType || 'run').planned_duration_label,
                 intensity: typeof s.intensity === 'string' ? s.intensity : undefined,
                 day: s.day,
                 completed: false,
@@ -997,7 +1003,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             const steps_preset = parseMaybeJson((w as any).steps_preset) || null;
             const export_hints = parseMaybeJson((w as any).export_hints) || null;
             const intervals = parseMaybeJson((w as any).intervals) || [];
-            return { ...w, day: dayName, duration, planned_duration_seconds: plannedSecs, tags, steps_preset, export_hints, intervals, rendered_description: renderedDesc };
+            return { ...w, day: dayName, duration, planned_duration_seconds: plannedSecs, planned_duration_label: plannedDurationFields(w).planned_duration_label, tags, steps_preset, export_hints, intervals, rendered_description: renderedDesc };
           });
           weekCacheRef.current.set(key, normalized);
           let weeks: any[];
