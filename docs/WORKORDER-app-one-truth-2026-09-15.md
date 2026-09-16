@@ -89,6 +89,13 @@ the standing-plan path first, then the rest of the screens, then the metric labe
 **Parked (silent until reopened):** the race plan path and the season wizard — §8.0 items 28, 33, 34, 37, 38, 39, 40
 and the race-projection question in Stage 2. They are recorded with file and line and wait.
 
+## 3b. Ruling on Stage 5's "code ≠ source" list (Michael, 2026-09-16: "good on all")
+
+The book wins on all five standing-plan items in `docs/STAGE5-REPORT-2026-09-16.md`: the lower-body cut fades over
+8–10 weeks (p247), the short-interval ride rests 1:30 (pp233–234), the dose cites p80, the "4 to 6 hours apart" line
+carries p145's condition (first session easy, under an hour), and the run analyser's fallback zones read the one
+Friel table. Built as one session before Stage 6. The other five items on that list are race path — parked (§3a).
+
 ## 4. Stages — one terminal session each, in this order
 
 Every stage: **trace → report → Michael's go → build → throwaway-account check → commit exact files → deploy
