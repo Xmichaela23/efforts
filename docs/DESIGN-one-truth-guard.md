@@ -1,9 +1,9 @@
 # DESIGN — the one-truth guard (Stage 6 of the one-truth workorder)
 
-**Status:** APPROVED (Michael, 2026-09-15). Build to this. The one open ruling — §1.3, a unit
-conversion on the phone — was settled the same day: **it fails.** Nothing has been built yet; the
-counts below are a dry run against the tree at `9b1c9171` and nothing in `src/` or
-`supabase/functions/` was changed to produce them.
+**Status:** BUILT (2026-09-16) — see **§11** for the real counts and which rules are FAIL. APPROVED
+(Michael, 2026-09-15). The one open ruling — §1.3, a unit conversion on the phone — was settled the same
+day: **it fails.** The counts in §1–§5 are the dry run against the tree at `9b1c9171`; §11 has the built
+guard's counts on that tree and on HEAD.
 
 **What it is:** five build-time rules that make the seven rules of
 `docs/WORKORDER-app-one-truth-2026-09-15.md` §1 enforced rather than asserted. It is the same move
@@ -548,6 +548,233 @@ unchanged from D-237 §5b.
 - Any runtime change. The guard ships zero runtime code.
 - `src/lib` and `src/hooks` under Rule 1 (§6). A later widening, on its own decision.
 - The race path and the season wizard (§7, WORKORDER §3a). Parked, listed, silent.
+
+---
+
+## 11. As built (2026-09-16) — the real counts, and which rules are FAIL
+
+**Built:** `scripts/check-estimate-provenance.mjs` (rules 1–5 added beside the D-237 check, which is Rule 0
+and unchanged) · `scripts/estimate-provenance.config.json` (`truth` block: severity per rule, scopes, the
+parked list, Rule 3's plumbing/partitioned lists, Rule 4's provider fields) · `package.json`: `npm run build`
+now runs the guard first (`--fail-only`) and stops on a FAIL hit; `npm run lint:truth` added beside
+`lint:provenance`. No code in `src/` or `supabase/functions/` was changed.
+
+**Run it on its own:** `npm run lint:truth` (every rule, every hit). Flags: `--rule N` (one rule), `--parked`
+(also list parked hits), `--fail-only` (hits of FAIL rules only), `--json`.
+
+**Output:** one line per hit, `file:line  rule · what`, then a count per rule.
+
+### 11.1 Counts on the tree at `89af2400`
+
+| rule | outside the park | parked | switch |
+|---|---|---|---|
+| 0 — D-237 estimate fallback (unchanged) | 4 (+3 ticketed Q-120) | — | WARN |
+| 1 (a) — a screen works out a number | **73** | 8 | WARN |
+| 2 (b) — a constant with no source | **1** | 31 | WARN |
+| 2 (b) — an OURS marker with no ledger row | **0** | 0 | **FAIL** |
+| 3 (c) — a derived field with two writers | **17 columns** (57 write sites) | 0 | WARN |
+| 4 (d) — a chain longer than sent → computed | **31** | 0 | WARN |
+| 5 (e) — the composer prints an unsourced number | **0** | 0 | **FAIL** |
+
+Rule 3 also allows 29 plumbing columns and 1 partitioned column (`workouts.workout_analysis`).
+
+`npm run build` passes on this tree with rules 2-ledger and 5 at FAIL. Run against the tree at `9b1c9171`
+the same guard exits 1 (Rule 5: 106 hits, OURS without a row: 64), so a FAIL rule does stop the build.
+
+**The CI job** (`.github/workflows/provenance.yml`, `npm run lint:provenance`) runs the same script, so it now fails only on a FAIL rule; before this stage it exited 1 on Rule 0's four hits.
+
+**Rule 2 is split in two switches, as §9 row 4 allowed:** the ledger half is 0 and is FAIL; the bare-constant
+half has one live hit and stays WARN.
+
+### 11.2 How each rule was calibrated, and where it differs from the dry-run numbers above
+
+Every rule was run against the tree at `9b1c9171` (the tree this design measured) before it was run on HEAD.
+
+- **Rule 2** — a module-level constant is one written at column 0 (Stage 5's reading). Window: 5 lines above,
+  2 below (§2.2). At `9b1c9171`: 175 bare + 31 parked = 206 (§2.4 measured 191 with a different constant
+  match). OURS-with-no-row at `9b1c9171`: 64 (§2.4: 58). The lookup is the file's full basename or a
+  backticked symbol; the dry run also accepted the basename without `.ts`, which let every `index.ts` pass.
+- **Rule 5** — Stage 5's "narrow" reading (ids, lookup keys, identifier-like strings and log/throw text are not
+  display strings), window ±5 (§5.1). At `9b1c9171`: 106, the number Stage 5 reported.
+- **Rule 3** — at `9b1c9171` it finds exactly the columns in the §3.2 table. That table lists 18 columns; less
+  the partitioned `workout_analysis` that is **17**, not the 16 written in §3.3 (an arithmetic slip in the
+  dry run). None of the 17 closed in Stages 3–4. Two writers dropped out because they sit in parked paths:
+  `_shared/race-feedback` (`learned_fitness`, now 5 steps) and `create-goal-and-materialize-plan`
+  (`strength_exercises`, now 2).
+- **Rule 4** — the §4.1 wording, read literally: a rung is SENT only when it is a property or element read
+  (a local variable is not a sent field), field names match as part of a name (`distance_m` also names
+  `distance_meters`). With the bare word `distance` in the field list this reproduces the dry run's **42**
+  at `9b1c9171` exactly (37 live + 5 parked — the five goal-distance strings §4.2 named were all on the race
+  path). Narrowed as §4.2 asked (no bare `distance`): **29** at `9b1c9171`, **31** now. The "≈37" in §4.2
+  was an estimate; 29 is the measured narrowed count.
+- **Rule 1** — at `9b1c9171`: 93 + 8 parked = **101**, against §1.4's 154. The difference is known:
+  (1) values handed to SVG and layout attributes (`x`, `y`, `transform`, `width`, `style`, `d`, handlers…)
+  are treated as geometry — `EffortsButton.tsx` (12 in the dry run, 0 now) is the animated logo, whose maths is parallax transforms and pointer position;
+  (2) an arithmetic chain is one hit, not one hit per operator; (3) a `?? null` rung is not counted as a
+  rung, a chain of text or identity fields (`name`, `id`, `date`, `description`…) is not a number, and an
+  object/array/`new` rung makes the chain non-numeric. The rule follows a local `const`, a local helper
+  function the screen calls, `useMemo`, and an immediately-called function, up to three hops; it does not
+  follow into another file (§6). `0.621371` (1 ÷ 1.609344) was added to the unit-pick constants.
+  **§1.2 check:** must-fail #3 (`WorkoutCalendar`) and #4 (`PlannedWorkoutSummary`) are caught, and the
+  m → mi half of pass #1 (`SessionNarrative`) fails as §1.3 ruled. Must-fail #1 (`LoadBar`, per-operand
+  rounding) and #5 (`StatePerformanceSection`, an effect that sets state) are **not** caught — neither
+  matches any of the four §1.1 shapes; both were fixed in Stages 3–4 anyway. #2 lives in `src/utils`,
+  outside the scope. Passes #2–#5 do not flag.
+- **Parked list** — the §7 seed plus the race-path files Stage 5 skipped (Stage 5 report §7):
+  `race-projections.ts`, `goal-predictor/**`, `marathon-readiness/**`, `riegel.ts`, `_shared/course-*.ts`,
+  `race-debrief.ts`, `race-feedback.ts`. Without them Rule 2's 31 would sit outside the park.
+- **The `parked:` comment for `NonRaceBuilder.tsx`** is supported by the tool (a leading comment on a
+  statement, or a `{/* parked: … */}` child before a JSX element, parks everything inside it) but **was not
+  placed** — this stage changed no code. So `NonRaceBuilder.tsx`'s hits count as live, including any on the
+  race step.
+
+### 11.3 The remaining hits — Stage 7's clean-up list
+
+A rule stays WARN until its list is empty; then its switch in the config goes to `fail`.
+
+**Rule 1 (a) — 73, WARN.** Each line: file:line · what the rule saw.
+
+- `src/components/AllPlansInterface.tsx:2111` · fallback chain, 3+ rungs
+- `src/components/AllPlansInterface.tsx:2112` · fallback chain, 3+ rungs
+- `src/components/CompletedTab.tsx:1047` · fallback chain, 3+ rungs
+- `src/components/CompletedTab.tsx:1284` · unit pick
+- `src/components/CompletedTab.tsx:1406` · threshold picking a printed number
+- `src/components/CompletedTab.tsx:1404` · unit pick
+- `src/components/CompletedTab.tsx:1456` · unit pick
+- `src/components/CompletedTab.tsx:1484` · unit pick
+- `src/components/CompletedTab.tsx:1493` · unit pick
+- `src/components/CompletedTab.tsx:1493` · arithmetic on a fetched value
+- `src/components/CompletedTab.tsx:1550` · unit pick
+- `src/components/CompletedTab.tsx:1682` · threshold picking a printed number
+- `src/components/CompletedTab.tsx:1680` · unit pick
+- `src/components/CompletedTab.tsx:1949` · fallback chain, 3+ rungs
+- `src/components/EffortsViewerMapbox.tsx:1356` · unit pick
+- `src/components/EffortsViewerMapbox.tsx:83` · unit pick
+- `src/components/EffortsViewerMapbox.tsx:163` · unit pick
+- `src/components/EffortsViewerMapbox.tsx:149` · unit pick
+- `src/components/EffortsViewerMapbox.tsx:152` · unit pick
+- `src/components/EffortsViewerMapbox.tsx:238` · unit pick
+- `src/components/EffortsViewerMapbox.tsx:262` · unit pick
+- `src/components/EffortsViewerMapbox.tsx:1580` · unit pick
+- `src/components/EffortsViewerMapbox.tsx:1151` · unit pick
+- `src/components/EffortsViewerMapbox.tsx:148` · unit pick
+- `src/components/EffortsViewerMapbox.tsx:1817` · unit pick
+- `src/components/EffortsViewerMapbox.tsx:1817` · unit pick
+- `src/components/EffortsViewerMapbox.tsx:1906` · unit pick
+- `src/components/EffortsViewerMapbox.tsx:1905` · arithmetic on a fetched value
+- `src/components/EffortsViewerMapbox.tsx:112` · unit pick
+- `src/components/EffortsViewerMapbox.tsx:119` · unit pick
+- `src/components/EffortsViewerMapbox.tsx:136` · unit pick
+- `src/components/EffortsViewerMapbox.tsx:141` · unit pick
+- `src/components/Gear.tsx:306` · unit pick
+- `src/components/MapEffort.tsx:1186` · unit pick
+- `src/components/NonRaceBuilder.tsx:5619` · fallback chain, 3+ rungs
+- `src/components/NonRaceBuilder.tsx:1956` · unit pick
+- `src/components/NonRaceBuilder.tsx:1954` · unit pick
+- `src/components/NonRaceBuilder.tsx:7123` · arithmetic on a fetched value
+- `src/components/PlannedWorkoutSummary.tsx:351` · unit pick
+- `src/components/PlannedWorkoutSummary.tsx:354` · unit pick
+- `src/components/PostWorkoutFeedback.tsx:512` · unit pick
+- `src/components/PostWorkoutFeedback.tsx:513` · threshold picking a printed number
+- `src/components/PostWorkoutFeedback.tsx:515` · threshold picking a printed number
+- `src/components/PostWorkoutFeedback.tsx:115` · unit pick
+- `src/components/SessionDeck.tsx:516` · unit pick
+- `src/components/SessionDeck.tsx:523` · unit pick
+- `src/components/StrengthCompareTable.tsx:305` · fallback chain, 3+ rungs
+- `src/components/StrengthLogger.tsx:549` · arithmetic on a fetched value
+- `src/components/StrengthLogger.tsx:558` · arithmetic on a fetched value
+- `src/components/StrengthLogger.tsx:3330` · arithmetic on a fetched value
+- `src/components/StrengthLogger.tsx:5737` · fallback chain, 3+ rungs
+- `src/components/StructuredPlannedView.tsx:392` · unit pick
+- `src/components/TodaysEffort.tsx:582` · fallback chain, 3+ rungs
+- `src/components/TodaysEffort.tsx:587` · fallback chain, 3+ rungs
+- `src/components/TodaysEffort.tsx:594` · unit pick
+- `src/components/TodaysEffort.tsx:598` · unit pick
+- `src/components/TodaysEffort.tsx:608` · unit pick
+- `src/components/TodaysEffort.tsx:612` · unit pick
+- `src/components/TodaysEffort.tsx:619` · unit pick
+- `src/components/TodaysEffort.tsx:630` · unit pick
+- `src/components/WorkoutCalendar.tsx:1065` · unit pick
+- `src/components/WorkoutCalendar.tsx:1123` · unit pick
+- `src/components/WorkoutCalendar.tsx:1133` · unit pick
+- `src/components/WorkoutMetrics.tsx:173` · fallback chain, 3+ rungs
+- `src/components/WorkoutMetrics.tsx:179` · fallback chain, 3+ rungs
+- `src/components/WorkoutMetrics.tsx:242` · fallback chain, 3+ rungs
+- `src/components/WorkoutMetrics.tsx:247` · fallback chain, 3+ rungs
+- `src/components/context/StateTab.tsx:296` · fallback chain, 3+ rungs
+- `src/components/context/StateTab.tsx:301` · fallback chain, 3+ rungs
+- `src/components/wizard/KnowYourNumbersStep.tsx:66` · unit pick
+- `src/components/workout-execution/ExecutionScreen.tsx:232` · arithmetic on a fetched value
+- `src/components/workout-execution/ExecutionScreen.tsx:242` · arithmetic on a fetched value
+- `src/components/workout-execution/PostRunSummary.tsx:42` · unit pick
+
+**Rule 3 (c) — 17 columns (57 write sites), WARN.**
+
+| column | writing steps | write sites |
+|---|---|---|
+| `planned_workouts.computed` | 2 | `materialize-plan/index.ts:4464`, `materialize-plan/index.ts:4595`, `rematerialize-standing-block/index.ts:137` |
+| `planned_workouts.duration` | 2 | `materialize-plan/index.ts:4483`, `rematerialize-standing-block/index.ts:136`, `rematerialize-standing-block/index.ts:501` |
+| `planned_workouts.strength_exercises` | 2 | `rematerialize-standing-block/index.ts:137`, `rematerialize-standing-block/index.ts:484`, `rematerialize-strength-block/index.ts:403` |
+| `planned_workouts.workload_planned` | 3 | `backfill-planned-workload/index.ts:108`, `backfill-strength-load/index.ts:241`, `rematerialize-standing-block/index.ts:502` |
+| `user_baselines.configured_hr_zones` | 2 | `save-imported-workout/index.ts:209`, `strava-token-exchange/index.ts:154` |
+| `user_baselines.learned_fitness` | 5 | `compute-facts/index.ts:977`, `compute-facts/index.ts:982`, `compute-workout-analysis/index.ts:828`, `compute-workout-analysis/index.ts:906`, `endurance-checkpoint/index.ts:224`, `endurance-checkpoint/index.ts:243`, `learn-fitness-profile/index.ts:590`, `learn-fitness-profile/index.ts:606`, `save-baselines/index.ts:189` |
+| `user_baselines.performance_numbers` | 5 | `adapt-plan/index.ts:1112`, `adapt-plan/index.ts:1138`, `compute-workout-analysis/index.ts:828`, `endurance-checkpoint/index.ts:230`, `endurance-checkpoint/index.ts:246`, `save-baseline-test/index.ts:233`, `save-baseline-test/index.ts:239`, `save-baselines/index.ts:162`, `save-baselines/index.ts:189` |
+| `workouts.avg_heart_rate` | 2 | `ingest-phone-workout/index.ts:213`, `strava-webhook/index.ts:677` |
+| `workouts.avg_speed` | 2 | `ingest-phone-workout/index.ts:215`, `strava-webhook/index.ts:684` |
+| `workouts.computed` | 2 | `analyze-cycling-workout/index.ts:1952`, `analyze-running-workout/index.ts:2186` |
+| `workouts.distance` | 2 | `ingest-phone-workout/index.ts:209`, `strava-webhook/index.ts:657` |
+| `workouts.duration` | 3 | `ingest-phone-workout/index.ts:210`, `mark-planned-complete/index.ts:76`, `strava-webhook/index.ts:656` |
+| `workouts.elapsed_time` | 3 | `ingest-phone-workout/index.ts:212`, `mark-planned-complete/index.ts:78`, `strava-webhook/index.ts:668` |
+| `workouts.max_heart_rate` | 2 | `ingest-phone-workout/index.ts:214`, `strava-webhook/index.ts:678` |
+| `workouts.moving_time` | 3 | `ingest-phone-workout/index.ts:211`, `mark-planned-complete/index.ts:77`, `strava-webhook/index.ts:667` |
+| `workouts.weather_data` | 2 | `analyze-running-workout/index.ts:141`, `get-weather/index.ts:330` |
+| `workouts.workout_metadata` | 2 | `compute-facts/index.ts:1594`, `compute-facts/index.ts:1646`, `detach-planned/index.ts:119`, `detach-planned/index.ts:139` |
+
+**Rule 4 (d) — 31, WARN.** Each line: file:line · the rungs in order.
+
+- `supabase/functions/_shared/block-analysis/data-quality.ts:57` · computed → computed
+- `supabase/functions/_shared/goal-finish-from-workouts.ts:39` · computed → computed
+- `supabase/functions/_shared/moving-seconds.ts:112` · sent → computed → computed
+- `supabase/functions/_shared/readiness.ts:591` · computed → literal
+- `supabase/functions/_shared/readiness.ts:737` · computed → literal
+- `supabase/functions/_shared/session-detail/build.ts:901` · computed → sent
+- `supabase/functions/_shared/session-detail/build.ts:2225` · computed → sent
+- `supabase/functions/analyze-running-workout/index.ts:3000` · computed → literal
+- `supabase/functions/analyze-running-workout/index.ts:3572` · sent → computed → computed
+- `supabase/functions/analyze-running-workout/lib/adherence/granular-pace.ts:628` · sent → computed → computed
+- `supabase/functions/calculate-workload/index.ts:123` · computed → literal
+- `supabase/functions/coach/index.ts:3880` · computed → computed
+- `supabase/functions/compute-facts/index.ts:1068` · computed → sent
+- `supabase/functions/compute-workout-analysis/index.ts:1899` · computed → sent → literal
+- `supabase/functions/compute-workout-analysis/index.ts:1907` · computed → sent
+- `supabase/functions/compute-workout-analysis/index.ts:1936` · computed → sent
+- `supabase/functions/compute-workout-summary/index.ts:73` · computed → computed → computed → computed → computed → computed → computed → computed
+- `supabase/functions/compute-workout-summary/index.ts:1069` · sent → computed → literal
+- `supabase/functions/detect-cores/index.ts:75` · computed → literal
+- `supabase/functions/import-fit-file/parse.ts:110` · computed → computed → computed
+- `supabase/functions/import-fit-file/parse.ts:191` · computed → computed → computed → computed → computed
+- `supabase/functions/import-fit-file/parse.ts:203` · computed → computed
+- `supabase/functions/ingest-activity/index.ts:1092` · sent → computed → literal
+- `supabase/functions/learn-fitness-profile/index.ts:1236` · computed → computed
+- `supabase/functions/workout-detail/index.ts:2007` · computed → computed
+- `src/components/AssociatePlannedDialog.tsx:163` · computed → literal
+- `src/components/EffortsViewerMapbox.tsx:549` · computed → literal
+- `src/components/TodaysEffort.tsx:582` · computed → computed
+- `src/components/TodaysEffort.tsx:584` · computed → sent
+- `src/lib/resolve-current-max-hr.ts:133` · computed → computed
+- `src/utils/formGogglesSwimScript.ts:55` · computed → computed
+
+**Rule 2 (b) — 1 outside the park, WARN.**
+
+- `supabase/functions/_shared/strength/test-session.ts:79` — `TEST_ROUND_TO_KG`, added in Stage 4 session 4 after Stage 5 ran. Its comment cites the IPF Technical Rules Book, and "IPF" is not in the §2.3 grammar.
+
+**Rule 0 (D-237) — 5, WARN** (it was already failing `npm run lint:provenance` at HEAD before this stage).
+
+- `supabase/functions/_shared/session-load.ts:63` · `0.7`
+- `supabase/functions/_shared/session-load.ts:82` · `modifier: 0.8`
+- `src/lib/trend-receipt.ts:131` · `99`
+- `src/lib/trend-receipt.ts:148` · `1`
+- `` ·         rule 0 known-unresolved: 3
 
 ---
 

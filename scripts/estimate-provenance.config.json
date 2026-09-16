@@ -1,6 +1,5 @@
 {
   "_doc": "D-237 estimate-provenance guard config. See docs/DESIGN-D237-lint-guard.md. Curated + grow: add files as the silent-fallback sweep expands the audited surface.",
-
   "files": [
     "supabase/functions/_shared/workload.ts",
     "supabase/functions/calculate-workload/index.ts",
@@ -10,13 +9,11 @@
     "supabase/functions/_shared/session-load.ts",
     "src/lib/trend-receipt.ts"
   ],
-
   "_declaredDefaultProviders_doc": "Functions whose SOLE job is to supply a default. Their internal literal fallback is the sanctioned source; the obligation to DECLARE falls on callers that persist/render the value. Keep this list SHORT and auditable.",
   "declaredDefaultProviders": [
     "getDefaultIntensityForType",
     "getStrengthIntensity"
   ],
-
   "_provenanceTokens_doc": "If a fallback's NEAREST enclosing function references any of these, the estimate is DECLARED and passes. Must be a SPECIFIC estimate-provenance vocabulary — NOT generic `_method`/`confidence`, which collide with unrelated fields (match_method, match_confidence) and mask real silent fallbacks. Extend deliberately as new declaration markers land.",
   "provenanceTokens": [
     "workload_method",
@@ -29,17 +26,278 @@
     "hr_rejected_corrupt",
     "hr_corrupt"
   ],
-
   "_defaultNamePattern_doc": "A fallback VALUE that is an identifier/property whose name matches this is a 'named default' (REF_SPW, defaults.mpw, DISTANCE_DEFAULTS.marathon) and is in scope just like a numeric literal.",
   "defaultNamePattern": "REF_|_DEFAULT|DEFAULT_|_FALLBACK|FALLBACK_|(^|\\.)defaults?($|\\.|\\[)",
-
   "_ignoreValues_doc": "Numeric fallbacks equal to these are treated as 'empty/none' sentinels, not fabricated estimates (e.g. `x ?? 0`, `Number(v) || 0`). 0 only by default.",
-  "ignoreValues": [0],
-
+  "ignoreValues": [
+    0
+  ],
   "_knownExceptions_doc": "EXPLICITLY ACKNOWLEDGED open bugs — NOT declared-OK. Matched by file+fallback text (line-independent). The guard lists them loudly as KNOWN-UNRESOLVED with their ticket and does NOT count them as failures, so CI can be made required and only NEW silent fallbacks block. Each MUST carry a ticket. Remove the entry when the ticket lands. This is the opposite of the band-aid: it flags the bug as open, it does not hide it behind a disclosure.",
   "knownExceptions": [
-    { "file": "supabase/functions/_shared/marathon-readiness/index.ts", "fallback": "DISTANCE_DEFAULTS.marathon", "ticket": "Q-120", "reason": "C3 — readiness must gate on a SET race goal, not default to marathon; discipline-aware. Fix is gating, not declaration." },
-    { "file": "supabase/functions/_shared/marathon-readiness/index.ts", "fallback": "defaults.longRunMi", "ticket": "Q-120", "reason": "C3 — marathon-default long-run target for a no-goal / non-running athlete." },
-    { "file": "supabase/functions/_shared/marathon-readiness/index.ts", "fallback": "defaults.mpw", "ticket": "Q-120", "reason": "C3 — marathon-default weekly-mileage target for a no-goal / non-running athlete." }
-  ]
+    {
+      "file": "supabase/functions/_shared/marathon-readiness/index.ts",
+      "fallback": "DISTANCE_DEFAULTS.marathon",
+      "ticket": "Q-120",
+      "reason": "C3 — readiness must gate on a SET race goal, not default to marathon; discipline-aware. Fix is gating, not declaration."
+    },
+    {
+      "file": "supabase/functions/_shared/marathon-readiness/index.ts",
+      "fallback": "defaults.longRunMi",
+      "ticket": "Q-120",
+      "reason": "C3 — marathon-default long-run target for a no-goal / non-running athlete."
+    },
+    {
+      "file": "supabase/functions/_shared/marathon-readiness/index.ts",
+      "fallback": "defaults.mpw",
+      "ticket": "Q-120",
+      "reason": "C3 — marathon-default weekly-mileage target for a no-goal / non-running athlete."
+    }
+  ],
+  "_truth_doc": "The one-truth guard (docs/DESIGN-one-truth-guard.md, Stage 6). severity: 'fail' stops `npm run build`; 'warn' prints and counts. A rule goes to fail only when its count outside `parked` is 0 (design §9). Parked hits are counted and never fail; removing a path reopens it for every rule at once.",
+  "truth": {
+    "severity": {
+      "0": "warn",
+      "1": "warn",
+      "2": "warn",
+      "2-ledger": "fail",
+      "3": "warn",
+      "4": "warn",
+      "5": "fail"
+    },
+    "scopes": {
+      "rule1": [
+        "src/components/**/*.tsx",
+        "src/components/**/*.ts"
+      ],
+      "loadBearing": [
+        "supabase/functions/_shared/**/*.ts",
+        "supabase/functions/analyze-running-workout/**/*.ts",
+        "supabase/functions/analyze-cycling-workout/**/*.ts",
+        "supabase/functions/analyze-strength-workout/**/*.ts",
+        "supabase/functions/analyze-swim-workout/**/*.ts",
+        "supabase/functions/materialize-plan/index.ts",
+        "src/lib/resolve-*.ts"
+      ],
+      "rule4": [
+        "supabase/functions/**/*.ts",
+        "src/**/*.ts",
+        "src/**/*.tsx"
+      ],
+      "rule5": [
+        "supabase/functions/_shared/standing-plan/**/*.ts"
+      ]
+    },
+    "parked": [
+      {
+        "path": "src/components/ArcSetupWizard.tsx",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked"
+      },
+      {
+        "path": "src/components/CourseStrategyModal.tsx",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked"
+      },
+      {
+        "path": "src/components/GoalsScreen.tsx",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked"
+      },
+      {
+        "path": "src/components/AthleticRecordPage.tsx",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked"
+      },
+      {
+        "path": "src/components/context/StateRaceBlock.tsx",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked"
+      },
+      {
+        "path": "supabase/functions/course-detail/**",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked"
+      },
+      {
+        "path": "supabase/functions/course-strategy/**",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked"
+      },
+      {
+        "path": "supabase/functions/create-goal-and-materialize-plan/**",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked"
+      },
+      {
+        "path": "supabase/functions/_shared/race-readiness/**",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked"
+      },
+      {
+        "path": "supabase/functions/_shared/session-detail/race-readiness.ts",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked"
+      },
+      {
+        "path": "supabase/functions/_shared/recompute-goal-race-projections.ts",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked"
+      },
+      {
+        "path": "supabase/functions/_shared/weeks-until-race.ts",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked"
+      },
+      {
+        "path": "supabase/functions/_shared/race-projections.ts",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked (Stage 5 report §7)"
+      },
+      {
+        "path": "supabase/functions/_shared/goal-predictor/**",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked (Stage 5 report §7)"
+      },
+      {
+        "path": "supabase/functions/_shared/marathon-readiness/**",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked (Stage 5 report §7)"
+      },
+      {
+        "path": "supabase/functions/_shared/riegel.ts",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked (Stage 5 report §7)"
+      },
+      {
+        "path": "supabase/functions/_shared/course-*.ts",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked (Stage 5 report §7)"
+      },
+      {
+        "path": "supabase/functions/_shared/race-debrief.ts",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked (Stage 5 report §7)"
+      },
+      {
+        "path": "supabase/functions/_shared/race-feedback.ts",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked (Stage 5 report §7)"
+      }
+    ],
+    "_parked_block_doc": "NonRaceBuilder.tsx is half parked (design §7): its race step is parked by a `parked: race step, WORKORDER §3a` comment on the block, not by path.",
+    "rule3": {
+      "tables": [
+        "workouts",
+        "workout_facts",
+        "athlete_snapshot",
+        "session_load",
+        "exercise_log",
+        "workout_metadata",
+        "planned_workouts",
+        "user_baselines"
+      ],
+      "plumbingColumns": [
+        {
+          "column": "analysis_status",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "analysis_error",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "analyzed_at",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "summary_status",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "summary_updated_at",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "metrics_status",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "metrics_updated_at",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "workout_status",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "updated_at",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "created_at",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "user_id",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "planned_id",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "completed_workout_id",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "training_plan_id",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "gear_id",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "name",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "type",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "source",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "date",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "week_number",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "day_number",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        },
+        {
+          "column": "gps_track",
+          "reason": "status / identity / timestamp / key / ingest raw (design §3.2)"
+        }
+      ],
+      "partitionedColumns": [
+        {
+          "column": "workouts.workout_analysis",
+          "reason": "one analyzer per discipline; a workout has one discipline (design §3.2)"
+        }
+      ]
+    },
+    "rule4": {
+      "providerFields": [
+        "avg_heart_rate",
+        "average_heartrate",
+        "max_heart_rate",
+        "normalized_power",
+        "weighted_average_watts",
+        "avg_power",
+        "average_watts",
+        "avg_speed",
+        "average_speed",
+        "moving_time",
+        "moving_seconds",
+        "elapsed_time",
+        "total_timer_time",
+        "elevation_gain",
+        "total_elevation_gain",
+        "number_of_active_lengths",
+        "avg_cadence",
+        "average_cadence",
+        "distance_m",
+        "distance_meters",
+        "calories"
+      ]
+    }
+  }
 }

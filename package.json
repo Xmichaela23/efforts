@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/check-estimate-provenance.mjs --fail-only && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "lint:provenance": "node scripts/check-estimate-provenance.mjs",
+    "lint:truth": "node scripts/check-estimate-provenance.mjs",
     "preview": "vite preview",
     "plan:minify": "node scripts/plan-minify.mjs",
     "block:print": "~/.deno/bin/deno run --allow-read --no-check scripts/print-block.ts",
