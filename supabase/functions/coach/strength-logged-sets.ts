@@ -12,6 +12,7 @@
  */
 import { capabilitiesForExercise } from '../../../src/lib/exercise-role.ts';
 import { canonicalDisplayName } from '../_shared/canonicalize.ts';
+import { KG_PER_LB } from '../_shared/strength/session-volume.ts';
 import type { LoggedLift, LoggedSetRow } from '../_shared/state-trend/logged-sets.ts';
 
 /** OURS — the main rows are capped at five (the four slots, plus a variant such as the trap bar). */
@@ -21,14 +22,32 @@ export const OTHER_LIFTS_SHOWN = 8;
 
 export interface StrengthLoggedSetsV1 {
   /** The main lifts, in the coach's per-lift order. `sets` is newest first and may be empty. */
-  main: Array<{ canonical: string; display_name: string; sets: LoggedSetRow[] }>;
+  main: Array<{
+    canonical: string; display_name: string; sets: LoggedSetRow[];
+    /** ⛔ EACH SET AS THE ATHLETE READS IT (2026-09-15, Stage 4 session 2) — "225 lb × 5", already in
+     *  their own unit, one entry per row of `sets` in the same order. The screen printed a hard-coded
+     *  "lb" beside every set whatever unit the account had chosen. */
+    set_lines?: string[];
+    /** The lift's estimate per set as the athlete reads it — "e1RM 240 lb". Null where there is none. */
+    e1rm_lines?: Array<string | null>;
+  }>;
   /** Every other logged lift's heaviest set, most-logged first. */
-  others: Array<{ canonical: string; display_name: string; weight: number; reps: number; sessions: number }>;
+  others: Array<{
+    canonical: string; display_name: string; weight: number; reps: number; sessions: number;
+    /** That heaviest set as the athlete reads it — "135 lb × 10". */
+    set_line?: string;
+  }>;
+  /** 'lb' | 'kg' — the unit every line above is written in. */
+  unit?: string;
 }
 
 export function buildStrengthLoggedSets(
   lifts: ReadonlyArray<LoggedLift> | null | undefined,
   perLift: ReadonlyArray<{ canonical_name: string; sufficient: boolean }> | null | undefined,
+  /** ⛔ THE ATHLETE'S UNIT. A set is stored in pounds and converts for a metric account by the
+   *  definition constant — the same rule `save-baselines/zones.ts` applies (§8.0 #7).
+   *  Absent → imperial, which is today's behaviour for every account in production. */
+  metric = false,
 ): StrengthLoggedSetsV1 | null {
   // A snapshot written before the field existed → nothing to print, not an empty section.
   if (!Array.isArray(lifts)) return null;
@@ -38,12 +57,22 @@ export function buildStrengthLoggedSets(
     .slice(0, MAIN_LIFTS_SHOWN);
   const byCanonical = new Map(lifts.map((l) => [l.canonical, l]));
   const mainCanonicals = new Set(main.map((l) => String(l?.canonical_name ?? '')));
+  const unit = metric ? 'kg' : 'lb';
+  const inAthletesUnit = (lb: number): number => Math.round(metric ? lb * KG_PER_LB : lb);
   return {
-    main: main.map((l) => ({
-      canonical: l.canonical_name,
-      display_name: canonicalDisplayName(l.canonical_name),
-      sets: byCanonical.get(l.canonical_name)?.recent ?? [],
-    })),
+    unit,
+    main: main.map((l) => {
+      const sets: LoggedSetRow[] = byCanonical.get(l.canonical_name)?.recent ?? [];
+      return {
+        canonical: l.canonical_name,
+        display_name: canonicalDisplayName(l.canonical_name),
+        sets,
+        set_lines: sets.map((e) => `${inAthletesUnit(Number(e.weight))} ${unit} × ${e.reps}`),
+        e1rm_lines: sets.map((e) => (e.e1rm != null && Number(e.e1rm) > 0
+          ? `e1RM ${inAthletesUnit(Number(e.e1rm))} ${unit}`
+          : null)),
+      };
+    }),
     others: lifts
       .filter((l) => !mainCanonicals.has(l.canonical))
       .filter((l) => l.heaviest != null && l.heaviest.weight > 0)
@@ -55,6 +84,7 @@ export function buildStrengthLoggedSets(
         weight: l.heaviest!.weight,
         reps: l.heaviest!.reps,
         sessions: l.sessions,
+        set_line: `${inAthletesUnit(Number(l.heaviest!.weight))} ${unit} × ${l.heaviest!.reps}`,
       })),
   };
 }

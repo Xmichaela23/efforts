@@ -226,6 +226,9 @@ export type CoachWeekContextResponseV1 = {
     planned_total_load: number | null; // full week planned load (week window)
     planned_remaining_load: number | null; // planned load remaining from as_of_date (inclusive), excluding completed planned rows
     key_sessions_remaining: KeySessionItem[]; // from as_of_date (inclusive), excluding completed planned rows
+    /** State's NEXT row: the same list AFTER as_of_date, at most three. A display scope, not a second
+     *  definition of "remaining" — `key_sessions_remaining` is unchanged and still includes today. */
+    next_sessions?: KeySessionItem[];
   };
   reaction: {
     // How the athlete is responding to the plan's expectations this week.

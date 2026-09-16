@@ -56,7 +56,10 @@ export function loadComposition7d(daily: ReadonlyArray<DailyLoad> | null | undef
     leftover -= 1;
   }
   return {
-    total_7d: total,
+    // ⛔ ROUNDED HERE (2026-09-15, Stage 4 session 2). The week-mix legend printed `Math.round` of this
+    // on the phone; the sum of per-session workload points is a whole number on screen wherever it is
+    // shown, so it is a whole number on the payload.
+    total_7d: Math.round(total),
     dominant: comp[0]?.type ?? null,
     composition_7d: comp.map((c) => ({ discipline: c.type, load: c.load, share_pct: c.displayPct })),
   };
