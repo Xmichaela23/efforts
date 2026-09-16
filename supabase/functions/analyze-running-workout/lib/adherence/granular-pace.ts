@@ -19,6 +19,7 @@ import { paceToGAP, computeSampleGrades, hasUsableElevation, enrichSamplesWithGA
  * 1800 is conservative — even a 30 min/mi crawl is exceptional within a run;
  * samples beyond that are almost certainly device artifacts, not effort.
  */
+// OURS — `PACE_OUTLIER_MAX_SEC_PER_MI` 30 min/mi; the reasoning is in the note above, no source; kept as found
 export const PACE_OUTLIER_MAX_SEC_PER_MI = 1800;
 
 export function filterPaceSamplesForCV(
@@ -163,6 +164,7 @@ function calculateIntervalAveragePaceAdherence(
     const deviation = avgPace < targetLower
       ? (targetLower - avgPace)
       : (avgPace - targetUpper);
+    // OURS — score falls to 0 at half the range width outside the edge; no page, kept as found
     const rangeWidth = (targetUpper - targetLower) / 2;
     return Math.max(0, 100 - (deviation / rangeWidth) * 100);
   });
@@ -394,6 +396,7 @@ function calculateIntervalPaceAdherence(
   console.log(`📊 [GRANULAR-PACE] Collecting basic HR stats from ${allWorkSamplesForHR.length} samples`);
   
   if (allWorkSamplesForHR.length > 0) {
+    // OURS — heart rate of 250 or more dropped as a sensor error; kept as found
     const validHRSamples = allWorkSamplesForHR.filter(s => s.heart_rate && s.heart_rate > 0 && s.heart_rate < 250);
     const avgHR = validHRSamples.length > 0
       ? Math.round(validHRSamples.reduce((sum, s) => sum + s.heart_rate, 0) / validHRSamples.length)
@@ -460,10 +463,12 @@ function calculateIntervalPaceAdherence(
     for (let i = 1; i < allPaceSamples.length; i++) {
       const delta = allPaceSamples[i] - allPaceSamples[i - 1];
       totalChange += Math.abs(delta);
+      // OURS — a 10 s change between samples = surge / crash; no page, kept as found
       if (delta < -10) surges++;
       if (delta > 10) crashes++;
     }
     const avgChange = totalChange / (allPaceSamples.length - 1);
+    // OURS — `steadinessScore` deductions: CV 10/7/5/3% → 40/30/20/10; surges or crashes over 10% of samples → 20 each; average change 15/10/5 s → 20/15/10; no page, kept as found
     let steadinessScore = 100;
     if (cv > 10) steadinessScore -= 40;
     else if (cv > 7) steadinessScore -= 30;
@@ -492,6 +497,7 @@ function calculateIntervalPaceAdherence(
   let durationAdherencePct = 0;
   if (plannedDurationSeconds > 0 && actualDurationSeconds > 0) {
     const ratio = actualDurationSeconds / plannedDurationSeconds;
+    // OURS — `durationAdherencePct` tiered: within 0.9–1.1 of planned = 100 minus the gap, under = the ratio, over = planned ÷ actual; no source, kept as found
     if (ratio >= 0.9 && ratio <= 1.1) {
       durationAdherencePct = 100 - Math.abs(ratio - 1) * 100;
     } else if (ratio < 0.9) {
@@ -622,6 +628,7 @@ function calculateSteadyStatePaceAdherence(
     const totalTimeSeconds = workout?.computed?.overall?.duration_s_moving ||
       (workout.moving_time ? (workout.moving_time < 1000 ? workout.moving_time * 60 : workout.moving_time) : null) ||
       (sensorData.length > 0 ? sensorData.length : 0);
+    // OURS — paces slower than 20 min/mi dropped here; no page, kept as found
     const validPaceSamples = sensorData.filter(s => s.pace_s_per_mi > 0 && s.pace_s_per_mi < 1200);
     const avgPace = validPaceSamples.length > 0
       ? validPaceSamples.reduce((sum, s) => sum + s.pace_s_per_mi, 0) / validPaceSamples.length
@@ -677,6 +684,7 @@ function calculateSteadyStatePaceAdherence(
     let durationAdherencePct = 0;
     if (plannedDurationSeconds > 0 && actualDurationSeconds > 0) {
       const ratio = actualDurationSeconds / plannedDurationSeconds;
+      // OURS — `durationAdherencePct` tiered 0.9 / 1.1, as above; no source
       if (ratio >= 0.9 && ratio <= 1.1) durationAdherencePct = 100 - Math.abs(ratio - 1) * 100;
       else if (ratio < 0.9) durationAdherencePct = ratio * 100;
       else durationAdherencePct = (plannedDurationSeconds / actualDurationSeconds) * 100;
@@ -728,6 +736,7 @@ function calculateSteadyStatePaceAdherence(
     };
   }
 
+  // OURS — `segmentDuration` 120 samples per pace segment; no page, kept as found
   const segmentDuration = 120;
   const segments: number[] = [];
   for (let i = 0; i < sensorData.length; i += segmentDuration) {
@@ -744,6 +753,7 @@ function calculateSteadyStatePaceAdherence(
     let durationAdherencePct = 0;
     if (plannedDurationSeconds > 0 && actualDurationSeconds > 0) {
       const ratio = actualDurationSeconds / plannedDurationSeconds;
+      // OURS — `durationAdherencePct` tiered 0.9 / 1.1, as above; no source
       if (ratio >= 0.9 && ratio <= 1.1) durationAdherencePct = 100 - Math.abs(ratio - 1) * 100;
       else if (ratio < 0.9) durationAdherencePct = ratio * 100;
       else durationAdherencePct = (plannedDurationSeconds / actualDurationSeconds) * 100;
@@ -766,6 +776,7 @@ function calculateSteadyStatePaceAdherence(
   const targetPaceUpper = mainSegments[0].pace_range.upper;
   const targetPace = targetPaceLower + (targetPaceUpper - targetPaceLower) / 2;
 
+  // OURS — paces slower than 20 min/mi dropped here; no page, kept as found
   const validPaceSamples = sensorData.filter(s => s.pace_s_per_mi > 0 && s.pace_s_per_mi < 1200);
   let timeInRange = 0;
   let timeOutsideRange = 0;
@@ -777,6 +788,7 @@ function calculateSteadyStatePaceAdherence(
   const totalPaceTime = timeInRange + timeOutsideRange;
   const timeInRangeScore = totalPaceTime > 0 ? timeInRange / totalPaceTime : 0;
 
+  // OURS — `consistencyMultiplier` CV over 6/4/2% → 0.85/0.90/0.95; no page, kept as found
   let consistencyMultiplier = 1.0;
   if (cv > 0.06) consistencyMultiplier = 0.85;
   else if (cv > 0.04) consistencyMultiplier = 0.90;
@@ -788,6 +800,7 @@ function calculateSteadyStatePaceAdherence(
   let durationAdherencePct = 0;
   if (plannedDurationSeconds > 0 && actualDurationSeconds > 0) {
     const ratio = actualDurationSeconds / plannedDurationSeconds;
+    // OURS — `durationAdherencePct` tiered 0.9 / 1.1, as above; no source
     if (ratio >= 0.9 && ratio <= 1.1) durationAdherencePct = 100 - Math.abs(ratio - 1) * 100;
     else if (ratio < 0.9) durationAdherencePct = ratio * 100;
     else durationAdherencePct = (plannedDurationSeconds / actualDurationSeconds) * 100;
@@ -805,6 +818,7 @@ function calculateSteadyStatePaceAdherence(
   if (samplesForHR.length > 0) {
     // NOTE: Full HR drift analysis is done by consolidated module in index.ts
     // We only capture basic stats here
+    // OURS — heart rate of 250 or more dropped as a sensor error; kept as found
     const validHRSamples = samplesForHR.filter(s => s.heart_rate && s.heart_rate > 0 && s.heart_rate < 250);
     const avgHR = validHRSamples.length > 0 ? Math.round(validHRSamples.reduce((sum, s) => sum + s.heart_rate, 0) / validHRSamples.length) : 0;
     heartRateAnalysis = {

@@ -19,8 +19,10 @@ import {
 // =============================================================================
 
 // Skip first 10 minutes for steady-state baseline (HR ramp-up period)
+// OURS — `WARMUP_SKIP_SECONDS` 10 min (capped at 15% of the samples below); no page gives the minutes, kept as found
 const WARMUP_SKIP_SECONDS = 600;
 
+// OURS — `DRIFT_EXPECTATIONS` bpm ranges per duration band; no page, kept as found
 // Expected drift ranges by duration (bpm)
 const DRIFT_EXPECTATIONS = {
   short: { lower: 3, upper: 8 },      // <60 min
@@ -30,6 +32,7 @@ const DRIFT_EXPECTATIONS = {
 };
 
 // Terrain contribution: ~4 bpm per 1% grade difference
+// OURS — `GRADE_TO_HR_COEFFICIENT` 4 bpm per 1% grade; no page, kept as found
 const GRADE_TO_HR_COEFFICIENT = 4;
 
 // =============================================================================
@@ -60,6 +63,7 @@ export function analyzeSteadyStateDrift(
   console.log('📊 [DRIFT] Samples to analyze:', selection.samples.length);
   console.log('📊 [DRIFT] Scope:', selection.scopeDescription);
   
+  // OURS — 15 min minimum, 15% warm-up cap, 10 min after warm-up, 10 min (or a third) per window; no page, kept as found
   // Check minimum duration (need at least 15 min after warmup skip)
   const durationMinutes = selection.samples.length / 60;
   if (durationMinutes < 15) {
@@ -113,6 +117,7 @@ export function analyzeSteadyStateDrift(
   const weather = analyzeWeatherContribution(context);
   
   // Calculate terrain-adjusted drift
+  // OURS — terrain is subtracted only at 3 bpm or more; no page, kept as found
   const terrainAdjustedDrift = terrain.contributionBpm !== null && Math.abs(terrain.contributionBpm) >= 3
     ? rawDriftBpm - terrain.contributionBpm
     : rawDriftBpm;
@@ -184,6 +189,7 @@ function selectSamplesForDrift(
   
   // Progressive: use first 2/3 only
   if (workoutType === 'progressive') {
+    // OURS — progressive run: first two thirds only; no page, kept as found
     const cutoff = Math.floor(validHRSamples.length * 0.67);
     return {
       samples: validHRSamples.slice(0, cutoff),
@@ -247,6 +253,7 @@ function selectTempoFinishSamples(
       }
     }
     
+    // OURS — 10 min of easy data before a tempo-finish drift; no page, kept as found
     if (easySamples.length >= 600) { // At least 10 min of easy data
       const tempoDurationMin = tempoSamples.length / 60;
       const tempoPace = lastInterval.paceRange 
@@ -348,6 +355,7 @@ function calculateAvgGrade(samples: SensorSample[]): number | null {
     
     if (currElev != null && prevElev != null && Number.isFinite(currElev) && Number.isFinite(prevElev)) {
       // Estimate distance from speed
+      // OURS — 2.5 m/s stand-in speed, grades over 25% dropped, 10 grades minimum; no page, kept as found
       const speed = curr.speedMetersPerSecond ?? 2.5; // ~9 min/mi default
       const distance = speed * 1; // 1 second
       
@@ -383,6 +391,7 @@ function analyzeTerrainProfile(
     .filter((e): e is number => e != null && Number.isFinite(e))
     .map(e => e * 3.28084); // Convert to feet
   
+  // OURS — 100 elevation samples minimum; under 100 ft = flat, one half 2x the other = early / late, middle 1.5x = mid climb; no page, kept as found
   if (elevations.length < 100) {
     return { description: null, climbingLocation: null, totalElevationFt: null };
   }
@@ -464,10 +473,12 @@ function analyzeWeatherContribution(context: HRAnalysisContext): WeatherContribu
   const effectiveTemp = feelsLike ?? temp;
   
   // Format temperature string - show feels like if significantly different
+  // OURS — feels-like shown when 3 °F off; no page, kept as found
   const tempStr = (feelsLike && Math.abs(feelsLike - temp) >= 3)
     ? `${Math.round(temp)}°F (feels like ${Math.round(feelsLike)}°F)`
     : `${Math.round(temp)}°F`;
   
+  // OURS — over 82 °F adds 8 bpm, over 75 °F adds 4 bpm, under 50 °F takes 2 bpm; no page, kept as found
   // Hot conditions (>82°F significant, >75°F moderate) - use effective temp
   if (effectiveTemp > 82) {
     return {
@@ -529,6 +540,7 @@ function getExpectedDriftRange(
   }
   
   // Adjust for plan phase
+  // OURS — build / peak +2 bpm, recovery −2, taper −3; half the weather bpm on the lower edge; no page, kept as found
   if (context.planContext?.weekIntent === 'build' || context.planContext?.weekIntent === 'peak') {
     base.upper += 2; // Build phase: expect more fatigue accumulation
   } else if (context.planContext?.isRecoveryWeek) {
@@ -554,6 +566,7 @@ function assessDrift(
   expected: DriftAnalysis['expected'],
   context: HRAnalysisContext
 ): DriftAnalysis['assessment'] {
+  // OURS — `assessDrift` 2 bpm under the range = excellent, 5 bpm over = elevated, beyond = high; no page, kept as found
   if (driftBpm < expected.lowerBpm - 2) {
     return 'excellent';
   }
@@ -600,6 +613,7 @@ function analyzeTempoSegment(
     .slice(lastInterval.sampleIdxStart, lastInterval.sampleIdxEnd + 1)
     .filter(s => s.heart_rate && s.heart_rate > 0 && s.heart_rate < 250);
   
+  // OURS — 60 samples minimum for a tempo segment; kept as found
   if (tempoSamples.length < 60) return undefined;
   
   const hrValues = tempoSamples.map(s => s.heart_rate!);

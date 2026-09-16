@@ -60,6 +60,7 @@ export interface WorkoutExecutionAnalysis {
 // Tolerance guidelines:
 // - Quality/intervals: ±4-5% (tighter) - work_interval uses 5%
 // - Easy/tempo: ±6-8% (looser) - tempo uses 7%, easy_run uses 8%
+// OURS — `SEGMENT_CONFIG` tolerances and weights; "Garmin-style" names the approach, no Garmin document with these numbers is in the repo (D-368: none of the reference apps makes one execution score); kept as found
 const SEGMENT_CONFIG: Record<SegmentType, SegmentConfig> = {
   warmup: { tolerance: 10, weight: 0.5 },
   cooldown: { tolerance: 10, weight: 0.3 },
@@ -114,6 +115,7 @@ function inferSegmentType(segment: any, plannedStep: any, plannedWorkout?: any):
       : (segment.planned?.distance_m ? segment.planned.distance_m / 1609.34 : 0);
 
     // Tempo characteristics: long continuous effort
+    // OURS — `inferSegmentType` over 20 min or 3 mi = tempo, 8 min or less = interval; no page, kept as found
     if (durationMin > 20 || distanceMi > 3) {
       return 'tempo'; // Long sustained effort = tempo
     }
@@ -137,6 +139,7 @@ export function getPaceToleranceForSegment(interval: any, plannedStep: any, plan
   const segmentType = inferSegmentType(interval, plannedStep, plannedWorkout);
   const config = SEGMENT_CONFIG[segmentType];
 
+  // OURS — 5% when the segment type is unknown; kept as found
   const tolerancePercent = config?.tolerance || 5; // Default to 5% if unknown
 
   // Debug logging for tempo detection
@@ -161,6 +164,7 @@ function getDirectionalPenalty(segment: any, adherence: number): number {
   const type = segment.type;
 
   // Too slow on work = missed training stimulus
+  // OURS — `getDirectionalPenalty` 95 / 110 / 85 / 115 edges and 5 / 3 / 2 points; no page, kept as found
   if (['work_interval', 'tempo', 'cruise_interval'].includes(type)) {
     if (adherence < 95) return 5;  // Significantly too slow
     if (adherence > 110) return 3; // Significantly too fast
@@ -275,6 +279,7 @@ export function calculateGarminExecutionScore(segments: any[], plannedWorkout: a
     }
   });
 
+  // OURS — score = 100 minus the penalties; duration = actual ÷ planned capped at 100; no source, kept as found
   const executionScore = Math.max(0, Math.round(100 - totalPenalty));
 
   const withDuration = segments.filter((i: any) =>
@@ -318,6 +323,7 @@ export function calculateGarminExecutionScore(segments: any[], plannedWorkout: a
         : 100,
       below_target: recoveryJogs.filter(s => {
         const adherence = s.executed?.adherence_percentage || 100;
+        // OURS — recovery under 85 = below target; warm-up / cool-down 90–110 = good; no page, kept as found
         return adherence < 85;
       }).length
     },

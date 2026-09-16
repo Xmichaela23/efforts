@@ -14,6 +14,7 @@ import {
 import { frielBand } from '../../../_shared/state-trend/run.ts';
 
 // Skip first 10 minutes (warmup/ramp-up)
+// OURS — `WARMUP_SKIP_SECONDS` 10 min (at most 15% of samples), 20 min of data, 10 min after the skip; the ledger's drift row names the skip (Friel) but no source gives the minutes; kept as found
 const WARMUP_SKIP_SECONDS = 600;
 
 /**
@@ -55,6 +56,7 @@ export function calculateEfficiency(
   
   // Need samples with both pace and HR
   const samplesWithBoth = sensorData.filter(s => 
+    // OURS — heart rate 250+ and pace slower than 30 min/mi dropped as sensor errors; kept as found
     s.heart_rate && s.heart_rate > 0 && s.heart_rate < 250 &&
     s.pace_s_per_mi && s.pace_s_per_mi > 0 && s.pace_s_per_mi < 1800 // < 30 min/mi
   );
@@ -163,6 +165,7 @@ function calculateEfficiencyRatio(samples: SensorSample[]): number | null {
   
   // Invert pace so higher = faster
   // Normalize by dividing by typical easy pace (~700 s/mi = 11:40/mi)
+  // OURS — 700 s/mi scale factor; it cancels in the early / late decoupling ratio; kept as found
   const normalizedSpeed = 700 / avgPace;
   
   // Efficiency ratio: speed / HR

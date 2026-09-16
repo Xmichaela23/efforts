@@ -37,6 +37,7 @@ interface InterpretationInput {
  * Hot conditions justify slower pacing without losing aerobic stimulus.
  */
 export function getHeatAllowance(tempF: number | null | undefined): number {
+  // OURS — `getHeatAllowance` over 85 °F +12%, over 75 °F +7%, over 65 °F +3%; no page, kept as found
   if (tempF === null || tempF === undefined) return 0;
   if (tempF > 85) return 0.12;  // +12%
   if (tempF > 75) return 0.07;  // +7%
@@ -48,6 +49,7 @@ export function getHeatAllowance(tempF: number | null | undefined): number {
  * Base slowdown threshold for easy/long runs.
  * Running more than 15% slower than target = under-stimulated.
  */
+// OURS — `BASE_SLOW_THRESHOLD` 15% slower than target; no page, kept as found
 export const BASE_SLOW_THRESHOLD = 0.15;
 
 /**
@@ -87,6 +89,7 @@ function calculateConditionsSeverity(
   let score = 0;
   let climbRateFtPerHour: number | null = null;
   
+  // OURS — conditions score: 85/75/65 °F → 3/2/1, climb 600/400/200 ft per hour → 3/2/1, back-loaded +1; 4+ high, 2+ moderate; no page, kept as found
   // Heat contribution (0-3 points)
   if (temperatureF !== null && temperatureF !== undefined) {
     if (temperatureF >= 85) score += 3;
@@ -242,6 +245,7 @@ export function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): str
   // -------------------------------------------------------------------------
   const effectiveSlowFloor = getEffectiveSlowFloor(temperatureF);
   const hrSuggestsStimulus = driftBand === 'normal' || driftBand === 'elevated';
+  // OURS — over 65 °F counts as warm; no page, kept as found
   const isWarm = temperatureF !== null && temperatureF !== undefined && temperatureF > 65;
   // Weather: only mention temp when severity >= moderate, always include the number
   // Map severity to adjective: moderate → "warm", high → "hot"
@@ -252,6 +256,7 @@ export function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): str
   // Determine if base portion was undercooked (beyond heat-adjusted tolerance)
   const baseUndercooked = baseSlowdownPct !== undefined && baseSlowdownPct > effectiveSlowFloor && !hrSuggestsStimulus;
   // Treat tiny differences as "on target" (rounding/GPS noise)
+  // OURS — `NEAR_TARGET_EPS` within 2% = on target (GPS and rounding); no page, kept as found
   const NEAR_TARGET_EPS = 0.02; // 2%
   const baseSlow = baseSlowdownPct !== undefined && baseSlowdownPct > NEAR_TARGET_EPS;
   const baseNearTarget = baseSlowdownPct !== undefined && baseSlowdownPct <= NEAR_TARGET_EPS;
@@ -265,6 +270,7 @@ export function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): str
     parts.push('Long run with fast finish.');
   } else if (isLongestRunInPlan) {
     parts.push('Longest run so far in your plan.');
+  // OURS — over 120 min is named a long run; no page, kept as found
   } else if (durationMinutes > 120) {
     parts.push(`${durationMinutes}-minute long run.`);
   } else if (intent === 'recovery') {
@@ -313,11 +319,13 @@ export function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): str
     }
 
     // Add magnitude when finish missed meaningfully (helps interpret “how far off”).
+    // OURS — 10 s/mi before the missed-finish gap is named; no page, kept as found
     if (!finishOnTarget && typeof finishDeltaSecPerMi === 'number' && Number.isFinite(finishDeltaSecPerMi) && finishDeltaSecPerMi > 10) {
       parts.push(`Fast-finish segment missed target by +${fmtDeltaSecPerMi(finishDeltaSecPerMi)}/mi.`);
     }
   } else if (paceAdherencePct !== undefined && paceAdherencePct !== null) {
     // Single-segment workout: use paceAdherencePct with heat/HR awareness
+    // OURS — pace adherence 95 / 85 sentence bands; no page, kept as found
     if (paceAdherencePct >= 95) {
       if (conditionsSeverity === 'moderate' || conditionsSeverity === 'high') {
         parts.push(`You hit your pace targets despite ${tempPhrase}.`);
@@ -388,6 +396,7 @@ export function buildSteadyStateNarrative(input: SteadyStateNarrativeInput): str
   // -------------------------------------------------------------------------
   // TERRAIN PROFILE (optional, only when relevant)
   // -------------------------------------------------------------------------
+  // OURS — under 95 pace adherence counts as slow here; no page, kept as found
   const paceWasSlow = paceAdherencePct !== undefined && paceAdherencePct < 95;
   const driftWasElevated = driftBand === 'elevated' || driftBand === 'high';
   
@@ -445,6 +454,7 @@ function buildMarathonGoalRaceDriftLine(drift: DriftAnalysis, eventName: string,
   const l = Math.round(drift.lateAvgHr);
   const raw = Math.round(drift.rawDriftBpm);
   const exp = drift.expected;
+  // OURS — 75 °F or more counts as hot for the race drift line; no page, kept as found
   const hot = tempF !== undefined && tempF !== null && tempF >= 75;
   const arc = `At ${eventName}, HR rose from ~${e} to ~${l} bpm (${raw > 0 ? '+' : ''}${raw} bpm across early vs late windows) — that is typical marathon cardiac drift for a ${exp.durationCategory} effort, not a training-day “recovery” mismatch.`;
   const band = ` For this duration, roughly ${exp.lowerBpm}–${exp.upperBpm} bpm drift is unremarkable.`;
@@ -478,6 +488,7 @@ function buildDriftInterpretation(
   let intent: 'easy' | 'long' | 'recovery' | undefined;
   if (context.plannedWorkout?.intent === 'recovery') {
     intent = 'recovery';
+  // OURS — over 90 min with no plan intent reads as a long run; no page, kept as found
   } else if (context.plannedWorkout?.intent === 'long' || durationMinutes > 90) {
     intent = 'long';
   } else if (context.plannedWorkout?.intent === 'easy') {
@@ -561,6 +572,7 @@ function buildOpeningSentence(drift: DriftAnalysis, context: HRAnalysisContext):
   
   // Conditions
   const conditions: string[] = [];
+  // OURS — 200 ft of climbing before terrain is named; no page, kept as found
   if (drift.terrain.totalElevationFt && drift.terrain.totalElevationFt >= 200) {
     const location = drift.terrain.climbingLocation === 'early' ? ' (front-loaded)' :
                      drift.terrain.climbingLocation === 'late' ? ' (back-loaded)' : '';
@@ -764,6 +776,7 @@ function classifyRepExecution(
   // Classify based on % thresholds
   let status: IntervalExecution['status'];
   
+  // OURS — `classifyRepExecution` 5% fast / 7% slow (ledger row: recording screen cue) and 15% slower = blown; no page, kept as found
   // The 5 and 7 also set the live cue's outer band on the recording screen (`_shared/live-cue.ts`).
   if (deviationPct <= -PACE_CUE_FAST_PCT) {
     // >5% faster than target
@@ -814,6 +827,7 @@ function detectExecutionPatterns(reps: IntervalExecution[]): ExecutionPatterns {
   patterns.hasBlownRep = reps.some(r => r.status === 'blown');
   patterns.firstRepTooFast = reps[0].status === 'too_fast';
   
+  // OURS — rep patterns: first rep 7% slow with 60% of the rest on target; fade = 3% per rep; negative split 3% over 4+ reps; consistent = within 3%, slow 5–15%, fast beyond 3%; no page, kept as found
   // First rep slow (>7% slow, but rest mostly on target)
   if (reps.length >= 2 && reps[0].deviationPct > 7) {
     const restOnTarget = reps.slice(1).filter(r => r.status === 'on_target').length;
@@ -1053,6 +1067,7 @@ function buildIntervalCoachingBottomLine(
   const goodRecovery = recovery === 'excellent' || recovery === 'good';
   
   // Great execution
+  // OURS — hit rate 75% = strong, 50% = the blown-rep and fade lines; no page, kept as found
   if (hitRate >= 0.75 && goodHR && !patterns.hasBlownRep) {
     return 'Strong interval execution.';
   }
@@ -1124,6 +1139,7 @@ function buildZonesInterpretation(
   parts.push(`Most time spent in ${zones.primaryZone}.`);
   
   // Zone breakdown
+  // OURS — zones with 10% of the time or more are listed; no page, kept as found
   const significantZones = zones.distribution.filter(z => z.percent >= 10);
   if (significantZones.length > 1) {
     const breakdown = significantZones

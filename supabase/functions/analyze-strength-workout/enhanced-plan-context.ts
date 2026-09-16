@@ -45,6 +45,7 @@ export function extractEnhancedPlanContext(
     week: weekNumber,
     total_weeks: 0,
     phase_description: '',
+    // OURS — `phase_progression_rate` 2.5% default; no page, kept as found
     phase_progression_rate: 0.025, // Default 2.5% per week
     phase_focus: '',
     endurance_sport: null,
@@ -131,6 +132,7 @@ export function extractEnhancedPlanContext(
   // Set phase-specific progression rates
   switch (context.phase) {
     case 'base':
+      // OURS — `phase_progression_rate` base 2%, build 2.5%, peak 3%, taper −10% a week; no page, kept as found
       context.phase_progression_rate = 0.02; // 2% per week
       context.phase_focus = 'Building base strength and movement patterns';
       break;
@@ -174,6 +176,7 @@ export function calculateExpectedProgression(
   progression_reason: string;
   phase_appropriate: boolean;
 } {
+  // OURS — 4-week phases; caps base 15%, build 25%, peak 30%, taper floor 80%; deload 70% of base weight; endurance strength 90%; no page, kept as found
   const weeksIntoPhase = context.week % 4; // Assume 4-week phases
   const progressionMultiplier = 1 + (context.phase_progression_rate * weeksIntoPhase);
   
@@ -253,6 +256,7 @@ export function generateEnhancedInsights(
     const avgProgression = improvingExercises.reduce((sum, ex) => 
       sum + ex.adherence.weight_progression, 0) / improvingExercises.length;
     
+    // OURS — over 5% average weight increase = strong progression; no page, kept as found
     if (avgProgression > 5) {
       insights.push(`Strong progression: ${avgProgression.toFixed(1)}% average weight increase`);
     } else if (avgProgression > 0) {

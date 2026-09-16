@@ -17,6 +17,7 @@ interface HRZones {
 }
 
 // Default zone percentages of max HR (if no custom zones provided)
+// OURS — `DEFAULT_ZONE_PERCENTAGES` 60/70/80/90/100% of max heart rate when no zones are set; no source in the repo (TRUTH-MAP §8.1 row 20b lists the %HRmax set as no source); kept as found
 const DEFAULT_ZONE_PERCENTAGES = {
   z1Max: 0.60,  // Recovery: <60% max HR
   z2Max: 0.70,  // Aerobic: 60-70% max HR
@@ -141,6 +142,7 @@ function estimateZonesFromSamples(samples: SensorSample[]): HRZones {
   // If max HR seems too low (probably didn't hit max), estimate higher.
   // ONE divisor (PEAK_TO_MAX, resolve-current-max-hr.ts) so this and the compute-workout-analysis
   // %HRmax path stop producing two different maxes from the same session peak (audit 2026-07-17 #5).
+  // OURS — a session peak under 150 bpm stands in 180 as max; no source (TRUTH-MAP §8.1 row 20b); kept as found
   const estimatedMaxHR = maxHR < 150 ? 180 : Math.round(maxHR / PEAK_TO_MAX);
   
   return {
@@ -156,6 +158,7 @@ function estimateZonesFromSamples(samples: SensorSample[]): HRZones {
  * Detect if HR crept from a lower zone to a higher zone during the workout.
  */
 function detectZoneCreep(samples: SensorSample[], zones: HRZones): boolean {
+  // OURS — zone creep: 10 min minimum, 5 min windows (or a quarter), skip the first 10% and last 5%; no page, kept as found
   if (samples.length < 600) return false; // Need at least 10 min
   
   const windowSize = Math.min(300, Math.floor(samples.length / 4)); // 5 min or 1/4 workout

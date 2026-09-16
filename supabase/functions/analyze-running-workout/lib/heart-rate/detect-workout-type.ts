@@ -129,6 +129,7 @@ function isFartlek(description: string, token: string): boolean {
  * Check for alternating work/recovery pattern by pace differences.
  */
 function hasAlternatingPattern(intervals: IntervalData[]): boolean {
+  // OURS — alternating pattern needs 4 intervals and 2 alternations; no page, kept as found
   if (intervals.length < 4) return false;
 
   // D-038 1A: prefer planned paceRange, but fall back to executed.avgPaceSPerMi for unplanned interval
@@ -183,6 +184,7 @@ function detectTempoOrProgressive(
   const lastPace = (paceRanges[paceRanges.length - 1].lower + paceRanges[paceRanges.length - 1].upper) / 2;
   
   // Last segment significantly faster (>5% faster = lower seconds/mile)
+  // OURS — last segment 5% faster = fast finish; no page, kept as found
   if (lastPace < firstPace * 0.95) {
     // Calculate durations to determine tempo finish vs progressive
     const lastInterval = relevantIntervals[relevantIntervals.length - 1];

@@ -123,6 +123,7 @@ export function generateMileByMileTerrainBreakdown(
 
   console.log(`🔍 [MILE BREAKDOWN] Total distance: ${totalDistanceM.toFixed(2)}m (${totalDistanceMi.toFixed(2)} miles)`);
 
+  // OURS — mile breakdown needs 0.5 mi; heart rate 40–250 kept; no page, kept as found
   if (totalDistanceMi < 0.5) {
     console.log(`⚠️ [MILE BREAKDOWN] Distance too short: ${totalDistanceMi.toFixed(2)} miles`);
     return null; // Too short for mile breakdown
@@ -184,6 +185,7 @@ export function generateMileByMileTerrainBreakdown(
 
       const s = sensorData[i];
       const hr = s.heartRate ?? s.heart_rate ?? s.hr ?? s.heartRateInBeatsPerMinute;
+      // OURS — heart rate 40–250 kept as real readings; kept as found
       if (typeof hr === 'number' && hr > 40 && hr < 250) {
         hrSum += hr;
         hrCount++;
@@ -301,6 +303,7 @@ export function generateMileByMileTerrainBreakdown(
       const deltaSec = Math.round(deltaAbs % 60);
       const sign = deltaS > 0 ? '+' : '-';
 
+      // OURS — within 5 s/mi of a single target = on target; no page, kept as found
       if (deltaAbs < 5) {
         comparison = '✓ On target';
         inRange = true;
@@ -347,6 +350,7 @@ export function generateMileByMileTerrainBreakdown(
 
   const inRangePct = Math.round((milesInRange / mileSplits.length) * 100);
 
+  // OURS — 50 / 30% = good / moderate for time and miles in range; within 5 s/mi of an edge = essentially in range; 75 / 50% miles in range for the overall line; no page, kept as found
   if (timeBasedAdherence != null) {
     sectionText += `- Time spent in range: ${timeBasedAdherence}% (${timeBasedAdherence >= 50 ? 'good' : timeBasedAdherence >= 30 ? 'moderate' : 'poor'} overall pace judgment)\n`;
   }

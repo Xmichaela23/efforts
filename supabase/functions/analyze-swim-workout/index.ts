@@ -327,6 +327,7 @@ Deno.serve(withAlarm('analyze-swim-workout', async (req) => {
     const poolDisplay = (() => {
       const Lm = Number(poolLength);
       if (!(Lm > 0)) return null;
+      // FIELD — definition (1 yd = 0.9144 m: 25 yd = 22.86 m, 50 yd = 45.72 m); OURS — the 22–24 m and 44–47 m windows around them, kept as found
       const isYdPool = (Lm >= 22 && Lm <= 24) || (Lm >= 44 && Lm <= 47); // 25yd ≈ 22.86m, 50yd ≈ 45.72m
       return isYdPool ? `${Math.round(Lm / 0.9144)} yd` : `${Math.round(Lm)} m`;
     })();
@@ -343,6 +344,7 @@ Deno.serve(withAlarm('analyze-swim-workout', async (req) => {
         stroke_type: interval.stroke_type || swimData.strokeType || 'Freestyle',
         planned_distance: plannedInterval?.distance || null,
         planned_pace: plannedInterval?.pace_per_100 || null,
+        // OURS — swim pace adherence = 100 minus the pace gap as a percent of the planned pace per 100; no source, kept as found (TRUTH-MAP §8.1 row 8b)
         adherence: plannedInterval ? 
           (interval.pace_per_100 && plannedInterval.pace_per_100 ? 
             Math.max(0, 100 - Math.abs((interval.pace_per_100 - plannedInterval.pace_per_100) / plannedInterval.pace_per_100 * 100)) : 
@@ -384,6 +386,7 @@ Deno.serve(withAlarm('analyze-swim-workout', async (req) => {
         plannedWorkout?.computed?.total_duration_seconds ?? 0
       );
       if (!(plannedSec > 0 && _swimElapsedSec != null && _swimElapsedSec > 0)) return null;
+      // OURS — swim duration adherence = elapsed ÷ planned × 100, uncapped; no source, kept as found (TRUTH-MAP §8.1 row 5a)
       return Math.round((_swimElapsedSec / plannedSec) * 100);
     })();
 
@@ -413,6 +416,7 @@ Deno.serve(withAlarm('analyze-swim-workout', async (req) => {
       // execution quality score above a clean session's.
       const dur = _swimDurationAdherence != null ? Math.min(100, _swimDurationAdherence) : null;
       if (pace != null && dur != null) {
+        // OURS — swim execution 50% pace + 50% duration (capped at 100); no source (running's 50/50 is OURS too, D-368), kept as found
         return Math.round((pace * 0.5) + (dur * 0.5));
       }
       // Only one component → use it as the execution score rather than halving.
@@ -472,6 +476,7 @@ Deno.serve(withAlarm('analyze-swim-workout', async (req) => {
       discipline: 'swim',
       glance: {
         status_label: typeof analysis?.performance?.execution_adherence === 'number'
+          // OURS — execution 85 / 70 glance bands; no page, kept as found
           ? (analysis.performance.execution_adherence >= 85 ? 'Strong execution' : analysis.performance.execution_adherence >= 70 ? 'Solid execution' : 'Needs adjustment')
           : null,
         execution_score: typeof analysis?.performance?.execution_adherence === 'number' ? analysis.performance.execution_adherence : null,
@@ -482,6 +487,7 @@ Deno.serve(withAlarm('analyze-swim-workout', async (req) => {
       },
       summary: {
         title: 'Insights',
+        // OURS — 4 bullets at most (display cap); kept as found
         bullets: Array.isArray(analysis?.insights) ? analysis.insights.slice(0, 4).map((s: any) => String(s || '').trim()).filter(Boolean) : [],
       },
       details: {

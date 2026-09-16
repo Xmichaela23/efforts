@@ -103,6 +103,7 @@ function extractEnhancedPlanContext(
     week: weekNumber,
     total_weeks: 0,
     phase_description: '',
+    // OURS — `phase_progression_rate` 2.5% default; no page, kept as found
     phase_progression_rate: 0.025, // Default 2.5% per week
     phase_focus: '',
     endurance_sport: null,
@@ -186,6 +187,7 @@ function extractEnhancedPlanContext(
                          description.toLowerCase().includes('recovery');
   }
 
+  // OURS — `phase_progression_rate` base 2%, build 2.5%, peak 3%, taper −10% a week; no page, kept as found
   // Set phase-specific progression rates
   switch (context.phase) {
     case 'base':
@@ -565,6 +567,7 @@ function calculateExerciseAdherence(match: any, userUnits: string, planUnits: st
       // across the sets. Then the LAST set is the read. Uniform sets keep the average.
       const first = executedRIRSets[0]; const last = executedRIRSets[executedRIRSets.length - 1];
       const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+      // OURS — 2 sets with reserve logged before a correction is read; no page, kept as found
       const corrected = executedRIRSets.length >= 2 && (
         ((num(last?.weight) ?? 0) > (num(first?.weight) ?? 0))
         || ((num(last?.reps) ?? 0) > (num(first?.reps) ?? 0))
@@ -576,6 +579,7 @@ function calculateExerciseAdherence(match: any, userUnits: string, planUnits: st
     }
   }
 
+  // OURS — `VERDICT_DEVIATION` ±1.0 RIR (marked OURS in _shared/strength-profiles.ts); kept as found
   // RIR verdict — directional signal, not a score. Shared ±1.0 band (VERDICT_DEVIATION via
   // rirVerdictFromDelta) so the Details table, the AI prose, and the State row can't land in
   // different tiers for the same set (this table previously used a ±1.5 outlier).
@@ -612,6 +616,7 @@ async function getStrengthProgression(
   userUnits: string
 ): Promise<any> {
   try {
+    // OURS — last 10 strength sessions, 4-session average, 5 (lb or kg) change = progress; no page, kept as found
     // Get last 8 weeks of strength workouts (reduced to 10 for faster queries)
     const { data: recentWorkouts, error } = await supabase
       .from('workouts')
@@ -735,6 +740,7 @@ async function getE1rmTrend(
       let trend: 'up' | 'down' | 'flat' | null = null;
       if (prior != null && prior > 0) {
         const d = current - prior;
+        // OURS — `getE1rmTrend` 2.5 lb dead-band (the smallest plate is the reason, no source); kept as found
         trend = Math.abs(d) < 2.5 ? 'flat' : d > 0 ? 'up' : 'down'; // 2.5 lb dead-band (smallest plate)
       }
       out.push({ exercise: r.exercise_name || r.canonical_name, canonical: r.canonical_name, current_e1rm: current, prior_e1rm: prior, trend });
@@ -932,6 +938,7 @@ function generateExerciseBreakdown(
       let actualWeight = completedSets.length > 0 ? completedSets[0].weight || 0 : 0;
       
       // For time-based exercises (planks), show "Bodyweight" instead of weight
+      // OURS — under 10 on a timed exercise shows as bodyweight; kept as found
       if (isTimeBased && actualWeight < 10) {
         actualWeight = 0; // Will be displayed as "Bodyweight"
       }
@@ -951,6 +958,7 @@ function generateExerciseBreakdown(
         ? executedRIRs.reduce((sum: number, r: number) => sum + r, 0) / executedRIRs.length 
         : null;
       
+      // OURS — exercise score 50% weight, 30% reserve, 20% sets; 1 rep of reserve off target = 20 points; 50 with no reserve logged; no source, kept as found
       // Calculate performance score (weight adherence 50%, RIR adherence 30%, set completion 20%)
       const weightScore = Math.max(0, 100 - Math.abs(adherence.weight_progression || 0));
       let performanceScore = 0;
@@ -1019,6 +1027,7 @@ function analyzeRIRProgressionAcrossSets(exerciseAdherence: any[]): any {
     
     // Determine pattern
     let pattern = 'consistent';
+    // OURS — reserve moving more than 1 from first to last set = harder / easier; no page, kept as found
     if (rirChange < -1) {
       pattern = 'increasing difficulty';
     } else if (rirChange > 1) {
@@ -1130,6 +1139,7 @@ function generateVolumeAssessment(muscleGroups: Record<string, number>, totalVol
   
   if (kneeDom > 0 && hipDom > 0) {
     const ratio = kneeDom / hipDom;
+    // OURS — knee / hip volume ratio 1.5 and 0.67 for the balance line; no page, kept as found
     if (ratio > 1.5) {
       return 'Knee-dominant focus. Consider adding more hip-dominant work for balance.';
     } else if (ratio < 0.67) {
@@ -1259,6 +1269,7 @@ function calculateExecutionSummary(
   //
   // ⚠️ The `matchedExercises.length > 0` outer guard STAYS: a session where nothing matched at all is
   // still a 0, not a free 100.
+  // OURS — load score = 100 minus the weight gap percent; reserve score = 100 minus 20 per rep off target; no source, kept as found
   const anchoredExercises = matchedExercises.filter((ex: any) => !ex.substituted);
   const loadAdherence = matchedExercises.length > 0
     ? (anchoredExercises.length > 0
@@ -1292,6 +1303,7 @@ function calculateExecutionSummary(
     ? (weightedMatched / weightedPlanned) * 100
     : (overallAdherence.exercise_completion_rate || 0);
 
+  // OURS — `overallExecution` 30% exercises, 20% sets, 30% load, 20% reserve; no source, kept as found
   const overallExecution = (exerciseCompletion * 0.3) +
                           (setCompletion * 0.2) +
                           (loadAdherence * 0.3) +
@@ -1350,6 +1362,7 @@ function analyzeSessionRPE(sessionRPE: number | null): any {
   
   return {
     value: sessionRPE,
+    // OURS — session RPE words at 3 / 5 / 7 / 9; 8+ high, 4 or less low; no page, kept as found
     intensity_level: sessionRPE <= 3 ? 'Light' :
                    sessionRPE <= 5 ? 'Moderate' :
                    sessionRPE <= 7 ? 'Hard' :
@@ -1996,6 +2009,7 @@ Deno.serve(withAlarm('analyze-strength-workout', async (req) => {
           : null;
         return {
           status_label: execScore != null
+            // OURS — execution 85 / 70 glance bands; no page, kept as found
             ? (execScore >= 85 ? 'Strong execution' : execScore >= 70 ? 'Solid execution' : 'Needs adjustment')
             : null,
           execution_score: execScore,
@@ -2012,6 +2026,7 @@ Deno.serve(withAlarm('analyze-strength-workout', async (req) => {
       },
       summary: {
         title: 'Insights',
+        // OURS — 4 bullets at most (display cap); kept as found
         bullets: Array.isArray(analysis.insights) ? analysis.insights.slice(0, 4).map((s: any) => String(s || '').trim()).filter(Boolean) : [],
       },
       details: {

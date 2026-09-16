@@ -43,6 +43,7 @@ function avgPaceForMiles(splits: MileSplit[], from: number, to: number): number 
 
 /** Build the pacing execution story from per-mile splits. Returns a coaching-grade interpretation. */
 function buildPacingInsight(sorted: MileSplit[], goalPaceSec: number | null): string {
+  // OURS — race pacing lines: 4 miles minimum; full miles 5:00–30:00/mi; split 60 / 15 / −15 s/mi = significant negative / slight negative / even; goal within 10 s/mi; grade beyond 0.8% = climb or descent; climbs 60 s/mi slower, or 3 descents 45 s/mi faster; no page, kept as found
   if (sorted.length < 4) return '';
 
   const n = sorted.length;
@@ -136,6 +137,7 @@ function buildHrInsight(args: {
   const parts: string[] = [];
 
   // Per-mile HR arc — find where drift accelerated
+  // OURS — race heart-rate lines: miles under 40 bpm dropped; heat share 0.8 bpm per °F of rise over 2 °F plus 0.15 bpm per °F above 60 °F, or 0.3 bpm per °F above 62 °F; named over 3 bpm; drift 15 bpm over 200 min / 25 / 35 bpm bands; heat echo over 5 bpm; climbs 8 bpm above descents; no page, kept as found
   const hrMiles = sorted.filter((s) => s.avg_hr_bpm != null && s.avg_hr_bpm > 40);
   const m1Hr = hrMiles.length ? Math.round(hrMiles[0].avg_hr_bpm!) : e;
   const mLastHr = hrMiles.length ? Math.round(hrMiles[hrMiles.length - 1].avg_hr_bpm!) : l;
@@ -238,6 +240,7 @@ function buildConditionsInsight(args: {
       }
     }
 
+    // OURS — net 50 ft down = downhill course, within 50 ft = flat; peak shown 3 °F over start and 2 °F over end; 55 / 62 / 70 °F heat words; humidity over 70%, wind over 12 mph named; no page, kept as found
     if (netFt != null && netFt < -50) {
       parts.push(`${gainFt} ft gain on a net ${Math.abs(netFt)} ft downhill course — real climbs early, descent opens later.`);
     } else if (netFt != null && Math.abs(netFt) < 50) {
@@ -328,6 +331,7 @@ export function buildMarathonGoalRaceAdherenceSummary(args: {
     const gts = match.goalTimeSeconds;
     if (gts != null && Number.isFinite(gts) && gts > 0) {
       // Assume marathon distance: 26.2 miles
+      // FIELD — definition (marathon 26.2 mi, rounded from 26.2188)
       return gts / 26.2;
     }
     return null;
@@ -335,6 +339,7 @@ export function buildMarathonGoalRaceAdherenceSummary(args: {
 
   // Headline: elapsed time, instrument-panel
   const name = match.eventName || 'Race';
+  // OURS — a race time under 2 min is not shown; sanity, kept as found
   const el = elSec != null && elSec > 120 ? fmtClock(elSec) : null;
   const mov = movSec != null && movSec > 120 ? fmtClock(movSec) : null;
   const headline = el ? `${el} — ${name}` : mov ? `${mov} moving — ${name}` : name;
@@ -405,6 +410,7 @@ export function buildMarathonGoalRaceAdherenceSummary(args: {
 function resolveMovingSeconds(workout: any, granular: any): number | null {
   const o = granular?.computed?.overall ?? workout?.computed?.overall;
   const dsm = Number(o?.duration_s_moving);
+  // OURS — under 60 s is treated as no reading; kept as found
   if (Number.isFinite(dsm) && dsm > 60) return Math.round(dsm);
   const mv = Number(workout?.moving_time);
   if (Number.isFinite(mv) && mv > 0) return mv < 1000 ? Math.round(mv * 60) : Math.round(mv);

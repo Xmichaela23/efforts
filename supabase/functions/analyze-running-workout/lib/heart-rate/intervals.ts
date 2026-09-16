@@ -145,6 +145,7 @@ function calculateIntervalHRStats(
     s.heart_rate && s.heart_rate > 0 && s.heart_rate < 250
   );
   
+  // OURS — 10 heart-rate samples minimum per interval; kept as found
   if (validSamples.length < 10) {
     console.log(`🏃 [INTERVAL HR] Interval ${intervalNumber}: only ${validSamples.length} valid HR samples (need 10)`);
     return null;
@@ -184,6 +185,7 @@ function calculateHRCreep(
   const creepBpm = lastAvg - firstAvg;
   const creepPct = firstAvg > 0 ? (creepBpm / firstAvg) * 100 : 0;
   
+  // OURS — interval heart-rate creep 3 / 6 / 10 bpm = minimal / normal / elevated; no page, kept as found
   // Assess creep
   let assessment: 'minimal' | 'normal' | 'elevated' | 'high';
   if (Math.abs(creepBpm) <= 3) {
@@ -231,6 +233,7 @@ function calculateConsistency(
   // Coefficient of variation (%)
   const cv = mean > 0 ? (stdDev / mean) * 100 : 0;
   
+  // OURS — interval heart-rate CV 2 / 4 / 7% = very consistent / consistent / variable; no page, kept as found
   // Assess consistency
   let assessment: 'very_consistent' | 'consistent' | 'variable' | 'inconsistent';
   if (cv < 2) {
@@ -304,6 +307,7 @@ function calculateRecovery(
     ? (avgDropBpm / avgRecoveryTimeS) * 60 
     : 0;
   
+  // OURS — recovery drop 30 / 20 / 10 bpm = excellent / good / fair; no page, kept as found
   // Assess quality
   let quality: 'excellent' | 'good' | 'fair' | 'poor';
   if (avgDropBpm >= 30) {
@@ -335,6 +339,7 @@ function getEndHR(sensorData: SensorSample[], interval: IntervalData): number | 
     endSamples = sensorData.filter(s => {
       if (!s.timestamp) return false;
       const tsMs = s.timestamp > 1e10 ? s.timestamp : s.timestamp * 1000;
+      // OURS — the last 10 s (or 10 samples) of a rep is its end heart rate; kept as found
       return tsMs >= endTimeMs - 10000 && tsMs <= endTimeMs;
     });
   } else if (interval.sampleIdxEnd !== undefined) {

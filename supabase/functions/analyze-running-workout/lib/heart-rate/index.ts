@@ -74,6 +74,7 @@ export function analyzeHeartRate(
   const durationMinutes = sensorData.length / 60; // ~1 sample/sec
   
   // Insufficient data check
+  // OURS — 60 samples (1 min) of heart rate minimum; kept as found
   if (validHRSamples.length < 60) { // Less than 1 minute of HR data
     console.log('⚠️ [HR ANALYSIS] Insufficient HR data');
     return createInsufficientDataResult(avgHr, maxHr, minHr, durationMinutes, context.workoutType);
@@ -400,6 +401,7 @@ function buildTrends(
   efficiency: any,
   context: HRAnalysisContext
 ): HRAnalysisResult['trends'] {
+  // OURS — 2 past runs before a drift trend; 10% change = improving / worsening; no page, kept as found
   if (!context.historicalDrift || context.historicalDrift.similarWorkouts.length < 2) {
     return undefined;
   }
@@ -455,6 +457,7 @@ function determineConfidence(
   const reasons: string[] = [];
   let score = 100;
   
+  // OURS — confidence score: under 10 min −30, under 20 min −15, terrain over 5 bpm −15, complex structure −10, fewer than 3 intervals −30, no recovery −20; 75 = high, 50 = medium; no page, kept as found
   // Sample count
   if (sampleCount < 600) { // <10 min
     score -= 30;
@@ -508,6 +511,7 @@ function determineMixedConfidence(
 ): { confidence: 'high' | 'medium' | 'low'; reasons: string[] } {
   const reasons: string[] = ['Unstructured workout — showing zone distribution'];
   
+  // OURS — under 10 min = low confidence; kept as found
   if (sampleCount < 600) {
     return { confidence: 'low', reasons: [...reasons, 'Limited HR data'] };
   }

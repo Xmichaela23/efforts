@@ -95,6 +95,7 @@ export function computeVarianceGate(input: VarianceGateInput): VarianceGateResul
   const terrainType = String(input.factPacketTerrainType || '').toLowerCase();
   const isFlat = terrainType === 'flat';
 
+  // OURS — `computeVarianceGate` pace CV of 8% trips the gate (the pre-heart-rate hint in index.ts uses 13%); no page, kept as found
   const cvTripsGap = cvValid && cvBasis === 'gap' && cvPct >= 8;
   const cvTripsRawFlat = cvValid && cvBasis === 'raw' && isFlat && cvPct >= 8;
   // Spec §3.3 + user direction: "without grade data you can't separate

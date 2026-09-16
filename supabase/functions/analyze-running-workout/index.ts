@@ -373,6 +373,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
       // Fetch similar workouts - MORE LENIENT: any run 30+ minutes in last 90 days
       // (removed strict duration matching - all aerobic runs are comparable for drift trends)
       // NOTE: moving_time is stored in MINUTES in the database, not seconds!
+      // OURS — `minDuration` 30 min floor, 90-day window and last 5 runs for the drift history; no page, kept as found
       const minDuration = 30; // 30 minutes minimum
       const ninetyDaysAgo = new Date();
       ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
@@ -425,11 +426,13 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
           const avgDrift = workoutsWithDrift.reduce((sum, w) => sum + w.driftBpm, 0) / workoutsWithDrift.length;
           
           // Find last similar workout (3-21 days ago for more flexibility)
+          // OURS — 3 to 21 days back for the last similar run; no page, kept as found
           const lastWeekSimilar = workoutsWithDrift.find(w => w.daysSince >= 3 && w.daysSince <= 21);
           console.log(`📊 [HISTORICAL] Looking for similar workout 3-21 days ago. Candidates: ${workoutsWithDrift.map(w => `${w.daysSince}d ago: ${w.driftBpm}bpm`).join(', ')}`);
           
           // Determine trend (compare recent 3 vs older)
           let trend: 'improving' | 'stable' | 'worsening' | undefined = undefined;
+          // OURS — 4 runs before a drift trend, 2 bpm between halves for improving / worsening; no page, kept as found
           if (workoutsWithDrift.length >= 4) {
             const recent = workoutsWithDrift.slice(0, Math.floor(workoutsWithDrift.length / 2));
             const older = workoutsWithDrift.slice(Math.floor(workoutsWithDrift.length / 2));
@@ -949,6 +952,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
 
         // Point target: use tight absolute tolerance (seconds) to avoid false positives.
         // This matches the UI expectation for targets like "9:52/mi".
+        // OURS — `POINT_EPS_SEC` 5 s around a point target, `RANGE_EPS_PCT` 1% around a range (GPS and rounding noise); no page, kept as found
         const POINT_EPS_SEC = 5;
         if (Math.abs(slow - fast) <= 0.5) {
           return Math.abs(a - fast) <= POINT_EPS_SEC;
@@ -964,6 +968,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         const lastMid = (lastRange.lower + lastRange.upper) / 2;
         
         // If last segment target is at least 5% faster, this is a fast-finish workout
+        // OURS — a last segment 5% faster than the first marks a fast finish; no page, kept as found
         if (lastMid < firstMid * 0.95) {
           const hasFinishSegment = true;
           
@@ -1078,6 +1083,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
       // gate ~1.05, jitter-resistant — not computed here yet.)
       const cvPct = Number((analysis as any)?.pacing_variability?.coefficient_of_variation);
       const gapAdj = Boolean((analysis as any)?.gap_adjusted);
+      // OURS — 13% pace CV (the reasoning is in the note above, no named source); kept as found
       if (Number.isFinite(cvPct) && cvPct >= 13 && gapAdj) return true;
       // (2) detected intervals on unplanned session (non-easy/steady/long/recovery)
       if (!isLinkedPlanSession) {
@@ -1512,6 +1518,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
       }
       performance.gap_adjusted = !!(analysis as any).gap_adjusted;
       
+      // OURS — `execution_adherence` 50/50 pace and duration; no source (D-368: none of the reference apps makes one execution score), kept as found
       // Execution adherence = combination of pace + duration (equal weight: 50% pace, 50% duration)
       // Will be recalculated after plannedPaceInfo is extracted to include average pace adherence
       performance.execution_adherence = Math.round(
@@ -1542,6 +1549,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         : 0;
       performance.pace_adherence = fallbackPace;
       performance.duration_adherence = fallbackDuration;
+      // OURS — `execution_adherence` 50/50 fallback, as above; no source
       performance.execution_adherence = Math.round((fallbackPace + fallbackDuration) / 2);
       performance.total_steps = Math.max(performance.total_steps, plannedWorkStepsForContract.length);
       console.warn('⚠️ [PLAN CONTRACT GUARD] Recovered plan-linked adherence from granular metrics to avoid invalid 0/0/0 payload.', {
@@ -1670,6 +1678,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         return out;
       };
       
+      // OURS — pace adherence 95 = on target, 85 = slightly slower; no page, kept as found
       if (paceAdherencePct >= 95) {
         // Should say "on target" or "hit targets despite conditions"
         for (const phrase of slowPhrases) {
@@ -1821,12 +1830,14 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
           // This ensures breakdown text uses the correct value
           if (enhancedAnalysis.performance) {
             enhancedAnalysis.performance.pace_adherence = avgPaceAdherence;
+            // OURS — `execution_adherence` 50/50 pace and duration, as above; no source
             enhancedAnalysis.performance.execution_adherence = Math.round(
               (avgPaceAdherence * 0.5) + (performance.duration_adherence * 0.5)
             );
           }
           
           // Recalculate execution adherence with corrected pace adherence
+          // OURS — `execution_adherence` 50/50 pace and duration, as above; no source
           performance.execution_adherence = Math.round(
             (performance.pace_adherence * 0.5) + (performance.duration_adherence * 0.5)
           );
@@ -2023,6 +2034,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
       Number.isFinite((performance as any).intensity_adherence) &&
       Number.isFinite(performance.duration_adherence)
     ) {
+      // OURS — `execution_adherence` 50/50 time in the easy band and duration; no source, kept as found
       const governed = Math.round(
         (Number((performance as any).intensity_adherence) * 0.5) +
         (Number(performance.duration_adherence) * 0.5),
@@ -2156,6 +2168,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
           cur > 0 &&
           inferred != null &&
           inferred > 0 &&
+          // OURS — a 3x gap between the two moving times is read as a minutes / seconds mix-up; 7200 s/mi is the pace sanity cap; kept as found
           (cur / inferred >= 3 || inferred / cur >= 3)
         ) {
           const distM = Number(overall?.distance_m) || (Number((workoutForFact as any)?.distance) || 0) * 1000;
@@ -2439,6 +2452,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
             // heat-IMMUNE), pace-at-HR decoupling supporting (capped), declared RPE the confirmer/veto.
             // PRIMARY — cadence drop vs the athlete's own recent baseline (legs sluggish, won't turn over).
             const thisCadence = Number((workout as any)?.computed?.overall?.avg_cadence_spm ?? (workout as any)?.avg_cadence);
+            // OURS — 42-day cadence baseline, 120–220 spm kept as real readings, 3 runs minimum; no page, kept as found
             const cadStart = new Date(new Date(wDate + 'T12:00:00Z').getTime() - 42 * 86400000).toISOString().slice(0, 10);
             const { data: recentRunCad } = await supabase.from('workouts')
               .select('avg_cadence, computed').eq('user_id', uid).eq('type', 'run').eq('workout_status', 'completed')
@@ -2462,6 +2476,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
             if (Number.isFinite(thisRpe) && thisRpe > 0 && Number.isFinite(thisAvgHr) && thisAvgHr > 0) {
               const { data: recRuns } = await supabase.from('workouts')
                 .select('rpe, workout_analysis').eq('user_id', uid).eq('type', 'run').eq('workout_status', 'completed')
+                // OURS — 90-day RPE baseline, runs within 8 bpm average heart rate, 3 runs minimum; no page, kept as found
                 .gte('date', new Date(new Date(wDate + 'T12:00:00Z').getTime() - 90 * 86400000).toISOString().slice(0, 10)).lt('date', wDate);
               const comps = ((recRuns ?? []) as any[])
                 .map((w) => ({ rpe: Number(w?.rpe), hr: Number(w?.workout_analysis?.granular_analysis?.heart_rate_analysis?.average_heart_rate ?? w?.workout_analysis?.heart_rate_summary?.avg_hr) }))
@@ -2478,6 +2493,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
             {
               const { data: soreWk } = await supabase.from('workouts')
                 .select('id, date, start_date, workout_metadata').eq('user_id', uid).eq('workout_status', 'completed')
+                // OURS — 60-day soreness window; no page, kept as found
                 .gte('date', new Date(new Date(wDate + 'T12:00:00Z').getTime() - 60 * 86400000).toISOString().slice(0, 10)).lte('date', wDate);
               const entries: SorenessEntry[] = ((soreWk ?? []) as any[])
                 .map((w) => ({ workoutId: String(w?.id ?? ''), startTime: String(w?.start_date || (w?.date + 'T12:00:00Z')), soreness: Number(w?.workout_metadata?.readiness?.soreness) }))
@@ -2488,6 +2504,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
             const carry = detectCrossDomainCarryover({
               targetDate: wDate, targetDiscipline: 'run',
               effortSignal: haveCadence ? 'cadence' : null, // primary = cadence (heat-immune → no confound subtraction)
+              // OURS — a 3 spm cadence drop counts; no page, kept as found
               rawElevation: cadenceDrop, adjustedElevation: cadenceDrop, threshold: 3, // ~3 spm drop = notable
               confounds: { grade: false, heat: false, prescribedHard: false },
               recentSessions, nonLegElevated: null, declaredRpeGap, declaredBaselineOk, declaredSorenessElevated, corroborated: decoupElevated,
@@ -2631,6 +2648,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         const cleanedBullets = fadeLeadBullets(bullets.map((b) => b.replace(/\s+/g, ' ').trim()).filter(Boolean), _executionHonesty).slice(0, 4);
         const tags: string[] = [];
         const confLbl = String((hrAnalysisResult as any)?.confidence || '').toLowerCase();
+        // OURS — confidence 0.85 / 0.65 / 0.45 per label; no page, kept as found
         const confidence = confLbl === 'high' ? 0.85 : confLbl === 'medium' ? 0.65 : 0.45;
         return {
           version: 1,
@@ -2667,6 +2685,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
           }
 
           const vs = fact_packet_v1?.derived?.comparisons?.vs_similar;
+          // OURS — 3 similar sessions before a vs-similar line; no page, kept as found
           if (vs && typeof vs.sample_size === 'number' && vs.sample_size >= 3 && typeof vs.assessment === 'string') {
             const map: Record<string, string> = {
               better_than_usual: 'Better than usual vs similar workouts.',
@@ -2770,6 +2789,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
 
         // Segment delta (fast-finish magnitude)
         const finishDelta = Number(seg?.finishDeltaSecPerMi);
+        // OURS — 10 s/mi before the fast-finish gap is spoken; no page, kept as found
         if (seg?.hasFinishSegment && Number.isFinite(finishDelta) && Math.abs(finishDelta) >= 10) {
           const dir = finishDelta > 0 ? 'slower' : 'faster';
           bullets.push(`Fast-finish segment was ${fmtDelta(finishDelta)}/mi ${dir} than target.`);
@@ -2788,6 +2808,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
 
           if (Number.isFinite(tempF)) {
             const tf = Math.round(tempF);
+            // OURS — 70 °F before temperature is named (ledger row 39's heat note uses Garmin's 72 °F); kept as found
             if (tf >= 70) {
               const hum = Number.isFinite(humidity) ? `, ${Math.round(humidity)}% humidity` : '';
               parts.push(`${tf}°F${hum}`);
@@ -2800,12 +2821,14 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
           const paceVar = Number.isFinite(cv) ? cv : (Number.isFinite(varPct) ? varPct : null);
           if (paceVar != null) {
             const pv = Math.round(paceVar);
+            // OURS — 6% pace variability before it is named; no page, kept as found
             if (pv >= 6) parts.push(`pace variability ~${pv}%`);
           }
 
           // Terrain: use mile-by-mile splits to detect "rolling" / non-flat terrain
           const terrain = (detailedAnalysis as any)?.mile_by_mile_terrain;
           const splits = Array.isArray(terrain?.splits) ? terrain.splits : [];
+          // OURS — 3 mile splits and 40% of them not flat = rolling terrain; no page, kept as found
           if (splits.length >= 3) {
             const nonFlat = splits.filter((s: any) => String(s?.terrain_type || '').toLowerCase() !== 'flat').length;
             if (nonFlat / splits.length >= 0.4) parts.push('rolling terrain');
@@ -2821,6 +2844,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         // When the fact packet exists, avoid re-introducing legacy narrative sentences
         // (it tends to restate the interval table rather than coach).
         if (fact_packet_v1) break;
+        // OURS — 4 bullets at most (display cap); kept as found
         if (bullets.length >= 4) break;
         if (bullets.some((b) => b.toLowerCase() === s.toLowerCase())) continue;
         bullets.push(s);
@@ -2830,6 +2854,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
       // Pace adherence tags (use the same metric displayed in UI)
       const paceAdh = Number((performance as any)?.pace_adherence);
       if (Number.isFinite(paceAdh)) {
+        // OURS — pace adherence 95 / 85 tag bands; no page, kept as found
         if (paceAdh >= 95) tags.push('pace_on_target');
         else if (paceAdh >= 85) tags.push('pace_slightly_off');
         else tags.push('pace_off_target');
@@ -2843,6 +2868,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
       const tempF = (hrAnalysisContext as any)?.weather?.temperatureF;
       if (Number.isFinite(Number(tempF))) {
         const tf = Number(tempF);
+        // OURS — 85 °F hot, 70 °F warm tags; no page, kept as found
         if (tf >= 85) tags.push('conditions_hot');
         else if (tf >= 70) tags.push('conditions_warm');
       }
@@ -2852,6 +2878,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
 
       // Confidence mapping
       const confLbl = String((hrAnalysisResult as any)?.confidence || '').toLowerCase();
+      // OURS — confidence 0.85 / 0.65 / 0.45 per label; no page, kept as found
       const confidence = confLbl === 'high' ? 0.85 : confLbl === 'medium' ? 0.65 : 0.45;
 
       const uniq = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
@@ -2930,6 +2957,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
           | undefined;
         const elapsedSec = (() => {
           const el = Number(overall?.duration_s_elapsed);
+          // OURS — under 60 s is treated as no reading; kept as found
           if (Number.isFinite(el) && el > 60) return Math.round(el);
           const et = Number(wAny.elapsed_time);
           if (Number.isFinite(et) && et > 0) return et < 1000 ? Math.round(et * 60) : Math.round(et);
@@ -3124,6 +3152,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
           const distM2 = Number.isFinite(distM) && distM > 0
             ? distM
             : (Number(workout?.distance) > 0 ? Number(workout.distance) * 1000 : 0);
+          // FIELD — definition (marathon 42.195 km = 26.2188 mi); OURS — 0.1 mi floor below, sanity only
           const raceMi = distM2 > 0 ? distM2 / 1609.34 : 26.2188;
           const gts = goalRaceCompletionMatch.goalTimeSeconds;
           const fps = goalRaceCompletionMatch.fitnessProjectionSeconds;
@@ -3367,6 +3396,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
  * - All helper functions only used by dead code
  */
 
+// OURS — `MIN_SEGMENT_DISTANCE_MI` 0.25 mi and `MIN_SEGMENT_DURATION_S` 120 s: shorter segments merge into one row (display); no page, kept as found
 const MIN_SEGMENT_DISTANCE_MI = 0.25;
 const MIN_SEGMENT_DURATION_S = 120;
 
@@ -3697,6 +3727,7 @@ function analyzeHeartRateRecovery(sensorData: any[], workIntervals: any[], recov
   const avgRecoveryEfficiency = hrRecoveryData.reduce((sum, d) => sum + d.recovery_efficiency, 0) / hrRecoveryData.length;
   
   // Assess recovery quality
+  // OURS — heart-rate drop 20 / 15 / 10 bpm = Excellent / Good / Fair; no page, kept as found
   const recoveryQuality = avgHRDrop > 20 ? 'Excellent' : 
                          avgHRDrop > 15 ? 'Good' : 
                          avgHRDrop > 10 ? 'Fair' : 'Poor';
@@ -3854,6 +3885,7 @@ function generateAdherenceSummary(
   // Analyze pace deviations for each work interval
   // For recovery/easy runs, use percentage-based tolerance to avoid false positives
   // Thresholds: ≤2% = on_target, 2-5% = slight (no warning), 5-10% = aggressive, >10% = blown
+  // OURS — `RECOVERY_TOLERANCE_PCT` 5% on easy / recovery reps; no page, kept as found
   const RECOVERY_TOLERANCE_PCT = 0.05; // 5% threshold for recovery/easy runs to trigger warning
   
   interface Deviation {
@@ -3902,6 +3934,7 @@ function generateAdherenceSummary(
         // for ultra-tight targets (e.g. 11:08-11:08) to avoid false "off target"
         // from rounding/GPS noise.
         const rangeWidth = Math.abs(targetUpper - targetLower);
+        // OURS — a range 3 s wide or less is widened 5 s each side; no page, kept as found
         const epsSec = rangeWidth <= 3 ? 5 : 0; // only widen point targets
         const lo = targetLower - epsSec;
         const hi = targetUpper + epsSec;
@@ -3946,6 +3979,7 @@ function generateAdherenceSummary(
   const targetRange = deviations[0]?.target || '';
   const paceAdherencePct = Math.round(performance.pace_adherence);
   
+  // OURS — pace adherence 95 / 85 / 50 bands for the deviation sentence; no page, kept as found
   if (paceAdherencePct >= 95 && okIntervals.length === deviations.length) {
     // Perfect or near-perfect adherence - plan-aware
     if (planContext?.hasActivePlan && isBuildContext) {
@@ -4013,6 +4047,7 @@ function generateAdherenceSummary(
         }
       } else {
         parts.push(`Completed intervals ${fmtDelta(avgFastDelta)}/mi faster than prescribed (${targetRange}/mi)`);
+        // OURS — 30 s/mi faster than target before the injury-risk line; no page, kept as found
         if (avgFastDelta > 30) {
           parts.push(`significantly faster than target — consider injury risk`);
         }
@@ -4132,6 +4167,7 @@ function generateAdherenceSummary(
   let hrSuggestsStimulus = false;
   if (hrDrift != null && Number.isFinite(hrDrift)) {
     // If drift is >= 6 bpm for longer runs (>45 min), HR response indicates work was done
+    // OURS — drift 6 bpm over 90 min, 4 bpm over 45 min, else 3 bpm = stimulus reached; no page, kept as found
     if (durationMinutes > 90 && hrDrift >= 6) hrSuggestsStimulus = true;
     else if (durationMinutes > 45 && hrDrift >= 4) hrSuggestsStimulus = true;
     else if (hrDrift >= 3) hrSuggestsStimulus = true;
@@ -4153,6 +4189,7 @@ function generateAdherenceSummary(
     const last = workIntervals[workIntervals.length - 1];
     const firstMid = ((Number(first?.planned_pace_range_lower) || 0) + (Number(first?.planned_pace_range_upper) || 0)) / 2;
     const lastMid = ((Number(last?.planned_pace_range_lower) || 0) + (Number(last?.planned_pace_range_upper) || 0)) / 2;
+    // OURS — last segment 5% faster = planned faster finish; no page, kept as found
     if (firstMid > 0 && lastMid > 0 && lastMid < firstMid * 0.95) {
       hasPlannedFasterFinish = true; // last segment target is at least 5% faster
       
@@ -4177,6 +4214,7 @@ function generateAdherenceSummary(
 
   // Verdict: single non-repetitive sentence; upgrade when internal vs external load tells a story
   let verdict = parts[0].trim() + (parts[0].endsWith('.') ? '' : '.');
+  // OURS — 5 bpm drift (bpm, not p107's percent); no page, kept as found
   if (fastDominant && isRecoveryContext && hrDriftAbs != null && hrDriftAbs <= 5 && hrIsAerobic !== true) {
     verdict = "Physiologically efficient, but tactically over-paced for a recovery day.";
   }
@@ -4259,6 +4297,7 @@ function generateAdherenceSummary(
   const technical_insights: { label: string; value: string }[] = [];
 
   // Internal vs external: if external load (pace) was high but internal (HR drift) low → surprising efficiency
+  // OURS — 5 bpm drift (bpm, not p107's percent); no page, kept as found
   if (fastDominant && hrDriftAbs != null && hrDriftAbs <= 5) {
     technical_insights.push({
       label: 'Internal vs External Load',
@@ -4281,6 +4320,7 @@ function generateAdherenceSummary(
     if (!driftLabel) {
       // Fallback for older analyses: derive label from drift magnitude
       driftLabel = 'Cardiac Drift';
+      // OURS — drift 3 / 10 bpm label bands; no page, kept as found
       if (hrDriftAbs <= 3) {
         driftLabel = 'Aerobic Efficiency';
       } else if (hrDriftAbs > 10) {
@@ -4293,6 +4333,7 @@ function generateAdherenceSummary(
       technical_insights.push({ label: driftLabel, value: richHRInterpretation });
     } else {
       // Fallback for older analyses without rich interpretation
+      // OURS — drift 3 / 10 bpm sentence bands; no page, kept as found
       if (hrDriftAbs <= 3) {
         technical_insights.push({ label: driftLabel, value: `${plannedWorkoutLeadIn}Heart rate remained stable (${hrDrift > 0 ? '+' : ''}${hrDrift} bpm drift${driftClarify}), suggesting this pace is within your aerobic threshold.` });
       } else if (hrDriftAbs <= 10) {
@@ -4312,6 +4353,7 @@ function generateAdherenceSummary(
   const speedFlux = detailedAnalysis?.speed_fluctuations;
   if (speedFlux?.available && speedFlux?.pace_variability_percent != null) {
     const pct = speedFlux.pace_variability_percent;
+    // OURS — pace variance 5 / 8% bands; no page, kept as found
     if (pct < 5) {
       technical_insights.push({ label: 'Pacing Mastery', value: `Pace variance under 5% — high control across work intervals, even under changing terrain or effort.` });
     } else if (pct <= 8) {
@@ -4323,6 +4365,7 @@ function generateAdherenceSummary(
   const paceVar = granularAnalysis?.pacing_analysis?.pacing_variability;
   if (paceVar?.coefficient_of_variation != null && technical_insights.every(t => t.label !== 'Pacing Mastery' && t.label !== 'Pacing Stability')) {
     const cv = paceVar.coefficient_of_variation;
+    // OURS — pace CV 5 / 10% bands; no page, kept as found
     if (cv < 5) {
       technical_insights.push({ label: 'Pacing Mastery', value: `Pace variability (CV ${cv}%) was low — steady output and high control.` });
     } else {
@@ -4334,6 +4377,7 @@ function generateAdherenceSummary(
   const hrRecovery = detailedAnalysis?.heart_rate_recovery;
   if (hrRecovery?.available && hrRecovery?.average_hr_drop_bpm != null) {
     const drop = hrRecovery.average_hr_drop_bpm;
+    // OURS — heart-rate drop 30 bpm, then 20 / 15 / 10 bpm bands; no page, kept as found
     if (drop >= 30) {
       technical_insights.push({ label: 'High Readiness', value: `HR dropped ${drop} bpm in recovery intervals — strong cardiovascular rebound and readiness for the next interval.` });
     } else {
@@ -4493,6 +4537,7 @@ function formatStridePlannedLabel(step: any, plannedDurationSec: number): string
   const ov = Number(step?.original_val ?? 0);
   const ou = String(step?.original_units || '').toLowerCase();
   let yardsOut = yd > 0 ? Math.round(yd) : 0;
+  // OURS — a stride of 25–800 m is labelled in yards (display); 0.9144 m = 1 yd is the definition
   if (!yardsOut && dm > 25 && dm < 800) yardsOut = Math.round(dm / 0.9144);
   if (!yardsOut && ov > 0 && (ou === 'yd' || ou === 'yard' || ou === 'yards')) yardsOut = Math.round(ov);
   if (yardsOut > 0) return `${yardsOut} yd Stride`;
@@ -4968,6 +5013,7 @@ function resolveClassifiedTypeKey(plannedWorkout: any, planContext: any, goalRac
   // 2) workout_type metadata is secondary
   // 3) description/token keyword guessing is last resort
   const workStepCount = getPlannedWorkSteps(plannedWorkout).length;
+  // OURS — 2 or more planned work steps = intervals; no page, kept as found
   if (workStepCount >= 2) return 'intervals';
   if (workStepCount === 1) {
     if (planContext?.isRecoveryWeek || planContext?.weekIntent === 'recovery') return 'recovery';
@@ -4989,6 +5035,7 @@ function resolveClassifiedTypeKey(plannedWorkout: any, planContext: any, goalRac
   if (plannedType) {
     // Generic "run" type must be disambiguated from planned structure.
     if (plannedType === 'run') {
+      // OURS — 2 or more planned work steps = intervals, as above
       if (workStepCount >= 2) return 'intervals';
       if (planContext?.isRecoveryWeek || planContext?.weekIntent === 'recovery') return 'recovery';
       return 'easy';

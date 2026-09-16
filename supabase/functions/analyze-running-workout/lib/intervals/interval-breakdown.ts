@@ -13,6 +13,7 @@ import { calculatePaceRangeAdherence } from '../adherence/pace-adherence.ts';
 import { calculateIntervalHeartRate } from '../analysis/heart-rate.ts';
 import { calculateIntervalElevation } from '../analysis/elevation.ts';
 
+// OURS — `PACE_SEC_PER_MI_MIN` 3:00/mi and `PACE_SEC_PER_MI_MAX` 30:00/mi: a pace outside is treated as a bad reading; no page, kept as found
 const PACE_SEC_PER_MI_MIN = 180;
 const PACE_SEC_PER_MI_MAX = 1800;
 
@@ -28,6 +29,7 @@ function reconcilePaceFromDurationDistance(
 ): number {
   if (!(durationS > 0 && distanceM > 0)) return reportedPaceSPerMi;
   const miles = distanceM / 1609.34;
+  // OURS — under 0.01 mi no pace is derived; sanity, kept as found
   if (miles <= 0.01) return reportedPaceSPerMi;
   const derived = durationS / miles;
   if (!paceSecPerMiIsValid(derived)) return reportedPaceSPerMi;
@@ -145,6 +147,7 @@ export function generateIntervalBreakdown(
     // Prefer duration ÷ distance when the gap is large so UI never shows impossible paces (e.g. 2:17/mi on a jog).
     if (!isOverallRow && displayDurationS > 0 && intervalDistanceM > 0) {
       const miles = intervalDistanceM / 1609.34;
+      // OURS — under 0.01 mi no pace is derived; sanity, kept as found
       if (miles > 0.01) {
         const derivedPace = displayDurationS / miles;
         if (isValidPace(derivedPace)) {
@@ -169,6 +172,7 @@ export function generateIntervalBreakdown(
     
     // Calculate duration adherence: how close actual is to planned (use display duration = moving for overall row)
     let durationAdherence = 0;
+    // OURS — `durationAdherence` per segment = 100 minus the gap as a percent of planned; no source, kept as found
     if (plannedDuration > 0 && displayDurationS > 0) {
       const durationDelta = Math.abs(displayDurationS - plannedDuration);
       durationAdherence = Math.max(0, 100 - (durationDelta / plannedDuration) * 100);
@@ -223,6 +227,7 @@ export function generateIntervalBreakdown(
     const intervalRole = String(interval.role || interval.kind || 'work').toLowerCase();
 
     const strideText = `${intervalRole} ${stepKindPlanned} ${stepLabel} ${stepName}`.toLowerCase();
+    // OURS — a rep of 4 min or less and 25–500 m can read as a stride; no page, kept as found
     const shortRepByTime = displayDurationS > 0 && displayDurationS <= 240; // ≤4 min reps
     const shortRepByDist = (plannedShortM > 25 && plannedShortM < 500) ||
       (execDistM > 25 && execDistM < 500 && shortRepByTime);
@@ -254,6 +259,7 @@ export function generateIntervalBreakdown(
     if (workRangeLower > 0 && workRangeUpper > 0 && actualPace > 0) {
       // Use range-based adherence calculation with asymmetric scoring
       paceAdherence = calculatePaceRangeAdherence(actualPace, workRangeLower, workRangeUpper, intervalType);
+    // OURS — single-target pace score = 100 minus the gap as a percent of target; no source, kept as found
     } else if (plannedPace > 0 && actualPace > 0) {
       // Fallback to single target calculation
       const paceDelta = Math.abs(actualPace - plannedPace);
@@ -267,6 +273,7 @@ export function generateIntervalBreakdown(
     }
 
     // Calculate overall performance score
+    // OURS — `overallScore` 70% pace, 30% duration per segment; no source, kept as found
     // Weight pace more heavily (70%) than duration (30%) for interval workouts
     // Pace is more important than exact duration match
     const overallScore = Number.isFinite(paceAdherenceOut)
@@ -339,6 +346,7 @@ export function generateIntervalBreakdown(
         const ov = Number(st?.original_val ?? 0);
         const ou = String(st?.original_units || '').toLowerCase();
         let yardsOut = yd > 0 ? Math.round(yd) : 0;
+        // OURS — a stride of 25–800 m is labelled in yards (display); 0.9144 m = 1 yd is the definition
         if (!yardsOut && dm > 25 && dm < 800) yardsOut = Math.round(dm / 0.9144);
         if (!yardsOut && ov > 0 && (ou === 'yd' || ou === 'yard' || ou === 'yards')) yardsOut = Math.round(ov);
         if (yardsOut > 0) return `${yardsOut} yd Stride`;
@@ -429,6 +437,7 @@ export function generateIntervalBreakdown(
   // Calculate summary first (needed for coaching insight)
   const summary = breakdown.reduce((acc, i) => {
     acc.total += i.performance_score;
+    // OURS — segment score bands 90 / 80 / 70; no page, kept as found
     if (i.performance_score >= 90) acc.high++;
     else if (i.performance_score >= 80) acc.good++;
     else if (i.performance_score >= 70) acc.fair++;
@@ -491,6 +500,7 @@ export function generateIntervalBreakdown(
         const recActualPace = rec.executed?.avg_pace_s_per_mi || 0;
         if (recPlannedPace > 0 && recActualPace > 0) {
           const recDelta = Math.abs(recActualPace - recPlannedPace);
+          // OURS — recovery pace score = 100 minus the gap as a percent of target; no source, kept as found
           return Math.max(0, 100 - (recDelta / recPlannedPace) * 100);
         }
         return 0;
@@ -549,6 +559,7 @@ export function generateIntervalBreakdown(
           if (breakdown.length > 0) {
             const workAdherences = breakdown.map((i: any) => i.pace_adherence_percent);
             const avgWorkAdherence = Math.round(workAdherences.reduce((sum: number, a: number) => sum + a, 0) / workAdherences.length);
+            // OURS — status words at 90 / 70 adherence; no page, kept as found
             const workStatus = avgWorkAdherence >= 90 ? 'Excellent' : avgWorkAdherence >= 70 ? 'Good' : 'Needs Improvement';
             pacingAnalysisText += `${workStatus} - Work Intervals: ${avgWorkAdherence}% (${breakdown.length}/${breakdown.length} reps on target)\n`;
             pacingAnalysisText += `   • Interval 1-${breakdown.length}: ${workAdherences.join('-')}% adherence\n`;
@@ -558,6 +569,7 @@ export function generateIntervalBreakdown(
           // Warmup
           if (segmentAdherence.warmup && warmupInterval) {
             const warmupAdherence = segmentAdherence.warmup.adherence;
+            // OURS — status words at 90 / 70; impact line = 20% of the shortfall; no page, kept as found
             const warmupStatus = warmupAdherence >= 90 ? 'Good' : warmupAdherence >= 70 ? 'Too Fast' : 'Too Fast';
             const warmupActual = warmupInterval.executed?.avg_pace_s_per_mi || 0;
             const warmupPlannedRange = warmupInterval.planned?.pace_range;
@@ -588,6 +600,7 @@ export function generateIntervalBreakdown(
               const recActualPace = rec.executed?.avg_pace_s_per_mi || 0;
               if (recPlannedPace > 0 && recActualPace > 0) {
                 const recDelta = Math.abs(recActualPace - recPlannedPace);
+                // OURS — recovery pace score = 100 minus the gap as a percent of target; no source, kept as found
                 return Math.max(0, 100 - (recDelta / recPlannedPace) * 100);
               }
               return 0;
@@ -597,6 +610,7 @@ export function generateIntervalBreakdown(
               ? Math.round(recoveryAdherences.reduce((sum: number, a: number) => sum + a, 0) / recoveryAdherences.length)
               : (segmentAdherence.recovery ? segmentAdherence.recovery.adherence : 0);
             
+            // OURS — status words at 90 / 70; impact line = 20% of the shortfall; no page, kept as found
             const recoveryStatus = avgRecoveryAdherence >= 90 ? 'Good' : avgRecoveryAdherence >= 70 ? 'Acceptable' : 'Needs Attention';
             pacingAnalysisText += `${recoveryStatus} - Recovery Jogs: ${avgRecoveryAdherence}% (${avgRecoveryAdherence >= 90 ? 'well controlled' : avgRecoveryAdherence >= 70 ? 'acceptable' : 'needs attention'})\n`;
             pacingAnalysisText += `   • ${recoveryIntervals.length}/${recoveryIntervals.length} recovery periods executed\n`;
@@ -609,6 +623,7 @@ export function generateIntervalBreakdown(
           // Cooldown
           if (segmentAdherence.cooldown && cooldownInterval) {
             const cooldownAdherence = segmentAdherence.cooldown.adherence;
+            // OURS — status words at 90 / 70; impact line = 20% of the shortfall; no page, kept as found
             const cooldownStatus = cooldownAdherence >= 90 ? 'Good' : cooldownAdherence >= 70 ? 'Slightly Too Fast' : 'Too Fast';
             const cooldownActual = cooldownInterval.executed?.avg_pace_s_per_mi || 0;
             const cooldownPlannedRange = cooldownInterval.planned?.pace_range;
@@ -674,6 +689,7 @@ export function generateIntervalBreakdown(
         let warmupDurationAdherence = 0;
         if (warmupPlannedDuration > 0 && warmupActualDuration > 0) {
           const durationDelta = Math.abs(warmupActualDuration - warmupPlannedDuration);
+          // OURS — duration score = 100 minus the gap as a percent of planned; 70/30 pace / duration below; no source, kept as found
           warmupDurationAdherence = Math.max(0, 100 - (durationDelta / warmupPlannedDuration) * 100);
         }
 
@@ -725,6 +741,7 @@ export function generateIntervalBreakdown(
     const multiWork = breakdown.length >= 2;
     // Long easy + strides: recoveries follow stride reps, not the first continuous block (mergeMicroSegments
     // only sees work[] so pairing recovery[i] after work[i] wrongly puts R1 under the main block).
+    // OURS — a first block of 15 min or more is the long easy block before strides; no page, kept as found
     const skipRecAfterFirstWork = multiWork && firstWorkDur >= 900;
 
     breakdown.forEach((workInterval, workIndex) => {
@@ -773,6 +790,7 @@ export function generateIntervalBreakdown(
         let recDurationAdherence = 0;
         if (recPlannedDuration > 0 && recActualDuration > 0) {
           const durationDelta = Math.abs(recActualDuration - recPlannedDuration);
+          // OURS — duration score = 100 minus the gap as a percent of planned; 70/30 pace / duration below; no source, kept as found
           recDurationAdherence = Math.max(0, 100 - (durationDelta / recPlannedDuration) * 100);
         }
         
@@ -843,6 +861,7 @@ export function generateIntervalBreakdown(
       let cooldownDurationAdherence = 0;
       if (cooldownPlannedDuration > 0 && cooldownActualDuration > 0) {
         const durationDelta = Math.abs(cooldownActualDuration - cooldownPlannedDuration);
+        // OURS — duration score = 100 minus the gap as a percent of planned; 70/30 pace / duration below; no source, kept as found
         cooldownDurationAdherence = Math.max(0, 100 - (durationDelta / cooldownPlannedDuration) * 100);
       }
       
@@ -1102,6 +1121,7 @@ export function generateIntervalBreakdown(
   
   sectionText += `SUMMARY:\n`;
   sectionText += `- Average performance: ${Math.round(summary.total / breakdown.length)}%\n`;
+  // OURS — printed bands 90 / 80 / 70, the same as the segment score bands; no page
   sectionText += `- High (≥90%): ${summary.high} intervals\n`;
   sectionText += `- Good (80-89%): ${summary.good} intervals\n`;
   sectionText += `- Fair (70-79%): ${summary.fair} intervals\n`;
@@ -1123,6 +1143,7 @@ export function generateIntervalBreakdown(
     const executionScore = granularAnalysis.performance.execution_adherence;
     // Use performance.pace_adherence as single source of truth (matches Summary view)
     const paceAdherence = granularAnalysis.performance.pace_adherence ?? overallPaceAdherence ?? 100;
+    // OURS — 99 stand-in when duration adherence is missing; kept as found
     const durationAdherence = granularAnalysis.performance.duration_adherence ?? 99;
     
     if (executionScore < 100 && allIntervals && allIntervals.length > 0) {
@@ -1147,6 +1168,7 @@ export function generateIntervalBreakdown(
         const warmupPaceAdherence = warmupRangeLower > 0 && warmupRangeUpper > 0 && warmupActualPace > 0
           ? calculatePaceRangeAdherence(warmupActualPace, warmupRangeLower, warmupRangeUpper, 'warmup')
           : 0;
+        // OURS — duration score = 100 minus the gap as a percent of planned; no source, kept as found
         const warmupDurationAdherence = warmupPlannedDuration > 0 && warmupActualDuration > 0
           ? Math.max(0, 100 - (Math.abs(warmupActualDuration - warmupPlannedDuration) / warmupPlannedDuration) * 100)
           : 0;
@@ -1214,6 +1236,7 @@ export function generateIntervalBreakdown(
                      const cooldownPaceAdh = cooldownPaceRange && cooldownActualPaceFromSensor > 0
                        ? calculatePaceRangeAdherence(cooldownActualPaceFromSensor, cooldownPaceRange.lower, cooldownPaceRange.upper, 'cooldown')
                        : 100;
+                     // OURS — duration score = 100 minus the gap as a percent of planned; no source, kept as found
                      const cooldownDurAdh = cooldownInterval.planned?.duration_s && cooldownInterval.executed?.duration_s
                        ? Math.max(0, 100 - (Math.abs(cooldownInterval.executed.duration_s - cooldownInterval.planned.duration_s) / cooldownInterval.planned.duration_s) * 100)
                        : 100;
@@ -1258,6 +1281,7 @@ export function generateIntervalBreakdown(
   const workSummary = workIntervalsOnly.reduce((acc, i) => {
     if (i.performance_score !== undefined) {
       acc.total += i.performance_score;
+      // OURS — segment score bands 90 / 80 / 70; no page, kept as found
       if (i.performance_score >= 90) acc.high++;
       else if (i.performance_score >= 80) acc.good++;
       else if (i.performance_score >= 70) acc.fair++;

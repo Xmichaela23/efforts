@@ -242,6 +242,7 @@ export function generateCyclingAdherenceSummary(opts: {
 
   // Verdict (single-line summary). Same severity tiers running uses for status_label.
   let verdict = 'Workout completed.';
+  // OURS — execution 90 / 80 / 65 verdict bands; no page, kept as found
   if (typeof exec === 'number') {
     if (exec >= 90) verdict = 'Excellent execution — power held steady through the prescribed work.';
     else if (exec >= 80) verdict = 'Solid execution — power adherence was strong with minor variation.';
@@ -327,6 +328,7 @@ export function generateCyclingAdherenceSummary(opts: {
 
   let outlook = 'Standard recovery sufficient before next quality session.';
   if (typeof exec === 'number') {
+    // OURS — execution 85 / 70 outlook bands; no page, kept as found
     if (exec >= 85) {
       outlook = 'Quality session executed well — proceed with planned next session.';
     } else if (exec >= 70) {
@@ -348,6 +350,7 @@ export function generateCyclingAdherenceSummary(opts: {
 // - Quality/intervals: ±5% (tighter)
 // - Sweet spot/tempo: ±7% (moderate)
 // - Endurance: ±10% (looser)
+// OURS — `SEGMENT_CONFIG` power tolerances and weights; "Garmin-style" names the approach, no Garmin document with these numbers is in the repo; kept as found
 const SEGMENT_CONFIG: Record<SegmentType, SegmentConfig> = {
   warmup: { tolerance: 15, weight: 0.5 },
   cooldown: { tolerance: 15, weight: 0.3 },
@@ -415,6 +418,7 @@ function parsePhaseFromTags(tags: string[]): { phase: string | null, week: strin
  */
 function calculateHeartRateZones(maxHR: number): HeartRateZones {
   return {
+    // OURS — `calculateHeartRateZones` 50/60/70/80/90/100% of max heart rate; no source in the repo (TRUTH-MAP §8.1 row 20b); kept as found
     zone1: { lower: maxHR * 0.50, upper: maxHR * 0.60, name: 'Zone 1' },
     zone2: { lower: maxHR * 0.60, upper: maxHR * 0.70, name: 'Zone 2' },
     zone3: { lower: maxHR * 0.70, upper: maxHR * 0.80, name: 'Zone 3' },
@@ -462,6 +466,7 @@ function inferSegmentType(segment: any, plannedStep: any, plannedWorkout?: any):
     const durationMin = segment.executed?.duration_s 
       ? segment.executed.duration_s / 60 
       : (segment.planned?.duration_s ? segment.planned.duration_s / 60 : 0);
+    // OURS — over 20 min = endurance segment; no page, kept as found
     if (durationMin > 20) {
       return 'endurance';
     }
@@ -479,6 +484,7 @@ function inferSegmentType(segment: any, plannedStep: any, plannedWorkout?: any):
 function calculateNormalizedPower(powerSamples: number[]): number {
   if (powerSamples.length === 0) return 0;
   
+  // FIELD — Coggan normalized power (30 s rolling average, 4th power, 4th root); ledger row "Judged ride power"
   // Use 30-second rolling average
   const rollingAverages: number[] = [];
   const windowSize = 30; // 30 seconds
@@ -532,6 +538,7 @@ function calculatePowerVariability(powerSamples: number[], normalizedPower: numb
   // Detect surges (power increases >20% of average)
   let numSurges = 0;
   let numCrashes = 0;
+  // OURS — a 20% change between samples = surge / crash; no page, kept as found
   const surgeThreshold = avgPower * 0.20;
   
   for (let i = 1; i < powerSamples.length; i++) {
@@ -885,6 +892,7 @@ function calculateDurationAdherence(workout: any, plannedWorkout: any, intervals
     
     // Calculate adherence percentage - same formula as running
     // Duration adherence = how close actual is to planned (100% when equal, decreases with deviation)
+    // OURS — `calculateDurationAdherence` = 100 minus the gap as a percent of planned; no source (TRUTH-MAP §8.1 row 5a), kept as found
     const durationDelta = Math.abs(actualDurationSeconds - plannedDurationSeconds);
     const adherencePercentage = Math.max(0, 100 - (durationDelta / plannedDurationSeconds) * 100);
     
@@ -973,6 +981,7 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
     let powerAdherence = 0;
     if (plannedPowerLower > 0 && actualPower > 0) {
       // Check if actual power is within range
+      // OURS — power score = 100 inside the range, else 100 minus the gap as a percent of the nearer edge; no source, kept as found
       if (actualPower >= plannedPowerLower && actualPower <= plannedPowerUpper) {
         powerAdherence = 100;
       } else if (actualPower < plannedPowerLower) {
@@ -990,6 +999,7 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
       powerAdherence = Math.max(0, 100 - (powerDelta / plannedPowerCenter) * 100);
     }
     
+    // OURS — `performanceScore` 70% power, 30% duration; no source, kept as found
     // Overall performance score (70% power, 30% duration)
     const performanceScore = (powerAdherence * 0.7) + (durationAdherence * 0.3);
     
@@ -1067,6 +1077,7 @@ function analyzeHeartRate(sensorData: any[], intervals: any[], maxHR?: number): 
   const minHR = Math.min(...hrSamples);
   
   // Calculate HR drift (early vs late)
+  // OURS — heart-rate drift fallback: first 20% vs last 20% of samples; no page, kept as found
   const earlySamples = hrSamples.slice(0, Math.floor(hrSamples.length * 0.2));
   const lateSamples = hrSamples.slice(Math.floor(hrSamples.length * 0.8));
   const earlyAvgHR = earlySamples.length > 0
@@ -1211,6 +1222,7 @@ function inferSecondsFromMaybeMinutes(args: {
   const asSeconds = value;
   const asMinutesSeconds = value * 60;
 
+  // OURS — 36 h longest real ride, 2 km/h and 60 s floors for the unit check; sanity, kept as found
   // If one option is clearly impossible (> 36h), prefer the other.
   const tooBig = (s: number) => s > 36 * 3600;
   if (tooBig(asMinutesSeconds) && !tooBig(asSeconds)) return asSeconds;
@@ -1622,6 +1634,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
         // this branch is purely about preserving the prior aggregate semantics.
         if (interval.power_adherence_percent == null) continue;
         const isWorkInterval = interval.interval_type === 'work';
+        // OURS — work intervals count twice in the power score; no page, kept as found
         // Work intervals get 2x weight, others get 1x
         const typeMultiplier = isWorkInterval ? 2.0 : 1.0;
         const durationWeight = interval.actual_duration_s || 1;
@@ -1676,6 +1689,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
       : timeUnderCeiling(sensorData.map((sample: any) => sample?.heart_rate), easyCeiling.ceiling);
     const intensityAdherence = easyRead?.pct ?? null;
 
+    // OURS — `executionAdherence` 70/30 power / duration, 50/50 time under the easy ceiling / duration; no source (running's 50/50 is OURS too, D-368), kept as found
     // Weighting mirrors running's 50/50 pace+duration: the two halves of "did you do the session" are
     // how long, and how hard. Power's 70/30 stays where power was actually prescribed.
     // No ceiling resolvable (no threshold HR, no max HR) → duration alone, and the row says so rather
@@ -1883,6 +1897,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
         const v = Number(sm?.power ?? sm?.watts ?? sm?.power_w ?? sm?.powerWatts);
         return Number.isFinite(v) ? v : null;
       }));
+      // OURS — 25 W pedalling floor, the same number as `_shared/ride-power.ts` (uncited there, TRUTH-MAP §8.1 row 12)
       const pw = stream.filter((w) => w > 25);
       // ⛔ THE FLOOR IS THE REPO'S OWN, AND THE FIRST ONE'S ARITHMETIC WAS WRONG (corrected 2026-08-02).
       //
@@ -1894,6 +1909,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
       // bike's own `MIN_EFFICIENCY_IN_BAND_S` (D-275-bike) — this codebase's existing answer to "a
       // fragment is not a measurement", already argued once. Five minutes of pedalling per half is
       // enough for a mean to mean something, and it is not a fresh opinion.
+      // OURS — `MIN_PEDALLING_S` 600 s reuses the repo's 10-min in-band floor (the note above); kept as found
       const MIN_PEDALLING_S = 600;
       if (pw.length >= MIN_PEDALLING_S) {
         const midIdx = Math.floor(stream.length / 2);
@@ -1921,6 +1937,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
         cur > 0 &&
         inferred != null &&
         inferred > 0 &&
+        // OURS — a 10x gap between the two moving times is read as a minutes / seconds mix-up; kept as found
         (cur / inferred >= 10 || inferred / cur >= 10)
       ) {
         const nextComputed = {
@@ -2172,6 +2189,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
       const tssByDate = new Map<string, number>(); // design #7: daily TSS sum
       try {
         const today = new Date().toISOString().slice(0, 10);
+        // OURS — 90-day ride history (120 rows), last 12 points, 3 points before a trend; no page, kept as found
         const ninetyAgo = (() => {
           const d = new Date(today + 'T00:00:00Z');
           d.setUTCDate(d.getUTCDate() - 90);
@@ -2432,6 +2450,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
       const viValid = Number.isFinite(vi) && vi > 0;
       const cvValid = Number.isFinite(cvPct) && cvPct > 0;
 
+      // OURS — mixed-effort ride: variability index 1.05 or power CV 12%; no page, kept as found
       const viTrips = viValid && vi >= 1.05;
       const cvTrips = cvValid && cvPct >= 12;
 
@@ -2482,6 +2501,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
     let spineBikeTrend: any = null;
     try {
       const spineAsOf = new Date().toISOString().slice(0, 10);
+      // OURS — rides per week over 90 days; no page, kept as found
       const ninetyAgo = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
       const { data: bikeCadRows } = await supabase
         .from('workouts').select('id')
@@ -2511,6 +2531,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
           if (p >= band.lo && p <= band.hi && Number.isFinite(h) && h > 0) hrs.push(h);
         }
         inBandS = hrs.length; // ≈ seconds (1 Hz)
+        // OURS — 120 s in the power band before heart rate at that band is read; no page, kept as found
         if (hrs.length >= 120) hrAtBand = Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length);
       }
       // ⛔ DOES THIS RIDE ACTUALLY COUNT (2026-08-02, Michael: "why would you say 146 is heart rate at
@@ -2617,6 +2638,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
         if (uid && /^\d{4}-\d{2}-\d{2}$/.test(wDate) && Number.isFinite(Number(cyclingHrDriftPct))) {
           // Read a WIDER 7d window (detector still filters to ≤3d) so the diagnostic can say "no lift in
           // window" when a leg session exists but is too old.
+          // OURS — 7-day lifting window read for the diagnostic; no page, kept as found
           const winStart = new Date(new Date(wDate + 'T12:00:00Z').getTime() - 7 * 86400000).toISOString().slice(0, 10);
           const { data: recentStr } = await supabase.from('workouts')
             .select('date, strength_exercises, workload_actual')
@@ -2636,9 +2658,11 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
           const nearestLift = legLifts[0] || null;
           const decoupPct = Number(cyclingHrDriftPct);
           const tempF = Number((workout as any)?.avg_temperature);
+          // OURS — 82 °F counts as a heat confound; no page, kept as found
           const heatConfound = Number.isFinite(tempF) && tempF >= 82;
           const prescribedHard = /interval|threshold|vo2|race|sweet.?spot|\bftp\b|hard/i.test(String((plannedWorkout as any)?.type || '') + ' ' + String((plannedWorkout as any)?.name || ''));
           const confounded = heatConfound || prescribedHard;
+          // Viada p107 — the 5% drift line; OURS — reusing it as the carryover floor, and the 3 points over it, kept as found
           const rawElevation = decoupPct - 5; // >5% aerobic (power-at-HR) decoupling = notable; ≥3 over base to fire
           // Two-way RPE gauge: this ride's RPE vs the athlete's OWN baseline RPE for comparable-INTENSITY
           // rides (IF ±0.1). Above expected → carryover trigger (catches easy rides the objective misses);
@@ -2662,6 +2686,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
               .gte('date', new Date(new Date(wDate + 'T12:00:00Z').getTime() - 90 * 86400000).toISOString().slice(0, 10)).lt('date', wDate);
             const comps = ((recRides ?? []) as any[])
               .map((w) => ({ rpe: Number(w?.rpe), iff: Number(w?.computed?.analysis?.power?.intensity_factor ?? w?.workout_analysis?.fact_packet_v1?.facts?.intensity_factor) }))
+              // OURS — rides within 0.1 intensity factor, 3 minimum, 90 days; 60-day soreness window; no page, kept as found
               .filter((x) => Number.isFinite(x.rpe) && x.rpe > 0 && Number.isFinite(x.iff) && Math.abs(x.iff - thisIF) <= 0.1);
             compCount = comps.length;
             if (comps.length >= 3) {
@@ -2800,6 +2825,7 @@ Deno.serve(withAlarm('analyze-cycling-workout', async (req) => {
       discipline: 'ride',
       glance: {
         status_label: typeof performance?.execution_score === 'number'
+          // OURS — execution 85 / 70 glance bands; no page, kept as found
           ? (performance.execution_score >= 85 ? 'Strong execution' : performance.execution_score >= 70 ? 'Solid execution' : 'Needs adjustment')
           : null,
         execution_score: typeof performance?.execution_score === 'number' ? performance.execution_score : null,
