@@ -75,6 +75,22 @@ set plan the server already sends (ramp + work sets) and pick each set's plates 
 plates are only added; say so when a target needs a swap. Presentation only, no new number, stays on the phone.
 Missing input: the athlete's own rack (a Baselines field if wanted). Not a build until the workorder is through.
 
+## QUEUED — ZONE 5 STARTS AT 105% OF THRESHOLD HEART RATE, FRIEL PRINTS 100% (filed 2026-09-16, WORKORDER §3b item 5; no change)
+
+The one run zone table (`src/lib/friel-zones.ts` `Z5_FLOOR_PCT_LTHR = 1.05`) starts zone 5 at 105% of
+threshold heart rate and ends zone 4 one beat below it. Its own receipt, TrainingPeaks' "A Quick Guide to
+Setting Zones" for Friel, prints Z4 threshold 95–99% and Z5 100%+; the file's comment says the 0.95 / 1.05
+cuts are pre-existing and kept deliberately. Every reader of the table (zone rows on Profile, the run
+analyser's bins, the facts bins) moves together if it changes, and stored run analyses would need a
+recalculation to re-bin.
+
+## QUEUED — THE RUN ANALYSER TAKES ONE MORE BEAT OFF A STORED ZONE 1 (filed 2026-09-16, WORKORDER §3b item 5; no change)
+
+`analyze-running-workout/index.ts` Priority 1 (the athlete's `configured_hr_zones.zones`) reads zone 1's
+top as `zones[0].max − 1`, while zones 2–4 are read as stored. When the stored table was written from
+`frielRunZones` (whose zone 1 top is already the beat below zone 2), a zone-1 beat is binned as zone 2.
+Not traced: which writers fill `configured_hr_zones.zones` and whether each already takes the beat off.
+
 ## ⏳ AWAITING MICHAEL — 2026-09-14 (look pass: sunrise on Home, space background on four screens — PUSHED, iOS synced, NOT device-checked)
 
 main = `ce546cd8`. No server functions touched. iOS synced from `ce546cd8`. Seen in the local browser only.
