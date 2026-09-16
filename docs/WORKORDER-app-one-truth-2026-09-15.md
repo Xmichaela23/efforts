@@ -165,6 +165,9 @@ each number equals the one server value, same on every screen. Report a table: n
 - **Every athlete-facing line** goes to Michael word for word first.
 - **Test on throwaway accounts**, created and deleted by script, with more than one data source. Never write
   to Michael's data by hand; read-only reads of his account only with his go-ahead.
+- **Recalculate the last 16 weeks, not the whole history** (Michael, 2026-09-16: "we just need the last 12 weeks
+  tops"; 16 because the run-threshold fit reads 16 weeks of best efforts and every other State window is shorter).
+  A recalculation names its window and its count in the report.
 - **Do not tune** to Michael's runs or to a number another app shows.
 - **Talk plain:** what he would see, no function names unless asked, no idioms.
 - **Report state precisely:** pushed · deployed · recalculated · checked on a phone.
