@@ -30,7 +30,8 @@
  *      reused verbatim. 'manual' + a manual value wins over even high-confidence learned; 'learned' SKIPS
  *      the manual tier so a declined typed number can't resurface when the learner thins out.
  *   1. learned  run_threshold_hr   (confidence medium/high AND sample_count > 0)      <- MEASURED
- *   2. manual / configured (typed in Baselines)                                        <- an ASSERTION
+ *   2. manual / configured — the sport's OWN typed field (`manual_run_lthr` / `manual_ride_lthr`),
+ *      never the sport-agnostic `threshold_heart_rate` (2026-09-15, §8.0 #23) <- an ASSERTION
  *   3. learned-low  (learned, any confidence, still sample_count > 0)
  *   4. device  (per-workout workouts.threshold_heart_rate, passed by workout-aware callers) <- lowest, provenance unknown
  *   5. null                                                                            <- SAY SO. Never 220-age. Never invent (Law 2).
@@ -93,15 +94,17 @@ export type BaselinesLike = {
      * 5-10 bpm above cycling at the same effort (the same fact Q-169 fixed in the easy band), so it
      * anchors every run zone too low.
      *
-     * ⚠️ THE RESIDUAL LEAK IS NOT CLOSED, DELIBERATELY. Preferring the run key fixes it whenever the
-     * athlete typed one. When they did not, `threshold_heart_rate` may still be a bike number and
-     * this resolver cannot tell — the field carries no sport. Closing that needs the WRITER to stop
-     * collapsing two sports into one key, which is a change to `TrainingBaselines`, not a detector
-     * bolted on here. Recorded rather than guessed at.
+     * ⛔ CLOSED 2026-09-15 (TRUTH-MAP §8.0 #23): NEITHER SPORT READS THE AGNOSTIC KEY NOW. The field
+     * carries no sport, so a run read could not tell a run number from a borrowed bike one — and the
+     * two screens disagreed because they fed this resolver different objects. Each sport reads its own
+     * typed field. `threshold_heart_rate` is still written (`save-baselines/derive.ts`, and only when
+     * one sport has a value) and still read by the analysers that ask for "whatever threshold there is";
+     * it is no longer a tier in this chain.
      */
     manual_run_lthr?: number | string | null;
     /** The bike's own typed override, written beside the run one by `TrainingBaselines.tsx:718`. */
     manual_ride_lthr?: number | string | null;
+    /** Sport-agnostic, written as run ‖ ride. Kept on the type for callers that pass the stored row; not a tier. */
     threshold_heart_rate?: number | string | null;
     source?: string | null;
   } | null;
@@ -176,15 +179,22 @@ export function resolveCurrentLthr(baselines: BaselinesLike, opts?: LthrResolveO
    * that is empty the honest answer is to fall through to the learned ride value, not to borrow the
    * run's.
    *
-   * ⚠️ The residual run-side leak (agnostic field holding a bike number when the athlete has no run
-   * one) is unchanged and still open — it needs the WRITER to stop collapsing two sports into one key.
+   * ⛔ THE RUN-SIDE LEAK IS CLOSED (2026-09-15, TRUTH-MAP §8.0 #23). The run chain used to end on
+   * `configured_hr_zones.threshold_heart_rate` — the field `save-baselines/derive.ts` writes as
+   * `runLthr || rideLthr`. An athlete with only a BIKE threshold typed therefore saw that bike number as
+   * their RUN threshold on Adjust (which passes the stored row) and not on Baselines (which passed a
+   * two-key object built from screen state): two screens, two numbers, for one fact. It also let an
+   * `is_estimate` learned value that this resolver had just refused come back in one tier lower wearing
+   * the word "manual". The run now reads its own typed field, exactly as the bike reads its own.
+   *
+   * ⚠️ `performance_numbers.threshold_heart_rate` STAYS. That one is a legacy RUN field — no current
+   * writer, but what is stored there is a run number, not a borrowed bike one.
    */
   const manualValue = isRide
     ? asPositiveFinite(baselines.configured_hr_zones?.manual_ride_lthr)
     : (asPositiveFinite(baselines.configured_hr_zones?.manual_run_lthr)
         ?? asPositiveFinite(pn?.threshold_heart_rate)
-        ?? asPositiveFinite(pn?.thresholdHeartRate)
-        ?? asPositiveFinite(baselines.configured_hr_zones?.threshold_heart_rate));
+        ?? asPositiveFinite(pn?.thresholdHeartRate));
 
   const deviceValue = asPositiveFinite(opts?.deviceThresholdHr);
 
