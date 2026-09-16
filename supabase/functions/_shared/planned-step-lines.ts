@@ -124,7 +124,9 @@ function targetText(s: PlannedStep, opts: StepLineOptions): string {
   const withRpe = (t: string) => (rpe ? `${t} · ${rpe}` : t);
   if (hr) return ` @ ${hr}${pace ? ` · ref ${pace}` : ''}`;
   if (pace) return withRpe(` @ ${pace}`);
-  if (isRecovery(s) && String(opts.sport || '').toLowerCase() === 'ride') return ' easy';
+  // ⛔ A RIDE'S RECOVERY PRINTS ITS WATTS WHEN IT CARRIES THEM (2026-09-16, Stage 7 session 3 — "a recovery step inside a
+  // hard run or ride prints the page's pace or power"). It printed " easy" ahead of the watts; " easy" is left for a
+  // recovery that carries no target at all (the last line below).
   if (pow) return withRpe(` @ ${pow}`);
   if (rpe) return ` @ ${rpe}`;
   return isRecovery(s) ? ' easy' : '';

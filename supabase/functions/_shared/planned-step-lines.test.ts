@@ -32,10 +32,13 @@ Deno.test('the last round may drop its recovery and still counts', () => {
   assertEquals(lines, ['3 × 5:00 @ 8:10–8:30/mi · RPE 8–10, 1:30 @ 8:33–9:41/mi between']);
 });
 
-Deno.test('a ride: watts, the floor-only "and up", and a spin with no range reads easy', () => {
+Deno.test('a ride: watts, the floor-only "and up", a spin prints its watts, and a spin with no range reads easy', () => {
   const work: PlannedStep = { kind: 'work', seconds: 30, powerRange: { lower: 202 } };
   const spin: PlannedStep = { kind: 'recovery', seconds: 270, powerRange: { lower: 80, upper: 110 } };
-  assertEquals(plannedStepLines([work, spin, work, spin, work, spin], { sport: 'ride' }), ['3 × 30 s @ 202 W and up, 4:30 easy between']);
+  // 2026-09-16: a recovery inside a hard ride prints the power it carries, not "easy".
+  assertEquals(plannedStepLines([work, spin, work, spin, work, spin], { sport: 'ride' }), ['3 × 30 s @ 202 W and up, 4:30 @ 80–110 W between']);
+  const bare: PlannedStep = { kind: 'recovery', seconds: 270 };
+  assertEquals(plannedStepLines([work, bare, work, bare, work, bare], { sport: 'ride' }), ['3 × 30 s @ 202 W and up, 4:30 easy between']);
 });
 
 Deno.test('a step that repeats nothing prints on its own line', () => {

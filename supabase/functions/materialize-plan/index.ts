@@ -702,10 +702,23 @@ export function stampRunPrescription(tok: string, steps: any[], baselines: Basel
   const isEasyToken = /^(warmup_run_|cooldown_run_|run_easy_|longrun_)/.test(t);
   const isThresholdToken = /^(cruise_|tempo_\d+(?:min|mi)_threshold)/.test(t);
   const isIntervalToken = /^(interval_|run_vo2_|round_|tempo_\d+(?:min|mi)_5kpace)/.test(t);
+  /**
+   * ⛔ A RECOVERY INSIDE A HARD RUN IS PRESCRIBED BY ITS PACE, NOT BY HEART RATE (Michael, 2026-09-16: "the break is
+   * the heart rate target"). Heart rate cannot fall from a threshold rep into zone 2 inside a minute, so the easy range
+   * is unreachable there. The step keeps the pace the page gives it (p231 "20 s @ 50%" → threshold ÷ 0.50; "@ VT1" →
+   * the easy pace, printed as the easy range). The heart-rate range stays on warm-ups, cool-downs, and the recoveries
+   * of an easy run (its strides).
+   */
+  const easySession = isEasyToken || /^strides_/.test(t);
   for (const s of steps) {
     if (!s || typeof s !== 'object') continue;
     const kind = String(s.kind ?? '');
     const atEasyPace = s.pace_sec_per_mi == null || (easyBand != null && s.pace_sec_per_mi === easyBand);
+    if (kind === 'recovery' && !easySession) {
+      const easyRange = (baselines as any)?._resolvedEasyRange as { lo: number; hi: number } | undefined;
+      if (easyRange && easyBand != null && s.pace_sec_per_mi === easyBand) s.pace_range = [easyRange.lo, easyRange.hi];
+      continue;
+    }
     const easyStep = kind === 'warmup' || kind === 'cooldown' || kind === 'recovery' || (isEasyToken && kind === 'work' && atEasyPace);
     if (easyStep) {
       s.prescription = 'heart_rate';

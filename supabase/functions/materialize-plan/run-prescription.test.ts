@@ -26,7 +26,7 @@ Deno.test('an easy run is prescribed by heart rate: every step carries the zone 
   }
 });
 
-Deno.test('threshold work carries effort 5–6 on the work steps and heart rate on the recoveries', () => {
+Deno.test('threshold work carries effort 5–6 on the work steps; its recoveries carry their pace, never the easy heart-rate range', () => {
   const steps = expand('cruise_4x1mi_threshold');
   const w = work(steps);
   assertEquals(w.length, 4);
@@ -37,7 +37,28 @@ Deno.test('threshold work carries effort 5–6 on the work steps and heart rate 
   }
   const rec = steps.filter((s) => s.kind === 'recovery');
   assert(rec.length > 0, 'cruise intervals carry recoveries');
-  for (const s of rec) assertEquals(s.hr_range, HR);
+  for (const s of rec) {
+    // Michael, 2026-09-16: "the break is the heart rate target" — heart rate cannot reach zone 2 inside a rep's rest.
+    assertEquals(s.hr_range, undefined);
+    assertEquals(s.prescription, undefined);
+    assert(Number(s.pace_sec_per_mi) > 0, 'the recovery keeps its pace');
+  }
+});
+
+Deno.test('a page percentage on a hard run\'s recovery travels as that pace (p231: 20 s @ 50% of threshold)', () => {
+  const steps = expand('round_3x_40s130-r20s50-40s130-r20s50_R120s');
+  const rec = steps.filter((s) => s.kind === 'recovery');
+  assert(rec.length > 0);
+  const half = rec.filter((s) => s.duration_s === 20);
+  assert(half.length > 0);
+  for (const s of half) {
+    assertEquals(s.pace_sec_per_mi, Math.round(450 / 0.5));
+    assertEquals(s.hr_range, undefined);
+  }
+});
+
+Deno.test('an easy run\'s strides keep heart rate on their recoveries', () => {
+  for (const s of expand('strides_6x20s').filter((x) => x.kind === 'recovery')) assertEquals(s.hr_range, HR);
 });
 
 Deno.test('intervals carry effort 8–10 on the work steps', () => {
@@ -90,7 +111,7 @@ Deno.test('v3 round-trip: prescription, hr_range and target_rpe reach computed.s
   const w = hard.filter((s) => s.kind === 'work');
   assertEquals(w.length, 4);
   for (const s of w) assertEquals(s.target_rpe, { lo: 5, hi: 6 });
-  for (const s of hard.filter((x) => x.kind === 'recovery')) assertEquals(s.hr_range, HR);
+  for (const s of hard.filter((x) => x.kind === 'recovery')) assertEquals(s.hr_range, undefined); // a hard run's rest carries its pace (2026-09-16)
 });
 
 Deno.test('D-478: an easy step priced at the easy pace shows the Friel range, not ±6% around one pace', () => {
