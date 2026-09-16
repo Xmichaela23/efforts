@@ -125,8 +125,9 @@ export function computeFitnessFatigue(
     form: r1(ctlPrior - atlPrior),             // freshness entering asOf (TSB, prior-day convention)
     fitness_prior: r1(ctlPrior),
     fatigue_prior: r1(atlPrior),
-    // §8.0 #31 — the ⓘ's equation, rounded here so it adds up on screen.
-    key_line: { fitness: Math.round(ctlPrior), fatigue: Math.round(atlPrior), form: Math.round(ctlPrior) - Math.round(atlPrior) },
+    // §8.0 #31 — the ⓘ's equation. Rounded from the 1-dp values every other read shows (so the operands are
+    // the fitness and fatigue the bar prints), and the form is their difference, so the line adds up.
+    key_line: { fitness: Math.round(r1(ctlPrior)), fatigue: Math.round(r1(atlPrior)), form: Math.round(r1(ctlPrior)) - Math.round(r1(atlPrior)) },
     provenance: prov(daysBetween(earliest, asOf) + 1),
   };
 }

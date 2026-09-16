@@ -100,5 +100,7 @@ Deno.test('§8.0 #31: the key line adds up as printed', () => {
   assertEquals(k.fitness - k.fatigue, k.form);
   assertEquals(k.fitness, Math.round(ff.fitness_prior!));
   assertEquals(k.fatigue, Math.round(ff.fatigue_prior!));
+  // And it agrees with the form the bar prints beside it (both whole numbers of the same 1-dp values).
+  assertEquals(k.form, Math.round(ff.fitness_prior!) - Math.round(ff.fatigue_prior!));
 });
 
