@@ -27,6 +27,11 @@ contradictions and their wrong approach … this needs to be the entire app."*
 5. **Guided by the data, not by Michael's numbers.** Rules are written for any athlete and tested on
    throwaway accounts with data from more than one source (Garmin and Strava shapes at minimum). Nothing is
    tuned to his runs or to a number another app shows him.
+7. **The device's number wins (Michael, 2026-09-15: "early models loved a fallback, or to make the phone do
+   something the device was already sending us").** If Garmin, Strava or the .fit file sent a summary value —
+   average heart rate, distance, moving time, elevation, lengths, average power — that is the value on every screen.
+   The app works one out only when none was sent, marks that path as the fallback, and never re-derives a number
+   the file carried. A fallback chain longer than "sent → computed" is a flag.
 6. **Plain on screen.** Every athlete-facing line goes to Michael word for word before it ships. No idioms,
    no imperatives, no "the book's".
 
