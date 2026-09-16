@@ -38,6 +38,8 @@ export type ZoneDef = { name: string; min: number; max: number };
 export interface HRZoneChartProps {
   samples?: HRSample[];              // time-ordered; t in seconds from start
   zoneDurationsSeconds?: number[];   // per-zone seconds [Z1..Z5]
+  /** 2026-09-16: each bin's share of the window (0–1), written on the server beside the bins. */
+  zoneShares?: number[];
   zones?: ZoneDef[];                 // explicit bpm zones (overrides everything)
 
   // Auto-zone helpers
@@ -83,6 +85,7 @@ const fmtTime = (sec: number) => {
 const HRZoneChart: React.FC<HRZoneChartProps> = ({
   samples = [],
   zoneDurationsSeconds,
+  zoneShares,
   zones,
   age,
   sex = "male",
@@ -158,13 +161,15 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
   // 2) Process samples or use provided durations
   const { zoneData, totalTime, avgHr, maxHr } = useMemo(() => {
     if (zoneDurationsSeconds && zoneDurationsSeconds.length > 0) {
-      // Use provided durations
+      // ⛔ THE SHARE OF EACH BIN IS THE SERVER'S (2026-09-16, Stage 4 session 3) — `zoneShares`, written
+      // beside the bins in `display_metrics.zones`. This divided each bin by the sum in the render.
+      // The total stays a sum of the same bins: it is the chart's own scale, not a printed number.
       const total = zoneDurationsSeconds.reduce((a, b) => a + b, 0);
       // Include ALL zones (even with 0 duration) so the chart shows all zones
       const zoneData = zoneDurationsSeconds.map((duration, i) => ({
         zone: zoneDefs[i]?.name || `Zone ${i + 1}`,
         duration,
-        percentage: total > 0 ? duration / total : 0,
+        percentage: zoneShares?.[i] ?? 0,
         color: colors[i % colors.length],
         zoneIndex: i, // Store original index for zoneDefs lookup
       }));

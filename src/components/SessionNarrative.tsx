@@ -75,7 +75,11 @@ interface SessionNarrativeProps {
       current_phase: string | null;
     } | null;
     summary?: { title?: string; bullets?: string[] };
-    completed_totals?: { duration_s?: number | null; distance_m?: number | null };
+    completed_totals?: {
+      duration_s?: number | null; distance_m?: number | null;
+      /** 2026-09-16: the header line's distance and clock, in the athlete's own unit. */
+      distance_display?: string | null; duration_display?: string | null;
+    };
     weather?: { temperature_f?: number | null; display?: string | null } | null;
     /** Trainer, treadmill, virtual — the server's one indoor predicate. */
     indoor?: boolean;
@@ -345,22 +349,18 @@ export default function SessionNarrative({
         // distance/duration from session_detail_v1.completed_totals; temperature
         // from session_detail_v1.weather (workouts.weather_data, same source as
         // the Details tab).
-        const distM = sd?.completed_totals?.distance_m;
-        const durS = sd?.completed_totals?.duration_s;
+        // ⛔ THE DISTANCE AND THE CLOCK ARE THE SERVER'S (2026-09-16, Stage 4 session 3). This divided
+        // metres by 1609.34 with NO metric branch, so a metric athlete read miles, and split the same
+        // seconds into m:ss while the Duration chip rounded them to whole minutes two files away.
+        const distDisplay = sd?.completed_totals?.distance_display ?? null;
+        const durDisplay = sd?.completed_totals?.duration_display ?? null;
         // The server composes the temperature string (start → end when it moved). `temperature_f` is
         // the fallback for a session built before `display` existed.
         const tDisplay = sd?.weather?.display
           ?? (typeof sd?.weather?.temperature_f === 'number' ? `${sd.weather.temperature_f}°F` : null);
         const parts: string[] = [];
-        if (typeof distM === 'number' && distM > 0) parts.push(`${(distM / 1609.34).toFixed(1)} mi`);
-        if (typeof durS === 'number' && durS > 0) {
-          const h = Math.floor(durS / 3600);
-          const m = Math.floor((durS % 3600) / 60);
-          const s = Math.round(durS % 60);
-          parts.push(h > 0
-            ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-            : `${m}:${String(s).padStart(2, '0')}`);
-        }
+        if (distDisplay) parts.push(distDisplay);
+        if (durDisplay) parts.push(durDisplay);
         if (tDisplay) parts.push(tDisplay);
         // ⛔ "INDOOR" ON THE HEADER LINE (2026-09-12, Michael: "can we clarify when rides are done on a
         // trainer? assuming I will see terrain and temp on an outdoor ride"). Garmin's and Strava's own

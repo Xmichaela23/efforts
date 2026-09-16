@@ -1,7 +1,12 @@
 import { useMemo } from 'react';
-import { getDistanceMeters, getElapsedSeconds, computeDistanceKm } from '../utils/workoutDataDerivation';
 
 export type WorkoutDataNormalized = {
+  /** 2026-09-16: the distance in the athlete's own unit, written on the server. */
+  distance_display?: string | null;
+  /** 2026-09-16: the swim's average stroke rate, averaged on the server. */
+  avg_swim_cadence_spm?: number | null;
+  /** 2026-09-16: the analyser's zone bins with each one's share of the window written beside it. */
+  zones?: unknown;
   distance_m: number | null;
   distance_km: number | null;
   duration_s: number | null;
@@ -69,85 +74,22 @@ export const useWorkoutData = (workoutData: any): WorkoutDataNormalized => {
         pct_time_pedaling: (dm as WorkoutDataNormalized).pct_time_pedaling ?? null,
       } as WorkoutDataNormalized;
     }
-    const distance_m = getDistanceMeters(workoutData);
-    const distance_km = computeDistanceKm(workoutData);
-    // ⛔ THE SERVER'S MOVING TIME (2026-09-10, audit H-D10): `moving_seconds` from workout-detail, read.
-    const duration_s = (() => {
-      const n = Number(workoutData?.moving_seconds);
-      return Number.isFinite(n) && n > 0 ? n : null;
-    })();
-    const elapsed_s = getElapsedSeconds(workoutData);
-    const elevation_gain_m = Number.isFinite(workoutData?.elevation_gain) ? Number(workoutData.elevation_gain) : null;
-    const avg_power = Number.isFinite(workoutData?.avg_power) ? Number(workoutData.avg_power) : (Number.isFinite(workoutData?.metrics?.avg_power) ? Number(workoutData.metrics.avg_power) : null);
-    const avg_hr = Number.isFinite(workoutData?.avg_heart_rate) ? Number(workoutData.avg_heart_rate) : (Number.isFinite(workoutData?.metrics?.avg_heart_rate) ? Number(workoutData.metrics.avg_heart_rate) : null);
-    const max_hr = Number.isFinite(workoutData?.max_heart_rate) ? Number(workoutData.max_heart_rate) : (Number.isFinite(workoutData?.metrics?.max_heart_rate) ? Number(workoutData.metrics.max_heart_rate) : null);
-    const max_power = Number.isFinite(workoutData?.max_power) ? Number(workoutData.max_power) : (Number.isFinite(workoutData?.metrics?.max_power) ? Number(workoutData.metrics.max_power) : null);
-    // Prefer metrics.avg_speed (already in km/h), fallback to root avg_speed (also km/h for Strava)
-    // Final fallback: calculate from distance and duration
-    const avg_speed_kmh = Number.isFinite(workoutData?.metrics?.avg_speed) ? Number(workoutData.metrics.avg_speed) 
-      : (Number.isFinite(workoutData?.avg_speed) ? Number(workoutData.avg_speed) 
-      : (distance_km && duration_s && duration_s > 0 ? (distance_km / (duration_s / 3600)) : null));
-    const avg_speed_mps = Number.isFinite(avg_speed_kmh) ? (avg_speed_kmh as number) / 3.6 : null;
-    // Calculate avg_pace - MUST use same source as Summary screen for consistency
-    // Summary uses computed.overall.avg_pace_s_per_mi, so Details should use the same
-    // Convert from per-mile to per-km: divide by 1.60934
-    // GRADE-ADJUSTED pace, straight from the server (never re-derived here — see the type above).
-    // The analyzer writes it as `avg_gap_s_per_mi`; `gap_pace_s_per_mi` is the older key on the same
-    // number. sec/MILE -> sec/KM, the same conversion avg_pace uses.
-    const _gapSecPerMi = Number(
-      workoutData?.computed?.overall?.avg_gap_s_per_mi
-      ?? workoutData?.computed?.overall?.gap_pace_s_per_mi,
-    );
-    const gap_pace_s_per_km = Number.isFinite(_gapSecPerMi) && _gapSecPerMi > 0
-      ? _gapSecPerMi / 1.60934
-      : null;
-    const avg_pace_s_per_km = Number.isFinite(workoutData?.computed?.overall?.avg_pace_s_per_mi)
-      ? Number(workoutData.computed.overall.avg_pace_s_per_mi) / 1.60934  // Convert mi to km
-      : (Number.isFinite(workoutData?.avg_pace) ? Number(workoutData.avg_pace) 
-      : (Number.isFinite(workoutData?.metrics?.avg_pace) ? Number(workoutData.metrics.avg_pace) 
-      : (avg_speed_kmh && avg_speed_kmh > 0 ? (3600 / avg_speed_kmh) : null)));
-    const avg_running_cadence_spm = Number.isFinite((workoutData as any)?.avg_cadence) ? Number((workoutData as any).avg_cadence) : (Number.isFinite((workoutData as any)?.avg_running_cadence) ? Number((workoutData as any).avg_running_cadence) : (Number.isFinite((workoutData as any)?.avg_run_cadence) ? Number((workoutData as any).avg_run_cadence) : null));
-    const avg_cycling_cadence_rpm = Number.isFinite((workoutData as any)?.avg_cadence) ? Number((workoutData as any).avg_cadence) : (Number.isFinite((workoutData as any)?.avg_bike_cadence) ? Number((workoutData as any).avg_bike_cadence) : (Number.isFinite((workoutData as any)?.metrics?.avg_bike_cadence) ? Number((workoutData as any).metrics.avg_bike_cadence) : null));
-    const calories = Number.isFinite(workoutData?.calories) ? Number(workoutData.calories) : (Number.isFinite(workoutData?.metrics?.calories) ? Number(workoutData.metrics.calories) : null);
-    
-    const max_speed_mps = Number.isFinite(workoutData?.computed?.analysis?.bests?.max_speed_mps)
-      ? Number(workoutData.computed.analysis.bests.max_speed_mps)
-      : Number.isFinite(workoutData?.computed?.overall?.max_speed_mps)
-      ? Number(workoutData.computed.overall.max_speed_mps)
-      : (Number.isFinite(workoutData?.max_speed) ? Number(workoutData.max_speed) / 3.6
-      : (Number.isFinite(workoutData?.metrics?.max_speed) ? Number(workoutData.metrics.max_speed) / 3.6
-      : null));
-    const max_cadence_rpm = Number.isFinite(workoutData?.max_cadence) ? Number(workoutData.max_cadence) : (Number.isFinite(workoutData?.max_cycling_cadence) ? Number(workoutData.max_cycling_cadence) : (Number.isFinite(workoutData?.max_running_cadence) ? Number(workoutData.max_running_cadence) : null));
-    // Use server-calculated max_pace from computed.analysis.bests (most accurate - from series data)
-    // Fallback to direct fields, then calculate from max_speed_mps (similar to avg_pace pattern)
-    const max_pace_s_per_km = Number.isFinite(workoutData?.computed?.analysis?.bests?.max_pace_s_per_km) 
-      ? Number(workoutData.computed.analysis.bests.max_pace_s_per_km)
-      : (Number.isFinite(workoutData?.metrics?.max_pace) ? Number(workoutData.metrics.max_pace) 
-      : (Number.isFinite(workoutData?.max_pace) ? Number(workoutData.max_pace) 
-      : (max_speed_mps && max_speed_mps > 0 ? (1000 / max_speed_mps) : null))); // Calculate from max_speed_mps
-    const work_kj = Number.isFinite(workoutData?.total_work) ? Number(workoutData.total_work) : null;
-    // Read from computed.analysis.power (server-calculated)
-    const powerMetrics = workoutData?.computed?.analysis?.power;
-    const normalized_power = Number.isFinite(powerMetrics?.normalized_power) ? Number(powerMetrics.normalized_power) : null;
-    const intensity_factor = Number.isFinite(powerMetrics?.intensity_factor) ? Number(powerMetrics.intensity_factor) : null;
-    const variability_index = Number.isFinite(powerMetrics?.variability_index) ? Number(powerMetrics.variability_index) : null;
-    const avg_power_pedaling_w = Number.isFinite(powerMetrics?.avg_power_pedaling_w) ? Number(powerMetrics.avg_power_pedaling_w) : null;
-    const pct_time_pedaling = Number.isFinite(powerMetrics?.pct_time_pedaling) ? Number(powerMetrics.pct_time_pedaling) : null;
-    
-    // Swim pace: PREFER the authoritative scalar (moving duration ÷ distance), matching the Performance
-    // tab (build.ts). computed.analysis.swim is sample-derived and can be stale/wrong — e.g. 3:03/100yd
-    // when the scalar truth is 2:00 — because the Layer-1 swim-pace correction reached facts/
-    // session_detail but NOT this computed.analysis block. Fall back to the stored value only when the
-    // scalar inputs are absent. (Only read for swims, so a meaningless value on run/ride is never shown.)
-    const swimMetrics = workoutData?.computed?.analysis?.swim;
-    const _swimScalarOk = !!(distance_m && duration_s && distance_m > 0 && duration_s > 0);
-    const _swimScalarPer100m = _swimScalarOk ? Math.round((duration_s as number) / ((distance_m as number) / 100)) : null;
-    const _swimScalarPer100yd = _swimScalarOk ? Math.round((duration_s as number) / (((distance_m as number) / 0.9144) / 100)) : null;
-    const avg_swim_pace_per_100m = _swimScalarPer100m ?? (Number.isFinite(swimMetrics?.avg_pace_per_100m) ? Number(swimMetrics.avg_pace_per_100m) : null);
-    const avg_swim_pace_per_100yd = _swimScalarPer100yd ?? (Number.isFinite(swimMetrics?.avg_pace_per_100yd) ? Number(swimMetrics.avg_pace_per_100yd) : null);
-    
-    const sport = typeof workoutData?.type === 'string' ? String(workoutData.type).toLowerCase() : null;
-    const series = workoutData?.computed?.analysis?.series || null;
-    return { distance_m, distance_km, duration_s, elapsed_s, elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, gap_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, avg_power_pedaling_w, pct_time_pedaling, sport, series };
+    /**
+     * ⛔ THE PHONE'S OWN DERIVATION LADDER IS DELETED (2026-09-16, Stage 4 session 3).
+     *
+     * Everything below this point rebuilt `display_metrics` out of the raw row when the server had not
+     * sent one: distance from `computed.overall`, pace from the same, swim pace as duration ÷ distance,
+     * elapsed as `max(elapsed, moving)`, speed from distance ÷ hours. Same formulas as the server's, a
+     * second copy of every one.
+     *
+     * ⛔ IT COULD ONLY RUN FOR A MOMENT. `workout-detail` writes `display_metrics` on EVERY answer
+     * (`index.ts`, unconditional), and this hook has exactly one caller (`CompletedTab`), so the ladder
+     * was reachable only in the frame before the fetch returned. A number that is right for one frame
+     * and then replaced is not worth a second copy of the maths.
+     *
+     * ⚠️ WHAT CHANGES ON SCREEN: that frame now shows nothing in those slots instead of an
+     * approximation. Nothing after it changes.
+     */
+    return {} as WorkoutDataNormalized;
   }, [workoutData]);
 };

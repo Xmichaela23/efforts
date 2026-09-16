@@ -98,12 +98,9 @@ const fmtPaceYAxis = (secPerKm: number | null, useMi = true) => {
   if (s === 60) { m += 1; s = 0; }
   return `${m}:${String(s).padStart(2, "0")}`;
 };
-const fmtSpeed = (secPerKm: number | null, useMi = true) => {
-  if (secPerKm == null || !Number.isFinite(secPerKm) || secPerKm <= 0) return "—";
-  const kmPerH = 3600 / secPerKm;
-  const speed = useMi ? kmPerH * 0.621371 : kmPerH;
-  return `${speed.toFixed(1)} ${useMi ? "mph" : "km/h"}`;
-};
+// ⛔ `fmtSpeed` DELETED (2026-09-16, Stage 4 session 3). It turned a split's seconds-per-kilometre into
+// miles per hour in the render, with the unit picked here. Each split row carries `rate_display` now —
+// speed on a ride, pace on everything else — written in the athlete's own unit by the server.
 // Y-axis formatters with units (for chart labels)
 const fmtYAxis = (value: number, metric: string, workoutType: string = 'run', useMiles: boolean = true, useFeet: boolean = true): string => {
   if (!Number.isFinite(value)) return "—";
@@ -603,13 +600,17 @@ function EffortsViewerMapbox({
   
   // Memoize segments to prevent re-renders from clearing them
   const memoizedSegments = useMemo(() => {
+    // ⛔ THE SERVER'S LIST WHEN IT SENT ONE (2026-09-16) — each effort carries `show_overall_rank`, so
+    // the placing gate is decided once, not with a bare 10 in the render.
+    const fromServer = (workoutData as { display_metrics?: { segments?: { efforts?: unknown } } })?.display_metrics?.segments?.efforts;
+    if (Array.isArray(fromServer)) return fromServer as SegmentEffort[];
     try {
       const ach = workoutData?.achievements;
       if (!ach) return undefined;
       const parsed = typeof ach === 'string' ? JSON.parse(ach) : ach;
       return parsed?.segment_efforts as SegmentEffort[] | undefined;
     } catch { return undefined; }
-  }, [workoutData?.achievements]);
+  }, [workoutData]);
   
 
 
@@ -1033,6 +1034,11 @@ function EffortsViewerMapbox({
    * holds the cursor.
    */
   const splits: Split[] = useMemo(() => {
+    // ⛔ THE ROWS COME PICKED AND LABELLED (2026-09-16, Stage 4 session 3) — `display_metrics.splits`,
+    // the analyser's own rows, chosen by the athlete's unit, each carrying its finished pace or speed.
+    // This picked the unit here and turned the pace into miles per hour in the render below.
+    const fromServer = (workoutData as { display_metrics?: { splits?: unknown } })?.display_metrics?.splits;
+    if (Array.isArray(fromServer)) return fromServer as Split[];
     const ev = workoutData?.computed?.analysis?.events?.splits;
     const rows = useMiles ? ev?.mi : ev?.km;
     return Array.isArray(rows) ? rows : [];
@@ -1200,13 +1206,16 @@ function EffortsViewerMapbox({
           ) : (
             <WeatherDisplay 
               weather={weatherForHeader}
+              /* The two lines, composed on the server (2026-09-16) — this card wrote them itself. */
+              lines={(workoutData as { display_metrics?: { weather_lines?: { line1?: string | null; line2?: string | null } | null } })?.display_metrics?.weather_lines ?? null}
               loading={weatherLoadingEffective}
             />
           )}
           {/* PR count badge - tap to open PR card */}
           {(() => {
+            // ⛔ THE COUNT IS THE SERVER'S (2026-09-16) — `display_metrics.segments.pr_count`.
             const prSegments = memoizedSegments?.filter(s => s.pr_rank === 1) ?? [];
-            const prCount = prSegments.length;
+            const prCount = Number((workoutData as { display_metrics?: { segments?: { pr_count?: unknown } } })?.display_metrics?.segments?.pr_count ?? prSegments.length);
             if (prCount === 0) return null;
             return (
               <button
@@ -1573,7 +1582,9 @@ function EffortsViewerMapbox({
                   }
                 </span>
               )}
-              {selectedSegment.kom_rank && selectedSegment.kom_rank <= 10 && (
+              {/* ⛔ WHETHER THE OVERALL PLACING PRINTS IS THE SERVER'S CALL (2026-09-16) — the cut was a
+                  bare 10 here; it is OURS with a ledger row now. */}
+              {(selectedSegment as { show_overall_rank?: boolean }).show_overall_rank && selectedSegment.kom_rank && (
                 <span style={{ color: '#059669', fontWeight: 500 }}>
                   #{selectedSegment.kom_rank} overall
                 </span>
@@ -2050,7 +2061,7 @@ function EffortsViewerMapbox({
               <React.Fragment key={i}>
                 {cell(sp.n)}
                 {cell(Number.isFinite(sp.time_s as any) ? fmtTime(sp.time_s as number) : '—')}
-                {cell(workoutData?.type === 'ride' ? fmtSpeed(sp.avgPace_s_per_km, useMiles) : fmtPace(sp.avgPace_s_per_km, useMiles))}
+                {cell((sp as { rate_display?: string | null }).rate_display ?? '—')}
                 {cell(Number.isFinite(sp.avgHr_bpm as any) ? `${Math.round(sp.avgHr_bpm as number)} bpm` : '—')}
                 {cell(fmtPct(sp.avgGrade_pct))}
               </React.Fragment>

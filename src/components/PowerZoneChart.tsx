@@ -31,6 +31,8 @@ interface PowerZoneBin {
   t_s: number;  // Duration in seconds
   min: number;  // Zone min power (W)
   max: number;  // Zone max power (W)
+  /** 2026-09-16: this bin's share of the window (0–1), written on the server beside the bin. */
+  share?: number;
 }
 
 interface PowerZoneChartProps {
@@ -82,6 +84,8 @@ const PowerZoneChart: React.FC<PowerZoneChartProps> = ({
   const { zoneData, totalTime } = useMemo(() => {
     // Use new bins format if available (preferred)
     if (zoneBins && zoneBins.length > 0) {
+      // ⛔ THE SHARE IS THE SERVER'S (2026-09-16) — `share` on each bin. This divided by the sum here.
+      // The total stays a sum of the same bins: it is the chart's scale, not a printed number.
       const total = zoneBins.reduce((sum, bin) => sum + (Number(bin.t_s) || 0), 0);
       
       // Create array for all 7 zones (0-6), filling in missing ones with 0 duration
@@ -91,7 +95,7 @@ const PowerZoneChart: React.FC<PowerZoneChartProps> = ({
           zoneIndex: i,
           zone: POWER_ZONE_LABELS[i] || `Zone ${i + 1}`,
           duration: bin ? (Number(bin.t_s) || 0) : 0,
-          percentage: total > 0 ? ((bin ? (Number(bin.t_s) || 0) : 0) / total) : 0,
+          percentage: bin ? (Number((bin as { share?: unknown }).share) || 0) : 0,
           color: POWER_ZONE_COLORS[i] || POWER_ZONE_COLORS[POWER_ZONE_COLORS.length - 1],
           range: bin ? { min: Number(bin.min) || 0, max: Number(bin.max) || 0 } : undefined,
         };

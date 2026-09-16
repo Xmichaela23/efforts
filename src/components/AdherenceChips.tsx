@@ -16,6 +16,8 @@ interface AdherenceChipsProps {
       volume_ratio_pct?: number | null;
       easy_under_s?: number | null;
       easy_total_s?: number | null;
+      /** 2026-09-16: "22 of 35 min" — the Easy chip's line, rounded once, on the server. */
+      easy_line?: string | null;
       easy_ceiling_bpm?: number | null;
       easy_ceiling_anchor?: string | null;
       performance_assessment?: string | null;
@@ -25,6 +27,10 @@ interface AdherenceChipsProps {
     };
     display?: { show_adherence_chips?: boolean };
     completed_totals?: {
+      /** 2026-09-16: the same seconds as whole minutes, written once on the server. */
+      duration_minutes?: number | null;
+      /** 2026-09-16, swim: "5s/100yd faster" — the difference against plan, as a phrase. */
+      swim_pace_vs_plan_display?: string | null;
       duration_s?: number | null;
       distance_m?: number | null;
       avg_pace_s_per_mi?: number | null;
@@ -261,14 +267,17 @@ export default function AdherenceChips({
      * long stops reads short here for that reason alone, not for anything the athlete did.
      */
     const durationValue = (() => {
-      const done = sd.completed_totals?.duration_s ?? null;
-      const plan = sd.planned_totals?.duration_s ?? null;
-      if (done == null || plan == null || plan <= 0) {
+      // ⛔ THE MINUTES ARE THE SERVER'S (2026-09-16, Stage 4 session 3) — `duration_minutes`, the same
+      // seconds the header line above prints as a clock. This rounded them here while the header
+      // floored them there: at 2790 s one read 47 min and the other 46:30.
+      const done = sd.completed_totals?.duration_minutes ?? null;
+      const planS = sd.planned_totals?.duration_s ?? null;
+      if (done == null || planS == null || planS <= 0) {
         // No plan to compare against — the percentage is the only honest thing left, and if that is
         // absent too the chip does not render at all.
         return durationAdherence != null ? `${durationAdherence}%` : null;
       }
-      return `${Math.round(done / 60)} of ${Math.round(plan / 60)} min`;
+      return `${done} of ${Math.round(planS / 60)} min`;
     })();
 
     /** "22 of 35 min" — whole minutes, from the seconds the server measured.
@@ -287,9 +296,8 @@ export default function AdherenceChips({
      * moving State to tidy two chips.
      *
      * So: no measurement, no chip. The session shows Execution and Duration until it is recomputed. */
-    const easyValue = (easyUnderS != null && easyTotalS != null && easyTotalS > 0)
-      ? `${Math.round(easyUnderS / 60)} of ${Math.round(easyTotalS / 60)} min`
-      : null;
+    // ⛔ THE LINE IS THE SERVER'S (2026-09-16) — `easy_line`. This rounded both seconds here.
+    const easyValue = ex?.easy_line ?? null;
     const easySubtitle = easyCeilingBpm != null
       ? `under\u00a0${easyCeilingBpm}\u00a0bpm ${easyCeilingNote ?? ''}`.trim()
       : 'held easy';
@@ -318,42 +326,15 @@ export default function AdherenceChips({
       return lo === hi ? `usual\u00a0${lo}` : `usual\u00a0${lo}–${hi}`;
     })();
 
-    const fmtDeltaTime = (s: number) => {
-      const sign = s >= 0 ? '+' : '−';
-      const v = Math.abs(Math.round(s));
-      const m = Math.floor(v / 60);
-      const ss = v % 60;
-      return `${sign}${m}:${String(ss).padStart(2, '0')}`;
-    };
-
-    // D-084: absolute duration formatter for the Duration chip's secondary
-    // line. The adherence % already conveys "how close to plan" — the
-    // secondary line is more useful as the actual completed duration than
-    // as a +/− delta from plan. H:MM:SS when ≥ 1h, MM:SS otherwise.
-    const fmtDurAbs = (s: number) => {
-      const v = Math.max(0, Math.round(s));
-      const h = Math.floor(v / 3600);
-      const m = Math.floor((v % 3600) / 60);
-      const ss = v % 60;
-      return h > 0
-        ? `${h}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`
-        : `${m}:${String(ss).padStart(2, '0')}`;
-    };
+    // ⛔ `fmtDeltaTime` AND `fmtDurAbs` DELETED (2026-09-16, Stage 4 session 3) — both had ZERO call
+    // sites. The Duration chip's secondary line is the plan's, not a delta, and has been since D-084.
 
     // ── Swim (open water only) ───────────────────────────────────────────────
     if (isSwim && !isPoolSwim) {
-      const swimUnit = sd.planned_totals?.swim_unit || 'yd';
-      const plannedPer100 = sd.planned_totals?.swim_pace_per_100_s ?? null;
-      const executedPer100 = sd.completed_totals?.swim_pace_per_100_s ?? null;
-      const paceDeltaSec = (plannedPer100 != null && executedPer100 != null)
-        ? plannedPer100 - executedPer100 : null;
-      const fmtDeltaPer100 = (s: number) => {
-        const faster = s > 0;
-        const v = Math.abs(s);
-        const m = Math.floor(v / 60);
-        const ss = Math.round(v % 60);
-        return `${m ? `${m}m ` : ''}${ss}s/${swimUnit === 'yd' ? '100yd' : '100m'} ${faster ? 'faster' : 'slower'}`.trim();
-      };
+      // ⛔ THE DIFFERENCE AGAINST PLAN IS THE SERVER'S PHRASE (2026-09-16, Stage 4 session 3) —
+      // "5s/100yd faster". This subtracted the two paces, split the remainder and chose the word here,
+      // and it labelled the result with the PLAN's unit while the number came from the plan's too.
+      const paceDeltaText = sd.completed_totals?.swim_pace_vs_plan_display ?? null;
 
       return (
         <div className="w-full pt-1 pb-2">
@@ -361,7 +342,7 @@ export default function AdherenceChips({
           <div className={outerCls}>
             <div className={rowCls}>
               {chipText('Workload', loadValue, loadSubtitle)}
-              {chip('Pace', paceAdherence, paceDeltaSec != null ? fmtDeltaPer100(paceDeltaSec) : '—')}
+              {chip('Pace', paceAdherence, paceDeltaText ?? '—')}
               {chipText('Duration', durationValue, 'of plan')}
             </div>
           </div>

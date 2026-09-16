@@ -285,18 +285,19 @@ export default function StrengthCompareTable({ slots, completedWorkoutRaw, previ
                   const hasRirSignal = showRir && typeof s.rir === 'number';
                   if (!hasNumericContent && !hasQualitativeWeight && !hasRirSignal) return '—';
                   const rirTxt = showRir && typeof s.rir === 'number' ? ` (RIR ${s.rir})` : '';
+                  // ⛔ THE WEIGHT ARRIVES AS TEXT, IN THE ATHLETE'S OWN UNIT (2026-09-16, Stage 4 session 3).
+                  // This rounded the stored pounds and wrote "lb" beside them, so a metric account read
+                  // pounds labelled pounds. A planned set keeps `weight_display` (the plan's own words —
+                  // "bodyweight", a range); a performed one now carries the same field, converted.
                   const weightClause = (() => {
                     if (isBw) return '';
                     if (s.weight_display) return ` × ${s.weight_display}`;
-                    if (typeof s.weight === 'number' && s.weight > 0) return ` @ ${Math.round(s.weight)} lb`;
                     return '';
                   })();
                   // Band assist on dips / chin-ups / pull-ups is stored in `resistance_level` (D-351).
-                  const assistClause = (() => {
-                    const a = (s as any).resistance_level;
-                    const n = a != null && String(a).trim() !== '' && Number.isFinite(Number(a)) ? Number(a) : NaN;
-                    return n > 0 ? ` · −${Math.round(n)} lb assist` : '';
-                  })();
+                  const assistClause = (s as { assist_display?: string | null }).assist_display
+                    ? ` · −${(s as { assist_display?: string | null }).assist_display} assist`
+                    : '';
                   if (s.duration_seconds && s.duration_seconds > 0) {
                     return `${formatSeconds(s.duration_seconds)}${weightClause}${assistClause}${rirTxt}`;
                   }

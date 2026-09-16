@@ -16,6 +16,9 @@ type ChartPoint = {
   date: string;
   pace_s_per_km: number;
   same_effort_pace_s_per_km: number;
+  /** 2026-09-16: the same two paces in the ATHLETE's unit — what the chart plots and labels. */
+  pace_s_per_unit: number;
+  same_effort_pace_s_per_unit: number;
   hr: number;
   provenance: 'hr_aligned' | 'raw_pace_only';
   is_best_same: boolean;
@@ -38,28 +41,30 @@ export type SegmentVerdict = {
   };
   chart_points: ChartPoint[];
   runs_all_time: number;
+  /** 2026-09-16: 'per_km' / 'per_mi' — which unit `*_s_per_unit` on each point is written in. */
+  chart_unit?: 'per_km' | 'per_mi';
+  /** 2026-09-16: the fitted line's two endpoints, one per lens, in that same unit. */
+  chart_fit_same?: { start: number; end: number } | null;
+  chart_fit_pace?: { start: number; end: number } | null;
+  /** 2026-09-16: "last 6 months" — the window as a phrase; this divided window_days by 30 in the render. */
+  window_months_label?: string | null;
 };
 
-const paceLabel = (sPerKm: number) => {
-  const perMi = sPerKm * 1.60934;
-  const m = Math.floor(perMi / 60);
-  const sec = Math.round(perMi - m * 60);
-  return `${m}:${String(sec).padStart(2, '0')}`;
+/**
+ * ⛔ M:SS OF A NUMBER THAT IS ALREADY IN THE ATHLETE'S UNIT (2026-09-16, Stage 4 session 3). This
+ * multiplied every seconds-per-kilometre by 1.60934 with NO metric branch, so a metric athlete read
+ * minutes per mile on their own chart. Each point now carries `*_s_per_unit`, written by the server.
+ */
+const paceLabel = (secPerUnit: number) => {
+  const v = Math.max(0, Math.round(secPerUnit));
+  return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
 };
 const dayNum = (s: string) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 864e5;
 const monthLabel = (x: number) => new Date(x * 864e5).toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
 const dateLabel = (x: number) => new Date(x * 864e5).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
-function ols(xs: number[], ys: number[]) {
-  const n = xs.length;
-  if (!n) return { a: 0, b: 0 };
-  const mx = xs.reduce((a, b) => a + b, 0) / n;
-  const my = ys.reduce((a, b) => a + b, 0) / n;
-  let Sxx = 0, Sxy = 0;
-  for (let i = 0; i < n; i++) { Sxx += (xs[i] - mx) ** 2; Sxy += (xs[i] - mx) * (ys[i] - my); }
-  const b = Sxx ? Sxy / Sxx : 0;
-  return { a: my - b * mx, b };
-}
+// ⛔ THE FITTED LINE IS THE SERVER'S (2026-09-16) — `chart_fit_same` / `chart_fit_pace`, its two
+// endpoints, one per lens. This ran its own least squares over the points below.
 
 // State pill: NEUTRAL for the abstain / flat states (the restraint is the honesty); toned only when the
 // server reports a confident direction. Never invents a claim the flags don't carry.
@@ -71,15 +76,22 @@ const PILL: Record<string, { label: string; tone: string }> = {
   declining: { label: 'Slower at effort', tone: 'text-amber-300 bg-amber-500/15' },
 };
 
-function SegmentChart({ pts, metric, showSlope }: { pts: ChartPoint[]; metric: 'same' | 'pace'; showSlope: boolean }) {
+function SegmentChart({ pts, metric, showSlope, fitLine }: {
+  pts: ChartPoint[]; metric: 'same' | 'pace'; showSlope: boolean;
+  /** The server's fitted line for THIS lens — its two endpoints, in the athlete's own unit. */
+  fitLine?: { start: number; end: number } | null;
+}) {
   const [tap, setTap] = useState<number | null>(null);
   const W = 340, H = 176, mL = 44, mR = 12, mT = 12, mB = 22;
-  const valOf = (p: ChartPoint) => (metric === 'same' ? p.same_effort_pace_s_per_km : p.pace_s_per_km);
+  // ⛔ THE POINTS ARE ALREADY IN THE ATHLETE'S UNIT (2026-09-16) — `*_s_per_unit`, written by the server,
+  // so the geometry, the axis labels and the tap readout all sit on the number that is printed. The
+  // `*_s_per_km` fields stay on the payload and nothing here reads them.
+  const valOf = (p: ChartPoint) => (metric === 'same' ? p.same_effort_pace_s_per_unit : p.pace_s_per_unit);
   const isBestOf = (p: ChartPoint) => (metric === 'same' ? p.is_best_same : p.is_best_pace);
   const xs = pts.map((p) => dayNum(p.date));
   const x0 = Math.min(...xs), x1 = Math.max(...xs);
   // LOCKED y-range across BOTH lenses — flipping Same-effort/Pace must not rescale the axis.
-  const allY = pts.flatMap((p) => [p.same_effort_pace_s_per_km, p.pace_s_per_km]);
+  const allY = pts.flatMap((p) => [p.same_effort_pace_s_per_unit, p.pace_s_per_unit]);
   let lo = Math.min(...allY), hi = Math.max(...allY);
   const pad = (hi - lo) * 0.14 || 1; lo -= pad; hi += pad;
   const px = (x: number) => mL + (x1 === x0 ? 0 : (x - x0) / (x1 - x0)) * (W - mL - mR);
@@ -92,9 +104,8 @@ function SegmentChart({ pts, metric, showSlope }: { pts: ChartPoint[]; metric: '
     const p = pts.find((pp) => pp.date.slice(0, 7) === mo)!;
     return { x: Math.min(Math.max(px(dayNum(p.date)), mL + 6), W - mR - 6), label: monthLabel(dayNum(p.date)) };
   });
-  // Trend line geometry ONLY when the server says show_slope. It fits over the server-sent points — it
-  // never windows or re-decides the verdict.
-  const fit = showSlope ? ols(xs, pts.map(valOf)) : null;
+  // Trend line geometry ONLY when the server says show_slope, and the line itself is the server's fit.
+  const fit = showSlope && fitLine ? fitLine : null;
   const tp = tap != null ? pts[tap] : null;
 
   return (
@@ -111,7 +122,7 @@ function SegmentChart({ pts, metric, showSlope }: { pts: ChartPoint[]; metric: '
         ))}
         {fit && (
           <line
-            x1={px(x0)} y1={py(fit.a + fit.b * x0)} x2={px(x1)} y2={py(fit.a + fit.b * x1)}
+            x1={px(x0)} y1={py(fit.start)} x2={px(x1)} y2={py(fit.end)}
             className="text-emerald-400" stroke="currentColor" strokeWidth={2} strokeLinecap="round" opacity={0.85}
           />
         )}
@@ -164,7 +175,8 @@ export function RouteDoorway({ verdict }: { verdict: SegmentVerdict | null | und
   const flags = verdict.render_flags;
   const pts = verdict.chart_points;
   const allTime = verdict.runs_all_time;
-  const months = Math.max(1, Math.round(v.window_days / 30));
+  // ⛔ THE WINDOW AS A PHRASE, FROM THE SERVER (2026-09-16) — this divided the days by 30 here.
+  const monthsLabel = verdict.window_months_label ?? null;
   const pill = PILL[v.direction] ?? PILL.still_learning;
 
   return (
@@ -194,7 +206,7 @@ export function RouteDoorway({ verdict }: { verdict: SegmentVerdict | null | und
             <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-3 text-[12.5px] text-gray-400 tabular-nums">
               <span><b className="text-gray-200 font-semibold">{v.n}</b> of {allTime} runs</span>
               <span className="text-gray-600">·</span>
-              <span>last <b className="text-gray-200 font-semibold">{months} months</b></span>
+              {monthsLabel && <span><b className="text-gray-200 font-semibold">{monthsLabel}</b></span>}
               {flags.show_pct && v.pct != null && (
                 <>
                   <span className="text-gray-600">·</span>
@@ -221,7 +233,12 @@ export function RouteDoorway({ verdict }: { verdict: SegmentVerdict | null | und
                 ))}
               </div>
             </div>
-            <SegmentChart pts={pts} metric={metric} showSlope={flags.show_slope} />
+            <SegmentChart
+              pts={pts}
+              metric={metric}
+              showSlope={flags.show_slope}
+              fitLine={metric === 'same' ? (verdict.chart_fit_same ?? null) : (verdict.chart_fit_pace ?? null)}
+            />
           </div>
 
           {/* Honesty line — kept verbatim. */}

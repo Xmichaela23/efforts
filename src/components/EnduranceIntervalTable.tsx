@@ -18,6 +18,10 @@ type IntervalRow = {
   planned_power_range?: { lower_w: number; upper_w: number };
   planned_pace_display?: string | null;
   executed: {
+    /** 2026-09-16: the printed forms, written on the server in the athlete's own unit. */
+    pace_display?: string | null;
+    gap_display?: string | null;
+    distance_display?: string | null;
     duration_s: number | null;
     distance_m: number | null;
     avg_hr: number | null;
@@ -168,32 +172,20 @@ export default function EnduranceIntervalTable({
     [allIntervals],
   );
 
+  /**
+   * ⛔ WHICH ROWS OPEN IS THE SERVER'S CALL (2026-09-16, Stage 4 session 3) — `print_by_default` on each
+   * interval. This applied the rule here with two bare numbers of its own: a long block over fifteen
+   * minutes, every other row under two. Both are on the contract now, marked ours with ledger rows.
+   * ⚠️ A contract written before this version carries the flag on no row, so every row prints — the
+   * safe reading, and the same thing an interval session has always shown.
+   */
   const visibleIntervals = useMemo(() => {
     if (showAllIntervals) return allIntervals;
-    if (!isEasyLike || allIntervals.length <= 2) return allIntervals;
+    const marked = allIntervals.filter((iv) => (iv as { print_by_default?: boolean }).print_by_default === true);
+    return marked.length > 0 ? marked : allIntervals;
+  }, [allIntervals, showAllIntervals]);
 
-    const BIG_S = 900;
-    const MICRO_S = 120;
-    const big = allIntervals.filter((iv) => {
-      const d = iv.executed.duration_s;
-      return d != null && d >= BIG_S;
-    });
-    const nonBig = allIntervals.filter((iv) => {
-      const d = iv.executed.duration_s;
-      return d == null || d < BIG_S;
-    });
-    const allNonBigAreMicro = nonBig.length > 0 && nonBig.every((iv) => {
-      const d = iv.executed.duration_s;
-      return d != null && d < MICRO_S;
-    });
-
-    if (big.length >= 1 && allNonBigAreMicro) {
-      return [big.sort((a, b) => (b.executed.duration_s ?? 0) - (a.executed.duration_s ?? 0))[0]];
-    }
-    return allIntervals;
-  }, [allIntervals, isEasyLike, showAllIntervals]);
-
-  const canToggleStrides = isEasyLike && allIntervals.length > 2 && visibleIntervals.length < allIntervals.length;
+  const canToggleStrides = visibleIntervals.length < allIntervals.length;
 
   if (!hasSessionDetail || !sd) return null;
 
@@ -318,9 +310,11 @@ export default function EnduranceIntervalTable({
             const paceCellSec = showGapPace
               ? iv.executed.actual_gap_sec_per_mi
               : iv.executed.actual_pace_sec_per_mi;
+            // ⛔ THE PACE CELL IS THE SERVER'S TEXT (2026-09-16) — `pace_display` / `gap_display`, in
+            // the athlete's own unit. This printed "/mi" on every account.
             const execCell = isRide
               ? (iv.executed.power_watts != null ? `${Math.round(iv.executed.power_watts)} W` : '—')
-              : fmtPaceSec(paceCellSec);
+              : ((showGapPace ? iv.executed.gap_display : iv.executed.pace_display) ?? '—');
             // Against the planned band, Garmin's colours (Michael 2026-09-03 read blue as slower, and Garmin
             // agrees): green in the target, blue BELOW it (slower / fewer watts), red ABOVE it (faster / more).
             // ⛔ THE SERVER DECIDES WHERE THE ACTUAL SITS (2026-09-10, audit H-D11) — `executed.band`, or
@@ -328,7 +322,7 @@ export default function EnduranceIntervalTable({
             // pace ±5 s are gone; a row the server did not band (no range, a goal race) is uncoloured.
             const band = showGapPace ? iv.executed.gap_band : iv.executed.band;
             const bandClass = band === 'below' ? 'text-sky-300' : band === 'above' ? 'text-red-400' : band === 'in' ? 'text-emerald-400' : '';
-            const distStr = fmtDist(iv.executed.distance_m, isSwim, useImperial);
+            const distStr = iv.executed.distance_display ?? '—';
             const durStr = iv.executed.duration_s != null && iv.executed.duration_s > 0
               ? fmtTime(iv.executed.duration_s) : '—';
             const hrVal = iv.executed.avg_hr != null && iv.executed.avg_hr > 0
@@ -443,8 +437,8 @@ function CompletedTotalsSegmentTable({
   isSwim: boolean;
   useImperial: boolean;
 }) {
-  const paceStr = fmtPaceSec(ct.avg_pace_s_per_mi ?? null);
-  const distStr = fmtDist(ct.distance_m ?? null, isSwim, useImperial);
+  const paceStr = (ct as { avg_pace_display?: string | null }).avg_pace_display ?? '—';
+  const distStr = (ct as { distance_display?: string | null }).distance_display ?? '—';
   const durStr = ct.duration_s ? fmtTime(ct.duration_s) : '—';
   const hrStr = ct.avg_hr ? String(Math.round(ct.avg_hr)) : '—';
   return (
@@ -500,8 +494,12 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
   const pt = sd.planned_totals;
   if (!ct) return null;
 
-  const swimUnit = pt?.swim_unit || 'yd';
-  const useYd = useImperial || swimUnit === 'yd';
+  // ⛔ THE PACE AND ITS UNIT ARE ONE SERVER FIELD (2026-09-16, §8.0 A4). The per-100 was computed in the
+  // PLAN's unit and labelled with the ATHLETE's, so a metric plan on an imperial account printed seconds
+  // per 100 METRES as "/100yd" — and the Details tab, reading its own field, printed the yards. Two tabs,
+  // two paces, one swim. `swim_pace_display` carries both, and Details reads the same field.
+  const paceUnitField = (ct as { swim_pace_unit?: string | null }).swim_pace_unit ?? null;
+  const useYd = paceUnitField ? paceUnitField === '100yd' : useImperial;
   const executedDurS = ct.duration_s ?? 0;
   const executedDistM = ct.distance_m ?? 0;
   const plannedDurS = pt?.duration_s ?? 0;
@@ -513,14 +511,17 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
   const timePct = ct.swim_duration_pct_of_plan ?? null;
   if (distPct == null && timePct == null && !(executedDistM > 0)) return null;
 
-  const fmtDistLocal = (m: number) => useYd ? `${Math.round(m / 0.9144)} yd` : `${Math.round(m)} m`;
+  // ⛔ THE TWO DISTANCES COME FINISHED (2026-09-16) — `distance_display` on each set of totals, written
+  // in the athlete's own unit. This converted metres to yards here, off a unit picked here.
+  const doneDistText = (ct as { distance_display?: string | null }).distance_display ?? null;
+  const planDistText = (pt as { distance_display?: string | null } | null | undefined)?.distance_display ?? null;
   const fmtTimeLocal = (s: number) => {
     const min = Math.floor(s / 60); const sec = Math.round(s % 60);
     return `${min}:${String(sec).padStart(2, '0')}`;
   };
 
-  const per100Unit = useYd ? 'yd' : 'm';
-  const pace100 = (ct as any).swim_pace_per_100_s as number | null | undefined;
+  // The whole pace line, unit and all, as the server wrote it.
+  const pace100Display = (ct as { swim_pace_display?: string | null }).swim_pace_display ?? null;
   const avgHr = (ct as any).avg_hr as number | null | undefined;
   const hrSeries = (sd as any)?.hr_series as number[] | null | undefined;
 
@@ -540,7 +541,7 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
   const metrics: Array<[string, string]> = [];
   // D-166 refinement: keep "2:00 /100yd" on one value line with "Pace" as the muted label beneath
   // (the unit was wrapping awkwardly under "Pace").
-  if (pace100 != null && pace100 > 0) metrics.push([`${formatSwimPace(pace100)} /100${per100Unit}`, 'Pace']);
+  if (pace100Display) metrics.push([pace100Display, 'Pace']);
   if (avgHr != null && avgHr > 0) metrics.push([`${Math.round(avgHr)}`, 'Avg HR']);
   // ⛔ THE POOL LABEL IS THE SERVER'S (2026-09-10, audit H-D13): `completed_totals.pool_display`, from the saved
   // unit. This called any pool from 20 to 26 m yards, so a 25 m pool read "27 yd".
@@ -572,10 +573,11 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
     const v = VERD[dt.verdict] || VERD.needs_data;
     const pct = dt.pct_change;
     // Sign by verdict so the number agrees with the arrow (D-160 verdictSignedPct rule).
-    const pctDisplay = pct == null ? null
-      : dt.verdict === 'improving' ? `+${Math.abs(pct)}%`
-      : dt.verdict === 'sliding' ? `−${Math.abs(pct)}%`
-      : `${pct > 0 ? '+' : ''}${pct}%`;
+    // ⛔ THE SIGNED CHANGE IS THE SERVER'S (2026-09-16, Stage 4 session 3) — `signed_pct`, the same
+    // `verdictSignedPct` rule State's rows read since 2026-09-15. D-160: the raw delta is negative when
+    // a lower-is-better metric improves, so the magnitude is signed by what the VERDICT means and the
+    // number and the arrow always agree. Three copies of that became one.
+    const pctDisplay = (dt as { signed_pct?: string | null }).signed_pct ?? null;
     return (
       <div className="flex items-baseline justify-center gap-1.5 text-[12px] mb-3">
         <span style={labelStyle}>{dt.discipline} trend</span>
@@ -607,7 +609,7 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
       {(executedDistM > 0 || executedDurS > 0) && (
         <div className="flex items-center justify-center gap-10 text-center mb-4">
           <div className="flex flex-col items-center">
-            <div className="text-2xl font-light text-gray-100" style={tnum}>{executedDistM > 0 ? fmtDistLocal(executedDistM) : '—'}</div>
+            <div className="text-2xl font-light text-gray-100" style={tnum}>{doneDistText ?? '—'}</div>
             <div className="text-[11px] mt-0.5" style={labelStyle}>Distance</div>
           </div>
           <div className="flex flex-col items-center">
@@ -657,12 +659,12 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <div className="text-[11px] mb-1" style={labelStyle}>Planned</div>
-            <div className="font-light text-gray-200" style={tnum}>{plannedDistM > 0 ? fmtDistLocal(plannedDistM) : '—'}</div>
+            <div className="font-light text-gray-200" style={tnum}>{planDistText ?? '—'}</div>
             <div className="text-gray-400" style={tnum}>{plannedDurS > 0 ? fmtTimeLocal(plannedDurS) : '—'}</div>
           </div>
           <div>
             <div className="text-[11px] mb-1" style={labelStyle}>Executed</div>
-            <div className="font-light text-gray-200" style={tnum}>{executedDistM > 0 ? fmtDistLocal(executedDistM) : '—'}</div>
+            <div className="font-light text-gray-200" style={tnum}>{doneDistText ?? '—'}</div>
             <div className="text-gray-400" style={tnum}>{executedDurS > 0 ? fmtTimeLocal(executedDurS) : '—'}</div>
           </div>
         </div>
@@ -673,17 +675,16 @@ function PoolSwimOverall({ sd, useImperial, swimExtras }: { sd: NonNullable<Endu
 
 // ── Formatting helpers ─────────────────────────────────────────────────────
 
+// ⛔ `fmtDist` DELETED (2026-09-16, Stage 4 session 3) — it divided by 1609.34, or by 0.9144 on a swim
+// off the athlete's setting. Every row and both totals carry `distance_display` now.
+//
+// ⚠️ `fmtPaceSec` SURVIVES FOR THE RACE BLOCK ONLY. The goal and projection paces below it belong to the
+// race path, which is PARKED (workorder §3a) and is not touched this session. Everything else on this
+// table reads `pace_display` / `gap_display` / `avg_pace_display`.
 function fmtPaceSec(s: number | null | undefined): string {
   if (s == null || !Number.isFinite(s) || s <= 0) return '—';
   const sec = Math.round(s);
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}/mi`;
-}
-
-function fmtDist(m: number | null | undefined, isSwim: boolean, useImperial: boolean): string {
-  if (m == null || !Number.isFinite(m) || m <= 0) return '—';
-  if (isSwim) return useImperial ? `${Math.round(m / 0.9144)} yd` : `${Math.round(m)} m`;
-  const mi = m / 1609.34;
-  return `${mi.toFixed(mi < 1 ? 2 : 1)} mi`;
 }
 
 /** The server's goal-race status word → its colour (audit H-D12). */

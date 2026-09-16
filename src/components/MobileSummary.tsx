@@ -41,10 +41,11 @@ function DisciplineTrendLine({ sd }: { sd: any }) {
   // a NEGATIVE delta, so the engine flips only the VERDICT — leaving "↑ improving  −34.6%" on screen,
   // which reads as a contradiction. The verdict already encodes good/bad; show the magnitude signed by
   // the verdict (improving → +, sliding → −) so the number and the arrow always agree.
-  const pctDisplay = pct == null ? null
-    : dt.verdict === 'improving' ? `+${Math.abs(pct)}%`
-    : dt.verdict === 'sliding' ? `−${Math.abs(pct)}%`
-    : `${pct > 0 ? '+' : ''}${pct}%`;
+  // ⛔ THE SIGNED CHANGE IS THE SERVER'S (2026-09-16, Stage 4 session 3) — `signed_pct`, the same
+  // `verdictSignedPct` rule State's rows read since 2026-09-15. D-160: the raw delta is negative when
+  // a lower-is-better metric improves, so the magnitude is signed by what the VERDICT means and the
+  // number and the arrow always agree. Three copies of that became one.
+  const pctDisplay = (dt as { signed_pct?: string | null }).signed_pct ?? null;
   return (
     <div className="flex items-baseline gap-1.5 py-1 text-[12px]">
       <span className="text-white/45">{dt.discipline} trend</span>

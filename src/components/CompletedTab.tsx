@@ -17,7 +17,6 @@ import HRZoneChart from './HRZoneChart';
 import PowerZoneChart from './PowerZoneChart';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase, getStoredUserId } from '../lib/supabase';
-import { computeDistanceKm } from '@/utils/workoutDataDerivation';
 import { readoutPlateStyle as readoutPlate, readoutValueStyle } from '@/lib/readout-plate';
 import { isVirtualActivity } from '@/utils/workoutNames';
 import { formatDuration, formatPace, formatElevation, formatDistance, formatSwimPace } from '@/utils/workoutFormatting';
@@ -869,173 +868,27 @@ const formatMaxSpeed = (speedValue: any): string => {
 
   /* removed legacy formatPoolLengthLabel */
 
-  const formatMetersCompact = (m: number | null | undefined): string => {
-    const n = Number(m);
-    if (!Number.isFinite(n) || n <= 0) return '—';
-    if (n >= 1000) return `${Math.round(n/10)/100} km`;
-    return `${Math.round(n)} m`;
-  };
 
-  const getSwimLengths = (): Array<{ distance_m?: number; duration_s?: number; strokes?: number }> => {
-    try {
-      const arr = (hydrated as any)?.swim_data?.lengths || (workoutData as any)?.swim_data?.lengths;
-      if (Array.isArray(arr)) return arr as any[];
-    } catch {}
-    return [];
-  };
-
-  const computeAvgStrokeRate = (): number | null => {
-    const v = Number((workoutData as any)?.avg_swim_cadence ?? (workoutData as any)?.avg_cadence);
-    if (Number.isFinite(v) && v > 0) return Math.round(v);
-    try {
-      const samples = Array.isArray((workoutData as any)?.sensor_data?.samples)
-        ? (workoutData as any).sensor_data.samples : (Array.isArray((workoutData as any)?.sensor_data) ? (workoutData as any).sensor_data : []);
-      const vals = samples.map((s:any)=> Number(s.swimCadenceInStrokesPerMinute ?? s.cadence)).filter((n:number)=> Number.isFinite(n) && n>0);
-      if (vals.length) return Math.round(vals.reduce((a:number,b:number)=>a+b,0)/vals.length);
-    } catch {}
-    return null;
-  };
-
-  const computeAvgStrokesPerLength = (): number | null => {
-    try {
-      const nLengths = Number((workoutData as any)?.number_of_active_lengths);
-      const totalStrokes = Number((workoutData as any)?.strokes ?? (workoutData as any)?.metrics?.strokes);
-      if (Number.isFinite(nLengths) && nLengths>0 && Number.isFinite(totalStrokes) && totalStrokes>0) {
-        return Math.round((totalStrokes / nLengths) * 10) / 10;
-      }
-      const lengths = getSwimLengths();
-      const strokes = lengths.map((l:any)=> Number(l?.strokes ?? l?.stroke_count)).filter((n:number)=> Number.isFinite(n));
-      if (strokes.length && lengths.length) return Math.round((strokes.reduce((a:number,b:number)=>a+b,0) / lengths.length) * 10) / 10;
-    } catch {}
-    return null;
-  };
-
-  type DetectedSet = { label: string; distance_m: number; pace_per100_s: number | null };
-
-  // Build fixed-distance splits at 100m or 100yd based on pool
-  const buildHundredSplits = (): Array<{ idx: number; duration_s: number; avg_hr: number | null; unit: 'm' | 'yd' }> => {
-    try {
-      const lengths = getSwimLengths();
-      if (!lengths.length) return [];
-      const Lm = Number(poolLengthMeters ?? (workoutData as any)?.pool_length) || 25; // default assumption
-      const isYd = Lm >= 20 && Lm <= 26; // Yard pools are typically 25 yards (~22.86m)
-      const unitLenM = isYd ? 91.44 : 100;
-      const perSplit = Math.max(1, Math.round(unitLenM / Lm));
-      const splits: Array<{ idx: number; duration_s: number; avg_hr: number | null; unit: 'm' | 'yd' }> = [];
-      let idx = 1;
-      for (let i = 0; i < lengths.length; i += perSplit) {
-        const chunk = lengths.slice(i, i + perSplit);
-        if (chunk.length < perSplit) break; // require full chunk for a clean split
-        let dur = 0;
-        let strokesSum: number | null = 0;
-        const hrVals: number[] = [];
-        for (const len of chunk) {
-          const t = Number((len as any)?.duration_s ?? (len as any)?.duration ?? 0);
-          dur += Number.isFinite(t) ? t : 0;
-          const st = Number((len as any)?.strokes ?? (len as any)?.stroke_count);
-          if (Number.isFinite(st)) strokesSum = (strokesSum as number) + st; else strokesSum = strokesSum;
-          const hr = Number((len as any)?.avg_heart_rate ?? (len as any)?.hr_bpm);
-          if (Number.isFinite(hr) && hr > 40 && hr < 230) hrVals.push(Math.round(hr));
-        }
-        const avgHr = hrVals.length ? Math.round(hrVals.reduce((a,b)=>a+b,0)/hrVals.length) : null;
-        splits.push({ idx: idx++, duration_s: Math.round(dur), avg_hr: avgHr, unit: isYd ? 'yd' : 'm' });
-      }
-      return splits;
-    } catch { return []; }
-  };
-  const detectSets = (): { summary: string[]; performance: DetectedSet[] } => {
-    const outSummary: string[] = [];
-    const outPerf: DetectedSet[] = [];
-    // Prefer laps if present
-    let laps: any[] = [];
-    try {
-      const raw = (hydrated as any)?.laps ?? (workoutData as any)?.laps;
-      if (typeof raw === 'string') { const j = JSON.parse(raw); if (Array.isArray(j)) laps = j; }
-      else if (Array.isArray(raw)) laps = raw;
-    } catch {}
-    if (laps.length > 0) {
-      const norm = laps.map((l:any)=>({
-        d: Number(l.totalDistanceInMeters ?? l.distanceInMeters ?? l.distance_m ?? l.distance ?? 0),
-        t: Number(l.durationInSeconds ?? l.duration_s ?? l.time ?? 0)
-      })).filter(x=> x.d>0 && x.t>0);
-      if (norm.length) {
-        // Identify repeats by most common lap distance
-        const counts: Record<string, number> = {};
-        for (const l of norm) { const key = String(Math.round(l.d/25)*25); counts[key] = (counts[key]||0)+1; }
-        const bestKey = Object.keys(counts).sort((a,b)=> counts[b]-counts[a])[0];
-        const mainD = Number(bestKey);
-        const main = norm.filter(l=> Math.abs(l.d - mainD) <= Math.max(10, mainD*0.05));
-        if (main.length>=3) {
-          const per100 = main.map(l=> (l.t/(l.d/100))).filter(Number.isFinite);
-          const avgPer100 = per100.length? (per100.reduce((a,b)=>a+b,0)/per100.length) : null;
-          const plusMinus = (()=>{
-            if (!per100.length || !avgPer100) return '±0s';
-            const dev = per100.reduce((a,b)=> a + Math.abs(b-avgPer100), 0)/per100.length;
-            return `±${Math.round(dev)}s`;
-          })();
-          outSummary.push(`Main: ${main.length}x${Math.round(mainD)}m - ${avgPer100?formatSwimPace(avgPer100):'—' } avg (${plusMinus} consistency)`);
-          let i=1; for (const l of main) {
-            const p100 = l.t/(l.d/100);
-            outPerf.push({ label: `${Math.round(mainD)}m #${i++}`, distance_m: l.d, pace_per100_s: p100 });
-          }
-        }
-        // Warmup = first lap if longer/slow; Cooldown = last lap if short
-        const first = norm[0];
-        if (first) {
-          const p100 = first.t/(first.d/100); outSummary.unshift(`Warmup: ${Math.round(first.d)}m - ${formatSwimPace(p100)}`);
-        }
-        const last = norm[norm.length-1];
-        if (last && last!==first) {
-          const p100 = last.t/(last.d/100); outSummary.push(`Cooldown: ${Math.round(last.d)}m - ${formatSwimPace(p100)}`);
-        }
-        return { summary: outSummary, performance: outPerf };
-      }
-    }
-    // Fallback: lengths
-    const lengths = getSwimLengths();
-    if (lengths.length) {
-      const L = (() => {
-        // Inline pool length inference (replaces inferPoolLengthMeters)
-        const explicit = Number(poolLengthMeters ?? (workoutData as any)?.pool_length);
-        if (Number.isFinite(explicit) && explicit > 0) return explicit;
-        const distM = norm.distance_m;
-        const nLengths = Number((workoutData as any)?.number_of_active_lengths) || (Array.isArray((workoutData as any)?.swim_data?.lengths) ? (workoutData as any).swim_data.lengths.length : 0);
-        if (distM && nLengths > 0) return distM / nLengths;
-        return 25;
-      })();
-      const total = lengths.reduce((a:number,l:any)=> a + Number(l?.distance_m ?? L), 0);
-      const dur = lengths.reduce((a:number,l:any)=> a + Number(l?.duration_s ?? l?.duration ?? 0), 0);
-      if (total>0 && dur>0) {
-        const p100 = dur/(total/100);
-        outSummary.push(`Main: ${formatMetersCompact(total)} - ${formatSwimPace(p100)}`);
-      }
-    }
-    return { summary: outSummary, performance: outPerf };
-  };
-
-  // Compute SWOLF (avg seconds per length + avg strokes per length)
-  const computeSwolf = (): number | null => {
-    try {
-      const nLengths = Number((workoutData as any)?.number_of_active_lengths) || (Array.isArray((workoutData as any)?.swim_data?.lengths) ? (workoutData as any).swim_data.lengths.length : 0);
-      const dur = Number(norm.duration_s);
-      if (!nLengths || !dur) return null;
-      let totalStrokes: number | null = null;
-      const s1 = Number((workoutData as any)?.strokes ?? (workoutData as any)?.metrics?.strokes);
-      if (Number.isFinite(s1) && s1 > 0) totalStrokes = Number(s1);
-      if (totalStrokes == null && Array.isArray((workoutData as any)?.swim_data?.lengths)) {
-        const arr = (workoutData as any).swim_data.lengths as any[];
-        const sum = arr
-          .map((l:any)=> Number(l?.strokes ?? l?.stroke_count))
-          .filter((n:any)=> Number.isFinite(n))
-          .reduce((a:number,b:number)=> a + Number(b), 0);
-        if (sum > 0) totalStrokes = sum;
-      }
-      const avgSecPerLen = dur / nLengths;
-      const avgStrokesPerLen = totalStrokes != null ? (totalStrokes / nLengths) : null;
-      const swolf = avgStrokesPerLen != null ? Math.round(avgSecPerLen + avgStrokesPerLen) : null;
-      return Number.isFinite(swolf as any) ? (swolf as number) : null;
-    } catch { return null; }
-  };
+  /**
+   * ⛔⛔ THE PHONE'S SWIM-LENGTHS ANALYSIS IS DELETED (2026-09-16, Stage 4 session 3).
+   *
+   * About a hundred and sixty lines sat here: `getSwimLengths`, `computeAvgStrokesPerLength`,
+   * `buildHundredSplits`, `detectSets` and `computeSwolf`. Between them they found the warm-up, the
+   * main set and the cool-down from the recording's lengths, worked out a pace per hundred for each,
+   * printed "±4s consistency", and computed SWOLF from strokes and seconds per length.
+   *
+   * ⛔ NONE OF IT WAS RENDERED. `detectSets`, `computeSwolf`, `computeAvgStrokesPerLength` and
+   * `buildHundredSplits` had ZERO call sites (grepped this session); only `computeAvgStrokeRate`
+   * below reached the screen, and that is now the server's.
+   * ⚠️ AND THE SERVER HAS NO TWIN. `analyze-swim-workout` reads `swim_data.swolf` and
+   * `swim_data.strokeRate` off the provider row; it detects no sets and computes no SWOLF (traced
+   * 2026-09-16). So nothing was moved and nothing is lost — this was unreachable code, not a
+   * capability. Set detection on the swim card would be a build, and it is not one that was asked for.
+   *
+   * ⛔ THE STROKE RATE IS THE ONE THAT SURVIVED, AND IT MOVED. It read the column and, when that was
+   * absent, averaged every `swimCadenceInStrokesPerMinute` sample in the recording inside the render.
+   * `display_metrics.avg_swim_cadence_spm` carries it now.
+   */
 
   // primaryMetrics removed; metrics are rendered directly where needed
 
@@ -1266,13 +1119,9 @@ const formatMovingTime = () => {
          {/* Distance */}
          <div className="px-0.5 pb-1">
            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
-             {(() => {
-               const src = (hydrated || workoutData);
-               const km = (computeDistanceKm(src) ?? Number((src as any)?.distance)) || 0;
-               const meters = Math.round(km * 1000);
-               if (!meters) return 'N/A';
-               return useImperial ? `${Math.round(meters / 0.9144)} yd` : `${meters} m`;
-             })()}
+             {/* ⛔ THE SWIM DISTANCE COMES FINISHED (2026-09-16) — `distance_display`, in the athlete's
+                 own unit. This rebuilt kilometres from the row and converted metres to yards here. */}
+             {norm.distance_display ?? 'N/A'}
            </div>
            <div className="text-xs font-light" style={metricLabelStyle}>Distance</div>
          </div>
@@ -1325,7 +1174,9 @@ const formatMovingTime = () => {
          {/* Avg stroke rate */}
          <div className="px-0.5 py-1">
            <div className="text-base font-light text-foreground mb-0.5" style={{ ...metricValueBaseStyle, fontFeatureSettings: '"tnum"' }}>
-             {(() => { const v = computeAvgStrokeRate(); return v != null ? String(v) : 'N/A'; })()}
+             {/* The server's average (2026-09-16) — this read the column and averaged the recording's
+                 stroke samples here when it was absent. */}
+             {norm.avg_swim_cadence_spm != null ? String(norm.avg_swim_cadence_spm) : 'N/A'}
            </div>
            <div className="text-xs font-light" style={metricLabelStyle}>Avg stroke rate</div>
          </div>
@@ -1991,8 +1842,12 @@ const formatMovingTime = () => {
 
       {/* Zones section (HR and Power) - render once */}
       {(() => {
-        const zonesHr = (hydrated||workoutData)?.computed?.analysis?.zones?.hr;
-        const zonesPower = (hydrated||workoutData)?.computed?.analysis?.zones?.power;
+        // ⛔ THE BINS COME WITH THEIR SHARES (2026-09-16, Stage 4 session 3) — `display_metrics.zones`,
+        // the analyser's own bins with each one's share of the window written beside it. Both charts
+        // divided a bin by the sum in their own render. A response without the field falls back to the
+        // raw bins and the charts draw no percentages, rather than working them out again.
+        const zonesHr = (norm as any)?.zones?.hr ?? (hydrated||workoutData)?.computed?.analysis?.zones?.hr;
+        const zonesPower = (norm as any)?.zones?.power ?? (hydrated||workoutData)?.computed?.analysis?.zones?.power;
         const hasHRZones = zonesHr?.bins?.length;
         const hasPowerZones = zonesPower?.bins?.length;
         const isRide = String(workoutData?.type || '').toLowerCase().includes('ride') || String(workoutData?.type || '').toLowerCase().includes('bike');
@@ -2006,6 +1861,7 @@ const formatMovingTime = () => {
               <div className="my-4">
                 <HRZoneChart
                   zoneDurationsSeconds={zonesHr.bins.map((b:any)=> Number(b.t_s)||0)}
+                  zoneShares={zonesHr.bins.map((b:any)=> Number(b.share)||0)}
                   zones={zonesHr.bins.map((b:any, i:number) => ({ name: `Zone ${i+1}`, min: Number(b.min)||0, max: Number(b.max)||0 }))}
                   avgHr={norm.avg_hr ?? undefined}
                   maxHr={norm.max_hr ?? undefined}
@@ -2022,7 +1878,8 @@ const formatMovingTime = () => {
                     i: Number(b.i) || 0,
                     t_s: Number(b.t_s) || 0,
                     min: Number(b.min) || 0,
-                    max: Number(b.max) || 0
+                    max: Number(b.max) || 0,
+                    share: Number(b.share) || 0,
                   }))}
                   avgPower={norm.avg_power ?? undefined}
                   maxPower={norm.max_power ?? undefined}
