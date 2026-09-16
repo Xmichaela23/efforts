@@ -1,6 +1,12 @@
-// Swim baseline re-test nudge (D-200 / D-201) — fires on the STATE screen after a real block of clean
-// swimming, prompting a CSS test to refresh the threshold benchmark. HONORED-swim-gated, not calendar:
+// Swim baseline re-test nudge — fires on the STATE screen after a real block of clean swimming,
+// prompting a CSS test to refresh the threshold benchmark. HONORED-swim-gated, not calendar:
 // re-testing only makes sense after consistent clean training. Pure (no I/O) so it's trivially testable.
+//
+// ⛔ IT RUNS ON THE SERVER (2026-09-15, Stage 4 session 2). `_shared/arc-context.ts` calls it over the
+// swim window and the baselines it already fetches, and sends State the finished sentence. It used to
+// run in the browser from `useSwimBaselineNudge`, which made two table queries of its own. The rule is
+// untouched; only its address changed. The file stays here because `src/lib/` bundles into each edge
+// function at deploy time.
 //
 // Reset is implicit: updating the threshold / logging a CSS test moves `lastUpdatedAt` forward, the
 // window resets, the nudge clears. Acting on it IS the dismiss — no separate dismiss bookkeeping.
@@ -24,6 +30,17 @@ export interface SwimNudgeResult {
 }
 
 const DAY = 86_400_000;
+/**
+ * ⛔ THE THREE GATES ARE OURS (marked 2026-09-15, Stage 4 session 2 — they carried no marker and no
+ * ledger row, and the "D-200" cited at the top of this file is not in DECISIONS-LOG; it lives in
+ * `docs/SPEC-intensity-baselines.md:162,226`). Searched: DECISIONS-LOG for D-200, STATE-SOURCES for
+ * "swim" / "nudge" / "honored" — no row for any of the three.
+ *
+ * A CSS re-test is worth asking for after a real block of clean swimming, not on a calendar: four
+ * weeks since the threshold was last set, four honored swims inside that time, and still swimming now.
+ * No commercial app publishes a re-test trigger for swim threshold — Garmin, TrainingPeaks and Swim
+ * Smooth all leave the CSS test to the athlete — so there is nothing to cite. docs/STATE-SOURCES.md.
+ */
 const WEEKS_MIN = 4;
 const HONORED_MIN = 4;
 const ACTIVE_WITHIN_DAYS = 10;

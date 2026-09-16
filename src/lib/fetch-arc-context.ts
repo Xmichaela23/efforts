@@ -7,6 +7,9 @@ export type ArcContextPayload = {
   recent_completed_events?: CompletedEvent[];
   longitudinal_signals?: LongitudinalSignalsPayload | null;
   readiness?: ArcReadiness | null;
+  /** ⛔ THE SWIM RE-TEST NUDGE, DECIDED AND WORDED ON THE SERVER (2026-09-15, Stage 4 session 2).
+   *  Null when the rule says nothing. It ran in the browser off two table queries of its own. */
+  swim_retest_nudge?: { sentence: string; honored_swims: number } | null;
   [k: string]: unknown;
 };
 

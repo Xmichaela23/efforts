@@ -31,6 +31,10 @@ import {
   resolveCurrentRunThresholdPace,
 } from '../../../src/lib/resolve-current-run-pace.ts';
 import { type StateTrendsV1 } from './state-trend/assemble.ts';
+// ⛔ THE SWIM RE-TEST RULE, UNCHANGED AND STILL ITS OWN FILE (2026-09-15, Stage 4 session 2). It ran in
+// the browser off two table queries of its own; it runs here over the swim window and the baselines this
+// context already fetched. `src/lib/` bundles into each edge function at deploy time.
+import { swimBaselineNudge } from '../../../src/lib/swimBaselineNudge.ts';
 
 /** JSON payload from `user_baselines.athlete_identity` */
 export type AthleteIdentity = Record<string, unknown>;
@@ -293,6 +297,20 @@ export interface ArcContext {
    */
   swim_training_from_workouts: SwimTrainingFromWorkouts | null;
 
+  /**
+   * ⛔ THE SWIM RE-TEST NUDGE (D-200 / D-201), DECIDED HERE SINCE 2026-09-15 (Stage 4 session 2).
+   *
+   * WHAT THIS REPLACED: `src/lib/swimBaselineNudge.ts` run from `useSwimBaselineNudge`, which made two
+   * table queries of its own from the State screen — seventy days of swims and the baselines row — ran
+   * the whole honored-swim rule in the browser and rounded the week count in the render. The rule is
+   * unchanged and still lives in that file; it runs here, over the swim window this context already
+   * fetched and the baselines it already parsed.
+   *
+   * Null when the athlete has no swim threshold on file, or the rule says nothing. `sentence` is the
+   * line the card prints, word for word.
+   */
+  swim_retest_nudge: { sentence: string; honored_swims: number } | null;
+
   /** Active (non-retired) shoes and bikes from `gear` — same source as the Gear screen. */
   gear: ArcGearSummary;
   /**
@@ -373,6 +391,7 @@ export function arcContextForFreshSetup(arc: ArcContext): ArcContext {
     state_trends_v1: null,
     fitness_verdict_divergence: null,
     swim_training_from_workouts: null,
+    swim_retest_nudge: null,
     active_plan: null,
     recent_completed_events: [],
     five_k_nudge: null,
@@ -1160,7 +1179,9 @@ export async function getArcContext(
       .order('target_date', { ascending: false }),
     supabase
       .from('workouts')
-      .select('date, type')
+      // ⛔ `workout_metadata` ADDED 2026-09-15 (Stage 4 session 2) for the swim re-test nudge, which ran
+      // its own 70-day query on the phone. This window already covers it and is already swim-only.
+      .select('date, type, workout_metadata')
       .eq('user_id', userId)
       .eq('workout_status', 'completed')
       .in('type', ['swim', 'swimming'])
@@ -1450,6 +1471,41 @@ export async function getArcContext(
     );
   }
 
+  /**
+   * ⛔ THE SWIM RE-TEST NUDGE, MOVED OFF THE PHONE AS-IS (2026-09-15, Stage 4 session 2).
+   *
+   * The rule is `swimBaselineNudge` — unchanged, still its own file, still pure. What moved is WHERE it
+   * runs: the State screen fetched seventy days of swims and the baselines row itself, ran this, and
+   * rounded the week count in the render. Both facts are already in hand here.
+   *
+   * ⚠️ "Last update" is the newer of the manual save stamp and any CSS-test write — the same two
+   * fields the hook read. No baseline on file → no nudge, which is the rule's own first gate.
+   */
+  const swim_retest_nudge: { sentence: string; honored_swims: number } | null = (() => {
+    if (swimWorkoutsRes?.error) return null;
+    const pn = performance_numbers as Record<string, unknown> | null;
+    const lf = learned_fitness as Record<string, unknown> | null;
+    const manualAt = (pn as { swimPace100_updated_at?: unknown } | null)?.swimPace100_updated_at ?? null;
+    const css = (lf as { swim_css_sec_per_100m?: Record<string, unknown> } | null)?.swim_css_sec_per_100m ?? null;
+    const testedAt = (css?.tested_at ?? css?.last_updated) ?? null;
+    const lastUpdatedAt = [manualAt, testedAt]
+      .filter((v): v is string => typeof v === 'string' && v.length > 0)
+      .sort()
+      .pop() ?? null;
+    const swims = ((swimWorkoutsRes?.data ?? []) as Array<Record<string, unknown>>).map((r) => {
+      const m = parseJsonObject(r?.workout_metadata) as { swam_as_planned?: unknown } | null;
+      return { date: typeof r?.date === 'string' ? r.date : null, swam_as_planned: m?.swam_as_planned as boolean | null | undefined };
+    });
+    const read = swimBaselineNudge({ swims, lastUpdatedAt, nowISO: new Date().toISOString() });
+    if (!read.show) return null;
+    // ⛔ THE LINE, WORD FOR WORD AS THE CARD PRINTED IT. The week count is rounded here; the card ran
+    // `Math.round` on a fraction of a week in the render.
+    return {
+      sentence: `About ${Math.round(read.weeksSince)} weeks of steady swimming since your last update — a quick CSS test would refresh your threshold.`,
+      honored_swims: read.honoredCount,
+    };
+  })();
+
   const sp = performance_numbers as Record<string, unknown> | null;
   if (sp && (sp['swimPace100'] != null || sp['swim_pace_100_yd'] != null)) {
     console.log('[getArcContext] performance_numbers swim (swimPace100 or swim_pace_100_yd):', sp['swimPace100'] ?? sp['swim_pace_100_yd']);
@@ -1520,6 +1576,7 @@ export async function getArcContext(
     fitness_verdict_divergence,
     athlete_memory,
     swim_training_from_workouts,
+    swim_retest_nudge,
     gear,
     run_pace_for_coach,
     user_id: userId,
