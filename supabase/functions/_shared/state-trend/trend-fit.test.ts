@@ -22,13 +22,40 @@ Deno.test('fit: start, end and weeks of the least-squares line — a hand-checke
 });
 
 Deno.test('fit: fewer than three usable points is "too few", with the count', () => {
-  assertEquals(fitTrend([]), { tooFew: true, n: 0 });
-  assertEquals(fitTrend([{ date: '2026-08-01', value: 1 }, { date: '2026-08-08', value: 2 }]), { tooFew: true, n: 2 });
-  assertEquals(fitTrend([{ date: '2026-08-01', value: 1 }, { date: '2026-08-08', value: Number.NaN }, { date: '2026-08-15', value: 2 }]), { tooFew: true, n: 2 });
+  // ⚠️ The chart's own facts ride on the "too few" outcome too (2026-09-15): a chart that cannot fit a
+  // line still prints "building · N of 12 weeks" and its low–high, so they must be here.
+  assertEquals(fitTrend([]), { tooFew: true, n: 0, spanWeeks: null, building: true, low: null, high: null });
+  assertEquals(
+    fitTrend([{ date: '2026-08-01', value: 1 }, { date: '2026-08-08', value: 2 }]),
+    { tooFew: true, n: 2, spanWeeks: 1, building: true, low: 1, high: 2 },
+  );
+  assertEquals(
+    fitTrend([{ date: '2026-08-01', value: 1 }, { date: '2026-08-08', value: Number.NaN }, { date: '2026-08-15', value: 2 }]),
+    { tooFew: true, n: 2, spanWeeks: 2, building: true, low: 1, high: 2 },
+  );
 });
 
 Deno.test('fit: every point on one day has no slope → too few', () => {
-  assertEquals(fitTrend([1, 2, 3].map((v) => ({ date: '2026-08-01', value: v }))), { tooFew: true, n: 3 });
+  assertEquals(
+    fitTrend([1, 2, 3].map((v) => ({ date: '2026-08-01', value: v }))),
+    { tooFew: true, n: 3, spanWeeks: 1, building: true, low: 1, high: 3 },
+  );
+});
+
+Deno.test('fit: the span, the building cut and the range come off the points', () => {
+  // Eleven weeks of readings clears the building cut; ten does not.
+  const eleven = fitTrend([
+    { date: '2026-01-01', value: 2 }, { date: '2026-02-01', value: 3 }, { date: '2026-03-19', value: 1 },
+  ]);
+  assertEquals(eleven.spanWeeks, 11);
+  assertEquals(eleven.building, false);
+  assertEquals(eleven.low, 1);
+  assertEquals(eleven.high, 3);
+  const ten = fitTrend([
+    { date: '2026-01-01', value: 2 }, { date: '2026-02-01', value: 3 }, { date: '2026-03-12', value: 1 },
+  ]);
+  assertEquals(ten.spanWeeks, 10);
+  assertEquals(ten.building, true);
 });
 
 Deno.test('fit: weeks is capped at the 12-week window and is at least 1', () => {
@@ -47,7 +74,7 @@ Deno.test('spine trends: the efficiency chart takes the sessions that count towa
     pt('2026-08-01'), pt('2026-08-08', { countsTowardTrend: false }), pt('2026-08-15', { efficiency: null }), pt('2026-08-22'),
   ]);
   assertEquals(efficiencyTrend.points.map((p) => p.date), ['2026-08-01', '2026-08-22']);
-  assertEquals(efficiencyTrend.fit, { tooFew: true, n: 2 });
+  assertEquals(efficiencyTrend.fit, { tooFew: true, n: 2, spanWeeks: 3, building: true, low: 1.5, high: 1.5 });
 });
 
 Deno.test('spine trends: the drift chart takes ratio reads only — no heart-rate-alone, withheld or interval day', () => {
@@ -65,4 +92,17 @@ Deno.test('spine trends: the drift chart takes ratio reads only — no heart-rat
     { date: '2026-08-01', value: 4 }, { date: '2026-08-02', value: 6 }, { date: '2026-08-08', value: 5 },
   ]);
   assert(!driftTrend.fit.tooFew && driftTrend.fit.n === 3);
+});
+
+Deno.test('spine trends: the left-out count and the heat flag are decided here, not on the screen', () => {
+  const t = spineTrends([
+    pt('2026-08-01', { tempF: 68 }),
+    pt('2026-08-08', { countsTowardTrend: false, tempF: 70 }),
+    pt('2026-08-15', { tempF: 71 }),
+  ]);
+  assertEquals(t.leftOutOfTrend, 1);
+  assertEquals(t.heatInWindow, false);
+  // Garmin's cut-off is 72 °F, and the boundary itself counts.
+  assertEquals(spineTrends([pt('2026-08-01', { tempF: 72 })]).heatInWindow, true);
+  assertEquals(spineTrends([pt('2026-08-01')]).heatInWindow, false);
 });

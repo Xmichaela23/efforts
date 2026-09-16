@@ -185,6 +185,29 @@ export interface StrengthPerLift {
    *  2026-09-10, H-S19). Null while the block is opening or when no reading carries a block week;
    *  0 = flat. Decided by `sinceBlockDelta` (`assemble.ts`). */
   sinceBlockDelta?: number | null;
+  /**
+   * ⛔ THE LIFT'S TILES, FINISHED (2026-09-15, Stage 4 session 2). The card rounded the numbers, hard-
+   * coded "lb" whatever unit the athlete reads in, and ran its OWN half-pound test to decide whether to
+   * show the record beside the latest — a second copy of the slack `isPr` above already uses.
+   *
+   * ⚠️ `best` IS ABSENT WHEN THE RECORD IS NOT WORTH SHOWING — when the latest reading IS the record,
+   * the PR tag above already says so and repeating the number reads as two different facts. Its
+   * presence is the decision; there is no separate flag to disagree with it.
+   * ⚠️ Every string is already in the athlete's own unit. Nothing here is converted on the phone.
+   */
+  readout?: {
+    /** e.g. "225 lb" / "102 kg". Null when the lift has no estimate. */
+    e1rm: string | null;
+    /** e.g. "240 lb". Null when the latest reading is the record, or there is no all-history read. */
+    best: string | null;
+    /** e.g. "135 lb × 10". Null when no all-out set is in the window. */
+    allOut: string | null;
+    /** 'lb' | 'kg' — what the tiles above are written in. */
+    unit: string;
+  } | null;
+  /** ⛔ THE PER-LIFT CHART'S OWN SPAN, RANGE AND BUILDING STATE (`trend-fit.ts`), over exactly the
+   *  points in `series`. The sparkline re-derived all three from the dots until 2026-09-15. */
+  seriesFit?: import('./trend-fit.ts').TrendFit | null;
 }
 
 /** Bridge the spine's per-lift e1RM `direction` (TrendVerdict) to the per-workout narrative's

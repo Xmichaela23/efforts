@@ -145,9 +145,24 @@ export function efficiencyIndexToSeries(
  *  The rows here carry the athlete's actual pace; median-of-five resists a single outlier. Returns
  *  null pace when the group has no run with a real pace — the caller then shows the count, never a
  *  reconstructed number. */
+/** ⛔ 1 mi in metres, by definition — the constant `save-baselines/zones.ts` converts paces with. */
+const SEC_PER_KM_TO_SEC_PER_MI = 1.609344;
+/**
+ * `M:SS` from seconds. ⛔ THE WHOLE PACE IS ROUNDED ONCE, then split — rounding the remainder on its
+ * own is what printed "7:60/mi" (§8.0 #2). Same rule as the one pace formatter.
+ */
+function paceClock(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
 export function recentGroupPaceHr(
   rows: ReadonlyArray<Record<string, unknown>> | null | undefined,
-): { recentPaceSecPerKm: number | null; recentHrAvg: number | null; paceIsGraded: boolean } {
+  /** ⛔ THE ATHLETE'S UNIT (2026-09-15, Stage 4 session 2). The State run row multiplied the server's
+   *  seconds-per-kilometre by 1.60934 on the phone and printed per mile — a unit pick on the screen.
+   *  Absent → imperial, which is today's behaviour for every account in production. */
+  metric = false,
+): { recentPaceSecPerKm: number | null; recentHrAvg: number | null; paceIsGraded: boolean; recentPaceDisplay: string | null } {
   const last5 = (Array.isArray(rows) ? rows : []).slice(-5);
   const median = (get: (r: Record<string, unknown>) => unknown): number => {
     const xs = last5.map((r) => Number(get(r) || 0)).filter((n) => n > 0).sort((a, b) => a - b);
@@ -159,7 +174,16 @@ export function recentGroupPaceHr(
   const hr = median((r) => r.hr);
   // pace_is_graded false when ANY of the last-five carried a raw (ungraded) pace — the row then flags it.
   const anyRaw = last5.some((r) => (r as any).pace_is_graded === false);
-  return { recentPaceSecPerKm: pace > 0 ? Math.round(pace) : null, recentHrAvg: hr > 0 ? Math.round(hr) : null, paceIsGraded: !anyRaw };
+  const secPerKm = pace > 0 ? Math.round(pace) : null;
+  return {
+    recentPaceSecPerKm: secPerKm,
+    recentHrAvg: hr > 0 ? Math.round(hr) : null,
+    paceIsGraded: !anyRaw,
+    // The pace as the row prints it, already in the athlete's own unit.
+    recentPaceDisplay: secPerKm == null
+      ? null
+      : `${paceClock(metric ? secPerKm : secPerKm * SEC_PER_KM_TO_SEC_PER_MI)}${metric ? '/km' : '/mi'}`,
+  };
 }
 
 
@@ -362,6 +386,7 @@ export interface RunFitness {
     sampleCount: number;
     newestAgeDays: number | null;
     recentPaceSecPerKm?: number | null;    // the "what": recent steady-run pace (grade-adjusted when available) — default display
+    recentPaceDisplay?: string | null;     // that pace as the row prints it, in the athlete's own unit (2026-09-15)
     paceIsGraded?: boolean;                // false when the recent pace was raw (a run with no elevation)
     recentGapPaceSecPerKm?: number | null; // grade-adjusted twin for the GAP toggle; null when any recent run lacks GAP
     recentHrAvg?: number | null;           // …at this heart rate — pace-at-HR in units the runner feels
@@ -413,6 +438,12 @@ export interface RunFitness {
        *  "easy 9:10/mi at 138" and "hard 7:20/mi at 158" on their own pools. */
       recentPaceSecPerKm?: number | null;
       recentHrAvg?: number | null;
+      /** False when the recent pace was raw (a run with no elevation) — the row flags it. Declared
+       *  2026-09-15: `recentGroupPaceHr` has always returned it and the type omitted it. */
+      paceIsGraded?: boolean;
+      /** That pace as the row prints it — "9:10/mi" / "5:42/km", already in the athlete's unit.
+       *  ⛔ The screen converted seconds-per-kilometre itself until 2026-09-15. */
+      recentPaceDisplay?: string | null;
     }>;
     /** 12-WEEK CHART series — the "long view" (Michael 2026-07-22). Same efficiency points the verdict
      *  reads, over a WIDER 84d window (verdict is 42d), so the chart's recent tail IS the verdict's data —

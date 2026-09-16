@@ -30,6 +30,9 @@
 export type LoadFitnessTrend = 'building' | 'holding' | 'fading';
 export type LoadFreshness = 'very_fresh' | 'fresh' | 'neutral' | 'working' | 'heavily_fatigued';
 
+// The recency line the row prints, written once (2026-09-15, Stage 4 session 2).
+import { recencyOf } from '../../../../src/lib/trend-receipt.ts';
+
 export interface LoadFloor {
   /** Current fitness (CTL) — 42-day weighted daily load, whole number. */
   ctl: number;
@@ -45,6 +48,9 @@ export interface LoadFloor {
    *  recency must not borrow the measurement signals' qualifying-rides-only stamp (which ignored a
    *  ride from yesterday while the load line counted it). Null when the caller didn't say. */
   newest_ride_age_days: number | null;
+  /** That age as the row prints it — "newest today" / "newest 2d ago". Null when the age is unknown.
+   *  ⛔ The bike card built this string itself until 2026-09-15 (Stage 4 session 2). */
+  newest_ride_recency_line?: string | null;
   /** CTL-over-time chart points, ascending, `recent` = within 56d of the newest point. Null when the
    *  caller passed no history (chart simply absent — never a substitute series). */
   series: Array<{ date: string; value: number; recent: boolean }> | null;
@@ -111,14 +117,16 @@ export function computeLoadFloor(inp: LoadFloorInput): LoadFloor | null {
       : 'holding';
   }
 
+  const newestRideAgeDays = inp.newestRideAgeDays == null || !Number.isFinite(Number(inp.newestRideAgeDays))
+    ? null : Math.max(0, Math.round(Number(inp.newestRideAgeDays)));
   return {
     ctl: Math.round(ctl),
     tsb: Math.round(tsb),
     fitness_trend: trend,
     ctl_delta_per_week: deltaPerWeek,
     freshness: freshnessFromTsb(Math.round(tsb)),
-    newest_ride_age_days: inp.newestRideAgeDays == null || !Number.isFinite(Number(inp.newestRideAgeDays))
-      ? null : Math.max(0, Math.round(Number(inp.newestRideAgeDays))),
+    newest_ride_age_days: newestRideAgeDays,
+    newest_ride_recency_line: recencyOf(newestRideAgeDays),
     series: buildLoadSeries(inp.series),
   };
 }

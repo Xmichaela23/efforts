@@ -3,6 +3,14 @@
 // 5 runs whose newest is 4 days old, so a real economy trend reads as a "now" claim (the 2026-07-02 RUN
 // incident). The receipt cites window + sample count + recency so the number is falsifiable at a glance.
 //
+// ⛔ THESE RUN ON THE SERVER NOW (2026-09-15, Stage 4 session 2). Every line below is athlete-facing text
+// built from a window in DAYS and a signed percentage — the State screen was its only caller and composed
+// each row as it drew it. `_shared/state-trend/discipline.ts` and `bike-fitness.ts` import this file and
+// put the finished strings on the payload; the screen prints them. The file stays here because the edge
+// functions bundle `src/lib/` at deploy time and already import several of its neighbours
+// (`estimate-1rm.ts`, `exercise-role.ts`, `tracked-max-lifts.ts`) — moving it would rewrite those imports
+// for no behaviour change, which is the same call made for the five resolvers on 2026-09-15.
+//
 // Pure/presentational: fields (verdict, pctChange, sampleCount, newestAgeDays) come from the spine
 // (classifyTrend → state_trends_v1). windowDays is the discipline constant (run 42, bike 56, swim 56).
 
@@ -107,4 +115,49 @@ export function subTrendVerdict(label: string, verdict: string, pctChange: numbe
   if (verdict === 'sliding' || verdict === 'declining') return `${label} ↓${pct}%`;
   if (verdict === 'needs_data') return `${label} needs data`;
   return `${label} holding`;
+}
+
+/**
+ * ⛔ A THIN AND STALE TREND IS NOT SHOWN AT FULL CONFIDENCE. Under this many readings AND a newest
+ * reading older than the staleness cut, the row dims and prints "limited data" — the counts are
+ * already at the render, so this adds a caution, never a second number.
+ * OURS — no outside source publishes this pair; it lived on the State screen with no marker until
+ * 2026-09-15. docs/STATE-SOURCES.md.
+ */
+export const LIMITED_DATA_UNDER_SAMPLES = 5;
+export const LIMITED_DATA_STALE_OVER_DAYS = 21;
+
+export function isLimitedData(sampleCount: number | null | undefined, newestAgeDays: number | null | undefined): boolean {
+  return (sampleCount ?? 99) < LIMITED_DATA_UNDER_SAMPLES && (newestAgeDays ?? 0) > LIMITED_DATA_STALE_OVER_DAYS;
+}
+
+/**
+ * The magnitude of a change, signed by what the VERDICT means rather than by the raw delta.
+ *
+ * D-160: `pctChange` is the raw metric delta (classify.ts keeps it raw so a reader knows real
+ * direction). For a lower-is-better discipline (run and swim pace) an improvement is a NEGATIVE delta,
+ * so printing it verbatim gives "↑ improving −34%". The verdict already encodes good or bad; sign the
+ * magnitude by the verdict and the number and the arrow always agree.
+ *
+ * ⚠️ ONE MINUS GLYPH, ALL THREE BRANCHES. The `holding` fallback used to print JS's own negative
+ * ("-0.4%", ASCII hyphen) while the sliding branch printed a true minus ("−15.2%") — adjacent rows on
+ * one screen, two characters at two widths (2026-08-01).
+ * ⚠️ `dp` IS DISPLAY ONLY; the raw change stays on the payload. A tenth of a percent on a regression
+ * slope over three months is false precision.
+ */
+export function verdictSignedPct(verdict: string, pct: number | null | undefined, dp = 1): string | null {
+  if (pct == null) return null;
+  const mag = (n: number) => Math.abs(n).toFixed(dp).replace(/\.0+$/, '');
+  if (verdict === 'improving') return `+${mag(pct)}%`;
+  if (verdict === 'sliding') return `−${mag(pct)}%`;
+  return `${pct > 0 ? '+' : pct < 0 ? '−' : ''}${mag(pct)}%`;
+}
+
+/**
+ * "newest today" / "newest 4d ago" — how fresh the pool behind a read is, so an athlete can tell
+ * whether the ride they just finished is in it yet. Distinct from a calendar "as of" stamp.
+ */
+export function recencyOf(ageDays: number | null | undefined): string | null {
+  if (ageDays == null || ageDays < 0) return null;
+  return ageDays <= 0 ? 'newest today' : `newest ${Math.round(ageDays)}d ago`;
 }

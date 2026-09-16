@@ -69,7 +69,8 @@ Deno.test('H-B07: each spine series\' efficiency and drift chart, with the fitte
   assert(!f.tooFew);
   if (!f.tooFew) { assertAlmostEquals(f.start, 1.65, 1e-9); assertAlmostEquals(f.end, 1.5, 1e-9); assertEquals(f.weeks, 3); }
   assertEquals(trends[0].driftTrend.points.map((x) => x.value), [4, 5, 6]);
-  assertEquals(trends[1].efficiencyTrend.fit, { tooFew: true, n: 1 });
+  // ⚠️ The chart's span, building state and range ride on the "too few" outcome too (2026-09-15).
+  assertEquals(trends[1].efficiencyTrend.fit, { tooFew: true, n: 1, spanWeeks: 1, building: true, low: 1.9, high: 1.9 });
   const noSpine = toStateTrendsV1(assembleStateTrends(inputs([])), AS_OF);
   assertEquals(noSpine.display!.enduranceSpineTrends, undefined, 'no spine, no trends');
 });

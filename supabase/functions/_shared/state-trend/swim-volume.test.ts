@@ -1,4 +1,6 @@
 // Swim VOLUME facts — the described-not-graded swim row. Run: deno test --no-check swim-volume.test.ts
+// ⚠️ `windowLabel` added 2026-09-15 (Stage 4 session 2): the window in weeks, written here because the
+// State screen divided `windowDays` by 7 in two separate places in one file.
 import { assertEquals } from 'https://deno.land/std@0.208.0/assert/mod.ts';
 import { swimVolumeFacts } from './assemble.ts';
 
@@ -10,7 +12,7 @@ Deno.test('counts swims, sums distance, finds the longest — all in-window', ()
     '2026-07-16',
     56,
   );
-  assertEquals(v, { swims: 3, totalDistanceM: 5300, longestM: 2000, windowDays: 56 });
+  assertEquals(v, { swims: 3, totalDistanceM: 5300, longestM: 2000, windowDays: 56, windowLabel: '8wk' });
 });
 
 Deno.test('drops rows outside the window (older than asOf − windowDays and future rows)', () => {
@@ -19,7 +21,7 @@ Deno.test('drops rows outside the window (older than asOf − windowDays and fut
     '2026-07-16',
     56,
   );
-  assertEquals(v, { swims: 1, totalDistanceM: 2000, longestM: 2000, windowDays: 56 });
+  assertEquals(v, { swims: 1, totalDistanceM: 2000, longestM: 2000, windowDays: 56, windowLabel: '8wk' });
 });
 
 Deno.test('ignores rows with no/zero/negative distance', () => {
@@ -28,10 +30,10 @@ Deno.test('ignores rows with no/zero/negative distance', () => {
     '2026-07-16',
     56,
   );
-  assertEquals(v, { swims: 1, totalDistanceM: 2000, longestM: 2000, windowDays: 56 });
+  assertEquals(v, { swims: 1, totalDistanceM: 2000, longestM: 2000, windowDays: 56, windowLabel: '8wk' });
 });
 
 Deno.test('no swims → zeroes, never a crash on empty/null', () => {
-  assertEquals(swimVolumeFacts([], '2026-07-16', 56), { swims: 0, totalDistanceM: 0, longestM: 0, windowDays: 56 });
-  assertEquals(swimVolumeFacts(null, '2026-07-16', 56), { swims: 0, totalDistanceM: 0, longestM: 0, windowDays: 56 });
+  assertEquals(swimVolumeFacts([], '2026-07-16', 56), { swims: 0, totalDistanceM: 0, longestM: 0, windowDays: 56, windowLabel: '8wk' });
+  assertEquals(swimVolumeFacts(null, '2026-07-16', 56), { swims: 0, totalDistanceM: 0, longestM: 0, windowDays: 56, windowLabel: '8wk' });
 });

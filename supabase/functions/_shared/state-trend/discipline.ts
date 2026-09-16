@@ -9,6 +9,12 @@
 import type { TrendVerdict, TrendResult } from './types.ts';
 import type { AdherenceState } from './adherence.ts';
 import type { Posture, PostureRead } from './posture.ts';
+// ⛔ THE ROW'S LINES ARE WRITTEN HERE (2026-09-15, Stage 4 session 2). The State screen composed each
+// one as it drew it, dividing the window by seven and signing the percentage itself. Same file, same
+// words; the edge functions bundle `src/lib/` at deploy time, as they already do for `estimate-1rm.ts`.
+import {
+  trendEvidence, trendReceipt, verdictSignedPct, isLimitedData, type Discipline,
+} from '../../../../src/lib/trend-receipt.ts';
 
 export type AxisMode = 'performance' | 'adherence';
 
@@ -29,6 +35,10 @@ export interface PerfSummary {
   stale?: boolean;
   /** The cadence-scaled min-session floor (needs_data too-few threshold) — so the receipt cites "need N" honestly. */
   minSessions?: number;
+  /** ⛔ THE CHANGE AS THE ROW PRINTS IT — "+6.5%" / "−4.2%", signed by what the verdict MEANS rather
+   *  than by the raw delta (D-160). Null when there is no change to state. The screen ran this
+   *  arithmetic itself until 2026-09-15. */
+  signedPct?: string | null;
 }
 
 export interface DisciplineCard {
@@ -50,6 +60,20 @@ export interface DisciplineCard {
   /** The server-minted plain-English line. Null when there is no posture claim to make.
    *  Law 4: the surface renders this. It does not compose its own. */
   postureSentence?: string | null;
+  /**
+   * ⛔ THE ROW'S OWN TEXT (2026-09-15, Stage 4 session 2). D-232's glass-box receipt, written once,
+   * here, instead of on the screen: the dimmed evidence tail, the full needs-data receipt, and whether
+   * the read is thin enough to dim and caption "limited data".
+   * ⚠️ Absent on a snapshot written before this; the row then prints no tail rather than build one.
+   */
+  display?: {
+    /** "last 8 weeks · 5 runs · newest 4 days ago". Null when the row carries no evidence. */
+    evidence: string | null;
+    /** The whole needs-data sentence. Null unless the verdict IS needs_data. */
+    needsDataReceipt: string | null;
+    /** Thin AND stale: dim the verdict and print "limited data" beside it. */
+    limitedData: boolean;
+  };
 }
 
 /**
@@ -72,6 +96,8 @@ export function resolveDisciplineCard(args: {
   const { discipline, performance, adherence } = args;
   const perfLeads = performanceLeads(performance);
   const showAdherence = DISPLAY_MODE === 'co-equal' ? true : !perfLeads;
+  const disc = discipline as Discipline;
+  const hasEvidence = performance?.sampleCount != null && performance.windowDays != null;
   return {
     discipline,
     primaryAxis: perfLeads ? 'performance' : 'adherence',
@@ -79,6 +105,29 @@ export function resolveDisciplineCard(args: {
     performance,
     adherence,
     headlineVerdict: perfLeads ? performance!.verdict : null,
+    display: {
+      evidence: hasEvidence
+        ? trendEvidence({
+            windowDays: performance!.windowDays!,
+            sampleCount: performance!.sampleCount!,
+            newestAgeDays: performance!.newestAgeDays,
+            discipline: disc,
+          })
+        : null,
+      needsDataReceipt: !perfLeads && hasEvidence
+        ? trendReceipt({
+            verdict: 'needs_data',
+            pctChange: null,
+            windowDays: performance!.windowDays!,
+            sampleCount: performance!.sampleCount!,
+            newestAgeDays: performance!.newestAgeDays,
+            stale: performance!.stale,
+            floor: performance!.minSessions,
+            discipline: disc,
+          })
+        : null,
+      limitedData: isLimitedData(performance?.sampleCount, performance?.newestAgeDays),
+    },
   };
 }
 
@@ -92,5 +141,7 @@ export function perfFromTrend(t: TrendResult | null): PerfSummary | null {
     windowDays: t.window?.days,
     stale: t.stale,
     minSessions: t.minSessions,
+    // The change as the row prints it — signed by the verdict's meaning, not the raw delta (D-160).
+    signedPct: verdictSignedPct(t.verdict, t.pctChange),
   } : null;
 }

@@ -32,7 +32,8 @@ import { canonicalDisplayName, canonicalize } from '../canonicalize.ts';
 // Audit 2026-09-10 (item 17): the slot fold, the chart trendlines and the logged-sets list, each moved
 // off the State screen — see each file's header.
 import { foldVariantSlots } from './fold-lift-slots.ts';
-import { spineTrends, type ChartTrend } from './trend-fit.ts';
+import { spineTrends, fitTrend, type ChartTrend } from './trend-fit.ts';
+import { KG_PER_LB } from '../strength/session-volume.ts';
 import { buildLoggedLifts, type LoggedLift } from './logged-sets.ts';
 // ⛔ VIADA'S TWO LIFTING DOSES, PERFORMED — the counting lives in `accessory-dosing`, which owns his
 // bands; this file supplies the window and the reference max. See `performed-ledger.ts`.
@@ -181,7 +182,12 @@ function isoMinusDaysPure(iso: string, days: number): string {
 // (TrainingPeaks/Swim Smooth/Garmin) benchmarks swim off a clean CSS test, not a rolling daily-pace
 // trend. So the swim row shows what fins CANNOT corrupt: how many swims, total distance, longest swim.
 // Distance is honest regardless of equipment. No dot, no arrow, no verdict — facts only.
-export interface SwimVolume { swims: number; totalDistanceM: number; longestM: number; windowDays: number; }
+export interface SwimVolume {
+  swims: number; totalDistanceM: number; longestM: number; windowDays: number;
+  /** ⛔ THE WINDOW IN WEEKS, WRITTEN HERE (2026-09-15, Stage 4 session 2) — e.g. "8wk". The screen
+   *  divided `windowDays` by 7 in two separate places in one file. */
+  windowLabel?: string;
+}
 export function swimVolumeFacts(
   rows: Array<{ date?: string; distance_m?: number | null }> | null | undefined,
   asOf: string,
@@ -199,6 +205,7 @@ export function swimVolumeFacts(
     totalDistanceM: Math.round(dists.reduce((a, b) => a + b, 0)),
     longestM: dists.length ? Math.round(Math.max(...dists)) : 0,
     windowDays,
+    windowLabel: `${Math.max(1, Math.round(windowDays / 7))}wk`,
   };
 }
 
@@ -607,6 +614,13 @@ export function liftSeriesFromExerciseLog(rows: ExerciseLogLite[], ctx?: LiftSer
 // ---- raw inputs (each caller fetches with its own client, then flattens identically) ----
 export interface StateTrendInputs {
   asOf: string;
+  /**
+   * ⛔ THE ATHLETE'S UNIT (`user_baselines.performance_numbers.units === 'metric'`), resolved by the
+   * caller. Lifts are stored in pounds and convert for a metric account by the definition constant —
+   * the same rule `save-baselines/zones.ts` applies to Adjust and Baselines (§8.0 #7).
+   * ⚠️ Absent → imperial, which is today's behaviour for every account in production.
+   */
+  metric?: boolean;
   exerciseRows: ExerciseLogLite[]; // 12wk exercise_log
   strengthVolumeRows?: StrengthVolumeRow[]; // per-strength-workout total_volume_lbs (the volume trend)
   bikeRows: Array<{ date: string; classified_type: string | null; w20: number | null; hr_at_band: number | null; in_band_s?: number | null; band_hi?: number | null; band_source: string | null; hr_corrupt?: boolean }>;
@@ -927,6 +941,17 @@ export interface ViadaWeekChange {
 export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   const { asOf } = inp;
 
+  /**
+   * ⛔ THE ATHLETE'S UNIT, RESOLVED ONCE FOR THE WHOLE ASSEMBLY (2026-09-15, Stage 4 session 2). Two
+   * things read it: a lift converts from pounds by the definition constant, and the run row's easy and
+   * hard paces are written per mile or per kilometre. Both were done on the screen — the lift number
+   * carried a hard-coded "lb" whatever the athlete had chosen, and the pace was multiplied by 1.60934
+   * in the render. Absent → imperial, which is today's behaviour for every account in production.
+   */
+  const _metric = inp.metric === true;
+  const liftUnit = _metric ? 'kg' : 'lb';
+  const inAthletesUnit = (lb: number): number => Math.round(_metric ? lb * KG_PER_LB : lb);
+
   // per-discipline cadence (sessions/week over 90d)
   const WEEKS_90D = STATE_TREND_WINDOWS.cadenceDays / 7;
   const spw: Record<string, number> = {};
@@ -953,6 +978,8 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
   // chart and word agree. Mirrors run efficiency / strength e1RM. Empty when power has no verdict (needs_data
   // → basis null → the bike row shows the efficiency read and no power chart). Uses the bike verdict window.
   bikeFitness.power.series = bikePowerChartSeries(binRides, asOf, bikeFitness.power.basis);
+  // The best-20 chart's span, range and building state, off the points just built (2026-09-15).
+  bikeFitness.powerSeriesFit = fitTrend((bikeFitness.power.series ?? []).map((p) => ({ date: p.date, value: p.value })));
   // LEAD SELECTION — power leads UNLESS it cannot make a claim and efficiency can (Q-241, 2026-08-01).
   // Before the ride floor there was only one way for power to be silent (`needs_data`); now there are
   // two, and a `withheld` power read left un-handled here would have hidden a perfectly good efficiency
@@ -1145,7 +1172,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
       // The old else-branch fell back to `recentEfficiencyPaceHr` — pace back-derived from the index —
       // which is what put 13:21/mi on the screen when there was no route pace. There is no fallback to
       // a reconstruction now: no real pace → null → the card shows the run count, never a fake number.
-      ...recentGroupPaceHr(runEffHeadlineRows as Array<Record<string, unknown>>),
+      ...recentGroupPaceHr(runEffHeadlineRows as Array<Record<string, unknown>>, _metric),
       recentGapPaceSecPerKm: null,
       series: effChartSeries,
       /** ⚠️ Present only when the route engine answered — lets the row say WHY it is withholding
@@ -1213,7 +1240,7 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
           withheld: fit?.withheld ?? null,
           // the group's own recent pace + HR (real recorded pace, median of its last five) — lets the
           // card show easy and hard on their own pools; null when the group carries no real pace.
-          ...recentGroupPaceHr(rows as Array<Record<string, unknown>>),
+          ...recentGroupPaceHr(rows as Array<Record<string, unknown>>, _metric),
           series: rows
             .map((r: any) => ({
               date: String(r?.date ?? ''),
@@ -1352,6 +1379,44 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
             : {}),
         }))]),
   );
+  /**
+   * ⛔ ONE HALF-POUND SLACK FOR THE WHOLE SCREEN (2026-09-15, Stage 4 session 2). It absorbs rounding
+   * between the stored estimate and the all-history read. Two rules use it and they must agree: is the
+   * latest reading a record (`isPr`), and is the record far enough above the latest to be worth showing
+   * beside it. The card kept its own copy of the second one.
+   */
+  const E1RM_ROUNDING_SLACK_LB = 0.5;
+
+  /** The newest all-out set for a lift, or null. Read twice — the rep PR and the tile below. */
+  const latestAllOut = (canonical: string): any | null => {
+    const pts = inp.allOutByLift?.[canonical];
+    if (!Array.isArray(pts) || pts.length === 0) return null;
+    return pts[pts.length - 1] ?? null;
+  };
+
+  /**
+   * ⛔ A LIFT IS STORED IN POUNDS, ALWAYS, AND CONVERTS FOR A METRIC ACCOUNT BY THE DEFINITION
+   * CONSTANT (§8.0 #7, the same rule `save-baselines/zones.ts` applies to Adjust and Baselines). The
+   * State tiles printed "lb" beside every number whatever the athlete had chosen.
+   * ⚠️ `best` COMES BACK NULL WHEN IT IS NOT WORTH SHOWING — the latest reading is the record, or
+   * there is no all-history read. Its presence is the decision, so no second flag can disagree.
+   */
+  const liftReadout = (
+    latest: number | null,
+    allTimeBest: number | null,
+    allOut: { weight: number; reps: number } | null,
+  ): StrengthPerLift['readout'] => {
+    const showBest = latest != null && allTimeBest != null && allTimeBest > latest + E1RM_ROUNDING_SLACK_LB;
+    return {
+      e1rm: latest != null && Number.isFinite(latest) ? `${inAthletesUnit(latest)} ${liftUnit}` : null,
+      best: showBest ? `${inAthletesUnit(allTimeBest as number)} ${liftUnit}` : null,
+      allOut: allOut && allOut.weight > 0 && allOut.reps > 0
+        ? `${inAthletesUnit(allOut.weight)} ${liftUnit} × ${allOut.reps}`
+        : null,
+      unit: liftUnit,
+    };
+  };
+
   const unfoldedPerLift: StrengthPerLift[] = strength.lifts.map((l) => ({
     canonical: l.canonical,
     displayName: l.displayName,
@@ -1364,9 +1429,8 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     pctChange: l.trend.pctChange,
     // D-420 pillar 2: the rep PR. Same walk the Performance card reads (slice 2's `allOutByLift`).
     lastAllOut: (() => {
-      const pts = inp.allOutByLift?.[l.canonical];
-      if (!Array.isArray(pts) || pts.length === 0) return null;
-      const last = pts[pts.length - 1] as any;
+      const last = latestAllOut(l.canonical);
+      if (!last) return null;
       return {
         date: String(last.date), weight: Number(last.weight), reps: Number(last.reps),
         isRepRecord: last.is_rep_record === true,
@@ -1382,18 +1446,30 @@ export function assembleStateTrends(inp: StateTrendInputs): StateTrendResult {
     // `StatePerformanceSection.tsx`. Rule unchanged, byte for byte — only the address moved.
     // Michael, 2026-07-21: *"a PR should be a real PR, basically a new 1RM."* It was best-of-6-weeks
     // once, which fired on nearly every progressing lift and even stamped a lift reading "new".
-    // ⚠️ The 0.5 lb slack absorbs rounding between the stored estimate and the all-history read; it
-    // is not a tolerance on what counts as a record.
+    // ⚠️ The half-pound slack absorbs rounding between the stored estimate and the all-history read;
+    // it is not a tolerance on what counts as a record. ONE constant, used by this verdict and by the
+    // "best" tile below — the card kept its own copy of the same number until 2026-09-15.
     isPr: (() => {
       const latest = liftLatest.get(l.canonical) ?? null;
       const allBest = inp.allTimeBestByLift?.[l.canonical]?.best ?? null;
       const allCount = inp.allTimeBestByLift?.[l.canonical]?.count ?? 0;
-      return latest != null && allBest != null && allCount >= 3 && latest >= allBest - 0.5;
+      return latest != null && allBest != null && allCount >= 3 && latest >= allBest - E1RM_ROUNDING_SLACK_LB;
     })(),
     sampleCount: l.trend.sampleCount,
     newestAgeDays: l.trend.newestAgeDays,
     provisional: isProvisionalTrend(l.trend),
     series: strengthChartByCanonical.get(l.canonical),
+    // The chart's own span, range and building state, through exactly the points above (2026-09-15).
+    seriesFit: fitTrend(strengthChartByCanonical.get(l.canonical) ?? []),
+    // The tiles as the athlete reads them — number, unit and the record only when it is worth showing.
+    readout: liftReadout(
+      liftLatest.get(l.canonical) ?? null,
+      inp.allTimeBestByLift?.[l.canonical]?.best ?? null,
+      (() => {
+        const last = latestAllOut(l.canonical);
+        return last ? { weight: Number(last.weight), reps: Number(last.reps) } : null;
+      })(),
+    ),
     // ⚠️ The faint line, carried from the caller. Absent before the block's test is read — the card
     // then draws the readings alone, which is still the read.
     expected: inp.expectedByCanonical?.[l.canonical],
@@ -1937,6 +2013,11 @@ export interface EnduranceSpineTrends {
   group: string;
   efficiencyTrend: ChartTrend;
   driftTrend: ChartTrend;
+  /** Sessions kept on the card but left out of the trend (a hard ride). The card names the number. */
+  leftOutOfTrend?: number;
+  /** A session in the window at or above Garmin's 72 °F cut-off → the card prints its fixed heat line.
+   *  ⛔ The test used to run on the phone over every point (2026-09-15, Stage 4 session 2). */
+  heatInWindow?: boolean;
 }
 
 export interface StateDisplayV1 {

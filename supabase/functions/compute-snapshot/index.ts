@@ -76,7 +76,7 @@ import {
   type ReferenceSeries,
 } from "../_shared/state-trend/index.ts";
 // Audit 2026-09-10 (H-B07): the FTP line's fit, attached beside `ftpHistory`.
-import { fitTrend } from "../_shared/state-trend/trend-fit.ts";
+import { fitTrend, TREND_CHART_MIN_POINTS } from "../_shared/state-trend/trend-fit.ts";
 // Slice 6 — the pull-up progression's clean/assisted split. ⛔ Read from the RAW logged sets; the
 // `exercise_log` aggregate has no `resistance_level` and cannot answer this.
 import { countPullupWork, SESSION_STANDARD_MINUTES, SESSION_STANDARD_REPS } from '../../../src/lib/pullup-progression.ts';
@@ -2021,7 +2021,11 @@ serve(async (req: Request) => {
           .flatMap((s) => s.points as Array<{ date: string; efficiency: number | null; countsTowardTrend?: boolean }>)
           .filter((p) => p.efficiency != null && Number.isFinite(Number(p.efficiency)) && p.countsTowardTrend !== false)
           .map((p) => ({ date: p.date, value: Number(p.efficiency) }));
-        const result = assembleStateTrends({ asOf, exerciseRows, bikeRows, bikeEffHistory, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, planWeekAsOf, testWeekDates, expectedByCanonical, namedSessions, enduranceSpine, blockDurationWeeks, measuredDates, allOutByLift, strengthEffortRead, pullupProgress, loggedSessions, weekStartDow });
+        const result = assembleStateTrends({ asOf,
+          // ⛔ THE ATHLETE'S UNIT (2026-09-15, Stage 4 session 2) — lifts convert from pounds and the run
+          // row's paces are written per mile or per kilometre on the server, not in the render.
+          metric: String((ub?.performance_numbers as { units?: unknown } | null)?.units ?? 'imperial') === 'metric',
+          exerciseRows, bikeRows, bikeEffHistory, bikeLoad, runJoined, runEffHistory, swimRows, strengthVolumeRows, plannedBy, doneBy, cadenceCounts, posture, declaredSessionsPerWeek: declaredSpw, strengthBaselines, fitnessBaselines, allTimeBestByLift, phaseByDate, weekByDate, planWeekAsOf, testWeekDates, expectedByCanonical, namedSessions, enduranceSpine, blockDurationWeeks, measuredDates, allOutByLift, strengthEffortRead, pullupProgress, loggedSessions, weekStartDow });
         // VDOT race projections (goal-free) — computed HERE, not in the shared assembler, because they need
         // learned_fitness + the VDOT engine and we keep that OFF the client-math fallback path (dumb client).
         // Threshold pace: learned first, then performance_numbers. Long-run distance is estimated inside
@@ -2129,6 +2133,10 @@ serve(async (req: Request) => {
             stateTrendsV1.display.bikeFitness.ftpHistoryFit = fitTrend(
               stateTrendsV1.display.bikeFitness.ftpHistory.filter((p) => !!p?.date && Number.isFinite(p.value)),
             );
+            // ⛔ TWO READINGS DRAW THE DOTS, THREE FIT THE LINE (2026-09-15). Both counts are named on
+            // the server now; the card tested the list's own length for the first one.
+            stateTrendsV1.display.bikeFitness.drawFtpLine =
+              stateTrendsV1.display.bikeFitness.ftpHistory.length >= TREND_CHART_MIN_POINTS;
           }
         }
         // Carry the descent cause on the payload (JSONB, no schema change) so the coach's composer receives

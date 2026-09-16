@@ -13,6 +13,9 @@
 import { classifyTrend } from './classify.ts';
 import { resolveThresholds, TREND_HALF_DAYS } from './thresholds.ts';
 import type { TrendPoint, TrendResult, TrendVerdict } from './types.ts';
+// ⛔ THE ROW'S RECEIPT LINE IS WRITTEN HERE (2026-09-15, Stage 4 session 2) — the bike card composed it
+// as it drew it. Same file, same words; `src/lib/` bundles into each edge function at deploy time.
+import { trendEvidence, recencyOf } from '../../../../src/lib/trend-receipt.ts';
 
 
 // Terrain bins — group by whether 20-min power is comparable. CLIMBING distinct (gravity-loaded);
@@ -146,6 +149,13 @@ export interface BikeFitness {
   /** The fitted trendline through `ftpHistory` (WKO5 least squares, `trend-fit.ts`), attached beside it by
    *  compute-snapshot (audit 2026-09-10, H-B07). The bike card prints its start, end and weeks. */
   ftpHistoryFit?: import('./trend-fit.ts').TrendFit | null;
+  /**
+   * ⛔ IS THERE A CHART TO DRAW AT ALL — two readings or more (`TREND_CHART_MIN_POINTS`). Two drawings
+   * sit on this history and they are NOT the same decision: the polyline through the dots needs two
+   * points, the dashed fitted line needs three (`TREND_FIT_MIN_POINTS`, on the fit above). The card read
+   * `ftpHistory.length >= 2` itself, which is the same rule written in a second place (2026-09-15).
+   */
+  drawFtpLine?: boolean;
   /** ⛔ THE SERVER DECIDES THE LEAD, THE CLIENT RENDERS IT. Both screens used to re-derive this from
    *  `power.verdict !== 'needs_data'`, which silently became wrong the moment `withheld` existed — two
    *  copies of one rule is the divergence the spine exists to prevent. 'none' = neither can assert. */
@@ -155,6 +165,21 @@ export interface BikeFitness {
   /** Rides in the window that COULD carry a threshold read (in a power bin, with a 20-min figure).
    *  Zero is the joy-rider signature and is what separates the two silent reasons. */
   hardRideCount?: number;
+  /**
+   * ⛔ THE BUILDING ROW'S OWN LINE (2026-09-15, Stage 4 session 2). "6 rides in 8 weeks" — the card
+   * took the LARGER of the two sample counts itself (power and efficiency count different rides) and
+   * typed the words "8 weeks" beside a window the server owns. Null when neither signal has a window.
+   */
+  ridesReadLine?: string | null;
+  /** The fitted line through `power.series`, so the best-20 chart's span, range and building state come
+   *  from the same place every other chart's do. Null when the series is absent. */
+  powerSeriesFit?: import('./trend-fit.ts').TrendFit | null;
+  /** ⛔ D-232's evidence tail for THIS row — "last 8 weeks · 6 rides · newest 2d ago" — off the LEAD
+   *  signal's own pool. The count is dropped on the aerobic read, whose line above already states it.
+   *  Null while the row is building (neither signal asserts). Composed on the screen until 2026-09-15. */
+  evidenceLine?: string | null;
+  /** "newest 2d ago" for the building row, off whichever signal has the freshest ride. */
+  newestRecencyLine?: string | null;
   /** Q-255: the always-on load read (CTL/TSB verdict words) under the measurement signals. Null when
    *  the athlete has no computed ride load. Optional so cached payloads predating it render unchanged. */
   loadFloor?: import('./load-floor.ts').LoadFloor | null;
@@ -247,11 +272,45 @@ export function computeBikeFitness(
   const hardRideCount = rides.filter((r) => r.classified_type && binTypes.has(String(r.classified_type)) && Number(r.w20) > 0).length;
   const asserts = (v: TrendVerdict) => v !== 'needs_data';
   const lead: 'power' | 'efficiency' | 'none' = asserts(power.verdict) ? 'power' : asserts(efficiency.verdict) ? 'efficiency' : 'none';
+  /**
+   * ⛔ THE RIDES THE ROW CAN READ FROM, AND THE WINDOW THEY SIT IN (2026-09-15, Stage 4 session 2).
+   * Power counts hard rides in the winning terrain bin; efficiency counts clean easy rides. They are
+   * different pools, so the row states the LARGER — "rides we can read from", never a total ride count,
+   * which is not known here. The card made this pick itself and typed the window as a literal.
+   * ⚠️ The window is the signals' own (`windowDays`, Garmin's 28-day halves = 8 weeks today), so it
+   * cannot drift from the receipt line beneath it the way a typed "8 weeks" could.
+   */
+  const ridesRead = Math.max(power.sampleCount ?? 0, efficiency.sampleCount ?? 0);
+  const readWindowDays = power.windowDays ?? efficiency.windowDays ?? null;
+  const ridesReadLine = readWindowDays == null
+    ? null
+    : ridesRead === 0
+      ? 'No rides yet'
+      : `${ridesRead} ${ridesRead === 1 ? 'ride' : 'rides'} in ${Math.max(1, Math.round(readWindowDays / 7))} weeks`;
+  // The tail belongs to whichever signal LEADS — they rest on different rides (power counts hard rides
+  // in the winning bin, efficiency counts clean easy ones). The aerobic read drops the count because
+  // its own line above already says "from N easy rides", and the same number twice on consecutive
+  // lines reads as two facts.
+  const leadSignal = lead === 'efficiency' ? efficiency : power;
+  const evidenceLine = lead !== 'none' && leadSignal.sampleCount != null && leadSignal.windowDays != null
+    ? trendEvidence({
+        windowDays: leadSignal.windowDays,
+        sampleCount: leadSignal.sampleCount,
+        newestAgeDays: leadSignal.newestAgeDays,
+        discipline: 'bike',
+        omitCount: lead === 'efficiency',
+      })
+    : null;
   return {
     power,
     efficiency,
     lead,
     powerSilent: lead === 'power' ? null : (hardRideCount === 0 ? 'no_hard_efforts' : 'too_few_rides'),
     hardRideCount,
+    ridesReadLine,
+    evidenceLine,
+    newestRecencyLine: recencyOf(efficiency.newestAgeDays ?? power.newestAgeDays),
+    // ⚠️ `powerSeriesFit` is attached by the assembly, not here: `power.series` is filled in AFTER this
+    // returns (`assemble.ts`, beside `bikePowerChartSeries`), so fitting it here would fit nothing.
   };
 }
