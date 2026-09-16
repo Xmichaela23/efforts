@@ -275,8 +275,15 @@ const STRENGTH_VOLUME_VERSION = 2;
  *   4 — completed_totals.pool_display / pool_unit, and the swim's share of plan (swim_distance_pct_of_plan,
  *       swim_duration_pct_of_plan and their status words) (2026-09-10, audit H-D08 / H-D13). A copy stored at
  *       v3 has none, and the pool-swim card would print no pool and no distance or duration pills.
+ *   5 — the lines the Performance tab prints, written here instead of in its render (2026-09-16, Stage 4
+ *       session 3): completed_totals.distance_display / duration_display / duration_minutes, the swim's
+ *       pace in the ATHLETE's unit with its label (swim_pace_display / swim_pace_unit /
+ *       swim_pace_athlete_unit_s / swim_pace_vs_plan_display), each interval row's print_by_default, and
+ *       each performed strength set's weight_display / assist_display. A copy stored at v4 has none, and
+ *       the header line, the Duration chip, the swim card, the interval table and the compare table
+ *       would print nothing in those slots.
  */
-const SESSION_TOTALS_VERSION = 4;
+const SESSION_TOTALS_VERSION = 5;
 
 type SessionDetailStaleReason = 'recomputing' | 'attach_pending' | 'analysis_missing';
 
@@ -730,7 +737,10 @@ async function runSessionDetailPipelineAndPersist(
     // the same read, widened to swims.
     let athleteUnits: string | null = null;
     const isSwimRow = String((row as any)?.type ?? '').toLowerCase() === 'swim';
-    if (isStrengthLikePerfSession(row) || isSwimRow) {
+    // ⛔ THE UNIT IS READ FOR EVERY SESSION NOW (2026-09-16, Stage 4 session 3). It was read only for a
+    // strength or swim row, because only the pool label wanted it; every distance, pace and weight this
+    // function writes is now written in the athlete's own unit, so every row needs it. Same one query.
+    {
       try {
         const { data: ubRow } = await supabase
           .from('user_baselines')
@@ -743,6 +753,8 @@ async function runSessionDetailPipelineAndPersist(
         console.warn('[workout-detail] body weight read failed (non-fatal, prices as pre-D-348):', bwErr instanceof Error ? bwErr.message : bwErr);
       }
     }
+    /** True when the athlete reads kilometres, kilograms and metres. Absent → imperial, today's default. */
+    const athleteMetric = String(athleteUnits ?? 'imperial').toLowerCase() === 'metric';
 
     // ⛔ ON A STACKED DAY, TODAY'S OTHER SESSION IS NEXT — NOT TOMORROW (Michael 2026-08-11).
     // The old filter was `date > workoutDate` (strictly future), so finishing the lift on a day that
@@ -958,6 +970,40 @@ async function runSessionDetailPipelineAndPersist(
             pts[bs].is_best_same = true;
             pts[bp].is_best_pace = true;
           }
+          /**
+           * ⛔ THE CHART'S UNIT, ITS LINE AND ITS WINDOW ARE THE SERVER'S (2026-09-16, Stage 4 session 3).
+           *
+           * The screen multiplied every seconds-per-kilometre by 1.60934 to label the axis — with no
+           * metric branch at all, so a metric athlete read minutes per mile — fitted its OWN
+           * least-squares line over the points below, and divided the window by 30 for "last N months".
+           *
+           * ⚠️ EACH POINT CARRIES ITS PACE IN THE ATHLETE'S UNIT, so the chart's geometry and its axis
+           * labels work on the number that is printed; the phone splits m:ss and nothing else.
+           * ⚠️ BOTH LENSES GET A LINE, because the athlete toggles same-effort against raw pace and the
+           * fit has to follow the lens. Same least squares, moved unchanged.
+           */
+          const rtPerUnit = (secPerKm: number) => (athleteMetric ? secPerKm : secPerKm * 1.609344);
+          for (const p of pts as Array<Record<string, number>>) {
+            p.pace_s_per_unit = Math.round(rtPerUnit(p.pace_s_per_km));
+            p.same_effort_pace_s_per_unit = Math.round(rtPerUnit(p.same_effort_pace_s_per_km));
+          }
+          const rtFit = (ys: number[]) => {
+            const xs = (pts as Array<{ date: string }>).map((p) => Date.UTC(
+              +p.date.slice(0, 4), +p.date.slice(5, 7) - 1, +p.date.slice(8, 10)) / 864e5);
+            const n = xs.length;
+            if (n < 2) return null;
+            const mx = xs.reduce((a, b) => a + b, 0) / n;
+            const my = ys.reduce((a, b) => a + b, 0) / n;
+            let Sxx = 0, Sxy = 0;
+            for (let i = 0; i < n; i++) { Sxx += (xs[i] - mx) ** 2; Sxy += (xs[i] - mx) * (ys[i] - my); }
+            const b = Sxx ? Sxy / Sxx : 0;
+            const a = my - b * mx;
+            return { start: a + b * xs[0], end: a + b * xs[n - 1] };
+          };
+          (v as any).chart_unit = athleteMetric ? 'per_km' : 'per_mi';
+          (v as any).chart_fit_same = rtFit((pts as Array<{ same_effort_pace_s_per_unit: number }>).map((p) => p.same_effort_pace_s_per_unit));
+          (v as any).chart_fit_pace = rtFit((pts as Array<{ pace_s_per_unit: number }>).map((p) => p.pace_s_per_unit));
+          (v as any).window_months_label = `last ${Math.max(1, Math.round(windowDays / 30))} months`;
           (v as any).chart_points = pts;
           // all-time efforts on this core (NOT windowed) — the familiarity count for "n of N runs"
           const { count: allTime } = await supabase
@@ -1071,6 +1117,8 @@ async function runSessionDetailPipelineAndPersist(
             athlete_units: athleteUnits,
           }
         : null,
+      // The athlete's unit for every distance, pace and set weight the contract prints (2026-09-16).
+      athleteMetric,
       completedSwimScalars: ((row?.type ?? (detail as any)?.type) === 'swim')
         ? resolveSwimScalars({
             moving_time: (detail as any).moving_time ?? (detail as any).metrics?.moving_time,
@@ -1624,6 +1672,19 @@ Deno.serve(async (req) => {
       }
     } catch {}
 
+    /**
+     * ⛔ THE ATHLETE'S UNIT, ONCE, FOR EVERY DETAILS ANSWER (2026-09-16, Stage 4 session 3). Every
+     * distance, pace and weight `display_metrics` carries is now written in the unit the athlete reads,
+     * so the screen prints a string and converts nothing. Absent → imperial, today's default.
+     */
+    let dmMetric = false;
+    if (userId) {
+      try {
+        const { data: ubRow } = await supabase.from('user_baselines').select('units').eq('user_id', userId).maybeSingle();
+        dmMetric = String((ubRow as { units?: unknown } | null)?.units ?? 'imperial').toLowerCase() === 'metric';
+      } catch { /* non-fatal: imperial */ }
+    }
+
     // Select minimal set plus optional blobs (shared column list)
     const baseSel = [
       'id','user_id','date','type','workout_status','planned_id','name','metrics','computed','workout_analysis',
@@ -1631,6 +1692,10 @@ Deno.serve(async (req) => {
       'completedmanually', // a receipt for is_executed (_shared/is-executed.ts)
       'analysis_status','analysis_error','analysis_updated_at', // "failed" on screen (plumbing work order §3)
       'avg_heart_rate','max_heart_rate','avg_power','max_power','avg_cadence','max_cadence',
+      // ⛔ 2026-09-16: `weather_data` and `avg_swim_cadence` join the Details select. The weather lines
+      // and the stroke rate were both composed on the phone — one off this blob, one by averaging the
+      // recording's samples in the render.
+      'weather_data','avg_swim_cadence',
       'avg_speed','max_speed','max_pace','distance','duration','elapsed_time','moving_time','calories','steps','elevation_gain','elevation_loss',
       'start_position_lat','start_position_long','timestamp',
       'strength_exercises','mobility_exercises','refined_type',
@@ -1989,7 +2054,198 @@ Deno.serve(async (req) => {
     // display_metrics existed). A READ of computed.overall — never derived here.
     const _gapSecPerMi = Number(d?.computed?.overall?.avg_gap_s_per_mi ?? d?.computed?.overall?.gap_pace_s_per_mi);
     const gap_pace_s_per_km = (!_isSwim && Number.isFinite(_gapSecPerMi) && _gapSecPerMi > 0) ? _gapSecPerMi / 1.60934 : null;
-    (detail as any).display_metrics = { gap_pace_s_per_km, distance_m: distM, distance_km: distKm, duration_s: durS, elapsed_s: elapsedS, elevation_gain_m: elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, avg_power_pedaling_w, pct_time_pedaling, sport: (d?.type || null), series };
+
+    /* ────────────────────────────────────────────────────────────────────────────────────────────
+     * ⛔ THE DETAILS SCREEN PRINTS STRINGS FROM HERE (2026-09-16, Stage 4 session 3).
+     *
+     * What it did instead: divided each zone bin by the sum, wrote the weather lines from three
+     * gates of its own, averaged the recording's stroke samples in the render, picked a swim pace by
+     * the athlete's unit out of two server fields while Performance labelled a third by the PLAN's,
+     * and turned split paces into miles per hour. Every one of those is below now.
+     * ⚠️ NOTHING HERE IS A NEW MEASUREMENT — each line is the athlete's unit and the athlete's words
+     * over a number this function already had.
+     * ──────────────────────────────────────────────────────────────────────────────────────────── */
+    const DM_M_PER_MI = 1609.344;   // 1 mi, by definition
+    const DM_M_PER_YD = 0.9144;     // 1 yd, by definition
+    const DM_FT_PER_M = 3.280839895;
+    /** M:SS from seconds. ⛔ The whole figure is rounded ONCE, then split — rounding the remainder on
+     *  its own is what printed "7:60/mi" (§8.0 #2). Same rule as the one pace formatter. */
+    const dmClock = (sec: number): string => {
+      const v = Math.max(0, Math.round(sec));
+      return `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`;
+    };
+    const dmPacePerUnit = (secPerKm: number | null | undefined): string | null => {
+      const v = Number(secPerKm);
+      if (!Number.isFinite(v) || v <= 0) return null;
+      return `${dmClock(dmMetric ? v : v * (DM_M_PER_MI / 1000))}${dmMetric ? '/km' : '/mi'}`;
+    };
+    const dmSpeed = (secPerKm: number | null | undefined): string | null => {
+      const v = Number(secPerKm);
+      if (!Number.isFinite(v) || v <= 0) return null;
+      const kmh = 3600 / v;
+      return dmMetric ? `${kmh.toFixed(1)} km/h` : `${(kmh * (1000 / DM_M_PER_MI)).toFixed(1)} mph`;
+    };
+    const dmDistance = (metres: number | null | undefined): string | null => {
+      const v = Number(metres);
+      if (!Number.isFinite(v) || v <= 0) return null;
+      if (dmMetric) return `${(v / 1000).toFixed(1)} km`;
+      const mi = v / DM_M_PER_MI;
+      return mi < 1 ? `${Math.round(v / DM_M_PER_YD)} yd` : `${mi.toFixed(1)} mi`;
+    };
+    const dmElevation = (metres: number | null | undefined): string | null => {
+      const v = Number(metres);
+      if (!Number.isFinite(v)) return null;
+      return dmMetric ? `${Math.round(v)} m` : `${Math.round(v * DM_FT_PER_M)} ft`;
+    };
+
+    // ── the swim pace, in the athlete's unit, with its label attached (§8.0 A4) ──────────────────
+    // ⛔ ONE FIELD FOR BOTH TABS. Performance computed its per-100 in the PLAN's unit and labelled it
+    // with the ATHLETE's, so a metric plan on an imperial account printed metres as "/100yd"; Details
+    // picked the right one of two fields and labelled it right. Two tabs, two paces, one swim.
+    const swim_pace_per_100_s = dmMetric ? avg_swim_pace_per_100m : avg_swim_pace_per_100yd;
+    const swim_pace_unit = dmMetric ? '100m' : '100yd';
+    const swim_pace_display = (Number.isFinite(swim_pace_per_100_s) && (swim_pace_per_100_s as number) > 0)
+      ? `${dmClock(swim_pace_per_100_s as number)} /${swim_pace_unit}` : null;
+
+    // ── the stroke rate (§6 "Swim lengths / stroke rate" — PHONE) ────────────────────────────────
+    // ⛔ THE AVERAGE IS TAKEN HERE. The screen read the column and, when it was absent, averaged every
+    // `swimCadenceInStrokesPerMinute` sample in the recording inside the render.
+    const avg_swim_cadence_spm = (() => {
+      if (!_isSwim) return null;
+      const col = Number(d?.avg_swim_cadence ?? d?.avg_cadence);
+      if (Number.isFinite(col) && col > 0) return Math.round(col);
+      const raw = (d as { sensor_data?: unknown })?.sensor_data as { samples?: unknown } | unknown[] | undefined;
+      const samples = Array.isArray((raw as { samples?: unknown })?.samples)
+        ? (raw as { samples: unknown[] }).samples
+        : (Array.isArray(raw) ? raw as unknown[] : []);
+      const vals = samples
+        .map((x) => Number((x as { swimCadenceInStrokesPerMinute?: unknown; cadence?: unknown })?.swimCadenceInStrokesPerMinute
+          ?? (x as { cadence?: unknown })?.cadence))
+        .filter((n) => Number.isFinite(n) && n > 0);
+      return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
+    })();
+
+    // ── zone shares (§8.1 Details #20a, #21) ────────────────────────────────────────────────────
+    // ⛔ THE SHARE OF EACH BIN IS WRITTEN HERE. Both charts divided a bin by the sum of the bins in
+    // their render. The bins themselves are `compute-workout-analysis`'s and are untouched — this is
+    // display over them, which is why it lives at read time and needs no re-analysis of a stored row.
+    const dmZones = (() => {
+      const withShare = (bins: unknown): Array<Record<string, unknown>> | null => {
+        if (!Array.isArray(bins) || bins.length === 0) return null;
+        const total = bins.reduce((sum: number, b) => sum + (Number((b as { t_s?: unknown })?.t_s) || 0), 0);
+        return bins.map((b) => {
+          const t = Number((b as { t_s?: unknown })?.t_s) || 0;
+          return {
+            ...(b as Record<string, unknown>),
+            // A share of 0–1, as both charts drew it; a window with no time has no shares.
+            share: total > 0 ? t / total : 0,
+            share_pct_display: total > 0 ? `${Math.round((t / total) * 100)}%` : '0%',
+          };
+        });
+      };
+      const z = d?.computed?.analysis?.zones;
+      const hr = withShare(z?.hr?.bins);
+      const power = withShare(z?.power?.bins);
+      if (!hr && !power) return null;
+      return {
+        ...(hr ? { hr: { ...(z?.hr ?? {}), bins: hr, total_s: hr.reduce((a, b) => a + (Number(b.t_s) || 0), 0) } } : {}),
+        ...(power ? { power: { ...(z?.power ?? {}), bins: power, total_s: power.reduce((a, b) => a + (Number(b.t_s) || 0), 0) } } : {}),
+      };
+    })();
+
+    // ── the weather lines (§8.1 Details #22) ────────────────────────────────────────────────────
+    // ⛔ THE THREE GATES ARE HERE NOW: the rise over the session, whether the peak is worth naming,
+    // and whether "feels like" differs enough to print. They ran in the render. Both cut-offs are
+    // OURS with ledger rows — searched Garmin, Strava, TrainingPeaks and Open-Meteo, none publishes
+    // a threshold for reporting a peak or a feels-like temperature.
+    const weather_lines = (() => {
+      const wRaw = (d as { weather_data?: unknown })?.weather_data;
+      let w: Record<string, unknown> | null = null;
+      if (wRaw && typeof wRaw === 'object') w = wRaw as Record<string, unknown>;
+      else if (typeof wRaw === 'string' && wRaw.length > 1) { try { w = JSON.parse(wRaw); } catch { w = null; } }
+      if (!w) return null;
+      const num = (v: unknown): number | null => { const x = Number(v); return Number.isFinite(x) ? x : null; };
+      const start = num(w.temperature_start_f);
+      const end = num(w.temperature_end_f);
+      const peak = num(w.temperature_peak_f);
+      const avg = num(w.temperature_avg_f) ?? num(w.temperature);
+      /** OURS — a peak is named only when it clears the higher end by more than half a degree, which is
+       *  the smallest step a whole-degree readout can show. docs/STATE-SOURCES.md. */
+      const PEAK_OVER_ENDS_F = 0.5;
+      /** OURS — "feels like" prints only when it is at least this far from the average; inside two
+       *  degrees the two numbers round to within one of each other and read as the same fact. */
+      const FEELS_LIKE_MIN_DIFF_F = 2;
+      if (start != null && end != null) {
+        const rise = Math.round(end) - Math.round(start);
+        const parts = [`${rise >= 0 ? '+' : ''}${rise}° over the session`];
+        if (peak != null && peak > Math.max(start, end) + PEAK_OVER_ENDS_F) parts.push(`peak ${Math.round(peak)}°`);
+        return {
+          line1: `${Math.round(start)}° start → ${Math.round(end)}° end (${parts.join(' · ')})`,
+          line2: avg != null && num(w.temperature_avg_f) != null ? `Avg across window ${Math.round(avg)}°` : null,
+        };
+      }
+      if (avg == null) return null;
+      const feels = num(w.feels_like);
+      const lo = num(w.daily_low);
+      const hi = num(w.daily_high);
+      const tail = [
+        feels != null && Math.abs(feels - avg) >= FEELS_LIKE_MIN_DIFF_F ? `Feels like ${Math.round(feels)}°` : null,
+        lo != null && hi != null ? `That day ${Math.round(lo)}–${Math.round(hi)}°` : null,
+      ].filter(Boolean).join(' · ');
+      return { line1: `${Math.round(avg)}°F (representative)`, line2: tail || null };
+    })();
+
+    (detail as any).display_metrics = { gap_pace_s_per_km,
+      // ⛔ EVERY LINE BELOW IS ALREADY IN THE ATHLETE'S UNIT (2026-09-16) — the screen prints them.
+      unit_system: dmMetric ? 'metric' : 'imperial',
+      distance_display: dmDistance(distM),
+      elevation_display: dmElevation(elevation_gain_m),
+      avg_pace_display: dmPacePerUnit(avg_pace_s_per_km),
+      gap_pace_display: dmPacePerUnit(gap_pace_s_per_km),
+      max_pace_display: dmPacePerUnit(max_pace_s_per_km),
+      avg_speed_display: avg_speed_kmh != null && avg_speed_kmh > 0 ? dmSpeed(3600 / avg_speed_kmh) : null,
+      swim_pace_per_100_s, swim_pace_unit, swim_pace_display, avg_swim_cadence_spm,
+      zones: dmZones,
+      weather_lines,
+      // ⛔ THE SPLIT ROWS, EACH WITH ITS OWN FINISHED PACE OR SPEED (2026-09-16). The map turned the
+      // server's seconds-per-kilometre into miles per hour on a ride and into a per-mile pace on a run,
+      // in the render, with the unit picked there too. The rows themselves are the analyser's, untouched.
+      splits: (() => {
+        const ev = d?.computed?.analysis?.events?.splits;
+        const rows = dmMetric ? ev?.km : ev?.mi;
+        if (!Array.isArray(rows)) return null;
+        const isRide = String(d?.type ?? '').toLowerCase().includes('ride') || String(d?.type ?? '').toLowerCase().includes('bike');
+        return rows.map((r) => {
+          const p = Number((r as { avgPace_s_per_km?: unknown })?.avgPace_s_per_km);
+          const ok = Number.isFinite(p) && p > 0;
+          return {
+            ...(r as Record<string, unknown>),
+            // A ride reads speed, everything else reads pace — the choice the map made by sport.
+            rate_display: !ok ? null : (isRide ? dmSpeed(p) : dmPacePerUnit(p)),
+          };
+        });
+      })(),
+      // ⛔ WHICH SEGMENT FACTS PRINT (2026-09-16). The map counted personal-record segments in the
+      // render and gated the overall placing at tenth itself. Both are decided here; the cut is OURS
+      // with a ledger row (Strava publishes leaderboards, not a rule for when a placing is worth showing).
+      segments: (() => {
+        const achRaw = (d as { achievements?: unknown })?.achievements;
+        let ach: { segment_efforts?: unknown } | null = null;
+        if (achRaw && typeof achRaw === 'object') ach = achRaw as { segment_efforts?: unknown };
+        else if (typeof achRaw === 'string' && achRaw.length > 1) { try { ach = JSON.parse(achRaw); } catch { ach = null; } }
+        const efforts = Array.isArray(ach?.segment_efforts) ? ach!.segment_efforts as Array<Record<string, unknown>> : null;
+        if (!efforts) return null;
+        /** OURS — an overall placing is worth naming inside the top ten; past that it is a rank nobody
+         *  reads as an achievement. Strava publishes the leaderboard, not a cut-off. STATE-SOURCES. */
+        const OVERALL_RANK_SHOWN_THROUGH = 10;
+        return {
+          pr_count: efforts.filter((e) => Number(e?.pr_rank) === 1).length,
+          efforts: efforts.map((e) => ({
+            ...e,
+            show_overall_rank: Number(e?.kom_rank) > 0 && Number(e?.kom_rank) <= OVERALL_RANK_SHOWN_THROUGH,
+          })),
+        };
+      })(), distance_m: distM, distance_km: distKm, duration_s: durS, elapsed_s: elapsedS, elevation_gain_m: elevation_gain_m, avg_power, avg_hr, max_hr, max_power, max_speed_mps, max_pace_s_per_km, max_cadence_rpm, avg_speed_kmh, avg_speed_mps, avg_pace_s_per_km, avg_running_cadence_spm, avg_cycling_cadence_rpm, avg_swim_pace_per_100m, avg_swim_pace_per_100yd, calories, work_kj, normalized_power, intensity_factor, variability_index, avg_power_pedaling_w, pct_time_pedaling, sport: (d?.type || null), series };
 
     if (scope === 'workout') {
       return new Response(JSON.stringify({
