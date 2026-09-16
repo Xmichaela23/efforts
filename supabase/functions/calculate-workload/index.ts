@@ -120,7 +120,8 @@ function calculateWorkload(workout: WorkoutData, sessionRPE?: number, bodyweight
 
 /** The one input shape for resolveCardioIntensity, built from a workout row + injected thresholds. */
 function cardioIntensityInput(w: WorkoutData & Record<string, any>) {
-  const minutes = Number(w.moving_time ?? w.duration) || 0;
+  const mt = Number(w.moving_time ?? w.duration);
+  const minutes = Number.isNaN(mt) || mt === 0 ? 0 : mt;
   const distRaw = Number(w.distance) || 0;
   const distM = distRaw > 0 ? (distRaw < 1000 ? distRaw * 1000 : distRaw) : 0;
   const paceSecPerKm = minutes > 0 && distM > 0 ? (minutes * 60) / (distM / 1000) : null;

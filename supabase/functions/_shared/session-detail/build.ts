@@ -255,6 +255,10 @@ export type SessionDetailInput = {
    *  primary with the narrative-trusted guard/reconciliation, raw columns fallback). Resolved in
    *  workout-detail; null for non-runs. So the card reads the SAME guarded pace/HR the narrative does. */
   completedRunScalars?: RunScalars | null;
+  /** ⛔ THE SESSION'S ONE AVERAGE HEART RATE (D-477; 2026-09-16, Stage 7 session 1) — `getOverallAvgHr`, the
+   *  device's average first, our sample mean only when none was sent. Every sport. Resolved in
+   *  workout-detail (the DB reader) and printed as passed; absent → null. */
+  completedAvgHr?: number | null;
   /** Completed workout's refined_type (e.g. 'pool_swim', 'open_water_swim'). */
   completedRefinedType?: string | null;
   /** Raw workouts.workout_metadata — for the swim pace equipment caveat (detectSwimEquipment). The
@@ -403,6 +407,7 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     athleteMetric: athleteMetricIn,
     completedMovingS,
     completedRunScalars,
+    completedAvgHr,
     loadContext,
     weatherTempF,
     weatherTempStartF,
@@ -867,9 +872,10 @@ export function buildSessionDetailV1(input: SessionDetailInput): SessionDetailV1
     // resolver returns null) and keep walk/hike on the prior path. Swim nulls land pace (D-182).
     avg_pace_s_per_mi: type === 'swim' ? null : ((type === 'run' ? fin(completedRunScalars?.paceSecPerMi) : null) ?? fin(compOverall?.avg_pace_s_per_mi) ?? fin(fpFacts?.avg_pace_sec_per_mi)),
     avg_gap_s_per_mi: type === 'swim' ? null : ((type === 'run' ? fin(completedRunGap) : null) ?? fin(compOverall?.avg_gap_s_per_mi) ?? fin(fpFacts?.avg_gap_sec_per_mi)),
-    // D-182 swim avg-HR from the raw-column scalar; D-185 run avg-HR from the run resolver (matches the
-    // narrative); other non-swims unchanged.
-    avg_hr: (type === 'swim' ? completedSwimScalars?.avgHr : (type === 'run' ? completedRunScalars?.avgHr : null)) ?? fin(compOverall?.avg_hr) ?? fin(fpFacts?.avg_hr) ?? fin(actualSession?.avg_heart_rate as any),
+    // ⛔ ONE AVERAGE HEART RATE, EVERY SPORT (2026-09-16, Stage 7 session 1) — the device's average first,
+    // our sample mean only when none was sent (D-477 `getOverallAvgHr`, passed in by workout-detail). This
+    // ranked the sample mean and the fact packet ahead of the device's number on rides, walks and lifts.
+    avg_hr: fin(completedAvgHr),
     swim_pace_per_100_s: completedSwimPer100,
     swim_work_rest: swimWorkRest, // D-194
     swim_pace_equipment_note: swimPaceEquipmentNote, // "with fins — reads faster than unaided"; null = no gear logged
@@ -2192,7 +2198,9 @@ export function buildAnalysisDetailRows(
       // disagree about one fact. The computed/lap values stay as the fallback for rows that predate
       // the column or arrived without it.
       const lap0 = comp?.analysis?.events?.laps?.[0];
-      const elevM = Number(
+      // ⛔ All device totals, none ours (2026-09-16, Stage 7 session 1): the parameter holds the row's
+      // `elevation_gain`; nothing writes computed.overall.elevation_gain(_m); the lap is the device's lap.
+      const elevM = Number( /* sent-held: elevation_gain — providerElevationGainM */
         providerElevationGainM ??
           comp?.overall?.elevation_gain_m ??
           comp?.overall?.elevation_gain ??

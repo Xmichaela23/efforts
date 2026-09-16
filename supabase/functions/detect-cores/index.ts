@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
     trailheadRadiusM: numOpt(body?.trailhead_radius_m) ?? TRAILHEAD_RADIUS_M,
     corridorM: numOpt(body?.corridor_m),
     coverageFrac: numOpt(body?.coverage_frac) ?? 0.4,
-    minCoreDistanceM: numOpt(body?.min_core_distance_m) ?? 600,
+    minCoreDistanceM: typeof body?.min_core_distance_m === 'number' ? body.min_core_distance_m : 600,
   };
 
   // B1: identity comes from the verified JWT; the service key (internal fan-out / scripts) may name a user in the body. Body user_id is otherwise ignored.

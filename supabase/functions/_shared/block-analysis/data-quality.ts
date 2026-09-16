@@ -53,9 +53,8 @@ function assessBikeQuality(workouts: Workout[]): DataQuality['bike'] {
   const count = workouts.length;
   
   // Check for power data
-  const withPower = workouts.filter(w => 
-    (w.avg_power && w.avg_power > 0) || 
-    (w.normalized_power && w.normalized_power > 0)
+  const withPower = workouts.filter(w =>
+    Number(w.avg_power) > 0 || Number(w.normalized_power) > 0
   );
   
   const hasPower = withPower.length > 0;

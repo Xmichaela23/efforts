@@ -130,7 +130,7 @@ export function resolveCurrentMaxHr(baselines: MaxHrBaselinesLike, opts?: MaxHrR
 
   // 1. manual / configured (an assertion the athlete stands behind).
   const cfg = baselines?.athlete_config;
-  const manualValue = asPositiveFinite(isRide ? cfg?.manual_ride_max_hr : cfg?.manual_run_max_hr)
+  const manualValue = asPositiveFinite(cfg?.[isRide ? 'manual_ride_max_hr' : 'manual_run_max_hr'])
     ?? asPositiveFinite(baselines?.configured_hr_zones?.max_heart_rate);
   if (manualValue != null) {
     return { bpm: manualValue, source: 'manual', confidence: null, sample_count: null, is_estimate: false };

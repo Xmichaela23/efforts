@@ -61,7 +61,7 @@
       "2": "warn",
       "2-ledger": "fail",
       "3": "warn",
-      "4": "warn",
+      "4": "fail",
       "5": "fail"
     },
     "scopes": {
@@ -130,6 +130,10 @@
       },
       {
         "path": "supabase/functions/_shared/recompute-goal-race-projections.ts",
+        "reason": "WORKORDER §3a — race plan path and season wizard, parked"
+      },
+      {
+        "path": "supabase/functions/_shared/goal-finish-from-workouts.ts",
         "reason": "WORKORDER §3a — race plan path and season wizard, parked"
       },
       {

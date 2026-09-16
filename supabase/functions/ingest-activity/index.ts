@@ -1087,9 +1087,12 @@ async function mapGarminToWorkout(activity, userId) {
           const distM = Number.isFinite(distIn) && distIn > 0 ? Math.round(distIn)
                         : (Number.isFinite(nLen) && nLen > 0 && Number.isFinite(poolM) && poolM > 0 ? Math.round(nLen * poolM) : null);
           const durS = Number.isFinite(durIn) && durIn > 0 ? Math.floor(durIn) : null;
+          // ⛔ THE DEVICE'S SWIM DISTANCE FIRST (2026-09-16, Stage 7 session 1) — `distance_meters` as sent, else
+          // lengths × pool (`distM` above); the samples' figure already on the overall only when neither. This
+          // put ours first and wrote a literal 0 when there was nothing.
           c.overall = {
             ...(c.overall || {}),
-            distance_m: (c.overall?.distance_m ?? distM ?? 0),
+            ...(distM != null ? { distance_m: distM } : {}),
             duration_s_moving: (c.overall?.duration_s_moving ?? durS ?? null)
           };
         }

@@ -7,6 +7,7 @@ import { generateIntervalBreakdown } from './lib/intervals/interval-breakdown.ts
 import { getWorkIntervals } from './lib/intervals/build-intervals.ts';
 import { calculatePaceRangeAdherence, getIntervalType, IntervalType } from './lib/adherence/pace-adherence.ts';
 import { calculateGarminExecutionScore, getPaceToleranceForSegment } from './lib/adherence/garmin-execution.ts';
+import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
 import { calculatePrescribedRangeAdherenceGranular, type PrescribedRangeAdherence, type IntervalAnalysis, type SampleTiming } from './lib/adherence/granular-pace.ts';
 import { calculateIntervalHeartRate } from './lib/analysis/heart-rate.ts';
 import { computeVarianceGate } from './lib/variance-gate.ts';
@@ -181,6 +182,8 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
         elapsed_time,
         total_timer_time,
         distance,
+        metrics,
+        avg_speed,
         elevation_gain,
         weather_data,
         avg_temperature,
@@ -1331,9 +1334,9 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
           title: plannedWorkout?.title
         });
         
-        const movingTimeForPace = workout?.computed?.overall?.duration_s_moving 
-          || (workout.moving_time ? (workout.moving_time < 1000 ? workout.moving_time * 60 : workout.moving_time) : null)
-          || null;
+        // ⛔ THE SESSION'S ONE MOVING TIME (2026-09-16, Stage 7 session 1) — `completedMovingSeconds`, the
+        // figure Details, the calendar and Today print; the device's seconds first. This was a copied ladder.
+        const movingTimeForPace = completedMovingSeconds(workout) ?? 0;
         const distanceKmForPace = workout.distance || 0;
         const distanceMiForPace = distanceKmForPace * 0.621371;
         const avgPaceSecondsForAdherence = (movingTimeForPace > 0 && distanceMiForPace > 0) 
@@ -1420,9 +1423,8 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
           console.log(`🔍 [PACE ADHERENCE] No work intervals (steady-state), calculating average pace vs target`);
           
           // Calculate overall average pace
-          const movingTimeForPace = workout?.computed?.overall?.duration_s_moving 
-            || (workout.moving_time ? (workout.moving_time < 1000 ? workout.moving_time * 60 : workout.moving_time) : null)
-            || null;
+          // ⛔ THE SESSION'S ONE MOVING TIME (2026-09-16, Stage 7 session 1) — `completedMovingSeconds`.
+          const movingTimeForPace = completedMovingSeconds(workout) ?? 0;
           const distanceKmForPace = workout.distance || 0;
           const distanceMiForPace = distanceKmForPace * 0.621371;
           const avgPaceSecondsForAdherence = (movingTimeForPace > 0 && distanceMiForPace > 0) 
@@ -2950,6 +2952,7 @@ Deno.serve(withAlarm('analyze-running-workout', async (req) => {
     // Hoisted out of the inner try so the persist step below can snapshot it
     // into workout_analysis.course_strategy_zones (defense-in-depth read path).
     let courseStrategyZonesUsed: CourseStrategyZoneLine[] | null = null;
+    /* parked: race debrief, WORKORDER §3a */
     if (goalRaceCompletionMatch.matched) {
       try {
         const wAny = workout as Record<string, unknown>;
@@ -3569,9 +3572,10 @@ function generateDetailedChartAnalysis(sensorData: any[], intervals: any[], gran
   
   // Calculate workout-level average pace (from moving_time/distance) to pass to mile breakdown
   // This ensures consistency between AI narrative and pattern analysis
-  const workoutMovingTimeSeconds = workout?.computed?.overall?.duration_s_moving 
-    || (workout?.moving_time ? (workout.moving_time < 1000 ? workout.moving_time * 60 : workout.moving_time) : null)
-    || (workout?.duration ? (workout.duration < 1000 ? workout.duration * 60 : workout.duration) : 0);
+  // ⛔ THE SESSION'S ONE MOVING TIME (2026-09-16, Stage 7 session 1) — `completedMovingSeconds`, the figure
+  // Details, the calendar and Today print (device seconds first). This copied ladder put our computed
+  // figure first and rebuilt the rest from whole minutes.
+  const workoutMovingTimeSeconds = completedMovingSeconds(workout) ?? 0;
   const workoutDistanceKm = workout?.distance || 0;
   const workoutDistanceMi = workoutDistanceKm * 0.621371;
   const workoutAvgPaceSeconds = (workoutMovingTimeSeconds > 0 && workoutDistanceMi > 0) 

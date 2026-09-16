@@ -156,11 +156,12 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
       let completedId: string = String(workout?.id || '');
       const isProviderOnly = /^garmin_/i.test(completedId) || /^strava_/i.test(completedId);
       if (isProviderOnly) {
+        const mins = Number(workout?.duration || (workout?.moving_time || workout?.total_timer_time || 0)/60);
         const toSave: any = {
           name: workout?.name || 'Imported Activity',
           type: String(workout?.type || 'run'),
           date: String(workout?.date || new Date().toISOString().slice(0,10)),
-          duration: Math.round(Number(workout?.duration || (workout?.moving_time || workout?.total_timer_time || 0)/60) || 0),
+          duration: Math.round(Number.isNaN(mins) || mins === 0 ? 0 : mins),
           description: workout?.description || '',
           usercomments: '',
           completedmanually: false,

@@ -588,7 +588,8 @@ export async function buildReadiness(
     const completed_volume_by_type: Record<string, number> = {};
     for (const w of workoutsWeek) {
       const t = (w.type ?? "other").toLowerCase();
-      const dur = Number(w.moving_time ?? w.duration) || 0;
+      const mt = Number(w.moving_time ?? w.duration);
+      const dur = Number.isNaN(mt) || mt === 0 ? 0 : mt;
       // OURS — `buildReadiness` a duration over 1000 is read as seconds: unit guess, no outside source
       const minutes = dur > 1000 ? dur / 60 : dur;
       if (t === "strength") {
@@ -734,8 +735,9 @@ export async function buildReadiness(
     const completed_volume_by_type: Record<string, number> = {};
     for (const w of woOnly ?? []) {
       const t = (w.type ?? "other").toLowerCase();
-      const dur = Number((w as { moving_time?: number; duration?: number }).moving_time ??
-        (w as { duration?: number }).duration) || 0;
+      const mt = Number((w as { moving_time?: number; duration?: number }).moving_time ??
+        (w as { duration?: number }).duration);
+      const dur = Number.isNaN(mt) || mt === 0 ? 0 : mt;
       // OURS — `buildReadiness` a duration over 1000 is read as seconds: unit guess, no outside source
       const minutes = dur > 1000 ? dur / 60 : dur;
       if (t === "strength") {

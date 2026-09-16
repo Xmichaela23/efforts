@@ -1065,7 +1065,8 @@ function classifyRunIntent(w: WorkoutRow, planned?: PlannedRow | null, threshold
   const detected = String((w as any)?.workout_analysis?.classified_type ?? (w.computed as any)?.analysis?.heart_rate?.workout_type ?? '').toLowerCase();
   if (detected === 'intervals' || detected === 'hill_repeats' || detected === 'tempo' || detected === 'threshold' || detected === 'vo2' || detected === 'speed') return 'interval';
   // the resolved average (the same number the facts row prints); the column is null on some imports
-  const avgHr = toNum(avgHrBpm) ?? toNum(w.avg_heart_rate);
+  // ⛔ getOverallAvgHr already read the device first; its column is not read a second time (2026-09-16, Stage 7 session 1).
+  const avgHr = toNum(avgHrBpm);
   if (avgHr != null && thresholdHrBpm != null && thresholdHrBpm > 0) {
     // 90% LTHR is FRIEL'S run-zone boundary, not a number of ours: his run zones put Z2 (aerobic/easy)
     // at 85-89% LTHR and Z3 (tempo/threshold) at 90-94% — the same zone table `workload.ts` reads for

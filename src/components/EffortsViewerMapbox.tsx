@@ -463,7 +463,7 @@ function EffortsViewerMapbox({
     const idxs = downsampleSeriesByDistance(distance_m as number[], 2000, splitMeters, peakIndices);
     return idxs.map((i): Sample => ({
       t_s: Number(time_s?.[i] ?? i) || 0,
-      d_m: Number(distance_m?.[i] ?? 0) || 0,
+      d_m: Number(distance_m?.[i]) || 0,
       elev_m_sm: num(elevation_m, i),
       pace_s_per_km: num(pace_s_per_km, i),
       speed_mps: num(speed_mps, i),

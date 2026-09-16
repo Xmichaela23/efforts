@@ -1232,9 +1232,8 @@ export function analyzeRides(
   // KEY: Filter for hard efforts to exclude casual rides!
   // ==========================================================================
   
-  const ridesWithPower = rides.filter(r => 
-    (r.avg_power && r.avg_power > 50) || 
-    (r.normalized_power && r.normalized_power > 50)
+  const ridesWithPower = rides.filter(r =>
+    Number(r.avg_power) > 50 || Number(r.normalized_power) > 50
   );
   let ftp_estimated: LearnedMetric | null = null;
 

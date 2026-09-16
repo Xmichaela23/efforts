@@ -1894,9 +1894,16 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
             
             const swimHrVals = hr_bpm.filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
             const swimAvgHr = swimHrVals.length > 0 ? Math.round(swimHrVals.reduce((s, v) => s + v, 0) / swimHrVals.length) : null;
+            // ⛔ THE DEVICE'S SWIM DISTANCE FIRST (2026-09-16, Stage 7 session 1) — the `distance` column (km)
+            // Garmin and Strava sent, the number the swim card already prints (D-182 `resolveSwimScalars`);
+            // ours (series → lengths sum → lengths × pool) only when none was sent. The column was never read
+            // here, and the previous run's figure and a literal 0 stood behind ours.
+            const providerSwimKm = Number((w as any)?.distance);
+            const providerSwimM = Number.isFinite(providerSwimKm) && providerSwimKm > 0 ? Math.round(providerSwimKm * 1000) : null;
             return {
               ...(prevOverall||{}),
-              distance_m: dist || prevOverall?.distance_m || 0,
+              /* sent-held: distance_m — providerSwimM */
+              distance_m: providerSwimM ?? (dist || null),
               duration_s_moving: safeDurationMoving,
               duration_s_elapsed: elapsedDur || prevOverall?.duration_s_elapsed || null,
               avg_hr: swimAvgHr ?? prevOverall?.avg_hr ?? null,
@@ -1904,7 +1911,8 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
           }
           // Non-swim (runs, rides)
           const dist = Number.isFinite(distSeries) && distSeries>0 ? Math.round(distSeries)
-            : (Number((w as any)?.distance)*1000 || prevOverall?.distance_m || null);
+            // ⛔ The previous analysis's own figure no longer stands behind the provider's (2026-09-16, Stage 7 session 1).
+            : (Number((w as any)?.distance)*1000 || null);
           // Extract duration - PRIORITIZE moving time over elapsed time
           // timeSeries might be elapsed time, so we need to get moving time explicitly
           let dur = null;
@@ -1933,6 +1941,8 @@ Deno.serve(withAlarm('compute-workout-analysis', async (req) => {
             const kph = Number((w as any)?.avg_speed);
             const secPerKm = Number((w as any)?.avg_pace);
             const runSec = runMovingSeconds({
+              // ⛔ `dur` here is only Garmin's last-sample moving seconds, set above (2026-09-16, Stage 7 session 1).
+              /* sent-held: moving_time — dur */
               movingSeconds: dur || Number(parseJson((w as any)?.metrics)?.moving_time_seconds) || null,
               avgSpeedMps: kph > 0 ? kph / 3.6 : (secPerKm > 0 ? 1000 / secPerKm : null),
               distanceM: dist,

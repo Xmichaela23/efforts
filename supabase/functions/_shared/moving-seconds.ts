@@ -53,6 +53,18 @@ function parseJson(v: unknown): any {
   try { return JSON.parse(v); } catch { return null; }
 }
 
+/**
+ * ⛔ THE PROVIDER'S ELAPSED SECONDS, OR NULL (2026-09-16, Stage 7 session 1). Garmin's import writes
+ * `metrics.total_elapsed_time_seconds`; the Strava webhook and the file import write
+ * `metrics.elapsed_time_seconds`; `durationInSeconds` is Garmin's own summary name. Only true seconds —
+ * the minute columns are not read here. Details' Elapsed reads this first; the race rung below too.
+ */
+export function providerElapsedSeconds(row: any): number | null {
+  const metrics = parseJson(row?.metrics) ?? {};
+  const s = positive(metrics?.total_elapsed_time_seconds) ?? positive(metrics?.elapsed_time_seconds) ?? positive(metrics?.durationInSeconds);
+  return s == null ? null : Math.round(s);
+}
+
 export function completedMovingSeconds(row: any): number | null {
   try {
     if (!row) return null;
@@ -63,8 +75,9 @@ export function completedMovingSeconds(row: any): number | null {
     const sport = String(row?.type ?? '').toLowerCase();
 
     const elapsedSeconds = (): number | null => {
-      const s = positive(metrics?.total_elapsed_time_seconds) ?? positive(metrics?.durationInSeconds);
-      if (s != null) return Math.round(s);
+      // ⛔ Strava's `elapsed_time_seconds` was never read here (2026-09-16, Stage 7 session 1).
+      const s = providerElapsedSeconds(row);
+      if (s != null) return s;
       for (const v of [metrics?.total_elapsed_time, row?.total_elapsed_time, row?.elapsed_time, metrics?.elapsed_time]) {
         const secs = minutesOrSeconds(v);
         if (secs != null) return secs;
@@ -109,9 +122,9 @@ export function completedMovingSeconds(row: any): number | null {
     }
 
     // 5 — distance over speed or pace, never longer than elapsed.
-    const distM = positive(overall?.distance_m)
-      ?? positive(row?.distance_meters ?? metrics?.distance_meters)
-      ?? (positive(row?.distance) != null ? Math.round(Number(row.distance) * 1000) : null);
+    // ⛔ One flat ladder, same order (2026-09-16, Stage 7 session 1).
+    const kmToM = (km: unknown): number | null => { const n = positive(km); return n == null ? null : Math.round(n * 1000); };
+    const distM = positive(overall?.distance_m) ?? positive(row?.distance_meters) ?? positive(metrics?.distance_meters) ?? kmToM(row?.distance);
     if (distM != null) {
       const elapsed = elapsedSeconds();
       const kph = positive(row?.avg_speed);
@@ -142,8 +155,8 @@ export function completedMovingSeconds(row: any): number | null {
 
     // 8 — elapsed seconds, never for a swim.
     if (sport !== 'swim') {
-      const e = positive(metrics?.total_elapsed_time_seconds ?? metrics?.durationInSeconds);
-      if (e != null) return Math.round(e);
+      const e = providerElapsedSeconds(row);
+      if (e != null) return e;
     }
     return null;
   } catch {

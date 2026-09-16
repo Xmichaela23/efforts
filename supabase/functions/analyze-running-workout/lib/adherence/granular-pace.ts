@@ -4,6 +4,7 @@
  */
 
 import { getPaceToleranceForSegment } from './garmin-execution.ts';
+import { completedMovingSeconds } from '../../../_shared/moving-seconds.ts';
 import { calculatePaceRangeAdherence, getIntervalType, type IntervalType } from './pace-adherence.ts';
 import { paceToGAP, computeSampleGrades, hasUsableElevation, enrichSamplesWithGAP } from '../../../_shared/gap.ts';
 
@@ -625,9 +626,10 @@ function calculateSteadyStatePaceAdherence(
   });
 
   if (mainSegments.length === 0) {
-    const totalTimeSeconds = workout?.computed?.overall?.duration_s_moving ||
-      (workout.moving_time ? (workout.moving_time < 1000 ? workout.moving_time * 60 : workout.moving_time) : null) ||
-      (sensorData.length > 0 ? sensorData.length : 0);
+    // ⛔ THE SESSION'S ONE MOVING TIME (2026-09-16, Stage 7 session 1) — `completedMovingSeconds`, the figure
+    // Details, the calendar and Today print (device seconds first). This copied ladder put our computed
+    // figure first, then whole minutes × 60, then the sample count.
+    const totalTimeSeconds = completedMovingSeconds(workout) ?? 0;
     // OURS — paces slower than 20 min/mi dropped here; no page, kept as found
     const validPaceSamples = sensorData.filter(s => s.pace_s_per_mi > 0 && s.pace_s_per_mi < 1200);
     const avgPace = validPaceSamples.length > 0
@@ -680,7 +682,7 @@ function calculateSteadyStatePaceAdherence(
     }
 
     const plannedDurationSeconds = plannedWorkout?.computed?.total_duration_seconds || 0;
-    const actualDurationSeconds = workout?.computed?.overall?.duration_s_moving || totalTimeSeconds || intervals.reduce((sum, i) => sum + (i.executed?.duration_s || 0), 0);
+    const actualDurationSeconds = totalTimeSeconds; // the one moving time above (2026-09-16, Stage 7 session 1)
     let durationAdherencePct = 0;
     if (plannedDurationSeconds > 0 && actualDurationSeconds > 0) {
       const ratio = actualDurationSeconds / plannedDurationSeconds;

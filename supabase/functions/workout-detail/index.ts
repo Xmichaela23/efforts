@@ -37,7 +37,7 @@ import { normalizeCompletedStrengthExercise } from '../../../src/lib/normalize-s
 // backfill use, so a session's lb column and its load score are priced off an identical number.
 import { resolveBodyweightLb } from '../_shared/workload.ts';
 // ⛔ ONE MOVING TIME PER FINISHED SESSION (2026-09-10, audit H-D10) — the rule get-week stamps too.
-import { completedMovingSeconds } from '../_shared/moving-seconds.ts';
+import { completedMovingSeconds, providerElapsedSeconds } from '../_shared/moving-seconds.ts';
 // ⛔ THE GOOD-NEWS LINE (2026-09-10, audit H-T14) — stored by recompute-workout, passed through here.
 import type { SessionBoomV1 } from '../_shared/session-boom/types.ts';
 // The all-out set: the rep record, the standard 1RM formula (D-339) and the rep ceiling above which
@@ -1141,6 +1141,8 @@ async function runSessionDetailPipelineAndPersist(
             workout_analysis: wa,
           })
         : null,
+      // ⛔ THE ONE AVERAGE HEART RATE, EVERY SPORT (D-477; 2026-09-16, Stage 7 session 1) — device first.
+      completedAvgHr: getOverallAvgHr(detail),
       completedRefinedType: (detail as any).refined_type ?? row?.refined_type ?? null,
       // Raw metadata for the swim pace equipment caveat (build.ts composes it; this is the DB reader).
       completedWorkoutMetadata: (detail as any).workout_metadata ?? row?.workout_metadata ?? null,
@@ -2003,9 +2005,14 @@ Deno.serve(async (req) => {
     // ran its own ladder (true seconds, then computed, then minutes; the 2026-09-03 "45:00" fix lives
     // on as rung 2 of `completedMovingSeconds`), so Details and the calendar could differ by seconds.
     const durS = (detail as any).moving_seconds ?? null;
+    // ⛔ ELAPSED IS THE DEVICE'S SECONDS FIRST (2026-09-16, Stage 7 session 1) — Garmin's or Strava's
+    // elapsed seconds (`providerElapsedSeconds`), our `duration_s_elapsed` only when none was sent. This
+    // put our figure first, then whole minutes × 60, then fell back to MOVING time. Swims keep D-182.
+    const providerElapsedS = providerElapsedSeconds(row);
     const elapsedS = (_isSwim && _swimSc?.elapsedSeconds != null)
       ? _swimSc.elapsedSeconds
-      : (Number.isFinite(d?.computed?.overall?.duration_s_elapsed) ? Number(d.computed.overall.duration_s_elapsed) : (Number.isFinite(d?.elapsed_time ?? d?.metrics?.elapsed_time) ? Number(d.elapsed_time ?? d.metrics.elapsed_time) * 60 : null) ?? durS);
+      /* sent-held: elapsed_time_seconds — providerElapsedS */
+      : (providerElapsedS ?? (Number(d?.computed?.overall?.duration_s_elapsed) > 0 ? Number(d.computed.overall.duration_s_elapsed) : null));
     const elevation_gain_m = Number.isFinite(d?.elevation_gain ?? d?.metrics?.elevation_gain) ? Number(d.elevation_gain ?? d.metrics.elevation_gain) : null;
     const avg_power = Number.isFinite(d?.avg_power ?? d?.metrics?.avg_power) ? Number(d.avg_power ?? d.metrics.avg_power) : null;
     const avg_hr = getOverallAvgHr(d); // D-477: the one average heart rate, same as Performance and Today

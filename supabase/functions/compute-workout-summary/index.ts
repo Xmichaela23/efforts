@@ -70,6 +70,7 @@ function avg(nums: number[]) {
               (typeof s.paceInSecondsPerKilometer === 'number' && (1000 / s.paceInSecondsPerKilometer)) ||
               undefined;
 
+    /* provider-first: distance_m — alias spellings of one sample field; `??` would keep a 0 first spelling */
     const d = (typeof s.totalDistanceInMeters === 'number' && s.totalDistanceInMeters) ||
               (typeof s.distanceInMeters === 'number' && s.distanceInMeters) ||
               (typeof s.cumulativeDistanceInMeters === 'number' && s.cumulativeDistanceInMeters) ||
@@ -1068,7 +1069,7 @@ Deno.serve(async (req) => {
         const time_s = Number(
           L?.totalElapsedTimeInSeconds ?? L?.totalTimerTimeInSeconds ?? L?.time_s ??
           L?.elapsed_time ?? L?.moving_time ??
-          (end_ts - start_ts) ?? 0
+          (end_ts - start_ts)
         );
         const dist_m = Number(
           L?.totalDistanceInMeters ?? L?.distanceInMeters ?? L?.dist_m ??
