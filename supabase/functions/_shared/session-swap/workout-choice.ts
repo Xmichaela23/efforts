@@ -251,6 +251,11 @@ export function workoutChoiceOptions(
     const held = tagValue(r, 'archetype:');
     if (held) taken.add(held);
   }
+  // ⛔ THE SHEET PRICES THE SLOT'S FAMILY THE WAY THE TAP WILL BUILD IT (2026-09-15). p237's anaerobic
+  // work carries a floor and no ceiling, so the line has to say "202 W and up" where the step will.
+  const slotPricing: QualityPricing = FAMILIES[slot.family].floorOnly
+    ? { ...pricing, floorOnlyAtOrAbovePct: FAMILIES[slot.family].workFloorPct }
+    : pricing;
   const out: SwapOption[] = [];
   for (const w of workoutsForSlot(slot)) {
     if (w.id === slot.archetype || w.id === planned || taken.has(w.id)) continue;
@@ -269,7 +274,7 @@ export function workoutChoiceOptions(
       archetype: w.id,
       to: slot.sport,
       label: `${w.label} · ${minutes} min`,
-      line: workoutLine(next, slot.sport, pricing),
+      line: workoutLine(next, slot.sport, slotPricing),
       patch: workoutChoicePatch(session, slot, next),
       needsMaterialize: true,
       warnings: [],

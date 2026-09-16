@@ -64,3 +64,17 @@ Deno.test('the range itself, no allowance', () => {
   assertEquals(powerRangeBand(108, 109, 126), 'below');
   assertEquals(powerRangeBand(128, 0, 126), null);
 });
+
+/**
+ * ⛔ p237's ANAEROBIC WORK: A FLOOR AND NO CEILING (2026-09-15). An absent upper reads as no ceiling,
+ * which is what `analyze-cycling-workout` has always meant by it. Before this, a floor-only step came
+ * back `null` — no verdict — and once the floor and ceiling were written as one number, every repeat
+ * above the floor read red.
+ */
+Deno.test('a floor with no ceiling: at or above the floor is in, under it is below', () => {
+  assertEquals(powerRangeBand(202, 202, null), 'in');
+  assertEquals(powerRangeBand(232, 202, null), 'in');   // 15% over the floor is still in
+  assertEquals(powerRangeBand(400, 202, undefined), 'in');
+  assertEquals(powerRangeBand(201, 202, null), 'below');
+  assertEquals(powerRangeBand(202, 0, null), null);     // no floor is still no verdict
+});

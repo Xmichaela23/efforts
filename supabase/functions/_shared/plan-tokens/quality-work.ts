@@ -148,15 +148,55 @@ export function pacedAt(pct: number | null | undefined, thresholdSecPerMi: numbe
   return Number.isFinite(thr) && thr > 0 && Number.isFinite(p) && p > 0 ? Math.round(thr / p) : undefined;
 }
 
-/** Percent of FTP as watts. Undefined without an FTP — the step then carries no target, as it always did. */
-export function wattsAt(lo: number, hi: number, ftp: number | null | undefined): { lower: number; upper: number } | undefined {
+/**
+ * ⛔⛔ THE BAND AROUND A SINGLE PRINTED PERCENTAGE, DEFINED ONCE (2026-09-15, WORKORDER Stage 3
+ * session 6). "2:30 @ 90%" is one number, and a step judged at exactly that number is red on every
+ * repeat — `151-151 W` is not a range. Four copies of ±5% stood in the app (the materializer's prose
+ * parser, two in `get-week`, the Garmin sender's centre fallback); this is the one, and it sits
+ * where a percentage becomes watts rather than where a string is re-parsed.
+ *
+ * // OURS — no field source. Searched TrainerRoad support + forum, Zwift support and Zwift Insider,
+ * TrainingPeaks Workout Builder help + FAQ, intervals.icu forum and docs: none of them publishes a
+ * tolerance for judging a single-target step. TrainingPeaks offers Target OR Range per step and does
+ * not widen a Target; TrainerRoad's own workouts use a fixed 20 W spread, a different rule on a
+ * different quantity, and borrowing it would be the same class of error as the ACWR clause.
+ * Ledger: `docs/STATE-SOURCES.md`, row "Single-percent power band".
+ */
+export const SINGLE_PERCENT_BAND = 0.05;
+
+/**
+ * Percent of FTP as watts. Undefined without an FTP — the step then carries no target, as it always did.
+ *
+ * ⛔ A SINGLE PERCENTAGE GETS `SINGLE_PERCENT_BAND` EITHER SIDE. Both ends equal is the caller saying
+ * "the page printed one number here", which is the whole of the rule's trigger.
+ * ⛔ AND `floorOnlyAtOrAbovePct` LEAVES THE CEILING OFF — p237, see `FAMILIES.ride_anaerobic.floorOnly`.
+ * An ABSENT `upper` is the app's existing way of saying "no ceiling": `analyze-cycling-workout` already
+ * reads a missing upper as Infinity, and the zone rows already print an absent bound as "176 bpm and up".
+ */
+export function wattsAt(
+  lo: number,
+  hi: number,
+  ftp: number | null | undefined,
+  floorOnlyAtOrAbovePct?: number | null,
+): { lower: number; upper?: number } | undefined {
   const f = Number(ftp);
   if (!Number.isFinite(f) || f <= 0) return undefined;
+  const floorPct = Number(floorOnlyAtOrAbovePct);
+  if (Number.isFinite(floorPct) && floorPct > 0 && lo >= floorPct) {
+    return { lower: Math.round(lo * f) };
+  }
+  if (lo === hi) {
+    return {
+      lower: Math.round(lo * f * (1 - SINGLE_PERCENT_BAND)),
+      upper: Math.round(lo * f * (1 + SINGLE_PERCENT_BAND)),
+    };
+  }
   return { lower: Math.round(lo * f), upper: Math.round(hi * f) };
 }
 
 export type RunStep = { kind: 'work' | 'recovery'; duration_s: number; pace_sec_per_mi?: number };
-export type RideStep = { kind: 'work' | 'recovery'; duration_s: number; power_range?: { lower: number; upper: number } };
+/** ⚠️ `upper` IS OPTIONAL: a floor-only step has no ceiling to carry. See `wattsAt`. */
+export type RideStep = { kind: 'work' | 'recovery'; duration_s: number; power_range?: { lower: number; upper?: number } };
 
 /**
  * The work as running steps — what `expandRunToken` pushes for these two shapes, id aside.
@@ -204,8 +244,16 @@ export function qualityRunSteps(
   return out;
 }
 
-/** The work as riding steps — what `expandBikeToken` pushes for these three shapes, id aside. */
-export function qualityRideSteps(work: QualityWork, ftp: number | null | undefined): RideStep[] {
+/**
+ * The work as riding steps — what `expandBikeToken` pushes for these three shapes, id aside.
+ * ⚠️ `floorOnlyAtOrAbovePct` IS THE FAMILY'S WORK FLOOR, and only `ride_anaerobic` passes one
+ * (`FAMILIES.ride_anaerobic.floorOnly`, p237). Every other family passes nothing and builds as before.
+ */
+export function qualityRideSteps(
+  work: QualityWork,
+  ftp: number | null | undefined,
+  floorOnlyAtOrAbovePct?: number | null,
+): RideStep[] {
   const recovery = wattsAt(RIDE_RECOVERY_PCT.lo, RIDE_RECOVERY_PCT.hi, ftp);
   const out: RideStep[] = [];
   if (work.kind === 'round') {
@@ -215,7 +263,14 @@ export function qualityRideSteps(work: QualityWork, ftp: number | null | undefin
         if (seg.at === 'racepace' || seg.at === 'allout') out.push({ kind: 'work', duration_s: seg.seconds });
         else if (seg.at) out.push({ kind: 'recovery', duration_s: seg.seconds, ...(recovery ? { power_range: recovery } : {}) });
         else {
-          const w = wattsAt(seg.pct ?? 0, seg.pctHi ?? seg.pct ?? 0, ftp);
+          // ⚠️ THE FLOOR IS OFFERED TO WORK ONLY. A recovery the page prints a percentage for (p237's
+          // 50% half) is a stated number, not an effort with a floor, and keeps its band.
+          const w = wattsAt(
+            seg.pct ?? 0,
+            seg.pctHi ?? seg.pct ?? 0,
+            ftp,
+            seg.role === 'work' ? floorOnlyAtOrAbovePct : null,
+          );
           out.push({ kind: seg.role, duration_s: seg.seconds, ...(w ? { power_range: w } : {}) });
         }
       }
@@ -257,6 +312,12 @@ export type QualityPricing = {
   ftp?: number | null;
   /** What the athlete reads distance in. Paces print per mile or per kilometre; watts are watts. */
   units?: 'imperial' | 'metric' | null;
+  /**
+   * The family's work floor, where the family prescribes a floor and no ceiling — `ride_anaerobic`
+   * and nothing else (p237). The sheet's line and the steps the tap builds read the same number, so
+   * the line cannot promise a ceiling the session does not carry.
+   */
+  floorOnlyAtOrAbovePct?: number | null;
 };
 
 const SEC_PER_MI_TO_KM = 1.60934;
@@ -276,8 +337,13 @@ export function paceWord(secPerMi: number, units?: 'imperial' | 'metric' | null)
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}/${units === 'metric' ? 'km' : 'mi'}`;
 }
 
-/** `185–220 W`, or `252 W` where the band is a single number. An en dash, as the page sets ranges. */
-export function wattWord(range: { lower: number; upper: number }): string {
+/**
+ * `185–220 W`, or `252 W` where the band is a single number.  An en dash, as the page sets ranges.
+ * ⛔ AND `202 W and up` WHERE THERE IS NO CEILING (2026-09-15, approved) — the house style the zone
+ * rows already print ("176 bpm and up", `save-baselines/zones.ts`).
+ */
+export function wattWord(range: { lower: number; upper?: number }): string {
+  if (range.upper == null) return `${range.lower} W and up`;
   return range.lower === range.upper ? `${range.lower} W` : `${range.lower}–${range.upper} W`;
 }
 
@@ -335,7 +401,7 @@ function rideSegmentWord(seg: QualitySegment, p: QualityPricing): string {
   if (seg.at === 'allout') return `${dur} ${ALL_OUT_WORD}`;
   if (seg.at === 'racepace' || seg.pct == null) return dur;
   const hi = seg.pctHi ?? seg.pct;
-  const w = wattsAt(seg.pct, hi, p.ftp);
+  const w = wattsAt(seg.pct, hi, p.ftp, seg.role === 'work' ? p.floorOnlyAtOrAbovePct : null);
   return `${dur} at ${w ? wattWord(w) : percentWord(seg.pct, hi)}`;
 }
 
@@ -362,9 +428,10 @@ export function qualityWorkLine(work: QualityWork | null, sport: 'run' | 'ride',
   }
   if (work.kind === 'interval') {
     const paced = pacedAt(work.pct, p.thresholdSecPerMi);
+    const iw = wattsAt(work.pct, work.pct, p.ftp, p.floorOnlyAtOrAbovePct);
     const at = sport === 'run'
       ? (paced ? paceWord(paced, p.units) : percentWord(work.pct, work.pct))
-      : (wattsAt(work.pct, work.pct, p.ftp) ? wattWord(wattsAt(work.pct, work.pct, p.ftp)!) : percentWord(work.pct, work.pct));
+      : (iw ? wattWord(iw) : percentWord(work.pct, work.pct));
     return `${work.reps} × ${durationWord(work.workS)} at ${at}${between(work.restS)}`;
   }
   const w = wattsAt(work.lo, work.hi, p.ftp);

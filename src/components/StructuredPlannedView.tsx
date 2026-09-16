@@ -255,7 +255,15 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           // Priority 3: Fall back to single pace target
           return typeof st?.paceTarget==='string' ? st.paceTarget : undefined;
         })();
-        const powRange = (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : undefined;
+        // ⛔ ONE NUMBER WHEN THE RANGE IS ONE NUMBER, AND "and up" WHEN THERE IS NO TOP (2026-09-15,
+        // approved). p237's anaerobic work carries a floor and no ceiling; this printed "202–202 W".
+        const powRange = (() => {
+          if (!(st?.powerRange && typeof st.powerRange.lower === 'number')) return undefined;
+          const lo = Math.round(st.powerRange.lower);
+          if (typeof st.powerRange.upper !== 'number') return `${lo} W and up`;
+          const hi = Math.round(st.powerRange.upper);
+          return lo === hi ? `${lo} W` : `${lo}–${hi} W`;
+        })();
         const pow = typeof st?.powerTarget==='string' ? st.powerTarget : undefined;
         const kind = niceKind(st?.kind);
         let equip = '';

@@ -849,7 +849,8 @@ export type IntervalRow = {
   planned_pace_range?: { lower_sec_per_mi: number; upper_sec_per_mi: number };
   /** 2026-09-03: the planned watts band, so the table can colour the actual (in range / above / below) the
    *  way TrainingPeaks and Garmin do, instead of printing a per-row percentage. */
-  planned_power_range?: { lower_w: number; upper_w: number };
+  /** ⚠️ `upper_w` IS ABSENT ON A FLOOR-ONLY STEP — p237's anaerobic work, a floor and no ceiling. */
+  planned_power_range?: { lower_w: number; upper_w?: number };
   /** Display-ready planned pace string, e.g. "10:30-11:00/mi". */
   planned_pace_display: string | null;
   executed: {

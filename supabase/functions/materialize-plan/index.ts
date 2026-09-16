@@ -37,7 +37,13 @@ import {
   parseQualityWork,
   qualityRideSteps,
   qualityRunSteps,
+  wattsAt,
 } from '../_shared/plan-tokens/quality-work.ts';
+// ⛔ THE FAMILY'S OWN RULES — `floorOnly` + `workFloorPct`, read for the one question "does this
+// family prescribe a floor and no ceiling" (p237). The tag on the row names the family; the library
+// states the rule, so the materializer does not carry a second list of which families those are.
+import { FAMILIES } from '../_shared/endurance-library/source-rules.ts';
+import type { FamilyId } from '../_shared/endurance-library/types.ts';
 import { liveCueFor } from '../_shared/live-cue.ts';
 import { plannedPoolFor } from '../_shared/swim/planned-pool.ts';
 import { calculatePlannedStrengthWorkload, resolveBodyweightLb } from '../_shared/workload.ts';
@@ -2121,7 +2127,16 @@ export /**
  * (Z1, under 55%) is where every ERG platform parks a recovery. Not a training dose — a held resistance.
  */
 
-function expandBikeToken(tok: string, baselines: Baselines): any[] {
+function expandBikeToken(
+  tok: string,
+  baselines: Baselines,
+  /**
+   * The family's work floor, where the family prescribes a floor and no ceiling — p237's anaerobic
+   * work, and nothing else (`FAMILIES.ride_anaerobic.floorOnly`). Absent on every other row, which
+   * builds exactly as before.
+   */
+  floorOnlyAtOrAbovePct?: number | null,
+): any[] {
   const out: any[] = []; const lower = String(tok ?? '').toLowerCase(); const ftp = typeof baselines.ftp==='number'? baselines.ftp: undefined;
   console.log(`🔍 [BIKE DEBUG] Token: ${tok}, FTP: ${ftp}`);
   const pctRange = (lo:number, hi:number)=> {
@@ -2190,7 +2205,7 @@ function expandBikeToken(tok: string, baselines: Baselines): any[] {
     // ⛔ ONE PARSER, ONE ARITHMETIC — `parseQualityWork` + `qualityRideSteps`.
     const work = parseQualityWork(lower);
     if (work && work.kind === 'round') {
-      for (const st of qualityRideSteps(work, ftp)) out.push({ id: uid(), ...st });
+      for (const st of qualityRideSteps(work, ftp, floorOnlyAtOrAbovePct)) out.push({ id: uid(), ...st });
       return out;
     }
   }
@@ -2200,14 +2215,26 @@ function expandBikeToken(tok: string, baselines: Baselines): any[] {
   {
     const work = parseQualityWork(lower);
     if (work && work.kind === 'band') {
-      for (const st of qualityRideSteps(work, ftp)) out.push({ id: uid(), ...st });
+      for (const st of qualityRideSteps(work, ftp, floorOnlyAtOrAbovePct)) out.push({ id: uid(), ...st });
       return out;
     }
   }
   let m: RegExpMatchArray | null = null;
   // VO2: bike_vo2_5x4min_R4min
+  /**
+   * ⛔ p237's PROGRESSIVE REPEATS — *"6-10 x 1 min @ 110-115%+, start at 110% and progress to
+   * 125-130% by the end"*. The `+` is the page's own open ceiling, so the step carries the 110% FLOOR
+   * and nothing above it (`FAMILIES.ride_anaerobic.floorOnly`). It used to carry 110-120%, which put
+   * every repeat inside a ceiling the page does not print.
+   * ⚠️ `bike_vo2_` IS THIS FAMILY'S TOKEN, NOT VO2'S — see the note in `session-vocabulary.ts`.
+   */
   m = lower.match(/bike_vo2_(\d+)x(\d+)min_r(\d+)min/);
-  if (m) { const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60; for(let i=0;i<reps;i++){ out.push({ id: uid(), kind:'work', duration_s: work, power_range: pctRange(1.1,1.2) }); if(rest && i < reps - 1) out.push({ id: uid(), kind:'recovery', duration_s: rest }); } return out; }
+  if (m) {
+    const reps=parseInt(m[1],10), work=parseInt(m[2],10)*60, rest=parseInt(m[3],10)*60;
+    const band = wattsAt(1.1, 1.2, ftp, floorOnlyAtOrAbovePct);
+    for(let i=0;i<reps;i++){ out.push({ id: uid(), kind:'work', duration_s: work, power_range: band }); if(rest && i < reps - 1) out.push({ id: uid(), kind:'recovery', duration_s: rest }); }
+    return out;
+  }
   /**
    * ⛔ p239's VT1 BOUT WITH SPRINTS (2026-09-10): `bike_vt1sprint_45min_10s_every9min`.
    * (interval − sprint) at the endurance band, then the sprint, repeated; the last piece without a
@@ -3216,10 +3243,23 @@ export function expandTokensForRow(
     return { steps, total_s: 0 };
   }
   console.log(`🔍 Parsing ${tokens.length} tokens for ${discipline}:`, tokens);
+  /**
+   * ⛔ DOES THIS ROW'S FAMILY PRESCRIBE A FLOOR AND NO CEILING? (2026-09-15, p237.) The composer
+   * stamps `family:<id>` on the row; `FAMILIES` states the rule. Null on every row that is not a
+   * floor-only family, and the bike expander then builds exactly as it did.
+   */
+  const floorOnlyPct: number | null = (() => {
+    const raw = (row as any)?.tags;
+    const tags: unknown[] = Array.isArray(raw) ? raw : [];
+    const hit = tags.map((t) => String(t ?? '').toLowerCase()).find((t) => t.startsWith('family:'));
+    if (!hit) return null;
+    const rules = FAMILIES[hit.slice('family:'.length) as FamilyId];
+    return rules?.floorOnly ? rules.workFloorPct : null;
+  })();
   for (const tok of tokens) {
     let added: any[] = [];
     if (discipline==='run' || discipline==='walk') added = stampRunPrescription(tok, expandRunToken(tok, baselines), baselines);
-    else if (discipline==='ride' || discipline==='bike' || discipline==='cycling') added = expandBikeToken(tok, baselines);
+    else if (discipline==='ride' || discipline==='bike' || discipline==='cycling') added = expandBikeToken(tok, baselines, floorOnlyPct);
     else if (discipline==='swim') {
       // Detailed swim expansion — one line per rep
       const s = String(tok).toLowerCase();
@@ -3543,15 +3583,15 @@ export function expandTokensForRow(
           return { lower: Math.round(ftp * (lo/100)), upper: Math.round(ftp * (hi/100)) };
         }
         
-        // Single percentage format: "90% FTP"
-        m = s.match(/(\d{1,3})\s*%\s*(?:ftp)?/i);
-        if (m) {
-          const pct = parseInt(m[1],10);
-          if (!Number.isFinite(pct) || pct<=0) return null;
-          const center = Math.round(ftp * (pct/100));
-          const tolerance = 0.05; // ±5% tolerance
-          return { lower: Math.round(center * (1-tolerance)), upper: Math.round(center * (1+tolerance)) };
-        }
+        /**
+         * ⛔ THE SINGLE-PERCENTAGE BRANCH IS GONE (2026-09-15, WORKORDER Stage 3 session 6). It held one
+         * of four copies of the ±5% band, and the band now lives once, where a percentage becomes watts
+         * (`SINGLE_PERCENT_BAND` in `_shared/plan-tokens/quality-work.ts`).
+         * ⚠️ NOTHING LOSES A TARGET. Every generator that writes a bike percentage into prose writes a
+         * RANGE ("110-120% FTP", "88-94% FTP", "82-88% FTP" — `generate-combined-plan/session-factory.ts`),
+         * which the branch above reads. The single-number read was also the one that matched ANY bare
+         * percentage in the prose, which is the fault the gate below was added for in the first place.
+         */
       }
       
       return null;
@@ -3803,11 +3843,17 @@ export function toV3Step(st: any, row?: any): any {
       out.pace_range = { lower: a, upper: b };
     }
   }
-  if (st?.power_range && typeof st.power_range.lower === 'number' && typeof st.power_range.upper === 'number') {
+  /**
+   * ⛔ A FLOOR WITH NO CEILING RIDES THROUGH (2026-09-15, p237). This required BOTH numbers, so a
+   * floor-only step arrived at the calendar row, the phone and the watch carrying no power at all —
+   * the whitelist trap this object has hit before. An absent `upper` is the app's existing way of
+   * saying "no ceiling"; `powerTarget` is then the floor itself rather than a midpoint of one number.
+   */
+  if (st?.power_range && typeof st.power_range.lower === 'number') {
     const lo = Math.round(st.power_range.lower);
-    const up = Math.round(st.power_range.upper);
-    out.powerTarget = `${Math.round((lo + up) / 2)} W`;
-    out.powerRange = { lower: lo, upper: up };
+    const up = typeof st.power_range.upper === 'number' ? Math.round(st.power_range.upper) : null;
+    out.powerTarget = up == null ? `${lo} W` : `${Math.round((lo + up) / 2)} W`;
+    out.powerRange = up == null ? { lower: lo } : { lower: lo, upper: up };
   }
   if (typeof st?.label === 'string') out.label = st.label;
   if (st?.equipment) out.equipment = st.equipment;

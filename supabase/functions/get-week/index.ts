@@ -771,7 +771,7 @@ Deno.serve(async (req)=>{
             if (userFtp && !processedStep.power_range && processedStep.powerTarget && typeof processedStep.powerTarget === 'string') {
               // Handle percentage ranges like "85-95% FTP" or "90% FTP"
               const pctRangeMatch = processedStep.powerTarget.match(/(\d{1,3})\s*[-–]\s*(\d{1,3})\s*%\s*(?:ftp)?/i);
-              const pctSingleMatch = processedStep.powerTarget.match(/(\d{1,3})\s*%\s*(?:ftp)?/i);
+
               if (pctRangeMatch) {
                 const lo = parseInt(pctRangeMatch[1], 10);
                 const hi = parseInt(pctRangeMatch[2], 10);
@@ -781,17 +781,11 @@ Deno.serve(async (req)=>{
                   lower,
                   upper
                 };
-              } else if (pctSingleMatch) {
-                const pct = parseInt(pctSingleMatch[1], 10);
-                const center = Math.round(userFtp * (pct / 100));
-                const tolerance = 0.05; // ±5% tolerance
-                const lower = Math.round(center * (1 - tolerance));
-                const upper = Math.round(center * (1 + tolerance));
-                processedStep.power_range = {
-                  lower,
-                  upper
-                };
               }
+/* ⛔ THE ±5% COPY IS GONE (2026-09-15, WORKORDER Stage 3 session 6). It was dead as well as duplicated:
+   the only server writer of `powerTarget` is `materialize-plan`, which writes "NNN W" and never a
+   percentage, so `pctSingleMatch` never matched a step this function sees. The band now lives once,
+   in `_shared/plan-tokens/quality-work.ts` (`SINGLE_PERCENT_BAND`). */
             }
             return processedStep;
           }) : null;
@@ -1081,7 +1075,7 @@ Deno.serve(async (req)=>{
           if (userFtp && !processedStep.power_range && processedStep.powerTarget && typeof processedStep.powerTarget === 'string') {
             // Handle percentage ranges like "85-95% FTP" or "90% FTP"
             const pctRangeMatch = processedStep.powerTarget.match(/(\d{1,3})\s*[-–]\s*(\d{1,3})\s*%\s*(?:ftp)?/i);
-            const pctSingleMatch = processedStep.powerTarget.match(/(\d{1,3})\s*%\s*(?:ftp)?/i);
+
             if (pctRangeMatch) {
               const lo = parseInt(pctRangeMatch[1], 10);
               const hi = parseInt(pctRangeMatch[2], 10);
@@ -1091,17 +1085,11 @@ Deno.serve(async (req)=>{
                 lower,
                 upper
               };
-            } else if (pctSingleMatch) {
-              const pct = parseInt(pctSingleMatch[1], 10);
-              const center = Math.round(userFtp * (pct / 100));
-              const tolerance = 0.05; // ±5% tolerance
-              const lower = Math.round(center * (1 - tolerance));
-              const upper = Math.round(center * (1 + tolerance));
-              processedStep.power_range = {
-                lower,
-                upper
-              };
             }
+/* ⛔ THE ±5% COPY IS GONE (2026-09-15, WORKORDER Stage 3 session 6). It was dead as well as duplicated:
+   the only server writer of `powerTarget` is `materialize-plan`, which writes "NNN W" and never a
+   percentage, so `pctSingleMatch` never matched a step this function sees. The band now lives once,
+   in `_shared/plan-tokens/quality-work.ts` (`SINGLE_PERCENT_BAND`). */
           }
           return processedStep;
         }) : null;

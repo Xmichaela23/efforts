@@ -256,22 +256,39 @@ export function generateCyclingAdherenceSummary(opts: {
   // (a leeway rule that no longer exists). One line now states the judged number against the range, or, with
   // several work intervals, how many sat inside theirs. Judged number and rule: `_shared/ride-power.ts`.
   {
+    /**
+     * ⛔ A FLOOR-ONLY SESSION IS NOT JUDGED "INSIDE A RANGE" (2026-09-15, approved copy). p237's work
+     * has a floor and no ceiling, so the sentence says what it is: at or above their floor. A session
+     * with both shapes in it — p237's sandwich has 120% work over a floor and a 90% middle in a band —
+     * keeps the range wording, because a mixed session is not a floor-only session.
+     */
     const judged = workIntervals
       .map((i: any) => {
         const w = Number(i?.actual_power_w ?? i?.executed?.judged_power_w ?? i?.executed?.avg_power_w);
         const lo = Number(i?.planned_power_range_lower ?? i?.planned?.power_range?.lower);
-        const hi = Number(i?.planned_power_range_upper ?? i?.planned?.power_range?.upper);
+        const hiRaw = i?.planned_power_range_upper ?? i?.planned?.power_range?.upper ?? null;
+        const hi = hiRaw == null ? null : Number(hiRaw);
         const band = powerRangeBand(w, lo, hi);
-        return band ? { w: Math.round(w), lo: Math.round(lo), hi: Math.round(hi), band } : null;
+        return band ? { w: Math.round(w), lo: Math.round(lo), hi: hi == null ? null : Math.round(hi), band } : null;
       })
-      .filter(Boolean) as Array<{ w: number; lo: number; hi: number; band: 'below' | 'in' | 'above' }>;
+      .filter(Boolean) as Array<{ w: number; lo: number; hi: number | null; band: 'below' | 'in' | 'above' }>;
+    const allFloorOnly = judged.length > 0 && judged.every((j) => j.hi == null);
     if (judged.length === 1 && workIntervals.length === 1) {
       const { w, lo, hi, band } = judged[0];
-      const tail = band === 'above' ? `, ${w - hi} W over the top` : band === 'below' ? `, ${lo - w} W under the bottom` : '';
-      technical_insights.push({ label: 'Power', value: `${w} W against ${lo}–${hi} W${tail}.` });
+      if (hi == null) {
+        technical_insights.push({ label: 'Power', value: `${w} W against a floor of ${lo} W.` });
+      } else {
+        const tail = band === 'above' ? `, ${w - hi} W over the top` : band === 'below' ? `, ${lo - w} W under the bottom` : '';
+        technical_insights.push({ label: 'Power', value: `${w} W against ${lo}–${hi} W${tail}.` });
+      }
     } else if (judged.length > 1) {
       const inside = judged.filter((j) => j.band === 'in').length;
-      technical_insights.push({ label: 'Power', value: `${inside} of ${judged.length} work intervals inside their range.` });
+      technical_insights.push({
+        label: 'Power',
+        value: allFloorOnly
+          ? `${inside} of ${judged.length} work intervals at or above their floor.`
+          : `${inside} of ${judged.length} work intervals inside their range.`,
+      });
     }
   }
 
@@ -914,9 +931,20 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
     // Extract planned values
     const plannedDuration = interval.planned?.duration_s || interval.duration_s || 0;
     const powerRange = interval.power_range || interval.planned?.power_range || interval.target_power;
+    /**
+     * ⛔ ONE READING OF AN ABSENT CEILING, AND IT IS THE ONE THIS FILE ALREADY USED (2026-09-15).
+     * `calculatePowerAdherence` and `calculateSteadyStatePowerAdherence` both read a missing upper as
+     * Infinity — no ceiling. This line collapsed it back down to the floor instead, so the same file
+     * held two answers to the same question and a floor-only step was graded as a single number.
+     * ⚠️ `planned_power_range_upper` GOES OUT AS NULL on a floor-only step, which is what every
+     * downstream reader now takes as "no ceiling": the Performance row, the drift window, the badge.
+     */
     const plannedPowerLower = powerRange?.lower || powerRange?.min || 0;
-    const plannedPowerUpper = powerRange?.upper || powerRange?.max || plannedPowerLower;
-    const plannedPowerCenter = plannedPowerLower > 0 && plannedPowerUpper > 0 
+    const plannedPowerUpperRaw = powerRange?.upper ?? powerRange?.max ?? null;
+    const plannedPowerUpper = Number.isFinite(Number(plannedPowerUpperRaw)) && Number(plannedPowerUpperRaw) > 0
+      ? Number(plannedPowerUpperRaw)
+      : Infinity;
+    const plannedPowerCenter = plannedPowerLower > 0 && Number.isFinite(plannedPowerUpper)
       ? Math.round((plannedPowerLower + plannedPowerUpper) / 2) 
       : plannedPowerLower;
     
@@ -943,7 +971,7 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
     
     // Calculate power adherence using range if available
     let powerAdherence = 0;
-    if (plannedPowerLower > 0 && plannedPowerUpper > 0 && actualPower > 0) {
+    if (plannedPowerLower > 0 && actualPower > 0) {
       // Check if actual power is within range
       if (actualPower >= plannedPowerLower && actualPower <= plannedPowerUpper) {
         powerAdherence = 100;
@@ -993,7 +1021,8 @@ function generateIntervalBreakdown(workIntervals: any[], allIntervalsWithPower?:
       duration_adherence_percent: isRecovery ? null : Math.round(durationAdherence),
       // Power metrics
       planned_power_range_lower: isRecovery ? null : plannedPowerLower,
-      planned_power_range_upper: isRecovery ? null : plannedPowerUpper,
+      // ⚠️ NULL = NO CEILING (p237's floor-only work), not "unknown". See the note above.
+      planned_power_range_upper: isRecovery || !Number.isFinite(plannedPowerUpper) ? null : plannedPowerUpper,
       planned_power_w: isRecovery ? null : plannedPowerCenter,
       actual_power_w: Math.round(actualPower),
       // D-089: session_detail/build.ts:274 reads `iv.avg_power_watts` (run-aligned

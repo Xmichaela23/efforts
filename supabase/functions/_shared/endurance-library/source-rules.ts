@@ -548,6 +548,18 @@ export const FAMILIES: Record<FamilyId, {
   label: string;
   /** Steps at or above this percentage of threshold count as WORK for the band and the ratio. */
   workFloorPct: number;
+  /**
+   * ⛔ THE PAGE PRESCRIBES A FLOOR AND NO CEILING FOR THIS FAMILY'S WORK (2026-09-15). p237 states it
+   * for the whole anaerobic family — *"best done by feel with a power FLOOR rather than a specific
+   * power target — the numbers are guidelines"* — and prints the `+` on its own first option
+   * ("110-115%+", starting at 110% and progressing to 125-130%). p238 names the same principle from
+   * the outside: the anaerobic sessions run on *"more power is generally better"*, which VO2 is then
+   * told NOT to do ("more carefully controlled").
+   * ⚠️ ONLY THE WORK. A step BELOW `workFloorPct` — p237's 90% sustained middle, its 50% half — is a
+   * printed number and keeps a band around it. The floor is the discriminator, not the family alone.
+   * ⚠️ ABSENT ON EVERY OTHER FAMILY, including `ride_vo2`, on p238's own instruction.
+   */
+  floorOnly?: true;
   /** The family's stated intent, in his words where he gives one. */
   intent: string;
   cite: string;
@@ -1234,6 +1246,7 @@ export const FAMILIES: Record<FamilyId, {
     sport: 'ride',
     label: 'Anaerobic',
     workFloorPct: 1.0,
+    floorOnly: true,
     intent: 'Anaerobic repeatability. Best done by feel against a power FLOOR rather than a specific '
       + 'power target — the numbers are guidelines.',
     cite: 'Viada p237',

@@ -258,7 +258,15 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               return paceTarget || undefined;
             } catch { return undefined; }
           };
-          const powerStr = (st:any) => (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : undefined;
+          // ⛔ SAME RULE AS THE OTHER TWO STEP LISTS (2026-09-15, approved): one number when the band
+          // is one number, "202 W and up" when p237 gives the work a floor and no ceiling.
+          const powerStr = (st:any) => {
+            if (!(st?.powerRange && typeof st.powerRange.lower === 'number')) return undefined;
+            const lo = Math.round(st.powerRange.lower);
+            if (typeof st.powerRange.upper !== 'number') return `${lo} W and up`;
+            const hi = Math.round(st.powerRange.upper);
+            return lo === hi ? `${lo} W` : `${lo}–${hi} W`;
+          };
           let i = 0;
           while (i < steps.length) {
             const st:any = steps[i];

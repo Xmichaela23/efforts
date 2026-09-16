@@ -2,6 +2,15 @@
 // Moved unchanged from send-workout-to-garmin/index.ts (2026-09-13) so the Send to Garmin button and the
 // automatic calendar sync build the same workout. Pure: no network, no database.
 import { getStepEquipmentDetail } from '../swim/swim-step-equipment.ts'
+// ⛔ ONE BAND AROUND A SINGLE PERCENTAGE, DEFINED ONCE (2026-09-15) — see the note on the constant.
+import { SINGLE_PERCENT_BAND } from '../plan-tokens/quality-work.ts'
+
+/**
+ * ⛔ THE CEILING A FLOOR-ONLY STEP GOES TO THE WATCH WITH — p237: *"start at 110% and progress to
+ * 125-130% by the end"*. A Garmin step's custom power target is a low/high pair with no open form,
+ * so the page's own top is what fills the high. ⚠️ PERCENT OF FTP, not a multiple of the floor.
+ */
+const FLOOR_ONLY_WATCH_CEILING_PCT_OF_FTP = 1.30
 
 export type PlannedWorkout = {
   id: string
@@ -208,6 +217,20 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         }
         let low = parseW((cs as any)?.power_range?.lower ?? (cs as any)?.powerRange?.lower ?? (cs as any)?.target_low)
         let high = parseW((cs as any)?.power_range?.upper ?? (cs as any)?.powerRange?.upper ?? (cs as any)?.target_high)
+        /**
+         * ⛔⛔ A FLOOR WITH NO CEILING STILL HAS TO REACH THE WATCH (2026-09-15, p237). A Garmin step's
+         * custom power target is a LOW/HIGH pair; there is no open-ended form, and without a high this
+         * fell through to the centre branch below and sent floor ×0.95 to floor ×1.05 — NARROWER than
+         * the prescription it started from, which is the "score that lies" class on a watch screen.
+         * ⛔ THE CEILING SENT IS 130% OF FTP — p237's own top ("start at 110%, progress to 125-130%").
+         * It is a percentage of FTP, NOT 1.30 × the floor: at an FTP of 168 a 120% step goes as
+         * 202 → 218 W. `floor × 1.30` would send 262 W, which is 156% of FTP, a number p237 never prints.
+         * ⚠️ WITH NO FTP TO READ there is no honest ceiling, so the step goes with no power target at
+         * all rather than one worked out from the floor.
+         */
+        if (typeof low === 'number' && high == null && userFTP) {
+          high = Math.max(low, Math.round(userFTP * FLOOR_ONLY_WATCH_CEILING_PCT_OF_FTP))
+        }
         if (typeof low === 'number' && typeof high === 'number') {
           step.targetType = 'POWER'
           step.targetValueLow = Math.round(low)
@@ -216,8 +239,8 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           const center = parseW((cs as any)?.target_watts ?? (cs as any)?.targetWatts ?? (cs as any)?.target_value ?? (cs as any)?.powerTarget)
           if (typeof center === 'number' && isFinite(center)) {
             step.targetType = 'POWER'
-            step.targetValueLow = Math.round(center * 0.95)
-            step.targetValueHigh = Math.round(center * 1.05)
+            step.targetValueLow = Math.round(center * (1 - SINGLE_PERCENT_BAND))
+            step.targetValueHigh = Math.round(center * (1 + SINGLE_PERCENT_BAND))
           } else {
             // Try % of FTP → watts
             const pctLow = parsePct((cs as any)?.power_pct_range?.lower ?? (cs as any)?.powerPercentRange?.lower ?? (cs as any)?.pct_low ?? (cs as any)?.powerPctLow)
@@ -229,8 +252,8 @@ export function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
               step.targetValueHigh = Math.round(userFTP * pctHigh)
             } else if (userFTP && typeof pct === 'number') {
               step.targetType = 'POWER'
-              step.targetValueLow = Math.round(userFTP * pct * 0.95)
-              step.targetValueHigh = Math.round(userFTP * pct * 1.05)
+              step.targetValueLow = Math.round(userFTP * pct * (1 - SINGLE_PERCENT_BAND))
+              step.targetValueHigh = Math.round(userFTP * pct * (1 + SINGLE_PERCENT_BAND))
             }
           }
         }

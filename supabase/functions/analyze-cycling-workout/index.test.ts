@@ -119,6 +119,48 @@ Deno.test('generateCyclingAdherenceSummary: several work intervals — how many 
   assertEquals(r?.technical_insights.find((i) => i.label === 'Power')?.value, '2 of 4 work intervals inside their range.');
 });
 
+/**
+ * ⛔ p237's FLOOR-ONLY WORK (2026-09-15, approved copy). A step with no ceiling is not "inside a
+ * range", and every set at or above the floor is green. The ride that raised this read "0 of 15
+ * inside their range" with the floor and the ceiling written as the same number.
+ */
+Deno.test('generateCyclingAdherenceSummary: a floor-only session is judged at or above its floor', () => {
+  const iv = (w: number) => ({ interval_type: 'work', actual_power_w: w, planned_power_range_lower: 202, planned_power_range_upper: null });
+  const r = generateCyclingAdherenceSummary({
+    performance: { execution_score: 95, power_adherence: 100 },
+    intervalBreakdown: [iv(232), iv(210), iv(202), iv(260)],
+    factPacket: null,
+    hrDriftPct: null,
+  });
+  assertEquals(r?.technical_insights.find((i) => i.label === 'Power')?.value, '4 of 4 work intervals at or above their floor.');
+});
+
+Deno.test('generateCyclingAdherenceSummary: one floor-only work interval names the floor', () => {
+  const r = generateCyclingAdherenceSummary({
+    performance: { execution_score: 96, power_adherence: 100 },
+    intervalBreakdown: [
+      { interval_type: 'work', actual_power_w: 218, planned_power_range_lower: 202, planned_power_range_upper: null },
+    ],
+    factPacket: null,
+    hrDriftPct: null,
+  });
+  assertEquals(r?.technical_insights.find((i) => i.label === 'Power')?.value, '218 W against a floor of 202 W.');
+});
+
+/** A session with BOTH shapes in it keeps the range wording — it is not a floor-only session. */
+Deno.test('generateCyclingAdherenceSummary: a mixed session keeps "inside their range"', () => {
+  const r = generateCyclingAdherenceSummary({
+    performance: { execution_score: 90, power_adherence: 95 },
+    intervalBreakdown: [
+      { interval_type: 'work', actual_power_w: 232, planned_power_range_lower: 202, planned_power_range_upper: null },
+      { interval_type: 'work', actual_power_w: 152, planned_power_range_lower: 143, planned_power_range_upper: 159 },
+    ],
+    factPacket: null,
+    hrDriftPct: null,
+  });
+  assertEquals(r?.technical_insights.find((i) => i.label === 'Power')?.value, '2 of 2 work intervals inside their range.');
+});
+
 // ── §4 no "Cardiac drift" insight — the ride's drift is one number, read by the session builder ────
 
 Deno.test('generateCyclingAdherenceSummary: never emits a Cardiac drift insight (2026-09-12)', () => {

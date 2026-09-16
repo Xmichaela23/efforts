@@ -481,9 +481,17 @@ function calculateExecutionPercentage(plannedStep: any, executedStep: any, overa
     // Power adherence (cycling)
     const powerRange = (plannedStep?.power_range || plannedStep?.powerRange) as { lower?: number; upper?: number } | undefined;
     const lower = Number(powerRange?.lower);
-    const upper = Number(powerRange?.upper);
+    /**
+     * ⛔ A FLOOR WITH NO CEILING IS MEASURED AGAINST ITS FLOOR (2026-09-15, p237). This required BOTH
+     * ends, so p237's anaerobic work fell past power entirely and the step's execution percentage came
+     * from its CLOCK — a rider who held every surge and one who soft-pedalled them scored the same.
+     * ⚠️ NO CREDIT ABOVE THE FLOOR. There is no "over" on a step with no ceiling, so at or above it is
+     * 100 and the number cannot run away with the score.
+     */
+    const floorOnly = powerRange != null && powerRange.upper == null && Number.isFinite(lower) && lower > 0;
+    const upper = floorOnly ? lower : Number(powerRange?.upper);
     if (Number.isFinite(lower) && Number.isFinite(upper) && lower > 0 && upper > 0) {
-      const targetMidpoint = (lower + upper) / 2;
+      const targetMidpoint = floorOnly ? lower : (lower + upper) / 2;
       
       // For continuous endurance workouts, use overall workout power (includes all time)
       // For interval workouts, use interval-specific power (excludes zeros)
@@ -536,7 +544,8 @@ function calculateExecutionPercentage(plannedStep: any, executedStep: any, overa
       }
       
       if (Number.isFinite(executedWatts) && executedWatts > 0 && targetMidpoint > 0) {
-        const percentage = Math.round((executedWatts / targetMidpoint) * 100);
+        const raw = Math.round((executedWatts / targetMidpoint) * 100);
+        const percentage = floorOnly ? Math.min(100, raw) : raw;
         console.log(`🔍 [SERVER ADHERENCE] Power: ${executedWatts}W vs ${lower}-${upper}W (midpoint: ${targetMidpoint}W) = ${percentage}%`);
         return percentage;
       }

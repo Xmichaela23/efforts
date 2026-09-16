@@ -133,14 +133,24 @@ export function judgedPowerW(
   return { watts: avg, basis: avg != null ? 'average' : null };
 }
 
-/** Where a judged number sits against a planned range: the range itself, no allowance. */
+/**
+ * Where a judged number sits against a planned range: the range itself, no allowance.
+ *
+ * ⛔ A FLOOR WITH NO CEILING READS GREEN AT OR ABOVE THE FLOOR (2026-09-15, p237). An ABSENT upper is
+ * the app's existing way of saying "no ceiling" — `analyze-cycling-workout` has read a missing upper
+ * as Infinity since it was written, and the zone rows print an absent bound as "176 bpm and up".
+ * This function used to answer `null` on one, so p237's anaerobic work was either ungraded or, once
+ * the floor and the ceiling were written as the same number, red on every single repeat.
+ * ⚠️ A MISSING FLOOR IS STILL NO VERDICT. There is no session in the app prescribed as a ceiling with
+ * nothing under it; "below 75%" is written as a floor of zero, which is a real floor.
+ */
 export function powerRangeBand(
   watts: number | null | undefined,
   lowerW: number | null | undefined,
   upperW: number | null | undefined,
 ): 'below' | 'in' | 'above' | null {
   const lo = Number(lowerW);
-  const hi = Number(upperW);
+  const hi = upperW == null ? Infinity : Number(upperW);
   const w = Number(watts);
   if (watts == null || !Number.isFinite(w) || !(lo > 0) || !(hi > 0)) return null;
   if (w < lo) return 'below';

@@ -121,3 +121,19 @@ Deno.test('a ride rep is banded on watts', () => {
   assertEquals(sd.intervals[0].executed.band, 'below');
   assertEquals(sd.intervals[0].executed.gap_band, undefined);
 });
+
+/**
+ * ⛔ A FLOOR-ONLY RIDE REP (p237): green at or above the floor, and it can never read `above`.
+ */
+Deno.test('a floor-only ride rep is green at or above its floor', () => {
+  const over: any = build('ride', {
+    interval_id: 'f1', interval_type: 'work', planned_power_range_lower: 202, planned_power_range_upper: null,
+    avg_power_watts: 232, power_adherence_percent: 100,
+  });
+  assertEquals(over.intervals[0].executed.band, 'in');
+  const under: any = build('ride', {
+    interval_id: 'f2', interval_type: 'work', planned_power_range_lower: 202, planned_power_range_upper: null,
+    avg_power_watts: 190, power_adherence_percent: 94,
+  });
+  assertEquals(under.intervals[0].executed.band, 'below');
+});

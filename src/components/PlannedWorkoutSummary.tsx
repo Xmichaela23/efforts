@@ -400,8 +400,11 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
        * percentage, and `pctRange(0.8, 0.8)` came back as `134–134 W` — a range that is not one.
        */
       const powerStr = (st:any) => {
-        if (!(st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number')) return undefined;
-        const lo = Math.round(st.powerRange.lower), hi = Math.round(st.powerRange.upper);
+        if (!(st?.powerRange && typeof st.powerRange.lower==='number')) return undefined;
+        const lo = Math.round(st.powerRange.lower);
+        // ⛔ AND "202 W and up" WHERE p237 GIVES THE WORK A FLOOR AND NO CEILING (2026-09-15, approved).
+        if (typeof st.powerRange.upper !== 'number') return `${lo} W and up`;
+        const hi = Math.round(st.powerRange.upper);
         return lo === hi ? `${lo} W` : `${lo}–${hi} W`;
       };
       /**

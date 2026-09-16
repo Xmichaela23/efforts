@@ -28,7 +28,12 @@ export function paceBand(
   return paceRangeBand(paceSecPerMi, range.lower_sec_per_mi, range.upper_sec_per_mi);
 }
 
-/** Fewer watts than the range reads `below`, more reads `above`. The analyzer's rule: the range itself. */
+/**
+ * Fewer watts than the range reads `below`, more reads `above`. The analyzer's rule: the range itself.
+ * ⛔ AND A FLOOR WITH NO CEILING NEVER READS `above` (2026-09-15, p237). An absent `upper_w` was
+ * already reaching here as `w > NaN`, which is false — the right answer by accident. Stated now, so a
+ * future tidy-up of the comparison cannot quietly turn p237's work red.
+ */
 export function powerBand(
   watts: number | null | undefined,
   range: IntervalRow['planned_power_range'] | null | undefined,
@@ -37,7 +42,7 @@ export function powerBand(
   const w = Number(watts);
   if (watts == null || !Number.isFinite(w)) return null;
   if (w < Number(range.lower_w)) return 'below';
-  if (w > Number(range.upper_w)) return 'above';
+  if (range.upper_w != null && w > Number(range.upper_w)) return 'above';
   return 'in';
 }
 
