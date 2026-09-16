@@ -186,7 +186,11 @@ Deno.serve(async (req: Request) => {
       sessions = (ws ?? []).map((w: any) => {
         const sport: 'run' | 'ride' = String(w.type).toLowerCase() === 'run' ? 'run' : 'ride';
         const rpe = Number(w?.workout_metadata?.session_rpe ?? w?.rpe);
-        const work = sport === 'run' ? Number(w.avg_pace) : Number(w.normalized_power ?? w.avg_power);
+        // ⛔ THE SHEET PRINTS "/mi" (2026-09-15, §8.0 #1). `workouts.avg_pace` is the provider's number in
+        // seconds per KILOMETRE (`ingest-activity:511` Strava, `:1005` Garmin), and this handed it over as if it
+        // were per mile — about 38% too fast on the evidence line. Converted once, here, where every other
+        // number on this sheet is already per mile; the sheet formats and decides nothing.
+        const work = sport === 'run' ? Number(w.avg_pace) * 1.609344 : Number(w.normalized_power ?? w.avg_power);
         return {
           date: String(w.date ?? ''), sport,
           avg_hr: Number.isFinite(Number(w.avg_heart_rate)) && Number(w.avg_heart_rate) > 0 ? Number(w.avg_heart_rate) : null,
