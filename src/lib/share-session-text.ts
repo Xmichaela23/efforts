@@ -1,4 +1,5 @@
 import { parseExercises, shareBody } from '@shared/strava/strength-description.ts';
+import { formatPace } from '@/utils/workoutFormatting';
 
 /**
  * The text a completed session becomes when the athlete shares it with a friend (2026-09-07).
@@ -47,9 +48,9 @@ export function enduranceLine(w: any, useImperial: boolean): string {
   if (Number.isFinite(durS) && durS > 0) parts.push(fmtHMS(durS));
   if (Number.isFinite(durS) && durS > 0 && Number.isFinite(distM) && distM > 0) {
     if (type === 'run' || type === 'walk') {
-      const per = useImperial ? (durS / 60) / (distM / 1609.34) : (durS / 60) / (distM / 1000);
-      const mm = Math.floor(per); const ss = Math.round((per - mm) * 60);
-      parts.push(`${mm}:${String(ss).padStart(2, '0')}/${useImperial ? 'mi' : 'km'}`);
+      // ⛔ THE ONE PACE FORMATTER (2026-09-15, §8.0 #2) — this split the minutes and rounded the seconds
+      // separately, so a share line could read "7:60/mi".
+      parts.push(formatPace(durS / (distM / 1000), useImperial));
     } else if (type === 'ride' || type === 'bike' || type === 'cycling') {
       const mps = Number(overall?.avg_speed_mps) || distM / durS;
       if (mps > 0) parts.push(useImperial ? `${Math.round(mps * 2.237 * 10) / 10} mph` : `${Math.round(mps * 3.6 * 10) / 10} km/h`);

@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { formatPace as formatPaceShared } from "@/utils/workoutFormatting"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -50,11 +51,14 @@ export function formatDuration(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+/**
+ * Seconds per MILE in. ⛔ ONE FORMATTER (2026-09-15, §8.0 #2): delegates to `formatPace` in
+ * `src/utils/workoutFormatting.ts`, which rounds the whole pace before splitting it — this rounded the
+ * remainder on its own and printed "7:60/mi". The empty answer stays "0:00/mi", which callers here expect.
+ */
 export function formatPace(secondsPerMile: number): string {
   if (!secondsPerMile || secondsPerMile <= 0) return '0:00/mi';
-  const mins = Math.floor(secondsPerMile / 60);
-  const secs = Math.round(secondsPerMile % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}/mi`;
+  return formatPaceShared(secondsPerMile / 1.60934, true);
 }
 
 // Distance normalization used by Today and Calendar chips

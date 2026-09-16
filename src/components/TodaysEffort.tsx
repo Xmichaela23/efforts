@@ -15,7 +15,7 @@ import { isUnmatchedAgainstPlan } from '@/lib/associate-candidates';
 // ⛔ THE SWAP IS THE SERVER'S (2026-09-10, audit H-T15). `swap-session` sends which swaps a session
 // offers, with the words each shows, and writes the tap; this file renders the sheet and posts it.
 import { useSwapSheet, useSportSwapIds, postSwap, type SwapSheetOption } from '@/hooks/useSwapSheet';
-import { formatSwimPace } from '@/utils/workoutFormatting';
+import { formatSwimPace, formatPace } from '@/utils/workoutFormatting';
 import { getDisciplineColor, getDisciplinePillClasses, getDisciplineCheckmarkColor, isBaselineTestWorkout, displayDisciplineOf } from '@/lib/utils';
 import { getDisciplineGlowColor, getDisciplineTextClass, SPORT_COLORS, getDisciplineColorRgb, getDisciplineGlowStyle, getDisciplinePhosphorPill, getDisciplinePhosphorCore, formZoneColor } from '@/lib/context-utils';
 import { LoadKeyForm } from './LoadBar';
@@ -593,11 +593,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       // pace / speed / swim pace
       if (Number.isFinite(durS) && durS > 0 && Number.isFinite(distM) && distM > 0) {
         if (type === 'run' || type === 'walk') {
-          const miles = distM / 1609.34;
-          const paceMinPerMile = (durS / 60) / miles;
-          const mm = Math.floor(paceMinPerMile);
-          const ss = Math.round((paceMinPerMile - mm) * 60);
-          parts.push(`${mm}:${String(ss).padStart(2, '0')}/mi`);
+          // ⛔ THE ONE PACE FORMATTER (2026-09-15, §8.0 #2) — the minutes and the seconds were rounded apart,
+          // so this line could read "7:60/mi".
+          parts.push(formatPace(durS / (distM / 1000), true));
         } else if (type === 'ride' || type === 'bike' || type === 'cycling') {
           const avgSpeedMps = Number(overall?.avg_speed_mps) || distM / durS;
           if (Number.isFinite(avgSpeedMps) && avgSpeedMps > 0) {

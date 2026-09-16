@@ -16,12 +16,18 @@ export const formatDistance = (km: number | null, imperial?: boolean): string =>
   return imp ? `${v.toFixed(1)} mi` : `${v.toFixed(1)} km`;
 };
 
+/**
+ * THE ONE PACE FORMATTER (2026-09-15, §8.0 #2). Seconds per KM in; "8:27/mi" or "5:15/km" out.
+ * ⛔ THE WHOLE PACE IS ROUNDED FIRST. Rounding the remainder on its own printed "7:60/mi" whenever the pace
+ * landed within half a second of the minute — on the popup's threshold card, the share text and Today's line,
+ * each of which had its own copy of this arithmetic. They call this now.
+ */
 export const formatPace = (secPerKm: number | null, imperial?: boolean): string => {
   if (!Number.isFinite(secPerKm as any) || (secPerKm as number) <= 0) return '—';
   const imp = typeof imperial === 'boolean' ? imperial : false;
-  const perUnit = imp ? (secPerKm as number) * 1.60934 : (secPerKm as number);
-  const m = Math.floor(perUnit / 60);
-  const s = Math.round(perUnit % 60);
+  const total = Math.round(imp ? (secPerKm as number) * 1.60934 : (secPerKm as number));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
   return `${m}:${String(s).padStart(2,'0')}/${imp ? 'mi' : 'km'}`;
 };
 
